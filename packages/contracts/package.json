@@ -1,0 +1,12 @@
+{
+  "name": "@glass/contracts",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./desktop": "./src/desktop.ts"
+  },
+  "dependencies": {
+    "effect": "catalog:"
+  }
+}

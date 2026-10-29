@@ -1,0 +1,27 @@
+{
+  "name": "glass",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.ts",
+    "dev:fake": "node scripts/dev.ts --fake",
+    "start": "pnpm build && pnpm --filter @glass/desktop start",
+    "build": "pnpm -r --filter=./apps/* build",
+    "dist": "pnpm build && pnpm --filter @glass/desktop dist",
+    "check": "vp check",
+    "fix": "vp check --fix",
+    "test": "pnpm -r test",
+    "test:e2e": "pnpm build && pnpm --filter @glass/desktop test:e2e"
+  },
+  "devDependencies": {
+    "@oxlint/plugins": "1.87.0",
+    "@types/node": "catalog:",
+    "effect": "catalog:",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "engines": {
+    "node": ">=24.11.0"
+  },
+  "packageManager": "pnpm@11.10.0"
+}

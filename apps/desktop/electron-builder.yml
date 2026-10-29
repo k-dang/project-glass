@@ -1,0 +1,21 @@
+appId: dev.kevindang.glass
+productName: Glass
+directories:
+  output: release
+files:
+  - dist/main/**
+  - dist/preload/**
+  - "!**/*.map"
+extraResources:
+  - from: ../server/dist
+    to: server
+    filter: ["**/*", "!**/*.map"]
+  - from: dist/renderer
+    to: renderer
+    filter: ["**/*", "!**/*.map"]
+win:
+  target: nsis
+mac:
+  target: dmg
+linux:
+  target: AppImage

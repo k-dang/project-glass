@@ -1,0 +1,425 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+
+@import "github-markdown-css/github-markdown.css";
+@source "../../node_modules/streamdown/dist/*.js";
+
+@custom-variant dark (@media (prefers-color-scheme: dark));
+
+@theme inline {
+  --font-sans: "Geist Variable", sans-serif;
+  --color-ring: var(--ring);
+  --color-added: var(--added);
+  --color-modified: var(--modified);
+  --color-deleted: var(--deleted);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-4xl: calc(var(--radius) * 2.6);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --radius: 0.625rem;
+  --added: #1a7f37;
+  --modified: #9a6700;
+  --deleted: #cf222e;
+  --viewed: #6255c4;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.205 0 0);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: oklch(0.205 0 0);
+    --popover-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.922 0 0);
+    --primary-foreground: oklch(0.205 0 0);
+    --secondary: oklch(0.269 0 0);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --accent: oklch(0.269 0 0);
+    --accent-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.556 0 0);
+    --added: #3fb950;
+    --modified: #d29922;
+    --deleted: #f85149;
+    --viewed: #a6a8ff;
+  }
+}
+
+:root[data-theme="charcoal"] {
+  color-scheme: dark;
+  --background: #111111;
+  --foreground: #cecece;
+  --card: #1b1b1b;
+  --card-foreground: #cecece;
+  --popover: #222222;
+  --popover-foreground: #cecece;
+  --primary: #e4e4e4;
+  --primary-foreground: #181818;
+  --secondary: #222222;
+  --secondary-foreground: #cecece;
+  --muted: #222222;
+  --muted-foreground: #a3a3a3;
+  --accent: #292929;
+  --accent-foreground: #ededed;
+  --destructive: #ef8586;
+  --border: #303030;
+  --input: #383838;
+  --ring: #a6a8ff;
+  --added: #63cd7b;
+  --modified: #e5a36e;
+  --deleted: #ef8586;
+  --viewed: #a6a8ff;
+  --diffs-bg-addition-override: #246d3b;
+  --diffs-bg-deletion-override: #8e3443;
+  --diffs-bg-addition-number-override: #246d3b;
+  --diffs-bg-deletion-number-override: #8e3443;
+  --diffs-bg-addition-emphasis-override: #284a34;
+  --diffs-bg-deletion-emphasis-override: #593035;
+  --diffs-fg-number-override: #999999;
+  --diffs-bg-buffer-override: #222222;
+}
+
+:root[data-theme="charcoal"] .markdown-body {
+  --fgColor-default: var(--foreground);
+  --fgColor-muted: var(--muted-foreground);
+  --fgColor-accent: #7ac8e9;
+  --fgColor-success: var(--added);
+  --fgColor-danger: var(--deleted);
+  --fgColor-attention: var(--modified);
+  --fgColor-done: var(--viewed);
+  --bgColor-default: var(--background);
+  --bgColor-muted: var(--muted);
+  --bgColor-neutral-muted: var(--accent);
+  --borderColor-default: var(--border);
+  --borderColor-muted: var(--border);
+  --borderColor-neutral-muted: var(--border);
+  --borderColor-accent-emphasis: var(--ring);
+  --borderColor-success-emphasis: var(--added);
+  --borderColor-danger-emphasis: var(--deleted);
+  --borderColor-attention-emphasis: var(--modified);
+  --borderColor-done-emphasis: var(--viewed);
+  --color-prettylights-syntax-comment: #999999;
+  --color-prettylights-syntax-constant: #7ac8e9;
+  --color-prettylights-syntax-constant-other-reference-link: #7ac8e9;
+  --color-prettylights-syntax-entity: #78cbd0;
+  --color-prettylights-syntax-entity-tag: #d995ca;
+  --color-prettylights-syntax-keyword: #d995ca;
+  --color-prettylights-syntax-storage-modifier-import: var(--foreground);
+  --color-prettylights-syntax-string: #e8c778;
+  --color-prettylights-syntax-string-regexp: #e8c778;
+  --color-prettylights-syntax-variable: #e5a36e;
+  --color-prettylights-syntax-markup-heading: #7ac8e9;
+  --color-prettylights-syntax-markup-bold: var(--foreground);
+  --color-prettylights-syntax-markup-italic: var(--foreground);
+  --color-prettylights-syntax-markup-inserted-bg: #1b2b21;
+  --color-prettylights-syntax-markup-inserted-text: var(--added);
+  --color-prettylights-syntax-markup-deleted-bg: #332124;
+  --color-prettylights-syntax-markup-deleted-text: var(--deleted);
+}
+
+.theme-preview {
+  --preview-bg: #ffffff;
+  --preview-border: #dedede;
+  --preview-text: #555555;
+  --preview-added: #d8f0dd;
+  --preview-deleted: #f6d8dc;
+  display: grid;
+  grid-template-columns: 16px 30px 1fr;
+  gap: 6px;
+  height: 80px;
+  padding: 8px;
+  border: 1px solid var(--preview-border);
+  border-radius: 4px;
+  background: var(--preview-bg);
+}
+
+.theme-preview[data-preview="dark"] {
+  --preview-bg: #0a0a0a;
+  --preview-border: #333333;
+  --preview-text: #dddddd;
+  --preview-added: #173d2d;
+  --preview-deleted: #4f2330;
+}
+
+.theme-preview[data-preview="charcoal"] {
+  --preview-bg: #1b1b1b;
+  --preview-border: #363636;
+  --preview-text: #c9c9c9;
+  --preview-added: #254331;
+  --preview-deleted: #4c2a2d;
+}
+
+.theme-preview[data-preview="system"] {
+  --preview-border: #747474;
+  --preview-text: #888888;
+  --preview-added: #79a789;
+  --preview-deleted: #bd8a91;
+  background: linear-gradient(90deg, #ffffff 50%, #0a0a0a 50%);
+}
+
+.theme-preview-rail,
+.theme-preview-files {
+  border-right: 1px solid var(--preview-border);
+}
+
+.theme-preview-files {
+  padding: 4px 4px 0 0;
+}
+
+.theme-preview-files i,
+.theme-preview-code i {
+  display: block;
+  height: 4px;
+  margin-bottom: 6px;
+  border-radius: 2px;
+  background: var(--preview-text);
+  opacity: 0.5;
+}
+
+.theme-preview-code {
+  padding-top: 4px;
+}
+
+.theme-preview-code i:first-child {
+  width: 75%;
+}
+
+.theme-preview-code i:nth-child(2) {
+  height: 8px;
+  background: var(--preview-added);
+  opacity: 1;
+}
+
+.theme-preview-code i:nth-child(3) {
+  width: 85%;
+  height: 8px;
+  background: var(--preview-deleted);
+  opacity: 1;
+}
+
+.theme-preview-code i:last-child {
+  width: 55%;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    scrollbar-color: color-mix(in oklch, var(--muted-foreground) 40%, transparent) transparent;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+    color-scheme: light dark;
+  }
+}
+
+@utility page-content {
+  @apply mx-auto w-full max-w-4xl px-6;
+}
+
+@utility popup-motion {
+  transition:
+    opacity 150ms var(--ease-out),
+    scale 150ms var(--ease-out);
+
+  &[data-starting-style],
+  &[data-ending-style] {
+    opacity: 0;
+    scale: 0.95;
+  }
+
+  &[data-slot="tooltip-content"] {
+    transition-duration: 125ms;
+  }
+
+  &[data-instant] {
+    transition: none;
+    opacity: 1;
+    scale: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition-property: opacity;
+
+    &[data-starting-style],
+    &[data-ending-style] {
+      scale: 1;
+    }
+  }
+}
+
+@utility backdrop-motion {
+  transition: opacity 150ms var(--ease-out);
+
+  &[data-starting-style],
+  &[data-ending-style] {
+    opacity: 0;
+  }
+
+  &[data-instant] {
+    transition: none;
+    opacity: 1;
+  }
+}
+
+:active-view-transition-type(theme)::view-transition-old(root),
+:active-view-transition-type(theme)::view-transition-new(root) {
+  animation-duration: 200ms;
+  animation-timing-function: --theme(--ease-out);
+}
+
+.title-strip {
+  height: max(2.25rem, calc(env(titlebar-area-height, 0px) + 1px));
+  app-region: drag;
+  user-select: none;
+}
+
+[data-diffs-search] {
+  --diffs-search-panel-bg: var(--popover);
+  --diffs-search-panel-fg: var(--popover-foreground);
+  --diffs-search-panel-font: "Geist Variable", sans-serif;
+}
+
+.markdown-body {
+  position: relative;
+  background: transparent;
+}
+
+.markdown-body [data-image-preview] {
+  cursor: zoom-in;
+}
+
+/* Tailwind resets list markers and inline media defaults that github-markdown-css leaves unset. */
+.markdown-body :where(ul, ol, menu) {
+  list-style: revert;
+}
+
+.markdown-body :where(img, svg, video) {
+  display: revert;
+  vertical-align: revert;
+}
+
+.markdown-body .js-suggested-changes-blob {
+  margin: 8px 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.markdown-body .js-suggested-changes-blob > :first-child {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.markdown-body .js-suggested-changes-blob table {
+  display: table;
+  width: 100%;
+  margin: 0;
+}
+
+.markdown-body .js-suggested-changes-blob table tr {
+  border: 0;
+  background: transparent;
+}
+
+.markdown-body .js-suggested-changes-blob td {
+  padding: 2px 12px;
+  border: 0;
+}
+
+.markdown-body .blob-num::before {
+  content: attr(data-line-number);
+}
+
+.markdown-body .blob-code-addition,
+.markdown-body .blob-num-addition {
+  background: color-mix(in oklch, var(--added) 15%, transparent);
+}
+
+.markdown-body .blob-code-deletion,
+.markdown-body .blob-num-deletion {
+  background: color-mix(in oklch, var(--deleted) 15%, transparent);
+}
+
+.markdown-body :is(.blob-num, .blob-code-inner) {
+  font-family: var(--fontStack-monospace, ui-monospace, monospace);
+  font-size: 12px;
+}
+
+.markdown-body .blob-num {
+  width: 1%;
+  color: var(--muted-foreground);
+  text-align: right;
+}
+
+.markdown-body .blob-code-inner {
+  white-space: pre-wrap;
+}
+
+.file-tree {
+  --trees-theme-sidebar-bg: var(--background);
+  --trees-theme-sidebar-fg: var(--foreground);
+  --trees-theme-sidebar-border: var(--border);
+  --trees-theme-list-hover-bg: var(--accent);
+  --trees-theme-list-active-selection-bg: var(--accent);
+  --trees-theme-list-active-selection-fg: var(--accent-foreground);
+  --trees-theme-focus-ring: var(--ring);
+  --trees-theme-input-bg: transparent;
+  --trees-theme-input-fg: var(--foreground);
+  --trees-theme-git-added-fg: var(--added);
+  --trees-theme-git-modified-fg: var(--modified);
+  --trees-theme-git-deleted-fg: var(--deleted);
+  --trees-theme-git-renamed-fg: var(--modified);
+  --truncate-marker-fade-in-duration: 0s;
+}

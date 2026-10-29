@@ -1,0 +1,10 @@
+node_modules/
+dist/
+dist-fake/
+release/
+.vitest/
+*.log
+.DS_Store
+.verify/
+test-results/
+playwright-report/

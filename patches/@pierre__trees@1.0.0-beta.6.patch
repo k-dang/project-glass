@@ -1,0 +1,194 @@
+diff --git a/dist/model/publicTypes.d.ts b/dist/model/publicTypes.d.ts
+index 7c851604626d34fcb838cd0381abfccfcc7728cf..8dacf566c8f369eae625ddea0930795649bc867f 100644
+--- a/dist/model/publicTypes.d.ts
++++ b/dist/model/publicTypes.d.ts
+@@ -295,6 +295,13 @@ interface FileTreeRowDecorationTextPart {
+   color?: string;
+ }
+ interface FileTreeRowDecorationText {
++  checkbox?: {
++    label: string;
++    title?: string;
++    checked: boolean;
++    disabled?: boolean;
++    onChange: (checked: boolean) => void;
++  };
+   text: string;
+   title?: string;
+   parts?: readonly FileTreeRowDecorationTextPart[];
+diff --git a/dist/render/FileTree.d.ts b/dist/render/FileTree.d.ts
+index 21af65bbdadbd2f4165ae821b6577d8f6624cfb1..99db4cafa687be7a0fbe7f23b5468ce12746ad72 100644
+--- a/dist/render/FileTree.d.ts
++++ b/dist/render/FileTree.d.ts
+@@ -49,6 +49,7 @@ declare class FileTree implements FileTreeMutationHandle, FileTreeSearchSessionH
+   resetPaths(options: FileTreeResetPreparedOptions): void;
+   setComposition(composition?: FileTreeCompositionOptions): void;
+   setGitStatus(gitStatus?: FileTreeOptions['gitStatus']): void;
++  setRowDecoration(renderRowDecoration?: FileTreeOptions['renderRowDecoration']): void;
+   setIcons(icons?: FileTreeOptions['icons']): void;
+   hydrate({
+     fileTreeContainer
+diff --git a/dist/render/FileTree.js b/dist/render/FileTree.js
+index 305714319d9d988bfc025ecaaca662562a3a0ff7..ece69217d44b3a57a9d98ea307a107944fc25e1e 100644
+--- a/dist/render/FileTree.js
++++ b/dist/render/FileTree.js
+@@ -270,6 +270,12 @@ var FileTree = class {
+ 		if (mountedTree == null) return;
+ 		renderFileTreeRoot(mountedTree.wrapper, this.#getViewProps());
+ 	}
++	setRowDecoration(renderRowDecoration) {
++		this.#renderRowDecoration = renderRowDecoration;
++		const mountedTree = this.#getMountedTreeElements();
++		if (mountedTree == null) return;
++		renderFileTreeRoot(mountedTree.wrapper, this.#getViewProps());
++	}
+ 	setIcons(icons) {
+ 		this.#icons = icons;
+ 		const mountedTree = this.#getMountedTreeElements();
+diff --git a/dist/render/FileTreeView.js b/dist/render/FileTreeView.js
+index 7d3b818c43a7621ab9170da32b180232ed3c9472..690c958e42e8017ba54cdb0387208e0f2e093b8b 100644
+--- a/dist/render/FileTreeView.js
++++ b/dist/render/FileTreeView.js
+@@ -3,7 +3,7 @@ import { createFileTreeIconResolver } from "./iconResolver.js";
+ import { FILE_TREE_DEFAULT_ITEM_HEIGHT } from "../model/virtualization.js";
+ import { FILE_TREE_RENAME_VIEW } from "../model/FileTreeController.js";
+ import { Icon } from "../components/Icon.js";
+-import { MiddleTruncate, Truncate } from "../components/OverflowText.js";
++import { Fruncate, MiddleTruncate, Truncate } from "../components/OverflowText.js";
+ import { computeFileTreeLayout, computeStickyRows } from "../model/layout.js";
+ import { GIT_STATUS_DESCENDANT_TITLE, GIT_STATUS_LABEL, GIT_STATUS_TITLE } from "../utils/gitStatusPresentation.js";
+ import { shouldBumpControllerRevision } from "./controllerSnapshotSubscription.js";
+@@ -21,6 +21,7 @@ function formatFlattenedSegments(row, renameInput = null, dragTargetFlattenedSeg
+ 	"use no memo";
+ 	const segments = row.flattenedSegments;
+ 	if (segments == null || segments.length === 0) return renameInput ?? row.name;
++	if (renameInput == null) return /* @__PURE__ */ jsx(Fruncate, { children: segments.map((segment) => segment.name).join("/") });
+ 	return /* @__PURE__ */ jsx("span", {
+ 		"data-item-flattened-subitems": true,
+ 		children: segments.map((segment, index) => {
+@@ -293,7 +294,7 @@ function getMountedStickyRowPaths(rootElement) {
+ }
+ function getFocusedParkedRowElement(rootElement, path) {
+ 	if (rootElement == null || path == null) return null;
+-	for (const element of rootElement.querySelectorAll("button[data-item-focused=\"true\"][data-item-parked=\"true\"]")) if (element instanceof HTMLElement && element.dataset.itemPath === path) return element;
++	for (const element of rootElement.querySelectorAll("[data-type=\"item\"][data-item-focused=\"true\"][data-item-parked=\"true\"]")) if (element instanceof HTMLElement && element.dataset.itemPath === path) return element;
+ 	return null;
+ }
+ function getStickyKeyboardViewportOffset(rootElement, scrollElement, activeTreeElement, path, itemHeight, stickyOverlayHeight, viewportHeight) {
+@@ -324,16 +325,30 @@ function isBuiltInDecorationIconName(name) {
+ function renderRowDecoration(decoration, resolveIcon) {
+ 	if (decoration == null) return null;
+ 	if ("text" in decoration) {
+-		if (decoration.parts != null) return /* @__PURE__ */ jsx("span", {
++		const checkbox = decoration.checkbox;
++		return jsxs("span", {
+ 			title: decoration.title,
+-			children: decoration.parts.map((part, index) => /* @__PURE__ */ jsx("span", {
+-				style: { color: part.color },
+-				children: part.text
+-			}, index))
+-		});
+-		return /* @__PURE__ */ jsx("span", {
+-			title: decoration.title,
+-			children: decoration.text
++			style: { display: "inline-flex", alignItems: "center" },
++			children: [jsx("span", { children: decoration.text }), checkbox == null ? null : jsx("button", {
++				type: "button",
++				role: "checkbox",
++				"aria-label": checkbox.label,
++				"aria-checked": checkbox.checked,
++				"data-row-checkbox": checkbox.checked ? "true" : "false",
++				disabled: checkbox.disabled,
++				title: checkbox.title,
++				onPointerDown: event => event.stopPropagation(),
++				onKeyDown: event => event.stopPropagation(),
++				onKeyUp: event => event.stopPropagation(),
++				onClick: event => {
++					event.stopPropagation();
++					checkbox.onChange(!checkbox.checked);
++				},
++				children: checkbox.checked ? jsx("svg", {
++					viewBox: "0 0 16 16", width: "14", height: "14", "aria-hidden": "true",
++					children: jsx("path", { d: "m3 8 3 3 7-7", fill: "none", stroke: "currentColor", "stroke-width": "1.6", "stroke-linecap": "round", "stroke-linejoin": "round" })
++				}) : jsx("span", { "data-row-checkbox-empty": "", "aria-hidden": "true" })
++			})]
+ 		});
+ 	}
+ 	const icon = typeof decoration.icon === "string" ? isBuiltInDecorationIconName(decoration.icon) ? resolveIcon(decoration.icon) : { name: decoration.icon } : isBuiltInDecorationIconName(decoration.icon.name) ? (() => {
+@@ -408,6 +423,7 @@ function renderStyledRow(frame, row, key, options = {}) {
+ 	const effectiveGitStatus = gitStatusByPath?.get(targetPath) ?? null ?? getInheritedIgnoredGitStatus(row.ancestorPaths, ignoredGitDirectories, ignoredInheritanceCache);
+ 	const containsGitChange = row.kind === "directory" && (directoriesWithGitChanges?.has(targetPath) ?? false);
+ 	const customDecoration = renderDecorationForRow(row, targetPath);
++	const hasCheckbox = customDecoration != null && "text" in customDecoration && customDecoration.checkbox != null;
+ 	const gitDecoration = getBuiltInGitStatusDecoration(effectiveGitStatus, containsGitChange);
+ 	const actionLaneEnabled = contextMenuEnabled && contextMenuButtonTriggerEnabled;
+ 	const decorationLaneEnabled = customDecoration != null || gitLaneActive || actionLaneEnabled;
+@@ -477,7 +493,8 @@ function renderStyledRow(frame, row, key, options = {}) {
+ 				source: "right-click"
+ 			});
+ 		} : void 0,
+-		onFocus: !isSticky ? () => {
++		onFocus: !isSticky ? (event) => {
++			if (hasCheckbox && event.target !== event.currentTarget) return;
+ 			controller.focusMountedPathFromInput(targetPath);
+ 		} : void 0,
+ 		onKeyDown: !isSticky ? onKeyDown : void 0,
+@@ -489,9 +506,22 @@ function renderStyledRow(frame, row, key, options = {}) {
+ 		...commonProps,
+ 		children: rowContent
+ 	});
+-	return /* @__PURE__ */ jsx("button", {
++	// A treeitem may contain controls, but a native button may not.
++	return /* @__PURE__ */ jsx(hasCheckbox ? "div" : "button", {
+ 		...commonProps,
+-		type: "button",
++		type: hasCheckbox ? void 0 : "button",
++		onKeyDown: hasCheckbox && !isSticky ? (event) => {
++			onKeyDown(event);
++			if (event.defaultPrevented || event.isComposing || event.repeat || event.target !== event.currentTarget) return;
++			if (event.key !== "Enter" && !isSpaceSelectionKey(event)) return;
++			event.preventDefault();
++			event.stopPropagation();
++			event.currentTarget.dispatchEvent(new MouseEvent("click", {
++				bubbles: true, cancelable: true, composed: true, view: window,
++				altKey: event.altKey, ctrlKey: event.ctrlKey,
++				metaKey: event.metaKey, shiftKey: event.shiftKey
++			}));
++		} : commonProps.onKeyDown,
+ 		draggable: dragAndDropEnabled && !isParked,
+ 		onDragEnd: dragAndDropEnabled && !isParked ? handleRowDragEnd : void 0,
+ 		onDragStart: dragAndDropEnabled && !isParked ? (event) => {
+@@ -508,6 +538,7 @@ function renderStyledRow(frame, row, key, options = {}) {
+ 			handleRowTouchStart(event, row, targetPath);
+ 		} : void 0,
+ 		onClick: (event) => {
++			if (hasCheckbox) focusElement(event.currentTarget);
+ 			onRowClick(event, row, targetPath, mode);
+ 		},
+ 		children: rowContent
+@@ -1069,11 +1100,7 @@ function FileTreeView({ composition, controller, gitStatusByPath, ignoredGitDire
+ 			} else if (event.key === "Enter") {
+ 				const currentFocusedPath = controller.getFocusedPath();
+ 				if (currentFocusedPath != null) controller.selectOnlyPath(currentFocusedPath);
+-				const scrollElement = scrollRef.current;
+-				const viewportHeight = readMeasuredViewportHeight(scrollElement, resolvedViewportHeight);
+-				restoreTreeFocusViewportOffsetRef.current = focusedIndex < 0 || scrollElement == null ? null : Math.max(0, Math.min(focusedIndex * itemHeight - scrollElement.scrollTop, Math.max(0, viewportHeight - itemHeight)));
+-				restoreTreeFocusAfterSearchCloseRef.current = true;
+-				controller.closeSearch();
++
+ 			} else if (event.key === "ArrowDown") controller.focusNextSearchMatch();
+ 			else if (event.key === "ArrowUp") controller.focusPreviousSearchMatch();
+ 			else return;
+diff --git a/dist/render/rowClickPlan.js b/dist/render/rowClickPlan.js
+index bc63b6027a89901053b343ae28fd7bae295cad8e..e38f43c35b113677593d5fd6248abd2e1fc34915 100644
+--- a/dist/render/rowClickPlan.js
++++ b/dist/render/rowClickPlan.js
+@@ -8,7 +8,7 @@ function computeFileTreeRowClickPlan(input) {
+ 		kind: "range"
+ 	} : additive ? { kind: "toggle" } : { kind: "single" };
+ 	return {
+-		closeSearch: isSearchOpen,
++		closeSearch: false,
+ 		revealCanonical: mode === "sticky",
+ 		selection,
+ 		toggleDirectory: !hasModifier && isDirectory
