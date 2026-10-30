@@ -5,10 +5,12 @@ import { Link, useNavigate } from "@tanstack/react-router"
 import { cn } from "cn"
 import { Option } from "effect"
 import { AsyncResult } from "effect/reactivity"
-import { ListOrdered } from "lucide-react"
-import { type ReactNode, useContext, useEffect, useEffectEvent } from "react"
+import { ListOrdered, ListPlus } from "lucide-react"
+import { type ReactNode, useContext, useEffect, useEffectEvent, useState } from "react"
 import { Button } from "@/components/ui/button"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { removeFromQueue, reviewedOutAtom, savedQueueAtom } from "./queue"
+import { QueueField } from "./QueueTab"
 import { listSearchAtom, sameRef, targetAtom } from "./reviewsArea"
 
 export function QueueBar(props: {
@@ -97,6 +99,7 @@ export function QueueBar(props: {
           {position + 1} of {entries.length}
         </span>
         <div className="ml-auto flex items-center gap-2">
+          <AddToQueue />
           <Button
             variant="ghost"
             size="sm"
@@ -140,6 +143,30 @@ export function QueueBar(props: {
         </Button>
       )}
     </Strip>
+  )
+}
+
+function AddToQueue() {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="sm"
+            className="px-3 text-xs leading-4 text-muted-foreground"
+          />
+        }
+      >
+        <ListPlus aria-hidden />
+        Add
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-96">
+        <QueueField onQueued={() => setOpen(false)} />
+      </PopoverContent>
+    </Popover>
   )
 }
 

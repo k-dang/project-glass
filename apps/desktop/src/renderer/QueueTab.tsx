@@ -237,7 +237,7 @@ function QueueTourStatus(props: { queued: QueuedPullRequest }) {
   )
 }
 
-function QueueField() {
+export function QueueField(props: { onQueued?: () => void }) {
   const result = useAtomValue(addToQueueAtom)
   const add = useAtomSet(addToQueueAtom, { mode: "promiseExit" })
   const [text, setText] = useState("")
@@ -249,9 +249,13 @@ function QueueField() {
     setText(entered)
     const exit = await add(references)
 
-    if (Exit.isSuccess(exit) && exit.value.added.length + exit.value.alreadyQueued.length > 0) {
-      setText("")
-    }
+    if (!Exit.isSuccess(exit)) return
+
+    const { added, alreadyQueued, notFound } = exit.value
+
+    if (added.length + alreadyQueued.length > 0) setText("")
+
+    if (alreadyQueued.length === 0 && notFound.length === 0) props.onQueued?.()
   }
 
   const paste = (event: ClipboardEvent<HTMLInputElement>) => {

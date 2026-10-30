@@ -446,3 +446,24 @@ it("keeps the bar while a reviewed PR stays open, offering the next one, until t
   await user.click(within(bar()).getByRole("button", { name: /^Remove/ }))
   await eventually(() => expect(screen.queryByRole("region", { name: "Queue" })).toBeNull())
 })
+
+it("adds PRs to the Queue from the bar without leaving the PR under review", async () => {
+  window.history.replaceState(null, "", "#/reviews?list=queue")
+  const user = mount([queued(greet)])
+
+  await user.click(await screen.findByRole("button", { name: /Greet the world/ }))
+  await showing("Greet the world")
+  expect(bar().textContent).toContain("1 of 1")
+
+  await user.click(within(bar()).getByRole("button", { name: "Add" }))
+  await user.click(await screen.findByRole("textbox", { name: "Add to the Queue" }))
+  await user.paste(greet.url)
+  await eventually(() => expect(note().textContent).toBe("Already queued"))
+
+  await user.paste(`${wave.url} ${fibers.url}`)
+  await eventually(() => expect(bar().textContent).toContain("1 of 3"))
+  await eventually(() =>
+    expect(screen.queryByRole("textbox", { name: "Add to the Queue" })).toBeNull(),
+  )
+  await showing("Greet the world")
+})
