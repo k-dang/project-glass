@@ -30,6 +30,7 @@ export interface TrafficMeter {
   readonly around: <A, E, R>(request: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>
   readonly slow: (delay: Duration.Input) => void
   readonly gather: (count: number) => void
+  readonly inFlight: number
   readonly mostAtOnce: number
 }
 
@@ -64,6 +65,9 @@ export const trafficMeter = (): TrafficMeter => {
     gather: (count) => {
       gathering = { count, together: Latch.makeUnsafe() }
       mostAtOnce = 0
+    },
+    get inFlight() {
+      return inFlight
     },
     get mostAtOnce() {
       return mostAtOnce

@@ -1,6 +1,7 @@
 import { assert, it } from "@effect/vitest"
 import { type AskPlace, type Engine, PullRequestRef, Revision } from "@glass/contracts"
 import { Effect, Fiber, Scope } from "effect"
+import { TestClock } from "effect/testing"
 import { existsSync } from "node:fs"
 import { eventually } from "../test/eventually"
 import { fakeAgent } from "../test/fakeAgent"
@@ -11,9 +12,11 @@ import { isolatedHome, startBackend } from "../test/harness"
 
 const answered = (answer: string) => piCliAnswer(JSON.stringify({ answer }))
 
+const deadline = 60_000
+
 const fixture = Effect.fnUntraced(function* (
   settings: Partial<FakeAgentSettings> = {},
-  timeout = 60_000,
+  timeout = deadline,
   engine: Engine = "pi-cli",
 ) {
   const piCli = yield* fakeAgent({
@@ -141,11 +144,14 @@ it.live("fails as unusable when the agent returns a blank answer", () =>
   }),
 )
 
-it.live("fails as timed out when the agent passes its limit", () =>
+it.effect("fails as timed out when the agent passes its limit", () =>
   Effect.gen(function* () {
-    const f = yield* fixture({ hangAt: "generate" }, 500)
+    const f = yield* fixture({ hangAt: "generate" })
 
-    const failure = yield* f.ask(helloName).pipe(Effect.flip)
+    const asking = yield* Effect.forkChild(f.ask(helloName).pipe(Effect.flip))
+    yield* f.piCli.untilCalls("generate")
+    yield* TestClock.adjust(deadline)
+    const failure = yield* Fiber.join(asking)
 
     assert.strictEqual(failure.reason, "timeout")
   }),
@@ -153,7 +159,7 @@ it.live("fails as timed out when the agent passes its limit", () =>
 
 it.live("interrupting a question stops the agent and removes its checkout", () =>
   Effect.gen(function* () {
-    const f = yield* fixture({ hangAt: "generate" }, 60_000)
+    const f = yield* fixture({ hangAt: "generate" })
 
     const asking = yield* Effect.forkChild(f.ask(helloName))
     yield* f.piCli.untilCalls("generate")
@@ -162,8 +168,8 @@ it.live("interrupting a question stops the agent and removes its checkout", () =
 
     yield* Fiber.interrupt(asking)
 
-    yield* Effect.promise(() =>
-      eventually(() => {
+    yield* eventually(
+      Effect.sync(() => {
         assert.throws(() => process.kill(hung.pid, 0))
         assert.isFalse(existsSync(hung.cwd))
       }),

@@ -7,6 +7,7 @@ import {
   type Engine,
 } from "@glass/contracts"
 import { Effect, Exit, Option, Scope, Stream } from "effect"
+import { TestClock } from "effect/testing"
 import { existsSync } from "node:fs"
 import { fakeAgent } from "../test/fakeAgent"
 import {
@@ -26,9 +27,11 @@ const answer = {
   ].join("\n\n"),
 }
 
+const deadline = 60_000
+
 const fixture = Effect.fnUntraced(function* (
   settings: Partial<FakeAgentSettings> = {},
-  timeout = 60_000,
+  timeout = deadline,
   engine: Engine = "pi-cli",
 ) {
   const piCli = yield* fakeAgent({
@@ -290,10 +293,12 @@ it.live("fails as not ready when the pi CLI lacks the saved model", () =>
   }),
 )
 
-it.live("fails as timed out when the agent passes its limit", () =>
+it.effect("fails as timed out when the agent passes its limit", () =>
   Effect.gen(function* () {
-    const f = yield* fixture({ hangAt: "generate" }, 500)
+    const f = yield* fixture({ hangAt: "generate" })
     yield* f.start
+    yield* f.piCli.untilCalls("generate")
+    yield* TestClock.adjust(deadline)
 
     const failure = yield* f.failed
     assert.strictEqual(failure.reason, "timeout")

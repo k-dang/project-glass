@@ -1,8 +1,9 @@
 import { assert, it } from "@effect/vitest"
 import { RPC_PATH } from "@glass/contracts"
-import { Effect, Schedule } from "effect"
+import { Effect } from "effect"
 import { spawn } from "node:child_process"
 import { HOST_TOKEN_HEADER } from "./agentHost/protocol"
+import { eventually } from "../test/eventually"
 import { freePort } from "../test/ports"
 import { bundledEntry } from "./processes"
 
@@ -34,9 +35,7 @@ const startPortedHost = Effect.gen(function* () {
       ),
     )
 
-  yield* status("/healthz").pipe(
-    Effect.repeat({ until: (code) => code === 200, schedule: Schedule.spaced("50 millis") }),
-  )
+  yield* eventually(status("/healthz").pipe(Effect.map((code) => assert.strictEqual(code, 200))))
 
   return status
 })

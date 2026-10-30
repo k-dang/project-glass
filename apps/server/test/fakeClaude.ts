@@ -1,7 +1,8 @@
-import { Effect, Schedule, Schema } from "effect"
+import { Effect, Schema } from "effect"
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import type { ToolInput } from "../src/agentHost/toolCalls"
+import { eventually } from "./eventually"
 
 export type FakeClaudeStep =
   | { readonly text: string }
@@ -96,10 +97,14 @@ export const fakeClaude = Effect.fnUntraced(function* (
     configure,
     log,
     logged: (kind: LogKind, count: number) =>
-      log.pipe(
-        Effect.map((lines) => lines.filter((line) => line.kind === kind).length),
-        Effect.repeat({ until: (seen) => seen >= count, schedule: Schedule.spaced("20 millis") }),
-        Effect.asVoid,
+      eventually(
+        log.pipe(
+          Effect.filterOrFail(
+            (lines) => lines.filter((line) => line.kind === kind).length >= count,
+            () => new Error(`Claude Code logged fewer than ${count} "${kind}" lines`),
+          ),
+          Effect.asVoid,
+        ),
       ),
   }
 })

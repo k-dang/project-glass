@@ -12,10 +12,12 @@ import {
   Redacted,
   Scope,
 } from "effect"
+import { TestClock } from "effect/testing"
 import { existsSync } from "node:fs"
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { vi } from "vite-plus/test"
+import { eventually } from "../test/eventually"
 import { type FakeGitHub, startFakeGitHub } from "../test/fakeGitHub"
 import { type FakePullRequest, type FakePullRequestSeed, VIEWER } from "../test/fakePullRequest"
 import { isolatedHome, LAUNCH_TOKEN } from "../test/harness"
@@ -288,17 +290,22 @@ it.live("fails as a failed fetch when GitHub errors", () =>
   }),
 )
 
-it.live("times out a slow fetch and checks out once it recovers", () =>
+it.effect("times out a slow fetch and checks out once it recovers", () =>
   Effect.gen(function* () {
+    const deadline = 60_000
+
     const { github, checkout, failure } = yield* fixture({
-      env: { GLASS_CHECKOUT_TIMEOUT_MS: "1000" },
+      env: { GLASS_CHECKOUT_TIMEOUT_MS: String(deadline) },
     })
 
     const pr = seed(github)
 
     yield* Effect.scoped(checkout(pr))
     github.timingOutRepositories.add(`${pr.owner}/${pr.repo}`)
-    assertFailure(yield* failure(pr), "timeout")
+    const failing = yield* Effect.forkChild(failure(pr))
+    yield* eventually(Effect.sync(() => assert.isAtLeast(github.gitTraffic.inFlight, 1)))
+    yield* TestClock.adjust(deadline)
+    assertFailure(yield* Fiber.join(failing), "timeout")
 
     github.timingOutRepositories.clear()
     yield* Effect.scoped(checkout(pr))
