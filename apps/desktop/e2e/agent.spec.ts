@@ -44,7 +44,8 @@ test("starts a local Claude Code Agent and answers its Permission request", asyn
   }, checkout)
 
   await window.getByRole("link", { name: "Agents" }).click()
-  await window.getByRole("button", { name: "Choose folder" }).click()
+  await window.getByRole("combobox", { name: "Repository" }).click()
+  await window.getByRole("option", { name: "Choose folder…" }).click()
 
   const draft = window.getByRole("region", { name: "New Agent" })
   await expect(draft.getByRole("combobox", { name: "Permission mode" })).toContainText("Default")
