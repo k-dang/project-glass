@@ -1,3 +1,4 @@
+import { NodeSocket } from "@effect/platform-node"
 import { assert, it } from "@effect/vitest"
 import {
   AgentStarted,
@@ -21,6 +22,7 @@ import {
   TurnStopped,
 } from "@glass/contracts"
 import { Effect, Option, Predicate, Stream } from "effect"
+import { Socket } from "effect/socket"
 import { execFileSync } from "node:child_process"
 import { existsSync, realpathSync, rmSync } from "node:fs"
 import { mkdir, writeFile } from "node:fs/promises"
@@ -30,6 +32,8 @@ import { agentsFixture, claudeCode, lastText, repository, settled } from "../tes
 import { type FakeModelRequest, runCommands } from "../test/fakeModelProvider"
 import { gitIn } from "../test/gitRepositories"
 import { isolatedHome, LAUNCH_TOKEN, startSignedInBackend } from "../test/harness"
+import { AgentHostRpcs } from "./agentHost/protocol"
+import { connectRpcClient } from "./rpcSocket"
 import { vi } from "vite-plus/test"
 
 const processes = (): ReadonlyArray<{ pid: number; ppid: number; command: string }> =>
@@ -71,39 +75,64 @@ const toTestBackend = (url: string | URL) => String(url).includes(`${TOKEN_PARAM
 
 const unreachable = "ws://127.0.0.1:9/"
 
-const droppableHostConnections = Effect.acquireRelease(
-  Effect.sync(() => {
-    const Real = globalThis.WebSocket
-    const open = new Set<WebSocket>()
-    let offline = false
+const droppableHostConnections = Effect.gen(function* () {
+  const makeWebSocket = yield* Socket.WebSocketConstructor.pipe(
+    Effect.provide(NodeSocket.layerWebSocketConstructor),
+  )
 
-    class Intercepted extends Real {
-      constructor(url: string | URL, protocols?: string | Array<string>) {
-        const toHost = !toTestBackend(url)
-        super(toHost && offline ? unreachable : url, protocols)
+  const open = new Set<Socket.WebSocketLike>()
+  let host: { readonly url: string; readonly headers: Readonly<Record<string, string>> } | undefined
+  let offline = false
+  let opened = 0
 
-        if (toHost) {
-          open.add(this)
-          this.addEventListener("close", () => open.delete(this))
-        }
-      }
+  const constructor: Socket.WebSocketConstructor["Service"] = (url, options) => {
+    const toHost = !toTestBackend(url)
+    const socket = makeWebSocket(toHost && offline ? unreachable : url, options)
+
+    if (toHost) {
+      if (options !== undefined && !Predicate.isString(options) && !Array.isArray(options))
+        host = { url, headers: options.headers ?? {} }
+
+      socket.addEventListener("open", () => {
+        opened++
+        open.add(socket)
+      })
+      socket.addEventListener("close", () => open.delete(socket))
     }
 
-    vi.stubGlobal("WebSocket", Intercepted)
+    return socket
+  }
 
-    return {
-      drop: () => {
-        offline = true
+  return {
+    constructor,
+    witness: Effect.gen(function* () {
+      if (host === undefined) return yield* Effect.die("The test hasn't connected to a host")
 
-        for (const socket of open) socket.close(3000, "dropped")
-      },
-      reconnect: () => {
-        offline = false
-      },
-    }
-  }),
-  () => Effect.sync(() => vi.unstubAllGlobals()),
-)
+      return yield* connectRpcClient(AgentHostRpcs, host.url, host.headers).pipe(
+        Effect.provideService(Socket.WebSocketConstructor, makeWebSocket),
+      )
+    }),
+    opened: () => opened,
+    drop: Effect.gen(function* () {
+      offline = true
+      const sockets = [...open]
+      assert.isAbove(sockets.length, 0, "The test must drop an open host connection")
+
+      yield* Effect.forEach(sockets, (socket) =>
+        Effect.callback<void>((resume) => {
+          const closed = () => resume(Effect.void)
+          socket.addEventListener("close", closed, { once: true })
+          socket.close(3000, "dropped")
+
+          return Effect.sync(() => socket.removeEventListener("close", closed))
+        }),
+      )
+    }),
+    reconnect: Effect.sync(() => {
+      offline = false
+    }),
+  }
+})
 
 it.live("links a clone as the Local checkout of the GitHub repository it names, and keeps it", () =>
   Effect.gen(function* () {
@@ -807,26 +836,48 @@ it.live(
   "fills in what it missed while it lost its connection to the agent host, repeating nothing",
   () =>
     Effect.gen(function* () {
+      const connections = yield* droppableHostConnections
+
       const f = yield* agentsFixture({}, undefined, {
         reply: [{ text: "Hello from Claude Code." }],
-      })
+      }).pipe(Effect.provideService(Socket.WebSocketConstructor, connections.constructor))
 
-      const connections = yield* droppableHostConnections
       const agent = yield* f.start("First", claudeCode)
       yield* f.transcript(agent.id, settled(1))
+      const opened = connections.opened()
 
       yield* f.claude.configure({
         reply: [{ text: "Written while you were away." }],
-        replyDelayMillis: 500,
+        hang: true,
       })
       yield* f.send(agent.id, "Second")
+      const running = yield* f.transcript(agent.id, (turns) => turns.length === 2)
+      const secondTurnId = running[1]!.id
 
       yield* f.claude.logged("prompt", 2)
-      connections.drop()
+      yield* connections.drop
+      yield* f.claude.configure({ reply: [{ text: "Written while you were away." }] })
       yield* f.claude.logged("replied", 2)
-      connections.reconnect()
+
+      const witness = yield* connections.witness
+      yield* witness.WatchJournal({ after: 0 }).pipe(
+        Stream.filter(
+          ({ agentId, event }) =>
+            agentId === agent.id &&
+            Predicate.isTagged(event, "TurnEnded") &&
+            event.turnId === secondTurnId,
+        ),
+        Stream.runHead,
+        Effect.map(Option.getOrThrow),
+      )
+
+      const beforeReconnect = yield* f.transcript(agent.id, (turns) => turns.length === 2)
+      assert.isNull(beforeReconnect[1]?.ended)
+      assert.isUndefined(lastText(beforeReconnect[1]))
+      yield* connections.reconnect
 
       const turns = yield* f.transcript(agent.id, settled(2))
+      assert.isAbove(connections.opened(), opened)
 
       assert.deepStrictEqual(
         turns.map((turn) => ({ parts: turn.parts, ending: turn.ended?.ending })),

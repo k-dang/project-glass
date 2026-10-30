@@ -15,6 +15,7 @@ import {
 } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import type { RpcClientError } from "effect/rpc"
+import { Socket } from "effect/socket"
 import { RPC_PATH } from "@glass/contracts"
 import { AgentHostRpcs, HOST_TOKEN_HEADER, HostReady, newHostToken } from "./agentHost/protocol"
 import { followJournal } from "./hostJournal"
@@ -49,6 +50,7 @@ export class LocalAgentHost extends Context.Service<
       const config = yield* ServerConfig
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
       const transcripts = yield* Transcripts
+      const webSocketConstructor = yield* Socket.WebSocketConstructor
       const backendScope = yield* Scope.Scope
       const lock = yield* Semaphore.make(1)
       const stopped = yield* PubSub.unbounded<void>()
@@ -92,7 +94,7 @@ export class LocalAgentHost extends Context.Service<
             AgentHostRpcs,
             `ws://127.0.0.1:${port}${RPC_PATH}`,
             { [HOST_TOKEN_HEADER]: token },
-          )
+          ).pipe(Effect.provideService(Socket.WebSocketConstructor, webSocketConstructor))
 
           yield* followJournal(transcripts, client, { saved: 0 }).pipe(
             Effect.tapCause((cause) => Effect.logWarning("Lost the agent host's journal", cause)),

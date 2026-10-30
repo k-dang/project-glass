@@ -6,17 +6,23 @@ import {
   isRequestPart,
   isWaiting,
   type RequestPart,
-  TextPart,
   type Turn,
   TurnDone,
   TurnInterrupted,
   TurnStopped,
 } from "@glass/contracts"
 import { Effect, Option, Predicate, Stream } from "effect"
+import { existsSync, readFileSync } from "node:fs"
 import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { agentsFixture as fixture, claudeCode, lastText, settled } from "../test/agentsFixture"
-import type { FakeClaudeSettings, FakeClaudeStep } from "../test/fakeClaude"
+import {
+  agentsFixture as fixture,
+  claudeAgentsFixture,
+  claudeCode,
+  lastText,
+  settled,
+} from "../test/agentsFixture"
+import type { FakeAnthropicReply, FakeAnthropicRequest } from "../test/fakeAnthropic"
 import { vi } from "vite-plus/test"
 
 vi.stubEnv("PI_OFFLINE", "1")
@@ -37,123 +43,114 @@ const toolCalls = (turn: Turn | undefined) =>
       : [],
   )
 
-const readEditRun: ReadonlyArray<FakeClaudeStep> = [
+const answerSteps =
+  (steps: ReadonlyArray<FakeAnthropicReply>) =>
+  (request: FakeAnthropicRequest): FakeAnthropicReply => {
+    if ((request.tools ?? []).length === 0) return { type: "text", text: "Fake session" }
+
+    const results = (request.messages ?? []).flatMap(({ content }) =>
+      Predicate.isString(content) ? [] : content.filter(({ type }) => type === "tool_result"),
+    )
+
+    return steps[results.length] ?? { type: "text", text: "Done." }
+  }
+
+const readEditRun: ReadonlyArray<FakeAnthropicReply> = [
+  { type: "tool_use", name: "Read", input: { file_path: "README.md" } },
   {
-    toolCall: {
-      id: "read-1",
-      name: "Read",
-      input: { file_path: "README.md" },
-      output: "# Greeter",
-    },
+    type: "tool_use",
+    name: "Edit",
+    input: { file_path: "README.md", old_string: "greeter", new_string: "Hello" },
   },
-  {
-    toolCall: {
-      id: "edit-1",
-      name: "Edit",
-      input: { file_path: "README.md", old_string: "Greeter", new_string: "Hello" },
-      output: "Edited README.md",
-    },
-  },
-  { toolCall: { id: "bash-1", name: "Bash", input: { command: "ls" }, output: "README.md" } },
-  { text: "Done." },
+  { type: "tool_use", name: "Bash", input: { command: "ls" } },
 ]
 
-it.live(
-  "asks what Claude Code asks for in each Permission mode, and runs what the user allows",
-  () =>
-    Effect.gen(function* () {
-      const f = yield* fixture({}, undefined, { reply: readEditRun })
-      const modes = ["default", "acceptEdits", "auto", "bypassPermissions"] as const
-      const askedIn: Partial<Record<(typeof modes)[number], ReturnType<typeof asked>>> = {}
-
-      for (const permissionMode of modes) {
-        const agent = yield* f.start("Tidy the README", { ...claudeCode, permissionMode })
-        assert.equal(agent.permissionMode, permissionMode)
-
-        const [turn] = yield* f.answering(agent.id, settled(1), allow)
-        assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
-        assert.isTrue(toolCalls(turn).every(({ status }) => status === "done"))
-        askedIn[permissionMode] = asked(turn)
-      }
-
-      assert.deepStrictEqual(askedIn, {
-        default: [
-          { tool: "Edit", summary: "README.md", status: "allowed" },
-          { tool: "Bash", summary: "ls", status: "allowed" },
-        ],
-        acceptEdits: [{ tool: "Bash", summary: "ls", status: "allowed" }],
-        auto: [{ tool: "Bash", summary: "ls", status: "allowed" }],
-        bypassPermissions: [],
-      })
-    }),
-)
-
-it.live("tells Claude Code why the user denied a tool call, and the Turn goes on", () =>
+it.live("uses the real Claude CLI's Default, Accept edits and Bypass permission decisions", () =>
   Effect.gen(function* () {
-    const f = yield* fixture({}, undefined, {
-      reply: [
-        { toolCall: { id: "rm-1", name: "Bash", input: { command: "rm -rf build" }, output: "" } },
-        { text: "I'll use git clean." },
-      ],
+    const f = yield* claudeAgentsFixture(answerSteps(readEditRun))
+    const modes = ["default", "acceptEdits", "bypassPermissions"] as const
+    const askedIn: Partial<Record<(typeof modes)[number], ReturnType<typeof asked>>> = {}
+    let defaultReadme = ""
+
+    for (const permissionMode of modes) {
+      const agent = yield* f.start("Tidy the README", { ...claudeCode, permissionMode })
+
+      if (permissionMode === "default") defaultReadme = join(f.worktree(agent.name), "README.md")
+      assert.equal(agent.permissionMode, permissionMode)
+      const [turn] = yield* f.answering(agent.id, settled(1), allow)
+      assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
+      assert.isTrue(toolCalls(turn).every(({ status }) => status === "done"))
+      assert.equal(
+        readFileSync(join(f.worktree(agent.name), "README.md"), "utf8").trim(),
+        "# Hello",
+      )
+      askedIn[permissionMode] = asked(turn)
+    }
+
+    assert.deepStrictEqual(askedIn, {
+      default: [{ tool: "Edit", summary: defaultReadme, status: "allowed" }],
+      acceptEdits: [],
+      bypassPermissions: [],
     })
-
-    const agent = yield* f.start("Clean up", { ...claudeCode, permissionMode: "default" })
-
-    const [turn] = yield* f.answering(agent.id, settled(1), () =>
-      DenyRequest.make({ reason: "Use git clean instead" }),
-    )
-
-    assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
-
-    const request = turn?.parts.find((part) => Predicate.isTagged(part, "PermissionRequest"))
-
-    assert.deepStrictEqual(
-      request && { tool: request.toolName, status: request.status, reason: request.reason },
-      { tool: "Bash", status: "denied", reason: "Use git clean instead" },
-    )
-    assert.deepStrictEqual(toolCalls(turn), [
-      { name: "Bash", output: "Use git clean instead", status: "failed" },
-    ])
-    assert.deepStrictEqual(lastText(turn), TextPart.make({ text: "I'll use git clean." }))
   }),
 )
 
-it.live("asks Claude Code's Questions with their options, answered with an option or text", () =>
+it.live("tells the real Claude CLI why the user denied a tool call, and the Turn goes on", () =>
   Effect.gen(function* () {
-    const f = yield* fixture({}, undefined, {
-      reply: [
+    const f = yield* claudeAgentsFixture()
+
+    const agent = yield* f.start("Please run `touch denied.txt`", {
+      ...claudeCode,
+      permissionMode: "default",
+    })
+
+    const [turn] = yield* f.answering(agent.id, settled(1), () =>
+      DenyRequest.make({ reason: "Leave the checkout alone" }),
+    )
+
+    assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
+    const request = turn?.parts.find((part) => Predicate.isTagged(part, "PermissionRequest"))
+    assert.deepStrictEqual(
+      request && { tool: request.toolName, status: request.status, reason: request.reason },
+      { tool: "Bash", status: "denied", reason: "Leave the checkout alone" },
+    )
+    assert.include(lastText(turn)?.text ?? "", "Leave the checkout alone")
+    assert.isFalse(existsSync(join(f.worktree(agent.name), "denied.txt")))
+  }),
+)
+
+it.live("answers the real Claude CLI's Questions with an option or text", () =>
+  Effect.gen(function* () {
+    const f = yield* claudeAgentsFixture(
+      answerSteps([
         {
-          toolCall: {
-            id: "ask-1",
-            name: "AskUserQuestion",
-            input: {
-              questions: [
-                {
-                  question: "Tabs or spaces?",
-                  header: "Indent",
-                  options: [
-                    { label: "Tabs", description: "One per level" },
-                    { label: "Spaces", description: "Two per level" },
-                  ],
-                  multiSelect: false,
-                },
-                {
-                  question: "Which folders?",
-                  header: "Folders",
-                  options: [
-                    { label: "src", description: "The code" },
-                    { label: "test", description: "The tests" },
-                  ],
-                  multiSelect: true,
-                },
-              ],
-            },
-            output: "",
+          type: "tool_use",
+          name: "AskUserQuestion",
+          input: {
+            questions: [
+              {
+                question: "Tabs or spaces?",
+                header: "Indent",
+                options: [
+                  { label: "Tabs", description: "One per level" },
+                  { label: "Spaces", description: "Two per level" },
+                ],
+                multiSelect: false,
+              },
+              {
+                question: "Which folders?",
+                header: "Folders",
+                options: [
+                  { label: "src", description: "The code" },
+                  { label: "test", description: "The tests" },
+                ],
+                multiSelect: true,
+              },
+            ],
           },
         },
-        { text: "Thanks." },
-      ],
-    })
+      ]),
+    )
 
     const agent = yield* f.start("Format the code", { ...claudeCode, permissionMode: "default" })
 
@@ -166,48 +163,61 @@ it.live("asks Claude Code's Questions with their options, answered with an optio
       }),
     )
 
-    const question = turn?.parts.find((part) => Predicate.isTagged(part, "Question"))
-
+    const questionPart = turn?.parts.find((part) => Predicate.isTagged(part, "Question"))
     assert.deepStrictEqual(
-      question && { questions: question.questions, answers: question.answers },
-      {
-        questions: [
-          {
-            header: "Indent",
-            question: "Tabs or spaces?",
-            detail: null,
-            options: [
-              { label: "Tabs", description: "One per level" },
-              { label: "Spaces", description: "Two per level" },
-            ],
-            multiSelect: false,
-            freeText: true,
-          },
-          {
-            header: "Folders",
-            question: "Which folders?",
-            detail: null,
-            options: [
-              { label: "src", description: "The code" },
-              { label: "test", description: "The tests" },
-            ],
-            multiSelect: true,
-            freeText: true,
-          },
-        ],
-        answers: [
-          { chosen: ["Tabs"], text: null },
-          { chosen: [], text: "Only the README" },
-        ],
-      },
+      questionPart?.questions.map(({ question, multiSelect, options }) => ({
+        question,
+        multiSelect,
+        options: options.map(({ label }) => label),
+      })),
+      [
+        { question: "Tabs or spaces?", multiSelect: false, options: ["Tabs", "Spaces"] },
+        { question: "Which folders?", multiSelect: true, options: ["src", "test"] },
+      ],
     )
-    assert.deepStrictEqual(toolCalls(turn), [
-      {
-        name: "AskUserQuestion",
-        output: JSON.stringify({ "Tabs or spaces?": "Tabs", "Which folders?": "Only the README" }),
-        status: "done",
-      },
+    assert.deepStrictEqual(questionPart?.answers, [
+      { chosen: ["Tabs"], text: null },
+      { chosen: [], text: "Only the README" },
     ])
+    assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
+    const output = toolCalls(turn).find(({ name }) => name === "AskUserQuestion")?.output ?? ""
+    assert.include(output, "Tabs")
+    assert.include(output, "Only the README")
+    assert.isTrue(
+      f.claude.provider.calls.some(({ messages }) =>
+        messages?.some(({ content }) =>
+          Predicate.isString(content)
+            ? false
+            : content.some(
+                ({ type, content: result }) =>
+                  type === "tool_result" &&
+                  JSON.stringify(result).includes("Tabs") &&
+                  JSON.stringify(result).includes("Only the README"),
+              ),
+        ),
+      ),
+    )
+  }),
+)
+
+it.live("continues a conversation through the pinned Claude CLI and shared model endpoint", () =>
+  Effect.gen(function* () {
+    const f = yield* claudeAgentsFixture()
+    const agent = yield* f.start("Remember lantern", claudeCode)
+    const [first] = yield* f.transcript(agent.id, settled(1))
+    assert.include(lastText(first)?.text ?? "", "Remember lantern")
+    yield* f.send(agent.id, "Continue the conversation")
+    const [, second] = yield* f.transcript(agent.id, settled(2))
+    assert.include(lastText(second)?.text ?? "", "Continue the conversation")
+    assert.deepStrictEqual(second?.ended?.ending, TurnDone.make({}))
+
+    const continued = f.claude.provider.calls.findLast(({ messages }) =>
+      messages?.some(({ content }) =>
+        JSON.stringify(content).includes("Continue the conversation"),
+      ),
+    )
+
+    assert.include(JSON.stringify(continued?.messages), "Remember lantern")
   }),
 )
 
@@ -280,19 +290,14 @@ it.live("asks pi's extension dialogs as Questions, answered with an option or te
 
 const waitingOn = (turns: ReadonlyArray<Turn>) => turns.some(({ parts }) => parts.some(isWaiting))
 
-const askToList: FakeClaudeSettings = {
-  reply: [
-    { toolCall: { id: "bash-1", name: "Bash", input: { command: "ls" }, output: "README.md" } },
-    { text: "Listed." },
-  ],
-}
+const askToRun = "Please run `touch notes.txt`"
 
 it.live(
   "keeps a waiting request for a new watch, marks its Agent, and refuses messages until it's answered",
   () =>
     Effect.gen(function* () {
-      const f = yield* fixture({}, undefined, askToList)
-      const agent = yield* f.start("List files", { ...claudeCode, permissionMode: "default" })
+      const f = yield* claudeAgentsFixture()
+      const agent = yield* f.start(askToRun, { ...claudeCode, permissionMode: "default" })
 
       const marked = (has: boolean) =>
         f.client.WatchWaitingAgents().pipe(
@@ -334,21 +339,23 @@ it.live(
       assert.equal(again._tag, "RequestNotWaiting")
 
       const [done] = yield* f.transcript(agent.id, settled(1))
-      assert.deepStrictEqual(lastText(done), TextPart.make({ text: "Listed." }))
+      assert.include(lastText(done)?.text ?? "", "The fake model saw:")
     }),
 )
 
 it.live("leaves a request no longer answerable once its Turn ends", () =>
   Effect.gen(function* () {
-    const f = yield* fixture({}, undefined, askToList)
-    const agent = yield* f.start("List files", { ...claudeCode, permissionMode: "default" })
+    const f = yield* claudeAgentsFixture()
+    const agent = yield* f.start(askToRun, { ...claudeCode, permissionMode: "default" })
     yield* f.transcript(agent.id, waitingOn)
 
     const restarted = yield* f.restart
     const [turn] = yield* f.transcript(agent.id, settled(1), restarted)
 
     assert.deepStrictEqual(turn?.ended?.ending, TurnInterrupted.make({}))
-    assert.deepStrictEqual(asked(turn), [{ tool: "Bash", summary: "ls", status: "expired" }])
+    assert.deepStrictEqual(asked(turn), [
+      { tool: "Bash", summary: "touch notes.txt", status: "expired" },
+    ])
 
     const waiting = yield* restarted
       .WatchWaitingAgents()
@@ -367,7 +374,7 @@ it.live("leaves a request no longer answerable once its Turn ends", () =>
 )
 
 const stoppedWhileWaiting = Effect.fnUntraced(function* (
-  f: Effect.Success<ReturnType<typeof fixture>>,
+  f: Pick<Effect.Success<ReturnType<typeof fixture>>, "transcript" | "client">,
   agentId: string,
 ) {
   const [waiting] = yield* f.transcript(agentId, waitingOn)
@@ -395,8 +402,8 @@ const stoppedWhileWaiting = Effect.fnUntraced(function* (
 
 it.live("stops a Claude Code Turn while a request waits, and the next message runs", () =>
   Effect.gen(function* () {
-    const f = yield* fixture({}, undefined, askToList)
-    const agent = yield* f.start("List files", { ...claudeCode, permissionMode: "default" })
+    const f = yield* claudeAgentsFixture()
+    const agent = yield* f.start(askToRun, { ...claudeCode, permissionMode: "default" })
 
     yield* stoppedWhileWaiting(f, agent.id)
 
@@ -436,8 +443,8 @@ it.live(
   "changes a Claude Code Agent's Permission mode for its next Turn, and refuses one for pi",
   () =>
     Effect.gen(function* () {
-      const f = yield* fixture({ output: "Hi." }, undefined, askToList)
-      const agent = yield* f.start("List files", { ...claudeCode, permissionMode: "default" })
+      const f = yield* claudeAgentsFixture(undefined, { output: "Hi." })
+      const agent = yield* f.start(askToRun, { ...claudeCode, permissionMode: "default" })
       const [first] = yield* f.answering(agent.id, settled(1), allow)
       assert.lengthOf(asked(first), 1)
 
@@ -448,9 +455,10 @@ it.live(
 
       assert.equal(changed.permissionMode, "bypassPermissions")
 
-      yield* f.send(agent.id, "Again")
+      yield* f.send(agent.id, "Please run `touch after-mode-change.txt`")
       const [, second] = yield* f.answering(agent.id, settled(2), allow)
       assert.deepStrictEqual(asked(second), [])
+      assert.isTrue(existsSync(join(f.worktree(agent.name), "after-mode-change.txt")))
 
       const pi = yield* f.start("Say hello")
 
@@ -466,13 +474,14 @@ it.live(
   "starts a Claude Code Agent in Default unless a mode is chosen, and a pi Agent in none",
   () =>
     Effect.gen(function* () {
-      const f = yield* fixture({})
+      const f = yield* claudeAgentsFixture()
 
       const unchosen = yield* f.start("Say hello", { ...claudeCode, permissionMode: null })
       const chosen = yield* f.start("Say hello", { ...claudeCode, permissionMode: "acceptEdits" })
+      const automatic = yield* f.start("Say hello", { ...claudeCode, permissionMode: "auto" })
       assert.deepStrictEqual(
-        [unchosen.permissionMode, chosen.permissionMode],
-        ["default", "acceptEdits"],
+        [unchosen.permissionMode, chosen.permissionMode, automatic.permissionMode],
+        ["default", "acceptEdits", "auto"],
       )
 
       const pi = { engine: "pi-cli", model: null, effort: null } as const
