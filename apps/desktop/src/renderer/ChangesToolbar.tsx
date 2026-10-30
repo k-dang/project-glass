@@ -4,6 +4,8 @@ import {
   ChevronsUpDown,
   Columns2,
   FolderTree,
+  Maximize2,
+  Minimize2,
   Route,
   Rows2,
   Settings2,
@@ -54,9 +56,13 @@ export function ChangesToolbar(props: {
     readonly current: ChangesOrder
     readonly onChange: (order: ChangesOrder) => void
   } | null
+  fullScreen: {
+    readonly on: boolean
+    readonly onChange: (on: boolean) => void
+  } | null
   agentReview: ReactNode
 }) {
-  const { display, onDisplayChange, tourOrder } = props
+  const { display, onDisplayChange, tourOrder, fullScreen } = props
   const set = (change: Partial<Display>) => onDisplayChange({ ...display, ...change })
   const collapsing = props.all !== "collapsed"
   const allLabel = collapsing ? "Collapse all files" : "Expand all files"
@@ -95,6 +101,19 @@ export function ChangesToolbar(props: {
         <span className="mr-2 tabular-nums" aria-live="polite">
           {props.viewedCount}/{props.fileCount} viewed
         </span>
+      )}
+      {fullScreen !== null && (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Full screen"
+          aria-pressed={fullScreen.on}
+          aria-keyshortcuts="F"
+          title={fullScreen.on ? "Exit full screen (F or Esc)" : "Full screen (F)"}
+          onClick={() => fullScreen.onChange(!fullScreen.on)}
+        >
+          {fullScreen.on ? <Minimize2 aria-hidden /> : <Maximize2 aria-hidden />}
+        </Button>
       )}
       <Button
         variant="ghost"

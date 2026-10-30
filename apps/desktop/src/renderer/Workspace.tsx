@@ -163,6 +163,9 @@ export function Workspace(props: {
 
   const tourInChanges = tab === "changes" && tourShown !== null
 
+  const [fullScreenChosen, setFullScreen] = useState(false)
+  const fullScreen = fullScreenChosen && tourInChanges
+
   const current = shown.find((entry) => entry.file.path === currentPath)?.file ?? shown[0]?.file
 
   const viewingPath = tab === "changes" ? (current?.path ?? null) : null
@@ -238,6 +241,8 @@ export function Workspace(props: {
   useReviewShortcuts(
     tourInChanges
       ? [
+          { key: "f", run: () => setFullScreen(!fullScreen) },
+          ...(fullScreen ? [{ key: "Escape", run: () => setFullScreen(false) }] : []),
           {
             key: "]",
             run: () => openChapter((tourView.current?.currentChapter() ?? 0) + 1, "instant"),
@@ -343,33 +348,45 @@ export function Workspace(props: {
   )
 
   return (
-    <Tabs value={tab} onValueChange={showTab} className="min-h-0 flex-1 gap-0">
+    <Tabs
+      value={tab}
+      onValueChange={showTab}
+      className={cn(
+        "min-h-0 flex-1 gap-0",
+        // Full screen covers the app rail, the Queue bar and the PR header; only the title strip stays.
+        fullScreen && "fixed inset-0 z-40 bg-background",
+      )}
+    >
       <CopyMenu pullRequest={pullRequest} />
-      <PullRequestHeader
-        pullRequest={pullRequest}
-        revision={revision}
-        reloading={props.reloading}
-        changedOnGitHub={props.changedOnGitHub}
-        busy={draftsLocked}
-        onReload={props.onReload}
-        onBack={props.onBack}
-        open={<OpenPullRequestDialog current={pullRequest.ref} onOpen={props.onOpen} />}
-        review={
-          <FinishReview
-            key={pullRequest.id}
-            store={drafts}
-            viewerIsAuthor={pullRequest.viewerIsAuthor}
-            onReload={props.onReload}
-          />
-        }
-        tabs={
-          <TabsList variant="line" aria-label="PR workspace" className="shrink-0">
-            <WorkspaceTabTrigger value="overview" label="Overview" icon={PanelsTopLeft} />
-            <WorkspaceTabTrigger value="changes" label="Changes" icon={FileDiff} />
-            <WorkspaceTabTrigger value="files" label="Files" icon={FolderTree} />
-          </TabsList>
-        }
-      />
+      {fullScreen ? (
+        <div className="title-strip shrink-0 border-b" aria-hidden />
+      ) : (
+        <PullRequestHeader
+          pullRequest={pullRequest}
+          revision={revision}
+          reloading={props.reloading}
+          changedOnGitHub={props.changedOnGitHub}
+          busy={draftsLocked}
+          onReload={props.onReload}
+          onBack={props.onBack}
+          open={<OpenPullRequestDialog current={pullRequest.ref} onOpen={props.onOpen} />}
+          review={
+            <FinishReview
+              key={pullRequest.id}
+              store={drafts}
+              viewerIsAuthor={pullRequest.viewerIsAuthor}
+              onReload={props.onReload}
+            />
+          }
+          tabs={
+            <TabsList variant="line" aria-label="PR workspace" className="shrink-0">
+              <WorkspaceTabTrigger value="overview" label="Overview" icon={PanelsTopLeft} />
+              <WorkspaceTabTrigger value="changes" label="Changes" icon={FileDiff} />
+              <WorkspaceTabTrigger value="files" label="Files" icon={FolderTree} />
+            </TabsList>
+          }
+        />
+      )}
       <ProblemBanner problem={fullFiles.problem} />
       <ViewedFilesProblem store={props.viewedFiles} onReload={props.onReload} />
       <div className="flex min-h-0 flex-1">
@@ -515,6 +532,7 @@ export function Workspace(props: {
             all={all}
             onAllChange={showAll}
             tourOrder={reading === null ? null : { current: chosenOrder, onChange: showOrder }}
+            fullScreen={tourInChanges ? { on: fullScreen, onChange: setFullScreen } : null}
             agentReview={<AgentReviewButton controls={agentReview} />}
           />
           <AgentReviewBanner controls={agentReview} onRead={readAgentReview} />

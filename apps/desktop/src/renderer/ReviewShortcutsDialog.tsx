@@ -55,6 +55,8 @@ const groups: ReadonlyArray<ShortcutGroup> = [
     shortcuts: [
       { label: "Next Chapter", keys: ["]"] },
       { label: "Previous Chapter", keys: ["["] },
+      { label: "Toggle full screen", keys: ["F"] },
+      { label: "Exit full screen", keys: ["Escape"] },
     ],
   },
 ]

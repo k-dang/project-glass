@@ -139,6 +139,7 @@ function Changes(props: { files: ReadonlyArray<ChangedFile> }) {
           all={all}
           onAllChange={showAll}
           tourOrder={null}
+          fullScreen={null}
           agentReview={null}
         />
         {layout.files.length > 0 && (
