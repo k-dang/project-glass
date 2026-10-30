@@ -1,6 +1,7 @@
 import { assert, it } from "@effect/vitest"
 import { PullRequestRef, type TourState } from "@glass/contracts"
 import { Effect, Exit, Option, Scope, Stream } from "effect"
+import { TestClock } from "effect/testing"
 import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { fakeAgent } from "../test/fakeAgent"
@@ -35,7 +36,9 @@ const tourState = (
     .WatchTour({ pullRequest: ref(pr) })
     .pipe(Stream.filter(predicate), Stream.runHead, Effect.map(Option.getOrThrow))
 
-const fixture = Effect.fnUntraced(function* ({ timeoutMs = 60_000, queueTours = true } = {}) {
+const deadline = 60_000
+
+const fixture = Effect.fnUntraced(function* ({ queueTours = true } = {}) {
   const home = yield* isolatedHome
   const gate = join(home, "answer")
   const agent = yield* fakeAgent({ ready: true, output: answer, gate })
@@ -62,7 +65,7 @@ const fixture = Effect.fnUntraced(function* ({ timeoutMs = 60_000, queueTours = 
     GH_TOKEN: VIEWER.token,
     GLASS_GITHUB_API_URL: github.url,
     GLASS_CLAUDE_COMMAND: agent.command,
-    GLASS_TOUR_TIMEOUT_MS: String(timeoutMs),
+    GLASS_TOUR_TIMEOUT_MS: String(deadline),
   }
 
   let serverScope = yield* Scope.make()
@@ -166,11 +169,16 @@ it.live("writes a Tour for every PR added to the Queue, two at a time", () =>
   }),
 )
 
-it.live("starts a waiting Tour's timeout only once a slot is free", () =>
+it.effect("starts a waiting Tour's timeout only once a slot is free", () =>
   Effect.gen(function* () {
-    const f = yield* fixture({ timeoutMs: 1500 })
+    const f = yield* fixture()
     const prs = ["Greet", "Wave", "Fibers"].map((title) => f.seed(title))
     yield* f.client.AddToQueue({ references: prs.map(ref) })
+
+    for (const count of [1, 2, 3]) {
+      yield* f.untilPrompted(count)
+      yield* TestClock.adjust(deadline)
+    }
 
     const failed = yield* Effect.forEach(
       prs,

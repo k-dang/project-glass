@@ -35,11 +35,12 @@ export const fakeAgent = Effect.fnUntraced(function* (initial: FakeAgentSettings
     log,
     calls,
     untilCalls: (stage: typeof AgentLogLine.Type.stage, count = 1) =>
-      Effect.promise(() =>
-        eventually(async () => {
-          const logged = await Effect.runPromise(calls)
-          assert.isAtLeast(logged.filter((call) => call.stage === stage).length, count)
-        }),
+      eventually(
+        calls.pipe(
+          Effect.map((logged) =>
+            assert.isAtLeast(logged.filter((call) => call.stage === stage).length, count),
+          ),
+        ),
       ),
   }
 })

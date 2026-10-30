@@ -1,13 +1,14 @@
 import { assert, it } from "@effect/vitest"
 import { PullRequestRef, Revision, type Engine, type TourState } from "@glass/contracts"
 import { Effect, Exit, Fiber, Option, Scope, Stream } from "effect"
+import { TestClock } from "effect/testing"
 import { existsSync } from "node:fs"
 import { readdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { eventually } from "../test/eventually"
 import { fakeAgent } from "../test/fakeAgent"
 import { fakeModelProvider } from "../test/fakeModelProvider"
-import { piCredentialHelper } from "../test/piCredentialHelper"
+import { piCredentialHelper, type RunningHelper } from "../test/piCredentialHelper"
 import { tourInstructions } from "./tourPrompt"
 import { claudeAnswer, type FakeAgentSettings, piCliOutput } from "../test/fakeAgentFiles"
 import { startFakeGitHub } from "../test/fakeGitHub"
@@ -34,9 +35,11 @@ const piCliModels = [
   "litellm    deepseek-test         1M",
 ].join("\n")
 
+const deadline = 60_000
+
 const fixture = Effect.fnUntraced(function* (
   settings?: Partial<FakeAgentSettings>,
-  timeout = 60_000,
+  timeout = deadline,
 ) {
   const agent = yield* fakeAgent({
     ready: true,
@@ -235,10 +238,16 @@ for (const [name, settings, expected] of [
   ["slow generation", { hangAt: "generate" }, "timeout"],
   ["slow readiness check", { hangAt: "auth" }, "timeout"],
 ] as const) {
-  it.live(`reports ${name} without leaking CLI output`, () =>
+  it.effect(`reports ${name} without leaking CLI output`, () =>
     Effect.gen(function* () {
-      const f = yield* fixture(settings, expected === "timeout" ? 350 : undefined)
+      const f = yield* fixture(settings)
       yield* f.write
+
+      if ("hangAt" in settings) {
+        yield* f.agent.untilCalls(settings.hangAt)
+        yield* TestClock.adjust(deadline)
+      }
+
       const state = yield* f.state(completed)
       assert.equal(state.job.status, "failed")
 
@@ -537,12 +546,18 @@ for (const [name, settings, expected] of [
   ["provider failure", { output: "secret-should-not-leak", status: 500 }, "runner"],
   ["slow generation", { output: "", hang: true }, "timeout"],
 ] as const) {
-  it.live(`reports pi SDK ${name} without leaking provider output`, () =>
+  it.effect(`reports pi SDK ${name} without leaking provider output`, () =>
     Effect.gen(function* () {
-      const f = yield* fixture(undefined, expected === "timeout" ? 1000 : undefined)
+      const f = yield* fixture()
       const pi = yield* fakeModelProvider(f.home, settings)
       yield* f.useEngine("pi")
       yield* f.write
+
+      if (expected === "timeout") {
+        yield* pi.received(1)
+        yield* TestClock.adjust(deadline)
+      }
+
       const state = yield* f.state(completed)
       assert.equal(state.job.status, "failed")
 
@@ -678,6 +693,15 @@ it.live("cancels Pi's model request and resolves its model again on the next job
   }),
 )
 
+const stopped = (helper: RunningHelper) =>
+  eventually(
+    Effect.sync(() => {
+      for (const pid of [helper.pid, helper.parentPid, helper.childPid])
+        assert.throws(() => process.kill(pid, 0))
+      assert.isFalse(existsSync(helper.cwd))
+    }),
+  )
+
 it.live("keeps RPCs responsive and kills the Pi credential helper tree on cancel", () =>
   Effect.gen(function* () {
     const f = yield* fixture()
@@ -686,18 +710,29 @@ it.live("keeps RPCs responsive and kills the Pi credential helper tree on cancel
     const helper = yield* piCredentialHelper(f.home)
     yield* helper.hang
     yield* f.write
-    const running = yield* Effect.promise(() => eventually(() => Effect.runPromise(helper.running)))
+    const running = yield* eventually(helper.running)
     assert.equal((yield* f.client.GetConnection()).login, VIEWER.login)
     yield* f.client.CancelTour({ pullRequest: f.ref })
     assert.deepStrictEqual(yield* f.state(completed), { tour: null, job: { status: "idle" } })
     assert.isEmpty(pi.calls)
-    yield* Effect.promise(() =>
-      eventually(() => {
-        for (const pid of [running.pid, running.parentPid, running.childPid])
-          assert.throws(() => process.kill(pid, 0))
-      }),
-    )
-    assert.isFalse(existsSync(running.cwd))
+    yield* stopped(running)
+  }),
+)
+
+it.effect("enforces the Tour deadline while a Pi credential helper is blocked", () =>
+  Effect.gen(function* () {
+    const f = yield* fixture()
+    const pi = yield* fakeModelProvider(f.home, { output: JSON.stringify(answer) })
+    yield* f.useEngine("pi")
+    const helper = yield* piCredentialHelper(f.home)
+    yield* helper.hang
+    yield* f.write
+    const running = yield* eventually(helper.running)
+    yield* TestClock.adjust(deadline)
+    const state = yield* f.state(completed)
+    assert.equal(state.job.status === "failed" && state.job.reason.reason, "timeout")
+    assert.isEmpty(pi.calls)
+    yield* stopped(running)
   }),
 )
 

@@ -2,6 +2,8 @@ import { Effect, Schema } from "effect"
 import { copyFile, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
+export type RunningHelper = typeof RunningHelper.Type
+
 const RunningHelper = Schema.fromJsonString(
   Schema.Struct({
     pid: Schema.Number,

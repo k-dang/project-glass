@@ -20,14 +20,13 @@ import {
   TurnInterrupted,
   TurnStopped,
 } from "@glass/contracts"
-import { Effect, Option, Predicate, Schedule, Stream } from "effect"
+import { Effect, Option, Predicate, Stream } from "effect"
 import { execFileSync } from "node:child_process"
 import { existsSync, realpathSync, rmSync } from "node:fs"
 import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { DatabaseSync } from "node:sqlite"
 import { agentsFixture, claudeCode, lastText, repository, settled } from "../test/agentsFixture"
-import type { fakeClaude } from "../test/fakeClaude"
 import { type FakeModelRequest, runCommands } from "../test/fakeModelProvider"
 import { gitIn } from "../test/gitRepositories"
 import { isolatedHome, LAUNCH_TOKEN, startSignedInBackend } from "../test/harness"
@@ -64,14 +63,6 @@ const startedHost = (before: ReadonlyArray<number>) =>
   childProcesses(process.pid, "agentHost.mjs").find((pid) => !before.includes(pid))
 
 vi.stubEnv("PI_OFFLINE", "1")
-
-const waitForPrompt = (claude: Effect.Success<ReturnType<typeof fakeClaude>>) =>
-  claude.log.pipe(
-    Effect.repeat({
-      until: (log) => log.some(({ kind }) => kind === "prompt"),
-      schedule: Schedule.spaced("20 millis"),
-    }),
-  )
 
 const userMessages = ({ messages }: FakeModelRequest) =>
   messages.filter(({ role }) => role === "user").map(({ content }) => JSON.stringify(content))
@@ -396,7 +387,7 @@ it.live("Steers a Claude Code Turn, which takes the message in before it ends", 
     const f = yield* agentsFixture({}, undefined, { hang: true })
     const agent = yield* f.start("Start", claudeCode)
     yield* f.transcript(agent.id, (turns) => turns.length === 1)
-    yield* waitForPrompt(f.claude)
+    yield* f.claude.logged("prompt", 1)
 
     yield* f.steer(agent.id, "Change course")
 
@@ -493,7 +484,7 @@ it.live("stops a Claude Code Turn, keeping its Queued messages", () =>
   Effect.gen(function* () {
     const f = yield* agentsFixture({}, undefined, { hang: true })
     const agent = yield* f.start("Start", claudeCode)
-    yield* waitForPrompt(f.claude)
+    yield* f.claude.logged("prompt", 1)
 
     yield* f.send(agent.id, "Later")
     yield* f.client.StopTurn({ agentId: agent.id })
@@ -508,12 +499,7 @@ it.live("stops a Turn whose program is still starting, which never gets the mess
   Effect.gen(function* () {
     const f = yield* agentsFixture({}, undefined, { holdStart: true })
     const agent = yield* f.start("Start", claudeCode)
-    yield* f.claude.log.pipe(
-      Effect.repeat({
-        until: (log) => log.some(({ kind }) => kind === "control"),
-        schedule: Schedule.spaced("20 millis"),
-      }),
-    )
+    yield* f.claude.logged("control", 1)
 
     yield* f.client.StopTurn({ agentId: agent.id })
     const [stopped] = yield* f.transcript(agent.id, settled(1))
