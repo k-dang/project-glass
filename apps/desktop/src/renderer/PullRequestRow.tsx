@@ -39,7 +39,6 @@ export const columnsWithRepository =
 
 export const columns = "grid-cols-[0_1rem_minmax(0,1fr)_3.5rem_7rem_2rem_0]"
 
-// The Queue's extra column, beside the checks icon, holds each row's `lead`.
 export const queueColumns =
   "grid-cols-[0_1rem_1rem_minmax(0,1fr)_fit-content(9rem)_3.5rem_7rem_2rem_0]"
 
