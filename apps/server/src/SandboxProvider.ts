@@ -39,7 +39,7 @@ export interface SandboxRequest {
 }
 
 export interface SandboxHost {
-  /** The host's bundle on this Mac, for the provider to copy into the Sandbox and run with Node. */
+  /** The host's bundle on this Mac, one self-contained file for the provider to copy into the Sandbox and run with Node. */
   readonly bundle: string
   /** The port the host listens on in the Sandbox, which `target` reaches. */
   readonly port: number
