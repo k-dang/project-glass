@@ -149,6 +149,23 @@ test("moves between Chapters from the keyboard and the sidebar in a tall window"
   await expect(second).toBeInViewport()
 })
 
+test("moves on to the next Chapter once the one in view is viewed", async ({
+  github,
+  claude,
+  window,
+}) => {
+  await claude.answer(tour)
+  await openPullRequest(window, seedTourPullRequest(github))
+  await writeTour(window)
+
+  const changes = window.getByRole("tabpanel", { name: "Changes" })
+  const first = changes.getByRole("region", { name: "Spell out the greeting" })
+  await first.getByRole("checkbox", { name: "Chapter viewed: Spell out the greeting" }).click()
+
+  await expect(first.getByRole("button", { expanded: false })).not.toBeInViewport()
+  await expect(changes.getByRole("heading", { name: "Document the greeting" })).toBeInViewport()
+})
+
 test("finds matches across Chapters and Everything else", async ({ github, claude, window }) => {
   await claude.answer(tour)
   await openPullRequest(window, seedTourPullRequest(github))

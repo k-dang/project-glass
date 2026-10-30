@@ -179,6 +179,26 @@ export function TourView(props: TourViewProps) {
     })
   }, [])
 
+  // Finishing the Chapter in view collapses it, so move on to the next unfinished one.
+  // The Chapter in view comes from the last scroll, since the collapse moves the layout.
+  const inView = useRef(initial?.chapter ?? 0)
+  const wasDone = useRef(done)
+
+  useLayoutEffect(() => {
+    const before = wasDone.current
+    wasDone.current = done
+    const finished = inView.current
+
+    if (done[finished] !== "1" || before[finished] !== "0") return undefined
+
+    const next = done.indexOf("0", finished + 1)
+    const frame = next === -1 ? undefined : revealChapter(next, "smooth")
+
+    return () => {
+      if (frame !== undefined) cancelAnimationFrame(frame)
+    }
+  }, [done, revealChapter])
+
   useLayoutEffect(() => {
     if (initial === null) return undefined
 
@@ -285,9 +305,11 @@ export function TourView(props: TourViewProps) {
       ref={container}
       aria-label="Tour Chapters"
       onScroll={() => {
+        const index = currentChapter()
+        inView.current = index
+
         if (!ready.current) return
 
-        const index = currentChapter()
         const path = selected.get(index) ?? groups[index]?.files[0]?.file.path
 
         if (path !== undefined) onCurrentPathChange(path)
