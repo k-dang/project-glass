@@ -27,9 +27,9 @@ import { Empty } from "./Lists"
 import { ProblemAlert } from "./ProblemAlert"
 import { describeError, type Problem, problemOf, problemText, settledProblem } from "./problems"
 import {
-  columnsWithRepository,
   NotRefreshed,
   PullRequestRow,
+  queueColumns,
   repositoryLabeller,
   subgridRow,
   warningTone,
@@ -87,7 +87,7 @@ export function QueueTab(props: { onOpen: (pullRequest: PullRequestRef) => void 
               <p>Paste PR links into the field above, one at a time or a whole message at once.</p>
             </Empty>
           ) : (
-            <ol aria-label="Queue" className={cn("grid gap-x-2.5", columnsWithRepository)}>
+            <ol aria-label="Queue" className={cn("grid gap-x-2.5", queueColumns)}>
               <QueueRows entries={entries} notRefreshed={notRefreshed} onOpen={props.onOpen} />
             </ol>
           ),
@@ -153,7 +153,7 @@ function QueueRow(props: {
             </span>
           )
         }
-        badge={<QueueTourStatus queued={props.queued} />}
+        lead={<QueueTourStatus queued={props.queued} />}
       />
       <Button
         variant="ghost"
@@ -215,24 +215,18 @@ function QueueTourStatus(props: { queued: QueuedPullRequest }) {
   if (status === null) return null
 
   const Icon = status.icon
-
-  const label = (
-    <span className={cn("flex shrink-0 items-center gap-1 text-xs", status.tone)}>
-      <Icon
-        aria-hidden
-        className={cn("size-3.5", status.spinning && "animate-spin motion-reduce:animate-none")}
-      />
-      {status.label}
-      {status.detail !== undefined && <span className="sr-only">: {status.detail}</span>}
-    </span>
-  )
-
-  if (status.detail === undefined) return label
+  const text = status.detail === undefined ? status.label : `${status.label}: ${status.detail}`
 
   return (
     <Tooltip>
-      <TooltipTrigger render={label} />
-      <TooltipContent>{status.detail}</TooltipContent>
+      <TooltipTrigger render={<span className={cn("flex items-center", status.tone)} />}>
+        <Icon
+          aria-hidden
+          className={cn("size-3.5", status.spinning && "animate-spin motion-reduce:animate-none")}
+        />
+        <span className="sr-only">{text}</span>
+      </TooltipTrigger>
+      <TooltipContent>{text}</TooltipContent>
     </Tooltip>
   )
 }
