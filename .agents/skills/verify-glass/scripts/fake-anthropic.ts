@@ -4,7 +4,7 @@ import { startFakeAnthropic } from "../../../../apps/server/test/fakeAnthropic.t
 
 export const serveFakeAnthropic = (readyFile: string) =>
   Effect.runPromise(Effect.scoped(Effect.gen(function* () {
-    const provider = yield* startFakeAnthropic()
+    const provider = yield* startFakeAnthropic
     writeFileSync(readyFile, JSON.stringify({ port: Number(new URL(provider.url).port) }))
     yield* Effect.never
   })))

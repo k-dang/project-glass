@@ -48,15 +48,14 @@ type Fixture = Effect.Success<typeof agentServicesFixture>
 
 const waitingOn = ({ turns }: Transcript) => turns.some(({ parts }) => parts.some(isWaiting))
 
-const finish = Effect.fnUntraced(function* (f: Fixture, agentId: string, turnId: string) {
-  yield* f.emit(
-    agentId,
+const finish = Effect.fnUntraced(function* (f: Fixture, turn: Effect.Success<Fixture["started"]>) {
+  yield* turn.emit(
     TurnEnded.make({
-      turnId,
+      turnId: turn.turnId,
       ended: { at: yield* DateTime.now, ending: TurnDone.make({}) },
     }),
   )
-  yield* f.transcript(agentId, ({ turns }) => Predicate.isNotNullish(turns[0]?.ended))
+  yield* f.transcript(turn.agentId, ({ turns }) => Predicate.isNotNullish(turns[0]?.ended))
 })
 
 it.live("keeps a supplied request waiting, refuses messages, and forwards the user's answer", () =>
@@ -64,7 +63,7 @@ it.live("keeps a supplied request waiting, refuses messages, and forwards the us
     const f = yield* agentServicesFixture
     const agent = yield* f.create()
     const turn = yield* f.started
-    yield* f.emit(agent.id, PartSet.make({ turnId: turn.turnId, index: 0, part: permission }))
+    yield* turn.emit(PartSet.make({ turnId: turn.turnId, index: 0, part: permission }))
 
     const before = yield* f.transcript(agent.id, waitingOn)
     assert.isTrue(before.turns[0]?.parts.some(isWaiting))
@@ -88,8 +87,7 @@ it.live("keeps a supplied request waiting, refuses messages, and forwards the us
     yield* f.agents.answer(agent.id, permission.requestId, answer)
     assert.deepStrictEqual(f.answers, [{ requestId: permission.requestId, answer }])
 
-    yield* f.emit(
-      agent.id,
+    yield* turn.emit(
       PartSet.make({
         turnId: turn.turnId,
         index: 0,
@@ -118,15 +116,14 @@ it.live("persists a supplied Question and forwards a free-text answer", () =>
     const f = yield* agentServicesFixture
     const agent = yield* f.create()
     const turn = yield* f.started
-    yield* f.emit(agent.id, PartSet.make({ turnId: turn.turnId, index: 0, part: question }))
+    yield* turn.emit(PartSet.make({ turnId: turn.turnId, index: 0, part: question }))
     const waiting = yield* f.transcript(agent.id, waitingOn)
     assert.deepStrictEqual(waiting.turns[0]?.parts, [question])
 
     const answer = AnswerQuestion.make({ answers: [{ chosen: [], text: "Only source files" }] })
     yield* f.agents.answer(agent.id, question.requestId, answer)
     assert.deepStrictEqual(f.answers, [{ requestId: question.requestId, answer }])
-    yield* f.emit(
-      agent.id,
+    yield* turn.emit(
       PartSet.make({
         turnId: turn.turnId,
         index: 0,
@@ -153,7 +150,7 @@ it.live("expires a persisted request when business services restart", () =>
     const f = yield* agentServicesFixture
     const agent = yield* f.create()
     const turn = yield* f.started
-    yield* f.emit(agent.id, PartSet.make({ turnId: turn.turnId, index: 0, part: permission }))
+    yield* turn.emit(PartSet.make({ turnId: turn.turnId, index: 0, part: permission }))
     yield* f.transcript(agent.id, waitingOn)
 
     const restarted = yield* f.restart
@@ -185,7 +182,7 @@ it.live("forwards Stop and waits for the host to expire its request before the n
     const f = yield* agentServicesFixture
     const agent = yield* f.create()
     const turn = yield* f.started
-    yield* f.emit(agent.id, PartSet.make({ turnId: turn.turnId, index: 0, part: question }))
+    yield* turn.emit(PartSet.make({ turnId: turn.turnId, index: 0, part: question }))
     yield* f.transcript(agent.id, waitingOn)
     yield* f.agents.stop(agent.id)
     assert.deepStrictEqual(f.stops, [agent.id])
@@ -193,16 +190,14 @@ it.live("forwards Stop and waits for the host to expire its request before the n
       (yield* f.agents.send(agent.id, { message: "Too early", images: [] }).pipe(Effect.flip))._tag,
       "RequestWaiting",
     )
-    yield* f.emit(
-      agent.id,
+    yield* turn.emit(
       PartSet.make({
         turnId: turn.turnId,
         index: 0,
         part: QuestionPart.make({ ...question, status: "expired" }),
       }),
     )
-    yield* f.emit(
-      agent.id,
+    yield* turn.emit(
       TurnEnded.make({
         turnId: turn.turnId,
         ended: { at: yield* DateTime.now, ending: TurnStopped.make({}) },
@@ -229,7 +224,7 @@ it.live("starts queued messages when the host reports a completed Turn", () =>
     yield* f.agents.send(agent.id, { message: "Next", images: [] })
     const waiting = yield* f.transcript(agent.id, ({ queued }) => queued.length === 1)
     assert.equal(waiting.queued[0]?.message, "Next")
-    yield* finish(f, agent.id, first.turnId)
+    yield* finish(f, first)
     assert.equal((yield* f.started).input.message, "Next")
   }),
 )
@@ -240,7 +235,7 @@ it.live("passes default and changed Permission modes to the host, and refuses mo
     const agent = yield* f.create()
     const first = yield* f.started
     assert.equal(first.settings.permissionMode, "default")
-    yield* finish(f, agent.id, first.turnId)
+    yield* finish(f, first)
     yield* f.agents.changePermissionMode(agent.id, "acceptEdits")
     yield* f.agents.send(agent.id, { message: "Next", images: [] })
     assert.equal((yield* f.started).settings.permissionMode, "acceptEdits")

@@ -34,9 +34,9 @@ type Block = typeof Block.Type
 
 type Message = typeof Message.Type
 
-export type FakeAnthropicRequest = typeof Request.Type
+type Request = typeof Request.Type
 
-export type FakeAnthropicReply =
+type Reply =
   | { readonly type: "text"; readonly text: string }
   | { readonly type: "tool_use"; readonly name: string; readonly input: Schema.Json }
 
@@ -58,7 +58,7 @@ const lastWords = (message: Message | undefined) =>
     .filter((block) => block.type === "text" && !(block.text ?? "").startsWith("<system-reminder>"))
     .at(-1)?.text ?? ""
 
-const replyTo = (request: FakeAnthropicRequest): FakeAnthropicReply => {
+const replyTo = (request: Request): Reply => {
   // The CLI can end the conversation with its own system messages; the user's turn is what answers.
   const last = request.messages?.findLast((message) => message.role === "user")
 
@@ -103,7 +103,7 @@ const send = (response: ServerResponse, status: number, body: Schema.Json) => {
   response.end(JSON.stringify(body))
 }
 
-const stream = (response: ServerResponse, model: string, reply: FakeAnthropicReply) => {
+const stream = (response: ServerResponse, model: string, reply: Reply) => {
   const id = `msg_${randomUUID()}`
 
   const event = (type: string, data: Readonly<Record<string, Schema.Json>>) =>
@@ -146,7 +146,7 @@ const stream = (response: ServerResponse, model: string, reply: FakeAnthropicRep
   response.end()
 }
 
-const message = (model: string, reply: FakeAnthropicReply) => ({
+const message = (model: string, reply: Reply) => ({
   id: `msg_${randomUUID()}`,
   type: "message",
   role: "assistant",
@@ -162,11 +162,7 @@ const message = (model: string, reply: FakeAnthropicReply) => ({
 })
 
 /** The shared Messages API boundary for real Claude CLI integration and app verification. */
-export const startFakeAnthropic = Effect.fnUntraced(function* (
-  answer: (request: FakeAnthropicRequest) => FakeAnthropicReply = replyTo,
-) {
-  const calls: Array<FakeAnthropicRequest> = []
-
+export const startFakeAnthropic = Effect.gen(function* () {
   const server = createServer(async (request, response) => {
     const path = (request.url ?? "").split("?")[0] ?? ""
 
@@ -184,9 +180,8 @@ export const startFakeAnthropic = Effect.fnUntraced(function* (
       return send(response, 400, { type: "error", error: { type: "invalid_request_error" } })
 
     const parsed = decoded.success
-    calls.push(parsed)
     const model = parsed.model ?? "claude-fake"
-    const reply = answer(parsed)
+    const reply = replyTo(parsed)
     console.log(
       `${new Date().toISOString()} messages ${model} -> ${reply.type === "text" ? "text" : reply.name}`,
     )
@@ -214,5 +209,5 @@ export const startFakeAnthropic = Effect.fnUntraced(function* (
       ),
   )
 
-  return { url: `http://127.0.0.1:${portOf(server)}`, calls }
+  return { url: `http://127.0.0.1:${portOf(server)}` }
 })

@@ -194,7 +194,7 @@ export const agentsFixture = (
 export const claudeIntegrationFixture = () =>
   makeAgentsFixture({}, { retry: { enabled: false } }, (home) =>
     Effect.gen(function* () {
-      const provider = yield* startFakeAnthropic()
+      const provider = yield* startFakeAnthropic
       const env = fakeAnthropicEnvironment(home, provider.url)
 
       for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value)

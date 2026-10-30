@@ -32,6 +32,7 @@ interface Started {
   readonly turnId: string
   readonly input: SentMessage
   readonly settings: TurnSettings
+  readonly emit: (event: AgentEvent) => Effect.Effect<void>
 }
 
 /** Real business services and host handlers, with execution replaced at AgentAdapter. */
@@ -51,7 +52,7 @@ export const agentServicesFixture = Effect.gen(function* () {
 
   const adapter: AgentAdapter = {
     models,
-    start: ({ conversation }) =>
+    start: ({ conversation, report }) =>
       Effect.sync<AgentSession>(() => {
         let settings: TurnSettings = { model: null, effort: null, permissionMode: null }
 
@@ -61,9 +62,13 @@ export const agentServicesFixture = Effect.gen(function* () {
               settings = next
             }),
           startTurn: (turnId, input) =>
-            Queue.offer(started, { agentId: conversation, turnId, input, settings }).pipe(
-              Effect.asVoid,
-            ),
+            Queue.offer(started, {
+              agentId: conversation,
+              turnId,
+              input,
+              settings,
+              emit: report,
+            }).pipe(Effect.asVoid),
           steer: () => Effect.void,
           stopTurn: Effect.sync(() => {
             stops.push(conversation)
@@ -92,8 +97,6 @@ export const agentServicesFixture = Effect.gen(function* () {
           Layer.provideMerge(Journal.layer),
         ),
       )
-
-      const journal = Context.get(hostContext, Journal)
 
       const client = yield* RpcTest.makeClient(AgentHostRpcs).pipe(
         Effect.provide(AgentHostHandlers),
@@ -140,7 +143,6 @@ export const agentServicesFixture = Effect.gen(function* () {
 
       return {
         agents: Context.get(services, Agents),
-        emit: (agentId: string, event: AgentEvent) => journal.append(agentId, event),
       }
     }).pipe(Effect.provideContext(database), Scope.provide(scope))
 
