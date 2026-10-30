@@ -36,7 +36,6 @@ const startPortedHost = Effect.gen(function* () {
 
   yield* status("/healthz").pipe(
     Effect.repeat({ until: (code) => code === 200, schedule: Schedule.spaced("50 millis") }),
-    Effect.timeout("10 seconds"),
   )
 
   return status

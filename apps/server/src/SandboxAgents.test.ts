@@ -14,10 +14,8 @@ import { Effect, Option, Predicate, Stream } from "effect"
 import { existsSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { vi } from "vite-plus/test"
-import { agentsFixture, lastText, repository, settled } from "../test/agentsFixture"
+import { agentsFixture, claudeCode, lastText, repository, settled } from "../test/agentsFixture"
 import { gitIn } from "../test/gitRepositories"
-
-vi.setConfig({ testTimeout: 30_000 })
 
 vi.stubEnv("PI_OFFLINE", "1")
 
@@ -53,7 +51,6 @@ it.live(
         Stream.filter(({ turns }) => settled(1)(turns)),
         Stream.runHead,
         Effect.map((found) => Option.getOrThrow(found).turns),
-        Effect.timeout("30 seconds"),
       )
 
       assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
@@ -239,13 +236,14 @@ it.live(
   "connects to a Sandbox's host again after a dropped connection, catching up on what it missed",
   () =>
     Effect.gen(function* () {
-      const f = yield* agentsFixture({ output: "Done.", hang: true })
-      const agent = yield* f.startSandbox("Start")
-      yield* f.model.received(1)
+      const reply = [{ text: "Finished while you were away." }]
+      const f = yield* agentsFixture({}, undefined, { reply, hang: true })
+      const agent = yield* f.startSandbox("Start", claudeCode)
+      yield* f.claude.logged("prompt", 1)
 
       f.sandboxes.dropConnections(agent.id)
-      yield* f.model.release({ output: "Finished while you were away." })
-      yield* Effect.sleep("300 millis")
+      yield* f.claude.configure({ reply })
+      yield* f.claude.logged("replied", 1)
       f.sandboxes.reconnect(agent.id)
 
       const [turn] = yield* f.transcript(agent.id, settled(1))

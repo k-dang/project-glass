@@ -1,6 +1,7 @@
 import { type Activity, FileViewed } from "@glass/contracts"
 import { Effect } from "effect"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test"
+import { eventually } from "../../test/eventually"
 import { ActivityRecorder } from "./activity"
 import { testRuntime } from "../../test/testBackend"
 import { recordedPullRequest, workspace } from "../../test/workspace"
@@ -41,7 +42,7 @@ describe("ActivityRecorder", () => {
 
     viewFor(activity, "greet.ts", 2000)
 
-    await vi.waitFor(() => expect(recorded).toEqual([viewed("greet.ts")]))
+    await eventually(() => expect(recorded).toEqual([viewed("greet.ts")]))
   })
 
   it("records only files viewed for two seconds, even after leaving and waiting", async () => {
@@ -54,7 +55,7 @@ describe("ActivityRecorder", () => {
     viewFor(activity, "e.ts", 1000)
     vi.advanceTimersByTime(5000)
 
-    await vi.waitFor(() => expect(recorded).toEqual([viewed("c.ts")]))
+    await eventually(() => expect(recorded).toEqual([viewed("c.ts")]))
   })
 
   it("records each file as viewed once per workspace load", async () => {
@@ -65,7 +66,7 @@ describe("ActivityRecorder", () => {
     viewFor(activity, "a.ts", 2000)
     viewFor(activity, "c.ts", 2000)
 
-    await vi.waitFor(() =>
+    await eventually(() =>
       expect(recorded).toEqual([viewed("a.ts"), viewed("b.ts"), viewed("c.ts")]),
     )
   })

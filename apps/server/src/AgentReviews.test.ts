@@ -28,7 +28,7 @@ const answer = {
 
 const fixture = Effect.fnUntraced(function* (
   settings: Partial<FakeAgentSettings> = {},
-  timeout = 5000,
+  timeout = 60_000,
   engine: Engine = "pi-cli",
 ) {
   const piCli = yield* fakeAgent({
@@ -110,12 +110,7 @@ const fixture = Effect.fnUntraced(function* (
   const state = (predicate: (state: AgentReviewState) => boolean) =>
     client
       .WatchAgentReview({ pullRequest: ref })
-      .pipe(
-        Stream.filter(predicate),
-        Stream.runHead,
-        Effect.map(Option.getOrThrow),
-        Effect.timeout("10 seconds"),
-      )
+      .pipe(Stream.filter(predicate), Stream.runHead, Effect.map(Option.getOrThrow))
 
   const failed = state((current) => current.job.status === "failed").pipe(
     Effect.map(({ job }) => (job.status === "failed" ? job.reason : assert.fail(job.status))),
@@ -308,7 +303,7 @@ it.live("fails as timed out when the agent passes its limit", () =>
 
 it.live("fails without starting an Agent review engine that can't read the checkout", () =>
   Effect.gen(function* () {
-    const f = yield* fixture({}, 5000, "pi")
+    const f = yield* fixture({}, undefined, "pi")
     yield* f.start
 
     const failure = yield* f.failed

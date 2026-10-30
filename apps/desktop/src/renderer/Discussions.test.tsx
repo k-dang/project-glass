@@ -4,7 +4,8 @@ import { GitHubUnavailable, LineDiscussion, PublishedComment } from "@glass/cont
 import { cleanup, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { DateTime, Effect } from "effect"
-import { afterEach, expect, it, vi } from "vite-plus/test"
+import { afterEach, expect, it } from "vite-plus/test"
+import { eventually } from "../../test/eventually"
 import { DiscussionThread } from "./Discussions"
 import { ReplyStore } from "./useReplies"
 import { createResolutions } from "./useResolutions"
@@ -134,7 +135,7 @@ it("shows the resolved state GitHub reports, even when that is not the state ask
 
   resolve.answer(Effect.succeed(false))
 
-  await vi.waitFor(() => expect(screen.queryByText("Resolving…")).toBeNull())
+  await eventually(() => expect(screen.queryByText("Resolving…")).toBeNull())
   expect(screen.getByText(/Unresolved thread/)).toBeTruthy()
   expect(screen.getByRole("button", { name: "Resolve thread on greet.ts line +2" })).toBeTruthy()
   expect(screen.queryByText(/Couldn't resolve this Discussion/)).toBeNull()

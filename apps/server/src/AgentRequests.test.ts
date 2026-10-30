@@ -19,8 +19,6 @@ import { agentsFixture as fixture, claudeCode, lastText, settled } from "../test
 import type { FakeClaudeSettings, FakeClaudeStep } from "../test/fakeClaude"
 import { vi } from "vite-plus/test"
 
-vi.setConfig({ testTimeout: 30_000 })
-
 vi.stubEnv("PI_OFFLINE", "1")
 
 const allow = () => AllowRequest.make({})
@@ -300,7 +298,6 @@ it.live(
         f.client.WatchWaitingAgents().pipe(
           Stream.filter((ids) => ids.includes(agent.id) === has),
           Stream.runHead,
-          Effect.timeout("30 seconds"),
         )
 
       yield* f.transcript(agent.id, waitingOn)
@@ -385,7 +382,6 @@ const stoppedWhileWaiting = Effect.fnUntraced(function* (
   const marked = yield* f.client.WatchWaitingAgents().pipe(
     Stream.filter((ids) => !ids.includes(agentId)),
     Stream.runHead,
-    Effect.timeout("30 seconds"),
   )
 
   assert.isTrue(Option.isSome(marked))

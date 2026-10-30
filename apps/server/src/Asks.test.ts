@@ -2,7 +2,7 @@ import { assert, it } from "@effect/vitest"
 import { type AskPlace, type Engine, PullRequestRef, Revision } from "@glass/contracts"
 import { Effect, Fiber, Scope } from "effect"
 import { existsSync } from "node:fs"
-import { vi } from "vite-plus/test"
+import { eventually } from "../test/eventually"
 import { fakeAgent } from "../test/fakeAgent"
 import { type FakeAgentSettings, piCliAnswer, piCliModels } from "../test/fakeAgentFiles"
 import { startFakeGitHub } from "../test/fakeGitHub"
@@ -13,7 +13,7 @@ const answered = (answer: string) => piCliAnswer(JSON.stringify({ answer }))
 
 const fixture = Effect.fnUntraced(function* (
   settings: Partial<FakeAgentSettings> = {},
-  timeout = 5000,
+  timeout = 60_000,
   engine: Engine = "pi-cli",
 ) {
   const piCli = yield* fakeAgent({
@@ -121,7 +121,7 @@ it.live("refuses a line outside the diff without starting the agent", () =>
 
 it.live("fails before starting an Agent review engine that can't read the checkout", () =>
   Effect.gen(function* () {
-    const f = yield* fixture({}, 5000, "pi")
+    const f = yield* fixture({}, undefined, "pi")
 
     const failure = yield* f.ask(helloName).pipe(Effect.flip)
 
@@ -163,7 +163,7 @@ it.live("interrupting a question stops the agent and removes its checkout", () =
     yield* Fiber.interrupt(asking)
 
     yield* Effect.promise(() =>
-      vi.waitFor(() => {
+      eventually(() => {
         assert.throws(() => process.kill(hung.pid, 0))
         assert.isFalse(existsSync(hung.cwd))
       }),

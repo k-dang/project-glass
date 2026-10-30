@@ -1,6 +1,6 @@
 import { assert, it } from "@effect/vitest"
 import { PullRequestRef } from "@glass/contracts"
-import { Deferred, Effect, SubscriptionRef } from "effect"
+import { Deferred, Effect, Fiber, SubscriptionRef } from "effect"
 import { pullRequestJobs } from "./pullRequestJobs"
 
 const pr = new PullRequestRef({ owner: "octo-org", repo: "hello-world", number: 1 })
@@ -22,17 +22,15 @@ it.live("replaces work that waits to commit while the replacement holds the lock
       ),
     )
 
-    yield* jobs
-      .begin(job, (replace) =>
-        Effect.gen(function* () {
-          yield* Deferred.succeed(replacing, undefined)
-          yield* Effect.sleep("50 millis")
-          yield* replace(jobs.commit(job, Effect.void, "second"))
-        }),
-      )
-      .pipe(Effect.timeout("2 seconds"))
+    yield* jobs.begin(job, (replace) =>
+      Effect.gen(function* () {
+        yield* Deferred.succeed(replacing, undefined)
+        yield* Effect.yieldNow
+        yield* replace(jobs.commit(job, Effect.void, "second"))
+      }),
+    )
 
-    yield* Effect.sleep("50 millis")
+    yield* Fiber.join(job.running!.fiber)
     assert.strictEqual(yield* SubscriptionRef.get(job.state), "second")
   }).pipe(Effect.scoped),
 )
