@@ -22,19 +22,22 @@ import { VIEWER } from "./fakePullRequest"
 import { installFakeSandboxProvider } from "./fakeSandboxProvider"
 import { seedClone } from "./gitRepositories"
 import { isolatedHome, startBackend } from "./harness"
+import { startFakeAnthropic } from "./fakeAnthropic"
+import { fakeAnthropicEnvironment } from "./pinnedClaude"
+import { vi } from "vite-plus/test"
 
 export const repository = new FollowedRepository({ owner: "glass-demo", repo: "greeter" })
 
-export const agentsFixture = Effect.fnUntraced(function* (
+const makeAgentsFixture = Effect.fnUntraced(function* <Claude extends { readonly command: string }>(
   settings: FakeModelSettings,
-  piSettings: PiSettings = { retry: { enabled: false } },
-  claudeSettings: FakeClaudeSettings = {},
+  piSettings: PiSettings,
+  startClaude: (home: string, repositories: string) => Effect.Effect<Claude, never, Scope.Scope>,
 ) {
   const github = yield* startFakeGitHub()
   const home = yield* isolatedHome
   const repositories = yield* isolatedHome
   const model = yield* fakeModelProvider(home, settings, piSettings)
-  const claude = yield* fakeClaude(repositories, claudeSettings)
+  const claude = yield* startClaude(home, repositories)
 
   const clone = seedClone(repositories, repository.owner, repository.repo)
 
@@ -176,6 +179,29 @@ export const agentsFixture = Effect.fnUntraced(function* (
     }),
   }
 })
+
+/** Controlled executable protocol for host transport, process lifecycle and exact event sequences. */
+export const agentsFixture = (
+  settings: FakeModelSettings,
+  piSettings: PiSettings = { retry: { enabled: false } },
+  claudeSettings: FakeClaudeSettings = {},
+) =>
+  makeAgentsFixture(settings, piSettings, (_home, repositories) =>
+    fakeClaude(repositories, claudeSettings),
+  )
+
+/** Compatibility coverage for the pinned CLI and SDK against the shared Messages API fake. */
+export const claudeIntegrationFixture = () =>
+  makeAgentsFixture({}, { retry: { enabled: false } }, (home) =>
+    Effect.gen(function* () {
+      const provider = yield* startFakeAnthropic
+      const env = fakeAnthropicEnvironment(home, provider.url)
+
+      for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value)
+
+      return { command: env.GLASS_CLAUDE_COMMAND }
+    }),
+  )
 
 export const settled = (count: number) => (turns: ReadonlyArray<Turn>) =>
   turns.length === count && turns.every((turn) => turn.ended !== null)

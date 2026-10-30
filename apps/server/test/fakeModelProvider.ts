@@ -210,10 +210,6 @@ export const fakeModelProvider = Effect.fnUntraced(function* (
     received.add()
     const current = settings
 
-    const output = Predicate.isFunction(current.output)
-      ? current.output(input)
-      : (current.output ?? "")
-
     if (current.failFirst !== undefined && calls.length <= current.failFirst) {
       res.writeHead(500, { "content-type": "application/json" })
       res.end(JSON.stringify({ error: { message: "overloaded" } }))
@@ -222,6 +218,10 @@ export const fakeModelProvider = Effect.fnUntraced(function* (
     }
 
     if (current.status !== undefined) {
+      const output = Predicate.isFunction(current.output)
+        ? current.output(input)
+        : (current.output ?? "")
+
       res.writeHead(current.status, { "content-type": "application/json" })
       res.end(JSON.stringify({ error: { message: output } }))
 

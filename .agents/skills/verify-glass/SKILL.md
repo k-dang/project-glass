@@ -42,7 +42,7 @@ Tour verification defaults to `--tour-provider fake`. Choose **pi** as the Tour 
 node $V doctor
 ```
 
-Read-only. Checks an Electron process serves the run's CDP port, that port belongs to our Electron (prints its version), the window shows the built renderer, the backend answers `/health` with the run's secret, the fake GitHub (if any) is up, and the build is newer than every source file. Exit code 1 on any `FAIL`. Run it first whenever anything looks off; a stale-build `FAIL` means relaunch without `--no-build`.
+Read-only. Checks an Electron process serves the run's CDP port, that port belongs to our Electron (prints its version), the window shows the built renderer, the backend answers `/health` with the run's secret, the helper-owned fake providers are up, and the build is newer than every source file. For `--backend fake`, it labels GitHub as backend-owned and Tours as synthetic runners; the fake Anthropic API supplies the pinned real Claude CLI. Exit code 1 on any `FAIL`. Run it first whenever anything looks off; a stale-build `FAIL` means relaunch without `--no-build`.
 
 ## Drive
 

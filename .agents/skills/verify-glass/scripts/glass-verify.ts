@@ -20,6 +20,7 @@ import { Cdp, cdpJson } from "./cdp.ts"
 import { FAKE_MODES, isFakeMode, serveFakeGitHub } from "./fake-github.ts"
 import { VIEWER } from "../../../../apps/server/test/fakePullRequest.ts"
 import { serveFakeAnthropic } from "./fake-anthropic.ts"
+import { fakeAnthropicEnvironment } from "../../../../apps/server/test/pinnedClaude.ts"
 import { serveFakePi } from "./fake-pi.ts"
 
 const root = join(import.meta.dirname, "..", "..", "..", "..")
@@ -59,6 +60,7 @@ interface RunState {
   readonly id: string
   readonly cdpPort: number
   readonly github: "real" | "fake"
+  readonly backend: "real" | "fake"
   readonly fake?: { readonly pid: number; readonly port: number }
   readonly fakePi?: { readonly pid: number; readonly port: number }
   readonly fakeAnthropic?: { readonly pid: number; readonly port: number }
@@ -341,18 +343,6 @@ const startFake = async (command: string, args: Array<string>, readyFile: string
   }
 }
 
-/** The `claude` the pinned Claude Agent SDK ships, so a run tests the CLI version Glass pins. */
-const pinnedClaude = () => {
-  const sdk = createRequire(join(root, "apps", "server", "package.json")).resolve(
-    "@anthropic-ai/claude-agent-sdk",
-  )
-  const platform = createRequire(sdk).resolve(
-    `@anthropic-ai/claude-agent-sdk-${process.platform}-${process.arch}/package.json`,
-  )
-
-  return join(platform, "..", isWindows ? "claude.exe" : "claude")
-}
-
 const withoutGhOnPath = (path: string) =>
   path
     .split(delimiter)
@@ -424,18 +414,7 @@ const launch = async (options: {
         join(paths.state, "fake-anthropic-ready.json"),
         join(paths.state, "fake-anthropic.log"),
       )
-      for (const name of [
-        "ANTHROPIC_AUTH_TOKEN",
-        "CLAUDE_CODE_OAUTH_TOKEN",
-        "CLAUDE_CODE_USE_BEDROCK",
-        "CLAUDE_CODE_USE_VERTEX",
-      ])
-        delete env[name]
-      env["GLASS_CLAUDE_COMMAND"] = pinnedClaude()
-      env["CLAUDE_CONFIG_DIR"] = join(paths.home, ".claude")
-      env["ANTHROPIC_BASE_URL"] = `http://127.0.0.1:${fakeAnthropic.port}`
-      env["ANTHROPIC_API_KEY"] = "sk-ant-glass-verify-fake"
-      env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1"
+      Object.assign(env, fakeAnthropicEnvironment(paths.home, `http://127.0.0.1:${fakeAnthropic.port}`))
       console.log("Claude Code: the pinned CLI on a fake Anthropic API; no model is called.")
     }
 
@@ -480,7 +459,8 @@ const launch = async (options: {
   const run: RunState = {
     id,
     cdpPort,
-    github,
+    github: fakeBackend ? "fake" : github,
+    backend: options.backend,
     ...(fake === undefined ? {} : { fake }),
     ...(fakePi === undefined ? {} : { fakePi }),
     ...(fakeAnthropic === undefined ? {} : { fakeAnthropic }),
@@ -524,8 +504,8 @@ const doctor = async (run: RunState) => {
     ok &&= pass
     console.log(`${pass ? "OK  " : "FAIL"} ${label}${detail ? `: ${detail}` : ""}`)
   }
-  console.log(`Run ${run.id} (github: ${run.github})`)
-  console.log(`Tour provider: ${run.fakePi === undefined ? "real" : "fake (pi; Claude Code disabled)"}`)
+  console.log(`Run ${run.id} (backend: ${run.backend}, github: ${run.backend === "fake" ? "fake, backend-owned" : run.github})`)
+  console.log(`Tour provider: ${run.backend === "fake" ? "synthetic runners" : run.fakePi === undefined ? "real" : "fake (pi; Claude Code disabled)"}`)
   const pid = glassPid(run)
   check(pid !== undefined, "Electron process", `pid ${pid ?? "none"}`)
   const version = await cdpJson(
@@ -726,6 +706,7 @@ const main = async () => {
     case "stop":
       return stop(run)
     case "fake-github": {
+      if (run.backend === "fake") fail("this backend owns its fake GitHub; launch with --github fake to control GitHub modes")
       if (run.github !== "fake") fail("this run uses real GitHub; launch with --github fake")
       if (!isFakeMode(arg)) return fail(`mode is one of ${FAKE_MODES.join(", ")}`)
       writeFileSync(runPaths(run.id).fakeModeFile, arg)

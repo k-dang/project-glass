@@ -18,6 +18,7 @@ import {
   Stream,
 } from "effect"
 import { SqlClient } from "effect/sql"
+import { Socket } from "effect/socket"
 import { newHostToken } from "./agentHost/protocol"
 import { uniqueAgentName } from "./agentNames"
 import { followJournal } from "./hostJournal"
@@ -145,6 +146,7 @@ export class Sandboxes extends Context.Service<
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
       const transcripts = yield* Transcripts
+      const webSocketConstructor = yield* Socket.WebSocketConstructor
       const { sandboxProviders } = yield* Plugins
       const scope = yield* Scope.Scope
       const sandboxFibers = yield* FiberMap.make<string>()
@@ -263,7 +265,9 @@ export class Sandboxes extends Context.Service<
 
             return yield* reconnecting((resetMisses) =>
               Effect.gen(function* () {
-                const client = yield* connectToHost(provider, record.state, record.token)
+                const client = yield* connectToHost(provider, record.state, record.token).pipe(
+                  Effect.provideService(Socket.WebSocketConstructor, webSocketConstructor),
+                )
 
                 // Effect's socket client connects in the background; a first call shows the host
                 // answered.

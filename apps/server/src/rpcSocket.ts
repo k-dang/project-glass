@@ -1,6 +1,6 @@
-import { NodeSocket } from "@effect/platform-node"
 import { Effect, Layer } from "effect"
 import { type Rpc, RpcClient, type RpcGroup, RpcSerialization } from "effect/rpc"
+import { Socket } from "effect/socket"
 
 export const connectRpcClient = Effect.fnUntraced(function* <Rpcs extends Rpc.Any>(
   group: RpcGroup.RpcGroup<Rpcs>,
@@ -9,7 +9,7 @@ export const connectRpcClient = Effect.fnUntraced(function* <Rpcs extends Rpc.An
 ) {
   const protocol = yield* Layer.build(
     RpcClient.layerProtocolSocket().pipe(
-      Layer.provide(NodeSocket.layerWebSocket(url, { headers })),
+      Layer.provide(Socket.layerWebSocket(url, { headers })),
       Layer.provide(RpcSerialization.layerJson),
     ),
   )

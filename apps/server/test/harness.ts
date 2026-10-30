@@ -1,6 +1,8 @@
+import { NodeSocket } from "@effect/platform-node"
 import { GlassRpcs, RPC_PATH, TOKEN_PARAM } from "@glass/contracts"
-import { ConfigProvider, Context, Effect, Layer } from "effect"
+import { ConfigProvider, Context, Effect, Layer, Option } from "effect"
 import { HttpServer } from "effect/http"
+import { Socket } from "effect/socket"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -26,6 +28,16 @@ export const startBackend = Effect.fnUntraced(function* (
   env: Record<string, string>,
   homeDirectory?: string,
 ) {
+  const webSocketConstructor = yield* Effect.serviceOption(Socket.WebSocketConstructor).pipe(
+    Effect.flatMap(
+      Option.match({
+        onNone: () =>
+          Socket.WebSocketConstructor.pipe(Effect.provide(NodeSocket.layerWebSocketConstructor)),
+        onSome: Effect.succeed,
+      }),
+    ),
+  )
+
   const home = homeDirectory ?? (yield* isolatedHome)
   vi.stubEnv("HOME", home)
   vi.stubEnv("USERPROFILE", home)
@@ -56,13 +68,16 @@ export const startBackend = Effect.fnUntraced(function* (
         ),
       ),
     ),
-  )
+  ).pipe(Effect.provideService(Socket.WebSocketConstructor, webSocketConstructor))
 
   const baseUrl = HttpServer.formatAddress(Context.get(services, HttpServer.HttpServer).address)
 
   const rpcUrl = `${baseUrl.replace(/^http/, "ws")}${RPC_PATH}?${TOKEN_PARAM}=${LAUNCH_TOKEN}`
 
-  const client = yield* connectRpcClient(GlassRpcs, rpcUrl)
+  const client = yield* connectRpcClient(GlassRpcs, rpcUrl).pipe(
+    Effect.provideService(Socket.WebSocketConstructor, webSocketConstructor),
+  )
+
   // Effect closes a still-connecting WebSocket after dropping its error listener, which `ws` then
   // throws as an uncaught exception; a test that never calls the client would end that way.
   yield* client.ListSandboxProviders()

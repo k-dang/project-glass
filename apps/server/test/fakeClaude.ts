@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect"
-import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises"
+import { copyFile, mkdir, readFile, rename, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import type { ToolInput } from "../src/agentHost/toolCalls"
 import { eventually } from "./eventually"
@@ -73,7 +73,11 @@ export const fakeClaude = Effect.fnUntraced(function* (
   const command = join(directory, "claude.mjs")
 
   const configure = (settings: FakeClaudeSettings) =>
-    Effect.promise(() => writeFile(`${command}.json`, JSON.stringify(settings)))
+    Effect.promise(async () => {
+      const temporary = `${command}.json.next`
+      await writeFile(temporary, JSON.stringify(settings))
+      await rename(temporary, `${command}.json`)
+    })
 
   yield* Effect.promise(async () => {
     await mkdir(directory, { recursive: true })

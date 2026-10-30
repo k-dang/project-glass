@@ -7,6 +7,7 @@ import {
   type Query,
   query,
   type SDKControlInitializeResponse,
+  type SDKMessage,
   type SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk"
 import {
@@ -42,6 +43,22 @@ const effortLevels = [
 
 const EffortLevel = Schema.NullOr(Schema.Literals(effortLevels))
 
+export interface ClaudeQuery extends AsyncIterable<SDKMessage> {
+  readonly initializationResult: () => Promise<Pick<SDKControlInitializeResponse, "models">>
+  readonly close: Query["close"]
+  readonly setModel: Query["setModel"]
+  readonly setPermissionMode: Query["setPermissionMode"]
+  readonly applyFlagSettings: Query["applyFlagSettings"]
+  readonly interrupt: Query["interrupt"]
+}
+
+export interface ClaudeSdk {
+  readonly query: (input: Parameters<typeof query>[0]) => ClaudeQuery
+  readonly getSessionInfo: typeof getSessionInfo
+}
+
+const liveSdk: ClaudeSdk = { query, getSessionInfo }
+
 const startFailure = (cause: unknown) =>
   new HostAgentError({
     message: /ENOENT|not found/i.test(String(cause))
@@ -50,20 +67,24 @@ const startFailure = (cause: unknown) =>
   })
 
 const startClaude = (
+  sdk: ClaudeSdk,
   command: string,
   folder: string,
   prompt: AsyncIterable<SDKUserMessage>,
   canUseTool: CanUseTool,
   sessionOption?: { readonly resume: string } | { readonly sessionId: string },
 ): Effect.Effect<
-  { readonly session: Query; readonly initialized: SDKControlInitializeResponse },
+  {
+    readonly session: ClaudeQuery
+    readonly initialized: Pick<SDKControlInitializeResponse, "models">
+  },
   HostAgentError,
   Scope.Scope
 > =>
   Effect.gen(function* () {
     const session = yield* Effect.acquireRelease(
       Effect.sync(() =>
-        query({
+        sdk.query({
           prompt,
           options: {
             pathToClaudeCodeExecutable: command,
@@ -125,7 +146,7 @@ interface CancellingInterrupt {
   interrupt(options: { readonly cancelQueued: boolean }): ReturnType<Query["interrupt"]>
 }
 
-const interruptAll = (session: Query) =>
+const interruptAll = (session: ClaudeQuery) =>
   Effect.tryPromise(async () => {
     // SAFETY: SDK 0.3.309's `interrupt` passes `{ cancelQueued: true }` on as the control request's
     // `cancel_queued`, which its types leave out. A CLI too old for it lists nothing as cancelled.
@@ -224,9 +245,10 @@ interface Asked {
   readonly answered: Deferred.Deferred<PermissionResult>
 }
 
-export const claudeAdapter = (command: string): AgentAdapter => ({
+export const claudeAdapter = (command: string, sdk: ClaudeSdk = liveSdk): AgentAdapter => ({
   models: Effect.gen(function* () {
     const { initialized } = yield* startClaude(
+      sdk,
       command,
       homedir(),
       Stream.toAsyncIterable(Stream.never),
@@ -274,7 +296,7 @@ export const claudeAdapter = (command: string): AgentAdapter => ({
 
     // Claude Code refuses to resume a conversation it hasn't saved, and to start one it has.
     const saved = yield* Effect.tryPromise(() =>
-      getSessionInfo(conversation, { dir: folder }),
+      sdk.getSessionInfo(conversation, { dir: folder }),
     ).pipe(
       Effect.tapError((cause) =>
         Effect.logWarning("Couldn't look up a Claude Code conversation", cause),
@@ -288,6 +310,7 @@ export const claudeAdapter = (command: string): AgentAdapter => ({
     )
 
     const { session } = yield* startClaude(
+      sdk,
       command,
       folder,
       Stream.toAsyncIterable(Stream.fromQueue(prompts)),

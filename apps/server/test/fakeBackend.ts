@@ -1,4 +1,4 @@
-import { NodeRuntime } from "@effect/platform-node"
+import { NodeRuntime, NodeSocket } from "@effect/platform-node"
 import { ConfigProvider, Effect, Layer, Redacted } from "effect"
 import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { mkdtemp, rm } from "node:fs/promises"
@@ -90,4 +90,4 @@ const main = Effect.gen(function* () {
   return yield* Effect.never
 })
 
-main.pipe(Effect.scoped, NodeRuntime.runMain)
+main.pipe(Effect.provide(NodeSocket.layerWebSocketConstructor), Effect.scoped, NodeRuntime.runMain)

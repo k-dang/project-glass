@@ -26,7 +26,12 @@ Building Claude Code Agents confirmed the SDK over driving `claude` stream-json 
 the stream-json control protocol, already written and kept in step with the CLI. Glass pins its
 version, points it at the user's `claude`, and asks for Claude Code's own system prompt and the
 user, project, and local settings sources, since the SDK otherwise starts `claude` without them.
-Tests launch a fake `claude` that speaks the same protocol.
+Business-service tests supply an `AgentAdapter` and explicit domain events through the real host
+handlers and journal. Claude adapter tests supply the SDK query and invoke its callbacks directly;
+they test Glass's translation without reproducing Claude Code's permission policy. A small
+compatibility test and desktop verification run the pinned real CLI against one shared fake
+Anthropic API. Controlled fake executables remain for process and protocol failures that need exact
+timing or malformed output.
 
 ## Considered Options
 

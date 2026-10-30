@@ -2,7 +2,7 @@ import { assert, describe, it } from "@effect/vitest"
 import { GitHubUnavailable } from "@glass/contracts"
 import { Context, Deferred, Effect, Fiber, Layer, Redacted, Schema } from "effect"
 import { FetchHttpClient } from "effect/http"
-import { vi } from "vite-plus/test"
+import { TestClock } from "effect/testing"
 import { ServerConfig } from "../ServerConfig"
 import { GitHubAuth } from "./GitHubAuth"
 import { GitHubClient } from "./GitHubClient"
@@ -14,11 +14,8 @@ const Operation = Schema.Struct({
 
 describe("GitHub request deadlines", () => {
   for (const stall of ["credentials", "headers", "body"] as const) {
-    it.live(`times out stalled ${stall}, aborting the request and releasing the next write`, () =>
+    it.effect(`times out stalled ${stall}, aborting the request and releasing the next write`, () =>
       Effect.gen(function* () {
-        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })
-        yield* Effect.addFinalizer(() => Effect.sync(() => vi.useRealTimers()))
-
         const started = yield* Deferred.make<void>()
         const aborted = yield* Deferred.make<void>()
         const operations: Array<typeof Operation.Type> = []
@@ -120,11 +117,10 @@ describe("GitHub request deadlines", () => {
           .updateDraft("D2", "Next")
           .pipe(Effect.forkChild({ startImmediately: true }))
 
-        yield* Effect.promise(() => vi.advanceTimersByTimeAsync(29_999))
         assert.isUndefined(first.pollUnsafe())
         assert.isUndefined(next.pollUnsafe())
 
-        yield* Effect.promise(() => vi.advanceTimersByTimeAsync(1))
+        yield* TestClock.adjust("31 seconds")
         assert.deepStrictEqual(
           yield* Fiber.join(first),
           new GitHubUnavailable({
