@@ -17,7 +17,7 @@ const installShim = (folder: string, name: string, target: string, runner = "") 
 
 const windowsHost = (folder: string) => ({
   platform: "win32" as const,
-  env: { PATH: folder, PATHEXT: ".EXE;.CMD" },
+  env: { PATH: folder, PATHEXT: ".exe;.cmd" },
 })
 
 it.live.skipIf(process.platform !== "win32")(
