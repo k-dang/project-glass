@@ -2,7 +2,7 @@ import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
 import { AgentEngine, type AgentModels, type ModelChoice } from "@glass/contracts"
 import { AsyncResult } from "effect/reactivity"
 import { ChevronDown, Gauge, LoaderCircle } from "lucide-react"
-import { memo, type ReactNode } from "react"
+import { memo, useState, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
@@ -34,6 +34,7 @@ export const ModelPicker = memo(function ModelPicker(props: {
 
   const listed = useAtomValue(offered)
   const retry = useAtomRefresh(offered)
+  const [open, setOpen] = useState(false)
   const { model, effort, onEngineChange } = props
 
   const { summary, body, efforts } = AsyncResult.builder(listed)
@@ -58,14 +59,22 @@ export const ModelPicker = memo(function ModelPicker(props: {
       return {
         summary: current?.name ?? model ?? "Default model",
         efforts: current?.efforts ?? [],
-        body: <Models models={models} model={model} effort={effort} onChange={props.onChange} />,
+        body: (
+          <Models
+            models={models}
+            model={model}
+            effort={effort}
+            onChange={props.onChange}
+            onPick={() => setOpen(false)}
+          />
+        ),
       }
     })
     .render()
 
   return (
     <>
-      <Popover>
+      <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger
           render={
             <Button
@@ -124,6 +133,7 @@ function Models(props: {
   model: string | null
   effort: string | null
   onChange: (choice: ModelChoice) => void
+  onPick: () => void
 }) {
   const { defaultModel, models } = props.models
   const { model, effort } = props
@@ -155,6 +165,7 @@ function Models(props: {
       orientation="vertical"
       value={toKey(model)}
       items={modelItems}
+      onPick={props.onPick}
       onChange={(chosen) => {
         const next = fromKey(chosen)
         const kept = effort !== null && (find(props.models, next)?.efforts ?? []).includes(effort)
@@ -170,6 +181,7 @@ function RequiredChoice<Value extends string>(props: {
   value: Value
   items: ReadonlyArray<{ value: Value; label: ReactNode }>
   onChange: (value: Value) => void
+  onPick?: () => void
   orientation?: "horizontal" | "vertical"
 }) {
   const stacked = props.orientation === "vertical"
@@ -189,9 +201,13 @@ function RequiredChoice<Value extends string>(props: {
         spacing={stacked ? 1 : 0}
         value={[props.value]}
         onValueChange={([pressed]) => {
-          const chosen = props.items.find((item) => item.value === pressed)
+          const chosen = props.items.find((item) => item.value === (pressed ?? props.value))
 
-          if (chosen !== undefined && chosen.value !== props.value) props.onChange(chosen.value)
+          if (chosen === undefined) return
+
+          if (chosen.value !== props.value) props.onChange(chosen.value)
+
+          props.onPick?.()
         }}
         className={stacked ? "w-auto gap-0 *:justify-start" : "m-1 w-auto *:flex-1"}
       >

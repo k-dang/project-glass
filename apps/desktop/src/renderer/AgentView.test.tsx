@@ -41,6 +41,7 @@ import { afterEach, expect, it } from "vite-plus/test"
 import { placeKey } from "./agentsArea"
 import { App } from "./App"
 import { backendLayerAtom } from "./backend"
+import { eventually } from "../../test/eventually"
 import { testLayer } from "../../test/testBackend"
 
 const sentAt = DateTime.makeUnsafe("2026-10-26T12:00:00Z")
@@ -442,7 +443,7 @@ it("offers the chosen agent program's own models, and efforts only for models th
   await waitFor(() => expect(window.location.hash).toBe(`#/agents/${agent.id}`))
 })
 
-it("changes the open Agent's model and effort from the composer", async () => {
+it("changes the open Agent's model from the composer, closing the picker", async () => {
   const changes: Array<{ model: string | null; effort: string | null }> = []
 
   const user = mount({
@@ -458,6 +459,7 @@ it("changes the open Agent's model and effort from the composer", async () => {
   await user.click(choice(await screen.findByRole("dialog"), "Model", "Thinker"))
 
   expect(changes).toEqual([{ model: "glass-test/thinker", effort: null }])
+  await eventually(() => expect(screen.queryByRole("dialog")).toBeNull())
 })
 
 const call = (toolCallId: string, name: string, parentToolCallId: string | null) =>
