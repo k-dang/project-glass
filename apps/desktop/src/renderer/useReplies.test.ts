@@ -6,7 +6,8 @@ import {
   ReplySent,
 } from "@glass/contracts"
 import { DateTime, Effect } from "effect"
-import { describe, expect, it, vi } from "vite-plus/test"
+import { describe, expect, it } from "vite-plus/test"
+import { eventually } from "../../test/eventually"
 import { ReplyStore } from "./useReplies"
 import { type Held, hold, next, testRegistry } from "../../test/testBackend"
 import { recordedPullRequest } from "../../test/workspace"
@@ -55,7 +56,7 @@ describe("ReplyStore", () => {
 
     reply.answer(Effect.succeed(confirmed))
 
-    await vi.waitFor(() =>
+    await eventually(() =>
       expect(store.view("T1")).toEqual({ body: "", feedback: null, published: [confirmed] }),
     )
   })
@@ -71,7 +72,7 @@ describe("ReplyStore", () => {
 
     failed.answer(Effect.fail(new DraftsBlockReply()))
 
-    await vi.waitFor(() =>
+    await eventually(() =>
       expect(store.view("T1")).toMatchObject({
         body: "To greet them.",
         feedback: { type: "failed" },
@@ -92,7 +93,7 @@ describe("ReplyStore", () => {
 
     retry.answer(Effect.succeed(confirmed))
 
-    await vi.waitFor(() =>
+    await eventually(() =>
       expect(store.view("T1")).toEqual({ body: "", feedback: null, published: [confirmed] }),
     )
     expect(recorded).toEqual([

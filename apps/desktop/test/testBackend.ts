@@ -2,7 +2,8 @@ import { GlassRpcs, nothingUnsent, SavedPlace } from "@glass/contracts"
 import { DateTime, Effect, Layer, ManagedRuntime, Stream } from "effect"
 import { AtomRegistry } from "effect/reactivity"
 import { type Rpc, type RpcGroup, RpcTest } from "effect/rpc"
-import { expect, vi } from "vite-plus/test"
+import { expect } from "vite-plus/test"
+import { eventually } from "./eventually"
 import { Backend, backendLayerAtom } from "../src/renderer/backend"
 
 export type Handlers = {
@@ -109,7 +110,7 @@ export const hold =
     })
 
 export const next = async <P, A, E>(queue: Array<Held<P, A, E>>) => {
-  await vi.waitFor(() => expect(queue).not.toHaveLength(0))
+  await eventually(() => expect(queue).not.toHaveLength(0))
 
   return queue.shift()!
 }

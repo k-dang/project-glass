@@ -179,16 +179,12 @@ it.live("checks out one repository at a time and different repositories at once"
         concurrency: "unbounded",
       }).pipe(Effect.scoped)
 
-    // Long enough for requests running at once to overlap. Every git request pays it, and the
-    // checkouts' real git work already takes most of the test's time budget.
-    const overlap = "20 millis"
-
-    github.gitTraffic.slow(overlap)
+    github.gitTraffic.slow("20 millis")
     const sameRepository = [seed(github), seed(github, { head: { sha: "h2", files: {} } })]
     yield* together(sameRepository)
     assert.strictEqual(github.gitTraffic.mostAtOnce, 1)
 
-    github.gitTraffic.slow(overlap)
+    github.gitTraffic.gather(2)
     yield* together([seed(github, { repo: "first" }), seed(github, { repo: "second" })])
     assert.strictEqual(github.gitTraffic.mostAtOnce, 2)
   }),

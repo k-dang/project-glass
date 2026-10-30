@@ -125,7 +125,7 @@ it("aborts the health request when startup is interrupted", () =>
       expect(yield* Effect.promise(() => accepted.promise)).toBe("/health?token=test-token")
 
       yield* Fiber.interrupt(starting)
-      yield* Effect.promise(() => disconnected.promise).pipe(Effect.timeout("1 second"))
+      yield* Effect.promise(() => disconnected.promise)
     }).pipe(Effect.scoped),
   ))
 

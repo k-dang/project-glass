@@ -63,8 +63,6 @@ const childProcesses = (parent: number, command: string) =>
 const startedHost = (before: ReadonlyArray<number>) =>
   childProcesses(process.pid, "agentHost.mjs").find((pid) => !before.includes(pid))
 
-vi.setConfig({ testTimeout: 30_000 })
-
 vi.stubEnv("PI_OFFLINE", "1")
 
 const waitForPrompt = (claude: Effect.Success<ReturnType<typeof fakeClaude>>) =>
@@ -73,7 +71,6 @@ const waitForPrompt = (claude: Effect.Success<ReturnType<typeof fakeClaude>>) =>
       until: (log) => log.some(({ kind }) => kind === "prompt"),
       schedule: Schedule.spaced("20 millis"),
     }),
-    Effect.timeout("30 seconds"),
   )
 
 const userMessages = ({ messages }: FakeModelRequest) =>

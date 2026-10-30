@@ -63,6 +63,9 @@ export const startBackend = Effect.fnUntraced(function* (
   const rpcUrl = `${baseUrl.replace(/^http/, "ws")}${RPC_PATH}?${TOKEN_PARAM}=${LAUNCH_TOKEN}`
 
   const client = yield* connectRpcClient(GlassRpcs, rpcUrl)
+  // Effect closes a still-connecting WebSocket after dropping its error listener, which `ws` then
+  // throws as an uncaught exception; a test that never calls the client would end that way.
+  yield* client.ListSandboxProviders()
 
   return { baseUrl, client }
 })

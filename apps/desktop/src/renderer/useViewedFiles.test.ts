@@ -1,6 +1,7 @@
 import { type ConnectionError, GitHubUnavailable, Revision, StaleRevision } from "@glass/contracts"
 import { Effect } from "effect"
 import { describe, expect, it, vi } from "vite-plus/test"
+import { eventually } from "../../test/eventually"
 import { ViewedFilesStore } from "./useViewedFiles"
 import { type Held, hold, next, testRegistry } from "../../test/testBackend"
 
@@ -46,7 +47,7 @@ describe("ViewedFilesStore", () => {
     expect(latest.payload).toMatchObject({ path: "new.ts", viewed: false })
     latest.answer(Effect.void)
 
-    await vi.waitFor(() => expect(store.snapshot().saving.size).toBe(0))
+    await eventually(() => expect(store.snapshot().saving.size).toBe(0))
     expect(calls).toHaveLength(0)
     registry.dispose()
   })
@@ -66,14 +67,14 @@ describe("ViewedFilesStore", () => {
     expect(store.snapshot().failures.size).toBe(0)
     latest.answer(Effect.fail(new GitHubUnavailable({ message: "Offline" })))
 
-    await vi.waitFor(() => expect(store.snapshot().failures.has("new.ts")).toBe(true))
+    await eventually(() => expect(store.snapshot().failures.has("new.ts")).toBe(true))
     store.retry("new.ts")
     const retry = await next(calls)
 
     expect(retry.payload.viewed).toBe(false)
     retry.answer(Effect.void)
 
-    await vi.waitFor(() => expect(store.snapshot().saving.size).toBe(0))
+    await eventually(() => expect(store.snapshot().saving.size).toBe(0))
     expect(store.snapshot().viewed.has("new.ts")).toBe(false)
     expect(store.snapshot().failures.size).toBe(0)
     registry.dispose()
@@ -90,7 +91,7 @@ describe("ViewedFilesStore", () => {
     const latest = await next(calls)
 
     latest.answer(Effect.fail(new GitHubUnavailable({ message: "Offline" })))
-    await vi.waitFor(() => expect(store.snapshot().failures.has("new.ts")).toBe(true))
+    await eventually(() => expect(store.snapshot().failures.has("new.ts")).toBe(true))
     expect(store.snapshot().viewed.has("new.ts")).toBe(true)
 
     store.retry("new.ts")
@@ -99,7 +100,7 @@ describe("ViewedFilesStore", () => {
     expect(retry.payload.viewed).toBe(false)
     retry.answer(Effect.void)
 
-    await vi.waitFor(() => expect(store.snapshot().saving.size).toBe(0))
+    await eventually(() => expect(store.snapshot().saving.size).toBe(0))
     expect(store.snapshot().viewed.has("new.ts")).toBe(false)
     expect(store.snapshot().failures.size).toBe(0)
     registry.dispose()
@@ -117,7 +118,7 @@ describe("ViewedFilesStore", () => {
     other.answer(Effect.void)
     failing.answer(Effect.fail(new GitHubUnavailable({ message: "Offline" })))
 
-    await vi.waitFor(() => expect(store.snapshot().failures.has("already.ts")).toBe(true))
+    await eventually(() => expect(store.snapshot().failures.has("already.ts")).toBe(true))
     expect(store.snapshot().viewed).toEqual(new Set(["already.ts", "other.ts"]))
 
     store.retry("already.ts")
@@ -126,7 +127,7 @@ describe("ViewedFilesStore", () => {
     expect(retry.payload.viewed).toBe(false)
     retry.answer(Effect.void)
 
-    await vi.waitFor(() => expect(store.snapshot().saving.size).toBe(0))
+    await eventually(() => expect(store.snapshot().saving.size).toBe(0))
     expect(store.snapshot().failures.size).toBe(0)
     expect(store.snapshot().viewed).toEqual(new Set(["other.ts"]))
     registry.dispose()
@@ -145,7 +146,7 @@ describe("ViewedFilesStore", () => {
     a.answer(offline)
     b.answer(offline)
 
-    await vi.waitFor(() => expect(store.snapshot().failures.size).toBe(2))
+    await eventually(() => expect(store.snapshot().failures.size).toBe(2))
     expect(store.snapshot().viewed).toEqual(new Set(["already.ts"]))
 
     store.retry("a.ts")
@@ -155,7 +156,7 @@ describe("ViewedFilesStore", () => {
     expect([...store.snapshot().failures.keys()]).toEqual(["b.ts"])
     retryA.answer(Effect.void)
 
-    await vi.waitFor(() => expect(store.snapshot().saving.size).toBe(0))
+    await eventually(() => expect(store.snapshot().saving.size).toBe(0))
     expect([...store.snapshot().failures.keys()]).toEqual(["b.ts"])
 
     store.retry("b.ts")
@@ -164,7 +165,7 @@ describe("ViewedFilesStore", () => {
     expect(retryB.payload).toMatchObject({ path: "b.ts", viewed: true })
     retryB.answer(Effect.void)
 
-    await vi.waitFor(() => expect(store.snapshot().saving.size).toBe(0))
+    await eventually(() => expect(store.snapshot().saving.size).toBe(0))
     expect(store.snapshot().failures.size).toBe(0)
     expect(store.snapshot().viewed).toEqual(new Set(["already.ts", "a.ts", "b.ts"]))
     registry.dispose()
