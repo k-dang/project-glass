@@ -175,10 +175,10 @@ it.effect("starts a waiting Tour's timeout only once a slot is free", () =>
     const prs = ["Greet", "Wave", "Fibers"].map((title) => f.seed(title))
     yield* f.client.AddToQueue({ references: prs.map(ref) })
 
-    for (const count of [1, 2, 3]) {
-      yield* f.untilPrompted(count)
-      yield* TestClock.adjust(deadline)
-    }
+    yield* f.untilPrompted(2)
+    yield* TestClock.adjust(deadline)
+    yield* f.untilPrompted(3)
+    yield* TestClock.adjust(deadline)
 
     const failed = yield* Effect.forEach(
       prs,
