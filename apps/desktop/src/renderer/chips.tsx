@@ -62,7 +62,7 @@ export function ChipSelect<Value extends string>(props: {
         ))}
         {props.action !== undefined && (
           <>
-            <SelectSeparator />
+            {props.items.length > 0 && <SelectSeparator />}
             <SelectItem
               value={ACTION}
               disabled={props.action.disabled}

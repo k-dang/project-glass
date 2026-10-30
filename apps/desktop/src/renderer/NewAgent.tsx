@@ -22,7 +22,6 @@ import { Exit, Option, Predicate } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
 import { Cloud, FolderGit2, FolderPlus, GitBranch, Laptop, LoaderCircle } from "lucide-react"
 import { type ReactNode, useCallback, useState } from "react"
-import { Button } from "@/components/ui/button"
 import { MessageGroup } from "@/components/ui/message"
 import { Trace, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace"
 import {
@@ -144,18 +143,14 @@ export function NewAgent(props: { repository: string | undefined }) {
         <ProblemAlert problem={problemOf(cause)} />
       </div>
     ))
-    .onSuccess((linked) =>
-      linked.length === 0 && providers.length === 0 ? (
-        <FirstFolder />
-      ) : (
-        <ChoosePlace
-          checkouts={linked}
-          providers={providers}
-          repository={props.repository}
-          newest={agents.at(-1)}
-        />
-      ),
-    )
+    .onSuccess((linked) => (
+      <ChoosePlace
+        checkouts={linked}
+        providers={providers}
+        repository={props.repository}
+        newest={agents.at(-1)}
+      />
+    ))
     .render()
 }
 
@@ -179,28 +174,6 @@ const useChooseFolder = () => {
   }
 
   return { choose, waiting: linked.waiting, problem: settledProblem(linked) }
-}
-
-function FirstFolder() {
-  const folder = useChooseFolder()
-
-  return (
-    <section
-      aria-label="New Agent"
-      className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center"
-    >
-      <h1 className="text-2xl font-semibold tracking-tight">What should we work on?</h1>
-      <p className="max-w-md text-sm text-muted-foreground">
-        Choose a folder you cloned a GitHub repository into. Each Agent works on a branch of its
-        own, in its own copy.
-      </p>
-      <Button disabled={folder.waiting} onClick={() => void folder.choose()}>
-        <FolderPlus aria-hidden />
-        Choose folder
-      </Button>
-      {folder.problem !== null && <ProblemAlert problem={folder.problem} />}
-    </section>
-  )
 }
 
 interface DraftChoices {

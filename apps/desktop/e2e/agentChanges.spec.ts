@@ -26,7 +26,8 @@ test("reviews a local Agent's changes on its Changes tab, held still until moved
   }, checkout)
 
   await window.getByRole("link", { name: "Agents" }).click()
-  await window.getByRole("button", { name: "Choose folder" }).click()
+  await window.getByRole("combobox", { name: "Repository" }).click()
+  await window.getByRole("option", { name: "Choose folder…" }).click()
   await expect(window.getByRole("combobox", { name: "Base branch" })).toContainText("main")
   await window.getByRole("button", { name: /^Claude Code:/ }).click()
   await window
