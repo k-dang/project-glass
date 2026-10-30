@@ -13,7 +13,6 @@ export function OutdatedNote(props: {
 }) {
   return (
     <Alert role="note">
-      {/* The icon rides with the text, so it stays level with it when the action makes the row taller. */}
       <AlertDescription className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <span className="flex min-w-0 flex-1 basis-48 items-start gap-2">
           <TriangleAlert aria-hidden className={cn("size-4 shrink-0 translate-y-0.5", warningTone)} />
