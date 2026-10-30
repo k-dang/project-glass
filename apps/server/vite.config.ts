@@ -15,19 +15,30 @@ const node = {
   deps: { onlyBundle: false },
 } as const
 
+// One file sharing no chunks, because a Sandbox provider copies only the bundle into the Sandbox.
+const agentHost = (outDir: string) =>
+  ({
+    ...node,
+    entry: { agentHost: "src/agentHost.ts" },
+    outDir,
+    outputOptions: { codeSplitting: false },
+  }) as const
+
 export default defineConfig({
   pack: [
     {
       ...node,
-      entry: { bin: "src/bin.ts", piWorker: "src/piWorker.ts", agentHost: "src/agentHost.ts" },
+      entry: { bin: "src/bin.ts", piWorker: "src/piWorker.ts" },
       outDir: "dist",
     },
+    agentHost("dist"),
     // `pnpm dev:fake`'s backend, kept out of `dist` so it never ships.
     {
       ...node,
-      entry: { fakeBackend: "test/fakeBackend.ts", agentHost: "src/agentHost.ts" },
+      entry: { fakeBackend: "test/fakeBackend.ts" },
       outDir: "dist-fake",
     },
+    agentHost("dist-fake"),
   ],
   test: {
     include: ["src/**/*.test.ts", "test/**/*.test.ts"],

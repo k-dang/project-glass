@@ -1,6 +1,14 @@
 import { Schema } from "effect"
 import { execFileSync, spawn } from "node:child_process"
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs"
 import { connect, createServer, type Socket } from "node:net"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -187,8 +195,11 @@ export const fakeSandboxProvider =
 
         await step("Starting the agent")
         const freeHostPort = await freePort()
+        // Copied alone, as a real provider uploads it, so a bundle that needs its neighbours fails here.
+        const bundle = join(folder, "agentHost.mjs")
+        copyFileSync(request.host.bundle, bundle)
 
-        const host = spawn(process.execPath, [request.host.bundle], {
+        const host = spawn(process.execPath, [bundle], {
           cwd: folder,
           env: {
             ...process.env,
