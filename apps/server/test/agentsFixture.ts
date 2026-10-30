@@ -22,11 +22,7 @@ import { VIEWER } from "./fakePullRequest"
 import { installFakeSandboxProvider } from "./fakeSandboxProvider"
 import { seedClone } from "./gitRepositories"
 import { isolatedHome, startBackend } from "./harness"
-import {
-  type FakeAnthropicRequest,
-  type FakeAnthropicReply,
-  startFakeAnthropic,
-} from "./fakeAnthropic"
+import { startFakeAnthropic } from "./fakeAnthropic"
 import { fakeAnthropicEnvironment } from "./pinnedClaude"
 import { vi } from "vite-plus/test"
 
@@ -184,7 +180,7 @@ const makeAgentsFixture = Effect.fnUntraced(function* <Claude extends { readonly
   }
 })
 
-/** Controlled executable protocol for startup, cancellation, crash and malformed-output cases. */
+/** Controlled executable protocol for host transport, process lifecycle and exact event sequences. */
 export const agentsFixture = (
   settings: FakeModelSettings,
   piSettings: PiSettings = { retry: { enabled: false } },
@@ -194,19 +190,16 @@ export const agentsFixture = (
     fakeClaude(repositories, claudeSettings),
   )
 
-/** Normal Claude conversations run the pinned executable against the shared Messages API fake. */
-export const claudeAgentsFixture = (
-  answer?: (request: FakeAnthropicRequest) => FakeAnthropicReply,
-  settings: FakeModelSettings = {},
-) =>
-  makeAgentsFixture(settings, { retry: { enabled: false } }, (home) =>
+/** Compatibility coverage for the pinned CLI and SDK against the shared Messages API fake. */
+export const claudeIntegrationFixture = () =>
+  makeAgentsFixture({}, { retry: { enabled: false } }, (home) =>
     Effect.gen(function* () {
-      const provider = yield* startFakeAnthropic(answer)
+      const provider = yield* startFakeAnthropic()
       const env = fakeAnthropicEnvironment(home, provider.url)
 
       for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value)
 
-      return { command: env.GLASS_CLAUDE_COMMAND, provider }
+      return { command: env.GLASS_CLAUDE_COMMAND }
     }),
   )
 

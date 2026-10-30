@@ -9,33 +9,11 @@ import { HostAgents } from "./agentHost/HostAgents"
 import { Journal } from "./agentHost/Journal"
 import { claudeAdapter } from "./agentHost/claudeAdapter"
 import { piAdapter } from "./agentHost/piAdapter"
+import { AgentHostHandlers } from "./agentHost/handlers"
 import { RPC_PATH } from "@glass/contracts"
 import { isToken } from "./access"
 import { Git } from "./git"
 import { AgentHostRpcs, HEALTH_PATH, HOST_TOKEN_HEADER, HostReady } from "./agentHost/protocol"
-
-const Handlers = AgentHostRpcs.toLayer(
-  Effect.gen(function* () {
-    const agents = yield* HostAgents
-    const journal = yield* Journal
-    const changes = yield* Changes
-
-    return AgentHostRpcs.of({
-      ListModels: ({ engine }) => agents.models(engine),
-      StartAgent: ({ agentId, engine, folder }) => agents.start(agentId, engine, folder),
-      StartTurn: ({ agentId, turnId, message, images, ...settings }) =>
-        agents.startTurn(agentId, turnId, { message, images }, settings),
-      Steer: ({ agentId, message, images }) => agents.steer(agentId, { message, images }),
-      StopTurn: ({ agentId }) => agents.stopTurn(agentId),
-      AnswerRequest: ({ agentId, requestId, answer }) => agents.answer(agentId, requestId, answer),
-      StopAgent: ({ agentId }) => agents.stop(agentId),
-      GetChanges: ({ folder, baseRef }) => changes.since(folder, baseRef),
-      HasUncommittedChanges: ({ folder }) => changes.uncommitted(folder),
-      WatchJournal: ({ after }) => journal.watch(after),
-      Acknowledge: ({ through }) => journal.acknowledge(through),
-    })
-  }),
-)
 
 const RequireToken = (token: Redacted.Redacted) =>
   HttpRouter.middleware(
@@ -102,7 +80,7 @@ const main = Effect.gen(function* () {
           host: address,
         }),
       ),
-      Layer.provide(Handlers),
+      Layer.provide(AgentHostHandlers),
       Layer.provide(HostAgents.make(adapters)),
       Layer.provide(Journal.layer),
       Layer.provide(Changes.layer),

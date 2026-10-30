@@ -5,488 +5,267 @@ import {
   DenyRequest,
   isRequestPart,
   isWaiting,
-  type RequestPart,
-  type Turn,
+  PartSet,
+  PermissionRequestPart,
+  QuestionPart,
+  RequestNotWaiting,
   TurnDone,
+  TurnEnded,
   TurnInterrupted,
   TurnStopped,
+  type Transcript,
 } from "@glass/contracts"
-import { Effect, Option, Predicate, Stream } from "effect"
-import { existsSync, readFileSync } from "node:fs"
-import { mkdir, writeFile } from "node:fs/promises"
-import { join } from "node:path"
-import {
-  agentsFixture as fixture,
-  claudeAgentsFixture,
-  claudeCode,
-  lastText,
-  settled,
-} from "../test/agentsFixture"
-import type { FakeAnthropicReply, FakeAnthropicRequest } from "../test/fakeAnthropic"
-import { vi } from "vite-plus/test"
+import { DateTime, Effect, Option, Predicate, Stream } from "effect"
+import { agentServicesFixture } from "../test/agentServicesFixture"
+import { HostAgentError } from "./agentHost/protocol"
 
-vi.stubEnv("PI_OFFLINE", "1")
+const permission = PermissionRequestPart.make({
+  requestId: "request-1",
+  toolName: "Bash",
+  inputSummary: "A tool request",
+  input: "{}",
+  status: "waiting",
+  reason: null,
+})
 
-const allow = () => AllowRequest.make({})
+const question = QuestionPart.make({
+  requestId: "question-1",
+  status: "waiting",
+  answers: null,
+  questions: [
+    {
+      header: "Scope",
+      question: "Which files?",
+      detail: null,
+      options: [{ label: "README", description: null }],
+      multiSelect: false,
+      freeText: true,
+    },
+  ],
+})
 
-const asked = (turn: Turn | undefined) =>
-  (turn?.parts ?? []).flatMap((part) =>
-    Predicate.isTagged(part, "PermissionRequest")
-      ? [{ tool: part.toolName, summary: part.inputSummary, status: part.status }]
-      : [],
+type Fixture = Effect.Success<typeof agentServicesFixture>
+
+const waitingOn = ({ turns }: Transcript) => turns.some(({ parts }) => parts.some(isWaiting))
+
+const finish = Effect.fnUntraced(function* (f: Fixture, agentId: string, turnId: string) {
+  yield* f.emit(
+    agentId,
+    TurnEnded.make({
+      turnId,
+      ended: { at: yield* DateTime.now, ending: TurnDone.make({}) },
+    }),
   )
+  yield* f.transcript(agentId, ({ turns }) => Predicate.isNotNullish(turns[0]?.ended))
+})
 
-const toolCalls = (turn: Turn | undefined) =>
-  (turn?.parts ?? []).flatMap((part) =>
-    Predicate.isTagged(part, "ToolCall")
-      ? [{ name: part.name, output: part.output, status: part.status }]
-      : [],
-  )
+it.live("keeps a supplied request waiting, refuses messages, and forwards the user's answer", () =>
+  Effect.gen(function* () {
+    const f = yield* agentServicesFixture
+    const agent = yield* f.create()
+    const turn = yield* f.started
+    yield* f.emit(agent.id, PartSet.make({ turnId: turn.turnId, index: 0, part: permission }))
 
-const answerSteps =
-  (steps: ReadonlyArray<FakeAnthropicReply>) =>
-  (request: FakeAnthropicRequest): FakeAnthropicReply => {
-    if ((request.tools ?? []).length === 0) return { type: "text", text: "Fake session" }
+    const before = yield* f.transcript(agent.id, waitingOn)
+    assert.isTrue(before.turns[0]?.parts.some(isWaiting))
 
-    const results = (request.messages ?? []).flatMap(({ content }) =>
-      Predicate.isString(content) ? [] : content.filter(({ type }) => type === "tool_result"),
+    const marked = yield* f.agents.watchWaiting().pipe(
+      Stream.filter((ids) => ids.includes(agent.id)),
+      Stream.runHead,
     )
 
-    return steps[results.length] ?? { type: "text", text: "Done." }
-  }
+    assert.isTrue(Option.isSome(marked))
 
-const readEditRun: ReadonlyArray<FakeAnthropicReply> = [
-  { type: "tool_use", name: "Read", input: { file_path: "README.md" } },
-  {
-    type: "tool_use",
-    name: "Edit",
-    input: { file_path: "README.md", old_string: "greeter", new_string: "Hello" },
-  },
-  { type: "tool_use", name: "Bash", input: { command: "ls" } },
-]
-
-it.live("uses the real Claude CLI's Default, Accept edits and Bypass permission decisions", () =>
-  Effect.gen(function* () {
-    const f = yield* claudeAgentsFixture(answerSteps(readEditRun))
-    const modes = ["default", "acceptEdits", "bypassPermissions"] as const
-    const askedIn: Partial<Record<(typeof modes)[number], ReturnType<typeof asked>>> = {}
-    let defaultReadme = ""
-
-    for (const permissionMode of modes) {
-      const agent = yield* f.start("Tidy the README", { ...claudeCode, permissionMode })
-
-      if (permissionMode === "default") defaultReadme = join(f.worktree(agent.name), "README.md")
-      assert.equal(agent.permissionMode, permissionMode)
-      const [turn] = yield* f.answering(agent.id, settled(1), allow)
-      assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
-      assert.isTrue(toolCalls(turn).every(({ status }) => status === "done"))
-      assert.equal(
-        readFileSync(join(f.worktree(agent.name), "README.md"), "utf8").trim(),
-        "# Hello",
-      )
-      askedIn[permissionMode] = asked(turn)
+    for (const send of [f.agents.send, f.agents.steer]) {
+      const refused = yield* send(agent.id, { message: "More", images: [] }).pipe(Effect.flip)
+      assert.equal(refused._tag, "RequestWaiting")
     }
 
-    assert.deepStrictEqual(askedIn, {
-      default: [{ tool: "Edit", summary: defaultReadme, status: "allowed" }],
-      acceptEdits: [],
-      bypassPermissions: [],
-    })
+    assert.deepStrictEqual(before.queued, [])
+    assert.deepStrictEqual((yield* f.transcript(agent.id, waitingOn)).turns, before.turns)
+
+    const answer = DenyRequest.make({ reason: "Leave the checkout alone" })
+    yield* f.agents.answer(agent.id, permission.requestId, answer)
+    assert.deepStrictEqual(f.answers, [{ requestId: permission.requestId, answer }])
+
+    yield* f.emit(
+      agent.id,
+      PartSet.make({
+        turnId: turn.turnId,
+        index: 0,
+        part: PermissionRequestPart.make({
+          ...permission,
+          status: "denied",
+          reason: answer.reason,
+        }),
+      }),
+    )
+    yield* f.agents.watchWaiting().pipe(
+      Stream.filter((ids) => !ids.includes(agent.id)),
+      Stream.runHead,
+    )
+
+    yield* f.failAnswers(new RequestNotWaiting())
+    assert.equal(
+      (yield* f.agents.answer(agent.id, permission.requestId, answer).pipe(Effect.flip))._tag,
+      "RequestNotWaiting",
+    )
   }),
 )
 
-it.live("tells the real Claude CLI why the user denied a tool call, and the Turn goes on", () =>
+it.live("persists a supplied Question and forwards a free-text answer", () =>
   Effect.gen(function* () {
-    const f = yield* claudeAgentsFixture()
+    const f = yield* agentServicesFixture
+    const agent = yield* f.create()
+    const turn = yield* f.started
+    yield* f.emit(agent.id, PartSet.make({ turnId: turn.turnId, index: 0, part: question }))
+    const waiting = yield* f.transcript(agent.id, waitingOn)
+    assert.deepStrictEqual(waiting.turns[0]?.parts, [question])
 
-    const agent = yield* f.start("Please run `touch denied.txt`", {
-      ...claudeCode,
-      permissionMode: "default",
-    })
-
-    const [turn] = yield* f.answering(agent.id, settled(1), () =>
-      DenyRequest.make({ reason: "Leave the checkout alone" }),
-    )
-
-    assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
-    const request = turn?.parts.find((part) => Predicate.isTagged(part, "PermissionRequest"))
-    assert.deepStrictEqual(
-      request && { tool: request.toolName, status: request.status, reason: request.reason },
-      { tool: "Bash", status: "denied", reason: "Leave the checkout alone" },
-    )
-    assert.include(lastText(turn)?.text ?? "", "Leave the checkout alone")
-    assert.isFalse(existsSync(join(f.worktree(agent.name), "denied.txt")))
-  }),
-)
-
-it.live("answers the real Claude CLI's Questions with an option or text", () =>
-  Effect.gen(function* () {
-    const f = yield* claudeAgentsFixture(
-      answerSteps([
-        {
-          type: "tool_use",
-          name: "AskUserQuestion",
-          input: {
-            questions: [
-              {
-                question: "Tabs or spaces?",
-                header: "Indent",
-                options: [
-                  { label: "Tabs", description: "One per level" },
-                  { label: "Spaces", description: "Two per level" },
-                ],
-                multiSelect: false,
-              },
-              {
-                question: "Which folders?",
-                header: "Folders",
-                options: [
-                  { label: "src", description: "The code" },
-                  { label: "test", description: "The tests" },
-                ],
-                multiSelect: true,
-              },
-            ],
-          },
-        },
-      ]),
-    )
-
-    const agent = yield* f.start("Format the code", { ...claudeCode, permissionMode: "default" })
-
-    const [turn] = yield* f.answering(agent.id, settled(1), () =>
-      AnswerQuestion.make({
-        answers: [
-          { chosen: ["Tabs"], text: null },
-          { chosen: [], text: "Only the README" },
-        ],
+    const answer = AnswerQuestion.make({ answers: [{ chosen: [], text: "Only source files" }] })
+    yield* f.agents.answer(agent.id, question.requestId, answer)
+    assert.deepStrictEqual(f.answers, [{ requestId: question.requestId, answer }])
+    yield* f.emit(
+      agent.id,
+      PartSet.make({
+        turnId: turn.turnId,
+        index: 0,
+        part: QuestionPart.make({ ...question, status: "answered", answers: answer.answers }),
       }),
     )
 
-    const questionPart = turn?.parts.find((part) => Predicate.isTagged(part, "Question"))
-    assert.deepStrictEqual(
-      questionPart?.questions.map(({ question, multiSelect, options }) => ({
-        question,
-        multiSelect,
-        options: options.map(({ label }) => label),
-      })),
-      [
-        { question: "Tabs or spaces?", multiSelect: false, options: ["Tabs", "Spaces"] },
-        { question: "Which folders?", multiSelect: true, options: ["src", "test"] },
-      ],
+    const settled = yield* f.transcript(
+      agent.id,
+      ({ turns }) =>
+        turns[0]?.parts.some(
+          (part) => Predicate.isTagged(part, "Question") && part.status === "answered",
+        ) === true,
     )
-    assert.deepStrictEqual(questionPart?.answers, [
-      { chosen: ["Tabs"], text: null },
-      { chosen: [], text: "Only the README" },
+
+    assert.deepStrictEqual(settled.turns[0]?.parts, [
+      QuestionPart.make({ ...question, status: "answered", answers: answer.answers }),
     ])
-    assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
-    const output = toolCalls(turn).find(({ name }) => name === "AskUserQuestion")?.output ?? ""
-    assert.include(output, "Tabs")
-    assert.include(output, "Only the README")
-    assert.isTrue(
-      f.claude.provider.calls.some(({ messages }) =>
-        messages?.some(({ content }) =>
-          Predicate.isString(content)
-            ? false
-            : content.some(
-                ({ type, content: result }) =>
-                  type === "tool_result" &&
-                  JSON.stringify(result).includes("Tabs") &&
-                  JSON.stringify(result).includes("Only the README"),
-              ),
-        ),
-      ),
-    )
   }),
 )
 
-it.live("continues a conversation through the pinned Claude CLI and shared model endpoint", () =>
+it.live("expires a persisted request when business services restart", () =>
   Effect.gen(function* () {
-    const f = yield* claudeAgentsFixture()
-    const agent = yield* f.start("Remember lantern", claudeCode)
-    const [first] = yield* f.transcript(agent.id, settled(1))
-    assert.include(lastText(first)?.text ?? "", "Remember lantern")
-    yield* f.send(agent.id, "Continue the conversation")
-    const [, second] = yield* f.transcript(agent.id, settled(2))
-    assert.include(lastText(second)?.text ?? "", "Continue the conversation")
-    assert.deepStrictEqual(second?.ended?.ending, TurnDone.make({}))
-
-    const continued = f.claude.provider.calls.findLast(({ messages }) =>
-      messages?.some(({ content }) =>
-        JSON.stringify(content).includes("Continue the conversation"),
-      ),
-    )
-
-    assert.include(JSON.stringify(continued?.messages), "Remember lantern")
-  }),
-)
-
-const firstQuestion = (part: RequestPart) =>
-  Predicate.isTagged(part, "Question") ? (part.questions[0]?.question ?? "") : ""
-
-it.live("asks pi's extension dialogs as Questions, answered with an option or text", () =>
-  Effect.gen(function* () {
-    const f = yield* fixture({
-      reply: ({ messages }) =>
-        messages.some(({ role }) => role === "tool")
-          ? [{ text: "Greeted." }]
-          : [{ toolCall: { id: "call-1", name: "bash", arguments: { command: "echo hi" } } }],
-    })
-
-    yield* Effect.promise(async () => {
-      const extensions = join(f.home, ".pi", "agent", "extensions")
-      await mkdir(extensions, { recursive: true })
-      await writeFile(
-        join(extensions, "greet.js"),
-        `export default (pi) => pi.on("tool_call", async (event, ctx) => {
-          const greeting = await ctx.ui.select("Which greeting?", ["Hi", "Hello"])
-          const name = await ctx.ui.input("Who to greet?", "a name")
-          const sure = await ctx.ui.confirm("Greet them?", "It prints to the terminal.")
-          return { block: true, reason: greeting + " " + name + " " + sure }
-        })`,
-      )
-    })
-
-    const agent = yield* f.start("Greet someone")
-
-    const replies = new Map([
-      ["Which greeting?", { chosen: ["Hello"], text: null }],
-      ["Who to greet?", { chosen: [], text: "Ada" }],
-      ["Greet them?", { chosen: ["Yes"], text: null }],
-    ])
-
-    const [turn] = yield* f.answering(agent.id, settled(1), (part) =>
-      AnswerQuestion.make({
-        answers: [replies.get(firstQuestion(part)) ?? { chosen: [], text: null }],
-      }),
-    )
-
-    assert.deepStrictEqual(
-      turn?.parts.flatMap((part) =>
-        Predicate.isTagged(part, "Question")
-          ? part.questions.map(({ question, detail, options, freeText }) => ({
-              question,
-              detail,
-              options: options.map(({ label }) => label),
-              freeText,
-            }))
-          : [],
-      ),
-      [
-        { question: "Which greeting?", detail: null, options: ["Hi", "Hello"], freeText: false },
-        { question: "Who to greet?", detail: null, options: [], freeText: true },
-        {
-          question: "Greet them?",
-          detail: "It prints to the terminal.",
-          options: ["Yes", "No"],
-          freeText: false,
-        },
-      ],
-    )
-    assert.include(toolCalls(turn)[0]?.output ?? "", "Hello Ada true")
-    assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
-  }),
-)
-
-const waitingOn = (turns: ReadonlyArray<Turn>) => turns.some(({ parts }) => parts.some(isWaiting))
-
-const askToRun = "Please run `touch notes.txt`"
-
-it.live(
-  "keeps a waiting request for a new watch, marks its Agent, and refuses messages until it's answered",
-  () =>
-    Effect.gen(function* () {
-      const f = yield* claudeAgentsFixture()
-      const agent = yield* f.start(askToRun, { ...claudeCode, permissionMode: "default" })
-
-      const marked = (has: boolean) =>
-        f.client.WatchWaitingAgents().pipe(
-          Stream.filter((ids) => ids.includes(agent.id) === has),
-          Stream.runHead,
-        )
-
-      yield* f.transcript(agent.id, waitingOn)
-      yield* marked(true)
-
-      const refused = yield* Effect.all([
-        f.send(agent.id, "Hurry up").pipe(Effect.flip),
-        f.steer(agent.id, "Hurry up").pipe(Effect.flip),
-      ])
-
-      assert.deepStrictEqual(
-        refused.map(({ _tag }) => _tag),
-        ["RequestWaiting", "RequestWaiting"],
-      )
-      assert.deepStrictEqual((yield* f.watch(agent.id, () => true)).queued, [])
-
-      // A second watch, as a reloaded renderer opens, still sees the request waiting.
-      const [turn] = yield* f.transcript(agent.id, waitingOn)
-      const request = turn?.parts.find(isWaiting)
-      assert.equal(request?._tag, "PermissionRequest")
-
-      const answer = { agentId: agent.id, requestId: request?.requestId ?? "", answer: allow() }
-
-      const misfit = yield* f.client
-        .AnswerRequest({ ...answer, answer: AnswerQuestion.make({ answers: [] }) })
-        .pipe(Effect.flip)
-
-      assert.equal(misfit._tag, "AgentError")
-
-      yield* f.client.AnswerRequest(answer)
-      yield* marked(false)
-
-      const again = yield* f.client.AnswerRequest(answer).pipe(Effect.flip)
-      assert.equal(again._tag, "RequestNotWaiting")
-
-      const [done] = yield* f.transcript(agent.id, settled(1))
-      assert.include(lastText(done)?.text ?? "", "The fake model saw:")
-    }),
-)
-
-it.live("leaves a request no longer answerable once its Turn ends", () =>
-  Effect.gen(function* () {
-    const f = yield* claudeAgentsFixture()
-    const agent = yield* f.start(askToRun, { ...claudeCode, permissionMode: "default" })
+    const f = yield* agentServicesFixture
+    const agent = yield* f.create()
+    const turn = yield* f.started
+    yield* f.emit(agent.id, PartSet.make({ turnId: turn.turnId, index: 0, part: permission }))
     yield* f.transcript(agent.id, waitingOn)
 
     const restarted = yield* f.restart
-    const [turn] = yield* f.transcript(agent.id, settled(1), restarted)
 
-    assert.deepStrictEqual(turn?.ended?.ending, TurnInterrupted.make({}))
-    assert.deepStrictEqual(asked(turn), [
-      { tool: "Bash", summary: "touch notes.txt", status: "expired" },
-    ])
-
-    const waiting = yield* restarted
-      .WatchWaitingAgents()
+    const snapshot = yield* restarted.agents
+      .transcript(agent.id)
       .pipe(Stream.runHead, Effect.map(Option.getOrThrow))
 
-    assert.deepStrictEqual(waiting, [])
+    assert.equal(snapshot._tag, "Snapshot")
 
-    const request = turn?.parts.find((part) => Predicate.isTagged(part, "PermissionRequest"))
+    if (!Predicate.isTagged(snapshot, "Snapshot")) return
+    assert.deepStrictEqual(snapshot.turns[0]?.ended?.ending, TurnInterrupted.make({}))
+    assert.equal(snapshot.turns[0]?.parts.find(isRequestPart)?.status, "expired")
+    assert.deepStrictEqual(
+      yield* restarted.agents.watchWaiting().pipe(Stream.runHead, Effect.map(Option.getOrThrow)),
+      [],
+    )
+    assert.equal(
+      (yield* restarted.agents
+        .answer(agent.id, permission.requestId, AllowRequest.make({}))
+        .pipe(Effect.flip))._tag,
+      "RequestNotWaiting",
+    )
+  }),
+)
 
-    const refused = yield* restarted
-      .AnswerRequest({ agentId: agent.id, requestId: request?.requestId ?? "", answer: allow() })
+it.live("forwards Stop and waits for the host to expire its request before the next message", () =>
+  Effect.gen(function* () {
+    const f = yield* agentServicesFixture
+    const agent = yield* f.create()
+    const turn = yield* f.started
+    yield* f.emit(agent.id, PartSet.make({ turnId: turn.turnId, index: 0, part: question }))
+    yield* f.transcript(agent.id, waitingOn)
+    yield* f.agents.stop(agent.id)
+    assert.deepStrictEqual(f.stops, [agent.id])
+    assert.equal(
+      (yield* f.agents.send(agent.id, { message: "Too early", images: [] }).pipe(Effect.flip))._tag,
+      "RequestWaiting",
+    )
+    yield* f.emit(
+      agent.id,
+      PartSet.make({
+        turnId: turn.turnId,
+        index: 0,
+        part: QuestionPart.make({ ...question, status: "expired" }),
+      }),
+    )
+    yield* f.emit(
+      agent.id,
+      TurnEnded.make({
+        turnId: turn.turnId,
+        ended: { at: yield* DateTime.now, ending: TurnStopped.make({}) },
+      }),
+    )
+
+    const stopped = yield* f.transcript(agent.id, ({ turns }) =>
+      Predicate.isNotNullish(turns[0]?.ended),
+    )
+
+    assert.deepStrictEqual(stopped.turns[0]?.ended?.ending, TurnStopped.make({}))
+    assert.equal(stopped.turns[0]?.parts.find(isRequestPart)?.status, "expired")
+
+    yield* f.agents.send(agent.id, { message: "Continue", images: [] })
+    assert.equal((yield* f.started).input.message, "Continue")
+  }),
+)
+
+it.live("starts queued messages when the host reports a completed Turn", () =>
+  Effect.gen(function* () {
+    const f = yield* agentServicesFixture
+    const agent = yield* f.create()
+    const first = yield* f.started
+    yield* f.agents.send(agent.id, { message: "Next", images: [] })
+    const waiting = yield* f.transcript(agent.id, ({ queued }) => queued.length === 1)
+    assert.equal(waiting.queued[0]?.message, "Next")
+    yield* finish(f, agent.id, first.turnId)
+    assert.equal((yield* f.started).input.message, "Next")
+  }),
+)
+
+it.live("passes default and changed Permission modes to the host, and refuses modes for pi", () =>
+  Effect.gen(function* () {
+    const f = yield* agentServicesFixture
+    const agent = yield* f.create()
+    const first = yield* f.started
+    assert.equal(first.settings.permissionMode, "default")
+    yield* finish(f, agent.id, first.turnId)
+    yield* f.agents.changePermissionMode(agent.id, "acceptEdits")
+    yield* f.agents.send(agent.id, { message: "Next", images: [] })
+    assert.equal((yield* f.started).settings.permissionMode, "acceptEdits")
+
+    const pi = yield* f.create(null, "pi-cli")
+    assert.isNull((yield* f.started).settings.permissionMode)
+    assert.equal(
+      (yield* f.agents.changePermissionMode(pi.id, "auto").pipe(Effect.flip))._tag,
+      "NoPermissionModes",
+    )
+  }),
+)
+
+it.live("maps a host failure while forwarding an answer to an Agent error", () =>
+  Effect.gen(function* () {
+    const f = yield* agentServicesFixture
+    const agent = yield* f.create()
+    yield* f.started
+    yield* f.failAnswers(new HostAgentError({ message: "The host refused the answer" }))
+
+    const refused = yield* f.agents
+      .answer(agent.id, "request-1", AllowRequest.make({}))
       .pipe(Effect.flip)
 
-    assert.equal(refused._tag, "RequestNotWaiting")
+    assert.equal(refused._tag, "AgentError")
+    assert.equal(refused.message, "The host refused the answer")
   }),
-)
-
-const stoppedWhileWaiting = Effect.fnUntraced(function* (
-  f: Pick<Effect.Success<ReturnType<typeof fixture>>, "transcript" | "client">,
-  agentId: string,
-) {
-  const [waiting] = yield* f.transcript(agentId, waitingOn)
-  const request = waiting?.parts.find(isWaiting)
-
-  yield* f.client.StopTurn({ agentId })
-
-  const [turn] = yield* f.transcript(agentId, settled(1))
-  assert.deepStrictEqual(turn?.ended?.ending, TurnStopped.make({}))
-  assert.equal(turn?.parts.find(isRequestPart)?.status, "expired")
-
-  const marked = yield* f.client.WatchWaitingAgents().pipe(
-    Stream.filter((ids) => !ids.includes(agentId)),
-    Stream.runHead,
-  )
-
-  assert.isTrue(Option.isSome(marked))
-
-  const refused = yield* f.client
-    .AnswerRequest({ agentId, requestId: request?.requestId ?? "", answer: allow() })
-    .pipe(Effect.flip)
-
-  assert.equal(refused._tag, "RequestNotWaiting")
-})
-
-it.live("stops a Claude Code Turn while a request waits, and the next message runs", () =>
-  Effect.gen(function* () {
-    const f = yield* claudeAgentsFixture()
-    const agent = yield* f.start(askToRun, { ...claudeCode, permissionMode: "default" })
-
-    yield* stoppedWhileWaiting(f, agent.id)
-
-    yield* f.send(agent.id, "Try again")
-    const [, again] = yield* f.answering(agent.id, settled(2), allow)
-    assert.deepStrictEqual(again?.ended?.ending, TurnDone.make({}))
-  }),
-)
-
-it.live("stops a pi Turn while its extension's dialog waits", () =>
-  Effect.gen(function* () {
-    const f = yield* fixture({
-      reply: () => [
-        { toolCall: { id: "call-1", name: "bash", arguments: { command: "echo hi" } } },
-      ],
-    })
-
-    yield* Effect.promise(async () => {
-      const extensions = join(f.home, ".pi", "agent", "extensions")
-      await mkdir(extensions, { recursive: true })
-      await writeFile(
-        join(extensions, "confirm.js"),
-        `export default (pi) => pi.on("tool_call", async (event, ctx) => {
-          const sure = await ctx.ui.confirm("Run it?", event.toolName)
-          return sure ? undefined : { block: true, reason: "Declined" }
-        })`,
-      )
-    })
-
-    const agent = yield* f.start("Greet someone")
-
-    yield* stoppedWhileWaiting(f, agent.id)
-  }),
-)
-
-it.live(
-  "changes a Claude Code Agent's Permission mode for its next Turn, and refuses one for pi",
-  () =>
-    Effect.gen(function* () {
-      const f = yield* claudeAgentsFixture(undefined, { output: "Hi." })
-      const agent = yield* f.start(askToRun, { ...claudeCode, permissionMode: "default" })
-      const [first] = yield* f.answering(agent.id, settled(1), allow)
-      assert.lengthOf(asked(first), 1)
-
-      const changed = yield* f.client.ChangePermissionMode({
-        agentId: agent.id,
-        permissionMode: "bypassPermissions",
-      })
-
-      assert.equal(changed.permissionMode, "bypassPermissions")
-
-      yield* f.send(agent.id, "Please run `touch after-mode-change.txt`")
-      const [, second] = yield* f.answering(agent.id, settled(2), allow)
-      assert.deepStrictEqual(asked(second), [])
-      assert.isTrue(existsSync(join(f.worktree(agent.name), "after-mode-change.txt")))
-
-      const pi = yield* f.start("Say hello")
-
-      const refused = yield* f.client
-        .ChangePermissionMode({ agentId: pi.id, permissionMode: "auto" })
-        .pipe(Effect.flip)
-
-      assert.equal(refused._tag, "NoPermissionModes")
-    }),
-)
-
-it.live(
-  "starts a Claude Code Agent in Default unless a mode is chosen, and a pi Agent in none",
-  () =>
-    Effect.gen(function* () {
-      const f = yield* claudeAgentsFixture()
-
-      const unchosen = yield* f.start("Say hello", { ...claudeCode, permissionMode: null })
-      const chosen = yield* f.start("Say hello", { ...claudeCode, permissionMode: "acceptEdits" })
-      const automatic = yield* f.start("Say hello", { ...claudeCode, permissionMode: "auto" })
-      assert.deepStrictEqual(
-        [unchosen.permissionMode, chosen.permissionMode, automatic.permissionMode],
-        ["default", "acceptEdits", "auto"],
-      )
-
-      const pi = { engine: "pi-cli", model: null, effort: null } as const
-      assert.isNull(
-        (yield* f.start("Say hello", { ...pi, permissionMode: "acceptEdits" })).permissionMode,
-      )
-    }),
 )
