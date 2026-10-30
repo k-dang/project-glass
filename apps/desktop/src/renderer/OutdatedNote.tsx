@@ -15,7 +15,10 @@ export function OutdatedNote(props: {
     <Alert role="note">
       <AlertDescription className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <span className="flex min-w-0 flex-1 basis-48 items-start gap-2">
-          <TriangleAlert aria-hidden className={cn("size-4 shrink-0 translate-y-0.5", warningTone)} />
+          <TriangleAlert
+            aria-hidden
+            className={cn("size-4 shrink-0 translate-y-0.5", warningTone)}
+          />
           <span className="min-w-0 break-words">
             Written for an older Revision (head <ShortSha sha={props.revision.head} />
             ), so {props.consequence}.
