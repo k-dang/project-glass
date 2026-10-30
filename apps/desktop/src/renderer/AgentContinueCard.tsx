@@ -2,7 +2,7 @@ import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
 import { type AgentDestination, repositoryKey } from "@glass/contracts"
 import { AsyncResult } from "effect/reactivity"
 import { Sparkles } from "lucide-react"
-import { agentsAtom, engineNames, machineNames } from "./agentsArea"
+import { agentsAtom, engineNames, placeNames } from "./agentsArea"
 import { ContinueCard, rememberPlaceHint } from "./ContinueCard"
 import { Empty } from "./Lists"
 import { ProblemAlert } from "./ProblemAlert"
@@ -23,7 +23,7 @@ export function AgentContinueCard(props: { destination: AgentDestination }) {
           link={{ to: "/agents/$agentId", params: { agentId: agent.id } }}
           name={agent.name}
           icon={Sparkles}
-          subtitle={`Agents · ${repositoryKey(agent.repository)} · ${engineNames[agent.engine]} · ${machineNames[agent.place._tag]}`}
+          subtitle={`Agents · ${repositoryKey(agent.repository)} · ${engineNames[agent.engine]} · ${placeNames[agent.place._tag]}`}
         />
       )
     })

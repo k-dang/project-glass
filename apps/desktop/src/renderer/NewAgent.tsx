@@ -20,7 +20,7 @@ import {
 import { useNavigate } from "@tanstack/react-router"
 import { Exit, Option, Predicate } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
-import { Cloud, FolderGit2, FolderPlus, GitBranch, Laptop, LoaderCircle } from "lucide-react"
+import { FolderGit2, FolderPlus, GitBranch, LoaderCircle } from "lucide-react"
 import { type ReactNode, useCallback, useState } from "react"
 import { MessageGroup } from "@/components/ui/message"
 import { Trace, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace"
@@ -32,11 +32,13 @@ import {
   gitHubBranchesAtom,
   linkCheckoutAtom,
   localCheckoutsAtom,
-  machineNames,
+  placeNames,
   sandboxProvidersAtom,
+  placeIcons,
   placeKey,
   placeOfKey,
 } from "./agentsArea"
+import { AgentHeader } from "./AgentHeader"
 import { UserMessage } from "./AgentView"
 import type { BackendError } from "./backend"
 import { ChipSelect } from "./chips"
@@ -62,7 +64,6 @@ interface Choosable {
 
 interface PlaceOptions {
   readonly place: AgentPlace
-  readonly icon: ReactNode
   readonly branches: (
     repository: FollowedRepository,
   ) => Atom.Atom<AsyncResult.AsyncResult<Branches, BackendError>>
@@ -73,7 +74,6 @@ interface PlaceOptions {
 
 const onThisMac: PlaceOptions = {
   place: thisMac,
-  icon: <Laptop aria-hidden />,
   branches: branchesAtom,
   describe: (key) =>
     key === undefined ? (
@@ -81,7 +81,7 @@ const onThisMac: PlaceOptions = {
     ) : (
       <>
         The Agent works on a branch of its own, in its own copy of{" "}
-        <span className="whitespace-nowrap">{key}</span> on {machineNames["this-mac"]}.
+        <span className="whitespace-nowrap">{key}</span> on {placeNames["this-mac"]}.
       </>
     ),
   starting: (key, baseBranch) => `Making the Agent's copy of ${key} from ${baseBranch}…`,
@@ -90,7 +90,6 @@ const onThisMac: PlaceOptions = {
 
 const inSandboxOf = ({ id, name }: SandboxProviderInfo): PlaceOptions => ({
   place: SandboxPlace.make({ providerId: id }),
-  icon: <Cloud aria-hidden />,
   branches: gitHubBranchesAtom,
   describe: (key) =>
     key === undefined ? (
@@ -273,6 +272,7 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
   const { where, program, setProgram, newest } = props
   const navigate = useNavigate()
   const folder = useChooseFolder()
+  const PlaceIcon = placeIcons[where.place._tag]
   const [written, setWritten] = useAtom(writtenAtom(NEW_AGENT_TEXT))
   const composed = written ?? nothingUnsent
 
@@ -346,9 +346,19 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
 
   return (
     <section aria-label="New Agent" className="flex min-h-0 flex-1 flex-col">
+      <AgentHeader
+        heading={
+          <h1 className="truncate font-medium">
+            {starting === null ? "New Agent" : "Starting Agent…"}
+          </h1>
+        }
+        place={where.place}
+        repository={key}
+        baseBranch={baseBranch}
+      />
       {starting === null ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">What should we work on?</h1>
+          <h2 className="text-2xl font-semibold tracking-tight">What should we work on?</h2>
           <p className="max-w-md text-sm text-muted-foreground">{where.describe(key)}</p>
         </div>
       ) : (
@@ -401,10 +411,10 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
             {props.providers.length > 0 && (
               <ChipSelect
                 label="Where the Agent runs"
-                icon={where.icon}
+                icon={<PlaceIcon aria-hidden />}
                 value={placeKey(where.place)}
                 items={[
-                  { value: placeKey(thisMac), label: machineNames["this-mac"] },
+                  { value: placeKey(thisMac), label: placeNames["this-mac"] },
                   ...props.providers.map((provider) => ({
                     value: placeKey(SandboxPlace.make({ providerId: provider.id })),
                     label: provider.name,

@@ -41,17 +41,21 @@ test("reviews a local Agent's changes on its Changes tab, held still until moved
   await message.press("Enter")
   await expect(window.getByText(/^Done in/)).toBeVisible({ timeout: agentTurnTimeout })
 
-  await window.getByRole("tab", { name: "Changes" }).click()
-  const changes = window.getByRole("tabpanel", { name: "Changes" })
+  const details = window.getByRole("button", { name: "Details" })
+  await details.click()
+  await window.getByRole("button", { name: "Changes" }).click()
+  const changes = window.getByRole("region", { name: "Changes" })
   await expect(changes.getByText("hello from the Agent")).toBeVisible()
   await expect(message).toBeHidden()
 
-  await window.getByRole("tab", { name: "Chat" }).click()
+  await details.click()
+  await window.getByRole("button", { name: "Back to Chat" }).click()
   await message.fill("Write another")
   await message.press("Enter")
   await expect(window.getByText(/^Done in/)).toHaveCount(2, { timeout: agentTurnTimeout })
 
-  await window.getByRole("tab", { name: "Changes" }).click()
+  await details.click()
+  await window.getByRole("button", { name: "Changes" }).click()
   await expect(changes.getByRole("note")).toContainText("worked since you opened these changes")
   await expect(changes.getByText("a second note")).toHaveCount(0)
 

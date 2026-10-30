@@ -19,6 +19,7 @@ import {
 } from "@glass/contracts"
 import { Data, Effect, Exit, Predicate, Schema, Stream } from "effect"
 import { Atom, type AtomRegistry } from "effect/reactivity"
+import { Cloud, Laptop, type LucideIcon } from "lucide-react"
 import { toast } from "@/components/ui/toast"
 import { Backend, backendRuntime, backendRuntimeOf } from "./backend"
 import { problemOf } from "./problems"
@@ -35,7 +36,9 @@ export const placeOfKey = (key: string): AgentPlace =>
     ? SandboxPlace.make({ providerId: key.slice("sandbox:".length) })
     : thisMac
 
-export const machineNames: Record<PlaceTag, string> = { "this-mac": "Local", sandbox: "Sandboxes" }
+export const placeNames: Record<PlaceTag, string> = { "this-mac": "Local", sandbox: "Sandbox" }
+
+export const placeIcons: Record<PlaceTag, LucideIcon> = { "this-mac": Laptop, sandbox: Cloud }
 
 export const engineNames: Record<AgentEngine, string> = {
   "claude-code": "Claude Code",
