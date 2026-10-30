@@ -63,7 +63,7 @@ import {
   TraceTitle,
 } from "@/components/ui/trace"
 import { AgentChanges } from "./AgentChanges"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { AgentHeader, AgentHeaderAction } from "./AgentHeader"
 import {
   QueueItem,
   QueueItemAction,
@@ -80,7 +80,6 @@ import {
   changeModelAtom,
   changePermissionModeAtom,
   writtenAtom,
-  machineNames,
   placeKey,
   saveUnsent,
   sendMessageAtom,
@@ -155,29 +154,42 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
   }, [registry, agent.id])
 
   return (
-    <Tabs
-      value={tab}
-      onValueChange={onTabChange}
-      render={<section aria-label={agent.name} />}
-      className="min-h-0 flex-1 gap-0"
-    >
-      <header className="flex items-center gap-2 border-b px-6">
-        <h1 className="shrink-0 py-2 text-sm font-medium">{agent.name}</h1>
-        <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-          {repositoryKey(agent.repository)} · from {agent.baseBranch} ·{" "}
-          {machineNames[agent.place._tag]}
-        </p>
-        <TabsList variant="line" aria-label="Agent" className="shrink-0 self-stretch">
-          <TabsTrigger value="chat" className="flex-none px-2">
-            <MessageCircle aria-hidden />
-            Chat
-          </TabsTrigger>
-          <TabsTrigger value="changes" className="flex-none px-2">
+    <section aria-label={agent.name} className="flex min-h-0 flex-1 flex-col">
+      <AgentHeader
+        heading={
+          tab === "changes" ? (
+            <>
+              <button
+                type="button"
+                className="truncate text-muted-foreground hover:text-foreground"
+                onClick={() => onTabChange("chat")}
+              >
+                {agent.name}
+              </button>
+              <span className="text-muted-foreground/50">/</span>
+              <h1 className="font-medium">Changes</h1>
+            </>
+          ) : (
+            <h1 className="truncate font-medium">{agent.name}</h1>
+          )
+        }
+        place={agent.place}
+        repository={repositoryKey(agent.repository)}
+        branch={agent.name}
+        baseBranch={agent.baseBranch}
+      >
+        {tab === "chat" ? (
+          <AgentHeaderAction onSelect={() => onTabChange("changes")}>
             <FileDiff aria-hidden />
             Changes
-          </TabsTrigger>
-        </TabsList>
-      </header>
+          </AgentHeaderAction>
+        ) : (
+          <AgentHeaderAction onSelect={() => onTabChange("chat")}>
+            <MessageCircle aria-hidden />
+            Back to Chat
+          </AgentHeaderAction>
+        )}
+      </AgentHeader>
       {AsyncResult.isFailure(transcript) && !transcript.waiting && (
         <div className="px-6 pt-4">
           <ProblemAlert
@@ -186,14 +198,18 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
           />
         </div>
       )}
-      <TabsContent value="chat" keepMounted className="flex min-h-0 flex-col">
+      <div hidden={tab !== "chat"} className="flex min-h-0 flex-1 flex-col">
         <Transcript agentId={agent.id} turns={turns} status={status} />
         <Composer agent={agent} running={running} waiting={waiting} turns={turns} queued={queued} />
-      </TabsContent>
-      <TabsContent value="changes" keepMounted className="flex min-h-0 min-w-0 flex-col">
+      </div>
+      <section
+        aria-label="Changes"
+        hidden={tab !== "changes"}
+        className="flex min-h-0 min-w-0 flex-1 flex-col"
+      >
         {changesOpened && <AgentChanges agent={agent} turns={turns} />}
-      </TabsContent>
-    </Tabs>
+      </section>
+    </section>
   )
 }
 

@@ -1,5 +1,5 @@
 import { RegistryContext, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
-import { type Agent, repositoryKey } from "@glass/contracts"
+import { type Agent, type PlaceTag, repositoryKey } from "@glass/contracts"
 import { Link, Outlet, useNavigate, useParams } from "@tanstack/react-router"
 import { Exit, Option, Predicate } from "effect"
 import { AsyncResult } from "effect/reactivity"
@@ -11,7 +11,7 @@ import { TooltipHint } from "@/components/ui/tooltip"
 import {
   agentsAtom,
   groupAgents,
-  machineNames,
+  placeNames,
   removalWarningsAtom,
   removeAgent,
   waitingAgentsAtom,
@@ -20,6 +20,8 @@ import { ConfirmationDialog } from "./ConfirmationDialog"
 import { settledProblem, streamProblem } from "./problems"
 import { ProblemAlert } from "./ProblemAlert"
 import { shortcutLabel } from "./shortcutLabel"
+
+const groupNames: Record<PlaceTag, string> = { ...placeNames, sandbox: "Sandboxes" }
 
 const noneWaiting: ReadonlySet<string> = new Set()
 
@@ -106,13 +108,9 @@ function AgentList() {
       ) : (
         <nav aria-label="Agents list" className="flex flex-col gap-4">
           {groupAgents(list).map(({ machine, agents: onMachine }) => (
-            <section
-              key={machine}
-              aria-label={machineNames[machine]}
-              className="flex flex-col gap-1"
-            >
+            <section key={machine} aria-label={groupNames[machine]} className="flex flex-col gap-1">
               <h2 className="px-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                {machineNames[machine]}
+                {groupNames[machine]}
               </h2>
               <ul className="flex flex-col gap-0.5">
                 {onMachine.map((agent) => (

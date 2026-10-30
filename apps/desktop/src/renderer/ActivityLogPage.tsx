@@ -27,7 +27,7 @@ import { Button } from "@/components/ui/button"
 import { Backend, backendRuntime } from "./backend"
 import { Empty, LoadMore } from "./Lists"
 import { plural } from "./plural"
-import { machineNames } from "./agentsArea"
+import { placeNames } from "./agentsArea"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf } from "./problems"
 import { dayOf } from "./recency"
@@ -117,7 +117,7 @@ const describe = (activity: Activity): Described =>
       verb: "Started Agent",
       icon: Sparkles,
       subject: name,
-      where: `${repositoryKey(repository)} on ${machineNames[machine]}`,
+      where: `${repositoryKey(repository)} on ${placeNames[machine]}`,
       written: unlessBlank(message),
     }),
   })
