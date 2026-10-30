@@ -1,6 +1,6 @@
 import { Cause, Deferred, Effect, Option, Predicate, Queue, Schema, Scope, Stream } from "effect"
-import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import { commandLine } from "../processes"
+import { ChildProcessSpawner } from "effect/process"
+import { launchCommand } from "../processes"
 import { HostAgentError } from "./protocol"
 import { ToolInput } from "./toolCalls"
 
@@ -165,20 +165,13 @@ export const startPiRpc = Effect.fnUntraced(function* (
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
   const scope = yield* Scope.Scope
 
-  const launch = commandLine(piCommand, [
-    "--mode",
-    "rpc",
-    ...(conversation === undefined ? [] : ["--session-id", conversation]),
-  ])
-
   const child = yield* spawner
     .spawn(
-      ChildProcess.make(launch.executable, launch.args, {
-        cwd: folder,
-        env: launch.env,
-        extendEnv: true,
-        forceKillAfter: "1 second",
-      }),
+      launchCommand(
+        piCommand,
+        ["--mode", "rpc", ...(conversation === undefined ? [] : ["--session-id", conversation])],
+        { cwd: folder, extendEnv: true, forceKillAfter: "1 second" },
+      ),
     )
     .pipe(
       Effect.tapError((cause) => Effect.logWarning("pi could not start", cause)),

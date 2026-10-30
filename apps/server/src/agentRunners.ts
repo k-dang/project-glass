@@ -23,7 +23,7 @@ import {
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { join } from "node:path"
 import { type AgentFailure, agentFailure, runnerFailureReason } from "./agentFailure"
-import { bundledEntry, commandLine } from "./processes"
+import { bundledEntry, launchCommand } from "./processes"
 import { PiAnswerJson, PiAnswerMessage, PiConfigJson, PiReady, PiRequest } from "./piProtocol"
 import { ServerConfig } from "./ServerConfig"
 
@@ -114,13 +114,10 @@ const runnerStrategies = Effect.gen(function* () {
     cwd: string,
     input = "",
   ) {
-    const line = commandLine(command, args)
-
     const process = yield* spawner.spawn(
-      ChildProcess.make(line.executable, line.args, {
+      launchCommand(command, args, {
         cwd,
         stdin: Stream.make(new TextEncoder().encode(input)),
-        env: line.env,
         extendEnv: true,
       }),
     )

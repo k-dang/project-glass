@@ -13,14 +13,14 @@ import {
   Semaphore,
   Stream,
 } from "effect"
-import { ChildProcess, ChildProcessSpawner } from "effect/process"
+import { ChildProcessSpawner } from "effect/process"
 import type { RpcClientError } from "effect/rpc"
 import { Socket } from "effect/socket"
 import { RPC_PATH } from "@glass/contracts"
 import { AgentHostRpcs, HOST_TOKEN_HEADER, HostReady, newHostToken } from "./agentHost/protocol"
 import { followJournal } from "./hostJournal"
 import type { HostClient } from "./Placement"
-import { bundledEntry, commandLine } from "./processes"
+import { bundledEntry, launchCommand } from "./processes"
 import { connectRpcClient } from "./rpcSocket"
 import { ServerConfig } from "./ServerConfig"
 import { Transcripts } from "./Transcripts"
@@ -61,12 +61,9 @@ export class LocalAgentHost extends Context.Service<
         const token = newHostToken()
 
         return yield* Effect.gen(function* () {
-          const host = commandLine(hostEntry, [])
-
           const child = yield* spawner.spawn(
-            ChildProcess.make(host.executable, host.args, {
+            launchCommand(hostEntry, [], {
               env: {
-                ...host.env,
                 GLASS_HOST_TOKEN: token,
                 GLASS_PI_COMMAND: config.piCommand,
                 GLASS_CLAUDE_COMMAND: config.claudeCommand,

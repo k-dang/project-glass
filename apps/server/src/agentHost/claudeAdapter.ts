@@ -24,6 +24,7 @@ import {
 import { Deferred, Effect, Option, Predicate, Queue, Schema, type Scope, Stream } from "effect"
 import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
+import { sdkExecutable } from "../processes"
 import type { AgentAdapter } from "./adapter"
 import { Input, isFailure, machine } from "./claudeTurn"
 import { couldNotSwitch, HostAgentError, notRunning } from "./protocol"
@@ -87,7 +88,7 @@ const startClaude = (
         sdk.query({
           prompt,
           options: {
-            pathToClaudeCodeExecutable: command,
+            pathToClaudeCodeExecutable: sdkExecutable(command),
             cwd: folder,
             // The SDK's own default system prompt is empty, unlike the terminal `claude`'s.
             systemPrompt: { type: "preset", preset: "claude_code" },
