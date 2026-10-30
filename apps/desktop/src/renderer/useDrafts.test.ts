@@ -17,7 +17,8 @@ import {
   type UpdateDraftError,
 } from "@glass/contracts"
 import { Effect } from "effect"
-import { describe, expect, it, vi } from "vite-plus/test"
+import { describe, expect, it } from "vite-plus/test"
+import { eventually } from "../../test/eventually"
 import { DraftStore } from "./useDrafts"
 import { type Held, hold, next, testRegistry } from "../../test/testBackend"
 import { recordedPullRequest, revision, workspace } from "../../test/workspace"
@@ -94,7 +95,7 @@ describe("DraftStore", () => {
     expect(store.linePlaces()).toBe(places)
 
     ;(await next(updates)).answer(Effect.void)
-    await vi.waitFor(() => expect(store.view("D1")?.feedback).toEqual({ type: "draft" }))
+    await eventually(() => expect(store.view("D1")?.feedback).toEqual({ type: "draft" }))
 
     expect(store.view("D2")).toBe(other)
     expect(store.linePlaces()).toBe(places)
@@ -116,7 +117,7 @@ describe("DraftStore", () => {
     expect(create.payload).toMatchObject({ path: "greet.ts", side: "new", line: 2, body: "Why" })
 
     create.answer(Effect.succeed(onGitHub("Why")))
-    await vi.waitFor(() => expect(store.view(key)?.feedback).toEqual({ type: "unsaved" }))
+    await eventually(() => expect(store.view(key)?.feedback).toEqual({ type: "unsaved" }))
     expect(made()).toBe(0)
 
     save(store, key, "Why??")
@@ -146,7 +147,7 @@ describe("DraftStore", () => {
     deletion.answer(Effect.void)
 
     expect(deletion.payload).toEqual({ id: "D1" })
-    await vi.waitFor(() => expect(store.view("D1")?.feedback).toBeNull())
+    await eventually(() => expect(store.view("D1")?.feedback).toBeNull())
     expect(store.hasUnsaved()).toBe(false)
   })
 
@@ -181,7 +182,7 @@ describe("DraftStore", () => {
     expect(store.takeLocal(sending)).toBeUndefined()
 
     create.answer(Effect.succeed(onGitHub("Why")))
-    await vi.waitFor(() => expect(store.views()[0]!.local).toBe(false))
+    await eventually(() => expect(store.views()[0]!.local).toBe(false))
     expect(store.takeLocal(sending)).toBeUndefined()
     expect(made()).toBe(0)
   })
@@ -201,7 +202,7 @@ describe("DraftStore", () => {
     deletion.answer(Effect.void)
 
     expect(deletion.payload).toEqual({ id: "D1" })
-    await vi.waitFor(() => expect(store.views()).toHaveLength(0))
+    await eventually(() => expect(store.views()).toHaveLength(0))
   })
 
   it("keeps text whose save failed until a retry saves it", async () => {
@@ -210,7 +211,7 @@ describe("DraftStore", () => {
     save(store, "D1", "Hi!")
     ;(await next(updates)).answer(Effect.fail(new GitHubUnavailable({ message: "Down" })))
 
-    await vi.waitFor(() =>
+    await eventually(() =>
       expect(store.view("D1")?.feedback).toMatchObject({ type: "failed", action: "save" }),
     )
     expect(store.view("D1")?.body).toBe("Hi!")
@@ -223,7 +224,7 @@ describe("DraftStore", () => {
 
     retry.answer(Effect.void)
 
-    await vi.waitFor(() => expect(store.view("D1")?.feedback).toEqual({ type: "draft" }))
+    await eventually(() => expect(store.view("D1")?.feedback).toEqual({ type: "draft" }))
     expect(store.view("D1")?.body).toBe("Hi!")
     expect(store.hasUnsaved()).toBe(false)
   })
@@ -408,7 +409,7 @@ describe("DraftStore", () => {
 
     save(store, "D1", "Hi!")
     ;(await next(updates)).answer(Effect.fail(new GitHubUnavailable({ message: "Down" })))
-    await vi.waitFor(() => expect(store.view("D1")?.feedback?.type).toBe("failed"))
+    await eventually(() => expect(store.view("D1")?.feedback?.type).toBe("failed"))
     await store.submit("approve", "")
     expect(store.submission().type).toBe("failed")
 
@@ -422,7 +423,7 @@ describe("DraftStore", () => {
 
     save(store, "D1", "Hi!")
     ;(await next(updates)).answer(Effect.fail(new GitHubUnavailable({ message: "Down" })))
-    await vi.waitFor(() => expect(store.view("D1")?.feedback?.type).toBe("failed"))
+    await eventually(() => expect(store.view("D1")?.feedback?.type).toBe("failed"))
 
     expect(await store.submit("approve", "")).toMatchObject({ type: "failed" })
     expect(submits).toHaveLength(0)

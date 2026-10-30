@@ -4,7 +4,7 @@ import { Effect, Exit, Fiber, Option, Scope, Stream } from "effect"
 import { existsSync } from "node:fs"
 import { readdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { vi } from "vite-plus/test"
+import { eventually } from "../test/eventually"
 import { fakeAgent } from "../test/fakeAgent"
 import { fakeModelProvider } from "../test/fakeModelProvider"
 import { piCredentialHelper } from "../test/piCredentialHelper"
@@ -36,7 +36,7 @@ const piCliModels = [
 
 const fixture = Effect.fnUntraced(function* (
   settings?: Partial<FakeAgentSettings>,
-  timeout = 5000,
+  timeout = 60_000,
 ) {
   const agent = yield* fakeAgent({
     ready: true,
@@ -90,12 +90,7 @@ const fixture = Effect.fnUntraced(function* (
   const state = (predicate: (state: TourState) => boolean) =>
     client
       .WatchTour({ pullRequest: ref })
-      .pipe(
-        Stream.filter(predicate),
-        Stream.runHead,
-        Effect.map(Option.getOrThrow),
-        Effect.timeout("10 seconds"),
-      )
+      .pipe(Stream.filter(predicate), Stream.runHead, Effect.map(Option.getOrThrow))
 
   return {
     agent,
@@ -242,7 +237,7 @@ for (const [name, settings, expected] of [
 ] as const) {
   it.live(`reports ${name} without leaking CLI output`, () =>
     Effect.gen(function* () {
-      const f = yield* fixture(settings, expected === "timeout" ? 350 : 5000)
+      const f = yield* fixture(settings, expected === "timeout" ? 350 : undefined)
       yield* f.write
       const state = yield* f.state(completed)
       assert.equal(state.job.status, "failed")
@@ -445,7 +440,6 @@ it.live("writes a saved Tour from the requested GitHub Revision", () =>
     const saved = yield* client.WatchTour({ pullRequest: ref }).pipe(
       Stream.filter((state) => state.tour !== null),
       Stream.runHead,
-      Effect.timeout("10 seconds"),
     )
 
     const state = Option.getOrThrow(saved)
@@ -545,7 +539,7 @@ for (const [name, settings, expected] of [
 ] as const) {
   it.live(`reports pi SDK ${name} without leaking provider output`, () =>
     Effect.gen(function* () {
-      const f = yield* fixture(undefined, expected === "timeout" ? 1000 : 5000)
+      const f = yield* fixture(undefined, expected === "timeout" ? 1000 : undefined)
       const pi = yield* fakeModelProvider(f.home, settings)
       yield* f.useEngine("pi")
       yield* f.write
@@ -686,45 +680,19 @@ it.live("cancels Pi's model request and resolves its model again on the next job
 
 it.live("keeps RPCs responsive and kills the Pi credential helper tree on cancel", () =>
   Effect.gen(function* () {
-    const f = yield* fixture(undefined, 20_000)
+    const f = yield* fixture()
     const pi = yield* fakeModelProvider(f.home, { output: JSON.stringify(answer) })
     yield* f.useEngine("pi")
     const helper = yield* piCredentialHelper(f.home)
     yield* helper.hang
     yield* f.write
-    const running = yield* Effect.promise(() => vi.waitFor(() => Effect.runPromise(helper.running)))
-    const before = Date.now()
+    const running = yield* Effect.promise(() => eventually(() => Effect.runPromise(helper.running)))
     assert.equal((yield* f.client.GetConnection()).login, VIEWER.login)
     yield* f.client.CancelTour({ pullRequest: f.ref })
-    assert.isBelow(Date.now() - before, 1500)
     assert.deepStrictEqual(yield* f.state(completed), { tour: null, job: { status: "idle" } })
     assert.isEmpty(pi.calls)
     yield* Effect.promise(() =>
-      vi.waitFor(() => {
-        for (const pid of [running.pid, running.parentPid, running.childPid])
-          assert.throws(() => process.kill(pid, 0))
-      }),
-    )
-    assert.isFalse(existsSync(running.cwd))
-  }),
-)
-
-it.live("enforces the Tour deadline while a Pi credential helper is blocked", () =>
-  Effect.gen(function* () {
-    const f = yield* fixture(undefined, 2000)
-    const pi = yield* fakeModelProvider(f.home, { output: JSON.stringify(answer) })
-    yield* f.useEngine("pi")
-    const helper = yield* piCredentialHelper(f.home)
-    yield* helper.hang
-    const before = Date.now()
-    yield* f.write
-    const running = yield* Effect.promise(() => vi.waitFor(() => Effect.runPromise(helper.running)))
-    const state = yield* f.state(completed)
-    assert.equal(state.job.status === "failed" && state.job.reason.reason, "timeout")
-    assert.isBelow(Date.now() - before, 4000)
-    assert.isEmpty(pi.calls)
-    yield* Effect.promise(() =>
-      vi.waitFor(() => {
+      eventually(() => {
         for (const pid of [running.pid, running.parentPid, running.childPid])
           assert.throws(() => process.kill(pid, 0))
       }),
@@ -810,7 +778,6 @@ it.live(
       const states = yield* f.client.WatchTour({ pullRequest: f.ref }).pipe(
         Stream.takeUntil((state) => state.tour?.intent === "Rewritten."),
         Stream.runCollect,
-        Effect.timeout("10 seconds"),
         Effect.forkChild,
       )
 

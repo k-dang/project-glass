@@ -33,14 +33,9 @@ const tourState = (
 ) =>
   client
     .WatchTour({ pullRequest: ref(pr) })
-    .pipe(
-      Stream.filter(predicate),
-      Stream.runHead,
-      Effect.map(Option.getOrThrow),
-      Effect.timeout("10 seconds"),
-    )
+    .pipe(Stream.filter(predicate), Stream.runHead, Effect.map(Option.getOrThrow))
 
-const fixture = Effect.fnUntraced(function* ({ timeoutMs = 10_000, queueTours = true } = {}) {
+const fixture = Effect.fnUntraced(function* ({ timeoutMs = 60_000, queueTours = true } = {}) {
   const home = yield* isolatedHome
   const gate = join(home, "answer")
   const agent = yield* fakeAgent({ ready: true, output: answer, gate })

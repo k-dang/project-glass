@@ -1,6 +1,7 @@
 import { Effect } from "effect"
 import { AtomRegistry } from "effect/reactivity"
 import { expect, it, vi } from "vite-plus/test"
+import { eventually } from "../../test/eventually"
 import { backendRuntime } from "./backend"
 import { createResolutions } from "./useResolutions"
 import { type Held, hold, next, testRegistry } from "../../test/testBackend"
@@ -31,8 +32,8 @@ it("lets a resolve finish after its workspace is evicted, then releases its atom
     expect(interrupted).not.toHaveBeenCalled()
     call.answer(Effect.succeed(true))
 
-    await vi.waitFor(() => expect(finished).toHaveBeenCalledOnce())
-    await vi.waitFor(() => expect(registry.getNodes().size).toBe(baseline))
+    await eventually(() => expect(finished).toHaveBeenCalledOnce())
+    await eventually(() => expect(registry.getNodes().size).toBe(baseline))
   } finally {
     registry.dispose()
   }

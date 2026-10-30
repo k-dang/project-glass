@@ -1,6 +1,6 @@
 import { assert } from "@effect/vitest"
 import { Effect, Schema } from "effect"
-import { vi } from "vite-plus/test"
+import { eventually } from "./eventually"
 import { type FakeAgentSettings, installFakeAgent } from "./fakeAgentFiles"
 import { isolatedHome } from "./harness"
 
@@ -36,13 +36,10 @@ export const fakeAgent = Effect.fnUntraced(function* (initial: FakeAgentSettings
     calls,
     untilCalls: (stage: typeof AgentLogLine.Type.stage, count = 1) =>
       Effect.promise(() =>
-        vi.waitFor(
-          async () => {
-            const logged = await Effect.runPromise(calls)
-            assert.isAtLeast(logged.filter((call) => call.stage === stage).length, count)
-          },
-          { timeout: 5000 },
-        ),
+        eventually(async () => {
+          const logged = await Effect.runPromise(calls)
+          assert.isAtLeast(logged.filter((call) => call.stage === stage).length, count)
+        }),
       ),
   }
 })

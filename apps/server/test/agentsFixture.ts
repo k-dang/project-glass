@@ -67,7 +67,6 @@ export const agentsFixture = Effect.fnUntraced(function* (
       Stream.filter(until),
       Stream.runHead,
       Effect.map(Option.getOrThrow),
-      Effect.timeout("30 seconds"),
     )
 
   const transcript = (
@@ -150,7 +149,6 @@ export const agentsFixture = Effect.fnUntraced(function* (
       Stream.filter(until),
       Stream.runHead,
       Effect.map(Option.getOrThrow),
-      Effect.timeout("30 seconds"),
     )
   }
 

@@ -24,5 +24,9 @@ export default defineConfig({
   server: { host: "127.0.0.1", strictPort: true },
   build: { outDir: "dist/renderer", sourcemap: true },
   pack: [bundle("main"), bundle("preload")],
-  test: { include: ["src/**/*.test.{ts,tsx}"] },
+  test: {
+    include: ["src/**/*.test.{ts,tsx}"],
+    setupFiles: ["test/setup.ts"],
+    testTimeout: 30_000,
+  },
 })

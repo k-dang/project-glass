@@ -1,4 +1,4 @@
-import { type Duration, Effect, type Layer } from "effect"
+import { type Duration, Effect, Latch, type Layer } from "effect"
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http"
 import { execFileSync, spawn } from "node:child_process"
 import { existsSync, mkdtempSync, rmSync } from "node:fs"
@@ -29,11 +29,13 @@ const fastImportCommit = (ref: string, files: FakeCommit["files"]) => [
 export interface TrafficMeter {
   readonly around: <A, E, R>(request: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>
   readonly slow: (delay: Duration.Input) => void
+  readonly gather: (count: number) => void
   readonly mostAtOnce: number
 }
 
 export const trafficMeter = (): TrafficMeter => {
   let delay: Duration.Input = 0
+  let gathering: { readonly count: number; readonly together: Latch.Latch } | null = null
   let inFlight = 0
   let mostAtOnce = 0
 
@@ -42,7 +44,10 @@ export const trafficMeter = (): TrafficMeter => {
       Effect.suspend(() => {
         mostAtOnce = Math.max(mostAtOnce, ++inFlight)
 
-        return Effect.sleep(delay).pipe(
+        if (gathering !== null && inFlight >= gathering.count) gathering.together.openUnsafe()
+        const hold = gathering === null ? Effect.sleep(delay) : gathering.together.await
+
+        return hold.pipe(
           Effect.andThen(request),
           Effect.ensuring(
             Effect.sync(() => {
@@ -53,6 +58,11 @@ export const trafficMeter = (): TrafficMeter => {
       }),
     slow: (next) => {
       delay = next
+      gathering = null
+      mostAtOnce = 0
+    },
+    gather: (count) => {
+      gathering = { count, together: Latch.makeUnsafe() }
       mostAtOnce = 0
     },
     get mostAtOnce() {
@@ -87,6 +97,9 @@ const httpBackend = (
     const output: Array<Buffer> = []
     backend.stdout.on("data", (chunk: Buffer) => output.push(chunk))
     backend.on("error", (error) => resume(Effect.die(error)))
+    backend.stdin.on("error", (error: NodeJS.ErrnoException) => {
+      if (error.code !== "EPIPE") resume(Effect.die(error))
+    })
 
     backend.on("close", () => {
       const response = Buffer.concat(output)
