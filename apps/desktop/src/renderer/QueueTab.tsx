@@ -8,7 +8,7 @@ import {
 } from "@glass/contracts"
 import { cn } from "cn"
 import { Exit, Option } from "effect"
-import { AsyncResult } from "effect/reactivity"
+import { AsyncResult, Atom } from "effect/reactivity"
 import {
   Clock,
   ListPlus,
@@ -18,7 +18,14 @@ import {
   TriangleAlert,
   X,
 } from "lucide-react"
-import { type ClipboardEvent, type FormEvent, useContext, useState } from "react"
+import {
+  type ClipboardEvent,
+  type FormEvent,
+  type ReactNode,
+  useContext,
+  useMemo,
+  useState,
+} from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { TabsTrigger } from "@/components/ui/tabs"
@@ -27,7 +34,6 @@ import { Empty } from "./Lists"
 import { ProblemAlert } from "./ProblemAlert"
 import { describeError, type Problem, problemOf, problemText, settledProblem } from "./problems"
 import {
-  columnsWithRepository,
   NotRefreshed,
   PullRequestRow,
   repositoryLabeller,
@@ -42,6 +48,12 @@ import {
   removeFromQueue,
   savedQueueAtom,
 } from "./queue"
+import {
+  PrototypeSwitcher,
+  type VariantKey,
+  useVariant,
+  variantColumns,
+} from "./QueueStatusPrototype"
 import { isOutdated, tourStates } from "./useTour"
 
 export function QueueTabTrigger() {
@@ -65,6 +77,7 @@ export function QueueTab(props: { onOpen: (pullRequest: PullRequestRef) => void 
   const saved = useAtomValue(savedQueueAtom)
   const retry = useAtomRefresh(savedQueueAtom)
   const notRefreshed = settledProblem(useAtomValue(queueRefreshAtom)) ?? undefined
+  const variant = useVariant()
 
   return (
     <div className="flex flex-col gap-2 pt-4">
@@ -87,17 +100,24 @@ export function QueueTab(props: { onOpen: (pullRequest: PullRequestRef) => void 
               <p>Paste PR links into the field above, one at a time or a whole message at once.</p>
             </Empty>
           ) : (
-            <ol aria-label="Queue" className={cn("grid gap-x-2.5", columnsWithRepository)}>
-              <QueueRows entries={entries} notRefreshed={notRefreshed} onOpen={props.onOpen} />
+            <ol aria-label="Queue" className={cn("grid gap-x-2.5", variantColumns[variant])}>
+              <QueueRows
+                variant={variant}
+                entries={entries}
+                notRefreshed={notRefreshed}
+                onOpen={props.onOpen}
+              />
             </ol>
           ),
         )
         .render()}
+      <PrototypeSwitcher />
     </div>
   )
 }
 
 function QueueRows(props: {
+  variant: VariantKey
   entries: ReadonlyArray<QueuedPullRequest>
   notRefreshed: Problem | undefined
   onOpen: (pullRequest: PullRequestRef) => void
@@ -108,19 +128,86 @@ function QueueRows(props: {
     props.entries.map(({ pullRequest }) => pullRequest.ref),
   )
 
-  return props.entries.map((queued) => (
+  const row = (queued: QueuedPullRequest) => (
     <QueueRow
       key={queued.pullRequest.url}
+      variant={props.variant}
       queued={queued}
       repository={repositoryLabel(queued.pullRequest.ref)}
       notRefreshed={queued.problem === null ? props.notRefreshed : describeError(queued.problem)}
       now={now}
       onOpen={props.onOpen}
     />
-  ))
+  )
+
+  if (props.variant !== "C") return props.entries.map(row)
+
+  return <GroupedRows entries={props.entries} row={row} />
+}
+
+const groupOrder = [
+  "Tour failed",
+  "Writing Tour",
+  "Tour waiting",
+  "Tour outdated",
+  "Tour ready",
+  "No Tour",
+]
+
+function GroupedRows(props: {
+  entries: ReadonlyArray<QueuedPullRequest>
+  row: (queued: QueuedPullRequest) => ReactNode
+}) {
+  const statusesAtom = useMemo(
+    () =>
+      Atom.make((get) =>
+        props.entries.map((queued) => {
+          const state = Option.getOrNull(AsyncResult.value(get(tourStates(queued.pullRequest.ref))))
+
+          return state === null ? null : tourStatus(state, queued.revision)
+        }),
+      ),
+    [props.entries],
+  )
+
+  const statuses = useAtomValue(statusesAtom)
+
+  const groups = Map.groupBy(props.entries, (_, index) => statuses[index]?.label ?? "No Tour")
+
+  return groupOrder
+    .filter((label) => groups.has(label))
+    .map((label) => {
+      const status = statuses.find((candidate) => candidate?.label === label) ?? null
+      const Icon = status?.icon
+      const rows = groups.get(label)!
+
+      return [
+        <li
+          key={`group:${label}`}
+          className={cn(
+            "col-span-full flex items-center gap-1.5 px-1 pt-4 pb-1 text-xs font-medium first:pt-1",
+            status?.tone ?? "text-muted-foreground",
+          )}
+        >
+          {Icon && (
+            <Icon
+              aria-hidden
+              className={cn(
+                "size-3.5",
+                status?.spinning && "animate-spin motion-reduce:animate-none",
+              )}
+            />
+          )}
+          {label}
+          <span className="text-muted-foreground tabular-nums">{rows.length}</span>
+        </li>,
+        ...rows.map(props.row),
+      ]
+    })
 }
 
 function QueueRow(props: {
+  variant: VariantKey
   queued: QueuedPullRequest
   repository: string
   notRefreshed: Problem | undefined
@@ -153,7 +240,11 @@ function QueueRow(props: {
             </span>
           )
         }
-        badge={<QueueTourStatus queued={props.queued} />}
+        badge={props.variant === "0" ? <QueueTourStatus queued={props.queued} /> : undefined}
+        status={props.variant === "A" ? <QueueTourStatus queued={props.queued} /> : undefined}
+        lead={
+          props.variant === "B" ? <QueueTourStatus queued={props.queued} iconOnly /> : undefined
+        }
       />
       <Button
         variant="ghost"
@@ -205,7 +296,7 @@ const tourStatus = (state: TourState, revision: Revision | null): TourStatus | n
     : { label: "Tour ready", icon: Route, tone: "text-foreground/70" }
 }
 
-function QueueTourStatus(props: { queued: QueuedPullRequest }) {
+function QueueTourStatus(props: { queued: QueuedPullRequest; iconOnly?: boolean }) {
   const state = Option.getOrNull(
     AsyncResult.value(useAtomValue(tourStates(props.queued.pullRequest.ref))),
   )
@@ -215,6 +306,25 @@ function QueueTourStatus(props: { queued: QueuedPullRequest }) {
   if (status === null) return null
 
   const Icon = status.icon
+
+  if (props.iconOnly)
+    return (
+      <Tooltip>
+        <TooltipTrigger
+          render={<span className={cn("flex items-center", status.tone)} />}
+          aria-label={status.label}
+        >
+          <Icon
+            aria-hidden
+            className={cn("size-3.5", status.spinning && "animate-spin motion-reduce:animate-none")}
+          />
+        </TooltipTrigger>
+        <TooltipContent>
+          {status.label}
+          {status.detail !== undefined && `: ${status.detail}`}
+        </TooltipContent>
+      </Tooltip>
+    )
 
   const label = (
     <span className={cn("flex shrink-0 items-center gap-1 text-xs", status.tone)}>

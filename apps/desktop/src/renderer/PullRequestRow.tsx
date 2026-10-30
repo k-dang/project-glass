@@ -57,6 +57,9 @@ export function PullRequestRow(props: {
   dimmed: boolean
   marker?: ReactNode
   badge?: ReactNode
+  // PROTOTYPE (queue-status-alignment): extra grid cells, see QueueStatusPrototype.tsx
+  lead?: ReactNode
+  status?: ReactNode
   notRefreshed?: Problem | undefined
   now: Date
   repository?: string
@@ -98,6 +101,7 @@ export function PullRequestRow(props: {
         </TooltipTrigger>
         <TooltipContent>{finished?.label ?? `Checks ${checks.label.toLowerCase()}`}</TooltipContent>
       </Tooltip>
+      {props.lead !== undefined && <span className="flex items-center">{props.lead}</span>}
       <span className="flex min-w-0 items-center gap-2.5 overflow-hidden">
         <TooltipHint content={pullRequest.title}>
           <span className={cn("min-w-0 truncate font-medium", props.dimmed && "opacity-55")}>
@@ -115,6 +119,9 @@ export function PullRequestRow(props: {
         )}
         {props.badge}
       </span>
+      {props.status !== undefined && (
+        <span className="flex min-w-0 items-center">{props.status}</span>
+      )}
       {props.repository !== undefined && (
         <TooltipHint content={`${owner}/${repo}`}>
           <span className="truncate text-xs text-foreground/70">{props.repository}</span>
