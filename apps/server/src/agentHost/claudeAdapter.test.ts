@@ -121,9 +121,7 @@ it.live("translates an SDK permission callback and the user's denial in both dir
     yield* session.startTurn("turn-1", { message: "Hello", images: [] })
     const result = f.ask("Bash", { command: "touch notes.txt" })
     const part = yield* f.part("waiting")
-    assert.equal(part._tag, "PermissionRequest")
-
-    if (!Predicate.isTagged(part, "PermissionRequest")) return
+    assert.ok(Predicate.isTagged(part, "PermissionRequest"))
     assert.equal(part.toolName, "Bash")
     assert.equal(part.input, JSON.stringify({ command: "touch notes.txt" }, null, 2))
     yield* session.answer(part.requestId, DenyRequest.make({ reason: "Leave it alone" }))
@@ -160,9 +158,7 @@ it.live("translates Questions and validates answers before returning the SDK's u
 
     const result = f.ask("AskUserQuestion", input)
     const part = yield* f.part("waiting")
-    assert.equal(part._tag, "Question")
-
-    if (!Predicate.isTagged(part, "Question")) return
+    assert.ok(Predicate.isTagged(part, "Question"))
     assert.isTrue(part.questions.every(({ freeText }) => freeText))
     assert.equal(
       (yield* session.answer(part.requestId, AllowRequest.make({})).pipe(Effect.flip))._tag,
@@ -182,10 +178,8 @@ it.live("translates Questions and validates answers before returning the SDK's u
       updatedInput: { ...input, answers: { "Which files?": "README", "Why?": "Start small" } },
     })
     const settled = yield* f.part("answered")
-    assert.equal(settled._tag, "Question")
-
-    if (Predicate.isTagged(settled, "Question"))
-      assert.deepStrictEqual(settled.answers, answer.answers)
+    assert.ok(Predicate.isTagged(settled, "Question"))
+    assert.deepStrictEqual(settled.answers, answer.answers)
   }),
 )
 

@@ -141,12 +141,10 @@ export const agentServicesFixture = Effect.gen(function* () {
       const transcripts = Context.get(services, Transcripts)
       yield* followJournal(transcripts, client, { saved: 0 }).pipe(Effect.forkScoped)
 
-      return {
-        agents: Context.get(services, Agents),
-      }
+      return Context.get(services, Agents)
     }).pipe(Effect.provideContext(database), Scope.provide(scope))
 
-    return { ...(yield* build), close: Scope.close(scope, Exit.void) }
+    return { agents: yield* build, close: Scope.close(scope, Exit.void) }
   })
 
   const running = yield* boot

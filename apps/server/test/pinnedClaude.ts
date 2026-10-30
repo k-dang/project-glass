@@ -2,7 +2,7 @@ import { createRequire } from "node:module"
 import { join } from "node:path"
 
 /** The executable shipped by the Claude Agent SDK version Glass pins. */
-export const pinnedClaude = () => {
+const pinnedClaude = () => {
   const sdk = createRequire(import.meta.url).resolve("@anthropic-ai/claude-agent-sdk")
 
   const platform = createRequire(sdk).resolve(

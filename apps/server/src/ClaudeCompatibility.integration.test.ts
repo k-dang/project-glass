@@ -21,9 +21,7 @@ it.live("connects the real Claude CLI's permission and Question callbacks to Gla
     )
 
     const permission = waiting[0]?.parts.find(isWaiting)
-    assert.equal(permission?._tag, "PermissionRequest")
-
-    if (permission === undefined || !Predicate.isTagged(permission, "PermissionRequest")) return
+    assert.ok(Predicate.isTagged(permission, "PermissionRequest"))
     assert.equal(permission.toolName, "Bash")
     yield* f.client.AnswerRequest({
       agentId: agent.id,
@@ -45,9 +43,7 @@ it.live("connects the real Claude CLI's permission and Question callbacks to Gla
     )
 
     const question = asking[1]?.parts.find(isWaiting)
-    assert.equal(question?._tag, "Question")
-
-    if (question === undefined || !Predicate.isTagged(question, "Question")) return
+    assert.ok(Predicate.isTagged(question, "Question"))
     yield* f.client.AnswerRequest({
       agentId: agent.id,
       requestId: question.requestId,

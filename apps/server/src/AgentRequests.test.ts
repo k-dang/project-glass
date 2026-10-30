@@ -159,9 +159,7 @@ it.live("expires a persisted request when business services restart", () =>
       .transcript(agent.id)
       .pipe(Stream.runHead, Effect.map(Option.getOrThrow))
 
-    assert.equal(snapshot._tag, "Snapshot")
-
-    if (!Predicate.isTagged(snapshot, "Snapshot")) return
+    assert.ok(Predicate.isTagged(snapshot, "Snapshot"))
     assert.deepStrictEqual(snapshot.turns[0]?.ended?.ending, TurnInterrupted.make({}))
     assert.equal(snapshot.turns[0]?.parts.find(isRequestPart)?.status, "expired")
     assert.deepStrictEqual(
