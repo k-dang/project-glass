@@ -99,6 +99,23 @@ it("remembers Path order across workspace tabs", async () => {
   expect(screen.getByRole("button", { name: "Path" }).getAttribute("aria-pressed")).toBe("true")
 })
 
+it("shows the Tour full screen, hiding the PR header until Escape", async () => {
+  const f = mount()
+  await f.user.click(await screen.findByRole("tab", { name: "Changes" }))
+  const fullScreen = await screen.findByRole("button", { name: "Full screen" })
+
+  await f.user.click(fullScreen)
+  expect(fullScreen.getAttribute("aria-pressed")).toBe("true")
+  expect(screen.queryByRole("button", { name: "Back to PRs" })).toBeNull()
+
+  await f.user.keyboard("{Escape}")
+  expect(fullScreen.getAttribute("aria-pressed")).toBe("false")
+  expect(screen.getByRole("button", { name: "Back to PRs" })).toBeDefined()
+
+  await f.user.click(screen.getByRole("button", { name: "Path" }))
+  expect(screen.queryByRole("button", { name: "Full screen" })).toBeNull()
+})
+
 it("hides the order toggle without a Tour", async () => {
   const f = mount(null)
   await f.user.click(await screen.findByRole("tab", { name: "Changes" }))
