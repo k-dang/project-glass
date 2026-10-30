@@ -39,6 +39,9 @@ export const columnsWithRepository =
 
 export const columns = "grid-cols-[0_1rem_minmax(0,1fr)_3.5rem_7rem_2rem_0]"
 
+export const queueColumns =
+  "grid-cols-[0_1rem_1rem_minmax(0,1fr)_fit-content(9rem)_3.5rem_7rem_2rem_0]"
+
 export const subgridRow = "col-span-full grid grid-cols-subgrid"
 
 export const repositoryLabeller = (
@@ -56,7 +59,7 @@ export function PullRequestRow(props: {
   state?: PullRequestState
   dimmed: boolean
   marker?: ReactNode
-  badge?: ReactNode
+  lead?: ReactNode
   notRefreshed?: Problem | undefined
   now: Date
   repository?: string
@@ -98,6 +101,7 @@ export function PullRequestRow(props: {
         </TooltipTrigger>
         <TooltipContent>{finished?.label ?? `Checks ${checks.label.toLowerCase()}`}</TooltipContent>
       </Tooltip>
+      {props.lead !== undefined && <span className="flex items-center">{props.lead}</span>}
       <span className="flex min-w-0 items-center gap-2.5 overflow-hidden">
         <TooltipHint content={pullRequest.title}>
           <span className={cn("min-w-0 truncate font-medium", props.dimmed && "opacity-55")}>
@@ -113,7 +117,6 @@ export function PullRequestRow(props: {
             Draft PR
           </Badge>
         )}
-        {props.badge}
       </span>
       {props.repository !== undefined && (
         <TooltipHint content={`${owner}/${repo}`}>
