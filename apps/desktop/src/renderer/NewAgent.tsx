@@ -21,7 +21,7 @@ import { useNavigate } from "@tanstack/react-router"
 import { Exit, Option, Predicate } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
 import { FolderGit2, FolderPlus, GitBranch, LoaderCircle } from "lucide-react"
-import { type ReactNode, useCallback, useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { MessageGroup } from "@/components/ui/message"
 import { Trace, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace"
 import {
@@ -67,7 +67,7 @@ interface PlaceOptions {
   readonly branches: (
     repository: FollowedRepository,
   ) => Atom.Atom<AsyncResult.AsyncResult<Branches, BackendError>>
-  readonly describe: (key: string | undefined) => ReactNode
+  readonly describe: (key: string | undefined) => string
   readonly starting: (key: string, baseBranch: string) => string
   readonly choosesFolder: boolean
   readonly engines: readonly [AgentEngine, ...Array<AgentEngine>]
@@ -77,14 +77,9 @@ const onThisMac: PlaceOptions = {
   place: thisMac,
   branches: branchesAtom,
   describe: (key) =>
-    key === undefined ? (
-      "Choose a folder you cloned a GitHub repository into."
-    ) : (
-      <>
-        The Agent works on a branch of its own, in its own copy of{" "}
-        <span className="whitespace-nowrap">{key}</span> on {placeNames["this-mac"]}.
-      </>
-    ),
+    key === undefined
+      ? "Choose a folder you cloned a GitHub repository into."
+      : "The Agent works on a branch of its own.",
   starting: (key, baseBranch) => `Making the Agent's copy of ${key} from ${baseBranch}…`,
   choosesFolder: true,
   engines: AgentEngine.literals,
@@ -94,14 +89,9 @@ const inSandboxOf = ({ id, name, engines }: SandboxProviderInfo): PlaceOptions =
   place: SandboxPlace.make({ providerId: id }),
   branches: gitHubBranchesAtom,
   describe: (key) =>
-    key === undefined ? (
-      "Follow a repository in Settings to start an Agent on it in a Sandbox."
-    ) : (
-      <>
-        The Agent works on a branch of its own, in a Sandbox of its own from {name}, with{" "}
-        <span className="whitespace-nowrap">{key}</span> cloned from GitHub.
-      </>
-    ),
+    key === undefined
+      ? "Follow a repository in Settings to get started."
+      : "The Agent works on a branch of its own.",
   starting: () => `Starting the Agent in a Sandbox from ${name}…`,
   choosesFolder: false,
   engines,
