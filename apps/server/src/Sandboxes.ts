@@ -1,4 +1,5 @@
 import { AgentError, AgentModels, SandboxProviderInfo } from "@glass/contracts"
+import type { SandboxProvider, SandboxRequest, SandboxState } from "@glass/plugin"
 import {
   type Cause,
   Context,
@@ -25,8 +26,7 @@ import { followJournal } from "./hostJournal"
 import type { HostClient, LostAgentIds, PlacedAgent, Placement, SubscribeLost } from "./Placement"
 import { Plugins } from "./Plugins"
 import { bundledEntry } from "./processes"
-import { call, connectToHost, waitForHost } from "./sandboxCalls"
-import type { SandboxProvider, SandboxRequest, SandboxState } from "./SandboxProvider"
+import { call, connectToHost, shutDownHost, waitForHost } from "./sandboxCalls"
 import { Transcripts } from "./Transcripts"
 
 const hostBundle = bundledEntry("agentHost", import.meta.url)
@@ -110,6 +110,15 @@ const orderedReports = Effect.gen(function* () {
   }
 })
 
+const deleteSandbox = (
+  provider: SandboxProvider,
+  { state, token }: Pick<SandboxRecord, "state" | "token">,
+  action: string,
+) =>
+  shutDownHost(provider, state, token).pipe(
+    Effect.andThen(call(provider, action, () => provider.remove(state))),
+  )
+
 const notInstalled = (providerId: string): Placement => {
   const failure = Effect.fail(
     new AgentError({
@@ -184,8 +193,12 @@ export class Sandboxes extends Context.Service<
           Effect.mapError(storageFailure),
         )
 
-      const discard = (provider: SandboxProvider, agentId: string, state: SandboxState) =>
-        call(provider, "delete the half-built Sandbox", () => provider.remove(state)).pipe(
+      const discard = (
+        provider: SandboxProvider,
+        agentId: string,
+        record: Pick<SandboxRecord, "state" | "token">,
+      ) =>
+        deleteSandbox(provider, record, "delete the half-built Sandbox").pipe(
           Effect.andThen(save(agentId, null)),
           Effect.ignore,
         )
@@ -243,7 +256,9 @@ export class Sandboxes extends Context.Service<
               return yield* save(agent.id, { state: recorded, token, ready: true })
             }).pipe(
               Effect.onError(() =>
-                recorded === undefined ? Effect.void : discard(provider, agent.id, recorded),
+                recorded === undefined
+                  ? Effect.void
+                  : discard(provider, agent.id, { state: recorded, token }),
               ),
               Effect.ensuring(transcripts.setStatus(agent.id, null)),
             )
@@ -361,7 +376,7 @@ export class Sandboxes extends Context.Service<
               const record = agents.get(agent.id)?.record ?? null
 
               if (record !== null) {
-                yield* call(provider, "delete the Sandbox", () => provider.remove(record.state))
+                yield* deleteSandbox(provider, record, "delete the Sandbox")
                 yield* save(agent.id, null)
               }
 
@@ -378,7 +393,7 @@ export class Sandboxes extends Context.Service<
         const provider = sandboxProviders.get(providerId)
 
         if (!sandbox.ready && provider !== undefined)
-          yield* discard(provider, id, sandbox.state).pipe(Effect.forkIn(scope))
+          yield* discard(provider, id, sandbox).pipe(Effect.forkIn(scope))
       }
 
       return Sandboxes.of({

@@ -27,12 +27,15 @@ needs, and the provider does everything specific to its platform.
   agent host bundle with the environment and port Glass gives it. It calls `record(state)` as soon
   as the Sandbox exists and reports each step through `progress`.
 - `target(state)` answers the host's URL and headers, freshly, for each connection.
-- `remove(state)` deletes the Sandbox.
+- `remove(state)` deletes the Sandbox. Glass first asks the agent host to end, with its agent
+  programs, so a provider needn't track the host's processes. If the host can't be reached,
+  `remove` runs anyway.
 - `models(engine)` lists what each Agent program offers in its Sandboxes, before one exists.
 
-The plugin API is Promises and `AbortSignal`, so a plugin needs no Effect. Glass passes in
-`glass.missingLogin(login, fix)` and `glass.noCapacity(message)` for the failures the user can act
-on; anything else a provider throws becomes a safe failure, with the cause in the backend log.
+The plugin API is Promises and `AbortSignal`, so a plugin needs no Effect; its types are the
+`@glass/plugin` package. Glass passes in `glass.missingLogin(login, fix)` and
+`glass.noCapacity(message)` for the failures the user can act on; anything else a provider throws
+becomes a safe failure, with the cause in the backend log.
 
 Glass stores the `state` a provider records as opaque JSON on the Agent's row, so the row stays
 the one record of the Agent and providers keep no storage of their own. If `create` fails or is

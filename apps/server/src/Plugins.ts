@@ -1,15 +1,10 @@
+import type { Glass, Plugin, SandboxProvider } from "@glass/plugin"
 import { Context, Effect, FileSystem, Layer, Option, Predicate, Result, Schema } from "effect"
 // The static entry imports jiti's TypeScript transform, so it lands in the backend's bundle.
 import { createJiti } from "jiti/static"
 import { extname, join } from "node:path"
 import { ServerConfig } from "./ServerConfig"
-import {
-  type Glass,
-  MissingLogin,
-  NoCapacity,
-  type Plugin,
-  type SandboxProvider,
-} from "./SandboxProvider"
+import { MissingLogin, NoCapacity } from "./sandboxFailures"
 
 const pluginFile = new Set([".ts", ".js", ".mts", ".mjs", ".cts", ".cjs"])
 

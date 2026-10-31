@@ -15,6 +15,7 @@ import { existsSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { vi } from "vite-plus/test"
 import { agentsFixture, claudeCode, lastText, repository, settled } from "../test/agentsFixture"
+import { eventually } from "../test/eventually"
 import { gitIn } from "../test/gitRepositories"
 
 vi.stubEnv("PI_OFFLINE", "1")
@@ -177,6 +178,20 @@ it.live("keeps an Agent whose Sandbox can't be deleted yet, saying which login t
     yield* f.client.RemoveAgent({ agentId: agent.id })
     assert.deepStrictEqual(yield* f.agents, [])
     assert.isFalse(existsSync(f.sandboxes.sandboxFolder(agent.id)))
+  }),
+)
+
+it.live("ends a Sandbox's agent host before deleting the Sandbox", () =>
+  Effect.gen(function* () {
+    const f = yield* agentsFixture({ output: "Hello" })
+    const agent = yield* f.startSandbox()
+    yield* f.transcript(agent.id, settled(1))
+    const host = f.sandboxes.hostPid(agent.id)
+
+    yield* f.client.RemoveAgent({ agentId: agent.id })
+
+    assert.isFalse(existsSync(f.sandboxes.sandboxFolder(agent.id)))
+    yield* eventually(Effect.try(() => assert.throws(() => process.kill(host, 0))))
   }),
 )
 
