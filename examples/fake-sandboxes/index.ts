@@ -1,4 +1,3 @@
-import { Schema } from "effect"
 import { execFile, spawn } from "node:child_process"
 import { once } from "node:events"
 import { mkdir, rm } from "node:fs/promises"
@@ -6,7 +5,7 @@ import { createServer } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { promisify } from "node:util"
-import type { Plugin } from "@glass/plugin"
+import type { Plugin, SandboxState } from "@glass/plugin"
 
 const run = promisify(execFile)
 
@@ -16,14 +15,15 @@ const FAKE_CLAUDE = join(import.meta.dirname, "claude.mjs")
 
 const FAKE_MODEL = { id: "fake-model", name: "Fake model", efforts: [] }
 
-const FakeSandbox = Schema.Struct({
-  folder: Schema.String,
-  port: Schema.Int,
-})
+const decodeSandbox = (state: SandboxState) => {
+  if (typeof state === "object" && state !== null && "folder" in state && "port" in state) {
+    const { folder, port } = state
 
-const decodeSandbox = Schema.decodeUnknownSync(FakeSandbox)
+    if (typeof folder === "string" && typeof port === "number") return { folder, port }
+  }
 
-const decodeAddress = Schema.decodeUnknownSync(Schema.Struct({ port: Schema.Int }))
+  throw new Error("This isn't a fake Sandbox's state")
+}
 
 const freePort = () =>
   new Promise<number>((resolve, reject) => {
@@ -31,9 +31,13 @@ const freePort = () =>
 
     server.once("error", reject)
     server.listen(0, "127.0.0.1", () => {
-      const { port } = decodeAddress(server.address())
+      const address = server.address()
 
-      server.close(() => resolve(port))
+      server.close(() =>
+        typeof address === "object" && address !== null
+          ? resolve(address.port)
+          : reject(new Error("The port finder didn't get a port")),
+      )
     })
   })
 

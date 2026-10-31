@@ -7,21 +7,17 @@ one. The seam it implements is `@glass/plugin`.
 
 ## Install
 
-Add a Plugin file that re-exports this one, then restart Glass. Run from the repository root:
+Copy this folder into Glass's plugins folder, then restart Glass. Run from the repository root:
 
 ```sh
-echo "export { default } from \"$PWD/examples/fake-sandboxes/index.ts\"" > ~/.project-glass/plugins/fake-sandboxes.ts
+cp -r examples/fake-sandboxes ~/.project-glass/plugins/
 ```
-
-In PowerShell, keep the path's slashes forward, as a backslash starts an escape in the string:
 
 ```powershell
-$example = "$PWD/examples/fake-sandboxes/index.ts".Replace("\", "/")
-Set-Content ~/.project-glass/plugins/fake-sandboxes.ts "export { default } from `"$example`""
+Copy-Item -Recurse examples/fake-sandboxes ~/.project-glass/plugins/
 ```
 
-Glass loads the re-export from its plugins folder, so this file and its imports resolve from the
-repository. A copy or link of the folder would not find `effect`.
+The Plugin imports only Node and the types in `@glass/plugin`, so it needs no install.
 
 ## What's fake
 
