@@ -100,6 +100,10 @@ export default (glass: Glass): void => {
       yield* write(join(plugins, "f-hangs.js"), `export default () => new Promise(() => {})`)
       yield* write(join(plugins, "g-unreadable", "index.js"), providerPlugin("unreadable"))
       yield* write(join(plugins, "h-no-engines.js"), providerPlugin("no-engines", []))
+      yield* write(
+        join(plugins, "i-null.js"),
+        `export default (glass) => glass.registerSandboxProvider("null", null)`,
+      )
       yield* Effect.promise(() => chmod(join(plugins, "g-unreadable"), 0o000))
       yield* Effect.addFinalizer(() =>
         Effect.promise(() => chmod(join(plugins, "g-unreadable"), 0o700)),
@@ -133,6 +137,7 @@ export default (glass: Glass): void => {
         ["Couldn't load a Plugin", join(plugins, "f-hangs.js")],
         ["Couldn't load a Plugin", join(plugins, "g-unreadable")],
         ["Skipped a Sandbox provider that doesn't list the Agent programs it runs", "no-engines"],
+        ["Skipped a Sandbox provider that doesn't list the Agent programs it runs", "null"],
       ])
     }),
   )

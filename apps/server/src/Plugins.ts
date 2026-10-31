@@ -58,7 +58,7 @@ const entryOf = Effect.fnUntraced(function* (
 
 const validProviderId = /^[a-z0-9][a-z0-9-]*$/
 
-const validEngines = Schema.is(Schema.NonEmptyArray(AgentEngine))
+const listsEngines = Schema.is(Schema.Struct({ engines: Schema.NonEmptyArray(AgentEngine) }))
 
 const loadPlugin = (
   fs: FileSystem.FileSystem,
@@ -127,7 +127,7 @@ export class Plugins extends Context.Service<
                 id,
                 path,
               )
-            } else if (!validEngines(provider.engines)) {
+            } else if (!listsEngines(provider)) {
               yield* Effect.logWarning(
                 "Skipped a Sandbox provider that doesn't list the Agent programs it runs",
                 id,

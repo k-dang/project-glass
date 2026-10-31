@@ -1,5 +1,6 @@
 import { assert, it } from "@effect/vitest"
 import {
+  AgentModels,
   applyTranscriptUpdate,
   emptyTranscript,
   SandboxPlace,
@@ -98,6 +99,13 @@ it.live("starts a Sandbox Agent only with an Agent program its provider runs", (
     assert.equal(
       refused.message,
       "That kind of Sandbox doesn't run this Agent program. Pick another.",
+    )
+    assert.deepStrictEqual(
+      yield* relaunched.ListAgentModels({
+        engine: "claude-code",
+        place: SandboxPlace.make({ providerId: "fake" }),
+      }),
+      new AgentModels({ defaultModel: null, models: [] }),
     )
   }),
 )
