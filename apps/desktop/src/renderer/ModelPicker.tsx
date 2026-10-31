@@ -12,7 +12,7 @@ import { chip, ChipSelect } from "./chips"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf } from "./problems"
 
-const DEFAULT_KEY = ""
+const DEFAULT_KEY = "\0default"
 
 const toKey = (choice: string | null) => choice ?? DEFAULT_KEY
 
@@ -96,24 +96,35 @@ export const ModelPicker = memo(function ModelPicker(props: {
           <span className="truncate">{summary}</span>
           <ChevronDown aria-hidden className="opacity-60" />
         </PopoverTrigger>
-        <PopoverContent side="top" align="start" className="w-auto max-w-80 min-w-64 gap-1 p-1">
+        <PopoverContent
+          side="top"
+          align="start"
+          className="h-96 max-h-(--available-height) w-80 max-w-(--available-width) gap-1 overflow-hidden p-1"
+        >
           {programs !== undefined && (
-            <RequiredChoice
-              label="Agent program"
-              value={props.engine}
-              onChange={programs.onChange}
-              items={programs.engines.map((engine) => ({
-                value: engine,
-                label: (
-                  <>
-                    <span aria-hidden>{engineGlyphs[engine]}</span>
-                    {engineNames[engine]}
-                  </>
-                ),
-              }))}
-            />
+            <div className="shrink-0">
+              <RequiredChoice
+                label="Agent program"
+                value={props.engine}
+                onChange={programs.onChange}
+                items={programs.engines.map((engine) => ({
+                  value: engine,
+                  label: (
+                    <>
+                      <span aria-hidden>{engineGlyphs[engine]}</span>
+                      {engineNames[engine]}
+                    </>
+                  ),
+                }))}
+              />
+            </div>
           )}
-          {body}
+          <div
+            key={props.engine}
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]"
+          >
+            {body}
+          </div>
         </PopoverContent>
       </Popover>
       {efforts.length > 0 && (
