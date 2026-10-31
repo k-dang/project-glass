@@ -266,10 +266,10 @@ function QuestionView(props: {
                 )}
               </div>
             ) : (
-              <RadioGroup<string>
+              <RadioGroup<string | null>
                 aria-labelledby={questionId}
-                value={props.chosen[0]}
-                onValueChange={(label) => props.onChoose([label])}
+                value={props.chosen[0] ?? null}
+                onValueChange={(label) => props.onChoose(label === null ? [] : [label])}
               >
                 {asked.options.map(({ label, description }) =>
                   option(label, description, <RadioGroupItem value={label} />),

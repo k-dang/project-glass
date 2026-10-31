@@ -44,7 +44,7 @@ it("leaves typing, dialogs, composing, repeats, modifiers and consumed events al
       <input />
       <textarea />
       <select aria-label="Choice" />
-      <div contentEditable>
+      <div contentEditable suppressContentEditableWarning>
         <span>Editing</span>
       </div>
       <dialog open>

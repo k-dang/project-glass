@@ -43,6 +43,7 @@ export default defineConfig({
   test: {
     include: ["src/**/*.test.ts", "test/**/*.test.ts"],
     testTimeout: 30_000,
+    silent: "passed-only",
     globalSetup: ["test/buildBundles.ts"],
     alias: { vitest },
     server: { deps: { inline: ["@effect/vitest"] } },
