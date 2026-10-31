@@ -156,7 +156,7 @@ export const fakeSandboxProvider =
   (glass) => {
     glass.registerSandboxProvider("fake", {
       name: "Fake Sandboxes",
-      engines: readSettings(settingsPath).engines ?? ["claude-code", "pi-cli"],
+      engines: readSettings(settingsPath).engines ?? ["claude-code", "pi"],
       create: async (request, { progress, record, signal }) => {
         const settings = readSettings(settingsPath)
 
