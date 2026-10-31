@@ -418,59 +418,59 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
           </>
         }
       >
-        <div className="flex items-center justify-between gap-1">
-          <div className="flex min-w-0 items-center gap-1">
-            {props.providers.length > 0 && (
-              <ChipSelect
-                label="Where the Agent runs"
-                icon={<PlaceIcon aria-hidden />}
-                value={placeKey(where.place)}
-                items={[
-                  { value: placeKey(thisMac), label: placeNames["this-mac"] },
-                  ...props.providers.map((provider) => ({
-                    value: placeKey(SandboxPlace.make({ providerId: provider.id })),
-                    label: provider.name,
-                  })),
-                ]}
-                onValueChange={(chosen) => props.onPlaceChange(placeOfKey(chosen))}
-              />
-            )}
+        <div className="flex min-w-0 flex-wrap items-center gap-1 [&>button]:min-w-0">
+          {props.providers.length > 0 && (
             <ChipSelect
-              label="Repository"
-              icon={<FolderGit2 aria-hidden />}
-              value={key ?? null}
-              items={props.repositories.map((choosable) => ({
-                value: repositoryKey(choosable.repository),
-                label: repositoryKey(choosable.repository),
-                title: choosable.title,
-              }))}
-              onValueChange={(chosen) =>
-                void navigate({ to: "/agents/new", search: { repository: chosen } })
+              label="Where the Agent runs"
+              icon={<PlaceIcon aria-hidden />}
+              value={placeKey(where.place)}
+              items={[
+                { value: placeKey(thisMac), label: placeNames["this-mac"] },
+                ...props.providers.map((provider) => ({
+                  value: placeKey(SandboxPlace.make({ providerId: provider.id })),
+                  label: provider.name,
+                })),
+              ]}
+              onValueChange={(chosen) => props.onPlaceChange(placeOfKey(chosen))}
+            />
+          )}
+          <ChipSelect
+            label="Repository"
+            icon={<FolderGit2 aria-hidden />}
+            value={key ?? null}
+            items={props.repositories.map((choosable) => ({
+              value: repositoryKey(choosable.repository),
+              label: repositoryKey(choosable.repository),
+              title: choosable.title,
+            }))}
+            onValueChange={(chosen) =>
+              void navigate({ to: "/agents/new", search: { repository: chosen } })
+            }
+            placeholder="No repositories"
+            action={
+              where.choosesFolder
+                ? {
+                    label: "Choose folder…",
+                    icon: <FolderPlus aria-hidden />,
+                    onSelect: () => void folder.choose(),
+                    disabled: folder.waiting,
+                  }
+                : undefined
+            }
+          />
+          <div className="ml-auto min-w-0 max-w-full [&>button]:min-w-0">
+            <ChipSelect
+              label="Base branch"
+              icon={<GitBranch aria-hidden />}
+              value={baseBranch}
+              items={(listed?.branches ?? []).map((branch) => ({ value: branch, label: branch }))}
+              onValueChange={(branch) =>
+                key !== undefined && setChosenBase({ repository: key, branch })
               }
-              placeholder="No repositories"
-              action={
-                where.choosesFolder
-                  ? {
-                      label: "Choose folder…",
-                      icon: <FolderPlus aria-hidden />,
-                      onSelect: () => void folder.choose(),
-                      disabled: folder.waiting,
-                    }
-                  : undefined
-              }
+              placeholder={key === undefined ? "No branches" : "Loading branches…"}
+              disabled={listed === null || key === undefined}
             />
           </div>
-          <ChipSelect
-            label="Base branch"
-            icon={<GitBranch aria-hidden />}
-            value={baseBranch}
-            items={(listed?.branches ?? []).map((branch) => ({ value: branch, label: branch }))}
-            onValueChange={(branch) =>
-              key !== undefined && setChosenBase({ repository: key, branch })
-            }
-            placeholder={key === undefined ? "No branches" : "Loading branches…"}
-            disabled={listed === null || key === undefined}
-          />
         </div>
       </MessageBox>
       {starting === null && <div className="flex-1" />}
