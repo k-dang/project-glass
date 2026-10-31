@@ -10,14 +10,17 @@ one. The seam it implements is `@glass/plugin`.
 Copy this folder into Glass's plugins folder, then restart Glass. Run from the repository root:
 
 ```sh
+mkdir -p ~/.project-glass/plugins
 cp -r examples/fake-sandboxes ~/.project-glass/plugins/
 ```
 
 ```powershell
+New-Item -ItemType Directory -Force ~/.project-glass/plugins
 Copy-Item -Recurse examples/fake-sandboxes ~/.project-glass/plugins/
 ```
 
-The Plugin imports only Node and the types in `@glass/plugin`, so it needs no install.
+The Plugin imports only Node and the types in `@glass/plugin`, so it needs no install. `pnpm dev:fake`
+keeps its data in a fresh temp folder, so it won't see the Plugin; use `pnpm dev`.
 
 ## What's fake
 
