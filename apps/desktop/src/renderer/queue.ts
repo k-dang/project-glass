@@ -48,6 +48,12 @@ export const queueRefreshAtom = watched(
     .pipe(Atom.setIdleTTL("5 minutes")),
 )
 
+export const watchedQueueAtom = Atom.make((get) => {
+  get(queueRefreshAtom)
+
+  return get(savedQueueAtom)
+})
+
 export const addToQueueAtom = backendRuntime.fn((references: ReadonlyArray<PullRequestRef>, get) =>
   Backend.use((backend) => backend.AddToQueue({ references })).pipe(
     Effect.tap(reread(get.registry)),

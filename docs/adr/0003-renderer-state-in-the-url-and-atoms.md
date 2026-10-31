@@ -63,8 +63,9 @@ carries the identity from its loaded workspace, so saving a position stays local
 GitHub is unavailable; the backend stamps only the save time.
 
 Continue reads the current in-memory destination for each area as soon as work changes; a
-persistence response never replaces it. Dashboard owns the Continue cards: the last PR first, then
-the newest Saved place from any other area. Visiting Dashboard leaves every Saved place unchanged.
+persistence response never replaces it. Dashboard gives each area a fixed Continue slot, the last PR
+then the last Agent, and invites the user into an area with no Saved place. Visiting Dashboard leaves
+every Saved place unchanged.
 The stored destinations seed a fresh renderer until work is opened in their area. Each diff
 or Tour viewer applies its initial file when it mounts, including when a Tour arrives after the
 workspace. Scroll callbacks report position only after that viewer applies its initial position.

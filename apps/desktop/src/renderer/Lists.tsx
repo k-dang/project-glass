@@ -10,6 +10,16 @@ export function Empty(props: { title: string; children: ReactNode }) {
   )
 }
 
+export function Count(props: { count: number }) {
+  if (props.count === 0) return null
+
+  return (
+    <span className="rounded-full bg-muted px-1.5 text-xs text-muted-foreground tabular-nums">
+      {props.count}
+    </span>
+  )
+}
+
 export function LoadMore(props: {
   label: string
   loading: boolean

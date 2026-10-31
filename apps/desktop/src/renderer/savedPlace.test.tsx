@@ -165,15 +165,17 @@ it("continues the last PR alongside the last Agent opened after it", async () =>
   ).toEqual(["Continue octo-org/hello-world#42", "Continue agent/swift-otter"])
 })
 
-it("opens Reviews from an empty Dashboard without creating a saved place", async () => {
+it("invites the user into each area without a Saved place, without creating one", async () => {
   const save = vi.fn<Handlers["SavePlace"]>(({ destination: value }) =>
     Effect.succeed(savedPlace(value)),
   )
 
   const user = mount({ GetSavedPlaces: () => Effect.succeed([]), SavePlace: save })
 
-  await screen.findByRole("heading", { name: "No saved place yet" })
-  await user.click(screen.getByRole("link", { name: "Browse pull requests" }))
+  await screen.findByRole("link", { name: "Start an Agent", description: "No Agent yet" })
+  await user.click(
+    screen.getByRole("link", { name: "Browse pull requests", description: "No pull request yet" }),
+  )
   await screen.findByRole("heading", { name: "Reviews" })
   expect(save).not.toHaveBeenCalled()
 })
@@ -429,7 +431,10 @@ it("doesn't offer another GitHub identity's saved destination", async () => {
     GetSavedPlaces: () => Effect.succeed([savedPlace({ ...destination, login: "someone-else" })]),
   })
 
-  await screen.findByRole("heading", { name: "No saved review for this account" })
+  await screen.findByRole("link", {
+    name: "Browse pull requests",
+    description: "No saved review for this account",
+  })
   expect(screen.queryByRole("link", { name: /^Continue / })).toBeNull()
 })
 
