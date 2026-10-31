@@ -438,7 +438,6 @@ export type NewAgent = typeof NewAgent.Type
 export class SandboxProviderInfo extends Schema.Class<SandboxProviderInfo>("SandboxProviderInfo")({
   id: Schema.String,
   name: Schema.String,
-  /** The Agent programs its Sandboxes can run. */
   engines: Schema.NonEmptyArray(AgentEngine),
 }) {}
 
