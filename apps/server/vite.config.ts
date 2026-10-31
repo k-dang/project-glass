@@ -28,7 +28,7 @@ export default defineConfig({
   pack: [
     {
       ...node,
-      entry: { bin: "src/bin.ts", piWorker: "src/piWorker.ts" },
+      entry: { bin: "src/bin.ts" },
       outDir: "dist",
     },
     agentHost("dist"),

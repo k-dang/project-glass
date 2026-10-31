@@ -7,7 +7,6 @@ import { isolatedHome, startBackend } from "../test/harness"
 
 const defaultModels = {
   "claude-code": "claude-sonnet-5-5",
-  pi: { provider: "anthropic", modelId: "claude-sonnet-5-5" },
   "pi-cli": { provider: "anthropic", modelId: "claude-sonnet-5-5" },
 }
 
@@ -44,8 +43,8 @@ describe("settings file", () => {
           path,
           JSON.stringify({
             followedRepositories,
-            tourModels: { pi: { provider: "openai", modelId: "gpt-test" } },
-            tourEngine: "pi",
+            tourModels: { "pi-cli": { provider: "openai", modelId: "gpt-test" } },
+            tourEngine: "pi-cli",
             queueTours: true,
           }),
         ),
@@ -54,8 +53,8 @@ describe("settings file", () => {
 
       assert.deepStrictEqual(JSON.parse(yield* Effect.promise(() => readFile(path, "utf8"))), {
         followedRepositories,
-        tourModels: { ...defaultModels, pi: { provider: "openai", modelId: "gpt-test" } },
-        tourEngine: "pi",
+        tourModels: { ...defaultModels, "pi-cli": { provider: "openai", modelId: "gpt-test" } },
+        tourEngine: "pi-cli",
         queueTours: true,
         agentReviewModels: defaultModels,
         agentReviewEngine: "pi-cli",
@@ -71,10 +70,9 @@ describe("settings file", () => {
         const home = yield* isolatedHome
 
         const tourSettings = {
-          engine: "pi" as const,
+          engine: "claude-code" as const,
           models: {
             "claude-code": "claude-opus-5-5",
-            pi: { provider: "openai", modelId: "gpt-test" },
             "pi-cli": { provider: "litellm", modelId: "gpt-test" },
           },
         }

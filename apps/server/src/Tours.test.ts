@@ -1,16 +1,18 @@
 import { assert, it } from "@effect/vitest"
-import { PullRequestRef, Revision, type Engine, type TourState } from "@glass/contracts"
+import { type AgentEngine, PullRequestRef, Revision, type TourState } from "@glass/contracts"
 import { Effect, Exit, Fiber, Option, Scope, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { existsSync } from "node:fs"
-import { readdir, writeFile } from "node:fs/promises"
+import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { eventually } from "../test/eventually"
 import { fakeAgent } from "../test/fakeAgent"
-import { fakeModelProvider } from "../test/fakeModelProvider"
-import { piCredentialHelper, type RunningHelper } from "../test/piCredentialHelper"
 import { tourInstructions } from "./tourPrompt"
-import { claudeAnswer, type FakeAgentSettings, piCliOutput } from "../test/fakeAgentFiles"
+import {
+  claudeAnswer,
+  type FakeAgentSettings,
+  piCliAnswer,
+  piCliOutput,
+} from "../test/fakeAgentFiles"
 import { startFakeGitHub } from "../test/fakeGitHub"
 import { VIEWER } from "../test/fakePullRequest"
 import { isolatedHome, startBackend } from "../test/harness"
@@ -115,7 +117,7 @@ const fixture = Effect.fnUntraced(function* (
         .pipe(Stream.runHead, Effect.map(Option.getOrThrow))
     }),
     write: client.WriteTour({ pullRequest: ref, revision }),
-    useEngine: (engine: Engine) =>
+    useEngine: (engine: AgentEngine) =>
       client
         .GetEngineSettings({ feature: "tours" })
         .pipe(
@@ -286,52 +288,6 @@ it.live("reports a missing selected runner and retries after it becomes availabl
   }),
 )
 
-for (const [name, file, contents, message] of [
-  [
-    "a pi model without a provider",
-    ".project-glass/settings.json",
-    { tourModels: { pi: { modelId: "gpt-test" } } },
-    "Couldn't read settings",
-  ],
-  [
-    "an empty pi provider",
-    ".project-glass/settings.json",
-    { tourModels: { pi: { provider: "", modelId: "gpt-test" } } },
-    "Couldn't read settings",
-  ],
-  ["missing pi authentication", ".pi/agent/auth.json", {}, "Sign into glass-test"],
-  [
-    "an unknown pi model",
-    ".project-glass/settings.json",
-    { tourModels: { pi: { provider: "glass-test", modelId: "missing" } }, tourEngine: "pi" },
-    "not available",
-  ],
-  [
-    "invalid pi model configuration",
-    ".pi/agent/models.json",
-    { providers: { "glass-test": { api: "invalid" } } },
-    "configuration",
-  ],
-] as const) {
-  it.live(`reports ${name} without probing Claude Code or invoking generation`, () =>
-    Effect.gen(function* () {
-      const f = yield* fixture()
-      const pi = yield* fakeModelProvider(f.home, { output: JSON.stringify(answer) })
-      yield* f.useEngine("pi")
-      yield* Effect.promise(() => writeFile(join(f.home, file), JSON.stringify(contents)))
-      yield* f.write
-      const state = yield* f.state(completed)
-      assert.equal(state.job.status, "failed")
-
-      if (state.job.status !== "failed") return
-      assert.equal(state.job.reason.reason, "not-ready")
-      assert.include(state.job.reason.message, message)
-      assert.equal(yield* f.agent.log, "")
-      assert.isEmpty(pi.calls)
-    }),
-  )
-}
-
 it.live("rejects a Revision that changes during the GitHub file read", () =>
   Effect.gen(function* () {
     const f = yield* fixture()
@@ -346,16 +302,14 @@ it.live("rejects a Revision that changes during the GitHub file read", () =>
   }),
 )
 
-it.live("rejects a selected Claude Code without required restrictions even when pi is ready", () =>
+it.live("rejects a selected Claude Code without required restrictions", () =>
   Effect.gen(function* () {
     const f = yield* fixture({ ready: true, helpOutput: "unsupported version" })
-    const pi = yield* fakeModelProvider(f.home, { output: JSON.stringify(answer) })
     yield* f.write
     const state = yield* f.state(completed)
     assert.equal(state.job.status === "failed" && state.job.reason.reason, "not-ready")
     assert.isNull(state.tour)
     assert.notInclude(yield* f.agent.log, '"stage":"generate"')
-    assert.isEmpty(pi.calls)
   }),
 )
 
@@ -462,116 +416,38 @@ it.live("writes a saved Tour from the requested GitHub Revision", () =>
   }),
 )
 
-it.live("uses a custom provider's key from Pi's model configuration", () =>
-  Effect.gen(function* () {
-    const f = yield* fixture()
-    const pi = yield* fakeModelProvider(f.home, { output: JSON.stringify(answer) })
-    yield* f.useEngine("pi")
-    yield* Effect.promise(async () => {
-      await writeFile(join(f.home, ".pi", "agent", "auth.json"), "{}")
-      await writeFile(
-        join(f.home, ".pi", "agent", "models.json"),
-        JSON.stringify({
-          providers: {
-            "glass-test": {
-              api: "openai-completions",
-              baseUrl: pi.url,
-              apiKey: "test-model-key",
-              models: [{ id: "gpt-test" }],
-            },
-          },
-        }),
-      )
-    })
-    yield* f.write
-    assert.equal((yield* f.state(completed)).tour?.intent, answer.intent)
-    assert.deepStrictEqual(pi.authorizations, ["Bearer test-model-key"])
-  }),
-)
+const piCliAnswering = (text: string) => ({
+  ready: true,
+  modelsOutput: piCliModels,
+  output: piCliAnswer(text),
+})
 
 it.live("uses the selected runner and never falls back after failure", () =>
   Effect.gen(function* () {
     const f = yield* fixture()
-    const pi = yield* fakeModelProvider(f.home, { output: JSON.stringify(answer) })
-    yield* f.useEngine("pi")
-    yield* f.write
-    const saved = yield* f.state(completed)
-    assert.equal(saved.tour?.intent, answer.intent)
-    assert.equal(yield* f.agent.log, "")
-    assert.lengthOf(pi.calls, 1)
-    const request = pi.calls[0]!
-    assert.equal(request.model, "gpt-test")
-    assert.isUndefined(request.tools)
-    assert.deepStrictEqual(request.messages[0], { role: "system", content: tourInstructions })
-    assert.include(request.messages[1]!.content, "Greet people")
-    assert.include(request.messages[1]!.content, "+hello name")
-    assert.include(request.messages[1]!.content, "Output JSON Schema:")
-    const files = yield* Effect.promise(() => readdir(join(f.home, ".pi", "agent")))
-    assert.notInclude(files, "sessions")
-
-    yield* f.useEngine("claude-code")
+    yield* f.piCli.configure(piCliAnswering(JSON.stringify(answer)))
+    yield* f.useEngine("pi-cli")
     yield* f.write
     assert.equal((yield* f.state(completed)).tour?.intent, answer.intent)
-    assert.lengthOf(pi.calls, 1)
+    assert.equal(yield* f.agent.log, "")
 
+    const piCliCalls = yield* f.piCli.log
     yield* f.agent.configure({ ready: false, output: "" })
+    yield* f.useEngine("claude-code")
     yield* f.write
     const rejected = yield* f.state(completed)
     assert.equal(rejected.job.status === "failed" && rejected.job.reason.reason, "not-ready")
-    assert.lengthOf(pi.calls, 1)
+    assert.equal(yield* f.piCli.log, piCliCalls)
 
     const claudeCalls = yield* f.agent.log
-    yield* pi.configure({ output: "not JSON" })
-    yield* f.useEngine("pi")
+    yield* f.piCli.configure(piCliAnswering("not JSON"))
+    yield* f.useEngine("pi-cli")
     yield* f.write
     const invalid = yield* f.state(completed)
     assert.equal(invalid.job.status === "failed" && invalid.job.reason.reason, "unusable-output")
-    assert.deepStrictEqual(invalid.tour, rejected.tour)
     assert.equal(yield* f.agent.log, claudeCalls)
   }),
 )
-
-for (const [name, settings, expected] of [
-  ["invalid answer shape", { output: JSON.stringify({ chapters: "wrong" }) }, "unusable-output"],
-  [
-    "truncated output",
-    { output: JSON.stringify(answer), finishReason: "length" },
-    "unusable-output",
-  ],
-  [
-    "authentication rejection",
-    { output: "401 unauthorized secret-should-not-leak", status: 401 },
-    "authentication",
-  ],
-  ["provider failure", { output: "secret-should-not-leak", status: 500 }, "runner"],
-  ["slow generation", { output: "", hang: true }, "timeout"],
-] as const) {
-  it.effect(`reports pi SDK ${name} without leaking provider output`, () =>
-    Effect.gen(function* () {
-      const f = yield* fixture()
-      const pi = yield* fakeModelProvider(f.home, settings)
-      yield* f.useEngine("pi")
-      yield* f.write
-
-      if (expected === "timeout") {
-        yield* pi.received(1)
-        yield* TestClock.adjust(deadline)
-      }
-
-      const state = yield* f.state(completed)
-      assert.equal(state.job.status, "failed")
-
-      if (state.job.status !== "failed") return
-      assert.equal(state.job.reason.reason, expected)
-      assert.notInclude(state.job.reason.message, "secret-should-not-leak")
-      assert.isNull(state.tour)
-      assert.equal(yield* f.agent.log, "")
-      assert.lengthOf(pi.calls, 1)
-
-      if (expected === "timeout") yield* pi.cancelled(1)
-    }),
-  )
-}
 
 it.live("writes a Tour with the pi CLI's model and none of pi's tools or resources", () =>
   Effect.gen(function* () {
@@ -587,7 +463,7 @@ it.live("writes a Tour with the pi CLI's model and none of pi's tools or resourc
     yield* f.piCli.configure({
       ready: true,
       modelsOutput: piCliModels,
-      output: piCliOutput({ content: [{ type: "text", text: JSON.stringify(answer) }] }),
+      output: piCliAnswer(JSON.stringify(answer)),
     })
     yield* f.write
     assert.equal((yield* f.state(completed)).tour?.intent, answer.intent)
@@ -633,10 +509,15 @@ for (const [name, settings, expected] of [
     "unusable-output",
   ],
   [
-    "an answer that isn't a Tour",
-    { output: piCliOutput({ content: [{ type: "text", text: "not JSON" }] }) },
+    "a text block without text",
+    {
+      output: piCliOutput({
+        content: [{ type: "text", text: JSON.stringify(answer) }, { type: "text" }],
+      }),
+    },
     "unusable-output",
   ],
+  ["an answer that isn't a Tour", { output: piCliAnswer("not JSON") }, "unusable-output"],
 ] as const) {
   it.live(`reports pi CLI ${name} without leaking its output`, () =>
     Effect.gen(function* () {
@@ -656,107 +537,6 @@ for (const [name, settings, expected] of [
     }),
   )
 }
-
-it.live("cancels Pi's model request and resolves its model again on the next job", () =>
-  Effect.gen(function* () {
-    const f = yield* fixture()
-    const pi = yield* fakeModelProvider(f.home, { output: "", hang: true })
-    yield* f.useEngine("pi")
-    yield* f.write
-
-    const writing = yield* f.state(
-      (state) => state.job.status === "writing" && state.job.runner !== null,
-    )
-
-    assert.equal(
-      writing.job.status === "writing" && writing.job.runner?.model,
-      "glass-test/gpt-test",
-    )
-    yield* pi.received(1)
-    yield* f.client.CancelTour({ pullRequest: f.ref })
-    assert.deepStrictEqual(yield* f.state(completed), { tour: null, job: { status: "idle" } })
-    yield* pi.cancelled(1)
-
-    yield* Effect.promise(() =>
-      writeFile(
-        join(f.home, ".project-glass", "settings.json"),
-        JSON.stringify({
-          tourModels: { pi: { provider: "glass-test", modelId: "missing" } },
-          tourEngine: "pi",
-        }),
-      ),
-    )
-    yield* f.write
-    const unavailable = yield* f.state(completed)
-    assert.equal(unavailable.job.status === "failed" && unavailable.job.reason.reason, "not-ready")
-    assert.lengthOf(pi.calls, 1)
-  }),
-)
-
-const stopped = (helper: RunningHelper) =>
-  eventually(
-    Effect.sync(() => {
-      for (const pid of [helper.pid, helper.parentPid, helper.childPid])
-        assert.throws(() => process.kill(pid, 0))
-      assert.isFalse(existsSync(helper.cwd))
-    }),
-  )
-
-it.live("keeps RPCs responsive and kills the Pi credential helper tree on cancel", () =>
-  Effect.gen(function* () {
-    const f = yield* fixture()
-    const pi = yield* fakeModelProvider(f.home, { output: JSON.stringify(answer) })
-    yield* f.useEngine("pi")
-    const helper = yield* piCredentialHelper(f.home)
-    yield* helper.hang
-    yield* f.write
-    const running = yield* eventually(helper.running)
-    assert.equal((yield* f.client.GetConnection()).login, VIEWER.login)
-    yield* f.client.CancelTour({ pullRequest: f.ref })
-    assert.deepStrictEqual(yield* f.state(completed), { tour: null, job: { status: "idle" } })
-    assert.isEmpty(pi.calls)
-    yield* stopped(running)
-  }),
-)
-
-it.effect("enforces the Tour deadline while a Pi credential helper is blocked", () =>
-  Effect.gen(function* () {
-    const f = yield* fixture()
-    const pi = yield* fakeModelProvider(f.home, { output: JSON.stringify(answer) })
-    yield* f.useEngine("pi")
-    const helper = yield* piCredentialHelper(f.home)
-    yield* helper.hang
-    yield* f.write
-    const running = yield* eventually(helper.running)
-    yield* TestClock.adjust(deadline)
-    const state = yield* f.state(completed)
-    assert.equal(state.job.status === "failed" && state.job.reason.reason, "timeout")
-    assert.isEmpty(pi.calls)
-    yield* stopped(running)
-  }),
-)
-
-it.live("retries failed credential helpers and picks up rotated keys without restarting", () =>
-  Effect.gen(function* () {
-    const f = yield* fixture()
-    const pi = yield* fakeModelProvider(f.home, { output: JSON.stringify(answer) })
-    yield* f.useEngine("pi")
-    const helper = yield* piCredentialHelper(f.home)
-    yield* f.write
-    const failed = yield* f.state(completed)
-    assert.equal(failed.job.status === "failed" && failed.job.reason.reason, "not-ready")
-    assert.isEmpty(pi.calls)
-
-    yield* helper.setKey("synthetic-first")
-    yield* f.write
-    assert.equal((yield* f.state(completed)).tour?.intent, answer.intent)
-
-    yield* helper.setKey("synthetic-second")
-    yield* f.write
-    assert.equal((yield* f.state(completed)).tour?.intent, answer.intent)
-    assert.deepStrictEqual(pi.authorizations, ["Bearer synthetic-first", "Bearer synthetic-second"])
-  }),
-)
 
 it.live("cancels readiness checks and loses only the running job on a backend restart", () =>
   Effect.gen(function* () {

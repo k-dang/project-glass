@@ -26,8 +26,9 @@ Tooling is [Vite+](https://viteplus.dev) (`vp`), configured in each package's `v
 
 Glass signs in to GitHub with `GH_TOKEN`, `GITHUB_TOKEN`, or your GitHub CLI login (`gh auth login`).
 
-Tours use either an authenticated Claude Code CLI or the bundled Pi SDK. Pi reuses the credentials
-and model configuration in `~/.pi/agent` (or `PI_CODING_AGENT_DIR`); use Pi's `/login` to sign in.
+Tours, Agent reviews, and Agents use either an authenticated Claude Code CLI or an installed pi CLI.
+pi reuses the credentials and model configuration in `~/.pi/agent` (or `PI_CODING_AGENT_DIR`); use
+pi's `/login` to sign in.
 
 ## Commands
 

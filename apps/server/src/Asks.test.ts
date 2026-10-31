@@ -1,5 +1,5 @@
 import { assert, it } from "@effect/vitest"
-import { type AskPlace, type Engine, PullRequestRef, Revision } from "@glass/contracts"
+import { type AgentEngine, type AskPlace, PullRequestRef, Revision } from "@glass/contracts"
 import { Effect, Fiber, Scope } from "effect"
 import { TestClock } from "effect/testing"
 import { existsSync } from "node:fs"
@@ -17,7 +17,7 @@ const deadline = 60_000
 const fixture = Effect.fnUntraced(function* (
   settings: Partial<FakeAgentSettings> = {},
   timeout = deadline,
-  engine: Engine = "pi-cli",
+  engine: AgentEngine = "pi-cli",
 ) {
   const piCli = yield* fakeAgent({
     ready: true,
@@ -119,18 +119,6 @@ it.live("refuses a line outside the diff without starting the agent", () =>
 
     assert.strictEqual(failure.reason, "stale-revision")
     assert.isFalse((yield* f.piCli.calls).some((call) => call.stage === "generate"))
-  }),
-)
-
-it.live("fails before starting an Agent review engine that can't read the checkout", () =>
-  Effect.gen(function* () {
-    const f = yield* fixture({}, undefined, "pi")
-
-    const failure = yield* f.ask(helloName).pipe(Effect.flip)
-
-    assert.strictEqual(failure.reason, "runner")
-    assert.include(failure.message, "can't read the PR's code")
-    assert.isEmpty(yield* f.piCli.calls)
   }),
 )
 

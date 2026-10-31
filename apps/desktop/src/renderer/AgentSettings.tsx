@@ -1,5 +1,5 @@
 import { useAtom, useAtomRefresh, useAtomValue } from "@effect/atom-react"
-import { type EngineSettings, ReviewPrompt, readsFiles } from "@glass/contracts"
+import { type EngineSettings, ReviewPrompt } from "@glass/contracts"
 import { Effect, Equal, Exit, Option, Schema } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
 import { cn } from "cn"
@@ -134,7 +134,6 @@ function AgentSettingsEditor(props: { saved: AgentSettings }) {
           <EnginePicker
             legend="Tour engine"
             description="Writes Queue Tours and the Tours you start from a PR."
-            offers={() => true}
             value={draft.tours}
             onChange={(tours) => change({ tours })}
           />
@@ -145,8 +144,7 @@ function AgentSettingsEditor(props: { saved: AgentSettings }) {
         >
           <EnginePicker
             legend="Agent review engine"
-            description="Runs every Agent review and answers Ask. Only engines that can read a PR's files can run them."
-            offers={(engine) => readsFiles[engine]}
+            description="Runs every Agent review and answers Ask."
             value={draft.agentReviews}
             onChange={(agentReviews) => change({ agentReviews })}
           />

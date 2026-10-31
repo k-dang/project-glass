@@ -1,6 +1,6 @@
 import {
+  AgentEngine,
   defaultReviewPrompt,
-  Engine,
   type EngineFeature,
   EngineModels,
   type EngineSettings,
@@ -19,7 +19,6 @@ const SavedModels = Schema.Struct({
   "claude-code": EngineModels.fields["claude-code"].pipe(
     Schema.withDecodingDefaultKey(Effect.succeed("claude-sonnet-5-5")),
   ),
-  pi: EngineModels.fields.pi.pipe(Schema.withDecodingDefaultKey(defaultPiModel)),
   "pi-cli": EngineModels.fields["pi-cli"].pipe(Schema.withDecodingDefaultKey(defaultPiModel)),
 }).pipe(Schema.withDecodingDefaultKey(Effect.succeed({})))
 
@@ -28,11 +27,10 @@ const Settings = Schema.Struct({
     Schema.withDecodingDefaultKey(Effect.succeed([])),
   ),
   tourModels: SavedModels,
-  tourEngine: Engine.pipe(Schema.withDecodingDefaultKey(Effect.succeed("claude-code"))),
+  tourEngine: AgentEngine.pipe(Schema.withDecodingDefaultKey(Effect.succeed("claude-code"))),
   queueTours: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
-  // Only the pi CLI reads a PR's files so far, so Agent reviews start on it.
   agentReviewModels: SavedModels,
-  agentReviewEngine: Engine.pipe(Schema.withDecodingDefaultKey(Effect.succeed("pi-cli"))),
+  agentReviewEngine: AgentEngine.pipe(Schema.withDecodingDefaultKey(Effect.succeed("pi-cli"))),
   reviewPrompt: ReviewPrompt.pipe(
     Schema.withDecodingDefaultKey(Effect.succeed(defaultReviewPrompt)),
   ),

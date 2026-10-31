@@ -36,7 +36,7 @@ export const piCliModels = ["provider   model", "anthropic  claude-sonnet-5-5"].
 export interface PiCliAssistant {
   readonly stopReason?: string
   readonly errorMessage?: string
-  readonly content?: ReadonlyArray<{ readonly type: "text"; readonly text: string }>
+  readonly content?: ReadonlyArray<{ readonly type: string; readonly text?: string }>
 }
 
 export const piCliOutput = (assistant: PiCliAssistant) =>

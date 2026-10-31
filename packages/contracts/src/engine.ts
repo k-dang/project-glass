@@ -1,18 +1,8 @@
 import { Schema } from "effect"
-
-export const Engine = Schema.Literals(["claude-code", "pi", "pi-cli"])
-
-export type Engine = typeof Engine.Type
-
-/** Whether an engine can read a PR's files, which every Agent review needs. */
-export const readsFiles: Record<Engine, boolean> = {
-  "claude-code": true,
-  pi: false,
-  "pi-cli": true,
-}
+import { AgentEngine } from "./agent"
 
 export const AgentRunnerIdentity = Schema.Struct({
-  engine: Engine,
+  engine: AgentEngine,
   model: Schema.String,
 })
 
@@ -24,17 +14,16 @@ export const PiModel = Schema.Struct({ provider: ModelSetting, modelId: ModelSet
 
 export type PiModel = typeof PiModel.Type
 
-/** Claude Code takes a bare model ID; pi and the pi CLI select a provider and model ID. */
+/** Claude Code takes a bare model ID; the pi CLI selects a provider and model ID. */
 export const EngineModels = Schema.Struct({
   "claude-code": ModelSetting,
-  pi: PiModel,
   "pi-cli": PiModel,
 })
 
 export type EngineModels = typeof EngineModels.Type
 
 /** The Tour engine and the Agent review engine are chosen apart; each keeps a model per engine. */
-export const EngineSettings = Schema.Struct({ engine: Engine, models: EngineModels })
+export const EngineSettings = Schema.Struct({ engine: AgentEngine, models: EngineModels })
 
 export type EngineSettings = typeof EngineSettings.Type
 

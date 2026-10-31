@@ -13,7 +13,6 @@ import { ServerConfig } from "./ServerConfig"
 
 const models: EngineModels = {
   "claude-code": "claude-sonnet-5-5",
-  pi: { provider: "glass-test", modelId: "gpt-test" },
   "pi-cli": { provider: "anthropic", modelId: "claude-sonnet-5-5" },
 }
 
@@ -57,7 +56,10 @@ it.live("the pi CLI reads a read-only directory with only its read-only tools", 
     })
 
     const answered = yield* Effect.gen(function* () {
-      const selected = yield* (yield* AgentRunners).select({ engine: "pi-cli", models })
+      const selected = yield* (yield* AgentRunners).select(
+        { engine: "pi-cli", models },
+        "read-only",
+      )
 
       return yield* selected.run(readOnlyTask(checkout))
     }).pipe(Effect.scoped, Effect.provide(runnersLayer(home, agent.command)))
@@ -84,7 +86,10 @@ it.live("Claude Code reads a read-only directory with only its restricted read t
     const agent = yield* fakeAgent({ ready: true, output: claudeAnswer })
 
     const answered = yield* Effect.gen(function* () {
-      const selected = yield* (yield* AgentRunners).select({ engine: "claude-code", models })
+      const selected = yield* (yield* AgentRunners).select(
+        { engine: "claude-code", models },
+        "read-only",
+      )
 
       return yield* selected.run(readOnlyTask(checkout))
     }).pipe(Effect.scoped, Effect.provide(runnersLayer(home, agent.command)))
@@ -104,7 +109,10 @@ it.live("Claude Code runs a task without file access with no tools", () =>
     const agent = yield* fakeAgent({ ready: true, output: claudeAnswer })
 
     yield* Effect.gen(function* () {
-      const selected = yield* (yield* AgentRunners).select({ engine: "claude-code", models })
+      const selected = yield* (yield* AgentRunners).select(
+        { engine: "claude-code", models },
+        "none",
+      )
 
       return yield* selected.run({ ...readOnlyTask(home), files: "none" })
     }).pipe(Effect.scoped, Effect.provide(runnersLayer(home, agent.command)))
@@ -116,7 +124,7 @@ it.live("Claude Code runs a task without file access with no tools", () =>
   }),
 )
 
-it.live("a Claude Code that can't restrict its tools doesn't read files", () =>
+it.live("a Claude Code that can't restrict its tools runs tasks only without file access", () =>
   Effect.gen(function* () {
     const home = yield* isolatedHome
 
@@ -126,10 +134,18 @@ it.live("a Claude Code that can't restrict its tools doesn't read files", () =>
       helpOutput: "--tools --strict-mcp-config --no-session-persistence --disable-slash-commands",
     })
 
-    const selected = yield* Effect.gen(function* () {
-      return yield* (yield* AgentRunners).select({ engine: "claude-code", models })
+    const [readOnly, none] = yield* Effect.gen(function* () {
+      const runners = yield* AgentRunners
+      const settings = { engine: "claude-code" as const, models }
+
+      return yield* Effect.all([
+        runners.select(settings, "read-only").pipe(Effect.flip),
+        runners.select(settings, "none"),
+      ])
     }).pipe(Effect.scoped, Effect.provide(runnersLayer(home, agent.command)))
 
-    assert.isFalse(selected.readsFiles)
+    assert.strictEqual(readOnly.reason, "not-ready")
+    assert.include(readOnly.message, "can't be limited to reading the PR's code")
+    assert.strictEqual(none.identity.engine, "claude-code")
   }),
 )

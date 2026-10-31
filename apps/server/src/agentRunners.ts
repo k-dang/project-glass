@@ -1,6 +1,6 @@
 import {
+  type AgentEngine,
   type AgentRunnerIdentity,
-  type Engine,
   type EngineModels,
   type EngineSettings,
   type PiModel,
@@ -20,12 +20,13 @@ import {
   type Scope,
   Stream,
 } from "effect"
-import { ChildProcess, ChildProcessSpawner } from "effect/process"
+import { ChildProcessSpawner } from "effect/process"
 import { join } from "node:path"
 import { type AgentFailure, agentFailure, runnerFailureReason } from "./agentFailure"
-import { bundledEntry, launchCommand } from "./processes"
-import { PiAnswerJson, PiAnswerMessage, PiConfigJson, PiReady, PiRequest } from "./piProtocol"
+import { launchCommand } from "./processes"
 import { ServerConfig } from "./ServerConfig"
+
+type FileAccess = "none" | "read-only"
 
 export interface AgentTask<A> {
   readonly subject: string
@@ -37,7 +38,6 @@ export interface AgentTask<A> {
 
 export interface AgentRunner {
   readonly identity: AgentRunnerIdentity
-  readonly readsFiles: boolean
   readonly run: <A>(task: AgentTask<A>) => Effect.Effect<A, AgentFailure>
 }
 
@@ -57,28 +57,6 @@ const promptWithSchema = (task: AgentTask<unknown>) =>
 
 const unusableFailure = (name: string, subject: string, identity: AgentRunnerIdentity) =>
   agentFailure("unusable-output", `${name} returned an unusable ${subject}. Try again.`, identity)
-
-const piAnswer = Effect.fnUntraced(function* <A>(
-  task: AgentTask<A>,
-  message: typeof PiAnswerMessage.Type,
-  identity: AgentRunnerIdentity,
-  failed: (errorMessage: string) => Effect.Effect<never, AgentFailure>,
-) {
-  if (message.stopReason === "error" || message.stopReason === "aborted")
-    return yield* failed(message.errorMessage ?? "")
-
-  const unusable = unusableFailure("pi", task.subject, identity)
-
-  if (message.stopReason !== "stop") return yield* unusable
-
-  const text = message.content
-    .flatMap((part) => (part.type === "text" ? [part.text ?? ""] : []))
-    .join("")
-
-  return yield* Schema.decodeUnknownEffect(Schema.fromJsonString(task.answer))(text).pipe(
-    Effect.mapError(() => unusable),
-  )
-})
 
 const startFailure = (name: string) => (error: { readonly reason: unknown }) => {
   const missing = Predicate.isTagged(error.reason, "NotFound")
@@ -195,7 +173,7 @@ const runnerStrategies = Effect.gen(function* () {
     Schema.fromJsonString(Schema.Struct({ loggedIn: Schema.Boolean })),
   )
 
-  const claudeRunner = Effect.fnUntraced(function* (models: EngineModels) {
+  const claudeRunner = Effect.fnUntraced(function* (models: EngineModels, access: FileAccess) {
     const model = models["claude-code"]
     const cwd = yield* workingDirectory
 
@@ -232,11 +210,14 @@ const runnerStrategies = Effect.gen(function* () {
 
     const identity = runnerIdentity({ engine: "claude-code", models })
 
-    return {
-      identity,
-      readsFiles: help.success.stdout.includes("--restricted"),
-      run: runClaudeCode(cwd, model, identity),
-    } satisfies AgentRunner
+    if (access === "read-only" && !help.success.stdout.includes("--restricted"))
+      return yield* agentFailure(
+        "not-ready",
+        "Claude Code can't be limited to reading the PR's code. Update it, then try again.",
+        identity,
+      )
+
+    return { identity, run: runClaudeCode(cwd, model, identity) } satisfies AgentRunner
   })
 
   const piReadOnlyTools = ["--tools", "read,grep,find,ls"]
@@ -264,7 +245,20 @@ const runnerStrategies = Effect.gen(function* () {
     ),
   )
 
-  const decodePiCliAnswer = Schema.decodeUnknownOption(PiAnswerMessage)
+  const decodePiCliAnswer = Schema.decodeUnknownOption(
+    Schema.Struct({
+      stopReason: Schema.String,
+      errorMessage: Schema.optional(Schema.String),
+      content: Schema.Array(
+        Schema.Union([
+          Schema.Struct({ type: Schema.Literal("text"), text: Schema.String }),
+          Schema.Struct({
+            type: Schema.String.check(Schema.makeFilter((type) => type !== "text")),
+          }),
+        ]),
+      ),
+    }),
+  )
 
   const runPiCli = (
     cwd: string,
@@ -332,12 +326,24 @@ const runnerStrategies = Effect.gen(function* () {
         Option.flatMap((end) => decodePiCliAnswer(end.messages.at(-1))),
       )
 
-      if (Option.isNone(answer)) return yield* unusableFailure("pi", task.subject, identity)
+      const unusable = unusableFailure("pi", task.subject, identity)
 
-      return yield* piAnswer(task, answer.value, identity, (message) =>
-        Effect.logWarning("pi's provider rejected the request", identity.model, message).pipe(
-          Effect.andThen(Effect.fail(failed(runnerFailureReason(message)))),
-        ),
+      if (Option.isNone(answer)) return yield* unusable
+
+      const { stopReason, errorMessage = "", content } = answer.value
+
+      if (stopReason === "error" || stopReason === "aborted") {
+        yield* Effect.logWarning("pi's provider rejected the request", identity.model, errorMessage)
+
+        return yield* failed(runnerFailureReason(errorMessage))
+      }
+
+      if (stopReason !== "stop") return yield* unusable
+
+      const text = content.flatMap((part) => ("text" in part ? [part.text] : [])).join("")
+
+      return yield* Schema.decodeUnknownEffect(Schema.fromJsonString(task.answer))(text).pipe(
+        Effect.mapError(() => unusable),
       )
     })
 
@@ -371,100 +377,22 @@ const runnerStrategies = Effect.gen(function* () {
         `pi has no model ${model}. Run pi --list-models to see yours, then change it in Settings.`,
       )
 
-    return {
-      identity,
-      readsFiles: true,
-      run: runPiCli(cwd, selection, identity),
-    } satisfies AgentRunner
-  })
-
-  const piRunner = Effect.fnUntraced(function* (models: EngineModels) {
-    const cwd = yield* workingDirectory
-    const selection = models.pi
-    const identity = runnerIdentity({ engine: "pi", models })
-
-    const workerConfig = yield* Schema.encodeEffect(PiConfigJson)(selection).pipe(
-      Effect.mapError(() =>
-        agentFailure("failed", "The Pi worker configuration could not be encoded.", identity),
-      ),
-    )
-
-    const stopped = agentFailure(
-      "failed",
-      "The Pi SDK worker stopped unexpectedly. Try again.",
-      identity,
-    )
-
-    const worker = bundledEntry("piWorker", import.meta.url)
-
-    const child = yield* spawner
-      .spawn(
-        ChildProcess.make(globalThis.process.execPath, [worker, workerConfig], {
-          cwd,
-          env: { ELECTRON_RUN_AS_NODE: "1" },
-          extendEnv: true,
-          stderr: "ignore",
-          additionalFds: { fd3: { type: "output" } },
-          forceKillAfter: "250 millis",
-        }),
-      )
-      .pipe(Effect.mapError(() => agentFailure("failed", "The Pi SDK worker could not start.")))
-
-    const ready = yield* child.getOutputFd(3).pipe(
-      Stream.decodeText(),
-      Stream.mkString,
-      Effect.flatMap(Schema.decodeUnknownEffect(PiReady)),
-      Effect.mapError(() => stopped),
-    )
-
-    if (ready !== "ready") return yield* ready
-
-    const run = Effect.fn("runPi")(function* <A>(task: AgentTask<A>) {
-      const request = yield* Schema.encodeEffect(PiRequest)({
-        instructions: task.instructions,
-        prompt: promptWithSchema(task),
-      }).pipe(Effect.mapError(() => stopped))
-
-      const [output, code] = yield* Effect.all(
-        [
-          child.stdout.pipe(Stream.decodeText(), Stream.mkString),
-          child.exitCode,
-          Stream.make(new TextEncoder().encode(request)).pipe(Stream.run(child.stdin)),
-        ],
-        { concurrency: "unbounded" },
-      ).pipe(Effect.mapError(() => stopped))
-
-      if (code !== 0) return yield* stopped
-
-      const answer = yield* Schema.decodeUnknownEffect(PiAnswerJson)(output).pipe(
-        Effect.mapError(() => stopped),
-      )
-
-      return yield* piAnswer(task, answer, identity, (message) =>
-        Effect.fail(
-          agentFailure(
-            runnerFailureReason(message),
-            `pi could not write the ${task.subject}. Check its provider login and model availability, then try again.`,
-            identity,
-          ),
-        ),
-      )
-    })
-
-    return { identity, readsFiles: false, run } satisfies AgentRunner
+    return { identity, run: runPiCli(cwd, selection, identity) } satisfies AgentRunner
   })
 
   const runners: Record<
-    Engine,
-    (models: EngineModels) => Effect.Effect<AgentRunner, AgentFailure, Scope.Scope>
+    AgentEngine,
+    (
+      models: EngineModels,
+      access: FileAccess,
+    ) => Effect.Effect<AgentRunner, AgentFailure, Scope.Scope>
   > = {
     "claude-code": claudeRunner,
-    pi: piRunner,
     "pi-cli": piCliRunner,
   }
 
-  return Effect.fn("selectAgentRunner")(({ engine, models }: EngineSettings) =>
-    runners[engine](models),
+  return Effect.fn("selectAgentRunner")(({ engine, models }: EngineSettings, access: FileAccess) =>
+    runners[engine](models, access),
   )
 })
 
@@ -473,6 +401,7 @@ export class AgentRunners extends Context.Service<
   {
     readonly select: (
       settings: EngineSettings,
+      access: FileAccess,
     ) => Effect.Effect<AgentRunner, AgentFailure, Scope.Scope>
   }
 >()("@glass/server/AgentRunners") {

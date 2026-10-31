@@ -403,7 +403,7 @@ const launch = async (options: {
       )
       env["PI_CODING_AGENT_DIR"] = join(paths.home, ".pi", "agent")
       env["GLASS_CLAUDE_COMMAND"] = join(paths.state, "claude-disabled-in-fake-provider-mode")
-      console.log("Tour provider: fake. Choose pi as the Tour engine in Settings; Claude Code is disabled.")
+      console.log("Tour provider: fake. Choose pi CLI as the Tour engine in Settings; Claude Code is disabled.")
     }
 
     if (fakeBackend) {
@@ -561,7 +561,7 @@ const doctor = async (run: RunState) => {
   const oldestBuild = Math.min(
     ...[
       "apps/server/dist/bin.mjs",
-      "apps/server/dist/piWorker.mjs",
+      "apps/server/dist/agentHost.mjs",
       "apps/desktop/dist/renderer/index.html",
       "apps/desktop/dist/main/index.cjs",
       "apps/desktop/dist/preload/index.cjs",

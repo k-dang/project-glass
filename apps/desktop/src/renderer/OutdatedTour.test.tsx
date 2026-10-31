@@ -95,7 +95,7 @@ it("keeps the old Tour readable through a rewrite until its replacement arrives"
   expect(screen.queryByRole("button", { name: "Rewrite" })).toBeNull()
   expect(within(sidebar()).getByText("Greet people by name.")).toBeDefined()
 
-  const runner = { engine: "pi" as const, model: "openai/gpt-test" }
+  const runner = { engine: "pi-cli" as const, model: "openai/gpt-test" }
   await f.publish({ tour: older, job: { status: "writing", startedAt: f.startedAt, runner } })
   expect(await screen.findByText("openai/gpt-test")).toBeDefined()
   expect(within(sidebar()).getByRole("button", { name: /Greet by name/ })).toBeDefined()

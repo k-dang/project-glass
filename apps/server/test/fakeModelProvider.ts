@@ -44,7 +44,7 @@ export type FakeModelDelta =
       }
     }
 
-const lastUserText = ({ messages }: FakeModelRequest) => {
+export const lastUserText = ({ messages }: FakeModelRequest) => {
   const content = messages.findLast(({ role }) => role === "user")?.content
 
   return Predicate.isString(content)
@@ -173,7 +173,6 @@ export const fakeModelProvider = Effect.fnUntraced(function* (
 ) {
   let settings = initial
   const calls: Array<typeof request.Type> = []
-  const authorizations: Array<string> = []
   const received = counter()
   const cancelled = counter()
   const hung: Array<{ readonly input: FakeModelRequest; readonly res: ServerResponse }> = []
@@ -206,7 +205,6 @@ export const fakeModelProvider = Effect.fnUntraced(function* (
     for await (const chunk of req) body += chunk
     const input = Schema.decodeUnknownSync(request)(body)
     calls.push(input)
-    authorizations.push(req.headers.authorization ?? "")
     received.add()
     const current = settings
 
@@ -298,7 +296,7 @@ export const fakeModelProvider = Effect.fnUntraced(function* (
     await writeFile(
       join(home, ".project-glass", "settings.json"),
       JSON.stringify({
-        tourModels: { pi: { provider: "glass-test", modelId: "gpt-test" } },
+        tourModels: { "pi-cli": { provider: "glass-test", modelId: "gpt-test" } },
       }),
     )
   })
@@ -306,7 +304,6 @@ export const fakeModelProvider = Effect.fnUntraced(function* (
   return {
     url,
     calls,
-    authorizations,
     received: received.reached,
     cancelled: cancelled.reached,
     configure: (next: FakeModelSettings) =>

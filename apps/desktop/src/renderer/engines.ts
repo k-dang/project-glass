@@ -1,8 +1,7 @@
-import type { AgentRunnerIdentity, Engine } from "@glass/contracts"
+import type { AgentEngine, AgentRunnerIdentity } from "@glass/contracts"
 
-export const engineLabels: Record<Engine, string> = {
+export const engineLabels: Record<AgentEngine, string> = {
   "claude-code": "Claude Code",
-  pi: "pi",
   "pi-cli": "pi CLI",
 }
 

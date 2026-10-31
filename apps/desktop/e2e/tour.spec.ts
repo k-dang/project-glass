@@ -1,7 +1,5 @@
 import type { Page } from "@playwright/test"
-import { Effect } from "effect"
 import type { FakeGitHub } from "../../server/test/fakeGitHub"
-import { fakeModelProvider } from "../../server/test/fakeModelProvider"
 import { expect, openPullRequest, startLineDraft, test } from "./glass"
 
 const numbered = (count: number, word = "line") =>
@@ -74,38 +72,6 @@ const seedTourPullRequest = (github: FakeGitHub) =>
       { path: "notes.txt", status: "added", additions: 1, patch: added(["note"]) },
     ],
   })
-
-// Pi settings must exist before the backend fills in defaults during startup.
-const piTest = test.extend<{ pi: Effect.Success<ReturnType<typeof fakeModelProvider>> }>({
-  pi: [
-    async ({ home }, use) => {
-      await Effect.runPromise(
-        Effect.scoped(
-          Effect.flatMap(fakeModelProvider(home, { output: JSON.stringify(tour) }), (pi) =>
-            Effect.promise(() => use(pi)),
-          ),
-        ),
-      )
-    },
-    { auto: true },
-  ],
-})
-
-piTest("writes a Tour with the bundled Pi SDK", async ({ github, pi, window }) => {
-  await window.getByRole("link", { name: "Settings" }).click()
-  const tours = window.getByRole("region", { name: "Tours" })
-  await tours.getByText("pi", { exact: true }).click()
-  await expect(tours.getByRole("radio", { name: "pi", exact: true })).toBeChecked()
-  await window.getByRole("button", { name: "Save changes" }).click()
-  await expect(window.getByText("Settings saved.")).toBeAttached()
-  await window.getByRole("link", { name: "Reviews" }).click()
-  await openPullRequest(window, seedTourPullRequest(github))
-  await writeTour(window)
-  await expect(
-    window.getByRole("tabpanel", { name: "Changes" }).getByText("Writes twenty in words."),
-  ).toBeVisible()
-  expect(pi.calls).toHaveLength(1)
-})
 
 test("moves between Chapters from the keyboard and the sidebar in a tall window", async ({
   github,
