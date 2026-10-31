@@ -9,7 +9,7 @@ import { Empty } from "./Lists"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf } from "./problems"
 import { ReviewContinueCard } from "./ReviewContinueCard"
-import { loadedPlaceAtom, savedDestinationAtom } from "./savedPlace"
+import { loadedPlacesAtom, savedDestinationsAtom } from "./savedPlace"
 
 function ContinueDestination(props: { destination: ResumableDestination }) {
   return Match.value(props.destination).pipe(
@@ -21,8 +21,8 @@ function ContinueDestination(props: { destination: ResumableDestination }) {
 }
 
 export function Dashboard() {
-  const result = useAtomValue(savedDestinationAtom)
-  const retry = useAtomRefresh(loadedPlaceAtom)
+  const result = useAtomValue(savedDestinationsAtom)
+  const retry = useAtomRefresh(loadedPlacesAtom)
 
   return (
     <div className="page-content flex flex-col gap-8 py-6">
@@ -32,8 +32,13 @@ export function Dashboard() {
           Continue where you left off
         </h2>
         {AsyncResult.builder(result)
-          .onSuccess((destination) =>
-            destination === null ? (
+          .onSuccess((destinations) => {
+            const continued = [
+              destinations.find(({ area }) => area === "reviews"),
+              destinations.find(({ area }) => area !== "reviews"),
+            ].filter((destination) => destination !== undefined)
+
+            return continued.length === 0 ? (
               <Empty title="No saved place yet">
                 {rememberPlaceHint}
                 <Link
@@ -44,9 +49,11 @@ export function Dashboard() {
                 </Link>
               </Empty>
             ) : (
-              <ContinueDestination destination={destination} />
-            ),
-          )
+              continued.map((destination) => (
+                <ContinueDestination key={destination.area} destination={destination} />
+              ))
+            )
+          })
           .onFailure((cause) => (
             <ProblemAlert problem={problemOf(cause)} action={{ label: "Retry", run: retry }} />
           ))

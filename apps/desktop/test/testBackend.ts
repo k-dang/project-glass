@@ -19,7 +19,7 @@ export const testLayer = (handlers: Partial<Handlers>) =>
   Layer.effect(Backend, RpcTest.makeClient(GlassRpcs)).pipe(
     Layer.provide(
       GlassRpcs.toLayer<Handlers>({
-        GetSavedPlace: () => Effect.succeed(null),
+        GetSavedPlaces: () => Effect.succeed([]),
         SavePlace: ({ destination }) =>
           DateTime.now.pipe(Effect.map((savedAt) => new SavedPlace({ destination, savedAt }))),
         WriteTour: unused,

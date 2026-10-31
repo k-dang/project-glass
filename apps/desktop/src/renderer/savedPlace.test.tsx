@@ -22,7 +22,8 @@ import { AsyncResult } from "effect/reactivity"
 import { afterEach, expect, it, vi } from "vite-plus/test"
 import { App } from "./App"
 import { backendLayerAtom } from "./backend"
-import { savedDestinationAtom, rememberPlace } from "./savedPlace"
+import { rememberPlace, savedDestinationsAtom } from "./savedPlace"
+import { agent } from "../../test/agent"
 import {
   type Handlers,
   type Held,
@@ -72,7 +73,7 @@ const mount = (handlers: Partial<Handlers>) => {
             ListPullRequests: () => Effect.succeed(noListings),
             ListActivity: () =>
               Effect.succeed(new ActivityPage({ activities: [], hasMore: false })),
-            GetSavedPlace: () => Effect.succeed(savedPlace()),
+            GetSavedPlaces: () => Effect.succeed([savedPlace()]),
             OpenPullRequest: () => Effect.succeed(pr),
             HasPullRequestChanged: () => Effect.succeed(false),
             RecordActivity: () => Effect.void,
@@ -149,12 +150,27 @@ it("continues from Dashboard after visiting Settings and Activity, without savin
   expect(writes).toHaveLength(count)
 })
 
+it("continues the last PR alongside the last Agent opened after it", async () => {
+  mount({
+    GetSavedPlaces: () =>
+      Effect.succeed([savedPlace({ area: "agents", agentId: agent.id }), savedPlace()]),
+    WatchAgents: () => Stream.make([agent]),
+  })
+
+  await screen.findByRole("link", { name: "Continue agent/swift-otter" })
+  expect(
+    screen
+      .getAllByRole("link", { name: /^Continue / })
+      .map((link) => link.getAttribute("aria-label")),
+  ).toEqual(["Continue octo-org/hello-world#42", "Continue agent/swift-otter"])
+})
+
 it("opens Reviews from an empty Dashboard without creating a saved place", async () => {
   const save = vi.fn<Handlers["SavePlace"]>(({ destination: value }) =>
     Effect.succeed(savedPlace(value)),
   )
 
-  const user = mount({ GetSavedPlace: () => Effect.succeed(null), SavePlace: save })
+  const user = mount({ GetSavedPlaces: () => Effect.succeed([]), SavePlace: save })
 
   await screen.findByRole("heading", { name: "No saved place yet" })
   await user.click(screen.getByRole("link", { name: "Browse pull requests" }))
@@ -170,8 +186,8 @@ it("selects and reveals the restored repository file when the tree finishes load
   const path = "src/components/Review.tsx"
 
   const user = mount({
-    GetSavedPlace: () =>
-      Effect.succeed(savedPlace({ ...destination, position: { tab: "files", file: path } })),
+    GetSavedPlaces: () =>
+      Effect.succeed([savedPlace({ ...destination, position: { tab: "files", file: path } })]),
     ListRepositoryFiles: hold(listings),
     GetFileContents: () => Effect.succeed(FileTooLarge.make({})),
   })
@@ -244,7 +260,7 @@ it("restores a later Chapter and file when the saved Tour arrives after the work
   }
 
   const user = mount({
-    GetSavedPlace: () => Effect.succeed(savedPlace(resumed)),
+    GetSavedPlaces: () => Effect.succeed([savedPlace(resumed)]),
     WatchTour: (payload) => Stream.fromEffect(hold(watches)(payload)),
     SavePlace: ({ destination: value }) => {
       writes.push(value)
@@ -310,13 +326,13 @@ it("keeps tracking the Tour after Reload removes the selected file", async () =>
   let opens = 0
 
   const user = mount({
-    GetSavedPlace: () =>
-      Effect.succeed(
+    GetSavedPlaces: () =>
+      Effect.succeed([
         savedPlace({
           ...destination,
           position: { tab: "changes", file: "third.ts", order: "tour" },
         }),
-      ),
+      ]),
     OpenPullRequest: () => Effect.succeed(opens++ === 0 ? pr : refreshed),
     WatchTour: () =>
       Stream.make({
@@ -397,8 +413,8 @@ it("continues the newest work even while an older destination is still saving", 
 
 it("opens Overview with an explanation when the saved Revision changed", async () => {
   const user = mount({
-    GetSavedPlace: () =>
-      Effect.succeed(savedPlace({ ...destination, revision: { base: "b0", head: "old" } })),
+    GetSavedPlaces: () =>
+      Effect.succeed([savedPlace({ ...destination, revision: { base: "b0", head: "old" } })]),
   })
 
   await user.click(await screen.findByRole("link", { name: /^Continue / }))
@@ -410,7 +426,7 @@ it("opens Overview with an explanation when the saved Revision changed", async (
 
 it("doesn't offer another GitHub identity's saved destination", async () => {
   mount({
-    GetSavedPlace: () => Effect.succeed(savedPlace({ ...destination, login: "someone-else" })),
+    GetSavedPlaces: () => Effect.succeed([savedPlace({ ...destination, login: "someone-else" })]),
   })
 
   await screen.findByRole("heading", { name: "No saved review for this account" })
@@ -419,13 +435,13 @@ it("doesn't offer another GitHub identity's saved destination", async () => {
 
 it("keeps Changes usable when the saved file is no longer in its diff", async () => {
   const user = mount({
-    GetSavedPlace: () =>
-      Effect.succeed(
+    GetSavedPlaces: () =>
+      Effect.succeed([
         savedPlace({
           ...destination,
           position: { tab: "changes", file: "missing.ts", order: "path" },
         }),
-      ),
+      ]),
   })
 
   await user.click(await screen.findByRole("link", { name: /^Continue / }))
@@ -437,14 +453,14 @@ it("lets the user retry a failed saved-place read", async () => {
   let reads = 0
 
   const user = mount({
-    GetSavedPlace: () => {
+    GetSavedPlaces: () => {
       reads++
 
       return reads === 1
         ? Effect.fail(
             new SavedPlaceError({ message: "Couldn't read your saved place. Try again." }),
           )
-        : Effect.succeed(savedPlace())
+        : Effect.succeed([savedPlace()])
     },
   })
 
@@ -477,7 +493,7 @@ it("reports a failed position save and retries without interrupting the review",
 it("serializes saves and skips intermediate positions while an earlier save is in flight", async () => {
   const calls: Array<Held<{ destination: ResumableDestination }, SavedPlace, never>> = []
   const registry = testRegistry({ SavePlace: hold(calls) })
-  const release = registry.mount(savedDestinationAtom)
+  const release = registry.mount(savedDestinationsAtom)
 
   try {
     rememberPlace(registry, destination)
@@ -491,15 +507,43 @@ it("serializes saves and skips intermediate positions while an earlier save is i
 
     rememberPlace(registry, last)
     expect(calls).toHaveLength(0)
-    expect(Option.getOrNull(AsyncResult.value(registry.get(savedDestinationAtom)))).toEqual(last)
+    expect(Option.getOrNull(AsyncResult.value(registry.get(savedDestinationsAtom)))).toEqual([last])
 
     first.answer(Effect.succeed(savedPlace(first.payload.destination)))
     const second = await next(calls)
     expect(second.payload.destination).toEqual(last)
-    expect(Option.getOrNull(AsyncResult.value(registry.get(savedDestinationAtom)))).toEqual(last)
+    expect(Option.getOrNull(AsyncResult.value(registry.get(savedDestinationsAtom)))).toEqual([last])
     second.answer(Effect.succeed(savedPlace(last)))
     await waitFor(() =>
-      expect(Option.getOrNull(AsyncResult.value(registry.get(savedDestinationAtom)))).toEqual(last),
+      expect(Option.getOrNull(AsyncResult.value(registry.get(savedDestinationsAtom)))).toEqual([
+        last,
+      ]),
+    )
+  } finally {
+    release()
+    registry.dispose()
+  }
+})
+
+it("keeps one destination per area, newest first", async () => {
+  const registry = testRegistry({})
+  const release = registry.mount(savedDestinationsAtom)
+  const opened: ResumableDestination = { area: "agents", agentId: agent.id }
+
+  const later: ResumableDestination = {
+    ...destination,
+    position: { tab: "files", file: "README.md" },
+  }
+
+  try {
+    rememberPlace(registry, destination)
+    rememberPlace(registry, opened)
+    rememberPlace(registry, later)
+    await waitFor(() =>
+      expect(Option.getOrNull(AsyncResult.value(registry.get(savedDestinationsAtom)))).toEqual([
+        later,
+        opened,
+      ]),
     )
   } finally {
     release()

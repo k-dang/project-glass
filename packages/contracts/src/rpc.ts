@@ -66,7 +66,8 @@ export type NewDraft = typeof NewDraft.Type
 const toDoList = { success: Schema.Array(ToDo), error: ToDoError }
 
 export class GlassRpcs extends RpcGroup.make(
-  Rpc.make("GetSavedPlace", { success: Schema.NullOr(SavedPlace), error: SavedPlaceError }),
+  /** One per area, newest first. */
+  Rpc.make("GetSavedPlaces", { success: Schema.Array(SavedPlace), error: SavedPlaceError }),
   Rpc.make("SavePlace", {
     payload: { destination: ResumableDestination },
     success: SavedPlace,
