@@ -44,6 +44,21 @@ describe("Plugins", () => {
     }),
   )
 
+  it.live("skips a Sandbox provider that doesn't list Agent programs Glass knows", () =>
+    Effect.gen(function* () {
+      const plugins = yield* isolatedHome
+      yield* write(join(plugins, "empty.js"), providerPlugin("empty", []))
+      yield* write(join(plugins, "unknown.js"), providerPlugin("unknown", ["pi-cli", "codex"]))
+      yield* write(
+        join(plugins, "null.js"),
+        `export default (glass) => glass.registerSandboxProvider("null", null)`,
+      )
+      yield* write(join(plugins, "valid.js"), providerPlugin("valid"))
+
+      assert.deepStrictEqual(yield* loadPlugins(plugins), ["valid"])
+    }),
+  )
+
   it.live("loads a TypeScript folder plugin that imports from its own node_modules", () =>
     Effect.gen(function* () {
       const plugins = yield* isolatedHome
@@ -99,11 +114,6 @@ export default (glass: Glass): void => {
       yield* write(join(plugins, "e-bad-id.js"), providerPlugin("sandbox:Fine"))
       yield* write(join(plugins, "f-hangs.js"), `export default () => new Promise(() => {})`)
       yield* write(join(plugins, "g-unreadable", "index.js"), providerPlugin("unreadable"))
-      yield* write(join(plugins, "h-no-engines.js"), providerPlugin("no-engines", []))
-      yield* write(
-        join(plugins, "i-null.js"),
-        `export default (glass) => glass.registerSandboxProvider("null", null)`,
-      )
       yield* Effect.promise(() => chmod(join(plugins, "g-unreadable"), 0o000))
       yield* Effect.addFinalizer(() =>
         Effect.promise(() => chmod(join(plugins, "g-unreadable"), 0o700)),
@@ -136,8 +146,6 @@ export default (glass: Glass): void => {
         ],
         ["Couldn't load a Plugin", join(plugins, "f-hangs.js")],
         ["Couldn't load a Plugin", join(plugins, "g-unreadable")],
-        ["Skipped a Sandbox provider that doesn't list the Agent programs it runs", "no-engines"],
-        ["Skipped a Sandbox provider that doesn't list the Agent programs it runs", "null"],
       ])
     }),
   )
