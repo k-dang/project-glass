@@ -66,6 +66,7 @@ it.live("upgrades existing Activity history and uses its indexes after reopening
       [15, "agent_reviews_as_markdown"],
       [16, "agent_sandboxes"],
       [17, "agent_place"],
+      [18, "saved_place_per_area"],
     ] as const
 
     for (const expected of [upgrade, []] as const) {
@@ -260,6 +261,42 @@ it.live("rewrites saved Agent reviews as Markdown and drops those that no longer
           "## No tests\n\nShould fix\n\nAdd one.",
         ].join("\n\n"),
       },
+    ])
+  }),
+)
+
+it.live("keeps the saved place as its area's saved place", () =>
+  Effect.gen(function* () {
+    const home = yield* isolatedHome
+    const filename = join(home, "glass.db")
+    const before = Object.fromEntries(Object.entries(migrations).filter(([id]) => id < "0018"))
+    const destination = JSON.stringify({ area: "agents", agentId: "agent-1" })
+
+    const run = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) =>
+      effect.pipe(Effect.provide(SqliteClient.layer({ filename })), Effect.scoped)
+
+    yield* run(
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient
+        yield* SqliteMigrator.run({ loader: SqliteMigrator.fromRecord(before) })
+        yield* sql`
+          INSERT INTO saved_place (id, destination, saved_at)
+          VALUES (1, ${destination}, '2026-10-20T00:00:00.000Z')
+        `
+      }),
+    )
+
+    const rows = yield* run(
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient
+        yield* SqliteMigrator.run({ loader: migrationLoader })
+
+        return yield* sql`SELECT * FROM saved_place`
+      }),
+    )
+
+    assert.deepStrictEqual(rows, [
+      { area: "agents", destination, saved_at: "2026-10-20T00:00:00.000Z" },
     ])
   }),
 )

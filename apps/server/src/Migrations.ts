@@ -16,6 +16,7 @@ import agentPermissionMode from "./migrations/0014_agent_permission_mode"
 import agentReviewsAsMarkdown from "./migrations/0015_agent_reviews_as_markdown"
 import agentSandboxes from "./migrations/0016_agent_sandboxes"
 import agentPlace from "./migrations/0017_agent_place"
+import savedPlacePerArea from "./migrations/0018_saved_place_per_area"
 
 export const migrations = {
   "0001_create_activity": createActivity,
@@ -35,6 +36,7 @@ export const migrations = {
   "0015_agent_reviews_as_markdown": agentReviewsAsMarkdown,
   "0016_agent_sandboxes": agentSandboxes,
   "0017_agent_place": agentPlace,
+  "0018_saved_place_per_area": savedPlacePerArea,
 }
 
 export const migrationLoader = SqliteMigrator.fromRecord(migrations)

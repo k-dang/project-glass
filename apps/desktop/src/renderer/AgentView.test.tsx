@@ -41,25 +41,11 @@ import { afterEach, expect, it } from "vite-plus/test"
 import { placeKey } from "./agentsArea"
 import { App } from "./App"
 import { backendLayerAtom } from "./backend"
+import { agent, agentFields } from "../../test/agent"
 import { eventually } from "../../test/eventually"
 import { testLayer } from "../../test/testBackend"
 
 const sentAt = DateTime.makeUnsafe("2026-10-26T12:00:00Z")
-
-const agentFields = {
-  id: "agent-1",
-  name: "agent/swift-otter",
-  place: thisMac,
-  repository: new FollowedRepository({ owner: "glass-demo", repo: "greeter" }),
-  baseBranch: "main",
-  engine: "pi",
-  model: null,
-  effort: null,
-  permissionMode: null,
-  createdAt: sentAt,
-} as const
-
-const agent = new Agent(agentFields)
 
 const piModels = new AgentModels({
   defaultModel: { id: "glass-test/gpt-test", name: "gpt-test", efforts: [] },

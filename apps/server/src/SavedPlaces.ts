@@ -14,7 +14,7 @@ const decodeStored = Schema.decodeUnknownEffect(
 export class SavedPlaces extends Context.Service<
   SavedPlaces,
   {
-    readonly get: () => Effect.Effect<SavedPlace | null, SavedPlaceError>
+    readonly list: () => Effect.Effect<ReadonlyArray<SavedPlace>, SavedPlaceError>
     readonly save: (destination: ResumableDestination) => Effect.Effect<SavedPlace, SavedPlaceError>
   }
 >()("@glass/server/SavedPlaces") {
@@ -24,13 +24,15 @@ export class SavedPlaces extends Context.Service<
       const sql = yield* SqlClient.SqlClient
 
       return SavedPlaces.of({
-        get: Effect.fn("SavedPlaces.get")(
+        list: Effect.fn("SavedPlaces.list")(
           function* () {
-            const [row] = yield* sql`
-              SELECT destination, saved_at AS savedAt FROM saved_place WHERE id = 1
+            const rows = yield* sql`
+              SELECT destination, saved_at AS savedAt FROM saved_place ORDER BY saved_at DESC
             `
 
-            return row === undefined ? null : new SavedPlace(yield* decodeStored(row))
+            return yield* Effect.forEach(rows, (row) =>
+              decodeStored(row).pipe(Effect.map((stored) => new SavedPlace(stored))),
+            )
           },
           Effect.mapError(
             () => new SavedPlaceError({ message: "Couldn't read your saved place. Try again." }),
@@ -42,9 +44,9 @@ export class SavedPlaces extends Context.Service<
             const encoded = yield* encodeDestination(destination)
 
             yield* sql`
-              INSERT INTO saved_place (id, destination, saved_at)
-              VALUES (1, ${encoded}, ${DateTime.formatIso(savedAt)})
-              ON CONFLICT(id) DO UPDATE SET
+              INSERT INTO saved_place (area, destination, saved_at)
+              VALUES (${destination.area}, ${encoded}, ${DateTime.formatIso(savedAt)})
+              ON CONFLICT(area) DO UPDATE SET
                 destination = excluded.destination, saved_at = excluded.saved_at
             `
 

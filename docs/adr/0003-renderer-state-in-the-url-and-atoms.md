@@ -55,16 +55,17 @@ opening a different PR resets. They stay out of the address because scrolling th
 file constantly and the workspace's handlers scroll right after switching tabs, which needs the
 change applied synchronously; navigation isn't. A window reload restores the matching Saved place
 when its GitHub identity and Revision still match; a changed Revision opens Overview with a notice.
-The Saved place keeps only the current resumable destination in SQLite, with a feature-owned
-position. Settings and Activity leave it unchanged. The Files tab's selected repository file also
+SQLite keeps one Saved place per area, each the latest resumable destination there with a
+feature-owned position. Settings and Activity leave them unchanged. The Files tab's selected repository file also
 lives in the workspace atom. Position writes are ordered, with superseded pending positions skipped;
 the Activity log remains history rather than the source of the current position. The destination
 carries the identity from its loaded workspace, so saving a position stays local and works when
 GitHub is unavailable; the backend stamps only the save time.
 
-Continue reads the current in-memory destination as soon as work changes; a persistence response
-never replaces it. Dashboard owns the Continue card; visiting Dashboard leaves the Saved place
-unchanged. The stored destination seeds a fresh renderer until work is opened. Each diff
+Continue reads the current in-memory destination for each area as soon as work changes; a
+persistence response never replaces it. Dashboard owns the Continue cards: the last PR first, then
+the newest Saved place from any other area. Visiting Dashboard leaves every Saved place unchanged.
+The stored destinations seed a fresh renderer until work is opened in their area. Each diff
 or Tour viewer applies its initial file when it mounts, including when a Tour arrives after the
 workspace. Scroll callbacks report position only after that viewer applies its initial position.
 

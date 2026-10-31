@@ -3,6 +3,7 @@ import {
   PullRequestList,
   PullRequestRef,
   type PullRequestWorkspace,
+  type ReviewDestination,
 } from "@glass/contracts"
 import { linkOptions } from "@tanstack/react-router"
 import { Effect, Option, Predicate, Schema, Stream } from "effect"
@@ -17,7 +18,7 @@ import { reviewingRevisionAtom } from "./workspaceEvents"
 import { ReplyStore } from "./useReplies"
 import { createResolutions, type Resolutions } from "./useResolutions"
 import { ViewedFilesStore } from "./useViewedFiles"
-import { savedDestinationAtom } from "./savedPlace"
+import { savedDestinationsAtom } from "./savedPlace"
 import { restoreReviewPosition } from "./reviewPosition"
 
 interface OpenWorkspace {
@@ -189,8 +190,11 @@ const recall = (registry: AtomRegistry.AtomRegistry, ref: PullRequestRef) => {
 export const openWorkspaceAtom = backendRuntime
   .fn((request: OpenRequest, get) =>
     Effect.gen(function* () {
-      const destination = yield* AtomRegistry.getResult(get.registry, savedDestinationAtom).pipe(
-        Effect.catch(() => Effect.succeed(null)),
+      const destination = yield* AtomRegistry.getResult(get.registry, savedDestinationsAtom).pipe(
+        Effect.map((destinations) =>
+          destinations.find((saved): saved is ReviewDestination => saved.area === "reviews"),
+        ),
+        Effect.catch(() => Effect.succeed(undefined)),
       )
 
       const open =
@@ -203,7 +207,7 @@ export const openWorkspaceAtom = backendRuntime
             Effect.andThen(load(request, get.registry)),
           ))
 
-      if (destination?.area === "reviews" && request.previous === undefined) {
+      if (destination !== undefined && request.previous === undefined) {
         const restored = restoreReviewPosition(open.workspace, destination)
 
         if (restored.view !== null) get.set(workspaceViewAtom, restored.view)

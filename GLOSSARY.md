@@ -8,8 +8,9 @@ with coding agents.
 ### Resuming work
 
 **Saved place**:
-The last piece of work the user was doing in Glass, with their place in it, kept on this device
-for them to continue. Visiting Settings or Activity leaves the Saved place unchanged.
+The last piece of work the user was doing in an area of Glass, with their place in it, kept on this
+device for them to continue. Each area keeps its own: the last PR in Reviews, the last Agent in
+Agents. Visiting Settings or Activity leaves every Saved place unchanged.
 
 ### Reviewing
 

@@ -33,7 +33,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
     const checkouts = yield* LocalCheckouts
 
     return GlassRpcs.of({
-      GetSavedPlace: () => savedPlaces.get(),
+      GetSavedPlaces: () => savedPlaces.list(),
       SavePlace: ({ destination }) => savedPlaces.save(destination),
       WriteTour: ({ pullRequest, revision }) => tours.write(pullRequest, revision),
       CancelTour: ({ pullRequest }) => tours.cancel(pullRequest),
