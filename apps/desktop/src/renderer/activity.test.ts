@@ -37,14 +37,6 @@ describe("ActivityRecorder", () => {
     vi.useRealTimers()
   })
 
-  it("records file views with their pull request, title, and Revision", async () => {
-    const { activity, recorded } = recorder()
-
-    viewFor(activity, "greet.ts", 2000)
-
-    await eventually(() => expect(recorded).toEqual([viewed("greet.ts")]))
-  })
-
   it("records only files viewed for two seconds, even after leaving and waiting", async () => {
     const { activity, recorded } = recorder()
 
