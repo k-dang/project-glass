@@ -14,7 +14,7 @@ import { connect, createServer, type Socket } from "node:net"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { isolatedGitEnv } from "../src/gitEnv.ts"
-import type { Plugin } from "@glass/plugin"
+import type { AgentModels, Plugin } from "@glass/plugin"
 import { freePort, portOf } from "./ports.ts"
 
 const FakeSandboxStep = Schema.Literals([
@@ -151,6 +151,34 @@ const holdWhile = (holding: () => boolean, signal: AbortSignal) =>
     }, 20)
   })
 
+const claudeEfforts = ["low", "medium", "high", "xhigh", "max"]
+
+const piModel = { id: "glass-test/gpt-test", name: "gpt-test", efforts: [] }
+
+/** What the fake `claude` and the fake model provider's pi offer once a Sandbox runs them. */
+const sandboxModels: Record<AgentEngine, AgentModels> = {
+  "claude-code": {
+    defaultModel: { id: "default", name: "Default (recommended)", efforts: claudeEfforts },
+    models: [
+      { id: "default", name: "Default (recommended)", efforts: claudeEfforts },
+      { id: "opus", name: "Opus 5.5", efforts: claudeEfforts },
+      { id: "sonnet", name: "Sonnet 5.5", efforts: ["low", "medium", "high"] },
+      { id: "claude-haiku-4-5", name: "Haiku 4.5", efforts: [] },
+    ],
+  },
+  pi: {
+    defaultModel: piModel,
+    models: [
+      piModel,
+      {
+        id: "glass-test/gpt-test-thinking",
+        name: "GPT Test Thinking",
+        efforts: ["off", "minimal", "low", "medium", "high"],
+      },
+    ],
+  },
+}
+
 export const fakeSandboxProvider =
   (settingsPath: string): Plugin =>
   (glass) => {
@@ -224,10 +252,7 @@ export const fakeSandboxProvider =
 
         rmSync(decodeSandbox(state).folder, { recursive: true, force: true, maxRetries: 10 })
       },
-      models: async () => ({
-        defaultModel: { id: "fake/sandbox-model", name: "Sandbox model", efforts: [] },
-        models: [{ id: "fake/sandbox-model", name: "Sandbox model", efforts: [] }],
-      }),
+      models: async (engine) => sandboxModels[engine],
     })
   }
 
