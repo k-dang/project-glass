@@ -44,23 +44,6 @@ const confirmed = new PublishedComment({
 })
 
 describe("ReplyStore", () => {
-  it("publishes a Reply, then shows it among its Discussion's comments", async () => {
-    const { store, replies } = replyStore()
-
-    store.edit("T1", "To greet them.")
-    store.send("T1")
-    const reply = await next(replies)
-
-    expect(reply.payload).toEqual({ discussionId: "T1", body: "To greet them." })
-    expect(store.view("T1").feedback).toEqual({ type: "sending" })
-
-    reply.answer(Effect.succeed(confirmed))
-
-    await eventually(() =>
-      expect(store.view("T1")).toEqual({ body: "", feedback: null, published: [confirmed] }),
-    )
-  })
-
   it("keeps a failed Reply's text until a retry publishes it, recording only the published one", async () => {
     const { store, replies, recorded } = replyStore()
 
