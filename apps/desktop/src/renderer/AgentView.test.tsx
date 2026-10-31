@@ -301,9 +301,7 @@ it("starts an Agent in a Sandbox on a Followed repository, from its branches on 
       ),
     ).toBeTruthy(),
   )
-  expect(
-    within(newAgentDraft()).getByText(/in a Sandbox of its own from Fake Sandboxes/),
-  ).toBeTruthy()
+  expect(within(newAgentDraft()).getByText("The Agent works on a branch of its own.")).toBeTruthy()
   expect(within(newAgentDraft()).queryByRole("combobox", { name: "Permission mode" })).toBeNull()
   expect(listedModels).toContain("sandbox:fake")
 
