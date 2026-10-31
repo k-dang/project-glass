@@ -51,7 +51,7 @@ import { randomUUID } from "node:crypto"
 import { ActivityLog } from "./ActivityLog"
 import { hostFailure, type PlacedAgent, type Placement } from "./Placement"
 import { Sandboxes } from "./Sandboxes"
-import { ThisMac } from "./ThisMac"
+import { LocalPlacement } from "./LocalPlacement"
 import { encodeImages, StoredMessage, Transcripts } from "./Transcripts"
 
 const StoredAgent = Schema.Struct({
@@ -154,7 +154,7 @@ export class Agents extends Context.Service<
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
       const transcripts = yield* Transcripts
-      const thisMac = yield* ThisMac
+      const localPlacement = yield* LocalPlacement
       const sandboxes = yield* Sandboxes
       const activityLog = yield* ActivityLog
       const lock = yield* Semaphore.make(1)
@@ -177,11 +177,13 @@ export class Agents extends Context.Service<
       })
 
       const placementFor = (place: AgentPlace): Placement =>
-        Predicate.isTagged(place, "sandbox") ? sandboxes.placement(place.providerId) : thisMac
+        Predicate.isTagged(place, "sandbox")
+          ? sandboxes.placement(place.providerId)
+          : localPlacement
 
       const placementOf = (row: PlacedAgent) => placementFor(row.agent.place)
 
-      yield* Stream.merge(yield* thisMac.subscribeLost, yield* sandboxes.subscribeLost).pipe(
+      yield* Stream.merge(yield* localPlacement.subscribeLost, yield* sandboxes.subscribeLost).pipe(
         Stream.runForEach((agentIds) =>
           transcripts
             .endRunning(TurnCutOff.make({}), agentIds)
