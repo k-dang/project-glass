@@ -289,7 +289,7 @@ it("starts an Agent in a Sandbox on a Followed repository, from its branches on 
           new SandboxProviderInfo({
             id: "fake",
             name: "Fake Sandboxes",
-            engines: ["claude-code", "pi-cli"],
+            engines: ["claude-code", "pi"],
           }),
         ]),
       ListFollowedRepositories: () => Effect.succeed([followed]),
@@ -343,7 +343,7 @@ it("offers only the Agent programs a Sandbox provider runs", async () => {
       ...newAgentHandlers([], []),
       ListSandboxProviders: () =>
         Effect.succeed([
-          new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes", engines: ["pi-cli"] }),
+          new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes", engines: ["pi"] }),
         ]),
       ListFollowedRepositories: () =>
         Effect.succeed([new FollowedRepository({ owner: "glass-demo", repo: "lamp" })]),

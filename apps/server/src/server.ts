@@ -22,7 +22,7 @@ import { LocalCheckouts } from "./LocalCheckouts"
 import { Plugins } from "./Plugins"
 import { Sandboxes } from "./Sandboxes"
 import { ServerConfig } from "./ServerConfig"
-import { ThisMac } from "./ThisMac"
+import { LocalPlacement } from "./LocalPlacement"
 import { FollowedRepositories } from "./FollowedRepositories"
 import { PullRequestLists } from "./PullRequestLists"
 import { PullRequestMirror } from "./PullRequestMirror"
@@ -55,7 +55,7 @@ type AgentRunnersLayer = Layer.Layer<
 >
 
 const AgentsLive = Agents.layer.pipe(
-  Layer.provide(ThisMac.layer),
+  Layer.provide(LocalPlacement.layer),
   Layer.provideMerge(Sandboxes.layer),
   Layer.provide(LocalAgentHost.layer),
   Layer.provide(Transcripts.layer),

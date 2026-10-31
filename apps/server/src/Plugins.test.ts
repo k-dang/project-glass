@@ -7,7 +7,7 @@ import { dirname, join } from "node:path"
 import { isolatedHome } from "../test/harness"
 import { Plugins } from "./Plugins"
 
-const providerPlugin = (id: string, engines: ReadonlyArray<string> = ["pi-cli"]) => `
+const providerPlugin = (id: string, engines: ReadonlyArray<string> = ["pi"]) => `
 export default (glass) => {
   glass.registerSandboxProvider(${JSON.stringify(id)}, {
     engines: ${JSON.stringify(engines)},
@@ -48,7 +48,7 @@ describe("Plugins", () => {
     Effect.gen(function* () {
       const plugins = yield* isolatedHome
       yield* write(join(plugins, "empty.js"), providerPlugin("empty", []))
-      yield* write(join(plugins, "unknown.js"), providerPlugin("unknown", ["pi-cli", "codex"]))
+      yield* write(join(plugins, "unknown.js"), providerPlugin("unknown", ["pi", "codex"]))
       yield* write(
         join(plugins, "null.js"),
         `export default (glass) => glass.registerSandboxProvider("null", null)`,
@@ -73,7 +73,7 @@ describe("Plugins", () => {
         `import { id } from "provider-id"
 type Glass = { registerSandboxProvider: (id: string, provider: unknown) => void }
 export default (glass: Glass): void => {
-  glass.registerSandboxProvider(id, { engines: ["pi-cli"] } as unknown)
+  glass.registerSandboxProvider(id, { engines: ["pi"] } as unknown)
 }
 `,
       )

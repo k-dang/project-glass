@@ -26,7 +26,7 @@ export interface SandboxProvider {
 }
 
 /** The Agent program an Agent runs: Claude Code or pi. */
-export type AgentEngine = "claude-code" | "pi-cli"
+export type AgentEngine = "claude-code" | "pi"
 
 /** A model an Agent program offers, with the efforts it takes, from lowest to highest. */
 export interface AgentModel {

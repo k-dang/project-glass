@@ -25,7 +25,7 @@ import { Agents } from "../src/Agents"
 import { followJournal } from "../src/hostJournal"
 import { migrationLoader } from "../src/Migrations"
 import { Sandboxes } from "../src/Sandboxes"
-import { ThisMac } from "../src/ThisMac"
+import { LocalPlacement } from "../src/LocalPlacement"
 import { Transcripts } from "../src/Transcripts"
 
 interface Started {
@@ -105,7 +105,7 @@ export const agentServicesFixture = Effect.gen(function* () {
         Effect.provideContext(hostContext),
       )
 
-      const placement = ThisMac.of({
+      const placement = LocalPlacement.of({
         engines: AgentEngine.literals,
         models: () => models,
         place: () =>
@@ -125,7 +125,7 @@ export const agentServicesFixture = Effect.gen(function* () {
       const services = yield* Layer.build(
         Agents.layer.pipe(
           Layer.provideMerge(Transcripts.layer),
-          Layer.provide(Layer.succeed(ThisMac, placement)),
+          Layer.provide(Layer.succeed(LocalPlacement, placement)),
           Layer.provide(
             Layer.succeed(
               Sandboxes,

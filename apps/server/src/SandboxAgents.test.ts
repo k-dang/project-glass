@@ -31,7 +31,7 @@ it.live(
         new SandboxProviderInfo({
           id: "fake",
           name: "Fake Sandboxes",
-          engines: ["claude-code", "pi-cli"],
+          engines: ["claude-code", "pi"],
         }),
       ])
 
@@ -75,11 +75,11 @@ it.live(
 it.live("starts a Sandbox Agent only with an Agent program its provider runs", () =>
   Effect.gen(function* () {
     const f = yield* agentsFixture({ output: "Hello" })
-    f.sandboxes.configure({ engines: ["pi-cli"] })
+    f.sandboxes.configure({ engines: ["pi"] })
     const relaunched = yield* f.restart
 
     assert.deepStrictEqual(yield* relaunched.ListSandboxProviders(), [
-      new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes", engines: ["pi-cli"] }),
+      new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes", engines: ["pi"] }),
     ])
 
     const refused = yield* relaunched

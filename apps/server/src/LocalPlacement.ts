@@ -19,12 +19,12 @@ const gitFailure =
 const succeeds = <E, R>(effect: Effect.Effect<unknown, E, R>) =>
   effect.pipe(Effect.exit, Effect.map(Exit.isSuccess))
 
-export class ThisMac extends Context.Service<
-  ThisMac,
+export class LocalPlacement extends Context.Service<
+  LocalPlacement,
   Placement & { readonly subscribeLost: SubscribeLost }
->()("@glass/server/ThisMac") {
+>()("@glass/server/LocalPlacement") {
   static readonly layer = Layer.effect(
-    ThisMac,
+    LocalPlacement,
     Effect.gen(function* () {
       const config = yield* ServerConfig
       const fs = yield* FileSystem.FileSystem
@@ -33,7 +33,7 @@ export class ThisMac extends Context.Service<
       const host = yield* LocalAgentHost
       const hosted = new Set<string>()
 
-      const place = Effect.fn("ThisMac.place")(function* (
+      const place = Effect.fn("LocalPlacement.place")(function* (
         repository: FollowedRepository,
         baseBranch: string,
       ) {
@@ -85,7 +85,7 @@ export class ThisMac extends Context.Service<
         return { name, folder, discard }
       })
 
-      const baseRef = Effect.fn("ThisMac.baseRef")(function* ({ agent }: PlacedAgent) {
+      const baseRef = Effect.fn("LocalPlacement.baseRef")(function* ({ agent }: PlacedAgent) {
         const checkout = yield* checkouts
           .get(agent.repository)
           .pipe(
@@ -100,7 +100,7 @@ export class ThisMac extends Context.Service<
       const worktreeExists = ({ folder }: PlacedAgent) =>
         fs.exists(folder).pipe(Effect.orElseSucceed(() => false))
 
-      const remove = Effect.fn("ThisMac.remove")(function* (placed: PlacedAgent) {
+      const remove = Effect.fn("LocalPlacement.remove")(function* (placed: PlacedAgent) {
         hosted.delete(placed.agent.id)
         const checkout = yield* checkouts.get(placed.agent.repository).pipe(Effect.option)
 
@@ -116,7 +116,7 @@ export class ThisMac extends Context.Service<
         ).pipe(gitFailure(`Couldn't remove ${placed.agent.name}'s worktree. Try again.`))
       })
 
-      return ThisMac.of({
+      return LocalPlacement.of({
         engines: AgentEngine.literals,
         models: (engine) =>
           host.client.pipe(
