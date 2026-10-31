@@ -21,11 +21,12 @@ import { useNavigate } from "@tanstack/react-router"
 import { Exit, Option, Predicate } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
 import { FolderGit2, FolderPlus, GitBranch, LoaderCircle } from "lucide-react"
-import { type ReactNode, useCallback, useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { MessageGroup } from "@/components/ui/message"
 import { Trace, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace"
 import {
   agentsAtom,
+  agentModelsAtom,
   branchesAtom,
   writtenAtom,
   createAgentAtom,
@@ -67,7 +68,7 @@ interface PlaceOptions {
   readonly branches: (
     repository: FollowedRepository,
   ) => Atom.Atom<AsyncResult.AsyncResult<Branches, BackendError>>
-  readonly describe: (key: string | undefined) => ReactNode
+  readonly describe: (key: string | undefined) => string
   readonly starting: (key: string, baseBranch: string) => string
   readonly choosesFolder: boolean
   readonly engines: readonly [AgentEngine, ...Array<AgentEngine>]
@@ -77,14 +78,9 @@ const onThisMac: PlaceOptions = {
   place: thisMac,
   branches: branchesAtom,
   describe: (key) =>
-    key === undefined ? (
-      "Choose a folder you cloned a GitHub repository into."
-    ) : (
-      <>
-        The Agent works on a branch of its own, in its own copy of{" "}
-        <span className="whitespace-nowrap">{key}</span> on {placeNames["this-mac"]}.
-      </>
-    ),
+    key === undefined
+      ? "Choose a folder you cloned a GitHub repository into."
+      : "The Agent works on a branch of its own.",
   starting: (key, baseBranch) => `Making the Agent's copy of ${key} from ${baseBranch}…`,
   choosesFolder: true,
   engines: AgentEngine.literals,
@@ -94,14 +90,9 @@ const inSandboxOf = ({ id, name, engines }: SandboxProviderInfo): PlaceOptions =
   place: SandboxPlace.make({ providerId: id }),
   branches: gitHubBranchesAtom,
   describe: (key) =>
-    key === undefined ? (
-      "Follow a repository in Settings to start an Agent on it in a Sandbox."
-    ) : (
-      <>
-        The Agent works on a branch of its own, in a Sandbox of its own from {name}, with{" "}
-        <span className="whitespace-nowrap">{key}</span> cloned from GitHub.
-      </>
-    ),
+    key === undefined
+      ? "Follow a repository in Settings to get started."
+      : "The Agent works on a branch of its own.",
   starting: () => `Starting the Agent in a Sandbox from ${name}…`,
   choosesFolder: false,
   engines,
@@ -186,6 +177,8 @@ interface DraftChoices {
   readonly setProgram: (program: Program) => void
   readonly repository: string | undefined
   readonly newest: Agent | undefined
+  readonly bases: Readonly<Record<string, string>>
+  readonly setBase: (context: string, branch: string) => void
 }
 
 function ChoosePlace(props: {
@@ -196,7 +189,9 @@ function ChoosePlace(props: {
 }) {
   const { newest, providers } = props
   const [chosenPlace, setChosenPlace] = useState<AgentPlace | null>(null)
-  const [chosenProgram, setChosenProgram] = useState<Program | null>(null)
+  const [engines, setEngines] = useState<Readonly<Record<string, AgentEngine>>>({})
+  const [programs, setPrograms] = useState<Readonly<Record<string, Program>>>({})
+  const [bases, setBases] = useState<Readonly<Record<string, string>>>({})
   const place = chosenPlace ?? defaultPlace(newest, providers, props.checkouts.length > 0)
 
   const provider = Predicate.isTagged(place, "sandbox")
@@ -205,38 +200,32 @@ function ChoosePlace(props: {
 
   const where = provider === undefined ? onThisMac : inSandboxOf(provider)
 
-  const preferred: Program =
-    chosenProgram ??
-    (newest === undefined
-      ? { engine: "claude-code", model: null, effort: null, permissionMode: null }
-      : {
-          engine: newest.engine,
-          model: newest.model,
-          effort: newest.effort,
-          permissionMode: null,
-        })
+  const placeContext = placeKey(where.place)
+  const preferredEngine = engines[placeContext] ?? newest?.engine ?? "claude-code"
+  const engine = where.engines.includes(preferredEngine) ? preferredEngine : where.engines[0]
+  const programContext = JSON.stringify([placeContext, engine])
+  const inherits = newest?.engine === engine && placeKey(newest.place) === placeContext
 
-  const program: Program = where.engines.includes(preferred.engine)
-    ? preferred
-    : { engine: where.engines[0], model: null, effort: null, permissionMode: null }
+  const program: Program = programs[programContext] ?? {
+    engine,
+    model: inherits ? newest.model : null,
+    effort: inherits ? newest.effort : null,
+    permissionMode: null,
+  }
 
   const choices: DraftChoices = {
     providers,
     where,
-    onPlaceChange: (chosen) => {
-      setChosenPlace(chosen)
-      const placeChanged = placeKey(chosen) !== placeKey(where.place)
-
-      if (placeChanged)
-        setChosenProgram({
-          engine: program.engine,
-          model: null,
-          effort: null,
-          permissionMode: null,
-        })
-    },
+    onPlaceChange: setChosenPlace,
     program,
-    setProgram: setChosenProgram,
+    setProgram: (chosen) => {
+      setEngines((current) => ({ ...current, [placeContext]: chosen.engine }))
+
+      if (chosen.engine === engine)
+        setPrograms((current) => ({ ...current, [programContext]: chosen }))
+    },
+    bases,
+    setBase: (context, branch) => setBases((current) => ({ ...current, [context]: branch })),
     repository: props.repository,
     newest,
   }
@@ -276,7 +265,7 @@ function InSandbox(props: DraftChoices) {
 }
 
 function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> }) {
-  const { where, program, setProgram, newest } = props
+  const { where, setProgram, newest } = props
   const navigate = useNavigate()
   const folder = useChooseFolder()
   const PlaceIcon = placeIcons[where.place._tag]
@@ -295,14 +284,34 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
 
   const created = useAtomValue(createAgentAtom)
   const create = useAtomSet(createAgentAtom, { mode: "promiseExit" })
-  const [chosenBase, setChosenBase] = useState<{ repository: string; branch: string } | null>(null)
   const listed = Option.getOrNull(AsyncResult.value(branches))
   const key = repository === undefined ? undefined : repositoryKey(repository)
+  const branchContext = JSON.stringify([placeKey(where.place), key])
+  const chosenBase = props.bases[branchContext]
 
   const baseBranch =
-    (chosenBase !== null && chosenBase.repository === key ? chosenBase.branch : null) ??
+    (chosenBase !== undefined && listed?.branches.includes(chosenBase) ? chosenBase : null) ??
     listed?.defaultBranch ??
     null
+
+  const offered = useAtomValue(agentModelsAtom(props.program.engine, placeKey(where.place)))
+  const models = Option.getOrNull(AsyncResult.value(offered))
+
+  const model =
+    props.program.model === null
+      ? models?.defaultModel
+      : models?.models.find(({ id }) => id === props.program.model)
+
+  const program: Program =
+    models === null
+      ? props.program
+      : {
+          ...props.program,
+          model: model === undefined ? null : props.program.model,
+          effort: model?.efforts.includes(props.program.effort ?? "") ? props.program.effort : null,
+        }
+
+  const awaitingModels = models === null && (program.model !== null || program.effort !== null)
 
   const chooseModel = useCallback(
     (choice: ModelChoice) =>
@@ -337,7 +346,8 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
   >(null)
 
   const send = async (message: MessageInput) => {
-    if (repository === undefined || key === undefined || baseBranch === null) return false
+    if (repository === undefined || key === undefined || baseBranch === null || awaitingModels)
+      return false
 
     setStarting({ ...message, key, baseBranch })
 
@@ -392,7 +402,7 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
         composed={composed}
         setComposed={(update) => setWritten(update(composed))}
         placeholder="What should the Agent do?"
-        blocked={created.waiting || baseBranch === null}
+        blocked={created.waiting || baseBranch === null || awaitingModels}
         problem={settledProblem(created) ?? settledProblem(branches) ?? folder.problem}
         send={send}
         steer={null}
@@ -460,13 +470,12 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
           />
           <div className="ml-auto min-w-0 max-w-full [&>button]:min-w-0">
             <ChipSelect
+              key={branchContext}
               label="Base branch"
               icon={<GitBranch aria-hidden />}
               value={baseBranch}
               items={(listed?.branches ?? []).map((branch) => ({ value: branch, label: branch }))}
-              onValueChange={(branch) =>
-                key !== undefined && setChosenBase({ repository: key, branch })
-              }
+              onValueChange={(branch) => key !== undefined && props.setBase(branchContext, branch)}
               placeholder={key === undefined ? "No branches" : "Loading branches…"}
               disabled={listed === null || key === undefined}
             />

@@ -36,7 +36,7 @@ import {
 } from "@glass/contracts"
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { DateTime, Deferred, Effect, Exit, Stream } from "effect"
+import { DateTime, Deferred, Effect, Exit, Predicate, Stream } from "effect"
 import { afterEach, expect, it } from "vite-plus/test"
 import { placeKey } from "./agentsArea"
 import { App } from "./App"
@@ -262,6 +262,324 @@ const newAgentHandlers = (created: Array<NewAgent>, agents: ReadonlyArray<Agent>
 
 const newAgentDraft = () => screen.getByRole("region", { name: "New Agent" })
 
+it("keeps local branch, program, model, effort, and unsent work when exploring a Sandbox", async () => {
+  const created: Array<NewAgent> = []
+
+  const user = mount(
+    {
+      ...newAgentHandlers(created, []),
+      ListBranches: () =>
+        Effect.succeed(new Branches({ defaultBranch: "main", branches: ["main", "develop"] })),
+      ListSandboxProviders: () =>
+        Effect.succeed([
+          new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes", engines: ["claude-code"] }),
+        ]),
+      ListFollowedRepositories: () => Effect.succeed([agent.repository]),
+      ListGitHubBranches: () =>
+        Effect.succeed(new Branches({ defaultBranch: "trunk", branches: ["trunk"] })),
+      ListAgentModels: ({ engine, place }) =>
+        Predicate.isTagged(place, "sandbox")
+          ? Effect.succeed(
+              new AgentModels({
+                defaultModel: { id: "remote", name: "Remote model", efforts: [] },
+                models: [],
+              }),
+            )
+          : listModels({ engine }),
+    },
+    "/agents/new",
+  )
+
+  const select = async (name: string, option: string) => {
+    await user.click(
+      await within(await screen.findByRole("region", { name: "New Agent" })).findByRole(
+        "combobox",
+        { name },
+      ),
+    )
+    await user.click(await screen.findByRole("option", { name: option }))
+  }
+
+  await select("Base branch", "develop")
+  await user.click(
+    await within(newAgentDraft()).findByRole("button", { name: "Claude Code: Opus 5.5" }),
+  )
+  await user.click(choice(await screen.findByRole("dialog"), "Agent program", "pi"))
+  await within(newAgentDraft()).findByRole("button", { name: "pi: gpt-test" })
+  await user.click(choice(await screen.findByRole("dialog"), "Model", "Thinker"))
+  await select("Effort", "High")
+  await user.type(
+    within(newAgentDraft()).getByRole("textbox", { name: "Message" }),
+    "Keep my choices",
+  )
+  const clipboard = new DataTransfer()
+  clipboard.items.add(
+    new File([Uint8Array.from(atob(pixel.data), (c) => c.charCodeAt(0))], "pixel.png", {
+      type: "image/png",
+    }),
+  )
+  await user.paste(clipboard)
+  await within(newAgentDraft()).findByRole("img", { name: "Attachment 1" })
+
+  await select("Where the Agent runs", "Fake Sandboxes")
+  await within(newAgentDraft()).findByRole("button", { name: "Claude Code: Remote model" })
+  expect(
+    within(within(newAgentDraft()).getByRole("combobox", { name: "Base branch" })).getByText(
+      "trunk",
+    ),
+  ).toBeTruthy()
+  expect(within(newAgentDraft()).queryByRole("combobox", { name: "Effort" })).toBeNull()
+  expect(within(newAgentDraft()).queryByRole("combobox", { name: "Permission mode" })).toBeNull()
+
+  await select("Where the Agent runs", "Local")
+  await within(newAgentDraft()).findByRole("button", { name: "pi: Thinker" })
+  expect(
+    within(within(newAgentDraft()).getByRole("combobox", { name: "Effort" })).getByText("High"),
+  ).toBeTruthy()
+  expect(
+    within(within(newAgentDraft()).getByRole("combobox", { name: "Base branch" })).getByText(
+      "develop",
+    ),
+  ).toBeTruthy()
+  expect(within(newAgentDraft()).getByRole("textbox", { name: "Message" })).toHaveProperty(
+    "value",
+    "Keep my choices",
+  )
+  await user.type(within(newAgentDraft()).getByRole("textbox", { name: "Message" }), "{Enter}")
+  expect(created).toMatchObject([
+    {
+      place: thisMac,
+      baseBranch: "develop",
+      engine: "pi",
+      model: "glass-test/thinker",
+      effort: "high",
+      permissionMode: null,
+      images: [pixel],
+    },
+  ])
+})
+
+it("restores each program's choices and keeps local Permission mode separate from a Sandbox", async () => {
+  const created: Array<NewAgent> = []
+
+  const user = mount(
+    {
+      ...newAgentHandlers(created, []),
+      ListSandboxProviders: () =>
+        Effect.succeed([
+          new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes", engines: ["claude-code"] }),
+        ]),
+      ListFollowedRepositories: () => Effect.succeed([agent.repository]),
+      ListGitHubBranches: () =>
+        Effect.succeed(new Branches({ defaultBranch: "main", branches: ["main"] })),
+    },
+    "/agents/new",
+  )
+
+  const select = async (name: string, option: string) => {
+    await user.click(
+      await within(await screen.findByRole("region", { name: "New Agent" })).findByRole(
+        "combobox",
+        { name },
+      ),
+    )
+    await user.click(await screen.findByRole("option", { name: option }))
+  }
+
+  await user.click(
+    await within(await screen.findByRole("region", { name: "New Agent" })).findByRole("button", {
+      name: "Claude Code: Opus 5.5",
+    }),
+  )
+  await user.click(choice(await screen.findByRole("dialog"), "Model", "Sonnet 5.5"))
+  await select("Effort", "High")
+  await select("Permission mode", "Accept edits")
+  await user.click(within(newAgentDraft()).getByRole("button", { name: "Claude Code: Sonnet 5.5" }))
+  await user.click(choice(await screen.findByRole("dialog"), "Agent program", "pi"))
+  await within(newAgentDraft()).findByRole("button", { name: "pi: gpt-test" })
+  expect(within(newAgentDraft()).queryByRole("combobox", { name: "Effort" })).toBeNull()
+  await user.click(choice(await screen.findByRole("dialog"), "Agent program", "Claude Code"))
+  await user.keyboard("{Escape}")
+  await within(newAgentDraft()).findByRole("button", { name: "Claude Code: Sonnet 5.5" })
+  await select("Where the Agent runs", "Fake Sandboxes")
+  await within(newAgentDraft()).findByRole("button", { name: "Claude Code: Opus 5.5" })
+  expect(within(newAgentDraft()).queryByRole("combobox", { name: "Permission mode" })).toBeNull()
+  await select("Where the Agent runs", "Local")
+  await within(newAgentDraft()).findByRole("button", { name: "Claude Code: Sonnet 5.5" })
+  expect(
+    within(within(newAgentDraft()).getByRole("combobox", { name: "Permission mode" })).getByText(
+      "Accept edits",
+    ),
+  ).toBeTruthy()
+  await user.type(
+    within(newAgentDraft()).getByRole("textbox", { name: "Message" }),
+    "Fix it{Enter}",
+  )
+  expect(created).toMatchObject([
+    { engine: "claude-code", model: "sonnet", effort: "high", permissionMode: "acceptEdits" },
+  ])
+})
+
+it("keeps branches per repository and falls back when a remembered branch disappears", async () => {
+  const other = new FollowedRepository({ owner: "glass-demo", repo: "lamp" })
+  let localBranches = ["main", "develop"]
+  const created: Array<NewAgent> = []
+
+  const user = mount(
+    {
+      ...newAgentHandlers(created, []),
+      ListLocalCheckouts: () =>
+        Effect.succeed(
+          [agent.repository, other].map(
+            (repository) => new LocalCheckout({ repository, path: `/src/${repository.repo}` }),
+          ),
+        ),
+      ListBranches: ({ repository }) =>
+        Effect.succeed(
+          new Branches({
+            defaultBranch: repository.repo === "lamp" ? "trunk" : "main",
+            branches: repository.repo === "lamp" ? ["trunk"] : localBranches,
+          }),
+        ),
+      ListSandboxProviders: () =>
+        Effect.succeed([
+          new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes", engines: ["claude-code"] }),
+        ]),
+      ListFollowedRepositories: () => Effect.succeed([]),
+    },
+    "/agents/new",
+  )
+
+  const select = async (name: string, option: string) => {
+    await user.click(
+      await within(await screen.findByRole("region", { name: "New Agent" })).findByRole(
+        "combobox",
+        { name },
+      ),
+    )
+    await user.click(await screen.findByRole("option", { name: option }))
+  }
+
+  await select("Base branch", "develop")
+  await select("Repository", "glass-demo/lamp")
+  await eventually(() =>
+    expect(
+      within(within(newAgentDraft()).getByRole("combobox", { name: "Base branch" })).getByText(
+        "trunk",
+      ),
+    ).toBeTruthy(),
+  )
+  await select("Repository", "glass-demo/greeter")
+  await eventually(() =>
+    expect(
+      within(within(newAgentDraft()).getByRole("combobox", { name: "Base branch" })).getByText(
+        "develop",
+      ),
+    ).toBeTruthy(),
+  )
+  await select("Where the Agent runs", "Fake Sandboxes")
+  expect(
+    (await within(newAgentDraft()).findByRole("combobox", { name: "Repository" })).textContent,
+  ).toContain("No repositories")
+  expect(within(newAgentDraft()).getByRole("button", { name: "Send" })).toHaveProperty(
+    "disabled",
+    true,
+  )
+  localBranches = ["main"]
+  await select("Where the Agent runs", "Local")
+  await eventually(() =>
+    expect(
+      within(within(newAgentDraft()).getByRole("combobox", { name: "Base branch" })).getByText(
+        "main",
+      ),
+    ).toBeTruthy(),
+  )
+  await user.type(
+    within(newAgentDraft()).getByRole("textbox", { name: "Message" }),
+    "Fix it{Enter}",
+  )
+  expect(created).toMatchObject([{ repository: agent.repository, baseBranch: "main" }])
+})
+
+it.each([
+  { model: "removed-model", effort: "high", expectedModel: null, expectedEffort: null },
+  { model: "sonnet", effort: "unsupported", expectedModel: "sonnet", expectedEffort: null },
+])(
+  "uses valid defaults for unavailable model or effort: $model / $effort",
+  async ({ model, effort, expectedModel, expectedEffort }) => {
+    const created: Array<NewAgent> = []
+
+    const user = mount(
+      newAgentHandlers(created, [
+        new Agent({ ...agentFields, engine: "claude-code", model, effort }),
+      ]),
+      "/agents/new",
+    )
+
+    await within(await screen.findByRole("region", { name: "New Agent" })).findByRole("button", {
+      name: `Claude Code: ${expectedModel === null ? "Opus 5.5" : "Sonnet 5.5"}`,
+    })
+    await user.type(
+      within(newAgentDraft()).getByRole("textbox", { name: "Message" }),
+      "Fix it{Enter}",
+    )
+    expect(created).toMatchObject([{ model: expectedModel, effort: expectedEffort }])
+  },
+)
+
+it("keeps an unlinked Local place blocked and never inherits Sandbox bypass permissions", async () => {
+  const sandbox = SandboxPlace.make({ providerId: "fake" })
+
+  const user = mount(
+    {
+      ...newAgentHandlers(
+        [],
+        [
+          new Agent({
+            ...agentFields,
+            place: sandbox,
+            engine: "claude-code",
+            permissionMode: "bypassPermissions",
+          }),
+        ],
+      ),
+      ListLocalCheckouts: () => Effect.succeed([]),
+      ListSandboxProviders: () =>
+        Effect.succeed([
+          new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes", engines: ["claude-code"] }),
+        ]),
+      ListFollowedRepositories: () => Effect.succeed([agent.repository]),
+      ListGitHubBranches: () =>
+        Effect.succeed(new Branches({ defaultBranch: "main", branches: ["main"] })),
+    },
+    "/agents/new",
+  )
+
+  const draft = await screen.findByRole("region", { name: "New Agent" })
+  await user.type(within(draft).getByRole("textbox", { name: "Message" }), "Unsent work")
+  expect(within(draft).queryByRole("combobox", { name: "Permission mode" })).toBeNull()
+  await user.click(await within(draft).findByRole("combobox", { name: "Where the Agent runs" }))
+  await user.click(await screen.findByRole("option", { name: "Local" }))
+  await eventually(() =>
+    expect(
+      within(newAgentDraft()).getByRole("combobox", { name: "Repository" }).textContent,
+    ).toContain("No repositories"),
+  )
+  expect(within(newAgentDraft()).getByRole("textbox", { name: "Message" })).toHaveProperty(
+    "value",
+    "Unsent work",
+  )
+  expect(within(newAgentDraft()).getByRole("button", { name: "Send" })).toHaveProperty(
+    "disabled",
+    true,
+  )
+  expect(
+    within(within(newAgentDraft()).getByRole("combobox", { name: "Permission mode" })).getByText(
+      "Default",
+    ),
+  ).toBeTruthy()
+})
+
 it("starts an Agent in a Sandbox on a Followed repository, from its branches on GitHub", async () => {
   const created: Array<NewAgent> = []
   const listedModels: Array<string | null> = []
@@ -301,9 +619,7 @@ it("starts an Agent in a Sandbox on a Followed repository, from its branches on 
       ),
     ).toBeTruthy(),
   )
-  expect(
-    within(newAgentDraft()).getByText(/in a Sandbox of its own from Fake Sandboxes/),
-  ).toBeTruthy()
+  expect(within(newAgentDraft()).getByText("The Agent works on a branch of its own.")).toBeTruthy()
   expect(within(newAgentDraft()).queryByRole("combobox", { name: "Permission mode" })).toBeNull()
   expect(listedModels).toContain("sandbox:fake")
 
