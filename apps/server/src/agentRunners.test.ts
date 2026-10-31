@@ -13,7 +13,6 @@ import { ServerConfig } from "./ServerConfig"
 
 const models: EngineModels = {
   "claude-code": "claude-sonnet-5-5",
-  pi: { provider: "glass-test", modelId: "gpt-test" },
   "pi-cli": { provider: "anthropic", modelId: "claude-sonnet-5-5" },
 }
 
@@ -116,7 +115,7 @@ it.live("Claude Code runs a task without file access with no tools", () =>
   }),
 )
 
-it.live("a Claude Code that can't restrict its tools doesn't read files", () =>
+it.live("a Claude Code that can't restrict its tools runs only tasks without file access", () =>
   Effect.gen(function* () {
     const home = yield* isolatedHome
 
@@ -126,10 +125,17 @@ it.live("a Claude Code that can't restrict its tools doesn't read files", () =>
       helpOutput: "--tools --strict-mcp-config --no-session-persistence --disable-slash-commands",
     })
 
-    const selected = yield* Effect.gen(function* () {
-      return yield* (yield* AgentRunners).select({ engine: "claude-code", models })
+    const [readOnly, none] = yield* Effect.gen(function* () {
+      const selected = yield* (yield* AgentRunners).select({ engine: "claude-code", models })
+
+      return yield* Effect.all([
+        selected.run(readOnlyTask(home)).pipe(Effect.flip),
+        selected.run({ ...readOnlyTask(home), files: "none" }),
+      ])
     }).pipe(Effect.scoped, Effect.provide(runnersLayer(home, agent.command)))
 
-    assert.isFalse(selected.readsFiles)
+    assert.strictEqual(readOnly.reason, "not-ready")
+    assert.include(readOnly.message, "can't be limited to reading the PR's code")
+    assert.deepStrictEqual(none, { summary: "Fine." })
   }),
 )

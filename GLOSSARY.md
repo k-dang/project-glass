@@ -80,12 +80,12 @@ _Avoid_: Section, stop, step
 
 **Tour engine**:
 The agent that writes every Tour, whether the user starts it from a PR or the Queue starts it:
-Claude Code, pi, or the pi CLI, each with its own model. The user chooses it in Settings.
+Claude Code or pi, each with its own model. The user chooses it in Settings.
 _Avoid_: Default engine, runner (in UI copy), generator, provider
 
 **Agent review engine**:
 The agent that runs every Agent review, chosen in Settings apart from the Tour engine and with its
-own model for each engine. It starts as the pi CLI, the only one that runs Agent reviews so far.
+own model for each engine. It starts as pi.
 _Avoid_: Default engine, runner (in UI copy), reviewer
 
 **Agent review**:

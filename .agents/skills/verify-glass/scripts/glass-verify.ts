@@ -561,7 +561,7 @@ const doctor = async (run: RunState) => {
   const oldestBuild = Math.min(
     ...[
       "apps/server/dist/bin.mjs",
-      "apps/server/dist/piWorker.mjs",
+      "apps/server/dist/agentHost.mjs",
       "apps/desktop/dist/renderer/index.html",
       "apps/desktop/dist/main/index.cjs",
       "apps/desktop/dist/preload/index.cjs",

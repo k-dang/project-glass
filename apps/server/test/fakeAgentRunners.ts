@@ -68,7 +68,6 @@ export const fakeAgentRunners = Layer.succeed(
     select: ({ engine }) =>
       Effect.succeed({
         identity: { engine, model: "fake/synthetic" },
-        readsFiles: true,
         run: (task) =>
           Schema.decodeUnknownEffect(task.answer)(
             Object.is(task.answer, AgentReviewAnswer)

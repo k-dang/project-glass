@@ -74,7 +74,6 @@ const tourSettings: EngineSettings = {
   engine: "claude-code",
   models: {
     "claude-code": "claude-sonnet-5-5",
-    pi: { provider: "anthropic", modelId: "claude-sonnet-5-5" },
     "pi-cli": { provider: "anthropic", modelId: "claude-sonnet-5-5" },
   },
 }

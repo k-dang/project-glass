@@ -1,10 +1,10 @@
 import { assert, it } from "@effect/vitest"
 import {
+  type AgentEngine,
   type AgentReviewState,
   defaultReviewPrompt,
   PullRequestRef,
   Revision,
-  type Engine,
 } from "@glass/contracts"
 import { Effect, Exit, Option, Scope, Stream } from "effect"
 import { TestClock } from "effect/testing"
@@ -32,7 +32,7 @@ const deadline = 60_000
 const fixture = Effect.fnUntraced(function* (
   settings: Partial<FakeAgentSettings> = {},
   timeout = deadline,
-  engine: Engine = "pi-cli",
+  engine: AgentEngine = "pi-cli",
 ) {
   const piCli = yield* fakeAgent({
     ready: true,
@@ -303,18 +303,6 @@ it.effect("fails as timed out when the agent passes its limit", () =>
     const failure = yield* f.failed
     assert.strictEqual(failure.reason, "timeout")
     assert.strictEqual(failure.runner?.engine, "pi-cli")
-  }),
-)
-
-it.live("fails without starting an Agent review engine that can't read the checkout", () =>
-  Effect.gen(function* () {
-    const f = yield* fixture({}, undefined, "pi")
-    yield* f.start
-
-    const failure = yield* f.failed
-    assert.strictEqual(failure.reason, "runner")
-    assert.include(failure.message, "can't read the PR's code")
-    assert.isEmpty(yield* f.piCli.calls)
   }),
 )
 

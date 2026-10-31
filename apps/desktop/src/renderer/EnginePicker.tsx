@@ -1,21 +1,20 @@
-import { Engine, type EngineSettings, type PiModel } from "@glass/contracts"
+import { AgentEngine, type EngineSettings, type PiModel } from "@glass/contracts"
 import { cn } from "cn"
 import { useId } from "react"
 import { Input } from "@/components/ui/input"
-import { engineLabels } from "./engines"
+import { engineNames } from "./engines"
 
-const hasModel = (engine: Engine, models: EngineSettings["models"]) =>
+const hasModel = (engine: AgentEngine, models: EngineSettings["models"]) =>
   engine === "claude-code"
     ? models["claude-code"] !== ""
     : models[engine].provider !== "" && models[engine].modelId !== ""
 
 export const missingModel = (settings: EngineSettings) =>
-  Engine.literals.find((engine) => !hasModel(engine, settings.models))
+  AgentEngine.literals.find((engine) => !hasModel(engine, settings.models))
 
 export function EnginePicker(props: {
   legend: string
   description: string
-  offers: (engine: Engine) => boolean
   value: EngineSettings
   onChange: (value: EngineSettings) => void
 }) {
@@ -32,19 +31,18 @@ export function EnginePicker(props: {
         {props.description}
       </p>
       <div className="flex w-fit flex-wrap gap-0.5 rounded-lg border bg-muted p-0.5">
-        {Engine.literals.map((option) => (
+        {AgentEngine.literals.map((option) => (
           <label key={option} className="relative">
             <input
               type="radio"
               name={id}
               value={option}
               checked={engine === option}
-              disabled={!props.offers(option)}
               onChange={() => props.onChange({ ...props.value, engine: option })}
               className="peer sr-only"
             />
-            <span className="block cursor-pointer rounded-md px-3.5 py-1 text-sm font-medium text-muted-foreground peer-checked:bg-card peer-checked:text-foreground peer-checked:shadow-sm peer-checked:ring-1 peer-checked:ring-border peer-focus-visible:outline-2 peer-focus-visible:outline-offset-1 peer-focus-visible:outline-ring peer-disabled:cursor-not-allowed peer-disabled:line-through peer-disabled:opacity-40">
-              {engineLabels[option]}
+            <span className="block cursor-pointer rounded-md px-3.5 py-1 text-sm font-medium text-muted-foreground peer-checked:bg-card peer-checked:text-foreground peer-checked:shadow-sm peer-checked:ring-1 peer-checked:ring-border peer-focus-visible:outline-2 peer-focus-visible:outline-offset-1 peer-focus-visible:outline-ring">
+              {engineNames[option]}
               {!hasModel(option, models) && (
                 <>
                   <span aria-hidden className="ml-1 text-destructive">
@@ -72,9 +70,8 @@ export function EnginePicker(props: {
           />
         ) : (
           <PiModelInputs
-            engine={engine}
-            value={models[engine]}
-            onChange={(model) => setModels(engine === "pi" ? { pi: model } : { "pi-cli": model })}
+            value={models["pi-cli"]}
+            onChange={(model) => setModels({ "pi-cli": model })}
           />
         )}
       </div>
@@ -82,12 +79,8 @@ export function EnginePicker(props: {
   )
 }
 
-function PiModelInputs(props: {
-  engine: "pi" | "pi-cli"
-  value: PiModel
-  onChange: (value: PiModel) => void
-}) {
-  const label = engineLabels[props.engine]
+function PiModelInputs(props: { value: PiModel; onChange: (value: PiModel) => void }) {
+  const label = engineNames["pi-cli"]
 
   return (
     <>

@@ -3,7 +3,6 @@ import {
   type CheckoutRunReason,
   type ConnectionError,
   type PullRequestRef,
-  readsFiles,
   type Revision,
   type StaleRevision,
 } from "@glass/contracts"
@@ -113,24 +112,11 @@ export class CheckoutRuns extends Context.Service<
           Effect.mapError((error) => checkoutRunFailure("not-ready", error.message)),
         )
 
-        if (!readsFiles[engineSettings.engine])
-          return yield* checkoutRunFailure(
-            "runner",
-            "This engine can't read the PR's code. Choose one that can as the Agent review engine in Settings.",
-          )
-
         const selected = yield* runners
           .select(engineSettings)
           .pipe(Effect.mapError(fromAgentFailure))
 
         const { identity } = selected
-
-        if (!selected.readsFiles)
-          return yield* checkoutRunFailure(
-            "not-ready",
-            "This engine can't be limited to reading the PR's code. Update it, then try again.",
-            identity,
-          )
 
         const stale = checkoutRunFailure(
           "stale-revision",

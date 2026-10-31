@@ -1,6 +1,6 @@
 import { Effect, Schema } from "effect"
 import { writeFileSync } from "node:fs"
-import { fakeModelProvider } from "../../../../apps/server/test/fakeModelProvider.ts"
+import { fakeModelProvider, lastUserText } from "../../../../apps/server/test/fakeModelProvider.ts"
 
 const material = Schema.fromJsonString(
   Schema.Struct({ files: Schema.Array(Schema.Struct({ path: Schema.String })) }),
@@ -11,8 +11,8 @@ export const serveFakePi = (home: string, readyFile: string) =>
     Effect.scoped(
       Effect.gen(function* () {
         const provider = yield* fakeModelProvider(home, {
-          output: ({ messages }) => {
-            const prompt = messages.findLast((message) => message.role === "user")?.content ?? ""
+          output: (input) => {
+            const prompt = lastUserText(input)
             const { files } = Schema.decodeUnknownSync(material)(prompt.split("\n")[1] ?? "")
             console.log(`${new Date().toISOString()} completion -> 200 (${files.length} files)`)
 

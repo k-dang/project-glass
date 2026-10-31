@@ -27,7 +27,6 @@ const tourSettings: EngineSettings = {
   engine: "claude-code",
   models: {
     "claude-code": "claude-sonnet-5-5",
-    pi: { provider: "anthropic", modelId: "claude-sonnet-5-5" },
     "pi-cli": { provider: "anthropic", modelId: "claude-sonnet-5-5" },
   },
 }
@@ -80,8 +79,8 @@ it("shows only the chosen engine's model, and saves the Tour engine and models",
   expect(saving.payload).toEqual({
     feature: "tours",
     engineSettings: {
-      engine: "pi",
-      models: { ...tourSettings.models, pi: { provider: "anthropic", modelId: "gpt-test" } },
+      engine: "pi-cli",
+      models: { ...tourSettings.models, "pi-cli": { provider: "anthropic", modelId: "gpt-test" } },
     },
   })
   saving.answer(Effect.succeed(saving.payload.engineSettings))
@@ -93,17 +92,15 @@ it("shows only the chosen engine's model, and saves the Tour engine and models",
   expect(screen.getByRole("status").textContent).toBe("Unsaved changes.")
 })
 
-it("offers Agent reviews only engines that read files, and saves only what changed", async () => {
+it("saves only what changed in the Agent review settings", async () => {
   const saves: Array<EngineSettingsSave> = []
   const { setPrompt, user } = mount({ SetEngineSettings: hold(saves) })
   const reviews = within(await screen.findByRole("region", { name: "Agent reviews" }))
   const radio = (name: string) => reviews.getByRole<HTMLInputElement>("radio", { name })
 
-  expect(radio("Claude Code").disabled).toBe(false)
-  expect(radio("pi").disabled).toBe(true)
-  expect(radio("pi CLI").checked).toBe(true)
+  expect(radio("pi").checked).toBe(true)
 
-  const model = reviews.getByRole("textbox", { name: "pi CLI model" })
+  const model = reviews.getByRole("textbox", { name: "pi model" })
   await user.clear(model)
   await user.type(model, "deepseek-test")
   await user.click(saveButton())
@@ -208,7 +205,7 @@ it("reloads what a partly failed save stored before Discard can use it", async (
 
   const reload = await next(reloads)
   expect(screen.getByRole("status").textContent).toBe("Saving…")
-  reload.answer(Effect.succeed({ ...tourSettings, engine: "pi" }))
+  reload.answer(Effect.succeed({ ...tourSettings, engine: "pi-cli" }))
   expect((await screen.findByRole("alert")).textContent).toContain("Disk full.")
 
   await user.click(screen.getByRole("button", { name: "Discard" }))

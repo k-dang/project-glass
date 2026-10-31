@@ -24,7 +24,7 @@ In Settings → Tours, choose pi as the Tour engine and Save changes. Open a PR,
 
 ## Gotchas
 
-- Fake output is marked synthetic and adapts only the file paths; it does not analyze the PR. This verifies the app and SDK path, saving, and reading, without validating real authentication or model quality.
+- Fake output is marked synthetic and adapts only the file paths; it does not analyze the PR. This verifies the app and the pi CLI path, saving, and reading, without validating real authentication or model quality.
 - Fake mode disables Claude Code; choose pi as the Tour engine to write the Tour. Your normal Pi credentials and settings are untouched.
 - The Tour engine starts as Claude Code. In fake mode, choose pi before writing or queueing, or Tours fail with Claude Code unavailable.
 - With `--github fake`, open a seeded PR such as `https://github.com/glass-demo/greeter/pull/100`; the shared fake supports its workspace, diff, and Tour input.
