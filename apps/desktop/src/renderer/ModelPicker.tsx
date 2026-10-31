@@ -2,14 +2,14 @@ import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
 import type { AgentEngine, AgentModels, ModelChoice } from "@glass/contracts"
 import { AsyncResult } from "effect/reactivity"
 import { cn } from "cn"
-import { ChevronDown, Gauge, LoaderCircle } from "lucide-react"
+import { LoaderCircle } from "lucide-react"
 import { memo, useState, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { agentModelsAtom, engineGlyphs } from "./agentsArea"
 import { engineNames } from "./engines"
-import { chip, ChipSelect, selectorSlot } from "./chips"
+import { chip, ChipSelect } from "./chips"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf } from "./problems"
 
@@ -86,21 +86,20 @@ export const ModelPicker = memo(function ModelPicker(props: {
               type="button"
               variant="ghost"
               size="sm"
-              className={cn(chip, selectorSlot, "justify-start")}
+              className={cn(chip, "text-foreground")}
               aria-label={`${engineNames[props.engine]}: ${summary}`}
               title={summary}
             />
           }
         >
-          <span aria-hidden className="w-3.5 shrink-0 text-center">
+          <span aria-hidden className="shrink-0 text-muted-foreground">
             {engineGlyphs[props.engine]}
           </span>
-          <span className="min-w-0 flex-1 truncate text-left">{summary}</span>
-          <ChevronDown aria-hidden className="opacity-60" />
+          <span className="min-w-0 truncate font-semibold">{summary}</span>
         </PopoverTrigger>
         <PopoverContent
           side="top"
-          align="start"
+          align="end"
           className="h-96 max-h-(--available-height) w-80 max-w-(--available-width) gap-1 overflow-hidden p-1"
         >
           {programs !== undefined && (
@@ -129,21 +128,20 @@ export const ModelPicker = memo(function ModelPicker(props: {
           </div>
         </PopoverContent>
       </Popover>
-      <div className={selectorSlot}>
-        {efforts.length > 0 && (
-          <ChipSelect
-            className="w-full min-w-0"
-            label="Effort"
-            icon={<Gauge aria-hidden />}
-            value={toKey(effort)}
-            items={[
-              { value: DEFAULT_KEY, label: "Default effort" },
-              ...efforts.map((level) => ({ value: level, label: effortName(level) })),
-            ]}
-            onValueChange={(chosen) => props.onChange({ model, effort: fromKey(chosen) })}
-          />
-        )}
-      </div>
+      {efforts.length > 0 && (
+        <ChipSelect
+          className="-ml-1"
+          label="Effort"
+          align="end"
+          indicator={false}
+          value={toKey(effort)}
+          items={[
+            { value: DEFAULT_KEY, label: "Default" },
+            ...efforts.map((level) => ({ value: level, label: effortName(level) })),
+          ]}
+          onValueChange={(chosen) => props.onChange({ model, effort: fromKey(chosen) })}
+        />
+      )}
     </>
   )
 })
