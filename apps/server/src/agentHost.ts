@@ -1,5 +1,5 @@
 import { NodeHttpServer, NodeRuntime, NodeServices } from "@effect/platform-node"
-import { Config, Context, Effect, Layer, Option, Redacted, Schema } from "effect"
+import { Config, Context, Deferred, Effect, Layer, Option, Redacted, Schema } from "effect"
 import { HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from "effect/http"
 import { RpcSerialization, RpcServer } from "effect/rpc"
 import { closeSync, writeSync } from "node:fs"
@@ -13,7 +13,13 @@ import { AgentHostHandlers } from "./agentHost/handlers"
 import { RPC_PATH } from "@glass/contracts"
 import { isToken } from "./access"
 import { Git } from "./git"
-import { AgentHostRpcs, HEALTH_PATH, HOST_TOKEN_HEADER, HostReady } from "./agentHost/protocol"
+import {
+  AgentHostRpcs,
+  HEALTH_PATH,
+  HOST_TOKEN_HEADER,
+  HostReady,
+  SHUTDOWN_PATH,
+} from "./agentHost/protocol"
 
 const RequireToken = (token: Redacted.Redacted) =>
   HttpRouter.middleware(
@@ -65,11 +71,22 @@ const main = Effect.gen(function* () {
     pi: yield* piAdapter(piCommand),
   }
 
+  const shutDown = yield* Deferred.make<void>()
+
   const services = yield* Layer.build(
     HttpRouter.serve(
       Layer.mergeAll(
         RpcServer.layerHttp({ group: AgentHostRpcs, path: RPC_PATH, protocol: "websocket" }),
         HttpRouter.add("GET", HEALTH_PATH, HttpServerResponse.text("ok")),
+        HttpRouter.add(
+          "POST",
+          SHUTDOWN_PATH,
+          Deferred.succeed(shutDown, undefined).pipe(
+            // This request is still open when the server starts closing, so Node won't close its
+            // connection as idle.
+            Effect.as(HttpServerResponse.empty({ headers: { connection: "close" } })),
+          ),
+        ),
         RequireToken(token),
       ),
       { disableLogger: true, disableListenLog: true },
@@ -89,9 +106,12 @@ const main = Effect.gen(function* () {
     ),
   )
 
-  yield* standalone
-    ? Effect.never
-    : servingBackend(Context.get(services, HttpServer.HttpServer).address)
+  yield* Effect.race(
+    Deferred.await(shutDown),
+    standalone
+      ? Effect.never
+      : servingBackend(Context.get(services, HttpServer.HttpServer).address),
+  )
 })
 
 main.pipe(Effect.scoped, Effect.provide(NodeServices.layer), NodeRuntime.runMain)

@@ -127,6 +127,9 @@ importers:
 
   .:
     devDependencies:
+      '@glass/plugin':
+        specifier: workspace:*
+        version: link:packages/plugin
       '@oxlint/plugins':
         specifier: 1.87.0
         version: 1.87.0
@@ -265,6 +268,9 @@ importers:
       '@glass/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@glass/plugin':
+        specifier: workspace:*
+        version: link:../../packages/plugin
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.2
@@ -283,6 +289,8 @@ importers:
       effect:
         specifier: 'catalog:'
         version: 4.0.5
+
+  packages/plugin: {}
 
 packages:
 

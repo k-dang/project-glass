@@ -285,7 +285,13 @@ it("starts an Agent in a Sandbox on a Followed repository, from its branches on 
     {
       ...newAgentHandlers(created, []),
       ListSandboxProviders: () =>
-        Effect.succeed([new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes" })]),
+        Effect.succeed([
+          new SandboxProviderInfo({
+            id: "fake",
+            name: "Fake Sandboxes",
+            engines: ["claude-code", "pi-cli"],
+          }),
+        ]),
       ListFollowedRepositories: () => Effect.succeed([followed]),
       ListGitHubBranches: () =>
         Effect.succeed(new Branches({ defaultBranch: "trunk", branches: ["trunk"] })),
@@ -329,6 +335,40 @@ it("starts an Agent in a Sandbox on a Followed repository, from its branches on 
     },
   ])
   await waitFor(() => expect(window.location.hash).toBe(`#/agents/${agent.id}`))
+})
+
+it("offers only the Agent programs a Sandbox provider runs", async () => {
+  const user = mount(
+    {
+      ...newAgentHandlers([], []),
+      ListSandboxProviders: () =>
+        Effect.succeed([
+          new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes", engines: ["pi-cli"] }),
+        ]),
+      ListFollowedRepositories: () =>
+        Effect.succeed([new FollowedRepository({ owner: "glass-demo", repo: "lamp" })]),
+      ListGitHubBranches: () =>
+        Effect.succeed(new Branches({ defaultBranch: "trunk", branches: ["trunk"] })),
+    },
+    "/agents/new",
+  )
+
+  const draft = await screen.findByRole("region", { name: "New Agent" })
+  await within(draft).findByRole("button", { name: "Claude Code: Opus 5.5" })
+  await user.click(await within(draft).findByRole("combobox", { name: "Where the Agent runs" }))
+  await user.click(await screen.findByRole("option", { name: "Fake Sandboxes" }))
+
+  await user.click(await within(newAgentDraft()).findByRole("button", { name: "pi: gpt-test" }))
+
+  const programs = within(await screen.findByRole("dialog")).getByRole("group", {
+    name: "Agent program",
+  })
+
+  expect(
+    within(programs)
+      .getAllByRole("button")
+      .map((button) => button.textContent),
+  ).toEqual(["πpi"])
 })
 
 it("lists a Sandbox Agent under Sandboxes, and shows the step its Sandbox is at while it's made", async () => {

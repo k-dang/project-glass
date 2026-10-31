@@ -33,6 +33,7 @@ export interface Placed {
 }
 
 export interface Placement {
+  readonly engines: ReadonlyArray<AgentEngine>
   readonly models: (engine: AgentEngine) => Effect.Effect<AgentModels, AgentError>
   readonly place: (
     repository: FollowedRepository,

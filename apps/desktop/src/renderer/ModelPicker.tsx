@@ -1,5 +1,5 @@
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
-import { AgentEngine, type AgentModels, type ModelChoice } from "@glass/contracts"
+import type { AgentEngine, AgentModels, ModelChoice } from "@glass/contracts"
 import { AsyncResult } from "effect/reactivity"
 import { ChevronDown, Gauge, LoaderCircle } from "lucide-react"
 import { memo, useState, type ReactNode } from "react"
@@ -29,14 +29,17 @@ export const ModelPicker = memo(function ModelPicker(props: {
   model: string | null
   effort: string | null
   onChange: (choice: ModelChoice) => void
-  onEngineChange?: (engine: AgentEngine) => void
+  programs?: {
+    readonly engines: ReadonlyArray<AgentEngine>
+    readonly onChange: (engine: AgentEngine) => void
+  }
 }) {
   const offered = agentModelsAtom(props.engine, props.placeKey)
 
   const listed = useAtomValue(offered)
   const retry = useAtomRefresh(offered)
   const [open, setOpen] = useState(false)
-  const { model, effort, onEngineChange } = props
+  const { model, effort, programs } = props
 
   const { summary, body, efforts } = AsyncResult.builder(listed)
     .onInitial(() => ({
@@ -94,12 +97,12 @@ export const ModelPicker = memo(function ModelPicker(props: {
           <ChevronDown aria-hidden className="opacity-60" />
         </PopoverTrigger>
         <PopoverContent side="top" align="start" className="w-auto max-w-80 min-w-64 gap-1 p-1">
-          {onEngineChange !== undefined && (
+          {programs !== undefined && (
             <RequiredChoice
               label="Agent program"
               value={props.engine}
-              onChange={onEngineChange}
-              items={AgentEngine.literals.map((engine) => ({
+              onChange={programs.onChange}
+              items={programs.engines.map((engine) => ({
                 value: engine,
                 label: (
                   <>

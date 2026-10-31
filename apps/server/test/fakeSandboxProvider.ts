@@ -1,3 +1,4 @@
+import { AgentEngine } from "@glass/contracts"
 import { Schema } from "effect"
 import { execFileSync, spawn } from "node:child_process"
 import {
@@ -13,7 +14,7 @@ import { connect, createServer, type Socket } from "node:net"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { isolatedGitEnv } from "../src/gitEnv.ts"
-import type { Plugin } from "../src/SandboxProvider"
+import type { Plugin } from "@glass/plugin"
 import { freePort, portOf } from "./ports.ts"
 
 const FakeSandboxStep = Schema.Literals([
@@ -33,6 +34,8 @@ const FakeSandboxSettings = Schema.Struct({
   noCapacity: Schema.optional(Schema.String),
   failAt: Schema.optional(FakeSandboxStep),
   holdAt: Schema.optional(FakeSandboxStep),
+  /** Read when Glass loads the Plugin, so a change takes a relaunch. */
+  engines: Schema.optional(Schema.NonEmptyArray(AgentEngine)),
 })
 
 export type FakeSandboxSettings = typeof FakeSandboxSettings.Type
@@ -43,7 +46,6 @@ const readSettings = (path: string) =>
 const FakeSandbox = Schema.Struct({
   folder: Schema.String,
   ingressPort: Schema.optional(Schema.Int),
-  pid: Schema.optional(Schema.Int),
 })
 
 const decodeSandbox = Schema.decodeUnknownSync(FakeSandbox)
@@ -149,19 +151,12 @@ const holdWhile = (holding: () => boolean, signal: AbortSignal) =>
     }, 20)
   })
 
-const stopHost = (pid: number | undefined) => {
-  if (pid === undefined) return
-
-  try {
-    process.kill(pid, "SIGKILL")
-  } catch {}
-}
-
 export const fakeSandboxProvider =
   (settingsPath: string): Plugin =>
   (glass) => {
     glass.registerSandboxProvider("fake", {
       name: "Fake Sandboxes",
+      engines: readSettings(settingsPath).engines ?? ["claude-code", "pi-cli"],
       create: async (request, { progress, record, signal }) => {
         const settings = readSettings(settingsPath)
 
@@ -215,7 +210,7 @@ export const fakeSandboxProvider =
 
         if (host.pid === undefined) throw new Error("The agent host didn't start")
         writeFileSync(join(folder, "host.pid"), String(host.pid))
-        record({ folder, ingressPort: await ingress(folder, freeHostPort), pid: host.pid })
+        record({ folder, ingressPort: await ingress(folder, freeHostPort) })
       },
       target: async (state) => ({
         url: `http://127.0.0.1:${decodeSandbox(state).ingressPort}${INGRESS_PATH}`,
@@ -227,9 +222,7 @@ export const fakeSandboxProvider =
         if (missingLogin !== undefined)
           throw glass.missingLogin(missingLogin.login, missingLogin.fix)
 
-        const { folder, pid } = decodeSandbox(state)
-        stopHost(pid)
-        rmSync(folder, { recursive: true, force: true })
+        rmSync(decodeSandbox(state).folder, { recursive: true, force: true, maxRetries: 10 })
       },
       models: async () => ({
         defaultModel: { id: "fake/sandbox-model", name: "Sandbox model", efforts: [] },
@@ -256,6 +249,7 @@ export const installFakeSandboxProvider = (
 
   const sandboxFolder = (agentId: string) => join(settings.root, agentId)
   const pidFile = (agentId: string) => join(sandboxFolder(agentId), "host.pid")
+  const hostPid = (agentId: string) => Number(readFileSync(pidFile(agentId), "utf8"))
 
   return {
     configure: (change: Partial<FakeSandboxSettings>) =>
@@ -264,10 +258,15 @@ export const installFakeSandboxProvider = (
     dropConnections: (agentId: string) =>
       writeFileSync(join(sandboxFolder(agentId), "dropped"), ""),
     reconnect: (agentId: string) => rmSync(join(sandboxFolder(agentId), "dropped")),
-    hostPid: (agentId: string) => Number(readFileSync(pidFile(agentId), "utf8")),
+    hostPid,
     stopHosts: () => {
-      for (const agentId of readdirSync(settings.root))
-        if (existsSync(pidFile(agentId))) stopHost(Number(readFileSync(pidFile(agentId), "utf8")))
+      for (const agentId of readdirSync(settings.root)) {
+        if (!existsSync(pidFile(agentId))) continue
+
+        try {
+          process.kill(hostPid(agentId), "SIGKILL")
+        } catch {}
+      }
     },
   }
 }

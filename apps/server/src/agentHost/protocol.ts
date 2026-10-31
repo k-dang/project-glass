@@ -28,6 +28,9 @@ export const newHostToken = () => randomBytes(32).toString("base64url")
 
 export const HEALTH_PATH = "/healthz"
 
+/** A `POST` here ends the host, and with it every agent program. */
+export const SHUTDOWN_PATH = "/shutdown"
+
 const HostFolder = Schema.String.pipe(
   Schema.decodeTo(
     Schema.String,

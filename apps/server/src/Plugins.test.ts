@@ -7,9 +7,10 @@ import { dirname, join } from "node:path"
 import { isolatedHome } from "../test/harness"
 import { Plugins } from "./Plugins"
 
-const providerPlugin = (id: string) => `
+const providerPlugin = (id: string, engines: ReadonlyArray<string> = ["pi-cli"]) => `
 export default (glass) => {
   glass.registerSandboxProvider(${JSON.stringify(id)}, {
+    engines: ${JSON.stringify(engines)},
     create: async () => {},
     target: async () => ({ url: "http://sandbox", headers: {} }),
     remove: async () => {},
@@ -43,6 +44,21 @@ describe("Plugins", () => {
     }),
   )
 
+  it.live("skips a Sandbox provider that doesn't list Agent programs Glass knows", () =>
+    Effect.gen(function* () {
+      const plugins = yield* isolatedHome
+      yield* write(join(plugins, "empty.js"), providerPlugin("empty", []))
+      yield* write(join(plugins, "unknown.js"), providerPlugin("unknown", ["pi-cli", "codex"]))
+      yield* write(
+        join(plugins, "null.js"),
+        `export default (glass) => glass.registerSandboxProvider("null", null)`,
+      )
+      yield* write(join(plugins, "valid.js"), providerPlugin("valid"))
+
+      assert.deepStrictEqual(yield* loadPlugins(plugins), ["valid"])
+    }),
+  )
+
   it.live("loads a TypeScript folder plugin that imports from its own node_modules", () =>
     Effect.gen(function* () {
       const plugins = yield* isolatedHome
@@ -57,7 +73,7 @@ describe("Plugins", () => {
         `import { id } from "provider-id"
 type Glass = { registerSandboxProvider: (id: string, provider: unknown) => void }
 export default (glass: Glass): void => {
-  glass.registerSandboxProvider(id, {} as unknown)
+  glass.registerSandboxProvider(id, { engines: ["pi-cli"] } as unknown)
 }
 `,
       )

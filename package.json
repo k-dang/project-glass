@@ -14,6 +14,7 @@
     "test:e2e": "pnpm build && pnpm --filter @glass/desktop test:e2e"
   },
   "devDependencies": {
+    "@glass/plugin": "workspace:*",
     "@oxlint/plugins": "1.87.0",
     "@types/node": "catalog:",
     "effect": "catalog:",

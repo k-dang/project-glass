@@ -63,6 +63,10 @@ export default defineConfig({
       "anti-slop-effect/no-service-constructor-imports": "error",
       "anti-slop-effect/prefer-effect-match": "error",
     },
+    overrides: [
+      // Example Plugins have no Effect, so they check what they read by hand.
+      { files: ["examples/**"], rules: { "anti-slop/no-runtime-typeof": "off" } },
+    ],
     options: {
       typeAware: true,
       typeCheck: true,

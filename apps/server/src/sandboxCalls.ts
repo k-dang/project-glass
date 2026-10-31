@@ -1,14 +1,9 @@
 import { AgentError, RPC_PATH } from "@glass/contracts"
+import type { SandboxProvider, SandboxState, SandboxTarget } from "@glass/plugin"
 import { Effect, Schedule } from "effect"
-import { AgentHostRpcs, HEALTH_PATH, HOST_TOKEN_HEADER } from "./agentHost/protocol"
+import { AgentHostRpcs, HEALTH_PATH, HOST_TOKEN_HEADER, SHUTDOWN_PATH } from "./agentHost/protocol"
 import { connectRpcClient } from "./rpcSocket"
-import {
-  MissingLogin,
-  NoCapacity,
-  type SandboxProvider,
-  type SandboxState,
-  type SandboxTarget,
-} from "./SandboxProvider"
+import { MissingLogin, NoCapacity } from "./sandboxFailures"
 
 const abortThenAwaitProvider = (controller: AbortController, running: Promise<unknown>) =>
   Effect.promise(() => {
@@ -102,4 +97,24 @@ export const connectToHost = (provider: SandboxProvider, state: SandboxState, to
         [HOST_TOKEN_HEADER]: token,
       })
     }),
+  )
+
+export const shutDownHost = (provider: SandboxProvider, state: SandboxState, token: string) =>
+  targetOf(provider, state).pipe(
+    Effect.flatMap((target) =>
+      Effect.tryPromise((signal) =>
+        fetch(hostUrl(target, SHUTDOWN_PATH), {
+          method: "POST",
+          headers: { ...target.headers, [HOST_TOKEN_HEADER]: token },
+          signal,
+        }),
+      ).pipe(
+        Effect.filterOrFail((response) => response.ok),
+        Effect.timeout("10 seconds"),
+        Effect.tapError((cause) =>
+          Effect.logWarning(`Couldn't end the agent host in a Sandbox of ${provider.name}`, cause),
+        ),
+      ),
+    ),
+    Effect.ignore,
   )

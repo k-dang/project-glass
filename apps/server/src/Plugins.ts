@@ -1,15 +1,11 @@
+import { AgentEngine } from "@glass/contracts"
+import type { Glass, Plugin, SandboxProvider } from "@glass/plugin"
 import { Context, Effect, FileSystem, Layer, Option, Predicate, Result, Schema } from "effect"
 // The static entry imports jiti's TypeScript transform, so it lands in the backend's bundle.
 import { createJiti } from "jiti/static"
 import { extname, join } from "node:path"
 import { ServerConfig } from "./ServerConfig"
-import {
-  type Glass,
-  MissingLogin,
-  NoCapacity,
-  type Plugin,
-  type SandboxProvider,
-} from "./SandboxProvider"
+import { MissingLogin, NoCapacity } from "./sandboxFailures"
 
 const pluginFile = new Set([".ts", ".js", ".mts", ".mjs", ".cts", ".cjs"])
 
@@ -61,6 +57,8 @@ const entryOf = Effect.fnUntraced(function* (
 })
 
 const validProviderId = /^[a-z0-9][a-z0-9-]*$/
+
+const listsEngines = Schema.is(Schema.Struct({ engines: Schema.NonEmptyArray(AgentEngine) }))
 
 const loadPlugin = (
   fs: FileSystem.FileSystem,
@@ -126,6 +124,12 @@ export class Plugins extends Context.Service<
             if (!validProviderId.test(id)) {
               yield* Effect.logWarning(
                 "Skipped a Sandbox provider whose id isn't lowercase letters, digits, and dashes",
+                id,
+                path,
+              )
+            } else if (!listsEngines(provider)) {
+              yield* Effect.logWarning(
+                "Skipped a Sandbox provider that doesn't list the Agent programs it runs",
                 id,
                 path,
               )

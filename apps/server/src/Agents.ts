@@ -3,7 +3,7 @@ import {
   AgentBusy,
   type AgentEngine,
   AgentError,
-  type AgentModels,
+  AgentModels,
   AgentNotFound,
   type AgentPlace,
   asksPermission,
@@ -233,6 +233,11 @@ export class Agents extends Context.Service<
         const { repository, baseBranch, engine, model, effort, place } = input
         const { message, images } = input
         const placement = placementFor(place)
+
+        if (!placement.engines.includes(engine))
+          return yield* new AgentError({
+            message: "That kind of Sandbox doesn't run this Agent program. Pick another.",
+          })
 
         const permissionMode =
           engineCapabilities[engine].permissionModes.length === 0
@@ -553,7 +558,13 @@ export class Agents extends Context.Service<
           ),
         transcript: (agentId) =>
           Stream.unwrap(find(agentId).pipe(Effect.as(transcripts.watch(agentId)))),
-        models: (engine, place) => placementFor(place).models(engine),
+        models: (engine, place) => {
+          const placement = placementFor(place)
+
+          return placement.engines.includes(engine)
+            ? placement.models(engine)
+            : Effect.succeed(new AgentModels({ defaultModel: null, models: [] }))
+        },
         create,
         send,
         changes,
