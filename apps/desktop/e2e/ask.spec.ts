@@ -32,7 +32,7 @@ test("turns a new Draft into a question about its line and reads the private ans
   const note = changes.getByRole("region", { name: "Ask on greet.ts line +2" })
   await expect(note).toContainText("main.ts prints there after the greeting.")
   await expect(note).toContainText("Only you can see this")
-  await expect(note).toContainText("pi CLI · anthropic/claude-sonnet-5-5")
+  await expect(note).toContainText("pi · anthropic/claude-sonnet-5-5")
   await expect(changes.getByRole("textbox", { name: /^Draft on / })).toHaveCount(0)
   expect(pr.pendingReview).toBeUndefined()
 

@@ -1,9 +1,9 @@
 import type { AgentEngine, AgentRunnerIdentity } from "@glass/contracts"
 
-export const engineLabels: Record<AgentEngine, string> = {
+export const engineNames: Record<AgentEngine, string> = {
   "claude-code": "Claude Code",
-  "pi-cli": "pi CLI",
+  "pi-cli": "pi",
 }
 
 export const runnerLabel = ({ engine, model }: AgentRunnerIdentity) =>
-  `${engineLabels[engine]} · ${model}`
+  `${engineNames[engine]} · ${model}`

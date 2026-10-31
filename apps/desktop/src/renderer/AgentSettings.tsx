@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { toast } from "@/components/ui/toast"
 import { Backend, backendRuntime } from "./backend"
 import { EnginePicker, missingModel } from "./EnginePicker"
-import { engineLabels } from "./engines"
+import { engineNames } from "./engines"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf, settledProblem } from "./problems"
 import { QueueToursSetting } from "./QueueTours"
@@ -106,9 +106,9 @@ function AgentSettingsEditor(props: { saved: AgentSettings }) {
   const missingReviewModel = missingModel(draft.agentReviews)
 
   const invalid = missingTourModel
-    ? `The ${engineLabels[missingTourModel]} Tour engine needs a model.`
+    ? `The ${engineNames[missingTourModel]} Tour engine needs a model.`
     : missingReviewModel
-      ? `The ${engineLabels[missingReviewModel]} Agent review engine needs a model.`
+      ? `The ${engineNames[missingReviewModel]} Agent review engine needs a model.`
       : !isReviewPrompt(trimmed.reviewPrompt)
         ? "Write a review prompt. Agent reviews need it to know how you review."
         : null

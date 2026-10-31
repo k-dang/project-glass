@@ -62,17 +62,17 @@ it("shows only the chosen engine's model, and saves the Tour engine and models",
   const { user } = mount({ SetEngineSettings: hold(saves) })
   const tours = within(await screen.findByRole("region", { name: "Tours" }))
   expect(saveButton().disabled).toBe(true)
-  expect(tours.queryByRole("textbox", { name: "pi CLI model" })).toBeNull()
+  expect(tours.queryByRole("textbox", { name: "pi model" })).toBeNull()
 
-  await user.click(tours.getByRole("radio", { name: "pi CLI" }))
+  await user.click(tours.getByRole("radio", { name: "pi" }))
   expect(tours.queryByRole("textbox", { name: "Claude Code model" })).toBeNull()
-  const model = tours.getByRole("textbox", { name: "pi CLI model" })
+  const model = tours.getByRole("textbox", { name: "pi model" })
   await user.clear(model)
   await user.click(tours.getByRole("radio", { name: "Claude Code" }))
-  expect(screen.getByRole("status").textContent).toBe("The pi CLI Tour engine needs a model.")
+  expect(screen.getByRole("status").textContent).toBe("The pi Tour engine needs a model.")
   expect(saveButton().disabled).toBe(true)
-  await user.click(tours.getByRole("radio", { name: "pi CLI (needs a model)" }))
-  await user.type(tours.getByRole("textbox", { name: "pi CLI model" }), " gpt-test ")
+  await user.click(tours.getByRole("radio", { name: "pi (needs a model)" }))
+  await user.type(tours.getByRole("textbox", { name: "pi model" }), " gpt-test ")
   await user.click(saveButton())
 
   const saving = await next(saves)
@@ -87,7 +87,7 @@ it("shows only the chosen engine's model, and saves the Tour engine and models",
   expect(await screen.findByText("Settings saved.")).toBeDefined()
   expect(saveButton().disabled).toBe(true)
 
-  await user.type(tours.getByRole("textbox", { name: "pi CLI model" }), "-updated")
+  await user.type(tours.getByRole("textbox", { name: "pi model" }), "-updated")
   expect(saveButton().disabled).toBe(false)
   expect(screen.getByRole("status").textContent).toBe("Unsaved changes.")
 })
@@ -98,9 +98,9 @@ it("saves only what changed in the Agent review settings", async () => {
   const reviews = within(await screen.findByRole("region", { name: "Agent reviews" }))
   const radio = (name: string) => reviews.getByRole<HTMLInputElement>("radio", { name })
 
-  expect(radio("pi CLI").checked).toBe(true)
+  expect(radio("pi").checked).toBe(true)
 
-  const model = reviews.getByRole("textbox", { name: "pi CLI model" })
+  const model = reviews.getByRole("textbox", { name: "pi model" })
   await user.clear(model)
   await user.type(model, "deepseek-test")
   await user.click(saveButton())
@@ -153,7 +153,7 @@ it("discards unsaved changes back to the saved settings", async () => {
   const tours = within(screen.getByRole("region", { name: "Tours" }))
 
   await user.type(box, " Skip tests.")
-  await user.click(tours.getByRole("radio", { name: "pi CLI" }))
+  await user.click(tours.getByRole("radio", { name: "pi" }))
   expect(screen.getByRole("status").textContent).toBe("Unsaved changes.")
   await user.click(screen.getByRole("button", { name: "Discard" }))
 
@@ -192,7 +192,7 @@ const mountWithFailingPrompt = () => {
 const saveEngineAndPrompt = async (user: ReturnType<typeof userEvent.setup>) => {
   const box = await promptBox()
   const tours = within(screen.getByRole("region", { name: "Tours" }))
-  await user.click(tours.getByRole("radio", { name: "pi CLI" }))
+  await user.click(tours.getByRole("radio", { name: "pi" }))
   await user.type(box, " Skip tests.")
   await user.click(saveButton())
 
@@ -210,7 +210,7 @@ it("reloads what a partly failed save stored before Discard can use it", async (
 
   await user.click(screen.getByRole("button", { name: "Discard" }))
   expect(box).toHaveProperty("value", defaultReviewPrompt)
-  expect(tours.getByRole<HTMLInputElement>("radio", { name: "pi CLI" }).checked).toBe(true)
+  expect(tours.getByRole<HTMLInputElement>("radio", { name: "pi" }).checked).toBe(true)
   expect(saveButton().disabled).toBe(true)
 })
 

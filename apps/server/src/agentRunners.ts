@@ -269,7 +269,7 @@ const runnerStrategies = Effect.gen(function* () {
       const failed = (reason: AgentFailure["reason"]) =>
         agentFailure(
           reason,
-          `The pi CLI could not write the ${task.subject}. The provider's error is in Glass's backend log; check pi's login and model, then try again.`,
+          `pi could not write the ${task.subject}. The provider's error is in Glass's backend log; check pi's login and model, then try again.`,
           identity,
         )
 
@@ -280,11 +280,7 @@ const runnerStrategies = Effect.gen(function* () {
         .writeFileString(instructions, task.instructions)
         .pipe(
           Effect.mapError(() =>
-            agentFailure(
-              "storage",
-              "Couldn't prepare the pi CLI's instructions. Try again.",
-              identity,
-            ),
+            agentFailure("storage", "Couldn't prepare pi's instructions. Try again.", identity),
           ),
         )
 
@@ -312,7 +308,7 @@ const runnerStrategies = Effect.gen(function* () {
         promptWithSchema(task),
       ).pipe(
         Effect.mapError(() =>
-          agentFailure("failed", "The pi CLI could not start. Check its installation.", identity),
+          agentFailure("failed", "pi could not start. Check its installation.", identity),
         ),
       )
 
@@ -357,12 +353,12 @@ const runnerStrategies = Effect.gen(function* () {
       config.piCommand,
       ["--offline", "--list-models", selection.modelId],
       cwd,
-    ).pipe(Effect.mapError(startFailure("The pi CLI")))
+    ).pipe(Effect.mapError(startFailure("pi")))
 
     if (listed.code !== 0)
       return yield* agentFailure(
         "not-ready",
-        "The pi CLI could not list its models. Check its installation.",
+        "pi could not list its models. Check its installation.",
       )
 
     // The listing is a table of `provider  model  …` rows matching the search fuzzily.

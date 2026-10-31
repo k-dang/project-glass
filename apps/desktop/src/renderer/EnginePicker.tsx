@@ -2,7 +2,7 @@ import { AgentEngine, type EngineSettings, type PiModel } from "@glass/contracts
 import { cn } from "cn"
 import { useId } from "react"
 import { Input } from "@/components/ui/input"
-import { engineLabels } from "./engines"
+import { engineNames } from "./engines"
 
 const hasModel = (engine: AgentEngine, models: EngineSettings["models"]) =>
   engine === "claude-code"
@@ -42,7 +42,7 @@ export function EnginePicker(props: {
               className="peer sr-only"
             />
             <span className="block cursor-pointer rounded-md px-3.5 py-1 text-sm font-medium text-muted-foreground peer-checked:bg-card peer-checked:text-foreground peer-checked:shadow-sm peer-checked:ring-1 peer-checked:ring-border peer-focus-visible:outline-2 peer-focus-visible:outline-offset-1 peer-focus-visible:outline-ring">
-              {engineLabels[option]}
+              {engineNames[option]}
               {!hasModel(option, models) && (
                 <>
                   <span aria-hidden className="ml-1 text-destructive">
@@ -80,7 +80,7 @@ export function EnginePicker(props: {
 }
 
 function PiModelInputs(props: { value: PiModel; onChange: (value: PiModel) => void }) {
-  const label = engineLabels["pi-cli"]
+  const label = engineNames["pi-cli"]
 
   return (
     <>
