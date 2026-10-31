@@ -426,7 +426,7 @@ it.live("uses the selected runner and never falls back after failure", () =>
   Effect.gen(function* () {
     const f = yield* fixture()
     yield* f.piCli.configure(piCliAnswering(JSON.stringify(answer)))
-    yield* f.useEngine("pi-cli")
+    yield* f.useEngine("pi")
     yield* f.write
     assert.equal((yield* f.state(completed)).tour?.intent, answer.intent)
     assert.equal(yield* f.agent.log, "")
@@ -441,7 +441,7 @@ it.live("uses the selected runner and never falls back after failure", () =>
 
     const claudeCalls = yield* f.agent.log
     yield* f.piCli.configure(piCliAnswering("not JSON"))
-    yield* f.useEngine("pi-cli")
+    yield* f.useEngine("pi")
     yield* f.write
     const invalid = yield* f.state(completed)
     assert.equal(invalid.job.status === "failed" && invalid.job.reason.reason, "unusable-output")
@@ -456,8 +456,8 @@ it.live("writes a Tour with the pi CLI's model and none of pi's tools or resourc
     yield* f.client.SetEngineSettings({
       feature: "tours",
       engineSettings: {
-        engine: "pi-cli",
-        models: { ...models, "pi-cli": { provider: "litellm", modelId: "deepseek-test" } },
+        engine: "pi",
+        models: { ...models, pi: { provider: "litellm", modelId: "deepseek-test" } },
       },
     })
     yield* f.piCli.configure({
@@ -523,7 +523,7 @@ for (const [name, settings, expected] of [
     Effect.gen(function* () {
       const f = yield* fixture()
       yield* f.piCli.configure({ ready: true, output: "", modelsOutput: piCliModels, ...settings })
-      yield* f.useEngine("pi-cli")
+      yield* f.useEngine("pi")
       yield* f.write
       const state = yield* f.state(completed)
       assert.equal(state.job.status, "failed")

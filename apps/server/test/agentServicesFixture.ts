@@ -93,7 +93,7 @@ export const agentServicesFixture = Effect.gen(function* () {
 
     const build = Effect.gen(function* () {
       const hostContext = yield* Layer.build(
-        HostAgents.make({ "claude-code": adapter, "pi-cli": adapter }).pipe(
+        HostAgents.make({ "claude-code": adapter, pi: adapter }).pipe(
           Layer.provideMerge(Journal.layer),
         ),
       )
@@ -169,7 +169,7 @@ export const agentServicesFixture = Effect.gen(function* () {
     transcript,
     create: (
       permissionMode: TurnSettings["permissionMode"] = null,
-      engine: "claude-code" | "pi-cli" = "claude-code",
+      engine: "claude-code" | "pi" = "claude-code",
     ) =>
       running.agents.create({
         repository: new FollowedRepository({ owner: "glass-test", repo: "greeter" }),

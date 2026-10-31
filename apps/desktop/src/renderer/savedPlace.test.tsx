@@ -108,7 +108,7 @@ it("continues from Dashboard after visiting Settings and Activity, without savin
         engine: "claude-code",
         models: {
           "claude-code": "claude",
-          "pi-cli": { provider: "test", modelId: "test" },
+          pi: { provider: "test", modelId: "test" },
         },
       }),
   })

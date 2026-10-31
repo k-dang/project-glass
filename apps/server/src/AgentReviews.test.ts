@@ -32,7 +32,7 @@ const deadline = 60_000
 const fixture = Effect.fnUntraced(function* (
   settings: Partial<FakeAgentSettings> = {},
   timeout = deadline,
-  engine: AgentEngine = "pi-cli",
+  engine: AgentEngine = "pi",
 ) {
   const piCli = yield* fakeAgent({
     ready: true,
@@ -302,7 +302,7 @@ it.effect("fails as timed out when the agent passes its limit", () =>
 
     const failure = yield* f.failed
     assert.strictEqual(failure.reason, "timeout")
-    assert.strictEqual(failure.runner?.engine, "pi-cli")
+    assert.strictEqual(failure.runner?.engine, "pi")
   }),
 )
 

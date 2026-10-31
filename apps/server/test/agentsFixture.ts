@@ -87,7 +87,7 @@ const makeAgentsFixture = Effect.fnUntraced(function* <Claude extends { readonly
   const start = (
     message = "Say hello",
     program: Pick<NewAgent, "engine" | "model" | "effort"> &
-      Partial<Pick<NewAgent, "permissionMode">> = { engine: "pi-cli", model: null, effort: null },
+      Partial<Pick<NewAgent, "permissionMode">> = { engine: "pi", model: null, effort: null },
     images: ReadonlyArray<Image> = [],
   ) =>
     client.LinkLocalCheckout({ path: clone.checkout }).pipe(
@@ -107,7 +107,7 @@ const makeAgentsFixture = Effect.fnUntraced(function* <Claude extends { readonly
   const startSandbox = (
     message = "Say hello",
     program: Pick<NewAgent, "engine" | "model" | "effort"> = {
-      engine: "pi-cli",
+      engine: "pi",
       model: null,
       effort: null,
     },

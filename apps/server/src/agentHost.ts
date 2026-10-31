@@ -62,7 +62,7 @@ const main = Effect.gen(function* () {
 
   const adapters = {
     "claude-code": claudeAdapter(claudeCommand),
-    "pi-cli": yield* piAdapter(piCommand),
+    pi: yield* piAdapter(piCommand),
   }
 
   const services = yield* Layer.build(

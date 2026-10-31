@@ -52,7 +52,7 @@ const agentFields = {
   place: thisMac,
   repository: new FollowedRepository({ owner: "glass-demo", repo: "greeter" }),
   baseBranch: "main",
-  engine: "pi-cli",
+  engine: "pi",
   model: null,
   effort: null,
   permissionMode: null,
@@ -75,7 +75,7 @@ const claudeModels = new AgentModels({
 })
 
 const listModels = ({ engine }: { engine: AgentEngine }) =>
-  Effect.succeed(engine === "pi-cli" ? piModels : claudeModels)
+  Effect.succeed(engine === "pi" ? piModels : claudeModels)
 
 const mount = (handlers: Parameters<typeof testLayer>[0], path = `/agents/${agent.id}`) => {
   const backend = testLayer({
@@ -438,7 +438,7 @@ it("offers the chosen agent program's own models, and efforts only for models th
   await user.type(within(draft).getByRole("textbox", { name: "Message" }), "Fix the bug{Enter}")
 
   expect(created).toMatchObject([
-    { engine: "pi-cli", model: "glass-test/thinker", effort: "low", permissionMode: null },
+    { engine: "pi", model: "glass-test/thinker", effort: "low", permissionMode: null },
   ])
   await waitFor(() => expect(window.location.hash).toBe(`#/agents/${agent.id}`))
 })

@@ -1,7 +1,7 @@
 import { Match, Predicate, Schema } from "effect"
 import { FollowedRepository } from "./followedRepository"
 
-export const AgentEngine = Schema.Literals(["claude-code", "pi-cli"])
+export const AgentEngine = Schema.Literals(["claude-code", "pi"])
 
 export type AgentEngine = typeof AgentEngine.Type
 
@@ -65,7 +65,7 @@ export interface AgentCapabilities {
 
 export const engineCapabilities: Record<AgentEngine, AgentCapabilities> = {
   "claude-code": { steer: true, permissionModes: PermissionMode.literals },
-  "pi-cli": { steer: true, permissionModes: [] },
+  pi: { steer: true, permissionModes: [] },
 }
 
 /** What an agent program offers in a place: its models. */

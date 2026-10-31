@@ -69,10 +69,7 @@ export function EnginePicker(props: {
             onChange={(model) => setModels({ "claude-code": model })}
           />
         ) : (
-          <PiModelInputs
-            value={models["pi-cli"]}
-            onChange={(model) => setModels({ "pi-cli": model })}
-          />
+          <PiModelInputs value={models.pi} onChange={(model) => setModels({ pi: model })} />
         )}
       </div>
     </fieldset>
@@ -80,7 +77,7 @@ export function EnginePicker(props: {
 }
 
 function PiModelInputs(props: { value: PiModel; onChange: (value: PiModel) => void }) {
-  const label = engineNames["pi-cli"]
+  const label = engineNames.pi
 
   return (
     <>

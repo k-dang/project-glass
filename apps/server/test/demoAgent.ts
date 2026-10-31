@@ -107,7 +107,7 @@ export const seedDemoAgent = Effect.fnUntraced(function* (
   yield* client.CreateAgent({
     repository: linked.repository,
     baseBranch: "main",
-    engine: "pi-cli",
+    engine: "pi",
     model: null,
     effort: null,
     permissionMode: null,

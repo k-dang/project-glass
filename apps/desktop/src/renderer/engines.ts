@@ -2,7 +2,7 @@ import type { AgentEngine, AgentRunnerIdentity } from "@glass/contracts"
 
 export const engineNames: Record<AgentEngine, string> = {
   "claude-code": "Claude Code",
-  "pi-cli": "pi",
+  pi: "pi",
 }
 
 export const runnerLabel = ({ engine, model }: AgentRunnerIdentity) =>

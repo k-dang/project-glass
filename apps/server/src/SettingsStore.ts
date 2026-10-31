@@ -19,7 +19,7 @@ const SavedModels = Schema.Struct({
   "claude-code": EngineModels.fields["claude-code"].pipe(
     Schema.withDecodingDefaultKey(Effect.succeed("claude-sonnet-5-5")),
   ),
-  "pi-cli": EngineModels.fields["pi-cli"].pipe(Schema.withDecodingDefaultKey(defaultPiModel)),
+  pi: EngineModels.fields.pi.pipe(Schema.withDecodingDefaultKey(defaultPiModel)),
 }).pipe(Schema.withDecodingDefaultKey(Effect.succeed({})))
 
 const Settings = Schema.Struct({
@@ -30,7 +30,7 @@ const Settings = Schema.Struct({
   tourEngine: AgentEngine.pipe(Schema.withDecodingDefaultKey(Effect.succeed("claude-code"))),
   queueTours: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
   agentReviewModels: SavedModels,
-  agentReviewEngine: AgentEngine.pipe(Schema.withDecodingDefaultKey(Effect.succeed("pi-cli"))),
+  agentReviewEngine: AgentEngine.pipe(Schema.withDecodingDefaultKey(Effect.succeed("pi"))),
   reviewPrompt: ReviewPrompt.pipe(
     Schema.withDecodingDefaultKey(Effect.succeed(defaultReviewPrompt)),
   ),
