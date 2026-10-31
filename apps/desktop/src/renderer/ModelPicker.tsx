@@ -1,6 +1,7 @@
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
 import type { AgentEngine, AgentModels, ModelChoice } from "@glass/contracts"
 import { AsyncResult } from "effect/reactivity"
+import { cn } from "cn"
 import { ChevronDown, Gauge, LoaderCircle } from "lucide-react"
 import { memo, useState, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
@@ -8,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { agentModelsAtom, engineGlyphs } from "./agentsArea"
 import { engineNames } from "./engines"
-import { chip, ChipSelect } from "./chips"
+import { chip, ChipSelect, selectorSlot } from "./chips"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf } from "./problems"
 
@@ -85,15 +86,16 @@ export const ModelPicker = memo(function ModelPicker(props: {
               type="button"
               variant="ghost"
               size="sm"
-              className={chip}
+              className={cn(chip, selectorSlot, "justify-start")}
               aria-label={`${engineNames[props.engine]}: ${summary}`}
+              title={summary}
             />
           }
         >
-          <span aria-hidden className="w-3.5 text-center">
+          <span aria-hidden className="w-3.5 shrink-0 text-center">
             {engineGlyphs[props.engine]}
           </span>
-          <span className="truncate">{summary}</span>
+          <span className="min-w-0 flex-1 truncate text-left">{summary}</span>
           <ChevronDown aria-hidden className="opacity-60" />
         </PopoverTrigger>
         <PopoverContent side="top" align="start" className="w-auto max-w-80 min-w-64 gap-1 p-1">
@@ -116,18 +118,21 @@ export const ModelPicker = memo(function ModelPicker(props: {
           {body}
         </PopoverContent>
       </Popover>
-      {efforts.length > 0 && (
-        <ChipSelect
-          label="Effort"
-          icon={<Gauge aria-hidden />}
-          value={toKey(effort)}
-          items={[
-            { value: DEFAULT_KEY, label: "Default effort" },
-            ...efforts.map((level) => ({ value: level, label: effortName(level) })),
-          ]}
-          onValueChange={(chosen) => props.onChange({ model, effort: fromKey(chosen) })}
-        />
-      )}
+      <div className={selectorSlot}>
+        {efforts.length > 0 && (
+          <ChipSelect
+            className="w-full min-w-0"
+            label="Effort"
+            icon={<Gauge aria-hidden />}
+            value={toKey(effort)}
+            items={[
+              { value: DEFAULT_KEY, label: "Default effort" },
+              ...efforts.map((level) => ({ value: level, label: effortName(level) })),
+            ]}
+            onValueChange={(chosen) => props.onChange({ model, effort: fromKey(chosen) })}
+          />
+        )}
+      </div>
     </>
   )
 })
