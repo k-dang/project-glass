@@ -3,6 +3,11 @@ export interface SandboxProvider {
   /** What the user sees for this kind of Sandbox, a plural such as "Acme Sandboxes". */
   readonly name: string
   /**
+   * The Agent programs its Sandboxes can run. Glass offers only these for this kind of Sandbox, and
+   * asks `create` and `models` about no other.
+   */
+  readonly engines: readonly [AgentEngine, ...Array<AgentEngine>]
+  /**
    * Makes the Sandbox, sets up the user's logins, clones the repository onto the Agent's branch,
    * and starts the agent host in it. Calls `record` as soon as the Sandbox exists, so Glass can
    * delete a half-built one, and `progress` for each step the user should see. Glass waits for

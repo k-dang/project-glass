@@ -24,5 +24,5 @@ keeps its data in a fresh temp folder, so it won't see the Plugin; use `pnpm dev
 
 ## What's fake
 
-Claude Code Agents answer every message with "Fake reply to: …" and need no login. pi Agents run the pi
-on your `PATH`, logged in as you. Cloning uses your own git credentials.
+Its Sandboxes run only Claude Code, whose Agents answer every message with "Fake reply to: …" and
+need no login. Cloning uses your own git credentials.

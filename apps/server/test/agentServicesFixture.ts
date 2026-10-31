@@ -1,5 +1,6 @@
 import { SqliteClient, SqliteMigrator } from "@effect/sql-sqlite-node"
 import {
+  AgentEngine,
   AgentModels,
   applyTranscriptUpdate,
   emptyTranscript,
@@ -105,6 +106,7 @@ export const agentServicesFixture = Effect.gen(function* () {
       )
 
       const placement = ThisMac.of({
+        engines: AgentEngine.literals,
         models: () => models,
         place: () =>
           Effect.sync(() => {

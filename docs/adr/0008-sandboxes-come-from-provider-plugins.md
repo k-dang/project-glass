@@ -22,6 +22,8 @@ A provider is coarse, like opencode's workspace adapters: Glass hands it what th
 needs, and the provider does everything specific to its platform.
 
 - `name` is what the user sees for this kind of Sandbox.
+- `engines` lists the Agent programs its Sandboxes can run. Glass offers only these when the user
+  picks this kind of Sandbox, so a provider sets up only the programs it lists.
 - `create(request, { progress, record, signal })` makes the Sandbox, sets up the user's logins,
   clones the repository onto the Agent's branch from its base branch, and uploads and starts the
   agent host bundle with the environment and port Glass gives it. It calls `record(state)` as soon
@@ -30,7 +32,7 @@ needs, and the provider does everything specific to its platform.
 - `remove(state)` deletes the Sandbox. Glass first asks the agent host to end, with its agent
   programs, so a provider needn't track the host's processes. If the host can't be reached,
   `remove` runs anyway.
-- `models(engine)` lists what each Agent program offers in its Sandboxes, before one exists.
+- `models(engine)` lists what each listed Agent program offers in its Sandboxes, before one exists.
 
 The plugin API is Promises and `AbortSignal`, so a plugin needs no Effect; its types are the
 `@glass/plugin` package. Glass passes in `glass.missingLogin(login, fix)` and

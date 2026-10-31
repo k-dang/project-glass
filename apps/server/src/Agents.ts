@@ -181,6 +181,21 @@ export class Agents extends Context.Service<
 
       const placementOf = (row: PlacedAgent) => placementFor(row.agent.place)
 
+      const placementRunning = (
+        place: AgentPlace,
+        engine: AgentEngine,
+      ): Effect.Effect<Placement, AgentError> => {
+        const placement = placementFor(place)
+
+        return placement.engines.includes(engine)
+          ? Effect.succeed(placement)
+          : Effect.fail(
+              new AgentError({
+                message: "That kind of Sandbox doesn't run this Agent program. Pick another.",
+              }),
+            )
+      }
+
       yield* Stream.merge(yield* thisMac.subscribeLost, yield* sandboxes.subscribeLost).pipe(
         Stream.runForEach((agentIds) =>
           transcripts
@@ -232,7 +247,7 @@ export class Agents extends Context.Service<
       const create = Effect.fn("Agents.create")(function* (input: NewAgent) {
         const { repository, baseBranch, engine, model, effort, place } = input
         const { message, images } = input
-        const placement = placementFor(place)
+        const placement = yield* placementRunning(place, engine)
 
         const permissionMode =
           engineCapabilities[engine].permissionModes.length === 0
@@ -553,7 +568,10 @@ export class Agents extends Context.Service<
           ),
         transcript: (agentId) =>
           Stream.unwrap(find(agentId).pipe(Effect.as(transcripts.watch(agentId)))),
-        models: (engine, place) => placementFor(place).models(engine),
+        models: (engine, place) =>
+          placementRunning(place, engine).pipe(
+            Effect.flatMap((placement) => placement.models(engine)),
+          ),
         create,
         send,
         changes,

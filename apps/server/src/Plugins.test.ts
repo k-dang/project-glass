@@ -7,9 +7,10 @@ import { dirname, join } from "node:path"
 import { isolatedHome } from "../test/harness"
 import { Plugins } from "./Plugins"
 
-const providerPlugin = (id: string) => `
+const providerPlugin = (id: string, engines: ReadonlyArray<string> = ["pi-cli"]) => `
 export default (glass) => {
   glass.registerSandboxProvider(${JSON.stringify(id)}, {
+    engines: ${JSON.stringify(engines)},
     create: async () => {},
     target: async () => ({ url: "http://sandbox", headers: {} }),
     remove: async () => {},
@@ -57,7 +58,7 @@ describe("Plugins", () => {
         `import { id } from "provider-id"
 type Glass = { registerSandboxProvider: (id: string, provider: unknown) => void }
 export default (glass: Glass): void => {
-  glass.registerSandboxProvider(id, {} as unknown)
+  glass.registerSandboxProvider(id, { engines: ["pi-cli"] } as unknown)
 }
 `,
       )
@@ -98,6 +99,7 @@ export default (glass: Glass): void => {
       yield* write(join(plugins, "e-bad-id.js"), providerPlugin("sandbox:Fine"))
       yield* write(join(plugins, "f-hangs.js"), `export default () => new Promise(() => {})`)
       yield* write(join(plugins, "g-unreadable", "index.js"), providerPlugin("unreadable"))
+      yield* write(join(plugins, "h-no-engines.js"), providerPlugin("no-engines", []))
       yield* Effect.promise(() => chmod(join(plugins, "g-unreadable"), 0o000))
       yield* Effect.addFinalizer(() =>
         Effect.promise(() => chmod(join(plugins, "g-unreadable"), 0o700)),
@@ -130,6 +132,7 @@ export default (glass: Glass): void => {
         ],
         ["Couldn't load a Plugin", join(plugins, "f-hangs.js")],
         ["Couldn't load a Plugin", join(plugins, "g-unreadable")],
+        ["Skipped a Sandbox provider that doesn't list the Agent programs it runs", "no-engines"],
       ])
     }),
   )

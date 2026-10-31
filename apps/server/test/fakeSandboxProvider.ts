@@ -1,3 +1,4 @@
+import { AgentEngine } from "@glass/contracts"
 import { Schema } from "effect"
 import { execFileSync, spawn } from "node:child_process"
 import {
@@ -33,6 +34,8 @@ const FakeSandboxSettings = Schema.Struct({
   noCapacity: Schema.optional(Schema.String),
   failAt: Schema.optional(FakeSandboxStep),
   holdAt: Schema.optional(FakeSandboxStep),
+  /** Read when Glass loads the Plugin, so a change takes a relaunch. */
+  engines: Schema.optional(Schema.NonEmptyArray(AgentEngine)),
 })
 
 export type FakeSandboxSettings = typeof FakeSandboxSettings.Type
@@ -153,6 +156,7 @@ export const fakeSandboxProvider =
   (glass) => {
     glass.registerSandboxProvider("fake", {
       name: "Fake Sandboxes",
+      engines: readSettings(settingsPath).engines ?? ["claude-code", "pi-cli"],
       create: async (request, { progress, record, signal }) => {
         const settings = readSettings(settingsPath)
 

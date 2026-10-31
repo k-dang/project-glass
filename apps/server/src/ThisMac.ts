@@ -1,4 +1,4 @@
-import { AgentError, type FollowedRepository } from "@glass/contracts"
+import { AgentEngine, AgentError, type FollowedRepository } from "@glass/contracts"
 import { Context, Effect, Exit, FileSystem, Layer, Option, Stream } from "effect"
 import { join } from "node:path"
 import { shortAgentNames, uniqueAgentName } from "./agentNames"
@@ -117,6 +117,7 @@ export class ThisMac extends Context.Service<
       })
 
       return ThisMac.of({
+        engines: AgentEngine.literals,
         models: (engine) =>
           host.client.pipe(
             Effect.flatMap((client) => client.ListModels({ engine })),

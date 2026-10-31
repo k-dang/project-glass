@@ -1,7 +1,7 @@
 import { useAtom, useAtomSet, useAtomValue } from "@effect/atom-react"
 import {
   type Agent,
-  type AgentEngine,
+  AgentEngine,
   type AgentPlace,
   asksPermission,
   Branches,
@@ -21,7 +21,7 @@ import { useNavigate } from "@tanstack/react-router"
 import { Exit, Option, Predicate } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
 import { FolderGit2, FolderPlus, GitBranch, LoaderCircle } from "lucide-react"
-import { type ReactNode, useCallback, useState } from "react"
+import { type ReactNode, useCallback, useMemo, useState } from "react"
 import { MessageGroup } from "@/components/ui/message"
 import { Trace, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace"
 import {
@@ -70,6 +70,7 @@ interface PlaceOptions {
   readonly describe: (key: string | undefined) => ReactNode
   readonly starting: (key: string, baseBranch: string) => string
   readonly choosesFolder: boolean
+  readonly engines: readonly [AgentEngine, ...Array<AgentEngine>]
 }
 
 const onThisMac: PlaceOptions = {
@@ -86,9 +87,10 @@ const onThisMac: PlaceOptions = {
     ),
   starting: (key, baseBranch) => `Making the Agent's copy of ${key} from ${baseBranch}…`,
   choosesFolder: true,
+  engines: AgentEngine.literals,
 }
 
-const inSandboxOf = ({ id, name }: SandboxProviderInfo): PlaceOptions => ({
+const inSandboxOf = ({ id, name, engines }: SandboxProviderInfo): PlaceOptions => ({
   place: SandboxPlace.make({ providerId: id }),
   branches: gitHubBranchesAtom,
   describe: (key) =>
@@ -102,6 +104,7 @@ const inSandboxOf = ({ id, name }: SandboxProviderInfo): PlaceOptions => ({
     ),
   starting: () => `Starting the Agent in a Sandbox from ${name}…`,
   choosesFolder: false,
+  engines,
 })
 
 export const defaultPlace = (
@@ -202,7 +205,7 @@ function ChoosePlace(props: {
 
   const where = provider === undefined ? onThisMac : inSandboxOf(provider)
 
-  const program: Program =
+  const preferred: Program =
     chosenProgram ??
     (newest === undefined
       ? { engine: "claude-code", model: null, effort: null, permissionMode: null }
@@ -212,6 +215,10 @@ function ChoosePlace(props: {
           effort: newest.effort,
           permissionMode: null,
         })
+
+  const program: Program = where.engines.includes(preferred.engine)
+    ? preferred
+    : { engine: where.engines[0], model: null, effort: null, permissionMode: null }
 
   const choices: DraftChoices = {
     providers,
@@ -320,6 +327,11 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
     [setProgram],
   )
 
+  const programs = useMemo(
+    () => ({ engines: where.engines, onChange: chooseEngine }),
+    [where.engines, chooseEngine],
+  )
+
   const [starting, setStarting] = useState<
     (MessageInput & { readonly key: string; readonly baseBranch: string }) | null
   >(null)
@@ -394,7 +406,7 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
               model={program.model}
               effort={program.effort}
               onChange={chooseModel}
-              onEngineChange={chooseEngine}
+              programs={programs}
             />
             {asksPermission(where.place) && (
               <PermissionModePicker

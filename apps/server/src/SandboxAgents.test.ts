@@ -27,7 +27,11 @@ it.live(
       const f = yield* agentsFixture({ output: "Hello from the Sandbox" })
 
       assert.deepStrictEqual(yield* f.client.ListSandboxProviders(), [
-        new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes" }),
+        new SandboxProviderInfo({
+          id: "fake",
+          name: "Fake Sandboxes",
+          engines: ["claude-code", "pi-cli"],
+        }),
       ])
 
       f.sandboxes.configure({ holdAt: "Creating the Sandbox" })
@@ -65,6 +69,37 @@ it.live(
       const clone = join(f.sandboxes.sandboxFolder(agent.id), repository.repo)
       assert.equal(gitIn(clone, "branch", "--show-current"), agent.name)
     }),
+)
+
+it.live("starts a Sandbox Agent only with an Agent program its provider runs", () =>
+  Effect.gen(function* () {
+    const f = yield* agentsFixture({ output: "Hello" })
+    f.sandboxes.configure({ engines: ["pi-cli"] })
+    const relaunched = yield* f.restart
+
+    assert.deepStrictEqual(yield* relaunched.ListSandboxProviders(), [
+      new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes", engines: ["pi-cli"] }),
+    ])
+
+    const refused = yield* relaunched
+      .CreateAgent({
+        repository,
+        baseBranch: "main",
+        message: "Say hello",
+        images: [],
+        engine: "claude-code",
+        model: null,
+        effort: null,
+        permissionMode: null,
+        place: SandboxPlace.make({ providerId: "fake" }),
+      })
+      .pipe(Effect.flip)
+
+    assert.equal(
+      refused.message,
+      "That kind of Sandbox doesn't run this Agent program. Pick another.",
+    )
+  }),
 )
 
 it.live("Steers and stops an Agent's Turns in its Sandbox, and shows its changes there", () =>

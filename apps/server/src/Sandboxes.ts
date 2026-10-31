@@ -1,4 +1,4 @@
-import { AgentError, AgentModels, SandboxProviderInfo } from "@glass/contracts"
+import { AgentEngine, AgentError, AgentModels, SandboxProviderInfo } from "@glass/contracts"
 import type { SandboxProvider, SandboxRequest, SandboxState } from "@glass/plugin"
 import {
   type Cause,
@@ -127,6 +127,7 @@ const notInstalled = (providerId: string): Placement => {
   )
 
   return {
+    engines: AgentEngine.literals,
     models: () => failure,
     place: () => failure,
     host: () => failure,
@@ -339,6 +340,7 @@ export class Sandboxes extends Context.Service<
         }
 
         return {
+          engines: provider.engines,
           models: (engine) =>
             call(provider, "list what its Sandboxes offer", () => provider.models(engine)).pipe(
               Effect.flatMap((models) =>
@@ -399,7 +401,7 @@ export class Sandboxes extends Context.Service<
       return Sandboxes.of({
         providers: Array.from(
           sandboxProviders,
-          ([id, { name }]) => new SandboxProviderInfo({ id, name }),
+          ([id, { name, engines }]) => new SandboxProviderInfo({ id, name, engines }),
         ),
         placement: (providerId) => placements.get(providerId) ?? notInstalled(providerId),
         subscribeLost: PubSub.subscribe(lost).pipe(Effect.map(Stream.fromSubscription)),

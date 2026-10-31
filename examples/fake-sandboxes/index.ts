@@ -44,6 +44,7 @@ const freePort = () =>
 const plugin: Plugin = (glass) => {
   glass.registerSandboxProvider("fake", {
     name: "Fake Sandboxes",
+    engines: ["claude-code"],
     create: async (request, { progress, record, signal }) => {
       progress("Creating the Sandbox")
       const folder = join(SANDBOXES, request.agentId)
@@ -93,10 +94,7 @@ const plugin: Plugin = (glass) => {
     remove: async (state) => {
       await rm(decodeSandbox(state).folder, { recursive: true, force: true, maxRetries: 10 })
     },
-    models: async (engine) =>
-      engine === "claude-code"
-        ? { defaultModel: FAKE_MODEL, models: [FAKE_MODEL] }
-        : { defaultModel: null, models: [] },
+    models: async () => ({ defaultModel: FAKE_MODEL, models: [FAKE_MODEL] }),
   })
 }
 
