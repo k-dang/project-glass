@@ -15,6 +15,15 @@ export const loadedPlacesAtom = backendRuntime
 
 type Area = ResumableDestination["area"]
 
+export const savedIn = <InArea extends Area>(
+  destinations: ReadonlyArray<ResumableDestination>,
+  area: InArea,
+) =>
+  destinations.find(
+    (destination): destination is Extract<ResumableDestination, { area: InArea }> =>
+      destination.area === area,
+  )
+
 const currentDestinationsAtom = Atom.make<ReadonlyArray<ResumableDestination>>([]).pipe(
   Atom.keepAlive,
 )
@@ -24,7 +33,7 @@ const saveLockAtom = Atom.make(() => Semaphore.makeUnsafe(1)).pipe(Atom.keepAliv
 const sameDestination = Schema.toEquivalence(ResumableDestination)
 
 const currentIn = (registry: AtomRegistry.AtomRegistry, area: Area) =>
-  registry.get(currentDestinationsAtom).find((destination) => destination.area === area)
+  savedIn(registry.get(currentDestinationsAtom), area)
 
 export const savedDestinationsAtom = Atom.make((get) => {
   const current = get(currentDestinationsAtom)

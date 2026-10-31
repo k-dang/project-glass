@@ -4,12 +4,31 @@ import { AsyncResult } from "effect/reactivity"
 import { Sparkles } from "lucide-react"
 import { agentsAtom, placeNames } from "./agentsArea"
 import { engineNames } from "./engines"
-import { ContinueCard, rememberPlaceHint } from "./ContinueCard"
-import { Empty } from "./Lists"
+import { ContinueCard, ContinueInvitation } from "./ContinueCard"
 import { ProblemAlert } from "./ProblemAlert"
 import { streamProblem } from "./problems"
 
-export function AgentContinueCard(props: { destination: AgentDestination }) {
+function AgentInvitation(props: { title: string }) {
+  return (
+    <ContinueInvitation
+      link={{ to: "/agents/new" }}
+      icon={Sparkles}
+      title={props.title}
+      hint="Start an Agent and Glass will remember your place."
+      action="Start an Agent"
+    />
+  )
+}
+
+export function AgentContinueCard(props: { destination: AgentDestination | undefined }) {
+  return props.destination === undefined ? (
+    <AgentInvitation title="No Agent yet" />
+  ) : (
+    <LastAgent destination={props.destination} />
+  )
+}
+
+function LastAgent(props: { destination: AgentDestination }) {
   const result = useAtomValue(agentsAtom)
   const retry = useAtomRefresh(agentsAtom)
 
@@ -18,7 +37,7 @@ export function AgentContinueCard(props: { destination: AgentDestination }) {
       const agent = agents.find(({ id }) => id === props.destination.agentId)
 
       return agent === undefined ? (
-        <Empty title="Your last Agent is gone">{rememberPlaceHint}</Empty>
+        <AgentInvitation title="Your last Agent is gone" />
       ) : (
         <ContinueCard
           link={{ to: "/agents/$agentId", params: { agentId: agent.id } }}

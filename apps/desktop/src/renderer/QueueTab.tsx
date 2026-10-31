@@ -3,27 +3,16 @@ import {
   findPullRequestReferences,
   type PullRequestRef,
   type QueuedPullRequest,
-  type Revision,
-  type TourState,
 } from "@glass/contracts"
 import { cn } from "cn"
-import { Exit, Option } from "effect"
+import { Exit } from "effect"
 import { AsyncResult } from "effect/reactivity"
-import {
-  Clock,
-  ListPlus,
-  LoaderCircle,
-  type LucideIcon,
-  Route,
-  TriangleAlert,
-  X,
-} from "lucide-react"
+import { ListPlus, X } from "lucide-react"
 import { type ClipboardEvent, type FormEvent, useContext, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { TabsTrigger } from "@/components/ui/tabs"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { Empty } from "./Lists"
+import { Count, Empty } from "./Lists"
 import { ProblemAlert } from "./ProblemAlert"
 import { describeError, type Problem, problemOf, problemText, settledProblem } from "./problems"
 import {
@@ -32,7 +21,6 @@ import {
   queueColumns,
   repositoryLabeller,
   subgridRow,
-  warningTone,
 } from "./PullRequestRow"
 import {
   addToQueueAtom,
@@ -41,22 +29,17 @@ import {
   referenceText,
   removeFromQueue,
   savedQueueAtom,
+  watchedQueueAtom,
 } from "./queue"
-import { isOutdated, tourStates } from "./useTour"
+import { QueueTourStatus } from "./QueueTourStatus"
 
 export function QueueTabTrigger() {
-  useAtomValue(queueRefreshAtom)
-  const saved = useAtomValue(savedQueueAtom)
-  const count = AsyncResult.isSuccess(saved) ? saved.value.length : 0
+  const saved = useAtomValue(watchedQueueAtom)
 
   return (
     <TabsTrigger value="queue" className="flex-none px-2">
       Queue
-      {count > 0 && (
-        <span className="rounded-full bg-muted px-1.5 text-xs text-muted-foreground tabular-nums">
-          {count}
-        </span>
-      )}
+      <Count count={AsyncResult.isSuccess(saved) ? saved.value.length : 0} />
     </TabsTrigger>
   )
 }
@@ -165,69 +148,6 @@ function QueueRow(props: {
         <X aria-hidden />
       </Button>
     </li>
-  )
-}
-
-interface TourStatus {
-  readonly label: string
-  readonly icon: LucideIcon
-  readonly tone: string
-  readonly spinning?: boolean
-  readonly detail?: string
-}
-
-const tourStatus = (state: TourState, revision: Revision | null): TourStatus | null => {
-  const { tour, job } = state
-
-  if (job.status === "waiting")
-    return { label: "Tour waiting", icon: Clock, tone: "text-muted-foreground" }
-
-  if (job.status === "writing")
-    return {
-      label: "Writing Tour",
-      icon: LoaderCircle,
-      tone: "text-muted-foreground",
-      spinning: true,
-    }
-
-  if (job.status === "failed")
-    return {
-      label: "Tour failed",
-      icon: TriangleAlert,
-      tone: "text-destructive",
-      detail: job.reason.message,
-    }
-
-  if (tour === null) return null
-
-  return revision !== null && isOutdated(tour, revision)
-    ? { label: "Tour outdated", icon: Route, tone: warningTone }
-    : { label: "Tour ready", icon: Route, tone: "text-foreground/70" }
-}
-
-function QueueTourStatus(props: { queued: QueuedPullRequest }) {
-  const state = Option.getOrNull(
-    AsyncResult.value(useAtomValue(tourStates(props.queued.pullRequest.ref))),
-  )
-
-  const status = state === null ? null : tourStatus(state, props.queued.revision)
-
-  if (status === null) return null
-
-  const Icon = status.icon
-  const text = status.detail === undefined ? status.label : `${status.label}: ${status.detail}`
-
-  return (
-    <Tooltip>
-      <TooltipTrigger render={<span className={cn("flex items-center", status.tone)} />}>
-        <Icon
-          aria-hidden
-          className={cn("size-3.5", status.spinning && "animate-spin motion-reduce:animate-none")}
-        />
-        <span className="sr-only">{text}</span>
-      </TooltipTrigger>
-      <TooltipContent>{text}</TooltipContent>
-    </Tooltip>
   )
 }
 

@@ -3,7 +3,6 @@ import {
   PullRequestList,
   PullRequestRef,
   type PullRequestWorkspace,
-  type ReviewDestination,
 } from "@glass/contracts"
 import { linkOptions } from "@tanstack/react-router"
 import { Effect, Option, Predicate, Schema, Stream } from "effect"
@@ -18,7 +17,7 @@ import { reviewingRevisionAtom } from "./workspaceEvents"
 import { ReplyStore } from "./useReplies"
 import { createResolutions, type Resolutions } from "./useResolutions"
 import { ViewedFilesStore } from "./useViewedFiles"
-import { savedDestinationsAtom } from "./savedPlace"
+import { savedDestinationsAtom, savedIn } from "./savedPlace"
 import { restoreReviewPosition } from "./reviewPosition"
 
 interface OpenWorkspace {
@@ -191,9 +190,7 @@ export const openWorkspaceAtom = backendRuntime
   .fn((request: OpenRequest, get) =>
     Effect.gen(function* () {
       const destination = yield* AtomRegistry.getResult(get.registry, savedDestinationsAtom).pipe(
-        Effect.map((destinations) =>
-          destinations.find((saved): saved is ReviewDestination => saved.area === "reviews"),
-        ),
+        Effect.map((destinations) => savedIn(destinations, "reviews")),
         Effect.catch(() => Effect.succeed(undefined)),
       )
 

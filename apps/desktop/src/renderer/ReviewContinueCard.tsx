@@ -2,10 +2,10 @@ import type { ReviewDestination, ReviewPosition } from "@glass/contracts"
 import { AsyncResult } from "effect/reactivity"
 import { GitPullRequest } from "lucide-react"
 import { useConnection } from "./connection"
-import { ContinueCard, rememberPlaceHint } from "./ContinueCard"
-import { Empty } from "./Lists"
+import { ContinueCard, ContinueInvitation } from "./ContinueCard"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf } from "./problems"
+import { defaultListSearch } from "./reviewsArea"
 
 const positionLabel = (position: ReviewPosition) => {
   if (position.tab === "overview") return "Overview"
@@ -15,7 +15,27 @@ const positionLabel = (position: ReviewPosition) => {
   return position.order === "tour" ? "Changes · Tour order" : "Changes · Path order"
 }
 
-export function ReviewContinueCard(props: { destination: ReviewDestination }) {
+function ReviewInvitation(props: { title: string }) {
+  return (
+    <ContinueInvitation
+      link={{ to: "/reviews", search: defaultListSearch }}
+      icon={GitPullRequest}
+      title={props.title}
+      hint="Open a pull request and Glass will remember your place."
+      action="Browse pull requests"
+    />
+  )
+}
+
+export function ReviewContinueCard(props: { destination: ReviewDestination | undefined }) {
+  return props.destination === undefined ? (
+    <ReviewInvitation title="No pull request yet" />
+  ) : (
+    <LastPullRequest destination={props.destination} />
+  )
+}
+
+function LastPullRequest(props: { destination: ReviewDestination }) {
   const { destination } = props
   const { result, retry } = useConnection()
   const { owner, repo, number } = destination.pullRequest
@@ -24,7 +44,7 @@ export function ReviewContinueCard(props: { destination: ReviewDestination }) {
   return AsyncResult.builder(result)
     .onSuccess((connection) =>
       destination.login.toLowerCase() !== connection.login.toLowerCase() ? (
-        <Empty title="No saved review for this account">{rememberPlaceHint}</Empty>
+        <ReviewInvitation title="No saved review for this account" />
       ) : (
         <ContinueCard
           link={{ to: "/reviews/$owner/$repo/$number", params: destination.pullRequest }}

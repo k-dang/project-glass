@@ -1,7 +1,6 @@
 import { useAtom, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
 import type { ToDo } from "@glass/contracts"
 import { cn } from "cn"
-import { Effect, Option } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
 import { Pencil, Trash2 } from "lucide-react"
 import type { KeyboardEvent } from "react"
@@ -10,19 +9,16 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/components/ui/toast"
-import { Backend, type BackendError, backendRuntime } from "./backend"
+import { Backend } from "./backend"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf, settledProblem } from "./problems"
-
-interface ToDoChange {
-  readonly save: Effect.Effect<ReadonlyArray<ToDo>, BackendError, Backend>
-  readonly onSaved?: () => void
-  readonly toggle?: { readonly id: number; readonly done: boolean }
-}
-
-const savedToDosAtom = backendRuntime
-  .atom(Backend.use((backend) => backend.ListToDos()))
-  .pipe(Atom.keepAlive)
+import {
+  changeAtom,
+  pendingToggleAtom,
+  savedToDosAtom,
+  type ToDoChange,
+  toDosAtom,
+} from "./toDoList"
 
 const newTitleAtom = Atom.make("").pipe(Atom.keepAlive)
 
@@ -32,35 +28,6 @@ interface ToDoEdit {
 }
 
 const editAtom = Atom.family((_id: number) => Atom.make<ToDoEdit | null>(null).pipe(Atom.keepAlive))
-
-const pendingToggleAtom = Atom.make<ToDoChange["toggle"]>(undefined).pipe(Atom.keepAlive)
-
-const changeAtom = backendRuntime
-  .fn((change: ToDoChange, get) =>
-    Effect.gen(function* () {
-      get.set(pendingToggleAtom, change.toggle)
-
-      const { saved } = yield* Effect.all(
-        {
-          saved: change.save,
-          feedback: change.toggle?.done ? Effect.sleep("250 millis") : Effect.void,
-        },
-        { concurrency: "unbounded" },
-      )
-
-      change.onSaved?.()
-
-      return saved
-    }).pipe(Effect.ensuring(Effect.sync(() => get.set(pendingToggleAtom, undefined)))),
-  )
-  .pipe(Atom.keepAlive)
-
-const toDosAtom = Atom.make((get) =>
-  Option.match(AsyncResult.value(get(changeAtom)), {
-    onSome: (saved) => AsyncResult.success(saved),
-    onNone: () => get(savedToDosAtom),
-  }),
-)
 
 function useToDoChanges() {
   const change = useAtomValue(changeAtom)
