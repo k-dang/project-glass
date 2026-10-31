@@ -179,7 +179,7 @@ export function MessageBox(props: {
             }}
           />
           <InputGroupAddon align="block-end" className="min-w-0 items-end gap-1">
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1 [&>button]:min-w-0">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1 [&>button]:min-w-0">
               {props.pickers}
             </div>
             <div className="ml-auto flex shrink-0 gap-1">
