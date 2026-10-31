@@ -12,10 +12,8 @@ Runners know nothing of git or GitHub: a shared `CheckoutRuns` service prepares 
 passes its path, for Agent reviews and for Ask, which answers a question about one line on the
 Agent review engine.
 
-Selecting a runner names the file access its tasks need, and a strategy that can't honour
-read-only access refuses to be selected for it, so `CheckoutRuns` fails before checking out and no
-strategy runs a file task without restrictions. The pi CLI
-runs in the directory with only its read-only built-in tools (`--tools read,grep,find,ls`). Claude
+A strategy that can't honour a task's read-only access refuses to run it, so no strategy runs a
+file task without restrictions. The pi CLI runs in the directory with only its read-only built-in tools (`--tools read,grep,find,ls`). Claude
 Code runs in the directory with only its read, search, and list tools in restricted mode
 (`--restricted --tools Read,Grep,Glob`), which confines those tools to the directory and skips the
 user's settings files and their hooks; a Claude Code without restricted mode can't read files.

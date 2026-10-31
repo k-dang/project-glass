@@ -113,7 +113,7 @@ export class CheckoutRuns extends Context.Service<
         )
 
         const selected = yield* runners
-          .select(engineSettings, "read-only")
+          .select(engineSettings)
           .pipe(Effect.mapError(fromAgentFailure))
 
         const { identity } = selected

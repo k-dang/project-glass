@@ -153,7 +153,7 @@ export class Tours extends Context.Service<
       const work = (job: Job, pr: PullRequestRef, revision: Revision, startedAt: number) =>
         Effect.gen(function* () {
           const selected = yield* runners
-            .select(yield* engineSettings, "none")
+            .select(yield* engineSettings)
             .pipe(Effect.mapError(fromAgentFailure))
 
           const runner = selected.identity

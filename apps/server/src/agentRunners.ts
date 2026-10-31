@@ -26,8 +26,6 @@ import { type AgentFailure, agentFailure, runnerFailureReason } from "./agentFai
 import { launchCommand } from "./processes"
 import { ServerConfig } from "./ServerConfig"
 
-type FileAccess = "none" | "read-only"
-
 export interface AgentTask<A> {
   readonly subject: string
   readonly instructions: string
@@ -132,9 +130,17 @@ const runnerStrategies = Effect.gen(function* () {
   const runClaudeCode = (
     cwd: string,
     model: string,
+    restricts: boolean,
     identity: AgentRunnerIdentity,
   ): AgentRunner["run"] =>
     Effect.fn("runClaudeCode")(function* <A>(task: AgentTask<A>) {
+      if (task.files !== "none" && !restricts)
+        return yield* agentFailure(
+          "not-ready",
+          "Claude Code can't be limited to reading the PR's code. Update it, then try again.",
+          identity,
+        )
+
       const files =
         task.files === "none"
           ? { directory: cwd, tools: ["--tools", ""] }
@@ -173,7 +179,7 @@ const runnerStrategies = Effect.gen(function* () {
     Schema.fromJsonString(Schema.Struct({ loggedIn: Schema.Boolean })),
   )
 
-  const claudeRunner = Effect.fnUntraced(function* (models: EngineModels, access: FileAccess) {
+  const claudeRunner = Effect.fnUntraced(function* (models: EngineModels) {
     const model = models["claude-code"]
     const cwd = yield* workingDirectory
 
@@ -209,15 +215,9 @@ const runnerStrategies = Effect.gen(function* () {
       )
 
     const identity = runnerIdentity({ engine: "claude-code", models })
+    const restricts = help.success.stdout.includes("--restricted")
 
-    if (access === "read-only" && !help.success.stdout.includes("--restricted"))
-      return yield* agentFailure(
-        "not-ready",
-        "Claude Code can't be limited to reading the PR's code. Update it, then try again.",
-        identity,
-      )
-
-    return { identity, run: runClaudeCode(cwd, model, identity) } satisfies AgentRunner
+    return { identity, run: runClaudeCode(cwd, model, restricts, identity) } satisfies AgentRunner
   })
 
   const piReadOnlyTools = ["--tools", "read,grep,find,ls"]
@@ -378,17 +378,14 @@ const runnerStrategies = Effect.gen(function* () {
 
   const runners: Record<
     AgentEngine,
-    (
-      models: EngineModels,
-      access: FileAccess,
-    ) => Effect.Effect<AgentRunner, AgentFailure, Scope.Scope>
+    (models: EngineModels) => Effect.Effect<AgentRunner, AgentFailure, Scope.Scope>
   > = {
     "claude-code": claudeRunner,
     "pi-cli": piCliRunner,
   }
 
-  return Effect.fn("selectAgentRunner")(({ engine, models }: EngineSettings, access: FileAccess) =>
-    runners[engine](models, access),
+  return Effect.fn("selectAgentRunner")(({ engine, models }: EngineSettings) =>
+    runners[engine](models),
   )
 })
 
@@ -397,7 +394,6 @@ export class AgentRunners extends Context.Service<
   {
     readonly select: (
       settings: EngineSettings,
-      access: FileAccess,
     ) => Effect.Effect<AgentRunner, AgentFailure, Scope.Scope>
   }
 >()("@glass/server/AgentRunners") {
