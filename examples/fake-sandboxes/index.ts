@@ -13,7 +13,16 @@ const SANDBOXES = join(tmpdir(), "glass-fake-sandboxes")
 
 const FAKE_CLAUDE = join(import.meta.dirname, "claude.mjs")
 
-const FAKE_MODEL = { id: "fake-model", name: "Fake model", efforts: [] }
+const EFFORTS = ["low", "medium", "high", "xhigh", "max"]
+
+const DEFAULT_MODEL = { id: "default", name: "Default (recommended)", efforts: EFFORTS }
+
+const MODELS = [
+  DEFAULT_MODEL,
+  { id: "opus", name: "Opus 5.5", efforts: EFFORTS },
+  { id: "sonnet", name: "Sonnet 5.5", efforts: ["low", "medium", "high"] },
+  { id: "haiku", name: "Haiku 5.5", efforts: [] },
+]
 
 const decodeSandbox = (state: SandboxState) => {
   if (typeof state === "object" && state !== null && "folder" in state && "port" in state) {
@@ -94,7 +103,7 @@ const plugin: Plugin = (glass) => {
     remove: async (state) => {
       await rm(decodeSandbox(state).folder, { recursive: true, force: true, maxRetries: 10 })
     },
-    models: async () => ({ defaultModel: FAKE_MODEL, models: [FAKE_MODEL] }),
+    models: async () => ({ defaultModel: DEFAULT_MODEL, models: MODELS }),
   })
 }
 
