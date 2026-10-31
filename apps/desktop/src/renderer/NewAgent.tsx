@@ -357,7 +357,7 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
         baseBranch={baseBranch}
       />
       {starting === null ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
+        <div className="flex flex-1 flex-col items-center justify-end gap-2 px-6 pb-4 text-center">
           <h2 className="text-2xl font-semibold tracking-tight">What should we work on?</h2>
           <p className="max-w-md text-sm text-muted-foreground">{where.describe(key)}</p>
         </div>
@@ -461,6 +461,7 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
           />
         </div>
       </MessageBox>
+      {starting === null && <div className="flex-1" />}
     </section>
   )
 }
