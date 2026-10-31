@@ -40,7 +40,7 @@ export const placeNames: Record<PlaceTag, string> = { "this-mac": "Local", sandb
 
 export const placeIcons: Record<PlaceTag, LucideIcon> = { "this-mac": Laptop, sandbox: Cloud }
 
-export const engineGlyphs: Record<AgentEngine, string> = { "claude-code": "✻", "pi-cli": "π" }
+export const engineGlyphs: Record<AgentEngine, string> = { "claude-code": "✻", pi: "π" }
 
 const TRANSCRIPT_IDLE_TTL = "5 minutes"
 

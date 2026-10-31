@@ -238,7 +238,7 @@ it.live("passes default and changed Permission modes to the host, and refuses mo
     yield* f.agents.send(agent.id, { message: "Next", images: [] })
     assert.equal((yield* f.started).settings.permissionMode, "acceptEdits")
 
-    const pi = yield* f.create(null, "pi-cli")
+    const pi = yield* f.create(null, "pi")
     assert.isNull((yield* f.started).settings.permissionMode)
     assert.equal(
       (yield* f.agents.changePermissionMode(pi.id, "auto").pipe(Effect.flip))._tag,

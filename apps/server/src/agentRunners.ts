@@ -345,8 +345,8 @@ const runnerStrategies = Effect.gen(function* () {
 
   const piCliRunner = Effect.fnUntraced(function* (models: EngineModels) {
     const cwd = yield* workingDirectory
-    const selection = models["pi-cli"]
-    const identity = runnerIdentity({ engine: "pi-cli", models })
+    const selection = models.pi
+    const identity = runnerIdentity({ engine: "pi", models })
     const { model } = identity
 
     const listed = yield* execute(
@@ -381,7 +381,7 @@ const runnerStrategies = Effect.gen(function* () {
     (models: EngineModels) => Effect.Effect<AgentRunner, AgentFailure, Scope.Scope>
   > = {
     "claude-code": claudeRunner,
-    "pi-cli": piCliRunner,
+    pi: piCliRunner,
   }
 
   return Effect.fn("selectAgentRunner")(({ engine, models }: EngineSettings) =>

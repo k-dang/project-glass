@@ -27,7 +27,7 @@ const tourSettings: EngineSettings = {
   engine: "claude-code",
   models: {
     "claude-code": "claude-sonnet-5-5",
-    "pi-cli": { provider: "anthropic", modelId: "claude-sonnet-5-5" },
+    pi: { provider: "anthropic", modelId: "claude-sonnet-5-5" },
   },
 }
 
@@ -36,7 +36,7 @@ const mount = (handlers: Partial<Handlers> = {}) => {
 
   const backend = testLayer({
     GetEngineSettings: ({ feature }) =>
-      Effect.succeed(feature === "tours" ? tourSettings : { ...tourSettings, engine: "pi-cli" }),
+      Effect.succeed(feature === "tours" ? tourSettings : { ...tourSettings, engine: "pi" }),
     GetReviewPrompt: () => Effect.succeed(defaultReviewPrompt),
     SetReviewPrompt: setPrompt,
     ...handlers,
@@ -79,8 +79,8 @@ it("shows only the chosen engine's model, and saves the Tour engine and models",
   expect(saving.payload).toEqual({
     feature: "tours",
     engineSettings: {
-      engine: "pi-cli",
-      models: { ...tourSettings.models, "pi-cli": { provider: "anthropic", modelId: "gpt-test" } },
+      engine: "pi",
+      models: { ...tourSettings.models, pi: { provider: "anthropic", modelId: "gpt-test" } },
     },
   })
   saving.answer(Effect.succeed(saving.payload.engineSettings))
@@ -109,10 +109,10 @@ it("saves only what changed in the Agent review settings", async () => {
   expect(saving.payload).toEqual({
     feature: "agentReviews",
     engineSettings: {
-      engine: "pi-cli",
+      engine: "pi",
       models: {
         ...tourSettings.models,
-        "pi-cli": { provider: "anthropic", modelId: "deepseek-test" },
+        pi: { provider: "anthropic", modelId: "deepseek-test" },
       },
     },
   })
@@ -171,7 +171,7 @@ const mountWithFailingPrompt = () => {
   const mounted = mount({
     GetEngineSettings: (payload) => {
       if (payload.feature === "agentReviews") {
-        return Effect.succeed({ ...tourSettings, engine: "pi-cli" })
+        return Effect.succeed({ ...tourSettings, engine: "pi" })
       }
 
       if (loaded) {
@@ -205,7 +205,7 @@ it("reloads what a partly failed save stored before Discard can use it", async (
 
   const reload = await next(reloads)
   expect(screen.getByRole("status").textContent).toBe("Saving…")
-  reload.answer(Effect.succeed({ ...tourSettings, engine: "pi-cli" }))
+  reload.answer(Effect.succeed({ ...tourSettings, engine: "pi" }))
   expect((await screen.findByRole("alert")).textContent).toContain("Disk full.")
 
   await user.click(screen.getByRole("button", { name: "Discard" }))

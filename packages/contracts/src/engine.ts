@@ -17,7 +17,7 @@ export type PiModel = typeof PiModel.Type
 /** Claude Code takes a bare model ID; the pi CLI selects a provider and model ID. */
 export const EngineModels = Schema.Struct({
   "claude-code": ModelSetting,
-  "pi-cli": PiModel,
+  pi: PiModel,
 })
 
 export type EngineModels = typeof EngineModels.Type

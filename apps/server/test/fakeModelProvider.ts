@@ -296,7 +296,7 @@ export const fakeModelProvider = Effect.fnUntraced(function* (
     await writeFile(
       join(home, ".project-glass", "settings.json"),
       JSON.stringify({
-        tourModels: { "pi-cli": { provider: "glass-test", modelId: "gpt-test" } },
+        tourModels: { pi: { provider: "glass-test", modelId: "gpt-test" } },
       }),
     )
   })

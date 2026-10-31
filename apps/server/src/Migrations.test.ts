@@ -156,7 +156,7 @@ it.live("keeps an Agent's Turns, with no images, when Queued and unsent messages
       yield* SqliteMigrator.run({ loader: SqliteMigrator.fromRecord(before) })
       yield* sql`
         INSERT INTO agent (id, name, machine, owner, repo, base_branch, engine, worktree, created_at)
-        VALUES ('agent-1', 'agent/swift-otter', 'this-mac', 'acme', 'api', 'main', 'pi-cli',
+        VALUES ('agent-1', 'agent/swift-otter', 'this-mac', 'acme', 'api', 'main', 'pi',
           ${join(home, "worktree")}, '2026-10-20T00:00:00Z')
       `
       yield* sql`

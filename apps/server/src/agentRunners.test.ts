@@ -13,7 +13,7 @@ import { ServerConfig } from "./ServerConfig"
 
 const models: EngineModels = {
   "claude-code": "claude-sonnet-5-5",
-  "pi-cli": { provider: "anthropic", modelId: "claude-sonnet-5-5" },
+  pi: { provider: "anthropic", modelId: "claude-sonnet-5-5" },
 }
 
 const runnersLayer = (home: string, command: string) =>
@@ -56,7 +56,7 @@ it.live("the pi CLI reads a read-only directory with only its read-only tools", 
     })
 
     const answered = yield* Effect.gen(function* () {
-      const selected = yield* (yield* AgentRunners).select({ engine: "pi-cli", models })
+      const selected = yield* (yield* AgentRunners).select({ engine: "pi", models })
 
       return yield* selected.run(readOnlyTask(checkout))
     }).pipe(Effect.scoped, Effect.provide(runnersLayer(home, agent.command)))

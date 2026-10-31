@@ -7,7 +7,7 @@ import { isolatedHome, startBackend } from "../test/harness"
 
 const defaultModels = {
   "claude-code": "claude-sonnet-5-5",
-  "pi-cli": { provider: "anthropic", modelId: "claude-sonnet-5-5" },
+  pi: { provider: "anthropic", modelId: "claude-sonnet-5-5" },
 }
 
 describe("settings file", () => {
@@ -26,7 +26,7 @@ describe("settings file", () => {
         tourEngine: "claude-code",
         queueTours: false,
         agentReviewModels: defaultModels,
-        agentReviewEngine: "pi-cli",
+        agentReviewEngine: "pi",
         reviewPrompt: defaultReviewPrompt,
       })
     }),
@@ -43,8 +43,8 @@ describe("settings file", () => {
           path,
           JSON.stringify({
             followedRepositories,
-            tourModels: { "pi-cli": { provider: "openai", modelId: "gpt-test" } },
-            tourEngine: "pi-cli",
+            tourModels: { pi: { provider: "openai", modelId: "gpt-test" } },
+            tourEngine: "pi",
             queueTours: true,
           }),
         ),
@@ -53,11 +53,11 @@ describe("settings file", () => {
 
       assert.deepStrictEqual(JSON.parse(yield* Effect.promise(() => readFile(path, "utf8"))), {
         followedRepositories,
-        tourModels: { ...defaultModels, "pi-cli": { provider: "openai", modelId: "gpt-test" } },
-        tourEngine: "pi-cli",
+        tourModels: { ...defaultModels, pi: { provider: "openai", modelId: "gpt-test" } },
+        tourEngine: "pi",
         queueTours: true,
         agentReviewModels: defaultModels,
-        agentReviewEngine: "pi-cli",
+        agentReviewEngine: "pi",
         reviewPrompt: defaultReviewPrompt,
       })
     }),
@@ -73,13 +73,13 @@ describe("settings file", () => {
           engine: "claude-code" as const,
           models: {
             "claude-code": "claude-opus-5-5",
-            "pi-cli": { provider: "litellm", modelId: "gpt-test" },
+            pi: { provider: "litellm", modelId: "gpt-test" },
           },
         }
 
         const agentReviewSettings = {
-          engine: "pi-cli" as const,
-          models: { ...defaultModels, "pi-cli": { provider: "litellm", modelId: "deepseek-test" } },
+          engine: "pi" as const,
+          models: { ...defaultModels, pi: { provider: "litellm", modelId: "deepseek-test" } },
         }
 
         yield* Effect.scoped(
@@ -90,7 +90,7 @@ describe("settings file", () => {
               models: defaultModels,
             })
             assert.deepStrictEqual(yield* client.GetEngineSettings({ feature: "agentReviews" }), {
-              engine: "pi-cli",
+              engine: "pi",
               models: defaultModels,
             })
             assert.deepStrictEqual(

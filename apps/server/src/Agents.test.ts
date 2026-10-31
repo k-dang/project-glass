@@ -214,7 +214,7 @@ it.live("starts an Agent in a worktree, on a new branch it names from its base",
         name: agent.name,
         repository,
         machine: "this-mac",
-        engine: "pi-cli",
+        engine: "pi",
         message: "Say hello",
       }),
     )
@@ -321,7 +321,7 @@ const endings = (turns: ReadonlyArray<Turn>) =>
 
 const holding = { output: "Done.", hang: true }
 
-for (const engine of ["pi-cli", "claude-code"] as const)
+for (const engine of ["pi", "claude-code"] as const)
   it.live(
     `queues messages sent while a ${engine} Turn runs, starting them in order as Turns end, except a cancelled one`,
     () =>
@@ -786,7 +786,7 @@ const relaunches: ReadonlyArray<{
 }> = [
   {
     program: "pi",
-    choice: { engine: "pi-cli", model: null, effort: null },
+    choice: { engine: "pi", model: null, effort: null },
     replyWithEarlier: (f) =>
       f.model.configure({
         output: (input) => `Earlier: ${userMessages(input).slice(0, -1).join(" | ")}`,
@@ -1037,7 +1037,7 @@ it.live("lists the models and efforts each agent program offers, with its defaul
       { id: "claude-haiku-4-5", name: "Haiku 4.5", efforts: [] },
     ])
 
-    const pi = yield* f.client.ListAgentModels({ engine: "pi-cli", place: thisMac })
+    const pi = yield* f.client.ListAgentModels({ engine: "pi", place: thisMac })
     assert.equal(pi.defaultModel?.id, "glass-test/gpt-test")
     // pi also lists the models of any other provider this machine has credentials for.
     assert.deepStrictEqual(
@@ -1086,7 +1086,7 @@ it.live(
         )
       })
 
-      const pi = yield* f.client.ListAgentModels({ engine: "pi-cli", place: thisMac })
+      const pi = yield* f.client.ListAgentModels({ engine: "pi", place: thisMac })
       assert.equal(pi.defaultModel?.id, "glass-extension/extension-model")
       assert.deepStrictEqual(
         pi.models.map(({ id }) => id),
@@ -1134,7 +1134,7 @@ it.live(
       const f = yield* agentsFixture({ output: "Hi." })
 
       const agent = yield* f.start("Say hello", {
-        engine: "pi-cli",
+        engine: "pi",
         model: "glass-test/gpt-test-thinking",
         effort: "high",
       })
@@ -1167,7 +1167,7 @@ it.live(
 it.live("runs a pi Agent's next Turn on pi's own thinking level once its effort is cleared", () =>
   Effect.gen(function* () {
     const f = yield* agentsFixture({ output: "Hi." })
-    const thinker = { engine: "pi-cli", model: "glass-test/gpt-test-thinking" } as const
+    const thinker = { engine: "pi", model: "glass-test/gpt-test-thinking" } as const
 
     const agent = yield* f.start("Say hello", { ...thinker, effort: "high" })
     yield* f.transcript(agent.id, settled(1))

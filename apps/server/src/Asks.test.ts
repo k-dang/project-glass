@@ -17,7 +17,7 @@ const deadline = 60_000
 const fixture = Effect.fnUntraced(function* (
   settings: Partial<FakeAgentSettings> = {},
   timeout = deadline,
-  engine: AgentEngine = "pi-cli",
+  engine: AgentEngine = "pi",
 ) {
   const piCli = yield* fakeAgent({
     ready: true,
@@ -85,7 +85,7 @@ it.live("answers from a read-only checkout, starting from the asked line", () =>
 
     assert.strictEqual(result.answer, "`main.ts` calls `greet` without a name.")
     assert.deepStrictEqual(result.runner, {
-      engine: "pi-cli",
+      engine: "pi",
       model: "anthropic/claude-sonnet-5-5",
     })
 
