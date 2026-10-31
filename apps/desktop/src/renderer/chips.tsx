@@ -12,7 +12,7 @@ import {
 export const chip =
   "h-7 w-auto max-w-64 gap-1.5 border-none bg-transparent px-2 text-xs text-muted-foreground shadow-none hover:bg-accent hover:text-accent-foreground dark:bg-transparent dark:hover:bg-accent"
 
-/** Reserve label-independent slots; zero width lets narrow fieldsets shrink below their contents. */
+/** Zero width lets the slots shrink inside narrow fieldsets. */
 export const selectorSlot = "flex w-0 min-w-0 shrink basis-36"
 
 interface ChipItem<Value extends string> {
@@ -35,7 +35,8 @@ export function ChipSelect<Value extends string>(props: {
   className?: string
   action?: { label: string; icon: ReactNode; onSelect: () => void; disabled: boolean } | undefined
 }) {
-  const selected = props.items.find((item) => item.value === props.value)
+  const valueLabel =
+    props.items.find((item) => item.value === props.value)?.label ?? props.placeholder
 
   return (
     <Select
@@ -49,13 +50,13 @@ export function ChipSelect<Value extends string>(props: {
     >
       <SelectTrigger
         aria-label={props.label}
-        title={selected?.label ?? props.placeholder}
+        title={valueLabel}
         size="sm"
         className={cn(chip, props.className)}
       >
         {props.icon}
         <SelectValue className="min-w-0" placeholder={props.placeholder}>
-          <span className="truncate">{selected?.label ?? props.placeholder}</span>
+          <span className="truncate">{valueLabel}</span>
         </SelectValue>
       </SelectTrigger>
       <SelectContent
