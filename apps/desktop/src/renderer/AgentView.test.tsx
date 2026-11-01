@@ -690,7 +690,7 @@ it("offers only the Agent programs a Sandbox provider runs", async () => {
     within(programs)
       .getAllByRole("button")
       .map((button) => button.textContent),
-  ).toEqual(["πpi"])
+  ).toEqual(["pi"])
 })
 
 it("lists a Sandbox Agent under Sandboxes, and shows the step its Sandbox is at while it's made", async () => {
