@@ -3,7 +3,7 @@ import { Schema } from "effect"
 const Message = Schema.Union([
   Schema.Struct({ id: Schema.Int, result: Schema.Unknown }),
   Schema.Struct({ id: Schema.Int, error: Schema.Struct({ message: Schema.String }) }),
-  Schema.Struct({ method: Schema.String }),
+  Schema.Struct({ method: Schema.String, params: Schema.optional(Schema.Unknown) }),
 ])
 
 const decodeMessage = Schema.decodeUnknownSync(Schema.fromJsonString(Message))
@@ -25,23 +25,35 @@ export class Cdp {
     { resolve: (value: unknown) => void; reject: (error: Error) => void }
   >()
   private readonly socket: WebSocket
+  private readonly listeners = new Map<string, Set<(params: unknown) => void>>()
 
   private constructor(socket: WebSocket) {
     this.socket = socket
     socket.addEventListener("message", (event) => {
       try {
         const message = decodeMessage(String(event.data))
-        if (!("id" in message)) return
-        const waiter = this.pending.get(message.id)
-        this.pending.delete(message.id)
-        if ("error" in message) waiter?.reject(new Error(message.error.message))
-        else waiter?.resolve(message.result)
+        if ("id" in message) {
+          const waiter = this.pending.get(message.id)
+          this.pending.delete(message.id)
+          if ("error" in message) waiter?.reject(new Error(message.error.message))
+          else waiter?.resolve(message.result)
+          return
+        }
+        for (const listener of this.listeners.get(message.method) ?? []) listener(message.params)
       } catch (cause) {
         this.rejectPending(new Error("Invalid CDP message", { cause }))
         socket.close()
       }
     })
     socket.addEventListener("close", () => this.rejectPending(new Error("CDP target closed")))
+  }
+
+  /** Listens for a CDP event, as `Target.attachedToTarget` reports a new worker target. */
+  on(method: string, listener: (params: unknown) => void) {
+    const listeners = this.listeners.get(method) ?? new Set()
+    listeners.add(listener)
+    this.listeners.set(method, listeners)
+    return () => listeners.delete(listener)
   }
 
   private rejectPending(error: Error) {
@@ -61,6 +73,7 @@ export class Cdp {
     method: string,
     response: S,
     params: object = {},
+    sessionId?: string,
   ): Promise<S["Type"]> {
     const id = this.nextId++
     const result = await new Promise<unknown>((resolve, reject) => {
@@ -79,7 +92,7 @@ export class Cdp {
         },
       })
       try {
-        this.socket.send(JSON.stringify({ id, method, params }))
+        this.socket.send(JSON.stringify({ id, method, params, sessionId }))
       } catch (cause) {
         clearTimeout(timer)
         this.pending.delete(id)
