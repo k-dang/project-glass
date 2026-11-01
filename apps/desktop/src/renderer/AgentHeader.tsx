@@ -4,6 +4,7 @@ import { FolderGit2, GitBranch, PanelTop } from "lucide-react"
 import type { ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { AgentsPanelToggle, NewAgentLink } from "./Agents"
 import { placeIcons, placeNames } from "./agentsArea"
 
 const fact =
@@ -11,49 +12,49 @@ const fact =
 
 export function AgentHeader(props: {
   heading: ReactNode
-  place: AgentPlace
+  place: AgentPlace | null
   repository?: string | undefined
   branch?: string | undefined
   baseBranch: string | null
   children?: ReactNode
 }) {
-  const PlaceIcon = placeIcons[props.place._tag]
+  const PlaceIcon = props.place === null ? null : placeIcons[props.place._tag]
 
   return (
-    <header className="flex h-11 shrink-0 items-center gap-2 border-b px-6 text-sm">
-      {props.heading}
-      <Popover>
-        <PopoverTrigger
-          render={
-            <Button variant="ghost" size="icon-sm" aria-label="Details" className="ml-auto" />
-          }
-        >
-          <PanelTop aria-hidden />
-        </PopoverTrigger>
-        <PopoverContent align="end" className="w-64 gap-0 p-1">
-          <div className={fact}>
-            <PlaceIcon aria-hidden />
-            {placeNames[props.place._tag]}
-          </div>
-          <div className={fact}>
-            <FolderGit2 aria-hidden />
-            <span className="truncate">{props.repository ?? "No repository"}</span>
-          </div>
-          {props.baseBranch !== null && (
-            <>
-              <div className="-mx-1 my-1 border-t" />
-              <div className={fact}>
-                <GitBranch aria-hidden />
-                {props.branch !== undefined && <span className="truncate">{props.branch}</span>}
-                <span className="ml-auto shrink-0 text-muted-foreground">
-                  from {props.baseBranch}
-                </span>
-              </div>
-            </>
-          )}
-          {props.children}
-        </PopoverContent>
-      </Popover>
+    <header className="flex h-11 shrink-0 items-center gap-2 border-b px-4 text-sm">
+      <AgentsPanelToggle />
+      <div className="flex min-w-0 flex-1 items-center gap-2">{props.heading}</div>
+      <NewAgentLink />
+      {PlaceIcon !== null && props.place !== null && (
+        <Popover>
+          <PopoverTrigger render={<Button variant="ghost" size="icon-sm" aria-label="Details" />}>
+            <PanelTop aria-hidden />
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-64 gap-0 p-1">
+            <div className={fact}>
+              <PlaceIcon aria-hidden />
+              {placeNames[props.place._tag]}
+            </div>
+            <div className={fact}>
+              <FolderGit2 aria-hidden />
+              <span className="truncate">{props.repository ?? "No repository"}</span>
+            </div>
+            {props.baseBranch !== null && (
+              <>
+                <div className="-mx-1 my-1 border-t" />
+                <div className={fact}>
+                  <GitBranch aria-hidden />
+                  {props.branch !== undefined && <span className="truncate">{props.branch}</span>}
+                  <span className="ml-auto shrink-0 text-muted-foreground">
+                    from {props.baseBranch}
+                  </span>
+                </div>
+              </>
+            )}
+            {props.children}
+          </PopoverContent>
+        </Popover>
+      )}
     </header>
   )
 }

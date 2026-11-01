@@ -1,15 +1,22 @@
-import { RegistryContext, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
+import {
+  RegistryContext,
+  useAtom,
+  useAtomRefresh,
+  useAtomSet,
+  useAtomValue,
+} from "@effect/atom-react"
 import { type Agent, type PlaceTag, repositoryKey } from "@glass/contracts"
 import { Link, Outlet, useNavigate, useParams } from "@tanstack/react-router"
 import { Exit, Option, Predicate } from "effect"
 import { AsyncResult } from "effect/reactivity"
-import { FolderGit2, SquarePen, Trash2 } from "lucide-react"
-import { useContext, useEffect, useEffectEvent, useId, useState } from "react"
+import { FolderGit2, PanelLeftClose, PanelLeftOpen, SquarePen, Trash2 } from "lucide-react"
+import { useContext, useId, useState } from "react"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Kbd } from "@/components/ui/kbd"
 import { TooltipHint } from "@/components/ui/tooltip"
 import {
   agentsAtom,
+  agentsPanelOpenAtom,
   groupAgents,
   placeNames,
   removalWarningsAtom,
@@ -20,6 +27,7 @@ import { ConfirmationDialog } from "./ConfirmationDialog"
 import { settledProblem, streamProblem } from "./problems"
 import { ProblemAlert } from "./ProblemAlert"
 import { shortcutLabel } from "./shortcutLabel"
+import { useReviewShortcuts } from "./useReviewShortcuts"
 
 const groupNames: Record<PlaceTag, string> = { ...placeNames, sandbox: "Sandboxes" }
 
@@ -28,15 +36,49 @@ const noneWaiting: ReadonlySet<string> = new Set()
 const agentLink =
   "flex flex-col gap-0.5 rounded-md py-1.5 pr-8 pl-2 outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-accent"
 
+const panelId = "agents-panel"
+
+const panelToggleId = "agents-panel-toggle"
+
 export function AgentsLayout() {
+  const [panelOpen, setPanelOpen] = useAtom(agentsPanelOpenAtom)
+  const navigate = useNavigate()
+
+  useReviewShortcuts([
+    {
+      key: "n",
+      mod: true,
+      allowInEditable: true,
+      run: () => void navigate({ to: "/agents/new" }),
+    },
+    {
+      key: "b",
+      mod: true,
+      allowInEditable: true,
+      run: () => {
+        if (panelOpen && document.getElementById(panelId)?.contains(document.activeElement))
+          document.getElementById(panelToggleId)?.focus()
+
+        setPanelOpen((open) => !open)
+      },
+    },
+  ])
+
   return (
     <main aria-label="Agents" className="flex min-h-0 flex-1">
-      <aside className="flex w-64 shrink-0 flex-col gap-4 overflow-y-auto border-r px-3 py-4">
+      <aside
+        id={panelId}
+        aria-label="Agents panel"
+        hidden={!panelOpen}
+        className="flex w-64 shrink-0 flex-col gap-4 border-r px-3 py-4"
+      >
         <div className="flex items-center justify-between pl-2">
           <h1 className="text-sm font-semibold">Agents</h1>
           <NewAgentLink />
         </div>
-        <AgentList />
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <AgentList />
+        </div>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <Outlet />
@@ -45,32 +87,36 @@ export function AgentsLayout() {
   )
 }
 
-function NewAgentLink() {
-  const navigate = useNavigate()
+export function AgentsPanelToggle() {
+  const [panelOpen, setPanelOpen] = useAtom(agentsPanelOpenAtom)
+  const panelLabel = panelOpen ? "Hide Agents panel" : "Show Agents panel"
+  const PanelIcon = panelOpen ? PanelLeftClose : PanelLeftOpen
 
-  const onShortcut = useEffectEvent((event: KeyboardEvent) => {
-    const inDialog =
-      event.target instanceof Element && event.target.closest("[role=dialog]") !== null
+  return (
+    <TooltipHint
+      content={
+        <span className="flex items-center gap-2">
+          {panelLabel} <Kbd>{shortcutLabel("B")}</Kbd>
+        </span>
+      }
+      side="bottom"
+    >
+      <Button
+        id={panelToggleId}
+        variant="ghost"
+        size="icon-sm"
+        aria-label={panelLabel}
+        aria-expanded={panelOpen}
+        aria-controls={panelId}
+        onClick={() => setPanelOpen((open) => !open)}
+      >
+        <PanelIcon aria-hidden />
+      </Button>
+    </TooltipHint>
+  )
+}
 
-    if (
-      inDialog ||
-      event.key.toLowerCase() !== "n" ||
-      !(event.metaKey || event.ctrlKey) ||
-      event.shiftKey ||
-      event.altKey
-    )
-      return
-
-    event.preventDefault()
-    void navigate({ to: "/agents/new" })
-  })
-
-  useEffect(() => {
-    window.addEventListener("keydown", onShortcut)
-
-    return () => window.removeEventListener("keydown", onShortcut)
-  }, [])
-
+export function NewAgentLink() {
   return (
     <TooltipHint
       content={

@@ -26,6 +26,8 @@ import { problemOf } from "./problems"
 
 export type AgentTab = "chat" | "changes"
 
+export const agentsPanelOpenAtom = Atom.make(true)
+
 export const AgentSearch = Schema.Struct({ view: Schema.optional(Schema.Literal("changes")) })
 
 export const placeKey = (place: AgentPlace) =>
