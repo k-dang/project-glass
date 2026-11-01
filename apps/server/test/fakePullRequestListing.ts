@@ -54,6 +54,7 @@ const candidatesPage = (
       title: pr.title,
       author: author(pr.author),
       updatedAt: pr.updatedAt,
+      headRefOid: pr.head.sha,
       isDraft: pr.isDraft,
       state: pr.state,
       viewerDidAuthor: pr.author === VIEWER.login,
@@ -245,7 +246,9 @@ export const answerListing = (
           nodes: request.variables.ids.map((id) => {
             const pr = pullRequests.find((candidate) => candidate.id === id)
 
-            return pr === undefined ? null : { id: pr.id, commits: checksNode(pr) }
+            return pr === undefined
+              ? null
+              : { id: pr.id, headRefOid: pr.head.sha, commits: checksNode(pr) }
           }),
         },
       }

@@ -22,7 +22,7 @@ import {
 import { join } from "node:path"
 import { writeDataFile } from "./dataFiles"
 import { GitHubClient } from "./github/GitHubClient"
-import type { Candidate, CandidatesPage } from "./github/repositoryPullRequests"
+import type { Candidate, CandidatesPage, CheckObservation } from "./github/repositoryPullRequests"
 import { ServerConfig } from "./ServerConfig"
 
 const FULL_READ_INTERVAL = Duration.minutes(10)
@@ -37,6 +37,7 @@ const MirroredPullRequest = Schema.Struct({
   author: Schema.String,
   isDraft: Schema.Boolean,
   updatedAt: Schema.DateTimeUtcFromString,
+  head: Schema.String,
   checks: Checks,
   viewerIsAuthor: Schema.Boolean,
   viewerHasDrafts: Schema.Boolean,
@@ -162,7 +163,7 @@ export class PullRequestMirror extends Context.Service<
 
         return {
           ...fields,
-          checks: known?.checks ?? "unavailable",
+          checks: known?.head === fields.head ? known.checks : "unavailable",
           requestedUsers,
           requestedTeams,
         } satisfies MirroredPullRequest
@@ -220,26 +221,38 @@ export class PullRequestMirror extends Context.Service<
         mirror: Mirror,
         shown: ReadonlyArray<MirroredPullRequest>,
       ) {
-        const checks = yield* github
-          .pullRequestChecks(shown.map((pr) => pr.id))
-          .pipe(
-            Effect.catch((error) =>
-              Effect.logWarning("Couldn't read PR checks", error).pipe(
-                Effect.as(new Map<string, Checks>()),
-              ),
-            ),
-          )
+        const result = yield* github.pullRequestChecks(shown.map((pr) => pr.id)).pipe(
+          Effect.tapError((error) => Effect.logWarning("Couldn't read PR checks", error)),
+          Effect.match({
+            onSuccess: (checks) => ({ checks, problem: null }),
+            onFailure: (error) => ({
+              checks: new Map<string, CheckObservation>(),
+              problem: new GitHubUnavailable({
+                message: `Checks couldn't refresh. ${error.message}`,
+              }),
+            }),
+          }),
+        )
+
+        const shownRepositories = new Set(shown.map((pr) => repositoryKey(pr.ref)))
+        const problem = result.problem
 
         return {
-          ...mirror,
-          repositories: mirror.repositories.map((repository) => ({
-            ...repository,
-            pullRequests: repository.pullRequests.map((pr) => ({
-              ...pr,
-              checks: checks.get(pr.id) ?? pr.checks,
+          mirror: {
+            ...mirror,
+            repositories: mirror.repositories.map((repository) => ({
+              ...repository,
+              pullRequests: repository.pullRequests.map((pr) => {
+                const observed = result.checks.get(pr.id)
+
+                return observed === undefined ? pr : { ...pr, ...observed }
+              }),
             })),
-          })),
-        } satisfies Mirror
+          } satisfies Mirror,
+          failures: new Map(
+            problem === null ? [] : [...shownRepositories].map((key) => [key, problem] as const),
+          ),
+        }
       })
 
       const sync = Effect.fn("PullRequestMirror.sync")(function* (
@@ -303,16 +316,17 @@ export class PullRequestMirror extends Context.Service<
           ),
         }
 
-        const mirror = yield* withLatestChecks(synced, shown(synced))
+        const { mirror, failures } = yield* withLatestChecks(synced, shown(synced))
         yield* commit(mirror)
 
         return {
           mirror,
-          failures: new Map(
-            results.flatMap(({ repository, failure }) =>
+          failures: new Map([
+            ...failures,
+            ...results.flatMap(({ repository, failure }) =>
               failure === undefined ? [] : [[repositoryKey(repository), failure] as const],
             ),
-          ),
+          ]),
         } satisfies Synced
       }, lock.withPermits(1))
 

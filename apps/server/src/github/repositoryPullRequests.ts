@@ -2,7 +2,7 @@ import { type Checks, type FollowedRepository, PullRequestRef } from "@glass/con
 import { DateTime, Schema } from "effect"
 import { GitHubAuthor, login } from "./author"
 
-const CANDIDATE_FIELDS = `id number url title author { login } updatedAt isDraft state viewerDidAuthor
+const CANDIDATE_FIELDS = `id number url title author { login } updatedAt headRefOid isDraft state viewerDidAuthor
   repository { owner { login } name }
   pendingReviews: reviews(states: PENDING, first: 1) { nodes { comments { totalCount } } }
   viewerSubmittedReviews: reviews(author: $viewerLogin, states: [APPROVED, CHANGES_REQUESTED, COMMENTED, DISMISSED], first: 1) { nodes { id } }
@@ -32,7 +32,7 @@ export const SEARCH_PULL_REQUESTS_QUERY = `query SearchPullRequests($query: Stri
 
 export const PULL_REQUEST_CHECKS_QUERY = `query PullRequestChecks($ids: [ID!]!) {
   nodes(ids: $ids) {
-    ... on PullRequest { id commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } }
+    ... on PullRequest { id headRefOid commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } }
   }
 }`
 
@@ -110,6 +110,7 @@ const GitHubCandidate = Schema.Struct({
   title: Schema.String,
   author: GitHubAuthor,
   updatedAt: Schema.DateTimeUtcFromString,
+  headRefOid: Schema.String,
   isDraft: Schema.Boolean,
   state: Schema.Literals(["OPEN", "CLOSED", "MERGED"]),
   viewerDidAuthor: Schema.Boolean,
@@ -135,6 +136,7 @@ export interface Candidate {
   readonly isDraft: boolean
   readonly isOpen: boolean
   readonly updatedAt: DateTime.Utc
+  readonly head: string
   readonly viewerIsAuthor: boolean
   readonly viewerHasDrafts: boolean
   readonly viewerHasSubmittedReview: boolean
@@ -162,6 +164,7 @@ export const PullRequestChecksData = Schema.Struct({
     Schema.NullOr(
       Schema.Struct({
         id: Schema.String,
+        headRefOid: Schema.String,
         commits: Schema.Struct({
           nodes: Schema.Array(
             Schema.Struct({
@@ -188,12 +191,27 @@ export const toCheck = (
   rollup: { readonly state: typeof StatusState.Type } | null | undefined,
 ): Checks => (rollup == null ? "unavailable" : checksOf[rollup.state])
 
-export const toChecks = (data: typeof PullRequestChecksData.Type): ReadonlyMap<string, Checks> =>
+export interface CheckObservation {
+  readonly head: string
+  readonly checks: Checks
+}
+
+export const toChecks = (
+  data: typeof PullRequestChecksData.Type,
+): ReadonlyMap<string, CheckObservation> =>
   new Map(
     data.nodes.flatMap((node) =>
       node === null
         ? []
-        : [[node.id, toCheck(node.commits.nodes[0]?.commit.statusCheckRollup)] as const],
+        : [
+            [
+              node.id,
+              {
+                head: node.headRefOid,
+                checks: toCheck(node.commits.nodes[0]?.commit.statusCheckRollup),
+              },
+            ] as const,
+          ],
     ),
   )
 
@@ -211,6 +229,7 @@ export const toCandidatesPage = (page: typeof CandidatesConnection.Type): Candid
     isDraft: node.isDraft,
     isOpen: node.state === "OPEN",
     updatedAt: node.updatedAt,
+    head: node.headRefOid,
     viewerIsAuthor: node.viewerDidAuthor,
     viewerHasDrafts: (node.pendingReviews.nodes[0]?.comments.totalCount ?? 0) > 0,
     viewerHasSubmittedReview: node.viewerSubmittedReviews.nodes.length > 0,

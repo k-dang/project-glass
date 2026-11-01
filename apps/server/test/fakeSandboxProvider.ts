@@ -1,6 +1,6 @@
 import { AgentEngine } from "@glass/contracts"
 import { Schema } from "effect"
-import { execFileSync, spawn } from "node:child_process"
+import { execFile, execFileSync, spawn } from "node:child_process"
 import {
   copyFileSync,
   existsSync,
@@ -13,9 +13,12 @@ import {
 import { connect, createServer, type Socket } from "node:net"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { promisify } from "node:util"
 import { isolatedGitEnv } from "../src/gitEnv.ts"
 import type { AgentModels, Plugin } from "@glass/plugin"
 import { freePort, portOf } from "./ports.ts"
+
+const execFileAsync = promisify(execFile)
 
 const FakeSandboxStep = Schema.Literals([
   "Creating the Sandbox",
@@ -284,12 +287,21 @@ export const installFakeSandboxProvider = (
       writeFileSync(join(sandboxFolder(agentId), "dropped"), ""),
     reconnect: (agentId: string) => rmSync(join(sandboxFolder(agentId), "dropped")),
     hostPid,
-    stopHosts: () => {
+    stopHosts: async () => {
       for (const agentId of readdirSync(settings.root)) {
         if (!existsSync(pidFile(agentId))) continue
 
         try {
-          process.kill(hostPid(agentId), "SIGKILL")
+          const pid = hostPid(agentId)
+
+          if (process.platform === "win32") {
+            // The host's programs hold their working directories open on Windows.
+            await execFileAsync("taskkill", ["/PID", String(pid), "/T", "/F"], {
+              windowsHide: true,
+            })
+          } else {
+            process.kill(pid, "SIGKILL")
+          }
         } catch {}
       }
     },

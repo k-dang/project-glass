@@ -19,6 +19,7 @@ import { createResolutions, type Resolutions } from "./useResolutions"
 import { ViewedFilesStore } from "./useViewedFiles"
 import { savedDestinationsAtom, savedIn } from "./savedPlace"
 import { restoreReviewPosition } from "./reviewPosition"
+import { watched } from "./watched"
 
 interface OpenWorkspace {
   readonly workspace: PullRequestWorkspace
@@ -217,17 +218,28 @@ export const openWorkspaceAtom = backendRuntime
   )
   .pipe(Atom.keepAlive)
 
-export const changedOnGitHubAtom = backendRuntime
-  .fn((workspace: PullRequestWorkspace) =>
-    Backend.use((backend) =>
+export const changedOnGitHubAtom = watched(
+  backendRuntime.atom((get) => {
+    const open = get(openWorkspaceAtom)
+    const workspace = Option.getOrNull(AsyncResult.value(open))?.workspace
+
+    if (workspace === undefined || open.waiting) return Effect.succeed(null)
+
+    const previouslyChanged = get
+      .self<AsyncResult.AsyncResult<PullRequestWorkspace | null>>()
+      .pipe(Option.flatMap(AsyncResult.value), Option.getOrNull)
+
+    if (previouslyChanged === workspace) return Effect.succeed(workspace)
+
+    return Backend.use((backend) =>
       backend.HasPullRequestChanged({
         pullRequestId: workspace.pullRequest.id,
         revision: workspace.revision,
         updatedAt: workspace.updatedAt,
       }),
-    ).pipe(Effect.map((changed) => (changed ? workspace : null))),
-  )
-  .pipe(Atom.keepAlive)
+    ).pipe(Effect.map((changed) => (changed ? workspace : null)))
+  }),
+)
 
 const load = (request: OpenRequest, registry: AtomRegistry.AtomRegistry) =>
   Backend.use((backend) => backend.OpenPullRequest({ pullRequest: request.ref })).pipe(
@@ -267,7 +279,6 @@ export const openPullRequest = (registry: AtomRegistry.AtomRegistry, ref: PullRe
   if (loaded === undefined) return registry.set(openWorkspaceAtom, { ref })
 
   registry.set(openWorkspaceAtom, { ref, loaded })
-  registry.set(changedOnGitHubAtom, loaded.workspace)
 }
 
 export const retryOpen = (registry: AtomRegistry.AtomRegistry) => {

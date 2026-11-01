@@ -5,6 +5,7 @@ import { AgentReviews } from "./AgentReviews"
 import { Asks } from "./Asks"
 import { Agents } from "./Agents"
 import { GitHubClient } from "./github/GitHubClient"
+import { BackgroundGitHubRequest } from "./github/GitHubRequestPolicy"
 import { FollowedRepositories } from "./FollowedRepositories"
 import { LocalCheckouts } from "./LocalCheckouts"
 import { PullRequestLists } from "./PullRequestLists"
@@ -59,10 +60,12 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       ListFollowedRepositories: () => repositories.list(),
       FollowRepository: ({ input }) => repositories.follow(input),
       UnfollowRepository: ({ repository }) => repositories.unfollow(repository),
-      ListPullRequests: () => lists.list(),
+      ListPullRequests: () =>
+        lists.list().pipe(Effect.provideService(BackgroundGitHubRequest, true)),
       ListSavedPullRequests: () => lists.saved(),
       ListSavedQueue: () => queue.saved(),
-      RefreshQueue: () => queue.refresh(),
+      RefreshQueue: () =>
+        queue.refresh().pipe(Effect.provideService(BackgroundGitHubRequest, true)),
       AddToQueue: ({ references }) => queue.add(references),
       RemoveFromQueue: ({ reference }) => queue.remove(reference),
       RestoreToQueue: ({ queued }) => queue.restore(queued),
@@ -85,7 +88,9 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
           ),
         ),
       HasPullRequestChanged: ({ pullRequestId, revision, updatedAt }) =>
-        github.hasChanged(pullRequestId, revision, updatedAt),
+        github
+          .hasChanged(pullRequestId, revision, updatedAt)
+          .pipe(Effect.provideService(BackgroundGitHubRequest, true)),
       GetFileContents: ({ pullRequest, revision, side, path }) =>
         github.fileContents(pullRequest, revision, side, path),
       ListRepositoryFiles: ({ pullRequest, revision }) =>

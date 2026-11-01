@@ -2,7 +2,6 @@ import {
   BinaryFile,
   Branches,
   type ChangedFile,
-  type Checks,
   type ConnectionError,
   DiscussionNotFound,
   type Discussions,
@@ -32,6 +31,7 @@ import {
   StaleRevision,
   TextFile,
   TokenRejected,
+  type TokenSource,
   Viewer,
 } from "@glass/contracts"
 import {
@@ -42,11 +42,14 @@ import {
   Effect,
   flow,
   Layer,
+  Option,
+  Redacted,
   Result,
   Schema,
   Semaphore,
 } from "effect"
-import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http"
+import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http"
+import { createHash } from "node:crypto"
 import { ServerConfig } from "../ServerConfig"
 import { GitHubChangedFile, toChangedFile } from "./changedFiles"
 import {
@@ -71,6 +74,12 @@ import {
 import { fromGitHubSide, toGitHubSide } from "./diffSide"
 import { GitHubAuth } from "./GitHubAuth"
 import {
+  BackgroundGitHubRequest,
+  GitHubErrorResponse,
+  GitHubRequestPolicy,
+} from "./GitHubRequestPolicy"
+import {
+  type CheckObservation,
   type CandidatesPage,
   PULL_REQUEST_CHECKS_QUERY,
   REPOSITORY_PULL_REQUESTS_QUERY,
@@ -247,7 +256,7 @@ export class GitHubClient extends Context.Service<
     ) => Effect.Effect<CandidatesPage, ConnectionError>
     readonly pullRequestChecks: (
       pullRequestIds: ReadonlyArray<string>,
-    ) => Effect.Effect<ReadonlyMap<string, Checks>, ConnectionError>
+    ) => Effect.Effect<ReadonlyMap<string, CheckObservation>, ConnectionError>
     readonly queuedPullRequests: (
       refs: ReadonlyArray<PullRequestRef>,
     ) => Effect.Effect<ReadonlyArray<LookedUpPullRequest | null>, ConnectionError>
@@ -304,6 +313,13 @@ export class GitHubClient extends Context.Service<
       const auth = yield* GitHubAuth
 
       const pendingReviewWrites = yield* Semaphore.make(1)
+      const policy = yield* GitHubRequestPolicy
+      const readsLock = yield* Semaphore.make(1)
+
+      const reads = new Map<
+        string,
+        Effect.Effect<{ readonly body: unknown; readonly source: TokenSource }, ConnectionError>
+      >()
 
       const http = (yield* HttpClient.HttpClient).pipe(
         HttpClient.mapRequest(
@@ -321,30 +337,110 @@ export class GitHubClient extends Context.Service<
       const send = Effect.fnUntraced(function* <A extends Schema.Top>(
         request: HttpClientRequest.HttpClientRequest,
         schema: A,
+        readKey?: string,
       ) {
         const { token, source } = yield* auth.resolveToken
+        const credential = createHash("sha256").update(Redacted.value(token)).digest("hex")
+        const resource = request.url === "/graphql" ? "graphql" : "core"
+        const mutation = request.method !== "GET" && readKey === undefined
+        const background = yield* BackgroundGitHubRequest
 
-        const response = yield* http
-          .execute(HttpClientRequest.bearerToken(request, token))
-          .pipe(Effect.catch(unavailable("Check your internet connection, then try again.")))
+        const key = JSON.stringify([
+          credential,
+          source,
+          background,
+          request.url,
+          request.urlParams,
+          readKey,
+        ])
 
-        if (response.status === 401) {
-          return yield* new TokenRejected({ tokenSource: source })
-        }
+        const perform = policy
+          .run(
+            credential,
+            resource,
+            Effect.gen(function* () {
+              const response = yield* http
+                .execute(HttpClientRequest.bearerToken(request, token))
+                .pipe(Effect.catch(unavailable("Check your internet connection, then try again.")))
 
-        if (response.status !== 200) {
-          return yield* new GitHubUnavailable({
-            message: `GitHub had a problem answering (HTTP ${response.status}). Try again in a moment.`,
-          })
-        }
+              if (response.status === 401) {
+                return yield* new TokenRejected({ tokenSource: source })
+              }
 
-        const body = yield* HttpClientResponse.schemaBodyJson(schema)(response).pipe(
+              const body = yield* response.json.pipe(
+                Effect.catch((error) =>
+                  response.status === 200
+                    ? unavailable(
+                        "GitHub sent a response Glass couldn't read. Try again in a moment.",
+                      )(error)
+                    : Effect.succeed(null),
+                ),
+              )
+
+              yield* policy.observe(
+                credential,
+                resource,
+                response.status,
+                response.headers,
+                Option.getOrUndefined(Schema.decodeUnknownOption(GitHubErrorResponse)(body)),
+              )
+
+              if (response.status !== 200) {
+                return yield* new GitHubUnavailable({
+                  message: `GitHub had a problem answering (HTTP ${response.status}). Try again in a moment.`,
+                })
+              }
+
+              return { body, source }
+            }),
+          )
+          .pipe(
+            withGitHubDeadline,
+            Effect.catchTag("GitHubRequestPaused", ({ retryAt }) =>
+              Effect.fail(
+                new GitHubUnavailable({
+                  message: `GitHub requests are paused until ${new Date(retryAt).toISOString()} to respect its rate limit.`,
+                }),
+              ),
+            ),
+          )
+
+        const answer = mutation
+          ? yield* Effect.sync(() => reads.clear()).pipe(
+              Effect.andThen(perform),
+              Effect.onExit(() => Effect.sync(() => reads.clear())),
+            )
+          : yield* Effect.gen(function* () {
+              const shared = yield* Effect.gen(function* () {
+                const pending = reads.get(key)
+
+                if (pending !== undefined) return pending
+
+                const created = yield* Effect.cached(
+                  perform.pipe(
+                    Effect.onExit(() =>
+                      Effect.sync(() => {
+                        if (reads.get(key) === created) reads.delete(key)
+                      }),
+                    ),
+                  ),
+                )
+
+                reads.set(key, created)
+
+                return created
+              }).pipe(readsLock.withPermits(1))
+
+              return yield* shared
+            })
+
+        const body = yield* Schema.decodeUnknownEffect(schema)(answer.body).pipe(
           Effect.catch(
             unavailable("GitHub sent a response Glass couldn't read. Try again in a moment."),
           ),
         )
 
-        return { body, source }
+        return { body, source: answer.source }
       }, withGitHubDeadline)
 
       const graphql = Effect.fnUntraced(function* <Data, E>(operation: {
@@ -363,6 +459,9 @@ export class GitHubClient extends Context.Service<
             }),
           ),
           operation.response,
+          /^\s*mutation\b/.test(operation.query)
+            ? undefined
+            : JSON.stringify([operation.query, operation.variables]),
         )
 
         for (const error of body.errors ?? []) {
@@ -704,6 +803,7 @@ export class GitHubClient extends Context.Service<
             }),
           ),
           QueuedPullRequestsResponse,
+          JSON.stringify(["QueuedPullRequests", refs]),
         )
 
         return yield* Result.match(toLookedUpBatch(refs.length, body), {
@@ -1057,5 +1157,8 @@ export class GitHubClient extends Context.Service<
     }),
   )
 
-  static readonly layer = GitHubClient.layerNoDeps.pipe(Layer.provide(FetchHttpClient.layer))
+  static readonly layer = GitHubClient.layerNoDeps.pipe(
+    Layer.provide(GitHubRequestPolicy.layer),
+    Layer.provide(FetchHttpClient.layer),
+  )
 }

@@ -48,7 +48,7 @@ const makeAgentsFixture = Effect.fnUntraced(function* <Claude extends { readonly
     claudeCommand: claude.command,
   })
 
-  yield* Effect.addFinalizer(() => Effect.sync(sandboxes.stopHosts))
+  yield* Effect.addFinalizer(() => Effect.promise(sandboxes.stopHosts))
 
   const env = {
     GH_TOKEN: VIEWER.token,
