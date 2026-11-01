@@ -40,7 +40,7 @@ export const columnsWithRepository =
 export const columns = "grid-cols-[0_1rem_minmax(0,1fr)_3.5rem_7rem_2rem_0]"
 
 export const queueColumns =
-  "grid-cols-[0_1rem_1rem_minmax(0,1fr)_fit-content(9rem)_3.5rem_7rem_2rem_0]"
+  "grid-cols-[0_auto_minmax(0,1fr)_fit-content(9rem)_3.5rem_7rem_2rem_0]"
 
 export const subgridRow = "col-span-full grid grid-cols-subgrid"
 
@@ -95,13 +95,15 @@ export function PullRequestRow(props: {
       )}
     >
       {props.marker}
-      <Tooltip open={statusHintOpen} onOpenChange={setStatusHintOpen} triggerId={statusId}>
-        <TooltipTrigger id={statusId} render={<span aria-hidden className="col-start-2" />}>
-          <StatusIcon className={cn("size-4", status.tone)} />
-        </TooltipTrigger>
-        <TooltipContent>{finished?.label ?? `Checks ${checks.label.toLowerCase()}`}</TooltipContent>
-      </Tooltip>
-      {props.lead !== undefined && <span className="flex items-center">{props.lead}</span>}
+      <span className="col-start-2 flex items-center gap-1.5">
+        <Tooltip open={statusHintOpen} onOpenChange={setStatusHintOpen} triggerId={statusId}>
+          <TooltipTrigger id={statusId} render={<span aria-hidden />}>
+            <StatusIcon className={cn("size-4", status.tone)} />
+          </TooltipTrigger>
+          <TooltipContent>{finished?.label ?? `Checks ${checks.label.toLowerCase()}`}</TooltipContent>
+        </Tooltip>
+        {props.lead}
+      </span>
       <span className="flex min-w-0 items-center gap-2.5 overflow-hidden">
         <TooltipHint content={pullRequest.title}>
           <span className={cn("min-w-0 truncate font-medium", props.dimmed && "opacity-55")}>
