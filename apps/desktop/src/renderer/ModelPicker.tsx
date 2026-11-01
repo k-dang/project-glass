@@ -7,7 +7,8 @@ import { memo, useState, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { agentModelsAtom, engineGlyphs } from "./agentsArea"
+import { agentModelsAtom } from "./agentsArea"
+import { AgentProgramIcon } from "./AgentProgramIcon"
 import { engineNames } from "./engines"
 import { chip, ChipSelect } from "./chips"
 import { ProblemAlert } from "./ProblemAlert"
@@ -97,9 +98,7 @@ export const ModelPicker = memo(function ModelPicker(props: {
             />
           }
         >
-          <span aria-hidden className="shrink-0 text-muted-foreground">
-            {engineGlyphs[props.engine]}
-          </span>
+          <AgentProgramIcon engine={props.engine} />
           <span className="min-w-0 truncate font-semibold">{summary}</span>
         </PopoverTrigger>
         <PopoverContent
@@ -117,7 +116,7 @@ export const ModelPicker = memo(function ModelPicker(props: {
                   value: engine,
                   label: (
                     <>
-                      <span aria-hidden>{engineGlyphs[engine]}</span>
+                      <AgentProgramIcon engine={engine} />
                       {engineNames[engine]}
                     </>
                   ),
