@@ -79,6 +79,11 @@ export const ModelPicker = memo(function ModelPicker(props: {
 
   return (
     <>
+      {programs?.engines
+        .filter((engine) => engine !== props.engine)
+        .map((engine) => (
+          <PrefetchModels key={engine} engine={engine} placeKey={props.placeKey} />
+        ))}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger
           render={
@@ -145,6 +150,12 @@ export const ModelPicker = memo(function ModelPicker(props: {
     </>
   )
 })
+
+function PrefetchModels(props: { engine: AgentEngine; placeKey: string }) {
+  useAtomValue(agentModelsAtom(props.engine, props.placeKey))
+
+  return null
+}
 
 function Models(props: {
   models: AgentModels

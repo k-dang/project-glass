@@ -639,6 +639,26 @@ it("starts an Agent in a Sandbox on a Followed repository, from its branches on 
   await waitFor(() => expect(window.location.hash).toBe(`#/agents/${agent.id}`))
 })
 
+it("lists every Agent program's models before one is chosen", async () => {
+  const listed: Array<AgentEngine> = []
+
+  mount(
+    {
+      ...newAgentHandlers([], []),
+      ListAgentModels: (payload) => {
+        listed.push(payload.engine)
+
+        return listModels(payload)
+      },
+    },
+    "/agents/new",
+  )
+
+  await screen.findByRole("region", { name: "New Agent" })
+  await eventually(() => expect(listed).toContain("pi"))
+  expect(listed).toContain("claude-code")
+})
+
 it("offers only the Agent programs a Sandbox provider runs", async () => {
   const user = mount(
     {
