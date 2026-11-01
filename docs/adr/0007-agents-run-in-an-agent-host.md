@@ -32,11 +32,11 @@ and explicit domain events through the real host handlers and journal; a program
 session that closes. Each program's translation into Glass's events is a pure `step`, tested by
 feeding it the program's messages. Wiring to a program (continuing a conversation, images, model
 and effort changes, Permission requests and Questions) runs the real program, the pinned Claude
-Code CLI or the bundled pi, against a fake model API, and desktop verification does the same. Real
-processes stay only where the process is the subject: a host that dies or a dropped connection. A
-fake SDK query stays only for failures the real CLI won't produce on demand, such as a handshake
-that never answers or a refused model change. Agent tests use no scripted fake `claude`
-executable.
+Code CLI or the bundled pi, against a fake model API, and desktop verification does the same.
+Those tests run the host and the program as real processes, and so do the tests whose subject is a
+process: a host that dies or a dropped connection. Everything else runs in-process. A fake SDK
+query stays only for failures the real CLI won't produce on demand, such as a failed handshake.
+Agent tests use no scripted fake `claude` executable.
 
 ## Considered Options
 

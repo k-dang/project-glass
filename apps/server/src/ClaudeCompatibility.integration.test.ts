@@ -2,14 +2,19 @@ import { assert, it } from "@effect/vitest"
 import {
   AllowRequest,
   AnswerQuestion,
+  DenyRequest,
   Image,
+  isRequestPart,
   isWaiting,
   SteerPart,
   TextPart,
   thisMac,
+  type Turn,
   TurnDone,
+  TurnStopped,
 } from "@glass/contracts"
 import { Effect, Predicate } from "effect"
+import { existsSync } from "node:fs"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { agentsFixture, claudeCode, lastText, settled } from "../test/agentsFixture"
@@ -181,5 +186,103 @@ it.live("continues the conversation after a relaunch cuts a running Turn short",
       ["Done", "Interrupted", "Done"],
     )
     assert.include(sent(f.claude.calls.at(-1)), "lantern")
+  }),
+)
+
+const waitingRequest = (turns: ReadonlyArray<Turn>) =>
+  turns.flatMap(({ parts }) => parts.filter(isWaiting)).at(0)
+
+it.live(
+  "refuses an answer that doesn't fit a Permission request, then denies it with the reason",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* agentsFixture({})
+
+      const agent = yield* f.start("Please run `touch notes.txt`", {
+        ...claudeCode,
+        permissionMode: "default",
+      })
+
+      const request = waitingRequest(
+        yield* f.transcript(agent.id, (turns) => waitingRequest(turns) !== undefined),
+      )
+
+      const requestId = request?.requestId ?? ""
+
+      const misfit = AnswerQuestion.make({ answers: [{ chosen: ["README"], text: null }] })
+
+      const refused = yield* f.client
+        .AnswerRequest({ agentId: agent.id, requestId, answer: misfit })
+        .pipe(Effect.flip)
+
+      assert.equal(refused._tag, "AgentError")
+
+      const denial = DenyRequest.make({ reason: "Leave the checkout alone" })
+      yield* f.client.AnswerRequest({ agentId: agent.id, requestId, answer: denial })
+      const [turn] = yield* f.transcript(agent.id, settled(1))
+
+      assert.equal(turn?.parts.find(isRequestPart)?.status, "denied")
+      assert.include(lastText(turn)?.text, "Leave the checkout alone")
+      assert.isFalse(existsSync(join(f.worktree(agent.name), "notes.txt")))
+
+      const late = yield* f.client
+        .AnswerRequest({ agentId: agent.id, requestId, answer: AllowRequest.make({}) })
+        .pipe(Effect.flip)
+
+      assert.equal(late._tag, "RequestNotWaiting")
+    }),
+)
+
+it.live(
+  "stops a Turn while its Permission request waits, leaving the request no longer answerable",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* agentsFixture({})
+
+      const agent = yield* f.start("Please run `touch notes.txt`", {
+        ...claudeCode,
+        permissionMode: "default",
+      })
+
+      const request = waitingRequest(
+        yield* f.transcript(agent.id, (turns) => waitingRequest(turns) !== undefined),
+      )
+
+      yield* f.client.StopTurn({ agentId: agent.id })
+      const [turn] = yield* f.transcript(agent.id, settled(1))
+
+      assert.deepStrictEqual(turn?.ended?.ending, TurnStopped.make({}))
+      assert.equal(turn?.parts.find(isRequestPart)?.status, "expired")
+
+      const late = yield* f.client
+        .AnswerRequest({
+          agentId: agent.id,
+          requestId: request?.requestId ?? "",
+          answer: AllowRequest.make({}),
+        })
+        .pipe(Effect.flip)
+
+      assert.equal(late._tag, "RequestNotWaiting")
+    }),
+)
+
+it.live("runs the next Turn in a newly chosen Permission mode", () =>
+  Effect.gen(function* () {
+    const f = yield* agentsFixture({})
+
+    const agent = yield* f.start("Please run `touch first.txt`", {
+      ...claudeCode,
+      permissionMode: "default",
+    })
+
+    yield* f.answering(agent.id, settled(1), () => AllowRequest.make({}))
+
+    yield* f.client.ChangePermissionMode({ agentId: agent.id, permissionMode: "bypassPermissions" })
+    yield* f.send(agent.id, "Please run `touch second.txt`")
+    const [, second] = yield* f.transcript(agent.id, settled(2))
+
+    assert.deepStrictEqual(second?.ended?.ending, TurnDone.make({}))
+    assert.isUndefined(second?.parts.find(isRequestPart))
+    assert.isTrue(existsSync(join(f.worktree(agent.name), "second.txt")))
   }),
 )
