@@ -1,9 +1,10 @@
 import { RegistryContext, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
 import { type Agent, type PlaceTag, repositoryKey } from "@glass/contracts"
 import { Link, Outlet, useNavigate, useParams } from "@tanstack/react-router"
+import { cn } from "cn"
 import { Exit, Option, Predicate } from "effect"
 import { AsyncResult } from "effect/reactivity"
-import { FolderGit2, SquarePen, Trash2 } from "lucide-react"
+import { FolderGit2, PanelLeftClose, PanelLeftOpen, SquarePen, Trash2 } from "lucide-react"
 import { useContext, useEffect, useEffectEvent, useId, useState } from "react"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Kbd } from "@/components/ui/kbd"
@@ -29,14 +30,39 @@ const agentLink =
   "flex flex-col gap-0.5 rounded-md py-1.5 pr-8 pl-2 outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-accent"
 
 export function AgentsLayout() {
+  const [panelOpen, setPanelOpen] = useState(true)
+  const panelId = useId()
+  const panelLabel = panelOpen ? "Collapse Agents panel" : "Expand Agents panel"
+  const PanelIcon = panelOpen ? PanelLeftClose : PanelLeftOpen
+
   return (
     <main aria-label="Agents" className="flex min-h-0 flex-1">
-      <aside className="flex w-64 shrink-0 flex-col gap-4 overflow-y-auto border-r px-3 py-4">
-        <div className="flex items-center justify-between pl-2">
-          <h1 className="text-sm font-semibold">Agents</h1>
+      <aside
+        aria-label="Agents panel"
+        className={cn(
+          "flex shrink-0 flex-col gap-4 border-r py-4",
+          panelOpen ? "w-64 px-3" : "w-12 px-2",
+        )}
+      >
+        <div className={cn("flex items-center gap-2", !panelOpen && "flex-col")}>
+          <TooltipHint content={panelLabel} side="bottom">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={panelLabel}
+              aria-expanded={panelOpen}
+              aria-controls={panelId}
+              onClick={() => setPanelOpen((open) => !open)}
+            >
+              <PanelIcon aria-hidden />
+            </Button>
+          </TooltipHint>
+          {panelOpen && <h1 className="flex-1 text-sm font-semibold">Agents</h1>}
           <NewAgentLink />
         </div>
-        <AgentList />
+        <div id={panelId} hidden={!panelOpen} className="min-h-0 flex-1 overflow-y-auto">
+          <AgentList />
+        </div>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <Outlet />
