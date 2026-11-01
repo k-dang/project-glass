@@ -7,11 +7,10 @@ import {
 } from "@effect/atom-react"
 import { type Agent, type PlaceTag, repositoryKey } from "@glass/contracts"
 import { Link, Outlet, useNavigate, useParams } from "@tanstack/react-router"
-import { cn } from "cn"
 import { Exit, Option, Predicate } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import { FolderGit2, PanelLeftClose, PanelLeftOpen, SquarePen, Trash2 } from "lucide-react"
-import { useContext, useEffect, useEffectEvent, useId, useState } from "react"
+import { useContext, useId, useState } from "react"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Kbd } from "@/components/ui/kbd"
 import { TooltipHint } from "@/components/ui/tooltip"
@@ -28,6 +27,7 @@ import { ConfirmationDialog } from "./ConfirmationDialog"
 import { settledProblem, streamProblem } from "./problems"
 import { ProblemAlert } from "./ProblemAlert"
 import { shortcutLabel } from "./shortcutLabel"
+import { useReviewShortcuts } from "./useReviewShortcuts"
 
 const groupNames: Record<PlaceTag, string> = { ...placeNames, sandbox: "Sandboxes" }
 
@@ -44,39 +44,25 @@ export function AgentsLayout() {
   const [panelOpen, setPanelOpen] = useAtom(agentsPanelOpenAtom)
   const navigate = useNavigate()
 
-  const onShortcut = useEffectEvent((event: KeyboardEvent) => {
-    const inDialog =
-      event.target instanceof Element &&
-      event.target.closest("[role=dialog], [role=alertdialog]") !== null
+  useReviewShortcuts([
+    {
+      key: "n",
+      mod: true,
+      allowInEditable: true,
+      run: () => void navigate({ to: "/agents/new" }),
+    },
+    {
+      key: "b",
+      mod: true,
+      allowInEditable: true,
+      run: () => {
+        if (panelOpen && document.getElementById(panelId)?.contains(document.activeElement))
+          document.getElementById(panelToggleId)?.focus()
 
-    const key = event.key.toLowerCase()
-
-    if (
-      inDialog ||
-      (key !== "n" && key !== "b") ||
-      !(event.metaKey || event.ctrlKey) ||
-      event.shiftKey ||
-      event.altKey ||
-      event.repeat
-    )
-      return
-
-    event.preventDefault()
-
-    if (key === "n") void navigate({ to: "/agents/new" })
-    else {
-      if (panelOpen && document.getElementById(panelId)?.contains(document.activeElement))
-        document.getElementById(panelToggleId)?.focus()
-
-      setPanelOpen((open) => !open)
-    }
-  })
-
-  useEffect(() => {
-    window.addEventListener("keydown", onShortcut)
-
-    return () => window.removeEventListener("keydown", onShortcut)
-  }, [])
+        setPanelOpen((open) => !open)
+      },
+    },
+  ])
 
   return (
     <main aria-label="Agents" className="flex min-h-0 flex-1">
@@ -84,10 +70,7 @@ export function AgentsLayout() {
         id={panelId}
         aria-label="Agents panel"
         hidden={!panelOpen}
-        className={cn(
-          "flex w-64 shrink-0 flex-col gap-4 border-r px-3 py-4",
-          !panelOpen && "hidden",
-        )}
+        className="flex w-64 shrink-0 flex-col gap-4 border-r px-3 py-4"
       >
         <div className="flex items-center justify-between pl-2">
           <h1 className="text-sm font-semibold">Agents</h1>
