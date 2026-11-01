@@ -409,23 +409,14 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
         recall={null}
         onStop={null}
         pickers={
-          <>
-            <ModelPicker
-              engine={program.engine}
-              placeKey={placeKey(where.place)}
-              model={program.model}
-              effort={program.effort}
-              onChange={chooseModel}
-              programs={programs}
-            />
-            {asksPermission(where.place) && (
-              <PermissionModePicker
-                engine={program.engine}
-                permissionMode={program.permissionMode ?? defaultPermissionMode}
-                onChange={choosePermissionMode}
-              />
-            )}
-          </>
+          <ModelPicker
+            engine={program.engine}
+            placeKey={placeKey(where.place)}
+            model={program.model}
+            effort={program.effort}
+            onChange={chooseModel}
+            programs={programs}
+          />
         }
       >
         <div className="flex min-w-0 flex-wrap items-center gap-1 [&>button]:min-w-0">
@@ -468,18 +459,25 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
                 : undefined
             }
           />
-          <div className="ml-auto min-w-0 max-w-full [&>button]:min-w-0">
-            <ChipSelect
-              key={branchContext}
-              label="Base branch"
-              icon={<GitBranch aria-hidden />}
-              value={baseBranch}
-              items={(listed?.branches ?? []).map((branch) => ({ value: branch, label: branch }))}
-              onValueChange={(branch) => key !== undefined && props.setBase(branchContext, branch)}
-              placeholder={key === undefined ? "No branches" : "Loading branches…"}
-              disabled={listed === null || key === undefined}
-            />
-          </div>
+          <ChipSelect
+            key={branchContext}
+            label="Base branch"
+            icon={<GitBranch aria-hidden />}
+            value={baseBranch}
+            items={(listed?.branches ?? []).map((branch) => ({ value: branch, label: branch }))}
+            onValueChange={(branch) => key !== undefined && props.setBase(branchContext, branch)}
+            placeholder={key === undefined ? "No branches" : "Loading branches…"}
+            disabled={listed === null || key === undefined}
+          />
+          {asksPermission(where.place) && (
+            <div className="ml-auto">
+              <PermissionModePicker
+                engine={program.engine}
+                permissionMode={program.permissionMode ?? defaultPermissionMode}
+                onChange={choosePermissionMode}
+              />
+            </div>
+          )}
         </div>
       </MessageBox>
       {starting === null && <div className="flex-1" />}
