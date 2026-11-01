@@ -1,5 +1,6 @@
 import { assert, it } from "@effect/vitest"
 import {
+  Image,
   nothingUnsent,
   type Transcript,
   TurnDone,
@@ -139,7 +140,12 @@ it.live("keeps an Agent's unsent message across a relaunch until it is cleared",
   Effect.gen(function* () {
     const f = yield* agentServicesFixture
     const agent = yield* f.create()
-    const unsent = { message: "Half a thought", images: [] }
+
+    const unsent = {
+      message: "Half a thought",
+      images: [Image.make({ mediaType: "image/png", data: "iVBORw0KGgo=" })],
+    }
+
     yield* f.agents.saveUnsent(agent.id, unsent)
 
     const { agents } = yield* f.restart

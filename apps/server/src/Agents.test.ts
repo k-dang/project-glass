@@ -466,17 +466,14 @@ it.live(
   "retires a Permission request waiting when the agent host dies, and the next message resumes the conversation",
   () =>
     Effect.gen(function* () {
-      const f = yield* agentsFixture({}, undefined, {
-        reply: [
-          {
-            toolCall: { id: "bash-1", name: "Bash", input: { command: "ls" }, output: "README.md" },
-          },
-          { text: "Earlier: {earlier}" },
-        ],
+      const f = yield* agentsFixture({})
+      const earlierHosts = childProcesses(process.pid, "agentHost.mjs")
+
+      const agent = yield* f.start("Please run `touch notes.txt`", {
+        ...claudeCode,
+        permissionMode: "default",
       })
 
-      const earlierHosts = childProcesses(process.pid, "agentHost.mjs")
-      const agent = yield* f.start("List files", { ...claudeCode, permissionMode: "default" })
       const [waiting] = yield* f.transcript(agent.id, (turns) => turns.some(hasWaiting))
       const request = waiting?.parts.find(isWaiting)
 
@@ -504,7 +501,10 @@ it.live(
       yield* f.send(agent.id, "Try again")
       const [, again] = yield* f.answering(agent.id, settled(2), () => AllowRequest.make({}))
       assert.deepStrictEqual(again?.ended?.ending, TurnDone.make({}))
-      assert.deepStrictEqual(lastText(again), TextPart.make({ text: "Earlier: List files" }))
+      assert.include(
+        JSON.stringify(f.claude.calls.at(-1)?.messages),
+        "Please run `touch notes.txt`",
+      )
     }),
 )
 
@@ -661,26 +661,22 @@ it.live(
     Effect.gen(function* () {
       const connections = yield* droppableHostConnections
 
-      const f = yield* agentsFixture({}, undefined, {
-        reply: [{ text: "Hello from Claude Code." }],
-      }).pipe(Effect.provideService(Socket.WebSocketConstructor, connections.constructor))
+      const f = yield* agentsFixture({}).pipe(
+        Effect.provideService(Socket.WebSocketConstructor, connections.constructor),
+      )
 
       const agent = yield* f.start("First", claudeCode)
       yield* f.transcript(agent.id, settled(1))
       const opened = connections.opened()
 
-      yield* f.claude.configure({
-        reply: [{ text: "Written while you were away." }],
-        hang: true,
-      })
+      yield* f.claude.hold
       yield* f.send(agent.id, "Second")
       const running = yield* f.transcript(agent.id, (turns) => turns.length === 2)
       const secondTurnId = running[1]!.id
 
-      yield* f.claude.logged("prompt", 2)
+      yield* f.claude.received(2)
       yield* connections.drop
-      yield* f.claude.configure({ reply: [{ text: "Written while you were away." }] })
-      yield* f.claude.logged("replied", 2)
+      yield* f.claude.release
 
       const witness = yield* connections.witness
       yield* witness.WatchJournal({ after: 0 }).pipe(
@@ -706,11 +702,11 @@ it.live(
         turns.map((turn) => ({ parts: turn.parts, ending: turn.ended?.ending })),
         [
           {
-            parts: [TextPart.make({ text: "Hello from Claude Code." })],
+            parts: [TextPart.make({ text: "Fake reply to: First" })],
             ending: TurnDone.make({}),
           },
           {
-            parts: [TextPart.make({ text: "Written while you were away." })],
+            parts: [TextPart.make({ text: "Fake reply to: Second" })],
             ending: TurnDone.make({}),
           },
         ],

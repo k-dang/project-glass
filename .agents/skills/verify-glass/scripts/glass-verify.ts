@@ -19,8 +19,6 @@ import { parseArgs } from "node:util"
 import { Cdp, cdpJson } from "./cdp.ts"
 import { FAKE_MODES, isFakeMode, serveFakeGitHub } from "./fake-github.ts"
 import { VIEWER } from "../../../../apps/server/test/fakePullRequest.ts"
-import { serveFakeAnthropic } from "./fake-anthropic.ts"
-import { fakeAnthropicEnvironment } from "../../../../apps/server/test/pinnedClaude.ts"
 import { serveFakePi } from "./fake-pi.ts"
 
 const root = join(import.meta.dirname, "..", "..", "..", "..")
@@ -63,7 +61,6 @@ interface RunState {
   readonly backend: "real" | "fake"
   readonly fake?: { readonly pid: number; readonly port: number }
   readonly fakePi?: { readonly pid: number; readonly port: number }
-  readonly fakeAnthropic?: { readonly pid: number; readonly port: number }
   backendUrl?: string
 }
 
@@ -391,7 +388,6 @@ const launch = async (options: {
   }
 
   let fakePi: RunState["fakePi"]
-  let fakeAnthropic: RunState["fakeAnthropic"]
   let fake: RunState["fake"]
   try {
     if (options.tourProvider === "fake" && !fakeBackend) {
@@ -404,18 +400,6 @@ const launch = async (options: {
       env["PI_CODING_AGENT_DIR"] = join(paths.home, ".pi", "agent")
       env["GLASS_CLAUDE_COMMAND"] = join(paths.state, "claude-disabled-in-fake-provider-mode")
       console.log("Tour provider: fake. Choose pi as the Tour engine in Settings; Claude Code is disabled.")
-    }
-
-    if (fakeBackend) {
-      // The real pinned `claude`, on a fake Anthropic API with the run's own config and no login.
-      fakeAnthropic = await startFake(
-        "__fake-anthropic",
-        [],
-        join(paths.state, "fake-anthropic-ready.json"),
-        join(paths.state, "fake-anthropic.log"),
-      )
-      Object.assign(env, fakeAnthropicEnvironment(paths.home, `http://127.0.0.1:${fakeAnthropic.port}`))
-      console.log("Claude Code: the pinned CLI on a fake Anthropic API; no model is called.")
     }
 
     if (github === "fake") {
@@ -431,7 +415,7 @@ const launch = async (options: {
       delete env["GITHUB_TOKEN"]
     }
   } catch (error) {
-    for (const provider of [fakePi, fakeAnthropic, fake]) {
+    for (const provider of [fakePi, fake]) {
       if (provider !== undefined) killTree(provider.pid)
     }
     return fail(error instanceof Error ? error.message : String(error))
@@ -463,7 +447,6 @@ const launch = async (options: {
     backend: options.backend,
     ...(fake === undefined ? {} : { fake }),
     ...(fakePi === undefined ? {} : { fakePi }),
-    ...(fakeAnthropic === undefined ? {} : { fakeAnthropic }),
   }
   saveRun(run)
 
@@ -543,13 +526,6 @@ const doctor = async (run: RunState) => {
       `port ${run.fakePi.port}`,
     )
   }
-  if (run.fakeAnthropic !== undefined) {
-    check(
-      isAlive(run.fakeAnthropic.pid) && (await portIsOpen(run.fakeAnthropic.port)),
-      "Fake Anthropic API",
-      `port ${run.fakeAnthropic.port}`,
-    )
-  }
   const newestSource = Math.max(
     ...["apps/server/src", "apps/desktop/src", "packages/contracts/src"].flatMap(
       (dir) =>
@@ -604,7 +580,6 @@ const stop = async (run: RunState) => {
   }
   if (run.fake !== undefined) killTree(run.fake.pid)
   if (run.fakePi !== undefined) killTree(run.fakePi.pid)
-  if (run.fakeAnthropic !== undefined) killTree(run.fakeAnthropic.pid)
   if (backendUrl) {
     const port = Number(new URL(backendUrl).port)
     for (let attempt = 0; attempt < 50 && (await portIsOpen(port)); attempt++) await sleep(100)
@@ -616,7 +591,6 @@ const stop = async (run: RunState) => {
     paths.backendLog,
     join(paths.state, "fake-github.log"),
     join(paths.state, "fake-pi.log"),
-    join(paths.state, "fake-anthropic.log"),
   ]) {
     if (existsSync(log)) copyFileSync(log, join(paths.evidence, basename(log)))
   }
@@ -677,8 +651,6 @@ const main = async () => {
         arg ?? fail("missing mode file"),
         positionals[2] ?? fail("missing ready file"),
       )
-    case "__fake-anthropic":
-      return serveFakeAnthropic(arg ?? fail("missing ready file"))
     case "__fake-pi":
       return serveFakePi(arg ?? fail("missing home"), positionals[2] ?? fail("missing ready file"))
     case "launch":

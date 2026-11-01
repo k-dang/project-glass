@@ -5,9 +5,10 @@ import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { connectRpcClient } from "../src/rpcSocket"
 import { DEMO_REPOSITORY } from "./demoPullRequests"
-import type { FakeClaudeStep } from "./fakeClaude"
+import { startFakeAnthropic } from "./fakeAnthropic"
 import { type FakeModelDelta, type FakeModelRequest, fakeModelProvider } from "./fakeModelProvider"
 import { seedClone } from "./gitRepositories"
+import { fakeAnthropicEnvironment } from "./pinnedClaude"
 
 export const bundledPi = fileURLToPath(
   new URL("../node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js", import.meta.url),
@@ -51,29 +52,14 @@ const demoReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
   ]
 }
 
-export const demoClaudeReply: ReadonlyArray<FakeClaudeStep> = [
-  { thinking: "A subagent can look around while I wait." },
-  {
-    toolCall: {
-      id: "demo-task",
-      name: "Agent",
-      input: { description: "Look around the repository", prompt: "List the files." },
-      output: "The repository holds a README.md.",
-    },
-  },
-  {
-    toolCall: {
-      id: "demo-subagent-ls",
-      name: "Bash",
-      input: { command: "ls" },
-      output: "README.md",
-      parentToolCallId: "demo-task",
-    },
-  },
-  {
-    text: "This is a **demo Claude Code Agent** on `{model}` at `{effort}` effort: Glass's fake `claude`, answering without a model.",
-  },
-]
+/** Runs Claude Code Agents on the pinned CLI against a fake Anthropic API, so they need no login. */
+export const startDemoClaude = Effect.fnUntraced(function* (directory: string) {
+  const { url } = yield* startFakeAnthropic
+  const environment = fakeAnthropicEnvironment(directory, url)
+  Object.assign(process.env, environment)
+
+  return environment.GLASS_CLAUDE_COMMAND
+})
 
 export const startDemoPi = Effect.fnUntraced(function* (directory: string) {
   yield* fakeModelProvider(directory, {

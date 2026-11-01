@@ -164,26 +164,44 @@ const message = (model: string, reply: Reply) => ({
   usage: { input_tokens: 1, output_tokens: 1 },
 })
 
+const counter = () => {
+  let seen = 0
+  const waiting = new Set<{ readonly count: number; readonly wake: () => void }>()
+
+  return {
+    add: () => {
+      seen++
+
+      for (const waiter of waiting)
+        if (seen >= waiter.count) {
+          waiting.delete(waiter)
+          waiter.wake()
+        }
+    },
+    reached: (count: number) =>
+      Effect.callback<void>((resume) => {
+        if (seen >= count) return resume(Effect.void)
+
+        const waiter = { count, wake: () => resume(Effect.void) }
+        waiting.add(waiter)
+
+        return Effect.sync(() => waiting.delete(waiter))
+      }),
+  }
+}
+
 /** The shared Messages API boundary for real Claude CLI integration and app verification. */
 export const startFakeAnthropic = Effect.gen(function* () {
   const calls: Array<FakeAnthropicRequest> = []
-  const waiting = new Set<() => void>()
+  const received = counter()
   let held: Array<() => void> | null = null
 
-  const received = (count: number) =>
-    Effect.callback<void>((resume) => {
-      const check = () => {
-        if (calls.length < count) return false
-        waiting.delete(check)
-        resume(Effect.void)
+  const releaseHeld = () => {
+    const hold = held ?? []
+    held = null
 
-        return true
-      }
-
-      if (!check()) waiting.add(check)
-
-      return Effect.sync(() => waiting.delete(check))
-    })
+    for (const resume of hold) resume()
+  }
 
   const server = createServer(async (request, response) => {
     const path = (request.url ?? "").split("?")[0] ?? ""
@@ -205,16 +223,19 @@ export const startFakeAnthropic = Effect.gen(function* () {
     const model = parsed.model ?? "claude-fake"
     const reply = replyTo(parsed)
 
-    if ((parsed.tools ?? []).length > 0) {
-      calls.push(parsed)
+    const conversation = (parsed.tools ?? []).length > 0
 
-      for (const check of waiting) check()
+    if (conversation) {
+      calls.push(parsed)
+      received.add()
 
       if (held !== null) {
         const hold = held
         await new Promise<void>((resolve) => hold.push(resolve))
       }
     }
+
+    if (response.destroyed) return
 
     console.log(
       `${new Date().toISOString()} messages ${model} -> ${reply.type === "text" ? "text" : reply.name}`,
@@ -237,6 +258,7 @@ export const startFakeAnthropic = Effect.gen(function* () {
       Effect.promise(
         () =>
           new Promise<void>((resolve, reject) => {
+            releaseHeld()
             server.closeAllConnections()
             server.close((error) => (error ? reject(error) : resolve()))
           }),
@@ -247,16 +269,11 @@ export const startFakeAnthropic = Effect.gen(function* () {
     url: `http://127.0.0.1:${portOf(server)}`,
     /** The conversation's requests, leaving out side requests such as naming the session. */
     calls,
-    received,
+    received: received.reached,
     /** Keeps later replies back until `release`. */
     hold: Effect.sync(() => {
       held ??= []
     }),
-    release: Effect.sync(() => {
-      const hold = held ?? []
-      held = null
-
-      for (const resume of hold) resume()
-    }),
+    release: Effect.sync(releaseHeld),
   }
 })

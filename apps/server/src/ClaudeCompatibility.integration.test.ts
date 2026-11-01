@@ -12,12 +12,12 @@ import {
 import { Effect, Predicate } from "effect"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
-import { claudeCode, claudeIntegrationFixture, lastText, settled } from "../test/agentsFixture"
+import { agentsFixture, claudeCode, lastText, settled } from "../test/agentsFixture"
 import type { FakeAnthropicRequest } from "../test/fakeAnthropic"
 
 it.live("connects the real Claude CLI's permission and Question callbacks to Glass", () =>
   Effect.gen(function* () {
-    const f = yield* claudeIntegrationFixture()
+    const f = yield* agentsFixture({})
 
     const agent = yield* f.start("Please run `touch compatible.txt`", {
       engine: "claude-code",
@@ -83,7 +83,7 @@ const pixel = Image.make({
 
 it.live("streams a long reply in small pieces to its end", () =>
   Effect.gen(function* () {
-    const f = yield* claudeIntegrationFixture()
+    const f = yield* agentsFixture({})
     const long = "Every word of this reply streams in its own small piece. ".repeat(8).trim()
     const agent = yield* f.start(long, claudeCode)
     const [turn] = yield* f.transcript(agent.id, settled(1))
@@ -95,7 +95,7 @@ it.live("streams a long reply in small pieces to its end", () =>
 
 it.live("sends a message's images to the model", () =>
   Effect.gen(function* () {
-    const f = yield* claudeIntegrationFixture()
+    const f = yield* agentsFixture({})
     const agent = yield* f.start("What's this?", claudeCode, [pixel])
     const [turn] = yield* f.transcript(agent.id, settled(1))
 
@@ -106,7 +106,7 @@ it.live("sends a message's images to the model", () =>
 
 it.live("lists Claude Code's models and efforts, naming its default after the model it runs", () =>
   Effect.gen(function* () {
-    const f = yield* claudeIntegrationFixture()
+    const f = yield* agentsFixture({})
     const listed = yield* f.client.ListAgentModels({ engine: "claude-code", place: thisMac })
     const efforts = ["low", "medium", "high", "xhigh", "max"]
 
@@ -122,7 +122,7 @@ it.live("lists Claude Code's models and efforts, naming its default after the mo
 
 it.live("starts on the chosen model and effort, and changes them for the next Turn", () =>
   Effect.gen(function* () {
-    const f = yield* claudeIntegrationFixture()
+    const f = yield* agentsFixture({})
     const agent = yield* f.start("Which model?", { ...claudeCode, model: "sonnet", effort: "high" })
     yield* f.transcript(agent.id, settled(1))
 
@@ -142,7 +142,7 @@ it.live("starts on the chosen model and effort, and changes them for the next Tu
 
 it.live("Steers a running Turn, showing the Steer where Claude Code takes it in", () =>
   Effect.gen(function* () {
-    const f = yield* claudeIntegrationFixture()
+    const f = yield* agentsFixture({})
     yield* f.claude.hold
     const agent = yield* f.start("Start", claudeCode)
     yield* f.claude.received(1)
@@ -161,16 +161,25 @@ it.live("Steers a running Turn, showing the Steer where Claude Code takes it in"
   }),
 )
 
-it.live("continues the conversation after a relaunch", () =>
+it.live("continues the conversation after a relaunch cuts a running Turn short", () =>
   Effect.gen(function* () {
-    const f = yield* claudeIntegrationFixture()
+    const f = yield* agentsFixture({})
     const agent = yield* f.start("Remember the word lantern", claudeCode)
     yield* f.transcript(agent.id, settled(1))
 
-    const restarted = yield* f.restart
-    yield* restarted.SendMessage({ agentId: agent.id, message: "What was the word?", images: [] })
-    yield* f.transcript(agent.id, settled(2), restarted)
+    yield* f.claude.hold
+    yield* f.send(agent.id, "Keep going")
+    yield* f.claude.received(2)
 
+    const restarted = yield* f.restart
+    yield* f.claude.release
+    yield* restarted.SendMessage({ agentId: agent.id, message: "What was the word?", images: [] })
+    const turns = yield* f.transcript(agent.id, settled(3), restarted)
+
+    assert.deepStrictEqual(
+      turns.map(({ ended }) => ended?.ending._tag),
+      ["Done", "Interrupted", "Done"],
+    )
     assert.include(sent(f.claude.calls.at(-1)), "lantern")
   }),
 )

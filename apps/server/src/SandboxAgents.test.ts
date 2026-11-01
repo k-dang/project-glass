@@ -1,7 +1,9 @@
+import { NodeSocket } from "@effect/platform-node"
 import { assert, it } from "@effect/vitest"
 import {
   AgentModels,
   applyTranscriptUpdate,
+  RPC_PATH,
   emptyTranscript,
   SandboxPlace,
   SandboxProviderInfo,
@@ -18,6 +20,8 @@ import { vi } from "vite-plus/test"
 import { agentsFixture, claudeCode, lastText, repository, settled } from "../test/agentsFixture"
 import { eventually } from "../test/eventually"
 import { gitIn } from "../test/gitRepositories"
+import { AgentHostRpcs, HOST_TOKEN_HEADER } from "./agentHost/protocol"
+import { connectRpcClient } from "./rpcSocket"
 
 vi.stubEnv("PI_OFFLINE", "1")
 
@@ -294,22 +298,32 @@ it.live(
   "connects to a Sandbox's host again after a dropped connection, catching up on what it missed",
   () =>
     Effect.gen(function* () {
-      const reply = [{ text: "Finished while you were away." }]
-      const f = yield* agentsFixture({}, undefined, { reply, hang: true })
+      const f = yield* agentsFixture({})
+      yield* f.claude.hold
       const agent = yield* f.startSandbox("Start", claudeCode)
-      yield* f.claude.logged("prompt", 1)
+      yield* f.claude.received(1)
 
       f.sandboxes.dropConnections(agent.id)
-      yield* f.claude.configure({ reply })
-      yield* f.claude.logged("replied", 1)
+      yield* f.claude.release
+
+      const { port, token } = f.sandboxes.host(agent.id)
+
+      const witness = yield* connectRpcClient(AgentHostRpcs, `ws://127.0.0.1:${port}${RPC_PATH}`, {
+        [HOST_TOKEN_HEADER]: token,
+      }).pipe(Effect.provide(NodeSocket.layerWebSocketConstructor))
+
+      yield* witness.WatchJournal({ after: 0 }).pipe(
+        Stream.filter(({ event }) => Predicate.isTagged(event, "TurnEnded")),
+        Stream.runHead,
+      )
+
+      const [missed] = yield* f.transcript(agent.id, (turns) => turns.length === 1)
+      assert.isNull(missed?.ended)
       f.sandboxes.reconnect(agent.id)
 
       const [turn] = yield* f.transcript(agent.id, settled(1))
       assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
-      assert.deepStrictEqual(
-        lastText(turn),
-        TextPart.make({ text: "Finished while you were away." }),
-      )
+      assert.deepStrictEqual(lastText(turn), TextPart.make({ text: "Fake reply to: Start" }))
     }),
 )
 

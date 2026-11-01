@@ -54,6 +54,10 @@ const dropping = (folder: string) => existsSync(join(folder, "dropped"))
 
 const INGRESS_PATH = "/fake-ingress"
 
+const HostFile = Schema.fromJsonString(
+  Schema.Struct({ pid: Schema.Int, port: Schema.Int, token: Schema.String }),
+)
+
 const requestLine = /^([A-Z]+) (\S+) HTTP\/1\.1\r$/gm
 
 const notFound = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
@@ -237,7 +241,14 @@ export const fakeSandboxProvider =
         })
 
         if (host.pid === undefined) throw new Error("The agent host didn't start")
-        writeFileSync(join(folder, "host.pid"), String(host.pid))
+        writeFileSync(
+          join(folder, "host.json"),
+          Schema.encodeSync(HostFile)({
+            pid: host.pid,
+            port: freeHostPort,
+            token: request.host.environment["GLASS_HOST_TOKEN"] ?? "",
+          }),
+        )
         record({ folder, ingressPort: await ingress(folder, freeHostPort) })
       },
       target: async (state) => ({
@@ -273,8 +284,13 @@ export const installFakeSandboxProvider = (
   )
 
   const sandboxFolder = (agentId: string) => join(settings.root, agentId)
-  const pidFile = (agentId: string) => join(sandboxFolder(agentId), "host.pid")
-  const hostPid = (agentId: string) => Number(readFileSync(pidFile(agentId), "utf8"))
+  const hostFile = (agentId: string) => join(sandboxFolder(agentId), "host.json")
+
+  /** The Sandbox's agent host, reachable without its ingress. */
+  const host = (agentId: string) =>
+    Schema.decodeUnknownSync(HostFile)(readFileSync(hostFile(agentId), "utf8"))
+
+  const hostPid = (agentId: string) => host(agentId).pid
 
   return {
     configure: (change: Partial<FakeSandboxSettings>) =>
@@ -283,10 +299,11 @@ export const installFakeSandboxProvider = (
     dropConnections: (agentId: string) =>
       writeFileSync(join(sandboxFolder(agentId), "dropped"), ""),
     reconnect: (agentId: string) => rmSync(join(sandboxFolder(agentId), "dropped")),
+    host,
     hostPid,
     stopHosts: () => {
       for (const agentId of readdirSync(settings.root)) {
-        if (!existsSync(pidFile(agentId))) continue
+        if (!existsSync(hostFile(agentId))) continue
 
         try {
           process.kill(hostPid(agentId), "SIGKILL")

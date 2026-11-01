@@ -214,19 +214,6 @@ it.live("forwards Stop and waits for the host to expire its request before the n
   }),
 )
 
-it.live("starts queued messages when the host reports a completed Turn", () =>
-  Effect.gen(function* () {
-    const f = yield* agentServicesFixture
-    const agent = yield* f.create()
-    const first = yield* f.started
-    yield* f.agents.send(agent.id, { message: "Next", images: [] })
-    const waiting = yield* f.transcript(agent.id, ({ queued }) => queued.length === 1)
-    assert.equal(waiting.queued[0]?.message, "Next")
-    yield* finish(f, first)
-    assert.equal((yield* f.started).input.message, "Next")
-  }),
-)
-
 it.live("passes default and changed Permission modes to the host, and refuses modes for pi", () =>
   Effect.gen(function* () {
     const f = yield* agentServicesFixture
