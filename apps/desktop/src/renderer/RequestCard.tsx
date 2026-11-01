@@ -8,6 +8,7 @@ import {
   type RequestAnswer,
   type RequestPart,
 } from "@glass/contracts"
+import { cn } from "cn"
 import { Match, Predicate } from "effect"
 import { CircleCheck, CircleHelp, CircleSlash, CircleX, ShieldAlert } from "lucide-react"
 import { type ReactNode, useId, useState } from "react"
@@ -60,7 +61,14 @@ export function RequestCard(props: { agentId: string; part: RequestPart }) {
   const { agentId, part } = props
 
   return (
-    <div id={requestElementId(part.requestId)} className="scroll-mt-4">
+    <div
+      id={requestElementId(part.requestId)}
+      className={cn(
+        "scroll-mt-4",
+        part.status === "waiting" &&
+          "transition-[opacity,translate] duration-200 ease-out starting:translate-y-1.5 starting:opacity-0 motion-reduce:transition-opacity motion-reduce:duration-150 motion-reduce:starting:translate-y-0",
+      )}
+    >
       {Predicate.isTagged(part, "Question") ? (
         <Questions agentId={agentId} question={part} />
       ) : (
