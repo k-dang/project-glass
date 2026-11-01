@@ -286,6 +286,9 @@ importers:
 
   packages/contracts:
     dependencies:
+      '@glass/plugin':
+        specifier: workspace:*
+        version: link:../plugin
       effect:
         specifier: 'catalog:'
         version: 4.0.5

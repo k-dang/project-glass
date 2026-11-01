@@ -26,7 +26,9 @@ export interface SandboxProvider {
 }
 
 /** The Agent program an Agent runs: Claude Code or pi. */
-export type AgentEngine = "claude-code" | "pi"
+export const agentEngines = ["claude-code", "pi"] as const
+
+export type AgentEngine = (typeof agentEngines)[number]
 
 /** A model an Agent program offers, with the efforts it takes, from lowest to highest. */
 export interface AgentModel {
