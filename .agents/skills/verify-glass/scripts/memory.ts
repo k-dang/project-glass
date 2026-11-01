@@ -74,6 +74,8 @@ export interface WorkerSample {
 export interface MemorySample {
   readonly at: string
   readonly seq: number
+  /** Which area the sweep was showing when this sample was taken. */
+  readonly label?: string
   readonly renderer: {
     readonly heap: HeapUsage
     readonly metrics: Readonly<Record<string, number>>
@@ -220,7 +222,7 @@ export const totalsOf = (processes: ReadonlyArray<ProcessRow>) => {
 }
 
 export interface Sampler {
-  readonly sample: (seq: number) => Promise<MemorySample>
+  readonly sample: (seq: number, label?: string) => Promise<MemorySample>
   readonly close: () => void
 }
 
@@ -258,7 +260,7 @@ export const startSampler = async (page: Cdp, rootPid: number | undefined): Prom
 
   let previous: Record<string, number> = {}
 
-  const sample = async (seq: number): Promise<MemorySample> => {
+  const sample = async (seq: number, label?: string): Promise<MemorySample> => {
     const [heap, metrics, dom] = await Promise.all([
       page.send("Runtime.getHeapUsage", HeapUsage),
       page.send("Performance.getMetrics", Metrics),
@@ -293,6 +295,7 @@ export const startSampler = async (page: Cdp, rootPid: number | undefined): Prom
     return {
       at: new Date().toISOString(),
       seq,
+      ...(label === undefined ? {} : { label }),
       renderer: {
         heap,
         metrics: values,
@@ -412,5 +415,44 @@ export const formatSummary = (
     "",
     `work: ${layoutTotals.layouts} layouts, ${layoutTotals.styleRecalcs} style recalcs, ${layoutTotals.scriptMs}ms of script`,
     `window: ${first.at} → ${last.at}`,
+  ].join("\n")
+}
+
+/** One row per visited area, from the last sample taken while it was showing. */
+export const formatAreas = (
+  samples: ReadonlyArray<MemorySample>,
+  file: string,
+  elapsed: number,
+) => {
+  const lastByLabel = new Map<string, MemorySample>()
+  for (const sample of samples) {
+    if (sample.label !== undefined) lastByLabel.set(sample.label, sample)
+  }
+  if (lastByLabel.size === 0) return "no areas sampled"
+
+  const rows = [...lastByLabel].map(([label, sample]) => {
+    const renderer = sample.processes.find((process) => process.role === "renderer")
+    return [
+      label,
+      mb(sample.renderer.heap.usedSize),
+      mb(sample.workers.reduce((sum, worker) => sum + worker.heap.usedSize, 0)),
+      String(sample.renderer.dom.nodes),
+      mb(renderer?.private ?? 0),
+      mb(sample.processes.reduce((sum, process) => sum + process.private, 0)),
+    ]
+  })
+
+  const header = ["area", "heap", "workers", "nodes", "renderer", "total private"]
+  const widths = header.map((title, column) =>
+    Math.max(title.length, ...rows.map((row) => row[column]!.length)),
+  )
+  const line = (cells: ReadonlyArray<string>) =>
+    cells.map((cell, column) => pad(cell, widths[column]!)).join("  ")
+
+  return [
+    `areas: ${rows.length} over ${(elapsed / 1000).toFixed(1)}s → ${file}`,
+    "",
+    line(header),
+    ...rows.map(line),
   ].join("\n")
 }

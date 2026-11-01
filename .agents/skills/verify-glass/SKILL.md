@@ -56,7 +56,8 @@ Read-only. Checks an Electron process serves the run's CDP port, that port belon
 | `press --key <key> [--meta]`                     | presses a key such as `Enter` or `ArrowUp` in the focused element, holding ⌘ with `--meta`  |
 | `wait --text <text> [--timeout ms]`              | polls the window text (default 15s); exit 1 on timeout                                      |
 | `scroll --by <pixels> [--x n] [--y n]`           | turns the wheel over the window, for views that load as you scroll                          |
-| `memory [--samples n] [--interval ms] [--out n]` | samples renderer, worker, and process memory into `evidence/<out>.jsonl`, then prints deltas |
+| `memory [--samples n] [--interval ms] [--gc] [--out n]` | samples renderer, worker, and process memory into `evidence/<out>.jsonl`, then prints deltas |
+| `memory --sweep [--dwell n] [--gc] [--out n]`     | visits each rail area, samples it, and prints one row per area                              |
 | `fake-github <mode>`                             | changes the fake GitHub's answer for the next request                                       |
 | `kill-backend`                                   | kills the window's current backend process, as a crash would                                |
 
@@ -75,6 +76,16 @@ node $V memory --samples 30 --interval 1000 --out baseline
 Each line holds the renderer's V8 heap, Blink counters and DOM counts, every worker target's own heap, and every process under the app's main process with its role and memory. The renderer numbers come from CDP (`Performance.getMetrics`, `Runtime.getHeapUsage`, `Memory.getDOMCounters`); worker heaps need `Target.setAutoAttach`, because a worker's V8 isolate is not part of the page's numbers. Process figures come from the OS (`Get-CimInstance Win32_Process`, or `ps`), because CDP cannot see RSS, the GPU process, main, or the backend.
 
 `rss` is the working set the app's own RAM readout sums, so shared pages count once per process and the total is an upper bound. `private` is the commit charge and the steadier number; compare `total private` across commits. A sample costs about a quarter second on Windows, so `--interval 1000` yields roughly one sample a second.
+
+`--gc` collects garbage before each sample. Without it, `DOM nodes` counts nodes the collector has not reached yet, so leaving a page can look like it kept its DOM; with it, the count is what is actually retained. Prefer `--gc` when comparing areas or judging whether a view released anything.
+
+`--sweep` walks the rail: Dashboard, Reviews, To-dos, Agents, Activity, Settings, then Dashboard again. It settles for two seconds after each click, takes `--dwell` samples labelled with the area, and prints one row per area:
+
+```sh
+node $V memory --sweep --dwell 4 --gc --out areas
+```
+
+Compare `renderer` (the renderer process's commit charge) across rows, not `total private`: with `--backend fake`, the backend's dev server and its fake GitHub and Anthropic servers are counted too, and they dwarf the UI.
 
 Measure a workload, not an idle window: what matters is what it adds and what it keeps afterwards. The repeatable one is the fake's 150-file PR (see [Changed files](features/changed-files.md)). `memory` runs in the foreground for the whole sample window, so drive from a second shell:
 
