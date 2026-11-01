@@ -1,4 +1,10 @@
-import { RegistryContext, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
+import {
+  RegistryContext,
+  useAtom,
+  useAtomRefresh,
+  useAtomSet,
+  useAtomValue,
+} from "@effect/atom-react"
 import { type Agent, type PlaceTag, repositoryKey } from "@glass/contracts"
 import { Link, Outlet, useNavigate, useParams } from "@tanstack/react-router"
 import { cn } from "cn"
@@ -11,6 +17,7 @@ import { Kbd } from "@/components/ui/kbd"
 import { TooltipHint } from "@/components/ui/tooltip"
 import {
   agentsAtom,
+  agentsPanelOpenAtom,
   groupAgents,
   placeNames,
   removalWarningsAtom,
@@ -29,38 +36,64 @@ const noneWaiting: ReadonlySet<string> = new Set()
 const agentLink =
   "flex flex-col gap-0.5 rounded-md py-1.5 pr-8 pl-2 outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-accent"
 
+const panelId = "agents-panel"
+
+const panelToggleId = "agents-panel-toggle"
+
 export function AgentsLayout() {
-  const [panelOpen, setPanelOpen] = useState(true)
-  const panelId = useId()
-  const panelLabel = panelOpen ? "Collapse Agents panel" : "Expand Agents panel"
-  const PanelIcon = panelOpen ? PanelLeftClose : PanelLeftOpen
+  const [panelOpen, setPanelOpen] = useAtom(agentsPanelOpenAtom)
+  const navigate = useNavigate()
+
+  const onShortcut = useEffectEvent((event: KeyboardEvent) => {
+    const inDialog =
+      event.target instanceof Element &&
+      event.target.closest("[role=dialog], [role=alertdialog]") !== null
+
+    const key = event.key.toLowerCase()
+
+    if (
+      inDialog ||
+      (key !== "n" && key !== "b") ||
+      !(event.metaKey || event.ctrlKey) ||
+      event.shiftKey ||
+      event.altKey ||
+      event.repeat
+    )
+      return
+
+    event.preventDefault()
+
+    if (key === "n") void navigate({ to: "/agents/new" })
+    else {
+      if (panelOpen && document.getElementById(panelId)?.contains(document.activeElement))
+        document.getElementById(panelToggleId)?.focus()
+
+      setPanelOpen((open) => !open)
+    }
+  })
+
+  useEffect(() => {
+    window.addEventListener("keydown", onShortcut)
+
+    return () => window.removeEventListener("keydown", onShortcut)
+  }, [])
 
   return (
     <main aria-label="Agents" className="flex min-h-0 flex-1">
       <aside
+        id={panelId}
         aria-label="Agents panel"
+        hidden={!panelOpen}
         className={cn(
-          "flex shrink-0 flex-col gap-4 border-r py-4",
-          panelOpen ? "w-64 px-3" : "w-12 px-2",
+          "flex w-64 shrink-0 flex-col gap-4 border-r px-3 py-4",
+          !panelOpen && "hidden",
         )}
       >
-        <div className={cn("flex items-center gap-2", !panelOpen && "flex-col")}>
-          <TooltipHint content={panelLabel} side="bottom">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={panelLabel}
-              aria-expanded={panelOpen}
-              aria-controls={panelId}
-              onClick={() => setPanelOpen((open) => !open)}
-            >
-              <PanelIcon aria-hidden />
-            </Button>
-          </TooltipHint>
-          {panelOpen && <h1 className="flex-1 text-sm font-semibold">Agents</h1>}
+        <div className="flex items-center justify-between pl-2">
+          <h1 className="text-sm font-semibold">Agents</h1>
           <NewAgentLink />
         </div>
-        <div id={panelId} hidden={!panelOpen} className="min-h-0 flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto">
           <AgentList />
         </div>
       </aside>
@@ -71,32 +104,36 @@ export function AgentsLayout() {
   )
 }
 
-function NewAgentLink() {
-  const navigate = useNavigate()
+export function AgentsPanelToggle() {
+  const [panelOpen, setPanelOpen] = useAtom(agentsPanelOpenAtom)
+  const panelLabel = panelOpen ? "Hide Agents panel" : "Show Agents panel"
+  const PanelIcon = panelOpen ? PanelLeftClose : PanelLeftOpen
 
-  const onShortcut = useEffectEvent((event: KeyboardEvent) => {
-    const inDialog =
-      event.target instanceof Element && event.target.closest("[role=dialog]") !== null
+  return (
+    <TooltipHint
+      content={
+        <span className="flex items-center gap-2">
+          {panelLabel} <Kbd>{shortcutLabel("B")}</Kbd>
+        </span>
+      }
+      side="bottom"
+    >
+      <Button
+        id={panelToggleId}
+        variant="ghost"
+        size="icon-sm"
+        aria-label={panelLabel}
+        aria-expanded={panelOpen}
+        aria-controls={panelId}
+        onClick={() => setPanelOpen((open) => !open)}
+      >
+        <PanelIcon aria-hidden />
+      </Button>
+    </TooltipHint>
+  )
+}
 
-    if (
-      inDialog ||
-      event.key.toLowerCase() !== "n" ||
-      !(event.metaKey || event.ctrlKey) ||
-      event.shiftKey ||
-      event.altKey
-    )
-      return
-
-    event.preventDefault()
-    void navigate({ to: "/agents/new" })
-  })
-
-  useEffect(() => {
-    window.addEventListener("keydown", onShortcut)
-
-    return () => window.removeEventListener("keydown", onShortcut)
-  }, [])
-
+export function NewAgentLink() {
   return (
     <TooltipHint
       content={
