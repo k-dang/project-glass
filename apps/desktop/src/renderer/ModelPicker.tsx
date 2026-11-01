@@ -244,7 +244,7 @@ function RequiredChoice<Value extends string>(props: {
           <ToggleGroupItem
             key={item.value}
             value={item.value}
-            className="gap-1.5 text-xs font-normal"
+            className="gap-1.5 text-xs font-normal hover:bg-accent hover:text-accent-foreground aria-pressed:bg-accent"
           >
             {item.label}
           </ToggleGroupItem>
