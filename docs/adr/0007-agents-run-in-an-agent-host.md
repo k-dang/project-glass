@@ -26,12 +26,17 @@ Building Claude Code Agents confirmed the SDK over driving `claude` stream-json 
 the stream-json control protocol, already written and kept in step with the CLI. Glass pins its
 version, points it at the user's `claude`, and asks for Claude Code's own system prompt and the
 user, project, and local settings sources, since the SDK otherwise starts `claude` without them.
-Business-service tests supply an `AgentAdapter` and explicit domain events through the real host
-handlers and journal. Claude adapter tests supply the SDK query and invoke its callbacks directly;
-they test Glass's translation without reproducing Claude Code's permission policy. A small
-compatibility test and desktop verification run the pinned real CLI against one shared fake
-Anthropic API. Controlled fake executables remain for process and protocol failures that need exact
-timing or malformed output.
+Tests fake only interfaces Glass owns, because a fake of someone else's interface encodes Glass's
+beliefs about it and passes when they are wrong. Business-service tests supply an `AgentAdapter`
+and explicit domain events through the real host handlers and journal; a program that exits is a
+session that closes. Each program's translation into Glass's events is a pure `step`, tested by
+feeding it the program's messages. Wiring to a program (continuing a conversation, images, model
+and effort changes, Permission requests and Questions) runs the real program, the pinned Claude
+Code CLI or the bundled pi, against a fake model API, and desktop verification does the same. Real
+processes stay only where the process is the subject: a host that dies or a dropped connection. A
+fake SDK query stays only for failures the real CLI won't produce on demand, such as a handshake
+that never answers or a refused model change. Agent tests use no scripted fake `claude`
+executable.
 
 ## Considered Options
 

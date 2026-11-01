@@ -24,6 +24,7 @@ const Message = Schema.Struct({
 const Request = Schema.fromJsonString(
   Schema.Struct({
     model: Schema.optional(Schema.String),
+    output_config: Schema.optional(Schema.Struct({ effort: Schema.optional(Schema.String) })),
     stream: Schema.optional(Schema.Boolean),
     tools: Schema.optional(Schema.Array(Schema.Unknown)),
     messages: Schema.optional(Schema.Array(Message)),
@@ -34,7 +35,7 @@ type Block = typeof Block.Type
 
 type Message = typeof Message.Type
 
-type Request = typeof Request.Type
+export type FakeAnthropicRequest = typeof Request.Type
 
 type Reply =
   | { readonly type: "text"; readonly text: string }
@@ -58,7 +59,7 @@ const lastWords = (message: Message | undefined) =>
     .filter((block) => block.type === "text" && !(block.text ?? "").startsWith("<system-reminder>"))
     .at(-1)?.text ?? ""
 
-const replyTo = (request: Request): Reply => {
+const replyTo = (request: FakeAnthropicRequest): Reply => {
   // The CLI can end the conversation with its own system messages; the user's turn is what answers.
   const last = request.messages?.findLast((message) => message.role === "user")
 
@@ -95,7 +96,7 @@ const replyTo = (request: Request): Reply => {
       },
     }
 
-  return { type: "text", text: `Fake reply to: ${words.slice(0, 200)}` }
+  return { type: "text", text: `Fake reply to: ${words}` }
 }
 
 const send = (response: ServerResponse, status: number, body: Schema.Json) => {
@@ -125,7 +126,9 @@ const stream = (response: ServerResponse, model: string, reply: Reply) => {
 
   if (reply.type === "text") {
     event("content_block_start", { index: 0, content_block: { type: "text", text: "" } })
-    event("content_block_delta", { index: 0, delta: { type: "text_delta", text: reply.text } })
+
+    for (const piece of reply.text.split(/(?<= )/))
+      event("content_block_delta", { index: 0, delta: { type: "text_delta", text: piece } })
   } else {
     event("content_block_start", {
       index: 0,
@@ -163,6 +166,25 @@ const message = (model: string, reply: Reply) => ({
 
 /** The shared Messages API boundary for real Claude CLI integration and app verification. */
 export const startFakeAnthropic = Effect.gen(function* () {
+  const calls: Array<FakeAnthropicRequest> = []
+  const waiting = new Set<() => void>()
+  let held: Array<() => void> | null = null
+
+  const received = (count: number) =>
+    Effect.callback<void>((resume) => {
+      const check = () => {
+        if (calls.length < count) return false
+        waiting.delete(check)
+        resume(Effect.void)
+
+        return true
+      }
+
+      if (!check()) waiting.add(check)
+
+      return Effect.sync(() => waiting.delete(check))
+    })
+
   const server = createServer(async (request, response) => {
     const path = (request.url ?? "").split("?")[0] ?? ""
 
@@ -182,6 +204,18 @@ export const startFakeAnthropic = Effect.gen(function* () {
     const parsed = decoded.success
     const model = parsed.model ?? "claude-fake"
     const reply = replyTo(parsed)
+
+    if ((parsed.tools ?? []).length > 0) {
+      calls.push(parsed)
+
+      for (const check of waiting) check()
+
+      if (held !== null) {
+        const hold = held
+        await new Promise<void>((resolve) => hold.push(resolve))
+      }
+    }
+
     console.log(
       `${new Date().toISOString()} messages ${model} -> ${reply.type === "text" ? "text" : reply.name}`,
     )
@@ -209,5 +243,20 @@ export const startFakeAnthropic = Effect.gen(function* () {
       ),
   )
 
-  return { url: `http://127.0.0.1:${portOf(server)}` }
+  return {
+    url: `http://127.0.0.1:${portOf(server)}`,
+    /** The conversation's requests, leaving out side requests such as naming the session. */
+    calls,
+    received,
+    /** Keeps later replies back until `release`. */
+    hold: Effect.sync(() => {
+      held ??= []
+    }),
+    release: Effect.sync(() => {
+      const hold = held ?? []
+      held = null
+
+      for (const resume of hold) resume()
+    }),
+  }
 })

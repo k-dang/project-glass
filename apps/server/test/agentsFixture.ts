@@ -199,7 +199,7 @@ export const claudeIntegrationFixture = () =>
 
       for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value)
 
-      return { command: env.GLASS_CLAUDE_COMMAND }
+      return { ...provider, command: env.GLASS_CLAUDE_COMMAND }
     }),
   )
 

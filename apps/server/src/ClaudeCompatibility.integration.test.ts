@@ -1,9 +1,19 @@
 import { assert, it } from "@effect/vitest"
-import { AllowRequest, AnswerQuestion, isWaiting } from "@glass/contracts"
+import {
+  AllowRequest,
+  AnswerQuestion,
+  Image,
+  isWaiting,
+  SteerPart,
+  TextPart,
+  thisMac,
+  TurnDone,
+} from "@glass/contracts"
 import { Effect, Predicate } from "effect"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
-import { claudeIntegrationFixture, settled } from "../test/agentsFixture"
+import { claudeCode, claudeIntegrationFixture, lastText, settled } from "../test/agentsFixture"
+import type { FakeAnthropicRequest } from "../test/fakeAnthropic"
 
 it.live("connects the real Claude CLI's permission and Question callbacks to Glass", () =>
   Effect.gen(function* () {
@@ -56,5 +66,111 @@ it.live("connects the real Claude CLI's permission and Question callbacks to Gla
         (part) => Predicate.isTagged(part, "Text") && part.text.includes("Only the README"),
       ),
     )
+  }),
+)
+
+const sent = (call: FakeAnthropicRequest | undefined) => JSON.stringify(call?.messages ?? [])
+
+const hasImage = (call: FakeAnthropicRequest | undefined) =>
+  (call?.messages ?? []).some(
+    ({ content }) => !Predicate.isString(content) && content.some(({ type }) => type === "image"),
+  )
+
+const pixel = Image.make({
+  mediaType: "image/png",
+  data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+})
+
+it.live("streams a long reply in small pieces to its end", () =>
+  Effect.gen(function* () {
+    const f = yield* claudeIntegrationFixture()
+    const long = "Every word of this reply streams in its own small piece. ".repeat(8).trim()
+    const agent = yield* f.start(long, claudeCode)
+    const [turn] = yield* f.transcript(agent.id, settled(1))
+
+    assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
+    assert.deepStrictEqual(lastText(turn), TextPart.make({ text: `Fake reply to: ${long}` }))
+  }),
+)
+
+it.live("sends a message's images to the model", () =>
+  Effect.gen(function* () {
+    const f = yield* claudeIntegrationFixture()
+    const agent = yield* f.start("What's this?", claudeCode, [pixel])
+    const [turn] = yield* f.transcript(agent.id, settled(1))
+
+    assert.deepStrictEqual(turn?.images, [pixel])
+    assert.isTrue(hasImage(f.claude.calls[0]))
+  }),
+)
+
+it.live("lists Claude Code's models and efforts, naming its default after the model it runs", () =>
+  Effect.gen(function* () {
+    const f = yield* claudeIntegrationFixture()
+    const listed = yield* f.client.ListAgentModels({ engine: "claude-code", place: thisMac })
+    const efforts = ["low", "medium", "high", "xhigh", "max"]
+
+    assert.deepStrictEqual(listed.defaultModel, { id: "default", name: "Opus", efforts })
+    assert.deepStrictEqual(listed.models, [
+      { id: "opus", name: "Opus", efforts },
+      { id: "fable", name: "Fable", efforts },
+      { id: "sonnet", name: "Sonnet", efforts },
+      { id: "haiku", name: "Haiku", efforts },
+    ])
+  }),
+)
+
+it.live("starts on the chosen model and effort, and changes them for the next Turn", () =>
+  Effect.gen(function* () {
+    const f = yield* claudeIntegrationFixture()
+    const agent = yield* f.start("Which model?", { ...claudeCode, model: "sonnet", effort: "high" })
+    yield* f.transcript(agent.id, settled(1))
+
+    yield* f.client.ChangeAgentModel({ agentId: agent.id, model: null, effort: null })
+    yield* f.send(agent.id, "And now?")
+    yield* f.transcript(agent.id, settled(2))
+
+    assert.deepStrictEqual(
+      f.claude.calls.map(({ model, output_config }) => ({ model, effort: output_config?.effort })),
+      [
+        { model: "claude-sonnet-5-5", effort: "high" },
+        { model: "claude-opus-5-5", effort: "medium" },
+      ],
+    )
+  }),
+)
+
+it.live("Steers a running Turn, showing the Steer where Claude Code takes it in", () =>
+  Effect.gen(function* () {
+    const f = yield* claudeIntegrationFixture()
+    yield* f.claude.hold
+    const agent = yield* f.start("Start", claudeCode)
+    yield* f.claude.received(1)
+
+    yield* f.steer(agent.id, "Change course")
+    yield* f.claude.release
+
+    const done = yield* f.watch(agent.id, ({ turns }) => settled(1)(turns))
+    assert.deepStrictEqual(done.turns[0]?.ended?.ending, TurnDone.make({}))
+    assert.deepStrictEqual(done.queued, [])
+    assert.deepInclude(
+      done.turns[0]?.parts ?? [],
+      SteerPart.make({ message: "Change course", images: [] }),
+    )
+    assert.include(sent(f.claude.calls.at(-1)), "Change course")
+  }),
+)
+
+it.live("continues the conversation after a relaunch", () =>
+  Effect.gen(function* () {
+    const f = yield* claudeIntegrationFixture()
+    const agent = yield* f.start("Remember the word lantern", claudeCode)
+    yield* f.transcript(agent.id, settled(1))
+
+    const restarted = yield* f.restart
+    yield* restarted.SendMessage({ agentId: agent.id, message: "What was the word?", images: [] })
+    yield* f.transcript(agent.id, settled(2), restarted)
+
+    assert.include(sent(f.claude.calls.at(-1)), "lantern")
   }),
 )

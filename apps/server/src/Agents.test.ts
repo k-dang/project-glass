@@ -6,8 +6,6 @@ import {
   type Image,
   isRequestPart,
   isWaiting,
-  type NewAgent,
-  nothingUnsent,
   TextPart,
   TextPatch,
   thisMac,
@@ -17,14 +15,13 @@ import {
   type Turn,
   TurnCutOff,
   TurnDone,
-  type TurnPart,
   TurnInterrupted,
   TurnStopped,
 } from "@glass/contracts"
 import { Effect, Option, Predicate, Stream } from "effect"
 import { Socket } from "effect/socket"
 import { execFileSync } from "node:child_process"
-import { existsSync, realpathSync, rmSync } from "node:fs"
+import { existsSync, rmSync } from "node:fs"
 import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { DatabaseSync } from "node:sqlite"
@@ -316,69 +313,7 @@ const pixel: Image = {
 
 const queuedMessages = ({ queued }: Transcript) => queued.map(({ message }) => message)
 
-const endings = (turns: ReadonlyArray<Turn>) =>
-  turns.map(({ message, ended }) => ({ message, ending: ended?.ending._tag }))
-
 const holding = { output: "Done.", hang: true }
-
-for (const engine of ["pi", "claude-code"] as const)
-  it.live(
-    `queues messages sent while a ${engine} Turn runs, starting them in order as Turns end, except a cancelled one`,
-    () =>
-      Effect.gen(function* () {
-        const f = yield* agentsFixture(holding, undefined, { hang: true })
-        const agent = yield* f.start("First", { engine, model: null, effort: null })
-        yield* f.transcript(agent.id, (turns) => turns.length === 1)
-
-        for (const message of ["Second", "Third", "Fourth"]) yield* f.send(agent.id, message)
-
-        const waiting = yield* f.watch(agent.id, ({ queued }) => queued.length === 3)
-        assert.deepStrictEqual(queuedMessages(waiting), ["Second", "Third", "Fourth"])
-
-        const third = waiting.queued[1]?.id ?? ""
-        yield* f.client.CancelQueuedMessage({ agentId: agent.id, queuedMessageId: third })
-        yield* f.watch(agent.id, ({ queued }) => queued.length === 2)
-
-        yield* f.model.release({ output: "Done." })
-        yield* f.claude.configure({})
-
-        const done = yield* f.watch(agent.id, ({ turns }) => settled(3)(turns))
-        assert.deepStrictEqual(endings(done.turns), [
-          { message: "First", ending: "Done" },
-          { message: "Second", ending: "Done" },
-          { message: "Fourth", ending: "Done" },
-        ])
-        assert.deepStrictEqual(done.queued, [])
-      }),
-  )
-
-it.live(
-  "keeps Queued messages when a relaunch interrupts the Turn, to send when the user chooses",
-  () =>
-    Effect.gen(function* () {
-      const f = yield* agentsFixture(holding)
-      const agent = yield* f.start()
-      yield* f.model.received(1)
-      yield* f.send(agent.id, "Again")
-
-      const restarted = yield* f.restart
-      yield* f.model.release({ output: "Done." })
-
-      const interrupted = yield* f.watch(agent.id, ({ turns }) => settled(1)(turns), restarted)
-      assert.deepStrictEqual(interrupted.turns[0]?.ended?.ending, TurnInterrupted.make({}))
-      assert.deepStrictEqual(queuedMessages(interrupted), ["Again"])
-
-      const [again] = interrupted.queued
-      yield* restarted.SendQueuedMessage({ agentId: agent.id, queuedMessageId: again?.id ?? "" })
-
-      const sent = yield* f.watch(agent.id, ({ turns }) => settled(2)(turns), restarted)
-      assert.deepStrictEqual(endings(sent.turns), [
-        { message: "Say hello", ending: "Interrupted" },
-        { message: "Again", ending: "Done" },
-      ])
-      assert.deepStrictEqual(sent.queued, [])
-    }),
-)
 
 const shownParts = (turn: Turn | undefined) =>
   turn?.parts.map((part) =>
@@ -408,25 +343,6 @@ it.live("Steers a pi Turn, which takes the message in before it ends", () =>
       { steer: "Change course" },
       { text: "Changed." },
     ])
-  }),
-)
-
-it.live("Steers a Claude Code Turn, which takes the message in before it ends", () =>
-  Effect.gen(function* () {
-    const f = yield* agentsFixture({}, undefined, { hang: true })
-    const agent = yield* f.start("Start", claudeCode)
-    yield* f.transcript(agent.id, (turns) => turns.length === 1)
-    yield* f.claude.logged("prompt", 1)
-
-    yield* f.steer(agent.id, "Change course")
-
-    const done = yield* f.watch(agent.id, ({ turns }) => settled(1)(turns))
-    assert.deepStrictEqual(done.turns[0]?.ended?.ending, TurnDone.make({}))
-    assert.deepStrictEqual(shownParts(done.turns[0]), [
-      { steer: "Change course" },
-      { text: "Taken in: Change course" },
-    ])
-    assert.deepStrictEqual(done.queued, [])
   }),
 )
 
@@ -509,43 +425,6 @@ it.live(
     }),
 )
 
-it.live("stops a Claude Code Turn, keeping its Queued messages", () =>
-  Effect.gen(function* () {
-    const f = yield* agentsFixture({}, undefined, { hang: true })
-    const agent = yield* f.start("Start", claudeCode)
-    yield* f.claude.logged("prompt", 1)
-
-    yield* f.send(agent.id, "Later")
-    yield* f.client.StopTurn({ agentId: agent.id })
-
-    const stopped = yield* f.watch(agent.id, ({ turns }) => settled(1)(turns))
-    assert.deepStrictEqual(stopped.turns[0]?.ended?.ending, TurnStopped.make({}))
-    assert.deepStrictEqual(queuedMessages(stopped), ["Later"])
-  }),
-)
-
-it.live("stops a Turn whose program is still starting, which never gets the message", () =>
-  Effect.gen(function* () {
-    const f = yield* agentsFixture({}, undefined, { holdStart: true })
-    const agent = yield* f.start("Start", claudeCode)
-    yield* f.claude.logged("control", 1)
-
-    yield* f.client.StopTurn({ agentId: agent.id })
-    const [stopped] = yield* f.transcript(agent.id, settled(1))
-    assert.deepStrictEqual(stopped?.ended?.ending, TurnStopped.make({}))
-
-    yield* f.claude.configure({})
-    yield* f.send(agent.id, "Next")
-    yield* f.transcript(agent.id, settled(2))
-
-    const prompts = (yield* f.claude.log).flatMap((entry) =>
-      entry.kind === "prompt" ? [entry.prompt] : [],
-    )
-
-    assert.deepStrictEqual(prompts, ["Next"])
-  }),
-)
-
 it.live("sends a message's images to pi and keeps them in the transcript", () =>
   Effect.gen(function* () {
     const f = yield* agentsFixture({ output: "A pixel." })
@@ -557,37 +436,6 @@ it.live("sends a message's images to pi and keeps them in the transcript", () =>
       JSON.stringify(f.model.calls[0]?.messages),
       `data:image/png;base64,${pixel.data}`,
     )
-  }),
-)
-
-it.live("sends a message's images to Claude Code", () =>
-  Effect.gen(function* () {
-    const f = yield* agentsFixture({})
-    const agent = yield* f.start("What's this?", claudeCode, [pixel])
-    yield* f.transcript(agent.id, settled(1))
-
-    const prompts = (yield* f.claude.log).filter(({ kind }) => kind === "prompt")
-    assert.deepStrictEqual(
-      prompts.map((entry) => entry.kind === "prompt" && entry.images),
-      [["image/png"]],
-    )
-  }),
-)
-
-it.live("keeps an Agent's unsent message across a relaunch until it is cleared", () =>
-  Effect.gen(function* () {
-    const f = yield* agentsFixture({ output: "Hi." })
-    const agent = yield* f.start()
-    const unsent = { message: "Half a thought", images: [pixel] }
-    yield* f.client.SaveUnsentMessage({ agentId: agent.id, ...unsent })
-
-    const restarted = yield* f.restart
-    const kept = yield* restarted.GetUnsentMessage({ agentId: agent.id })
-    assert.deepStrictEqual({ message: kept.message, images: kept.images }, unsent)
-
-    yield* restarted.SaveUnsentMessage({ agentId: agent.id, ...nothingUnsent })
-    const cleared = yield* restarted.GetUnsentMessage({ agentId: agent.id })
-    assert.deepStrictEqual({ message: cleared.message, images: cleared.images }, nothingUnsent)
   }),
 )
 
@@ -776,61 +624,36 @@ it.live(
     }),
 )
 
-type Fixture = Effect.Success<ReturnType<typeof agentsFixture>>
+it.live(
+  "marks a running pi Turn interrupted after a relaunch, and continues the conversation",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* agentsFixture({})
 
-const relaunches: ReadonlyArray<{
-  readonly program: string
-  readonly choice: Pick<NewAgent, "engine" | "model" | "effort">
-  readonly replyWithEarlier: (f: Fixture) => Effect.Effect<void>
-  readonly hang: (f: Fixture) => Effect.Effect<void>
-}> = [
-  {
-    program: "pi",
-    choice: { engine: "pi", model: null, effort: null },
-    replyWithEarlier: (f) =>
-      f.model.configure({
+      const replyWithEarlier = f.model.configure({
         output: (input) => `Earlier: ${userMessages(input).slice(0, -1).join(" | ")}`,
-      }),
-    hang: (f) => f.model.configure({ hang: true }),
-  },
-  {
-    program: "Claude Code",
-    choice: claudeCode,
-    replyWithEarlier: (f) => f.claude.configure({ reply: [{ text: "Earlier: {earlier}" }] }),
-    hang: (f) => f.claude.configure({ hang: true }),
-  },
-]
+      })
 
-for (const { program, choice, replyWithEarlier, hang } of relaunches)
-  it.live(
-    `marks a running ${program} Turn interrupted after a relaunch, and continues the conversation`,
-    () =>
-      Effect.gen(function* () {
-        const f = yield* agentsFixture({})
-        yield* replyWithEarlier(f)
-        const agent = yield* f.start("Remember the word lantern", choice)
-        yield* f.transcript(agent.id, settled(1))
+      yield* replyWithEarlier
+      const agent = yield* f.start("Remember the word lantern")
+      yield* f.transcript(agent.id, settled(1))
 
-        yield* hang(f)
-        yield* f.send(agent.id, "Keep going")
-        yield* f.transcript(agent.id, (turns) => turns.length === 2)
+      yield* f.model.configure({ hang: true })
+      yield* f.send(agent.id, "Keep going")
+      yield* f.transcript(agent.id, (turns) => turns.length === 2)
 
-        const restarted = yield* f.restart
-        yield* replyWithEarlier(f)
-        yield* restarted.SendMessage({
-          agentId: agent.id,
-          message: "What was the word?",
-          images: [],
-        })
-        const turns = yield* f.transcript(agent.id, settled(3), restarted)
+      const restarted = yield* f.restart
+      yield* replyWithEarlier
+      yield* restarted.SendMessage({ agentId: agent.id, message: "What was the word?", images: [] })
+      const turns = yield* f.transcript(agent.id, settled(3), restarted)
 
-        assert.deepStrictEqual(
-          turns.map(({ ended }) => ended?.ending),
-          [TurnDone.make({}), TurnInterrupted.make({}), TurnDone.make({})],
-        )
-        assert.include(lastText(turns[2])?.text, "lantern")
-      }),
-  )
+      assert.deepStrictEqual(
+        turns.map(({ ended }) => ended?.ending),
+        [TurnDone.make({}), TurnInterrupted.make({}), TurnDone.make({})],
+      )
+      assert.include(lastText(turns[2])?.text, "lantern")
+    }),
+)
 
 it.live(
   "fills in what it missed while it lost its connection to the agent host, repeating nothing",
@@ -897,7 +720,7 @@ it.live(
 
 it.live("cuts off the running Turn when its output can't be saved, and keeps the Agent going", () =>
   Effect.gen(function* () {
-    const f = yield* agentsFixture({}, undefined, { reply: [{ text: "Hello from Claude Code." }] })
+    const f = yield* agentsFixture({ output: "Hello from pi." })
     const database = new DatabaseSync(join(f.home, ".project-glass", "glass.db"))
 
     try {
@@ -905,7 +728,7 @@ it.live("cuts off the running Turn when its output can't be saved, and keeps the
         CREATE TRIGGER refuse_parts BEFORE INSERT ON agent_turn_part
         BEGIN SELECT RAISE(FAIL, 'disk full'); END
       `)
-      const agent = yield* f.start("First", claudeCode)
+      const agent = yield* f.start("First")
       const [cutOff] = yield* f.transcript(agent.id, settled(1))
       assert.deepStrictEqual(cutOff?.ended?.ending, TurnCutOff.make({}))
 
@@ -913,130 +736,16 @@ it.live("cuts off the running Turn when its output can't be saved, and keeps the
       yield* f.send(agent.id, "Second")
       const turns = yield* f.transcript(agent.id, settled(2))
       assert.deepStrictEqual(turns[1]?.ended?.ending, TurnDone.make({}))
-      assert.deepStrictEqual(lastText(turns[1]), TextPart.make({ text: "Hello from Claude Code." }))
+      assert.deepStrictEqual(lastText(turns[1]), TextPart.make({ text: "Hello from pi." }))
     } finally {
       database.close()
     }
   }),
 )
 
-const shown = (part: TurnPart) =>
-  Predicate.isTagged(part, "ToolCall")
-    ? {
-        name: part.name,
-        summary: part.inputSummary,
-        output: part.output,
-        status: part.status,
-        parent: part.parentToolCallId,
-      }
-    : part
-
-it.live(
-  "streams a Claude Code Agent's thinking, text, and tool calls, nesting a subagent's under its parent",
-  () =>
-    Effect.gen(function* () {
-      const f = yield* agentsFixture({}, undefined, {
-        reply: [
-          { thinking: "I'll delegate the listing." },
-          {
-            toolCall: {
-              id: "task-1",
-              name: "Agent",
-              input: { description: "List files", prompt: "Run ls" },
-              output: "README.md",
-            },
-          },
-          {
-            toolCall: {
-              id: "bash-1",
-              name: "Bash",
-              input: { command: "ls" },
-              output: "README.md",
-              parentToolCallId: "task-1",
-            },
-          },
-          {
-            toolCall: {
-              id: "bash-2",
-              name: "Bash",
-              input: { command: "false" },
-              output: "exit 1",
-              isError: true,
-            },
-          },
-          { text: "There's a **README**." },
-        ],
-      })
-
-      const agent = yield* f.start("What's here?", claudeCode)
-      const [turn] = yield* f.transcript(agent.id, settled(1))
-
-      assert.equal(agent.engine, "claude-code")
-      assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
-      assert.deepStrictEqual(turn?.parts.map(shown), [
-        ThinkingPart.make({ text: "I'll delegate the listing." }),
-        { name: "Agent", summary: "List files", output: "README.md", status: "done", parent: null },
-        { name: "Bash", summary: "ls", output: "README.md", status: "done", parent: "task-1" },
-        { name: "Bash", summary: "false", output: "exit 1", status: "failed", parent: null },
-        TextPart.make({ text: "There's a **README**." }),
-      ])
-
-      const launched = (yield* f.claude.log).flatMap((line) =>
-        line.kind === "launched" ? [line.cwd] : [],
-      )
-
-      assert.deepStrictEqual(launched, [realpathSync(f.worktree(agent.name))])
-    }),
-)
-
-it.live("fails a Claude Code Turn with a reason that leaves out Claude Code's own words", () =>
-  Effect.gen(function* () {
-    const f = yield* agentsFixture({}, undefined, {
-      error: { status: 401, message: "sk-ant-secret is not a valid API key" },
-    })
-
-    const agent = yield* f.start("Say hello", claudeCode)
-    const [turn] = yield* f.transcript(agent.id, settled(1))
-
-    const ending = turn?.ended?.ending
-    const reason = Predicate.isTagged(ending, "Failed") ? ending.reason : ""
-    assert.include(reason, "sign in")
-    assert.notInclude(reason, "sk-ant-secret")
-  }),
-)
-
-it.live(
-  "fails the running Turn when Claude Code exits, and starts it again for the next message",
-  () =>
-    Effect.gen(function* () {
-      const f = yield* agentsFixture({}, undefined, { exit: true })
-      const agent = yield* f.start("Say hello", claudeCode)
-
-      const [failed] = yield* f.transcript(agent.id, settled(1))
-      const ending = failed?.ended?.ending
-      assert.include(Predicate.isTagged(ending, "Failed") ? ending.reason : "", "stopped")
-
-      yield* f.claude.configure({ reply: [{ text: "Back again." }] })
-      yield* f.send(agent.id, "Try again")
-      const [, retried] = yield* f.transcript(agent.id, settled(2))
-
-      assert.deepStrictEqual(retried?.ended?.ending, TurnDone.make({}))
-      assert.deepInclude(retried?.parts ?? [], TextPart.make({ text: "Back again." }))
-    }),
-)
-
-it.live("lists the models and efforts each agent program offers, with its default", () =>
+it.live("lists the models and efforts pi offers, with its default", () =>
   Effect.gen(function* () {
     const f = yield* agentsFixture({})
-
-    const claude = yield* f.client.ListAgentModels({ engine: "claude-code", place: thisMac })
-    assert.equal(claude.defaultModel?.name, "Opus 5.5")
-    assert.deepStrictEqual(claude.models, [
-      { id: "opus", name: "Opus 5.5", efforts: ["low", "medium", "high", "xhigh", "max"] },
-      { id: "sonnet", name: "Sonnet 5.5", efforts: ["low", "medium", "high"] },
-      { id: "claude-haiku-4-5", name: "Haiku 4.5", efforts: [] },
-    ])
-
     const pi = yield* f.client.ListAgentModels({ engine: "pi", place: thisMac })
     assert.equal(pi.defaultModel?.id, "glass-test/gpt-test")
     // pi also lists the models of any other provider this machine has credentials for.
@@ -1096,38 +805,6 @@ it.live(
 )
 
 it.live(
-  "starts a Claude Code Agent on the chosen model and effort, and changes them for the next Turn",
-  () =>
-    Effect.gen(function* () {
-      const f = yield* agentsFixture({}, undefined, { reply: [{ text: "{model} at {effort}" }] })
-
-      const agent = yield* f.start("Which model?", {
-        engine: "claude-code",
-        model: "sonnet",
-        effort: "high",
-      })
-
-      const [first] = yield* f.transcript(agent.id, settled(1))
-      assert.deepStrictEqual(lastText(first), TextPart.make({ text: "sonnet at high" }))
-
-      const changed = yield* f.client.ChangeAgentModel({
-        agentId: agent.id,
-        model: null,
-        effort: null,
-      })
-
-      assert.deepStrictEqual(
-        { model: changed.model, effort: changed.effort },
-        { model: null, effort: null },
-      )
-
-      yield* f.send(agent.id, "And now?")
-      const [, second] = yield* f.transcript(agent.id, settled(2))
-      assert.deepStrictEqual(lastText(second), TextPart.make({ text: "default at default" }))
-    }),
-)
-
-it.live(
   "starts a pi Agent on the chosen model and effort, and changes them for the next Turn",
   () =>
     Effect.gen(function* () {
@@ -1180,17 +857,5 @@ it.live("runs a pi Agent's next Turn on pi's own thinking level once its effort 
       f.model.calls.map(({ reasoning_effort }) => reasoning_effort),
       ["high", "medium"],
     )
-  }),
-)
-
-it.live("streams a long Claude Code reply, a fast burst of events, to its end", () =>
-  Effect.gen(function* () {
-    const long = "Every word of this reply streams in its own small piece. ".repeat(8).trim()
-    const f = yield* agentsFixture({}, undefined, { reply: [{ text: long }] })
-    const agent = yield* f.start("Say a lot", claudeCode)
-    const [turn] = yield* f.transcript(agent.id, settled(1))
-
-    assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
-    assert.deepStrictEqual(lastText(turn), TextPart.make({ text: long }))
   }),
 )
