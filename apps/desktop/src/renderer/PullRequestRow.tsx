@@ -39,8 +39,7 @@ export const columnsWithRepository =
 
 export const columns = "grid-cols-[0_1rem_minmax(0,1fr)_3.5rem_7rem_2rem_0]"
 
-export const queueColumns =
-  "grid-cols-[0_auto_minmax(0,1fr)_fit-content(9rem)_3.5rem_7rem_2rem_0]"
+export const queueColumns = "grid-cols-[0_auto_minmax(0,1fr)_fit-content(9rem)_3.5rem_7rem_2rem_0]"
 
 export const subgridRow = "col-span-full grid grid-cols-subgrid"
 
@@ -100,7 +99,9 @@ export function PullRequestRow(props: {
           <TooltipTrigger id={statusId} render={<span aria-hidden />}>
             <StatusIcon className={cn("size-4", status.tone)} />
           </TooltipTrigger>
-          <TooltipContent>{finished?.label ?? `Checks ${checks.label.toLowerCase()}`}</TooltipContent>
+          <TooltipContent>
+            {finished?.label ?? `Checks ${checks.label.toLowerCase()}`}
+          </TooltipContent>
         </Tooltip>
         {props.lead}
       </span>
