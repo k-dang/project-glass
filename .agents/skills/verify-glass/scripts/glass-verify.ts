@@ -17,6 +17,7 @@ import { connect, createServer as createNetServer } from "node:net"
 import { basename, delimiter, join } from "node:path"
 import { parseArgs } from "node:util"
 import { Cdp, cdpJson } from "./cdp.ts"
+import { formatAreas, formatSummary, type MemorySample, startSampler } from "./memory.ts"
 import { FAKE_MODES, isFakeMode, serveFakeGitHub } from "./fake-github.ts"
 import { VIEWER } from "../../../../apps/server/test/fakePullRequest.ts"
 import { serveFakeAnthropic } from "./fake-anthropic.ts"
@@ -48,7 +49,20 @@ const USAGE = `Usage: node .agents/skills/verify-glass/scripts/glass-verify.ts <
                                          click the element, then replace its text with <text>
   press --key <key> [--meta]             press a key (e.g. Enter, ArrowUp) in the focused element,
                                          holding ⌘ with --meta
+  scroll --by <pixels> [--x <n>] [--y <n>]
+                                         turn the wheel over the window, for views that load as you
+                                         scroll
   wait --text <text> [--timeout <ms>]    wait until the window shows <text>
+  memory [--samples <n>] [--interval <ms>] [--gc] [--out <name>]
+                                         sample renderer, worker, and process memory to
+                                         evidence/<name>.jsonl, then print what moved
+  memory --sweep [--dwell <n>] [--interval <ms>] [--gc] [--out <name>]
+                                         visit every rail area in turn, sample it while it
+                                         settles, then revisit Dashboard and print one row
+                                         per area
+                                         --gc collects garbage before each sample, so DOM
+                                         counts and commit show what is retained, not what
+                                         the collector has not reached yet
   fake-github <ok|401|500|down|busy-500> change what the run's fake GitHub answers
   kill-backend                           kill the backend process, as a crash would
   stop                                   quit Glass, keep logs as evidence, delete run state
@@ -667,6 +681,15 @@ const main = async () => {
       name: { type: "string" },
       text: { type: "string" },
       timeout: { type: "string", default: "15000" },
+      samples: { type: "string", default: "30" },
+      interval: { type: "string", default: "1000" },
+      sweep: { type: "boolean", default: false },
+      dwell: { type: "string", default: "4" },
+      gc: { type: "boolean", default: false },
+      out: { type: "string" },
+      by: { type: "string" },
+      x: { type: "string" },
+      y: { type: "string" },
     },
   })
   const [command, arg] = positionals
@@ -730,6 +753,73 @@ const main = async () => {
       }
       case "text":
         return console.log(await page.evaluate("document.body.innerText", Schema.String))
+      case "scroll": {
+        const by = Number(values.by)
+        if (!Number.isFinite(by) || by === 0) fail("scroll needs --by <pixels>")
+        const x = Number(values.x ?? 800)
+        const y = Number(values.y ?? 400)
+        await page.send("Input.dispatchMouseEvent", EmptyResponse, {
+          type: "mouseWheel",
+          x,
+          y,
+          deltaX: 0,
+          deltaY: by,
+        })
+        return console.log(`Scrolled by ${by}px at ${x},${y}`)
+      }
+      case "memory": {
+        const samples = Number(values.samples)
+        const interval = Number(values.interval)
+        const dwell = Number(values.dwell)
+        if (!Number.isInteger(samples) || samples < 1) fail("--samples is a positive integer")
+        if (!Number.isFinite(interval) || interval < 0) fail("--interval is milliseconds")
+        if (values.sweep && (!Number.isInteger(dwell) || dwell < 1))
+          fail("--dwell is a positive integer")
+        const name =
+          values.out ?? `memory-${new Date().toISOString().replace(/\D/g, "").slice(0, 14)}`
+        const file = join(evidenceDir(run), `${name}.jsonl`)
+        writeFileSync(file, "")
+        const sampler = await startSampler(page, glassPid(run))
+        const started = Date.now()
+        const collected: Array<MemorySample> = []
+        let seq = 0
+        const record = async (label?: string) => {
+          if (values.gc) await page.send("HeapProfiler.collectGarbage", Schema.Struct({}))
+          const sample = await sampler.sample(++seq, label)
+          collected.push(sample)
+          writeFileSync(file, `${JSON.stringify(sample)}\n`, { flag: "a" })
+          process.stdout.write(".")
+        }
+        try {
+          if (values.sweep) {
+            const areas = ["Dashboard", "Reviews", "To-dos", "Agents", "Activity", "Settings"]
+            for (const [index, area] of [...areas, "Dashboard"].entries()) {
+              const label = index === areas.length ? "Dashboard again" : area
+              await clickElement(page, "link", area)
+              console.log(`\n${label}: settling`)
+              await sleep(2000)
+              for (let taken = 0; taken < dwell; taken++) {
+                if (taken > 0) await sleep(interval)
+                await record(label)
+              }
+            }
+          } else {
+            for (let taken = 1; taken <= samples; taken++) {
+              const wait = started + (taken - 1) * interval - Date.now()
+              if (wait > 0) await sleep(wait)
+              await record()
+            }
+          }
+        } finally {
+          sampler.close()
+        }
+        process.stdout.write("\n")
+        return console.log(
+          values.sweep
+            ? formatAreas(collected, file, Date.now() - started)
+            : formatSummary(collected, file, Date.now() - started),
+        )
+      }
       case "snapshot": {
         if (!arg) fail("snapshot needs a name")
         const tree = formatAxTree(await axTree(page))

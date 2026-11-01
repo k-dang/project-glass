@@ -32,7 +32,7 @@ node $V launch --backend fake                   # pnpm dev:fake's backend, with 
 
 Each run is isolated under `.verify/<id>/` (gitignored): its own Electron profile, its own `GLASS_HOME` (so backend logs and data files go to the run, not `~/.glass/logs` and `~/.project-glass`), its own ports. Several runs can live side by side; then every command needs `--run <id>`.
 
-With `--github fake`, the backend's `GLASS_GITHUB_API_URL` points at the shared fake in `apps/server/test/fakeGitHub.ts`. It answers `GET /user` as `octocat` (`ok`), HTTP 401, HTTP 500, or a dropped connection (`down`), and `GH_TOKEN` is a dummy. In `ok` mode it also answers the PR list reads (the full read of open PRs, the catch-up search, and checks) with four Needs review PRs (Passing, Failing, Running, and Unavailable checks), two My PRs (one a draft), and one Reviewing PR per followed repository; a repository named `quiet` has none and one named `busy` supplies 134 Needs review PRs alongside My PRs and Reviewing. `busy-500` answers like `ok` except that every PR list read of the `busy` repository fails with HTTP 500. Listed PRs open into a PR workspace with a one-file diff; Drafts, Reviews, and Tours use the shared fake too. That env var is the backend's real GitHub boundary, so everything from the renderer to the HTTP call is production code. Change its answer mid-run with `node $V fake-github <mode>`.
+With `--github fake`, the backend's `GLASS_GITHUB_API_URL` points at the shared fake in `apps/server/test/fakeGitHub.ts`. It answers `GET /user` as `octocat` (`ok`), HTTP 401, HTTP 500, or a dropped connection (`down`), and `GH_TOKEN` is a dummy. In `ok` mode it also answers the PR list reads (the full read of open PRs, the catch-up search, and checks) with four Needs review PRs (Passing, Failing, Running, and Unavailable checks), two My PRs (one a draft), and one Reviewing PR per followed repository; a repository named `quiet` has none and one named `busy` supplies 134 Needs review PRs alongside My PRs and Reviewing. `busy-500` answers like `ok` except that every PR list read of the `busy` repository fails with HTTP 500. Listed PRs open into a PR workspace with a one-file diff; `octo-org/glass#101` is the exception, 150 generated files for scroll and memory runs. Drafts, Reviews, and Tours use the shared fake too. That env var is the backend's real GitHub boundary, so everything from the renderer to the HTTP call is production code. Change its answer mid-run with `node $V fake-github <mode>`.
 
 Tour verification defaults to `--tour-provider fake`. Choose **pi** as the Tour engine in Settings → Tours before **Write Tour**. Your installed `pi` calls a local provider that returns a clearly marked synthetic Chapter covering the PR's actual changed paths. Pi credentials and model settings live inside the run; Claude Code is disabled to prevent accidental paid calls. GitHub still uses the chosen `--github` mode. See [Tours](features/tours.md) for the recipe. Choose `--tour-provider real` explicitly to use your normal Pi configuration and Claude Code installation; this may incur model charges.
 
@@ -55,12 +55,47 @@ Read-only. Checks an Electron process serves the run's CDP port, that port belon
 | `type --role <role> --name <name> --text <text>` | clicks the element, then replaces its contents with `<text>` as a paste would               |
 | `press --key <key> [--meta]`                     | presses a key such as `Enter` or `ArrowUp` in the focused element, holding ⌘ with `--meta`  |
 | `wait --text <text> [--timeout ms]`              | polls the window text (default 15s); exit 1 on timeout                                      |
+| `scroll --by <pixels> [--x n] [--y n]`           | turns the wheel over the window, for views that load as you scroll                          |
+| `memory [--samples n] [--interval ms] [--gc] [--out n]` | samples renderer, worker, and process memory into `evidence/<out>.jsonl`, then prints deltas |
+| `memory --sweep [--dwell n] [--gc] [--out n]`     | visits each rail area, samples it, and prints one row per area                              |
 | `fake-github <mode>`                             | changes the fake GitHub's answer for the next request                                       |
 | `kill-backend`                                   | kills the window's current backend process, as a crash would                                |
 
 Target elements by accessible role and name from a `snapshot` (e.g. `--role button --name "Try again"`), never by coordinates. Use `wait`, not `sleep`, after any action that triggers an RPC.
 
 For anything not covered, `node $V doctor` prints the CDP port; `http://127.0.0.1:<port>/json/list` gives the page's WebSocket URL for raw CDP.
+
+## Memory
+
+`memory` samples a live run, writes one JSON line per sample to `evidence/<out>.jsonl`, and prints what moved:
+
+```sh
+node $V memory --samples 30 --interval 1000 --out baseline
+```
+
+Each line holds the renderer's V8 heap, Blink counters and DOM counts, every worker target's own heap, and every process under the app's main process with its role and memory. The renderer numbers come from CDP (`Performance.getMetrics`, `Runtime.getHeapUsage`, `Memory.getDOMCounters`); worker heaps need `Target.setAutoAttach`, because a worker's V8 isolate is not part of the page's numbers. Process figures come from the OS (`Get-CimInstance Win32_Process`, or `ps`), because CDP cannot see RSS, the GPU process, main, or the backend.
+
+`rss` is the working set the app's own RAM readout sums, so shared pages count once per process and the total is an upper bound. `private` is the commit charge and the steadier number; compare `total private` across commits. A sample costs about a quarter second on Windows, so `--interval 1000` yields roughly one sample a second.
+
+`--gc` collects garbage before each sample. Without it, `DOM nodes` counts nodes the collector has not reached yet, so leaving a page can look like it kept its DOM; with it, the count is what is actually retained. Prefer `--gc` when comparing areas or judging whether a view released anything.
+
+`--sweep` walks the rail: Dashboard, Reviews, To-dos, Agents, Activity, Settings, then Dashboard again. It settles for two seconds after each click, takes `--dwell` samples labelled with the area, and prints one row per area:
+
+```sh
+node $V memory --sweep --dwell 4 --gc --out areas
+```
+
+Compare `renderer` (the renderer process's commit charge) across rows, not `total private`: with `--backend fake`, the backend's dev server and its fake GitHub and Anthropic servers are counted too, and they dwarf the UI.
+
+Measure a workload, not an idle window: what matters is what it adds and what it keeps afterwards. The repeatable one is the fake's 150-file PR (see [Changed files](features/changed-files.md)). `memory` runs in the foreground for the whole sample window, so drive from a second shell:
+
+```sh
+node $V launch --github fake            # follow octo-org/glass; open "Wide change across 150 files"
+node $V memory --samples 80 --out baseline   # shell 1
+node $V click --role tab --name Changes      # shell 2, then scroll --by 9000 to the last file
+```
+
+Sampling is read-only, but it attaches a debugger to the window's target, which fails while DevTools is open on that window.
 
 ## Evidence
 
