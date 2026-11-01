@@ -625,6 +625,7 @@ it("reopens a PR as Glass last loaded it, marking Reload once GitHub says it cha
   await user.click(await rowFor("Greet the world"))
   ;(await next(opens)).answer(Effect.succeed(workspaceOf(greet, "head001", [savedDraft])))
   await screen.findByText("Private feedback")
+  ;(await next(checks)).answer(Effect.succeed(false))
   await user.click(screen.getByRole("button", { name: "Back to PRs" }))
 
   await user.click(await rowFor("Greet the world"))
@@ -646,6 +647,58 @@ it("reopens a PR as Glass last loaded it, marking Reload once GitHub says it cha
   await user.hover(screen.getByRole("button", { name: "Reload" }))
   await screen.findByRole("tooltip")
   expect(reloadHint()).not.toContain("Changed on GitHub")
+})
+
+it("monitors a visible workspace without overlapping reads or replacing its Revision and Drafts", async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true })
+  const checks: Array<Held<{ updatedAt: DateTime.Utc }, boolean, ConnectionError>> = []
+  const calls: Array<void> = []
+  const opens: Array<PullRequestRef> = []
+
+  const user = mount({
+    OpenPullRequest: ({ pullRequest }) => {
+      opens.push(pullRequest)
+
+      return Effect.succeed(workspaceOf(greet, "head001", [savedDraft]))
+    },
+    HasPullRequestChanged: (input) => {
+      calls.push(undefined)
+
+      return hold(checks)(input)
+    },
+  })
+
+  await user.click(await rowFor("Greet the world"))
+  await screen.findByText("Private feedback")
+  const initial = await next(checks)
+  act(() => void window.dispatchEvent(new Event("focus")))
+  act(() => void vi.advanceTimersByTime(30_000))
+  expect(calls).toHaveLength(1)
+  await act(async () => initial.answer(Effect.succeed(false)))
+
+  act(() => setDocumentVisible(false))
+  act(() => void vi.advanceTimersByTime(60_000))
+  act(() => void window.dispatchEvent(new Event("focus")))
+  expect(calls).toHaveLength(1)
+  act(() => setDocumentVisible(true))
+  const changed = await next(checks)
+  await act(async () => changed.answer(Effect.succeed(true)))
+
+  await user.hover(screen.getByRole("button", { name: "Reload" }))
+  await screen.findByRole("tooltip")
+  expect(reloadHint()).toContain("Changed on GitHub")
+  expect(screen.getByText("head001")).toBeTruthy()
+  expect(screen.getByText("Private feedback")).toBeTruthy()
+  expect(opens).toEqual([greet.ref])
+
+  act(() => void vi.advanceTimersByTime(60_000))
+  act(() => void window.dispatchEvent(new Event("focus")))
+  expect(calls).toHaveLength(2)
+
+  await user.click(screen.getByRole("button", { name: "Back to PRs" }))
+  act(() => void vi.advanceTimersByTime(60_000))
+  act(() => void window.dispatchEvent(new Event("focus")))
+  expect(calls).toHaveLength(2)
 })
 
 const withDiscussion = (head: string, resolved = false) =>

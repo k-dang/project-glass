@@ -2,7 +2,6 @@ import {
   BinaryFile,
   Branches,
   type ChangedFile,
-  type Checks,
   type ConnectionError,
   DiscussionNotFound,
   type Discussions,
@@ -71,6 +70,7 @@ import {
 import { fromGitHubSide, toGitHubSide } from "./diffSide"
 import { GitHubAuth } from "./GitHubAuth"
 import {
+  type CheckObservation,
   type CandidatesPage,
   PULL_REQUEST_CHECKS_QUERY,
   REPOSITORY_PULL_REQUESTS_QUERY,
@@ -247,7 +247,7 @@ export class GitHubClient extends Context.Service<
     ) => Effect.Effect<CandidatesPage, ConnectionError>
     readonly pullRequestChecks: (
       pullRequestIds: ReadonlyArray<string>,
-    ) => Effect.Effect<ReadonlyMap<string, Checks>, ConnectionError>
+    ) => Effect.Effect<ReadonlyMap<string, CheckObservation>, ConnectionError>
     readonly queuedPullRequests: (
       refs: ReadonlyArray<PullRequestRef>,
     ) => Effect.Effect<ReadonlyArray<LookedUpPullRequest | null>, ConnectionError>
