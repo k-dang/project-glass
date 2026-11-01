@@ -35,6 +35,7 @@ const USAGE = `Usage: node .agents/skills/verify-glass/scripts/glass-verify.ts <
          [--tour-provider fake|real] [--fail-backend-start] [--backend real|fake]
          [--no-build] [--run <id>]
                                          build, start an isolated Glass, wait until ready
+                                         GitHub defaults to fake; --github real selects live GitHub
                                          Tour provider defaults to fake; real may incur model charges
                                          --backend fake runs pnpm dev:fake's backend and its demo
                                          Agents; it brings its own fake GitHub and providers, and
@@ -365,7 +366,7 @@ const withoutGhOnPath = (path: string) =>
 
 const launch = async (options: {
   run?: string
-  github: string
+  github: string | undefined
   fakeMode: string
   tourProvider: string
   noCredentials: boolean
@@ -374,7 +375,7 @@ const launch = async (options: {
   noBuild: boolean
 }) => {
   const github =
-    options.github === "real" || options.github === "fake"
+    options.github === undefined ? (options.backend === "fake" ? "real" : "fake") : options.github === "real" || options.github === "fake"
       ? options.github
       : fail("--github is real or fake")
   if (!isFakeMode(options.fakeMode)) fail(`--fake-mode is one of ${FAKE_MODES.join(", ")}`)
@@ -668,7 +669,7 @@ const main = async () => {
     allowPositionals: true,
     options: {
       run: { type: "string" },
-      github: { type: "string", default: "real" },
+      github: { type: "string" },
       "fake-mode": { type: "string", default: "ok" },
       "tour-provider": { type: "string", default: "fake" },
       "no-credentials": { type: "boolean", default: false },

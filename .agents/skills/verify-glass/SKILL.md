@@ -19,7 +19,7 @@ Run from the repo root. First time in a checkout: `mise trust && mise install &&
 
 ```sh
 V=.agents/skills/verify-glass/scripts/glass-verify.ts
-node $V launch                                  # real GitHub, local Pi provider; no model charges
+node $V launch                                  # fake GitHub, local Pi provider; no model charges
 node $V launch --tour-provider real             # live model provider; may incur charges
 node $V launch --github fake --fake-mode 401    # fake GitHub: ok | 401 | 500 | down | busy-500
 node $V launch --no-credentials                 # no token env vars, gh hidden from PATH
@@ -106,7 +106,7 @@ Proof standards:
 - Drive the real user path: clicks on the window, real backend, real RPC. Never call `window.glass` or the backend directly to _cause_ a state.
 - Capture the action and the resulting state: a snapshot/screenshot before and after, not only the final screen.
 - Verify side effects alongside the UI: `fake-github.log` proves the click reached GitHub; `stop` prints whether the backend port closed.
-- Use the fake only for GitHub states you can't produce honestly; prove the happy path once against real GitHub when the change touches it.
+- Use fake GitHub for isolated verification. Explicit `--github real` selects live GitHub; isolated storage does not isolate GitHub writes.
 - A fake-provider Tour proves the app, SDK transport, saving, and rendering. Report it as synthetic; live authentication and model output quality require a real-provider run.
 - Look at every screenshot with the Read tool; layout or copy that looks off is a finding.
 
