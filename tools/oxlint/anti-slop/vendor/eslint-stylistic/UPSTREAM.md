@@ -12,7 +12,7 @@ The rule is MIT-licensed. Keep `LICENSE` with every redistributed copy, includin
 
 ## Local adaptations
 
-- Removed 31 redundant comment blocks from the rule and helper adapter. Executable code, license material, upstream policy links, and retained API/JavaScript behavior notes are unchanged.
+- Removed 31 redundant comment blocks from the rule and helper adapter. That cleanup left executable code, license material, upstream policy links, and retained API/JavaScript behavior notes unchanged.
 
 - Replace upstream type aliases with Oxlint's ESTree, context, token/comment, and rule types. Upstream's token type includes comments; Oxlint exposes those separately.
 - Replace `AST_NODE_TYPES` enum members with identical string literals.
@@ -20,11 +20,14 @@ The rule is MIT-licensed. Keep `LICENSE` with every redistributed copy, includin
 - Replace the repository-specific `createRule` factory with `createPaddingLineRule(options)`. The anti-slop wrapper supplies typed options directly; it exposes no user configuration options.
 - Implement the small required AST helper surface in `padding-line-ast.ts` using Oxlint's public source-code/token API. `isParenthesized` only needs the one-pair check used to exclude parenthesized directive strings, not the upstream general-purpose overloads.
 - Retain the upstream statement matchers, scope tracking, comment-aware insertion/removal, selector support, and diagnostic text. Upstream naming and non-null assumptions remain localized here to keep future diffs reviewable; the file is not a model for new application code.
+- Glass's local insertion fix selects the source file's first line ending (CRLF, LF, or CR; defaults to LF when none exists). Previously a CRLF file acquired mixed line endings on autofix. Existing bytes and comments remain intact; the spacing policy is unchanged. This fix is not mirrored into the installation skill assets.
 
 The opinionated policy lives outside this directory in `../../rules/require-readable-spacing.ts`. It adds spacing without collapsing existing blank lines. Short local bindings, consecutive imports, and adjacent overload signatures/implementation remain grouped. Spacing is syntactic, not an inference of business-logic boundaries.
 
 ## Updating and verification
 
-Fetch an explicit upstream revision, compare the original rule and types against this revision, and port relevant fixes while retaining the adapters above. Update this record and preserve the license. Run `pnpm check` and `pnpm sync:skill-assets` as required by repository guidance.
+Fetch an explicit upstream revision, compare the original rule and types against the recorded revision, and port relevant fixes while retaining the adapters and local fix above. Update this record and preserve the license. The active Glass copy and installation templates have distinct roles, documented in [`../../UPSTREAM.md`](../../UPSTREAM.md).
 
-Focused Oxlint RuleTester cases live in `../../rules/require-readable-spacing.test.ts`; they test exact fixes, JSDoc/trailing comments, same-line statements, semicolon-free code, TypeScript exports/overloads, Effect-style generators, and upstream removal behavior. `../../rules/require-readable-spacing-cli.test.ts` verifies the exported plugin through the native Oxlint CLI on multiple files, including rejection, autofix, and repeated-fix stability. The complete upstream JS/TS test suites have not been ported; this is focused compatibility evidence, not a claim of full upstream conformance.
+Run `pnpm check` for repository formatting/lint/type checks and `pnpm test` for the workspace application suites. These commands do not establish dedicated custom-rule coverage: the vendored directory is excluded from application lint/format checks, and Glass does not retain a dedicated RuleTester or CLI fixture suite.
+
+The upstream JS/TS suites have not been ported. Earlier references to tests under `../../rules/` and `pnpm sync:skill-assets` were inherited upstream prose; those files and that command do not exist in Glass. Glass's wrapper inserts spacing and deliberately does not collapse existing blank lines; it does not use the entire configurable upstream policy.
