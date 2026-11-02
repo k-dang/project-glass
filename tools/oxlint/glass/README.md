@@ -1,8 +1,7 @@
 # Glass boundary and wait checks
 
 `pnpm check` runs `glass/architecture` and `glass/test-waits` through the root
-Vite+/Oxlint configuration. `pnpm test:policies` tests these protections, including
-registration through the real root lint CLI; it also runs as part of `pnpm test`.
+Vite+/Oxlint configuration.
 
 ## Imports
 

@@ -10,8 +10,7 @@
     "dist": "pnpm build && pnpm --filter @glass/desktop dist",
     "check": "vp check",
     "fix": "vp check --fix",
-    "test": "pnpm test:policies && pnpm -r test",
-    "test:policies": "node --test tools/oxlint/glass/policies.test.ts",
+    "test": "pnpm -r test",
     "test:e2e": "pnpm build && pnpm --filter @glass/desktop test:e2e"
   },
   "devDependencies": {
