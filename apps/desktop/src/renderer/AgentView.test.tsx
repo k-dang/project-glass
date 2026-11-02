@@ -1327,7 +1327,7 @@ it("dims a Sandbox Agent Glass can't reach, and makes one whose Sandbox expired 
   expect(screen.getByRole("textbox", { name: "Message" })).toBeTruthy()
 
   await user.click(screen.getByRole("button", { name: "Try again" }))
-  await waitFor(() => expect(reached).toEqual([agentFields.id]))
+  await eventually(() => expect(reached).toEqual([agentFields.id]))
 
   cleanup()
   mount({

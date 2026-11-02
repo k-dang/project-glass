@@ -186,7 +186,6 @@ export class Sandboxes extends Context.Service<
       const { sandboxProviders } = yield* Plugins
       const scope = yield* Scope.Scope
       const sandboxFibers = yield* FiberMap.make<string>()
-      const extenders = yield* FiberMap.make<string>()
       const lost = yield* PubSub.unbounded<LostAgentIds>()
 
       const stored = yield* sql`
@@ -394,9 +393,7 @@ export class Sandboxes extends Context.Service<
             const link = linkOf(agentId)
 
             if (provider.extend !== undefined)
-              yield* FiberMap.run(extenders, agentId, extendAhead(agentId, provider.extend), {
-                onlyIfMissing: true,
-              })
+              yield* extendAhead(agentId, provider.extend).pipe(Effect.forkChild)
 
             return yield* reconnecting(
               (connected) =>
@@ -510,7 +507,6 @@ export class Sandboxes extends Context.Service<
           remove: ({ agent }) =>
             Effect.gen(function* () {
               yield* FiberMap.remove(sandboxFibers, agent.id)
-              yield* FiberMap.remove(extenders, agent.id)
 
               const { record, reach } = yield* knownOf(agent.id)
 
