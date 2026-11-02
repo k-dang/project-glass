@@ -393,7 +393,9 @@ export function Workspace(props: {
         <aside
           id={filePanelId}
           className={cn(
-            "flex w-80 shrink-0 flex-col border-r",
+            // The Agent review is prose, so the panel widens while it shows.
+            "flex shrink-0 flex-col border-r",
+            shownPanelTab === "agent-review" ? "w-[30rem]" : "w-80",
             (!filePanelOpen || tab === "files" || tourInChanges) && "hidden",
           )}
         >

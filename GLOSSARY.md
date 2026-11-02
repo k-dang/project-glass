@@ -211,6 +211,12 @@ _Avoid_: Run, execution, exchange
 **Queued message**:
 A message sent while a Turn runs, waiting to start the next Turn; the user can cancel it before then.
 
+**Mention**:
+A To-do the user points at from a message to an Agent, by typing `@` and picking it. The message
+shows it by its title; the Agent reads the To-do's title and notes as they are when the message
+reaches it.
+_Avoid_: Reference, attachment, tag, chip
+
 **Steer**:
 A message sent into the running Turn, for the Agent to take in before it finishes.
 _Avoid_: Interrupt, inject

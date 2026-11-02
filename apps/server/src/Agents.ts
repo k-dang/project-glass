@@ -12,6 +12,7 @@ import {
   FollowedRepository,
   type InvalidLocalCheckout,
   type MessageInput,
+  mentionedToDoIds,
   type ModelChoice,
   defaultPermissionMode,
   engineCapabilities,
@@ -54,7 +55,10 @@ import { ActivityLog } from "./ActivityLog"
 import { hostFailure, type PlacedAgent, type Placement } from "./Placement"
 import { Sandboxes } from "./Sandboxes"
 import { LocalPlacement } from "./LocalPlacement"
+import type { DeliveredMessage } from "./agentHost/deliveredMessage"
 import { encodeImages, StoredMessage, Transcripts } from "./Transcripts"
+import { prompt } from "./prompt"
+import { ToDos } from "./ToDos"
 
 const StoredAgent = Schema.Struct({
   id: Agent.fields.id,
@@ -165,6 +169,7 @@ export class Agents extends Context.Service<
       const localPlacement = yield* LocalPlacement
       const sandboxes = yield* Sandboxes
       const activityLog = yield* ActivityLog
+      const toDos = yield* ToDos
       const lock = yield* Semaphore.make(1)
       const scope = yield* Scope.Scope
 
@@ -211,18 +216,46 @@ export class Agents extends Context.Service<
       const withSandbox = (agent: Agent) =>
         sandboxes.status(agent.id).pipe(Effect.map((sandbox) => withStatus(agent, sandbox)))
 
+      const delivered = Effect.fnUntraced(function* ({ message, images }: MessageInput) {
+        const ids = mentionedToDoIds(message)
+
+        const listed =
+          ids.length === 0
+            ? []
+            : yield* toDos.list().pipe(
+                Effect.tapError((cause) =>
+                  Effect.logWarning("Couldn't read mentioned To-dos", cause),
+                ),
+                Effect.orElseSucceed(() => []),
+              )
+
+        const mentioned = ids.flatMap((id) => listed.find((toDo) => toDo.id === id) ?? [])
+
+        return { message, images, prompt: prompt(message, mentioned) } satisfies DeliveredMessage
+      })
+
       const deliver = (row: PlacedAgent, turnId: string, input: MessageInput) =>
         Effect.gen(function* () {
           const client = yield* placementOf(row).host(row)
           const { id: agentId, engine, model, effort, permissionMode } = row.agent
 
-          yield* client.StartAgent({ agentId, engine, folder: row.folder })
+          const [, message] = yield* Effect.all(
+            [client.StartAgent({ agentId, engine, folder: row.folder }), delivered(input)],
+            { concurrency: "unbounded" },
+          )
 
           yield* lock.withPermits(1)(
             Effect.gen(function* () {
               if ((yield* transcripts.runningTurn(agentId)) !== turnId) return
 
-              yield* client.StartTurn({ agentId, turnId, ...input, model, effort, permissionMode })
+              yield* client.StartTurn({
+                agentId,
+                turnId,
+                ...message,
+                model,
+                effort,
+                permissionMode,
+              })
             }),
           )
         }).pipe(
@@ -340,7 +373,9 @@ export class Agents extends Context.Service<
 
           if (Option.isNone(running)) return false
 
-          return yield* running.value.Steer({ agentId, ...input }).pipe(
+          const message = yield* delivered(input)
+
+          return yield* running.value.Steer({ agentId, ...message }).pipe(
             Effect.as(true),
             Effect.tapError((cause) => Effect.logWarning("Couldn't Steer a Turn", cause)),
             Effect.orElseSucceed(() => false),

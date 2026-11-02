@@ -24,6 +24,8 @@ export function AgentReviewMarkdown(props: { markdown: string; className?: strin
     <Streamdown
       className={cn(
         "text-sm leading-relaxed break-words [&_h2]:mt-5 [&_h2]:mb-1 [&_h2]:text-sm [&_h2]:font-semibold",
+        // Long inline code such as paths wraps often here, so its chip is slim and wraps cleanly.
+        "[&_:not(pre)>code]:px-1 [&_:not(pre)>code]:py-0 [&_:not(pre)>code]:text-[0.8125rem] [&_:not(pre)>code]:[box-decoration-break:clone]",
         props.className,
       )}
     >
@@ -149,7 +151,7 @@ function Composer(props: {
 
   return (
     <form
-      className="shrink-0 border-t px-4 py-3"
+      className="shrink-0 border-t px-5 py-3"
       onSubmit={(event) => {
         event.preventDefault()
         send()
@@ -209,7 +211,7 @@ export function AgentReviewPanel(props: {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <section aria-label="Agent review" className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+      <section aria-label="Agent review" className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
         <AgentReviewMarkdown markdown={review.markdown} />
         <ol aria-label="Follow-ups" className="m-0 mt-4 flex list-none flex-col gap-4 p-0">
           {review.followUps.map((followUp, index) => (
@@ -244,12 +246,12 @@ export function AgentReviewPanel(props: {
         </ol>
       </section>
       {props.controls.followUpProblem !== null && (
-        <div className="px-4 pt-2">
+        <div className="px-5 pt-2">
           <ProblemAlert problem={props.controls.followUpProblem} />
         </div>
       )}
       {outdated ? (
-        <p className="m-0 shrink-0 border-t px-4 py-3 text-sm text-muted-foreground">
+        <p className="m-0 shrink-0 border-t px-5 py-3 text-sm text-muted-foreground">
           Written for an older Revision. Review again to follow up.
         </p>
       ) : (

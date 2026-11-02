@@ -1,5 +1,5 @@
 import { assert, it } from "@effect/vitest"
-import { TextPart, ThinkingPart, TurnDone } from "@glass/contracts"
+import { TextPart, ThinkingPart, toDoMention, TurnDone } from "@glass/contracts"
 import { Effect, Predicate } from "effect"
 import { agentsFixture, pixel, settled, userMessages } from "../test/agentsFixture"
 import { vi } from "vite-plus/test"
@@ -105,5 +105,30 @@ it.live("sends a message's images to pi and keeps them in the transcript", () =>
       JSON.stringify(f.model.calls[0]?.messages),
       `data:image/png;base64,${pixel.data}`,
     )
+  }),
+)
+
+it.live("gives pi a mentioned To-do's notes and keeps the message as the user wrote it", () =>
+  Effect.gen(function* () {
+    const f = yield* agentsFixture({ output: "On it." })
+    const [added] = yield* f.client.AddToDo({ title: "Fix the flaky test" })
+    assert.isDefined(added)
+    yield* f.client.EditToDo({ id: added.id, title: added.title, notes: "It times out on CI." })
+
+    const message = `Look at ${toDoMention(added)} please`
+    const agent = yield* f.start(message)
+    const [turn] = yield* f.transcript(agent.id, settled(1))
+
+    assert.equal(turn?.message, message)
+
+    const read = f.model.calls[0]?.messages
+      .filter(({ role }) => role === "user")
+      .flatMap(({ content }) =>
+        Predicate.isString(content) ? [content] : (content ?? []).map(({ text }) => text ?? ""),
+      )
+      .join("\n")
+
+    assert.include(read, `Look at To-do ${added.id} ("Fix the flaky test") please`)
+    assert.include(read, "It times out on CI.")
   }),
 )
