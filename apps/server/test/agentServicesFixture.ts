@@ -181,7 +181,7 @@ export const agentServicesFixture = Effect.gen(function* () {
           ),
           Layer.provideMerge(Transcripts.layer),
           Layer.provide(Layer.succeed(LocalPlacement, placement)),
-          Layer.provideMerge(ToDos.layer),
+          Layer.provide(ToDos.layer),
           Layer.provide(Layer.mock(ActivityLog)({ record: () => Effect.void })),
         ),
       )
@@ -191,18 +191,13 @@ export const agentServicesFixture = Effect.gen(function* () {
         saved: 0,
       }).pipe(Effect.forkScoped)
 
-      return {
-        agents: Context.get(services, Agents),
-        sandboxes: Context.get(services, Sandboxes),
-        toDos: Context.get(services, ToDos),
-      }
+      return { agents: Context.get(services, Agents), sandboxes: Context.get(services, Sandboxes) }
     }).pipe(Effect.provideContext(database), Scope.provide(scope))
 
     const built = yield* build
 
     return {
       agents: built.agents,
-      toDos: built.toDos,
       sandboxProviders: built.sandboxes.providers,
       close: Scope.close(scope, Exit.void),
     }

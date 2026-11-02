@@ -1,16 +1,9 @@
 import { useAtomValue } from "@effect/atom-react"
-import {
-  MessagePiece,
-  replaceMentions,
-  splitMentions,
-  type ToDo,
-  toDoMention,
-} from "@glass/contracts"
+import { mapMentions, replaceMentions, type ToDo, toDoMention } from "@glass/contracts"
 import { Option } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import { ListTodo } from "lucide-react"
 import {
-  type ChangeEvent,
   Fragment,
   type KeyboardEvent,
   type SyntheticEvent,
@@ -26,21 +19,19 @@ import { openToDosAtom } from "./toDoList"
 export const readableText = (message: string) => replaceMentions(message, ({ title }) => title)
 
 export function MessageText(props: { text: string }) {
-  return splitMentions(props.text).map((piece, index) =>
-    MessagePiece.$match(piece, {
-      Text: ({ text }) => <Fragment key={index}>{text}</Fragment>,
-      Mention: ({ title }) => (
-        <span
-          key={index}
-          data-slot="mention"
-          className="inline-flex items-baseline gap-1 rounded-sm bg-background/70 px-1 font-medium"
-        >
-          <ListTodo aria-hidden className="size-3.5 shrink-0 self-center" />
-          {title}
-        </span>
-      ),
-    }),
-  )
+  return mapMentions(props.text, {
+    text: (text, at) => <Fragment key={at}>{text}</Fragment>,
+    mention: ({ title }, at) => (
+      <span
+        key={at}
+        data-slot="mention"
+        className="inline-flex items-baseline gap-1 rounded-sm bg-background/70 px-1 font-medium"
+      >
+        <ListTodo aria-hidden className="size-3.5 shrink-0 self-center" />
+        {title}
+      </span>
+    ),
+  })
 }
 
 const TRIGGER = /(?:^|\s)@([^\s@[\]()]*)$/
@@ -108,7 +99,8 @@ const mention = (message: string, { start, caret }: Picking, toDo: ToDo) => {
 
 /**
  * Lets the user mention an open To-do by typing `@` in the composer's textarea. Spread `textarea`
- * onto it, let `onKeyDown` take a key before the composer does, and render `choices` near it.
+ * onto it, call `follow` from its change handler, let `onKeyDown` take a key before the composer
+ * does, and render `choices` near it. `setMessage` writes the message when the user picks one.
  */
 export function useMentionPicker(message: string, setMessage: (message: string) => void) {
   const ref = useRef<HTMLTextAreaElement>(null)
@@ -127,8 +119,13 @@ export function useMentionPicker(message: string, setMessage: (message: string) 
     nextCaret.current = null
   })
 
+  // A keystroke reports both a change and a select; the second finds the caret where it is.
   const follow = ({ value, selectionEnd }: HTMLTextAreaElement) => {
-    setSelection({ text: value, caret: selectionEnd })
+    setSelection((current) =>
+      current.text === value && current.caret === selectionEnd
+        ? current
+        : { text: value, caret: selectionEnd },
+    )
     setHighlighted(0)
   }
 
@@ -162,12 +159,9 @@ export function useMentionPicker(message: string, setMessage: (message: string) 
       ref,
       "aria-controls": open === null ? undefined : id,
       "aria-activedescendant": open === null ? undefined : `${id}-${open.chosen.id}`,
-      onChange: (event: ChangeEvent<HTMLTextAreaElement>) => {
-        follow(event.target)
-        setMessage(event.target.value)
-      },
       onSelect: (event: SyntheticEvent<HTMLTextAreaElement>) => follow(event.currentTarget),
     },
+    follow,
     onKeyDown,
     choices: open === null ? null : <MentionChoices id={id} open={open} onChoose={choose} />,
   }

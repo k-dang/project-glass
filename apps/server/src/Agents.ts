@@ -241,8 +241,10 @@ export class Agents extends Context.Service<
           const client = yield* placementOf(row).host(row)
           const { id: agentId, engine, model, effort, permissionMode } = row.agent
 
-          yield* client.StartAgent({ agentId, engine, folder: row.folder })
-          const message = yield* delivered(input)
+          const [, message] = yield* Effect.all(
+            [client.StartAgent({ agentId, engine, folder: row.folder }), delivered(input)],
+            { concurrency: "unbounded" },
+          )
 
           yield* lock.withPermits(1)(
             Effect.gen(function* () {

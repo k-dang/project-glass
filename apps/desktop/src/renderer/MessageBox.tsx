@@ -171,6 +171,11 @@ export function MessageBox(props: {
             className="max-h-60 p-3"
             placeholder={props.placeholder}
             value={composed.message}
+            onChange={(event) => {
+              const message = event.target.value
+              picker.follow(event.target)
+              setComposed((current) => ({ ...current, message }))
+            }}
             onKeyDown={onKeyDown}
             onPaste={onPaste}
             onDragOver={(event) => {

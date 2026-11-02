@@ -735,43 +735,47 @@ function QueuedMessages(props: {
         {props.running ? "Starts when the Agent finishes" : "Waiting until you send them"}
       </p>
       <QueueList>
-        {props.queued.map((queued) => (
-          <QueueItem key={queued.id} aria-label={readableText(queued.message)}>
-            <QueueItemRow>
-              <QueueItemContent>
-                <MessageText text={queued.message} />
-              </QueueItemContent>
-              <QueueItemActions>
-                {!props.running && (
+        {props.queued.map((queued) => {
+          const readable = readableText(queued.message)
+
+          return (
+            <QueueItem key={queued.id} aria-label={readable}>
+              <QueueItemRow>
+                <QueueItemContent>
+                  <MessageText text={queued.message} />
+                </QueueItemContent>
+                <QueueItemActions>
+                  {!props.running && (
+                    <QueueItemAction
+                      aria-label={`Send now: ${readable}`}
+                      onClick={() => sendNow(queued.id)}
+                    >
+                      <ArrowUp />
+                    </QueueItemAction>
+                  )}
                   <QueueItemAction
-                    aria-label={`Send now: ${readableText(queued.message)}`}
-                    onClick={() => sendNow(queued.id)}
+                    aria-label={`Cancel: ${readable}`}
+                    onClick={() => cancel(queued.id)}
                   >
-                    <ArrowUp />
+                    <X />
                   </QueueItemAction>
-                )}
-                <QueueItemAction
-                  aria-label={`Cancel: ${readableText(queued.message)}`}
-                  onClick={() => cancel(queued.id)}
-                >
-                  <X />
-                </QueueItemAction>
-              </QueueItemActions>
-            </QueueItemRow>
-            {queued.images.length > 0 && (
-              <QueueItemAttachment>
-                {queued.images.map((image, index) => (
-                  <Attachment
-                    key={index}
-                    image={image}
-                    index={index}
-                    className="size-8 rounded border object-cover"
-                  />
-                ))}
-              </QueueItemAttachment>
-            )}
-          </QueueItem>
-        ))}
+                </QueueItemActions>
+              </QueueItemRow>
+              {queued.images.length > 0 && (
+                <QueueItemAttachment>
+                  {queued.images.map((image, index) => (
+                    <Attachment
+                      key={index}
+                      image={image}
+                      index={index}
+                      className="size-8 rounded border object-cover"
+                    />
+                  ))}
+                </QueueItemAttachment>
+              )}
+            </QueueItem>
+          )
+        })}
       </QueueList>
     </section>
   )

@@ -1,4 +1,3 @@
-import { Data } from "effect"
 import type { ToDo } from "./toDo"
 
 /**
@@ -14,25 +13,28 @@ const label = (title: string) => title.replaceAll(/[[\]\s]+/g, " ").trim() || "T
 
 export const toDoMention = ({ id, title }: Mentioned) => `[${label(title)}](glass://to-do/${id})`
 
-export type MessagePiece = Data.TaggedEnum<{
-  Text: { readonly text: string }
-  Mention: Mentioned
-}>
+/**
+ * The message's text and Mentions in order, each written as `write` puts it. `at` tells pieces
+ * apart, such as for React keys.
+ */
+export const mapMentions = <A>(
+  text: string,
+  write: {
+    readonly text: (text: string, at: number) => A
+    readonly mention: (mentioned: Mentioned, at: number) => A
+  },
+): ReadonlyArray<A> => {
+  // Splitting on a pattern with two groups gives text, title, id, text, title, id, …, text.
+  const parts = text.split(MENTION)
+  const pieces: Array<A> = []
 
-export const MessagePiece = Data.taggedEnum<MessagePiece>()
+  for (let at = 0; at < parts.length; at += 3) {
+    const [between = "", title, id] = parts.slice(at, at + 3)
 
-/** The message's text, split around its Mentions. */
-export const splitMentions = (text: string): ReadonlyArray<MessagePiece> => {
-  const pieces: Array<MessagePiece> = []
-  let from = 0
+    if (between !== "") pieces.push(write.text(between, at))
 
-  for (const { 0: link, 1: title = "", 2: id, index: at } of text.matchAll(MENTION)) {
-    if (at > from) pieces.push(MessagePiece.Text({ text: text.slice(from, at) }))
-    pieces.push(MessagePiece.Mention({ id: Number(id), title }))
-    from = at + link.length
+    if (title !== undefined) pieces.push(write.mention({ id: Number(id), title }, at + 1))
   }
-
-  if (from < text.length) pieces.push(MessagePiece.Text({ text: text.slice(from) }))
 
   return pieces
 }
