@@ -15,7 +15,7 @@ In Changes, the collapsed context above, between, and below a file's hunks can b
 
 ## Driving it with glass-verify
 
-Preconditions: a real-GitHub run (`node $V launch`). `k-dang/project-glass` PR #8 has long files with collapsed context; `k-dang/glass-api-probe` PR #2 has a binary `image.bin`.
+Preconditions: a real-GitHub run (`node $V launch --github real`). `k-dang/project-glass` PR #8 has long files with collapsed context; `k-dang/glass-api-probe` PR #2 has a binary `image.bin`.
 
 - **Expand (`context-expand`).** Open PR #8, choose `Changes`, screenshot. The separator chevrons and tree rows have no accessible name: `node $V doctor` prints the CDP port, then dispatch `Input.dispatchMouseEvent` (moved, pressed, released) at the chevron's position from the screenshot. Screenshot again: README.md's lines 1–31 show above its hunk.
 - **Browse (`files-browse`).** `click --role tab --name Files`, `wait --text "Choose a file"`, screenshot: the tree shows the head's files with changed ones marked. Click a row (by CDP, as above), then screenshot: the file shows with line numbers under its path.

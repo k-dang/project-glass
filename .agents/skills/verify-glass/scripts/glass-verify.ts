@@ -18,6 +18,7 @@ import { basename, delimiter, join } from "node:path"
 import { parseArgs } from "node:util"
 import { Cdp, cdpJson } from "./cdp.ts"
 import { formatAreas, formatSummary, type MemorySample, startSampler } from "./memory.ts"
+import { githubMode } from "./launch-options.ts"
 import { FAKE_MODES, isFakeMode, serveFakeGitHub } from "./fake-github.ts"
 import { VIEWER } from "../../../../apps/server/test/fakePullRequest.ts"
 import { serveFakeAnthropic } from "./fake-anthropic.ts"
@@ -35,6 +36,7 @@ const USAGE = `Usage: node .agents/skills/verify-glass/scripts/glass-verify.ts <
          [--tour-provider fake|real] [--fail-backend-start] [--backend real|fake]
          [--no-build] [--run <id>]
                                          build, start an isolated Glass, wait until ready
+                                         GitHub defaults to fake; --github real selects live GitHub
                                          Tour provider defaults to fake; real may incur model charges
                                          --backend fake runs pnpm dev:fake's backend and its demo
                                          Agents; it brings its own fake GitHub and providers, and
@@ -365,7 +367,7 @@ const withoutGhOnPath = (path: string) =>
 
 const launch = async (options: {
   run?: string
-  github: string
+  github: string | undefined
   fakeMode: string
   tourProvider: string
   noCredentials: boolean
@@ -373,16 +375,12 @@ const launch = async (options: {
   backend: string
   noBuild: boolean
 }) => {
-  const github =
-    options.github === "real" || options.github === "fake"
-      ? options.github
-      : fail("--github is real or fake")
+  const github = githubMode(options.github, options.backend)
   if (!isFakeMode(options.fakeMode)) fail(`--fake-mode is one of ${FAKE_MODES.join(", ")}`)
   if (options.tourProvider !== "real" && options.tourProvider !== "fake")
     fail("--tour-provider is real or fake")
   if (options.backend !== "real" && options.backend !== "fake") fail("--backend is real or fake")
   const fakeBackend = options.backend === "fake"
-  if (fakeBackend && github === "fake") fail("--backend fake brings its own fake GitHub; drop --github fake")
   const id = options.run ?? `run-${new Date().toISOString().replace(/\D/g, "").slice(0, 14)}`
   const paths = runPaths(id)
   if (existsSync(paths.stateFile)) fail(`run ${id} is already live; stop it or pick another --run`)
@@ -432,7 +430,7 @@ const launch = async (options: {
       console.log("Claude Code: the pinned CLI on a fake Anthropic API; no model is called.")
     }
 
-    if (github === "fake") {
+    if (!fakeBackend && github === "fake") {
       writeFileSync(paths.fakeModeFile, options.fakeMode)
       fake = await startFake(
         "__fake-github",
@@ -647,7 +645,10 @@ const waitForText = async (run: RunState, text: string, timeout: number) => {
         page ??= await tryOpenWindow(run)
         if (
           page &&
-          (await page.evaluate("document.body.innerText", Schema.String)).includes(text)
+          ((await page.evaluate("document.body.innerText", Schema.String)).includes(text) ||
+            (await axTree(page)).some(
+              (node) => !node.ignored && node.role?.value === "StaticText" && node.name?.value.includes(text),
+            ))
         ) {
           return console.log(`Found "${text}"`)
         }
@@ -668,7 +669,7 @@ const main = async () => {
     allowPositionals: true,
     options: {
       run: { type: "string" },
-      github: { type: "string", default: "real" },
+      github: { type: "string" },
       "fake-mode": { type: "string", default: "ok" },
       "tour-provider": { type: "string", default: "fake" },
       "no-credentials": { type: "boolean", default: false },
@@ -880,4 +881,4 @@ const main = async () => {
   }
 }
 
-await main()
+await main().catch((error: unknown) => fail(error instanceof Error ? error.message : String(error)))

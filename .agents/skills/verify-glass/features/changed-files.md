@@ -18,7 +18,7 @@ An open PR workspace has three tabs in its header: Overview (the description), C
 
 ## Driving it with glass-verify
 
-Preconditions: a real-GitHub run (`node $V launch`) and access to the kept probe repo `k-dang/glass-api-probe`. PR #2 (branch `file-kinds`) holds a deleted, empty, binary, too-large, purely renamed, and renamed-and-edited file. For scrolling, use a PR with long diffs, such as `k-dang/project-glass` PR #8. For a repeatable workload, a fake-GitHub run (`node $V launch --github fake`) lists `octo-org/glass#101`, "Wide change across 150 files": 150 generated files of 40 lines each, which fills the diff caches the same way every time.
+Preconditions: a real-GitHub run (`node $V launch --github real`) and access to the kept probe repo `k-dang/glass-api-probe`. PR #2 (branch `file-kinds`) holds a deleted, empty, binary, too-large, purely renamed, and renamed-and-edited file. For scrolling, use a PR with long diffs, such as `k-dang/project-glass` PR #8. For a repeatable workload, a fake-GitHub run (`node $V launch --github fake`) lists `octo-org/glass#101`, "Wide change across 150 files": 150 generated files of 40 lines each, which fills the diff caches the same way every time.
 
 - **Tree (`files-tree`).** Open `https://github.com/k-dang/glass-api-probe/pull/2`, `wait --text "Tree"`, then `snapshot`: each `treeitem` carries its counts and change letter.
 - **Diffs (`files-diff`, `files-placeholders`).** `click --role tab --name "Changes …"` (the name includes the totals; take it from a snapshot), then screenshot. Every line of a hunk shows on its own row; placeholder files show their reason in the header. `click --role button --name Split` switches layout.

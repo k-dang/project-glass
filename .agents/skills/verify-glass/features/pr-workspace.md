@@ -25,7 +25,7 @@ The user opens a PR from the [PR list](./pr-list.md) or pastes its GitHub URL in
 
 Preconditions:
 
-- A real-GitHub run (`node $V launch`) signed in with a token that can read public repos; `node $V doctor` passes.
+- An explicitly selected real-GitHub run (`node $V launch --github real`) signed in with a token that can read public repos; `node $V doctor` passes.
 - For `pr-reload`, push access to the kept probe repo `k-dang/glass-api-probe` (PR #1, branch `change`).
 
 - **Open (`pr-open`, `pr-pinned`).** `node $V type --role textbox --name "Open a PR" --text "https://github.com/k-dang/glass-api-probe/pull/1"`, `node $V click --role button --name "Open"`, `node $V wait --text "Reload"`, then snapshot and screenshot. "Head <sha>" matches `gh pr view 1 -R k-dang/glass-api-probe --json headRefOid`.
@@ -42,6 +42,6 @@ Preconditions:
 
 - `pr-denied` needs an organization that refuses your token (SAML, IP allow list) and usually can't be produced honestly; the backend tests cover it.
 - GitHub answers the same for a private repo you can't see as for one that doesn't exist, so both show "Pull request not found".
-- Run steps one after another with pauses in between: earlier versions dropped the backend socket while the window was hidden, and only a sequence spread over time catches that again.
+- Run steps in sequence, waiting for visible results after each RPC.
 - Clicking an ordinary description link opens the user's browser; image previews stay inside Glass.
-- `wait --text` reads `innerText`, which doesn't include the URL field's value; check it in a `snapshot` instead.
+- `wait --text` reads body text and accessible StaticText (including shadow-root diffs), which don't include the URL field's value; check it in a `snapshot` instead.
