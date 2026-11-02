@@ -34,6 +34,7 @@ const UNINHERITED = new Set(["VITE_DEV_SERVER_URL", "ELECTRON_RUN_AS_NODE", "GLA
 interface FakeClaude {
   readonly command: string
   readonly answer: (tour: TourAnswer) => Promise<void>
+  readonly environment: Readonly<Record<string, string>>
 }
 
 interface FakePiCli {
@@ -77,7 +78,7 @@ export const test = base.extend<Glass>({
     const answer = (tour: TourAnswer) =>
       agent.configure({ ready: true, output: claudeAnswer(tour) })
 
-    await use({ command: agent.command, answer })
+    await use({ command: agent.command, answer, environment: {} })
     await rm(directory, { recursive: true, force: true })
   },
   // oxlint-disable-next-line no-empty-pattern -- Playwright reads a fixture's dependencies from it.
@@ -134,6 +135,7 @@ export const test = base.extend<Glass>({
         GH_TOKEN: VIEWER.token,
         GLASS_GITHUB_API_URL: github.url,
         GLASS_CLAUDE_COMMAND: claude.command,
+        ...claude.environment,
         GLASS_PI_COMMAND: realPi ?? piCli.command,
         // Keeps pi from refreshing its model catalog over the network.
         PI_OFFLINE: "1",
