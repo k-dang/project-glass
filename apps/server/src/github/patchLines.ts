@@ -1,6 +1,6 @@
 import type { DiffSide } from "@glass/contracts"
 
-export const lineInPatch = (hunks: string, side: DiffSide, line: number) => {
+function* patchLines(hunks: string, side: DiffSide) {
   let oldLine = 0
   let newLine = 0
 
@@ -20,12 +20,30 @@ export const lineInPatch = (hunks: string, side: DiffSide, line: number) => {
     const onSide = side === "old" ? onOld : onNew
     const current = side === "old" ? oldLine : newLine
 
-    if (onSide && current === line) return row.slice(1)
+    if (onSide) yield { number: current, text: row.slice(1) }
 
     if (onOld) oldLine++
 
     if (onNew) newLine++
   }
+}
+
+export const lineInPatch = (hunks: string, side: DiffSide, line: number) => {
+  for (const entry of patchLines(hunks, side)) {
+    if (entry.number === line) return entry.text
+  }
 
   return null
+}
+
+export const rangeInPatch = (hunks: string, side: DiffSide, start: number, end: number) => {
+  if (end < start) return false
+
+  let count = 0
+
+  for (const { number } of patchLines(hunks, side)) {
+    if (number >= start && number <= end) count++
+  }
+
+  return count === end - start + 1
 }

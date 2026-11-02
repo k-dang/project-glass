@@ -44,6 +44,10 @@ pnpm check        # format check, type-aware lint, and type check
 pnpm fix          # apply format and lint fixes
 ```
 
+In `pnpm dev:fake`, open **Rate-limit the public API** → **Tour** → **Write Tour** →
+**Start reading** to try diagrams, playback, call trees, and code callouts.
+The curated Tour is synthetic and written without a model.
+
 The backend runs on its own: `GLASS_PORT=4000 GLASS_TOKEN=secret node apps/server/dist/bin.mjs`.
 
 ## Storage

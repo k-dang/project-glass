@@ -1,6 +1,8 @@
-import type { DiffSide } from "@glass/contracts"
+import type { DiffSide, TourCodeTarget } from "@glass/contracts"
+import { cn } from "cn"
 import { Check, ChevronRight, ChevronUp } from "lucide-react"
 import { useAtomValue } from "@effect/atom-react"
+import { DateTime } from "effect"
 import {
   type Ref,
   type RefObject,
@@ -22,6 +24,8 @@ import { plural } from "./plural"
 import { allViewed, twoDigits } from "./tourProgress"
 import type { TourChapter, TourReading } from "./tourReading"
 import { TourText } from "./TourText"
+import { TourDiagram } from "./TourDiagram"
+import { TourCallTree } from "./TourCallTree"
 import { useViewedFiles, type ViewedFilesStore } from "./useViewedFiles"
 
 type ScrollBehavior = "smooth" | "instant"
@@ -50,7 +54,7 @@ interface ChapterSection {
 }
 
 export function TourView(props: TourViewProps) {
-  const { reading, ref, onCurrentPathChange } = props
+  const { reading, ref, onCurrentPathChange, onOpenChange } = props
   const container = useRef<HTMLDivElement>(null)
   const sections = useRef(new Map<number, ChapterSection>())
 
@@ -254,6 +258,29 @@ export function TourView(props: TourViewProps) {
     [revealChapter, selectFile],
   )
 
+  const showTarget = useCallback(
+    (target: TourCodeTarget) => {
+      const { path, side, startLine, endLine } = target
+      const index = chapterOf(path)
+      selectFile(index, path)
+      onOpenChange(path, true)
+      const view = sections.current.get(index)?.view.current
+      view?.setSelectedLines({
+        id: path,
+        range: { start: startLine, end: endLine, side: annotationSides[side] },
+      })
+      view?.scrollTo({
+        type: "line",
+        id: path,
+        side: annotationSides[side],
+        lineNumber: startLine,
+        align: "center",
+        behavior: "instant",
+      })
+    },
+    [chapterOf, selectFile, onOpenChange],
+  )
+
   useImperativeHandle(
     ref,
     () => ({
@@ -280,23 +307,20 @@ export function TourView(props: TourViewProps) {
         const index = chapterOf(path)
         open(index)
         revealChapter(index, "instant")
-        selectFile(index, path)
-        const view = sections.current.get(index)?.view.current
-        view?.setSelectedLines({
-          id: path,
-          range: { start: line, end: line, side: annotationSides[side] },
-        })
-        view?.scrollTo({
-          type: "line",
-          id: path,
-          side: annotationSides[side],
-          lineNumber: line,
-          align: "center",
-          behavior: "smooth-auto",
-        })
+        showTarget({ path, side, startLine: line, endLine: line })
       },
     }),
-    [groups, currentChapter, revealChapter, selectFile, open, collapsed, scrollToFile, chapterOf],
+    [
+      groups,
+      currentChapter,
+      revealChapter,
+      selectFile,
+      open,
+      collapsed,
+      scrollToFile,
+      chapterOf,
+      showTarget,
+    ],
   )
 
   return (
@@ -317,7 +341,7 @@ export function TourView(props: TourViewProps) {
     >
       {groups.map(({ chapter, files }, index) => (
         <ChapterCard
-          key={index}
+          key={`${DateTime.formatIso(reading.writtenAt)}:${index}`}
           diff={props}
           searchGroup={searchGroup}
           chapter={chapter}
@@ -333,6 +357,7 @@ export function TourView(props: TourViewProps) {
             else sections.current.set(index, { element, view })
           }}
           onSelect={(path) => selectFile(index, path)}
+          onShowTarget={showTarget}
           onCurrentPath={(path) => {
             if (ready.current && currentChapter() === index) selectFile(index, path)
           }}
@@ -355,6 +380,7 @@ function ChapterCard(props: {
   initialPath: string | null
   register: (element: HTMLElement | null, view: RefObject<ViewHandle | null>) => void
   onSelect: (path: string) => void
+  onShowTarget: (target: TourCodeTarget) => void
   onCurrentPath: (path: string) => void
 }) {
   const view = useRef<ViewHandle>(null)
@@ -430,7 +456,12 @@ function ChapterCard(props: {
       ) : (
         <>
           <aside
-            className="max-h-(--tour-card-height) min-w-0 overflow-y-auto px-6 py-5.5 [scrollbar-width:thin] @max-[850px]/tour:p-4.5 @max-[700px]/tour:max-h-75"
+            className={cn(
+              "max-h-(--tour-card-height) min-w-0 overflow-y-auto px-6 py-5.5 [scrollbar-width:thin] @max-[850px]/tour:p-4.5",
+              chapter?.diagram == null && chapter?.callTree == null
+                ? "@max-[700px]/tour:max-h-75"
+                : "@max-[700px]/tour:max-h-none",
+            )}
             aria-label={`Chapter explanation: ${title}`}
           >
             <div className="flex items-start gap-2">
@@ -467,6 +498,38 @@ function ChapterCard(props: {
                 </p>
               ))}
             </div>
+            {chapter !== null && chapter.callouts.length > 0 && (
+              <nav className="mt-4 space-y-2" aria-label={`Code callouts for ${title}`}>
+                {chapter.callouts.map((callout, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    className="block w-full cursor-pointer rounded-md border-l-2 border-(--viewed) px-3 py-2 text-left text-xs leading-5 wrap-anywhere hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                    onClick={() => props.onShowTarget(callout.target)}
+                  >
+                    <TourText text={callout.label} />
+                    <span className="ml-1 text-muted-foreground" aria-hidden>
+                      ↗
+                    </span>
+                  </button>
+                ))}
+              </nav>
+            )}
+            {chapter?.diagram != null && (
+              <TourDiagram
+                diagram={chapter.diagram}
+                chapterTitle={title}
+                path={props.path}
+                onSelect={(node) => props.onShowTarget(node.target)}
+              />
+            )}
+            {chapter?.callTree != null && (
+              <TourCallTree
+                tree={chapter.callTree}
+                chapterTitle={title}
+                onSelect={props.onShowTarget}
+              />
+            )}
             <ChapterFiles
               files={files}
               path={props.path}

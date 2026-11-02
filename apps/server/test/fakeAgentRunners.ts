@@ -4,6 +4,8 @@ import { AgentRunners } from "../src/agentRunners"
 import { AgentReviewAnswer } from "../src/agentReviewPrompt"
 import { AskAgentAnswer } from "../src/askPrompt"
 import type { TourAnswer } from "../src/tourPrompt"
+import { RATE_LIMIT_TITLE } from "./demoPullRequests"
+import { demoTour } from "./demoTour"
 
 const chapterSize = 2
 
@@ -20,6 +22,9 @@ const decodeMaterial = (prompt: string) =>
 /** Pairs the files into Chapters, leaving the last for Everything else once there are three. */
 const syntheticTour = (prompt: string): TourAnswer => {
   const { title, files } = decodeMaterial(prompt)
+
+  if (title === RATE_LIMIT_TITLE) return demoTour
+
   const paths = files.map((file) => file.path)
   const placed = paths.length > chapterSize ? paths.slice(0, -1) : paths
 
