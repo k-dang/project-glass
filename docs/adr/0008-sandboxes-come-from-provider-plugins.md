@@ -50,8 +50,10 @@ provider gave, so providers needn't say which, and keeps the verdict on the Agen
 A Sandbox outlives Glass. Its Turns keep running while Glass is closed, so at launch Glass
 interrupts only local Turns and reconnects to each Sandbox's host, asking for the journal after the
 last entry it saved; that position is saved with the transcript, so a relaunch neither misses nor
-repeats an event. A Sandbox Glass can't reach is marked unreachable and its running Turn cut off,
-and Glass keeps trying; once it answers, the ending its host reports replaces the cut-off one.
+repeats an event. A Sandbox Glass can't reach is marked unreachable and its running Turn cut off.
+Glass tries again ever less often, at most five minutes apart, and gives up after an hour, so a
+provider's `target` isn't called without end; sending the Agent a message, its Try again, or a
+relaunch starts over. Once the host answers, the ending it reports replaces the cut-off one.
 
 Glass stores the `state` a provider records as opaque JSON on the Agent's row, so the row stays
 the one record of the Agent and providers keep no storage of their own. If `create` fails or is

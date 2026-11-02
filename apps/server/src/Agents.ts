@@ -132,6 +132,7 @@ export class Agents extends Context.Service<
       agentId: string,
     ) => Effect.Effect<ReadonlyArray<ChangedFile>, AgentNotFound | AgentError>
     readonly stop: (agentId: string) => Effect.Effect<void, AgentNotFound | AgentError>
+    readonly reachSandbox: (agentId: string) => Effect.Effect<void, AgentNotFound | AgentError>
     readonly unsent: (agentId: string) => Effect.Effect<SentMessage, AgentNotFound | AgentError>
     readonly saveUnsent: (
       agentId: string,
@@ -599,6 +600,11 @@ export class Agents extends Context.Service<
           find(agentId).pipe(Effect.andThen(transcripts.cancelQueued(agentId, queuedId))),
         sendQueued,
         stop,
+        reachSandbox: (agentId) =>
+          find(agentId).pipe(
+            Effect.flatMap((row) => placementOf(row).host(row)),
+            Effect.asVoid,
+          ),
         unsent,
         saveUnsent,
         watchWaiting: () =>

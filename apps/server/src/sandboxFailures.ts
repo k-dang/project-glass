@@ -1,4 +1,4 @@
-import { Data } from "effect"
+import { Data, Predicate } from "effect"
 
 export class MissingLogin extends Error {
   constructor(
@@ -18,3 +18,5 @@ export class NoCapacity extends Error {
 }
 
 export class SandboxGone extends Data.TaggedError("SandboxGone") {}
+
+export const isSandboxGone = Predicate.isTagged("SandboxGone")

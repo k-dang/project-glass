@@ -1306,19 +1306,28 @@ const inSandboxWith = (reach: SandboxReach) =>
   })
 
 it("dims a Sandbox Agent Glass can't reach, and makes one whose Sandbox expired read-only", async () => {
-  mount({
+  const reached: Array<string> = []
+
+  const user = mount({
     WatchAgents: () => Stream.make([inSandboxWith("unreachable")]),
     WatchTranscript: noTranscript,
+    ReachSandbox: ({ agentId }) =>
+      Effect.sync(() => {
+        reached.push(agentId)
+      }),
   })
 
   const link = await screen.findByRole("link", { description: /Can't reach its Sandbox · Expires/ })
   expect(link.className).toContain("opacity-60")
   expect(
     screen.getByText(
-      "Glass can't reach this Agent's Sandbox. It keeps trying, and fills in what the Agent did once it answers.",
+      /Glass can't reach this Agent's Sandbox. Once it answers, Glass fills in what the Agent did./,
     ),
   ).toBeTruthy()
   expect(screen.getByRole("textbox", { name: "Message" })).toBeTruthy()
+
+  await user.click(screen.getByRole("button", { name: "Try again" }))
+  await waitFor(() => expect(reached).toEqual([agentFields.id]))
 
   cleanup()
   mount({

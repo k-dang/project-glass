@@ -88,6 +88,7 @@ import {
   sendQueuedAtom,
   steerAtom,
   stopTurnAtom,
+  reachSandboxAtom,
   transcriptAtom,
   unsentMessageAtom,
 } from "./agentsArea"
@@ -96,7 +97,7 @@ import { ModelPicker } from "./ModelPicker"
 import { PermissionModePicker } from "./PermissionModePicker"
 import { RequestCard, requestElementId } from "./RequestCard"
 import { ProblemAlert } from "./ProblemAlert"
-import { settledProblem, streamProblem } from "./problems"
+import { problemText, settledProblem, streamProblem } from "./problems"
 import { rememberPlace } from "./savedPlace"
 
 const TURNS_PER_PAGE = 20
@@ -214,12 +215,7 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
       )}
       <div hidden={tab !== "chat"} className="flex min-h-0 flex-1 flex-col">
         <Transcript agentId={agent.id} turns={turns} status={status} />
-        {reach === "unreachable" && (
-          <output className="mx-auto block w-full max-w-3xl px-6 pt-2 text-sm text-muted-foreground">
-            Glass can't reach this Agent's Sandbox. It keeps trying, and fills in what the Agent did
-            once it answers.
-          </output>
-        )}
+        {reach === "unreachable" && <UnreachableNotice agentId={agent.id} />}
         {gone === null ? (
           <Composer
             agent={agent}
@@ -593,6 +589,29 @@ function WaitingNotice(props: { waiting: RequestPart }) {
         Show it
       </Button>
     </p>
+  )
+}
+
+function UnreachableNotice({ agentId }: { agentId: string }) {
+  const tried = useAtomValue(reachSandboxAtom(agentId))
+  const tryAgain = useAtomSet(reachSandboxAtom(agentId))
+  const problem = settledProblem(tried)
+
+  return (
+    <output className="mx-auto block w-full max-w-3xl px-6 pt-2 text-sm text-muted-foreground">
+      Glass can't reach this Agent's Sandbox. Once it answers, Glass fills in what the Agent did.{" "}
+      <Button
+        type="button"
+        variant="link"
+        size="sm"
+        className="h-auto p-0"
+        disabled={tried.waiting}
+        onClick={() => tryAgain()}
+      >
+        Try again
+      </Button>
+      {problem !== null && <span className="block">{problemText(problem)}</span>}
+    </output>
   )
 }
 

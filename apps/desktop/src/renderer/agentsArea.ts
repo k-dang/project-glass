@@ -168,6 +168,10 @@ export const stopTurnAtom = Atom.family((agentId: string) =>
   backendRuntime.fn(() => Backend.use((backend) => backend.StopTurn({ agentId }))),
 )
 
+export const reachSandboxAtom = Atom.family((agentId: string) =>
+  backendRuntime.fn(() => Backend.use((backend) => backend.ReachSandbox({ agentId }))),
+)
+
 export const cancelQueuedAtom = Atom.family((agentId: string) =>
   backendRuntime.fn((queuedMessageId: string) =>
     Backend.use((backend) => backend.CancelQueuedMessage({ agentId, queuedMessageId })),

@@ -47,7 +47,8 @@ import {
   shutDownHost,
   waitForHost,
 } from "./sandboxCalls"
-import { SandboxGone } from "./sandboxFailures"
+import { reconnecting } from "./reconnecting"
+import { isSandboxGone, SandboxGone } from "./sandboxFailures"
 import { Transcripts } from "./Transcripts"
 
 const hostBundle = bundledEntry("agentHost", import.meta.url)
@@ -86,8 +87,6 @@ const unreachable = () =>
 
 const goneFailure = (reach: GoneReach) => new AgentError({ message: goneExplanation(reach) })
 
-const isSandboxGone = Predicate.isTagged("SandboxGone")
-
 const storageFailure = () =>
   new AgentError({ message: "Couldn't save the Agent's Sandbox. Try again." })
 
@@ -119,36 +118,7 @@ const newLink = (saved: number): HostLink => ({
   connectLock: Semaphore.makeUnsafe(1),
 })
 
-const LOST_AFTER_MISSES = 4
-
-const RECONNECT_SPACING = "500 millis"
-
 const EXTEND_RETRY_SPACING = "1 minute"
-
-const UNREACHABLE_RETRY_SPACING = "5 seconds"
-
-const reconnecting = <E, R>(
-  connection: (resetMisses: Effect.Effect<void>) => Effect.Effect<void, E, R>,
-) =>
-  Effect.suspend(() => {
-    let misses = 0
-
-    return connection(
-      Effect.sync(() => {
-        misses = 0
-      }),
-    ).pipe(
-      Effect.tapError(() =>
-        Effect.sync(() => {
-          misses += 1
-        }),
-      ),
-      Effect.retry({
-        while: (error) => !isSandboxGone(error) && misses < LOST_AFTER_MISSES,
-        schedule: Schedule.spaced(RECONNECT_SPACING),
-      }),
-    )
-  })
 
 const orderedReports = Effect.gen(function* () {
   const queue = yield* Queue.unbounded<Effect.Effect<void, AgentError>, Cause.Done>()
@@ -428,43 +398,36 @@ export class Sandboxes extends Context.Service<
                 onlyIfMissing: true,
               })
 
-            return yield* reconnecting((resetMisses) =>
-              Effect.gen(function* () {
-                const client = yield* connectToHost(provider, record.state, record.token).pipe(
-                  Effect.provideService(Socket.WebSocketConstructor, webSocketConstructor),
-                )
+            return yield* reconnecting(
+              (connected) =>
+                Effect.gen(function* () {
+                  const client = yield* connectToHost(provider, record.state, record.token).pipe(
+                    Effect.provideService(Socket.WebSocketConstructor, webSocketConstructor),
+                  )
 
-                // Effect's socket client connects in the background; a first call shows the host
-                // answered.
-                yield* client.Acknowledge({ through: link.position.saved })
-                yield* resetMisses
+                  // Effect's socket client connects in the background; a first call shows the host
+                  // answered.
+                  yield* client.Acknowledge({ through: link.position.saved })
+                  yield* connected
 
-                yield* Effect.acquireRelease(
-                  Effect.sync(() => {
-                    link.connection = client
-                  }),
-                  () =>
+                  yield* Effect.acquireRelease(
                     Effect.sync(() => {
-                      if (link.connection === client) link.connection = null
+                      link.connection = client
                     }),
-                )
-                yield* setReach(agentId, "reachable")
-                yield* Deferred.succeed(opened, client)
-                yield* followJournal(transcripts.save, client, link.position)
-              }).pipe(Effect.scoped),
-            ).pipe(
-              Effect.tapError((error) =>
-                isSandboxGone(error)
-                  ? Effect.void
-                  : Effect.logWarning("Lost a Sandbox's agent host", error).pipe(
-                      Effect.andThen(Deferred.fail(opened, unreachable())),
-                      Effect.andThen(setReach(agentId, "unreachable")),
-                    ),
-              ),
-              Effect.retry({
-                while: (error) => !isSandboxGone(error),
-                schedule: Schedule.spaced(UNREACHABLE_RETRY_SPACING),
-              }),
+                    () =>
+                      Effect.sync(() => {
+                        if (link.connection === client) link.connection = null
+                      }),
+                  )
+                  yield* setReach(agentId, "reachable")
+                  yield* Deferred.succeed(opened, client)
+                  yield* followJournal(transcripts.save, client, link.position)
+                }).pipe(Effect.scoped),
+              (error) =>
+                Effect.logWarning("Lost a Sandbox's agent host", error).pipe(
+                  Effect.andThen(Deferred.fail(opened, unreachable())),
+                  Effect.andThen(setReach(agentId, "unreachable")),
+                ),
             )
           }).pipe(
             Effect.catch((error) =>
