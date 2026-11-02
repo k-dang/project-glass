@@ -127,7 +127,7 @@ export class LocalPlacement extends Context.Service<
         host: ({ agent }) =>
           host.client.pipe(Effect.tap(() => Effect.sync(() => void hosted.add(agent.id)))),
         runningHost: () => host.running,
-        writable: () => Effect.void,
+        refuseIfReadOnly: () => Effect.void,
         hostOnceMade: (placed) =>
           worktreeExists(placed).pipe(
             Effect.flatMap((exists) =>

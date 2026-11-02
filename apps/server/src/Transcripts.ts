@@ -136,14 +136,10 @@ export class Transcripts extends Context.Service<
       agentId: string,
       events: ReadonlyArray<AgentEvent>,
     ) => Effect.Effect<void, AgentError>
-    /**
-     * Saves events from an agent host's journal with the entry they end at, so a host that outlives
-     * Glass is asked only for later ones.
-     */
     readonly saveFromJournal: (
       agentId: string,
       events: ReadonlyArray<AgentEvent>,
-      journalSaved: number,
+      throughJournalEntry: number,
     ) => Effect.Effect<void, AgentError>
     readonly watch: (agentId: string) => Stream.Stream<TranscriptUpdate, AgentError>
     readonly endRunning: (
@@ -232,7 +228,6 @@ export class Transcripts extends Context.Service<
                 SET part = json_set(part, '$.text', json_extract(part, '$.text') || ${text})
                 WHERE turn_id = ${turnId} AND position = ${index}
               `.pipe(Effect.as(true)),
-            // A cut-off Turn takes the ending its host reports later (see `TurnCutOff`).
             TurnEnded: ({ turnId, ended }) =>
               sql`
                 UPDATE agent_turn SET ended = ${encodeEnd(ended)}

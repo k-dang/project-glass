@@ -161,7 +161,7 @@ export const agentServicesFixture = Effect.gen(function* () {
         hostOnceMade: () => Effect.succeedSome(client),
         baseRef: () => Effect.succeed("main"),
         remove: () => Effect.void,
-        writable: () => Effect.void,
+        refuseIfReadOnly: () => Effect.void,
         subscribeLost: Effect.succeed(Stream.never),
       })
 

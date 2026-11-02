@@ -199,13 +199,11 @@ export class Agents extends Context.Service<
         Effect.forkIn(scope),
       )
 
-      // Only Sandboxes outlive Glass; the Turns of every other Agent ended with it. Requests only
-      // wait in a running Turn, so this leaves none waiting.
-      const resumed = yield* sandboxes.resume
+      const outlivedGlass = yield* sandboxes.resume
       yield* transcripts
         .endRunning(
           TurnInterrupted.make({}),
-          stored.flatMap(({ id }) => (resumed.has(id) ? [] : [id])),
+          stored.flatMap(({ id }) => (outlivedGlass.has(id) ? [] : [id])),
         )
         .pipe(Effect.orDie)
 
@@ -355,7 +353,7 @@ export class Agents extends Context.Service<
           .pipe(Effect.flatMap((waiting) => (waiting ? new RequestWaiting() : Effect.void)))
 
       const findWritable = (agentId: string) =>
-        find(agentId).pipe(Effect.tap((row) => placementOf(row).writable(row)))
+        find(agentId).pipe(Effect.tap((row) => placementOf(row).refuseIfReadOnly(row)))
 
       const startOrQueue = (agentId: string, input: MessageInput) =>
         refuseWhileWaiting(agentId).pipe(Effect.andThen(transcripts.startOrQueue(agentId, input)))

@@ -17,9 +17,8 @@ export interface InProcessSandboxSettings {
   readonly failAt?: string
   readonly missingLogin?: { readonly login: string; readonly fix: string }
   readonly noCapacity?: string
-  /** How far ahead each extension pushes a Sandbox's expiry, and how long after creation it ends. */
-  readonly lifetimeMillis?: number
-  readonly capMillis?: number
+  readonly extensionMillis?: number
+  readonly maxLifetimeMillis?: number
 }
 
 const TWO_DAYS = 2 * 24 * 60 * 60 * 1000
@@ -158,16 +157,11 @@ export const inProcessSandboxes = (host: () => Layer.Layer<HostAgents | Journal 
       if (gone.has(agentId)) throw new SandboxGone()
 
       const expiresAt = Math.min(
-        Date.now() + (settings.lifetimeMillis ?? TWO_DAYS),
-        (createdAt.get(agentId) ?? Date.now()) + (settings.capMillis ?? TWO_DAYS),
+        Date.now() + (settings.extensionMillis ?? TWO_DAYS),
+        (createdAt.get(agentId) ?? Date.now()) + (settings.maxLifetimeMillis ?? TWO_DAYS),
       )
 
-      // The fake platform reclaims a Sandbox once it expires, as a real one would.
-      clearTimeout(expiries.get(agentId))
-      expiries.set(
-        agentId,
-        setTimeout(() => Effect.runFork(reclaim(agentId)), expiresAt - Date.now()).unref(),
-      )
+      reclaimAt(agentId, expiresAt)
 
       return new Date(expiresAt)
     },
@@ -195,6 +189,14 @@ export const inProcessSandboxes = (host: () => Layer.Layer<HostAgents | Journal 
         }),
       ),
     )
+
+  const reclaimAt = (agentId: string, expiresAt: number) => {
+    clearTimeout(expiries.get(agentId))
+    expiries.set(
+      agentId,
+      setTimeout(() => Effect.runFork(reclaim(agentId)), expiresAt - Date.now()).unref(),
+    )
+  }
 
   return {
     provider,

@@ -77,7 +77,6 @@ export const agentsFixture = Effect.fnUntraced(function* (
     Effect.provideService(Scope.Scope, serverScope),
   )
 
-  /** Quits Glass, leaving its Sandboxes running; `launch` opens it again. */
   const quit = Scope.close(serverScope, Exit.void)
 
   const launch = startBackend(env, home).pipe(Effect.map((backend) => backend.client))

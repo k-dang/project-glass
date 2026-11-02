@@ -296,7 +296,6 @@ it.live(
       yield* end(yield* f.started)
       yield* f.transcript(agent.id, settled(1))
 
-      // Reclaimed while Glass was closed, so the relaunched Glass learns of it on reaching it.
       yield* f.sandboxes.reclaim(agent.id)
       const relaunched = yield* f.restart
       yield* reachOf(relaunched.agents, agent.id, "deleted")
@@ -307,7 +306,6 @@ it.live(
         "This Agent's Sandbox was deleted, so it can't take messages. Its transcript stays until you remove the Agent.",
       )
 
-      // Glass remembers, so the next launch needn't reach it to know.
       const { agents } = yield* f.restart
       const [listed] = yield* agents.watch().pipe(Stream.runHead, Effect.map(Option.getOrThrow))
       assert.equal(listed?.sandbox?.reach, "deleted")
@@ -327,7 +325,7 @@ it.live(
   () =>
     Effect.gen(function* () {
       const f = yield* agentServicesFixture
-      f.sandboxes.configure({ lifetimeMillis: 1000, capMillis: 3000 })
+      f.sandboxes.configure({ extensionMillis: 1000, maxLifetimeMillis: 3000 })
       const agent = yield* createSandboxed(f)
       yield* end(yield* f.started)
 
@@ -345,7 +343,6 @@ it.live(
         Stream.runHead,
       )
 
-      // Extended more than once, each time later, until the cap let it expire.
       assert.isAbove(expiries.length, 2)
       assert.deepStrictEqual(
         expiries,

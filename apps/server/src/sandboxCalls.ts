@@ -67,7 +67,6 @@ const hostUrl = (target: SandboxTarget, path: string) => {
   return url
 }
 
-/** A call about a Sandbox that may be gone, which the provider says by throwing `SandboxGone`. */
 const callAbout = <A>(provider: SandboxProvider, action: string, run: () => Promise<A>) =>
   fromProvider(run).pipe(
     Effect.catch(({ rejected }): Effect.Effect<never, AgentError | SandboxGone> =>
@@ -80,7 +79,6 @@ const callAbout = <A>(provider: SandboxProvider, action: string, run: () => Prom
 const targetOf = (provider: SandboxProvider, state: SandboxState) =>
   callAbout(provider, "reach the Sandbox", () => provider.target(state))
 
-/** Deletes the Sandbox; one already gone needs nothing more. */
 export const removeSandbox = (provider: SandboxProvider, state: SandboxState, action: string) =>
   callAbout(provider, action, () => provider.remove(state)).pipe(
     Effect.catchTag("SandboxGone", () => Effect.void),

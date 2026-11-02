@@ -58,9 +58,7 @@ const SandboxRecord = Schema.Struct({
   state: Schema.Json,
   token: Schema.String,
   ready: Schema.Boolean,
-  /** When the Sandbox expires, as its provider last said. */
   expiresAt: Schema.optional(Schema.DateTimeUtcFromString),
-  /** Set once the Sandbox is gone for good. */
   gone: Schema.optional(GoneReach),
 })
 
@@ -93,23 +91,23 @@ const isSandboxGone = Predicate.isTagged("SandboxGone")
 const storageFailure = () =>
   new AgentError({ message: "Couldn't save the Agent's Sandbox. Try again." })
 
-/** What Glass knows of one Agent's Sandbox; the Agents list shows it. */
-interface Known {
+interface KnownSandbox {
   readonly record: SandboxRecord | null
   readonly reach: SandboxReach
 }
 
-const unknown: Known = { record: null, reach: "connecting" }
+const unknown: KnownSandbox = { record: null, reach: "connecting" }
 
-const statusOf = ({ record, reach }: Known) =>
+const statusOf = ({ record, reach }: KnownSandbox) =>
   new SandboxStatus({ expiresAt: record?.expiresAt ?? null, reach })
 
-// Providers don't say why a Sandbox is gone; one gone before it was due was deleted.
-const pastExpiry = (record: SandboxRecord | null, now: DateTime.Utc) =>
+const expiredBy = (record: SandboxRecord | null, now: DateTime.Utc) =>
   record?.expiresAt !== undefined && DateTime.isLessThanOrEqualTo(record.expiresAt, now)
 
-/** Glass's live link to one Sandbox's agent host. */
-interface Link {
+const goneReason = (record: SandboxRecord | null, now: DateTime.Utc): GoneReach =>
+  expiredBy(record, now) ? "expired" : "deleted"
+
+interface HostLink {
   connection: HostClient | null
   readonly position: JournalPosition
   readonly connectLock: Semaphore.Semaphore
@@ -121,7 +119,7 @@ const RECONNECT_SPACING = "500 millis"
 
 const EXTEND_RETRY_SPACING = "1 minute"
 
-const UNREACHABLE_SPACING = "5 seconds"
+const UNREACHABLE_RETRY_SPACING = "5 seconds"
 
 const reconnecting = <E, R>(
   connection: (resetMisses: Effect.Effect<void>) => Effect.Effect<void, E, R>,
@@ -180,7 +178,7 @@ const notInstalled = (providerId: string): Placement => {
     place: () => failure,
     host: () => failure,
     runningHost: () => Effect.succeedNone,
-    writable: () => Effect.void,
+    refuseIfReadOnly: () => Effect.void,
     hostOnceMade: () => Effect.succeedNone,
     baseRef: () => failure,
     remove: ({ agent }) =>
@@ -198,13 +196,8 @@ export class Sandboxes extends Context.Service<
     readonly providers: ReadonlyArray<SandboxProviderInfo>
     readonly placement: (providerId: string) => Placement
     readonly subscribeLost: SubscribeLost
-    /** Each Sandbox Agent's Sandbox status, again after every change. */
     readonly statuses: Stream.Stream<ReadonlyMap<string, SandboxStatus>>
     readonly status: (agentId: string) => Effect.Effect<SandboxStatus | null>
-    /**
-     * Reconnects to every Sandbox that outlived Glass, answering their Agents, whose Turns carried
-     * on while Glass was closed. Subscribe to lost Agents first: a Sandbox found gone is one.
-     */
     readonly resume: Effect.Effect<ReadonlySet<string>>
   }
 >()("@glass/server/Sandboxes") {
@@ -227,11 +220,10 @@ export class Sandboxes extends Context.Service<
 
       const launchedAt = yield* DateTime.now
 
-      const known = yield* SubscriptionRef.make<ReadonlyMap<string, Known>>(
+      const known = yield* SubscriptionRef.make<ReadonlyMap<string, KnownSandbox>>(
         new Map(
           stored.map(({ id, sandbox }) => {
-            // One past its expiry while Glass was closed is gone without asking.
-            const gone = sandbox.gone ?? (pastExpiry(sandbox, launchedAt) ? "expired" : undefined)
+            const gone = sandbox.gone ?? (expiredBy(sandbox, launchedAt) ? "expired" : undefined)
 
             return [id, { record: sandbox, reach: gone ?? "connecting" }]
           }),
@@ -239,14 +231,14 @@ export class Sandboxes extends Context.Service<
       )
 
       const savedPositions = new Map(stored.map(({ id, journalSaved }) => [id, journalSaved]))
-      const links = new Map<string, Link>()
+      const links = new Map<string, HostLink>()
 
       const linkOf = (agentId: string) => {
         const found = links.get(agentId)
 
         if (found !== undefined) return found
 
-        const link: Link = {
+        const link: HostLink = {
           connection: null,
           position: { saved: savedPositions.get(agentId) ?? 0 },
           connectLock: Semaphore.makeUnsafe(1),
@@ -260,22 +252,17 @@ export class Sandboxes extends Context.Service<
       const knownOf = (agentId: string) =>
         SubscriptionRef.get(known).pipe(Effect.map((all) => all.get(agentId) ?? unknown))
 
-      const change = (agentId: string, update: (before: Known) => Known) =>
-        SubscriptionRef.modify(known, (all) => {
+      const change = (agentId: string, update: (before: KnownSandbox) => KnownSandbox) =>
+        SubscriptionRef.modifySome(known, (all) => {
           const before = all.get(agentId) ?? unknown
           const after = update(before)
 
           return [
             [before, after] as const,
-            after === before ? all : new Map(all).set(agentId, after),
+            after === before ? Option.none() : Option.some(new Map(all).set(agentId, after)),
           ]
         })
 
-      /**
-       * The one place a lost Sandbox cuts off its running Turn: whenever Glass stops reaching it, or
-       * it turns out gone. Gone is for good. A host that answers again replays how the Turn really
-       * ended, replacing the cut-off ending.
-       */
       const setReach = (agentId: string, reach: SandboxReach) =>
         change(agentId, (before) =>
           isGone(before.reach) || before.reach === reach ? before : { ...before, reach },
@@ -301,7 +288,7 @@ export class Sandboxes extends Context.Service<
       const becomeGone = (agentId: string) =>
         Effect.gen(function* () {
           const { record } = yield* knownOf(agentId)
-          const gone: GoneReach = pastExpiry(record, yield* DateTime.now) ? "expired" : "deleted"
+          const gone = goneReason(record, yield* DateTime.now)
 
           yield* Effect.logWarning(`An Agent's Sandbox was ${gone}`, agentId)
 
@@ -388,10 +375,6 @@ export class Sandboxes extends Context.Service<
             )
           })
 
-        /**
-         * Extends the Sandbox now and again halfway to each expiry, until its provider can't move
-         * the expiry any later.
-         */
         const extendAhead = (agentId: string, extend: (state: SandboxState) => Promise<Date>) =>
           Effect.gen(function* () {
             let last = (yield* knownOf(agentId)).record?.expiresAt
@@ -420,11 +403,10 @@ export class Sandboxes extends Context.Service<
               while: (error) => !isSandboxGone(error),
               schedule: Schedule.spaced(EXTEND_RETRY_SPACING),
             }),
-            // Reaching the host finds a gone Sandbox too, and says so; providers log the rest.
+            Effect.catchTag("SandboxGone", () => becomeGone(agentId)),
             Effect.ignore,
           )
 
-        /** Makes the Sandbox if `placed` still needs one, then follows its host while it exists. */
         const follow = (
           agentId: string,
           placed: PlacedAgent | null,
@@ -478,10 +460,9 @@ export class Sandboxes extends Context.Service<
                       Effect.andThen(setReach(agentId, "unreachable")),
                     ),
               ),
-              // Keeps trying while the Agent exists, so the Sandbox's work fills in once it answers.
               Effect.retry({
                 while: (error) => !isSandboxGone(error),
-                schedule: Schedule.spaced(UNREACHABLE_SPACING),
+                schedule: Schedule.spaced(UNREACHABLE_RETRY_SPACING),
               }),
             )
           }).pipe(
@@ -543,7 +524,7 @@ export class Sandboxes extends Context.Service<
                 refuseIfGone(placed.agent.id).pipe(Effect.andThen(Effect.fail(unreachable()))),
               ),
             ),
-          writable: ({ agent }) => refuseIfGone(agent.id),
+          refuseIfReadOnly: ({ agent }) => refuseIfGone(agent.id),
           runningHost: ({ agent }) =>
             Effect.sync(() => Option.fromNullishOr(links.get(agent.id)?.connection)),
           // A gone Sandbox took everything in it, so like one never made, it holds nothing to lose.
@@ -567,7 +548,6 @@ export class Sandboxes extends Context.Service<
               const { record, reach } = yield* knownOf(agent.id)
 
               if (record !== null) {
-                // A gone Sandbox leaves its provider nothing to delete.
                 if (!isGone(reach)) yield* deleteSandbox(provider, record, "delete the Sandbox")
 
                 yield* save(agent.id, null)
@@ -621,8 +601,6 @@ export class Sandboxes extends Context.Service<
         placement: (providerId) => placed.get(providerId)?.placement ?? notInstalled(providerId),
         subscribeLost: PubSub.subscribe(lost).pipe(Effect.map(Stream.fromSubscription)),
         statuses: SubscriptionRef.changes(known).pipe(
-          // An update that changed nothing hands back the same map.
-          Stream.changesWith((a, b) => a === b),
           Stream.map(
             (all) => new Map(Array.from(all, ([agentId, found]) => [agentId, statusOf(found)])),
           ),

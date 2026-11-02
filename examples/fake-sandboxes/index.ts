@@ -100,8 +100,6 @@ const plugin: Plugin = (glass) => {
       url: `http://127.0.0.1:${decodeSandbox(state).port}`,
       headers: {},
     }),
-    // This platform lets a Sandbox live two days from each extension.
-    extend: async () => new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
     remove: async (state) => {
       await rm(decodeSandbox(state).folder, { recursive: true, force: true, maxRetries: 10 })
     },

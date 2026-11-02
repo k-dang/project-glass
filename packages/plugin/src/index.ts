@@ -29,7 +29,7 @@ export interface SandboxProvider {
   /**
    * Deletes the Sandbox. Glass has asked its agent host to end first; one it couldn't reach may
    * still run. Throws `glass.sandboxGone()` if the Sandbox is already gone, which Glass takes as
-   * deleted.
+   * done.
    */
   readonly remove: (state: SandboxState) => Promise<void>
   /** What an Agent program offers in this provider's Sandboxes, before one exists. */

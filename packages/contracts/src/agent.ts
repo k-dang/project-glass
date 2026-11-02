@@ -85,11 +85,6 @@ export const ModelChoice = Schema.Struct({
 
 export type ModelChoice = typeof ModelChoice.Type
 
-/**
- * How Glass stands with an Agent's Sandbox: connecting until it first answers, then reachable or
- * not. Expired and deleted are for good: the Sandbox is gone with everything in it, leaving its
- * Agent read-only.
- */
 export const GoneReach = Schema.Literals(["expired", "deleted"])
 
 export type GoneReach = typeof GoneReach.Type
@@ -106,14 +101,13 @@ export type SandboxReach = typeof SandboxReach.Type
 export const isGone = (reach: SandboxReach): reach is GoneReach =>
   reach === "expired" || reach === "deleted"
 
-/** Glass can't reach the Sandbox now, for a while or for good. */
 export const isOutOfReach = (reach: SandboxReach) => reach === "unreachable" || isGone(reach)
 
 export const goneExplanation = (reach: GoneReach) =>
   `This Agent's Sandbox ${reach === "expired" ? "expired" : "was deleted"}, so it can't take messages. Its transcript stays until you remove the Agent.`
 
 export class SandboxStatus extends Schema.Class<SandboxStatus>("SandboxStatus")({
-  /** `null` until the Sandbox's provider says when it expires. */
+  /** `null` until the Sandbox's provider says when it expires, and for one whose Sandboxes don't. */
   expiresAt: Schema.NullOr(Schema.DateTimeUtcFromString),
   reach: SandboxReach,
 }) {}
@@ -291,10 +285,7 @@ export const TurnFailed = Schema.TaggedStruct("Failed", { reason: Schema.String 
 
 export const TurnStopped = Schema.TaggedStruct("Stopped", {})
 
-/**
- * Glass lost the Agent while the Turn ran. A Sandbox's agent host may carry on, so the ending it
- * reports once Glass reaches it again replaces this one.
- */
+/** Glass lost the Agent while the Turn ran. */
 export const TurnCutOff = Schema.TaggedStruct("CutOff", {})
 
 /** The Turn was running when Glass quit. */

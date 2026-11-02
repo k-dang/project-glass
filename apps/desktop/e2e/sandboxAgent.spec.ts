@@ -10,42 +10,39 @@ const repository = { owner: "glass-demo", repo: "greeter" }
 
 const reply = "Finished while you were away."
 
-// The Sandbox Agent runs the bundled pi on a fake model, which holds each reply until the test lets
-// it through.
 const test = glass.extend<{
   model: Effect.Success<ReturnType<typeof fakeModelProvider>>
   sandboxes: ReturnType<typeof installFakeSandboxProvider>
 }>({
-  model: async ({ home }, use) => {
-    await Effect.runPromise(
-      Effect.scoped(
-        Effect.flatMap(
-          fakeModelProvider(home, { output: reply, hang: true }, { retry: { enabled: false } }),
-          (model) => Effect.promise(() => use(model)),
+  model: [
+    async ({ home }, use) => {
+      await Effect.runPromise(
+        Effect.scoped(
+          Effect.flatMap(
+            fakeModelProvider(home, { output: reply, hang: true }, { retry: { enabled: false } }),
+            (model) => Effect.promise(() => use(model)),
+          ),
         ),
-      ),
-    )
-  },
-  sandboxes: async ({ home }, use) => {
-    const { origin } = seedClone(join(home, "repositories"), repository.owner, repository.repo)
+      )
+    },
+    { auto: true },
+  ],
+  sandboxes: [
+    async ({ home }, use) => {
+      const { origin } = seedClone(join(home, "repositories"), repository.owner, repository.repo)
 
-    const sandboxes = installFakeSandboxProvider(home, {
-      root: join(home, "sandboxes"),
-      cloneFrom: origin,
-      piCommand: bundledPi,
-      // The Agent here runs pi.
-      claudeCommand: "glass-missing-claude",
-    })
+      const sandboxes = installFakeSandboxProvider(home, {
+        root: join(home, "sandboxes"),
+        cloneFrom: origin,
+        piCommand: bundledPi,
+        claudeCommand: "glass-missing-claude",
+      })
 
-    await use(sandboxes)
-    await sandboxes.stopHosts()
-  },
-  // The provider and the model must be in place before Glass starts, which loads Plugins once.
-  claude: async ({ claude, model, sandboxes }, use) => {
-    void model
-    void sandboxes
-    await use(claude)
-  },
+      await use(sandboxes)
+      await sandboxes.stopHosts()
+    },
+    { auto: true },
+  ],
 })
 
 test("starts a Sandbox Agent, and fills in what it missed while its connection was down", async ({

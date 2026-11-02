@@ -240,12 +240,6 @@ export const fakeSandboxProvider =
           headers: { "x-fake-sandbox": "yes" },
         }
       },
-      // This platform lets a Sandbox live two days from each extension.
-      extend: async (state) => {
-        if (!existsSync(decodeSandbox(state).folder)) throw glass.sandboxGone()
-
-        return new Date(Date.now() + 2 * 24 * 60 * 60 * 1000)
-      },
       remove: async (state) => {
         const { folder } = decodeSandbox(state)
         const hostPath = join(folder, "host.json")
