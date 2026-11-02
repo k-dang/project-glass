@@ -11,11 +11,6 @@ const MAX_LOST_RETRY_SPACING = Duration.minutes(5)
 
 const GIVE_UP_AFTER = Duration.hours(1)
 
-/**
- * Runs `session` again each time it fails, until its Sandbox is gone. After a few quick misses the
- * Sandbox is lost: `onLost` runs, and the tries spread out until an hour has passed. A session
- * calls `connected` once it reaches the host, which starts the count afresh.
- */
 export const reconnecting = <E, R>(
   session: (connected: Effect.Effect<void>) => Effect.Effect<void, E, R>,
   onLost: (error: E) => Effect.Effect<void>,
