@@ -183,7 +183,6 @@ export const agentServicesFixture = Effect.gen(function* () {
       Effect.sync(() => {
         nextAnswer = Effect.fail(error)
       }),
-    /** Later program starts wait until `releaseStart`. */
     holdStart: Deferred.make<void>().pipe(
       Effect.map((gate) => {
         starting = gate
@@ -192,14 +191,12 @@ export const agentServicesFixture = Effect.gen(function* () {
     releaseStart: Effect.suspend(() =>
       starting === null ? Effect.void : Deferred.succeed(starting, undefined).pipe(Effect.asVoid),
     ),
-    /** Ends the Agent's program, as a crash would. */
     exit: (agentId: string) =>
       Effect.suspend(() => {
         const exited = exits.get(agentId)
 
         return exited === undefined ? Effect.void : Deferred.succeed(exited, undefined)
       }).pipe(Effect.asVoid),
-    /** What the program answers Stop with: the Steers it hadn't taken in. */
     leaveOnStop: (messages: ReadonlyArray<SentMessage>) =>
       Effect.sync(() => {
         leftOnStop = messages

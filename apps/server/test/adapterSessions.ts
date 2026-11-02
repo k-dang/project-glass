@@ -74,7 +74,6 @@ const drive = Effect.fnUntraced(function* (
   return { adapter, events, turns: SubscriptionRef.get(turns), until, open }
 })
 
-/** Claude Code's adapter, on a recorded pinned CLI that answered from the fake Anthropic API. */
 export const claudeSession = Effect.fnUntraced(function* (
   scenario: string,
   reply?: (request: FakeAnthropicRequest) => FakeAnthropicReply,
@@ -108,7 +107,6 @@ export const claudeSession = Effect.fnUntraced(function* (
   return { ...(yield* drive(claudeAdapter(pinnedClaude(), sdk), tape, folder)), api }
 })
 
-/** pi's adapter, on a recorded bundled pi that answered from the fake model provider. */
 export const piSession = Effect.fnUntraced(function* (
   scenario: string,
   settings: FakeModelSettings = {},

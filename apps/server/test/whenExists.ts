@@ -1,7 +1,6 @@
 import { existsSync, watch } from "node:fs"
 import { dirname } from "node:path"
 
-/** Resolves once `path` exists, watching its folder rather than polling. */
 export const whenExists = (path: string, signal?: AbortSignal) =>
   new Promise<void>((resolve) => {
     const watcher = watch(dirname(path), () => {

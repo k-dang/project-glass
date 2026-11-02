@@ -26,11 +26,6 @@ interface Waiting {
   readonly answered: Deferred.Deferred<void>
 }
 
-/**
- * Runs each Turn the way its message says, for tests of Glass's own host:
- * `hold:<name>` says "Holding." and waits for the file `<name>` in `gates` before it takes in its
- * Steers; `ask permission` waits on a Permission request; every Turn ends replying to its message.
- */
 export const scriptedAdapter = (gates: string): AgentAdapter => ({
   models: Effect.succeed(
     new AgentModels({

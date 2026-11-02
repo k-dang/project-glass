@@ -27,10 +27,6 @@ export const repository = new FollowedRepository({ owner: "glass-demo", repo: "g
 
 const scriptedHost = fileURLToPath(new URL("../dist-test/scriptedAgentHost.mjs", import.meta.url))
 
-/**
- * A backend on fake GitHub whose agent hosts, local and in fake Sandboxes, run the scripted
- * adapter. `release(name)` lets a Turn sent as `hold:<name>` go on.
- */
 export const agentsFixture = Effect.gen(function* () {
   const github = yield* startFakeGitHub()
   const home = yield* isolatedHome

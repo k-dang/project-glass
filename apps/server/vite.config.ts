@@ -42,7 +42,6 @@ export default defineConfig({
       outDir: "dist-fake",
     },
     agentHost("dist-fake"),
-    // The backend tests' scripted agent host, built only when `test/buildBundles.ts` asks for it.
     ...(process.env["GLASS_PACK_TEST_HOST"] === "1"
       ? [agentHost("dist-test", { scriptedAgentHost: "test/scriptedAgentHost.ts" })]
       : []),

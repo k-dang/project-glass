@@ -47,7 +47,6 @@ const signedOut = {
 
 const replyFine = 'Reply with exactly this JSON and nothing else: {"summary":"Fine."}'
 
-/** Gives a checkout the file the read-only scenarios read. */
 export const seedCheckout = (checkout: string) => {
   mkdirSync(join(checkout, "src"), { recursive: true })
   writeFileSync(join(checkout, "src", "greet.ts"), "hello")
@@ -126,7 +125,6 @@ export const readRecording = (scenario: string) =>
     readFileSync(recordingFile(scenario), "utf8"),
   )
 
-/** The agent runners on the given spawner, configured the way the backend configures them. */
 export const runnersLayer = (
   env: Readonly<Record<string, string>>,
   spawner: Layer.Layer<
@@ -155,7 +153,6 @@ const personal = /email|org|account|uuid|name|subscription|plan/i
 const redactJson = (value: Json) =>
   mapStrings(value, (text, field) => (personal.test(field) ? "<redacted>" : text))
 
-/** Blanks personal fields in output that is one JSON document or one per line. */
 const redact = (output: string) => {
   const whole = decodeJson(output)
 

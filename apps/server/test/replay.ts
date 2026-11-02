@@ -9,7 +9,6 @@ export const isJsonArray = (value: Json): value is Schema.JsonArray => Array.isA
 export const isJsonObject = (value: Json): value is Schema.JsonObject =>
   Predicate.isObject(value) && !Array.isArray(value)
 
-/** Changes every string in `value`, told the field each sits in. */
 export const mapStrings = (
   value: Json,
   change: (text: string, field: string) => string,
@@ -27,13 +26,11 @@ export const mapStrings = (
 
 export const decodeJson = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Json))
 
-/** A line as JSON, or as the text it is when it isn't JSON. */
 export const parseLine = (line: string): Json => Option.getOrElse(decodeJson(line), () => line)
 
 const withMachinePlaces = (places: Readonly<Record<string, string>>) =>
   Object.entries({ ...places, "<home>": homedir(), "<tmp>": tmpdir() })
 
-/** A path as programs write it: native, with forward slashes, JSON-escaped, and as a folder name. */
 const spellings = (path: string) => {
   const dashed = path.replace(/[^A-Za-z0-9]/g, "-")
 
@@ -45,7 +42,6 @@ const spellings = (path: string) => {
   ]
 }
 
-/** Replaces this machine's paths with placeholders, so a recording matches on any machine. */
 export const normalizer = (places: Readonly<Record<string, string>>) => {
   const known = withMachinePlaces(places)
     .flatMap(([name, path]) => spellings(path).map((spelling) => [name, spelling] as const))
@@ -85,10 +81,6 @@ export const utf8 = () => {
   return (chunk: Uint8Array) => decoder.decode(chunk, { stream: true })
 }
 
-/**
- * Spawns the real program and tells `tap` what passes through it as text. Its exit comes once the
- * program has exited and every tapped output has ended, so no output is missed.
- */
 export const tappedSpawn = Effect.fnUntraced(function* (
   real: ChildProcessSpawner.ChildProcessSpawner["Service"],
   command: ChildProcess.StandardCommand,
@@ -151,7 +143,6 @@ export const tappedSpawn = Effect.fnUntraced(function* (
   })
 })
 
-/** A handle for a program a replay plays, with no process behind it. */
 export const playedHandle = (played: {
   readonly stdout: Stream.Stream<Uint8Array>
   readonly stderr?: Stream.Stream<Uint8Array>

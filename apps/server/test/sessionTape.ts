@@ -50,14 +50,12 @@ type Tape = typeof Tape.Type
 const tapeFile = (scenario: string) =>
   fileURLToPath(new URL(`./recordings/sessions/${scenario}.json`, import.meta.url))
 
-/** Set GLASS_RECORD_SESSIONS=1 to run the real programs, with your logins, and save what they say. */
 export const recordingSessions = process.env["GLASS_RECORD_SESSIONS"] === "1"
 
 const uuids = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi
 
 const idFields = new Set(["request_id", "uuid", "session_id", "tool_use_id", "toolUseID"])
 
-/** Takes `actual` as this run's spelling of the recorded id, unless either is already another's. */
 const learn = (ids: Map<string, string>, recorded: string, actual: string) => {
   const known = ids.get(recorded)
 
@@ -70,7 +68,6 @@ const learn = (ids: Map<string, string>, recorded: string, actual: string) => {
   return true
 }
 
-/** Binds the ids a program says first to themselves, so Glass must answer with those very ids. */
 const bindSaid = (value: Json, ids: Map<string, string>, field = ""): void => {
   if (Predicate.isString(value)) {
     if (idFields.has(field)) learn(ids, value, value)
@@ -91,7 +88,6 @@ const sameIds = (recorded: string, actual: string, ids: Map<string, string>) => 
   return recordedIds.every((id, index) => learn(ids, id, actualIds[index]!))
 }
 
-/** Whether `actual` is what `recorded` was, learning which ids this run uses in place of the recorded ones. */
 const matches = (recorded: Json, actual: Json, ids: Map<string, string>, field = ""): boolean => {
   if (Predicate.isString(recorded) && Predicate.isString(actual)) {
     if (recorded === actual) return true
@@ -143,11 +139,6 @@ interface Program {
   readonly unsent: () => number
 }
 
-/**
- * A recorded program's side of a conversation: it says its recorded lines, waiting at each run of
- * lines Glass sent until Glass sends them again, in any order within the run. Glass closes every
- * program it starts, so a recorded exit only gives the code the program closes with.
- */
 const replayProgram = (
   recorded: Process,
   ids: Map<string, string>,
@@ -237,7 +228,6 @@ const replayProgram = (
   }
 }
 
-/** Records or replays what Agent programs said to Glass, for one scenario. */
 export const sessionTape = (scenario: string, places: Readonly<Record<string, string>>) => {
   const normalizeText = normalizer(places)
   const normalize = (value: Json) => mapStrings(value, normalizeText)
@@ -266,7 +256,6 @@ export const sessionTape = (scenario: string, places: Readonly<Record<string, st
     for (const fail of failing) fail(failure())
   }
 
-  /** Fails as soon as the replay goes anywhere the recording didn't. */
   const mismatch = Effect.callback<never, Error>((resume) => {
     if (problems.length > 0) return resume(failure())
 
@@ -316,7 +305,6 @@ export const sessionTape = (scenario: string, places: Readonly<Record<string, st
     }
   }
 
-  /** For the Claude Agent SDK's `spawnClaudeCodeProcess`. */
   const claude = (options: SpawnOptions): SpawnedProcess => {
     if (recordingSessions) {
       const child = spawn(options.command, options.args, {
@@ -382,7 +370,6 @@ export const sessionTape = (scenario: string, places: Readonly<Record<string, st
     })
   }
 
-  /** A ChildProcessSpawner for programs Glass starts itself, such as pi. */
   const spawner = Layer.effect(
     ChildProcessSpawner.ChildProcessSpawner,
     Effect.gen(function* () {
@@ -434,7 +421,6 @@ export const sessionTape = (scenario: string, places: Readonly<Record<string, st
     }),
   )
 
-  /** Records what the SDK found of a saved conversation on disk, or replays it. */
   const sessionInfo = (
     conversation: string,
     dir: string | undefined,
@@ -468,7 +454,6 @@ export const sessionTape = (scenario: string, places: Readonly<Record<string, st
     return Promise.resolve(saved)
   }
 
-  /** Saves the recording, or fails if the replay went anywhere the recording didn't. */
   const finish = Effect.sync(() => {
     if (recordingSessions) {
       const file = tapeFile(scenario)

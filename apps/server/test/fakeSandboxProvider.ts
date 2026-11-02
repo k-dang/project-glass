@@ -292,7 +292,6 @@ export const installFakeSandboxProvider = (
   const sandboxFolder = (agentId: string) => join(settings.root, agentId)
   const hostFile = (agentId: string) => join(sandboxFolder(agentId), "host.json")
 
-  /** The Sandbox's agent host, reachable without its ingress. */
   const host = (agentId: string) =>
     Schema.decodeUnknownSync(HostFile)(readFileSync(hostFile(agentId), "utf8"))
 
@@ -302,7 +301,6 @@ export const installFakeSandboxProvider = (
     configure: (change: Partial<FakeSandboxSettings>) =>
       writeFileSync(settingsPath, JSON.stringify({ ...settings, ...change })),
     sandboxFolder,
-    /** Resolves once the Sandbox's ingress has closed every open connection. */
     dropConnections: (agentId: string) => {
       const folder = sandboxFolder(agentId)
       writeFileSync(join(folder, "dropped"), "")

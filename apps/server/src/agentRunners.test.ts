@@ -99,7 +99,6 @@ for (const name of ["claude-answer", "pi-answer"])
     }),
   )
 
-/** The scenario's recording with `from` replaced by `to` in what one of its programs printed. */
 const edited = (
   base: string,
   printed: (spawn: Recording["spawns"][number]) => boolean,

@@ -243,13 +243,11 @@ export const startFakeAnthropic = Effect.gen(function* () {
 
   return {
     url: `http://127.0.0.1:${portOf(server)}`,
-    /** The conversation's requests, leaving out side requests such as naming the session. */
     received: received.reached,
     respond: (reply: (request: FakeAnthropicRequest) => Reply) =>
       Effect.sync(() => {
         respond = reply
       }),
-    /** Keeps later replies back until `release`. */
     hold: Effect.sync(() => {
       held ??= []
     }),
