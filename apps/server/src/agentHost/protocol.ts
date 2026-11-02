@@ -8,7 +8,6 @@ import {
   RequestAnswer,
   RequestNotWaiting,
   SentMessage,
-  UnsavedWork,
 } from "@glass/contracts"
 import { Schema, SchemaTransformation } from "effect"
 import { randomBytes } from "node:crypto"
@@ -100,9 +99,9 @@ export class AgentHostRpcs extends RpcGroup.make(
     success: Schema.Array(ChangedFile),
     error: HostAgentError,
   }),
-  Rpc.make("GetUnsavedWork", {
+  Rpc.make("HasUncommittedChanges", {
     payload: { folder: HostFolder },
-    success: UnsavedWork,
+    success: Schema.Boolean,
     error: HostAgentError,
   }),
   Rpc.make("WatchJournal", {

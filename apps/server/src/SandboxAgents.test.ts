@@ -1,12 +1,9 @@
 import { NodeSocket } from "@effect/platform-node"
 import { assert, it } from "@effect/vitest"
-import { RemovalWarnings, RPC_PATH, TextPart, TurnCutOff, TurnDone } from "@glass/contracts"
+import { RPC_PATH, TextPart, TurnCutOff, TurnDone } from "@glass/contracts"
 import { Effect, Predicate, Stream } from "effect"
 import { vi } from "vite-plus/test"
-import { writeFileSync } from "node:fs"
-import { join } from "node:path"
-import { agentsFixture, claudeCode, lastText, repository, settled } from "../test/agentsFixture"
-import { gitIn } from "../test/gitRepositories"
+import { agentsFixture, claudeCode, lastText, settled } from "../test/agentsFixture"
 import { AgentHostRpcs, HOST_TOKEN_HEADER } from "./agentHost/protocol"
 import { connectRpcClient } from "./rpcSocket"
 
@@ -111,38 +108,6 @@ it.live(
 
       assert.deepStrictEqual(lastText(filledIn), TextPart.make({ text: "Done." }))
     }),
-)
-
-it.live("warns before removing a Sandbox Agent with work in its Sandbox that isn't on GitHub", () =>
-  Effect.gen(function* () {
-    const f = yield* agentsFixture({ output: "Done." })
-    const agent = yield* f.startSandbox()
-    yield* f.transcript(agent.id, settled(1))
-    const clone = join(f.sandboxes.sandboxFolder(agent.id), repository.repo)
-
-    const clean = yield* f.client.GetRemovalWarnings({ agentId: agent.id })
-    assert.deepStrictEqual(
-      clean,
-      new RemovalWarnings({ uncommittedChanges: "none", unpushedCommits: [] }),
-    )
-
-    writeFileSync(join(clone, "notes.txt"), "hi\n")
-    const dirty = yield* f.client.GetRemovalWarnings({ agentId: agent.id })
-    assert.equal(dirty.uncommittedChanges, "some")
-
-    gitIn(clone, "add", "notes.txt")
-    gitIn(clone, "commit", "--quiet", "-m", "Add notes")
-    const committed = yield* f.client.GetRemovalWarnings({ agentId: agent.id })
-    assert.deepStrictEqual(
-      committed.unpushedCommits.map(({ subject }) => subject),
-      ["Add notes"],
-    )
-    assert.equal(committed.uncommittedChanges, "none")
-
-    gitIn(clone, "push", "--quiet", "origin", agent.name)
-    const pushed = yield* f.client.GetRemovalWarnings({ agentId: agent.id })
-    assert.deepStrictEqual(pushed.unpushedCommits, [])
-  }),
 )
 
 it.live("cuts off a Turn whose Sandbox host died while Glass was closed", () =>

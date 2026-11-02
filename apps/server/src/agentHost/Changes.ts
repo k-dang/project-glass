@@ -7,7 +7,6 @@ import {
   NoTextChanges,
   PatchTooLarge,
   TextPatch,
-  type UnsavedWork,
 } from "@glass/contracts"
 import { Context, Effect, FileSystem, Layer } from "effect"
 import { join } from "node:path"
@@ -107,7 +106,7 @@ export class Changes extends Context.Service<
       folder: string,
       baseRef: string,
     ) => Effect.Effect<ReadonlyArray<ChangedFile>, HostAgentError>
-    readonly unsaved: (folder: string) => Effect.Effect<UnsavedWork, HostAgentError>
+    readonly uncommitted: (folder: string) => Effect.Effect<boolean, HostAgentError>
   }
 >()("@glass/server/agentHost/Changes") {
   static readonly layer = Layer.effect(
@@ -176,26 +175,9 @@ export class Changes extends Context.Service<
                 }),
             )
           }).pipe(Effect.scoped, failure("Couldn't read the Agent's changes.")),
-        unsaved: (folder) =>
-          Effect.all(
-            [
-              git.run(folder, ["status", "--porcelain"]),
-              // Pushing updates the remote-tracking branch, so this is what no remote has.
-              git.run(folder, ["log", "--format=%H%x00%s", "HEAD", "--not", "--remotes"]),
-            ],
-            { concurrency: "unbounded" },
-          ).pipe(
-            Effect.map(([status, log]) => ({
-              uncommittedChanges: status !== "",
-              unpushedCommits:
-                log === ""
-                  ? []
-                  : log.split("\n").map((line) => {
-                      const [sha = "", subject = ""] = line.split("\0")
-
-                      return { sha, subject }
-                    }),
-            })),
+        uncommitted: (folder) =>
+          git.run(folder, ["status", "--porcelain"]).pipe(
+            Effect.map((status) => status !== ""),
             failure("Couldn't check the Agent's folder for changes."),
           ),
       })

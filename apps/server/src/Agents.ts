@@ -34,7 +34,6 @@ import {
   isNothingUnsent,
   nothingUnsent,
   type SentMessage,
-  type UnsavedWork,
 } from "@glass/contracts"
 import {
   Context,
@@ -96,8 +95,6 @@ const toRow = ({
 const withStatus = (agent: Agent, sandbox: SandboxStatus | null) =>
   // oxlint-disable-next-line typescript/no-misused-spread -- The fields go straight back into Agent.
   new Agent({ ...agent, sandbox })
-
-const nothingUnsaved: UnsavedWork = { uncommittedChanges: false, unpushedCommits: [] }
 
 const storageFailure = () =>
   new AgentError({ message: "Couldn't read or save your Agents. Try again." })
@@ -526,24 +523,18 @@ export class Agents extends Context.Service<
           .pipe(
             Effect.flatMap(
               Option.match({
-                onNone: () => Effect.succeed(nothingUnsaved),
-                onSome: (host) => host.GetUnsavedWork({ folder: row.folder }),
+                onNone: () => Effect.succeed(false),
+                onSome: (host) => host.HasUncommittedChanges({ folder: row.folder }),
               }),
             ),
             Effect.timeout("10 seconds"),
             Effect.map(
-              ({ uncommittedChanges, unpushedCommits }) =>
-                new RemovalWarnings({
-                  uncommittedChanges: uncommittedChanges ? "some" : "none",
-                  unpushedCommits,
-                }),
+              (some) => new RemovalWarnings({ uncommittedChanges: some ? "some" : "none" }),
             ),
             // A connection to a host that just died ends interrupted, not failed.
             Effect.catchCause((cause) =>
-              Effect.logWarning("Couldn't check an Agent for unsaved work", cause).pipe(
-                Effect.as(
-                  new RemovalWarnings({ uncommittedChanges: "unchecked", unpushedCommits: [] }),
-                ),
+              Effect.logWarning("Couldn't check an Agent for uncommitted work", cause).pipe(
+                Effect.as(new RemovalWarnings({ uncommittedChanges: "unchecked" })),
               ),
             ),
           )

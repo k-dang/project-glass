@@ -196,8 +196,7 @@ it("removes the open Agent from the sidebar after confirming its uncommitted cha
   const user = mount({
     WatchTranscript: () =>
       Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
-    GetRemovalWarnings: () =>
-      Effect.succeed(new RemovalWarnings({ uncommittedChanges: "some", unpushedCommits: [] })),
+    GetRemovalWarnings: () => Effect.succeed(new RemovalWarnings({ uncommittedChanges: "some" })),
     RemoveAgent: ({ agentId }) => Effect.sync(() => void removed.push(agentId)),
   })
 
@@ -1334,30 +1333,4 @@ it("dims a Sandbox Agent Glass can't reach, and makes one whose Sandbox expired 
   ).toBeTruthy()
   expect(screen.queryByRole("textbox", { name: "Message" })).toBeNull()
   expect(screen.getByRole("link", { description: /Sandbox expired/ })).toBeTruthy()
-})
-
-it("lists a Sandbox Agent's unpushed commits before removing it", async () => {
-  const removed: Array<string> = []
-
-  const user = mount({
-    WatchAgents: () => Stream.make([inSandboxWith("reachable")]),
-    WatchTranscript: noTranscript,
-    GetRemovalWarnings: () =>
-      Effect.succeed(
-        new RemovalWarnings({
-          uncommittedChanges: "none",
-          unpushedCommits: [{ sha: "0123456789abcdef", subject: "Add notes" }],
-        }),
-      ),
-    RemoveAgent: ({ agentId }) => Effect.sync(() => void removed.push(agentId)),
-  })
-
-  await user.click(await screen.findByRole("button", { name: "Remove agent/swift-otter" }))
-  const dialog = await screen.findByRole("alertdialog", { name: "Remove agent/swift-otter?" })
-  expect(within(dialog).getByText(/1 commit not pushed to GitHub/)).toBeTruthy()
-  const commits = within(dialog).getByRole("list", { name: "Commits not on GitHub" })
-  expect(commits.textContent).toBe("0123456Add notes")
-
-  await user.click(within(dialog).getByRole("button", { name: "Remove Agent" }))
-  await waitFor(() => expect(removed).toEqual([agent.id]))
 })

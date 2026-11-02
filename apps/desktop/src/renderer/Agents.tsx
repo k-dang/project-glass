@@ -10,10 +10,8 @@ import {
   isGone,
   isOutOfReach,
   type PlaceTag,
-  type RemovalWarnings,
   repositoryKey,
   type SandboxStatus,
-  type UnpushedCommit,
 } from "@glass/contracts"
 import { Link, Outlet, useNavigate, useParams } from "@tanstack/react-router"
 import { DateTime, Exit, Option, Predicate } from "effect"
@@ -37,8 +35,6 @@ import { ConfirmationDialog } from "./ConfirmationDialog"
 import { settledProblem, streamProblem } from "./problems"
 import { ProblemAlert } from "./ProblemAlert"
 import { shortcutLabel } from "./shortcutLabel"
-import { plural } from "./plural"
-import { ShortSha } from "./shortSha"
 import { useReviewShortcuts } from "./useReviewShortcuts"
 
 const groupNames: Record<PlaceTag, string> = { ...placeNames, sandbox: "Sandboxes" }
@@ -202,30 +198,17 @@ function AgentList() {
     .render()
 }
 
-/** What removing the Agent would lose, or `null` when it loses nothing. */
-const removalWarning = (agent: Agent, { uncommittedChanges, unpushedCommits }: RemovalWarnings) => {
-  // Removing a local Agent keeps its branch, so its commits stay.
-  if (!Predicate.isTagged(agent.place, "sandbox")) {
-    if (uncommittedChanges === "none") return null
+const removalWarning = (agent: Agent, warning: "some" | "unchecked") => {
+  const inSandbox = Predicate.isTagged(agent.place, "sandbox")
 
-    return uncommittedChanges === "unchecked"
-      ? `Glass couldn't check its worktree for uncommitted changes. Removing it discards any. The branch ${agent.name} and its commits stay.`
-      : `Its worktree has uncommitted changes, which removing it discards. The branch ${agent.name} and its commits stay.`
-  }
+  if (warning === "unchecked")
+    return inSandbox
+      ? "Glass couldn't reach its Sandbox to check for uncommitted changes. Removing it deletes the Sandbox and everything in it."
+      : `Glass couldn't check its worktree for uncommitted changes. Removing it discards any. The branch ${agent.name} and its commits stay.`
 
-  if (uncommittedChanges === "unchecked")
-    return "Glass couldn't reach its Sandbox to check for work that isn't on GitHub. Removing it deletes the Sandbox and everything in it."
-
-  const lost = [
-    ...(uncommittedChanges === "some" ? ["uncommitted changes"] : []),
-    ...(unpushedCommits.length > 0
-      ? [`${plural(unpushedCommits.length, "commit")} not pushed to GitHub`]
-      : []),
-  ]
-
-  if (lost.length === 0) return null
-
-  return `Its Sandbox has ${lost.join(" and ")}, which removing it deletes along with the Sandbox. Ask the Agent to push first to keep them.`
+  return inSandbox
+    ? "Its Sandbox has uncommitted changes, which removing it discards along with the Sandbox."
+    : `Its worktree has uncommitted changes, which removing it discards. The branch ${agent.name} and its commits stay.`
 }
 
 function AgentRow(props: { agent: Agent }) {
@@ -236,10 +219,7 @@ function AgentRow(props: { agent: Agent }) {
   const warnings = useAtomValue(removalWarningsAtom(agent.id))
   const checkWarnings = useAtomSet(removalWarningsAtom(agent.id), { mode: "promiseExit" })
 
-  const [confirming, setConfirming] = useState<{
-    readonly warning: string
-    readonly unpushedCommits: ReadonlyArray<UnpushedCommit>
-  } | null>(null)
+  const [confirming, setConfirming] = useState<"some" | "unchecked" | null>(null)
 
   const problem = settledProblem(warnings)
   const repositoryId = useId()
@@ -267,10 +247,10 @@ function AgentRow(props: { agent: Agent }) {
 
     if (Exit.isFailure(exit)) return
 
-    const warning = removalWarning(agent, exit.value)
+    const { uncommittedChanges } = exit.value
 
-    if (warning === null) removeNow()
-    else setConfirming({ warning, unpushedCommits: exit.value.unpushedCommits })
+    if (uncommittedChanges === "none") removeNow()
+    else setConfirming(uncommittedChanges)
   }
 
   return (
@@ -335,22 +315,7 @@ function AgentRow(props: { agent: Agent }) {
       <ConfirmationDialog
         open={confirming !== null}
         title={`Remove ${agent.name}?`}
-        description={confirming?.warning ?? ""}
-        details={
-          confirming !== null &&
-          confirming.unpushedCommits.length > 0 && (
-            <ul aria-label="Commits not on GitHub" className="flex flex-col gap-1 text-sm">
-              {confirming.unpushedCommits.map(({ sha, subject }) => (
-                <li key={sha} className="flex min-w-0 gap-2">
-                  <span className="shrink-0">
-                    <ShortSha sha={sha} />
-                  </span>
-                  <span className="truncate">{subject}</span>
-                </li>
-              ))}
-            </ul>
-          )
-        }
+        description={confirming === null ? "" : removalWarning(agent, confirming)}
         confirmLabel="Remove Agent"
         onConfirm={removeNow}
         onCancel={() => setConfirming(null)}

@@ -121,7 +121,7 @@ export const agentServicesFixture = Effect.gen(function* () {
 
         return changed
       }),
-    unsaved: () => Effect.sync(() => ({ uncommittedChanges: uncommitted, unpushedCommits: [] })),
+    uncommitted: () => Effect.sync(() => uncommitted),
   })
 
   const hostServices = () =>

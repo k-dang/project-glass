@@ -480,22 +480,8 @@ export class SandboxProviderInfo extends Schema.Class<SandboxProviderInfo>("Sand
   engines: Schema.NonEmptyArray(AgentEngine),
 }) {}
 
-export const UnpushedCommit = Schema.Struct({ sha: Schema.String, subject: Schema.String })
-
-export type UnpushedCommit = typeof UnpushedCommit.Type
-
-/** What an Agent's place holds that isn't on GitHub, and removing the Agent would lose. */
-export const UnsavedWork = Schema.Struct({
-  uncommittedChanges: Schema.Boolean,
-  unpushedCommits: Schema.Array(UnpushedCommit),
-})
-
-export type UnsavedWork = typeof UnsavedWork.Type
-
 export class RemovalWarnings extends Schema.Class<RemovalWarnings>("RemovalWarnings")({
   uncommittedChanges: Schema.Literals(["none", "some", "unchecked"]),
-  /** Newest first. Removing a local Agent keeps its branch, so only a Sandbox Agent loses them. */
-  unpushedCommits: Schema.Array(UnpushedCommit),
 }) {}
 
 export class InvalidLocalCheckout extends Schema.TaggedError<InvalidLocalCheckout>()(
