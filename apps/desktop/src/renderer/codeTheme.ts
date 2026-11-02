@@ -8,8 +8,14 @@ registerCustomTheme("glass-charcoal", () => import("./charcoal").then((module) =
 
 const defaultCodeTheme = { dark: "pierre-dark", light: "pierre-light" }
 
-export const codeThemeFor = (theme: Theme) =>
-  theme === "charcoal" ? "glass-charcoal" : defaultCodeTheme
+// Catppuccin Mocha's code theme ships with Shiki, which @pierre/diffs resolves by name.
+export const codeThemeFor = (theme: Theme) => {
+  if (theme === "charcoal") return "glass-charcoal"
+
+  if (theme === "catppuccin-mocha") return "catppuccin-mocha"
+
+  return defaultCodeTheme
+}
 
 export function CodeThemeSync() {
   const { theme } = useTheme()
