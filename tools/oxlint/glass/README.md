@@ -23,7 +23,7 @@ source as in the app's bundler configuration.
   service or every file in a subdirectory as domain logic.
 
 Transport owners are `bin.ts`, `server.ts`, `handlers.ts`, `access.ts`, `agentHost.ts`,
-`agentHost/handlers.ts`, `rpcSocket.ts`, `LocalAgentHost.ts`, and `sandboxCalls.ts`
+`agentHost/handlers.ts`, `agentHost/server.ts`, `rpcSocket.ts`, `LocalAgentHost.ts`, and `sandboxCalls.ts`
 under `apps/server/src/`. The last two are connection adapters that services may call;
 other code cannot import the entry points or socket implementation directly.
 `github/GitHubClient.ts` may import the named outbound Effect HTTP client modules in
