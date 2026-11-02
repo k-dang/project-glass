@@ -6,6 +6,7 @@ import {
   startFakeGitHub,
 } from "../../../../apps/server/test/fakeGitHub.ts"
 import { VIEWER } from "../../../../apps/server/test/fakePullRequest.ts"
+import type { FakeChangedFile } from "../../../../apps/server/test/fakePullRequest.ts"
 
 export const FAKE_MODES = ["ok", "401", "500", "down", "busy-500"] as const
 const FakeMode = Schema.Literals(FAKE_MODES)
@@ -13,6 +14,15 @@ export const isFakeMode = Schema.is(FakeMode)
 const decodeMode = Schema.decodeUnknownSync(FakeMode)
 
 const samples = [
+  {
+    number: 101,
+    list: "needs-review",
+    title: "Wide change across 150 files",
+    author: "mona",
+    isDraft: false,
+    checks: "SUCCESS",
+    wide: true,
+  },
   {
     number: 100,
     list: "needs-review",
@@ -88,6 +98,39 @@ const repositoryOf = ({ path, graphql }: FakeGitHubRequest) => {
   }
 }
 
+/** One PR wide enough to fill the diff cache and every Shiki worker, so memory runs compare. */
+const WIDE_FILE_COUNT = 150
+const WIDE_FILE_LINES = 40
+
+const wideChangedFiles = () => {
+  const changed: Array<FakeChangedFile> = []
+  const head: Record<string, string> = {}
+  for (let index = 0; index < WIDE_FILE_COUNT; index++) {
+    const path = `src/feature-${String(index + 1).padStart(3, "0")}/index.ts`
+    const lines = Array.from(
+      { length: WIDE_FILE_LINES },
+      (_, line) => `export const value${line} = ${line + index}`,
+    )
+    head[path] = `${lines.join("\n")}\n`
+    let additions = 0
+    let deletions = 0
+    const body = lines.map((line, position) => {
+      if (position % 7 !== 3) return ` ${line}`
+      additions++
+      deletions++
+      return `-${line}\n+${line} // changed`
+    })
+    changed.push({
+      path,
+      status: "modified",
+      additions,
+      deletions,
+      patch: `@@ -1,${lines.length} +1,${lines.length} @@\n${body.join("\n")}`,
+    })
+  }
+  return { changed, head }
+}
+
 const seedRepository = (github: FakeGitHub, owner: string, repo: string) => {
   const needsReview = samples.filter((pr) => pr.list === "needs-review")
   const pullRequests =
@@ -108,6 +151,7 @@ const seedRepository = (github: FakeGitHub, owner: string, repo: string) => {
   const patch = "@@ -1 +1 @@\n-hello\n+hello name"
 
   for (const [index, sample] of pullRequests.entries()) {
+    const wide = "wide" in sample && sample.wide === true ? wideChangedFiles() : undefined
     const pr = github.seedPullRequest({
       owner,
       repo,
@@ -118,9 +162,11 @@ const seedRepository = (github: FakeGitHub, owner: string, repo: string) => {
       checks: sample.checks ?? undefined,
       updatedAt: new Date(now - (index + 1) * 3_600_000).toISOString(),
       requestedReviewers: sample.list === "needs-review" ? [VIEWER.login] : [],
-      base: { sha: "b0", files: { "greet.ts": "hello\n" } },
-      head: { sha: "h1", files: { "greet.ts": "hello name\n" } },
-      changedFiles: [{ path: "greet.ts", status: "modified", additions: 1, deletions: 1, patch }],
+      base: { sha: "b0", files: wide?.head ?? { "greet.ts": "hello\n" } },
+      head: { sha: "h1", files: wide?.head ?? { "greet.ts": "hello name\n" } },
+      changedFiles: wide?.changed ?? [
+        { path: "greet.ts", status: "modified", additions: 1, deletions: 1, patch },
+      ],
     })
     if (sample.list === "reviewing") {
       pr.addDraft({ path: "greet.ts", line: 1, side: "RIGHT", body: "Why names?", diffHunk: patch })

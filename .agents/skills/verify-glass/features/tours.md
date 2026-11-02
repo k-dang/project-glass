@@ -14,9 +14,9 @@ In Settings → Tours, choose pi as the Tour engine and Save changes. Open a PR,
 
 ## Driving it with glass-verify
 
-1. Launch `node $V launch` and run `node $V doctor`. This defaults to real GitHub for PR reads and a local synthetic provider for Tour generation.
+1. Launch `node $V launch` and run `node $V doctor`. This defaults to fake GitHub for PR reads and a local synthetic provider for Tour generation.
 2. Open Settings, `node $V click --role radio --name "pi"`, then `node $V click --role button --name "Save changes"` and `node $V wait --text "Settings saved."`.
-3. Open a readable PR following [PR workspace](pr-workspace.md). A small example is `https://github.com/k-dang/glass-api-probe/pull/1`. `node $V click --role tab --name "Tour"`, then capture a snapshot and screenshot before writing.
+3. In Reviews, type `https://github.com/glass-demo/greeter/pull/100` into the Open a PR textbox, choose Open, and wait for Reload. `node $V click --role tab --name "Tour"`, then capture a snapshot and screenshot before writing.
 4. `node $V click --role button --name "Write Tour"`, then `node $V wait --text "Development Tour"`. Capture a snapshot and screenshot of the saved Tour.
 5. `node $V click --role button --name "Start reading"`. Capture the Chapter and its `Synthetic file summary.` entries in Changes. Confirm its file paths match the PR's changed files.
 6. For `tour-queue`, open Settings and `node $V click --role switch --name "Tours for the Queue"`. Go back to Reviews, select the Queue tab, and `node $V type --role textbox --name "Add to the Queue" --text "<another PR URL>"`. Then `node $V wait --text "Tour ready"` and capture the row.

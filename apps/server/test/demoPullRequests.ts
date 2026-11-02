@@ -4,6 +4,8 @@ import { type FakeChangedFile, VIEWER } from "./fakePullRequest"
 /** The repository the demo PRs live in, followed so they show in Reviews. */
 export const DEMO_REPOSITORY = { owner: "octo-org", repo: "hello-world" } as const
 
+export const RATE_LIMIT_TITLE = "Rate-limit the public API"
+
 type Line = readonly [" " | "-" | "+", string]
 
 const lines = (prefix: Line[0], ...texts: Array<string>) =>
@@ -80,7 +82,7 @@ const seed = (
   })
 }
 
-const rateLimit = [
+export const rateLimitFiles = [
   modified("src/server/middleware.ts", [
     ...keep('import type { Handler, Request } from "./http"'),
     ...add('import { type Bucket, createBucket, retryAfter, take } from "../rateLimit/bucket"'),
@@ -245,12 +247,12 @@ export const seedDemoPullRequests = (github: FakeGitHub) => {
   seed(
     github,
     {
-      title: "Rate-limit the public API",
+      title: RATE_LIMIT_TITLE,
       author: "hubot",
       body: "Adds a per-client token bucket in front of the public API.",
       reviewers: [VIEWER.login],
     },
-    rateLimit,
+    rateLimitFiles,
   )
 
   seed(

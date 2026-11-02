@@ -5,7 +5,7 @@ import { Context, Effect, FileSystem, Layer, Option, Predicate, Result, Schema }
 import { createJiti } from "jiti/static"
 import { extname, join } from "node:path"
 import { ServerConfig } from "./ServerConfig"
-import { MissingLogin, NoCapacity } from "./sandboxFailures"
+import { MissingLogin, NoCapacity, SandboxGone } from "./sandboxFailures"
 
 const pluginFile = new Set([".ts", ".js", ".mts", ".mjs", ".cts", ".cjs"])
 
@@ -84,6 +84,7 @@ const loadPlugin = (
       registerSandboxProvider: (id, provider) => void registered.set(id, provider),
       missingLogin: (login, fix) => new MissingLogin(login, fix),
       noCapacity: (message) => new NoCapacity(message),
+      sandboxGone: () => new SandboxGone(),
     }
 
     yield* Effect.tryPromise(async () => factory(glass)).pipe(Effect.timeout("10 seconds"))

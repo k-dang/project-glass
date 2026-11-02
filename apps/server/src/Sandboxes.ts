@@ -1,8 +1,20 @@
-import { AgentEngine, AgentError, AgentModels, SandboxProviderInfo } from "@glass/contracts"
+import {
+  AgentEngine,
+  AgentError,
+  AgentModels,
+  GoneReach,
+  goneExplanation,
+  isGone,
+  isOutOfReach,
+  SandboxProviderInfo,
+  type SandboxReach,
+  SandboxStatus,
+} from "@glass/contracts"
 import type { SandboxProvider, SandboxRequest, SandboxState } from "@glass/plugin"
 import {
   type Cause,
   Context,
+  DateTime,
   Deferred,
   Effect,
   Fiber,
@@ -17,15 +29,25 @@ import {
   Scope,
   Semaphore,
   Stream,
+  SubscriptionRef,
 } from "effect"
 import { SqlClient } from "effect/sql"
 import { Socket } from "effect/socket"
 import { newHostToken } from "./agentHost/protocol"
 import { uniqueAgentName } from "./agentNames"
-import { followJournal } from "./hostJournal"
+import { followJournal, type JournalPosition } from "./hostJournal"
 import type { HostClient, LostAgentIds, PlacedAgent, Placement, SubscribeLost } from "./Placement"
 import { Plugins } from "./Plugins"
-import { call, connectToHost, shutDownHost, waitForHost } from "./sandboxCalls"
+import {
+  call,
+  connectToHost,
+  extendSandbox,
+  removeSandbox,
+  shutDownHost,
+  waitForHost,
+} from "./sandboxCalls"
+import { reconnecting } from "./reconnecting"
+import { isSandboxGone, SandboxGone } from "./sandboxFailures"
 import { ServerConfig } from "./ServerConfig"
 import { Transcripts } from "./Transcripts"
 
@@ -35,6 +57,8 @@ const SandboxRecord = Schema.Struct({
   state: Schema.Json,
   token: Schema.String,
   ready: Schema.Boolean,
+  expiresAt: Schema.optional(Schema.DateTimeUtcFromString),
+  gone: Schema.optional(GoneReach),
 })
 
 type SandboxRecord = typeof SandboxRecord.Type
@@ -44,7 +68,14 @@ const RecordJson = Schema.fromJsonString(SandboxRecord)
 const encodeRecord = Schema.encodeSync(RecordJson)
 
 const decodeStored = Schema.decodeUnknownEffect(
-  Schema.Array(Schema.Struct({ id: Schema.String, provider: Schema.String, sandbox: RecordJson })),
+  Schema.Array(
+    Schema.Struct({
+      id: Schema.String,
+      provider: Schema.String,
+      sandbox: RecordJson,
+      journalSaved: Schema.Int,
+    }),
+  ),
 )
 
 const decodeModels = Schema.decodeUnknownEffect(AgentModels)
@@ -52,47 +83,40 @@ const decodeModels = Schema.decodeUnknownEffect(AgentModels)
 const unreachable = () =>
   new AgentError({ message: "Glass couldn't reach the Agent's Sandbox. Try again." })
 
+const goneFailure = (reach: GoneReach) => new AgentError({ message: goneExplanation(reach) })
+
 const storageFailure = () =>
   new AgentError({ message: "Couldn't save the Agent's Sandbox. Try again." })
 
-interface SandboxAgent {
-  record: SandboxRecord | null
+interface KnownSandbox {
+  readonly record: SandboxRecord | null
+  readonly reach: SandboxReach
+}
+
+const unknown: KnownSandbox = { record: null, reach: "connecting" }
+
+const statusOf = ({ record, reach }: KnownSandbox) =>
+  new SandboxStatus({ expiresAt: record?.expiresAt ?? null, reach })
+
+const expiredBy = (record: SandboxRecord | null, now: DateTime.Utc) =>
+  record?.expiresAt !== undefined && DateTime.isLessThanOrEqualTo(record.expiresAt, now)
+
+const goneReason = (record: SandboxRecord | null, now: DateTime.Utc): GoneReach =>
+  expiredBy(record, now) ? "expired" : "deleted"
+
+interface HostLink {
   connection: HostClient | null
+  readonly position: JournalPosition
   readonly connectLock: Semaphore.Semaphore
 }
 
-const fresh = (record: SandboxRecord | null): SandboxAgent => ({
-  record,
+const newLink = (saved: number): HostLink => ({
   connection: null,
+  position: { saved },
   connectLock: Semaphore.makeUnsafe(1),
 })
 
-const LOST_AFTER_MISSES = 4
-
-const RECONNECT_SPACING = "500 millis"
-
-const reconnecting = <E, R>(
-  connection: (resetMisses: Effect.Effect<void>) => Effect.Effect<void, E, R>,
-) =>
-  Effect.suspend(() => {
-    let misses = 0
-
-    return connection(
-      Effect.sync(() => {
-        misses = 0
-      }),
-    ).pipe(
-      Effect.tapError(() =>
-        Effect.sync(() => {
-          misses += 1
-        }),
-      ),
-      Effect.retry({
-        while: () => misses < LOST_AFTER_MISSES,
-        schedule: Schedule.spaced(RECONNECT_SPACING),
-      }),
-    )
-  })
+const EXTEND_RETRY_SPACING = "1 minute"
 
 const orderedReports = Effect.gen(function* () {
   const queue = yield* Queue.unbounded<Effect.Effect<void, AgentError>, Cause.Done>()
@@ -113,9 +137,7 @@ const deleteSandbox = (
   { state, token }: Pick<SandboxRecord, "state" | "token">,
   action: string,
 ) =>
-  shutDownHost(provider, state, token).pipe(
-    Effect.andThen(call(provider, action, () => provider.remove(state))),
-  )
+  shutDownHost(provider, state, token).pipe(Effect.andThen(removeSandbox(provider, state, action)))
 
 const notInstalled = (providerId: string): Placement => {
   const failure = Effect.fail(
@@ -147,6 +169,10 @@ export class Sandboxes extends Context.Service<
     readonly providers: ReadonlyArray<SandboxProviderInfo>
     readonly placement: (providerId: string) => Placement
     readonly subscribeLost: SubscribeLost
+    readonly statuses: Stream.Stream<ReadonlyMap<string, SandboxStatus>>
+    readonly status: (agentId: string) => Effect.Effect<SandboxStatus | null>
+    readonly refuseIfGone: (agentId: string) => Effect.Effect<void, AgentError>
+    readonly resume: Effect.Effect<ReadonlySet<string>>
   }
 >()("@glass/server/Sandboxes") {
   static readonly layer = Layer.effect(
@@ -162,35 +188,88 @@ export class Sandboxes extends Context.Service<
       const lost = yield* PubSub.unbounded<LostAgentIds>()
 
       const stored = yield* sql`
-        SELECT id, sandbox_provider AS provider, sandbox FROM agent WHERE sandbox IS NOT NULL
+        SELECT id, sandbox_provider AS provider, sandbox, journal_saved AS journalSaved
+        FROM agent WHERE sandbox IS NOT NULL
       `.pipe(Effect.flatMap(decodeStored), Effect.orDie)
 
-      const agents = new Map<string, SandboxAgent>(
-        stored.map(({ id, sandbox }) => [id, fresh(sandbox)]),
+      const launchedAt = yield* DateTime.now
+
+      const known = yield* SubscriptionRef.make<ReadonlyMap<string, KnownSandbox>>(
+        new Map(
+          stored.map(({ id, sandbox }) => {
+            const gone = sandbox.gone ?? (expiredBy(sandbox, launchedAt) ? "expired" : undefined)
+
+            return [id, { record: sandbox, reach: gone ?? "connecting" }]
+          }),
+        ),
       )
 
-      const sandboxOf = (agentId: string) => {
-        const known = agents.get(agentId)
+      const links = new Map(stored.map(({ id, journalSaved }) => [id, newLink(journalSaved)]))
 
-        if (known !== undefined) return known
+      const linkOf = (agentId: string) => {
+        const found = links.get(agentId)
 
-        const sandbox = fresh(null)
-        agents.set(agentId, sandbox)
+        if (found !== undefined) return found
 
-        return sandbox
+        const link = newLink(0)
+        links.set(agentId, link)
+
+        return link
       }
 
-      const save = (agentId: string, record: SandboxRecord | null) =>
-        Effect.suspend(() => {
-          sandboxOf(agentId).record = record
+      const knownOf = (agentId: string) =>
+        SubscriptionRef.get(known).pipe(Effect.map((all) => all.get(agentId) ?? unknown))
 
-          return sql`
-            UPDATE agent SET sandbox = ${record === null ? null : encodeRecord(record)}
-            WHERE id = ${agentId}
-          `
-        }).pipe(
+      const change = (agentId: string, update: (before: KnownSandbox) => KnownSandbox) =>
+        SubscriptionRef.modifySome(known, (all) => {
+          const before = all.get(agentId) ?? unknown
+          const after = update(before)
+
+          return [
+            [before, after] as const,
+            after === before ? Option.none() : Option.some(new Map(all).set(agentId, after)),
+          ]
+        })
+
+      const setReach = (agentId: string, reach: SandboxReach) =>
+        change(agentId, (before) =>
+          isGone(before.reach) || before.reach === reach ? before : { ...before, reach },
+        ).pipe(
+          Effect.flatMap(([before, after]) =>
+            before.reach !== after.reach && isOutOfReach(after.reach)
+              ? PubSub.publish(lost, [agentId])
+              : Effect.void,
+          ),
+        )
+
+      const save = (agentId: string, record: SandboxRecord | null) =>
+        sql`
+          UPDATE agent SET sandbox = ${record === null ? null : encodeRecord(record)}
+          WHERE id = ${agentId}
+        `.pipe(
+          Effect.andThen(change(agentId, (before) => ({ ...before, record }))),
+          Effect.asVoid,
           Effect.tapError((cause) => Effect.logWarning("Couldn't save a Sandbox", cause)),
           Effect.mapError(storageFailure),
+        )
+
+      const becomeGone = (agentId: string) =>
+        Effect.gen(function* () {
+          const { record } = yield* knownOf(agentId)
+          const gone = goneReason(record, yield* DateTime.now)
+
+          yield* Effect.logWarning(`An Agent's Sandbox was ${gone}`, agentId)
+
+          if (record !== null) yield* save(agentId, { ...record, gone }).pipe(Effect.ignore)
+
+          yield* setReach(agentId, gone)
+        })
+
+      const refuseIfGone = (agentId: string) =>
+        knownOf(agentId).pipe(
+          Effect.flatMap(({ reach }) =>
+            isGone(reach) ? Effect.fail(goneFailure(reach)) : Effect.void,
+          ),
         )
 
       const discard = (
@@ -203,7 +282,7 @@ export class Sandboxes extends Context.Service<
           Effect.ignore,
         )
 
-      const makePlacement = (provider: SandboxProvider): Placement => {
+      const makePlacement = (provider: SandboxProvider) => {
         const provision = ({ agent, folder }: PlacedAgent) =>
           Effect.gen(function* () {
             const token = newHostToken()
@@ -264,81 +343,118 @@ export class Sandboxes extends Context.Service<
             )
           })
 
-        const provisionAndFollow = (
-          placed: PlacedAgent,
-          sandbox: SandboxAgent,
-          opened: Deferred.Deferred<HostClient, AgentError>,
+        const extendAhead = (agentId: string, extend: (state: SandboxState) => Promise<Date>) =>
+          Effect.gen(function* () {
+            let last = (yield* knownOf(agentId)).record?.expiresAt
+
+            for (;;) {
+              const { record, reach } = yield* knownOf(agentId)
+
+              if (record === null || isGone(reach)) return
+
+              const expiresAt = yield* extendSandbox(provider, extend, record.state)
+
+              if (last !== undefined && !DateTime.isGreaterThan(expiresAt, last)) return
+
+              const { record: current } = yield* knownOf(agentId)
+
+              if (current !== null) yield* save(agentId, { ...current, expiresAt })
+
+              last = expiresAt
+
+              const left =
+                DateTime.toEpochMillis(expiresAt) - DateTime.toEpochMillis(yield* DateTime.now)
+
+              yield* Effect.sleep(Math.max(0, left / 2))
+            }
+          }).pipe(
+            Effect.retry({
+              while: (error) => !isSandboxGone(error),
+              schedule: Schedule.spaced(EXTEND_RETRY_SPACING),
+            }),
+            Effect.catchTag("SandboxGone", () => becomeGone(agentId)),
+            Effect.ignore,
+          )
+
+        const follow = (
+          agentId: string,
+          placed: PlacedAgent | null,
+          opened: Deferred.Deferred<HostClient, AgentError | SandboxGone>,
         ) =>
           Effect.gen(function* () {
-            if (sandbox.record?.ready !== true) yield* provision(placed)
+            if ((yield* knownOf(agentId)).record?.ready !== true && placed !== null)
+              yield* provision(placed)
 
-            const record = sandbox.record
+            const { record } = yield* knownOf(agentId)
 
-            if (record === null) return yield* unreachable()
+            if (record?.ready !== true) return yield* unreachable()
 
-            const position = { saved: 0 }
+            const link = linkOf(agentId)
 
-            return yield* reconnecting((resetMisses) =>
-              Effect.gen(function* () {
-                const client = yield* connectToHost(provider, record.state, record.token).pipe(
-                  Effect.provideService(Socket.WebSocketConstructor, webSocketConstructor),
-                )
+            if (provider.extend !== undefined)
+              yield* extendAhead(agentId, provider.extend).pipe(Effect.forkChild)
 
-                // Effect's socket client connects in the background; a first call shows the host
-                // answered.
-                yield* client.Acknowledge({ through: position.saved })
-                yield* resetMisses
+            return yield* reconnecting(
+              (connected) =>
+                Effect.gen(function* () {
+                  const client = yield* connectToHost(provider, record.state, record.token).pipe(
+                    Effect.provideService(Socket.WebSocketConstructor, webSocketConstructor),
+                  )
 
-                yield* Effect.acquireRelease(
-                  Effect.sync(() => {
-                    sandbox.connection = client
-                  }),
-                  () =>
+                  // Effect's socket client connects in the background; a first call shows the host
+                  // answered.
+                  yield* client.Acknowledge({ through: link.position.saved })
+                  yield* connected
+
+                  yield* Effect.acquireRelease(
                     Effect.sync(() => {
-                      if (sandbox.connection === client) sandbox.connection = null
+                      link.connection = client
                     }),
-                )
-                yield* Deferred.succeed(opened, client)
-                yield* followJournal(transcripts, client, position)
-              }).pipe(Effect.scoped),
-            ).pipe(
-              Effect.tapCause((cause) => Effect.logWarning("Lost a Sandbox's agent host", cause)),
+                    () =>
+                      Effect.sync(() => {
+                        if (link.connection === client) link.connection = null
+                      }),
+                  )
+                  yield* setReach(agentId, "reachable")
+                  yield* Deferred.succeed(opened, client)
+                  yield* followJournal(transcripts.save, client, link.position)
+                }).pipe(Effect.scoped),
+              (error) =>
+                Effect.logWarning("Lost a Sandbox's agent host", error).pipe(
+                  Effect.andThen(Deferred.fail(opened, unreachable())),
+                  Effect.andThen(setReach(agentId, "unreachable")),
+                ),
             )
           }).pipe(
             Effect.catch((error) =>
-              Deferred.fail(
-                opened,
-                Predicate.isTagged(error, "AgentError") ? error : unreachable(),
-              ).pipe(
-                Effect.flatMap((failedBeforeOpening) =>
-                  failedBeforeOpening ? Effect.void : PubSub.publish(lost, [placed.agent.id]),
-                ),
-                Effect.ignore,
-              ),
+              isSandboxGone(error)
+                ? becomeGone(agentId).pipe(Effect.andThen(Deferred.fail(opened, error)))
+                : Deferred.fail(
+                    opened,
+                    Predicate.isTagged(error, "AgentError") ? error : unreachable(),
+                  ),
             ),
             Effect.ensuring(Deferred.fail(opened, unreachable())),
           )
 
-        const host = (placed: PlacedAgent) => {
-          const sandbox = sandboxOf(placed.agent.id)
+        const connect = (agentId: string, placed: PlacedAgent | null) => {
+          const link = linkOf(agentId)
 
-          return sandbox.connectLock.withPermits(1)(
+          return link.connectLock.withPermits(1)(
             Effect.gen(function* () {
-              if (sandbox.connection !== null) return sandbox.connection
+              if (link.connection !== null) return link.connection
 
-              const opened = yield* Deferred.make<HostClient, AgentError>()
-              yield* FiberMap.run(
-                sandboxFibers,
-                placed.agent.id,
-                provisionAndFollow(placed, sandbox, opened),
-              )
+              if (isGone((yield* knownOf(agentId)).reach)) return yield* new SandboxGone()
+
+              const opened = yield* Deferred.make<HostClient, AgentError | SandboxGone>()
+              yield* FiberMap.run(sandboxFibers, agentId, follow(agentId, placed, opened))
 
               return yield* Deferred.await(opened)
             }),
           )
         }
 
-        return {
+        const placement: Placement = {
           engines: provider.engines,
           models: (engine) =>
             call(provider, "list what its Sandboxes offer", () => provider.models(engine)).pipe(
@@ -362,31 +478,57 @@ export class Sandboxes extends Context.Service<
               folder: repository.repo,
               discard: Effect.void,
             }),
-          host,
+          host: (placed) =>
+            connect(placed.agent.id, placed).pipe(
+              Effect.catchTag("SandboxGone", () =>
+                knownOf(placed.agent.id).pipe(
+                  Effect.flatMap(({ reach }) =>
+                    Effect.fail(isGone(reach) ? goneFailure(reach) : unreachable()),
+                  ),
+                ),
+              ),
+            ),
           runningHost: ({ agent }) =>
-            Effect.sync(() => Option.fromNullishOr(agents.get(agent.id)?.connection)),
-          hostOnceMade: (placed) =>
-            agents.get(placed.agent.id)?.record?.ready === true
-              ? host(placed).pipe(Effect.map(Option.some))
-              : Effect.succeedNone,
+            Effect.sync(() => Option.fromNullishOr(links.get(agent.id)?.connection)),
+          // A gone Sandbox took everything in it, so like one never made, it holds nothing to lose.
+          hostOnceMade: ({ agent }) =>
+            knownOf(agent.id).pipe(
+              Effect.flatMap(({ record }) =>
+                record?.ready === true
+                  ? connect(agent.id, null).pipe(
+                      Effect.map(Option.some),
+                      Effect.catchTag("SandboxGone", () => Effect.succeedNone),
+                    )
+                  : Effect.succeedNone,
+              ),
+            ),
           baseRef: ({ agent }) => Effect.succeed(`refs/remotes/origin/${agent.baseBranch}`),
           remove: ({ agent }) =>
             Effect.gen(function* () {
               yield* FiberMap.remove(sandboxFibers, agent.id)
 
-              const record = agents.get(agent.id)?.record ?? null
+              const { record, reach } = yield* knownOf(agent.id)
 
               if (record !== null) {
-                yield* deleteSandbox(provider, record, "delete the Sandbox")
+                if (!isGone(reach)) yield* deleteSandbox(provider, record, "delete the Sandbox")
+
                 yield* save(agent.id, null)
               }
 
-              agents.delete(agent.id)
+              links.delete(agent.id)
+              yield* SubscriptionRef.update(known, (all) => {
+                const left = new Map(all)
+                left.delete(agent.id)
+
+                return left
+              })
             }),
         }
+
+        return { placement, resume: (agentId: string) => connect(agentId, null) }
       }
 
-      const placements = new Map(
+      const placed = new Map(
         Array.from(sandboxProviders, ([id, provider]) => [id, makePlacement(provider)]),
       )
 
@@ -397,13 +539,44 @@ export class Sandboxes extends Context.Service<
           yield* discard(provider, id, sandbox).pipe(Effect.forkIn(scope))
       }
 
+      const resume = Effect.gen(function* () {
+        const resumed = new Set<string>()
+
+        for (const { id, provider } of stored) {
+          const found = placed.get(provider)
+          const { record, reach } = yield* knownOf(id)
+
+          if (found === undefined || record?.ready !== true || isGone(reach)) continue
+
+          resumed.add(id)
+          yield* found.resume(id).pipe(Effect.ignore, Effect.forkIn(scope))
+        }
+
+        return resumed
+      })
+
       return Sandboxes.of({
         providers: Array.from(
           sandboxProviders,
           ([id, { name, engines }]) => new SandboxProviderInfo({ id, name, engines }),
         ),
-        placement: (providerId) => placements.get(providerId) ?? notInstalled(providerId),
+        placement: (providerId) => placed.get(providerId)?.placement ?? notInstalled(providerId),
         subscribeLost: PubSub.subscribe(lost).pipe(Effect.map(Stream.fromSubscription)),
+        statuses: SubscriptionRef.changes(known).pipe(
+          Stream.map(
+            (all) => new Map(Array.from(all, ([agentId, found]) => [agentId, statusOf(found)])),
+          ),
+        ),
+        status: (agentId) =>
+          SubscriptionRef.get(known).pipe(
+            Effect.map((all) => {
+              const found = all.get(agentId)
+
+              return found === undefined ? null : statusOf(found)
+            }),
+          ),
+        refuseIfGone,
+        resume,
       })
     }),
   )

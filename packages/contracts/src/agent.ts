@@ -1,7 +1,8 @@
+import { agentEngines } from "@glass/plugin"
 import { Match, Predicate, Schema } from "effect"
 import { FollowedRepository } from "./followedRepository"
 
-export const AgentEngine = Schema.Literals(["claude-code", "pi"])
+export const AgentEngine = Schema.Literals(agentEngines)
 
 export type AgentEngine = typeof AgentEngine.Type
 
@@ -84,6 +85,32 @@ export const ModelChoice = Schema.Struct({
 
 export type ModelChoice = typeof ModelChoice.Type
 
+export const GoneReach = Schema.Literals(["expired", "deleted"])
+
+export type GoneReach = typeof GoneReach.Type
+
+export const SandboxReach = Schema.Literals([
+  "connecting",
+  "reachable",
+  "unreachable",
+  ...GoneReach.literals,
+])
+
+export type SandboxReach = typeof SandboxReach.Type
+
+export const isGone = Schema.is(GoneReach)
+
+export const isOutOfReach = (reach: SandboxReach) => reach === "unreachable" || isGone(reach)
+
+export const goneExplanation = (reach: GoneReach) =>
+  `This Agent's Sandbox ${reach === "expired" ? "expired" : "was deleted"}, so it can't take messages. Its transcript stays until you remove the Agent.`
+
+export class SandboxStatus extends Schema.Class<SandboxStatus>("SandboxStatus")({
+  /** `null` until the Sandbox's provider says when it expires, and for one whose Sandboxes don't. */
+  expiresAt: Schema.NullOr(Schema.DateTimeUtcFromString),
+  reach: SandboxReach,
+}) {}
+
 export class Agent extends Schema.Class<Agent>("Agent")({
   id: Schema.String,
   /** Also the name of the branch the Agent works on. */
@@ -96,6 +123,8 @@ export class Agent extends Schema.Class<Agent>("Agent")({
   /** `null` for a program without Permission modes. */
   permissionMode: Schema.NullOr(PermissionMode),
   createdAt: Schema.DateTimeUtcFromString,
+  /** `null` for a local Agent, and for a Sandbox Agent whose Sandbox doesn't exist yet. */
+  sandbox: Schema.NullOr(SandboxStatus),
 }) {}
 
 export const ImageMediaType = Schema.Literals([

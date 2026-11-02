@@ -9,6 +9,7 @@ import {
   type RequestPart,
   type Transcript,
   SandboxPlace,
+  type SandboxStatus,
   thisMac,
   type Turn,
 } from "@glass/contracts"
@@ -44,7 +45,7 @@ export const agentsFixture = Effect.gen(function* () {
     claudeCommand: "unused",
   })
 
-  yield* Effect.addFinalizer(() => Effect.sync(sandboxes.stopHosts))
+  yield* Effect.addFinalizer(() => Effect.promise(sandboxes.stopHosts))
 
   const env = {
     GH_TOKEN: VIEWER.token,
@@ -59,6 +60,10 @@ export const agentsFixture = Effect.gen(function* () {
     Effect.provideService(Scope.Scope, serverScope),
   )
 
+  const quit = Scope.close(serverScope, Exit.void)
+
+  const launch = startBackend(env, home).pipe(Effect.map((backend) => backend.client))
+
   const watch = (agentId: string, until: (transcript: Transcript) => boolean, backend = client) =>
     backend.WatchTranscript({ agentId }).pipe(
       Stream.scan(() => emptyTranscript, applyTranscriptUpdate),
@@ -72,6 +77,18 @@ export const agentsFixture = Effect.gen(function* () {
     until: (turns: ReadonlyArray<Turn>) => boolean,
     backend = client,
   ) => watch(agentId, ({ turns }) => until(turns), backend).pipe(Effect.map(({ turns }) => turns))
+
+  const sandboxStatus = (
+    agentId: string,
+    until: (status: SandboxStatus) => boolean,
+    backend = client,
+  ) =>
+    backend.WatchAgents().pipe(
+      Stream.map((agents) => agents.find(({ id }) => id === agentId)?.sandbox ?? null),
+      Stream.filter((status): status is SandboxStatus => status !== null && until(status)),
+      Stream.runHead,
+      Effect.map(Option.getOrThrow),
+    )
 
   const send = (agentId: string, message: string, images: ReadonlyArray<Image> = []) =>
     client.SendMessage({ agentId, message, images })
@@ -158,6 +175,7 @@ export const agentsFixture = Effect.gen(function* () {
     release: (name: string) => Effect.sync(() => writeFileSync(join(gates, name), "")),
     watch,
     transcript,
+    sandboxStatus,
     send,
     steer,
     answering,
@@ -166,11 +184,9 @@ export const agentsFixture = Effect.gen(function* () {
     sandboxes,
     worktree: (name: string) =>
       join(home, ".project-glass", "worktrees", repository.owner, repository.repo, name),
-    restart: Effect.gen(function* () {
-      yield* Scope.close(serverScope, Exit.void)
-
-      return (yield* startBackend(env, home)).client
-    }),
+    quit,
+    launch,
+    restart: quit.pipe(Effect.andThen(launch)),
   }
 })
 
@@ -187,3 +203,8 @@ export const claudeCode = {
 
 export const lastText = (turn: Turn | undefined) =>
   turn?.parts.findLast((part) => Predicate.isTagged(part, "Text"))
+
+export const holding = (turns: ReadonlyArray<Turn>) =>
+  turns.some(({ parts }) =>
+    parts.some((part) => Predicate.isTagged(part, "Text") && part.text === "Holding."),
+  )

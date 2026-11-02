@@ -2,13 +2,16 @@ import { assert, it } from "@effect/vitest"
 import {
   AllowRequest,
   AnswerQuestion,
+  DenyRequest,
   Image,
+  isRequestPart,
   isWaiting,
   type RequestPart,
   SteerPart,
   TextPart,
   type Turn,
   TurnDone,
+  TurnStopped,
 } from "@glass/contracts"
 import { Effect, Predicate } from "effect"
 import { claudeSession } from "../../test/adapterSessions"
@@ -168,5 +171,82 @@ it.live("continues a conversation when Claude Code starts again", () =>
     const turns = yield* f.until(settled(2))
 
     assert.deepStrictEqual(lastText(turns[1]), TextPart.make({ text: "You told me lantern." }))
+  }).pipe(Effect.scoped),
+)
+
+it.live(
+  "refuses an answer that doesn't fit a Permission request, then denies it with the reason",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* claudeSession("claude-deny")
+      const agent = yield* f.open(conversation)
+      yield* agent.configure({ permissionMode: "default" })
+
+      yield* agent.send("Please run `touch notes.txt`")
+      const request = waiting(yield* f.until((turns) => waiting(turns) !== undefined))!
+
+      const refused = yield* agent
+        .answer(
+          request.requestId,
+          AnswerQuestion.make({ answers: [{ chosen: ["README"], text: null }] }),
+        )
+        .pipe(Effect.flip)
+
+      assert.equal(refused._tag, "HostAgentError")
+
+      yield* agent.answer(
+        request.requestId,
+        DenyRequest.make({ reason: "Leave the checkout alone" }),
+      )
+      const [turn] = yield* f.until(settled(1))
+
+      assert.equal(turn?.parts.find(isRequestPart)?.status, "denied")
+      assert.include(lastText(turn)?.text, "Leave the checkout alone")
+
+      const late = yield* agent.answer(request.requestId, AllowRequest.make({})).pipe(Effect.flip)
+
+      assert.equal(late._tag, "RequestNotWaiting")
+    }).pipe(Effect.scoped),
+)
+
+it.live(
+  "stops a Turn while its Permission request waits, leaving the request no longer answerable",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* claudeSession("claude-stop-in-request")
+      const agent = yield* f.open(conversation)
+      yield* agent.configure({ permissionMode: "default" })
+
+      yield* agent.send("Please run `touch notes.txt`")
+      const request = waiting(yield* f.until((turns) => waiting(turns) !== undefined))!
+      yield* agent.session.stopTurn
+
+      const [turn] = yield* f.until(settled(1))
+      assert.deepStrictEqual(turn?.ended?.ending, TurnStopped.make({}))
+      assert.equal(turn?.parts.find(isRequestPart)?.status, "expired")
+
+      const late = yield* agent.answer(request.requestId, AllowRequest.make({})).pipe(Effect.flip)
+
+      assert.equal(late._tag, "RequestNotWaiting")
+    }).pipe(Effect.scoped),
+)
+
+it.live("runs the next Turn in a newly chosen Permission mode", () =>
+  Effect.gen(function* () {
+    const f = yield* claudeSession("claude-permission-mode-change")
+    const agent = yield* f.open(conversation)
+    yield* agent.configure({ permissionMode: "default" })
+
+    yield* agent.send("Please run `touch first.txt`")
+    const request = waiting(yield* f.until((turns) => waiting(turns) !== undefined))!
+    yield* agent.answer(request.requestId, AllowRequest.make({}))
+    yield* f.until(settled(1))
+
+    yield* agent.configure({ permissionMode: "bypassPermissions" })
+    yield* agent.send("Please run `touch second.txt`")
+    const [, second] = yield* f.until(settled(2))
+
+    assert.deepStrictEqual(second?.ended?.ending, TurnDone.make({}))
+    assert.isUndefined(second?.parts.find(isRequestPart))
   }).pipe(Effect.scoped),
 )

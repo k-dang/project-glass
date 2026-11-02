@@ -1,10 +1,12 @@
 import { NodeServices } from "@effect/platform-node"
 import { assert, describe, it } from "@effect/vitest"
-import { Context, Effect, Layer, Logger, Schema } from "effect"
+import { Context, Effect, Fiber, FileSystem, Layer, Logger, PlatformError, Schema } from "effect"
 import { TestClock } from "effect/testing"
-import { chmod, mkdir, symlink, writeFile } from "node:fs/promises"
+import { existsSync } from "node:fs"
+import { mkdir, symlink, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 import { isolatedHome } from "../test/harness"
+import { eventually } from "../test/eventually"
 import { Plugins } from "./Plugins"
 
 const providerPlugin = (id: string, engines: ReadonlyArray<string> = ["pi"]) => `
@@ -25,11 +27,9 @@ const write = (path: string, contents: string) =>
     await writeFile(path, contents)
   })
 
-const loadPlugins = (directory: string) =>
+const loadPlugins = (directory: string, services = NodeServices.layer) =>
   Effect.gen(function* () {
-    const context = yield* Layer.build(
-      Plugins.layerFrom(directory).pipe(Layer.provide(NodeServices.layer)),
-    )
+    const context = yield* Layer.build(Plugins.layerFrom(directory).pipe(Layer.provide(services)))
 
     return [...Context.get(context, Plugins).sandboxProviders.keys()]
   })
@@ -112,28 +112,52 @@ export default (glass: Glass): void => {
       yield* write(join(plugins, "c-fine.js"), providerPlugin("fine"))
       yield* write(join(plugins, "d-duplicate.js"), providerPlugin("fine"))
       yield* write(join(plugins, "e-bad-id.js"), providerPlugin("sandbox:Fine"))
-      yield* write(join(plugins, "f-hangs.js"), `export default () => new Promise(() => {})`)
-      yield* write(join(plugins, "g-unreadable", "index.js"), providerPlugin("unreadable"))
-      yield* Effect.promise(() => chmod(join(plugins, "g-unreadable"), 0o000))
-      yield* Effect.addFinalizer(() =>
-        Effect.promise(() => chmod(join(plugins, "g-unreadable"), 0o700)),
+      const factoryStarted = join(plugins, "factory-started")
+
+      yield* write(
+        join(plugins, "f-hangs.js"),
+        `import { writeFileSync } from "node:fs"
+export default () => {
+  writeFileSync(${JSON.stringify(factoryStarted)}, "")
+  return new Promise(() => {})
+}`,
       )
+      yield* write(join(plugins, "g-unreadable", "index.js"), providerPlugin("unreadable"))
+
+      const services = Layer.effect(
+        FileSystem.FileSystem,
+        Effect.map(FileSystem.FileSystem, (fs) => ({
+          ...fs,
+          readDirectory: (path: string) =>
+            path === join(plugins, "g-unreadable")
+              ? Effect.fail(
+                  PlatformError.systemError({
+                    // oxlint-disable-next-line anti-slop-effect/no-manual-tagged-construction -- systemError requires a reason tag option.
+                    _tag: "PermissionDenied",
+                    module: "FileSystem",
+                    method: "readDirectory",
+                    pathOrDescriptor: path,
+                  }),
+                )
+              : fs.readDirectory(path),
+        })),
+      ).pipe(Layer.provideMerge(NodeServices.layer))
+
       const logged: Array<ReadonlyArray<unknown>> = []
 
       const logger = Logger.make(({ message }) => {
         logged.push(Schema.decodeUnknownSync(Schema.Array(Schema.Unknown))(message).slice(0, 2))
       })
 
-      const passFactoryTimeouts = Effect.forever(
-        TestClock.adjust("10 seconds").pipe(
-          Effect.andThen(Effect.promise(() => new Promise((resolve) => setTimeout(resolve, 20)))),
-        ),
+      const loading = yield* loadPlugins(plugins, services).pipe(
+        Effect.provide(Logger.layer([logger])),
+        Effect.forkChild({ startImmediately: true }),
       )
 
-      const providers = yield* loadPlugins(plugins).pipe(
-        Effect.provide(Logger.layer([logger])),
-        Effect.race(passFactoryTimeouts),
-      )
+      yield* eventually(Effect.sync(() => assert.isTrue(existsSync(factoryStarted))))
+      yield* TestClock.adjust("11 seconds")
+
+      const providers = yield* Fiber.join(loading)
 
       assert.deepStrictEqual(providers, ["fine"])
       assert.deepStrictEqual(logged, [

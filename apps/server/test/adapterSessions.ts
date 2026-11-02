@@ -61,12 +61,12 @@ const drive = Effect.fnUntraced(function* (
             const turnId = `turn-${++nextTurn}`
             const sentAt = yield* DateTime.now
             yield* report(TurnStarted.make({ turnId, message, images, sentAt }))
-            yield* session.startTurn(turnId, { message, images })
+            yield* session.startTurn(turnId, { message, images, prompt: message })
 
             return turnId
           }),
         steer: (message: string, images: ReadonlyArray<Image> = []) =>
-          session.steer({ message, images }),
+          session.steer({ message, images, prompt: message }),
         answer: (requestId: string, answer: RequestAnswer) => session.answer(requestId, answer),
       })),
     )

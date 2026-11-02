@@ -1,9 +1,9 @@
 import { AgentError, RPC_PATH } from "@glass/contracts"
 import type { SandboxProvider, SandboxState, SandboxTarget } from "@glass/plugin"
-import { Effect, Schedule } from "effect"
+import { DateTime, Effect, Schedule } from "effect"
 import { AgentHostRpcs, HEALTH_PATH, HOST_TOKEN_HEADER, SHUTDOWN_PATH } from "./agentHost/protocol"
 import { connectRpcClient } from "./rpcSocket"
-import { MissingLogin, NoCapacity } from "./sandboxFailures"
+import { MissingLogin, NoCapacity, SandboxGone } from "./sandboxFailures"
 
 const abortThenAwaitProvider = (controller: AbortController, running: Promise<unknown>) =>
   Effect.promise(() => {
@@ -67,11 +67,46 @@ const hostUrl = (target: SandboxTarget, path: string) => {
   return url
 }
 
-const targetOf = (provider: SandboxProvider, state: SandboxState) =>
-  call(provider, "reach the Sandbox", () => provider.target(state))
+const callAbout = <A>(provider: SandboxProvider, action: string, run: () => Promise<A>) =>
+  fromProvider(run).pipe(
+    Effect.catch(({ rejected }): Effect.Effect<never, AgentError | SandboxGone> =>
+      rejected instanceof SandboxGone
+        ? Effect.fail(rejected)
+        : providerFailure(provider, action)({ rejected }),
+    ),
+  )
 
+const targetOf = (provider: SandboxProvider, state: SandboxState) =>
+  callAbout(provider, "reach the Sandbox", () => provider.target(state))
+
+export const removeSandbox = (provider: SandboxProvider, state: SandboxState, action: string) =>
+  callAbout(provider, action, () => provider.remove(state)).pipe(
+    Effect.catchTag("SandboxGone", () => Effect.void),
+  )
+
+export const extendSandbox = (
+  provider: SandboxProvider,
+  extend: (state: SandboxState) => Promise<Date>,
+  state: SandboxState,
+) =>
+  callAbout(provider, "extend the Sandbox", () => extend(state)).pipe(
+    Effect.flatMap((date) =>
+      Effect.fromOption(DateTime.make(date)).pipe(
+        Effect.mapError(
+          () =>
+            new AgentError({ message: `${provider.name} answered an expiry Glass can't read.` }),
+        ),
+      ),
+    ),
+  )
+
+const didntStart = () =>
+  new AgentError({ message: "The agent in the Sandbox didn't start. Try again." })
+
+// A Sandbox gone while being made is one Glass discards and makes again, not one left to remove.
 export const waitForHost = (provider: SandboxProvider, state: SandboxState) =>
   targetOf(provider, state).pipe(
+    Effect.catchTag("SandboxGone", () => Effect.fail(didntStart())),
     Effect.flatMap((target) =>
       Effect.tryPromise(() =>
         fetch(hostUrl(target, HEALTH_PATH), { headers: { ...target.headers } }),
@@ -79,9 +114,7 @@ export const waitForHost = (provider: SandboxProvider, state: SandboxState) =>
         Effect.filterOrFail((response) => response.ok),
         Effect.retry({ schedule: Schedule.spaced("250 millis") }),
         Effect.timeout("1 minute"),
-        Effect.mapError(
-          () => new AgentError({ message: "The agent in the Sandbox didn't start. Try again." }),
-        ),
+        Effect.mapError(didntStart),
       ),
     ),
   )

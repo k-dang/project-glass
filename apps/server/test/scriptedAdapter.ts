@@ -67,7 +67,7 @@ export const scriptedAdapter = (gates: string): AgentAdapter => ({
             yield* Effect.promise((signal) => whenExists(join(gates, hold), signal))
 
             for (const steer of turn!.steers.splice(0)) {
-              yield* part(turnId, SteerPart.make(steer))
+              yield* part(turnId, SteerPart.make({ message: steer.message, images: steer.images }))
               yield* part(turnId, TextPart.make({ text: `Reply to: ${steer.message}` }))
             }
           }

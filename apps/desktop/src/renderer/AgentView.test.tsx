@@ -22,10 +22,14 @@ import {
   type ResumableDestination,
   SandboxPlace,
   SandboxProviderInfo,
+  type SandboxReach,
+  SandboxStatus,
   thisMac,
   SavedPlace,
   TextPart,
   ThinkingPart,
+  ToDo,
+  toDoMention,
   ToolCallPart,
   TranscriptSnapshot,
   TurnCutOff,
@@ -153,6 +157,39 @@ it("sends a message with Enter and clears the composer", async () => {
 
   expect(sent).toEqual(["Add a test\nfor it"])
   expect(composer).toHaveProperty("value", "")
+})
+
+it("keeps the hidden panel recoverable across Agent navigation", async () => {
+  const user = mount(
+    {
+      WatchTranscript: () =>
+        Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
+    },
+    "/agents/missing",
+  )
+
+  await screen.findByText("This Agent is gone. Pick another Agent or start a new one.")
+  const panel = screen.getByRole("complementary", { name: "Agents panel" })
+  await user.click(screen.getByRole("button", { name: "Hide Agents panel" }))
+
+  expect(panel).toHaveProperty("hidden", true)
+  expect(screen.queryByRole("navigation", { name: "Agents list" })).toBeNull()
+  const toggle = screen.getByRole("button", { name: "Show Agents panel" })
+  expect(toggle.getAttribute("aria-controls")).toBe(panel.id)
+  expect(toggle.getAttribute("aria-expanded")).toBe("false")
+
+  await user.click(screen.getByRole("link", { name: "New Agent" }))
+  await screen.findByRole("region", { name: "New Agent" })
+  expect(screen.getByRole("button", { name: "Show Agents panel" })).toBeTruthy()
+
+  await user.keyboard("{Control>}b{/Control}")
+  const link = await screen.findByRole("link", { name: agent.name })
+  link.focus()
+  await user.keyboard("{Meta>}b{/Meta}")
+  expect(document.activeElement).toBe(screen.getByRole("button", { name: "Show Agents panel" }))
+
+  await user.keyboard(" ")
+  expect(screen.getByRole("link", { name: agent.name })).toBeTruthy()
 })
 
 it("removes the open Agent from the sidebar after confirming its uncommitted changes", async () => {
@@ -639,6 +676,26 @@ it("starts an Agent in a Sandbox on a Followed repository, from its branches on 
   await waitFor(() => expect(window.location.hash).toBe(`#/agents/${agent.id}`))
 })
 
+it("lists every Agent program's models before one is chosen", async () => {
+  const listed: Array<AgentEngine> = []
+
+  mount(
+    {
+      ...newAgentHandlers([], []),
+      ListAgentModels: (payload) => {
+        listed.push(payload.engine)
+
+        return listModels(payload)
+      },
+    },
+    "/agents/new",
+  )
+
+  await screen.findByRole("region", { name: "New Agent" })
+  await eventually(() => expect(listed).toContain("pi"))
+  expect(listed).toContain("claude-code")
+})
+
 it("offers only the Agent programs a Sandbox provider runs", async () => {
   const user = mount(
     {
@@ -670,7 +727,7 @@ it("offers only the Agent programs a Sandbox provider runs", async () => {
     within(programs)
       .getAllByRole("button")
       .map((button) => button.textContent),
-  ).toEqual(["πpi"])
+  ).toEqual(["pi"])
 })
 
 it("lists a Sandbox Agent under Sandboxes, and shows the step its Sandbox is at while it's made", async () => {
@@ -1236,4 +1293,120 @@ it("saves what the user was still writing when they switch to another Agent", as
   await user.click(screen.getByRole("link", { name: other.name }))
 
   await waitFor(() => expect(saved).toEqual([{ agentId: agent.id, message: "Half a thought" }]))
+})
+
+const noTranscript = () =>
+  Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null }))
+
+const inSandboxWith = (reach: SandboxReach) =>
+  new Agent({
+    ...agentFields,
+    place: SandboxPlace.make({ providerId: "fake" }),
+    engine: "claude-code",
+    permissionMode: "bypassPermissions",
+    sandbox: new SandboxStatus({ expiresAt: DateTime.makeUnsafe("2026-10-28T12:00:00Z"), reach }),
+  })
+
+it("dims a Sandbox Agent Glass can't reach, and makes one whose Sandbox expired read-only", async () => {
+  const reached: Array<string> = []
+
+  const user = mount({
+    WatchAgents: () => Stream.make([inSandboxWith("unreachable")]),
+    WatchTranscript: noTranscript,
+    ReachSandbox: ({ agentId }) =>
+      Effect.sync(() => {
+        reached.push(agentId)
+      }),
+  })
+
+  const link = await screen.findByRole("link", { description: /Can't reach its Sandbox · Expires/ })
+  expect(link.className).toContain("opacity-60")
+  expect(
+    screen.getByText(
+      /Glass can't reach this Agent's Sandbox. Once it answers, Glass fills in what the Agent did./,
+    ),
+  ).toBeTruthy()
+  expect(screen.getByRole("textbox", { name: "Message" })).toBeTruthy()
+
+  await user.click(screen.getByRole("button", { name: "Try again" }))
+  await eventually(() => expect(reached).toEqual([agentFields.id]))
+
+  cleanup()
+  mount({
+    WatchAgents: () => Stream.make([inSandboxWith("expired")]),
+    WatchTranscript: noTranscript,
+  })
+
+  expect(
+    await screen.findByText(
+      "This Agent's Sandbox expired, so it can't take messages. Its transcript stays until you remove the Agent.",
+    ),
+  ).toBeTruthy()
+  expect(screen.queryByRole("textbox", { name: "Message" })).toBeNull()
+  expect(screen.getByRole("link", { description: /Sandbox expired/ })).toBeTruthy()
+})
+
+const flaky = new ToDo({ id: 3, title: "Fix the flaky test", notes: "", done: false })
+
+it("mentions an open To-do picked after @, and shows the Mention as its title", async () => {
+  const sent: Array<string> = []
+
+  const user = mount({
+    ListToDos: () =>
+      Effect.succeed([
+        flaky,
+        new ToDo({ id: 4, title: "Fix the docs", notes: "", done: true }),
+        new ToDo({ id: 5, title: "Write the release notes", notes: "", done: false }),
+      ]),
+    WatchTranscript: () =>
+      Stream.make(
+        TranscriptSnapshot.make({ turns: [], queued: [], status: null }),
+        TurnStarted.make({
+          turnId: "turn-1",
+          message: `Earlier: ${toDoMention(flaky)}`,
+          images: [],
+          sentAt,
+        }),
+      ),
+    SendMessage: ({ message }) => Effect.sync(() => void sent.push(message)),
+  })
+
+  const transcript = await screen.findByRole("region", { name: "Transcript" })
+  expect(await within(transcript).findByText("Fix the flaky test")).toBeTruthy()
+  expect(within(transcript).queryByText(/glass:\/\//)).toBeNull()
+
+  const composer = await screen.findByRole("textbox", { name: "Message" })
+  await user.type(composer, "Look at @fix")
+  const choices = await screen.findByRole("listbox", { name: "To-dos" })
+  expect(
+    within(choices)
+      .getAllByRole("option")
+      .map((option) => option.textContent),
+  ).toEqual(["Fix the flaky test"])
+
+  await user.keyboard("{Enter}")
+  expect(screen.queryByRole("listbox", { name: "To-dos" })).toBeNull()
+  await user.type(composer, "now{Enter}")
+
+  expect(sent).toEqual([`Look at ${toDoMention(flaky)} now`])
+})
+
+it("keeps the To-do choices closed after Escape, so Enter sends the @ as written", async () => {
+  const sent: Array<string> = []
+
+  const user = mount({
+    ListToDos: () => Effect.succeed([flaky]),
+    WatchTranscript: () =>
+      Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
+    SendMessage: ({ message }) => Effect.sync(() => void sent.push(message)),
+  })
+
+  const composer = await screen.findByRole("textbox", { name: "Message" })
+  await user.type(composer, "Ping @f")
+  await screen.findByRole("listbox", { name: "To-dos" })
+  await user.keyboard("{Escape}")
+  expect(screen.queryByRole("listbox", { name: "To-dos" })).toBeNull()
+  await user.keyboard("{Enter}")
+
+  expect(sent).toEqual(["Ping @f"])
 })

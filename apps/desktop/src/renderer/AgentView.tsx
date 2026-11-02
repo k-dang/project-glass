@@ -21,6 +21,8 @@ import {
   type Turn,
   type TurnEnd,
   type TurnPart,
+  goneExplanation,
+  isGone,
 } from "@glass/contracts"
 import { cn } from "cn"
 import { DateTime, Exit, Match, Option, Predicate } from "effect"
@@ -86,15 +88,17 @@ import {
   sendQueuedAtom,
   steerAtom,
   stopTurnAtom,
+  reachSandboxAtom,
   transcriptAtom,
   unsentMessageAtom,
 } from "./agentsArea"
+import { MessageText, readableText } from "./Mentions"
 import { Attachment, MessageBox } from "./MessageBox"
 import { ModelPicker } from "./ModelPicker"
 import { PermissionModePicker } from "./PermissionModePicker"
 import { RequestCard, requestElementId } from "./RequestCard"
 import { ProblemAlert } from "./ProblemAlert"
-import { settledProblem, streamProblem } from "./problems"
+import { problemText, settledProblem, streamProblem } from "./problems"
 import { rememberPlace } from "./savedPlace"
 
 const TURNS_PER_PAGE = 20
@@ -122,11 +126,20 @@ export function AgentView(props: { agentId: string } & AgentTabs) {
   const agent = Option.getOrNull(AsyncResult.value(agents))?.find(({ id }) => id === props.agentId)
 
   if (agent === undefined)
-    return AsyncResult.isSuccess(agents) ? (
-      <p className="p-6 text-sm text-muted-foreground">
-        This Agent is gone. Pick another Agent or start a new one.
-      </p>
-    ) : null
+    return (
+      <section aria-label="Agent" className="flex min-h-0 flex-1 flex-col">
+        <AgentHeader
+          heading={<h1 className="truncate font-medium">Agent</h1>}
+          place={null}
+          baseBranch={null}
+        />
+        {AsyncResult.isSuccess(agents) && (
+          <p className="p-6 text-sm text-muted-foreground">
+            This Agent is gone. Pick another Agent or start a new one.
+          </p>
+        )}
+      </section>
+    )
 
   return <OpenAgent key={agent.id} agent={agent} tab={props.tab} onTabChange={props.onTabChange} />
 }
@@ -148,6 +161,9 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
 
   const waiting = turns.at(-1)?.parts.find(isWaiting)
   const registry = useContext(RegistryContext)
+
+  const reach = agent.sandbox?.reach
+  const gone = isGone(reach) ? reach : null
 
   useEffect(() => {
     rememberPlace(registry, { area: "agents", agentId: agent.id })
@@ -200,7 +216,20 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
       )}
       <div hidden={tab !== "chat"} className="flex min-h-0 flex-1 flex-col">
         <Transcript agentId={agent.id} turns={turns} status={status} />
-        <Composer agent={agent} running={running} waiting={waiting} turns={turns} queued={queued} />
+        {reach === "unreachable" && <UnreachableNotice agentId={agent.id} />}
+        {gone === null ? (
+          <Composer
+            agent={agent}
+            running={running}
+            waiting={waiting}
+            turns={turns}
+            queued={queued}
+          />
+        ) : (
+          <output className="mx-auto block w-full max-w-3xl px-6 py-4 text-sm text-muted-foreground">
+            {goneExplanation(gone)}
+          </output>
+        )}
       </div>
       <section
         aria-label="Changes"
@@ -231,7 +260,7 @@ function Transcript(props: { agentId: string; turns: ReadonlyArray<Turn>; status
   }, [])
 
   return (
-    <MessageScrollerProvider autoScroll>
+    <MessageScrollerProvider autoScroll scrollPreviousItemPeek={16}>
       <section aria-label="Transcript" className="flex min-h-0 flex-1 flex-col">
         <MessageScroller className="min-h-0 flex-1">
           <MessageScrollerViewport className="px-6 py-4">
@@ -248,6 +277,7 @@ function Transcript(props: { agentId: string; turns: ReadonlyArray<Turn>; status
                   key={turn.id}
                   agentId={props.agentId}
                   turn={turn}
+                  latest={turn === props.turns.at(-1)}
                   status={turn === props.turns.at(-1) ? props.status : null}
                 />
               ))}
@@ -290,7 +320,9 @@ export function UserMessage(props: {
         )}
         <AttachedImages images={props.images} />
         <Bubble align="end" variant="muted">
-          <BubbleContent className="whitespace-pre-wrap">{props.message}</BubbleContent>
+          <BubbleContent className="whitespace-pre-wrap">
+            <MessageText text={props.message} />
+          </BubbleContent>
         </Bubble>
       </MessageContent>
     </Message>
@@ -300,12 +332,18 @@ export function UserMessage(props: {
 const TurnView = memo(function TurnView(props: {
   agentId: string
   turn: Turn
+  latest: boolean
   status: string | null
 }) {
   const { turn } = props
 
   return (
-    <MessageScrollerItem messageId={turn.id} scrollAnchor>
+    // Sized from the 10rem estimate, the latest Turn would anchor short and jump.
+    <MessageScrollerItem
+      messageId={turn.id}
+      scrollAnchor
+      className={props.latest ? "[content-visibility:visible]" : undefined}
+    >
       <MessageGroup className="gap-4">
         <UserMessage message={turn.message} images={turn.images} />
         <Message>
@@ -557,6 +595,29 @@ function WaitingNotice(props: { waiting: RequestPart }) {
   )
 }
 
+function UnreachableNotice({ agentId }: { agentId: string }) {
+  const tried = useAtomValue(reachSandboxAtom(agentId))
+  const tryAgain = useAtomSet(reachSandboxAtom(agentId))
+  const problem = settledProblem(tried)
+
+  return (
+    <output className="mx-auto block w-full max-w-3xl px-6 pt-2 text-sm text-muted-foreground">
+      Glass can't reach this Agent's Sandbox. Once it answers, Glass fills in what the Agent did.{" "}
+      <Button
+        type="button"
+        variant="link"
+        size="sm"
+        className="h-auto p-0"
+        disabled={tried.waiting}
+        onClick={() => tryAgain()}
+      >
+        Try again
+      </Button>
+      {problem !== null && <span className="block">{problemText(problem)}</span>}
+    </output>
+  )
+}
+
 function Composer(props: {
   agent: Agent
   running: boolean
@@ -674,41 +735,47 @@ function QueuedMessages(props: {
         {props.running ? "Starts when the Agent finishes" : "Waiting until you send them"}
       </p>
       <QueueList>
-        {props.queued.map((queued) => (
-          <QueueItem key={queued.id} aria-label={queued.message}>
-            <QueueItemRow>
-              <QueueItemContent>{queued.message}</QueueItemContent>
-              <QueueItemActions>
-                {!props.running && (
+        {props.queued.map((queued) => {
+          const readable = readableText(queued.message)
+
+          return (
+            <QueueItem key={queued.id} aria-label={readable}>
+              <QueueItemRow>
+                <QueueItemContent>
+                  <MessageText text={queued.message} />
+                </QueueItemContent>
+                <QueueItemActions>
+                  {!props.running && (
+                    <QueueItemAction
+                      aria-label={`Send now: ${readable}`}
+                      onClick={() => sendNow(queued.id)}
+                    >
+                      <ArrowUp />
+                    </QueueItemAction>
+                  )}
                   <QueueItemAction
-                    aria-label={`Send now: ${queued.message}`}
-                    onClick={() => sendNow(queued.id)}
+                    aria-label={`Cancel: ${readable}`}
+                    onClick={() => cancel(queued.id)}
                   >
-                    <ArrowUp />
+                    <X />
                   </QueueItemAction>
-                )}
-                <QueueItemAction
-                  aria-label={`Cancel: ${queued.message}`}
-                  onClick={() => cancel(queued.id)}
-                >
-                  <X />
-                </QueueItemAction>
-              </QueueItemActions>
-            </QueueItemRow>
-            {queued.images.length > 0 && (
-              <QueueItemAttachment>
-                {queued.images.map((image, index) => (
-                  <Attachment
-                    key={index}
-                    image={image}
-                    index={index}
-                    className="size-8 rounded border object-cover"
-                  />
-                ))}
-              </QueueItemAttachment>
-            )}
-          </QueueItem>
-        ))}
+                </QueueItemActions>
+              </QueueItemRow>
+              {queued.images.length > 0 && (
+                <QueueItemAttachment>
+                  {queued.images.map((image, index) => (
+                    <Attachment
+                      key={index}
+                      image={image}
+                      index={index}
+                      className="size-8 rounded border object-cover"
+                    />
+                  ))}
+                </QueueItemAttachment>
+              )}
+            </QueueItem>
+          )
+        })}
       </QueueList>
     </section>
   )

@@ -76,7 +76,8 @@ _Avoid_: Code tour, guided review, guide, walkthrough
 
 **Chapter**:
 One step of a Tour: a group of changed files that belong together, with an explanation of what
-they do and why.
+they do and why. A Chapter may include diagrams, call trees, flows the reader can step through,
+and callouts linked to diff lines.
 _Avoid_: Section, stop, step
 
 **Tour engine**:
@@ -176,7 +177,8 @@ a worktree of its own.
 
 **Sandbox**:
 The remote machine a Sandbox provider creates for one Agent, kept until the user removes the Agent
-or it expires.
+or it expires. While Glass runs, it extends a Sandbox that expires ahead of expiry, up to the
+platform's cap.
 _Avoid_: Box, computer, devbox, pod
 
 **Sandbox provider**:
@@ -191,11 +193,18 @@ _Avoid_: Extension, add-on
 
 **Turn**:
 One message to an Agent and its whole response. It ends done, failed, stopped by the user, cut off
-when Glass loses the Agent, or interrupted when Glass quits.
+when Glass loses the Agent, or interrupted when Glass quits; a Sandbox Agent's Turn carries on
+while Glass is closed.
 _Avoid_: Run, execution, exchange
 
 **Queued message**:
 A message sent while a Turn runs, waiting to start the next Turn; the user can cancel it before then.
+
+**Mention**:
+A To-do the user points at from a message to an Agent, by typing `@` and picking it. The message
+shows it by its title; the Agent reads the To-do's title and notes as they are when the message
+reaches it.
+_Avoid_: Reference, attachment, tag, chip
 
 **Steer**:
 A message sent into the running Turn, for the Agent to take in before it finishes.

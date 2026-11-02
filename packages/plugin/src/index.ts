@@ -14,11 +14,22 @@ export interface SandboxProvider {
    * the host's health check once this resolves.
    */
   readonly create: (request: SandboxRequest, context: SandboxCreation) => Promise<void>
-  /** Where the agent host in the Sandbox answers, asked afresh for each connection. */
+  /**
+   * Where the agent host in the Sandbox answers, asked afresh for each connection. Throws
+   * `glass.sandboxGone()` once the Sandbox no longer exists, so Glass stops trying to reach it.
+   */
   readonly target: (state: SandboxState) => Promise<SandboxTarget>
   /**
+   * Pushes the Sandbox's expiry as late as the platform allows, answering when it now expires.
+   * Glass calls it while the Agent exists and Glass runs, again before each expiry it was given,
+   * until the expiry stops moving. Throws `glass.sandboxGone()` once the Sandbox no longer exists.
+   * A provider whose Sandboxes don't expire leaves it out.
+   */
+  readonly extend?: (state: SandboxState) => Promise<Date>
+  /**
    * Deletes the Sandbox. Glass has asked its agent host to end first; one it couldn't reach may
-   * still run.
+   * still run. Throws `glass.sandboxGone()` if the Sandbox is already gone, which Glass takes as
+   * done.
    */
   readonly remove: (state: SandboxState) => Promise<void>
   /** What an Agent program offers in this provider's Sandboxes, before one exists. */
@@ -26,7 +37,9 @@ export interface SandboxProvider {
 }
 
 /** The Agent program an Agent runs: Claude Code or pi. */
-export type AgentEngine = "claude-code" | "pi"
+export const agentEngines = ["claude-code", "pi"] as const
+
+export type AgentEngine = (typeof agentEngines)[number]
 
 /** A model an Agent program offers, with the efforts it takes, from lowest to highest. */
 export interface AgentModel {
@@ -95,6 +108,8 @@ export interface Glass {
   readonly missingLogin: (login: string, fix: string) => Error
   /** The platform has no room for another Sandbox right now; trying again later may work. */
   readonly noCapacity: (message: string) => Error
+  /** The Sandbox no longer exists, with everything in it, so its Agent can only be removed. */
+  readonly sandboxGone: () => Error
 }
 
 export type Plugin = (glass: Glass) => void | Promise<void>

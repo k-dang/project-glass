@@ -28,16 +28,32 @@ needs, and the provider does everything specific to its platform.
   clones the repository onto the Agent's branch from its base branch, and uploads and starts the
   agent host bundle with the environment and port Glass gives it. It calls `record(state)` as soon
   as the Sandbox exists and reports each step through `progress`.
-- `target(state)` answers the host's URL and headers, freshly, for each connection.
+- `target(state)` answers the host's URL and headers, freshly, for each connection, and throws
+  `glass.sandboxGone()` once the Sandbox no longer exists.
+- `extend(state)` pushes the Sandbox's expiry as late as the platform allows and answers when it
+  now expires. Glass calls it once the Sandbox is up or Glass opens, then halfway to each expiry,
+  until the expiry stops moving: the platform's cap. It throws `glass.sandboxGone()` too. It's
+  optional: a provider whose Sandboxes don't expire leaves it out, and Glass shows no expiry.
 - `remove(state)` deletes the Sandbox. Glass first asks the agent host to end, with its agent
   programs, so a provider needn't track the host's processes. If the host can't be reached,
   `remove` runs anyway.
 - `models(engine)` lists what each listed Agent program offers in its Sandboxes, before one exists.
 
 The plugin API is Promises and `AbortSignal`, so a plugin needs no Effect; its types are the
-`@glass/plugin` package. Glass passes in `glass.missingLogin(login, fix)` and
-`glass.noCapacity(message)` for the failures the user can act on; anything else a provider throws
-becomes a safe failure, with the cause in the backend log.
+`@glass/plugin` package. Glass passes in `glass.missingLogin(login, fix)`,
+`glass.noCapacity(message)` and `glass.sandboxGone()` for the failures the user can act on;
+anything else a provider throws becomes a safe failure, with the cause in the backend log. Glass
+doesn't retry a gone Sandbox: its Agent turns read-only, its transcript kept, and has nothing left
+to lose, so the user can only remove it. Glass tells expired from deleted by the last expiry the
+provider gave, so providers needn't say which, and keeps the verdict on the Agent's row.
+
+A Sandbox outlives Glass. Its Turns keep running while Glass is closed, so at launch Glass
+interrupts only local Turns and reconnects to each Sandbox's host, asking for the journal after the
+last entry it saved; that position is saved with the transcript, so a relaunch neither misses nor
+repeats an event. A Sandbox Glass can't reach is marked unreachable and its running Turn cut off.
+Glass tries again ever less often, at most five minutes apart, and gives up after 15 minutes, and stops
+extending it, so no provider call repeats without end; sending the Agent a message, its Try again, or a
+relaunch starts over. Once the host answers, the ending it reports replaces the cut-off one.
 
 Glass stores the `state` a provider records as opaque JSON on the Agent's row, so the row stays
 the one record of the Agent and providers keep no storage of their own. If `create` fails or is

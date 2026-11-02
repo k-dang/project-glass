@@ -6,7 +6,13 @@ import { fileURLToPath } from "node:url"
 import { connectRpcClient } from "../src/rpcSocket"
 import { DEMO_REPOSITORY } from "./demoPullRequests"
 import { startFakeAnthropic } from "./fakeAnthropic"
-import { type FakeModelDelta, type FakeModelRequest, fakeModelProvider } from "./fakeModelProvider"
+import {
+  type FakeModelDelta,
+  type FakeModelRequest,
+  fakeModelProvider,
+  lastUserText,
+  runCommands,
+} from "./fakeModelProvider"
 import { seedClone } from "./gitRepositories"
 import { fakeAnthropicEnvironment } from "./pinnedClaude"
 
@@ -31,6 +37,12 @@ const slowReply = `Working through it one step at a time. ${Array.from(
 ).join(" ")} All done.`
 
 const demoReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
+  const changes = {
+    "Write a note": "printf 'hello from the Agent\\n' > notes.txt",
+    "Write another": "printf 'a second note\\n' > more.txt",
+  }
+
+  if (Object.hasOwn(changes, lastUserText(input))) return runCommands(changes)(input)
   const { messages } = input
   const last = messages.at(-1)
 

@@ -79,6 +79,7 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         CancelQueuedMessage: unused,
         SendQueuedMessage: unused,
         StopTurn: unused,
+        ReachSandbox: unused,
         Steer: unused,
         GetUnsentMessage: () => Effect.succeed(nothingUnsent),
         SaveUnsentMessage: () => Effect.void,

@@ -15,6 +15,11 @@ const themes = [
   { value: "light", label: "Light", description: "Bright and familiar." },
   { value: "dark", label: "Dark", description: "The existing dark theme." },
   { value: "charcoal", label: "Charcoal", description: "Softer surfaces. Colorful code." },
+  {
+    value: "catppuccin-mocha",
+    label: "Catppuccin Mocha",
+    description: "Soothing pastels on deep blue.",
+  },
 ] satisfies ReadonlyArray<{ value: Theme; label: string; description: string }>
 
 export function ConnectionAvatar() {

@@ -12,6 +12,7 @@ import {
   FollowedRepository,
   type InvalidLocalCheckout,
   type MessageInput,
+  mentionedToDoIds,
   type ModelChoice,
   defaultPermissionMode,
   engineCapabilities,
@@ -23,11 +24,13 @@ import {
   type RequestNotWaiting,
   RequestWaiting,
   SandboxPlace,
+  type SandboxStatus,
   thisMac as thisMacPlace,
   type TranscriptUpdate,
   TurnCutOff,
   TurnEnded,
   TurnFailed,
+  TurnInterrupted,
   TurnStopped,
   isNothingUnsent,
   nothingUnsent,
@@ -52,7 +55,10 @@ import { ActivityLog } from "./ActivityLog"
 import { hostFailure, type PlacedAgent, type Placement } from "./Placement"
 import { Sandboxes } from "./Sandboxes"
 import { LocalPlacement } from "./LocalPlacement"
+import type { DeliveredMessage } from "./agentHost/deliveredMessage"
 import { encodeImages, StoredMessage, Transcripts } from "./Transcripts"
+import { prompt } from "./prompt"
+import { ToDos } from "./ToDos"
 
 const StoredAgent = Schema.Struct({
   id: Agent.fields.id,
@@ -85,9 +91,14 @@ const toRow = ({
     place:
       sandboxProvider === null ? thisMacPlace : SandboxPlace.make({ providerId: sandboxProvider }),
     repository: new FollowedRepository({ owner, repo }),
+    sandbox: null,
   }),
   folder,
 })
+
+const withStatus = (agent: Agent, sandbox: SandboxStatus | null) =>
+  // oxlint-disable-next-line typescript/no-misused-spread -- The fields go straight back into Agent.
+  new Agent({ ...agent, sandbox })
 
 const storageFailure = () =>
   new AgentError({ message: "Couldn't read or save your Agents. Try again." })
@@ -125,6 +136,7 @@ export class Agents extends Context.Service<
       agentId: string,
     ) => Effect.Effect<ReadonlyArray<ChangedFile>, AgentNotFound | AgentError>
     readonly stop: (agentId: string) => Effect.Effect<void, AgentNotFound | AgentError>
+    readonly reachSandbox: (agentId: string) => Effect.Effect<void, AgentNotFound | AgentError>
     readonly unsent: (agentId: string) => Effect.Effect<SentMessage, AgentNotFound | AgentError>
     readonly saveUnsent: (
       agentId: string,
@@ -157,6 +169,7 @@ export class Agents extends Context.Service<
       const localPlacement = yield* LocalPlacement
       const sandboxes = yield* Sandboxes
       const activityLog = yield* ActivityLog
+      const toDos = yield* ToDos
       const lock = yield* Semaphore.make(1)
       const scope = yield* Scope.Scope
 
@@ -192,18 +205,57 @@ export class Agents extends Context.Service<
         Effect.forkIn(scope),
       )
 
+      const outlivedGlass = yield* sandboxes.resume
+      yield* transcripts
+        .endRunning(
+          TurnInterrupted.make({}),
+          stored.flatMap(({ id }) => (outlivedGlass.has(id) ? [] : [id])),
+        )
+        .pipe(Effect.orDie)
+
+      const withSandbox = (agent: Agent) =>
+        sandboxes.status(agent.id).pipe(Effect.map((sandbox) => withStatus(agent, sandbox)))
+
+      const delivered = Effect.fnUntraced(function* ({ message, images }: MessageInput) {
+        const ids = mentionedToDoIds(message)
+
+        const listed =
+          ids.length === 0
+            ? []
+            : yield* toDos.list().pipe(
+                Effect.tapError((cause) =>
+                  Effect.logWarning("Couldn't read mentioned To-dos", cause),
+                ),
+                Effect.orElseSucceed(() => []),
+              )
+
+        const mentioned = ids.flatMap((id) => listed.find((toDo) => toDo.id === id) ?? [])
+
+        return { message, images, prompt: prompt(message, mentioned) } satisfies DeliveredMessage
+      })
+
       const deliver = (row: PlacedAgent, turnId: string, input: MessageInput) =>
         Effect.gen(function* () {
           const client = yield* placementOf(row).host(row)
           const { id: agentId, engine, model, effort, permissionMode } = row.agent
 
-          yield* client.StartAgent({ agentId, engine, folder: row.folder })
+          const [, message] = yield* Effect.all(
+            [client.StartAgent({ agentId, engine, folder: row.folder }), delivered(input)],
+            { concurrency: "unbounded" },
+          )
 
           yield* lock.withPermits(1)(
             Effect.gen(function* () {
               if ((yield* transcripts.runningTurn(agentId)) !== turnId) return
 
-              yield* client.StartTurn({ agentId, turnId, ...input, model, effort, permissionMode })
+              yield* client.StartTurn({
+                agentId,
+                turnId,
+                ...message,
+                model,
+                effort,
+                permissionMode,
+              })
             }),
           )
         }).pipe(
@@ -261,6 +313,7 @@ export class Agents extends Context.Service<
           effort,
           permissionMode,
           createdAt: yield* DateTime.now,
+          sandbox: null,
         })
 
         const row: PlacedAgent = { agent, folder }
@@ -307,7 +360,7 @@ export class Agents extends Context.Service<
           }),
         )
 
-        return agent
+        return yield* withSandbox(agent)
       })
 
       const trySteer = (row: PlacedAgent, input: MessageInput) =>
@@ -320,7 +373,9 @@ export class Agents extends Context.Service<
 
           if (Option.isNone(running)) return false
 
-          return yield* running.value.Steer({ agentId, ...input }).pipe(
+          const message = yield* delivered(input)
+
+          return yield* running.value.Steer({ agentId, ...message }).pipe(
             Effect.as(true),
             Effect.tapError((cause) => Effect.logWarning("Couldn't Steer a Turn", cause)),
             Effect.orElseSucceed(() => false),
@@ -333,24 +388,27 @@ export class Agents extends Context.Service<
           .isWaiting(agentId)
           .pipe(Effect.flatMap((waiting) => (waiting ? new RequestWaiting() : Effect.void)))
 
+      const findWritable = (agentId: string) =>
+        find(agentId).pipe(Effect.tap(() => sandboxes.refuseIfGone(agentId)))
+
       const send = Effect.fn("Agents.send")(function* (agentId: string, input: MessageInput) {
-        yield* find(agentId)
+        yield* findWritable(agentId)
         yield* refuseWhileWaiting(agentId)
         yield* transcripts.startOrQueue(agentId, input)
       })
 
       const steer = Effect.fn("Agents.steer")(function* (agentId: string, input: MessageInput) {
-        const row = yield* find(agentId)
+        const row = yield* findWritable(agentId)
         yield* refuseWhileWaiting(agentId)
 
-        if (!(yield* trySteer(row, input))) yield* send(agentId, input)
+        if (!(yield* trySteer(row, input))) yield* transcripts.startOrQueue(agentId, input)
       })
 
       const sendQueued = Effect.fn("Agents.sendQueued")(function* (
         agentId: string,
         queuedId: string,
       ) {
-        yield* find(agentId)
+        yield* findWritable(agentId)
         yield* transcripts.startQueued(agentId, queuedId)
       })
 
@@ -452,7 +510,7 @@ export class Agents extends Context.Service<
               current.map((row) => (row.agent.id === agentId ? { ...row, agent } : row)),
             )
 
-            return agent
+            return yield* withSandbox(agent)
           }),
         )
       })
@@ -555,8 +613,10 @@ export class Agents extends Context.Service<
 
       return Agents.of({
         watch: () =>
-          SubscriptionRef.changes(rows).pipe(
-            Stream.map((current) => current.map(({ agent }) => agent)),
+          Stream.zipLatest(SubscriptionRef.changes(rows), sandboxes.statuses).pipe(
+            Stream.map(([current, statuses]) =>
+              current.map(({ agent }) => withStatus(agent, statuses.get(agent.id) ?? null)),
+            ),
           ),
         transcript: (agentId) =>
           Stream.unwrap(find(agentId).pipe(Effect.as(transcripts.watch(agentId)))),
@@ -575,6 +635,11 @@ export class Agents extends Context.Service<
           find(agentId).pipe(Effect.andThen(transcripts.cancelQueued(agentId, queuedId))),
         sendQueued,
         stop,
+        reachSandbox: (agentId) =>
+          find(agentId).pipe(
+            Effect.flatMap((row) => placementOf(row).host(row)),
+            Effect.asVoid,
+          ),
         unsent,
         saveUnsent,
         watchWaiting: () =>

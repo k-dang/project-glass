@@ -83,6 +83,8 @@ let theme: Theme = "system"
 const windowColors = () => {
   if (theme === "charcoal") return { color: "#111111", symbolColor: "#cecece" }
 
+  if (theme === "catppuccin-mocha") return { color: "#181825", symbolColor: "#cdd6f4" }
+
   return nativeTheme.shouldUseDarkColors
     ? { color: "#0a0a0a", symbolColor: "#fafafa" }
     : { color: "#ffffff", symbolColor: "#0a0a0a" }
@@ -181,7 +183,7 @@ void app.whenReady().then(() => {
   ipcMain.handle(RESOURCE_USAGE_CHANNEL, () => summarizeResourceUsage(app.getAppMetrics()))
   ipcMain.handle(SET_THEME_CHANNEL, (_event, next: Theme) => {
     theme = next
-    nativeTheme.themeSource = next === "charcoal" ? "dark" : next
+    nativeTheme.themeSource = next === "charcoal" || next === "catppuccin-mocha" ? "dark" : next
 
     for (const window of BrowserWindow.getAllWindows()) updateWindowTheme(window)
 
@@ -204,6 +206,9 @@ void app.whenReady().then(() => {
   })
 
   if (devServerUrl === undefined) serveRenderer()
+
+  // Packaged builds get their icon from electron-builder.
+  if (!app.isPackaged) app.dock?.setIcon(join(__dirname, "../../build/icon.png"))
 
   createWindow()
   app.on("activate", () => {

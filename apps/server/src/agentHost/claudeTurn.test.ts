@@ -15,7 +15,7 @@ import { beginTurn, Input, step, stoppedReason, type TurnState } from "./claudeT
 
 const now = DateTime.makeUnsafe("2026-10-26T12:00:00Z")
 
-const steer = { message: "Use tabs", images: [], id: "steer-1" }
+const steer = { message: "Use tabs", images: [], prompt: "Use tabs", id: "steer-1" }
 
 const fresh = beginTurn("turn-1", { message: "Build it", images: [] }, now)
 

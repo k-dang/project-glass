@@ -36,7 +36,10 @@ interface Glass {
   readonly github: FakeGitHub
   readonly claude: Claude
   readonly piModel: FakeModelSettings
-  readonly pi: string
+  readonly pi: {
+    readonly command: string
+    readonly model: Effect.Success<ReturnType<typeof fakeModelProvider>>
+  }
   readonly app: ElectronApplication
   readonly window: Page
 }
@@ -78,8 +81,8 @@ export const test = base.extend<Glass>({
   pi: async ({ piModel, home }, use) => {
     await Effect.runPromise(
       Effect.scoped(
-        Effect.flatMap(fakeModelProvider(home, piModel, { retry: { enabled: false } }), () =>
-          Effect.promise(() => use(bundledPi)),
+        Effect.flatMap(fakeModelProvider(home, piModel, { retry: { enabled: false } }), (model) =>
+          Effect.promise(() => use({ command: bundledPi, model })),
         ),
       ),
     )
@@ -105,7 +108,7 @@ export const test = base.extend<Glass>({
         GH_TOKEN: VIEWER.token,
         GLASS_GITHUB_API_URL: github.url,
         ...claude.environment,
-        GLASS_PI_COMMAND: pi,
+        GLASS_PI_COMMAND: pi.command,
         // Keeps pi from refreshing its model catalog over the network.
         PI_OFFLINE: "1",
         GLASS_GIT_REMOTE: github.gitUrl,

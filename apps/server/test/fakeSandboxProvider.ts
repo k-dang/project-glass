@@ -1,6 +1,6 @@
 import { AgentEngine } from "@glass/contracts"
 import { Schema } from "effect"
-import { execFileSync, spawn } from "node:child_process"
+import { execFile, execFileSync, spawn } from "node:child_process"
 import {
   copyFileSync,
   existsSync,
@@ -13,30 +13,17 @@ import {
 import { connect, createServer, type Socket } from "node:net"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { promisify } from "node:util"
 import { isolatedGitEnv } from "../src/gitEnv.ts"
 import type { AgentModels, Plugin } from "@glass/plugin"
 import { freePort, portOf } from "./ports.ts"
 import { whenExists } from "./whenExists.ts"
-
-const FakeSandboxStep = Schema.Literals([
-  "Creating the Sandbox",
-  "Cloning the repository",
-  "Starting the agent",
-])
-
-export type FakeSandboxStep = typeof FakeSandboxStep.Type
 
 const FakeSandboxSettings = Schema.Struct({
   root: Schema.String,
   cloneFrom: Schema.String,
   piCommand: Schema.String,
   claudeCommand: Schema.String,
-  missingLogin: Schema.optional(Schema.Struct({ login: Schema.String, fix: Schema.String })),
-  noCapacity: Schema.optional(Schema.String),
-  failAt: Schema.optional(FakeSandboxStep),
-  holdAt: Schema.optional(FakeSandboxStep),
-  /** Read when Glass loads the Plugin, so a change takes a relaunch. */
-  engines: Schema.optional(Schema.NonEmptyArray(AgentEngine)),
 })
 
 export type FakeSandboxSettings = typeof FakeSandboxSettings.Type
@@ -150,30 +137,50 @@ const ingress = (folder: string, hostPort: number) =>
     server.listen(0, "127.0.0.1", () => resolve(portOf(server)))
   })
 
-const holdWhile = (holding: () => boolean, signal: AbortSignal) =>
-  new Promise<void>((resolve, reject) => {
-    const timer = setInterval(() => {
-      if (signal.aborted) reject(new Error("Cancelled"))
-      else if (!holding()) resolve()
-      else return
+const execFileAsync = promisify(execFile)
 
-      clearInterval(timer)
-    }, 20)
-  })
+/** Ends a host and the programs it started. */
+const killTree = async (pid: number) => {
+  try {
+    if (process.platform === "win32") {
+      // The host's programs hold their working directories open on Windows.
+      await execFileAsync("taskkill", ["/PID", String(pid), "/T", "/F"], { windowsHide: true })
+    } else {
+      // Effect gives agent programs their own process groups, outside the host's group.
+      const { stdout } = await execFileAsync("ps", ["-A", "-o", "pid=,ppid="])
+
+      const processes = stdout
+        .trim()
+        .split("\n")
+        .map((line) => {
+          const [child, parent] = line.trim().split(/\s+/)
+
+          return { pid: Number(child), parent: Number(parent) }
+        })
+
+      const pids = [pid]
+
+      for (const parent of pids)
+        pids.push(...processes.filter((child) => child.parent === parent).map((child) => child.pid))
+
+      await execFileAsync("kill", ["-KILL", ...pids.toReversed().map(String)])
+    }
+  } catch {}
+}
 
 const claudeEfforts = ["low", "medium", "high", "xhigh", "max"]
 
 const piModel = { id: "glass-test/gpt-test", name: "gpt-test", efforts: [] }
 
-/** What the fake `claude` and the fake model provider's pi offer once a Sandbox runs them. */
+/** What the pinned Claude Code and the fake model provider's pi offer once a Sandbox runs them. */
 const sandboxModels: Record<AgentEngine, AgentModels> = {
   "claude-code": {
-    defaultModel: { id: "default", name: "Default (recommended)", efforts: claudeEfforts },
+    defaultModel: { id: "default", name: "Opus", efforts: claudeEfforts },
     models: [
-      { id: "default", name: "Default (recommended)", efforts: claudeEfforts },
-      { id: "opus", name: "Opus 5.5", efforts: claudeEfforts },
-      { id: "sonnet", name: "Sonnet 5.5", efforts: ["low", "medium", "high"] },
-      { id: "claude-haiku-4-5", name: "Haiku 4.5", efforts: [] },
+      { id: "opus", name: "Opus", efforts: claudeEfforts },
+      { id: "fable", name: "Fable", efforts: claudeEfforts },
+      { id: "sonnet", name: "Sonnet", efforts: claudeEfforts },
+      { id: "haiku", name: "Haiku", efforts: claudeEfforts },
     ],
   },
   pi: {
@@ -194,29 +201,16 @@ export const fakeSandboxProvider =
   (glass) => {
     glass.registerSandboxProvider("fake", {
       name: "Fake Sandboxes",
-      engines: readSettings(settingsPath).engines ?? ["claude-code", "pi"],
-      create: async (request, { progress, record, signal }) => {
+      engines: ["claude-code", "pi"],
+      create: async (request, { progress, record }) => {
         const settings = readSettings(settingsPath)
 
-        if (settings.missingLogin !== undefined)
-          throw glass.missingLogin(settings.missingLogin.login, settings.missingLogin.fix)
-
-        if (settings.noCapacity !== undefined) throw glass.noCapacity(settings.noCapacity)
-
-        const step = async (name: FakeSandboxStep) => {
-          progress(name)
-
-          await holdWhile(() => readSettings(settingsPath).holdAt === name, signal)
-
-          if (settings.failAt === name) throw new Error(`The fake failed at ${name}`)
-        }
-
-        await step("Creating the Sandbox")
+        progress("Creating the Sandbox")
         const folder = join(settings.root, request.agentId)
         mkdirSync(folder, { recursive: true })
         record({ folder })
 
-        await step("Cloning the repository")
+        progress("Cloning the repository")
         const clone = join(folder, request.folder)
         const env = isolatedGitEnv()
         execFileSync("git", ["clone", "--quiet", settings.cloneFrom, clone], { env })
@@ -226,7 +220,7 @@ export const fakeSandboxProvider =
           { cwd: clone, env },
         )
 
-        await step("Starting the agent")
+        progress("Starting the agent")
         const freeHostPort = await freePort()
         // Copied alone, as a real provider uploads it, so a bundle that needs its neighbours fails here.
         const bundle = join(folder, "agentHost.mjs")
@@ -244,6 +238,7 @@ export const fakeSandboxProvider =
             GLASS_CLAUDE_COMMAND: settings.claudeCommand,
           },
           stdio: ["ignore", "inherit", "inherit"],
+          detached: process.platform !== "win32",
         })
 
         if (host.pid === undefined) throw new Error("The agent host didn't start")
@@ -257,17 +252,26 @@ export const fakeSandboxProvider =
         )
         record({ folder, ingressPort: await ingress(folder, freeHostPort) })
       },
-      target: async (state) => ({
-        url: `http://127.0.0.1:${decodeSandbox(state).ingressPort}${INGRESS_PATH}`,
-        headers: { "x-fake-sandbox": "yes" },
-      }),
+      target: async (state) => {
+        const { folder, ingressPort } = decodeSandbox(state)
+
+        if (!existsSync(folder)) throw glass.sandboxGone()
+
+        return {
+          url: `http://127.0.0.1:${ingressPort}${INGRESS_PATH}`,
+          headers: { "x-fake-sandbox": "yes" },
+        }
+      },
       remove: async (state) => {
-        const { missingLogin } = readSettings(settingsPath)
+        const { folder } = decodeSandbox(state)
+        const hostPath = join(folder, "host.json")
 
-        if (missingLogin !== undefined)
-          throw glass.missingLogin(missingLogin.login, missingLogin.fix)
+        if (!existsSync(folder)) throw glass.sandboxGone()
 
-        rmSync(decodeSandbox(state).folder, { recursive: true, force: true, maxRetries: 10 })
+        if (existsSync(hostPath))
+          await killTree(Schema.decodeUnknownSync(HostFile)(readFileSync(hostPath, "utf8")).pid)
+
+        rmSync(folder, { recursive: true, force: true, maxRetries: 10 })
       },
       models: async (engine) => sandboxModels[engine],
     })
@@ -295,12 +299,7 @@ export const installFakeSandboxProvider = (
   const host = (agentId: string) =>
     Schema.decodeUnknownSync(HostFile)(readFileSync(hostFile(agentId), "utf8"))
 
-  const hostPid = (agentId: string) => host(agentId).pid
-
   return {
-    configure: (change: Partial<FakeSandboxSettings>) =>
-      writeFileSync(settingsPath, JSON.stringify({ ...settings, ...change })),
-    sandboxFolder,
     dropConnections: (agentId: string) => {
       const folder = sandboxFolder(agentId)
       writeFileSync(join(folder, "dropped"), "")
@@ -312,15 +311,11 @@ export const installFakeSandboxProvider = (
       rmSync(droppedAll(sandboxFolder(agentId)), { force: true })
     },
     host,
-    hostPid,
-    stopHosts: () => {
-      for (const agentId of readdirSync(settings.root)) {
-        if (!existsSync(hostFile(agentId))) continue
-
-        try {
-          process.kill(hostPid(agentId), "SIGKILL")
-        } catch {}
-      }
+    /** Ends a Sandbox's host and its programs, as a crash would. */
+    killHost: (agentId: string) => killTree(host(agentId).pid),
+    stopHosts: async () => {
+      for (const agentId of readdirSync(settings.root))
+        if (existsSync(hostFile(agentId))) await killTree(host(agentId).pid)
     },
   }
 }

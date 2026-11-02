@@ -9,7 +9,7 @@ export interface BackendFailure {
   readonly logFile: string
 }
 
-export type Theme = "light" | "dark" | "system" | "charcoal"
+export type Theme = "light" | "dark" | "system" | "charcoal" | "catppuccin-mocha"
 
 export type ColorScheme = "light" | "dark"
 
