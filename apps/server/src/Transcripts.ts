@@ -16,7 +16,6 @@ import {
   Turn,
   TurnEnd,
   type TurnEnding,
-  TurnInterrupted,
   TurnPart,
   TurnStarted,
 } from "@glass/contracts"
@@ -133,11 +132,12 @@ export class Transcripts extends Context.Service<
     readonly save: (
       agentId: string,
       events: ReadonlyArray<AgentEvent>,
+      throughJournalEntry?: number,
     ) => Effect.Effect<void, AgentError>
     readonly watch: (agentId: string) => Stream.Stream<TranscriptUpdate, AgentError>
     readonly endRunning: (
       ending: TurnEnding,
-      agentIds?: ReadonlyArray<string>,
+      agentIds: ReadonlyArray<string>,
     ) => Effect.Effect<void, AgentError>
     readonly runningTurn: (agentId: string) => Effect.Effect<string | null, AgentError>
     readonly startOrQueue: (agentId: string, input: MessageInput) => Effect.Effect<void, AgentError>
@@ -224,7 +224,9 @@ export class Transcripts extends Context.Service<
             TurnEnded: ({ turnId, ended }) =>
               sql`
                 UPDATE agent_turn SET ended = ${encodeEnd(ended)}
-                WHERE id = ${turnId} AND ended IS NULL RETURNING id
+                WHERE id = ${turnId}
+                  AND (ended IS NULL OR json_extract(ended, '$.ending._tag') = 'CutOff')
+                RETURNING id
               `.pipe(Effect.map((rows) => rows.length > 0)),
           }),
         )
@@ -310,24 +312,27 @@ export class Transcripts extends Context.Service<
         return head === undefined ? [] : yield* startFromQueue(agentId, head)
       })
 
-      const save = Effect.fn("Transcripts.save")(
-        function* (agentId: string, events: ReadonlyArray<AgentEvent>) {
-          yield* change(
-            agentId,
-            Effect.gen(function* () {
-              const written = yield* Effect.filter(joinConsecutiveAppends(events), (event) =>
-                writeApplied(agentId, event),
-              )
+      const save = (
+        agentId: string,
+        events: ReadonlyArray<AgentEvent>,
+        throughJournalEntry?: number,
+      ) =>
+        change(
+          agentId,
+          Effect.gen(function* () {
+            if (throughJournalEntry !== undefined)
+              yield* sql`UPDATE agent SET journal_saved = ${throughJournalEntry} WHERE id = ${agentId}`
 
-              return written.some(startsNext)
-                ? [...written, ...(yield* startNext(agentId))]
-                : written
-            }),
-          )
-        },
-        Effect.tapError((cause) => Effect.logWarning("Couldn't save a transcript", cause)),
-        Effect.mapError(storageFailure),
-      )
+            const written = yield* Effect.filter(joinConsecutiveAppends(events), (event) =>
+              writeApplied(agentId, event),
+            )
+
+            return written.some(startsNext) ? [...written, ...(yield* startNext(agentId))] : written
+          }),
+        ).pipe(
+          Effect.tapError((cause) => Effect.logWarning("Couldn't save a transcript", cause)),
+          Effect.mapError(storageFailure),
+        )
 
       const snapshot = Effect.fnUntraced(function* (agentId: string) {
         const turns = yield* decodeTurns(
@@ -359,14 +364,14 @@ export class Transcripts extends Context.Service<
 
       const endRunning = Effect.fn("Transcripts.endRunning")(function* (
         ending: TurnEnding,
-        agentIds?: ReadonlyArray<string>,
+        agentIds: ReadonlyArray<string>,
       ) {
-        if (agentIds?.length === 0) return
+        if (agentIds.length === 0) return
 
         const running = yield* sql`
           SELECT t.agent_id AS agentId, t.id AS turnId, p.part AS part
           FROM agent_turn t LEFT JOIN agent_turn_part p ON p.turn_id = t.id
-          WHERE ${sql.and(["t.ended IS NULL", ...(agentIds === undefined ? [] : [sql.in("t.agent_id", agentIds)])])}
+          WHERE t.ended IS NULL AND ${sql.in("t.agent_id", agentIds)}
           ORDER BY t.rowid, p.position
         `.pipe(Effect.flatMap(decodeRunning), Effect.mapError(storageFailure))
 
@@ -386,9 +391,6 @@ export class Transcripts extends Context.Service<
           yield* save(runningAgent, events.flat())
         }
       })
-
-      // Requests only wait in a running Turn, so this leaves none waiting.
-      yield* endRunning(TurnInterrupted.make({})).pipe(Effect.orDie)
 
       const withStorageFailure = <A, E, R>(name: string, effect: Effect.Effect<A, E, R>) =>
         effect.pipe(

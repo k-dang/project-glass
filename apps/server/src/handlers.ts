@@ -137,6 +137,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       SendQueuedMessage: ({ agentId, queuedMessageId }) =>
         agents.sendQueued(agentId, queuedMessageId),
       StopTurn: ({ agentId }) => agents.stop(agentId),
+      ReachSandbox: ({ agentId }) => agents.reachSandbox(agentId),
       GetUnsentMessage: ({ agentId }) => agents.unsent(agentId),
       SaveUnsentMessage: ({ agentId, message, images }) =>
         agents.saveUnsent(agentId, { message, images }),

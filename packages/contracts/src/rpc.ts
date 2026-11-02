@@ -325,6 +325,11 @@ export class GlassRpcs extends RpcGroup.make(
     payload: { agentId: Schema.String },
     error: Schema.Union([AgentNotFound, AgentError]),
   }),
+  /** Tries again to reach the Sandbox of an Agent Glass can't reach. */
+  Rpc.make("ReachSandbox", {
+    payload: { agentId: Schema.String },
+    error: Schema.Union([AgentNotFound, AgentError]),
+  }),
   Rpc.make("GetUnsentMessage", {
     payload: { agentId: Schema.String },
     success: SentMessage,

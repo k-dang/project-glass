@@ -9,6 +9,7 @@ import {
   type RequestPart,
   type Transcript,
   SandboxPlace,
+  type SandboxStatus,
   thisMac,
   type Turn,
 } from "@glass/contracts"
@@ -76,6 +77,10 @@ export const agentsFixture = Effect.fnUntraced(function* (
     Effect.provideService(Scope.Scope, serverScope),
   )
 
+  const quit = Scope.close(serverScope, Exit.void)
+
+  const launch = startBackend(env, home).pipe(Effect.map((backend) => backend.client))
+
   const watch = (agentId: string, until: (transcript: Transcript) => boolean, backend = client) =>
     backend.WatchTranscript({ agentId }).pipe(
       Stream.scan(() => emptyTranscript, applyTranscriptUpdate),
@@ -89,6 +94,18 @@ export const agentsFixture = Effect.fnUntraced(function* (
     until: (turns: ReadonlyArray<Turn>) => boolean,
     backend = client,
   ) => watch(agentId, ({ turns }) => until(turns), backend).pipe(Effect.map(({ turns }) => turns))
+
+  const sandboxStatus = (
+    agentId: string,
+    until: (status: SandboxStatus) => boolean,
+    backend = client,
+  ) =>
+    backend.WatchAgents().pipe(
+      Stream.map((agents) => agents.find(({ id }) => id === agentId)?.sandbox ?? null),
+      Stream.filter((status): status is SandboxStatus => status !== null && until(status)),
+      Stream.runHead,
+      Effect.map(Option.getOrThrow),
+    )
 
   const send = (agentId: string, message: string, images: ReadonlyArray<Image> = []) =>
     client.SendMessage({ agentId, message, images })
@@ -176,6 +193,7 @@ export const agentsFixture = Effect.fnUntraced(function* (
     claude,
     watch,
     transcript,
+    sandboxStatus,
     send,
     steer,
     answering,
@@ -184,11 +202,9 @@ export const agentsFixture = Effect.fnUntraced(function* (
     sandboxes,
     worktree: (name: string) =>
       join(home, ".project-glass", "worktrees", repository.owner, repository.repo, name),
-    restart: Effect.gen(function* () {
-      yield* Scope.close(serverScope, Exit.void)
-
-      return (yield* startBackend(env, home)).client
-    }),
+    quit,
+    launch,
+    restart: quit.pipe(Effect.andThen(launch)),
   }
 })
 
