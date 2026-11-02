@@ -16,10 +16,13 @@ const node = {
 } as const
 
 // One file sharing no chunks, because a Sandbox provider copies only the bundle into the Sandbox.
-const agentHost = (outDir: string) =>
+const agentHost = (
+  outDir: string,
+  entry: Record<string, string> = { agentHost: "src/agentHost.ts" },
+) =>
   ({
     ...node,
-    entry: { agentHost: "src/agentHost.ts" },
+    entry,
     outDir,
     outputOptions: { codeSplitting: false },
   }) as const
@@ -39,12 +42,7 @@ export default defineConfig({
       outDir: "dist-fake",
     },
     agentHost("dist-fake"),
-    {
-      ...node,
-      entry: { scriptedAgentHost: "test/scriptedAgentHost.ts" },
-      outDir: "dist-test",
-      outputOptions: { codeSplitting: false },
-    },
+    agentHost("dist-test", { scriptedAgentHost: "test/scriptedAgentHost.ts" }),
   ],
   test: {
     include: ["src/**/*.test.ts", "test/**/*.test.ts"],

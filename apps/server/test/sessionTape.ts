@@ -11,14 +11,26 @@ import {
   Sink,
   Stream,
 } from "effect"
-import { ChildProcess, ChildProcessSpawner } from "effect/process"
+import { ChildProcessSpawner } from "effect/process"
 import { spawn } from "node:child_process"
 import { EventEmitter } from "node:events"
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
-import { homedir, tmpdir } from "node:os"
 import { dirname } from "node:path"
 import { PassThrough } from "node:stream"
 import { fileURLToPath } from "node:url"
+import {
+  denormalizer,
+  isJsonArray,
+  isJsonObject,
+  type Json,
+  mapStrings,
+  normalizer,
+  playedHandle,
+  programArgs,
+  singleCommand,
+  tappedSpawn,
+  utf8,
+} from "./replay"
 
 const Frame = Schema.Union([
   Schema.Struct({ out: Schema.Json }),
@@ -54,58 +66,6 @@ const uuids = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi
 
 const idFields = new Set(["request_id", "uuid", "session_id", "tool_use_id", "toolUseID"])
 
-const spellings = (path: string) => [
-  path,
-  path.replaceAll("\\", "/"),
-  path.replace(/[^A-Za-z0-9]/g, "-"),
-]
-
-const placesOf = (places: Readonly<Record<string, string>>) =>
-  Object.entries({ ...places, "<home>": homedir(), "<tmp>": tmpdir() })
-    .flatMap(([name, path]) => spellings(path).map((spelling) => [name, spelling] as const))
-    .toSorted(([, a], [, b]) => b.length - a.length)
-
-type Json = Schema.Json
-
-const isArray = (value: Json): value is Schema.JsonArray => Array.isArray(value)
-
-const isObject = (value: Json): value is Schema.JsonObject =>
-  Predicate.isObject(value) && !Array.isArray(value)
-
-const mapStrings = (value: Json, change: (text: string) => string): Json =>
-  Predicate.isString(value)
-    ? change(value)
-    : isArray(value)
-      ? value.map((item) => mapStrings(item, change))
-      : isObject(value)
-        ? Object.fromEntries(
-            Object.entries(value).map(([field, inner]) => [field, mapStrings(inner, change)]),
-          )
-        : value
-
-const normalizer = (places: Readonly<Record<string, string>>) => {
-  const known = placesOf(places)
-
-  return (value: Json) =>
-    mapStrings(value, (text) =>
-      known
-        .reduce((current, [name, spelling]) => current.replaceAll(spelling, name), text)
-        .replace(
-          /(<[a-z-]+>)((?:[\\/][\w .@-]+)*)/g,
-          (_, place, rest: string) => `${place}${rest.replaceAll("\\", "/")}`,
-        ),
-    )
-}
-
-const denormalizer = (places: Readonly<Record<string, string>>) => {
-  const known = Object.entries({ ...places, "<home>": homedir(), "<tmp>": tmpdir() })
-
-  return (value: Json) =>
-    mapStrings(value, (text) =>
-      known.reduce((current, [name, path]) => current.replaceAll(name, path), text),
-    )
-}
-
 /** Takes `actual` as this run's spelling of the recorded id, unless either is already another's. */
 const learn = (ids: Map<string, string>, recorded: string, actual: string) => {
   const known = ids.get(recorded)
@@ -125,8 +85,8 @@ const bindSaid = (value: Json, ids: Map<string, string>, field = ""): void => {
     if (idFields.has(field)) learn(ids, value, value)
 
     for (const id of value.match(uuids) ?? []) learn(ids, id, id)
-  } else if (isArray(value)) for (const item of value) bindSaid(item, ids)
-  else if (isObject(value))
+  } else if (isJsonArray(value)) for (const item of value) bindSaid(item, ids)
+  else if (isJsonObject(value))
     for (const [name, inner] of Object.entries(value)) bindSaid(inner, ids, name)
 }
 
@@ -148,13 +108,13 @@ const matches = (recorded: Json, actual: Json, ids: Map<string, string>, field =
     return idFields.has(field) ? learn(ids, recorded, actual) : sameIds(recorded, actual, ids)
   }
 
-  if (isArray(recorded) && isArray(actual))
+  if (isJsonArray(recorded) && isJsonArray(actual))
     return (
       recorded.length === actual.length &&
       recorded.every((item, index) => matches(item, actual[index]!, ids))
     )
 
-  if (isObject(recorded) && isObject(actual)) {
+  if (isJsonObject(recorded) && isJsonObject(actual)) {
     const fields = new Set([...Object.keys(recorded), ...Object.keys(actual)])
 
     return [...fields].every(
@@ -205,13 +165,14 @@ interface Program {
 
 /**
  * A recorded program's side of a conversation: it says its recorded lines, waiting at each run of
- * lines Glass sent until Glass sends them again, in any order within the run.
+ * lines Glass sent until Glass sends them again, in any order within the run. Glass closes every
+ * program it starts, so a recorded exit only gives the code the program closes with.
  */
 const replayProgram = (
   recorded: Process,
   ids: Map<string, string>,
   places: Readonly<Record<string, string>>,
-  problems: Array<string>,
+  problem: (text: string) => void,
   say: (line: string) => void,
   exit: (code: number | null) => void,
 ): Program => {
@@ -241,6 +202,8 @@ const replayProgram = (
       if (ended) return
       const frame = frames[cursor]!
 
+      if ("exit" in frame) return
+
       if ("in" in frame) {
         bindSaid(frame.in, ids)
 
@@ -251,14 +214,6 @@ const replayProgram = (
         say(show(line))
         cursor++
         continue
-      }
-
-      if ("exit" in frame) {
-        if (cursor === frames.length - 1) return
-        cursor++
-        finish(frame.exit)
-
-        return
       }
 
       const { start, end } = outRun()
@@ -273,7 +228,8 @@ const replayProgram = (
 
   return {
     write: (line) => {
-      const actual = normalize(parse(line))
+      if (ended) return
+      const actual = mapStrings(parse(line), normalize)
       const { start, end } = outRun()
 
       for (let index = start; index < end; index++) {
@@ -287,8 +243,8 @@ const replayProgram = (
         }
       }
 
-      problems.push(`Glass sent what the recording doesn't have next: ${show(actual)}`)
-      console.error(problems.at(-1))
+      problem(`Glass sent what the recording doesn't have next: ${show(actual)}`)
+      finish(1)
     },
     close: () => {
       const last = frames.at(-1)
@@ -301,8 +257,10 @@ const replayProgram = (
 
 /** Records or replays what Agent programs said to Glass, for one scenario. */
 export const sessionTape = (scenario: string, places: Readonly<Record<string, string>>) => {
-  const normalize = normalizer(places)
+  const normalizeText = normalizer(places)
+  const normalize = (value: Json) => mapStrings(value, normalizeText)
   const problems: Array<string> = []
+  const failing = new Set<(failure: Effect.Effect<never, Error>) => void>()
   const ids = new Map<string, string>()
 
   const recorded: Tape = recordingSessions
@@ -317,17 +275,26 @@ export const sessionTape = (scenario: string, places: Readonly<Record<string, st
   let nextProcess = 0
   let nextCall = 0
 
+  const failure = () => Effect.fail(new Error(problems.join("\n")))
+
   const problem = (text: string) => {
     problems.push(text)
-    console.error(text)
+
+    for (const fail of failing) fail(failure())
   }
 
-  const launch = (args: ReadonlyArray<string>, cwd: string | undefined) =>
-    show(normalize({ args: [...args], cwd: cwd ?? "" }))
+  /** Fails as soon as the replay goes anywhere the recording didn't. */
+  const mismatch = Effect.callback<never, Error>((resume) => {
+    if (problems.length > 0) return resume(failure())
+
+    failing.add(resume)
+
+    return Effect.sync(() => failing.delete(resume))
+  })
 
   const nextRecorded = (args: ReadonlyArray<string>, cwd: string | undefined) => {
     const process = recorded.processes[nextProcess++]
-    const started = launch(args, cwd)
+    const started = show({ args: args.map(normalizeText), cwd: normalizeText(cwd ?? "") })
 
     if (process === undefined || show({ args: [...process.args], cwd: process.cwd }) !== started) {
       problem(`Glass started a program the recording doesn't have: ${started}`)
@@ -343,9 +310,13 @@ export const sessionTape = (scenario: string, places: Readonly<Record<string, st
     say: (line: string) => void,
     exit: (code: number | null) => void,
   ): Program => {
-    if (process === undefined) return { write: () => {}, close: () => exit(1), unsent: () => 0 }
+    if (process === undefined) {
+      queueMicrotask(() => exit(1))
 
-    const program = replayProgram(process, ids, places, problems, say, exit)
+      return { write: () => {}, close: () => {}, unsent: () => 0 }
+    }
+
+    const program = replayProgram(process, ids, places, problem, say, exit)
     programs.push(program)
 
     return program
@@ -353,15 +324,7 @@ export const sessionTape = (scenario: string, places: Readonly<Record<string, st
 
   const recordProcess = (args: ReadonlyArray<string>, cwd: string | undefined) => {
     const frames: Array<Frame> = []
-
-    const normalized = args.flatMap((arg) => {
-      const text = normalize(arg)
-
-      return Predicate.isString(text) ? [text] : []
-    })
-
-    const place = normalize(cwd ?? "")
-    processes.push({ args: normalized, cwd: Predicate.isString(place) ? place : "", frames })
+    processes.push({ args: args.map(normalizeText), cwd: normalizeText(cwd ?? ""), frames })
 
     return {
       out: lines((line) => frames.push({ out: normalize(parse(line)) })),
@@ -384,9 +347,11 @@ export const sessionTape = (scenario: string, places: Readonly<Record<string, st
       const tape = recordProcess(options.args, options.cwd)
       const stdin = new PassThrough()
       const stdout = new PassThrough()
-      stdin.on("data", (chunk: Buffer) => tape.out(chunk.toString("utf8")))
+      const sentText = utf8()
+      const saidText = utf8()
+      stdin.on("data", (chunk: Buffer) => tape.out(sentText(chunk)))
       stdin.pipe(child.stdin)
-      child.stdout.on("data", (chunk: Buffer) => tape.in(chunk.toString("utf8")))
+      child.stdout.on("data", (chunk: Buffer) => tape.in(saidText(chunk)))
       child.stdout.pipe(stdout)
       child.on("close", (code) => tape.exit(code))
 
@@ -411,7 +376,9 @@ export const sessionTape = (scenario: string, places: Readonly<Record<string, st
       exit,
     )
 
-    stdin.on("data", lines(program.write))
+    const sentText = utf8()
+    const write = lines(program.write)
+    stdin.on("data", (chunk: Buffer) => write(sentText(chunk)))
     stdin.on("end", program.close)
 
     return Object.assign(events, {
@@ -440,34 +407,16 @@ export const sessionTape = (scenario: string, places: Readonly<Record<string, st
 
       return ChildProcessSpawner.make((command) =>
         Effect.gen(function* () {
-          if (!ChildProcess.isStandardCommand(command))
-            return yield* Effect.die("Session tapes cover single commands only")
-
-          const args =
-            command.command === globalThis.process.execPath ? command.args.slice(1) : command.args
+          const given = yield* singleCommand(command)
+          const args = programArgs(given)
 
           if (recordingSessions) {
-            const tape = recordProcess(args, command.options.cwd)
-            const handle = yield* real.spawn(command)
-            const decoder = new TextDecoder()
-            const exited = yield* Deferred.make<number>()
+            const tape = recordProcess(args, given.options.cwd)
 
-            return ChildProcessSpawner.makeHandle({
-              ...handle,
-              stdin: Sink.mapInput(handle.stdin, (chunk: Uint8Array) => {
-                tape.out(decoder.decode(chunk))
-
-                return chunk
-              }),
-              stdout: handle.stdout.pipe(
-                Stream.tap((chunk) => Effect.sync(() => tape.in(new TextDecoder().decode(chunk)))),
-                Stream.onEnd(
-                  Deferred.await(exited).pipe(
-                    Effect.tap((code) => Effect.sync(() => tape.exit(code))),
-                  ),
-                ),
-              ),
-              exitCode: handle.exitCode.pipe(Effect.tap((code) => Deferred.succeed(exited, code))),
+            return yield* tappedSpawn(real, given, {
+              stdin: tape.out,
+              stdout: tape.in,
+              exit: tape.exit,
             })
           }
 
@@ -481,29 +430,21 @@ export const sessionTape = (scenario: string, places: Readonly<Record<string, st
           }
 
           const program = replay(
-            nextRecorded(args, command.options.cwd),
+            nextRecorded(args, given.options.cwd),
             (line) => Effect.runSync(Queue.offer(output, encoder.encode(`${line}\n`))),
             exit,
           )
 
           yield* Effect.addFinalizer(() => Effect.sync(program.close))
-          const decoder = new TextDecoder()
+          const sentText = utf8()
           const write = lines(program.write)
 
-          return ChildProcessSpawner.makeHandle({
-            pid: ChildProcessSpawner.ProcessId(0),
+          return playedHandle({
             exitCode: Deferred.await(exited),
             isRunning: Deferred.isDone(exited).pipe(Effect.map((done) => !done)),
             kill: () => Effect.sync(program.close),
-            stdin: Sink.forEach((chunk: Uint8Array) =>
-              Effect.sync(() => write(decoder.decode(chunk, { stream: true }))),
-            ),
+            stdin: Sink.forEach((chunk: Uint8Array) => Effect.sync(() => write(sentText(chunk)))),
             stdout: Stream.fromQueue(output),
-            stderr: Stream.empty,
-            all: Stream.fromQueue(output),
-            getInputFd: () => Sink.drain,
-            getOutputFd: () => Stream.empty,
-            unref: Effect.succeed(Effect.void),
           })
         }),
       )
@@ -569,5 +510,5 @@ export const sessionTape = (scenario: string, places: Readonly<Record<string, st
     if (problems.length > 0) throw new Error(problems.join("\n"))
   })
 
-  return { claude, spawner, sessionInfo, finish }
+  return { claude, spawner, sessionInfo, mismatch, finish }
 }

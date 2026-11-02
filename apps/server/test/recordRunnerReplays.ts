@@ -1,6 +1,5 @@
-import { NodeServices } from "@effect/platform-node"
 import type { EngineModels } from "@glass/contracts"
-import { ConfigProvider, Effect, Layer, Schema } from "effect"
+import { Effect, Schema } from "effect"
 import { execSync } from "node:child_process"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
@@ -9,13 +8,13 @@ import { fileURLToPath } from "node:url"
 import { parseArgs } from "node:util"
 import { AgentRunners } from "../src/agentRunners"
 import { sdkExecutable } from "../src/processes"
-import { ServerConfig } from "../src/ServerConfig"
 import {
   Recording,
   type RunnerScenario,
   recordingFile,
   recordingSpawner,
   runnerScenarios,
+  runnersLayer,
 } from "./runnerReplay"
 
 const USAGE = `Records how the real Claude Code and pi CLIs answer Glass's agent runners.
@@ -23,7 +22,8 @@ const USAGE = `Records how the real Claude Code and pi CLIs answer Glass's agent
   pnpm --filter @glass/server exec jiti test/recordRunnerReplays.ts --pi-model <provider/model> [--claude-model haiku] [--only <scenario>]
 
 Uses your own claude and pi logins (GLASS_CLAUDE_COMMAND and GLASS_PI_COMMAND pick other
-executables) and writes test/recordings/runners/<scenario>.json. Pick cheap models.`
+executables) and writes test/recordings/runners/<scenario>.json. Pick cheap models. Fields
+that look personal (email, org, account) are blanked; check the files before committing them.`
 
 const { values } = parseArgs({
   options: {
@@ -94,22 +94,13 @@ const record = async (scenario: RunnerScenario) => {
           onFailure: (failure) => ({ failure: failure.reason }),
         }),
         Effect.provide(
-          AgentRunners.layer.pipe(
-            Layer.provide(recorder.layer),
-            Layer.provide(ServerConfig.layer),
-            Layer.provide(
-              ConfigProvider.layer(
-                ConfigProvider.fromEnvRecord({
-                  GLASS_PORT: "0",
-                  GLASS_TOKEN: "unused",
-                  GLASS_HOME: checkout,
-                  GLASS_CLAUDE_COMMAND: sdkExecutable(commands["claude-code"]),
-                  GLASS_PI_COMMAND: sdkExecutable(commands.pi),
-                }),
-              ),
-            ),
-            Layer.provide(NodeServices.layer),
-            Layer.orDie,
+          runnersLayer(
+            {
+              GLASS_HOME: checkout,
+              GLASS_CLAUDE_COMMAND: sdkExecutable(commands["claude-code"]),
+              GLASS_PI_COMMAND: sdkExecutable(commands.pi),
+            },
+            recorder.layer,
           ),
         ),
       ),

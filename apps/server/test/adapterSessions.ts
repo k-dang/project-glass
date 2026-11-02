@@ -50,6 +50,7 @@ const drive = Effect.fnUntraced(function* (
       Stream.filter(holds),
       Stream.runHead,
       Effect.map(Option.getOrThrow),
+      Effect.raceFirst(tape.mismatch),
     )
 
   const open = (conversation: string) =>

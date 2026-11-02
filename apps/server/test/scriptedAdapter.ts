@@ -14,24 +14,11 @@ import {
 } from "@glass/contracts"
 import { DateTime, Deferred, Effect, Fiber, Scope } from "effect"
 import { randomUUID } from "node:crypto"
-import { existsSync, watch } from "node:fs"
 import { join } from "node:path"
 import type { AgentAdapter, AgentSession } from "../src/agentHost/adapter"
 import { notRunning } from "../src/agentHost/protocol"
 import { settleWith } from "../src/agentHost/requests"
-
-const untilFile = (path: string) =>
-  Effect.callback<void>((resume) => {
-    if (existsSync(path)) return resume(Effect.void)
-
-    const watcher = watch(join(path, ".."), () => {
-      if (existsSync(path)) resume(Effect.void)
-    })
-
-    if (existsSync(path)) resume(Effect.void)
-
-    return Effect.sync(() => watcher.close())
-  })
+import { whenExists } from "./whenExists"
 
 interface Waiting {
   readonly part: RequestPart
@@ -54,11 +41,10 @@ export const scriptedAdapter = (gates: string): AgentAdapter => ({
   start: ({ report }) =>
     Effect.gen(function* () {
       const scope = yield* Scope.Scope
-      const closed = yield* Deferred.make<void>()
 
       let turn: {
         readonly id: string
-        fiber: Fiber.Fiber<void> | null
+        readonly fiber: Fiber.Fiber<void>
         steers: Array<SentMessage>
         index: number
         waiting: Waiting | null
@@ -83,7 +69,7 @@ export const scriptedAdapter = (gates: string): AgentAdapter => ({
 
           if (hold !== undefined) {
             yield* part(turnId, TextPart.make({ text: "Holding." }))
-            yield* untilFile(join(gates, hold))
+            yield* Effect.promise((signal) => whenExists(join(gates, hold), signal))
 
             for (const steer of turn!.steers.splice(0)) {
               yield* part(turnId, SteerPart.make(steer))
@@ -115,8 +101,8 @@ export const scriptedAdapter = (gates: string): AgentAdapter => ({
         configure: () => Effect.void,
         startTurn: (turnId, message) =>
           Effect.gen(function* () {
-            turn = { id: turnId, fiber: null, steers: [], index: 0, waiting: null }
-            turn.fiber = yield* run(turnId, message).pipe(Effect.forkIn(scope))
+            const fiber = yield* run(turnId, message).pipe(Effect.forkIn(scope))
+            turn = { id: turnId, fiber, steers: [], index: 0, waiting: null }
           }),
         steer: (message) =>
           turn === null ? notRunning : Effect.sync(() => void turn!.steers.push(message)),
@@ -125,7 +111,7 @@ export const scriptedAdapter = (gates: string): AgentAdapter => ({
 
           const { id, fiber, steers } = turn
 
-          if (fiber !== null) yield* Fiber.interrupt(fiber)
+          yield* Fiber.interrupt(fiber)
           yield* end(id, TurnStopped.make({}))
 
           return steers
@@ -144,7 +130,7 @@ export const scriptedAdapter = (gates: string): AgentAdapter => ({
 
             return undefined
           }),
-        closed: Deferred.await(closed),
+        closed: Effect.never,
         stopped: Effect.succeed(false),
       } satisfies AgentSession
     }),

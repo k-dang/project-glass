@@ -8,7 +8,6 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
-  watch,
   writeFileSync,
 } from "node:fs"
 import { connect, createServer, type Socket } from "node:net"
@@ -17,6 +16,7 @@ import { fileURLToPath } from "node:url"
 import { isolatedGitEnv } from "../src/gitEnv.ts"
 import type { AgentModels, Plugin } from "@glass/plugin"
 import { freePort, portOf } from "./ports.ts"
+import { whenExists } from "./whenExists.ts"
 
 const FakeSandboxStep = Schema.Literals([
   "Creating the Sandbox",
@@ -307,18 +307,7 @@ export const installFakeSandboxProvider = (
       const folder = sandboxFolder(agentId)
       writeFileSync(join(folder, "dropped"), "")
 
-      return new Promise<void>((resolve) => {
-        const watcher = watch(folder, () => {
-          if (!existsSync(droppedAll(folder))) return
-          watcher.close()
-          resolve()
-        })
-
-        if (existsSync(droppedAll(folder))) {
-          watcher.close()
-          resolve()
-        }
-      })
+      return whenExists(droppedAll(folder))
     },
     reconnect: (agentId: string) => {
       rmSync(join(sandboxFolder(agentId), "dropped"))

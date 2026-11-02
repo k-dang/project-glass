@@ -1,12 +1,24 @@
+import { NodeServices } from "@effect/platform-node"
 import { EngineModels } from "@glass/contracts"
-import { Effect, Layer, Option, Predicate, Schema, Sink, Stream } from "effect"
+import { ConfigProvider, Effect, Layer, Option, Predicate, Schema, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { readFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { AgentFailure } from "../src/agentFailure"
-import type { AgentTask } from "../src/agentRunners"
+import { AgentRunners, type AgentTask } from "../src/agentRunners"
+import { ServerConfig } from "../src/ServerConfig"
 import { counter } from "./counter"
+import {
+  isJsonArray,
+  isJsonObject,
+  type Json,
+  normalizer,
+  playedHandle,
+  programArgs,
+  singleCommand,
+  tappedSpawn,
+} from "./replay"
 
 const Summary = Schema.Struct({ summary: Schema.String })
 
@@ -108,32 +120,34 @@ export const readRecording = (scenario: string) =>
     readFileSync(recordingFile(scenario), "utf8"),
   )
 
-const spellings = (path: string) => [
-  path,
-  path.replaceAll("\\", "/"),
-  path.replaceAll("\\", "\\\\"),
-]
-
-export const normalize = (text: string, places: Readonly<Record<string, string>>) =>
-  Object.entries({ ...places, "<tmp>": tmpdir() })
-    .flatMap(([name, path]) => spellings(path).map((spelling) => [name, spelling] as const))
-    .toSorted(([, a], [, b]) => b.length - a.length)
-    .reduce((current, [name, spelling]) => current.replaceAll(spelling, name), text)
-    .replace(/<tmp>(?:\\\\|\\|\/)+glass-agent-[A-Za-z0-9]+/g, "<workdir>")
-    .replace(
-      /(<(?:workdir|checkout|home|tmp)>)((?:(?:\\\\|\\|\/)[\w.-]+)*)/g,
-      (_, place, rest) => `${place}${rest.replace(/\\\\|\\/g, "/")}`,
-    )
-
-const encode = (value: string) => new TextEncoder().encode(value)
+/** The agent runners on the given spawner, configured the way the backend configures them. */
+export const runnersLayer = (
+  env: Readonly<Record<string, string>>,
+  spawner: Layer.Layer<
+    ChildProcessSpawner.ChildProcessSpawner,
+    never,
+    ChildProcessSpawner.ChildProcessSpawner
+  > = Layer.effect(
+    ChildProcessSpawner.ChildProcessSpawner,
+    Effect.service(ChildProcessSpawner.ChildProcessSpawner),
+  ),
+) =>
+  AgentRunners.layer.pipe(
+    Layer.provide(spawner),
+    Layer.provide(ServerConfig.layer),
+    Layer.provide(
+      ConfigProvider.layer(
+        ConfigProvider.fromEnvRecord({ GLASS_PORT: "0", GLASS_TOKEN: "unused", ...env }),
+      ),
+    ),
+    Layer.provide(NodeServices.layer),
+    Layer.orDie,
+  )
 
 const personal = /email|org|account|uuid|name|subscription|plan/i
 
-const isJsonObject = (value: Schema.Json): value is Schema.JsonObject =>
-  Predicate.isObject(value) && !Array.isArray(value)
-
-const redactJson = (value: Schema.Json): Schema.Json =>
-  Array.isArray(value)
+const redactJson = (value: Json): Json =>
+  isJsonArray(value)
     ? value.map(redactJson)
     : isJsonObject(value)
       ? Object.fromEntries(
@@ -146,11 +160,22 @@ const redactJson = (value: Schema.Json): Schema.Json =>
 
 const decodeJson = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Json))
 
-const redact = (output: string) =>
-  Option.match(decodeJson(output), {
-    onNone: () => output,
-    onSome: (json) => JSON.stringify(redactJson(json)),
-  })
+/** Blanks personal fields in output that is one JSON document or one per line. */
+const redact = (output: string) => {
+  const whole = decodeJson(output)
+
+  return Option.isSome(whole)
+    ? JSON.stringify(redactJson(whole.value))
+    : output
+        .split("\n")
+        .map((line) =>
+          Option.match(decodeJson(line), {
+            onNone: () => line,
+            onSome: (json) => JSON.stringify(redactJson(json)),
+          }),
+        )
+        .join("\n")
+}
 
 const text = (stream: Stream.Stream<Uint8Array, unknown>) =>
   stream.pipe(Stream.decodeText(), Stream.mkString)
@@ -173,19 +198,9 @@ const systemPromptOf = (args: ReadonlyArray<string>) => {
   return index === -1 ? undefined : readFileSync(args[index + 1]!, "utf8")
 }
 
-// A JavaScript CLI runs as `node <script> ...args`; only its own arguments are the run's.
-const argsOf = (command: ChildProcess.StandardCommand) =>
-  command.command === process.execPath ? command.args.slice(1) : command.args
-
-const standard = (command: ChildProcess.Command) =>
-  ChildProcess.isStandardCommand(command)
-    ? command
-    : (() => {
-        throw new Error("Runner recordings cover single commands only")
-      })()
-
 export const recordingSpawner = (places: Readonly<Record<string, string>>) => {
   const spawns: Array<Spawn> = []
+  const normalize = normalizer(places)
 
   const layer = Layer.effect(
     ChildProcessSpawner.ChildProcessSpawner,
@@ -194,69 +209,39 @@ export const recordingSpawner = (places: Readonly<Record<string, string>>) => {
 
       return ChildProcessSpawner.make((command) =>
         Effect.gen(function* () {
-          const given = standard(command)
+          const given = yield* singleCommand(command)
           const stdin = yield* stdinOf(given)
           const systemPrompt = systemPromptOf(given.args)
+          let stdout = ""
+          let stderr = ""
 
-          const handle = yield* real.spawn(
+          return yield* tappedSpawn(
+            real,
             ChildProcess.make(given.command, given.args, {
               ...given.options,
               stdin: Stream.make(new TextEncoder().encode(stdin)),
             }),
+            {
+              stdout: (chunk) => {
+                stdout += chunk
+              },
+              stderr: (chunk) => {
+                stderr += chunk
+              },
+              exit: (exitCode) => {
+                const spawn: Spawn = {
+                  args: programArgs(given).map(normalize),
+                  cwd: normalize(given.options.cwd ?? ""),
+                  stdin: normalize(stdin),
+                  stdout: normalize(redact(stdout)),
+                  stderr: normalize(stderr),
+                  exitCode,
+                }
+
+                spawns.push(systemPrompt === undefined ? spawn : { ...spawn, systemPrompt })
+              },
+            },
           )
-
-          let stdout = ""
-          let stderr = ""
-          let exitCode: number | null = null
-          let streamsOpen = 2
-
-          const save = () => {
-            if (exitCode === null || streamsOpen > 0) return
-
-            const spawn: Spawn = {
-              args: argsOf(given).map((arg) => normalize(arg, places)),
-              cwd: normalize(given.options.cwd ?? "", places),
-              stdin: normalize(stdin, places),
-              stdout: normalize(redact(stdout), places),
-              stderr: normalize(stderr, places),
-              exitCode,
-            }
-
-            spawns.push(systemPrompt === undefined ? spawn : { ...spawn, systemPrompt })
-          }
-
-          const ended = Effect.sync(() => {
-            streamsOpen--
-            save()
-          })
-
-          return ChildProcessSpawner.makeHandle({
-            ...handle,
-            stdout: handle.stdout.pipe(
-              Stream.tap((chunk) =>
-                Effect.sync(() => {
-                  stdout += new TextDecoder().decode(chunk)
-                }),
-              ),
-              Stream.onEnd(ended),
-            ),
-            stderr: handle.stderr.pipe(
-              Stream.tap((chunk) =>
-                Effect.sync(() => {
-                  stderr += new TextDecoder().decode(chunk)
-                }),
-              ),
-              Stream.onEnd(ended),
-            ),
-            exitCode: handle.exitCode.pipe(
-              Effect.tap((code) =>
-                Effect.sync(() => {
-                  exitCode = code
-                  save()
-                }),
-              ),
-            ),
-          })
         }),
       )
     }),
@@ -264,6 +249,8 @@ export const recordingSpawner = (places: Readonly<Record<string, string>>) => {
 
   return { layer, spawns }
 }
+
+const encode = (value: string) => new TextEncoder().encode(value)
 
 export const replaySpawner = (
   recording: Recording,
@@ -274,15 +261,16 @@ export const replaySpawner = (
   const unexpected: Array<string> = []
   const stopped = counter()
   const served = counter()
+  const normalize = normalizer(places)
 
   const layer = Layer.succeed(
     ChildProcessSpawner.ChildProcessSpawner,
     ChildProcessSpawner.make((command) =>
       Effect.gen(function* () {
-        const given = standard(command)
-        const args = argsOf(given).map((arg) => normalize(arg, places))
-        const cwd = normalize(given.options.cwd ?? "", places)
-        const stdin = normalize(yield* stdinOf(given), places)
+        const given = yield* singleCommand(command)
+        const args = programArgs(given).map(normalize)
+        const cwd = normalize(given.options.cwd ?? "")
+        const stdin = normalize(yield* stdinOf(given))
         const systemPrompt = systemPromptOf(given.args)
 
         const index = unused.findIndex(
@@ -318,18 +306,11 @@ export const replaySpawner = (
             return value
           })
 
-        return ChildProcessSpawner.makeHandle({
-          pid: ChildProcessSpawner.ProcessId(0),
+        return playedHandle({
           exitCode: holding ? Effect.never : finished(ChildProcessSpawner.ExitCode(spawn.exitCode)),
           isRunning: Effect.sync(() => running),
-          kill: () => Effect.void,
-          stdin: Sink.drain,
           stdout: holding ? Stream.never : Stream.make(encode(spawn.stdout)),
           stderr: holding ? Stream.never : Stream.make(encode(spawn.stderr)),
-          all: Stream.make(encode(spawn.stdout + spawn.stderr)),
-          getInputFd: () => Sink.drain,
-          getOutputFd: () => Stream.empty,
-          unref: Effect.succeed(Effect.void),
         })
       }),
     ),

@@ -1,6 +1,5 @@
-import { NodeServices } from "@effect/platform-node"
 import { assert, it } from "@effect/vitest"
-import { ConfigProvider, Effect, Fiber, Layer } from "effect"
+import { Effect, Fiber } from "effect"
 import { mkdirSync, readdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { vi } from "vite-plus/test"
@@ -11,9 +10,11 @@ import {
   replaySpawner,
   type RunnerScenario,
   runnerScenarios,
+  runnersLayer,
 } from "../test/runnerReplay"
 import { AgentRunners } from "./agentRunners"
-import { ServerConfig } from "./ServerConfig"
+
+const scenarioNamed = (name: string) => runnerScenarios.find((scenario) => scenario.name === name)!
 
 const fixture = Effect.fnUntraced(function* (
   scenario: RunnerScenario,
@@ -41,22 +42,13 @@ const fixture = Effect.fnUntraced(function* (
   }).pipe(
     Effect.scoped,
     Effect.provide(
-      AgentRunners.layer.pipe(
-        Layer.provide(replay.layer),
-        Layer.provide(ServerConfig.layer),
-        Layer.provide(
-          ConfigProvider.layer(
-            ConfigProvider.fromEnvRecord({
-              GLASS_PORT: "0",
-              GLASS_TOKEN: "unused",
-              GLASS_HOME: home,
-              GLASS_CLAUDE_COMMAND: join(home, "claude"),
-              GLASS_PI_COMMAND: join(home, "pi"),
-            }),
-          ),
-        ),
-        Layer.provide(NodeServices.layer),
-        Layer.orDie,
+      runnersLayer(
+        {
+          GLASS_HOME: home,
+          GLASS_CLAUDE_COMMAND: join(home, "claude"),
+          GLASS_PI_COMMAND: join(home, "pi"),
+        },
+        replay.layer,
       ),
     ),
   )
@@ -96,10 +88,7 @@ for (const scenario of runnerScenarios)
 for (const name of ["claude-answer", "pi-answer"])
   it.live(`stopping ${name} part-way stops the CLI and removes its directory`, () =>
     Effect.gen(function* () {
-      const f = yield* fixture(
-        runnerScenarios.find((scenario) => scenario.name === name)!,
-        { hold: true },
-      )
+      const f = yield* fixture(scenarioNamed(name), { hold: true })
 
       const running = yield* Effect.forkChild(f.run)
       yield* f.replay.served(f.recording.spawns.length)
@@ -109,6 +98,25 @@ for (const name of ["claude-answer", "pi-answer"])
       assert.isEmpty(f.leftovers())
     }),
   )
+
+/** The scenario's recording with `from` replaced by `to` in what one of its programs printed. */
+const edited = (
+  base: string,
+  printed: (spawn: Recording["spawns"][number]) => boolean,
+  from: string,
+  to: string,
+): Recording => {
+  const recorded = readRecording(base)
+  const target = recorded.spawns.find(printed)!
+  assert.include(target.stdout, from)
+
+  return {
+    ...recorded,
+    spawns: recorded.spawns.map((spawn) =>
+      spawn === target ? { ...spawn, stdout: spawn.stdout.replaceAll(from, to) } : spawn,
+    ),
+  }
+}
 
 const piText = '{"type":"text","text":"{\\"summary\\":\\"Fine.\\"}"}'
 
@@ -130,19 +138,8 @@ for (const [name, base, from, to] of [
 ] as const)
   it.live(`fails as unusable output for ${name}`, () =>
     Effect.gen(function* () {
-      const scenario = runnerScenarios.find((candidate) => candidate.name === base)!
-      const recorded = readRecording(base)
-      const answering = recorded.spawns.at(-1)!
-      assert.include(answering.stdout, from)
-
-      const f = yield* fixture(scenario, {
-        recording: {
-          ...recorded,
-          spawns: [
-            ...recorded.spawns.slice(0, -1),
-            { ...answering, stdout: answering.stdout.replaceAll(from, to) },
-          ],
-        },
+      const f = yield* fixture(scenarioNamed(base), {
+        recording: edited(base, (spawn) => spawn.args.includes("-p"), from, to),
       })
 
       const failure = yield* Effect.flip(f.run)
@@ -150,6 +147,30 @@ for (const [name, base, from, to] of [
       assert.notInclude(failure.message, "secret-should-not-leak")
     }),
   )
+
+const withoutRestrictedTools = (base: string) =>
+  edited(base, (spawn) => spawn.args[0] === "--help", "--restricted", "--unrelated")
+
+it.live("refuses file access to a Claude Code that can't restrict its tools", () =>
+  Effect.gen(function* () {
+    const f = yield* fixture(scenarioNamed("claude-read-only"), {
+      recording: withoutRestrictedTools("claude-read-only"),
+    })
+
+    const failure = yield* Effect.flip(f.run)
+    assert.strictEqual(failure.reason, "not-ready")
+  }),
+)
+
+it.live("runs a task without file access on a Claude Code that can't restrict its tools", () =>
+  Effect.gen(function* () {
+    const f = yield* fixture(scenarioNamed("claude-answer"), {
+      recording: withoutRestrictedTools("claude-answer"),
+    })
+
+    assert.deepStrictEqual(yield* f.run, { summary: "Fine." })
+  }),
+)
 
 it.live("reports a runner whose executable is missing as not installed", () =>
   Effect.gen(function* () {
@@ -170,22 +191,11 @@ it.live("reports a runner whose executable is missing as not installed", () =>
         Effect.scoped,
         Effect.flip,
         Effect.provide(
-          AgentRunners.layer.pipe(
-            Layer.provide(ServerConfig.layer),
-            Layer.provide(
-              ConfigProvider.layer(
-                ConfigProvider.fromEnvRecord({
-                  GLASS_PORT: "0",
-                  GLASS_TOKEN: "unused",
-                  GLASS_HOME: home,
-                  GLASS_CLAUDE_COMMAND: "glass-missing-claude",
-                  GLASS_PI_COMMAND: "glass-missing-pi",
-                }),
-              ),
-            ),
-            Layer.provide(NodeServices.layer),
-            Layer.orDie,
-          ),
+          runnersLayer({
+            GLASS_HOME: home,
+            GLASS_CLAUDE_COMMAND: "glass-missing-claude",
+            GLASS_PI_COMMAND: "glass-missing-pi",
+          }),
         ),
       ),
     )
