@@ -316,8 +316,7 @@ const TurnView = memo(function TurnView(props: {
   const { turn } = props
 
   return (
-    // The latest Turn lays out at once: sized from the 10rem estimate, it
-    // would land short when anchored and jump back a frame later.
+    // Sized from the 10rem estimate, the latest Turn would anchor short and jump.
     <MessageScrollerItem
       messageId={turn.id}
       scrollAnchor
