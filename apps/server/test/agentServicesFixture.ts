@@ -13,7 +13,6 @@ import {
   thisMac,
 } from "@glass/contracts"
 import { Context, Deferred, Effect, Exit, Layer, Option, Queue, Scope, Stream } from "effect"
-import { SqlClient } from "effect/sql"
 import { RpcTest } from "effect/rpc"
 import type { AgentAdapter, AgentSession } from "../src/agentHost/adapter"
 import { Changes } from "../src/agentHost/Changes"
@@ -176,7 +175,6 @@ export const agentServicesFixture = Effect.gen(function* () {
 
   return {
     ...running,
-    sql: Context.get(database, SqlClient.SqlClient),
     answers,
     stops,
     starts,

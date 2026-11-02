@@ -1,4 +1,4 @@
-import { Effect, Predicate, Schema, Sink, Stream } from "effect"
+import { Effect, Option, Predicate, Schema, Sink, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { homedir, tmpdir } from "node:os"
 
@@ -9,16 +9,26 @@ export const isJsonArray = (value: Json): value is Schema.JsonArray => Array.isA
 export const isJsonObject = (value: Json): value is Schema.JsonObject =>
   Predicate.isObject(value) && !Array.isArray(value)
 
-export const mapStrings = (value: Json, change: (text: string) => string): Json =>
+/** Changes every string in `value`, told the field each sits in. */
+export const mapStrings = (
+  value: Json,
+  change: (text: string, field: string) => string,
+  field = "",
+): Json =>
   Predicate.isString(value)
-    ? change(value)
+    ? change(value, field)
     : isJsonArray(value)
-      ? value.map((item) => mapStrings(item, change))
+      ? value.map((item) => mapStrings(item, change, field))
       : isJsonObject(value)
         ? Object.fromEntries(
-            Object.entries(value).map(([field, inner]) => [field, mapStrings(inner, change)]),
+            Object.entries(value).map(([name, inner]) => [name, mapStrings(inner, change, name)]),
           )
         : value
+
+export const decodeJson = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Json))
+
+/** A line as JSON, or as the text it is when it isn't JSON. */
+export const parseLine = (line: string): Json => Option.getOrElse(decodeJson(line), () => line)
 
 const withMachinePlaces = (places: Readonly<Record<string, string>>) =>
   Object.entries({ ...places, "<home>": homedir(), "<tmp>": tmpdir() })

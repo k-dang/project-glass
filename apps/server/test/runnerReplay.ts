@@ -2,7 +2,7 @@ import { NodeServices } from "@effect/platform-node"
 import { EngineModels } from "@glass/contracts"
 import { ConfigProvider, Effect, Layer, Option, Predicate, Schema, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
-import { readFileSync } from "node:fs"
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { AgentFailure } from "../src/agentFailure"
@@ -10,9 +10,9 @@ import { AgentRunners, type AgentTask } from "../src/agentRunners"
 import { ServerConfig } from "../src/ServerConfig"
 import { counter } from "./counter"
 import {
-  isJsonArray,
-  isJsonObject,
+  decodeJson,
   type Json,
+  mapStrings,
   normalizer,
   playedHandle,
   programArgs,
@@ -46,6 +46,12 @@ const signedOut = {
 }
 
 const replyFine = 'Reply with exactly this JSON and nothing else: {"summary":"Fine."}'
+
+/** Gives a checkout the file the read-only scenarios read. */
+export const seedCheckout = (checkout: string) => {
+  mkdirSync(join(checkout, "src"), { recursive: true })
+  writeFileSync(join(checkout, "src", "greet.ts"), "hello")
+}
 
 const readGreeting =
   'Read the file src/greet.ts, then reply with only JSON of the form {"summary":"<the file\'s contents>"}.'
@@ -146,19 +152,8 @@ export const runnersLayer = (
 
 const personal = /email|org|account|uuid|name|subscription|plan/i
 
-const redactJson = (value: Json): Json =>
-  isJsonArray(value)
-    ? value.map(redactJson)
-    : isJsonObject(value)
-      ? Object.fromEntries(
-          Object.entries(value).map(([field, inner]) => [
-            field,
-            personal.test(field) && Predicate.isString(inner) ? "<redacted>" : redactJson(inner),
-          ]),
-        )
-      : value
-
-const decodeJson = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Json))
+const redactJson = (value: Json) =>
+  mapStrings(value, (text, field) => (personal.test(field) ? "<redacted>" : text))
 
 /** Blanks personal fields in output that is one JSON document or one per line. */
 const redact = (output: string) => {
@@ -176,6 +171,8 @@ const redact = (output: string) => {
         )
         .join("\n")
 }
+
+const encode = (value: string) => new TextEncoder().encode(value)
 
 const text = (stream: Stream.Stream<Uint8Array, unknown>) =>
   stream.pipe(Stream.decodeText(), Stream.mkString)
@@ -219,7 +216,7 @@ export const recordingSpawner = (places: Readonly<Record<string, string>>) => {
             real,
             ChildProcess.make(given.command, given.args, {
               ...given.options,
-              stdin: Stream.make(new TextEncoder().encode(stdin)),
+              stdin: Stream.make(encode(stdin)),
             }),
             {
               stdout: (chunk) => {
@@ -250,8 +247,6 @@ export const recordingSpawner = (places: Readonly<Record<string, string>>) => {
   return { layer, spawns }
 }
 
-const encode = (value: string) => new TextEncoder().encode(value)
-
 export const replaySpawner = (
   recording: Recording,
   places: Readonly<Record<string, string>>,
@@ -269,13 +264,14 @@ export const replaySpawner = (
       Effect.gen(function* () {
         const given = yield* singleCommand(command)
         const args = programArgs(given).map(normalize)
+        const argsText = JSON.stringify(args)
         const cwd = normalize(given.options.cwd ?? "")
         const stdin = normalize(yield* stdinOf(given))
         const systemPrompt = systemPromptOf(given.args)
 
         const index = unused.findIndex(
           (spawn) =>
-            JSON.stringify(spawn.args) === JSON.stringify(args) &&
+            JSON.stringify(spawn.args) === argsText &&
             spawn.cwd === cwd &&
             spawn.stdin === stdin &&
             spawn.systemPrompt === systemPrompt,

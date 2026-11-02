@@ -27,9 +27,6 @@ import { isolatedHome } from "./harness"
 import { fakeAnthropicEnvironment, pinnedClaude } from "./pinnedClaude"
 import { recordingSessions, sessionTape } from "./sessionTape"
 
-export const settled = (count: number) => (turns: ReadonlyArray<Turn>) =>
-  turns.length === count && turns.every((turn) => turn.ended !== null)
-
 const drive = Effect.fnUntraced(function* (
   adapter: AgentAdapter,
   tape: ReturnType<typeof sessionTape>,
@@ -74,7 +71,7 @@ const drive = Effect.fnUntraced(function* (
       })),
     )
 
-  return { adapter, tape, folder, events, turns: SubscriptionRef.get(turns), until, open }
+  return { adapter, events, turns: SubscriptionRef.get(turns), until, open }
 })
 
 /** Claude Code's adapter, on a recorded pinned CLI that answered from the fake Anthropic API. */
@@ -120,6 +117,7 @@ export const piSession = Effect.fnUntraced(function* (
   const home = yield* isolatedHome
   const folder = join(home, "work")
   mkdirSync(folder)
+
   const provider = yield* fakeModelProvider(home, settings, piSettings)
 
   const model: Pick<typeof provider, "received" | "cancelled" | "release"> = recordingSessions
@@ -141,5 +139,5 @@ export const piSession = Effect.fnUntraced(function* (
       writeFileSync(join(extensions, name), source)
     })
 
-  return { ...(yield* drive(adapter, tape, folder)), home, model, extension }
+  return { ...(yield* drive(adapter, tape, folder)), model, extension }
 })

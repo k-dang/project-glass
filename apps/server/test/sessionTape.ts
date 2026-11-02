@@ -1,16 +1,5 @@
 import type { SDKSessionInfo, SpawnedProcess, SpawnOptions } from "@anthropic-ai/claude-agent-sdk"
-import {
-  Cause,
-  Deferred,
-  Effect,
-  Layer,
-  Option,
-  Predicate,
-  Queue,
-  Schema,
-  Sink,
-  Stream,
-} from "effect"
+import { Cause, Deferred, Effect, Layer, Predicate, Queue, Schema, Sink, Stream } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import { spawn } from "node:child_process"
 import { EventEmitter } from "node:events"
@@ -18,6 +7,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname } from "node:path"
 import { PassThrough } from "node:stream"
 import { fileURLToPath } from "node:url"
+import { lineFramer } from "../src/agentHost/piRpc"
 import {
   denormalizer,
   isJsonArray,
@@ -25,6 +15,7 @@ import {
   type Json,
   mapStrings,
   normalizer,
+  parseLine,
   playedHandle,
   programArgs,
   singleCommand,
@@ -137,23 +128,12 @@ const tryMatch = (recorded: Json, actual: Json, ids: Map<string, string>) => {
 }
 
 const lines = (onLine: (line: string) => void) => {
-  let pending = ""
+  const frame = lineFramer()
 
   return (chunk: string) => {
-    pending += chunk
-
-    for (let end = pending.indexOf("\n"); end >= 0; end = pending.indexOf("\n")) {
-      const line = pending.slice(0, end).replace(/\r$/, "")
-      pending = pending.slice(end + 1)
-
-      if (line.trim() !== "") onLine(line)
-    }
+    for (const line of frame(chunk)) if (line.trim() !== "") onLine(line)
   }
 }
-
-const decodeLine = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Json))
-
-const parse = (line: string): Json => Option.getOrElse(decodeLine(line), () => line)
 
 const show = (value: Json) => (Predicate.isString(value) ? value : JSON.stringify(value))
 
@@ -171,14 +151,16 @@ interface Program {
 const replayProgram = (
   recorded: Process,
   ids: Map<string, string>,
-  places: Readonly<Record<string, string>>,
+  places: {
+    readonly normalize: (value: Json) => Json
+    readonly denormalize: (value: Json) => Json
+  },
   problem: (text: string) => void,
   say: (line: string) => void,
   exit: (code: number | null) => void,
 ): Program => {
   const { frames } = recorded
-  const normalize = normalizer(places)
-  const denormalize = denormalizer(places)
+  const { normalize, denormalize } = places
   const sent = new Set<number>()
   let cursor = 0
   let ended = false
@@ -229,7 +211,7 @@ const replayProgram = (
   return {
     write: (line) => {
       if (ended) return
-      const actual = mapStrings(parse(line), normalize)
+      const actual = normalize(parseLine(line))
       const { start, end } = outRun()
 
       for (let index = start; index < end; index++) {
@@ -259,6 +241,7 @@ const replayProgram = (
 export const sessionTape = (scenario: string, places: Readonly<Record<string, string>>) => {
   const normalizeText = normalizer(places)
   const normalize = (value: Json) => mapStrings(value, normalizeText)
+  const denormalize = denormalizer(places)
   const problems: Array<string> = []
   const failing = new Set<(failure: Effect.Effect<never, Error>) => void>()
   const ids = new Map<string, string>()
@@ -316,7 +299,7 @@ export const sessionTape = (scenario: string, places: Readonly<Record<string, st
       return { write: () => {}, close: () => {}, unsent: () => 0 }
     }
 
-    const program = replayProgram(process, ids, places, problem, say, exit)
+    const program = replayProgram(process, ids, { normalize, denormalize }, problem, say, exit)
     programs.push(program)
 
     return program
@@ -327,8 +310,8 @@ export const sessionTape = (scenario: string, places: Readonly<Record<string, st
     processes.push({ args: args.map(normalizeText), cwd: normalizeText(cwd ?? ""), frames })
 
     return {
-      out: lines((line) => frames.push({ out: normalize(parse(line)) })),
-      in: lines((line) => frames.push({ in: normalize(parse(line)) })),
+      out: lines((line) => frames.push({ out: normalize(parseLine(line)) })),
+      in: lines((line) => frames.push({ in: normalize(parseLine(line)) })),
       exit: (code: number | null) => frames.push({ exit: code }),
     }
   }
@@ -461,7 +444,7 @@ export const sessionTape = (scenario: string, places: Readonly<Record<string, st
 
     if (recordingSessions)
       return live().then((info) => {
-        calls.push({ args, info: normalize(parse(JSON.stringify(info ?? null))) })
+        calls.push({ args, info: normalize(parseLine(JSON.stringify(info ?? null))) })
 
         return info
       })
@@ -480,7 +463,7 @@ export const sessionTape = (scenario: string, places: Readonly<Record<string, st
 
     // SAFETY: the recording holds what getSessionInfo returned for this call when it was recorded.
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- See SAFETY above.
-    const saved = denormalizer(places)(info) as SDKSessionInfo
+    const saved = denormalize(info) as SDKSessionInfo
 
     return Promise.resolve(saved)
   }

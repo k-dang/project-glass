@@ -38,9 +38,11 @@ export const scriptedAgentRunners = Effect.fnUntraced(function* (initial: Script
   const started = counter()
   const interrupted = counter()
 
-  const answer = <A>(task: AgentTask<A>, reply: ScriptedReply): Effect.Effect<A, AgentFailure> =>
-    reply === "hold"
-      ? Deferred.await(held).pipe(Effect.flatMap(() => answer(task, settings.reply)))
+  const answer = <A>(task: AgentTask<A>): Effect.Effect<A, AgentFailure> => {
+    const { reply } = settings
+
+    return reply === "hold"
+      ? Deferred.await(held).pipe(Effect.flatMap(() => answer(task)))
       : "fail" in reply
         ? Effect.fail(agentFailure(reply.fail, `The scripted runner failed: ${reply.fail}.`))
         : Schema.decodeUnknownEffect(task.answer)(reply.answer).pipe(
@@ -51,6 +53,7 @@ export const scriptedAgentRunners = Effect.fnUntraced(function* (initial: Script
               ),
             ),
           )
+  }
 
   const layer = Layer.succeed(
     AgentRunners,
@@ -73,7 +76,7 @@ export const scriptedAgentRunners = Effect.fnUntraced(function* (initial: Script
               Effect.suspend(() => {
                 // Effect resumes a waiting test synchronously inside `started.add()`, before this
                 // returns, so the reply and any hold are fixed first.
-                const answering = answer(task, settings.reply)
+                const answering = answer(task)
                 runs.push({
                   engine: engineSettings.engine,
                   task,

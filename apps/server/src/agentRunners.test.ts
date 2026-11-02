@@ -1,6 +1,6 @@
 import { assert, it } from "@effect/vitest"
 import { Effect, Fiber } from "effect"
-import { mkdirSync, readdirSync, writeFileSync } from "node:fs"
+import { mkdirSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { vi } from "vite-plus/test"
 import { isolatedHome } from "../test/harness"
@@ -11,6 +11,7 @@ import {
   type RunnerScenario,
   runnerScenarios,
   runnersLayer,
+  seedCheckout,
 } from "../test/runnerReplay"
 import { AgentRunners } from "./agentRunners"
 
@@ -24,8 +25,7 @@ const fixture = Effect.fnUntraced(function* (
   const temporary = join(home, "tmp")
   const checkout = join(home, "checkout")
   mkdirSync(temporary)
-  mkdirSync(join(checkout, "src"), { recursive: true })
-  writeFileSync(join(checkout, "src", "greet.ts"), "hello")
+  seedCheckout(checkout)
 
   for (const name of ["TMPDIR", "TEMP", "TMP"]) vi.stubEnv(name, temporary)
 

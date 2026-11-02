@@ -3,7 +3,7 @@ import { Effect, Schema } from "effect"
 import { execSync } from "node:child_process"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
-import { delimiter, dirname, join } from "node:path"
+import { delimiter, dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { parseArgs } from "node:util"
 import { AgentRunners } from "../src/agentRunners"
@@ -15,6 +15,7 @@ import {
   recordingSpawner,
   runnerScenarios,
   runnersLayer,
+  seedCheckout,
 } from "./runnerReplay"
 
 const USAGE = `Records how the real Claude Code and pi CLIs answer Glass's agent runners.
@@ -41,11 +42,13 @@ if (values.help || values["pi-model"] === undefined) {
 
 const [provider, ...modelId] = values["pi-model"].split("/")
 
+const repository = fileURLToPath(new URL("../../..", import.meta.url)).toLowerCase()
+
 // `pnpm exec` puts the repo's own bins, the bundled pi among them, ahead of the user's programs.
 for (const name of Object.keys(process.env).filter((key) => key.toUpperCase() === "PATH"))
   process.env[name] = process.env[name]
     ?.split(delimiter)
-    .filter((entry) => !entry.includes("node_modules"))
+    .filter((entry) => !resolve(entry).toLowerCase().startsWith(repository))
     .join(delimiter)
 
 const commands = {
@@ -77,8 +80,7 @@ const record = async (scenario: RunnerScenario) => {
   }
 
   const checkout = mkdtempSync(join(tmpdir(), "glass-recording-"))
-  mkdirSync(join(checkout, "src"))
-  writeFileSync(join(checkout, "src", "greet.ts"), "hello")
+  seedCheckout(checkout)
   const recorder = recordingSpawner({ "<checkout>": checkout, "<home>": homedir() })
 
   const outcome = await withEnv(scenario.recordEnv ?? {}, () =>
@@ -109,7 +111,7 @@ const record = async (scenario: RunnerScenario) => {
 
   rmSync(checkout, { recursive: true, force: true })
 
-  const recording = Schema.encodeSync(Schema.fromJsonString(Recording))({
+  const recording = Schema.encodeSync(Recording)({
     scenario: scenario.name,
     program: version(commands[scenario.engine]),
     models,
@@ -119,7 +121,7 @@ const record = async (scenario: RunnerScenario) => {
 
   const file = fileURLToPath(recordingFile(scenario.name))
   mkdirSync(dirname(file), { recursive: true })
-  writeFileSync(file, `${JSON.stringify(JSON.parse(recording), null, 2)}\n`)
+  writeFileSync(file, `${JSON.stringify(recording, null, 2)}\n`)
   console.log(`${scenario.name}: ${JSON.stringify(outcome)}`)
 }
 

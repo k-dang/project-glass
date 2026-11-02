@@ -12,7 +12,8 @@ import {
   TurnStopped,
 } from "@glass/contracts"
 import { Effect, Predicate } from "effect"
-import { piSession, settled } from "../../test/adapterSessions"
+import { piSession } from "../../test/adapterSessions"
+import { settled } from "../../test/agentsFixture"
 import { lastUserText } from "../../test/fakeModelProvider"
 
 const conversation = "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d"

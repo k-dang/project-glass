@@ -169,7 +169,6 @@ const message = (model: string, reply: Reply) => ({
 
 /** The shared Messages API boundary for real Claude CLI integration and app verification. */
 export const startFakeAnthropic = Effect.gen(function* () {
-  const calls: Array<FakeAnthropicRequest> = []
   const received = counter()
   let respond: (request: FakeAnthropicRequest) => Reply = replyTo
   let held: Array<() => void> | null = null
@@ -204,7 +203,6 @@ export const startFakeAnthropic = Effect.gen(function* () {
     const conversation = (parsed.tools ?? []).length > 0
 
     if (conversation) {
-      calls.push(parsed)
       received.add()
 
       if (held !== null) {
@@ -246,7 +244,6 @@ export const startFakeAnthropic = Effect.gen(function* () {
   return {
     url: `http://127.0.0.1:${portOf(server)}`,
     /** The conversation's requests, leaving out side requests such as naming the session. */
-    calls,
     received: received.reached,
     respond: (reply: (request: FakeAnthropicRequest) => Reply) =>
       Effect.sync(() => {

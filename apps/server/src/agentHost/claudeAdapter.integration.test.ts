@@ -11,7 +11,8 @@ import {
   TurnDone,
 } from "@glass/contracts"
 import { Effect, Predicate } from "effect"
-import { claudeSession, settled } from "../../test/adapterSessions"
+import { claudeSession } from "../../test/adapterSessions"
+import { settled } from "../../test/agentsFixture"
 
 const conversation = "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
 
