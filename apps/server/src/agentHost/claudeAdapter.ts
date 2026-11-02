@@ -18,7 +18,6 @@ import {
   type RequestAnswer,
   RequestNotWaiting,
   type RequestPart,
-  type SentMessage,
   sentOf,
 } from "@glass/contracts"
 import { Deferred, Effect, Option, Predicate, Queue, Schema, type Scope, Stream } from "effect"
@@ -27,6 +26,7 @@ import { homedir } from "node:os"
 import { sdkExecutable } from "../processes"
 import type { AgentAdapter } from "./adapter"
 import { Input, isFailure, machine } from "./claudeTurn"
+import type { DeliveredMessage } from "./deliveredMessage"
 import { couldNotSwitch, HostAgentError, notRunning } from "./protocol"
 import { settleWith } from "./requests"
 import { permissionRequest, ToolInput } from "./toolCalls"
@@ -125,19 +125,19 @@ const toModel = (info: ModelInfo): AgentModel => ({
   efforts: info.supportedEffortLevels ?? [],
 })
 
-const userMessage = ({ message, images }: SentMessage): SDKUserMessage => ({
+const userMessage = ({ prompt, images }: DeliveredMessage): SDKUserMessage => ({
   type: "user",
   message: {
     role: "user",
     content:
       images.length === 0
-        ? message
+        ? prompt
         : [
             ...images.map(({ mediaType, data }) => ({
               type: "image" as const,
               source: { type: "base64" as const, media_type: mediaType, data },
             })),
-            { type: "text" as const, text: message },
+            { type: "text" as const, text: prompt },
           ],
   },
   parent_tool_use_id: null,
@@ -356,15 +356,15 @@ export const claudeAdapter = (command: string, sdk: ClaudeSdk = liveSdk): AgentA
         if (permissionMode !== null)
           yield* control("Permission mode", () => session.setPermissionMode(permissionMode))
       }),
-      startTurn: Effect.fnUntraced(function* (turnId: string, sent: SentMessage) {
-        yield* turns.begin(turnId, sent)
+      startTurn: Effect.fnUntraced(function* (turnId: string, sent: DeliveredMessage) {
+        yield* turns.begin(turnId, sentOf(sent))
 
         return yield* Queue.offer(prompts, { ...userMessage(sent), uuid: randomUUID() }).pipe(
           Effect.asVoid,
         )
       }),
       // Claude Code folds a message with priority `next` into the running Turn between tool rounds.
-      steer: Effect.fnUntraced(function* (sent: SentMessage) {
+      steer: Effect.fnUntraced(function* (sent: DeliveredMessage) {
         const uuid = randomUUID()
 
         if (!(yield* turns.steer({ ...sent, id: uuid }))) return yield* notRunning

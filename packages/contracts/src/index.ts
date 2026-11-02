@@ -44,4 +44,6 @@ export * from "./settings"
 
 export * from "./toDo"
 
+export * from "./toDoMention"
+
 export * from "./tour"

@@ -28,6 +28,8 @@ import {
   SavedPlace,
   TextPart,
   ThinkingPart,
+  ToDo,
+  toDoMention,
   ToolCallPart,
   TranscriptSnapshot,
   TurnCutOff,
@@ -1342,4 +1344,69 @@ it("dims a Sandbox Agent Glass can't reach, and makes one whose Sandbox expired 
   ).toBeTruthy()
   expect(screen.queryByRole("textbox", { name: "Message" })).toBeNull()
   expect(screen.getByRole("link", { description: /Sandbox expired/ })).toBeTruthy()
+})
+
+const flaky = new ToDo({ id: 3, title: "Fix the flaky test", notes: "", done: false })
+
+it("mentions an open To-do picked after @, and shows the Mention as its title", async () => {
+  const sent: Array<string> = []
+
+  const user = mount({
+    ListToDos: () =>
+      Effect.succeed([
+        flaky,
+        new ToDo({ id: 4, title: "Fix the docs", notes: "", done: true }),
+        new ToDo({ id: 5, title: "Write the release notes", notes: "", done: false }),
+      ]),
+    WatchTranscript: () =>
+      Stream.make(
+        TranscriptSnapshot.make({ turns: [], queued: [], status: null }),
+        TurnStarted.make({
+          turnId: "turn-1",
+          message: `Earlier: ${toDoMention(flaky)}`,
+          images: [],
+          sentAt,
+        }),
+      ),
+    SendMessage: ({ message }) => Effect.sync(() => void sent.push(message)),
+  })
+
+  const transcript = await screen.findByRole("region", { name: "Transcript" })
+  expect(await within(transcript).findByText("Fix the flaky test")).toBeTruthy()
+  expect(within(transcript).queryByText(/glass:\/\//)).toBeNull()
+
+  const composer = await screen.findByRole("textbox", { name: "Message" })
+  await user.type(composer, "Look at @fix")
+  const choices = await screen.findByRole("listbox", { name: "To-dos" })
+  expect(
+    within(choices)
+      .getAllByRole("option")
+      .map((option) => option.textContent),
+  ).toEqual(["Fix the flaky test"])
+
+  await user.keyboard("{Enter}")
+  expect(screen.queryByRole("listbox", { name: "To-dos" })).toBeNull()
+  await user.type(composer, "now{Enter}")
+
+  expect(sent).toEqual([`Look at ${toDoMention(flaky)} now`])
+})
+
+it("keeps the To-do choices closed after Escape, so Enter sends the @ as written", async () => {
+  const sent: Array<string> = []
+
+  const user = mount({
+    ListToDos: () => Effect.succeed([flaky]),
+    WatchTranscript: () =>
+      Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
+    SendMessage: ({ message }) => Effect.sync(() => void sent.push(message)),
+  })
+
+  const composer = await screen.findByRole("textbox", { name: "Message" })
+  await user.type(composer, "Ping @f")
+  await screen.findByRole("listbox", { name: "To-dos" })
+  await user.keyboard("{Escape}")
+  expect(screen.queryByRole("listbox", { name: "To-dos" })).toBeNull()
+  await user.keyboard("{Enter}")
+
+  expect(sent).toEqual(["Ping @f"])
 })

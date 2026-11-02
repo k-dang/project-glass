@@ -22,6 +22,7 @@ import {
   InputGroupButton,
   InputGroupTextarea,
 } from "@/components/ui/input-group"
+import { useMentionPicker } from "./Mentions"
 import { type Problem } from "./problems"
 import { ProblemAlert } from "./ProblemAlert"
 
@@ -76,6 +77,10 @@ export function MessageBox(props: {
 }) {
   const { composed, setComposed } = props
 
+  const picker = useMentionPicker(composed.message, (message) =>
+    setComposed((current) => ({ ...current, message })),
+  )
+
   const submit = async (deliver: (message: MessageInput) => Promise<boolean>) => {
     const sent = composed
     const message = sent.message.trim()
@@ -97,6 +102,8 @@ export function MessageBox(props: {
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     // Enter can confirm an input method's candidates.
     if (event.nativeEvent.isComposing) return
+
+    if (picker.onKeyDown(event)) return
 
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault()
@@ -129,6 +136,7 @@ export function MessageBox(props: {
       <div className="mx-auto flex max-w-3xl flex-col gap-2">
         {props.problem !== null && <ProblemAlert problem={props.problem} />}
         {props.notice}
+        {picker.choices}
         <InputGroup>
           {composed.images.length > 0 && (
             <InputGroupAddon align="block-start" className="flex-wrap gap-2">
@@ -158,12 +166,14 @@ export function MessageBox(props: {
             </InputGroupAddon>
           )}
           <InputGroupTextarea
+            {...picker.textarea}
             aria-label="Message"
             className="max-h-60 p-3"
             placeholder={props.placeholder}
             value={composed.message}
             onChange={(event) => {
               const message = event.target.value
+              picker.follow(event.target)
               setComposed((current) => ({ ...current, message }))
             }}
             onKeyDown={onKeyDown}

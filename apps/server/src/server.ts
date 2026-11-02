@@ -59,6 +59,7 @@ const AgentsLive = Agents.layer.pipe(
   Layer.provideMerge(Sandboxes.layer),
   Layer.provide(LocalAgentHost.layer),
   Layer.provide(Transcripts.layer),
+  Layer.provide(ToDos.layer),
   Layer.provideMerge(LocalCheckouts.layer),
 )
 
