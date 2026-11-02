@@ -4,6 +4,7 @@ Electron app for reviewing GitHub pull requests, growing into a work hub with an
 
 - **Domain words** come from [`GLOSSARY.md`](GLOSSARY.md); use them in code, UI copy, and specs.
 - **Architecture decisions**: read the relevant ADRs in [`docs/adr/`](docs/adr/) before changing the architecture.
+- **Import boundaries and test waits**: `pnpm check` enforces the [executable policies](tools/oxlint/glass/README.md); consult their syntax and exceptions when changing imports or test synchronization.
 
 ## Effect 4
 
