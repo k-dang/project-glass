@@ -299,9 +299,6 @@ const followUpAnswer = {
 const followedUp = (state: AgentReviewState) =>
   state.job.status === "idle" && (state.review?.followUps.length ?? 0) > 0
 
-const answering = (f: Effect.Success<ReturnType<typeof fixture>>, output: string) =>
-  f.piCli.configure({ ready: true, output: piCliAnswer(output), modelsOutput: piCliModels })
-
 it.live(
   "follows up on the Agent review, keeping Drafts on diff lines and the thread across restarts",
   () =>
@@ -310,15 +307,15 @@ it.live(
       yield* f.start
       const { review } = yield* f.state(reviewed)
 
-      yield* answering(f, JSON.stringify(followUpAnswer))
+      yield* f.runners.configure({ reply: { answer: followUpAnswer } })
       const message = "Draft a comment for the punctuation point."
       yield* f.client.FollowUpAgentReview({ pullRequest: f.ref, revision: f.revision, message })
       const done = yield* f.state(followedUp)
 
-      const prompted = (yield* f.piCli.calls).filter((call) => call.stage === "prompted").at(-1)!
-      assert.include(prompted.input, "+hello name")
-      assert.include(prompted.input, JSON.stringify(answer.markdown))
-      assert.include(prompted.input, message)
+      const { prompt } = f.runners.runs.at(-1)!.task
+      assert.include(prompt, "+hello name")
+      assert.include(prompt, JSON.stringify(answer.markdown))
+      assert.include(prompt, message)
 
       const [followUp] = done.review!.followUps
       assert.strictEqual(followUp?.message, message)
@@ -337,7 +334,7 @@ it.live("starts the thread over when the Agent review is written again", () =>
     yield* f.start
     yield* f.state(reviewed)
 
-    yield* answering(f, JSON.stringify(followUpAnswer))
+    yield* f.runners.configure({ reply: { answer: followUpAnswer } })
     yield* f.client.FollowUpAgentReview({
       pullRequest: f.ref,
       revision: f.revision,
@@ -345,7 +342,7 @@ it.live("starts the thread over when the Agent review is written again", () =>
     })
     yield* f.state(followedUp)
 
-    yield* answering(f, JSON.stringify(answer))
+    yield* f.runners.configure({ reply: { answer: answer } })
     yield* f.start
 
     const rewritten = yield* f.state(
@@ -362,7 +359,7 @@ it.live("refuses a follow-up on another Revision without running the agent", () 
     const f = yield* fixture()
     yield* f.start
     yield* f.state(reviewed)
-    const before = (yield* f.piCli.calls).length
+    const before = f.runners.runs.length
 
     const error = yield* f.client
       .FollowUpAgentReview({
@@ -374,7 +371,7 @@ it.live("refuses a follow-up on another Revision without running the agent", () 
 
     assert.instanceOf(error, AgentReviewFailure)
     assert.strictEqual(error.reason, "stale-revision")
-    assert.strictEqual((yield* f.piCli.calls).length, before)
+    assert.strictEqual(f.runners.runs.length, before)
   }),
 )
 
@@ -384,7 +381,7 @@ it.live("keeps the message of a failed follow-up and leaves the thread as it was
     yield* f.start
     const { review } = yield* f.state(reviewed)
 
-    yield* answering(f, "not JSON")
+    yield* f.runners.configure({ reply: { answer: { markdown: " \n", suggestedDrafts: [] } } })
     yield* f.client.FollowUpAgentReview({
       pullRequest: f.ref,
       revision: f.revision,
@@ -407,15 +404,10 @@ it.live("refuses a second follow-up while one runs, and lets writing the review 
     yield* f.start
     yield* f.state(reviewed)
 
-    yield* f.piCli.configure({
-      ready: true,
-      output: "",
-      modelsOutput: piCliModels,
-      hangAt: "generate",
-    })
+    yield* f.runners.configure({ reply: "hold" })
     const first = { pullRequest: f.ref, revision: f.revision, message: "Why?" }
     yield* f.client.FollowUpAgentReview(first)
-    yield* f.piCli.untilCalls("generate", 2)
+    yield* f.runners.ran(2)
 
     const error = yield* f.client
       .FollowUpAgentReview({ ...first, message: "And this?" })
@@ -426,10 +418,9 @@ it.live("refuses a second follow-up while one runs, and lets writing the review 
     const running = yield* f.state((state) => state.job.status === "following-up")
     assert.strictEqual(running.job.status === "following-up" && running.job.message, "Why?")
 
-    const hung = (yield* f.piCli.calls).filter((call) => call.stage === "generate").at(-1)!
-    yield* answering(f, JSON.stringify(answer))
+    yield* f.runners.configure({ reply: { answer } })
     yield* f.start
+    yield* f.runners.interrupted(1)
     yield* f.state((state) => reviewed(state) && state.review?.followUps.length === 0)
-    assert.throws(() => process.kill(hung.pid, 0))
   }),
 )
