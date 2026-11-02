@@ -270,13 +270,14 @@ export class Sandboxes extends Context.Service<
         })
 
       /**
-       * The one place a lost Sandbox cuts off its running Turn: once one it reached stops
-       * answering, or when it turns out gone. Gone is for good.
+       * The one place a lost Sandbox cuts off its running Turn: whenever Glass stops reaching it, or
+       * it turns out gone. Gone is for good. A host that answers again replays how the Turn really
+       * ended, replacing the cut-off ending.
        */
       const setReach = (agentId: string, reach: SandboxReach) =>
         change(agentId, (before) => (isGone(before.reach) ? before : { ...before, reach })).pipe(
           Effect.flatMap(([before, after]) =>
-            before.reach !== after.reach && (before.reach === "reachable" || isGone(after.reach))
+            before.reach !== after.reach && (after.reach === "unreachable" || isGone(after.reach))
               ? PubSub.publish(lost, [agentId])
               : Effect.void,
           ),

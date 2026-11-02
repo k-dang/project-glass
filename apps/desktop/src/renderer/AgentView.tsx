@@ -214,6 +214,12 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
       )}
       <div hidden={tab !== "chat"} className="flex min-h-0 flex-1 flex-col">
         <Transcript agentId={agent.id} turns={turns} status={status} />
+        {reach === "unreachable" && (
+          <output className="mx-auto block w-full max-w-3xl px-6 pt-2 text-sm text-muted-foreground">
+            Glass can't reach this Agent's Sandbox. It keeps trying, and fills in what the Agent did
+            once it answers.
+          </output>
+        )}
         {gone === null ? (
           <Composer
             agent={agent}

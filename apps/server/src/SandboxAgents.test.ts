@@ -475,3 +475,19 @@ it.live(
       )
     }),
 )
+
+it.live("cuts off a Turn whose Sandbox host died while Glass was closed", () =>
+  Effect.gen(function* () {
+    const f = yield* agentsFixture({ output: "Done.", hang: true })
+    const agent = yield* f.startSandbox("Start")
+    yield* f.model.received(1)
+
+    yield* f.quit
+    process.kill(f.sandboxes.hostPid(agent.id), "SIGKILL")
+    const relaunched = yield* f.launch
+
+    yield* f.sandboxStatus(agent.id, ({ reach }) => reach === "unreachable", relaunched)
+    const [turn] = yield* f.transcript(agent.id, settled(1), relaunched)
+    assert.deepStrictEqual(turn?.ended?.ending, TurnCutOff.make({}))
+  }),
+)

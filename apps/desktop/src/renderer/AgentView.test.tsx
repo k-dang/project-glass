@@ -1321,6 +1321,11 @@ it("dims a Sandbox Agent Glass can't reach, and makes one whose Sandbox expired 
 
   const link = await screen.findByRole("link", { description: /Can't reach its Sandbox · Expires/ })
   expect(link.className).toContain("opacity-60")
+  expect(
+    screen.getByText(
+      "Glass can't reach this Agent's Sandbox. It keeps trying, and fills in what the Agent did once it answers.",
+    ),
+  ).toBeTruthy()
   expect(screen.getByRole("textbox", { name: "Message" })).toBeTruthy()
 
   cleanup()
