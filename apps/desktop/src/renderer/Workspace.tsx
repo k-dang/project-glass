@@ -42,7 +42,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { ActivityRecorder } from "./activity"
 import { AgentReviewBanner, AgentReviewButton } from "./AgentReview"
 import { AgentReviewCard } from "./AgentReviewCard"
-import { AgentReviewPanel } from "./AgentReviewPanel"
+import {
+  DraftFeedbackVariant,
+  FeedbackVariantSwitcher,
+  type StubDraft,
+  useFeedbackVariant,
+} from "./DraftFeedback.prototype"
 import { BackToPullRequests } from "./BackToPullRequests"
 import { annotationSides, type CollapseChoices, layOut, type ShowNote } from "./changesView"
 import { ChangedFilesTree } from "./ChangedFilesTree"
@@ -134,6 +139,9 @@ export function Workspace(props: {
   const view = useRef<ViewHandle>(null)
   const tourView = useRef<TourViewHandle>(null)
   const [panelTab, setPanelTab] = useState<FilePanelTab>("tree")
+  // PROTOTYPE: drafting feedback from an Agent review
+  const feedbackVariant = useFeedbackVariant()
+  const [stubDrafts, setStubDrafts] = useState<ReadonlyArray<StubDraft>>([])
   const fullFiles = useFullFiles(pullRequest.ref, revision)
   const { activity, drafts, asks, replies, resolutions } = props
   const draftCount = useDraftCount(drafts)
@@ -393,7 +401,8 @@ export function Workspace(props: {
         <aside
           id={filePanelId}
           className={cn(
-            "flex w-80 shrink-0 flex-col border-r",
+            "flex shrink-0 flex-col border-r",
+            shownPanelTab === "agent-review" ? "w-[30rem]" : "w-80",
             (!filePanelOpen || tab === "files" || tourInChanges) && "hidden",
           )}
         >
@@ -451,7 +460,13 @@ export function Workspace(props: {
               />
             </TabsContent>
             <TabsContent value="agent-review" className="flex min-h-0 flex-col">
-              {agentReview.review !== null && <AgentReviewPanel review={agentReview.review} />}
+              {agentReview.review !== null && (
+                <DraftFeedbackVariant
+                  key={feedbackVariant}
+                  variant={feedbackVariant}
+                  onAddDraft={(draft) => setStubDrafts((previous) => [...previous, draft])}
+                />
+              )}
             </TabsContent>
             <TabsContent value="tour" className="flex min-h-0 flex-col">
               <TourSidebar
@@ -607,6 +622,7 @@ export function Workspace(props: {
       <footer className="flex shrink-0 justify-end border-t px-3 py-1.5">
         <ReviewShortcutsDialog />
       </footer>
+      <FeedbackVariantSwitcher drafts={stubDrafts} />
     </Tabs>
   )
 }
