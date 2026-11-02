@@ -18,7 +18,6 @@ export type SuggestedDraft = typeof SuggestedDraft.Type
 
 export const FollowUp = Schema.Struct({
   message: FollowUpMessage,
-  /** The agent's Markdown answer. */
   answer: Schema.String,
   suggestedDrafts: Schema.Array(SuggestedDraft),
 })

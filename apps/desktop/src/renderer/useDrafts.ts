@@ -401,7 +401,6 @@ export class DraftStore {
     return false
   }
 
-  /** Adds an unsaved Draft on a line, returning its key. */
   #addLine(path: string, side: DiffSide, line: number, body: string) {
     const key = `new-${++this.#lastKey}`
     this.#add({ key, path, place: LinePlace.make({ side, line }), body, saved: null })

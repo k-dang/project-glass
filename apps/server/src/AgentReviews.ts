@@ -194,11 +194,7 @@ export class AgentReviews extends Context.Service<
         Effect.mapError((error) => failure("not-ready", error.message)),
       )
 
-      /**
-       * Runs an agent task over a checkout of the Revision, with the user's Review prompt, once
-       * the job names the runner. A Follow-up carries the whole PR and its thread, so it gets an
-       * Agent review's time too.
-       */
+      // A Follow-up carries the whole PR and its thread, so it gets an Agent review's time too.
       const runAgent = Effect.fnUntraced(function* <A>(
         job: Job,
         pr: PullRequestRef,
