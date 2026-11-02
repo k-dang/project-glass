@@ -17,7 +17,7 @@ export const SuggestedDraft = Schema.Struct({
 export type SuggestedDraft = typeof SuggestedDraft.Type
 
 export const FollowUp = Schema.Struct({
-  message: Schema.String,
+  message: FollowUpMessage,
   /** The agent's Markdown answer. */
   answer: Schema.String,
   suggestedDrafts: Schema.Array(SuggestedDraft),
@@ -61,14 +61,14 @@ export const AgentReviewState = Schema.Struct({
     Schema.Struct({ status: Schema.Literal("failed"), reason: AgentReviewFailure }),
     Schema.Struct({
       status: Schema.Literal("following-up"),
-      message: Schema.String,
+      message: FollowUpMessage,
       startedAt: Schema.Number,
       runner: Schema.NullOr(AgentRunnerIdentity),
     }),
     /** Keeps the message so the user can send it again. */
     Schema.Struct({
       status: Schema.Literal("follow-up-failed"),
-      message: Schema.String,
+      message: FollowUpMessage,
       reason: AgentReviewFailure,
     }),
   ]),

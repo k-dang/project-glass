@@ -34,7 +34,7 @@ export class Asks extends Context.Service<
         function* (pr: PullRequestRef, revision: Revision, place: AskPlace, question: string) {
           const runner = yield* checkoutRuns.select()
 
-          const answer = yield* runner.run({
+          const { answer } = yield* runner.run({
             pr,
             revision,
             subject: "answer",

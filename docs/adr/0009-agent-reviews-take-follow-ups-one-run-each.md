@@ -10,7 +10,8 @@ new message, and answers with Markdown and a list of Suggested drafts, each a pa
 body. Glass keeps the Suggested drafts that land on a line of the diff and adds the text of the rest
 to the answer, so a stray placement costs one comment rather than the answer, which is the failure
 ADR 0008 removed placement to avoid. Follow-ups share the Agent review's job for the PR: one runs at
-a time, cancelling the review cancels it, and writing the review again starts without them. A
+a time, so Glass refuses a Follow-up while the review or another Follow-up runs; cancelling stops a
+running one, and writing the review again replaces it and starts without any Follow-ups. A
 Follow-up runs only on the review's own Revision, so a Suggested draft's line is a line of the diff
 the user is reading; an outdated review keeps its Follow-ups to read.
 

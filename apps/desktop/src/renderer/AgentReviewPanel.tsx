@@ -106,9 +106,10 @@ function FollowUpView(props: {
     <li className="flex flex-col gap-2">
       <UserMessage message={props.followUp.message} images={[]} />
       <AgentReviewMarkdown markdown={props.followUp.answer} />
-      {props.followUp.suggestedDrafts.map((draft) => (
+      {props.followUp.suggestedDrafts.map((draft, index) => (
+        // A saved Follow-up never changes, and two may share a line, so the place can't key it.
         <SuggestedDraftCard
-          key={`${draft.path}:${draft.side}:${draft.line}`}
+          key={index}
           draft={draft}
           drafts={props.drafts}
           addable={props.addable}

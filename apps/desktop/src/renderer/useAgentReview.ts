@@ -1,21 +1,25 @@
 import { useAtom, useAtomRefresh, useAtomValue } from "@effect/atom-react"
 import type { PullRequestRef, Revision } from "@glass/contracts"
-import { Effect, Equal, Exit, Match, Option, Predicate, Stream } from "effect"
+import { Effect, Equal, Exit, Option, Predicate, Stream } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
 import { useCallback, useMemo } from "react"
-import { Backend, backendRuntime } from "./backend"
+import { Backend, type BackendError, backendRuntime } from "./backend"
 import { describeError, problemOf, unexpectedProblem } from "./problems"
 
-type AgentReviewCommand =
-  | { readonly kind: "start" }
-  | { readonly kind: "cancel" }
-  | { readonly kind: "follow-up"; readonly message: string }
+type AgentReviewCommand = "start" | "cancel"
 
 const agentReviewStates = Atom.family((pullRequest: PullRequestRef) =>
   backendRuntime.atom(
     Stream.unwrap(Backend.useSync((backend) => backend.WatchAgentReview({ pullRequest }))),
   ),
 )
+
+/** Why a command's latest call failed, once it has settled. */
+const problemOfResult = (result: AsyncResult.AsyncResult<Exit.Exit<void, BackendError>>) => {
+  const exit = Option.getOrNull(AsyncResult.value(result))
+
+  return !result.waiting && exit !== null && Exit.isFailure(exit) ? problemOf(exit.cause) : null
+}
 
 export const useAgentReview = (
   pullRequest: PullRequestRef,
@@ -28,18 +32,20 @@ export const useAgentReview = (
     () =>
       backendRuntime.fn((command: AgentReviewCommand) =>
         Backend.use((backend) =>
-          Match.value(command).pipe(
-            Match.discriminatorsExhaustive("kind")({
-              start: () => backend.StartAgentReview({ pullRequest, revision }),
-              cancel: () => backend.CancelAgentReview({ pullRequest }),
-              "follow-up": ({ message }) =>
-                backend.FollowUpAgentReview({ pullRequest, revision, message }),
-            }),
-          ),
-        ).pipe(
-          Effect.exit,
-          Effect.map((exit) => ({ command, exit })),
-        ),
+          command === "start"
+            ? backend.StartAgentReview({ pullRequest, revision })
+            : backend.CancelAgentReview({ pullRequest }),
+        ).pipe(Effect.exit),
+      ),
+    [pullRequest, revision],
+  )
+
+  const followUpAtom = useMemo(
+    () =>
+      backendRuntime.fn((message: string) =>
+        Backend.use((backend) =>
+          backend.FollowUpAgentReview({ pullRequest, revision, message }),
+        ).pipe(Effect.exit),
       ),
     [pullRequest, revision],
   )
@@ -47,15 +53,8 @@ export const useAgentReview = (
   const state = useAtomValue(stateAtom)
   const reconnect = useAtomRefresh(stateAtom)
   const [commandResult, runCommand] = useAtom(commandAtom)
+  const [followUpResult, runFollowUp] = useAtom(followUpAtom)
   const latest = Option.getOrNull(AsyncResult.value(state))
-  const outcome = Option.getOrNull(AsyncResult.value(commandResult))
-
-  const problem =
-    !commandResult.waiting && outcome !== null && Exit.isFailure(outcome.exit)
-      ? problemOf(outcome.exit.cause)
-      : null
-
-  const followingUp = outcome?.command.kind === "follow-up"
 
   const subscriptionProblem = AsyncResult.matchWithWaiting(state, {
     onWaiting: () => null,
@@ -65,13 +64,9 @@ export const useAgentReview = (
       Predicate.isTagged(error, "NoSuchElementError") ? unexpectedProblem : describeError(error),
   })
 
-  const start = useCallback(() => runCommand({ kind: "start" }), [runCommand])
-  const cancel = useCallback(() => runCommand({ kind: "cancel" }), [runCommand])
-
-  const followUp = useCallback(
-    (message: string) => runCommand({ kind: "follow-up", message }),
-    [runCommand],
-  )
+  const start = useCallback(() => runCommand("start"), [runCommand])
+  const cancel = useCallback(() => runCommand("cancel"), [runCommand])
+  const followUp = useCallback((message: string) => runFollowUp(message), [runFollowUp])
 
   const review = latest?.review ?? null
   const current = review !== null && Equal.equals(review.revision, revision)
@@ -81,9 +76,9 @@ export const useAgentReview = (
     review,
     outdated: review !== null && !current,
     /** Why starting or cancelling the Agent review failed. */
-    commandProblem: followingUp ? null : problem,
-    /** Why the backend refused a follow-up before the agent ran. */
-    followUpProblem: followingUp ? problem : null,
+    commandProblem: problemOfResult(commandResult),
+    /** Why the backend refused a Follow-up before the agent ran. */
+    followUpProblem: problemOfResult(followUpResult),
     subscriptionProblem,
     reconnect,
     /** Null where no Agent review can start, such as a closed PR. */

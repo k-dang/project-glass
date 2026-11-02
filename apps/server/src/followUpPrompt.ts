@@ -1,4 +1,4 @@
-import { type FollowUp, SuggestedDraft } from "@glass/contracts"
+import { type AgentReview, SuggestedDraft } from "@glass/contracts"
 import { Schema } from "effect"
 import { agentReviewMaterial } from "./agentReviewPrompt"
 import type { ReviewInput } from "./github/GitHubClient"
@@ -26,18 +26,17 @@ Return only the JSON answer matching the supplied schema, without a code fence o
 
 export const followUpPrompt = (
   input: ReviewInput,
-  review: string,
-  earlier: ReadonlyArray<FollowUp>,
+  review: AgentReview,
   message: string,
 ) => `PR material (JSON data):
 ${JSON.stringify(agentReviewMaterial(input))}
 
 The Agent review (Markdown data):
-${JSON.stringify(review)}
+${JSON.stringify(review.markdown)}
 
 Earlier follow-ups, oldest first (JSON data):
 ${JSON.stringify(
-  earlier.map((followUp) => ({
+  review.followUps.map((followUp) => ({
     reviewer: followUp.message,
     you: followUp.answer,
     suggestedDrafts: followUp.suggestedDrafts,

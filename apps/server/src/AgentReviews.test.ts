@@ -433,3 +433,36 @@ it.live("keeps the message of a failed follow-up and leaves the thread as it was
     assert.deepStrictEqual(after, review)
   }),
 )
+
+it.live("refuses a second follow-up while one runs, and lets writing the review replace it", () =>
+  Effect.gen(function* () {
+    const f = yield* fixture()
+    yield* f.start
+    yield* f.state(reviewed)
+
+    yield* f.piCli.configure({
+      ready: true,
+      output: "",
+      modelsOutput: piCliModels,
+      hangAt: "generate",
+    })
+    const first = { pullRequest: f.ref, revision: f.revision, message: "Why?" }
+    yield* f.client.FollowUpAgentReview(first)
+    yield* f.piCli.untilCalls("generate", 2)
+
+    const error = yield* f.client
+      .FollowUpAgentReview({ ...first, message: "And this?" })
+      .pipe(Effect.flip)
+
+    assert.instanceOf(error, AgentReviewFailure)
+    assert.strictEqual(error.reason, "not-ready")
+    const running = yield* f.state((state) => state.job.status === "following-up")
+    assert.strictEqual(running.job.status === "following-up" && running.job.message, "Why?")
+
+    const hung = (yield* f.piCli.calls).filter((call) => call.stage === "generate").at(-1)!
+    yield* answering(f, JSON.stringify(answer))
+    yield* f.start
+    yield* f.state((state) => reviewed(state) && state.review?.followUps.length === 0)
+    assert.throws(() => process.kill(hung.pid, 0))
+  }),
+)

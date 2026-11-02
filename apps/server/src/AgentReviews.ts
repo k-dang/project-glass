@@ -4,12 +4,14 @@ import {
   type AgentReviewState,
   type ChangedFile,
   type FollowUp,
+  FollowUpMessage,
   type PullRequestRef,
   Revision,
   type AgentRunnerIdentity,
   SuggestedDraft,
 } from "@glass/contracts"
 import {
+  Array as Arr,
   Context,
   DateTime,
   Effect,
@@ -17,6 +19,7 @@ import {
   Layer,
   Option,
   Predicate,
+  Result,
   Schema,
   Stream,
   SubscriptionRef,
@@ -45,15 +48,20 @@ const stored = Schema.Array(
   }),
 )
 
+const SuggestedDraftsJson = Schema.fromJsonString(Schema.Array(SuggestedDraft))
+
 const storedFollowUps = Schema.Array(
   Schema.Struct({
-    message: Schema.String,
+    message: FollowUpMessage,
     answer: Schema.String,
-    suggested_drafts: Schema.fromJsonString(Schema.Array(SuggestedDraft)),
+    suggested_drafts: SuggestedDraftsJson,
   }),
 )
 
-const encodeSuggestedDrafts = Schema.encodeSync(Schema.fromJsonString(Schema.Array(SuggestedDraft)))
+const encodeSuggestedDrafts = Schema.encodeSync(SuggestedDraftsJson)
+
+/** The runner of the work in progress, for a failure that names none. */
+const runnerOf = (job: AgentReviewState["job"]) => ("runner" in job ? job.runner : null)
 
 const failure = (
   reason: AgentReviewFailure["reason"],
@@ -214,7 +222,7 @@ export class AgentReviews extends Context.Service<
 
           yield* setJob(job, { status: "reviewing", startedAt, runner: runner.identity })
 
-          const answer = yield* runner
+          const { answer } = yield* runner
             .run({
               pr,
               revision,
@@ -245,9 +253,7 @@ export class AgentReviews extends Context.Service<
               review,
               job: {
                 status: "failed",
-                reason: Option.getOrElse(error, () =>
-                  stoppedRunner(current.status === "reviewing" ? current.runner : null),
-                ),
+                reason: Option.getOrElse(error, () => stoppedRunner(runnerOf(current))),
               },
             }),
           ),
@@ -271,29 +277,26 @@ export class AgentReviews extends Context.Service<
             runner: runner.identity,
           })
 
-          let files: ReadonlyArray<ChangedFile> = []
-
-          const answer = yield* runner
+          // A Follow-up carries the whole PR and its thread, so it gets an Agent review's time.
+          const { input, answer } = yield* runner
             .run({
               pr,
               revision: review.revision,
               subject: "answer",
-              timeout: config.askTimeoutMs,
+              timeout: config.agentReviewTimeoutMs,
               read: github.reviewInput,
-              task: (material) => {
-                files = material.files
-
-                return Effect.succeed({
+              task: (material) =>
+                Effect.succeed({
                   instructions: followUpInstructions(prompt),
-                  prompt: followUpPrompt(material, review.markdown, review.followUps, message),
+                  prompt: followUpPrompt(material, review, message),
                   answer: FollowUpAnswer,
-                })
-              },
+                }),
             })
             .pipe(Effect.mapError(fromCheckoutRunFailure))
 
-          const placed = answer.suggestedDrafts.filter((draft) => onDiffLine(files, draft))
-          const unplaced = answer.suggestedDrafts.filter((draft) => !onDiffLine(files, draft))
+          const [placed, unplaced] = Arr.partition(answer.suggestedDrafts, (draft) =>
+            onDiffLine(input.files, draft) ? Result.succeed(draft) : Result.fail(draft),
+          )
 
           return {
             message,
@@ -308,9 +311,7 @@ export class AgentReviews extends Context.Service<
             job: {
               status: "follow-up-failed",
               message,
-              reason: Option.getOrElse(error, () =>
-                stoppedRunner(state.job.status === "following-up" ? state.job.runner : null),
-              ),
+              reason: Option.getOrElse(error, () => stoppedRunner(runnerOf(state.job))),
             },
           })),
         )
@@ -341,8 +342,13 @@ export class AgentReviews extends Context.Service<
           Effect.gen(function* () {
             const { review, job: current } = yield* SubscriptionRef.get(job.state)
 
+            // One run at a time: a Follow-up never replaces running work. Starting the review
+            // again does, since it starts the thread over.
             if (current.status === "reviewing")
               return yield* failure("not-ready", "Wait for the Agent review to finish.")
+
+            if (current.status === "following-up")
+              return yield* failure("not-ready", "Wait for the answer to your last Follow-up.")
 
             if (review === null || !Equal.equals(review.revision, revision))
               return yield* failure(
