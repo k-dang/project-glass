@@ -1,16 +1,17 @@
 import { createRequire } from "node:module"
 import { join } from "node:path"
 
-/** The executable shipped by the Claude Agent SDK version Glass pins. */
-export const pinnedClaude = () => {
+export const pinnedClaudePackage = () => {
   const sdk = createRequire(import.meta.url).resolve("@anthropic-ai/claude-agent-sdk")
 
-  const platform = createRequire(sdk).resolve(
+  return createRequire(sdk).resolve(
     `@anthropic-ai/claude-agent-sdk-${process.platform}-${process.arch}/package.json`,
   )
-
-  return join(platform, "..", process.platform === "win32" ? "claude.exe" : "claude")
 }
+
+/** The executable shipped by the Claude Agent SDK version Glass pins. */
+export const pinnedClaude = () =>
+  join(pinnedClaudePackage(), "..", process.platform === "win32" ? "claude.exe" : "claude")
 
 export const fakeAnthropicEnvironment = (home: string, url: string) => ({
   GLASS_CLAUDE_COMMAND: pinnedClaude(),

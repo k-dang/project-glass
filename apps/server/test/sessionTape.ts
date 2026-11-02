@@ -231,7 +231,7 @@ const replayProgram = (
 
 export const sessionTape = (
   scenario: string,
-  pin: string,
+  current: string,
   places: Readonly<Record<string, string>>,
 ) => {
   const normalizeText = normalizer(places)
@@ -242,7 +242,7 @@ export const sessionTape = (
   const ids = new Map<string, string>()
 
   const recorded: Tape = recordingSessions
-    ? { scenario, program: pin, processes: [], calls: [] }
+    ? { scenario, program: current, processes: [], calls: [] }
     : Schema.decodeUnknownSync(Schema.fromJsonString(Tape))(
         readFileSync(tapeFile(scenario), "utf8"),
       )
@@ -261,9 +261,9 @@ export const sessionTape = (
     for (const fail of failing) fail(failure())
   }
 
-  if (recorded.program !== pin)
-    problem(
-      `${scenario} was recorded from ${recorded.program}, but this checkout pins ${pin}. Record it again with GLASS_RECORD_SESSIONS=1.`,
+  if (recorded.program !== current)
+    throw new Error(
+      `${scenario} was recorded from ${recorded.program}, but this checkout has ${current}. Record it again with GLASS_RECORD_SESSIONS=1.`,
     )
 
   const mismatch = Effect.callback<never, Error>((resume) => {
@@ -470,7 +470,7 @@ export const sessionTape = (
       mkdirSync(dirname(file), { recursive: true })
       writeFileSync(
         file,
-        `${JSON.stringify({ scenario, program: pin, processes, calls }, null, 2)}\n`,
+        `${JSON.stringify({ scenario, program: current, processes, calls }, null, 2)}\n`,
       )
 
       return
