@@ -205,6 +205,9 @@ void app.whenReady().then(() => {
 
   if (devServerUrl === undefined) serveRenderer()
 
+  // Packaged builds get their icon from electron-builder.
+  if (!app.isPackaged) app.dock?.setIcon(join(__dirname, "../../build/icon.png"))
+
   createWindow()
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
