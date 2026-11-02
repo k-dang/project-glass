@@ -113,6 +113,12 @@ interface HostLink {
   readonly connectLock: Semaphore.Semaphore
 }
 
+const newLink = (saved: number): HostLink => ({
+  connection: null,
+  position: { saved },
+  connectLock: Semaphore.makeUnsafe(1),
+})
+
 const LOST_AFTER_MISSES = 4
 
 const RECONNECT_SPACING = "500 millis"
@@ -178,7 +184,6 @@ const notInstalled = (providerId: string): Placement => {
     place: () => failure,
     host: () => failure,
     runningHost: () => Effect.succeedNone,
-    refuseIfReadOnly: () => Effect.void,
     hostOnceMade: () => Effect.succeedNone,
     baseRef: () => failure,
     remove: ({ agent }) =>
@@ -198,6 +203,7 @@ export class Sandboxes extends Context.Service<
     readonly subscribeLost: SubscribeLost
     readonly statuses: Stream.Stream<ReadonlyMap<string, SandboxStatus>>
     readonly status: (agentId: string) => Effect.Effect<SandboxStatus | null>
+    readonly refuseIfGone: (agentId: string) => Effect.Effect<void, AgentError>
     readonly resume: Effect.Effect<ReadonlySet<string>>
   }
 >()("@glass/server/Sandboxes") {
@@ -230,20 +236,14 @@ export class Sandboxes extends Context.Service<
         ),
       )
 
-      const savedPositions = new Map(stored.map(({ id, journalSaved }) => [id, journalSaved]))
-      const links = new Map<string, HostLink>()
+      const links = new Map(stored.map(({ id, journalSaved }) => [id, newLink(journalSaved)]))
 
       const linkOf = (agentId: string) => {
         const found = links.get(agentId)
 
         if (found !== undefined) return found
 
-        const link: HostLink = {
-          connection: null,
-          position: { saved: savedPositions.get(agentId) ?? 0 },
-          connectLock: Semaphore.makeUnsafe(1),
-        }
-
+        const link = newLink(0)
         links.set(agentId, link)
 
         return link
@@ -449,7 +449,7 @@ export class Sandboxes extends Context.Service<
                 )
                 yield* setReach(agentId, "reachable")
                 yield* Deferred.succeed(opened, client)
-                yield* followJournal(transcripts, client, link.position)
+                yield* followJournal(transcripts.save, client, link.position)
               }).pipe(Effect.scoped),
             ).pipe(
               Effect.tapError((error) =>
@@ -524,7 +524,6 @@ export class Sandboxes extends Context.Service<
                 refuseIfGone(placed.agent.id).pipe(Effect.andThen(Effect.fail(unreachable()))),
               ),
             ),
-          refuseIfReadOnly: ({ agent }) => refuseIfGone(agent.id),
           runningHost: ({ agent }) =>
             Effect.sync(() => Option.fromNullishOr(links.get(agent.id)?.connection)),
           // A gone Sandbox took everything in it, so like one never made, it holds nothing to lose.
@@ -613,6 +612,7 @@ export class Sandboxes extends Context.Service<
               return found === undefined ? null : statusOf(found)
             }),
           ),
+        refuseIfGone,
         resume,
       })
     }),

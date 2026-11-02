@@ -353,7 +353,7 @@ export class Agents extends Context.Service<
           .pipe(Effect.flatMap((waiting) => (waiting ? new RequestWaiting() : Effect.void)))
 
       const findWritable = (agentId: string) =>
-        find(agentId).pipe(Effect.tap((row) => placementOf(row).refuseIfReadOnly(row)))
+        find(agentId).pipe(Effect.tap(() => sandboxes.refuseIfGone(agentId)))
 
       const startOrQueue = (agentId: string, input: MessageInput) =>
         refuseWhileWaiting(agentId).pipe(Effect.andThen(transcripts.startOrQueue(agentId, input)))

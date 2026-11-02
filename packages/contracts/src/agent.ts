@@ -98,8 +98,7 @@ export const SandboxReach = Schema.Literals([
 
 export type SandboxReach = typeof SandboxReach.Type
 
-export const isGone = (reach: SandboxReach): reach is GoneReach =>
-  reach === "expired" || reach === "deleted"
+export const isGone = Schema.is(GoneReach)
 
 export const isOutOfReach = (reach: SandboxReach) => reach === "unreachable" || isGone(reach)
 

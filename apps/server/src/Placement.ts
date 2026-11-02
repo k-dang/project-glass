@@ -40,7 +40,6 @@ export interface Placement {
     baseBranch: string,
   ) => Effect.Effect<Placed, InvalidLocalCheckout | AgentError>
   readonly host: (placed: PlacedAgent) => Effect.Effect<HostClient, AgentError>
-  readonly refuseIfReadOnly: (placed: PlacedAgent) => Effect.Effect<void, AgentError>
   readonly runningHost: (placed: PlacedAgent) => Effect.Effect<Option.Option<HostClient>>
   readonly hostOnceMade: (
     placed: PlacedAgent,

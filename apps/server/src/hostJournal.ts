@@ -1,13 +1,17 @@
+import type { AgentError, AgentEvent } from "@glass/contracts"
 import { Effect, Stream } from "effect"
 import type { HostClient } from "./Placement"
-import type { Transcripts } from "./Transcripts"
 
 export interface JournalPosition {
   saved: number
 }
 
 export const followJournal = (
-  transcripts: Transcripts["Service"],
+  save: (
+    agentId: string,
+    events: ReadonlyArray<AgentEvent>,
+    throughJournalEntry: number,
+  ) => Effect.Effect<void, AgentError>,
   client: HostClient,
   position: JournalPosition,
 ) =>
@@ -16,7 +20,7 @@ export const followJournal = (
       Stream.runForEachArray((entries) =>
         Effect.gen(function* () {
           for (const [agentId, saved] of Map.groupBy(entries, (entry) => entry.agentId))
-            yield* transcripts.saveFromJournal(
+            yield* save(
               agentId,
               saved.map(({ event }) => event),
               saved.at(-1)!.sequence,

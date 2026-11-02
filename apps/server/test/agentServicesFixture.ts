@@ -161,7 +161,6 @@ export const agentServicesFixture = Effect.gen(function* () {
         hostOnceMade: () => Effect.succeedSome(client),
         baseRef: () => Effect.succeed("main"),
         remove: () => Effect.void,
-        refuseIfReadOnly: () => Effect.void,
         subscribeLost: Effect.succeed(Stream.never),
       })
 
@@ -185,7 +184,9 @@ export const agentServicesFixture = Effect.gen(function* () {
       )
 
       const transcripts = Context.get(services, Transcripts)
-      yield* followJournal(transcripts, client, { saved: 0 }).pipe(Effect.forkScoped)
+      yield* followJournal((agentId, events) => transcripts.save(agentId, events), client, {
+        saved: 0,
+      }).pipe(Effect.forkScoped)
 
       return { agents: Context.get(services, Agents), sandboxes: Context.get(services, Sandboxes) }
     }).pipe(Effect.provideContext(database), Scope.provide(scope))

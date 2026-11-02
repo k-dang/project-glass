@@ -135,11 +135,7 @@ export class Transcripts extends Context.Service<
     readonly save: (
       agentId: string,
       events: ReadonlyArray<AgentEvent>,
-    ) => Effect.Effect<void, AgentError>
-    readonly saveFromJournal: (
-      agentId: string,
-      events: ReadonlyArray<AgentEvent>,
-      throughJournalEntry: number,
+      throughJournalEntry?: number,
     ) => Effect.Effect<void, AgentError>
     readonly watch: (agentId: string) => Stream.Stream<TranscriptUpdate, AgentError>
     readonly endRunning: (
@@ -319,16 +315,16 @@ export class Transcripts extends Context.Service<
         return head === undefined ? [] : yield* startFromQueue(agentId, head)
       })
 
-      const write = (
+      const save = (
         agentId: string,
         events: ReadonlyArray<AgentEvent>,
-        journalSaved: number | null,
+        throughJournalEntry?: number,
       ) =>
         change(
           agentId,
           Effect.gen(function* () {
-            if (journalSaved !== null)
-              yield* sql`UPDATE agent SET journal_saved = ${journalSaved} WHERE id = ${agentId}`
+            if (throughJournalEntry !== undefined)
+              yield* sql`UPDATE agent SET journal_saved = ${throughJournalEntry} WHERE id = ${agentId}`
 
             const written = yield* Effect.filter(joinConsecutiveAppends(events), (event) =>
               writeApplied(agentId, event),
@@ -340,9 +336,6 @@ export class Transcripts extends Context.Service<
           Effect.tapError((cause) => Effect.logWarning("Couldn't save a transcript", cause)),
           Effect.mapError(storageFailure),
         )
-
-      const save = (agentId: string, events: ReadonlyArray<AgentEvent>) =>
-        write(agentId, events, null)
 
       const snapshot = Effect.fnUntraced(function* (agentId: string) {
         const turns = yield* decodeTurns(
@@ -416,7 +409,6 @@ export class Transcripts extends Context.Service<
 
       return Transcripts.of({
         save,
-        saveFromJournal: write,
         endRunning,
         watch: (agentId) =>
           Stream.unwrap(

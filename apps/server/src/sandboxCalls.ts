@@ -91,11 +91,12 @@ export const extendSandbox = (
 ) =>
   callAbout(provider, "extend the Sandbox", () => extend(state)).pipe(
     Effect.flatMap((date) =>
-      Effect.try({
-        try: () => DateTime.fromDateUnsafe(date),
-        catch: () =>
-          new AgentError({ message: `${provider.name} answered an expiry Glass can't read.` }),
-      }),
+      Effect.fromOption(DateTime.make(date)).pipe(
+        Effect.mapError(
+          () =>
+            new AgentError({ message: `${provider.name} answered an expiry Glass can't read.` }),
+        ),
+      ),
     ),
   )
 

@@ -4,7 +4,6 @@ import {
   FollowedRepository,
   SandboxPlace,
   SandboxProviderInfo,
-  type SandboxReach,
   type SandboxStatus,
   TextPatch,
   type Transcript,
@@ -280,13 +279,6 @@ const sandboxOf = (agents: Fixture["agents"], agentId: string) =>
     Stream.filter((status): status is SandboxStatus => status !== null),
   )
 
-const reachOf = (agents: Fixture["agents"], agentId: string, reach: SandboxReach) =>
-  sandboxOf(agents, agentId).pipe(
-    Stream.filter((status) => status.reach === reach),
-    Stream.runHead,
-    Effect.map(Option.getOrThrow),
-  )
-
 it.live(
   "makes an Agent read-only once its Sandbox is deleted, and removes it without a warning",
   () =>
@@ -298,7 +290,10 @@ it.live(
 
       yield* f.sandboxes.reclaim(agent.id)
       const relaunched = yield* f.restart
-      yield* reachOf(relaunched.agents, agent.id, "deleted")
+      yield* sandboxOf(relaunched.agents, agent.id).pipe(
+        Stream.filter(({ reach }) => reach === "deleted"),
+        Stream.runHead,
+      )
 
       const refused = yield* relaunched.agents.send(agent.id, say("Still there?")).pipe(Effect.flip)
       assert.equal(
