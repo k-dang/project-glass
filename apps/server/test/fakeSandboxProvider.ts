@@ -302,7 +302,11 @@ export const fakeSandboxProvider =
         if (missingLogin !== undefined)
           throw glass.missingLogin(missingLogin.login, missingLogin.fix)
 
-        rmSync(decodeSandbox(state).folder, { recursive: true, force: true, maxRetries: 10 })
+        const { folder } = decodeSandbox(state)
+
+        if (!existsSync(folder)) throw glass.sandboxGone()
+
+        rmSync(folder, { recursive: true, force: true, maxRetries: 10 })
       },
       models: async (engine) => sandboxModels[engine],
     })

@@ -21,6 +21,8 @@ import {
   type Turn,
   type TurnEnd,
   type TurnPart,
+  goneExplanation,
+  isGone,
 } from "@glass/contracts"
 import { cn } from "cn"
 import { DateTime, Exit, Match, Option, Predicate } from "effect"
@@ -76,7 +78,6 @@ import {
 import {
   type AgentTab,
   agentsAtom,
-  goneExplanation,
   sandboxesAtom,
   cancelQueuedAtom,
   changeModelAtom,
@@ -164,7 +165,7 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
     agent.id,
   )?.reach
 
-  const gone = reach === "expired" || reach === "deleted" ? reach : null
+  const gone = reach !== undefined && isGone(reach) ? reach : null
 
   useEffect(() => {
     rememberPlace(registry, { area: "agents", agentId: agent.id })

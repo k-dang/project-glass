@@ -70,9 +70,6 @@ export const sandboxesAtom = backendRuntime
   )
   .pipe(Atom.keepAlive)
 
-export const goneExplanation = (reach: "expired" | "deleted") =>
-  `This Agent's Sandbox ${reach === "expired" ? "expired" : "was deleted"}, so it can't take messages. Its transcript stays until you remove the Agent.`
-
 export const transcriptAtom = Atom.family((agentId: string) =>
   backendRuntime
     .atom(

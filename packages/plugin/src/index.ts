@@ -27,7 +27,8 @@ export interface SandboxProvider {
   readonly extend: (state: SandboxState) => Promise<Date>
   /**
    * Deletes the Sandbox. Glass has asked its agent host to end first; one it couldn't reach may
-   * still run.
+   * still run. Throws `glass.sandboxGone()` if the Sandbox is already gone, which Glass takes as
+   * deleted.
    */
   readonly remove: (state: SandboxState) => Promise<void>
   /** What an Agent program offers in this provider's Sandboxes, before one exists. */

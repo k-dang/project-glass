@@ -457,7 +457,11 @@ export class SandboxStatus extends Schema.Class<SandboxStatus>("SandboxStatus")(
   reach: SandboxReach,
 }) {}
 
-export const isGone = (reach: SandboxReach) => reach === "expired" || reach === "deleted"
+export const isGone = (reach: SandboxReach): reach is "expired" | "deleted" =>
+  reach === "expired" || reach === "deleted"
+
+export const goneExplanation = (reach: "expired" | "deleted") =>
+  `This Agent's Sandbox ${reach === "expired" ? "expired" : "was deleted"}, so it can't take messages. Its transcript stays until you remove the Agent.`
 
 export const UnpushedCommit = Schema.Struct({ sha: Schema.String, subject: Schema.String })
 

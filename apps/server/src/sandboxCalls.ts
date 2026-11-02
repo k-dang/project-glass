@@ -80,6 +80,12 @@ const callAbout = <A>(provider: SandboxProvider, action: string, run: () => Prom
 const targetOf = (provider: SandboxProvider, state: SandboxState) =>
   callAbout(provider, "reach the Sandbox", () => provider.target(state))
 
+/** Deletes the Sandbox; one already gone needs nothing more. */
+export const removeSandbox = (provider: SandboxProvider, state: SandboxState, action: string) =>
+  callAbout(provider, action, () => provider.remove(state)).pipe(
+    Effect.catchTag("SandboxGone", () => Effect.void),
+  )
+
 export const extendSandbox = (provider: SandboxProvider, state: SandboxState) =>
   callAbout(provider, "extend the Sandbox", () => provider.extend(state)).pipe(
     Effect.flatMap((date) =>

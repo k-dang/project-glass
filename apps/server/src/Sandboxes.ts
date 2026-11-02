@@ -2,6 +2,7 @@ import {
   AgentEngine,
   AgentError,
   AgentModels,
+  goneExplanation,
   isGone,
   SandboxProviderInfo,
   type SandboxReach,
@@ -36,7 +37,14 @@ import { followJournal, type JournalPosition } from "./hostJournal"
 import type { HostClient, LostAgentIds, PlacedAgent, Placement, SubscribeLost } from "./Placement"
 import { Plugins } from "./Plugins"
 import { bundledEntry } from "./processes"
-import { call, connectToHost, extendSandbox, shutDownHost, waitForHost } from "./sandboxCalls"
+import {
+  call,
+  connectToHost,
+  extendSandbox,
+  removeSandbox,
+  shutDownHost,
+  waitForHost,
+} from "./sandboxCalls"
 import { SandboxGone } from "./sandboxFailures"
 import { Transcripts } from "./Transcripts"
 
@@ -74,10 +82,8 @@ const decodeModels = Schema.decodeUnknownEffect(AgentModels)
 const unreachable = () =>
   new AgentError({ message: "Glass couldn't reach the Agent's Sandbox. Try again." })
 
-const goneFailure = (reach: SandboxReach) =>
-  new AgentError({
-    message: `This Agent's Sandbox ${reach === "expired" ? "expired" : "was deleted"}, so it can't take messages. Its transcript stays until you remove the Agent.`,
-  })
+const goneFailure = (reach: "expired" | "deleted") =>
+  new AgentError({ message: goneExplanation(reach) })
 
 const isSandboxGone = Predicate.isTagged("SandboxGone")
 
@@ -152,9 +158,7 @@ const deleteSandbox = (
   { state, token }: Pick<SandboxRecord, "state" | "token">,
   action: string,
 ) =>
-  shutDownHost(provider, state, token).pipe(
-    Effect.andThen(call(provider, action, () => provider.remove(state))),
-  )
+  shutDownHost(provider, state, token).pipe(Effect.andThen(removeSandbox(provider, state, action)))
 
 const notInstalled = (providerId: string): Placement => {
   const failure = Effect.fail(
@@ -209,8 +213,21 @@ export class Sandboxes extends Context.Service<
         FROM agent WHERE sandbox IS NOT NULL
       `.pipe(Effect.flatMap(decodeStored), Effect.orDie)
 
+      const launchedAt = yield* DateTime.now
+
       const agents = new Map<string, SandboxAgent>(
-        stored.map(({ id, sandbox, journalSaved }) => [id, fresh(sandbox, journalSaved)]),
+        stored.map(({ id, sandbox, journalSaved }) => {
+          const known = fresh(sandbox, journalSaved)
+
+          // One past its expiry while Glass was closed is gone without asking.
+          if (
+            sandbox.expiresAt !== undefined &&
+            DateTime.isLessThanOrEqualTo(sandbox.expiresAt, launchedAt)
+          )
+            known.reach = "expired"
+
+          return [id, known]
+        }),
       )
 
       const statusesOf = () =>
@@ -516,7 +533,11 @@ export class Sandboxes extends Context.Service<
           host: (placed) =>
             host(placed).pipe(
               Effect.catchTag("SandboxGone", () =>
-                Effect.suspend(() => Effect.fail(goneFailure(sandboxOf(placed.agent.id).reach))),
+                Effect.suspend(() => {
+                  const { reach } = sandboxOf(placed.agent.id)
+
+                  return Effect.fail(isGone(reach) ? goneFailure(reach) : unreachable())
+                }),
               ),
             ),
           writable: ({ agent }) =>
