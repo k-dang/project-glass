@@ -76,6 +76,8 @@ import {
 import {
   type AgentTab,
   agentsAtom,
+  goneExplanation,
+  sandboxesAtom,
   cancelQueuedAtom,
   changeModelAtom,
   changePermissionModeAtom,
@@ -158,6 +160,12 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
   const waiting = turns.at(-1)?.parts.find(isWaiting)
   const registry = useContext(RegistryContext)
 
+  const reach = Option.getOrNull(AsyncResult.value(useAtomValue(sandboxesAtom)))?.get(
+    agent.id,
+  )?.reach
+
+  const gone = reach === "expired" || reach === "deleted" ? reach : null
+
   useEffect(() => {
     rememberPlace(registry, { area: "agents", agentId: agent.id })
   }, [registry, agent.id])
@@ -209,7 +217,19 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
       )}
       <div hidden={tab !== "chat"} className="flex min-h-0 flex-1 flex-col">
         <Transcript agentId={agent.id} turns={turns} status={status} />
-        <Composer agent={agent} running={running} waiting={waiting} turns={turns} queued={queued} />
+        {gone === null ? (
+          <Composer
+            agent={agent}
+            running={running}
+            waiting={waiting}
+            turns={turns}
+            queued={queued}
+          />
+        ) : (
+          <output className="mx-auto block w-full max-w-3xl px-6 py-4 text-sm text-muted-foreground">
+            {goneExplanation(gone)}
+          </output>
+        )}
       </div>
       <section
         aria-label="Changes"

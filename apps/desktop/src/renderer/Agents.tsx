@@ -5,11 +5,19 @@ import {
   useAtomSet,
   useAtomValue,
 } from "@effect/atom-react"
-import { type Agent, type PlaceTag, repositoryKey } from "@glass/contracts"
+import {
+  type Agent,
+  isGone,
+  type PlaceTag,
+  type RemovalWarnings,
+  repositoryKey,
+  type SandboxStatus,
+} from "@glass/contracts"
 import { Link, Outlet, useNavigate, useParams } from "@tanstack/react-router"
-import { Exit, Option, Predicate } from "effect"
+import { DateTime, Exit, Option, Predicate } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import { FolderGit2, PanelLeftClose, PanelLeftOpen, SquarePen, Trash2 } from "lucide-react"
+import { cn } from "cn"
 import { useContext, useId, useState } from "react"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Kbd } from "@/components/ui/kbd"
@@ -21,6 +29,7 @@ import {
   placeNames,
   removalWarningsAtom,
   removeAgent,
+  sandboxesAtom,
   waitingAgentsAtom,
 } from "./agentsArea"
 import { ConfirmationDialog } from "./ConfirmationDialog"
@@ -32,6 +41,27 @@ import { useReviewShortcuts } from "./useReviewShortcuts"
 const groupNames: Record<PlaceTag, string> = { ...placeNames, sandbox: "Sandboxes" }
 
 const noneWaiting: ReadonlySet<string> = new Set()
+
+const noSandboxes: ReadonlyMap<string, SandboxStatus> = new Map()
+
+const expiryFormat = new Intl.DateTimeFormat(undefined, {
+  weekday: "short",
+  hour: "numeric",
+  minute: "2-digit",
+})
+
+const sandboxLine = ({ reach, expiresAt }: SandboxStatus) => {
+  if (reach === "expired") return "Sandbox expired"
+
+  if (reach === "deleted") return "Sandbox deleted"
+
+  const expiry =
+    expiresAt === null ? null : `Expires ${expiryFormat.format(DateTime.toDateUtc(expiresAt))}`
+
+  return reach === "unreachable"
+    ? ["Can't reach its Sandbox", expiry].filter(Boolean).join(" · ")
+    : expiry
+}
 
 const agentLink =
   "flex flex-col gap-0.5 rounded-md py-1.5 pr-8 pl-2 outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-accent"
@@ -171,18 +201,29 @@ function AgentList() {
     .render()
 }
 
-const removalWarning = (agent: Agent, warning: "some" | "unchecked") => {
-  const inSandbox = Predicate.isTagged(agent.place, "sandbox")
+const removalWarning = (agent: Agent, { uncommittedChanges, unpushedCommits }: RemovalWarnings) => {
+  if (!Predicate.isTagged(agent.place, "sandbox"))
+    return uncommittedChanges === "unchecked"
+      ? `Glass couldn't check its worktree for uncommitted changes. Removing it discards any. The branch ${agent.name} and its commits stay.`
+      : `Its worktree has uncommitted changes, which removing it discards. The branch ${agent.name} and its commits stay.`
 
-  if (warning === "unchecked")
-    return inSandbox
-      ? "Glass couldn't reach its Sandbox to check for uncommitted changes. Removing it deletes the Sandbox and everything in it."
-      : `Glass couldn't check its worktree for uncommitted changes. Removing it discards any. The branch ${agent.name} and its commits stay.`
+  if (uncommittedChanges === "unchecked")
+    return "Glass couldn't reach its Sandbox to check for work that isn't on GitHub. Removing it deletes the Sandbox and everything in it."
 
-  return inSandbox
-    ? "Its Sandbox has uncommitted changes, which removing it discards along with the Sandbox."
-    : `Its worktree has uncommitted changes, which removing it discards. The branch ${agent.name} and its commits stay.`
+  const lost = [
+    ...(uncommittedChanges === "some" ? ["uncommitted changes"] : []),
+    ...(unpushedCommits.length > 0
+      ? [
+          `${unpushedCommits.length === 1 ? "a commit" : `${unpushedCommits.length} commits`} not pushed to GitHub`,
+        ]
+      : []),
+  ]
+
+  return `Its Sandbox has ${lost.join(" and ")}, which removing it deletes along with the Sandbox. Ask the Agent to push first to keep them.`
 }
+
+const needsConfirming = ({ uncommittedChanges, unpushedCommits }: RemovalWarnings) =>
+  uncommittedChanges !== "none" || unpushedCommits.length > 0
 
 function AgentRow(props: { agent: Agent }) {
   const { agent } = props
@@ -191,10 +232,18 @@ function AgentRow(props: { agent: Agent }) {
   const registry = useContext(RegistryContext)
   const warnings = useAtomValue(removalWarningsAtom(agent.id))
   const checkWarnings = useAtomSet(removalWarningsAtom(agent.id), { mode: "promiseExit" })
-  const [confirming, setConfirming] = useState<"some" | "unchecked" | null>(null)
+  const [confirming, setConfirming] = useState<RemovalWarnings | null>(null)
   const problem = settledProblem(warnings)
   const repositoryId = useId()
   const waitingId = useId()
+
+  const sandbox =
+    Option.getOrElse(AsyncResult.value(useAtomValue(sandboxesAtom)), () => noSandboxes).get(
+      agent.id,
+    ) ?? null
+
+  const sandboxText = sandbox === null ? null : sandboxLine(sandbox)
+  const sandboxId = useId()
 
   const waiting = Option.getOrElse(
     AsyncResult.value(useAtomValue(waitingAgentsAtom)),
@@ -214,10 +263,8 @@ function AgentRow(props: { agent: Agent }) {
 
     if (Exit.isFailure(exit)) return
 
-    const { uncommittedChanges } = exit.value
-
-    if (uncommittedChanges === "none") removeNow()
-    else setConfirming(uncommittedChanges)
+    if (needsConfirming(exit.value)) setConfirming(exit.value)
+    else removeNow()
   }
 
   return (
@@ -226,8 +273,12 @@ function AgentRow(props: { agent: Agent }) {
         to="/agents/$agentId"
         params={{ agentId: agent.id }}
         aria-label={agent.name}
-        aria-describedby={waiting ? `${repositoryId} ${waitingId}` : repositoryId}
-        className={agentLink}
+        aria-describedby={[
+          repositoryId,
+          ...(waiting ? [waitingId] : []),
+          ...(sandboxText === null ? [] : [sandboxId]),
+        ].join(" ")}
+        className={cn(agentLink, sandbox !== null && sandbox.reach !== "reachable" && "opacity-60")}
       >
         <span
           id={repositoryId}
@@ -248,6 +299,17 @@ function AgentRow(props: { agent: Agent }) {
             </span>
           )}
         </span>
+        {sandboxText !== null && (
+          <span
+            id={sandboxId}
+            className={cn(
+              "truncate text-xs text-muted-foreground",
+              sandbox !== null && isGone(sandbox.reach) && "text-destructive",
+            )}
+          >
+            {sandboxText}
+          </span>
+        )}
       </Link>
       <Button
         variant="ghost"
@@ -268,6 +330,19 @@ function AgentRow(props: { agent: Agent }) {
         open={confirming !== null}
         title={`Remove ${agent.name}?`}
         description={confirming === null ? "" : removalWarning(agent, confirming)}
+        details={
+          confirming !== null &&
+          confirming.unpushedCommits.length > 0 && (
+            <ul aria-label="Commits not on GitHub" className="flex flex-col gap-1 text-sm">
+              {confirming.unpushedCommits.map(({ sha, subject }) => (
+                <li key={sha} className="flex min-w-0 gap-2">
+                  <code className="shrink-0 text-muted-foreground">{sha.slice(0, 7)}</code>
+                  <span className="truncate">{subject}</span>
+                </li>
+              ))}
+            </ul>
+          )
+        }
         confirmLabel="Remove Agent"
         onConfirm={removeNow}
         onCancel={() => setConfirming(null)}

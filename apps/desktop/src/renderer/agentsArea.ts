@@ -12,6 +12,7 @@ import {
   type PlaceTag,
   type RequestAnswer,
   SandboxPlace,
+  type SandboxStatus,
   type SentMessage,
   type Transcript,
   repositoryKey,
@@ -57,6 +58,20 @@ export const waitingAgentsAtom = backendRuntime
     ),
   )
   .pipe(Atom.keepAlive)
+
+export const sandboxesAtom = backendRuntime
+  .atom(
+    Stream.unwrap(Backend.useSync((backend) => backend.WatchSandboxes())).pipe(
+      Stream.map(
+        (statuses): ReadonlyMap<string, SandboxStatus> =>
+          new Map(statuses.map((status) => [status.agentId, status])),
+      ),
+    ),
+  )
+  .pipe(Atom.keepAlive)
+
+export const goneExplanation = (reach: "expired" | "deleted") =>
+  `This Agent's Sandbox ${reach === "expired" ? "expired" : "was deleted"}, so it can't take messages. Its transcript stays until you remove the Agent.`
 
 export const transcriptAtom = Atom.family((agentId: string) =>
   backendRuntime

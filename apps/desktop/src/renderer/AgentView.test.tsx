@@ -22,6 +22,7 @@ import {
   type ResumableDestination,
   SandboxPlace,
   SandboxProviderInfo,
+  SandboxStatus,
   thisMac,
   SavedPlace,
   TextPart,
@@ -1290,4 +1291,74 @@ it("saves what the user was still writing when they switch to another Agent", as
   await user.click(screen.getByRole("link", { name: other.name }))
 
   await waitFor(() => expect(saved).toEqual([{ agentId: agent.id, message: "Half a thought" }]))
+})
+
+const sandboxAgent = new Agent({
+  ...agentFields,
+  place: SandboxPlace.make({ providerId: "fake" }),
+  engine: "claude-code",
+  permissionMode: "bypassPermissions",
+})
+
+it("dims a Sandbox Agent Glass can't reach, and makes one whose Sandbox expired read-only", async () => {
+  const expiresAt = DateTime.makeUnsafe("2026-10-28T12:00:00Z")
+
+  const reach = Stream.make([
+    new SandboxStatus({ agentId: agent.id, expiresAt, reach: "unreachable" }),
+  ])
+
+  mount({
+    WatchAgents: () => Stream.make([sandboxAgent]),
+    WatchSandboxes: () => reach,
+    WatchTranscript: () =>
+      Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
+  })
+
+  const link = await screen.findByRole("link", { description: /Can't reach its Sandbox · Expires/ })
+  expect(link.className).toContain("opacity-60")
+  expect(screen.getByRole("textbox", { name: "Message" })).toBeTruthy()
+
+  cleanup()
+  mount({
+    WatchAgents: () => Stream.make([sandboxAgent]),
+    WatchSandboxes: () =>
+      Stream.make([new SandboxStatus({ agentId: agent.id, expiresAt, reach: "expired" })]),
+    WatchTranscript: () =>
+      Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
+  })
+
+  expect(
+    await screen.findByText(
+      "This Agent's Sandbox expired, so it can't take messages. Its transcript stays until you remove the Agent.",
+    ),
+  ).toBeTruthy()
+  expect(screen.queryByRole("textbox", { name: "Message" })).toBeNull()
+  expect(screen.getByRole("link", { description: /Sandbox expired/ })).toBeTruthy()
+})
+
+it("lists a Sandbox Agent's unpushed commits before removing it", async () => {
+  const removed: Array<string> = []
+
+  const user = mount({
+    WatchAgents: () => Stream.make([sandboxAgent]),
+    WatchTranscript: () =>
+      Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
+    GetRemovalWarnings: () =>
+      Effect.succeed(
+        new RemovalWarnings({
+          uncommittedChanges: "none",
+          unpushedCommits: [{ sha: "0123456789abcdef", subject: "Add notes" }],
+        }),
+      ),
+    RemoveAgent: ({ agentId }) => Effect.sync(() => void removed.push(agentId)),
+  })
+
+  await user.click(await screen.findByRole("button", { name: "Remove agent/swift-otter" }))
+  const dialog = await screen.findByRole("alertdialog", { name: "Remove agent/swift-otter?" })
+  expect(within(dialog).getByText(/a commit not pushed to GitHub/)).toBeTruthy()
+  const commits = within(dialog).getByRole("list", { name: "Commits not on GitHub" })
+  expect(commits.textContent).toBe("0123456Add notes")
+
+  await user.click(within(dialog).getByRole("button", { name: "Remove Agent" }))
+  await waitFor(() => expect(removed).toEqual([agent.id]))
 })

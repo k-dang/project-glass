@@ -30,6 +30,9 @@ needs, and the provider does everything specific to its platform.
   as the Sandbox exists and reports each step through `progress`.
 - `target(state)` answers the host's URL and headers, freshly, for each connection, and throws
   `glass.sandboxGone()` once the Sandbox no longer exists.
+- `extend(state)` pushes the Sandbox's expiry as late as the platform allows and answers when it
+  now expires. Glass calls it once the Sandbox is up or Glass opens, then halfway to each expiry,
+  until the expiry stops moving: the platform's cap. It throws `glass.sandboxGone()` too.
 - `remove(state)` deletes the Sandbox. Glass first asks the agent host to end, with its agent
   programs, so a provider needn't track the host's processes. If the host can't be reached,
   `remove` runs anyway.
@@ -39,8 +42,15 @@ The plugin API is Promises and `AbortSignal`, so a plugin needs no Effect; its t
 `@glass/plugin` package. Glass passes in `glass.missingLogin(login, fix)`,
 `glass.noCapacity(message)` and `glass.sandboxGone()` for the failures the user can act on;
 anything else a provider throws becomes a safe failure, with the cause in the backend log. Glass
-doesn't retry a gone Sandbox: its Agent can't run again and has nothing left to lose, so the user
-can only remove it.
+doesn't retry a gone Sandbox: its Agent turns read-only, its transcript kept, and has nothing left
+to lose, so the user can only remove it. Glass tells expired from deleted by the last expiry the
+provider gave, so providers needn't say which.
+
+A Sandbox outlives Glass. Its Turns keep running while Glass is closed, so at launch Glass
+interrupts only local Turns and reconnects to each Sandbox's host, asking for the journal after the
+last entry it saved; that position is saved with the transcript, so a relaunch neither misses nor
+repeats an event. A Sandbox Glass can't reach is marked unreachable and its running Turn cut off,
+and Glass keeps trying; once it answers, the ending its host reports replaces the cut-off one.
 
 Glass stores the `state` a provider records as opaque JSON on the Agent's row, so the row stays
 the one record of the Agent and providers keep no storage of their own. If `create` fails or is
