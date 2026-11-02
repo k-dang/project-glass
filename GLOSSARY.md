@@ -177,7 +177,8 @@ a worktree of its own.
 
 **Sandbox**:
 The remote machine a Sandbox provider creates for one Agent, kept until the user removes the Agent
-or it expires.
+or it expires. While Glass runs, it extends a Sandbox that expires ahead of expiry, up to the
+platform's cap.
 _Avoid_: Box, computer, devbox, pod
 
 **Sandbox provider**:
@@ -192,7 +193,8 @@ _Avoid_: Extension, add-on
 
 **Turn**:
 One message to an Agent and its whole response. It ends done, failed, stopped by the user, cut off
-when Glass loses the Agent, or interrupted when Glass quits.
+when Glass loses the Agent, or interrupted when Glass quits; a Sandbox Agent's Turn carries on
+while Glass is closed.
 _Avoid_: Run, execution, exchange
 
 **Queued message**:

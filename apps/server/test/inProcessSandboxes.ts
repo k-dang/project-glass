@@ -1,5 +1,5 @@
 import type { AgentEngine, SandboxProvider, SandboxState } from "@glass/plugin"
-import { Context, Deferred, Effect, Exit, Layer, Redacted, Schema, Scope } from "effect"
+import { Context, Deferred, Duration, Effect, Exit, Layer, Redacted, Schema, Scope } from "effect"
 import { NodeHttpServer } from "@effect/platform-node"
 import { HttpServer } from "effect/http"
 import { createServer } from "node:http"
@@ -17,7 +17,11 @@ export interface InProcessSandboxSettings {
   readonly failAt?: string
   readonly missingLogin?: { readonly login: string; readonly fix: string }
   readonly noCapacity?: string
+  readonly extensionMillis?: number
+  readonly maxLifetimeMillis?: number
 }
+
+const TWO_DAYS = Duration.toMillis(Duration.days(2))
 
 export const steps = ["Creating the Sandbox", "Starting the agent"] as const
 
@@ -35,6 +39,8 @@ export const inProcessSandboxes = (host: () => Layer.Layer<HostAgents | Journal 
   const waiting: Array<() => void> = []
   const urls = new Map<string, string>()
   const gone = new Set<string>()
+  const createdAt = new Map<string, number>()
+  const expiries = new Map<string, NodeJS.Timeout>()
 
   const hosts = new Map<
     string,
@@ -123,6 +129,7 @@ export const inProcessSandboxes = (host: () => Layer.Layer<HostAgents | Journal 
       if (settings.noCapacity !== undefined) throw new NoCapacity(settings.noCapacity)
 
       record({ agentId: request.agentId })
+      createdAt.set(request.agentId, Date.now())
 
       for (const step of steps) {
         progress(step)
@@ -144,6 +151,20 @@ export const inProcessSandboxes = (host: () => Layer.Layer<HostAgents | Journal 
 
       return { url, headers: {} }
     },
+    extend: async (state) => {
+      const agentId = agentIdOf(state)
+
+      if (gone.has(agentId)) throw new SandboxGone()
+
+      const expiresAt = Math.min(
+        Date.now() + (settings.extensionMillis ?? TWO_DAYS),
+        (createdAt.get(agentId) ?? Date.now()) + (settings.maxLifetimeMillis ?? TWO_DAYS),
+      )
+
+      reclaimAt(agentId, expiresAt)
+
+      return new Date(expiresAt)
+    },
     remove: async (state) => {
       refuseLogin()
 
@@ -159,6 +180,24 @@ export const inProcessSandboxes = (host: () => Layer.Layer<HostAgents | Journal 
     models: async () => ({ defaultModel: null, models: [] }),
   }
 
+  const reclaim = (agentId: string) =>
+    stop(agentId).pipe(
+      Effect.andThen(
+        Effect.sync(() => {
+          clearTimeout(expiries.get(agentId))
+          gone.add(agentId)
+        }),
+      ),
+    )
+
+  const reclaimAt = (agentId: string, expiresAt: number) => {
+    clearTimeout(expiries.get(agentId))
+    expiries.set(
+      agentId,
+      setTimeout(() => Effect.runFork(reclaim(agentId)), expiresAt - Date.now()).unref(),
+    )
+  }
+
   return {
     provider,
     /** What happened to the Sandboxes, in order: `ended <agentId>` and `removed <agentId>`. */
@@ -171,14 +210,11 @@ export const inProcessSandboxes = (host: () => Layer.Layer<HostAgents | Journal 
     /** Ends a Sandbox's agent host as a crash would, leaving the Sandbox. */
     stopHost: stop,
     /** Deletes a Sandbox behind Glass's back, as a platform reclaiming it would. */
-    reclaim: (agentId: string) =>
-      stop(agentId).pipe(
-        Effect.andThen(
-          Effect.sync(() => {
-            gone.add(agentId)
-          }),
-        ),
-      ),
-    closeAll: Effect.suspend(() => Effect.forEach([...hosts.keys()], stop, { discard: true })),
+    reclaim,
+    closeAll: Effect.suspend(() => {
+      for (const timer of expiries.values()) clearTimeout(timer)
+
+      return Effect.forEach([...hosts.keys()], stop, { discard: true })
+    }),
   }
 }

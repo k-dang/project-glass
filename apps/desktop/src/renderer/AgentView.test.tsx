@@ -22,6 +22,8 @@ import {
   type ResumableDestination,
   SandboxPlace,
   SandboxProviderInfo,
+  type SandboxReach,
+  SandboxStatus,
   thisMac,
   SavedPlace,
   TextPart,
@@ -1289,4 +1291,55 @@ it("saves what the user was still writing when they switch to another Agent", as
   await user.click(screen.getByRole("link", { name: other.name }))
 
   await waitFor(() => expect(saved).toEqual([{ agentId: agent.id, message: "Half a thought" }]))
+})
+
+const noTranscript = () =>
+  Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null }))
+
+const inSandboxWith = (reach: SandboxReach) =>
+  new Agent({
+    ...agentFields,
+    place: SandboxPlace.make({ providerId: "fake" }),
+    engine: "claude-code",
+    permissionMode: "bypassPermissions",
+    sandbox: new SandboxStatus({ expiresAt: DateTime.makeUnsafe("2026-10-28T12:00:00Z"), reach }),
+  })
+
+it("dims a Sandbox Agent Glass can't reach, and makes one whose Sandbox expired read-only", async () => {
+  const reached: Array<string> = []
+
+  const user = mount({
+    WatchAgents: () => Stream.make([inSandboxWith("unreachable")]),
+    WatchTranscript: noTranscript,
+    ReachSandbox: ({ agentId }) =>
+      Effect.sync(() => {
+        reached.push(agentId)
+      }),
+  })
+
+  const link = await screen.findByRole("link", { description: /Can't reach its Sandbox · Expires/ })
+  expect(link.className).toContain("opacity-60")
+  expect(
+    screen.getByText(
+      /Glass can't reach this Agent's Sandbox. Once it answers, Glass fills in what the Agent did./,
+    ),
+  ).toBeTruthy()
+  expect(screen.getByRole("textbox", { name: "Message" })).toBeTruthy()
+
+  await user.click(screen.getByRole("button", { name: "Try again" }))
+  await eventually(() => expect(reached).toEqual([agentFields.id]))
+
+  cleanup()
+  mount({
+    WatchAgents: () => Stream.make([inSandboxWith("expired")]),
+    WatchTranscript: noTranscript,
+  })
+
+  expect(
+    await screen.findByText(
+      "This Agent's Sandbox expired, so it can't take messages. Its transcript stays until you remove the Agent.",
+    ),
+  ).toBeTruthy()
+  expect(screen.queryByRole("textbox", { name: "Message" })).toBeNull()
+  expect(screen.getByRole("link", { description: /Sandbox expired/ })).toBeTruthy()
 })

@@ -5,11 +5,19 @@ import {
   useAtomSet,
   useAtomValue,
 } from "@effect/atom-react"
-import { type Agent, type PlaceTag, repositoryKey } from "@glass/contracts"
+import {
+  type Agent,
+  isGone,
+  isOutOfReach,
+  type PlaceTag,
+  repositoryKey,
+  type SandboxStatus,
+} from "@glass/contracts"
 import { Link, Outlet, useNavigate, useParams } from "@tanstack/react-router"
-import { Exit, Option, Predicate } from "effect"
+import { DateTime, Exit, Option, Predicate } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import { FolderGit2, PanelLeftClose, PanelLeftOpen, SquarePen, Trash2 } from "lucide-react"
+import { cn } from "cn"
 import { useContext, useId, useState } from "react"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Kbd } from "@/components/ui/kbd"
@@ -32,6 +40,23 @@ import { useReviewShortcuts } from "./useReviewShortcuts"
 const groupNames: Record<PlaceTag, string> = { ...placeNames, sandbox: "Sandboxes" }
 
 const noneWaiting: ReadonlySet<string> = new Set()
+
+const expiryFormat = new Intl.DateTimeFormat(undefined, {
+  weekday: "short",
+  hour: "numeric",
+  minute: "2-digit",
+})
+
+const sandboxLine = ({ reach, expiresAt }: SandboxStatus) => {
+  if (isGone(reach)) return `Sandbox ${reach}`
+
+  const expiry =
+    expiresAt === null ? null : `Expires ${expiryFormat.format(DateTime.toDateUtc(expiresAt))}`
+
+  return reach === "unreachable"
+    ? ["Can't reach its Sandbox", expiry].filter(Boolean).join(" · ")
+    : expiry
+}
 
 const agentLink =
   "flex flex-col gap-0.5 rounded-md py-1.5 pr-8 pl-2 outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-accent"
@@ -191,10 +216,16 @@ function AgentRow(props: { agent: Agent }) {
   const registry = useContext(RegistryContext)
   const warnings = useAtomValue(removalWarningsAtom(agent.id))
   const checkWarnings = useAtomSet(removalWarningsAtom(agent.id), { mode: "promiseExit" })
+
   const [confirming, setConfirming] = useState<"some" | "unchecked" | null>(null)
+
   const problem = settledProblem(warnings)
   const repositoryId = useId()
   const waitingId = useId()
+
+  const { sandbox } = agent
+  const sandboxText = sandbox === null ? null : sandboxLine(sandbox)
+  const sandboxId = useId()
 
   const waiting = Option.getOrElse(
     AsyncResult.value(useAtomValue(waitingAgentsAtom)),
@@ -226,8 +257,12 @@ function AgentRow(props: { agent: Agent }) {
         to="/agents/$agentId"
         params={{ agentId: agent.id }}
         aria-label={agent.name}
-        aria-describedby={waiting ? `${repositoryId} ${waitingId}` : repositoryId}
-        className={agentLink}
+        aria-describedby={[
+          repositoryId,
+          ...(waiting ? [waitingId] : []),
+          ...(sandboxText === null ? [] : [sandboxId]),
+        ].join(" ")}
+        className={cn(agentLink, sandbox !== null && isOutOfReach(sandbox.reach) && "opacity-60")}
       >
         <span
           id={repositoryId}
@@ -248,6 +283,17 @@ function AgentRow(props: { agent: Agent }) {
             </span>
           )}
         </span>
+        {sandboxText !== null && (
+          <span
+            id={sandboxId}
+            className={cn(
+              "truncate text-xs text-muted-foreground",
+              isGone(sandbox?.reach) && "text-destructive",
+            )}
+          >
+            {sandboxText}
+          </span>
+        )}
       </Link>
       <Button
         variant="ghost"

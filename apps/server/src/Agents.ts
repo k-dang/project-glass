@@ -23,11 +23,13 @@ import {
   type RequestNotWaiting,
   RequestWaiting,
   SandboxPlace,
+  type SandboxStatus,
   thisMac as thisMacPlace,
   type TranscriptUpdate,
   TurnCutOff,
   TurnEnded,
   TurnFailed,
+  TurnInterrupted,
   TurnStopped,
   isNothingUnsent,
   nothingUnsent,
@@ -85,9 +87,14 @@ const toRow = ({
     place:
       sandboxProvider === null ? thisMacPlace : SandboxPlace.make({ providerId: sandboxProvider }),
     repository: new FollowedRepository({ owner, repo }),
+    sandbox: null,
   }),
   folder,
 })
+
+const withStatus = (agent: Agent, sandbox: SandboxStatus | null) =>
+  // oxlint-disable-next-line typescript/no-misused-spread -- The fields go straight back into Agent.
+  new Agent({ ...agent, sandbox })
 
 const storageFailure = () =>
   new AgentError({ message: "Couldn't read or save your Agents. Try again." })
@@ -125,6 +132,7 @@ export class Agents extends Context.Service<
       agentId: string,
     ) => Effect.Effect<ReadonlyArray<ChangedFile>, AgentNotFound | AgentError>
     readonly stop: (agentId: string) => Effect.Effect<void, AgentNotFound | AgentError>
+    readonly reachSandbox: (agentId: string) => Effect.Effect<void, AgentNotFound | AgentError>
     readonly unsent: (agentId: string) => Effect.Effect<SentMessage, AgentNotFound | AgentError>
     readonly saveUnsent: (
       agentId: string,
@@ -191,6 +199,17 @@ export class Agents extends Context.Service<
         ),
         Effect.forkIn(scope),
       )
+
+      const outlivedGlass = yield* sandboxes.resume
+      yield* transcripts
+        .endRunning(
+          TurnInterrupted.make({}),
+          stored.flatMap(({ id }) => (outlivedGlass.has(id) ? [] : [id])),
+        )
+        .pipe(Effect.orDie)
+
+      const withSandbox = (agent: Agent) =>
+        sandboxes.status(agent.id).pipe(Effect.map((sandbox) => withStatus(agent, sandbox)))
 
       const deliver = (row: PlacedAgent, turnId: string, input: MessageInput) =>
         Effect.gen(function* () {
@@ -261,6 +280,7 @@ export class Agents extends Context.Service<
           effort,
           permissionMode,
           createdAt: yield* DateTime.now,
+          sandbox: null,
         })
 
         const row: PlacedAgent = { agent, folder }
@@ -307,7 +327,7 @@ export class Agents extends Context.Service<
           }),
         )
 
-        return agent
+        return yield* withSandbox(agent)
       })
 
       const trySteer = (row: PlacedAgent, input: MessageInput) =>
@@ -333,24 +353,27 @@ export class Agents extends Context.Service<
           .isWaiting(agentId)
           .pipe(Effect.flatMap((waiting) => (waiting ? new RequestWaiting() : Effect.void)))
 
+      const findWritable = (agentId: string) =>
+        find(agentId).pipe(Effect.tap(() => sandboxes.refuseIfGone(agentId)))
+
       const send = Effect.fn("Agents.send")(function* (agentId: string, input: MessageInput) {
-        yield* find(agentId)
+        yield* findWritable(agentId)
         yield* refuseWhileWaiting(agentId)
         yield* transcripts.startOrQueue(agentId, input)
       })
 
       const steer = Effect.fn("Agents.steer")(function* (agentId: string, input: MessageInput) {
-        const row = yield* find(agentId)
+        const row = yield* findWritable(agentId)
         yield* refuseWhileWaiting(agentId)
 
-        if (!(yield* trySteer(row, input))) yield* send(agentId, input)
+        if (!(yield* trySteer(row, input))) yield* transcripts.startOrQueue(agentId, input)
       })
 
       const sendQueued = Effect.fn("Agents.sendQueued")(function* (
         agentId: string,
         queuedId: string,
       ) {
-        yield* find(agentId)
+        yield* findWritable(agentId)
         yield* transcripts.startQueued(agentId, queuedId)
       })
 
@@ -452,7 +475,7 @@ export class Agents extends Context.Service<
               current.map((row) => (row.agent.id === agentId ? { ...row, agent } : row)),
             )
 
-            return agent
+            return yield* withSandbox(agent)
           }),
         )
       })
@@ -555,8 +578,10 @@ export class Agents extends Context.Service<
 
       return Agents.of({
         watch: () =>
-          SubscriptionRef.changes(rows).pipe(
-            Stream.map((current) => current.map(({ agent }) => agent)),
+          Stream.zipLatest(SubscriptionRef.changes(rows), sandboxes.statuses).pipe(
+            Stream.map(([current, statuses]) =>
+              current.map(({ agent }) => withStatus(agent, statuses.get(agent.id) ?? null)),
+            ),
           ),
         transcript: (agentId) =>
           Stream.unwrap(find(agentId).pipe(Effect.as(transcripts.watch(agentId)))),
@@ -575,6 +600,11 @@ export class Agents extends Context.Service<
           find(agentId).pipe(Effect.andThen(transcripts.cancelQueued(agentId, queuedId))),
         sendQueued,
         stop,
+        reachSandbox: (agentId) =>
+          find(agentId).pipe(
+            Effect.flatMap((row) => placementOf(row).host(row)),
+            Effect.asVoid,
+          ),
         unsent,
         saveUnsent,
         watchWaiting: () =>

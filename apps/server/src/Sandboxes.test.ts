@@ -4,6 +4,7 @@ import {
   FollowedRepository,
   SandboxPlace,
   SandboxProviderInfo,
+  type SandboxStatus,
   TextPatch,
   type Transcript,
   TurnDone,
@@ -272,27 +273,81 @@ it.live("warns before removing a Sandbox Agent with uncommitted work in its Sand
   }),
 )
 
-it.live("fails an Agent whose Sandbox is gone, and removes it without a warning", () =>
-  Effect.gen(function* () {
-    const f = yield* agentServicesFixture
-    const agent = yield* createSandboxed(f)
-    yield* end(yield* f.started)
-    yield* f.transcript(agent.id, settled(1))
+const sandboxOf = (agents: Fixture["agents"], agentId: string) =>
+  agents.watch().pipe(
+    Stream.map((listed) => listed.find(({ id }) => id === agentId)?.sandbox ?? null),
+    Stream.filter((status): status is SandboxStatus => status !== null),
+  )
 
-    yield* f.sandboxes.reclaim(agent.id)
-    const { agents } = yield* f.restart
-    yield* agents.send(agent.id, say("Still there?"))
+it.live(
+  "makes an Agent read-only once its Sandbox is deleted, and removes it without a warning",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* agentServicesFixture
+      const agent = yield* createSandboxed(f)
+      yield* end(yield* f.started)
+      yield* f.transcript(agent.id, settled(1))
 
-    assert.equal(
-      failedReason(yield* f.transcript(agent.id, settled(2), agents)),
-      "This Agent's Sandbox no longer exists. Remove the Agent.",
-    )
-    assert.equal((yield* agents.removalWarnings(agent.id)).uncommittedChanges, "none")
+      yield* f.sandboxes.reclaim(agent.id)
+      const relaunched = yield* f.restart
+      yield* sandboxOf(relaunched.agents, agent.id).pipe(
+        Stream.filter(({ reach }) => reach === "deleted"),
+        Stream.runHead,
+      )
 
-    yield* agents.remove(agent.id)
-    assert.deepStrictEqual(
-      yield* agents.watch().pipe(Stream.runHead, Effect.map(Option.getOrThrow)),
-      [],
-    )
-  }),
+      const refused = yield* relaunched.agents.send(agent.id, say("Still there?")).pipe(Effect.flip)
+      assert.equal(
+        refused.message,
+        "This Agent's Sandbox was deleted, so it can't take messages. Its transcript stays until you remove the Agent.",
+      )
+
+      const { agents } = yield* f.restart
+      const [listed] = yield* agents.watch().pipe(Stream.runHead, Effect.map(Option.getOrThrow))
+      assert.equal(listed?.sandbox?.reach, "deleted")
+      assert.equal(failedReason(yield* f.transcript(agent.id, settled(1), agents)), "Done")
+      assert.equal((yield* agents.removalWarnings(agent.id)).uncommittedChanges, "none")
+
+      yield* agents.remove(agent.id)
+      assert.deepStrictEqual(
+        yield* agents.watch().pipe(Stream.runHead, Effect.map(Option.getOrThrow)),
+        [],
+      )
+    }),
+)
+
+it.live(
+  "extends a Sandbox ahead of expiry up to its cap, then makes its Agent read-only once it expires",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* agentServicesFixture
+      f.sandboxes.configure({ extensionMillis: 1000, maxLifetimeMillis: 3000 })
+      const agent = yield* createSandboxed(f)
+      yield* end(yield* f.started)
+
+      const expiries: Array<number> = []
+
+      yield* sandboxOf(f.agents, agent.id).pipe(
+        Stream.tap(({ expiresAt }) =>
+          Effect.sync(() => {
+            const at = expiresAt === null ? null : DateTime.toEpochMillis(expiresAt)
+
+            if (at !== null && at !== expiries.at(-1)) expiries.push(at)
+          }),
+        ),
+        Stream.filter(({ reach }) => reach === "expired"),
+        Stream.runHead,
+      )
+
+      assert.isAbove(expiries.length, 2)
+      assert.deepStrictEqual(
+        expiries,
+        expiries.toSorted((a, b) => a - b),
+      )
+
+      const refused = yield* f.agents.send(agent.id, say("Still there?")).pipe(Effect.flip)
+      assert.equal(
+        refused.message,
+        "This Agent's Sandbox expired, so it can't take messages. Its transcript stays until you remove the Agent.",
+      )
+    }),
 )

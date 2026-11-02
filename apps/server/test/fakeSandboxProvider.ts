@@ -140,7 +140,8 @@ const killTree = async (pid: number) => {
       // The host's programs hold their working directories open on Windows.
       await execFileAsync("taskkill", ["/PID", String(pid), "/T", "/F"], { windowsHide: true })
     } else {
-      process.kill(pid, "SIGKILL")
+      // The host leads its own process group, so this ends its agent programs with it.
+      process.kill(-pid, "SIGKILL")
     }
   } catch {}
 }
@@ -215,6 +216,7 @@ export const fakeSandboxProvider =
             GLASS_CLAUDE_COMMAND: settings.claudeCommand,
           },
           stdio: ["ignore", "inherit", "inherit"],
+          detached: process.platform !== "win32",
         })
 
         if (host.pid === undefined) throw new Error("The agent host didn't start")
@@ -241,6 +243,8 @@ export const fakeSandboxProvider =
       remove: async (state) => {
         const { folder } = decodeSandbox(state)
         const hostPath = join(folder, "host.json")
+
+        if (!existsSync(folder)) throw glass.sandboxGone()
 
         if (existsSync(hostPath))
           await killTree(Schema.decodeUnknownSync(HostFile)(readFileSync(hostPath, "utf8")).pid)

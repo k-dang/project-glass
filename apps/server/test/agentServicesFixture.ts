@@ -184,7 +184,9 @@ export const agentServicesFixture = Effect.gen(function* () {
       )
 
       const transcripts = Context.get(services, Transcripts)
-      yield* followJournal(transcripts, client, { saved: 0 }).pipe(Effect.forkScoped)
+      yield* followJournal((agentId, events) => transcripts.save(agentId, events), client, {
+        saved: 0,
+      }).pipe(Effect.forkScoped)
 
       return { agents: Context.get(services, Agents), sandboxes: Context.get(services, Sandboxes) }
     }).pipe(Effect.provideContext(database), Scope.provide(scope))

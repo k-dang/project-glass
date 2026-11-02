@@ -21,6 +21,8 @@ import {
   type Turn,
   type TurnEnd,
   type TurnPart,
+  goneExplanation,
+  isGone,
 } from "@glass/contracts"
 import { cn } from "cn"
 import { DateTime, Exit, Match, Option, Predicate } from "effect"
@@ -86,6 +88,7 @@ import {
   sendQueuedAtom,
   steerAtom,
   stopTurnAtom,
+  reachSandboxAtom,
   transcriptAtom,
   unsentMessageAtom,
 } from "./agentsArea"
@@ -94,7 +97,7 @@ import { ModelPicker } from "./ModelPicker"
 import { PermissionModePicker } from "./PermissionModePicker"
 import { RequestCard, requestElementId } from "./RequestCard"
 import { ProblemAlert } from "./ProblemAlert"
-import { settledProblem, streamProblem } from "./problems"
+import { problemText, settledProblem, streamProblem } from "./problems"
 import { rememberPlace } from "./savedPlace"
 
 const TURNS_PER_PAGE = 20
@@ -158,6 +161,9 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
   const waiting = turns.at(-1)?.parts.find(isWaiting)
   const registry = useContext(RegistryContext)
 
+  const reach = agent.sandbox?.reach
+  const gone = isGone(reach) ? reach : null
+
   useEffect(() => {
     rememberPlace(registry, { area: "agents", agentId: agent.id })
   }, [registry, agent.id])
@@ -209,7 +215,20 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
       )}
       <div hidden={tab !== "chat"} className="flex min-h-0 flex-1 flex-col">
         <Transcript agentId={agent.id} turns={turns} status={status} />
-        <Composer agent={agent} running={running} waiting={waiting} turns={turns} queued={queued} />
+        {reach === "unreachable" && <UnreachableNotice agentId={agent.id} />}
+        {gone === null ? (
+          <Composer
+            agent={agent}
+            running={running}
+            waiting={waiting}
+            turns={turns}
+            queued={queued}
+          />
+        ) : (
+          <output className="mx-auto block w-full max-w-3xl px-6 py-4 text-sm text-muted-foreground">
+            {goneExplanation(gone)}
+          </output>
+        )}
       </div>
       <section
         aria-label="Changes"
@@ -570,6 +589,29 @@ function WaitingNotice(props: { waiting: RequestPart }) {
         Show it
       </Button>
     </p>
+  )
+}
+
+function UnreachableNotice({ agentId }: { agentId: string }) {
+  const tried = useAtomValue(reachSandboxAtom(agentId))
+  const tryAgain = useAtomSet(reachSandboxAtom(agentId))
+  const problem = settledProblem(tried)
+
+  return (
+    <output className="mx-auto block w-full max-w-3xl px-6 pt-2 text-sm text-muted-foreground">
+      Glass can't reach this Agent's Sandbox. Once it answers, Glass fills in what the Agent did.{" "}
+      <Button
+        type="button"
+        variant="link"
+        size="sm"
+        className="h-auto p-0"
+        disabled={tried.waiting}
+        onClick={() => tryAgain()}
+      >
+        Try again
+      </Button>
+      {problem !== null && <span className="block">{problemText(problem)}</span>}
+    </output>
   )
 }
 
