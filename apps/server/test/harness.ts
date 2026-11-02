@@ -1,6 +1,6 @@
 import { NodeSocket } from "@effect/platform-node"
 import { GlassRpcs, RPC_PATH, TOKEN_PARAM } from "@glass/contracts"
-import { ConfigProvider, Context, Effect, Layer, Option } from "effect"
+import { Clock, ConfigProvider, Context, Effect, Layer, Option } from "effect"
 import { HttpServer } from "effect/http"
 import { Socket } from "effect/socket"
 import { mkdtemp, rm } from "node:fs/promises"
@@ -74,8 +74,11 @@ export const startBackend = Effect.fnUntraced(function* (
 
   const rpcUrl = `${baseUrl.replace(/^http/, "ws")}${RPC_PATH}?${TOKEN_PARAM}=${LAUNCH_TOKEN}`
 
+  // The client's heartbeat runs on real time: a deadline test's `TestClock.adjust` would otherwise
+  // time out its ping before the backend's real answer arrives.
   const client = yield* connectRpcClient(GlassRpcs, rpcUrl).pipe(
     Effect.provideService(Socket.WebSocketConstructor, webSocketConstructor),
+    Effect.provideService(Clock.Clock, Clock.Clock.defaultValue()),
   )
 
   // Effect closes a still-connecting WebSocket after dropping its error listener, which `ws` then

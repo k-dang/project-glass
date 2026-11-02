@@ -15,7 +15,12 @@ import {
 import { Effect, Exit, Option, Predicate, Scope, Stream } from "effect"
 import { join } from "node:path"
 import { bundledPi } from "./demoAgent"
-import { type FakeModelSettings, fakeModelProvider, type PiSettings } from "./fakeModelProvider"
+import {
+  type FakeModelRequest,
+  type FakeModelSettings,
+  fakeModelProvider,
+  type PiSettings,
+} from "./fakeModelProvider"
 import { type FakeClaudeSettings, fakeClaude } from "./fakeClaude"
 import { startFakeGitHub } from "./fakeGitHub"
 import { VIEWER } from "./fakePullRequest"
@@ -216,3 +221,11 @@ export const claudeCode = {
 
 export const lastText = (turn: Turn | undefined) =>
   turn?.parts.findLast((part) => Predicate.isTagged(part, "Text"))
+
+export const userMessages = ({ messages }: FakeModelRequest) =>
+  messages.filter(({ role }) => role === "user").map(({ content }) => JSON.stringify(content))
+
+export const pixel: Image = {
+  mediaType: "image/png",
+  data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+}
