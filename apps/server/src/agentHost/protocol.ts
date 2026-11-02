@@ -13,6 +13,7 @@ import { Schema, SchemaTransformation } from "effect"
 import { randomBytes } from "node:crypto"
 import { resolve } from "node:path"
 import { Rpc, RpcGroup } from "effect/rpc"
+import { DeliveredMessage } from "./deliveredMessage"
 
 export const JournalEntry = Schema.Struct({
   sequence: Schema.Int,
@@ -69,7 +70,7 @@ export class AgentHostRpcs extends RpcGroup.make(
     payload: {
       agentId: Schema.String,
       turnId: Schema.String,
-      ...SentMessage.fields,
+      ...DeliveredMessage.fields,
       ...TurnSettings.fields,
     },
     error: HostAgentError,
@@ -80,7 +81,7 @@ export class AgentHostRpcs extends RpcGroup.make(
     error: Schema.Union([RequestNotWaiting, HostAgentError]),
   }),
   Rpc.make("Steer", {
-    payload: { agentId: Schema.String, ...SentMessage.fields },
+    payload: { agentId: Schema.String, ...DeliveredMessage.fields },
     error: HostAgentError,
   }),
   /**

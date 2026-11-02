@@ -6,6 +6,7 @@ import type {
   SentMessage,
 } from "@glass/contracts"
 import type { Effect, Scope } from "effect"
+import type { DeliveredMessage } from "./deliveredMessage"
 import type { HostAgentError, TurnSettings } from "./protocol"
 
 export interface AgentSession {
@@ -14,9 +15,12 @@ export interface AgentSession {
    * `engineCapabilities`. The program refuses anything else. A fresh session runs its defaults.
    */
   readonly configure: (settings: TurnSettings) => Effect.Effect<void, HostAgentError>
-  readonly startTurn: (turnId: string, message: SentMessage) => Effect.Effect<void, HostAgentError>
+  readonly startTurn: (
+    turnId: string,
+    message: DeliveredMessage,
+  ) => Effect.Effect<void, HostAgentError>
   /** Fails when no Turn runs. The Turn shows the Steer once the program takes it in. */
-  readonly steer: (message: SentMessage) => Effect.Effect<void, HostAgentError>
+  readonly steer: (message: DeliveredMessage) => Effect.Effect<void, HostAgentError>
   /** Answers with the Steers not taken in, which the program drops, or `null` when no Turn ran. */
   readonly stopTurn: Effect.Effect<ReadonlyArray<SentMessage> | null>
   /** Fails when the request no longer waits, or the answer doesn't fit it. */

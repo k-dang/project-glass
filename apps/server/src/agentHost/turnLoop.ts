@@ -1,8 +1,9 @@
 import type { AgentEvent, SentMessage } from "@glass/contracts"
+import type { DeliveredMessage } from "./deliveredMessage"
 import { type Cause, DateTime, Deferred, Effect, Queue, Scope, Stream } from "effect"
 import { HostAgentError } from "./protocol"
 
-export interface Steer extends SentMessage {
+export interface Steer extends DeliveredMessage {
   readonly id: string
 }
 

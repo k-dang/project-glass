@@ -6,8 +6,10 @@ import {
   nothingUnsent,
   type SentMessage,
 } from "@glass/contracts"
-import { Predicate, Schema } from "effect"
+import { useAtomValue } from "@effect/atom-react"
+import { Option, Predicate, Schema } from "effect"
 import { Base64 } from "effect/encoding"
+import { AsyncResult } from "effect/reactivity"
 import { ArrowUp, Square, X } from "lucide-react"
 import {
   type ClipboardEvent,
@@ -15,6 +17,10 @@ import {
   type KeyboardEvent,
   memo,
   type ReactNode,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
 } from "react"
 import {
   InputGroup,
@@ -22,8 +28,10 @@ import {
   InputGroupButton,
   InputGroupTextarea,
 } from "@/components/ui/input-group"
+import { mention, MentionChoices, mentionChoices, mentionTrigger } from "./Mentions"
 import { type Problem } from "./problems"
 import { ProblemAlert } from "./ProblemAlert"
+import { openToDosAtom } from "./toDoList"
 
 const isMediaType = Schema.is(ImageMediaType)
 
@@ -75,6 +83,42 @@ export function MessageBox(props: {
   children?: ReactNode
 }) {
   const { composed, setComposed } = props
+  const textarea = useRef<HTMLTextAreaElement>(null)
+  const choicesId = useId()
+  const [caret, setCaret] = useState(0)
+  const [highlighted, setHighlighted] = useState(0)
+  // Where the user closed the To-do choices with Escape, so they stay closed for that `@`.
+  const [dismissed, setDismissed] = useState<number | null>(null)
+  const nextCaret = useRef<number | null>(null)
+  const openToDos = Option.getOrElse(AsyncResult.value(useAtomValue(openToDosAtom)), () => [])
+
+  const trigger = mentionTrigger(composed.message, caret)
+
+  const choices =
+    trigger === null || trigger.start === dismissed ? [] : mentionChoices(openToDos, trigger.query)
+
+  const chosen = choices[Math.min(highlighted, choices.length - 1)]
+
+  useLayoutEffect(() => {
+    if (nextCaret.current === null) return
+    textarea.current?.setSelectionRange(nextCaret.current, nextCaret.current)
+    nextCaret.current = null
+  })
+
+  const followCaret = (element: HTMLTextAreaElement) => {
+    setCaret(element.selectionEnd)
+    setHighlighted(0)
+
+    if (mentionTrigger(element.value, element.selectionEnd) === null) setDismissed(null)
+  }
+
+  const choose = (toDo: (typeof choices)[number]) => {
+    if (trigger === null) return
+    const next = mention(composed.message, trigger, caret, toDo)
+    nextCaret.current = next.caret
+    setCaret(next.caret)
+    setComposed((current) => ({ ...current, message: next.text }))
+  }
 
   const submit = async (deliver: (message: MessageInput) => Promise<boolean>) => {
     const sent = composed
@@ -97,6 +141,31 @@ export function MessageBox(props: {
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     // Enter can confirm an input method's candidates.
     if (event.nativeEvent.isComposing) return
+
+    if (chosen !== undefined && trigger !== null) {
+      const moves = { ArrowDown: 1, ArrowUp: choices.length - 1 }[event.key]
+
+      if (moves !== undefined) {
+        event.preventDefault()
+        setHighlighted((choices.indexOf(chosen) + moves) % choices.length)
+
+        return
+      }
+
+      if (event.key === "Enter" || event.key === "Tab") {
+        event.preventDefault()
+        choose(chosen)
+
+        return
+      }
+
+      if (event.key === "Escape") {
+        event.preventDefault()
+        setDismissed(trigger.start)
+
+        return
+      }
+    }
 
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault()
@@ -129,6 +198,14 @@ export function MessageBox(props: {
       <div className="mx-auto flex max-w-3xl flex-col gap-2">
         {props.problem !== null && <ProblemAlert problem={props.problem} />}
         {props.notice}
+        {chosen !== undefined && (
+          <MentionChoices
+            id={choicesId}
+            choices={choices}
+            highlighted={choices.indexOf(chosen)}
+            onChoose={choose}
+          />
+        )}
         <InputGroup>
           {composed.images.length > 0 && (
             <InputGroupAddon align="block-start" className="flex-wrap gap-2">
@@ -158,14 +235,19 @@ export function MessageBox(props: {
             </InputGroupAddon>
           )}
           <InputGroupTextarea
+            ref={textarea}
             aria-label="Message"
+            aria-controls={chosen === undefined ? undefined : choicesId}
+            aria-activedescendant={chosen === undefined ? undefined : `${choicesId}-${chosen.id}`}
             className="max-h-60 p-3"
             placeholder={props.placeholder}
             value={composed.message}
             onChange={(event) => {
               const message = event.target.value
+              followCaret(event.target)
               setComposed((current) => ({ ...current, message }))
             }}
+            onSelect={(event) => followCaret(event.currentTarget)}
             onKeyDown={onKeyDown}
             onPaste={onPaste}
             onDragOver={(event) => {

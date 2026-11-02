@@ -9,13 +9,14 @@ import {
   type RequestAnswer,
   RequestNotWaiting,
   type RequestPart,
-  type SentMessage,
+  sentOf,
 } from "@glass/contracts"
 import { Duration, Effect, Option, Predicate, Queue, Schema, Scope, Stream } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
 import type { AgentAdapter } from "./adapter"
+import { type DeliveredMessage, programText } from "./deliveredMessage"
 import {
   AvailableModels,
   ClearedQueue,
@@ -117,10 +118,10 @@ const freshThinkingLevel = (folder: string, model: { provider: string; id: strin
   )
 }
 
-const piMessage = (type: "prompt" | "steer", { message, images }: SentMessage) => ({
+const piMessage = (type: "prompt" | "steer", delivered: DeliveredMessage) => ({
   type,
-  message,
-  images: images.map(({ mediaType, data }) => ({
+  message: programText(delivered),
+  images: delivered.images.map(({ mediaType, data }) => ({
     type: "image" as const,
     data,
     mimeType: mediaType,
@@ -276,8 +277,8 @@ export const piAdapter = (command: string) =>
 
             return undefined
           }),
-          startTurn: Effect.fnUntraced(function* (turnId: string, sent: SentMessage) {
-            yield* turns.begin(turnId, sent)
+          startTurn: Effect.fnUntraced(function* (turnId: string, sent: DeliveredMessage) {
+            yield* turns.begin(turnId, sentOf(sent))
 
             const answer = yield* rpc.request(piMessage("prompt", sent), PromptAccepted).pipe(
               Effect.map(({ disposition }) =>
@@ -308,7 +309,7 @@ export const piAdapter = (command: string) =>
 
             return undefined
           }),
-          steer: Effect.fnUntraced(function* (sent: SentMessage) {
+          steer: Effect.fnUntraced(function* (sent: DeliveredMessage) {
             const id = randomUUID()
 
             if (!(yield* turns.steer({ ...sent, id }))) return yield* notRunning

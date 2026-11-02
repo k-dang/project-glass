@@ -19,6 +19,7 @@ import { Context, Deferred, Effect, Exit, Layer, Option, Queue, Scope, Stream } 
 import { SqlClient } from "effect/sql"
 import { RpcTest } from "effect/rpc"
 import type { AgentAdapter, AgentSession } from "../src/agentHost/adapter"
+import type { DeliveredMessage } from "../src/agentHost/deliveredMessage"
 import { Changes } from "../src/agentHost/Changes"
 import { AgentHostHandlers } from "../src/agentHost/handlers"
 import { HostAgents } from "../src/agentHost/HostAgents"
@@ -31,13 +32,14 @@ import { migrationLoader } from "../src/Migrations"
 import { Plugins } from "../src/Plugins"
 import { Sandboxes } from "../src/Sandboxes"
 import { LocalPlacement } from "../src/LocalPlacement"
+import { ToDos } from "../src/ToDos"
 import { Transcripts } from "../src/Transcripts"
 import { inProcessSandboxes } from "./inProcessSandboxes"
 
 interface Started {
   readonly agentId: string
   readonly turnId: string
-  readonly input: SentMessage
+  readonly input: DeliveredMessage
   readonly settings: TurnSettings
   readonly emit: (event: AgentEvent) => Effect.Effect<void>
 }
@@ -179,6 +181,7 @@ export const agentServicesFixture = Effect.gen(function* () {
           ),
           Layer.provideMerge(Transcripts.layer),
           Layer.provide(Layer.succeed(LocalPlacement, placement)),
+          Layer.provideMerge(ToDos.layer),
           Layer.provide(Layer.mock(ActivityLog)({ record: () => Effect.void })),
         ),
       )
@@ -188,13 +191,18 @@ export const agentServicesFixture = Effect.gen(function* () {
         saved: 0,
       }).pipe(Effect.forkScoped)
 
-      return { agents: Context.get(services, Agents), sandboxes: Context.get(services, Sandboxes) }
+      return {
+        agents: Context.get(services, Agents),
+        sandboxes: Context.get(services, Sandboxes),
+        toDos: Context.get(services, ToDos),
+      }
     }).pipe(Effect.provideContext(database), Scope.provide(scope))
 
     const built = yield* build
 
     return {
       agents: built.agents,
+      toDos: built.toDos,
       sandboxProviders: built.sandboxes.providers,
       close: Scope.close(scope, Exit.void),
     }

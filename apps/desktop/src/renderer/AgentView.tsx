@@ -92,6 +92,7 @@ import {
   transcriptAtom,
   unsentMessageAtom,
 } from "./agentsArea"
+import { MessageText, readableText } from "./Mentions"
 import { Attachment, MessageBox } from "./MessageBox"
 import { ModelPicker } from "./ModelPicker"
 import { PermissionModePicker } from "./PermissionModePicker"
@@ -319,7 +320,9 @@ export function UserMessage(props: {
         )}
         <AttachedImages images={props.images} />
         <Bubble align="end" variant="muted">
-          <BubbleContent className="whitespace-pre-wrap">{props.message}</BubbleContent>
+          <BubbleContent className="whitespace-pre-wrap">
+            <MessageText text={props.message} />
+          </BubbleContent>
         </Bubble>
       </MessageContent>
     </Message>
@@ -733,20 +736,22 @@ function QueuedMessages(props: {
       </p>
       <QueueList>
         {props.queued.map((queued) => (
-          <QueueItem key={queued.id} aria-label={queued.message}>
+          <QueueItem key={queued.id} aria-label={readableText(queued.message)}>
             <QueueItemRow>
-              <QueueItemContent>{queued.message}</QueueItemContent>
+              <QueueItemContent>
+                <MessageText text={queued.message} />
+              </QueueItemContent>
               <QueueItemActions>
                 {!props.running && (
                   <QueueItemAction
-                    aria-label={`Send now: ${queued.message}`}
+                    aria-label={`Send now: ${readableText(queued.message)}`}
                     onClick={() => sendNow(queued.id)}
                   >
                     <ArrowUp />
                   </QueueItemAction>
                 )}
                 <QueueItemAction
-                  aria-label={`Cancel: ${queued.message}`}
+                  aria-label={`Cancel: ${readableText(queued.message)}`}
                   onClick={() => cancel(queued.id)}
                 >
                   <X />
