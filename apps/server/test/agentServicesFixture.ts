@@ -12,7 +12,8 @@ import {
   type RequestNotWaiting,
   thisMac,
 } from "@glass/contracts"
-import { Context, Effect, Exit, Layer, Option, Queue, Scope, Stream } from "effect"
+import { Context, Deferred, Effect, Exit, Layer, Option, Queue, Scope, Stream } from "effect"
+import { SqlClient } from "effect/sql"
 import { RpcTest } from "effect/rpc"
 import type { AgentAdapter, AgentSession } from "../src/agentHost/adapter"
 import { Changes } from "../src/agentHost/Changes"
@@ -47,6 +48,10 @@ export const agentServicesFixture = Effect.gen(function* () {
   const started = yield* Queue.unbounded<Started>()
   const answers: Array<{ readonly requestId: string; readonly answer: RequestAnswer }> = []
   const stops: Array<string> = []
+  const starts: Array<string> = []
+  const exits = new Map<string, Deferred.Deferred<void>>()
+  let starting: Deferred.Deferred<void> | null = null
+  let leftOnStop: ReadonlyArray<SentMessage> = []
   let nextAnswer: Effect.Effect<void, HostAgentError | RequestNotWaiting> = Effect.void
   let nextName = 0
   const models = Effect.succeed(new AgentModels({ defaultModel: null, models: [] }))
@@ -54,7 +59,13 @@ export const agentServicesFixture = Effect.gen(function* () {
   const adapter: AgentAdapter = {
     models,
     start: ({ conversation, report }) =>
-      Effect.sync<AgentSession>(() => {
+      Effect.gen(function* () {
+        starts.push(conversation)
+
+        if (starting !== null) yield* Deferred.await(starting)
+
+        const exited = yield* Deferred.make<void>()
+        exits.set(conversation, exited)
         let settings: TurnSettings = { model: null, effort: null, permissionMode: null }
 
         return {
@@ -74,7 +85,7 @@ export const agentServicesFixture = Effect.gen(function* () {
           stopTurn: Effect.sync(() => {
             stops.push(conversation)
 
-            return []
+            return leftOnStop
           }),
           answer: (requestId, answer) =>
             Effect.suspend(() => {
@@ -82,9 +93,9 @@ export const agentServicesFixture = Effect.gen(function* () {
 
               return nextAnswer
             }),
-          closed: Effect.never,
-          stopped: Effect.succeed(false),
-        }
+          closed: Deferred.await(exited),
+          stopped: Deferred.isDone(exited),
+        } satisfies AgentSession
       }),
   }
 
@@ -151,8 +162,12 @@ export const agentServicesFixture = Effect.gen(function* () {
 
   const running = yield* boot
 
-  const transcript = (agentId: string, until: (value: Transcript) => boolean) =>
-    running.agents.transcript(agentId).pipe(
+  const transcript = (
+    agentId: string,
+    until: (value: Transcript) => boolean,
+    agents = running.agents,
+  ) =>
+    agents.transcript(agentId).pipe(
       Stream.scan(() => emptyTranscript, applyTranscriptUpdate),
       Stream.filter(until),
       Stream.runHead,
@@ -161,12 +176,35 @@ export const agentServicesFixture = Effect.gen(function* () {
 
   return {
     ...running,
+    sql: Context.get(database, SqlClient.SqlClient),
     answers,
     stops,
+    starts,
     started: Queue.take(started),
     failAnswers: (error: HostAgentError | RequestNotWaiting) =>
       Effect.sync(() => {
         nextAnswer = Effect.fail(error)
+      }),
+    /** Later program starts wait until `releaseStart`. */
+    holdStart: Deferred.make<void>().pipe(
+      Effect.map((gate) => {
+        starting = gate
+      }),
+    ),
+    releaseStart: Effect.suspend(() =>
+      starting === null ? Effect.void : Deferred.succeed(starting, undefined).pipe(Effect.asVoid),
+    ),
+    /** Ends the Agent's program, as a crash would. */
+    exit: (agentId: string) =>
+      Effect.suspend(() => {
+        const exited = exits.get(agentId)
+
+        return exited === undefined ? Effect.void : Deferred.succeed(exited, undefined)
+      }).pipe(Effect.asVoid),
+    /** What the program answers Stop with: the Steers it hadn't taken in. */
+    leaveOnStop: (messages: ReadonlyArray<SentMessage>) =>
+      Effect.sync(() => {
+        leftOnStop = messages
       }),
     transcript,
     create: (
