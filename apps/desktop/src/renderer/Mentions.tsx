@@ -45,7 +45,6 @@ interface Selection {
 }
 
 interface Picking {
-  /** Where the `@` the user is typing the Mention from is. */
   readonly start: number
   readonly caret: number
   readonly choices: ReadonlyArray<ToDo>
@@ -97,11 +96,7 @@ const mention = (message: string, { start, caret }: Picking, toDo: ToDo) => {
   return { text: message.slice(0, start) + spaced + after, caret: start + link.length + 1 }
 }
 
-/**
- * Lets the user mention an open To-do by typing `@` in the composer's textarea. Spread `textarea`
- * onto it, call `follow` from its change handler, let `onKeyDown` take a key before the composer
- * does, and render `choices` near it. `setMessage` writes the message when the user picks one.
- */
+/** Lets the user mention an open To-do by typing `@` in the composer's textarea. */
 export function useMentionPicker(message: string, setMessage: (message: string) => void) {
   const ref = useRef<HTMLTextAreaElement>(null)
   const id = useId()
@@ -119,7 +114,6 @@ export function useMentionPicker(message: string, setMessage: (message: string) 
     nextCaret.current = null
   })
 
-  // A keystroke reports both a change and a select; the second finds the caret where it is.
   const follow = ({ value, selectionEnd }: HTMLTextAreaElement) => {
     setSelection((current) =>
       current.text === value && current.caret === selectionEnd
