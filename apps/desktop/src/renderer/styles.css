@@ -164,6 +164,75 @@
   --color-prettylights-syntax-markup-deleted-text: var(--deleted);
 }
 
+/* Catppuccin Mocha, from https://catppuccin.com/palette/. Diff colors follow its Shiki theme. */
+:root[data-theme="catppuccin-mocha"] {
+  color-scheme: dark;
+  --background: #181825; /* mantle */
+  --foreground: #cdd6f4; /* text */
+  --card: #1e1e2e; /* base */
+  --card-foreground: #cdd6f4;
+  --popover: #313244; /* surface0 */
+  --popover-foreground: #cdd6f4;
+  --primary: #cba6f7; /* mauve */
+  --primary-foreground: #11111b; /* crust */
+  --secondary: #313244;
+  --secondary-foreground: #cdd6f4;
+  --muted: #313244;
+  --muted-foreground: #a6adc8; /* subtext0 */
+  --accent: #45475a; /* surface1 */
+  --accent-foreground: #cdd6f4;
+  --destructive: #f38ba8; /* red */
+  --border: #313244;
+  --input: #45475a;
+  --ring: #b4befe; /* lavender */
+  --added: #a6e3a1; /* green */
+  --modified: #fab387; /* peach */
+  --deleted: #f38ba8;
+  --viewed: #b4befe;
+}
+
+:root[data-theme="catppuccin-mocha"] .markdown-body {
+  --fgColor-default: var(--foreground);
+  --fgColor-muted: var(--muted-foreground);
+  --fgColor-accent: #89b4fa; /* blue */
+  --fgColor-success: var(--added);
+  --fgColor-danger: var(--deleted);
+  --fgColor-attention: var(--modified);
+  --fgColor-done: var(--viewed);
+  --bgColor-default: var(--background);
+  --bgColor-muted: var(--muted);
+  --bgColor-neutral-muted: var(--accent);
+  --borderColor-default: var(--border);
+  --borderColor-muted: var(--border);
+  --borderColor-neutral-muted: var(--border);
+  --borderColor-accent-emphasis: var(--ring);
+  --borderColor-success-emphasis: var(--added);
+  --borderColor-danger-emphasis: var(--deleted);
+  --borderColor-attention-emphasis: var(--modified);
+  --borderColor-done-emphasis: var(--viewed);
+  --color-prettylights-syntax-comment: #9399b2; /* overlay2 */
+  --color-prettylights-syntax-constant: #fab387;
+  --color-prettylights-syntax-constant-other-reference-link: #89b4fa;
+  --color-prettylights-syntax-entity: #89b4fa;
+  --color-prettylights-syntax-entity-tag: #cba6f7;
+  --color-prettylights-syntax-keyword: #cba6f7;
+  --color-prettylights-syntax-storage-modifier-import: var(--foreground);
+  --color-prettylights-syntax-string: #a6e3a1;
+  --color-prettylights-syntax-string-regexp: #f5c2e7; /* pink */
+  --color-prettylights-syntax-variable: #fab387;
+  --color-prettylights-syntax-markup-heading: #89b4fa;
+  --color-prettylights-syntax-markup-bold: var(--foreground);
+  --color-prettylights-syntax-markup-italic: var(--foreground);
+  --color-prettylights-syntax-markup-inserted-bg: color-mix(in srgb, var(--added) 15%, var(--card));
+  --color-prettylights-syntax-markup-inserted-text: var(--added);
+  --color-prettylights-syntax-markup-deleted-bg: color-mix(
+    in srgb,
+    var(--deleted) 15%,
+    var(--card)
+  );
+  --color-prettylights-syntax-markup-deleted-text: var(--deleted);
+}
+
 .theme-preview {
   --preview-bg: #ffffff;
   --preview-border: #dedede;
@@ -194,6 +263,14 @@
   --preview-text: #c9c9c9;
   --preview-added: #254331;
   --preview-deleted: #4c2a2d;
+}
+
+.theme-preview[data-preview="catppuccin-mocha"] {
+  --preview-bg: #1e1e2e;
+  --preview-border: #45475a;
+  --preview-text: #cdd6f4;
+  --preview-added: #3a4a43;
+  --preview-deleted: #4a3243;
 }
 
 .theme-preview[data-preview="system"] {

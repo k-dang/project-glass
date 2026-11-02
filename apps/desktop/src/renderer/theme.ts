@@ -12,7 +12,13 @@ const themeAtom = Atom.writable(savedTheme, (ctx, theme: Theme) => {
 export function savedTheme(): Theme {
   const saved = localStorage.getItem(storageKey)
 
-  if (saved === "light" || saved === "dark" || saved === "system" || saved === "charcoal")
+  if (
+    saved === "light" ||
+    saved === "dark" ||
+    saved === "system" ||
+    saved === "charcoal" ||
+    saved === "catppuccin-mocha"
+  )
     return saved
 
   return "system"
