@@ -1,17 +1,16 @@
 import { expect, openPullRequest, test } from "./glass"
 
-test.use({ git: true })
+const answer = {
+  markdown:
+    "**The greeting changes its wording.** One line changes.\n\n## Callers expect the old word\n\nBlocking: `main.ts` matches on `world`.",
+}
+
+test.use({ git: true, piModel: { output: JSON.stringify(answer) } })
 
 test("runs an Agent review, reads it beside the diff, and shows its opening on Overview", async ({
   github,
-  piCli,
   window,
 }) => {
-  await piCli.answer({
-    markdown:
-      "**The greeting changes its wording.** One line changes.\n\n## Callers expect the old word\n\nBlocking: `main.ts` matches on `world`.",
-  })
-
   const pr = github.seedPullRequest({
     base: { sha: "b0", files: { "greet.ts": "hello\nworld\n" } },
     head: { sha: "h1", files: { "greet.ts": "hello\nthere\nworld\n" } },

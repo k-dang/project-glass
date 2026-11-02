@@ -2,6 +2,7 @@ import { Effect, Predicate, Schema } from "effect"
 import { mkdir, writeFile } from "node:fs/promises"
 import { createServer, type ServerResponse } from "node:http"
 import { join } from "node:path"
+import { counter } from "./counter.ts"
 import { portOf } from "./ports.ts"
 
 const request = Schema.fromJsonString(
@@ -87,32 +88,6 @@ interface CompletionDelta {
     readonly type: "function"
     readonly function: { readonly name: string; readonly arguments: string }
   }>
-}
-
-const counter = () => {
-  let seen = 0
-  const waiting = new Set<{ readonly count: number; readonly wake: () => void }>()
-
-  return {
-    add: () => {
-      seen++
-
-      for (const waiter of waiting)
-        if (seen >= waiter.count) {
-          waiting.delete(waiter)
-          waiter.wake()
-        }
-    },
-    reached: (count: number) =>
-      Effect.callback<void>((resume) => {
-        if (seen >= count) return resume(Effect.void)
-
-        const waiter = { count, wake: () => resume(Effect.void) }
-        waiting.add(waiter)
-
-        return Effect.sync(() => waiting.delete(waiter))
-      }),
-  }
 }
 
 const sseChunk = (delta: CompletionDelta, finishReason: string | null) =>
@@ -297,6 +272,7 @@ export const fakeModelProvider = Effect.fnUntraced(function* (
       join(home, ".project-glass", "settings.json"),
       JSON.stringify({
         tourModels: { pi: { provider: "glass-test", modelId: "gpt-test" } },
+        agentReviewModels: { pi: { provider: "glass-test", modelId: "gpt-test" } },
       }),
     )
   })

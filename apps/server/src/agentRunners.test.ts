@@ -1,141 +1,207 @@
-import { NodeServices } from "@effect/platform-node"
 import { assert, it } from "@effect/vitest"
-import type { EngineModels } from "@glass/contracts"
-import { ConfigProvider, Effect, Layer, Schema } from "effect"
-import { realpathSync } from "node:fs"
-import { mkdir, writeFile } from "node:fs/promises"
+import { Effect, Fiber } from "effect"
+import { mkdirSync, readdirSync } from "node:fs"
 import { join } from "node:path"
-import { fakeAgent } from "../test/fakeAgent"
-import { piCliAnswer, piCliModels } from "../test/fakeAgentFiles"
+import { vi } from "vite-plus/test"
 import { isolatedHome } from "../test/harness"
+import {
+  type Recording,
+  readRecording,
+  replaySpawner,
+  type RunnerScenario,
+  runnerScenarios,
+  runnersLayer,
+  seedCheckout,
+} from "../test/runnerReplay"
 import { AgentRunners } from "./agentRunners"
-import { ServerConfig } from "./ServerConfig"
 
-const models: EngineModels = {
-  "claude-code": "claude-sonnet-5-5",
-  pi: { provider: "anthropic", modelId: "claude-sonnet-5-5" },
-}
+const scenarioNamed = (name: string) => runnerScenarios.find((scenario) => scenario.name === name)!
 
-const runnersLayer = (home: string, command: string) =>
-  AgentRunners.layer.pipe(
-    Layer.provide(ServerConfig.layer),
-    Layer.provide(
-      ConfigProvider.layer(
-        ConfigProvider.fromEnvRecord({
-          GLASS_PORT: "0",
-          GLASS_TOKEN: "unused",
+const fixture = Effect.fnUntraced(function* (
+  scenario: RunnerScenario,
+  options: { hold?: boolean; recording?: Recording } = {},
+) {
+  const home = yield* isolatedHome
+  const temporary = join(home, "tmp")
+  const checkout = join(home, "checkout")
+  mkdirSync(temporary)
+  seedCheckout(checkout)
+
+  for (const name of ["TMPDIR", "TEMP", "TMP"]) vi.stubEnv(name, temporary)
+
+  const recording = options.recording ?? readRecording(scenario.name)
+  const replay = replaySpawner(recording, { "<checkout>": checkout }, options)
+
+  const run = Effect.gen(function* () {
+    const runner = yield* (yield* AgentRunners).select({
+      engine: scenario.engine,
+      models: recording.models,
+    })
+
+    return yield* runner.run(scenario.task(checkout))
+  }).pipe(
+    Effect.scoped,
+    Effect.provide(
+      runnersLayer(
+        {
           GLASS_HOME: home,
-          GLASS_CLAUDE_COMMAND: command,
-          GLASS_PI_COMMAND: command,
-        }),
+          GLASS_CLAUDE_COMMAND: join(home, "claude"),
+          GLASS_PI_COMMAND: join(home, "pi"),
+        },
+        replay.layer,
       ),
     ),
-    Layer.provide(NodeServices.layer),
-    Layer.orDie,
   )
 
-const readOnlyTask = (directory: string) => ({
-  subject: "Agent review",
-  instructions: "Review the code.",
-  prompt: "PR material",
-  answer: Schema.Struct({ summary: Schema.String }),
-  files: { readOnly: directory },
+  return {
+    recording,
+    replay,
+    run,
+    leftovers: () => readdirSync(temporary).filter((name) => name.startsWith("glass-agent-")),
+  }
 })
 
-it.live("the pi CLI reads a read-only directory with only its read-only tools", () =>
-  Effect.gen(function* () {
-    const home = yield* isolatedHome
-    const checkout = join(home, "checkout")
-    yield* Effect.promise(() => mkdir(join(checkout, "src"), { recursive: true }))
-    yield* Effect.promise(() => writeFile(join(checkout, "src", "greet.ts"), "hello"))
+for (const scenario of runnerScenarios)
+  it.live(`replays ${scenario.name} to the outcome the real CLI gave`, () =>
+    Effect.gen(function* () {
+      const f = yield* fixture(scenario)
 
-    const agent = yield* fakeAgent({
-      ready: true,
-      output: piCliAnswer('{"summary":"Fine."}'),
-      modelsOutput: piCliModels,
+      const outcome = yield* f.run.pipe(
+        Effect.match({
+          onSuccess: (answer) => ({ answer }),
+          onFailure: (failure) => {
+            for (const spawn of f.recording.spawns)
+              if (spawn.stdout.trim().length > 20) assert.notInclude(failure.message, spawn.stdout)
+
+            return { failure: failure.reason }
+          },
+        }),
+      )
+
+      assert.deepStrictEqual(outcome, f.recording.outcome)
+      assert.deepStrictEqual(f.replay.unexpected, [])
+      assert.strictEqual(f.replay.unused(), 0)
+      assert.isEmpty(f.leftovers())
+    }),
+  )
+
+for (const name of ["claude-answer", "pi-answer"])
+  it.live(`stopping ${name} part-way stops the CLI and removes its directory`, () =>
+    Effect.gen(function* () {
+      const f = yield* fixture(scenarioNamed(name), { hold: true })
+
+      const running = yield* Effect.forkChild(f.run)
+      yield* f.replay.served(f.recording.spawns.length)
+      yield* Fiber.interrupt(running)
+
+      yield* f.replay.stopped(1)
+      assert.isEmpty(f.leftovers())
+    }),
+  )
+
+const edited = (
+  base: string,
+  printed: (spawn: Recording["spawns"][number]) => boolean,
+  from: string,
+  to: string,
+): Recording => {
+  const recorded = readRecording(base)
+  const target = recorded.spawns.find(printed)!
+  assert.include(target.stdout, from)
+
+  return {
+    ...recorded,
+    spawns: recorded.spawns.map((spawn) =>
+      spawn === target ? { ...spawn, stdout: spawn.stdout.replaceAll(from, to) } : spawn,
+    ),
+  }
+}
+
+const piText = '{"type":"text","text":"{\\"summary\\":\\"Fine.\\"}"}'
+
+for (const [name, base, from, to] of [
+  ["a truncated pi answer", "pi-answer", '"stopReason":"stop"', '"stopReason":"length"'],
+  ["a pi text block without text", "pi-answer", piText, `${piText},{"type":"text"}`],
+  [
+    "a pi answer that isn't JSON",
+    "pi-answer",
+    piText,
+    '{"type":"text","text":"not JSON secret-should-not-leak"}',
+  ],
+  [
+    "a Claude Code answer that isn't JSON",
+    "claude-answer",
+    '"result":"{\\"summary\\":\\"Fine.\\"}"',
+    '"result":"not JSON secret-should-not-leak"',
+  ],
+] as const)
+  it.live(`fails as unusable output for ${name}`, () =>
+    Effect.gen(function* () {
+      const f = yield* fixture(scenarioNamed(base), {
+        recording: edited(base, (spawn) => spawn.args.includes("-p"), from, to),
+      })
+
+      const failure = yield* Effect.flip(f.run)
+      assert.strictEqual(failure.reason, "unusable-output")
+      assert.notInclude(failure.message, "secret-should-not-leak")
+    }),
+  )
+
+const withoutRestrictedTools = (base: string) =>
+  edited(base, (spawn) => spawn.args[0] === "--help", "--restricted", "--unrelated")
+
+it.live("refuses file access to a Claude Code that can't restrict its tools", () =>
+  Effect.gen(function* () {
+    const f = yield* fixture(scenarioNamed("claude-read-only"), {
+      recording: withoutRestrictedTools("claude-read-only"),
     })
 
-    const answered = yield* Effect.gen(function* () {
-      const selected = yield* (yield* AgentRunners).select({ engine: "pi", models })
-
-      return yield* selected.run(readOnlyTask(checkout))
-    }).pipe(Effect.scoped, Effect.provide(runnersLayer(home, agent.command)))
-
-    assert.deepStrictEqual(answered, { summary: "Fine." })
-    const prompted = (yield* agent.calls).find((call) => call.stage === "prompted")!
-    assert.strictEqual(prompted.cwd, realpathSync(checkout))
-    assert.deepStrictEqual(prompted.files, ["src/greet.ts"])
-    assert.include(prompted.args.join(" "), "--tools read,grep,find,ls")
-    assert.notInclude(prompted.args, "--no-tools")
-    assert.strictEqual(prompted.systemPrompt, "Review the code.")
+    const failure = yield* Effect.flip(f.run)
+    assert.strictEqual(failure.reason, "not-ready")
   }),
 )
 
-const claudeAnswer = JSON.stringify({ result: '{"summary":"Fine."}' })
-
-it.live("Claude Code reads a read-only directory with only its restricted read tools", () =>
+it.live("runs a task without file access on a Claude Code that can't restrict its tools", () =>
   Effect.gen(function* () {
-    const home = yield* isolatedHome
-    const checkout = join(home, "checkout")
-    yield* Effect.promise(() => mkdir(join(checkout, "src"), { recursive: true }))
-    yield* Effect.promise(() => writeFile(join(checkout, "src", "greet.ts"), "hello"))
-
-    const agent = yield* fakeAgent({ ready: true, output: claudeAnswer })
-
-    const answered = yield* Effect.gen(function* () {
-      const selected = yield* (yield* AgentRunners).select({ engine: "claude-code", models })
-
-      return yield* selected.run(readOnlyTask(checkout))
-    }).pipe(Effect.scoped, Effect.provide(runnersLayer(home, agent.command)))
-
-    assert.deepStrictEqual(answered, { summary: "Fine." })
-    const prompted = (yield* agent.calls).find((call) => call.stage === "prompted")!
-    assert.strictEqual(prompted.cwd, realpathSync(checkout))
-    assert.include(prompted.args.join(" "), "--restricted --tools Read,Grep,Glob")
-    assert.notInclude(prompted.args, "--json-schema")
-    assert.include(prompted.input, '"summary"')
-  }),
-)
-
-it.live("Claude Code runs a task without file access with no tools", () =>
-  Effect.gen(function* () {
-    const home = yield* isolatedHome
-    const agent = yield* fakeAgent({ ready: true, output: claudeAnswer })
-
-    yield* Effect.gen(function* () {
-      const selected = yield* (yield* AgentRunners).select({ engine: "claude-code", models })
-
-      return yield* selected.run({ ...readOnlyTask(home), files: "none" })
-    }).pipe(Effect.scoped, Effect.provide(runnersLayer(home, agent.command)))
-
-    const prompted = (yield* agent.calls).find((call) => call.stage === "prompted")!
-    assert.notStrictEqual(prompted.cwd, realpathSync(home))
-    assert.include(prompted.args.join(" "), "--tools  --strict-mcp-config")
-    assert.notInclude(prompted.args, "--restricted")
-  }),
-)
-
-it.live("a Claude Code that can't restrict its tools runs only tasks without file access", () =>
-  Effect.gen(function* () {
-    const home = yield* isolatedHome
-
-    const agent = yield* fakeAgent({
-      ready: true,
-      output: claudeAnswer,
-      helpOutput: "--tools --strict-mcp-config --no-session-persistence --disable-slash-commands",
+    const f = yield* fixture(scenarioNamed("claude-answer"), {
+      recording: withoutRestrictedTools("claude-answer"),
     })
 
-    const [readOnly, none] = yield* Effect.gen(function* () {
-      const selected = yield* (yield* AgentRunners).select({ engine: "claude-code", models })
+    assert.deepStrictEqual(yield* f.run, { summary: "Fine." })
+  }),
+)
 
-      return yield* Effect.all([
-        selected.run(readOnlyTask(home)).pipe(Effect.flip),
-        selected.run({ ...readOnlyTask(home), files: "none" }),
-      ])
-    }).pipe(Effect.scoped, Effect.provide(runnersLayer(home, agent.command)))
+it.live("reports a runner whose executable is missing as not installed", () =>
+  Effect.gen(function* () {
+    const home = yield* isolatedHome
 
-    assert.strictEqual(readOnly.reason, "not-ready")
-    assert.include(readOnly.message, "can't be limited to reading the PR's code")
-    assert.deepStrictEqual(none, { summary: "Fine." })
+    const failures = yield* Effect.forEach(["claude-code", "pi"] as const, (engine) =>
+      Effect.gen(function* () {
+        const runner = yield* (yield* AgentRunners).select({
+          engine,
+          models: {
+            "claude-code": "claude-haiku",
+            pi: { provider: "glass-test", modelId: "gpt-test" },
+          },
+        })
+
+        return runner
+      }).pipe(
+        Effect.scoped,
+        Effect.flip,
+        Effect.provide(
+          runnersLayer({
+            GLASS_HOME: home,
+            GLASS_CLAUDE_COMMAND: "glass-missing-claude",
+            GLASS_PI_COMMAND: "glass-missing-pi",
+          }),
+        ),
+      ),
+    )
+
+    assert.deepStrictEqual(
+      failures.map((failure) => failure.reason),
+      ["not-installed", "not-installed"],
+    )
   }),
 )

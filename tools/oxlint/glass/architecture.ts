@@ -22,6 +22,7 @@ const transportOwners = new Set([
   "agentHost.ts",
   "agentHost/handlers.ts",
   "agentHost/server.ts",
+  "agentHost/serve.ts",
   "rpcSocket.ts",
   "LocalAgentHost.ts",
   "sandboxCalls.ts",
@@ -35,6 +36,7 @@ const entryPoints = new Set([
   "agentHost.ts",
   "agentHost/handlers.ts",
   "agentHost/server.ts",
+  "agentHost/serve.ts",
   "rpcSocket.ts",
 ])
 

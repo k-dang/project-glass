@@ -2,25 +2,19 @@ import { NodeSocket } from "@effect/platform-node"
 import { assert, it } from "@effect/vitest"
 import { RPC_PATH, TextPart, TurnCutOff, TurnDone } from "@glass/contracts"
 import { Effect, Predicate, Stream } from "effect"
-import { vi } from "vite-plus/test"
-import { agentsFixture, claudeCode, lastText, settled } from "../test/agentsFixture"
+import { agentsFixture, holding, lastText, settled } from "../test/agentsFixture"
 import { AgentHostRpcs, HOST_TOKEN_HEADER } from "./agentHost/protocol"
 import { connectRpcClient } from "./rpcSocket"
-
-vi.stubEnv("PI_OFFLINE", "1")
 
 it.live(
   "connects to a Sandbox's host again after a dropped connection, catching up on what it missed",
   () =>
     Effect.gen(function* () {
-      const f = yield* agentsFixture({})
-      yield* f.claude.hold
-      const agent = yield* f.startSandbox("Start", claudeCode)
-      yield* f.claude.received(1)
-
-      f.sandboxes.dropConnections(agent.id)
-      yield* f.claude.release
-
+      const f = yield* agentsFixture
+      const agent = yield* f.startSandbox("hold:start")
+      yield* f.transcript(agent.id, holding)
+      yield* Effect.promise(() => f.sandboxes.dropConnections(agent.id))
+      yield* f.release("start")
       const { port, token } = f.sandboxes.host(agent.id)
 
       const witness = yield* connectRpcClient(AgentHostRpcs, `ws://127.0.0.1:${port}${RPC_PATH}`, {
@@ -38,24 +32,24 @@ it.live(
 
       const [turn] = yield* f.transcript(agent.id, settled(1))
       assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
-      assert.deepStrictEqual(lastText(turn), TextPart.make({ text: "Fake reply to: Start" }))
+      assert.deepStrictEqual(lastText(turn), TextPart.make({ text: "Reply to: hold:start" }))
     }),
 )
 
 it.live("cuts off only the running Turn of an Agent whose Sandbox host is lost", () =>
   Effect.gen(function* () {
-    const f = yield* agentsFixture({ output: "Done.", hang: true })
-    const local = yield* f.start("Locally")
-    const sandboxed = yield* f.startSandbox("In the Sandbox")
-    yield* f.model.received(2)
+    const f = yield* agentsFixture
+    const local = yield* f.start("hold:local")
+    const sandboxed = yield* f.startSandbox("hold:sandboxed")
+    yield* f.transcript(local.id, holding)
+    yield* f.transcript(sandboxed.id, holding)
 
     yield* Effect.promise(() => f.sandboxes.killHost(sandboxed.id))
 
     const [lost] = yield* f.transcript(sandboxed.id, settled(1))
     assert.deepStrictEqual(lost?.ended?.ending, TurnCutOff.make({}))
 
-    yield* f.model.release({ output: "Done." })
-
+    yield* f.release("local")
     const [kept] = yield* f.transcript(local.id, settled(1))
     assert.deepStrictEqual(kept?.ended?.ending, TurnDone.make({}))
   }),
@@ -63,19 +57,19 @@ it.live("cuts off only the running Turn of an Agent whose Sandbox host is lost",
 
 it.live("fills in what a Sandbox Agent did while Glass was closed, once Glass opens again", () =>
   Effect.gen(function* () {
-    const f = yield* agentsFixture({ output: "Started.", hang: true })
-    const agent = yield* f.startSandbox("Start")
-    yield* f.model.received(1)
+    const f = yield* agentsFixture
+    const agent = yield* f.startSandbox("hold:start")
+    yield* f.transcript(agent.id, holding)
 
     yield* f.quit
-    yield* f.model.release({ output: "Finished." })
+    yield* f.release("start")
     const relaunched = yield* f.launch
 
     const [turn] = yield* f.transcript(agent.id, settled(1), relaunched)
     assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
     assert.deepStrictEqual(
       turn?.parts.filter((part) => Predicate.isTagged(part, "Text")),
-      [TextPart.make({ text: "Finished." })],
+      [TextPart.make({ text: "Holding." }), TextPart.make({ text: "Reply to: hold:start" })],
     )
   }),
 )
@@ -84,17 +78,19 @@ it.live(
   "marks a Sandbox it can't reach unreachable without holding up local Agents, then fills in how its Turn ended",
   () =>
     Effect.gen(function* () {
-      const f = yield* agentsFixture({ output: "Done.", hang: true })
-      const local = yield* f.start("Locally")
-      const sandboxed = yield* f.startSandbox("In the Sandbox")
-      yield* f.model.received(2)
+      const f = yield* agentsFixture
+      const local = yield* f.start("hold:local")
+      const sandboxed = yield* f.startSandbox("hold:sandboxed")
+      yield* f.transcript(local.id, holding)
+      yield* f.transcript(sandboxed.id, holding)
 
-      f.sandboxes.dropConnections(sandboxed.id)
+      yield* Effect.promise(() => f.sandboxes.dropConnections(sandboxed.id))
       yield* f.sandboxStatus(sandboxed.id, ({ reach }) => reach === "unreachable")
       const [cutOff] = yield* f.transcript(sandboxed.id, settled(1))
       assert.deepStrictEqual(cutOff?.ended?.ending, TurnCutOff.make({}))
 
-      yield* f.model.release({ output: "Done." })
+      yield* f.release("local")
+      yield* f.release("sandboxed")
       const [kept] = yield* f.transcript(local.id, settled(1))
       assert.deepStrictEqual(kept?.ended?.ending, TurnDone.make({}))
 
@@ -106,15 +102,18 @@ it.live(
         ([turn]) => turn?.ended?.ending._tag === "Done",
       )
 
-      assert.deepStrictEqual(lastText(filledIn), TextPart.make({ text: "Done." }))
+      assert.deepStrictEqual(
+        lastText(filledIn),
+        TextPart.make({ text: "Reply to: hold:sandboxed" }),
+      )
     }),
 )
 
 it.live("cuts off a Turn whose Sandbox host died while Glass was closed", () =>
   Effect.gen(function* () {
-    const f = yield* agentsFixture({ output: "Done.", hang: true })
-    const agent = yield* f.startSandbox("Start")
-    yield* f.model.received(1)
+    const f = yield* agentsFixture
+    const agent = yield* f.startSandbox("hold:start")
+    yield* f.transcript(agent.id, holding)
 
     yield* f.quit
     yield* Effect.promise(() => f.sandboxes.killHost(agent.id))

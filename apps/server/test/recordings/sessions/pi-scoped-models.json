@@ -1,0 +1,122 @@
+{
+  "scenario": "pi-scoped-models",
+  "processes": [
+    {
+      "args": ["--mode", "rpc"],
+      "cwd": "<home>",
+      "frames": [
+        {
+          "out": {
+            "type": "get_available_models",
+            "id": "glass-1"
+          }
+        },
+        {
+          "in": {
+            "id": "glass-1",
+            "type": "response",
+            "command": "get_available_models",
+            "success": true,
+            "data": {
+              "models": [
+                {
+                  "id": "gpt-test",
+                  "name": "gpt-test",
+                  "api": "openai-completions",
+                  "provider": "glass-test",
+                  "baseUrl": "http://127.0.0.1:55089/v1",
+                  "reasoning": false,
+                  "input": ["text", "image"],
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0
+                  },
+                  "contextWindow": 128000,
+                  "maxTokens": 4096
+                },
+                {
+                  "id": "gpt-test-thinking",
+                  "name": "GPT Test Thinking",
+                  "api": "openai-completions",
+                  "provider": "glass-test",
+                  "baseUrl": "http://127.0.0.1:55089/v1",
+                  "reasoning": true,
+                  "input": ["text"],
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0
+                  },
+                  "contextWindow": 128000,
+                  "maxTokens": 4096
+                },
+                {
+                  "id": "extension-model",
+                  "reasoning": false,
+                  "input": ["text"],
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0
+                  },
+                  "contextWindow": 128000,
+                  "maxTokens": 4096,
+                  "api": "openai-completions",
+                  "provider": "glass-extension",
+                  "baseUrl": "http://127.0.0.1:1/v1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "out": {
+            "type": "get_state",
+            "id": "glass-2"
+          }
+        },
+        {
+          "in": {
+            "id": "glass-2",
+            "type": "response",
+            "command": "get_state",
+            "success": true,
+            "data": {
+              "model": {
+                "id": "extension-model",
+                "reasoning": false,
+                "input": ["text"],
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0
+                },
+                "contextWindow": 128000,
+                "maxTokens": 4096,
+                "api": "openai-completions",
+                "provider": "glass-extension",
+                "baseUrl": "http://127.0.0.1:1/v1"
+              },
+              "thinkingLevel": "off",
+              "isStreaming": false,
+              "isCompacting": false,
+              "steeringMode": "one-at-a-time",
+              "followUpMode": "one-at-a-time",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<home>--\\2026-11-02T10-17-02-725Z_01a19bc3-3005-74c9-88dc-b3818bd2de76.jsonl",
+              "sessionId": "01a19bc3-3005-74c9-88dc-b3818bd2de76",
+              "autoCompactionEnabled": true,
+              "messageCount": 0,
+              "pendingMessageCount": 0
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "calls": []
+}

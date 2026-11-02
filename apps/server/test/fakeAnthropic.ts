@@ -1,6 +1,7 @@
 import { Effect, Predicate, Result, Schema } from "effect"
 import { randomUUID } from "node:crypto"
 import { createServer, type ServerResponse } from "node:http"
+import { counter } from "./counter.ts"
 import { portOf } from "./ports.ts"
 
 const TextBlock = Schema.Struct({
@@ -36,6 +37,8 @@ type Block = typeof Block.Type
 type Message = typeof Message.Type
 
 export type FakeAnthropicRequest = typeof Request.Type
+
+export type FakeAnthropicReply = Reply
 
 type Reply =
   | { readonly type: "text"; readonly text: string }
@@ -164,36 +167,10 @@ const message = (model: string, reply: Reply) => ({
   usage: { input_tokens: 1, output_tokens: 1 },
 })
 
-const counter = () => {
-  let seen = 0
-  const waiting = new Set<{ readonly count: number; readonly wake: () => void }>()
-
-  return {
-    add: () => {
-      seen++
-
-      for (const waiter of waiting)
-        if (seen >= waiter.count) {
-          waiting.delete(waiter)
-          waiter.wake()
-        }
-    },
-    reached: (count: number) =>
-      Effect.callback<void>((resume) => {
-        if (seen >= count) return resume(Effect.void)
-
-        const waiter = { count, wake: () => resume(Effect.void) }
-        waiting.add(waiter)
-
-        return Effect.sync(() => waiting.delete(waiter))
-      }),
-  }
-}
-
 /** The shared Messages API boundary for real Claude CLI integration and app verification. */
 export const startFakeAnthropic = Effect.gen(function* () {
-  const calls: Array<FakeAnthropicRequest> = []
   const received = counter()
+  let respond: (request: FakeAnthropicRequest) => Reply = replyTo
   let held: Array<() => void> | null = null
 
   const releaseHeld = () => {
@@ -221,12 +198,11 @@ export const startFakeAnthropic = Effect.gen(function* () {
 
     const parsed = decoded.success
     const model = parsed.model ?? "claude-fake"
-    const reply = replyTo(parsed)
+    const reply = respond(parsed)
 
     const conversation = (parsed.tools ?? []).length > 0
 
     if (conversation) {
-      calls.push(parsed)
       received.add()
 
       if (held !== null) {
@@ -267,10 +243,11 @@ export const startFakeAnthropic = Effect.gen(function* () {
 
   return {
     url: `http://127.0.0.1:${portOf(server)}`,
-    /** The conversation's requests, leaving out side requests such as naming the session. */
-    calls,
     received: received.reached,
-    /** Keeps later replies back until `release`. */
+    respond: (reply: (request: FakeAnthropicRequest) => Reply) =>
+      Effect.sync(() => {
+        respond = reply
+      }),
     hold: Effect.sync(() => {
       held ??= []
     }),

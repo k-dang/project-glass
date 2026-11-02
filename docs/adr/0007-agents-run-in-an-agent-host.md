@@ -26,19 +26,25 @@ Building Claude Code Agents confirmed the SDK over driving `claude` stream-json 
 the stream-json control protocol, already written and kept in step with the CLI. Glass pins its
 version, points it at the user's `claude`, and asks for Claude Code's own system prompt and the
 user, project, and local settings sources, since the SDK otherwise starts `claude` without them.
+Tests check Glass's own rules at seams Glass owns, and its use of each program against recordings
+of the real program. A hand-written fake `claude` came before this and encoded wrong beliefs about
+the CLI, such as its model list and asking before read-only commands, while its tests passed.
 Business-service tests supply an `AgentAdapter` and explicit domain events through the real host
-handlers and journal; a program that exits is a session that closes. Each program's translation
-into Glass's events is a pure `step`, tested by feeding it the program's messages. Wiring to a
-program (continuing a conversation, images, model and effort changes, Permission requests and
-Questions) runs the pinned Claude Code CLI or the bundled pi against a fake model API, and desktop
-verification does the same. A hand-written fake `claude` came before this and encoded wrong
-beliefs about the CLI, such as its model list and asking before read-only commands, while its tests
-passed; running the pinned CLI catches such changes on each upgrade. Recordings of real runs are the
-other honest fake, and capture model behaviour a hand-written fake model API can't, such as thinking
-and subagents, at the cost of re-recording on each upgrade. Those wiring tests run the host and the
-program as real processes, and so do the tests whose subject is a process: a host that dies or a
-dropped connection. Everything else runs in-process. A fake SDK query covers failures the real CLI
-won't produce on demand, such as a failed handshake.
+handlers and journal; a program that exits is a session that closes. Sandbox bookkeeping runs real
+host servers in the test process. Tests whose subject is a process (a host that dies, a dropped
+connection, a Sandbox that outlives Glass) run the agent host as a real process on a scripted
+adapter, and Tours, Agent reviews, and Asks supply scripted `AgentRunners`. Each program's
+translation into Glass's events is a pure `step`, tested by feeding it the program's messages.
+Wiring to a program (continuing a conversation, images, model, effort and Permission mode changes,
+Permission requests, Questions, Steers, Stop) replays a recording of the real program, matched
+launch by launch and message by message, so a change in what Glass sends fails until it is
+recorded again: Agent sessions are recorded from the pinned Claude Code CLI and the bundled pi
+answering fake model APIs (`GLASS_RECORD_SESSIONS=1`), and the completion runners (ADR 0004) from
+the user's own `claude` and `pi` (`test/recordRunnerReplays.ts`). Recordings also capture model
+behaviour a hand-written fake can't, at the cost of recording again whenever the pinned SDK or the
+bundled pi changes. Desktop end-to-end tests and `pnpm dev:fake` run the real programs against the
+fake model APIs. A fake SDK query stays only for failures the real CLI won't produce on demand,
+such as a failed handshake.
 
 ## Considered Options
 

@@ -1,7 +1,6 @@
 import { Effect } from "effect"
 import { join } from "node:path"
 import { bundledPi } from "../../server/test/demoAgent"
-import { fakeModelProvider } from "../../server/test/fakeModelProvider"
 import { installFakeSandboxProvider } from "../../server/test/fakeSandboxProvider"
 import { seedClone } from "../../server/test/gitRepositories"
 import { expect, test as glass } from "./glass"
@@ -11,22 +10,8 @@ const repository = { owner: "glass-demo", repo: "greeter" }
 const reply = "Finished while you were away."
 
 const test = glass.extend<{
-  model: Effect.Success<ReturnType<typeof fakeModelProvider>>
   sandboxes: ReturnType<typeof installFakeSandboxProvider>
 }>({
-  model: [
-    async ({ home }, use) => {
-      await Effect.runPromise(
-        Effect.scoped(
-          Effect.flatMap(
-            fakeModelProvider(home, { output: reply, hang: true }, { retry: { enabled: false } }),
-            (model) => Effect.promise(() => use(model)),
-          ),
-        ),
-      )
-    },
-    { auto: true },
-  ],
   sandboxes: [
     async ({ home }, use) => {
       const { origin } = seedClone(join(home, "repositories"), repository.owner, repository.repo)
@@ -45,9 +30,11 @@ const test = glass.extend<{
   ],
 })
 
+test.use({ piModel: { output: reply, hang: true } })
+
 test("starts a Sandbox Agent, and fills in what it missed while its connection was down", async ({
   github,
-  model,
+  pi: { model },
   sandboxes,
   window,
 }) => {
@@ -77,7 +64,7 @@ test("starts a Sandbox Agent, and fills in what it missed while its connection w
   await Effect.runPromise(model.received(1))
   const agentId = /#\/agents\/([^/?]+)/.exec(window.url())?.[1] ?? ""
   expect(agentId).not.toBe("new")
-  sandboxes.dropConnections(agentId)
+  await sandboxes.dropConnections(agentId)
   await expect(
     window
       .getByRole("navigation", { name: "Agents list" })

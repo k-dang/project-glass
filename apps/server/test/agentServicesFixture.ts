@@ -15,8 +15,18 @@ import {
   type RequestNotWaiting,
   thisMac,
 } from "@glass/contracts"
-import { Context, Deferred, Effect, Exit, Layer, Option, Queue, Scope, Stream } from "effect"
-import { SqlClient } from "effect/sql"
+import {
+  ConfigProvider,
+  Context,
+  Deferred,
+  Effect,
+  Exit,
+  Layer,
+  Option,
+  Queue,
+  Scope,
+  Stream,
+} from "effect"
 import { RpcTest } from "effect/rpc"
 import type { AgentAdapter, AgentSession } from "../src/agentHost/adapter"
 import type { DeliveredMessage } from "../src/agentHost/deliveredMessage"
@@ -31,6 +41,7 @@ import { followJournal } from "../src/hostJournal"
 import { migrationLoader } from "../src/Migrations"
 import { Plugins } from "../src/Plugins"
 import { Sandboxes } from "../src/Sandboxes"
+import { ServerConfig } from "../src/ServerConfig"
 import { LocalPlacement } from "../src/LocalPlacement"
 import { ToDos } from "../src/ToDos"
 import { Transcripts } from "../src/Transcripts"
@@ -177,6 +188,15 @@ export const agentServicesFixture = Effect.gen(function* () {
                 ),
               ),
               Layer.provide(NodeSocket.layerWebSocketConstructor),
+              Layer.provide(
+                ServerConfig.layer.pipe(
+                  Layer.provide(
+                    ConfigProvider.layer(
+                      ConfigProvider.fromEnvRecord({ GLASS_PORT: "0", GLASS_TOKEN: "unused" }),
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
           Layer.provideMerge(Transcripts.layer),
@@ -219,7 +239,6 @@ export const agentServicesFixture = Effect.gen(function* () {
 
   return {
     ...running,
-    sql: Context.get(database, SqlClient.SqlClient),
     answers,
     stops,
     starts,
@@ -240,7 +259,6 @@ export const agentServicesFixture = Effect.gen(function* () {
       Effect.sync(() => {
         nextAnswer = Effect.fail(error)
       }),
-    /** Later program starts wait until `releaseStart`. */
     holdStart: Deferred.make<void>().pipe(
       Effect.map((gate) => {
         starting = gate
@@ -249,14 +267,12 @@ export const agentServicesFixture = Effect.gen(function* () {
     releaseStart: Effect.suspend(() =>
       starting === null ? Effect.void : Deferred.succeed(starting, undefined).pipe(Effect.asVoid),
     ),
-    /** Ends the Agent's program, as a crash would. */
     exit: (agentId: string) =>
       Effect.suspend(() => {
         const exited = exits.get(agentId)
 
         return exited === undefined ? Effect.void : Deferred.succeed(exited, undefined)
       }).pipe(Effect.asVoid),
-    /** What the program answers Stop with: the Steers it hadn't taken in. */
     leaveOnStop: (messages: ReadonlyArray<SentMessage>) =>
       Effect.sync(() => {
         leftOnStop = messages

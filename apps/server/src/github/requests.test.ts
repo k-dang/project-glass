@@ -29,6 +29,7 @@ const clientWith = Effect.fnUntraced(function* (
           githubApiUrl: "http://127.0.0.1",
           claudeCommand: "claude",
           piCommand: "pi",
+          agentHostBundle: "agentHost.mjs",
           tourTimeoutMs: 300_000,
           askTimeoutMs: 300_000,
           agentReviewTimeoutMs: 900_000,

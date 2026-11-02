@@ -64,7 +64,6 @@ const demoReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
   ]
 }
 
-/** Runs Claude Code Agents on the pinned CLI against a fake Anthropic API, so they need no login. */
 export const startDemoClaude = Effect.fnUntraced(function* (directory: string) {
   const { url } = yield* startFakeAnthropic
   const environment = fakeAnthropicEnvironment(directory, url)

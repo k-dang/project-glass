@@ -6,7 +6,7 @@ import { expect, test } from "./glass"
 const agentTurnTimeout = 20_000
 
 test.use({
-  realPiModel: {
+  piModel: {
     reply: runCommands({
       "Write a note": "printf 'hello from the Agent\\n' > notes.txt",
       "Write another": "printf 'a second note\\n' > more.txt",

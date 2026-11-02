@@ -11,19 +11,13 @@ import { mkdtemp, rm } from "node:fs/promises"
 import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { AgentReviewAnswer } from "../../server/src/agentReviewPrompt"
-import type { AskAgentAnswer } from "../../server/src/askPrompt"
 import type { TourAnswer } from "../../server/src/tourPrompt"
 import { bundledPi } from "../../server/test/demoAgent"
-import {
-  claudeAnswer,
-  installFakeAgent,
-  piCliAnswer,
-  piCliModels,
-} from "../../server/test/fakeAgentFiles"
+import { startFakeAnthropic } from "../../server/test/fakeAnthropic"
 import { type FakeModelSettings, fakeModelProvider } from "../../server/test/fakeModelProvider"
 import { type FakeGitHub, startFakeGitHub } from "../../server/test/fakeGitHub"
 import { type FakePullRequest, VIEWER } from "../../server/test/fakePullRequest"
+import { fakeAnthropicEnvironment } from "../../server/test/pinnedClaude"
 
 const desktopDir = join(import.meta.dirname, "..")
 
@@ -31,25 +25,21 @@ const electronPath: string = createRequire(import.meta.url)("electron")
 
 const UNINHERITED = new Set(["VITE_DEV_SERVER_URL", "ELECTRON_RUN_AS_NODE", "GLASS_HOME"])
 
-interface FakeClaude {
-  readonly command: string
+interface Claude {
   readonly answer: (tour: TourAnswer) => Promise<void>
   readonly environment: Readonly<Record<string, string>>
-}
-
-interface FakePiCli {
-  readonly command: string
-  readonly answer: (answer: AgentReviewAnswer | AskAgentAnswer) => Promise<void>
 }
 
 interface Glass {
   readonly home: string
   readonly git: boolean
   readonly github: FakeGitHub
-  readonly claude: FakeClaude
-  readonly piCli: FakePiCli
-  readonly realPiModel: FakeModelSettings | null
-  readonly realPi: string | null
+  readonly claude: Claude
+  readonly piModel: FakeModelSettings
+  readonly pi: {
+    readonly command: string
+    readonly model: Effect.Success<ReturnType<typeof fakeModelProvider>>
+  }
   readonly app: ElectronApplication
   readonly window: Page
 }
@@ -70,51 +60,34 @@ export const test = base.extend<Glass>({
       ),
     )
   },
-  // oxlint-disable-next-line no-empty-pattern -- Playwright reads a fixture's dependencies from it.
-  claude: async ({}, use) => {
-    const directory = await mkdtemp(join(tmpdir(), "glass-e2e-claude-"))
-    const agent = await installFakeAgent(directory, "claude.cjs", { ready: true, output: "" })
-
-    const answer = (tour: TourAnswer) =>
-      agent.configure({ ready: true, output: claudeAnswer(tour) })
-
-    await use({ command: agent.command, answer, environment: {} })
-    await rm(directory, { recursive: true, force: true })
-  },
-  // oxlint-disable-next-line no-empty-pattern -- Playwright reads a fixture's dependencies from it.
-  piCli: async ({}, use) => {
-    const directory = await mkdtemp(join(tmpdir(), "glass-e2e-pi-"))
-    const modelsOutput = piCliModels
-
-    const agent = await installFakeAgent(directory, "pi.cjs", {
-      ready: true,
-      output: "",
-      modelsOutput,
-    })
-
-    const answer = (answered: AgentReviewAnswer | AskAgentAnswer) =>
-      agent.configure({
-        ready: true,
-        modelsOutput,
-        output: piCliAnswer(JSON.stringify(answered)),
-      })
-
-    await use({ command: agent.command, answer })
-    await rm(directory, { recursive: true, force: true })
-  },
-  realPiModel: [null, { option: true }],
-  realPi: async ({ realPiModel, home }, use) => {
-    if (realPiModel === null) return use(null)
-
+  claude: async ({ home }, use) => {
     await Effect.runPromise(
       Effect.scoped(
-        Effect.flatMap(fakeModelProvider(home, realPiModel, { retry: { enabled: false } }), () =>
-          Effect.promise(() => use(bundledPi)),
+        Effect.flatMap(startFakeAnthropic, (anthropic) =>
+          Effect.promise(() =>
+            use({
+              answer: (tour) =>
+                Effect.runPromise(
+                  anthropic.respond(() => ({ type: "text", text: JSON.stringify(tour) })),
+                ),
+              environment: fakeAnthropicEnvironment(home, anthropic.url),
+            }),
+          ),
         ),
       ),
     )
   },
-  app: async ({ github, claude, piCli, realPi, home }, use) => {
+  piModel: [{}, { option: true }],
+  pi: async ({ piModel, home }, use) => {
+    await Effect.runPromise(
+      Effect.scoped(
+        Effect.flatMap(fakeModelProvider(home, piModel, { retry: { enabled: false } }), (model) =>
+          Effect.promise(() => use({ command: bundledPi, model })),
+        ),
+      ),
+    )
+  },
+  app: async ({ github, claude, pi, home }, use) => {
     const inherited = Object.entries(process.env).flatMap(([key, value]) =>
       value === undefined || UNINHERITED.has(key) ? [] : [[key, value]],
     )
@@ -134,9 +107,8 @@ export const test = base.extend<Glass>({
         PI_CODING_AGENT_DIR: join(home, ".pi", "agent"),
         GH_TOKEN: VIEWER.token,
         GLASS_GITHUB_API_URL: github.url,
-        GLASS_CLAUDE_COMMAND: claude.command,
         ...claude.environment,
-        GLASS_PI_COMMAND: realPi ?? piCli.command,
+        GLASS_PI_COMMAND: pi.command,
         // Keeps pi from refreshing its model catalog over the network.
         PI_OFFLINE: "1",
         GLASS_GIT_REMOTE: github.gitUrl,

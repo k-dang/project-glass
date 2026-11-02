@@ -1,30 +1,5 @@
-import { Effect } from "effect"
-import { startFakeAnthropic } from "../../server/test/fakeAnthropic"
 import { seedClone } from "../../server/test/gitRepositories"
-import { fakeAnthropicEnvironment } from "../../server/test/pinnedClaude"
-import { expect, test as glass } from "./glass"
-
-// Agents drive `claude` through the Claude Agent SDK, so this file swaps the Tours' fake for the
-// pinned CLI on a fake Anthropic API.
-const test = glass.extend({
-  claude: async ({ home }, use) => {
-    await Effect.runPromise(
-      Effect.scoped(
-        Effect.flatMap(startFakeAnthropic, ({ url }) => {
-          const environment = fakeAnthropicEnvironment(home, url)
-
-          return Effect.promise(() =>
-            use({
-              command: environment.GLASS_CLAUDE_COMMAND,
-              answer: () => Promise.reject(new Error("This file writes no Tours.")),
-              environment,
-            }),
-          )
-        }),
-      ),
-    )
-  },
-})
+import { expect, test } from "./glass"
 
 test("starts a local Claude Code Agent and answers its Permission request", async ({
   app,

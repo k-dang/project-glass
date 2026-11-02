@@ -8,7 +8,8 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, vi } from "vite-plus/test"
 import { connectRpcClient } from "../src/rpcSocket"
-import { ServerLive } from "../src/server"
+import { AgentRunners } from "../src/agentRunners"
+import { serve } from "../src/server"
 import { ServerConfig } from "../src/ServerConfig"
 import { startFakeGitHub } from "./fakeGitHub"
 import { VIEWER } from "./fakePullRequest"
@@ -27,6 +28,7 @@ afterEach(() => vi.unstubAllEnvs())
 export const startBackend = Effect.fnUntraced(function* (
   env: Record<string, string>,
   homeDirectory?: string,
+  agentRunners: Parameters<typeof serve>[0] = AgentRunners.layer,
 ) {
   const webSocketConstructor = yield* Effect.serviceOption(Socket.WebSocketConstructor).pipe(
     Effect.flatMap(
@@ -49,7 +51,7 @@ export const startBackend = Effect.fnUntraced(function* (
       : { GH_TOKEN: VIEWER.token, GLASS_GITHUB_API_URL: (yield* startFakeGitHub()).url }
 
   const services = yield* Layer.build(
-    ServerLive.pipe(
+    serve(agentRunners).pipe(
       Layer.provide(ServerConfig.layer),
       Layer.provide(
         ConfigProvider.layer(
