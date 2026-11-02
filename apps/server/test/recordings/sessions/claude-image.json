@@ -1,5 +1,6 @@
 {
   "scenario": "claude-image",
+  "program": "@anthropic-ai/claude-agent-sdk 0.3.309",
   "processes": [
     {
       "args": [
@@ -17,7 +18,7 @@
       "frames": [
         {
           "out": {
-            "request_id": "ywut1p172d",
+            "request_id": "ctyv5u9q7yf",
             "type": "control_request",
             "request": {
               "subtype": "initialize"
@@ -29,7 +30,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "ywut1p172d",
+              "request_id": "ctyv5u9q7yf",
               "response": {
                 "commands": [
                   {
@@ -403,7 +404,7 @@
                   "apiKeySource": "ANTHROPIC_API_KEY",
                   "apiProvider": "firstParty"
                 },
-                "pid": 127236,
+                "pid": 145812,
                 "claude_code_version": "2.1.309",
                 "current_permission_mode": "default",
                 "feedback_mode": {
@@ -446,7 +447,7 @@
               ]
             },
             "parent_tool_use_id": null,
-            "uuid": "3930b156-a3d1-42b4-b914-af62efabe888"
+            "uuid": "d29f7bba-b2df-4c1f-9849-cbe73cd55479"
           }
         },
         {
@@ -455,25 +456,25 @@
             "subtype": "session_state_changed",
             "state": "running",
             "sdk_host_only": true,
-            "uuid": "2270f982-bcec-4b36-a699-6413b361789c",
+            "uuid": "35d5c9d3-4aee-4d37-a187-32432da8b282",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "3930b156-a3d1-42b4-b914-af62efabe888",
+            "command_uuid": "d29f7bba-b2df-4c1f-9849-cbe73cd55479",
             "state": "queued",
-            "uuid": "f15d6d73-62ed-45d5-a025-ca2ef0397b6c",
+            "uuid": "7ac4f4dc-77e0-42f5-9d07-06009312b865",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "3930b156-a3d1-42b4-b914-af62efabe888",
+            "command_uuid": "d29f7bba-b2df-4c1f-9849-cbe73cd55479",
             "state": "started",
-            "uuid": "c68fd738-79f0-4c8e-a1e3-3c678ca6d91b",
+            "uuid": "c67d2308-979a-4c1c-9da4-9bfc11ac58f8",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -612,19 +613,19 @@
             ],
             "analytics_disabled": true,
             "product_feedback_disabled": true,
-            "uuid": "e6972787-924c-4363-8d94-6b082f061550",
+            "uuid": "0c66293e-d58e-48f4-a8a4-9a353dfdd0c3",
             "memory_paths": {
               "auto": "<folder>/.claude/projects\\<folder>/memory\\"
             },
             "original_cwd": "<folder>",
             "additional_directories": [],
-            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-61193e1e158b3f25a1210561cedf06b2",
+            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-d3472db179b14488f61f7478a89bec36",
             "fast_mode_state": "off",
             "fast_mode_disabled_reason": "sdk_opt_in_required",
             "per_turn_effort_active": true,
             "view_mode": "default",
             "powershell_path": "<home>/AppData/Local/Programs/PowerShell/7/pwsh.exe",
-            "user_message_uuids": ["3930b156-a3d1-42b4-b914-af62efabe888"]
+            "user_message_uuids": ["d29f7bba-b2df-4c1f-9849-cbe73cd55479"]
           }
         },
         {
@@ -633,8 +634,8 @@
             "subtype": "status",
             "status": "requesting",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "b96e31ef-d9aa-438e-92f9-120fe9014506",
-            "user_message_uuids": ["3930b156-a3d1-42b4-b914-af62efabe888"]
+            "uuid": "76dd263a-dee2-471d-b18c-95ab37d8c5bc",
+            "user_message_uuids": ["d29f7bba-b2df-4c1f-9849-cbe73cd55479"]
           }
         },
         {
@@ -643,7 +644,7 @@
             "event": {
               "type": "message_start",
               "message": {
-                "id": "msg_7a225479-7f6c-4a2f-be6a-abfc09817bb1",
+                "id": "msg_466e587f-10ed-46d7-b23f-9a8419cc6a2b",
                 "type": "message",
                 "role": "assistant",
                 "model": "claude-opus-5-5",
@@ -658,12 +659,12 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "b16c031e-a147-4362-adb1-dc941fe2e857",
-            "ttft_ms": 21,
+            "uuid": "1954c0a5-f665-4840-ae75-34df2552d116",
+            "ttft_ms": 27,
             "thinking_display": "updates",
-            "api_message_id": "msg_7a225479-7f6c-4a2f-be6a-abfc09817bb1",
-            "user_message_uuid": "3930b156-a3d1-42b4-b914-af62efabe888",
-            "user_message_uuids": ["3930b156-a3d1-42b4-b914-af62efabe888"]
+            "api_message_id": "msg_466e587f-10ed-46d7-b23f-9a8419cc6a2b",
+            "user_message_uuid": "d29f7bba-b2df-4c1f-9849-cbe73cd55479",
+            "user_message_uuids": ["d29f7bba-b2df-4c1f-9849-cbe73cd55479"]
           }
         },
         {
@@ -679,8 +680,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "efa0b028-d99a-45ae-92b1-f2597ea0b6ed",
-            "api_message_id": "msg_7a225479-7f6c-4a2f-be6a-abfc09817bb1"
+            "uuid": "6e27f24d-098e-463b-9d17-bd66ca453475",
+            "api_message_id": "msg_466e587f-10ed-46d7-b23f-9a8419cc6a2b"
           }
         },
         {
@@ -696,8 +697,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "2f50f8c1-9944-44b3-8714-09acb2691417",
-            "api_message_id": "msg_7a225479-7f6c-4a2f-be6a-abfc09817bb1"
+            "uuid": "090b56df-dbbb-4ffe-b255-ebd77d2d1ef4",
+            "api_message_id": "msg_466e587f-10ed-46d7-b23f-9a8419cc6a2b"
           }
         },
         {
@@ -713,8 +714,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "e764e6c4-def7-4866-a238-21a9d52baade",
-            "api_message_id": "msg_7a225479-7f6c-4a2f-be6a-abfc09817bb1"
+            "uuid": "c4bde323-b1cb-417a-9086-3c3e96d1e7f0",
+            "api_message_id": "msg_466e587f-10ed-46d7-b23f-9a8419cc6a2b"
           }
         },
         {
@@ -730,8 +731,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "880c7552-a1c9-47d3-a4d8-7753776777fc",
-            "api_message_id": "msg_7a225479-7f6c-4a2f-be6a-abfc09817bb1"
+            "uuid": "26ae6058-994f-4025-ad65-11ee33ea1787",
+            "api_message_id": "msg_466e587f-10ed-46d7-b23f-9a8419cc6a2b"
           }
         },
         {
@@ -747,8 +748,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "4ef2e9cc-439e-4bf5-b000-8e700a386425",
-            "api_message_id": "msg_7a225479-7f6c-4a2f-be6a-abfc09817bb1"
+            "uuid": "aeb2670d-e0a6-4134-a96d-07028fec44c1",
+            "api_message_id": "msg_466e587f-10ed-46d7-b23f-9a8419cc6a2b"
           }
         },
         {
@@ -764,8 +765,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "82a904c2-cb7e-4db4-b848-98db2521f375",
-            "api_message_id": "msg_7a225479-7f6c-4a2f-be6a-abfc09817bb1"
+            "uuid": "776f8df0-ad41-4ded-9bf3-98fcef6a17a2",
+            "api_message_id": "msg_466e587f-10ed-46d7-b23f-9a8419cc6a2b"
           }
         },
         {
@@ -781,15 +782,15 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "b255dc60-597f-4e0f-b317-35008aaf334a",
-            "api_message_id": "msg_7a225479-7f6c-4a2f-be6a-abfc09817bb1"
+            "uuid": "8046bf33-71d2-47f7-82cc-3a22a12ffa71",
+            "api_message_id": "msg_466e587f-10ed-46d7-b23f-9a8419cc6a2b"
           }
         },
         {
           "in": {
             "type": "assistant",
             "message": {
-              "id": "msg_7a225479-7f6c-4a2f-be6a-abfc09817bb1",
+              "id": "msg_466e587f-10ed-46d7-b23f-9a8419cc6a2b",
               "type": "message",
               "role": "assistant",
               "model": "claude-opus-5-5",
@@ -809,10 +810,10 @@
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "8967daf1-f8c7-4e77-a9c7-6e47eee090dd",
-            "timestamp": "2026-11-02T10:12:37.372Z",
-            "user_message_uuid": "3930b156-a3d1-42b4-b914-af62efabe888",
-            "user_message_uuids": ["3930b156-a3d1-42b4-b914-af62efabe888"]
+            "uuid": "30289f80-044c-47d0-a79e-8950622e8805",
+            "timestamp": "2026-11-02T23:40:11.207Z",
+            "user_message_uuid": "d29f7bba-b2df-4c1f-9849-cbe73cd55479",
+            "user_message_uuids": ["d29f7bba-b2df-4c1f-9849-cbe73cd55479"]
           }
         },
         {
@@ -824,8 +825,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "358bbb7a-30aa-4684-803e-155ec34e6c12",
-            "api_message_id": "msg_7a225479-7f6c-4a2f-be6a-abfc09817bb1"
+            "uuid": "480ead2c-9508-446e-b26e-e140408216b9",
+            "api_message_id": "msg_466e587f-10ed-46d7-b23f-9a8419cc6a2b"
           }
         },
         {
@@ -843,8 +844,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "c9375743-3f00-44b4-853c-e3e2ee3c1883",
-            "api_message_id": "msg_7a225479-7f6c-4a2f-be6a-abfc09817bb1"
+            "uuid": "27b02bb2-06cd-47db-b6cc-b7080c16a089",
+            "api_message_id": "msg_466e587f-10ed-46d7-b23f-9a8419cc6a2b"
           }
         },
         {
@@ -855,13 +856,13 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "2825d2d8-d7be-4b92-a020-b13b7f78f903",
-            "api_message_id": "msg_7a225479-7f6c-4a2f-be6a-abfc09817bb1"
+            "uuid": "88e3da70-422d-460e-93b9-ad702575e5dd",
+            "api_message_id": "msg_466e587f-10ed-46d7-b23f-9a8419cc6a2b"
           }
         },
         {
           "in": {
-            "duration_api_ms": 49,
+            "duration_api_ms": 37,
             "stop_reason": "end_turn",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "total_cost_usd": 0.000023999999999999997,
@@ -937,16 +938,16 @@
             "subtype": "success",
             "api_error_status": null,
             "result": "Fake reply to: [Image: source: <tmp>/claude\\<folder>/6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b/images/1.png]",
-            "ttft_ms": 96,
+            "ttft_ms": 88,
             "type": "result",
-            "duration_ms": 102,
-            "uuid": "3588c912-0c4b-460b-a325-f2e549cd7065",
-            "ttft_stream_ms": 94,
-            "time_to_request_ms": 76,
-            "first_content_frame_ms": 95,
-            "user_message_uuid": "3930b156-a3d1-42b4-b914-af62efabe888",
-            "user_message_uuids": ["3930b156-a3d1-42b4-b914-af62efabe888"],
-            "request_sent_wall_ms": 1793614357352,
+            "duration_ms": 97,
+            "uuid": "05f06e48-fae9-47cf-b8e4-7ac4b8aa54cc",
+            "ttft_stream_ms": 86,
+            "time_to_request_ms": 61,
+            "first_content_frame_ms": 87,
+            "user_message_uuid": "d29f7bba-b2df-4c1f-9849-cbe73cd55479",
+            "user_message_uuids": ["d29f7bba-b2df-4c1f-9849-cbe73cd55479"],
+            "request_sent_wall_ms": 1793662811179,
             "first_request_input_tokens": 1,
             "queued_turn_count": 0,
             "result_index": 0,
@@ -971,9 +972,9 @@
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "3930b156-a3d1-42b4-b914-af62efabe888",
+            "command_uuid": "d29f7bba-b2df-4c1f-9849-cbe73cd55479",
             "state": "completed",
-            "uuid": "c93d57a4-7a0a-4fc5-bc55-f9e9edcbb5ec",
+            "uuid": "b5fd81fd-a7c1-42bd-a6b9-7c0b9ee9295a",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -983,7 +984,7 @@
             "subtype": "session_state_changed",
             "state": "idle",
             "sdk_host_only": true,
-            "uuid": "f8b0babb-a65a-46ce-8792-b9bd4d6bc585",
+            "uuid": "c4df7f06-79df-49af-8f9c-acdff8c2f291",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },

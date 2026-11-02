@@ -1,5 +1,6 @@
 {
   "scenario": "claude-long-reply",
+  "program": "@anthropic-ai/claude-agent-sdk 0.3.309",
   "processes": [
     {
       "args": [
@@ -17,7 +18,7 @@
       "frames": [
         {
           "out": {
-            "request_id": "67fbux3y8jh",
+            "request_id": "q8l88vzjxjm",
             "type": "control_request",
             "request": {
               "subtype": "initialize"
@@ -29,7 +30,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "67fbux3y8jh",
+              "request_id": "q8l88vzjxjm",
               "response": {
                 "commands": [
                   {
@@ -403,7 +404,7 @@
                   "apiKeySource": "ANTHROPIC_API_KEY",
                   "apiProvider": "firstParty"
                 },
-                "pid": 16656,
+                "pid": 148392,
                 "claude_code_version": "2.1.309",
                 "current_permission_mode": "default",
                 "feedback_mode": {
@@ -433,7 +434,7 @@
               "content": "Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece."
             },
             "parent_tool_use_id": null,
-            "uuid": "517a1d8f-4a7f-43c0-88ff-7fea208f3850"
+            "uuid": "439e8c07-5826-4fd0-af8e-8cf4f83f0d40"
           }
         },
         {
@@ -442,25 +443,25 @@
             "subtype": "session_state_changed",
             "state": "running",
             "sdk_host_only": true,
-            "uuid": "a43991f2-573b-4872-a2e6-eeec3a9be57a",
+            "uuid": "f3e1c825-3fec-433c-936d-24934e465bf8",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "517a1d8f-4a7f-43c0-88ff-7fea208f3850",
+            "command_uuid": "439e8c07-5826-4fd0-af8e-8cf4f83f0d40",
             "state": "queued",
-            "uuid": "d8938081-4e2f-4f9b-b5e9-a494c6d668c7",
+            "uuid": "ab48e246-35c6-449b-a98c-c2001ba83108",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "517a1d8f-4a7f-43c0-88ff-7fea208f3850",
+            "command_uuid": "439e8c07-5826-4fd0-af8e-8cf4f83f0d40",
             "state": "started",
-            "uuid": "ff773420-87ca-4050-975d-21a4ef27181d",
+            "uuid": "eb519c40-73bd-47cf-95d5-62b57c53dd73",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -599,19 +600,19 @@
             ],
             "analytics_disabled": true,
             "product_feedback_disabled": true,
-            "uuid": "dfab3b96-f934-48fd-8ee6-d34103263a4d",
+            "uuid": "f1de6c64-3716-456f-91ce-10e192841993",
             "memory_paths": {
               "auto": "<folder>/.claude/projects\\<folder>/memory\\"
             },
             "original_cwd": "<folder>",
             "additional_directories": [],
-            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-00e6d7e09ddc1a9824059441067c8ca1",
+            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-e61ae009adee3b8f966e62b45482a4b7",
             "fast_mode_state": "off",
             "fast_mode_disabled_reason": "sdk_opt_in_required",
             "per_turn_effort_active": true,
             "view_mode": "default",
             "powershell_path": "<home>/AppData/Local/Programs/PowerShell/7/pwsh.exe",
-            "user_message_uuids": ["517a1d8f-4a7f-43c0-88ff-7fea208f3850"]
+            "user_message_uuids": ["439e8c07-5826-4fd0-af8e-8cf4f83f0d40"]
           }
         },
         {
@@ -620,8 +621,8 @@
             "subtype": "status",
             "status": "requesting",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "4ad99f36-390e-4e47-8379-3d1cc11ef9fc",
-            "user_message_uuids": ["517a1d8f-4a7f-43c0-88ff-7fea208f3850"]
+            "uuid": "b3961a29-65aa-4494-8bb8-6ea62bf9af81",
+            "user_message_uuids": ["439e8c07-5826-4fd0-af8e-8cf4f83f0d40"]
           }
         },
         {
@@ -630,7 +631,7 @@
             "event": {
               "type": "message_start",
               "message": {
-                "id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e",
+                "id": "msg_bd9c8950-e797-470b-b51e-786c34742a21",
                 "type": "message",
                 "role": "assistant",
                 "model": "claude-opus-5-5",
@@ -645,12 +646,12 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "32aef052-9522-4d6f-9c7c-00bd31ebfe1c",
-            "ttft_ms": 25,
+            "uuid": "3bbd7d21-7c2b-4f27-a954-1d4edf726146",
+            "ttft_ms": 19,
             "thinking_display": "updates",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e",
-            "user_message_uuid": "517a1d8f-4a7f-43c0-88ff-7fea208f3850",
-            "user_message_uuids": ["517a1d8f-4a7f-43c0-88ff-7fea208f3850"]
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21",
+            "user_message_uuid": "439e8c07-5826-4fd0-af8e-8cf4f83f0d40",
+            "user_message_uuids": ["439e8c07-5826-4fd0-af8e-8cf4f83f0d40"]
           }
         },
         {
@@ -666,8 +667,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "bce780dc-75fe-4d37-a6ea-8dfb81927145",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "d44ff1fd-0ddf-45ed-aca2-8a83194a8c75",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -683,8 +684,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "95065bb3-07ee-4c87-866e-3f726b8c5e77",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "aa849f9d-7b53-4738-8a09-8288b25ab70d",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -700,8 +701,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "dcf5b2b6-b060-47d7-a1f6-31f0aaaf6fbd",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "bb2b4014-c59f-42b7-af10-626508361abb",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -717,8 +718,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "75ead54c-0c1c-4096-a362-3ba8d5aa43ab",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "5930172c-1dfc-414b-971e-406dee549d9e",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -734,8 +735,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "f3191fb2-1242-48fb-9f4b-19f38b5ba8e7",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "87bed615-27f8-4bad-a9cd-9b595fe1fbc3",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -751,8 +752,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "0a4c6dcf-4686-458f-bb16-727f530f4593",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "3e2cf205-21d9-408c-8c50-be3822212548",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -768,8 +769,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "709f49a2-11a2-4c66-9c15-8d3c8edfab9c",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "4eaa314e-4af5-48a1-a0e0-408a660848ed",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -785,8 +786,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "b0cfdfeb-8339-4cec-a0bd-9a8ce941064c",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "b951d153-47cd-4d7b-b244-e9c582aaa994",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -802,8 +803,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "4f0df080-3881-43c5-8307-bacaf0e202b6",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "69c76db5-7b10-464e-98bc-bd9c7a64fc31",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -819,8 +820,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "91d2e0f1-85aa-4ad4-8cc1-30dfc05f7c2b",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "9b5d81b5-9145-4201-ba95-461db9a2a4eb",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -836,8 +837,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "1920ebc5-5701-4fd5-80e0-3bc66ad548ba",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "77e67249-9a01-4303-8ead-6b29c9496526",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -853,8 +854,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "a5974f56-2128-45cc-aae4-9eeb12a06bf7",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "be79ae0f-9762-4c8a-8b92-f967df46af73",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -870,8 +871,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "4dd1688b-ed2d-422c-870f-38130eebd61b",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "9d3a8d70-37f9-45d1-b175-f43f53a7956d",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -887,8 +888,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "454fe0eb-8611-4b1d-9289-e808168f0fa4",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "e78f3dd9-9c39-41d5-b682-48d280d7871a",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -904,8 +905,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "b747a640-82f3-435e-9aed-a0d078ca21e9",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "57a002fc-2561-4cd2-8d4a-93a08b684367",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -921,8 +922,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "08456d3f-f653-4479-82fe-89969b3623e8",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "757f22c3-c99e-4ebe-819b-78f1086e8dc2",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -938,8 +939,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "1cb424da-688a-45f2-8e1f-a3ae0772b966",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "670375bb-6bfb-444b-b118-ea3c20b94ffd",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -955,8 +956,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "b5b636d2-67b1-4cda-8e61-701126348d29",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "3f958747-6a39-47fe-8f4d-37b5a6e0b86e",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -972,8 +973,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "65bb1736-821d-40c3-81b2-ad87db35e572",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "5ab7f410-936e-4a01-b47c-92d6eac910a1",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -989,8 +990,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "4d2c4aac-27b0-425b-a6cf-590588fa9fb7",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "1212fcf8-19a2-44d6-ac7d-ffeb84183986",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1006,8 +1007,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "d390b584-d988-48c1-9cc2-e5798f5842f2",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "9c55e361-8a0b-43bf-bb86-bfa9b4847958",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1023,8 +1024,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "5dfd8b15-9328-4db0-b0ca-c7cb414cf682",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "0c72c4a5-e38b-4c64-8831-58177716a125",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1040,8 +1041,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "c8d54376-eec9-47e0-8221-81b81a4c2e65",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "4164c1d5-9f98-4e39-b48f-a58dd29c4995",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1057,8 +1058,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "6141a201-d9fd-4800-a065-19abc3ca3271",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "509f2579-c71f-4117-9e4a-3c4e7dc4a569",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1074,8 +1075,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "d4442dea-1057-431f-afa0-b0759a580738",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "9ae7a5ad-10fc-4725-b0a1-944ec6d3f316",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1091,8 +1092,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "c243d383-57aa-4212-a689-e25418330255",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "6d85e208-b4a1-43a6-9ba4-2e8bbb624f7c",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1108,8 +1109,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "46fa1000-2545-4b30-9938-68fe2e282864",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "344d9dc8-7e56-4eb3-a440-49b6ebd9186c",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1125,8 +1126,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "6241ead1-b91a-4a5f-9b8f-7eb4886e4b23",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "709a1af7-af26-4bf8-a526-0d0cdcf02a48",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1142,8 +1143,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "afbca57f-aca8-4e29-8127-fa72430e43a0",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "9c90891a-ea53-471a-84c4-1f3744260c84",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1159,8 +1160,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "2790f765-90d5-496c-8f0d-24ad2bf0a956",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "3a92ba04-0cf5-4c65-82a7-56df9f6b44f9",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1176,8 +1177,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "d3157da0-028c-4cfe-9040-c6d5f22db376",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "c455d820-84ac-4fe8-a993-606492bb4c20",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1193,8 +1194,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "ed2d7fdb-52fa-46fc-b040-8925dcdc4924",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "c78d6ecc-9536-4668-93b4-45ac89c7c082",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1210,8 +1211,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "dfef2057-e433-4a36-b530-0a272279c5a6",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "b85d8acd-a5db-4d3a-ac0c-f2e8555c9114",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1227,8 +1228,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "382b9573-822e-43b8-a354-67ef00cc3b53",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "244d4ea7-8e1c-4b7b-bd00-09266e0ac2f0",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1244,8 +1245,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "caaf388c-730a-4231-bc3f-05713a6624c7",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "c102e489-46d1-4423-b6e8-2a81feec242f",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1261,8 +1262,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "50f27530-6b59-43ae-b36f-20bf65c3c90b",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "5be50040-7f2a-4ffe-a4d9-fd02177b2b83",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1278,8 +1279,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "6f8dcff1-116f-4603-b216-4558b7f0dc1b",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "745fd949-d3d6-4daa-82e0-c03dd7622f71",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1295,8 +1296,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "00f87f29-942c-45eb-8536-6e4d357d8500",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "72baff96-a948-4859-8141-a23b1f6a804a",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1312,8 +1313,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "0677d067-f083-478e-b590-30c1d41732bd",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "f9a669e0-eb83-4f7b-ba02-3065be5a9b2b",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1329,8 +1330,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "7c94cb5a-0362-4be0-b38f-5d1c3c35e74d",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "db59ff20-668d-4566-8c4a-7366a81941d4",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1346,8 +1347,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "a18b8cc9-2e9c-42de-b902-1eed08569ac0",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "a40a5b7d-1766-4d07-bc3f-fc4d4811f244",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1363,8 +1364,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "7e2f1107-a98f-4485-a07d-78f368e736cc",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "4b1b253f-3277-4735-9e8a-15ebb4203086",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1380,8 +1381,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "a1087a80-757a-4249-a910-034a53fbb424",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "75ae502b-21ba-442b-a139-a674d78b31d6",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1397,8 +1398,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "11bfefea-bb35-4792-ba54-9a69c8e45432",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "5d079424-6c6a-4ef2-a0a9-3bfa5d93ef84",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1414,8 +1415,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "de8c258a-fe38-485a-84c1-c51a0da49009",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "56f6540b-0c20-4d2a-9ca4-a64813ca6417",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1431,8 +1432,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "1dece20a-c28c-4193-8b0c-5df9bb4839f6",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "b39defbe-b251-42cb-8612-cb78e5313d02",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1448,8 +1449,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "218041ee-71d9-4f3a-99f3-4ed575df5738",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "a082b183-dc69-4687-9cbe-ed2a4335eabb",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1465,8 +1466,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "29107e62-4b5a-49db-ae51-10656937c039",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "38a1dd1a-08ba-4d2a-bfde-65420c27660c",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1482,8 +1483,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "3f376b7d-77b7-41ba-8f37-7085173c7043",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "22e5e281-7abd-4d93-a48e-9dd4ee245343",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1499,8 +1500,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "29237161-3018-4880-8696-326da6db3265",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "17fd6af4-9455-4f67-b83a-bd12557ed2b7",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1516,8 +1517,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "ebea56e2-a2ea-4de4-8572-ccd3ccdff783",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "60db5a26-62c5-400c-bef7-1137c03cb678",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1533,8 +1534,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "36d9b6ba-fca8-4967-86ab-039562a50321",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "6ecab83e-f8bd-41d3-aa71-d5e9abc58583",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1550,8 +1551,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "3c2360e0-ed2b-4053-9eb8-88ef70f7a61e",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "a6ecf219-a5a8-4407-9353-78aa11c23e04",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1567,8 +1568,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "25eda92f-50cf-4a99-a1a4-4fd1cfe54fd3",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "c2543478-f2a1-49f5-b769-ac848e875a62",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1584,8 +1585,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "613fbc45-8a12-4f8a-b3fb-821d2de51be8",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "cd42dc52-0d70-4ac2-b799-9b9e2ed53a30",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1601,8 +1602,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "2ec8c3d8-d39c-4d9b-b8b6-f3b315cd5079",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "d3e4305e-b91d-47b3-85aa-ea73ef2106ba",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1618,8 +1619,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "439eeefe-ce4c-47c5-b299-0ee392c2aa4a",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "97ce9a7f-1c18-4439-be85-4761ff126db7",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1635,8 +1636,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "d453c707-0860-4322-8df1-35b7921bb17c",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "20fd4b0c-7120-4568-bfcc-cc493e5b3929",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1652,8 +1653,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "7a7d001c-572f-469b-8601-0165d9da0572",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "79360562-2df4-4c8c-bfec-8266c441e195",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1669,8 +1670,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "09cc50d0-1234-42ac-93a8-ea3c691868bf",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "fe5c69e2-ef7f-40cc-a018-c65ee72c417e",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1686,8 +1687,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "d26ed57a-15e5-41d8-a4d1-903ccce5503a",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "bfeff892-6ea6-4526-8ac1-08c079c71b91",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1703,8 +1704,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "ca35f0a8-a6ea-4509-909e-87af00b35cf1",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "c896d92f-0e8e-40c7-8f04-81dc4ce128f3",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1720,8 +1721,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "8fe8affe-5ca1-40fb-a383-f11de675edfe",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "d09f27f5-bb5f-402b-b9e2-662b0fd7c819",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1737,8 +1738,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "b5c217e6-b592-4e4b-8d09-7e7b420041c8",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "68d28fca-4d7f-4086-b575-9efac163fdf1",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1754,8 +1755,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "fd77d00f-c661-40cc-ab22-dd2d62a859c9",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "a425b661-8bd8-45a7-8d1a-fc0c7f2fb3b0",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1771,8 +1772,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "0303a012-0a84-4c28-9738-30bb050c567f",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "4c2145bd-6b82-4ef4-b419-91c96b088c16",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1788,8 +1789,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "91ec5c51-45f1-4ea9-bf0e-b7c700e9971f",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "a1634a1e-9c5b-496f-b926-c878b8d5c168",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1805,8 +1806,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "1c6e1e1f-842d-47e4-815d-a77bd7c6213f",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "597ff0e7-2f45-4ea5-a149-c240a058e700",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1822,8 +1823,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "5709935c-24b3-4f39-8ef2-2f7bc7a24a53",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "dcf7e0d1-0789-40b5-9ebb-b38d5d021669",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1839,8 +1840,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "eab66011-e8bd-4136-bf2e-f1067230fbd3",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "811827a8-94c9-40bd-bc09-823b96665cbf",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1856,8 +1857,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "9f2157ca-bc42-486b-ac76-df05f6defe22",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "5f9c06f0-1987-4062-85bb-fa2061652dbd",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1873,8 +1874,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "60a0df6a-3493-46fd-987a-705c57d7f830",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "017b68f8-72c6-4142-95b3-ce9e115e7ffe",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1890,8 +1891,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "4b255307-c717-4ce9-8257-aa647c11a527",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "a3169491-a049-4ee1-a93f-59e0e5394b7c",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1907,8 +1908,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "01d34535-4570-4c0c-8a48-deaf6ba9b1d5",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "5c9b091e-0f89-40ad-be4b-46b8f25dc90c",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1924,8 +1925,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "004552de-2a29-4f3b-8682-9be9f78db4c5",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "a91be702-0378-43d3-82b8-207bdd69d269",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1941,8 +1942,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "ca81b589-076a-460f-903b-576699b1fea8",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "304c8911-051f-4e8f-9b2a-9a9500edf018",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1958,8 +1959,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "9139ce91-a836-4505-a213-21c03f0f4a76",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "88bce016-869f-4454-95e5-80160c05fc72",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1975,8 +1976,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "8fdcc705-dfe8-4081-90b2-1419dc56028d",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "5e5b2332-4a84-4bad-bf8d-0cebb95a0db8",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -1992,8 +1993,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "0f853579-128a-4cd3-a057-d6bc5b8827aa",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "f0cf9ed8-4d5d-456c-907f-c54c64b65624",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -2009,8 +2010,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "cf8947a9-e3ca-4803-a82d-b2928ed9b390",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "4f8262fe-d5ae-4ea3-ad7c-4766cef68687",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -2026,8 +2027,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "057cc746-1ed8-413c-9007-e1270e81c9d1",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "19256a0d-9034-46ae-a2e2-da7e696b10cd",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -2043,8 +2044,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "e948bf9e-a91f-49c4-9fab-6096cc0886e9",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "ca9de892-4f56-448e-825b-78a54dd877ad",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -2060,8 +2061,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "099577bf-d365-42a0-8e57-d765d0be5f50",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "08662a36-7b7c-4114-9c06-d73413f92020",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -2077,8 +2078,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "aa25c0bd-cc99-4ab6-8557-c58dd65a2168",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "4b63c0a5-e031-4bd6-b11b-4d293673d96b",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -2094,8 +2095,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "4543e445-bd37-4cf3-be23-dcc88f8ebd30",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "22151fb0-7085-4cc8-bf75-91d64f24a119",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -2111,8 +2112,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "6d7c745c-d12a-4a0b-ac76-f7bbb2f6e686",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "343ff9d5-dbd0-4a9a-a197-387378d72fcf",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -2128,8 +2129,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "e70c2816-7a7a-49ce-b852-6cda4d50fb1d",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "ad16564e-7e9c-4137-808f-67df120f902f",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -2145,8 +2146,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "458a4bdf-f234-4524-aad6-45b763851ea8",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "af612c07-2d32-476e-8f3e-c495773de6a4",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -2162,8 +2163,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "80bf8fc9-7228-4202-8fe3-f7902c382ef3",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "5dfbe3f4-8d19-48c8-b1e8-baf604b763c2",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -2179,8 +2180,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "be449c66-4737-419d-9567-860509bbbd4f",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "1b7e0c11-caa4-4f2b-b65c-bb83ef2877ff",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -2196,8 +2197,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "3db215db-17c4-4eb4-8bb7-2a8175bd534b",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "00afcb80-0d10-471b-a521-7a64e4203e0b",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -2213,15 +2214,15 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "269f000e-9651-483b-9864-573cfc366f0c",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "e14028af-76b6-4aef-af7c-b9db8fb35724",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
           "in": {
             "type": "assistant",
             "message": {
-              "id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e",
+              "id": "msg_bd9c8950-e797-470b-b51e-786c34742a21",
               "type": "message",
               "role": "assistant",
               "model": "claude-opus-5-5",
@@ -2241,10 +2242,10 @@
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "a4ef5196-b665-49f7-9bdf-94d7e644d51e",
-            "timestamp": "2026-11-02T10:12:36.842Z",
-            "user_message_uuid": "517a1d8f-4a7f-43c0-88ff-7fea208f3850",
-            "user_message_uuids": ["517a1d8f-4a7f-43c0-88ff-7fea208f3850"]
+            "uuid": "0c07e901-a191-4313-ba4f-32d085229dd2",
+            "timestamp": "2026-11-02T23:40:10.660Z",
+            "user_message_uuid": "439e8c07-5826-4fd0-af8e-8cf4f83f0d40",
+            "user_message_uuids": ["439e8c07-5826-4fd0-af8e-8cf4f83f0d40"]
           }
         },
         {
@@ -2256,8 +2257,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "b56caf37-3f07-4123-a361-0ca1c67f8b8b",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "92c742f9-76a4-4895-a824-485291619626",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -2275,8 +2276,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "794f673f-b74d-4dc3-8593-4b83d5ba4a9f",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "6d88223f-bc66-44d3-be44-f98300cbf0ec",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
@@ -2287,13 +2288,13 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "65d314b2-09c4-4fae-87e6-b6f21f4e70e9",
-            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+            "uuid": "9eda25de-1516-4823-8eef-7cb452ee4c36",
+            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
           }
         },
         {
           "in": {
-            "duration_api_ms": 43,
+            "duration_api_ms": 36,
             "stop_reason": "end_turn",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "total_cost_usd": 0.000023999999999999997,
@@ -2369,16 +2370,16 @@
             "subtype": "success",
             "api_error_status": null,
             "result": "Fake reply to: Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece.",
-            "ttft_ms": 81,
+            "ttft_ms": 83,
             "type": "result",
-            "duration_ms": 88,
-            "uuid": "fee5485d-b31d-4e39-9ace-e00efe2c7674",
-            "ttft_stream_ms": 69,
-            "time_to_request_ms": 45,
-            "first_content_frame_ms": 70,
-            "user_message_uuid": "517a1d8f-4a7f-43c0-88ff-7fea208f3850",
-            "user_message_uuids": ["517a1d8f-4a7f-43c0-88ff-7fea208f3850"],
-            "request_sent_wall_ms": 1793614356807,
+            "duration_ms": 89,
+            "uuid": "67ba7aea-0855-4c15-94e3-7457d8aedc7f",
+            "ttft_stream_ms": 73,
+            "time_to_request_ms": 55,
+            "first_content_frame_ms": 73,
+            "user_message_uuid": "439e8c07-5826-4fd0-af8e-8cf4f83f0d40",
+            "user_message_uuids": ["439e8c07-5826-4fd0-af8e-8cf4f83f0d40"],
+            "request_sent_wall_ms": 1793662810633,
             "first_request_input_tokens": 1,
             "queued_turn_count": 0,
             "result_index": 0,
@@ -2403,9 +2404,9 @@
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "517a1d8f-4a7f-43c0-88ff-7fea208f3850",
+            "command_uuid": "439e8c07-5826-4fd0-af8e-8cf4f83f0d40",
             "state": "completed",
-            "uuid": "ba7a0ffa-5f13-4174-9a6d-d023110ccd18",
+            "uuid": "1fb48e3d-d490-42f5-817e-df3f90413d52",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -2415,7 +2416,7 @@
             "subtype": "session_state_changed",
             "state": "idle",
             "sdk_host_only": true,
-            "uuid": "c0016f8a-8f70-42bd-ab00-cec7bee3f8dc",
+            "uuid": "af282248-e8c4-48f5-98ec-ebb05d3805db",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },

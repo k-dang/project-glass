@@ -8,8 +8,8 @@ import {
   TurnStarted,
 } from "@glass/contracts"
 import { NodeServices } from "@effect/platform-node"
-import { DateTime, Effect, Layer, Option, Stream, SubscriptionRef } from "effect"
-import { mkdirSync, writeFileSync } from "node:fs"
+import { DateTime, Effect, Layer, Option, Schema, Stream, SubscriptionRef } from "effect"
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { vi } from "vite-plus/test"
 import type { AgentAdapter, AgentSession } from "../src/agentHost/adapter"
@@ -26,6 +26,14 @@ import { type FakeModelSettings, fakeModelProvider, type PiSettings } from "./fa
 import { isolatedHome } from "./harness"
 import { fakeAnthropicEnvironment, pinnedClaude } from "./pinnedClaude"
 import { recordingSessions, sessionTape } from "./sessionTape"
+
+const pins = Schema.decodeUnknownSync(
+  Schema.fromJsonString(
+    Schema.Struct({ devDependencies: Schema.Record(Schema.String, Schema.String) }),
+  ),
+)(readFileSync(new URL("../package.json", import.meta.url), "utf8")).devDependencies
+
+const pinned = (name: string) => `${name} ${pins[name]}`
 
 const drive = Effect.fnUntraced(function* (
   adapter: AgentAdapter,
@@ -79,7 +87,10 @@ export const claudeSession = Effect.fnUntraced(function* (
   reply?: (request: FakeAnthropicRequest) => FakeAnthropicReply,
 ) {
   const folder = yield* isolatedHome
-  const tape = sessionTape(scenario, { "<folder>": folder })
+
+  const tape = sessionTape(scenario, pinned("@anthropic-ai/claude-agent-sdk"), {
+    "<folder>": folder,
+  })
 
   let api: Pick<Effect.Success<typeof startFakeAnthropic>, "hold" | "release" | "received"> = {
     hold: Effect.void,
@@ -124,7 +135,11 @@ export const piSession = Effect.fnUntraced(function* (
 
   vi.stubEnv("PI_CODING_AGENT_DIR", join(home, ".pi", "agent"))
   vi.stubEnv("PI_OFFLINE", "1")
-  const tape = sessionTape(scenario, { "<folder>": folder, "<pi-home>": home })
+
+  const tape = sessionTape(scenario, pinned("@earendil-works/pi-coding-agent"), {
+    "<folder>": folder,
+    "<pi-home>": home,
+  })
 
   const adapter = yield* piAdapter(bundledPi).pipe(
     Effect.provide(tape.spawner.pipe(Layer.provide(NodeServices.layer))),

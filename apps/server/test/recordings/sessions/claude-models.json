@@ -1,5 +1,6 @@
 {
   "scenario": "claude-models",
+  "program": "@anthropic-ai/claude-agent-sdk 0.3.309",
   "processes": [
     {
       "args": [
@@ -16,7 +17,7 @@
       "frames": [
         {
           "out": {
-            "request_id": "gw2i883e5ab",
+            "request_id": "jbpylsjh2d",
             "type": "control_request",
             "request": {
               "subtype": "initialize"
@@ -28,7 +29,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "gw2i883e5ab",
+              "request_id": "jbpylsjh2d",
               "response": {
                 "commands": [
                   {
@@ -402,7 +403,7 @@
                   "apiKeySource": "ANTHROPIC_API_KEY",
                   "apiProvider": "firstParty"
                 },
-                "pid": 132100,
+                "pid": 138744,
                 "claude_code_version": "2.1.309",
                 "current_permission_mode": "default",
                 "feedback_mode": {

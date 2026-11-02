@@ -41,8 +41,10 @@ launch by launch and message by message, so a change in what Glass sends fails u
 recorded again: Agent sessions are recorded from the pinned Claude Code CLI and the bundled pi
 answering fake model APIs (`GLASS_RECORD_SESSIONS=1`), and the completion runners (ADR 0004) from
 the user's own `claude` and `pi` (`test/recordRunnerReplays.ts`). Recordings also capture model
-behaviour a hand-written fake can't, at the cost of recording again whenever the pinned SDK or the
-bundled pi changes. Desktop end-to-end tests and `pnpm dev:fake` run the real programs against the
+behaviour a hand-written fake can't, at the cost of recording again: each session recording names
+the pinned SDK or bundled pi version it came from, and its replay fails once that pin moves. A
+runner recording names the `claude` or `pi` version it came from too, but only as a note, since
+users run whichever version they have. Desktop end-to-end tests and `pnpm dev:fake` run the real programs against the
 fake model APIs. A fake SDK query stays only for failures the real CLI won't produce on demand,
 such as a failed handshake.
 
