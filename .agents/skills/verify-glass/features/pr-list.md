@@ -25,7 +25,7 @@ Reviews has Needs review, My PRs, and Reviewing tabs, starting on Needs review. 
 Preconditions:
 
 - For `list-empty` and `list-needs-review`, a fake-GitHub run (`node $V launch --github fake`): it answers four Needs review PRs, two My PRs (one a draft), and one Reviewing PR, so follow `octo-org/glass`, `octo-org/busy` (134 Needs review PRs plus the other lists), and `octo-org/quiet` (none, so hidden). `fake-github 500` then Retry shows the load-failure alert.
-- For `list-open-back` and `list-discard`, a real-GitHub run (`node $V launch --github real`), since the fake can't open a PR. Rows there need someone to have requested your review; without one, open a PR by URL above the list instead. Never request reviews on repositories you don't own for this.
+- For `list-open-back` and `list-discard`, use the same fake-GitHub run: listed rows open a workspace with a one-file diff. No live review request is needed.
 
 - **Empty (`list-empty`).** On a fresh launch, `wait --text "No followed repositories"` and snapshot; the `Follow repositories` link opens Settings. Follow only `octo-org/quiet`, return to Reviews, and `wait --text "No PRs need your review"`.
 - **Tabs (`list-tabs`).** Choose My PRs and confirm two rows, one marked Draft PR. Choose Reviewing and confirm one row. `fake-github.log` gains no GraphQL request for either switch.
