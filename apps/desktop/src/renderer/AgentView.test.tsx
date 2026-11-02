@@ -1294,13 +1294,6 @@ it("saves what the user was still writing when they switch to another Agent", as
   await waitFor(() => expect(saved).toEqual([{ agentId: agent.id, message: "Half a thought" }]))
 })
 
-const sandboxAgent = new Agent({
-  ...agentFields,
-  place: SandboxPlace.make({ providerId: "fake" }),
-  engine: "claude-code",
-  permissionMode: "bypassPermissions",
-})
-
 const noTranscript = () =>
   Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null }))
 
@@ -1347,9 +1340,8 @@ it("lists a Sandbox Agent's unpushed commits before removing it", async () => {
   const removed: Array<string> = []
 
   const user = mount({
-    WatchAgents: () => Stream.make([sandboxAgent]),
-    WatchTranscript: () =>
-      Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
+    WatchAgents: () => Stream.make([inSandboxWith("reachable")]),
+    WatchTranscript: noTranscript,
     GetRemovalWarnings: () =>
       Effect.succeed(
         new RemovalWarnings({
@@ -1362,7 +1354,7 @@ it("lists a Sandbox Agent's unpushed commits before removing it", async () => {
 
   await user.click(await screen.findByRole("button", { name: "Remove agent/swift-otter" }))
   const dialog = await screen.findByRole("alertdialog", { name: "Remove agent/swift-otter?" })
-  expect(within(dialog).getByText(/a commit not pushed to GitHub/)).toBeTruthy()
+  expect(within(dialog).getByText(/1 commit not pushed to GitHub/)).toBeTruthy()
   const commits = within(dialog).getByRole("list", { name: "Commits not on GitHub" })
   expect(commits.textContent).toBe("0123456Add notes")
 

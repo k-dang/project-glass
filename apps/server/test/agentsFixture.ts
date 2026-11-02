@@ -70,6 +70,11 @@ const makeAgentsFixture = Effect.fnUntraced(function* <Claude extends { readonly
     Effect.provideService(Scope.Scope, serverScope),
   )
 
+  /** Quits Glass, leaving its Sandboxes running; `launch` opens it again. */
+  const quit = Scope.close(serverScope, Exit.void)
+
+  const launch = startBackend(env, home).pipe(Effect.map((backend) => backend.client))
+
   const watch = (agentId: string, until: (transcript: Transcript) => boolean, backend = client) =>
     backend.WatchTranscript({ agentId }).pipe(
       Stream.scan(() => emptyTranscript, applyTranscriptUpdate),
@@ -191,13 +196,9 @@ const makeAgentsFixture = Effect.fnUntraced(function* <Claude extends { readonly
     sandboxes,
     worktree: (name: string) =>
       join(home, ".project-glass", "worktrees", repository.owner, repository.repo, name),
-    /** Quits Glass, leaving its Sandboxes running; `launch` opens it again. */
-    quit: Scope.close(serverScope, Exit.void),
-    launch: startBackend(env, home).pipe(Effect.map((backend) => backend.client)),
-    restart: Scope.close(serverScope, Exit.void).pipe(
-      Effect.andThen(startBackend(env, home)),
-      Effect.map((backend) => backend.client),
-    ),
+    quit,
+    launch,
+    restart: quit.pipe(Effect.andThen(launch)),
   }
 })
 

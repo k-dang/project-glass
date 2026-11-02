@@ -90,20 +90,24 @@ export type ModelChoice = typeof ModelChoice.Type
  * not. Expired and deleted are for good: the Sandbox is gone with everything in it, leaving its
  * Agent read-only.
  */
+export const GoneReach = Schema.Literals(["expired", "deleted"])
+
+export type GoneReach = typeof GoneReach.Type
+
 export const SandboxReach = Schema.Literals([
   "connecting",
   "reachable",
   "unreachable",
-  "expired",
-  "deleted",
+  ...GoneReach.literals,
 ])
 
 export type SandboxReach = typeof SandboxReach.Type
 
-export type GoneReach = "expired" | "deleted"
-
 export const isGone = (reach: SandboxReach): reach is GoneReach =>
-  reach === "expired" || reach === "deleted"
+  GoneReach.literals.some((gone) => gone === reach)
+
+/** Glass can't reach the Sandbox now, for a while or for good. */
+export const isOutOfReach = (reach: SandboxReach) => reach === "unreachable" || isGone(reach)
 
 export const goneExplanation = (reach: GoneReach) =>
   `This Agent's Sandbox ${reach === "expired" ? "expired" : "was deleted"}, so it can't take messages. Its transcript stays until you remove the Agent.`

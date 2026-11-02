@@ -23,6 +23,7 @@ import {
   type RequestNotWaiting,
   RequestWaiting,
   SandboxPlace,
+  type SandboxStatus,
   thisMac as thisMacPlace,
   type TranscriptUpdate,
   TurnCutOff,
@@ -92,6 +93,10 @@ const toRow = ({
   }),
   folder,
 })
+
+const withStatus = (agent: Agent, sandbox: SandboxStatus | null) =>
+  // oxlint-disable-next-line typescript/no-misused-spread -- The fields go straight back into Agent.
+  new Agent({ ...agent, sandbox })
 
 const nothingUnsaved: UnsavedWork = { uncommittedChanges: false, unpushedCommits: [] }
 
@@ -209,10 +214,7 @@ export class Agents extends Context.Service<
         .pipe(Effect.orDie)
 
       const withSandbox = (agent: Agent) =>
-        sandboxes.status(agent.id).pipe(
-          // oxlint-disable-next-line typescript/no-misused-spread -- The fields go straight back into Agent.
-          Effect.map((sandbox) => new Agent({ ...agent, sandbox })),
-        )
+        sandboxes.status(agent.id).pipe(Effect.map((sandbox) => withStatus(agent, sandbox)))
 
       const deliver = (row: PlacedAgent, turnId: string, input: MessageInput) =>
         Effect.gen(function* () {
@@ -591,11 +593,7 @@ export class Agents extends Context.Service<
         watch: () =>
           Stream.zipLatest(SubscriptionRef.changes(rows), sandboxes.statuses).pipe(
             Stream.map(([current, statuses]) =>
-              current.map(
-                ({ agent }) =>
-                  // oxlint-disable-next-line typescript/no-misused-spread -- The fields go straight back into Agent.
-                  new Agent({ ...agent, sandbox: statuses.get(agent.id) ?? null }),
-              ),
+              current.map(({ agent }) => withStatus(agent, statuses.get(agent.id) ?? null)),
             ),
           ),
         transcript: (agentId) =>

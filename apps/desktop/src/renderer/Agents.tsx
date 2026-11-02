@@ -8,10 +8,12 @@ import {
 import {
   type Agent,
   isGone,
+  isOutOfReach,
   type PlaceTag,
   type RemovalWarnings,
   repositoryKey,
   type SandboxStatus,
+  type UnpushedCommit,
 } from "@glass/contracts"
 import { Link, Outlet, useNavigate, useParams } from "@tanstack/react-router"
 import { DateTime, Exit, Option, Predicate } from "effect"
@@ -35,6 +37,8 @@ import { ConfirmationDialog } from "./ConfirmationDialog"
 import { settledProblem, streamProblem } from "./problems"
 import { ProblemAlert } from "./ProblemAlert"
 import { shortcutLabel } from "./shortcutLabel"
+import { plural } from "./plural"
+import { ShortSha } from "./shortSha"
 import { useReviewShortcuts } from "./useReviewShortcuts"
 
 const groupNames: Record<PlaceTag, string> = { ...placeNames, sandbox: "Sandboxes" }
@@ -215,9 +219,7 @@ const removalWarning = (agent: Agent, { uncommittedChanges, unpushedCommits }: R
   const lost = [
     ...(uncommittedChanges === "some" ? ["uncommitted changes"] : []),
     ...(unpushedCommits.length > 0
-      ? [
-          `${unpushedCommits.length === 1 ? "a commit" : `${unpushedCommits.length} commits`} not pushed to GitHub`,
-        ]
+      ? [`${plural(unpushedCommits.length, "commit")} not pushed to GitHub`]
       : []),
   ]
 
@@ -236,7 +238,7 @@ function AgentRow(props: { agent: Agent }) {
 
   const [confirming, setConfirming] = useState<{
     readonly warning: string
-    readonly unpushedCommits: RemovalWarnings["unpushedCommits"]
+    readonly unpushedCommits: ReadonlyArray<UnpushedCommit>
   } | null>(null)
 
   const problem = settledProblem(warnings)
@@ -282,12 +284,7 @@ function AgentRow(props: { agent: Agent }) {
           ...(waiting ? [waitingId] : []),
           ...(sandboxText === null ? [] : [sandboxId]),
         ].join(" ")}
-        className={cn(
-          agentLink,
-          sandbox !== null &&
-            (sandbox.reach === "unreachable" || isGone(sandbox.reach)) &&
-            "opacity-60",
-        )}
+        className={cn(agentLink, sandbox !== null && isOutOfReach(sandbox.reach) && "opacity-60")}
       >
         <span
           id={repositoryId}
@@ -345,7 +342,9 @@ function AgentRow(props: { agent: Agent }) {
             <ul aria-label="Commits not on GitHub" className="flex flex-col gap-1 text-sm">
               {confirming.unpushedCommits.map(({ sha, subject }) => (
                 <li key={sha} className="flex min-w-0 gap-2">
-                  <code className="shrink-0 text-muted-foreground">{sha.slice(0, 7)}</code>
+                  <span className="shrink-0">
+                    <ShortSha sha={sha} />
+                  </span>
                   <span className="truncate">{subject}</span>
                 </li>
               ))}

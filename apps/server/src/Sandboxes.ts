@@ -2,9 +2,10 @@ import {
   AgentEngine,
   AgentError,
   AgentModels,
-  type GoneReach,
+  GoneReach,
   goneExplanation,
   isGone,
+  isOutOfReach,
   SandboxProviderInfo,
   type SandboxReach,
   SandboxStatus,
@@ -60,7 +61,7 @@ const SandboxRecord = Schema.Struct({
   /** When the Sandbox expires, as its provider last said. */
   expiresAt: Schema.optional(Schema.DateTimeUtcFromString),
   /** Set once the Sandbox is gone for good. */
-  gone: Schema.optional(Schema.Literals(["expired", "deleted"])),
+  gone: Schema.optional(GoneReach),
 })
 
 type SandboxRecord = typeof SandboxRecord.Type
@@ -266,7 +267,10 @@ export class Sandboxes extends Context.Service<
           const before = all.get(agentId) ?? unknown
           const after = update(before)
 
-          return [[before, after] as const, new Map(all).set(agentId, after)]
+          return [
+            [before, after] as const,
+            after === before ? all : new Map(all).set(agentId, after),
+          ]
         })
 
       /**
@@ -275,9 +279,11 @@ export class Sandboxes extends Context.Service<
        * ended, replacing the cut-off ending.
        */
       const setReach = (agentId: string, reach: SandboxReach) =>
-        change(agentId, (before) => (isGone(before.reach) ? before : { ...before, reach })).pipe(
+        change(agentId, (before) =>
+          isGone(before.reach) || before.reach === reach ? before : { ...before, reach },
+        ).pipe(
           Effect.flatMap(([before, after]) =>
-            before.reach !== after.reach && (after.reach === "unreachable" || isGone(after.reach))
+            before.reach !== after.reach && isOutOfReach(after.reach)
               ? PubSub.publish(lost, [agentId])
               : Effect.void,
           ),
@@ -394,9 +400,9 @@ export class Sandboxes extends Context.Service<
             let last = (yield* knownOf(agentId)).record?.expiresAt
 
             for (;;) {
-              const { record } = yield* knownOf(agentId)
+              const { record, reach } = yield* knownOf(agentId)
 
-              if (record === null || record.gone !== undefined) return
+              if (record === null || isGone(reach)) return
 
               const expiresAt = yield* extendSandbox(provider, record.state)
               const { record: current } = yield* knownOf(agentId)
@@ -615,6 +621,8 @@ export class Sandboxes extends Context.Service<
         placement: (providerId) => placed.get(providerId)?.placement ?? notInstalled(providerId),
         subscribeLost: PubSub.subscribe(lost).pipe(Effect.map(Stream.fromSubscription)),
         statuses: SubscriptionRef.changes(known).pipe(
+          // An update that changed nothing hands back the same map.
+          Stream.changesWith((a, b) => a === b),
           Stream.map(
             (all) => new Map(Array.from(all, ([agentId, found]) => [agentId, statusOf(found)])),
           ),

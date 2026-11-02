@@ -63,14 +63,29 @@ const expiryFile = (folder: string) => join(folder, "expires")
 
 const expiresAt = (folder: string) => Number(readFileSync(expiryFile(folder), "utf8"))
 
-/** The fake platform reclaims a Sandbox past its expiry, as a real one would. */
-const reclaimIfExpired = (folder: string) => {
-  if (!existsSync(expiryFile(folder)) || Date.now() < expiresAt(folder)) return
+const expired = (folder: string) =>
+  existsSync(expiryFile(folder)) && Date.now() >= expiresAt(folder)
+
+const stopHostIn = async (folder: string) => {
+  const pidFile = join(folder, "host.pid")
+
+  if (!existsSync(pidFile)) return
 
   try {
-    process.kill(Number(readFileSync(join(folder, "host.pid"), "utf8")), "SIGKILL")
-  } catch {}
+    const pid = Number(readFileSync(pidFile, "utf8"))
 
+    if (process.platform === "win32") {
+      // The host's programs hold their working directories open on Windows.
+      await execFileAsync("taskkill", ["/PID", String(pid), "/T", "/F"], { windowsHide: true })
+    } else {
+      process.kill(pid, "SIGKILL")
+    }
+  } catch {}
+}
+
+/** Ends the Sandbox's agent host and deletes the Sandbox, as the platform does. */
+const reclaim = async (folder: string) => {
+  await stopHostIn(folder)
   rmSync(folder, { recursive: true, force: true, maxRetries: 10 })
 }
 
@@ -149,8 +164,15 @@ const ingress = (folder: string, hostPort: number) =>
       upstream.on("close", close).on("error", close)
     })
 
+    let reclaiming = false
+
     const watching = setInterval(() => {
-      reclaimIfExpired(folder)
+      // The fake platform reclaims a Sandbox past its expiry, as a real one would.
+      if (!reclaiming && expired(folder)) {
+        reclaiming = true
+        void reclaim(folder)
+      }
+
       const deleted = !existsSync(folder)
 
       if (deleted || dropping(folder)) for (const socket of open) socket.destroy()
@@ -332,23 +354,6 @@ export const installFakeSandboxProvider = (
   const pidFile = (agentId: string) => join(sandboxFolder(agentId), "host.pid")
   const hostPid = (agentId: string) => Number(readFileSync(pidFile(agentId), "utf8"))
 
-  const stopHost = async (agentId: string) => {
-    if (!existsSync(pidFile(agentId))) return
-
-    try {
-      const pid = hostPid(agentId)
-
-      if (process.platform === "win32") {
-        // The host's programs hold their working directories open on Windows.
-        await execFileAsync("taskkill", ["/PID", String(pid), "/T", "/F"], {
-          windowsHide: true,
-        })
-      } else {
-        process.kill(pid, "SIGKILL")
-      }
-    } catch {}
-  }
-
   return {
     configure: (change: Partial<FakeSandboxSettings>) =>
       writeFileSync(settingsPath, JSON.stringify({ ...settings, ...change })),
@@ -357,12 +362,10 @@ export const installFakeSandboxProvider = (
       writeFileSync(join(sandboxFolder(agentId), "dropped"), ""),
     reconnect: (agentId: string) => rmSync(join(sandboxFolder(agentId), "dropped")),
     hostPid,
-    deleteSandbox: async (agentId: string) => {
-      await stopHost(agentId)
-      rmSync(sandboxFolder(agentId), { recursive: true, force: true, maxRetries: 10 })
-    },
+    /** Deletes a Sandbox behind Glass's back, as a platform reclaiming it would. */
+    deleteSandbox: (agentId: string) => reclaim(sandboxFolder(agentId)),
     stopHosts: async () => {
-      for (const agentId of readdirSync(settings.root)) await stopHost(agentId)
+      for (const agentId of readdirSync(settings.root)) await stopHostIn(sandboxFolder(agentId))
     },
   }
 }
