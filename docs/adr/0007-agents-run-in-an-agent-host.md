@@ -26,17 +26,19 @@ Building Claude Code Agents confirmed the SDK over driving `claude` stream-json 
 the stream-json control protocol, already written and kept in step with the CLI. Glass pins its
 version, points it at the user's `claude`, and asks for Claude Code's own system prompt and the
 user, project, and local settings sources, since the SDK otherwise starts `claude` without them.
-Tests fake only interfaces Glass owns, because a fake of someone else's interface encodes Glass's
-beliefs about it and passes when they are wrong. Business-service tests supply an `AgentAdapter`
-and explicit domain events through the real host handlers and journal; a program that exits is a
-session that closes. Each program's translation into Glass's events is a pure `step`, tested by
-feeding it the program's messages. Wiring to a program (continuing a conversation, images, model
-and effort changes, Permission requests and Questions) runs the real program, the pinned Claude
-Code CLI or the bundled pi, against a fake model API, and desktop verification does the same.
-Those tests run the host and the program as real processes, and so do the tests whose subject is a
-process: a host that dies or a dropped connection. Everything else runs in-process. A fake SDK
-query stays only for failures the real CLI won't produce on demand, such as a failed handshake.
-Agent tests use no scripted fake `claude` executable.
+Business-service tests supply an `AgentAdapter` and explicit domain events through the real host
+handlers and journal; a program that exits is a session that closes. Each program's translation
+into Glass's events is a pure `step`, tested by feeding it the program's messages. Wiring to a
+program (continuing a conversation, images, model and effort changes, Permission requests and
+Questions) runs the pinned Claude Code CLI or the bundled pi against a fake model API, and desktop
+verification does the same. A hand-written fake `claude` came before this and encoded wrong
+beliefs about the CLI, such as its model list and asking before read-only commands, while its tests
+passed; running the pinned CLI catches such changes on each upgrade. Recordings of real runs are the
+other honest fake, and capture model behaviour a hand-written fake model API can't, such as thinking
+and subagents, at the cost of re-recording on each upgrade. Those wiring tests run the host and the
+program as real processes, and so do the tests whose subject is a process: a host that dies or a
+dropped connection. Everything else runs in-process. A fake SDK query covers failures the real CLI
+won't produce on demand, such as a failed handshake.
 
 ## Considered Options
 
