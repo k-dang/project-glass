@@ -114,8 +114,14 @@ it("declines pi's extension dialogs, even between Turns", () => {
   assert.deepStrictEqual(commands, [Command.DeclineDialog({ id: "ask-1" })])
 })
 
-it("goes on with the Steers pi went idle holding, showing each as pi takes it in", () => {
-  const steer = { message: "Use tabs", images: [], toDos: [], id: "steer-1" }
+it("goes on with the Steers pi went idle holding, sending each prompt again and showing what the user wrote", () => {
+  const steer = {
+    message: "Use tabs",
+    images: [],
+    prompt: "Use tabs, as To-do 3 says",
+    id: "steer-1",
+  }
+
   const holding = { ...started, steers: [steer] }
 
   const idle = run(
@@ -152,10 +158,10 @@ it("goes on with the Steers pi went idle holding, showing each as pi takes it in
 
 const image = { mediaType: "image/png", data: "AA==" } as const
 
-const tabs = { message: "/tabs", images: [image], toDos: [], id: "steer-2" }
+const tabs = { message: "/tabs", images: [image], prompt: "/tabs", id: "steer-2" }
 
 it("gives back the Steers pi held as the user wrote them, and its follow-ups as its text", () => {
-  const lint = { message: "Run lint", images: [], toDos: [], id: "steer-1" }
+  const lint = { message: "Run lint", images: [], prompt: "Run lint", id: "steer-1" }
 
   assert.deepStrictEqual(
     leftover([lint, tabs], {

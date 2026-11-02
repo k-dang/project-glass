@@ -26,7 +26,7 @@ import { homedir } from "node:os"
 import { sdkExecutable } from "../processes"
 import type { AgentAdapter } from "./adapter"
 import { Input, isFailure, machine } from "./claudeTurn"
-import { type DeliveredMessage, programText } from "./deliveredMessage"
+import type { DeliveredMessage } from "./deliveredMessage"
 import { couldNotSwitch, HostAgentError, notRunning } from "./protocol"
 import { settleWith } from "./requests"
 import { permissionRequest, ToolInput } from "./toolCalls"
@@ -125,28 +125,23 @@ const toModel = (info: ModelInfo): AgentModel => ({
   efforts: info.supportedEffortLevels ?? [],
 })
 
-const userMessage = (delivered: DeliveredMessage): SDKUserMessage => {
-  const { images } = delivered
-  const text = programText(delivered)
-
-  return {
-    type: "user",
-    message: {
-      role: "user",
-      content:
-        images.length === 0
-          ? text
-          : [
-              ...images.map(({ mediaType, data }) => ({
-                type: "image" as const,
-                source: { type: "base64" as const, media_type: mediaType, data },
-              })),
-              { type: "text" as const, text },
-            ],
-    },
-    parent_tool_use_id: null,
-  }
-}
+const userMessage = ({ prompt, images }: DeliveredMessage): SDKUserMessage => ({
+  type: "user",
+  message: {
+    role: "user",
+    content:
+      images.length === 0
+        ? prompt
+        : [
+            ...images.map(({ mediaType, data }) => ({
+              type: "image" as const,
+              source: { type: "base64" as const, media_type: mediaType, data },
+            })),
+            { type: "text" as const, text: prompt },
+          ],
+  },
+  parent_tool_use_id: null,
+})
 
 interface CancellingInterrupt {
   interrupt(options: { readonly cancelQueued: boolean }): ReturnType<Query["interrupt"]>

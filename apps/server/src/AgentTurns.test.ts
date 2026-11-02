@@ -120,8 +120,15 @@ it.live("gives pi a mentioned To-do's notes and keeps the message as the user wr
     const [turn] = yield* f.transcript(agent.id, settled(1))
 
     assert.equal(turn?.message, message)
-    const read = JSON.stringify(f.model.calls[0]?.messages)
-    assert.include(read, `Look at To-do ${added.id} (\\"Fix the flaky test\\") please`)
+
+    const read = f.model.calls[0]?.messages
+      .filter(({ role }) => role === "user")
+      .flatMap(({ content }) =>
+        Predicate.isString(content) ? [content] : (content ?? []).map(({ text }) => text ?? ""),
+      )
+      .join("\n")
+
+    assert.include(read, `Look at To-do ${added.id} ("Fix the flaky test") please`)
     assert.include(read, "It times out on CI.")
   }),
 )

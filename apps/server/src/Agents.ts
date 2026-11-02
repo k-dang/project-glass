@@ -57,6 +57,7 @@ import { Sandboxes } from "./Sandboxes"
 import { LocalPlacement } from "./LocalPlacement"
 import type { DeliveredMessage } from "./agentHost/deliveredMessage"
 import { encodeImages, StoredMessage, Transcripts } from "./Transcripts"
+import { prompt } from "./prompt"
 import { ToDos } from "./ToDos"
 
 const StoredAgent = Schema.Struct({
@@ -215,9 +216,10 @@ export class Agents extends Context.Service<
       const withSandbox = (agent: Agent) =>
         sandboxes.status(agent.id).pipe(Effect.map((sandbox) => withStatus(agent, sandbox)))
 
-      // A To-do that can't be read now reaches the Agent as only its Mention's title.
-      const delivered = Effect.fnUntraced(function* (input: MessageInput) {
-        const ids = mentionedToDoIds(input.message)
+      // A To-do that can't be read, or no longer exists, reaches the Agent as only its Mention's
+      // title.
+      const delivered = Effect.fnUntraced(function* ({ message, images }: MessageInput) {
+        const ids = mentionedToDoIds(message)
 
         const listed =
           ids.length === 0
@@ -229,11 +231,9 @@ export class Agents extends Context.Service<
                 Effect.orElseSucceed(() => []),
               )
 
-        return {
-          message: input.message,
-          images: input.images,
-          toDos: ids.flatMap((id) => listed.find((toDo) => toDo.id === id) ?? []),
-        } satisfies DeliveredMessage
+        const mentioned = ids.flatMap((id) => listed.find((toDo) => toDo.id === id) ?? [])
+
+        return { message, images, prompt: prompt(message, mentioned) } satisfies DeliveredMessage
       })
 
       const deliver = (row: PlacedAgent, turnId: string, input: MessageInput) =>
@@ -242,6 +242,7 @@ export class Agents extends Context.Service<
           const { id: agentId, engine, model, effort, permissionMode } = row.agent
 
           yield* client.StartAgent({ agentId, engine, folder: row.folder })
+          const message = yield* delivered(input)
 
           yield* lock.withPermits(1)(
             Effect.gen(function* () {
@@ -250,7 +251,7 @@ export class Agents extends Context.Service<
               yield* client.StartTurn({
                 agentId,
                 turnId,
-                ...(yield* delivered(input)),
+                ...message,
                 model,
                 effort,
                 permissionMode,
@@ -372,7 +373,9 @@ export class Agents extends Context.Service<
 
           if (Option.isNone(running)) return false
 
-          return yield* running.value.Steer({ agentId, ...(yield* delivered(input)) }).pipe(
+          const message = yield* delivered(input)
+
+          return yield* running.value.Steer({ agentId, ...message }).pipe(
             Effect.as(true),
             Effect.tapError((cause) => Effect.logWarning("Couldn't Steer a Turn", cause)),
             Effect.orElseSucceed(() => false),

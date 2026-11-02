@@ -16,7 +16,7 @@ import { ChildProcessSpawner } from "effect/process"
 import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
 import type { AgentAdapter } from "./adapter"
-import { type DeliveredMessage, programText } from "./deliveredMessage"
+import type { DeliveredMessage } from "./deliveredMessage"
 import {
   AvailableModels,
   ClearedQueue,
@@ -118,10 +118,10 @@ const freshThinkingLevel = (folder: string, model: { provider: string; id: strin
   )
 }
 
-const piMessage = (type: "prompt" | "steer", delivered: DeliveredMessage) => ({
+const piMessage = (type: "prompt" | "steer", { prompt, images }: DeliveredMessage) => ({
   type,
-  message: programText(delivered),
-  images: delivered.images.map(({ mediaType, data }) => ({
+  message: prompt,
+  images: images.map(({ mediaType, data }) => ({
     type: "image" as const,
     data,
     mimeType: mediaType,
