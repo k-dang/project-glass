@@ -19,7 +19,7 @@ Run from the repo root. First time in a checkout: `mise trust && mise install &&
 
 ```sh
 V=.agents/skills/verify-glass/scripts/glass-verify.ts
-node $V launch                                  # real GitHub, local Pi provider; no model charges
+node $V launch                                  # fake GitHub, local Pi provider; no model charges
 node $V launch --tour-provider real             # live model provider; may incur charges
 node $V launch --github fake --fake-mode 401    # fake GitHub: ok | 401 | 500 | down | busy-500
 node $V launch --no-credentials                 # no token env vars, gh hidden from PATH
@@ -32,7 +32,7 @@ node $V launch --backend fake                   # pnpm dev:fake's backend, with 
 
 Each run is isolated under `.verify/<id>/` (gitignored): its own Electron profile, its own `GLASS_HOME` (so backend logs and data files go to the run, not `~/.glass/logs` and `~/.project-glass`), its own ports. Several runs can live side by side; then every command needs `--run <id>`.
 
-With `--github fake`, the backend's `GLASS_GITHUB_API_URL` points at the shared fake in `apps/server/test/fakeGitHub.ts`. It answers `GET /user` as `octocat` (`ok`), HTTP 401, HTTP 500, or a dropped connection (`down`), and `GH_TOKEN` is a dummy. In `ok` mode it also answers the PR list reads (the full read of open PRs, the catch-up search, and checks) with four Needs review PRs (Passing, Failing, Running, and Unavailable checks), two My PRs (one a draft), and one Reviewing PR per followed repository; a repository named `quiet` has none and one named `busy` supplies 134 Needs review PRs alongside My PRs and Reviewing. `busy-500` answers like `ok` except that every PR list read of the `busy` repository fails with HTTP 500. Listed PRs open into a PR workspace with a one-file diff; `octo-org/glass#101` is the exception, 150 generated files for scroll and memory runs. Drafts, Reviews, and Tours use the shared fake too. That env var is the backend's real GitHub boundary, so everything from the renderer to the HTTP call is production code. Change its answer mid-run with `node $V fake-github <mode>`.
+GitHub defaults to fake. Explicit `--github real` selects live GitHub. With fake GitHub, the backend's `GLASS_GITHUB_API_URL` points at the shared fake in `apps/server/test/fakeGitHub.ts`. It answers `GET /user` as `octocat` (`ok`), HTTP 401, HTTP 500, or a dropped connection (`down`), and `GH_TOKEN` is a dummy. In `ok` mode it also answers the PR list reads (the full read of open PRs, the catch-up search, and checks) with four Needs review PRs (Passing, Failing, Running, and Unavailable checks), two My PRs (one a draft), and one Reviewing PR per followed repository; a repository named `quiet` has none and one named `busy` supplies 134 Needs review PRs alongside My PRs and Reviewing. `busy-500` answers like `ok` except that every PR list read of the `busy` repository fails with HTTP 500. Listed PRs open into a PR workspace with a one-file diff; `octo-org/glass#101` is the exception, 150 generated files for scroll and memory runs. Drafts, Reviews, and Tours use the shared fake too. That env var is the backend's real GitHub boundary, so everything from the renderer to the HTTP call is production code. Change its answer mid-run with `node $V fake-github <mode>`.
 
 Tour verification defaults to `--tour-provider fake`. Choose **pi** as the Tour engine in Settings → Tours before **Write Tour**. Your installed `pi` calls a local provider that returns a clearly marked synthetic Chapter covering the PR's actual changed paths. Pi credentials and model settings live inside the run; Claude Code is disabled to prevent accidental paid calls. GitHub still uses the chosen `--github` mode. See [Tours](features/tours.md) for the recipe. Choose `--tour-provider real` explicitly to use your normal Pi configuration and Claude Code installation; this may incur model charges.
 
@@ -54,7 +54,7 @@ Read-only. Checks an Electron process serves the run's CDP port, that port belon
 | `click --role <role> --name <name>`              | finds the element in the accessibility tree and dispatches a real mouse click at its center |
 | `type --role <role> --name <name> --text <text>` | clicks the element, then replaces its contents with `<text>` as a paste would               |
 | `press --key <key> [--meta]`                     | presses a key such as `Enter` or `ArrowUp` in the focused element, holding ⌘ with `--meta`  |
-| `wait --text <text> [--timeout ms]`              | polls the window text (default 15s); exit 1 on timeout                                      |
+| `wait --text <text> [--timeout ms]`              | polls body text and accessible StaticText, including shadow-root diffs (default 15s); exit 1 on timeout                                      |
 | `scroll --by <pixels> [--x n] [--y n]`           | turns the wheel over the window, for views that load as you scroll                          |
 | `memory [--samples n] [--interval ms] [--gc] [--out n]` | samples renderer, worker, and process memory into `evidence/<out>.jsonl`, then prints deltas |
 | `memory --sweep [--dwell n] [--gc] [--out n]`     | visits each rail area, samples it, and prints one row per area                              |
@@ -106,7 +106,7 @@ Proof standards:
 - Drive the real user path: clicks on the window, real backend, real RPC. Never call `window.glass` or the backend directly to _cause_ a state.
 - Capture the action and the resulting state: a snapshot/screenshot before and after, not only the final screen.
 - Verify side effects alongside the UI: `fake-github.log` proves the click reached GitHub; `stop` prints whether the backend port closed.
-- Use the fake only for GitHub states you can't produce honestly; prove the happy path once against real GitHub when the change touches it.
+- Use fake GitHub for isolated verification. Explicit `--github real` selects live GitHub; isolated storage does not isolate GitHub writes.
 - A fake-provider Tour proves the app, SDK transport, saving, and rendering. Report it as synthetic; live authentication and model output quality require a real-provider run.
 - Look at every screenshot with the Read tool; layout or copy that looks off is a finding.
 

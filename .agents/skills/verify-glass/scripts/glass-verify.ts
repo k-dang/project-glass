@@ -18,10 +18,9 @@ import { basename, delimiter, join } from "node:path"
 import { parseArgs } from "node:util"
 import { Cdp, cdpJson } from "./cdp.ts"
 import { formatAreas, formatSummary, type MemorySample, startSampler } from "./memory.ts"
+import { githubMode } from "./launch-options.ts"
 import { FAKE_MODES, isFakeMode, serveFakeGitHub } from "./fake-github.ts"
 import { VIEWER } from "../../../../apps/server/test/fakePullRequest.ts"
-import { serveFakeAnthropic } from "./fake-anthropic.ts"
-import { fakeAnthropicEnvironment } from "../../../../apps/server/test/pinnedClaude.ts"
 import { serveFakePi } from "./fake-pi.ts"
 
 const root = join(import.meta.dirname, "..", "..", "..", "..")
@@ -35,6 +34,7 @@ const USAGE = `Usage: node .agents/skills/verify-glass/scripts/glass-verify.ts <
          [--tour-provider fake|real] [--fail-backend-start] [--backend real|fake]
          [--no-build] [--run <id>]
                                          build, start an isolated Glass, wait until ready
+                                         GitHub defaults to fake; --github real selects live GitHub
                                          Tour provider defaults to fake; real may incur model charges
                                          --backend fake runs pnpm dev:fake's backend and its demo
                                          Agents; it brings its own fake GitHub and providers, and
@@ -77,7 +77,6 @@ interface RunState {
   readonly backend: "real" | "fake"
   readonly fake?: { readonly pid: number; readonly port: number }
   readonly fakePi?: { readonly pid: number; readonly port: number }
-  readonly fakeAnthropic?: { readonly pid: number; readonly port: number }
   backendUrl?: string
 }
 
@@ -365,7 +364,7 @@ const withoutGhOnPath = (path: string) =>
 
 const launch = async (options: {
   run?: string
-  github: string
+  github: string | undefined
   fakeMode: string
   tourProvider: string
   noCredentials: boolean
@@ -373,16 +372,12 @@ const launch = async (options: {
   backend: string
   noBuild: boolean
 }) => {
-  const github =
-    options.github === "real" || options.github === "fake"
-      ? options.github
-      : fail("--github is real or fake")
+  const github = githubMode(options.github, options.backend)
   if (!isFakeMode(options.fakeMode)) fail(`--fake-mode is one of ${FAKE_MODES.join(", ")}`)
   if (options.tourProvider !== "real" && options.tourProvider !== "fake")
     fail("--tour-provider is real or fake")
   if (options.backend !== "real" && options.backend !== "fake") fail("--backend is real or fake")
   const fakeBackend = options.backend === "fake"
-  if (fakeBackend && github === "fake") fail("--backend fake brings its own fake GitHub; drop --github fake")
   const id = options.run ?? `run-${new Date().toISOString().replace(/\D/g, "").slice(0, 14)}`
   const paths = runPaths(id)
   if (existsSync(paths.stateFile)) fail(`run ${id} is already live; stop it or pick another --run`)
@@ -405,7 +400,6 @@ const launch = async (options: {
   }
 
   let fakePi: RunState["fakePi"]
-  let fakeAnthropic: RunState["fakeAnthropic"]
   let fake: RunState["fake"]
   try {
     if (options.tourProvider === "fake" && !fakeBackend) {
@@ -420,19 +414,7 @@ const launch = async (options: {
       console.log("Tour provider: fake. Choose pi as the Tour engine in Settings; Claude Code is disabled.")
     }
 
-    if (fakeBackend) {
-      // The real pinned `claude`, on a fake Anthropic API with the run's own config and no login.
-      fakeAnthropic = await startFake(
-        "__fake-anthropic",
-        [],
-        join(paths.state, "fake-anthropic-ready.json"),
-        join(paths.state, "fake-anthropic.log"),
-      )
-      Object.assign(env, fakeAnthropicEnvironment(paths.home, `http://127.0.0.1:${fakeAnthropic.port}`))
-      console.log("Claude Code: the pinned CLI on a fake Anthropic API; no model is called.")
-    }
-
-    if (github === "fake") {
+    if (!fakeBackend && github === "fake") {
       writeFileSync(paths.fakeModeFile, options.fakeMode)
       fake = await startFake(
         "__fake-github",
@@ -445,7 +427,7 @@ const launch = async (options: {
       delete env["GITHUB_TOKEN"]
     }
   } catch (error) {
-    for (const provider of [fakePi, fakeAnthropic, fake]) {
+    for (const provider of [fakePi, fake]) {
       if (provider !== undefined) killTree(provider.pid)
     }
     return fail(error instanceof Error ? error.message : String(error))
@@ -477,7 +459,6 @@ const launch = async (options: {
     backend: options.backend,
     ...(fake === undefined ? {} : { fake }),
     ...(fakePi === undefined ? {} : { fakePi }),
-    ...(fakeAnthropic === undefined ? {} : { fakeAnthropic }),
   }
   saveRun(run)
 
@@ -557,13 +538,6 @@ const doctor = async (run: RunState) => {
       `port ${run.fakePi.port}`,
     )
   }
-  if (run.fakeAnthropic !== undefined) {
-    check(
-      isAlive(run.fakeAnthropic.pid) && (await portIsOpen(run.fakeAnthropic.port)),
-      "Fake Anthropic API",
-      `port ${run.fakeAnthropic.port}`,
-    )
-  }
   const newestSource = Math.max(
     ...["apps/server/src", "apps/desktop/src", "packages/contracts/src"].flatMap(
       (dir) =>
@@ -618,7 +592,6 @@ const stop = async (run: RunState) => {
   }
   if (run.fake !== undefined) killTree(run.fake.pid)
   if (run.fakePi !== undefined) killTree(run.fakePi.pid)
-  if (run.fakeAnthropic !== undefined) killTree(run.fakeAnthropic.pid)
   if (backendUrl) {
     const port = Number(new URL(backendUrl).port)
     for (let attempt = 0; attempt < 50 && (await portIsOpen(port)); attempt++) await sleep(100)
@@ -630,7 +603,6 @@ const stop = async (run: RunState) => {
     paths.backendLog,
     join(paths.state, "fake-github.log"),
     join(paths.state, "fake-pi.log"),
-    join(paths.state, "fake-anthropic.log"),
   ]) {
     if (existsSync(log)) copyFileSync(log, join(paths.evidence, basename(log)))
   }
@@ -647,7 +619,10 @@ const waitForText = async (run: RunState, text: string, timeout: number) => {
         page ??= await tryOpenWindow(run)
         if (
           page &&
-          (await page.evaluate("document.body.innerText", Schema.String)).includes(text)
+          ((await page.evaluate("document.body.innerText", Schema.String)).includes(text) ||
+            (await axTree(page)).some(
+              (node) => !node.ignored && node.role?.value === "StaticText" && node.name?.value.includes(text),
+            ))
         ) {
           return console.log(`Found "${text}"`)
         }
@@ -668,7 +643,7 @@ const main = async () => {
     allowPositionals: true,
     options: {
       run: { type: "string" },
-      github: { type: "string", default: "real" },
+      github: { type: "string" },
       "fake-mode": { type: "string", default: "ok" },
       "tour-provider": { type: "string", default: "fake" },
       "no-credentials": { type: "boolean", default: false },
@@ -700,8 +675,6 @@ const main = async () => {
         arg ?? fail("missing mode file"),
         positionals[2] ?? fail("missing ready file"),
       )
-    case "__fake-anthropic":
-      return serveFakeAnthropic(arg ?? fail("missing ready file"))
     case "__fake-pi":
       return serveFakePi(arg ?? fail("missing home"), positionals[2] ?? fail("missing ready file"))
     case "launch":
@@ -880,4 +853,4 @@ const main = async () => {
   }
 }
 
-await main()
+await main().catch((error: unknown) => fail(error instanceof Error ? error.message : String(error)))

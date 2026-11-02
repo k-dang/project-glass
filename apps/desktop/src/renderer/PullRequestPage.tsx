@@ -79,11 +79,11 @@ export function PullRequestPage() {
             key={`${ref.owner}/${ref.repo}#${ref.number}`}
             workspace={open.workspace}
             activity={open.activity}
-            drafts={open.drafts}
-            asks={open.asks}
-            replies={open.replies}
-            resolutions={open.resolutions}
-            viewedFiles={open.viewedFiles}
+            drafts={open.feedback.drafts}
+            asks={open.feedback.asks}
+            replies={open.feedback.replies}
+            resolutions={open.feedback.resolutions}
+            viewedFiles={open.feedback.viewedFiles}
             reloading={result.waiting}
             changedOnGitHub={changed === open.workspace}
             onReload={reload}

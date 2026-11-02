@@ -28,12 +28,15 @@ export default defineConfig({
       { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },
       { name: "anti-slop", specifier: "./tools/oxlint/anti-slop/index.ts" },
       { name: "anti-slop-effect", specifier: "./tools/oxlint/anti-slop/effect/index.ts" },
+      { name: "glass", specifier: "./tools/oxlint/glass/index.ts" },
     ],
     categories: {
       correctness: "error",
       suspicious: "error",
     },
     rules: {
+      "glass/architecture": "error",
+      "glass/test-waits": "error",
       "react/react-in-jsx-scope": "off",
       "no-underscore-dangle": "off",
       "import/no-unassigned-import": ["error", { allow: ["**/*.css"] }],

@@ -7,8 +7,7 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { serve } from "../src/server"
 import { ServerConfig } from "../src/ServerConfig"
-import { bundledPi, demoClaudeReply, seedDemoAgent, startDemoPi } from "./demoAgent"
-import { fakeClaude } from "./fakeClaude"
+import { bundledPi, seedDemoAgent, startDemoClaude, startDemoPi } from "./demoAgent"
 import { DEMO_REPOSITORY, seedDemoPullRequests } from "./demoPullRequests"
 import { startFakeGitHub } from "./fakeGitHub"
 import { VIEWER } from "./fakePullRequest"
@@ -40,7 +39,7 @@ const main = Effect.gen(function* () {
     (directory) => Effect.promise(() => rm(directory, { recursive: true, force: true })),
   )
 
-  const claude = yield* fakeClaude(claudeDirectory, { reply: demoClaudeReply })
+  const claudeCommand = yield* startDemoClaude(claudeDirectory)
 
   const configured = ConfigProvider.layer(
     ConfigProvider.fromEnvRecord({
@@ -49,8 +48,7 @@ const main = Effect.gen(function* () {
       GLASS_GITHUB_API_URL: github.url,
       GLASS_GIT_REMOTE: github.gitUrl,
       GLASS_PI_COMMAND: bundledPi,
-      // A caller can bring its own `claude`, as verify-glass brings the real one on a fake model.
-      GLASS_CLAUDE_COMMAND: process.env["GLASS_CLAUDE_COMMAND"] ?? claude.command,
+      GLASS_CLAUDE_COMMAND: claudeCommand,
     }),
   )
 
@@ -70,7 +68,7 @@ const main = Effect.gen(function* () {
       root: join(demo, "sandboxes"),
       cloneFrom: join(demo, "repositories", `${DEMO_REPOSITORY.repo}-origin.git`),
       piCommand: bundledPi,
-      claudeCommand: process.env["GLASS_CLAUDE_COMMAND"] ?? claude.command,
+      claudeCommand,
     },
     fileURLToPath(new URL("../test/fakeSandboxProvider.ts", import.meta.url)),
   )

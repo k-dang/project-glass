@@ -15,8 +15,12 @@ import {
 import { Effect, Exit, Option, Predicate, Scope, Stream } from "effect"
 import { join } from "node:path"
 import { bundledPi } from "./demoAgent"
-import { type FakeModelSettings, fakeModelProvider, type PiSettings } from "./fakeModelProvider"
-import { type FakeClaudeSettings, fakeClaude } from "./fakeClaude"
+import {
+  type FakeModelRequest,
+  type FakeModelSettings,
+  fakeModelProvider,
+  type PiSettings,
+} from "./fakeModelProvider"
 import { startFakeGitHub } from "./fakeGitHub"
 import { VIEWER } from "./fakePullRequest"
 import { installFakeSandboxProvider } from "./fakeSandboxProvider"
@@ -28,16 +32,24 @@ import { vi } from "vite-plus/test"
 
 export const repository = new FollowedRepository({ owner: "glass-demo", repo: "greeter" })
 
-const makeAgentsFixture = Effect.fnUntraced(function* <Claude extends { readonly command: string }>(
+/**
+ * A backend on fake GitHub whose Agents run the real programs against fake models: the bundled pi on
+ * a fake model provider, and the pinned Claude Code CLI on a fake Anthropic API.
+ */
+export const agentsFixture = Effect.fnUntraced(function* (
   settings: FakeModelSettings,
-  piSettings: PiSettings,
-  startClaude: (home: string, repositories: string) => Effect.Effect<Claude, never, Scope.Scope>,
+  piSettings: PiSettings = { retry: { enabled: false } },
 ) {
   const github = yield* startFakeGitHub()
   const home = yield* isolatedHome
   const repositories = yield* isolatedHome
   const model = yield* fakeModelProvider(home, settings, piSettings)
-  const claude = yield* startClaude(home, repositories)
+  const anthropic = yield* startFakeAnthropic
+  const claudeEnvironment = fakeAnthropicEnvironment(home, anthropic.url)
+
+  for (const [name, value] of Object.entries(claudeEnvironment)) vi.stubEnv(name, value)
+
+  const claude = { ...anthropic, command: claudeEnvironment.GLASS_CLAUDE_COMMAND }
 
   const clone = seedClone(repositories, repository.owner, repository.repo)
 
@@ -180,29 +192,6 @@ const makeAgentsFixture = Effect.fnUntraced(function* <Claude extends { readonly
   }
 })
 
-/** Controlled executable protocol for host transport, process lifecycle and exact event sequences. */
-export const agentsFixture = (
-  settings: FakeModelSettings,
-  piSettings: PiSettings = { retry: { enabled: false } },
-  claudeSettings: FakeClaudeSettings = {},
-) =>
-  makeAgentsFixture(settings, piSettings, (_home, repositories) =>
-    fakeClaude(repositories, claudeSettings),
-  )
-
-/** Compatibility coverage for the pinned CLI and SDK against the shared Messages API fake. */
-export const claudeIntegrationFixture = () =>
-  makeAgentsFixture({}, { retry: { enabled: false } }, (home) =>
-    Effect.gen(function* () {
-      const provider = yield* startFakeAnthropic
-      const env = fakeAnthropicEnvironment(home, provider.url)
-
-      for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value)
-
-      return { command: env.GLASS_CLAUDE_COMMAND }
-    }),
-  )
-
 export const settled = (count: number) => (turns: ReadonlyArray<Turn>) =>
   turns.length === count && turns.every((turn) => turn.ended !== null)
 
@@ -216,3 +205,11 @@ export const claudeCode = {
 
 export const lastText = (turn: Turn | undefined) =>
   turn?.parts.findLast((part) => Predicate.isTagged(part, "Text"))
+
+export const userMessages = ({ messages }: FakeModelRequest) =>
+  messages.filter(({ role }) => role === "user").map(({ content }) => JSON.stringify(content))
+
+export const pixel: Image = {
+  mediaType: "image/png",
+  data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+}

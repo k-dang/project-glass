@@ -20,14 +20,14 @@ A local Claude Code Agent has a Permission mode (Default, Accept edits, Auto, By
 
 Preconditions:
 
-- `node $V launch --backend fake`. Claude Code Agents run the real `claude` the pinned SDK ships, against a fake Anthropic API with the run's own Claude config, so no model is called and nothing is charged. `node $V doctor` shows `Fake Anthropic API` OK.
+- `node $V launch --backend fake`. `pnpm dev:fake`'s backend runs Claude Code Agents on the real `claude` the pinned SDK ships, against its own fake Anthropic API and Claude config, so no model is called and nothing is charged.
 
 - **Start a Claude Code Agent.** `click --role link --name "Agents"`, `wait --text "Local"`, `click --role button --name "pi: gpt-test"`, `click --role button --name "Claude Code"`, `press --key Escape`.
 - **A waiting Permission request (`request-waiting`).** `type --role textbox --name "Message" --text 'Please run `touch notes.txt`'`, `press --key Enter`, `wait --text "Allow Bash?"`, `wait --text "Waiting on you"`, and capture `card-waiting`.
 - **Allow or Deny (`request-allow`, `request-deny`).** `click --role button --name "Allow"`, then `wait --text "The fake model saw"`; or type a reason into the card's "Why not?" box and `click --role button --name "Deny"`.
 - **A Question (`question-answer`).** Send `Please ask me which files to read`, `wait --text "Which files should I look at?"`, click an option or type into "Or answer in your own words", then `click --role button --name "Answer"`.
 - **Stop while a card waits (`request-stop`).** With a card waiting, `click --role button --name "Stop"`, `wait --text "Stopped after"`, `wait --text "No longer answerable"`, and capture `stopped`; `text` no longer contains "Waiting on you". A next message then runs and ends "Done in …".
-- **Proof.** A snapshot and screenshot of each state, and `fake-anthropic.log` in the evidence: one `messages` line per model call, naming the tool the fake asked for, shows the real CLI reached the fake.
+- **Proof.** A snapshot and screenshot of each state, and `backend.log` in the evidence: one `messages` line per model call, naming the tool the fake asked for, shows the real CLI reached the fake.
 
 ## Gotchas
 
