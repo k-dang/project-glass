@@ -22,6 +22,7 @@ import {
   type ResumableDestination,
   SandboxPlace,
   SandboxProviderInfo,
+  type SandboxReach,
   SandboxStatus,
   thisMac,
   SavedPlace,
@@ -1300,18 +1301,22 @@ const sandboxAgent = new Agent({
   permissionMode: "bypassPermissions",
 })
 
+const noTranscript = () =>
+  Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null }))
+
+const inSandboxWith = (reach: SandboxReach) =>
+  new Agent({
+    ...agentFields,
+    place: SandboxPlace.make({ providerId: "fake" }),
+    engine: "claude-code",
+    permissionMode: "bypassPermissions",
+    sandbox: new SandboxStatus({ expiresAt: DateTime.makeUnsafe("2026-10-28T12:00:00Z"), reach }),
+  })
+
 it("dims a Sandbox Agent Glass can't reach, and makes one whose Sandbox expired read-only", async () => {
-  const expiresAt = DateTime.makeUnsafe("2026-10-28T12:00:00Z")
-
-  const reach = Stream.make([
-    new SandboxStatus({ agentId: agent.id, expiresAt, reach: "unreachable" }),
-  ])
-
   mount({
-    WatchAgents: () => Stream.make([sandboxAgent]),
-    WatchSandboxes: () => reach,
-    WatchTranscript: () =>
-      Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
+    WatchAgents: () => Stream.make([inSandboxWith("unreachable")]),
+    WatchTranscript: noTranscript,
   })
 
   const link = await screen.findByRole("link", { description: /Can't reach its Sandbox · Expires/ })
@@ -1320,11 +1325,8 @@ it("dims a Sandbox Agent Glass can't reach, and makes one whose Sandbox expired 
 
   cleanup()
   mount({
-    WatchAgents: () => Stream.make([sandboxAgent]),
-    WatchSandboxes: () =>
-      Stream.make([new SandboxStatus({ agentId: agent.id, expiresAt, reach: "expired" })]),
-    WatchTranscript: () =>
-      Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
+    WatchAgents: () => Stream.make([inSandboxWith("expired")]),
+    WatchTranscript: noTranscript,
   })
 
   expect(

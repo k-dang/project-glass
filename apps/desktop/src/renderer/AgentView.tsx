@@ -78,7 +78,6 @@ import {
 import {
   type AgentTab,
   agentsAtom,
-  sandboxesAtom,
   cancelQueuedAtom,
   changeModelAtom,
   changePermissionModeAtom,
@@ -161,10 +160,7 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
   const waiting = turns.at(-1)?.parts.find(isWaiting)
   const registry = useContext(RegistryContext)
 
-  const reach = Option.getOrNull(AsyncResult.value(useAtomValue(sandboxesAtom)))?.get(
-    agent.id,
-  )?.reach
-
+  const reach = agent.sandbox?.reach
   const gone = reach !== undefined && isGone(reach) ? reach : null
 
   useEffect(() => {

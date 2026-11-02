@@ -118,7 +118,6 @@ export class LocalPlacement extends Context.Service<
 
       return LocalPlacement.of({
         engines: AgentEngine.literals,
-        keepsBranch: true,
         models: (engine) =>
           host.client.pipe(
             Effect.flatMap((client) => client.ListModels({ engine })),
@@ -137,8 +136,6 @@ export class LocalPlacement extends Context.Service<
           ),
         baseRef,
         remove,
-        // The local agent host ends with Glass, and its Agents' Turns with it.
-        reopen: () => Effect.succeed(false),
         subscribeLost: host.subscribeStopped.pipe(Effect.map(Stream.map(() => [...hosted]))),
       })
     }),

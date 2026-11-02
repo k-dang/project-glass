@@ -29,7 +29,6 @@ import {
   placeNames,
   removalWarningsAtom,
   removeAgent,
-  sandboxesAtom,
   waitingAgentsAtom,
 } from "./agentsArea"
 import { ConfirmationDialog } from "./ConfirmationDialog"
@@ -41,8 +40,6 @@ import { useReviewShortcuts } from "./useReviewShortcuts"
 const groupNames: Record<PlaceTag, string> = { ...placeNames, sandbox: "Sandboxes" }
 
 const noneWaiting: ReadonlySet<string> = new Set()
-
-const noSandboxes: ReadonlyMap<string, SandboxStatus> = new Map()
 
 const expiryFormat = new Intl.DateTimeFormat(undefined, {
   weekday: "short",
@@ -201,11 +198,16 @@ function AgentList() {
     .render()
 }
 
+/** What removing the Agent would lose, or `null` when it loses nothing. */
 const removalWarning = (agent: Agent, { uncommittedChanges, unpushedCommits }: RemovalWarnings) => {
-  if (!Predicate.isTagged(agent.place, "sandbox"))
+  // Removing a local Agent keeps its branch, so its commits stay.
+  if (!Predicate.isTagged(agent.place, "sandbox")) {
+    if (uncommittedChanges === "none") return null
+
     return uncommittedChanges === "unchecked"
       ? `Glass couldn't check its worktree for uncommitted changes. Removing it discards any. The branch ${agent.name} and its commits stay.`
       : `Its worktree has uncommitted changes, which removing it discards. The branch ${agent.name} and its commits stay.`
+  }
 
   if (uncommittedChanges === "unchecked")
     return "Glass couldn't reach its Sandbox to check for work that isn't on GitHub. Removing it deletes the Sandbox and everything in it."
@@ -219,11 +221,10 @@ const removalWarning = (agent: Agent, { uncommittedChanges, unpushedCommits }: R
       : []),
   ]
 
+  if (lost.length === 0) return null
+
   return `Its Sandbox has ${lost.join(" and ")}, which removing it deletes along with the Sandbox. Ask the Agent to push first to keep them.`
 }
-
-const needsConfirming = ({ uncommittedChanges, unpushedCommits }: RemovalWarnings) =>
-  uncommittedChanges !== "none" || unpushedCommits.length > 0
 
 function AgentRow(props: { agent: Agent }) {
   const { agent } = props
@@ -232,16 +233,17 @@ function AgentRow(props: { agent: Agent }) {
   const registry = useContext(RegistryContext)
   const warnings = useAtomValue(removalWarningsAtom(agent.id))
   const checkWarnings = useAtomSet(removalWarningsAtom(agent.id), { mode: "promiseExit" })
-  const [confirming, setConfirming] = useState<RemovalWarnings | null>(null)
+
+  const [confirming, setConfirming] = useState<{
+    readonly warning: string
+    readonly unpushedCommits: RemovalWarnings["unpushedCommits"]
+  } | null>(null)
+
   const problem = settledProblem(warnings)
   const repositoryId = useId()
   const waitingId = useId()
 
-  const sandbox =
-    Option.getOrElse(AsyncResult.value(useAtomValue(sandboxesAtom)), () => noSandboxes).get(
-      agent.id,
-    ) ?? null
-
+  const { sandbox } = agent
   const sandboxText = sandbox === null ? null : sandboxLine(sandbox)
   const sandboxId = useId()
 
@@ -263,8 +265,10 @@ function AgentRow(props: { agent: Agent }) {
 
     if (Exit.isFailure(exit)) return
 
-    if (needsConfirming(exit.value)) setConfirming(exit.value)
-    else removeNow()
+    const warning = removalWarning(agent, exit.value)
+
+    if (warning === null) removeNow()
+    else setConfirming({ warning, unpushedCommits: exit.value.unpushedCommits })
   }
 
   return (
@@ -278,7 +282,12 @@ function AgentRow(props: { agent: Agent }) {
           ...(waiting ? [waitingId] : []),
           ...(sandboxText === null ? [] : [sandboxId]),
         ].join(" ")}
-        className={cn(agentLink, sandbox !== null && sandbox.reach !== "reachable" && "opacity-60")}
+        className={cn(
+          agentLink,
+          sandbox !== null &&
+            (sandbox.reach === "unreachable" || isGone(sandbox.reach)) &&
+            "opacity-60",
+        )}
       >
         <span
           id={repositoryId}
@@ -329,7 +338,7 @@ function AgentRow(props: { agent: Agent }) {
       <ConfirmationDialog
         open={confirming !== null}
         title={`Remove ${agent.name}?`}
-        description={confirming === null ? "" : removalWarning(agent, confirming)}
+        description={confirming?.warning ?? ""}
         details={
           confirming !== null &&
           confirming.unpushedCommits.length > 0 && (

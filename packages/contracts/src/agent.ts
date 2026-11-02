@@ -85,6 +85,35 @@ export const ModelChoice = Schema.Struct({
 
 export type ModelChoice = typeof ModelChoice.Type
 
+/**
+ * How Glass stands with an Agent's Sandbox: connecting until it first answers, then reachable or
+ * not. Expired and deleted are for good: the Sandbox is gone with everything in it, leaving its
+ * Agent read-only.
+ */
+export const SandboxReach = Schema.Literals([
+  "connecting",
+  "reachable",
+  "unreachable",
+  "expired",
+  "deleted",
+])
+
+export type SandboxReach = typeof SandboxReach.Type
+
+export type GoneReach = "expired" | "deleted"
+
+export const isGone = (reach: SandboxReach): reach is GoneReach =>
+  reach === "expired" || reach === "deleted"
+
+export const goneExplanation = (reach: GoneReach) =>
+  `This Agent's Sandbox ${reach === "expired" ? "expired" : "was deleted"}, so it can't take messages. Its transcript stays until you remove the Agent.`
+
+export class SandboxStatus extends Schema.Class<SandboxStatus>("SandboxStatus")({
+  /** `null` until the Sandbox's provider says when it expires. */
+  expiresAt: Schema.NullOr(Schema.DateTimeUtcFromString),
+  reach: SandboxReach,
+}) {}
+
 export class Agent extends Schema.Class<Agent>("Agent")({
   id: Schema.String,
   /** Also the name of the branch the Agent works on. */
@@ -97,6 +126,8 @@ export class Agent extends Schema.Class<Agent>("Agent")({
   /** `null` for a program without Permission modes. */
   permissionMode: Schema.NullOr(PermissionMode),
   createdAt: Schema.DateTimeUtcFromString,
+  /** `null` for a local Agent, and for a Sandbox Agent whose Sandbox doesn't exist yet. */
+  sandbox: Schema.NullOr(SandboxStatus),
 }) {}
 
 export const ImageMediaType = Schema.Literals([
@@ -256,7 +287,10 @@ export const TurnFailed = Schema.TaggedStruct("Failed", { reason: Schema.String 
 
 export const TurnStopped = Schema.TaggedStruct("Stopped", {})
 
-/** Glass lost the Agent while the Turn ran. */
+/**
+ * Glass lost the Agent while the Turn ran. A Sandbox's agent host may carry on, so the ending it
+ * reports once Glass reaches it again replaces this one.
+ */
 export const TurnCutOff = Schema.TaggedStruct("CutOff", {})
 
 /** The Turn was running when Glass quit. */
@@ -442,27 +476,6 @@ export class SandboxProviderInfo extends Schema.Class<SandboxProviderInfo>("Sand
   engines: Schema.NonEmptyArray(AgentEngine),
 }) {}
 
-/**
- * How Glass last found an Agent's Sandbox. An expired or deleted one is gone with everything in it,
- * leaving its Agent read-only.
- */
-export const SandboxReach = Schema.Literals(["reachable", "unreachable", "expired", "deleted"])
-
-export type SandboxReach = typeof SandboxReach.Type
-
-export class SandboxStatus extends Schema.Class<SandboxStatus>("SandboxStatus")({
-  agentId: Schema.String,
-  /** `null` until the Sandbox's provider says when it expires. */
-  expiresAt: Schema.NullOr(Schema.DateTimeUtcFromString),
-  reach: SandboxReach,
-}) {}
-
-export const isGone = (reach: SandboxReach): reach is "expired" | "deleted" =>
-  reach === "expired" || reach === "deleted"
-
-export const goneExplanation = (reach: "expired" | "deleted") =>
-  `This Agent's Sandbox ${reach === "expired" ? "expired" : "was deleted"}, so it can't take messages. Its transcript stays until you remove the Agent.`
-
 export const UnpushedCommit = Schema.Struct({ sha: Schema.String, subject: Schema.String })
 
 export type UnpushedCommit = typeof UnpushedCommit.Type
@@ -477,7 +490,7 @@ export type UnsavedWork = typeof UnsavedWork.Type
 
 export class RemovalWarnings extends Schema.Class<RemovalWarnings>("RemovalWarnings")({
   uncommittedChanges: Schema.Literals(["none", "some", "unchecked"]),
-  /** Newest first; always none for a local Agent, whose branch outlives it. */
+  /** Newest first. Removing a local Agent keeps its branch, so only a Sandbox Agent loses them. */
   unpushedCommits: Schema.Array(UnpushedCommit),
 }) {}
 

@@ -107,7 +107,6 @@ export const agentServicesFixture = Effect.gen(function* () {
 
       const placement = LocalPlacement.of({
         engines: AgentEngine.literals,
-        keepsBranch: true,
         models: () => models,
         place: () =>
           Effect.sync(() => {
@@ -121,7 +120,6 @@ export const agentServicesFixture = Effect.gen(function* () {
         baseRef: () => Effect.succeed("main"),
         remove: () => Effect.void,
         writable: () => Effect.void,
-        reopen: () => Effect.succeed(false),
         subscribeLost: Effect.succeed(Stream.never),
       })
 
@@ -137,6 +135,8 @@ export const agentServicesFixture = Effect.gen(function* () {
                 placement: () => placement,
                 subscribeLost: Effect.succeed(Stream.never),
                 statuses: Stream.never,
+                status: () => Effect.succeed(null),
+                resume: Effect.succeed(new Set()),
               }),
             ),
           ),
@@ -145,7 +145,7 @@ export const agentServicesFixture = Effect.gen(function* () {
       )
 
       const transcripts = Context.get(services, Transcripts)
-      yield* followJournal(transcripts, client, { saved: 0, kept: false }).pipe(Effect.forkScoped)
+      yield* followJournal(transcripts, client, { saved: 0 }).pipe(Effect.forkScoped)
 
       return Context.get(services, Agents)
     }).pipe(Effect.provideContext(database), Scope.provide(scope))

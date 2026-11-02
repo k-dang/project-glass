@@ -210,14 +210,23 @@ it.live(
         "This Agent's Sandbox was deleted, so it can't take messages. Its transcript stays until you remove the Agent.",
       )
 
-      const [kept] = yield* f.transcript(agent.id, settled(1), relaunched)
+      // Glass remembers, so the next launch needn't reach it to know.
+      const again = yield* f.restart
+
+      const [listed] = yield* again
+        .WatchAgents()
+        .pipe(Stream.runHead, Effect.map(Option.getOrThrow))
+
+      assert.equal(listed?.sandbox?.reach, "deleted")
+
+      const [kept] = yield* f.transcript(agent.id, settled(1), again)
       assert.deepStrictEqual(lastText(kept), TextPart.make({ text: "Done." }))
 
-      const warnings = yield* relaunched.GetRemovalWarnings({ agentId: agent.id })
+      const warnings = yield* again.GetRemovalWarnings({ agentId: agent.id })
       assert.equal(warnings.uncommittedChanges, "none")
 
-      yield* relaunched.RemoveAgent({ agentId: agent.id })
-      const left = yield* relaunched.WatchAgents().pipe(Stream.runHead)
+      yield* again.RemoveAgent({ agentId: agent.id })
+      const left = yield* again.WatchAgents().pipe(Stream.runHead)
       assert.deepStrictEqual(Option.getOrThrow(left), [])
     }),
 )
@@ -438,7 +447,7 @@ it.live(
   () =>
     Effect.gen(function* () {
       const f = yield* agentsFixture({ output: "Done." })
-      f.sandboxes.configure({ lifetimeMillis: 1000, capMillis: 3000 })
+      f.sandboxes.configure({ lifetimeMillis: 3000, capMillis: 6000 })
       const agent = yield* f.startSandbox()
       yield* f.transcript(agent.id, settled(1))
 

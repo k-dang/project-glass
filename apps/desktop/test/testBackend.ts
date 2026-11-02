@@ -66,7 +66,6 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         DeleteToDo: unused,
         WatchAgents: () => Stream.make([]),
         WatchWaitingAgents: () => Stream.make([]),
-        WatchSandboxes: () => Stream.make([]),
         WatchTranscript: unused,
         ListLocalCheckouts: () => Effect.succeed([]),
         LinkLocalCheckout: unused,

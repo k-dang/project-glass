@@ -17,6 +17,7 @@ import {
   TurnEnd,
   type TurnEnding,
   TurnPart,
+  TurnCutOff,
   TurnStarted,
 } from "@glass/contracts"
 import {
@@ -123,17 +124,26 @@ const startsNext = (event: TranscriptUpdate) =>
   (Predicate.isTagged(event.ended.ending, "Done") ||
     Predicate.isTagged(event.ended.ending, "Failed"))
 
+const cutOffTag = TurnCutOff.fields._tag.schema.literal
+
 const storageFailure = () =>
   new AgentError({ message: "Couldn't read or save the Agent's transcript. Try again." })
 
 export class Transcripts extends Context.Service<
   Transcripts,
   {
-    /** `journalSaved`, the host's journal entry these end at, is kept for a host that outlives Glass. */
     readonly save: (
       agentId: string,
       events: ReadonlyArray<AgentEvent>,
-      journalSaved?: number,
+    ) => Effect.Effect<void, AgentError>
+    /**
+     * Saves events from an agent host's journal with the entry they end at, so a host that outlives
+     * Glass is asked only for later ones.
+     */
+    readonly saveFromJournal: (
+      agentId: string,
+      events: ReadonlyArray<AgentEvent>,
+      journalSaved: number,
     ) => Effect.Effect<void, AgentError>
     readonly watch: (agentId: string) => Stream.Stream<TranscriptUpdate, AgentError>
     readonly endRunning: (
@@ -222,12 +232,12 @@ export class Transcripts extends Context.Service<
                 SET part = json_set(part, '$.text', json_extract(part, '$.text') || ${text})
                 WHERE turn_id = ${turnId} AND position = ${index}
               `.pipe(Effect.as(true)),
-            // A Turn cut off while Glass couldn't reach its Sandbox may have ended there since.
+            // A cut-off Turn takes the ending its host reports later (see `TurnCutOff`).
             TurnEnded: ({ turnId, ended }) =>
               sql`
                 UPDATE agent_turn SET ended = ${encodeEnd(ended)}
                 WHERE id = ${turnId}
-                  AND (ended IS NULL OR json_extract(ended, '$.ending._tag') = 'CutOff')
+                  AND (ended IS NULL OR json_extract(ended, '$.ending._tag') = ${cutOffTag})
                 RETURNING id
               `.pipe(Effect.map((rows) => rows.length > 0)),
           }),
@@ -314,27 +324,30 @@ export class Transcripts extends Context.Service<
         return head === undefined ? [] : yield* startFromQueue(agentId, head)
       })
 
-      const save = Effect.fn("Transcripts.save")(
-        function* (agentId: string, events: ReadonlyArray<AgentEvent>, journalSaved?: number) {
-          yield* change(
-            agentId,
-            Effect.gen(function* () {
-              if (journalSaved !== undefined)
-                yield* sql`UPDATE agent SET journal_saved = ${journalSaved} WHERE id = ${agentId}`
+      const write = (
+        agentId: string,
+        events: ReadonlyArray<AgentEvent>,
+        journalSaved: number | null,
+      ) =>
+        change(
+          agentId,
+          Effect.gen(function* () {
+            if (journalSaved !== null)
+              yield* sql`UPDATE agent SET journal_saved = ${journalSaved} WHERE id = ${agentId}`
 
-              const written = yield* Effect.filter(joinConsecutiveAppends(events), (event) =>
-                writeApplied(agentId, event),
-              )
+            const written = yield* Effect.filter(joinConsecutiveAppends(events), (event) =>
+              writeApplied(agentId, event),
+            )
 
-              return written.some(startsNext)
-                ? [...written, ...(yield* startNext(agentId))]
-                : written
-            }),
-          )
-        },
-        Effect.tapError((cause) => Effect.logWarning("Couldn't save a transcript", cause)),
-        Effect.mapError(storageFailure),
-      )
+            return written.some(startsNext) ? [...written, ...(yield* startNext(agentId))] : written
+          }),
+        ).pipe(
+          Effect.tapError((cause) => Effect.logWarning("Couldn't save a transcript", cause)),
+          Effect.mapError(storageFailure),
+        )
+
+      const save = (agentId: string, events: ReadonlyArray<AgentEvent>) =>
+        write(agentId, events, null)
 
       const snapshot = Effect.fnUntraced(function* (agentId: string) {
         const turns = yield* decodeTurns(
@@ -408,6 +421,7 @@ export class Transcripts extends Context.Service<
 
       return Transcripts.of({
         save,
+        saveFromJournal: write,
         endRunning,
         watch: (agentId) =>
           Stream.unwrap(

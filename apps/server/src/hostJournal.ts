@@ -4,8 +4,6 @@ import type { Transcripts } from "./Transcripts"
 
 export interface JournalPosition {
   saved: number
-  /** Whether to keep `saved` with the transcript, for a host that outlives Glass. */
-  readonly kept: boolean
 }
 
 export const followJournal = (
@@ -18,10 +16,10 @@ export const followJournal = (
       Stream.runForEachArray((entries) =>
         Effect.gen(function* () {
           for (const [agentId, saved] of Map.groupBy(entries, (entry) => entry.agentId))
-            yield* transcripts.save(
+            yield* transcripts.saveFromJournal(
               agentId,
               saved.map(({ event }) => event),
-              position.kept ? saved.at(-1)?.sequence : undefined,
+              saved.at(-1)!.sequence,
             )
 
           const last = entries.at(-1)

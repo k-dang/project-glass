@@ -24,7 +24,6 @@ import {
   RequestNotWaiting,
   RequestWaiting,
   SandboxProviderInfo,
-  SandboxStatus,
   SentMessage,
   TranscriptUpdate,
 } from "./agent"
@@ -265,12 +264,6 @@ export class GlassRpcs extends RpcGroup.make(
   /** The ids of the Agents with a Permission request or Question waiting, again after every change. */
   Rpc.make("WatchWaitingAgents", {
     success: Schema.Array(Schema.String),
-    error: AgentError,
-    stream: true,
-  }),
-  /** Each Sandbox Agent's Sandbox status, again after every change. */
-  Rpc.make("WatchSandboxes", {
-    success: Schema.Array(SandboxStatus),
     error: AgentError,
     stream: true,
   }),

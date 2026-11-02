@@ -12,7 +12,6 @@ import {
   type PlaceTag,
   type RequestAnswer,
   SandboxPlace,
-  type SandboxStatus,
   type SentMessage,
   type Transcript,
   repositoryKey,
@@ -55,17 +54,6 @@ export const waitingAgentsAtom = backendRuntime
   .atom(
     Stream.unwrap(Backend.useSync((backend) => backend.WatchWaitingAgents())).pipe(
       Stream.map((ids): ReadonlySet<string> => new Set(ids)),
-    ),
-  )
-  .pipe(Atom.keepAlive)
-
-export const sandboxesAtom = backendRuntime
-  .atom(
-    Stream.unwrap(Backend.useSync((backend) => backend.WatchSandboxes())).pipe(
-      Stream.map(
-        (statuses): ReadonlyMap<string, SandboxStatus> =>
-          new Map(statuses.map((status) => [status.agentId, status])),
-      ),
     ),
   )
   .pipe(Atom.keepAlive)

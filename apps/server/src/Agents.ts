@@ -23,7 +23,6 @@ import {
   type RequestNotWaiting,
   RequestWaiting,
   SandboxPlace,
-  type SandboxStatus,
   thisMac as thisMacPlace,
   type TranscriptUpdate,
   TurnCutOff,
@@ -88,6 +87,8 @@ const toRow = ({
     place:
       sandboxProvider === null ? thisMacPlace : SandboxPlace.make({ providerId: sandboxProvider }),
     repository: new FollowedRepository({ owner, repo }),
+    // Sandboxes knows this, and Agents adds it as it hands an Agent out.
+    sandbox: null,
   }),
   folder,
 })
@@ -102,7 +103,6 @@ export class Agents extends Context.Service<
   {
     readonly watch: () => Stream.Stream<ReadonlyArray<Agent>, AgentError>
     readonly watchWaiting: () => Stream.Stream<ReadonlyArray<string>>
-    readonly watchSandboxes: () => Stream.Stream<ReadonlyArray<SandboxStatus>>
     readonly transcript: (
       agentId: string,
     ) => Stream.Stream<TranscriptUpdate, AgentNotFound | AgentError>
@@ -189,20 +189,6 @@ export class Agents extends Context.Service<
 
       const placementOf = (row: PlacedAgent) => placementFor(row.agent.place)
 
-      const interrupted = yield* Effect.filter(yield* SubscriptionRef.get(rows), (row) =>
-        placementOf(row)
-          .reopen(row)
-          .pipe(Effect.map((keptRunning) => !keptRunning)),
-      )
-
-      // Requests only wait in a running Turn, so this leaves none waiting.
-      yield* transcripts
-        .endRunning(
-          TurnInterrupted.make({}),
-          interrupted.map(({ agent }) => agent.id),
-        )
-        .pipe(Effect.orDie)
-
       yield* Stream.merge(yield* localPlacement.subscribeLost, yield* sandboxes.subscribeLost).pipe(
         Stream.runForEach((agentIds) =>
           transcripts
@@ -211,6 +197,22 @@ export class Agents extends Context.Service<
         ),
         Effect.forkIn(scope),
       )
+
+      // Only Sandboxes outlive Glass; the Turns of every other Agent ended with it. Requests only
+      // wait in a running Turn, so this leaves none waiting.
+      const resumed = yield* sandboxes.resume
+      yield* transcripts
+        .endRunning(
+          TurnInterrupted.make({}),
+          stored.flatMap(({ id }) => (resumed.has(id) ? [] : [id])),
+        )
+        .pipe(Effect.orDie)
+
+      const withSandbox = (agent: Agent) =>
+        sandboxes.status(agent.id).pipe(
+          // oxlint-disable-next-line typescript/no-misused-spread -- The fields go straight back into Agent.
+          Effect.map((sandbox) => new Agent({ ...agent, sandbox })),
+        )
 
       const deliver = (row: PlacedAgent, turnId: string, input: MessageInput) =>
         Effect.gen(function* () {
@@ -281,6 +283,7 @@ export class Agents extends Context.Service<
           effort,
           permissionMode,
           createdAt: yield* DateTime.now,
+          sandbox: null,
         })
 
         const row: PlacedAgent = { agent, folder }
@@ -327,7 +330,7 @@ export class Agents extends Context.Service<
           }),
         )
 
-        return agent
+        return yield* withSandbox(agent)
       })
 
       const trySteer = (row: PlacedAgent, input: MessageInput) =>
@@ -353,27 +356,29 @@ export class Agents extends Context.Service<
           .isWaiting(agentId)
           .pipe(Effect.flatMap((waiting) => (waiting ? new RequestWaiting() : Effect.void)))
 
+      const findWritable = (agentId: string) =>
+        find(agentId).pipe(Effect.tap((row) => placementOf(row).writable(row)))
+
+      const startOrQueue = (agentId: string, input: MessageInput) =>
+        refuseWhileWaiting(agentId).pipe(Effect.andThen(transcripts.startOrQueue(agentId, input)))
+
       const send = Effect.fn("Agents.send")(function* (agentId: string, input: MessageInput) {
-        const row = yield* find(agentId)
-        yield* placementOf(row).writable(row)
-        yield* refuseWhileWaiting(agentId)
-        yield* transcripts.startOrQueue(agentId, input)
+        yield* findWritable(agentId)
+        yield* startOrQueue(agentId, input)
       })
 
       const steer = Effect.fn("Agents.steer")(function* (agentId: string, input: MessageInput) {
-        const row = yield* find(agentId)
-        yield* placementOf(row).writable(row)
+        const row = yield* findWritable(agentId)
         yield* refuseWhileWaiting(agentId)
 
-        if (!(yield* trySteer(row, input))) yield* send(agentId, input)
+        if (!(yield* trySteer(row, input))) yield* startOrQueue(agentId, input)
       })
 
       const sendQueued = Effect.fn("Agents.sendQueued")(function* (
         agentId: string,
         queuedId: string,
       ) {
-        const row = yield* find(agentId)
-        yield* placementOf(row).writable(row)
+        yield* findWritable(agentId)
         yield* transcripts.startQueued(agentId, queuedId)
       })
 
@@ -475,7 +480,7 @@ export class Agents extends Context.Service<
               current.map((row) => (row.agent.id === agentId ? { ...row, agent } : row)),
             )
 
-            return agent
+            return yield* withSandbox(agent)
           }),
         )
       })
@@ -515,32 +520,32 @@ export class Agents extends Context.Service<
       const removalWarnings = Effect.fn("Agents.removalWarnings")(function* (agentId: string) {
         const row = yield* find(agentId)
 
-        const placement = placementOf(row)
-
-        return yield* placement.hostOnceMade(row).pipe(
-          Effect.flatMap(
-            Option.match({
-              onNone: () => Effect.succeed(nothingUnsaved),
-              onSome: (host) => host.GetUnsavedWork({ folder: row.folder }),
-            }),
-          ),
-          Effect.timeout("10 seconds"),
-          Effect.map(
-            ({ uncommittedChanges, unpushedCommits }) =>
-              new RemovalWarnings({
-                uncommittedChanges: uncommittedChanges ? "some" : "none",
-                unpushedCommits: placement.keepsBranch ? [] : unpushedCommits,
+        return yield* placementOf(row)
+          .hostOnceMade(row)
+          .pipe(
+            Effect.flatMap(
+              Option.match({
+                onNone: () => Effect.succeed(nothingUnsaved),
+                onSome: (host) => host.GetUnsavedWork({ folder: row.folder }),
               }),
-          ),
-          // A connection to a host that just died ends interrupted, not failed.
-          Effect.catchCause((cause) =>
-            Effect.logWarning("Couldn't check an Agent for unsaved work", cause).pipe(
-              Effect.as(
-                new RemovalWarnings({ uncommittedChanges: "unchecked", unpushedCommits: [] }),
+            ),
+            Effect.timeout("10 seconds"),
+            Effect.map(
+              ({ uncommittedChanges, unpushedCommits }) =>
+                new RemovalWarnings({
+                  uncommittedChanges: uncommittedChanges ? "some" : "none",
+                  unpushedCommits,
+                }),
+            ),
+            // A connection to a host that just died ends interrupted, not failed.
+            Effect.catchCause((cause) =>
+              Effect.logWarning("Couldn't check an Agent for unsaved work", cause).pipe(
+                Effect.as(
+                  new RemovalWarnings({ uncommittedChanges: "unchecked", unpushedCommits: [] }),
+                ),
               ),
             ),
-          ),
-        )
+          )
       })
 
       const remove = Effect.fn("Agents.remove")(function* (agentId: string) {
@@ -584,8 +589,14 @@ export class Agents extends Context.Service<
 
       return Agents.of({
         watch: () =>
-          SubscriptionRef.changes(rows).pipe(
-            Stream.map((current) => current.map(({ agent }) => agent)),
+          Stream.zipLatest(SubscriptionRef.changes(rows), sandboxes.statuses).pipe(
+            Stream.map(([current, statuses]) =>
+              current.map(
+                ({ agent }) =>
+                  // oxlint-disable-next-line typescript/no-misused-spread -- The fields go straight back into Agent.
+                  new Agent({ ...agent, sandbox: statuses.get(agent.id) ?? null }),
+              ),
+            ),
           ),
         transcript: (agentId) =>
           Stream.unwrap(find(agentId).pipe(Effect.as(transcripts.watch(agentId)))),
@@ -608,7 +619,6 @@ export class Agents extends Context.Service<
         saveUnsent,
         watchWaiting: () =>
           transcripts.waiting.pipe(Stream.map((waiting) => Array.from(waiting).toSorted())),
-        watchSandboxes: () => sandboxes.statuses,
         changeModel: update,
         changePermissionMode,
         answer,

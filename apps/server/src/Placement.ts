@@ -34,8 +34,6 @@ export interface Placed {
 
 export interface Placement {
   readonly engines: ReadonlyArray<AgentEngine>
-  /** Whether the Agent's branch, with its commits, outlives removing it. */
-  readonly keepsBranch: boolean
   readonly models: (engine: AgentEngine) => Effect.Effect<AgentModels, AgentError>
   readonly place: (
     repository: FollowedRepository,
@@ -50,9 +48,4 @@ export interface Placement {
   ) => Effect.Effect<Option.Option<HostClient>, AgentError>
   readonly baseRef: (placed: PlacedAgent) => Effect.Effect<string, AgentError>
   readonly remove: (placed: PlacedAgent) => Effect.Effect<void, AgentError>
-  /**
-   * Picks the Agent up once Glass opens, answering whether its running Turn carried on while Glass
-   * was closed; one that didn't is interrupted.
-   */
-  readonly reopen: (placed: PlacedAgent) => Effect.Effect<boolean>
 }

@@ -12,6 +12,7 @@ export const agentFields = {
   effort: null,
   permissionMode: null,
   createdAt: DateTime.makeUnsafe("2026-10-26T12:00:00Z"),
+  sandbox: null,
 } as const
 
 export const agent = new Agent(agentFields)
