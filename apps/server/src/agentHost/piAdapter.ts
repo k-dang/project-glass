@@ -321,7 +321,7 @@ export const piAdapter = (command: string) =>
 
             if (Option.isSome(accepted))
               return accepted.value === "handled"
-                ? yield* turns.offer(Input.SteerHandled({ id }))
+                ? yield* turns.apply(Input.SteerHandled({ id }))
                 : undefined
 
             yield* turns.dropSteer(id)

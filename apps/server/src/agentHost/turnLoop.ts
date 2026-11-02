@@ -45,14 +45,25 @@ export const runTurns = Effect.fnUntraced(function* <
 }) {
   const { machine, report, run } = options
   const scope = yield* Scope.Scope
-  const inputs = yield* Queue.unbounded<Input, Cause.Done>()
+
+  const inputs = yield* Queue.unbounded<
+    { readonly input: Input; readonly handled?: Deferred.Deferred<void> },
+    Cause.Done
+  >()
+
   const closed = yield* Deferred.make<void>()
   let state: State | null = null
   let exited = false
 
-  const offer = (input: Input) => Queue.offer(inputs, input).pipe(Effect.asVoid)
+  const offer = (input: Input) => Queue.offer(inputs, { input }).pipe(Effect.asVoid)
 
-  const handle = Effect.fnUntraced(function* (input: Input) {
+  const handle = Effect.fnUntraced(function* ({
+    input,
+    handled,
+  }: {
+    readonly input: Input
+    readonly handled?: Deferred.Deferred<void>
+  }) {
     const next = machine.step(state, input, yield* DateTime.now)
     state = next.state
     yield* Effect.forEach(next.events, report, { discard: true })
@@ -61,17 +72,19 @@ export const runTurns = Effect.fnUntraced(function* <
       yield* Effect.forEach(next.commands ?? [], (command) => run(command, offer), {
         discard: true,
       })
+
+    if (handled !== undefined) yield* Deferred.succeed(handled, undefined)
   })
 
   yield* options.events.pipe(
-    Stream.runForEach((input) => Queue.offer(inputs, input)),
+    Stream.runForEach((input) => Queue.offer(inputs, { input })),
     Effect.catchCause((cause) => Effect.logWarning(`${options.program} stopped`, cause)),
     Effect.andThen(
       Effect.sync(() => {
         exited = true
       }),
     ),
-    Effect.andThen(Queue.offer(inputs, machine.exitInput)),
+    Effect.andThen(Queue.offer(inputs, { input: machine.exitInput })),
     Effect.andThen(Queue.end(inputs)),
     Effect.forkIn(scope),
   )
@@ -105,6 +118,14 @@ export const runTurns = Effect.fnUntraced(function* <
       return state.steers
     }),
     offer,
+    /** Offers the input and waits until the Turn has taken it, or the program has stopped. */
+    apply: (input: Input) =>
+      Effect.gen(function* () {
+        const handled = yield* Deferred.make<void>()
+
+        if (yield* Queue.offer(inputs, { input, handled }))
+          yield* Effect.raceFirst(Deferred.await(handled), Deferred.await(closed))
+      }),
     begin: Effect.fnUntraced(function* (turnId: string, message: SentMessage) {
       const at = yield* DateTime.now
 
