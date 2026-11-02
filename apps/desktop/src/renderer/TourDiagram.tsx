@@ -1,4 +1,5 @@
 import type { TourDiagram as Diagram, TourDiagramNode } from "@glass/contracts"
+import { cn } from "cn"
 import { useEffect, useEffectEvent, useId, useLayoutEffect, useRef, useState } from "react"
 import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -18,9 +19,42 @@ const colors = {
 
 const changes = { unchanged: "Unchanged", added: "Added", removed: "Removed" }
 
+const connection = (from: Box, to: Box, lane: number, horizontal: boolean) => {
+  const direct = lane === -1
+
+  if (horizontal) {
+    const startX = direct ? from.left + from.width : from.left + from.width / 2
+    const endX = direct ? to.left : to.left + to.width / 2
+    const center = from.top + from.height / 2
+    const y = from.top + from.height + 12 + lane * 10
+
+    return {
+      path: direct
+        ? `M ${startX} ${center} L ${endX - 3} ${to.top + to.height / 2}`
+        : `M ${startX} ${from.top + from.height} V ${y} H ${endX} V ${to.top + to.height + 3}`,
+      labelX: (startX + endX) / 2,
+      labelY: direct ? center - 8 : y - 4,
+    }
+  }
+
+  const x = from.left + from.width + 12 + lane * 10
+  const startY = direct ? from.top + from.height : from.top + from.height / 2
+  const endY = direct ? to.top : to.top + to.height / 2
+  const center = from.left + from.width / 2
+
+  return {
+    path: direct
+      ? `M ${center} ${startY} V ${endY - 3}`
+      : `M ${from.left + from.width} ${startY} H ${x} V ${endY} H ${to.left + to.width + 3}`,
+    labelX: direct ? center + 8 : x + 3,
+    labelY: (startY + endY) / 2 + 4,
+  }
+}
+
 export function TourDiagram(props: {
   diagram: Diagram
   chapterTitle: string
+  expanded: boolean
   path: string | undefined
   onSelect: (node: TourDiagramNode) => void
 }) {
@@ -86,6 +120,9 @@ export function TourDiagram(props: {
   const routed = diagram.edges.filter((edge) => order.get(edge.to)! !== order.get(edge.from)! + 1)
   const gutter = routed.length === 0 ? 0 : 16 + routed.length * 10
 
+  const horizontal =
+    boxes.size > 0 && boxes.get(diagram.nodes[1]!.id)!.left > boxes.get(diagram.nodes[0]!.id)!.left
+
   useLayoutEffect(() => {
     const root = container.current
 
@@ -132,7 +169,10 @@ export function TourDiagram(props: {
   const labels = new Map(diagram.nodes.map((node) => [node.id, node.label]))
 
   return (
-    <figure className="my-5" aria-label={`Change diagram for ${props.chapterTitle}`}>
+    <figure
+      className="@container/diagram my-5"
+      aria-label={`Change diagram for ${props.chapterTitle}`}
+    >
       {steps.length > 0 && (
         <fieldset ref={playback} className="mb-4 min-w-0" aria-label="Flow playback">
           <div className="mb-2 flex flex-wrap items-center gap-1">
@@ -223,16 +263,7 @@ export function TourDiagram(props: {
 
             if (from === undefined || to === undefined) return null
 
-            const lane = routed.indexOf(edge)
-            const direct = lane === -1
-            const x = from.left + from.width + 12 + lane * 10
-            const startY = direct ? from.top + from.height : from.top + from.height / 2
-            const endY = direct ? to.top : to.top + to.height / 2
-            const center = from.left + from.width / 2
-
-            const path = direct
-              ? `M ${center} ${startY} V ${endY - 3}`
-              : `M ${from.left + from.width} ${startY} H ${x} V ${endY} H ${to.left + to.width + 3}`
+            const { path, labelX, labelY } = connection(from, to, routed.indexOf(edge), horizontal)
 
             return (
               <g
@@ -250,8 +281,8 @@ export function TourDiagram(props: {
                 />
                 {edge.change !== "unchanged" && (
                   <text
-                    x={direct ? center + 8 : x + 3}
-                    y={(startY + endY) / 2 + 4}
+                    x={labelX}
+                    y={labelY}
                     fill={colors[edge.change]}
                     className="font-mono text-[11px]"
                   >
@@ -262,7 +293,13 @@ export function TourDiagram(props: {
             )
           })}
         </svg>
-        <ol className="relative flex flex-col gap-7" style={{ paddingRight: gutter }}>
+        <ol
+          className={cn(
+            "relative flex flex-col gap-7",
+            props.expanded && "@min-[700px]/diagram:flex-row",
+          )}
+          style={{ paddingRight: horizontal ? 0 : gutter, paddingBottom: horizontal ? gutter : 0 }}
+        >
           {diagram.nodes.map((node) => {
             const { target } = node
             const name = target.path.slice(target.path.lastIndexOf("/") + 1)
@@ -273,7 +310,14 @@ export function TourDiagram(props: {
                 : `${target.startLine}–${target.endLine}`
 
             return (
-              <li key={node.id}>
+              <li
+                key={node.id}
+                className={
+                  props.expanded
+                    ? "@min-[700px]/diagram:min-w-0 @min-[700px]/diagram:flex-1"
+                    : undefined
+                }
+              >
                 <button
                   type="button"
                   data-diagram-node={node.id}
@@ -286,7 +330,7 @@ export function TourDiagram(props: {
                     setPlaying(false)
                     props.onSelect(node)
                   }}
-                  className="w-full cursor-pointer rounded-[7px] border bg-background px-3 py-2.5 text-left hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-ring aria-pressed:border-(--viewed) aria-pressed:bg-[color-mix(in_oklch,var(--viewed)_10%,var(--background))] data-flow-active:border-(--viewed)"
+                  className="h-full w-full cursor-pointer rounded-[7px] border bg-background px-3 py-2.5 text-left hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-ring aria-pressed:border-(--viewed) aria-pressed:bg-[color-mix(in_oklch,var(--viewed)_10%,var(--background))] data-flow-active:border-(--viewed)"
                 >
                   <span className="block text-[13px] leading-5 font-medium wrap-anywhere">
                     {node.label}

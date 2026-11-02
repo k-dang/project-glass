@@ -1,4 +1,5 @@
 import type { TourCallTree as CallTree, TourCodeTarget } from "@glass/contracts"
+import { cn } from "cn"
 import { ChevronDown, ChevronRight } from "lucide-react"
 import { useState, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
@@ -6,6 +7,7 @@ import { Button } from "@/components/ui/button"
 export function TourCallTree(props: {
   tree: CallTree
   chapterTitle: string
+  expanded: boolean
   onSelect: (target: TourCodeTarget) => void
 }) {
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set())
@@ -18,7 +20,7 @@ export function TourCallTree(props: {
     const source = `${node.target.path}:${node.target.startLine}`
 
     return (
-      <li key={node.id}>
+      <li key={node.id} className={props.expanded ? "min-w-0 flex-1 basis-60" : undefined}>
         <div className="flex min-w-0 items-start gap-1">
           {nested.length > 0 ? (
             <Button
@@ -64,7 +66,11 @@ export function TourCallTree(props: {
             </span>
           </button>
         </div>
-        {nested.length > 0 && open && <ul className="ml-1 border-l pl-1">{nested.map(branch)}</ul>}
+        {nested.length > 0 && open && (
+          <ul className={cn("ml-1 border-l pl-1", props.expanded && "flex flex-wrap gap-3")}>
+            {nested.map(branch)}
+          </ul>
+        )}
       </li>
     )
   }

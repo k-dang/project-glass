@@ -242,6 +242,32 @@ test("reads linked visuals and plays flows without changing viewed progress", as
   await flow.getByRole("button", { name: "Next flow step" }).click()
   await expect(flow).toContainText("Validation checks the name before storage.")
   await expect(flow).toContainText("unchecked → validated")
+  await chapter.getByRole("button", { name: "Expand diagram", exact: true }).click()
+  const collapse = chapter.getByRole("button", { name: "Collapse diagram", exact: true })
+  await expect(collapse).toBeFocused()
+  await expect(collapse).toHaveAttribute("aria-expanded", "true")
+  await expect(flow).toContainText("unchecked → validated")
+  await expect
+    .poll(() =>
+      chapter.evaluate((element) => {
+        const figure = element.querySelector("figure")!.getBoundingClientRect()
+
+        const nodes = [...element.querySelectorAll("[data-diagram-node]")].map((node) =>
+          node.getBoundingClientRect(),
+        )
+
+        const explanation = element.querySelector("aside")!.getBoundingClientRect()
+        const diff = element.querySelector("aside")!.nextElementSibling!.getBoundingClientRect()
+
+        return {
+          wide: figure.width > element.clientWidth * 0.85,
+          horizontal: nodes.every((node) => Math.abs(node.top - nodes[0]!.top) < 1),
+          stacked: diff.top >= explanation.bottom,
+        }
+      }),
+    )
+    .toEqual({ wide: true, horizontal: true, stacked: true })
+  await window.screenshot({ path: testInfo.outputPath("diagram-expanded.png") })
   await flow.getByRole("button", { name: "Next flow step" }).click()
   await expect(flow.getByRole("button", { name: "Next flow step" })).toBeDisabled()
   await flow.getByRole("button", { name: "Previous flow step" }).click()
@@ -258,6 +284,8 @@ test("reads linked visuals and plays flows without changing viewed progress", as
   await expect(window.getByRole("tabpanel", { name: "Overview", exact: true })).toBeVisible()
   await window.getByRole("tab", { name: "Changes", exact: true }).click()
   await expect(flow.getByRole("button", { name: "Play flow" })).toBeVisible()
+  await chapter.getByRole("button", { name: "Expand diagram", exact: true }).focus()
+  await window.keyboard.press("Enter")
 
   await diagram.getByRole("button", { name: /^Write immediately,/ }).click()
   await expect(
@@ -275,6 +303,11 @@ test("reads linked visuals and plays flows without changing viewed progress", as
   ).toBeVisible()
   await expect(chapter).toContainText("0/2 viewed")
   await window.screenshot({ path: testInfo.outputPath("diagram-selected.png") })
+  const caption = await flow.locator("p").innerText()
+  await collapse.click()
+  await expect(chapter.getByRole("button", { name: "Expand diagram", exact: true })).toBeFocused()
+  await expect(check).toHaveAttribute("aria-pressed", "true")
+  await expect(flow).toContainText(caption)
 
   await chapter.getByRole("checkbox", { name: "Viewed: validate.ts", exact: true }).click()
   await expect(chapter.getByRole("button", { name: "Show validate.ts", exact: true })).toBeVisible()
@@ -288,6 +321,8 @@ test("reads linked visuals and plays flows without changing viewed progress", as
     chapter.locator("[data-selected-line]").filter({ hasText: "export function validate(input)" }),
   ).toBeVisible()
   await tree.getByRole("button", { name: "Collapse calls from handle(input)" }).click()
+  await expect(tree.getByRole("button", { name: /validate\(input\)/ })).toHaveCount(0)
+  await chapter.getByRole("button", { name: "Expand diagram", exact: true }).click()
   await expect(tree.getByRole("button", { name: /validate\(input\)/ })).toHaveCount(0)
   await tree.getByRole("button", { name: "Expand calls from handle(input)" }).click()
   await expect(tree.getByRole("button", { name: /validate\(input\)/ })).toBeVisible()
@@ -304,7 +339,13 @@ test("reads linked visuals and plays flows without changing viewed progress", as
   })
 
   expect(positions).toEqual({ stacked: true, fits: true })
+  const nodes = diagram.locator("[data-diagram-node]")
+  const first = await nodes.nth(0).boundingBox()
+  const second = await nodes.nth(1).boundingBox()
+  expect(second!.y).toBeGreaterThan(first!.y)
   await window.screenshot({ path: testInfo.outputPath("diagram-narrow.png") })
+  await collapse.click()
+  await expect(chapter).toContainText("1/2 viewed")
 })
 
 test("moves between Chapters from the keyboard and the sidebar in a tall window", async ({
