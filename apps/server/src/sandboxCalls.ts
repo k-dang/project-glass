@@ -3,7 +3,7 @@ import type { SandboxProvider, SandboxState, SandboxTarget } from "@glass/plugin
 import { Effect, Schedule } from "effect"
 import { AgentHostRpcs, HEALTH_PATH, HOST_TOKEN_HEADER, SHUTDOWN_PATH } from "./agentHost/protocol"
 import { connectRpcClient } from "./rpcSocket"
-import { MissingLogin, NoCapacity } from "./sandboxFailures"
+import { MissingLogin, NoCapacity, SandboxGone } from "./sandboxFailures"
 
 const abortThenAwaitProvider = (controller: AbortController, running: Promise<unknown>) =>
   Effect.promise(() => {
@@ -68,10 +68,21 @@ const hostUrl = (target: SandboxTarget, path: string) => {
 }
 
 const targetOf = (provider: SandboxProvider, state: SandboxState) =>
-  call(provider, "reach the Sandbox", () => provider.target(state))
+  fromProvider(() => provider.target(state)).pipe(
+    Effect.catch(({ rejected }): Effect.Effect<never, AgentError | SandboxGone> =>
+      rejected instanceof SandboxGone
+        ? Effect.fail(rejected)
+        : providerFailure(provider, "reach the Sandbox")({ rejected }),
+    ),
+  )
 
+const didntStart = () =>
+  new AgentError({ message: "The agent in the Sandbox didn't start. Try again." })
+
+// A Sandbox gone while being made is one Glass discards and makes again, not one left to remove.
 export const waitForHost = (provider: SandboxProvider, state: SandboxState) =>
   targetOf(provider, state).pipe(
+    Effect.catchTag("SandboxGone", () => Effect.fail(didntStart())),
     Effect.flatMap((target) =>
       Effect.tryPromise(() =>
         fetch(hostUrl(target, HEALTH_PATH), { headers: { ...target.headers } }),
@@ -79,9 +90,7 @@ export const waitForHost = (provider: SandboxProvider, state: SandboxState) =>
         Effect.filterOrFail((response) => response.ok),
         Effect.retry({ schedule: Schedule.spaced("250 millis") }),
         Effect.timeout("1 minute"),
-        Effect.mapError(
-          () => new AgentError({ message: "The agent in the Sandbox didn't start. Try again." }),
-        ),
+        Effect.mapError(didntStart),
       ),
     ),
   )

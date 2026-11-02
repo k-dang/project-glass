@@ -243,10 +243,16 @@ export const fakeSandboxProvider =
         writeFileSync(join(folder, "host.pid"), String(host.pid))
         record({ folder, ingressPort: await ingress(folder, freeHostPort) })
       },
-      target: async (state) => ({
-        url: `http://127.0.0.1:${decodeSandbox(state).ingressPort}${INGRESS_PATH}`,
-        headers: { "x-fake-sandbox": "yes" },
-      }),
+      target: async (state) => {
+        const { folder, ingressPort } = decodeSandbox(state)
+
+        if (!existsSync(folder)) throw glass.sandboxGone()
+
+        return {
+          url: `http://127.0.0.1:${ingressPort}${INGRESS_PATH}`,
+          headers: { "x-fake-sandbox": "yes" },
+        }
+      },
       remove: async (state) => {
         const { missingLogin } = readSettings(settingsPath)
 
@@ -279,6 +285,23 @@ export const installFakeSandboxProvider = (
   const pidFile = (agentId: string) => join(sandboxFolder(agentId), "host.pid")
   const hostPid = (agentId: string) => Number(readFileSync(pidFile(agentId), "utf8"))
 
+  const stopHost = async (agentId: string) => {
+    if (!existsSync(pidFile(agentId))) return
+
+    try {
+      const pid = hostPid(agentId)
+
+      if (process.platform === "win32") {
+        // The host's programs hold their working directories open on Windows.
+        await execFileAsync("taskkill", ["/PID", String(pid), "/T", "/F"], {
+          windowsHide: true,
+        })
+      } else {
+        process.kill(pid, "SIGKILL")
+      }
+    } catch {}
+  }
+
   return {
     configure: (change: Partial<FakeSandboxSettings>) =>
       writeFileSync(settingsPath, JSON.stringify({ ...settings, ...change })),
@@ -287,23 +310,12 @@ export const installFakeSandboxProvider = (
       writeFileSync(join(sandboxFolder(agentId), "dropped"), ""),
     reconnect: (agentId: string) => rmSync(join(sandboxFolder(agentId), "dropped")),
     hostPid,
+    deleteSandbox: async (agentId: string) => {
+      await stopHost(agentId)
+      rmSync(sandboxFolder(agentId), { recursive: true, force: true, maxRetries: 10 })
+    },
     stopHosts: async () => {
-      for (const agentId of readdirSync(settings.root)) {
-        if (!existsSync(pidFile(agentId))) continue
-
-        try {
-          const pid = hostPid(agentId)
-
-          if (process.platform === "win32") {
-            // The host's programs hold their working directories open on Windows.
-            await execFileAsync("taskkill", ["/PID", String(pid), "/T", "/F"], {
-              windowsHide: true,
-            })
-          } else {
-            process.kill(pid, "SIGKILL")
-          }
-        } catch {}
-      }
+      for (const agentId of readdirSync(settings.root)) await stopHost(agentId)
     },
   }
 }

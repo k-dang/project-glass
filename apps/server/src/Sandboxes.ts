@@ -1,7 +1,7 @@
 import { AgentEngine, AgentError, AgentModels, SandboxProviderInfo } from "@glass/contracts"
 import type { SandboxProvider, SandboxRequest, SandboxState } from "@glass/plugin"
 import {
-  type Cause,
+  Cause,
   Context,
   Deferred,
   Effect,
@@ -27,6 +27,7 @@ import type { HostClient, LostAgentIds, PlacedAgent, Placement, SubscribeLost } 
 import { Plugins } from "./Plugins"
 import { bundledEntry } from "./processes"
 import { call, connectToHost, shutDownHost, waitForHost } from "./sandboxCalls"
+import type { SandboxGone } from "./sandboxFailures"
 import { Transcripts } from "./Transcripts"
 
 const hostBundle = bundledEntry("agentHost", import.meta.url)
@@ -53,6 +54,11 @@ const decodeModels = Schema.decodeUnknownEffect(AgentModels)
 
 const unreachable = () =>
   new AgentError({ message: "Glass couldn't reach the Agent's Sandbox. Try again." })
+
+const gone = () =>
+  new AgentError({ message: "This Agent's Sandbox no longer exists. Remove the Agent." })
+
+const isGone = Predicate.isTagged("SandboxGone")
 
 const storageFailure = () =>
   new AgentError({ message: "Couldn't save the Agent's Sandbox. Try again." })
@@ -90,7 +96,7 @@ const reconnecting = <E, R>(
         }),
       ),
       Effect.retry({
-        while: () => misses < LOST_AFTER_MISSES,
+        while: (error) => !isGone(error) && misses < LOST_AFTER_MISSES,
         schedule: Schedule.spaced(RECONNECT_SPACING),
       }),
     )
@@ -268,7 +274,7 @@ export class Sandboxes extends Context.Service<
         const provisionAndFollow = (
           placed: PlacedAgent,
           sandbox: SandboxAgent,
-          opened: Deferred.Deferred<HostClient, AgentError>,
+          opened: Deferred.Deferred<HostClient, AgentError | SandboxGone>,
         ) =>
           Effect.gen(function* () {
             if (sandbox.record?.ready !== true) yield* provision(placed)
@@ -303,13 +309,22 @@ export class Sandboxes extends Context.Service<
                 yield* followJournal(transcripts, client, position)
               }).pipe(Effect.scoped),
             ).pipe(
-              Effect.tapCause((cause) => Effect.logWarning("Lost a Sandbox's agent host", cause)),
+              Effect.tapCause((cause) =>
+                Option.exists(Cause.findErrorOption(cause), isGone)
+                  ? Effect.void
+                  : Effect.logWarning("Lost a Sandbox's agent host", cause),
+              ),
             )
           }).pipe(
+            Effect.tapError((error) =>
+              isGone(error)
+                ? Effect.logWarning("An Agent's Sandbox no longer exists", placed.agent.id)
+                : Effect.void,
+            ),
             Effect.catch((error) =>
               Deferred.fail(
                 opened,
-                Predicate.isTagged(error, "AgentError") ? error : unreachable(),
+                Predicate.isTagged(error, "AgentError") || isGone(error) ? error : unreachable(),
               ).pipe(
                 Effect.flatMap((failedBeforeOpening) =>
                   failedBeforeOpening ? Effect.void : PubSub.publish(lost, [placed.agent.id]),
@@ -327,7 +342,7 @@ export class Sandboxes extends Context.Service<
             Effect.gen(function* () {
               if (sandbox.connection !== null) return sandbox.connection
 
-              const opened = yield* Deferred.make<HostClient, AgentError>()
+              const opened = yield* Deferred.make<HostClient, AgentError | SandboxGone>()
               yield* FiberMap.run(
                 sandboxFibers,
                 placed.agent.id,
@@ -363,12 +378,17 @@ export class Sandboxes extends Context.Service<
               folder: repository.repo,
               discard: Effect.void,
             }),
-          host,
+          host: (placed) =>
+            host(placed).pipe(Effect.catchTag("SandboxGone", () => Effect.fail(gone()))),
           runningHost: ({ agent }) =>
             Effect.sync(() => Option.fromNullishOr(agents.get(agent.id)?.connection)),
+          // A gone Sandbox took everything in it, so like one never made, it holds nothing to lose.
           hostOnceMade: (placed) =>
             agents.get(placed.agent.id)?.record?.ready === true
-              ? host(placed).pipe(Effect.map(Option.some))
+              ? host(placed).pipe(
+                  Effect.map(Option.some),
+                  Effect.catchTag("SandboxGone", () => Effect.succeedNone),
+                )
               : Effect.succeedNone,
           baseRef: ({ agent }) => Effect.succeed(`refs/remotes/origin/${agent.baseBranch}`),
           remove: ({ agent }) =>

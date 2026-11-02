@@ -1,3 +1,5 @@
+import { Data } from "effect"
+
 export class MissingLogin extends Error {
   constructor(
     readonly login: string,
@@ -14,3 +16,5 @@ export class NoCapacity extends Error {
     this.name = "NoCapacity"
   }
 }
+
+export class SandboxGone extends Data.TaggedError("SandboxGone") {}
