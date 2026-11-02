@@ -20,12 +20,10 @@ import { RPC_PATH } from "@glass/contracts"
 import { AgentHostRpcs, HOST_TOKEN_HEADER, HostReady, newHostToken } from "./agentHost/protocol"
 import { followJournal } from "./hostJournal"
 import type { HostClient } from "./Placement"
-import { bundledEntry, launchCommand } from "./processes"
+import { launchCommand } from "./processes"
 import { connectRpcClient } from "./rpcSocket"
 import { ServerConfig } from "./ServerConfig"
 import { Transcripts } from "./Transcripts"
-
-const hostEntry = bundledEntry("agentHost", import.meta.url)
 
 const FORCE_KILL_AFTER = "2 seconds"
 
@@ -64,7 +62,7 @@ export class LocalAgentHost extends Context.Service<
 
         return yield* Effect.gen(function* () {
           const child = yield* spawner.spawn(
-            launchCommand(hostEntry, [], {
+            launchCommand(config.agentHostBundle, [], {
               env: {
                 GLASS_HOST_TOKEN: token,
                 GLASS_PI_COMMAND: config.piCommand,

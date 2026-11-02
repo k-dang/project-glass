@@ -17,6 +17,7 @@ import { promisify } from "node:util"
 import { isolatedGitEnv } from "../src/gitEnv.ts"
 import type { AgentModels, Plugin } from "@glass/plugin"
 import { freePort, portOf } from "./ports.ts"
+import { whenExists } from "./whenExists.ts"
 
 const FakeSandboxSettings = Schema.Struct({
   root: Schema.String,
@@ -38,6 +39,8 @@ const FakeSandbox = Schema.Struct({
 const decodeSandbox = Schema.decodeUnknownSync(FakeSandbox)
 
 const dropping = (folder: string) => existsSync(join(folder, "dropped"))
+
+const droppedAll = (folder: string) => join(folder, "dropped-all")
 
 const INGRESS_PATH = "/fake-ingress"
 
@@ -118,6 +121,9 @@ const ingress = (folder: string, hostPort: number) =>
       const deleted = !existsSync(folder)
 
       if (deleted || dropping(folder)) for (const socket of open) socket.destroy()
+
+      if (!deleted && dropping(folder) && !existsSync(droppedAll(folder)))
+        writeFileSync(droppedAll(folder), "")
 
       if (deleted) {
         clearInterval(watching)
@@ -290,14 +296,20 @@ export const installFakeSandboxProvider = (
   const sandboxFolder = (agentId: string) => join(settings.root, agentId)
   const hostFile = (agentId: string) => join(sandboxFolder(agentId), "host.json")
 
-  /** The Sandbox's agent host, reachable without its ingress. */
   const host = (agentId: string) =>
     Schema.decodeUnknownSync(HostFile)(readFileSync(hostFile(agentId), "utf8"))
 
   return {
-    dropConnections: (agentId: string) =>
-      writeFileSync(join(sandboxFolder(agentId), "dropped"), ""),
-    reconnect: (agentId: string) => rmSync(join(sandboxFolder(agentId), "dropped")),
+    dropConnections: (agentId: string) => {
+      const folder = sandboxFolder(agentId)
+      writeFileSync(join(folder, "dropped"), "")
+
+      return whenExists(droppedAll(folder))
+    },
+    reconnect: (agentId: string) => {
+      rmSync(join(sandboxFolder(agentId), "dropped"))
+      rmSync(droppedAll(sandboxFolder(agentId)), { force: true })
+    },
     host,
     /** Ends a Sandbox's host and its programs, as a crash would. */
     killHost: (agentId: string) => killTree(host(agentId).pid),

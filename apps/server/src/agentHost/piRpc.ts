@@ -137,7 +137,7 @@ interface PiRpc {
 }
 
 // pi's RPC framing is LF only: `readline` would also split on U+2028 and U+2029, which JSON strings may hold.
-const lineFramer = () => {
+export const lineFramer = () => {
   let pending: Array<string> = []
 
   return (chunk: string) => {

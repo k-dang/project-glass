@@ -1,14 +1,14 @@
 import { expect, openPullRequest, startLineDraft, test } from "./glass"
 
-test.use({ git: true })
+test.use({
+  git: true,
+  piModel: { output: JSON.stringify({ answer: "`main.ts` prints `there` after the greeting." }) },
+})
 
 test("turns a new Draft into a question about its line and reads the private answer under it", async ({
   github,
-  piCli,
   window,
 }) => {
-  await piCli.answer({ answer: "`main.ts` prints `there` after the greeting." })
-
   const pr = github.seedPullRequest({
     base: { sha: "b0", files: { "greet.ts": "hello\nworld\n" } },
     head: { sha: "h1", files: { "greet.ts": "hello\nthere\nworld\n" } },
@@ -32,7 +32,7 @@ test("turns a new Draft into a question about its line and reads the private ans
   const note = changes.getByRole("region", { name: "Ask on greet.ts line +2" })
   await expect(note).toContainText("main.ts prints there after the greeting.")
   await expect(note).toContainText("Only you can see this")
-  await expect(note).toContainText("pi · anthropic/claude-sonnet-5-5")
+  await expect(note).toContainText("pi · glass-test/gpt-test")
   await expect(changes.getByRole("textbox", { name: /^Draft on / })).toHaveCount(0)
   expect(pr.pendingReview).toBeUndefined()
 

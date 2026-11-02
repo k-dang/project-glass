@@ -14,51 +14,35 @@ import {
   type Turn,
 } from "@glass/contracts"
 import { Effect, Exit, Option, Predicate, Scope, Stream } from "effect"
+import { mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
-import { bundledPi } from "./demoAgent"
-import {
-  type FakeModelRequest,
-  type FakeModelSettings,
-  fakeModelProvider,
-  type PiSettings,
-} from "./fakeModelProvider"
+import { fileURLToPath } from "node:url"
 import { startFakeGitHub } from "./fakeGitHub"
 import { VIEWER } from "./fakePullRequest"
 import { installFakeSandboxProvider } from "./fakeSandboxProvider"
 import { seedClone } from "./gitRepositories"
 import { isolatedHome, startBackend } from "./harness"
-import { startFakeAnthropic } from "./fakeAnthropic"
-import { fakeAnthropicEnvironment } from "./pinnedClaude"
 import { vi } from "vite-plus/test"
 
 export const repository = new FollowedRepository({ owner: "glass-demo", repo: "greeter" })
 
-/**
- * A backend on fake GitHub whose Agents run the real programs against fake models: the bundled pi on
- * a fake model provider, and the pinned Claude Code CLI on a fake Anthropic API.
- */
-export const agentsFixture = Effect.fnUntraced(function* (
-  settings: FakeModelSettings,
-  piSettings: PiSettings = { retry: { enabled: false } },
-) {
+const scriptedHost = fileURLToPath(new URL("../dist-test/scriptedAgentHost.mjs", import.meta.url))
+
+export const agentsFixture = Effect.gen(function* () {
   const github = yield* startFakeGitHub()
   const home = yield* isolatedHome
   const repositories = yield* isolatedHome
-  const model = yield* fakeModelProvider(home, settings, piSettings)
-  const anthropic = yield* startFakeAnthropic
-  const claudeEnvironment = fakeAnthropicEnvironment(home, anthropic.url)
-
-  for (const [name, value] of Object.entries(claudeEnvironment)) vi.stubEnv(name, value)
-
-  const claude = { ...anthropic, command: claudeEnvironment.GLASS_CLAUDE_COMMAND }
+  const gates = join(home, "gates")
+  mkdirSync(gates)
+  vi.stubEnv("GLASS_SCRIPTED_GATES", gates)
 
   const clone = seedClone(repositories, repository.owner, repository.repo)
 
   const sandboxes = installFakeSandboxProvider(home, {
     root: join(repositories, "sandboxes"),
     cloneFrom: clone.origin,
-    piCommand: bundledPi,
-    claudeCommand: claude.command,
+    piCommand: "unused",
+    claudeCommand: "unused",
   })
 
   yield* Effect.addFinalizer(() => Effect.promise(sandboxes.stopHosts))
@@ -66,8 +50,7 @@ export const agentsFixture = Effect.fnUntraced(function* (
   const env = {
     GH_TOKEN: VIEWER.token,
     GLASS_GITHUB_API_URL: github.url,
-    GLASS_PI_COMMAND: bundledPi,
-    GLASS_CLAUDE_COMMAND: claude.command,
+    GLASS_AGENT_HOST_BUNDLE: scriptedHost,
   }
 
   const serverScope = yield* Scope.make()
@@ -189,8 +172,7 @@ export const agentsFixture = Effect.fnUntraced(function* (
     agents: client.WatchAgents().pipe(Stream.runHead, Effect.map(Option.getOrThrow)),
     home,
     clone,
-    model,
-    claude,
+    release: (name: string) => Effect.sync(() => writeFileSync(join(gates, name), "")),
     watch,
     transcript,
     sandboxStatus,
@@ -222,10 +204,7 @@ export const claudeCode = {
 export const lastText = (turn: Turn | undefined) =>
   turn?.parts.findLast((part) => Predicate.isTagged(part, "Text"))
 
-export const userMessages = ({ messages }: FakeModelRequest) =>
-  messages.filter(({ role }) => role === "user").map(({ content }) => JSON.stringify(content))
-
-export const pixel: Image = {
-  mediaType: "image/png",
-  data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-}
+export const holding = (turns: ReadonlyArray<Turn>) =>
+  turns.some(({ parts }) =>
+    parts.some((part) => Predicate.isTagged(part, "Text") && part.text === "Holding."),
+  )

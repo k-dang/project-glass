@@ -32,7 +32,7 @@ export type Input = Data.TaggedEnum<{
   Idle: { readonly idle: boolean; readonly generation: number }
   /** A `null` answer leaves the dialog no longer answerable. */
   Settled: { readonly requestId: string; readonly answer: RequestAnswer | null }
-  SteerHandled: { readonly id: string }
+  SteerHandled: { readonly steer: Steer }
   Exited: {}
 }>
 
@@ -275,10 +275,8 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
           : TurnFailed.make({ reason: failureReason(state.providerError) }),
       )
     },
-    SteerHandled: ({ id }) => {
-      const steer = state?.steers.find((sent) => sent.id === id)
-
-      if (state !== null && steer !== undefined) showSteer(state, steer)
+    SteerHandled: ({ steer }) => {
+      if (state !== null) showSteer(state, steer)
     },
     Exited: () => {
       if (state !== null) end(state, TurnFailed.make({ reason: stoppedReason }))
