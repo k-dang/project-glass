@@ -17,7 +17,19 @@ jobs:
       - uses: jdx/mise-action@v5
       - run: pnpm install
       - run: pnpm check
-      - run: pnpm test
+
+  # One runner per app: their suites are CPU-bound and slow each other down on a shared runner.
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [server, desktop]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v5
+      - run: pnpm install
+      - run: pnpm --filter @glass/${{ matrix.app }} test
 
   e2e:
     runs-on: ubuntu-latest

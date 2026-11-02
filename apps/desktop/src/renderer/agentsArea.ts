@@ -26,6 +26,8 @@ import { problemOf } from "./problems"
 
 export type AgentTab = "chat" | "changes"
 
+export const agentsPanelOpenAtom = Atom.make(true)
+
 export const AgentSearch = Schema.Struct({ view: Schema.optional(Schema.Literal("changes")) })
 
 export const placeKey = (place: AgentPlace) =>
@@ -39,8 +41,6 @@ export const placeOfKey = (key: string): AgentPlace =>
 export const placeNames: Record<PlaceTag, string> = { "this-mac": "Local", sandbox: "Sandbox" }
 
 export const placeIcons: Record<PlaceTag, LucideIcon> = { "this-mac": Laptop, sandbox: Cloud }
-
-export const engineGlyphs: Record<AgentEngine, string> = { "claude-code": "✻", pi: "π" }
 
 const TRANSCRIPT_IDLE_TTL = "5 minutes"
 

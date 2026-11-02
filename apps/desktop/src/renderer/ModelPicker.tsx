@@ -7,7 +7,8 @@ import { memo, useState, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { agentModelsAtom, engineGlyphs } from "./agentsArea"
+import { agentModelsAtom } from "./agentsArea"
+import { AgentProgramIcon } from "./AgentProgramIcon"
 import { engineNames } from "./engines"
 import { chip, ChipSelect } from "./chips"
 import { ProblemAlert } from "./ProblemAlert"
@@ -79,6 +80,11 @@ export const ModelPicker = memo(function ModelPicker(props: {
 
   return (
     <>
+      {programs?.engines
+        .filter((engine) => engine !== props.engine)
+        .map((engine) => (
+          <PrefetchModels key={engine} engine={engine} placeKey={props.placeKey} />
+        ))}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger
           render={
@@ -92,9 +98,7 @@ export const ModelPicker = memo(function ModelPicker(props: {
             />
           }
         >
-          <span aria-hidden className="shrink-0 text-muted-foreground">
-            {engineGlyphs[props.engine]}
-          </span>
+          <AgentProgramIcon engine={props.engine} />
           <span className="min-w-0 truncate font-semibold">{summary}</span>
         </PopoverTrigger>
         <PopoverContent
@@ -112,7 +116,7 @@ export const ModelPicker = memo(function ModelPicker(props: {
                   value: engine,
                   label: (
                     <>
-                      <span aria-hidden>{engineGlyphs[engine]}</span>
+                      <AgentProgramIcon engine={engine} />
                       {engineNames[engine]}
                     </>
                   ),
@@ -145,6 +149,12 @@ export const ModelPicker = memo(function ModelPicker(props: {
     </>
   )
 })
+
+function PrefetchModels(props: { engine: AgentEngine; placeKey: string }) {
+  useAtomValue(agentModelsAtom(props.engine, props.placeKey))
+
+  return null
+}
 
 function Models(props: {
   models: AgentModels
@@ -233,7 +243,7 @@ function RequiredChoice<Value extends string>(props: {
           <ToggleGroupItem
             key={item.value}
             value={item.value}
-            className="gap-1.5 text-xs font-normal"
+            className="gap-1.5 text-xs font-normal hover:bg-accent hover:text-accent-foreground aria-pressed:bg-accent"
           >
             {item.label}
           </ToggleGroupItem>

@@ -11,7 +11,7 @@ import {
   TurnEnded,
   TurnStopped,
 } from "@glass/contracts"
-import { DateTime, Effect, Predicate } from "effect"
+import { DateTime, Effect, Option, Predicate, Stream } from "effect"
 import { resolve } from "node:path"
 import { agentServicesFixture } from "../test/agentServicesFixture"
 import { eventually } from "../test/eventually"
@@ -269,5 +269,30 @@ it.live("warns before removing a Sandbox Agent with uncommitted work in its Sand
 
     yield* f.sandboxes.stopHost(agent.id)
     assert.equal((yield* f.agents.removalWarnings(agent.id)).uncommittedChanges, "unchecked")
+  }),
+)
+
+it.live("fails an Agent whose Sandbox is gone, and removes it without a warning", () =>
+  Effect.gen(function* () {
+    const f = yield* agentServicesFixture
+    const agent = yield* createSandboxed(f)
+    yield* end(yield* f.started)
+    yield* f.transcript(agent.id, settled(1))
+
+    yield* f.sandboxes.reclaim(agent.id)
+    const { agents } = yield* f.restart
+    yield* agents.send(agent.id, say("Still there?"))
+
+    assert.equal(
+      failedReason(yield* f.transcript(agent.id, settled(2), agents)),
+      "This Agent's Sandbox no longer exists. Remove the Agent.",
+    )
+    assert.equal((yield* agents.removalWarnings(agent.id)).uncommittedChanges, "none")
+
+    yield* agents.remove(agent.id)
+    assert.deepStrictEqual(
+      yield* agents.watch().pipe(Stream.runHead, Effect.map(Option.getOrThrow)),
+      [],
+    )
   }),
 )

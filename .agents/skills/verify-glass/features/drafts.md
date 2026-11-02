@@ -19,7 +19,7 @@ In Changes, hovering a line inside a diff hunk shows a `+` in its gutter; clicki
 
 ## Driving it with glass-verify
 
-Preconditions: a real-GitHub run (`node $V launch`) as `k-dang`, who can push to the kept probe repo. Its PR #3 (`drafts-change` into `drafts-base`) changes line 20 of the 40-line `long.txt`, so lines 1–16 are context to expand. Start and end with no pending review on it: `gh api graphql` `pullRequest(number: 3) { reviews(states: PENDING) { totalCount } }`.
+Preconditions: a real-GitHub run (`node $V launch --github real`) as `k-dang`, who can push to the kept probe repo. Its PR #3 (`drafts-change` into `drafts-base`) changes line 20 of the 40-line `long.txt`, so lines 1–16 are context to expand. Start and end with no pending review on it: `gh api graphql` `pullRequest(number: 3) { reviews(states: PENDING) { totalCount } }`.
 
 - **The gutter `+` isn't in the accessibility tree.** Over raw CDP (`doctor` prints the port), scroll the row (`diffs-container` shadow root, `[data-content] [data-line-index="<i>"]`) into view, dispatch `Input.dispatchMouseEvent` `mouseMoved` over it, then press and release on `[data-gutter-utility-slot]`. The first synthetic move after a click elsewhere only wakes the gutter: repeat until `snapshot` shows `textbox "Draft on long.txt line +18"`.
 - **Create and edit (`draft-create`, `draft-edit`).** Type with CDP `Input.insertText` (it goes to the focused field, proving focus), `wait --text "Not saved"`, press Enter, `wait --text "Saved privately"`; confirm the body, line, and `diffSide` with `gh api graphql` `reviewThreads { line diffSide comments { nodes { body state } } }`.

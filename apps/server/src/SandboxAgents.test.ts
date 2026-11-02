@@ -49,7 +49,7 @@ it.live("cuts off only the running Turn of an Agent whose Sandbox host is lost",
     const sandboxed = yield* f.startSandbox("In the Sandbox")
     yield* f.model.received(2)
 
-    f.sandboxes.killHost(sandboxed.id)
+    yield* Effect.promise(() => f.sandboxes.killHost(sandboxed.id))
 
     const [lost] = yield* f.transcript(sandboxed.id, settled(1))
     assert.deepStrictEqual(lost?.ended?.ending, TurnCutOff.make({}))

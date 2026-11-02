@@ -122,11 +122,20 @@ export function AgentView(props: { agentId: string } & AgentTabs) {
   const agent = Option.getOrNull(AsyncResult.value(agents))?.find(({ id }) => id === props.agentId)
 
   if (agent === undefined)
-    return AsyncResult.isSuccess(agents) ? (
-      <p className="p-6 text-sm text-muted-foreground">
-        This Agent is gone. Pick another Agent or start a new one.
-      </p>
-    ) : null
+    return (
+      <section aria-label="Agent" className="flex min-h-0 flex-1 flex-col">
+        <AgentHeader
+          heading={<h1 className="truncate font-medium">Agent</h1>}
+          place={null}
+          baseBranch={null}
+        />
+        {AsyncResult.isSuccess(agents) && (
+          <p className="p-6 text-sm text-muted-foreground">
+            This Agent is gone. Pick another Agent or start a new one.
+          </p>
+        )}
+      </section>
+    )
 
   return <OpenAgent key={agent.id} agent={agent} tab={props.tab} onTabChange={props.onTabChange} />
 }
@@ -231,7 +240,7 @@ function Transcript(props: { agentId: string; turns: ReadonlyArray<Turn>; status
   }, [])
 
   return (
-    <MessageScrollerProvider autoScroll>
+    <MessageScrollerProvider autoScroll scrollPreviousItemPeek={16}>
       <section aria-label="Transcript" className="flex min-h-0 flex-1 flex-col">
         <MessageScroller className="min-h-0 flex-1">
           <MessageScrollerViewport className="px-6 py-4">
@@ -248,6 +257,7 @@ function Transcript(props: { agentId: string; turns: ReadonlyArray<Turn>; status
                   key={turn.id}
                   agentId={props.agentId}
                   turn={turn}
+                  latest={turn === props.turns.at(-1)}
                   status={turn === props.turns.at(-1) ? props.status : null}
                 />
               ))}
@@ -300,12 +310,18 @@ export function UserMessage(props: {
 const TurnView = memo(function TurnView(props: {
   agentId: string
   turn: Turn
+  latest: boolean
   status: string | null
 }) {
   const { turn } = props
 
   return (
-    <MessageScrollerItem messageId={turn.id} scrollAnchor>
+    // Sized from the 10rem estimate, the latest Turn would anchor short and jump.
+    <MessageScrollerItem
+      messageId={turn.id}
+      scrollAnchor
+      className={props.latest ? "[content-visibility:visible]" : undefined}
+    >
       <MessageGroup className="gap-4">
         <UserMessage message={turn.message} images={turn.images} />
         <Message>

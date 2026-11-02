@@ -27,6 +27,8 @@ import { Transcripts } from "./Transcripts"
 
 const hostEntry = bundledEntry("agentHost", import.meta.url)
 
+const FORCE_KILL_AFTER = "2 seconds"
+
 const lostConnection = (error: RpcClientError.RpcClientError | AgentError) =>
   Predicate.isTagged(error, "RpcClientError")
 
@@ -72,7 +74,7 @@ export class LocalAgentHost extends Context.Service<
               stdout: "inherit",
               stderr: "inherit",
               additionalFds: { fd3: { type: "output" } },
-              forceKillAfter: "2 seconds",
+              forceKillAfter: FORCE_KILL_AFTER,
               // Signal only the host, so it closes its programs itself: killing its process group
               // would end them under it, which it logs as crashes.
               detached: false,
@@ -87,11 +89,18 @@ export class LocalAgentHost extends Context.Service<
               Effect.flatMap(Schema.decodeUnknownEffect(HostReady)),
             )
 
+          // Its own scope, so the backend can hang up before stopping the host: the host waits
+          // for open connections before it exits.
+          const connection = yield* Scope.fork(scope)
+
           const client = yield* connectRpcClient(
             AgentHostRpcs,
             `ws://127.0.0.1:${port}${RPC_PATH}`,
             { [HOST_TOKEN_HEADER]: token },
-          ).pipe(Effect.provideService(Socket.WebSocketConstructor, webSocketConstructor))
+          ).pipe(
+            Effect.provideService(Socket.WebSocketConstructor, webSocketConstructor),
+            Scope.provide(connection),
+          )
 
           yield* followJournal(transcripts, client, { saved: 0 }).pipe(
             Effect.tapCause((cause) => Effect.logWarning("Lost the agent host's journal", cause)),
@@ -99,7 +108,13 @@ export class LocalAgentHost extends Context.Service<
               while: lostConnection,
               schedule: Schedule.spaced("1 second"),
             }),
-            Effect.catch(() => child.kill().pipe(Effect.ignore)),
+            Effect.catch(() =>
+              Scope.close(connection, Exit.void).pipe(
+                // `kill` takes its own options, not the spawn's.
+                Effect.andThen(child.kill({ forceKillAfter: FORCE_KILL_AFTER })),
+                Effect.ignore,
+              ),
+            ),
             Effect.forkIn(scope),
           )
 

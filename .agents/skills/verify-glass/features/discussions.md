@@ -17,7 +17,7 @@ In Changes, each Discussion on a line shows under that line, on its side of the 
 
 ## Driving it with glass-verify
 
-Preconditions: a real-GitHub run (`node $V launch`). The kept probe repo `k-dang/glass-api-probe` holds every kind: PR #2 has a comment on the PR, a thread with a Reply and a suggested change on `renamed.txt` line 2, a resolved thread on deleted `c.txt` line 1, and a whole-file thread on `image.bin`; PR #1 has two Reviews with summaries, an outdated thread on `a.txt`, and a thread on `b.txt`'s old line 2.
+Preconditions: a real-GitHub run (`node $V launch --github real`). The kept probe repo `k-dang/glass-api-probe` holds every kind: PR #2 has a comment on the PR, a thread with a Reply and a suggested change on `renamed.txt` line 2, a resolved thread on deleted `c.txt` line 1, and a whole-file thread on `image.bin`; PR #1 has two Reviews with summaries, an outdated thread on `a.txt`, and a thread on `b.txt`'s old line 2.
 
 - **Timeline and outdated (`discussion-timeline`, `discussion-outdated`).** Open PR #1, `wait --text "Finish Review"`, screenshot: two "reviewed" entries, then `a.txt:2` marked Outdated with its hunk. Open PR #2: the comment on the PR shows a highlighted code block and a task list, and `image.bin` is marked Whole file.
 - **Inline (`discussion-inline`).** On PR #2, `click --role treeitem --name renamed.txt`, `wait --text "A reply"`, screenshot. On PR #1, `click --role button --name Split`, `click --role treeitem --name b.txt`, then screenshot: the comment sits in the left column under line 2.

@@ -28,16 +28,19 @@ needs, and the provider does everything specific to its platform.
   clones the repository onto the Agent's branch from its base branch, and uploads and starts the
   agent host bundle with the environment and port Glass gives it. It calls `record(state)` as soon
   as the Sandbox exists and reports each step through `progress`.
-- `target(state)` answers the host's URL and headers, freshly, for each connection.
+- `target(state)` answers the host's URL and headers, freshly, for each connection, and throws
+  `glass.sandboxGone()` once the Sandbox no longer exists.
 - `remove(state)` deletes the Sandbox. Glass first asks the agent host to end, with its agent
   programs, so a provider needn't track the host's processes. If the host can't be reached,
   `remove` runs anyway.
 - `models(engine)` lists what each listed Agent program offers in its Sandboxes, before one exists.
 
 The plugin API is Promises and `AbortSignal`, so a plugin needs no Effect; its types are the
-`@glass/plugin` package. Glass passes in `glass.missingLogin(login, fix)` and
-`glass.noCapacity(message)` for the failures the user can act on; anything else a provider throws
-becomes a safe failure, with the cause in the backend log.
+`@glass/plugin` package. Glass passes in `glass.missingLogin(login, fix)`,
+`glass.noCapacity(message)` and `glass.sandboxGone()` for the failures the user can act on;
+anything else a provider throws becomes a safe failure, with the cause in the backend log. Glass
+doesn't retry a gone Sandbox: its Agent can't run again and has nothing left to lose, so the user
+can only remove it.
 
 Glass stores the `state` a provider records as opaque JSON on the Agent's row, so the row stays
 the one record of the Agent and providers keep no storage of their own. If `create` fails or is

@@ -8,7 +8,7 @@ import type { Changes } from "../src/agentHost/Changes"
 import type { HostAgents } from "../src/agentHost/HostAgents"
 import type { Journal } from "../src/agentHost/Journal"
 import { hostServer } from "../src/agentHost/server"
-import { MissingLogin, NoCapacity } from "../src/sandboxFailures"
+import { MissingLogin, NoCapacity, SandboxGone } from "../src/sandboxFailures"
 
 export interface InProcessSandboxSettings {
   readonly engines?: readonly [AgentEngine, ...Array<AgentEngine>]
@@ -34,6 +34,7 @@ export const inProcessSandboxes = (host: () => Layer.Layer<HostAgents | Journal 
 
   const waiting: Array<() => void> = []
   const urls = new Map<string, string>()
+  const gone = new Set<string>()
 
   const hosts = new Map<
     string,
@@ -133,7 +134,11 @@ export const inProcessSandboxes = (host: () => Layer.Layer<HostAgents | Journal 
       await startHost(request.agentId, request.host.environment["GLASS_HOST_TOKEN"] ?? "")
     },
     target: async (state) => {
-      const url = urls.get(agentIdOf(state))
+      const agentId = agentIdOf(state)
+
+      if (gone.has(agentId)) throw new SandboxGone()
+
+      const url = urls.get(agentId)
 
       if (url === undefined) throw new Error("No such fake Sandbox")
 
@@ -165,6 +170,15 @@ export const inProcessSandboxes = (host: () => Layer.Layer<HostAgents | Journal 
     },
     /** Ends a Sandbox's agent host as a crash would, leaving the Sandbox. */
     stopHost: stop,
+    /** Deletes a Sandbox behind Glass's back, as a platform reclaiming it would. */
+    reclaim: (agentId: string) =>
+      stop(agentId).pipe(
+        Effect.andThen(
+          Effect.sync(() => {
+            gone.add(agentId)
+          }),
+        ),
+      ),
     closeAll: Effect.suspend(() => Effect.forEach([...hosts.keys()], stop, { discard: true })),
   }
 }

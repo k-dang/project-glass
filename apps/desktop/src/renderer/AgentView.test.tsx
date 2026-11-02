@@ -155,6 +155,39 @@ it("sends a message with Enter and clears the composer", async () => {
   expect(composer).toHaveProperty("value", "")
 })
 
+it("keeps the hidden panel recoverable across Agent navigation", async () => {
+  const user = mount(
+    {
+      WatchTranscript: () =>
+        Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
+    },
+    "/agents/missing",
+  )
+
+  await screen.findByText("This Agent is gone. Pick another Agent or start a new one.")
+  const panel = screen.getByRole("complementary", { name: "Agents panel" })
+  await user.click(screen.getByRole("button", { name: "Hide Agents panel" }))
+
+  expect(panel).toHaveProperty("hidden", true)
+  expect(screen.queryByRole("navigation", { name: "Agents list" })).toBeNull()
+  const toggle = screen.getByRole("button", { name: "Show Agents panel" })
+  expect(toggle.getAttribute("aria-controls")).toBe(panel.id)
+  expect(toggle.getAttribute("aria-expanded")).toBe("false")
+
+  await user.click(screen.getByRole("link", { name: "New Agent" }))
+  await screen.findByRole("region", { name: "New Agent" })
+  expect(screen.getByRole("button", { name: "Show Agents panel" })).toBeTruthy()
+
+  await user.keyboard("{Control>}b{/Control}")
+  const link = await screen.findByRole("link", { name: agent.name })
+  link.focus()
+  await user.keyboard("{Meta>}b{/Meta}")
+  expect(document.activeElement).toBe(screen.getByRole("button", { name: "Show Agents panel" }))
+
+  await user.keyboard(" ")
+  expect(screen.getByRole("link", { name: agent.name })).toBeTruthy()
+})
+
 it("removes the open Agent from the sidebar after confirming its uncommitted changes", async () => {
   const removed: Array<string> = []
 
@@ -639,6 +672,26 @@ it("starts an Agent in a Sandbox on a Followed repository, from its branches on 
   await waitFor(() => expect(window.location.hash).toBe(`#/agents/${agent.id}`))
 })
 
+it("lists every Agent program's models before one is chosen", async () => {
+  const listed: Array<AgentEngine> = []
+
+  mount(
+    {
+      ...newAgentHandlers([], []),
+      ListAgentModels: (payload) => {
+        listed.push(payload.engine)
+
+        return listModels(payload)
+      },
+    },
+    "/agents/new",
+  )
+
+  await screen.findByRole("region", { name: "New Agent" })
+  await eventually(() => expect(listed).toContain("pi"))
+  expect(listed).toContain("claude-code")
+})
+
 it("offers only the Agent programs a Sandbox provider runs", async () => {
   const user = mount(
     {
@@ -670,7 +723,7 @@ it("offers only the Agent programs a Sandbox provider runs", async () => {
     within(programs)
       .getAllByRole("button")
       .map((button) => button.textContent),
-  ).toEqual(["πpi"])
+  ).toEqual(["pi"])
 })
 
 it("lists a Sandbox Agent under Sandboxes, and shows the step its Sandbox is at while it's made", async () => {

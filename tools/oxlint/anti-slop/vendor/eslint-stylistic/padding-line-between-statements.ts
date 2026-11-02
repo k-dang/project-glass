@@ -333,9 +333,10 @@ function verifyForAlways(
             return true
           },
         })! || nextNode
+      const newline = sourceCode.text.match(/\r\n|[\r\n]/u)?.[0] ?? '\n'
       const insertText = isTokenOnSameLine(prevToken, nextToken)
-        ? '\n\n'
-        : '\n'
+        ? newline + newline
+        : newline
 
       return fixer.insertTextAfter(prevToken, insertText)
     },

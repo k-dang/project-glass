@@ -1,7 +1,8 @@
+import { agentEngines } from "@glass/plugin"
 import { Match, Predicate, Schema } from "effect"
 import { FollowedRepository } from "./followedRepository"
 
-export const AgentEngine = Schema.Literals(["claude-code", "pi"])
+export const AgentEngine = Schema.Literals(agentEngines)
 
 export type AgentEngine = typeof AgentEngine.Type
 

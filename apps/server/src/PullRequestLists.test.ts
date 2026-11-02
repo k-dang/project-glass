@@ -611,6 +611,103 @@ describe("Keeping up with GitHub", () => {
     }),
   )
 
+  it.live("marks held checks stale after a failed read and drops a previous head's result", () =>
+    Effect.gen(function* () {
+      let failChecks = false
+
+      const github = yield* startFakeGitHub({
+        beforeRequest: ({ graphql }) =>
+          failChecks && graphql?.operationName === "PullRequestChecks" ? 503 : undefined,
+      })
+
+      const home = yield* isolatedHome
+
+      const { client } = yield* startBackend(
+        { GH_TOKEN: VIEWER.token, GLASS_GITHUB_API_URL: github.url },
+        home,
+      )
+
+      yield* client.FollowRepository({ input: "octo-org/glass" })
+
+      const pr = github.seedPullRequest({
+        owner: "octo-org",
+        repo: "glass",
+        requestedReviewers: [VIEWER.login],
+        checks: "SUCCESS",
+        base,
+        head,
+      })
+
+      const [fresh] = yield* listed(client, "needs-review")
+      assert.strictEqual(fresh?.pullRequests[0]?.checks, "passing")
+
+      failChecks = true
+      const [held] = (yield* client.ListPullRequests())["needs-review"]
+      assert.instanceOf(held, RepositoryUnavailable)
+      assert.include(held.error.message, "Checks couldn't refresh")
+      assert.strictEqual(held.pullRequests[0]?.checks, "passing")
+
+      pr.push({ head: { sha: "h2", files: {} } })
+      pr.checks = "PENDING"
+      const [pushed] = (yield* client.ListPullRequests())["needs-review"]
+      assert.instanceOf(pushed, RepositoryUnavailable)
+      assert.strictEqual(pushed.pullRequests[0]?.checks, "unavailable")
+
+      failChecks = false
+      const [recovered] = yield* listed(client, "needs-review")
+      assert.strictEqual(recovered?.pullRequests[0]?.checks, "running")
+    }),
+  )
+
+  it.live("associates checks with the head observed after a push during a list read", () =>
+    Effect.gen(function* () {
+      let pushBeforeChecks: (() => void) | undefined
+      let failChecks = false
+
+      const github = yield* startFakeGitHub({
+        beforeRequest: ({ graphql }) => {
+          if (graphql?.operationName !== "PullRequestChecks") return undefined
+
+          pushBeforeChecks?.()
+
+          return failChecks ? 503 : undefined
+        },
+      })
+
+      const home = yield* isolatedHome
+
+      const { client } = yield* startBackend(
+        { GH_TOKEN: VIEWER.token, GLASS_GITHUB_API_URL: github.url },
+        home,
+      )
+
+      yield* client.FollowRepository({ input: "octo-org/glass" })
+
+      const pr = github.seedPullRequest({
+        owner: "octo-org",
+        repo: "glass",
+        requestedReviewers: [VIEWER.login],
+        checks: "SUCCESS",
+        base,
+        head,
+      })
+
+      pushBeforeChecks = () => {
+        pr.push({ head: { sha: "h2", files: {} } })
+        pr.checks = "PENDING"
+      }
+
+      const [pushed] = yield* listed(client, "needs-review")
+      assert.strictEqual(pushed?.pullRequests[0]?.checks, "running")
+
+      pushBeforeChecks = undefined
+      failChecks = true
+      const [held] = (yield* client.ListPullRequests())["needs-review"]
+      assert.instanceOf(held, RepositoryUnavailable)
+      assert.strictEqual(held.pullRequests[0]?.checks, "running")
+    }),
+  )
+
   it.live("keeps a failing repository's last rows listed beside healthy ones", () =>
     Effect.gen(function* () {
       const { github, client } = yield* startSignedInBackend

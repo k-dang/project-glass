@@ -14,7 +14,10 @@ export interface SandboxProvider {
    * the host's health check once this resolves.
    */
   readonly create: (request: SandboxRequest, context: SandboxCreation) => Promise<void>
-  /** Where the agent host in the Sandbox answers, asked afresh for each connection. */
+  /**
+   * Where the agent host in the Sandbox answers, asked afresh for each connection. Throws
+   * `glass.sandboxGone()` once the Sandbox no longer exists, so Glass stops trying to reach it.
+   */
   readonly target: (state: SandboxState) => Promise<SandboxTarget>
   /**
    * Deletes the Sandbox. Glass has asked its agent host to end first; one it couldn't reach may
@@ -26,7 +29,9 @@ export interface SandboxProvider {
 }
 
 /** The Agent program an Agent runs: Claude Code or pi. */
-export type AgentEngine = "claude-code" | "pi"
+export const agentEngines = ["claude-code", "pi"] as const
+
+export type AgentEngine = (typeof agentEngines)[number]
 
 /** A model an Agent program offers, with the efforts it takes, from lowest to highest. */
 export interface AgentModel {
@@ -95,6 +100,8 @@ export interface Glass {
   readonly missingLogin: (login: string, fix: string) => Error
   /** The platform has no room for another Sandbox right now; trying again later may work. */
   readonly noCapacity: (message: string) => Error
+  /** The Sandbox no longer exists, with everything in it, so its Agent can only be removed. */
+  readonly sandboxGone: () => Error
 }
 
 export type Plugin = (glass: Glass) => void | Promise<void>

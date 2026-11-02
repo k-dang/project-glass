@@ -47,3 +47,6 @@ Each feature file has an H1 title, one paragraph of user-visible behavior, then 
 - [To-dos](./to-dos.md): the user's own to-do list in its rail area: adding, editing title and notes, checking off into Done and reopening, deleting, and keeping them across a backend restart.
 - [App lifecycle](./app-lifecycle.md): opening the window, the backend starting with it, logs, the error screen when the backend fails to start or crashes, relaunching, and quitting stopping the backend.
 - [Backend access](./backend-access.md): the standalone backend's secret and origin checks, for when it is promoted to a server.
+
+- [Agent reviews](./agent-reviews.md): private criticism beside the PR diff and its opening on Overview.
+- [Agent changes](./agent-changes.md): local worktree changes pinned until Show latest.

@@ -1,6 +1,6 @@
 import { AgentEngine } from "@glass/contracts"
 import { Schema } from "effect"
-import { execFileSync, spawn } from "node:child_process"
+import { execFile, execFileSync, spawn } from "node:child_process"
 import {
   copyFileSync,
   existsSync,
@@ -13,6 +13,7 @@ import {
 import { connect, createServer, type Socket } from "node:net"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { promisify } from "node:util"
 import { isolatedGitEnv } from "../src/gitEnv.ts"
 import type { AgentModels, Plugin } from "@glass/plugin"
 import { freePort, portOf } from "./ports.ts"
@@ -130,12 +131,17 @@ const ingress = (folder: string, hostPort: number) =>
     server.listen(0, "127.0.0.1", () => resolve(portOf(server)))
   })
 
-/** Ends a host and the programs it started, which Windows leaves running when only the host ends. */
-const killTree = (pid: number) => {
+const execFileAsync = promisify(execFile)
+
+/** Ends a host and the programs it started. */
+const killTree = async (pid: number) => {
   try {
-    if (process.platform === "win32")
-      execFileSync("taskkill", ["/pid", String(pid), "/t", "/f"], { stdio: "ignore" })
-    else process.kill(pid, "SIGKILL")
+    if (process.platform === "win32") {
+      // The host's programs hold their working directories open on Windows.
+      await execFileAsync("taskkill", ["/PID", String(pid), "/T", "/F"], { windowsHide: true })
+    } else {
+      process.kill(pid, "SIGKILL")
+    }
   } catch {}
 }
 
@@ -222,16 +228,22 @@ export const fakeSandboxProvider =
         )
         record({ folder, ingressPort: await ingress(folder, freeHostPort) })
       },
-      target: async (state) => ({
-        url: `http://127.0.0.1:${decodeSandbox(state).ingressPort}${INGRESS_PATH}`,
-        headers: { "x-fake-sandbox": "yes" },
-      }),
+      target: async (state) => {
+        const { folder, ingressPort } = decodeSandbox(state)
+
+        if (!existsSync(folder)) throw glass.sandboxGone()
+
+        return {
+          url: `http://127.0.0.1:${ingressPort}${INGRESS_PATH}`,
+          headers: { "x-fake-sandbox": "yes" },
+        }
+      },
       remove: async (state) => {
         const { folder } = decodeSandbox(state)
         const hostPath = join(folder, "host.json")
 
         if (existsSync(hostPath))
-          killTree(Schema.decodeUnknownSync(HostFile)(readFileSync(hostPath, "utf8")).pid)
+          await killTree(Schema.decodeUnknownSync(HostFile)(readFileSync(hostPath, "utf8")).pid)
 
         rmSync(folder, { recursive: true, force: true, maxRetries: 10 })
       },
@@ -269,9 +281,9 @@ export const installFakeSandboxProvider = (
     host,
     /** Ends a Sandbox's host and its programs, as a crash would. */
     killHost: (agentId: string) => killTree(host(agentId).pid),
-    stopHosts: () => {
+    stopHosts: async () => {
       for (const agentId of readdirSync(settings.root))
-        if (existsSync(hostFile(agentId))) killTree(host(agentId).pid)
+        if (existsSync(hostFile(agentId))) await killTree(host(agentId).pid)
     },
   }
 }
