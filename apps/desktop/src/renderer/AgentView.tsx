@@ -240,7 +240,7 @@ function Transcript(props: { agentId: string; turns: ReadonlyArray<Turn>; status
   }, [])
 
   return (
-    <MessageScrollerProvider autoScroll>
+    <MessageScrollerProvider autoScroll scrollPreviousItemPeek={16}>
       <section aria-label="Transcript" className="flex min-h-0 flex-1 flex-col">
         <MessageScroller className="min-h-0 flex-1">
           <MessageScrollerViewport className="px-6 py-4">
@@ -257,6 +257,7 @@ function Transcript(props: { agentId: string; turns: ReadonlyArray<Turn>; status
                   key={turn.id}
                   agentId={props.agentId}
                   turn={turn}
+                  latest={turn === props.turns.at(-1)}
                   status={turn === props.turns.at(-1) ? props.status : null}
                 />
               ))}
@@ -309,12 +310,19 @@ export function UserMessage(props: {
 const TurnView = memo(function TurnView(props: {
   agentId: string
   turn: Turn
+  latest: boolean
   status: string | null
 }) {
   const { turn } = props
 
   return (
-    <MessageScrollerItem messageId={turn.id} scrollAnchor>
+    // The latest Turn lays out at once: sized from the 10rem estimate, it
+    // would land short when anchored and jump back a frame later.
+    <MessageScrollerItem
+      messageId={turn.id}
+      scrollAnchor
+      className={props.latest ? "[content-visibility:visible]" : undefined}
+    >
       <MessageGroup className="gap-4">
         <UserMessage message={turn.message} images={turn.images} />
         <Message>
