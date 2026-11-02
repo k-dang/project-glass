@@ -194,7 +194,8 @@ it("removes the open Agent from the sidebar after confirming its uncommitted cha
   const user = mount({
     WatchTranscript: () =>
       Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
-    GetRemovalWarnings: () => Effect.succeed(new RemovalWarnings({ uncommittedChanges: "some" })),
+    GetRemovalWarnings: () =>
+      Effect.succeed(new RemovalWarnings({ uncommittedChanges: "some", unpushedCommits: [] })),
     RemoveAgent: ({ agentId }) => Effect.sync(() => void removed.push(agentId)),
   })
 

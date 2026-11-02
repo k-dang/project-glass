@@ -20,7 +20,7 @@ export const AgentHostHandlers = AgentHostRpcs.toLayer(
       AnswerRequest: ({ agentId, requestId, answer }) => agents.answer(agentId, requestId, answer),
       StopAgent: ({ agentId }) => agents.stop(agentId),
       GetChanges: ({ folder, baseRef }) => changes.since(folder, baseRef),
-      HasUncommittedChanges: ({ folder }) => changes.uncommitted(folder),
+      GetUnsavedWork: ({ folder }) => changes.unsaved(folder),
       WatchJournal: ({ after }) => journal.watch(after),
       Acknowledge: ({ through }) => journal.acknowledge(through),
     })

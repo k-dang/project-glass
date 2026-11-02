@@ -1,6 +1,6 @@
 import { AgentError, RPC_PATH } from "@glass/contracts"
 import type { SandboxProvider, SandboxState, SandboxTarget } from "@glass/plugin"
-import { Effect, Schedule } from "effect"
+import { DateTime, Effect, Schedule } from "effect"
 import { AgentHostRpcs, HEALTH_PATH, HOST_TOKEN_HEADER, SHUTDOWN_PATH } from "./agentHost/protocol"
 import { connectRpcClient } from "./rpcSocket"
 import { MissingLogin, NoCapacity, SandboxGone } from "./sandboxFailures"
@@ -67,12 +67,27 @@ const hostUrl = (target: SandboxTarget, path: string) => {
   return url
 }
 
-const targetOf = (provider: SandboxProvider, state: SandboxState) =>
-  fromProvider(() => provider.target(state)).pipe(
+/** A call about a Sandbox that may be gone, which the provider says by throwing `SandboxGone`. */
+const callAbout = <A>(provider: SandboxProvider, action: string, run: () => Promise<A>) =>
+  fromProvider(run).pipe(
     Effect.catch(({ rejected }): Effect.Effect<never, AgentError | SandboxGone> =>
       rejected instanceof SandboxGone
         ? Effect.fail(rejected)
-        : providerFailure(provider, "reach the Sandbox")({ rejected }),
+        : providerFailure(provider, action)({ rejected }),
+    ),
+  )
+
+const targetOf = (provider: SandboxProvider, state: SandboxState) =>
+  callAbout(provider, "reach the Sandbox", () => provider.target(state))
+
+export const extendSandbox = (provider: SandboxProvider, state: SandboxState) =>
+  callAbout(provider, "extend the Sandbox", () => provider.extend(state)).pipe(
+    Effect.flatMap((date) =>
+      Effect.try({
+        try: () => DateTime.fromDateUnsafe(date),
+        catch: () =>
+          new AgentError({ message: `${provider.name} answered an expiry Glass can't read.` }),
+      }),
     ),
   )
 

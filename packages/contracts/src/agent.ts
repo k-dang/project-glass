@@ -442,8 +442,39 @@ export class SandboxProviderInfo extends Schema.Class<SandboxProviderInfo>("Sand
   engines: Schema.NonEmptyArray(AgentEngine),
 }) {}
 
+/**
+ * How Glass last found an Agent's Sandbox. An expired or deleted one is gone with everything in it,
+ * leaving its Agent read-only.
+ */
+export const SandboxReach = Schema.Literals(["reachable", "unreachable", "expired", "deleted"])
+
+export type SandboxReach = typeof SandboxReach.Type
+
+export class SandboxStatus extends Schema.Class<SandboxStatus>("SandboxStatus")({
+  agentId: Schema.String,
+  /** `null` until the Sandbox's provider says when it expires. */
+  expiresAt: Schema.NullOr(Schema.DateTimeUtcFromString),
+  reach: SandboxReach,
+}) {}
+
+export const isGone = (reach: SandboxReach) => reach === "expired" || reach === "deleted"
+
+export const UnpushedCommit = Schema.Struct({ sha: Schema.String, subject: Schema.String })
+
+export type UnpushedCommit = typeof UnpushedCommit.Type
+
+/** What an Agent's place holds that isn't on GitHub, and removing the Agent would lose. */
+export const UnsavedWork = Schema.Struct({
+  uncommittedChanges: Schema.Boolean,
+  unpushedCommits: Schema.Array(UnpushedCommit),
+})
+
+export type UnsavedWork = typeof UnsavedWork.Type
+
 export class RemovalWarnings extends Schema.Class<RemovalWarnings>("RemovalWarnings")({
   uncommittedChanges: Schema.Literals(["none", "some", "unchecked"]),
+  /** Newest first; always none for a local Agent, whose branch outlives it. */
+  unpushedCommits: Schema.Array(UnpushedCommit),
 }) {}
 
 export class InvalidLocalCheckout extends Schema.TaggedError<InvalidLocalCheckout>()(

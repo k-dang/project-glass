@@ -102,7 +102,7 @@ export class LocalAgentHost extends Context.Service<
             Scope.provide(connection),
           )
 
-          yield* followJournal(transcripts, client, { saved: 0 }).pipe(
+          yield* followJournal(transcripts, client, { saved: 0, kept: false }).pipe(
             Effect.tapCause((cause) => Effect.logWarning("Lost the agent host's journal", cause)),
             Effect.retry({
               while: lostConnection,

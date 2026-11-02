@@ -125,6 +125,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       ListSandboxProviders: () => Effect.succeed(sandboxes.providers),
       CreateAgent: (input) => agents.create(input),
       WatchWaitingAgents: () => agents.watchWaiting(),
+      WatchSandboxes: () => agents.watchSandboxes(),
       ChangeAgentModel: ({ agentId, model, effort }) =>
         agents.changeModel(agentId, { model, effort }),
       ChangePermissionMode: ({ agentId, permissionMode }) =>

@@ -34,16 +34,25 @@ export interface Placed {
 
 export interface Placement {
   readonly engines: ReadonlyArray<AgentEngine>
+  /** Whether the Agent's branch, with its commits, outlives removing it. */
+  readonly keepsBranch: boolean
   readonly models: (engine: AgentEngine) => Effect.Effect<AgentModels, AgentError>
   readonly place: (
     repository: FollowedRepository,
     baseBranch: string,
   ) => Effect.Effect<Placed, InvalidLocalCheckout | AgentError>
   readonly host: (placed: PlacedAgent) => Effect.Effect<HostClient, AgentError>
+  /** Fails with why the Agent can't take messages, if it can't. */
+  readonly writable: (placed: PlacedAgent) => Effect.Effect<void, AgentError>
   readonly runningHost: (placed: PlacedAgent) => Effect.Effect<Option.Option<HostClient>>
   readonly hostOnceMade: (
     placed: PlacedAgent,
   ) => Effect.Effect<Option.Option<HostClient>, AgentError>
   readonly baseRef: (placed: PlacedAgent) => Effect.Effect<string, AgentError>
   readonly remove: (placed: PlacedAgent) => Effect.Effect<void, AgentError>
+  /**
+   * Picks the Agent up once Glass opens, answering whether its running Turn carried on while Glass
+   * was closed; one that didn't is interrupted.
+   */
+  readonly reopen: (placed: PlacedAgent) => Effect.Effect<boolean>
 }

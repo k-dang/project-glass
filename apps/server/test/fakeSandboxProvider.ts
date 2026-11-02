@@ -37,6 +37,9 @@ const FakeSandboxSettings = Schema.Struct({
   noCapacity: Schema.optional(Schema.String),
   failAt: Schema.optional(FakeSandboxStep),
   holdAt: Schema.optional(FakeSandboxStep),
+  /** How far ahead each extension pushes a Sandbox's expiry, and how long after creation it ends. */
+  lifetimeMillis: Schema.optional(Schema.Int),
+  capMillis: Schema.optional(Schema.Int),
   /** Read when Glass loads the Plugin, so a change takes a relaunch. */
   engines: Schema.optional(Schema.NonEmptyArray(AgentEngine)),
 })
@@ -48,8 +51,28 @@ const readSettings = (path: string) =>
 
 const FakeSandbox = Schema.Struct({
   folder: Schema.String,
+  createdAt: Schema.Int,
+  lifetimeMillis: Schema.Int,
+  capMillis: Schema.Int,
   ingressPort: Schema.optional(Schema.Int),
 })
+
+const DAY = 24 * 60 * 60 * 1000
+
+const expiryFile = (folder: string) => join(folder, "expires")
+
+const expiresAt = (folder: string) => Number(readFileSync(expiryFile(folder), "utf8"))
+
+/** The fake platform reclaims a Sandbox past its expiry, as a real one would. */
+const reclaimIfExpired = (folder: string) => {
+  if (!existsSync(expiryFile(folder)) || Date.now() < expiresAt(folder)) return
+
+  try {
+    process.kill(Number(readFileSync(join(folder, "host.pid"), "utf8")), "SIGKILL")
+  } catch {}
+
+  rmSync(folder, { recursive: true, force: true, maxRetries: 10 })
+}
 
 const decodeSandbox = Schema.decodeUnknownSync(FakeSandbox)
 
@@ -127,6 +150,7 @@ const ingress = (folder: string, hostPort: number) =>
     })
 
     const watching = setInterval(() => {
+      reclaimIfExpired(folder)
       const deleted = !existsSync(folder)
 
       if (deleted || dropping(folder)) for (const socket of open) socket.destroy()
@@ -207,7 +231,16 @@ export const fakeSandboxProvider =
         await step("Creating the Sandbox")
         const folder = join(settings.root, request.agentId)
         mkdirSync(folder, { recursive: true })
-        record({ folder })
+
+        const sandbox = {
+          folder,
+          createdAt: Date.now(),
+          lifetimeMillis: settings.lifetimeMillis ?? 2 * DAY,
+          capMillis: settings.capMillis ?? 2 * DAY,
+        }
+
+        writeFileSync(expiryFile(folder), String(sandbox.createdAt + sandbox.lifetimeMillis))
+        record(sandbox)
 
         await step("Cloning the repository")
         const clone = join(folder, request.folder)
@@ -241,7 +274,7 @@ export const fakeSandboxProvider =
 
         if (host.pid === undefined) throw new Error("The agent host didn't start")
         writeFileSync(join(folder, "host.pid"), String(host.pid))
-        record({ folder, ingressPort: await ingress(folder, freeHostPort) })
+        record({ ...sandbox, ingressPort: await ingress(folder, freeHostPort) })
       },
       target: async (state) => {
         const { folder, ingressPort } = decodeSandbox(state)
@@ -252,6 +285,16 @@ export const fakeSandboxProvider =
           url: `http://127.0.0.1:${ingressPort}${INGRESS_PATH}`,
           headers: { "x-fake-sandbox": "yes" },
         }
+      },
+      extend: async (state) => {
+        const { folder, createdAt, lifetimeMillis, capMillis } = decodeSandbox(state)
+
+        if (!existsSync(folder)) throw glass.sandboxGone()
+
+        const extended = Math.min(Date.now() + lifetimeMillis, createdAt + capMillis)
+        writeFileSync(expiryFile(folder), String(extended))
+
+        return new Date(extended)
       },
       remove: async (state) => {
         const { missingLogin } = readSettings(settingsPath)

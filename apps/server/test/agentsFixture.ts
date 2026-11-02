@@ -9,6 +9,7 @@ import {
   type RequestPart,
   type Transcript,
   SandboxPlace,
+  type SandboxStatus,
   thisMac,
   type Turn,
 } from "@glass/contracts"
@@ -82,6 +83,18 @@ const makeAgentsFixture = Effect.fnUntraced(function* <Claude extends { readonly
     until: (turns: ReadonlyArray<Turn>) => boolean,
     backend = client,
   ) => watch(agentId, ({ turns }) => until(turns), backend).pipe(Effect.map(({ turns }) => turns))
+
+  const sandboxStatus = (
+    agentId: string,
+    until: (status: SandboxStatus) => boolean,
+    backend = client,
+  ) =>
+    backend.WatchSandboxes().pipe(
+      Stream.map((statuses) => statuses.find((status) => status.agentId === agentId)),
+      Stream.filter((status) => status !== undefined && until(status)),
+      Stream.runHead,
+      Effect.map((found) => Option.getOrThrow(found)!),
+    )
 
   const send = (agentId: string, message: string, images: ReadonlyArray<Image> = []) =>
     client.SendMessage({ agentId, message, images })
@@ -169,6 +182,7 @@ const makeAgentsFixture = Effect.fnUntraced(function* <Claude extends { readonly
     claude,
     watch,
     transcript,
+    sandboxStatus,
     send,
     steer,
     answering,
@@ -177,11 +191,13 @@ const makeAgentsFixture = Effect.fnUntraced(function* <Claude extends { readonly
     sandboxes,
     worktree: (name: string) =>
       join(home, ".project-glass", "worktrees", repository.owner, repository.repo, name),
-    restart: Effect.gen(function* () {
-      yield* Scope.close(serverScope, Exit.void)
-
-      return (yield* startBackend(env, home)).client
-    }),
+    /** Quits Glass, leaving its Sandboxes running; `launch` opens it again. */
+    quit: Scope.close(serverScope, Exit.void),
+    launch: startBackend(env, home).pipe(Effect.map((backend) => backend.client)),
+    restart: Scope.close(serverScope, Exit.void).pipe(
+      Effect.andThen(startBackend(env, home)),
+      Effect.map((backend) => backend.client),
+    ),
   }
 })
 

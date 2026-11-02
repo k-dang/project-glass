@@ -23,15 +23,18 @@ import {
   type RequestNotWaiting,
   RequestWaiting,
   SandboxPlace,
+  type SandboxStatus,
   thisMac as thisMacPlace,
   type TranscriptUpdate,
   TurnCutOff,
   TurnEnded,
   TurnFailed,
+  TurnInterrupted,
   TurnStopped,
   isNothingUnsent,
   nothingUnsent,
   type SentMessage,
+  type UnsavedWork,
 } from "@glass/contracts"
 import {
   Context,
@@ -89,6 +92,8 @@ const toRow = ({
   folder,
 })
 
+const nothingUnsaved: UnsavedWork = { uncommittedChanges: false, unpushedCommits: [] }
+
 const storageFailure = () =>
   new AgentError({ message: "Couldn't read or save your Agents. Try again." })
 
@@ -97,6 +102,7 @@ export class Agents extends Context.Service<
   {
     readonly watch: () => Stream.Stream<ReadonlyArray<Agent>, AgentError>
     readonly watchWaiting: () => Stream.Stream<ReadonlyArray<string>>
+    readonly watchSandboxes: () => Stream.Stream<ReadonlyArray<SandboxStatus>>
     readonly transcript: (
       agentId: string,
     ) => Stream.Stream<TranscriptUpdate, AgentNotFound | AgentError>
@@ -182,6 +188,20 @@ export class Agents extends Context.Service<
           : localPlacement
 
       const placementOf = (row: PlacedAgent) => placementFor(row.agent.place)
+
+      const interrupted = yield* Effect.filter(yield* SubscriptionRef.get(rows), (row) =>
+        placementOf(row)
+          .reopen(row)
+          .pipe(Effect.map((keptRunning) => !keptRunning)),
+      )
+
+      // Requests only wait in a running Turn, so this leaves none waiting.
+      yield* transcripts
+        .endRunning(
+          TurnInterrupted.make({}),
+          interrupted.map(({ agent }) => agent.id),
+        )
+        .pipe(Effect.orDie)
 
       yield* Stream.merge(yield* localPlacement.subscribeLost, yield* sandboxes.subscribeLost).pipe(
         Stream.runForEach((agentIds) =>
@@ -334,13 +354,15 @@ export class Agents extends Context.Service<
           .pipe(Effect.flatMap((waiting) => (waiting ? new RequestWaiting() : Effect.void)))
 
       const send = Effect.fn("Agents.send")(function* (agentId: string, input: MessageInput) {
-        yield* find(agentId)
+        const row = yield* find(agentId)
+        yield* placementOf(row).writable(row)
         yield* refuseWhileWaiting(agentId)
         yield* transcripts.startOrQueue(agentId, input)
       })
 
       const steer = Effect.fn("Agents.steer")(function* (agentId: string, input: MessageInput) {
         const row = yield* find(agentId)
+        yield* placementOf(row).writable(row)
         yield* refuseWhileWaiting(agentId)
 
         if (!(yield* trySteer(row, input))) yield* send(agentId, input)
@@ -350,7 +372,8 @@ export class Agents extends Context.Service<
         agentId: string,
         queuedId: string,
       ) {
-        yield* find(agentId)
+        const row = yield* find(agentId)
+        yield* placementOf(row).writable(row)
         yield* transcripts.startQueued(agentId, queuedId)
       })
 
@@ -492,26 +515,32 @@ export class Agents extends Context.Service<
       const removalWarnings = Effect.fn("Agents.removalWarnings")(function* (agentId: string) {
         const row = yield* find(agentId)
 
-        return yield* placementOf(row)
-          .hostOnceMade(row)
-          .pipe(
-            Effect.flatMap(
-              Option.match({
-                onNone: () => Effect.succeed(false),
-                onSome: (host) => host.HasUncommittedChanges({ folder: row.folder }),
+        const placement = placementOf(row)
+
+        return yield* placement.hostOnceMade(row).pipe(
+          Effect.flatMap(
+            Option.match({
+              onNone: () => Effect.succeed(nothingUnsaved),
+              onSome: (host) => host.GetUnsavedWork({ folder: row.folder }),
+            }),
+          ),
+          Effect.timeout("10 seconds"),
+          Effect.map(
+            ({ uncommittedChanges, unpushedCommits }) =>
+              new RemovalWarnings({
+                uncommittedChanges: uncommittedChanges ? "some" : "none",
+                unpushedCommits: placement.keepsBranch ? [] : unpushedCommits,
               }),
-            ),
-            Effect.timeout("10 seconds"),
-            Effect.map(
-              (some) => new RemovalWarnings({ uncommittedChanges: some ? "some" : "none" }),
-            ),
-            // A connection to a host that just died ends interrupted, not failed.
-            Effect.catchCause((cause) =>
-              Effect.logWarning("Couldn't check an Agent for uncommitted work", cause).pipe(
-                Effect.as(new RemovalWarnings({ uncommittedChanges: "unchecked" })),
+          ),
+          // A connection to a host that just died ends interrupted, not failed.
+          Effect.catchCause((cause) =>
+            Effect.logWarning("Couldn't check an Agent for unsaved work", cause).pipe(
+              Effect.as(
+                new RemovalWarnings({ uncommittedChanges: "unchecked", unpushedCommits: [] }),
               ),
             ),
-          )
+          ),
+        )
       })
 
       const remove = Effect.fn("Agents.remove")(function* (agentId: string) {
@@ -579,6 +608,7 @@ export class Agents extends Context.Service<
         saveUnsent,
         watchWaiting: () =>
           transcripts.waiting.pipe(Stream.map((waiting) => Array.from(waiting).toSorted())),
+        watchSandboxes: () => sandboxes.statuses,
         changeModel: update,
         changePermissionMode,
         answer,
