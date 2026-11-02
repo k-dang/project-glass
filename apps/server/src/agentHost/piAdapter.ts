@@ -309,9 +309,9 @@ export const piAdapter = (command: string) =>
             return undefined
           }),
           steer: Effect.fnUntraced(function* (sent: SentMessage) {
-            const id = randomUUID()
+            const steer = { ...sent, id: randomUUID() }
 
-            if (!(yield* turns.steer({ ...sent, id }))) return yield* notRunning
+            if (!(yield* turns.steer(steer))) return yield* notRunning
 
             const accepted = yield* rpc.request(piMessage("steer", sent), PromptAccepted).pipe(
               Effect.map(({ disposition }) => disposition),
@@ -319,12 +319,11 @@ export const piAdapter = (command: string) =>
               Effect.option,
             )
 
-            if (Option.isSome(accepted))
-              return accepted.value === "handled"
-                ? yield* turns.apply(Input.SteerHandled({ id }))
-                : undefined
+            if (Option.isSome(accepted) && accepted.value !== "handled") return undefined
 
-            yield* turns.dropSteer(id)
+            yield* turns.dropSteer(steer.id)
+
+            if (Option.isSome(accepted)) return yield* turns.offer(Input.SteerHandled({ steer }))
 
             return yield* new HostAgentError({ message: "pi didn't take the message in." })
           }),
