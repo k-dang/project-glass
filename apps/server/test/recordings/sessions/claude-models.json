@@ -12,6 +12,7 @@
         "--allow-dangerously-skip-permissions",
         "--include-partial-messages"
       ],
+      "cwd": "<home>",
       "frames": [
         {
           "out": {

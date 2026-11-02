@@ -6,6 +6,7 @@ import { join } from "node:path"
 import { vi } from "vite-plus/test"
 import { isolatedHome } from "../test/harness"
 import {
+  type Recording,
   readRecording,
   replaySpawner,
   type RunnerScenario,
@@ -14,7 +15,10 @@ import {
 import { AgentRunners } from "./agentRunners"
 import { ServerConfig } from "./ServerConfig"
 
-const fixture = Effect.fnUntraced(function* (scenario: RunnerScenario, options = { hold: false }) {
+const fixture = Effect.fnUntraced(function* (
+  scenario: RunnerScenario,
+  options: { hold?: boolean; recording?: Recording } = {},
+) {
   const home = yield* isolatedHome
   const temporary = join(home, "tmp")
   const checkout = join(home, "checkout")
@@ -24,7 +28,7 @@ const fixture = Effect.fnUntraced(function* (scenario: RunnerScenario, options =
 
   for (const name of ["TMPDIR", "TEMP", "TMP"]) vi.stubEnv(name, temporary)
 
-  const recording = readRecording(scenario.name)
+  const recording = options.recording ?? readRecording(scenario.name)
   const replay = replaySpawner(recording, { "<checkout>": checkout }, options)
 
   const run = Effect.gen(function* () {
@@ -94,9 +98,7 @@ for (const name of ["claude-answer", "pi-answer"])
     Effect.gen(function* () {
       const f = yield* fixture(
         runnerScenarios.find((scenario) => scenario.name === name)!,
-        {
-          hold: true,
-        },
+        { hold: true },
       )
 
       const running = yield* Effect.forkChild(f.run)
@@ -105,6 +107,47 @@ for (const name of ["claude-answer", "pi-answer"])
 
       yield* f.replay.stopped(1)
       assert.isEmpty(f.leftovers())
+    }),
+  )
+
+const piText = '{"type":"text","text":"{\\"summary\\":\\"Fine.\\"}"}'
+
+for (const [name, base, from, to] of [
+  ["a truncated pi answer", "pi-answer", '"stopReason":"stop"', '"stopReason":"length"'],
+  ["a pi text block without text", "pi-answer", piText, `${piText},{"type":"text"}`],
+  [
+    "a pi answer that isn't JSON",
+    "pi-answer",
+    piText,
+    '{"type":"text","text":"not JSON secret-should-not-leak"}',
+  ],
+  [
+    "a Claude Code answer that isn't JSON",
+    "claude-answer",
+    '"result":"{\\"summary\\":\\"Fine.\\"}"',
+    '"result":"not JSON secret-should-not-leak"',
+  ],
+] as const)
+  it.live(`fails as unusable output for ${name}`, () =>
+    Effect.gen(function* () {
+      const scenario = runnerScenarios.find((candidate) => candidate.name === base)!
+      const recorded = readRecording(base)
+      const answering = recorded.spawns.at(-1)!
+      assert.include(answering.stdout, from)
+
+      const f = yield* fixture(scenario, {
+        recording: {
+          ...recorded,
+          spawns: [
+            ...recorded.spawns.slice(0, -1),
+            { ...answering, stdout: answering.stdout.replaceAll(from, to) },
+          ],
+        },
+      })
+
+      const failure = yield* Effect.flip(f.run)
+      assert.strictEqual(failure.reason, "unusable-output")
+      assert.notInclude(failure.message, "secret-should-not-leak")
     }),
   )
 

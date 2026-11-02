@@ -4,7 +4,7 @@ import { ConfigProvider, Effect, Layer, Schema } from "effect"
 import { execSync } from "node:child_process"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
-import { dirname, join } from "node:path"
+import { delimiter, dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { parseArgs } from "node:util"
 import { AgentRunners } from "../src/agentRunners"
@@ -40,6 +40,13 @@ if (values.help || values["pi-model"] === undefined) {
 }
 
 const [provider, ...modelId] = values["pi-model"].split("/")
+
+// `pnpm exec` puts the repo's own bins, the bundled pi among them, ahead of the user's programs.
+for (const name of Object.keys(process.env).filter((key) => key.toUpperCase() === "PATH"))
+  process.env[name] = process.env[name]
+    ?.split(delimiter)
+    .filter((entry) => !entry.includes("node_modules"))
+    .join(delimiter)
 
 const commands = {
   "claude-code": process.env["GLASS_CLAUDE_COMMAND"] ?? "claude",

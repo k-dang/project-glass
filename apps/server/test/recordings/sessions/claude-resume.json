@@ -13,6 +13,7 @@
         "--include-partial-messages",
         "--session-id=6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
       ],
+      "cwd": "<folder>",
       "frames": [
         {
           "out": {
@@ -905,6 +906,7 @@
         "--allow-dangerously-skip-permissions",
         "--include-partial-messages"
       ],
+      "cwd": "<folder>",
       "frames": [
         {
           "out": {
@@ -1838,16 +1840,28 @@
     }
   ],
   "calls": [
-    null,
     {
-      "sessionId": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-      "summary": "Remember the word lantern",
-      "lastModified": 1793614359853,
-      "fileSize": 159749,
-      "firstPrompt": "Remember the word lantern",
-      "gitBranch": "HEAD",
-      "cwd": "<folder>",
-      "createdAt": 1793614359753
+      "args": {
+        "conversation": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+        "dir": "<folder>"
+      },
+      "info": null
+    },
+    {
+      "args": {
+        "conversation": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+        "dir": "<folder>"
+      },
+      "info": {
+        "sessionId": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+        "summary": "Remember the word lantern",
+        "lastModified": 1793614359853,
+        "fileSize": 159749,
+        "firstPrompt": "Remember the word lantern",
+        "gitBranch": "HEAD",
+        "cwd": "<folder>",
+        "createdAt": 1793614359753
+      }
     }
   ]
 }

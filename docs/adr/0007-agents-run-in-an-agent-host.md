@@ -33,15 +33,15 @@ the host process itself (worktrees, Sandboxes, a host that dies, a dropped conne
 host on a scripted adapter, and Tours, Agent reviews, and Asks supply scripted `AgentRunners`. Each
 program's translation into Glass's events is a pure `step`, tested by feeding it the program's
 messages. Wiring to a program (continuing a conversation, images, model and effort changes,
-Permission requests, Questions, Steers) replays a recording of the real program, matched message
-by message, so a change in what Glass sends fails until it is recorded again: Agent sessions are
-recorded from the pinned Claude Code CLI and the bundled pi answering fake model APIs
-(`GLASS_RECORD_SESSIONS=1`), and the completion runners (ADR 0004) from the user's own `claude`
-and `pi` (`test/recordRunnerReplays.ts`). A recording only shows what the program did when it was
-made, so bumping the pinned SDK or the bundled pi means recording again. Desktop end-to-end tests
-and `pnpm dev:fake` run the real programs against the fake model APIs. A fake SDK query stays for
-failures the real CLI won't produce on demand, such as a handshake that never answers or a refused
-model change.
+Permission requests, Questions, Steers) replays a recording of the real program, matched launch
+by launch and message by message, so a change in what Glass sends fails until it is recorded
+again: Agent sessions are recorded from the pinned Claude Code CLI and the bundled pi answering
+fake model APIs (`GLASS_RECORD_SESSIONS=1`), and the completion runners (ADR 0004) from the
+user's own `claude` and `pi` (`test/recordRunnerReplays.ts`). A recording only shows what the
+program did when it was made, so bumping the pinned SDK or the bundled pi means recording again.
+Desktop end-to-end tests and `pnpm dev:fake` run the real programs against the fake model APIs. A
+fake SDK query stays for failures the real CLI won't produce on demand, such as a handshake that
+never answers or a refused model change.
 
 ## Considered Options
 

@@ -207,6 +207,28 @@ export const recordingSpawner = (places: Readonly<Record<string, string>>) => {
 
           let stdout = ""
           let stderr = ""
+          let exitCode: number | null = null
+          let streamsOpen = 2
+
+          const save = () => {
+            if (exitCode === null || streamsOpen > 0) return
+
+            const spawn: Spawn = {
+              args: argsOf(given).map((arg) => normalize(arg, places)),
+              cwd: normalize(given.options.cwd ?? "", places),
+              stdin: normalize(stdin, places),
+              stdout: normalize(redact(stdout), places),
+              stderr: normalize(stderr, places),
+              exitCode,
+            }
+
+            spawns.push(systemPrompt === undefined ? spawn : { ...spawn, systemPrompt })
+          }
+
+          const ended = Effect.sync(() => {
+            streamsOpen--
+            save()
+          })
 
           return ChildProcessSpawner.makeHandle({
             ...handle,
@@ -216,6 +238,7 @@ export const recordingSpawner = (places: Readonly<Record<string, string>>) => {
                   stdout += new TextDecoder().decode(chunk)
                 }),
               ),
+              Stream.onEnd(ended),
             ),
             stderr: handle.stderr.pipe(
               Stream.tap((chunk) =>
@@ -223,20 +246,13 @@ export const recordingSpawner = (places: Readonly<Record<string, string>>) => {
                   stderr += new TextDecoder().decode(chunk)
                 }),
               ),
+              Stream.onEnd(ended),
             ),
             exitCode: handle.exitCode.pipe(
-              Effect.tap((exitCode) =>
+              Effect.tap((code) =>
                 Effect.sync(() => {
-                  const spawn: Spawn = {
-                    args: argsOf(given).map((arg) => normalize(arg, places)),
-                    cwd: normalize(given.options.cwd ?? "", places),
-                    stdin: normalize(stdin, places),
-                    stdout: normalize(redact(stdout), places),
-                    stderr: normalize(stderr, places),
-                    exitCode,
-                  }
-
-                  spawns.push(systemPrompt === undefined ? spawn : { ...spawn, systemPrompt })
+                  exitCode = code
+                  save()
                 }),
               ),
             ),

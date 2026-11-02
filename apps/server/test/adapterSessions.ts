@@ -103,7 +103,8 @@ export const claudeSession = Effect.fnUntraced(function* (
   const sdk: ClaudeSdk = {
     query: (input) =>
       query({ ...input, options: { ...input.options, spawnClaudeCodeProcess: tape.claude } }),
-    getSessionInfo: (id, options) => tape.sessionInfo(() => getSessionInfo(id, options)),
+    getSessionInfo: (id, options) =>
+      tape.sessionInfo(id, options?.dir, () => getSessionInfo(id, options)),
   }
 
   return { ...(yield* drive(claudeAdapter(pinnedClaude(), sdk), tape, folder)), api }

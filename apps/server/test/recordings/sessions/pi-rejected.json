@@ -3,6 +3,7 @@
   "processes": [
     {
       "args": ["--mode", "rpc", "--session-id", "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d"],
+      "cwd": "<folder>",
       "frames": [
         {
           "out": {

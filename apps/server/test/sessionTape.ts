@@ -28,14 +28,18 @@ const Frame = Schema.Union([
 
 type Frame = typeof Frame.Type
 
-const Process = Schema.Struct({ args: Schema.Array(Schema.String), frames: Schema.Array(Frame) })
+const Process = Schema.Struct({
+  args: Schema.Array(Schema.String),
+  cwd: Schema.String,
+  frames: Schema.Array(Frame),
+})
 
 type Process = typeof Process.Type
 
 const Tape = Schema.Struct({
   scenario: Schema.String,
   processes: Schema.Array(Process),
-  calls: Schema.Array(Schema.Json),
+  calls: Schema.Array(Schema.Struct({ args: Schema.Json, info: Schema.Json })),
 })
 
 type Tape = typeof Tape.Type
@@ -102,6 +106,30 @@ const denormalizer = (places: Readonly<Record<string, string>>) => {
     )
 }
 
+/** Takes `actual` as this run's spelling of the recorded id, unless either is already another's. */
+const learn = (ids: Map<string, string>, recorded: string, actual: string) => {
+  const known = ids.get(recorded)
+
+  if (known !== undefined) return known === actual
+
+  for (const taken of ids.values()) if (taken === actual) return false
+
+  ids.set(recorded, actual)
+
+  return true
+}
+
+/** Binds the ids a program says first to themselves, so Glass must answer with those very ids. */
+const bindSaid = (value: Json, ids: Map<string, string>, field = ""): void => {
+  if (Predicate.isString(value)) {
+    if (idFields.has(field)) learn(ids, value, value)
+
+    for (const id of value.match(uuids) ?? []) learn(ids, id, id)
+  } else if (isArray(value)) for (const item of value) bindSaid(item, ids)
+  else if (isObject(value))
+    for (const [name, inner] of Object.entries(value)) bindSaid(inner, ids, name)
+}
+
 const sameIds = (recorded: string, actual: string, ids: Map<string, string>) => {
   const recordedIds = recorded.match(uuids) ?? []
   const actualIds = actual.match(uuids) ?? []
@@ -109,15 +137,7 @@ const sameIds = (recorded: string, actual: string, ids: Map<string, string>) => 
   if (recordedIds.length === 0 || recorded.replace(uuids, "<id>") !== actual.replace(uuids, "<id>"))
     return false
 
-  return recordedIds.every((id, index) => {
-    const known = ids.get(id)
-
-    if (known !== undefined) return known === actualIds[index]
-
-    ids.set(id, actualIds[index]!)
-
-    return true
-  })
+  return recordedIds.every((id, index) => learn(ids, id, actualIds[index]!))
 }
 
 /** Whether `actual` is what `recorded` was, learning which ids this run uses in place of the recorded ones. */
@@ -125,15 +145,7 @@ const matches = (recorded: Json, actual: Json, ids: Map<string, string>, field =
   if (Predicate.isString(recorded) && Predicate.isString(actual)) {
     if (recorded === actual) return true
 
-    if (!idFields.has(field)) return sameIds(recorded, actual, ids)
-
-    const known = ids.get(recorded)
-
-    if (known !== undefined) return known === actual
-
-    ids.set(recorded, actual)
-
-    return true
+    return idFields.has(field) ? learn(ids, recorded, actual) : sameIds(recorded, actual, ids)
   }
 
   if (isArray(recorded) && isArray(actual))
@@ -188,6 +200,7 @@ const show = (value: Json) => (Predicate.isString(value) ? value : JSON.stringif
 interface Program {
   readonly write: (line: string) => void
   readonly close: () => void
+  readonly unsent: () => number
 }
 
 /**
@@ -229,6 +242,8 @@ const replayProgram = (
       const frame = frames[cursor]!
 
       if ("in" in frame) {
+        bindSaid(frame.in, ids)
+
         const line = mapStrings(denormalize(frame.in), (text) =>
           [...ids].reduce((current, [from, to]) => current.replaceAll(from, to), text),
         )
@@ -279,6 +294,8 @@ const replayProgram = (
       const last = frames.at(-1)
       finish(last !== undefined && "exit" in last ? last.exit : 0)
     },
+    unsent: () =>
+      frames.filter((frame, index) => index >= cursor && "out" in frame && !sent.has(index)).length,
   }
 }
 
@@ -294,17 +311,26 @@ export const sessionTape = (scenario: string, places: Readonly<Record<string, st
         readFileSync(tapeFile(scenario), "utf8"),
       )
 
-  const processes: Array<{ args: Array<string>; frames: Array<Frame> }> = []
-  const calls: Array<Json> = []
+  const processes: Array<Process> = []
+  const calls: Array<{ args: Json; info: Json }> = []
+  const programs: Array<Program> = []
   let nextProcess = 0
   let nextCall = 0
 
-  const nextRecorded = (args: ReadonlyArray<string>) => {
-    const process = recorded.processes[nextProcess++]
+  const problem = (text: string) => {
+    problems.push(text)
+    console.error(text)
+  }
 
-    if (process === undefined || !tryMatch(process.args, normalize(args), ids)) {
-      problems.push(`Glass started a program the recording doesn't have: ${args.join(" ")}`)
-      console.error(problems.at(-1))
+  const launch = (args: ReadonlyArray<string>, cwd: string | undefined) =>
+    show(normalize({ args: [...args], cwd: cwd ?? "" }))
+
+  const nextRecorded = (args: ReadonlyArray<string>, cwd: string | undefined) => {
+    const process = recorded.processes[nextProcess++]
+    const started = launch(args, cwd)
+
+    if (process === undefined || show({ args: [...process.args], cwd: process.cwd }) !== started) {
+      problem(`Glass started a program the recording doesn't have: ${started}`)
 
       return undefined
     }
@@ -312,7 +338,20 @@ export const sessionTape = (scenario: string, places: Readonly<Record<string, st
     return process
   }
 
-  const recordProcess = (args: ReadonlyArray<string>) => {
+  const replay = (
+    process: Process | undefined,
+    say: (line: string) => void,
+    exit: (code: number | null) => void,
+  ): Program => {
+    if (process === undefined) return { write: () => {}, close: () => exit(1), unsent: () => 0 }
+
+    const program = replayProgram(process, ids, places, problems, say, exit)
+    programs.push(program)
+
+    return program
+  }
+
+  const recordProcess = (args: ReadonlyArray<string>, cwd: string | undefined) => {
     const frames: Array<Frame> = []
 
     const normalized = args.flatMap((arg) => {
@@ -321,7 +360,8 @@ export const sessionTape = (scenario: string, places: Readonly<Record<string, st
       return Predicate.isString(text) ? [text] : []
     })
 
-    processes.push({ args: normalized, frames })
+    const place = normalize(cwd ?? "")
+    processes.push({ args: normalized, cwd: Predicate.isString(place) ? place : "", frames })
 
     return {
       out: lines((line) => frames.push({ out: normalize(parse(line)) })),
@@ -341,14 +381,14 @@ export const sessionTape = (scenario: string, places: Readonly<Record<string, st
         windowsHide: true,
       })
 
-      const tape = recordProcess(options.args)
+      const tape = recordProcess(options.args, options.cwd)
       const stdin = new PassThrough()
       const stdout = new PassThrough()
       stdin.on("data", (chunk: Buffer) => tape.out(chunk.toString("utf8")))
       stdin.pipe(child.stdin)
       child.stdout.on("data", (chunk: Buffer) => tape.in(chunk.toString("utf8")))
       child.stdout.pipe(stdout)
-      child.on("exit", (code) => tape.exit(code))
+      child.on("close", (code) => tape.exit(code))
 
       return Object.assign(child, { stdin, stdout })
     }
@@ -365,12 +405,11 @@ export const sessionTape = (scenario: string, places: Readonly<Record<string, st
       events.emit("exit", code, null)
     }
 
-    const process = nextRecorded(options.args)
-
-    const program =
-      process === undefined
-        ? { write: () => {}, close: () => exit(1) }
-        : replayProgram(process, ids, places, problems, (line) => stdout.write(`${line}\n`), exit)
+    const program = replay(
+      nextRecorded(options.args, options.cwd),
+      (line) => stdout.write(`${line}\n`),
+      exit,
+    )
 
     stdin.on("data", lines(program.write))
     stdin.on("end", program.close)
@@ -408,9 +447,10 @@ export const sessionTape = (scenario: string, places: Readonly<Record<string, st
             command.command === globalThis.process.execPath ? command.args.slice(1) : command.args
 
           if (recordingSessions) {
-            const tape = recordProcess(args)
+            const tape = recordProcess(args, command.options.cwd)
             const handle = yield* real.spawn(command)
             const decoder = new TextDecoder()
+            const exited = yield* Deferred.make<number>()
 
             return ChildProcessSpawner.makeHandle({
               ...handle,
@@ -421,10 +461,13 @@ export const sessionTape = (scenario: string, places: Readonly<Record<string, st
               }),
               stdout: handle.stdout.pipe(
                 Stream.tap((chunk) => Effect.sync(() => tape.in(new TextDecoder().decode(chunk)))),
+                Stream.onEnd(
+                  Deferred.await(exited).pipe(
+                    Effect.tap((code) => Effect.sync(() => tape.exit(code))),
+                  ),
+                ),
               ),
-              exitCode: handle.exitCode.pipe(
-                Effect.tap((code) => Effect.sync(() => tape.exit(code))),
-              ),
+              exitCode: handle.exitCode.pipe(Effect.tap((code) => Deferred.succeed(exited, code))),
             })
           }
 
@@ -437,19 +480,11 @@ export const sessionTape = (scenario: string, places: Readonly<Record<string, st
             Effect.runSync(Deferred.succeed(exited, ChildProcessSpawner.ExitCode(code ?? 1)))
           }
 
-          const process = nextRecorded(args)
-
-          const program =
-            process === undefined
-              ? { write: () => {}, close: () => exit(1) }
-              : replayProgram(
-                  process,
-                  ids,
-                  places,
-                  problems,
-                  (line) => Effect.runSync(Queue.offer(output, encoder.encode(`${line}\n`))),
-                  exit,
-                )
+          const program = replay(
+            nextRecorded(args, command.options.cwd),
+            (line) => Effect.runSync(Queue.offer(output, encoder.encode(`${line}\n`))),
+            exit,
+          )
 
           yield* Effect.addFinalizer(() => Effect.sync(program.close))
           const decoder = new TextDecoder()
@@ -477,16 +512,28 @@ export const sessionTape = (scenario: string, places: Readonly<Record<string, st
 
   /** Records what the SDK found of a saved conversation on disk, or replays it. */
   const sessionInfo = (
+    conversation: string,
+    dir: string | undefined,
     live: () => Promise<SDKSessionInfo | undefined>,
   ): Promise<SDKSessionInfo | undefined> => {
+    const args = normalize({ conversation, dir: dir ?? "" })
+
     if (recordingSessions)
       return live().then((info) => {
-        calls.push(normalize(parse(JSON.stringify(info ?? null))))
+        calls.push({ args, info: normalize(parse(JSON.stringify(info ?? null))) })
 
         return info
       })
 
-    const info = recorded.calls[nextCall++] ?? null
+    const call = recorded.calls[nextCall++]
+
+    if (call === undefined || show(call.args) !== show(args)) {
+      problem(`Glass looked up a conversation the recording doesn't have: ${show(args)}`)
+
+      return Promise.resolve(undefined)
+    }
+
+    const { info } = call
 
     if (info === null) return Promise.resolve(undefined)
 
@@ -511,6 +558,13 @@ export const sessionTape = (scenario: string, places: Readonly<Record<string, st
       problems.push(
         `Glass never started ${recorded.processes.length - nextProcess} recorded programs`,
       )
+
+    if (nextCall < recorded.calls.length)
+      problems.push(`Glass never made ${recorded.calls.length - nextCall} recorded lookups`)
+
+    const unsent = programs.reduce((total, program) => total + program.unsent(), 0)
+
+    if (unsent > 0) problems.push(`Glass never sent ${unsent} recorded lines`)
 
     if (problems.length > 0) throw new Error(problems.join("\n"))
   })

@@ -13,6 +13,7 @@
         "--include-partial-messages",
         "--session-id=6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
       ],
+      "cwd": "<folder>",
       "frames": [
         {
           "out": {
@@ -2424,5 +2425,13 @@
       ]
     }
   ],
-  "calls": [null]
+  "calls": [
+    {
+      "args": {
+        "conversation": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+        "dir": "<folder>"
+      },
+      "info": null
+    }
+  ]
 }

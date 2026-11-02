@@ -3,6 +3,7 @@
   "processes": [
     {
       "args": ["--mode", "rpc"],
+      "cwd": "<home>",
       "frames": [
         {
           "out": {
