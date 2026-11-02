@@ -216,8 +216,6 @@ export class Agents extends Context.Service<
       const withSandbox = (agent: Agent) =>
         sandboxes.status(agent.id).pipe(Effect.map((sandbox) => withStatus(agent, sandbox)))
 
-      // A To-do that can't be read, or no longer exists, reaches the Agent as only its Mention's
-      // title.
       const delivered = Effect.fnUntraced(function* ({ message, images }: MessageInput) {
         const ids = mentionedToDoIds(message)
 

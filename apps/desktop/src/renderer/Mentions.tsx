@@ -6,6 +6,7 @@ import { ListTodo } from "lucide-react"
 import {
   Fragment,
   type KeyboardEvent,
+  type MouseEvent,
   type SyntheticEvent,
   useId,
   useLayoutEffect,
@@ -15,15 +16,14 @@ import {
 import { cn } from "cn"
 import { openToDosAtom } from "./toDoList"
 
-/** A message's text as the user reads it: each Mention shows as its To-do's title. */
 export const readableText = (message: string) => replaceMentions(message, ({ title }) => title)
 
 export function MessageText(props: { text: string }) {
   return mapMentions(props.text, {
-    text: (text, at) => <Fragment key={at}>{text}</Fragment>,
-    mention: ({ title }, at) => (
+    text: (text, key) => <Fragment key={key}>{text}</Fragment>,
+    mention: ({ title }, key) => (
       <span
-        key={at}
+        key={key}
         data-slot="mention"
         className="inline-flex items-baseline gap-1 rounded-sm bg-background/70 px-1 font-medium"
       >
@@ -38,8 +38,7 @@ const TRIGGER = /(?:^|\s)@([^\s@[\]()]*)$/
 
 const MAX_CHOICES = 6
 
-/** The caret, with the text it was measured in. */
-interface Selection {
+interface CaretInText {
   readonly text: string
   readonly caret: number
 }
@@ -52,28 +51,27 @@ interface Picking {
   readonly chosen: ToDo
 }
 
-/**
- * What the user is picking a Mention from, if anything: open To-dos whose titles hold what they
- * typed after an `@` that ends at the caret. Text the composer changed by itself, such as a
- * recalled message or another Agent's, has no caret yet, so nothing opens until the user moves it.
- */
+const throughTrigger = (message: string, start: number) => message.slice(0, start + 1)
+
 const picking = (
   message: string,
-  selection: Selection,
-  dismissed: string | null,
+  measured: CaretInText,
+  dismissedThroughTrigger: string | null,
   toDos: ReadonlyArray<ToDo>,
   highlighted: number,
 ): Picking | null => {
-  if (selection.text !== message) return null
+  const caretIsInMessage = measured.text === message
 
-  const { caret } = selection
+  if (!caretIsInMessage) return null
+
+  const { caret } = measured
   const typed = TRIGGER.exec(message.slice(0, caret))?.[1]
 
   if (typed === undefined) return null
 
   const start = caret - typed.length - 1
 
-  if (dismissed === message.slice(0, start + 1)) return null
+  if (dismissedThroughTrigger === throughTrigger(message, start)) return null
 
   const wanted = typed.toLowerCase()
 
@@ -87,8 +85,7 @@ const picking = (
   return chosen === undefined ? null : { start, caret, choices, active, chosen }
 }
 
-/** The message with the typed `@` replaced by the To-do's Mention, and the caret just after it. */
-const mention = (message: string, { start, caret }: Picking, toDo: ToDo) => {
+const insertMention = (message: string, { start, caret }: Picking, toDo: ToDo): CaretInText => {
   const after = message.slice(caret)
   const link = toDoMention(toDo)
   const spaced = /^\s/.test(after) ? link : `${link} `
@@ -96,17 +93,15 @@ const mention = (message: string, { start, caret }: Picking, toDo: ToDo) => {
   return { text: message.slice(0, start) + spaced + after, caret: start + link.length + 1 }
 }
 
-/** Lets the user mention an open To-do by typing `@` in the composer's textarea. */
 export function useMentionPicker(message: string, setMessage: (message: string) => void) {
   const ref = useRef<HTMLTextAreaElement>(null)
   const id = useId()
-  const [selection, setSelection] = useState<Selection>({ text: "", caret: 0 })
+  const [measured, setMeasured] = useState<CaretInText>({ text: "", caret: 0 })
   const [highlighted, setHighlighted] = useState(0)
-  // The text up to the `@` the user closed the choices on with Escape, so they stay closed for it.
-  const [dismissed, setDismissed] = useState<string | null>(null)
+  const [dismissedThroughTrigger, setDismissedThroughTrigger] = useState<string | null>(null)
   const nextCaret = useRef<number | null>(null)
   const openToDos = Option.getOrElse(AsyncResult.value(useAtomValue(openToDosAtom)), () => [])
-  const open = picking(message, selection, dismissed, openToDos, highlighted)
+  const open = picking(message, measured, dismissedThroughTrigger, openToDos, highlighted)
 
   useLayoutEffect(() => {
     if (nextCaret.current === null) return
@@ -115,7 +110,7 @@ export function useMentionPicker(message: string, setMessage: (message: string) 
   })
 
   const follow = ({ value, selectionEnd }: HTMLTextAreaElement) => {
-    setSelection((current) =>
+    setMeasured((current) =>
       current.text === value && current.caret === selectionEnd
         ? current
         : { text: value, caret: selectionEnd },
@@ -125,13 +120,12 @@ export function useMentionPicker(message: string, setMessage: (message: string) 
 
   const choose = (toDo: ToDo) => {
     if (open === null) return
-    const next = mention(message, open, toDo)
+    const next = insertMention(message, open, toDo)
     nextCaret.current = next.caret
-    setSelection(next)
+    setMeasured(next)
     setMessage(next.text)
   }
 
-  /** Takes the keys that move through and choose the open choices; answers whether it took one. */
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (open === null) return false
 
@@ -140,7 +134,7 @@ export function useMentionPicker(message: string, setMessage: (message: string) 
     if (event.key === "ArrowDown") setHighlighted((active + 1) % choices.length)
     else if (event.key === "ArrowUp") setHighlighted((active + choices.length - 1) % choices.length)
     else if (event.key === "Enter" || event.key === "Tab") choose(chosen)
-    else if (event.key === "Escape") setDismissed(message.slice(0, open.start + 1))
+    else if (event.key === "Escape") setDismissedThroughTrigger(throughTrigger(message, open.start))
     else return false
 
     event.preventDefault()
@@ -161,10 +155,12 @@ export function useMentionPicker(message: string, setMessage: (message: string) 
   }
 }
 
+const keepComposerFocus = (event: MouseEvent) => event.preventDefault()
+
 /**
- * The To-dos the user can mention, as the ARIA combobox pattern lists them: focus stays in the
- * composer, whose keys move through and choose these options, so they take no focus of their own
- * and a native select, which can't follow the caret, doesn't fit.
+ * WAI-ARIA APG combobox: focus stays in the composer textarea, which drives these options through
+ * `aria-activedescendant`, so they take no focus. A native `select` would take focus, and
+ * `datalist` can't attach to a textarea.
  */
 function MentionChoices(props: { id: string; open: Picking; onChoose: (toDo: ToDo) => void }) {
   return (
@@ -187,8 +183,7 @@ function MentionChoices(props: { id: string; open: Picking; onChoose: (toDo: ToD
             "flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-sm",
             index === props.open.active && "bg-accent text-accent-foreground",
           )}
-          // Keeps focus, and with it the caret, in the composer.
-          onMouseDown={(event) => event.preventDefault()}
+          onMouseDown={keepComposerFocus}
           onClick={() => props.onChoose(toDo)}
         >
           <ListTodo aria-hidden className="size-4 shrink-0 text-muted-foreground" />
