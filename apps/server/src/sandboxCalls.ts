@@ -86,8 +86,12 @@ export const removeSandbox = (provider: SandboxProvider, state: SandboxState, ac
     Effect.catchTag("SandboxGone", () => Effect.void),
   )
 
-export const extendSandbox = (provider: SandboxProvider, state: SandboxState) =>
-  callAbout(provider, "extend the Sandbox", () => provider.extend(state)).pipe(
+export const extendSandbox = (
+  provider: SandboxProvider,
+  extend: (state: SandboxState) => Promise<Date>,
+  state: SandboxState,
+) =>
+  callAbout(provider, "extend the Sandbox", () => extend(state)).pipe(
     Effect.flatMap((date) =>
       Effect.try({
         try: () => DateTime.fromDateUnsafe(date),

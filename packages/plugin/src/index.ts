@@ -23,8 +23,9 @@ export interface SandboxProvider {
    * Pushes the Sandbox's expiry as late as the platform allows, answering when it now expires.
    * Glass calls it while the Agent exists and Glass runs, again before each expiry it was given,
    * until the expiry stops moving. Throws `glass.sandboxGone()` once the Sandbox no longer exists.
+   * A provider whose Sandboxes don't expire leaves it out.
    */
-  readonly extend: (state: SandboxState) => Promise<Date>
+  readonly extend?: (state: SandboxState) => Promise<Date>
   /**
    * Deletes the Sandbox. Glass has asked its agent host to end first; one it couldn't reach may
    * still run. Throws `glass.sandboxGone()` if the Sandbox is already gone, which Glass takes as

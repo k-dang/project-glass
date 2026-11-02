@@ -392,7 +392,7 @@ export class Sandboxes extends Context.Service<
          * Extends the Sandbox now and again halfway to each expiry, until its provider can't move
          * the expiry any later.
          */
-        const extendAhead = (agentId: string) =>
+        const extendAhead = (agentId: string, extend: (state: SandboxState) => Promise<Date>) =>
           Effect.gen(function* () {
             let last = (yield* knownOf(agentId)).record?.expiresAt
 
@@ -401,7 +401,7 @@ export class Sandboxes extends Context.Service<
 
               if (record === null || isGone(reach)) return
 
-              const expiresAt = yield* extendSandbox(provider, record.state)
+              const expiresAt = yield* extendSandbox(provider, extend, record.state)
               const { record: current } = yield* knownOf(agentId)
 
               if (current !== null) yield* save(agentId, { ...current, expiresAt })
@@ -440,7 +440,10 @@ export class Sandboxes extends Context.Service<
 
             const link = linkOf(agentId)
 
-            yield* FiberMap.run(extenders, agentId, extendAhead(agentId), { onlyIfMissing: true })
+            if (provider.extend !== undefined)
+              yield* FiberMap.run(extenders, agentId, extendAhead(agentId, provider.extend), {
+                onlyIfMissing: true,
+              })
 
             return yield* reconnecting((resetMisses) =>
               Effect.gen(function* () {

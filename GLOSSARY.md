@@ -176,7 +176,8 @@ a worktree of its own.
 
 **Sandbox**:
 The remote machine a Sandbox provider creates for one Agent, kept until the user removes the Agent
-or it expires. While Glass runs, it extends the Sandbox ahead of expiry, up to the platform's cap.
+or it expires. While Glass runs, it extends a Sandbox that expires ahead of expiry, up to the
+platform's cap.
 _Avoid_: Box, computer, devbox, pod
 
 **Sandbox provider**:

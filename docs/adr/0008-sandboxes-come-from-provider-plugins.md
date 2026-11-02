@@ -32,7 +32,8 @@ needs, and the provider does everything specific to its platform.
   `glass.sandboxGone()` once the Sandbox no longer exists.
 - `extend(state)` pushes the Sandbox's expiry as late as the platform allows and answers when it
   now expires. Glass calls it once the Sandbox is up or Glass opens, then halfway to each expiry,
-  until the expiry stops moving: the platform's cap. It throws `glass.sandboxGone()` too.
+  until the expiry stops moving: the platform's cap. It throws `glass.sandboxGone()` too. It's
+  optional: a provider whose Sandboxes don't expire leaves it out, and Glass shows no expiry.
 - `remove(state)` deletes the Sandbox. Glass first asks the agent host to end, with its agent
   programs, so a provider needn't track the host's processes. If the host can't be reached,
   `remove` runs anyway.
