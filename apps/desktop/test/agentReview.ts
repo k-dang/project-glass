@@ -8,9 +8,11 @@ export const controls = (overrides: Partial<AgentReviewControls>): AgentReviewCo
   review: null,
   outdated: false,
   commandProblem: null,
+  followUpProblem: null,
   subscriptionProblem: null,
   reconnect: vi.fn<() => void>(),
   start: vi.fn<() => void>(),
+  followUp: vi.fn<(message: string) => void>(),
   cancel: vi.fn<() => void>(),
   ...overrides,
 })
@@ -20,4 +22,5 @@ export const reviewOf = (revision: Revision): AgentReview => ({
   writtenAt: DateTime.makeUnsafe(0),
   markdown:
     "**The greeting changes a letter callers match on.** One line changes.\n\n## Callers expect the old letter\n\n`main.ts` matches on `b`.",
+  followUps: [],
 })

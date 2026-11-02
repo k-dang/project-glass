@@ -2,7 +2,9 @@ import { RegistryProvider } from "@effect/atom-react"
 import {
   type AgentReviewState,
   type ChangedFile,
+  Draft,
   GitHubConnection,
+  LinePlace,
   type TourState,
 } from "@glass/contracts"
 import { act, cleanup, render, screen, within } from "@testing-library/react"
@@ -58,6 +60,14 @@ export const mountTourWorkspace = (
 
   const setViewed = vi.fn<Handlers["SetFileViewed"]>(() => Effect.void)
 
+  const followUp = vi.fn<Handlers["FollowUpAgentReview"]>(() => Effect.void)
+
+  const createDraft = vi.fn<Handlers["CreateDraft"]>(({ path, side, line, body }) =>
+    Effect.succeed(
+      new Draft({ id: `draft-${line}`, path, place: LinePlace.make({ side, line }), body }),
+    ),
+  )
+
   const backend = testLayer({
     GetConnection: () =>
       Effect.succeed(new GitHubConnection({ login: "kevin", tokenSource: "gh" })),
@@ -73,6 +83,8 @@ export const mountTourWorkspace = (
     WatchTour: () => SubscriptionRef.changes(state),
     WatchAgentReview: () =>
       Stream.make(options.agentReview ?? { review: null, job: { status: "idle" } }),
+    FollowUpAgentReview: followUp,
+    CreateDraft: createDraft,
   })
 
   window.history.replaceState(null, "", "#/reviews/octo-org/hello-world/42")
@@ -86,6 +98,8 @@ export const mountTourWorkspace = (
     write,
     cancel,
     setViewed,
+    followUp,
+    createDraft,
     startedAt,
     user: userEvent.setup({ pointerEventsCheck: PointerEventsCheckLevel.Never }),
     publish: (next: TourState) =>

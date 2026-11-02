@@ -1,7 +1,7 @@
 import { Schema } from "effect"
 import { Rpc, RpcGroup } from "effect/rpc"
 import { Activity, ActivityLogError, ActivityPage } from "./activity"
-import { AgentReviewFailure, AgentReviewState, ReviewPrompt } from "./agentReview"
+import { AgentReviewFailure, AgentReviewState, FollowUpMessage, ReviewPrompt } from "./agentReview"
 import { AskAnswer, AskFailure, AskPlace, AskQuestion } from "./ask"
 import {
   Agent,
@@ -88,6 +88,11 @@ export class GlassRpcs extends RpcGroup.make(
   /** Starting again cancels a running Agent review; the finished one replaces the last. */
   Rpc.make("StartAgentReview", {
     payload: { pullRequest: PullRequestRef, revision: Revision },
+    error: AgentReviewFailure,
+  }),
+  /** Answers a message about the Agent review on its own Revision; cancelling it cancels this. */
+  Rpc.make("FollowUpAgentReview", {
+    payload: { pullRequest: PullRequestRef, revision: Revision, message: FollowUpMessage },
     error: AgentReviewFailure,
   }),
   Rpc.make("CancelAgentReview", {

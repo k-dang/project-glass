@@ -238,6 +238,15 @@ export class DraftStore {
     this.#add({ key, path, place: LinePlace.make({ side, line }), body: "", saved: null })
   }
 
+  /** Adds a written Draft on a line and saves it, as writing one there and leaving it would. */
+  add(path: string, side: DiffSide, line: number, body: string) {
+    if (this.locked()) return
+
+    const key = `new-${++this.#lastKey}`
+    this.#add({ key, path, place: LinePlace.make({ side, line }), body, saved: null })
+    this.save(key)
+  }
+
   takeStarted(key: string) {
     if (this.#started !== key) return false
 

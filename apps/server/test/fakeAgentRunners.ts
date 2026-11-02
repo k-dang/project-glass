@@ -3,6 +3,7 @@ import { basename } from "node:path"
 import { AgentRunners } from "../src/agentRunners"
 import { AgentReviewAnswer } from "../src/agentReviewPrompt"
 import { AskAgentAnswer } from "../src/askPrompt"
+import { FollowUpAnswer } from "../src/followUpPrompt"
 import type { TourAnswer } from "../src/tourPrompt"
 import { RATE_LIMIT_TITLE } from "./demoPullRequests"
 import { demoTour } from "./demoTour"
@@ -12,12 +13,15 @@ const chapterSize = 2
 const material = Schema.fromJsonString(
   Schema.Struct({
     title: Schema.String,
-    files: Schema.Array(Schema.Struct({ path: Schema.String })),
+    files: Schema.Array(
+      Schema.Struct({ path: Schema.String, diff: Schema.optional(Schema.NullOr(Schema.String)) }),
+    ),
   }),
 )
 
+/** The PR material is the prompt's first JSON line; a follow-up's prompt carries more after it. */
 const decodeMaterial = (prompt: string) =>
-  Schema.decodeUnknownSync(material)(prompt.slice(prompt.indexOf("{")))
+  Schema.decodeUnknownSync(material)(prompt.slice(prompt.indexOf("{")).split("\n")[0])
 
 /** Pairs the files into Chapters, leaving the last for Everything else once there are three. */
 const syntheticTour = (prompt: string): TourAnswer => {
@@ -67,6 +71,32 @@ const syntheticReview = (prompt: string): AgentReviewAnswer => {
   }
 }
 
+/** Suggests one Draft on the first head line of the first diff, so accepting one can be tried. */
+const syntheticFollowUp = (prompt: string): FollowUpAnswer => {
+  const { files } = decodeMaterial(prompt)
+
+  const added = files.flatMap(({ path, diff }) => {
+    const start = /^@@ -\d+(?:,\d+)? \+(\d+)/.exec(diff ?? "")?.[1]
+
+    return start === undefined || start === "0" ? [] : [{ path, line: Number(start) }]
+  })[0]
+
+  return {
+    markdown: "A synthetic follow-up answer: no agent read this code.",
+    suggestedDrafts:
+      added === undefined
+        ? []
+        : [
+            {
+              path: added.path,
+              side: "new",
+              line: added.line,
+              body: `A synthetic comment on \`${basename(added.path)}\`, written without a model.`,
+            },
+          ],
+  }
+}
+
 export const fakeAgentRunners = Layer.succeed(
   AgentRunners,
   AgentRunners.of({
@@ -79,7 +109,9 @@ export const fakeAgentRunners = Layer.succeed(
               ? syntheticReview(task.prompt)
               : Object.is(task.answer, AskAgentAnswer)
                 ? { answer: "A synthetic answer: no agent read this code." }
-                : syntheticTour(task.prompt),
+                : Object.is(task.answer, FollowUpAnswer)
+                  ? syntheticFollowUp(task.prompt)
+                  : syntheticTour(task.prompt),
           ).pipe(Effect.orDie, Effect.delay("2 seconds")),
       }),
   }),

@@ -1,6 +1,7 @@
 import { assert, it } from "@effect/vitest"
 import {
   type AgentEngine,
+  AgentReviewFailure,
   type AgentReviewState,
   defaultReviewPrompt,
   PullRequestRef,
@@ -317,5 +318,118 @@ it.live("reviews on Claude Code with only its restricted read tools in the check
     const prompted = (yield* f.piCli.calls).find((call) => call.stage === "prompted")!
     assert.include(prompted.args.join(" "), "--restricted --tools Read,Grep,Glob")
     assert.include(prompted.files ?? [], "greet.ts")
+  }),
+)
+
+const followUpAnswer = {
+  markdown: "Yes: `greet.ts` line 2 drops the `!`.",
+  suggestedDrafts: [
+    { path: "greet.ts", side: "new", line: 2, body: "Could this keep the caller's `!`?" },
+    { path: "main.ts", side: "new", line: 1, body: "Unrelated aside." },
+  ],
+} as const
+
+const followedUp = (state: AgentReviewState) =>
+  state.job.status === "idle" && (state.review?.followUps.length ?? 0) > 0
+
+const answering = (f: Effect.Success<ReturnType<typeof fixture>>, output: string) =>
+  f.piCli.configure({ ready: true, output: piCliAnswer(output), modelsOutput: piCliModels })
+
+it.live(
+  "follows up on the Agent review, keeping Drafts on diff lines and the thread across restarts",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* fixture()
+      yield* f.start
+      const { review } = yield* f.state(reviewed)
+
+      yield* answering(f, JSON.stringify(followUpAnswer))
+      const message = "Draft a comment for the punctuation point."
+      yield* f.client.FollowUpAgentReview({ pullRequest: f.ref, revision: f.revision, message })
+      const done = yield* f.state(followedUp)
+
+      const prompted = (yield* f.piCli.calls).filter((call) => call.stage === "prompted").at(-1)!
+      assert.include(prompted.input, "+hello name")
+      assert.include(prompted.input, JSON.stringify(answer.markdown))
+      assert.include(prompted.input, message)
+
+      const [followUp] = done.review!.followUps
+      assert.strictEqual(followUp?.message, message)
+      assert.deepStrictEqual(followUp?.suggestedDrafts, [followUpAnswer.suggestedDrafts[0]])
+      assert.include(followUp?.answer, followUpAnswer.markdown)
+      assert.include(followUp?.answer, "`main.ts` line 1:\n\n> Unrelated aside.")
+      assert.strictEqual(done.review?.markdown, review?.markdown)
+
+      assert.deepStrictEqual(yield* f.restart, done)
+    }),
+)
+
+it.live("starts the thread over when the Agent review is written again", () =>
+  Effect.gen(function* () {
+    const f = yield* fixture()
+    yield* f.start
+    yield* f.state(reviewed)
+
+    yield* answering(f, JSON.stringify(followUpAnswer))
+    yield* f.client.FollowUpAgentReview({
+      pullRequest: f.ref,
+      revision: f.revision,
+      message: "Why?",
+    })
+    yield* f.state(followedUp)
+
+    yield* answering(f, JSON.stringify(answer))
+    yield* f.start
+
+    const rewritten = yield* f.state(
+      (state) => reviewed(state) && state.review?.followUps.length === 0,
+    )
+
+    assert.strictEqual(rewritten.review?.markdown, answer.markdown)
+    assert.deepStrictEqual((yield* f.restart).review?.followUps, [])
+  }),
+)
+
+it.live("refuses a follow-up on another Revision without running the agent", () =>
+  Effect.gen(function* () {
+    const f = yield* fixture()
+    yield* f.start
+    yield* f.state(reviewed)
+    const before = (yield* f.piCli.calls).length
+
+    const error = yield* f.client
+      .FollowUpAgentReview({
+        pullRequest: f.ref,
+        revision: new Revision({ base: f.revision.base, head: "h2" }),
+        message: "Why?",
+      })
+      .pipe(Effect.flip)
+
+    assert.instanceOf(error, AgentReviewFailure)
+    assert.strictEqual(error.reason, "stale-revision")
+    assert.strictEqual((yield* f.piCli.calls).length, before)
+  }),
+)
+
+it.live("keeps the message of a failed follow-up and leaves the thread as it was", () =>
+  Effect.gen(function* () {
+    const f = yield* fixture()
+    yield* f.start
+    const { review } = yield* f.state(reviewed)
+
+    yield* answering(f, "not JSON")
+    yield* f.client.FollowUpAgentReview({
+      pullRequest: f.ref,
+      revision: f.revision,
+      message: "Why?",
+    })
+
+    const { job, review: after } = yield* f.state(
+      (state) => state.job.status === "follow-up-failed",
+    )
+
+    assert.strictEqual(job.status === "follow-up-failed" && job.message, "Why?")
+    assert.strictEqual(job.status === "follow-up-failed" && job.reason.reason, "unusable-output")
+    assert.deepStrictEqual(after, review)
   }),
 )

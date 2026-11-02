@@ -97,6 +97,17 @@ one for each PR and leaves it outdated after new commits. Unlike a Review, it is
 and never suggests a Review decision.
 _Avoid_: AI review, code review, critique
 
+**Follow-up**:
+A message the user sends about an Agent review, read beside it, and the agent's answer, which may
+include Suggested drafts. An Agent review keeps its Follow-ups until it is written again, and takes
+new ones only while it is current.
+_Avoid_: Chat, conversation, thread, Turn (a Turn belongs to an Agent)
+
+**Suggested draft**:
+A comment for the PR's author that the agent proposes in a Follow-up, on a line of the diff. It
+becomes a Draft only when the user adds it, after any edits.
+_Avoid_: Proposed comment, AI comment
+
 **Review prompt**:
 The user's own description of how they review, set once in Settings and used by every Agent review
 inside Glass's fixed instructions. It starts as a default the user can restore.
