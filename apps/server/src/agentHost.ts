@@ -1,7 +1,6 @@
 import { NodeHttpServer, NodeRuntime, NodeServices } from "@effect/platform-node"
-import { Config, Context, Deferred, Effect, Layer, Option, Redacted, Schema } from "effect"
-import { HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from "effect/http"
-import { RpcSerialization, RpcServer } from "effect/rpc"
+import { Config, Context, Deferred, Effect, Layer, Option, Schema } from "effect"
+import { HttpServer } from "effect/http"
 import { closeSync, writeSync } from "node:fs"
 import { createServer } from "node:http"
 import { Changes } from "./agentHost/Changes"
@@ -9,35 +8,9 @@ import { HostAgents } from "./agentHost/HostAgents"
 import { Journal } from "./agentHost/Journal"
 import { claudeAdapter } from "./agentHost/claudeAdapter"
 import { piAdapter } from "./agentHost/piAdapter"
-import { AgentHostHandlers } from "./agentHost/handlers"
-import { RPC_PATH } from "@glass/contracts"
-import { isToken } from "./access"
+import { HostReady } from "./agentHost/protocol"
+import { hostServer } from "./agentHost/server"
 import { Git } from "./git"
-import {
-  AgentHostRpcs,
-  HEALTH_PATH,
-  HOST_TOKEN_HEADER,
-  HostReady,
-  SHUTDOWN_PATH,
-} from "./agentHost/protocol"
-
-const RequireToken = (token: Redacted.Redacted) =>
-  HttpRouter.middleware(
-    Effect.sync(() => {
-      const matches = isToken(token)
-
-      return (httpEffect) =>
-        Effect.gen(function* () {
-          const request = yield* HttpServerRequest.HttpServerRequest
-          const url = new URL(request.url, "http://127.0.0.1")
-
-          return url.pathname === HEALTH_PATH || matches(request.headers[HOST_TOKEN_HEADER])
-            ? yield* httpEffect
-            : HttpServerResponse.text("Unauthorized", { status: 401 })
-        })
-    }),
-    { global: true },
-  )
 
 const backendExited = Effect.callback<void>((resume) => {
   process.stdin.once("close", () => resume(Effect.void))
@@ -74,35 +47,17 @@ const main = Effect.gen(function* () {
   const shutDown = yield* Deferred.make<void>()
 
   const services = yield* Layer.build(
-    HttpRouter.serve(
-      Layer.mergeAll(
-        RpcServer.layerHttp({ group: AgentHostRpcs, path: RPC_PATH, protocol: "websocket" }),
-        HttpRouter.add("GET", HEALTH_PATH, HttpServerResponse.text("ok")),
-        HttpRouter.add(
-          "POST",
-          SHUTDOWN_PATH,
-          Deferred.succeed(shutDown, undefined).pipe(
-            // This request is still open when the server starts closing, so Node won't close its
-            // connection as idle.
-            Effect.as(HttpServerResponse.empty({ headers: { connection: "close" } })),
-          ),
-        ),
-        RequireToken(token),
-      ),
-      { disableLogger: true, disableListenLog: true },
-    ).pipe(
+    hostServer({ token, shutDown }).pipe(
       Layer.provideMerge(
         NodeHttpServer.layer(createServer, {
           port: Option.getOrElse(port, () => 0),
           host: address,
         }),
       ),
-      Layer.provide(AgentHostHandlers),
       Layer.provide(HostAgents.make(adapters)),
       Layer.provide(Journal.layer),
       Layer.provide(Changes.layer),
       Layer.provide(Git.layer),
-      Layer.provide(RpcSerialization.layerJson),
     ),
   )
 

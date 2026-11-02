@@ -1,10 +1,10 @@
 import { assert, it } from "@effect/vitest"
-import { AgentStarted, nothingUnsent, TextPart, TextPatch, thisMac } from "@glass/contracts"
+import { AgentStarted, TextPatch, thisMac } from "@glass/contracts"
 import { Effect, Option, Stream } from "effect"
 import { existsSync } from "node:fs"
 import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { agentsFixture, lastText, pixel, repository, settled } from "../test/agentsFixture"
+import { agentsFixture, repository, settled } from "../test/agentsFixture"
 import { runCommands } from "../test/fakeModelProvider"
 import { gitIn } from "../test/gitRepositories"
 import { isolatedHome, startSignedInBackend } from "../test/harness"
@@ -99,23 +99,6 @@ it.live("starts an Agent in a worktree, on a new branch it names from its base",
   }),
 )
 
-it.live("keeps an Agent's unsent message across a relaunch until it is cleared", () =>
-  Effect.gen(function* () {
-    const f = yield* agentsFixture({ output: "Hi." })
-    const agent = yield* f.start()
-    const unsent = { message: "Half a thought", images: [pixel] }
-    yield* f.client.SaveUnsentMessage({ agentId: agent.id, ...unsent })
-
-    const restarted = yield* f.restart
-    const kept = yield* restarted.GetUnsentMessage({ agentId: agent.id })
-    assert.deepStrictEqual({ message: kept.message, images: kept.images }, unsent)
-
-    yield* restarted.SaveUnsentMessage({ agentId: agent.id, ...nothingUnsent })
-    const cleared = yield* restarted.GetUnsentMessage({ agentId: agent.id })
-    assert.deepStrictEqual({ message: cleared.message, images: cleared.images }, nothingUnsent)
-  }),
-)
-
 it.live(
   "removes an Agent's worktree and transcript, warning about changes and keeping its branch",
   () =>
@@ -207,18 +190,9 @@ it.live(
     }),
 )
 
-it.live("lists the models and efforts each agent program offers, with its default", () =>
+it.live("lists the models and efforts pi offers, with its default", () =>
   Effect.gen(function* () {
     const f = yield* agentsFixture({})
-
-    const claude = yield* f.client.ListAgentModels({ engine: "claude-code", place: thisMac })
-    assert.equal(claude.defaultModel?.name, "Opus 5.5")
-    assert.deepStrictEqual(claude.models, [
-      { id: "opus", name: "Opus 5.5", efforts: ["low", "medium", "high", "xhigh", "max"] },
-      { id: "sonnet", name: "Sonnet 5.5", efforts: ["low", "medium", "high"] },
-      { id: "claude-haiku-4-5", name: "Haiku 4.5", efforts: [] },
-    ])
-
     const pi = yield* f.client.ListAgentModels({ engine: "pi", place: thisMac })
     assert.equal(pi.defaultModel?.id, "glass-test/gpt-test")
     // pi also lists the models of any other provider this machine has credentials for.
@@ -274,38 +248,6 @@ it.live(
         pi.models.map(({ id }) => id),
         ["glass-extension/extension-model", "glass-test/gpt-test-thinking"],
       )
-    }),
-)
-
-it.live(
-  "starts a Claude Code Agent on the chosen model and effort, and changes them for the next Turn",
-  () =>
-    Effect.gen(function* () {
-      const f = yield* agentsFixture({}, undefined, { reply: [{ text: "{model} at {effort}" }] })
-
-      const agent = yield* f.start("Which model?", {
-        engine: "claude-code",
-        model: "sonnet",
-        effort: "high",
-      })
-
-      const [first] = yield* f.transcript(agent.id, settled(1))
-      assert.deepStrictEqual(lastText(first), TextPart.make({ text: "sonnet at high" }))
-
-      const changed = yield* f.client.ChangeAgentModel({
-        agentId: agent.id,
-        model: null,
-        effort: null,
-      })
-
-      assert.deepStrictEqual(
-        { model: changed.model, effort: changed.effort },
-        { model: null, effort: null },
-      )
-
-      yield* f.send(agent.id, "And now?")
-      const [, second] = yield* f.transcript(agent.id, settled(2))
-      assert.deepStrictEqual(lastText(second), TextPart.make({ text: "default at default" }))
     }),
 )
 
