@@ -6,7 +6,7 @@ import { SandboxGone } from "./sandboxFailures"
 
 const minutes = (millis: number) => millis / 60_000
 
-it.effect("tries a lost Sandbox ever less often, and gives up after an hour", () =>
+it.effect("tries a lost Sandbox ever less often, and gives up after 15 minutes", () =>
   Effect.gen(function* () {
     const tries: Array<number> = []
     let lost = 0
@@ -22,7 +22,7 @@ it.effect("tries a lost Sandbox ever less often, and gives up after an hour", ()
         }),
     ).pipe(Effect.forkChild)
 
-    yield* TestClock.adjust("2 hours")
+    yield* TestClock.adjust("1 hour")
 
     assert.isTrue(Exit.isFailure(yield* Fiber.await(running)))
     assert.equal(lost, 1)
@@ -33,8 +33,8 @@ it.effect("tries a lost Sandbox ever less often, and gives up after an hour", ()
 
     const lostAt = tries[3]!
     const lastTry = tries.at(-1)!
-    assert.isAtLeast(minutes(lastTry - lostAt), 60)
-    assert.isBelow(minutes(lastTry - lostAt), 65)
+    assert.isAtLeast(minutes(lastTry - lostAt), 15)
+    assert.isBelow(minutes(lastTry - lostAt), 20)
   }),
 )
 

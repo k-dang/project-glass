@@ -9,7 +9,7 @@ const FIRST_LOST_RETRY_SPACING = Duration.seconds(5)
 
 const MAX_LOST_RETRY_SPACING = Duration.minutes(5)
 
-const GIVE_UP_AFTER = Duration.hours(1)
+const GIVE_UP_AFTER = Duration.minutes(15)
 
 export const reconnecting = <E, R>(
   session: (connected: Effect.Effect<void>) => Effect.Effect<void, E, R>,

@@ -51,7 +51,7 @@ A Sandbox outlives Glass. Its Turns keep running while Glass is closed, so at la
 interrupts only local Turns and reconnects to each Sandbox's host, asking for the journal after the
 last entry it saved; that position is saved with the transcript, so a relaunch neither misses nor
 repeats an event. A Sandbox Glass can't reach is marked unreachable and its running Turn cut off.
-Glass tries again ever less often, at most five minutes apart, and gives up after an hour, and stops
+Glass tries again ever less often, at most five minutes apart, and gives up after 15 minutes, and stops
 extending it, so no provider call repeats without end; sending the Agent a message, its Try again, or a
 relaunch starts over. Once the host answers, the ending it reports replaces the cut-off one.
 
