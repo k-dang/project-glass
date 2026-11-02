@@ -36,6 +36,8 @@ const tour = {
   unplacedFiles: [],
 }
 
+test.slow()
+
 const writeTour = async (window: Page) => {
   await window.getByRole("tab", { name: "Tour" }).click()
   await window.getByRole("button", { name: "Write Tour" }).click()

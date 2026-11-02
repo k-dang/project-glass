@@ -1,0 +1,24 @@
+{
+  "scenario": "pi-unlisted-model",
+  "program": "1.4.0",
+  "models": {
+    "claude-code": "haiku",
+    "pi": {
+      "provider": "radius",
+      "modelId": "glass-no-such-model"
+    }
+  },
+  "outcome": {
+    "failure": "not-ready"
+  },
+  "spawns": [
+    {
+      "args": ["--offline", "--list-models", "glass-no-such-model"],
+      "cwd": "<workdir>",
+      "stdin": "",
+      "stdout": "No models matching \"glass-no-such-model\"\n",
+      "stderr": "",
+      "exitCode": 0
+    }
+  ]
+}

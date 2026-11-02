@@ -16,20 +16,17 @@ import {
 import { Effect, Option, Predicate, Stream } from "effect"
 import { existsSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
-import { vi } from "vite-plus/test"
-import { agentsFixture, claudeCode, lastText, repository, settled } from "../test/agentsFixture"
+import { agentsFixture, lastText, repository, settled } from "../test/agentsFixture"
 import { eventually } from "../test/eventually"
 import { gitIn } from "../test/gitRepositories"
 import { AgentHostRpcs, HOST_TOKEN_HEADER } from "./agentHost/protocol"
 import { connectRpcClient } from "./rpcSocket"
 
-vi.stubEnv("PI_OFFLINE", "1")
-
 it.live(
   "starts an Agent in a Sandbox, showing each step of making it until the first message runs there",
   () =>
     Effect.gen(function* () {
-      const f = yield* agentsFixture({ output: "Hello from the Sandbox" })
+      const f = yield* agentsFixture
 
       assert.deepStrictEqual(yield* f.client.ListSandboxProviders(), [
         new SandboxProviderInfo({
@@ -64,7 +61,7 @@ it.live(
       )
 
       assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
-      assert.deepStrictEqual(lastText(turn), TextPart.make({ text: "Hello from the Sandbox" }))
+      assert.deepStrictEqual(lastText(turn), TextPart.make({ text: "Reply to: Say hello" }))
       assert.deepStrictEqual(
         statuses.filter((status) => status !== null),
         ["Creating the Sandbox", "Cloning the repository", "Starting the agent"],
@@ -78,7 +75,7 @@ it.live(
 
 it.live("starts a Sandbox Agent only with an Agent program its provider runs", () =>
   Effect.gen(function* () {
-    const f = yield* agentsFixture({ output: "Hello" })
+    const f = yield* agentsFixture
     f.sandboxes.configure({ engines: ["pi"] })
     const relaunched = yield* f.restart
 
@@ -116,24 +113,19 @@ it.live("starts a Sandbox Agent only with an Agent program its provider runs", (
 
 it.live("Steers and stops an Agent's Turns in its Sandbox, and shows its changes there", () =>
   Effect.gen(function* () {
-    const f = yield* agentsFixture({ output: "Done.", hang: true })
-    const agent = yield* f.startSandbox("Start")
-    yield* f.model.received(1)
-
+    const f = yield* agentsFixture
+    const agent = yield* f.startSandbox("hold:start")
+    yield* f.transcript(agent.id, holding)
     yield* f.steer(agent.id, "Change course")
-    yield* f.model.release({
-      output: ({ messages }) =>
-        JSON.stringify(messages).includes("Change course") ? "Changed." : "Started.",
-    })
-
+    yield* f.release("start")
     const [steered] = yield* f.transcript(agent.id, settled(1))
     assert.deepStrictEqual(
       steered?.parts.map((part) => (Predicate.isTagged(part, "Text") ? part.text : part._tag)),
-      ["Started.", "Steer", "Changed."],
+      ["Holding.", "Steer", "Reply to: Change course", "Reply to: hold:start"],
     )
 
-    yield* f.model.configure({ hang: true })
-    yield* f.send(agent.id, "Keep going")
+    yield* f.send(agent.id, "hold:never")
+    yield* f.transcript(agent.id, (turns) => holding(turns.slice(1)))
     yield* f.client.StopTurn({ agentId: agent.id })
 
     const [, stopped] = yield* f.transcript(agent.id, settled(2))
@@ -151,7 +143,7 @@ it.live("Steers and stops an Agent's Turns in its Sandbox, and shows its changes
 
 it.live("warns before removing a Sandbox Agent with uncommitted work in its Sandbox", () =>
   Effect.gen(function* () {
-    const f = yield* agentsFixture({ output: "Done." })
+    const f = yield* agentsFixture
     const agent = yield* f.startSandbox()
     yield* f.transcript(agent.id, settled(1))
 
@@ -168,6 +160,11 @@ it.live("warns before removing a Sandbox Agent with uncommitted work in its Sand
   }),
 )
 
+const holding = (turns: ReadonlyArray<Turn>) =>
+  turns.some(({ parts }) =>
+    parts.some((part) => Predicate.isTagged(part, "Text") && part.text === "Holding."),
+  )
+
 const failedReason = (turn: Turn | undefined) => {
   const ending = turn?.ended?.ending
 
@@ -176,7 +173,7 @@ const failedReason = (turn: Turn | undefined) => {
 
 it.live("deletes a Sandbox that fails part-way, failing the first message safely", () =>
   Effect.gen(function* () {
-    const f = yield* agentsFixture({ output: "Hello" })
+    const f = yield* agentsFixture
     f.sandboxes.configure({ failAt: "Cloning the repository" })
     const agent = yield* f.startSandbox()
 
@@ -191,7 +188,7 @@ it.live("deletes a Sandbox that fails part-way, failing the first message safely
 
 it.live("fails with the login a Sandbox needs and the command that fixes it", () =>
   Effect.gen(function* () {
-    const f = yield* agentsFixture({ output: "Hello" })
+    const f = yield* agentsFixture
     f.sandboxes.configure({ missingLogin: { login: "fake-cloud", fix: "fake-cloud login" } })
     const agent = yield* f.startSandbox()
 
@@ -205,7 +202,7 @@ it.live("fails with the login a Sandbox needs and the command that fixes it", ()
 
 it.live("keeps an Agent whose Sandbox can't be deleted yet, saying which login that needs", () =>
   Effect.gen(function* () {
-    const f = yield* agentsFixture({ output: "Hello" })
+    const f = yield* agentsFixture
     const agent = yield* f.startSandbox()
     yield* f.transcript(agent.id, settled(1))
 
@@ -230,7 +227,7 @@ it.live("keeps an Agent whose Sandbox can't be deleted yet, saying which login t
 
 it.live("ends a Sandbox's agent host before deleting the Sandbox", () =>
   Effect.gen(function* () {
-    const f = yield* agentsFixture({ output: "Hello" })
+    const f = yield* agentsFixture
     const agent = yield* f.startSandbox()
     yield* f.transcript(agent.id, settled(1))
     const host = f.sandboxes.hostPid(agent.id)
@@ -246,7 +243,7 @@ it.live(
   "refuses a Sandbox when there's no room, and makes one when the message is sent again",
   () =>
     Effect.gen(function* () {
-      const f = yield* agentsFixture({ output: "Hello" })
+      const f = yield* agentsFixture
       f.sandboxes.configure({ noCapacity: "Fake Sandboxes are full." })
       const agent = yield* f.startSandbox()
 
@@ -263,7 +260,7 @@ it.live(
 
 it.live("deletes a Sandbox still being made when its Agent is removed", () =>
   Effect.gen(function* () {
-    const f = yield* agentsFixture({ output: "Hello" })
+    const f = yield* agentsFixture
     f.sandboxes.configure({ holdAt: "Cloning the repository" })
     const agent = yield* f.startSandbox()
 
@@ -277,7 +274,7 @@ it.live("deletes a Sandbox still being made when its Agent is removed", () =>
 
 it.live("deletes a Sandbox still being made when Glass quits, and makes a new one after", () =>
   Effect.gen(function* () {
-    const f = yield* agentsFixture({ output: "Hello" })
+    const f = yield* agentsFixture
     f.sandboxes.configure({ holdAt: "Cloning the repository" })
     const agent = yield* f.startSandbox()
 
@@ -298,14 +295,11 @@ it.live(
   "connects to a Sandbox's host again after a dropped connection, catching up on what it missed",
   () =>
     Effect.gen(function* () {
-      const f = yield* agentsFixture({})
-      yield* f.claude.hold
-      const agent = yield* f.startSandbox("Start", claudeCode)
-      yield* f.claude.received(1)
-
-      f.sandboxes.dropConnections(agent.id)
-      yield* f.claude.release
-
+      const f = yield* agentsFixture
+      const agent = yield* f.startSandbox("hold:start")
+      yield* f.transcript(agent.id, holding)
+      yield* Effect.promise(() => f.sandboxes.dropConnections(agent.id))
+      yield* f.release("start")
       const { port, token } = f.sandboxes.host(agent.id)
 
       const witness = yield* connectRpcClient(AgentHostRpcs, `ws://127.0.0.1:${port}${RPC_PATH}`, {
@@ -323,24 +317,23 @@ it.live(
 
       const [turn] = yield* f.transcript(agent.id, settled(1))
       assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
-      assert.deepStrictEqual(lastText(turn), TextPart.make({ text: "Fake reply to: Start" }))
+      assert.deepStrictEqual(lastText(turn), TextPart.make({ text: "Reply to: hold:start" }))
     }),
 )
 
 it.live("cuts off only the running Turn of an Agent whose Sandbox host is lost", () =>
   Effect.gen(function* () {
-    const f = yield* agentsFixture({ output: "Done.", hang: true })
-    const local = yield* f.start("Locally")
-    const sandboxed = yield* f.startSandbox("In the Sandbox")
-    yield* f.model.received(2)
-
+    const f = yield* agentsFixture
+    const local = yield* f.start("hold:local")
+    const sandboxed = yield* f.startSandbox("hold:sandboxed")
+    yield* f.transcript(local.id, holding)
+    yield* f.transcript(sandboxed.id, holding)
     process.kill(f.sandboxes.hostPid(sandboxed.id), "SIGKILL")
 
     const [lost] = yield* f.transcript(sandboxed.id, settled(1))
     assert.deepStrictEqual(lost?.ended?.ending, TurnCutOff.make({}))
 
-    yield* f.model.release({ output: "Done." })
-
+    yield* f.release("local")
     const [kept] = yield* f.transcript(local.id, settled(1))
     assert.deepStrictEqual(kept?.ended?.ending, TurnDone.make({}))
   }),

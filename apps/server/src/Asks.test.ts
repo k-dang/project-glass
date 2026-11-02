@@ -1,31 +1,22 @@
 import { assert, it } from "@effect/vitest"
-import { type AgentEngine, type AskPlace, PullRequestRef, Revision } from "@glass/contracts"
+import { type AskPlace, PullRequestRef, Revision } from "@glass/contracts"
 import { Effect, Fiber, Scope } from "effect"
 import { TestClock } from "effect/testing"
 import { existsSync } from "node:fs"
 import { eventually } from "../test/eventually"
-import { fakeAgent } from "../test/fakeAgent"
-import { type FakeAgentSettings, piCliAnswer, piCliModels } from "../test/fakeAgentFiles"
 import { startFakeGitHub } from "../test/fakeGitHub"
 import { VIEWER } from "../test/fakePullRequest"
 import { isolatedHome, startBackend } from "../test/harness"
-
-const answered = (answer: string) => piCliAnswer(JSON.stringify({ answer }))
+import { type ScriptedSettings, scriptedAgentRunners } from "../test/scriptedAgentRunners"
 
 const deadline = 60_000
 
 const fixture = Effect.fnUntraced(function* (
-  settings: Partial<FakeAgentSettings> = {},
-  timeout = deadline,
-  engine: AgentEngine = "pi",
+  settings: ScriptedSettings = {
+    reply: { answer: { answer: "`main.ts` calls `greet` without a name.\n" } },
+  },
 ) {
-  const piCli = yield* fakeAgent({
-    ready: true,
-    output: answered("`main.ts` calls `greet` without a name.\n"),
-    modelsOutput: piCliModels,
-    ...settings,
-  })
-
+  const runners = yield* scriptedAgentRunners(settings)
   const github = yield* startFakeGitHub({ git: true })
   const home = yield* isolatedHome
 
@@ -53,18 +44,11 @@ const fixture = Effect.fnUntraced(function* (
       GH_TOKEN: VIEWER.token,
       GLASS_GITHUB_API_URL: github.url,
       GLASS_GIT_REMOTE: github.gitUrl,
-      GLASS_PI_COMMAND: piCli.command,
-      GLASS_CLAUDE_COMMAND: piCli.command,
-      GLASS_ASK_TIMEOUT_MS: String(timeout),
+      GLASS_ASK_TIMEOUT_MS: String(deadline),
     },
     home,
+    runners.layer,
   ).pipe(Effect.provideService(Scope.Scope, scope))
-
-  const engineSettings = yield* client.GetEngineSettings({ feature: "agentReviews" })
-  yield* client.SetEngineSettings({
-    feature: "agentReviews",
-    engineSettings: { ...engineSettings, engine },
-  })
 
   const ref = new PullRequestRef({ owner: pr.owner, repo: pr.repo, number: pr.number })
   const revision = new Revision({ base: pr.base.sha, head: pr.head.sha })
@@ -72,7 +56,7 @@ const fixture = Effect.fnUntraced(function* (
   const ask = (place: AskPlace, question = "Who calls this?") =>
     client.Ask({ pullRequest: ref, revision, place, question })
 
-  return { piCli, client, ask }
+  return { runners, ask }
 })
 
 const helloName: AskPlace = { path: "greet.ts", side: "new", line: 2 }
@@ -84,19 +68,15 @@ it.live("answers from a read-only checkout, starting from the asked line", () =>
     const result = yield* f.ask(helloName)
 
     assert.strictEqual(result.answer, "`main.ts` calls `greet` without a name.")
-    assert.deepStrictEqual(result.runner, {
-      engine: "pi",
-      model: "anthropic/claude-sonnet-5-5",
-    })
+    assert.deepStrictEqual(result.runner, { engine: "pi", model: "anthropic/claude-sonnet-5-5" })
 
-    const prompted = (yield* f.piCli.calls).find((call) => call.stage === "prompted")!
-    assert.deepStrictEqual(prompted.files, ["greet.ts", "main.ts"])
-    assert.include(prompted.args.join(" "), "--tools read,grep,find,ls")
-    assert.include(prompted.input, "Use the person's name.")
-    assert.include(prompted.input, "+hello name")
-    assert.include(prompted.input, '"text":"hello name"')
-    assert.include(prompted.input, "Who calls this?")
-    assert.isFalse(existsSync(prompted.cwd))
+    const [run] = f.runners.runs
+    assert.deepStrictEqual(run?.files, ["greet.ts", "main.ts"])
+    assert.include(run?.task.prompt, "Use the person's name.")
+    assert.include(run?.task.prompt, "+hello name")
+    assert.include(run?.task.prompt, '"text":"hello name"')
+    assert.include(run?.task.prompt, "Who calls this?")
+    assert.isFalse(existsSync(run!.directory!))
   }),
 )
 
@@ -106,8 +86,7 @@ it.live("asks about a removed line on the base side", () =>
 
     yield* f.ask({ path: "greet.ts", side: "old", line: 1 }, "Why did this go?")
 
-    const prompted = (yield* f.piCli.calls).find((call) => call.stage === "prompted")!
-    assert.include(prompted.input, '"side":"base","number":1,"text":"hello"')
+    assert.include(f.runners.runs[0]?.task.prompt, '"side":"base","number":1,"text":"hello"')
   }),
 )
 
@@ -118,13 +97,13 @@ it.live("refuses a line outside the diff without starting the agent", () =>
     const failure = yield* f.ask({ path: "main.ts", side: "new", line: 1 }).pipe(Effect.flip)
 
     assert.strictEqual(failure.reason, "stale-revision")
-    assert.isFalse((yield* f.piCli.calls).some((call) => call.stage === "generate"))
+    assert.isEmpty(f.runners.runs)
   }),
 )
 
 it.live("fails as unusable when the agent returns a blank answer", () =>
   Effect.gen(function* () {
-    const f = yield* fixture({ output: answered(" \n") })
+    const f = yield* fixture({ reply: { answer: { answer: " \n" } } })
 
     const failure = yield* f.ask(helloName).pipe(Effect.flip)
 
@@ -134,10 +113,10 @@ it.live("fails as unusable when the agent returns a blank answer", () =>
 
 it.effect("fails as timed out when the agent passes its limit", () =>
   Effect.gen(function* () {
-    const f = yield* fixture({ hangAt: "generate" })
+    const f = yield* fixture({ reply: "hold" })
 
     const asking = yield* Effect.forkChild(f.ask(helloName).pipe(Effect.flip))
-    yield* f.piCli.untilCalls("generate")
+    yield* f.runners.ran(1)
     yield* TestClock.adjust(deadline)
     const failure = yield* Fiber.join(asking)
 
@@ -147,20 +126,16 @@ it.effect("fails as timed out when the agent passes its limit", () =>
 
 it.live("interrupting a question stops the agent and removes its checkout", () =>
   Effect.gen(function* () {
-    const f = yield* fixture({ hangAt: "generate" })
+    const f = yield* fixture({ reply: "hold" })
 
     const asking = yield* Effect.forkChild(f.ask(helloName))
-    yield* f.piCli.untilCalls("generate")
-    const hung = (yield* f.piCli.calls).find((call) => call.stage === "generate")!
-    assert.isTrue(existsSync(hung.cwd))
+    yield* f.runners.ran(1)
+    const checkout = f.runners.runs[0]!.directory!
+    assert.isTrue(existsSync(checkout))
 
     yield* Fiber.interrupt(asking)
 
-    yield* eventually(
-      Effect.sync(() => {
-        assert.throws(() => process.kill(hung.pid, 0))
-        assert.isFalse(existsSync(hung.cwd))
-      }),
-    )
+    yield* f.runners.interrupted(1)
+    yield* eventually(Effect.sync(() => assert.isFalse(existsSync(checkout))))
   }),
 )

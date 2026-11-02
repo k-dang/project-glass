@@ -20,4 +20,5 @@ The repo uses Effect 4, whose APIs differ from the Effect 3 most examples show (
 
 - Wait on events, never on time: no elapsed-time assertions, no sleeps to order work, and product deadlines in success-path tests set far above the test timeout.
 - Backend tests use `it.live`, except deadline tests: those use `it.effect`, wait until the work is stuck, then `TestClock.adjust` past the deadline. The server runs in the test process, so its deadlines follow the `TestClock`; timers in child processes stay real.
+- Tests replay recordings of the real Agent programs (`apps/server/test/recordings/`, ADR 0007), so a change to what Glass sends Claude Code or pi fails until it is recorded again: run the adapter tests with `GLASS_RECORD_SESSIONS=1`, and the runners with `pnpm --filter @glass/server exec jiti test/recordRunnerReplays.ts`.
 - Wait with `eventually` from each app's `test/eventually.ts`, not `vi.waitFor` (its default gives up after 1s) or `Effect.repeat` on a `Schedule` (it stalls under the `TestClock`). It waits up to 25s, inside each package's 30s `testTimeout`; don't add shorter `Effect.timeout` guards inside tests.

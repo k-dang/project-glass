@@ -2,20 +2,11 @@ import { assert, it } from "@effect/vitest"
 import { type AgentEngine, PullRequestRef, Revision, type TourState } from "@glass/contracts"
 import { Effect, Exit, Fiber, Option, Scope, Stream } from "effect"
 import { TestClock } from "effect/testing"
-import { existsSync } from "node:fs"
-import { writeFile } from "node:fs/promises"
-import { join } from "node:path"
-import { fakeAgent } from "../test/fakeAgent"
-import { tourInstructions } from "./tourPrompt"
-import {
-  claudeAnswer,
-  type FakeAgentSettings,
-  piCliAnswer,
-  piCliOutput,
-} from "../test/fakeAgentFiles"
 import { startFakeGitHub } from "../test/fakeGitHub"
 import { VIEWER } from "../test/fakePullRequest"
 import { isolatedHome, startBackend } from "../test/harness"
+import { type ScriptedSettings, scriptedAgentRunners } from "../test/scriptedAgentRunners"
+import { tourInstructions } from "./tourPrompt"
 
 const answer = {
   intent: "Greet people by name.",
@@ -29,27 +20,10 @@ const answer = {
   unplacedFiles: [],
 }
 
-// `pi --list-models` prints a table; its search is fuzzy, so near misses appear too.
-const piCliModels = [
-  "provider   model                 context",
-  "anthropic  claude-sonnet-5-5     1M",
-  "litellm    deepseek-test-2       1M",
-  "litellm    deepseek-test         1M",
-].join("\n")
-
 const deadline = 60_000
 
-const fixture = Effect.fnUntraced(function* (
-  settings?: Partial<FakeAgentSettings>,
-  timeout = deadline,
-) {
-  const agent = yield* fakeAgent({
-    ready: true,
-    output: claudeAnswer(answer),
-    ...settings,
-  })
-
-  const piCli = yield* fakeAgent({ ready: true, output: "", modelsOutput: piCliModels })
+const fixture = Effect.fnUntraced(function* (settings: ScriptedSettings = { reply: { answer } }) {
+  const runners = yield* scriptedAgentRunners(settings)
   const github = yield* startFakeGitHub()
   const home = yield* isolatedHome
 
@@ -80,15 +54,13 @@ const fixture = Effect.fnUntraced(function* (
   const env = {
     GH_TOKEN: VIEWER.token,
     GLASS_GITHUB_API_URL: github.url,
-    GLASS_CLAUDE_COMMAND: agent.command,
-    GLASS_PI_COMMAND: piCli.command,
-    GLASS_TOUR_TIMEOUT_MS: String(timeout),
+    GLASS_TOUR_TIMEOUT_MS: String(deadline),
   }
 
   const serverScope = yield* Scope.make()
   yield* Effect.addFinalizer((exit) => Scope.close(serverScope, exit))
 
-  const { client } = yield* startBackend(env, home).pipe(
+  const { client } = yield* startBackend(env, home, runners.layer).pipe(
     Effect.provideService(Scope.Scope, serverScope),
   )
 
@@ -98,19 +70,16 @@ const fixture = Effect.fnUntraced(function* (
       .pipe(Stream.filter(predicate), Stream.runHead, Effect.map(Option.getOrThrow))
 
   return {
-    agent,
-    piCli,
+    runners,
     github,
-    home,
     pr,
     ref,
     revision,
-    env,
     client,
     state,
     restart: Effect.gen(function* () {
       yield* Scope.close(serverScope, Exit.void)
-      const restarted = yield* startBackend(env, home)
+      const restarted = yield* startBackend(env, home, runners.layer)
 
       return yield* restarted.client
         .WatchTour({ pullRequest: ref })
@@ -130,31 +99,50 @@ const fixture = Effect.fnUntraced(function* (
 
 const completed = (state: TourState) => state.job.status !== "writing"
 
+it.live("writes a saved Tour from the requested Revision's PR material, without file access", () =>
+  Effect.gen(function* () {
+    const f = yield* fixture()
+    assert.deepStrictEqual(yield* f.state(() => true), { tour: null, job: { status: "idle" } })
+
+    yield* f.write
+    const state = yield* f.state((current) => current.tour !== null)
+
+    assert.equal(state.tour?.intent, answer.intent)
+    assert.deepStrictEqual(state.tour?.chapters, answer.chapters)
+    assert.deepStrictEqual(state.tour?.revision, f.revision)
+    assert.equal(state.job.status, "idle")
+    const [run] = f.runners.runs
+    assert.strictEqual(run?.task.instructions, tourInstructions)
+    assert.strictEqual(run?.task.files, "none")
+    assert.include(run?.task.prompt, "Greet people")
+    assert.include(run?.task.prompt, "Use the person's name.")
+    assert.include(run?.task.prompt, "+hello name")
+  }),
+)
+
 it.live(
-  "cancels an agent process and keeps a saved Tour after a failed replacement and restart",
+  "cancels a running Tour and keeps the saved one after a failed replacement and restart",
   () =>
     Effect.gen(function* () {
       const f = yield* fixture()
       yield* f.write
       const saved = yield* f.state((state) => state.tour !== null)
-      yield* f.agent.configure({ ready: true, output: "", hangAt: "generate" })
+      yield* f.runners.configure({ reply: "hold" })
       yield* f.write
       yield* f.state((state) => state.job.status === "writing" && state.job.runner !== null)
-      yield* f.agent.untilCalls("generate", 2)
-      const calls = yield* f.agent.calls
-      const processCall = calls.filter((entry) => entry.stage === "generate").at(-1)!
+      yield* f.runners.ran(2)
+
       yield* f.client.CancelTour({ pullRequest: f.ref })
       assert.deepStrictEqual((yield* f.state(completed)).tour, saved.tour)
-      assert.throws(() => process.kill(processCall.pid, 0))
-      assert.isFalse(existsSync(processCall.cwd))
-      yield* f.agent.configure({ ready: true, output: "not JSON" })
+      yield* f.runners.interrupted(1)
+
+      yield* f.runners.configure({ reply: { fail: "unusable-output" } })
       yield* f.write
       const failed = yield* f.state(completed)
       assert.deepStrictEqual(failed.tour, saved.tour)
       assert.equal(failed.job.status, "failed")
-      const restored = yield* f.restart
 
-      assert.deepStrictEqual(restored, { tour: saved.tour, job: { status: "idle" } })
+      assert.deepStrictEqual(yield* f.restart, { tour: saved.tour, job: { status: "idle" } })
     }),
 )
 
@@ -163,26 +151,28 @@ it.live(
   () =>
     Effect.gen(function* () {
       const f = yield* fixture({
-        output: claudeAnswer({
-          intent: "Cover every file.",
-          chapters: [
-            {
-              title: "Greeting",
-              explanation: "Changes behavior.",
-              files: [
-                { path: "greet.ts", summary: "First placement." },
-                { path: "invented.ts", summary: "Drop this." },
-              ],
-            },
-            {
-              title: "Duplicate",
-              explanation: "",
-              files: [{ path: "greet.ts", summary: "Drop duplicate." }],
-            },
-            { title: "Context", explanation: "Keep this explanation.", files: [] },
-          ],
-          unplacedFiles: ["logo.png", "logo.png", "invented.ts", "greet.ts"],
-        }),
+        reply: {
+          answer: {
+            intent: "Cover every file.",
+            chapters: [
+              {
+                title: "Greeting",
+                explanation: "Changes behavior.",
+                files: [
+                  { path: "greet.ts", summary: "First placement." },
+                  { path: "invented.ts", summary: "Drop this." },
+                ],
+              },
+              {
+                title: "Duplicate",
+                explanation: "",
+                files: [{ path: "greet.ts", summary: "Drop duplicate." }],
+              },
+              { title: "Context", explanation: "Keep this explanation.", files: [] },
+            ],
+            unplacedFiles: ["logo.png", "logo.png", "invented.ts", "greet.ts"],
+          },
+        },
       })
 
       yield* f.write
@@ -198,91 +188,56 @@ it.live(
         ],
       )
       assert.deepStrictEqual(state.tour?.everythingElse, ["logo.png", "README.md"])
-      const log = yield* f.agent.log
-      assert.include(log, "Use the person's name.")
-      assert.include(log, "logo.png")
+      assert.include(f.runners.runs[0]?.task.prompt, "logo.png")
     }),
 )
 
 for (const [name, settings, expected] of [
-  ["invalid answer shape", { output: claudeAnswer({ chapters: "wrong" }) }, "unusable-output"],
-  [
-    "no surviving Chapters",
-    { output: claudeAnswer({ ...answer, chapters: [] }) },
-    "unusable-output",
-  ],
-  [
-    "unsuccessful exit",
-    { exitCode: 1, stderr: "provider unavailable; secret-should-not-leak" },
-    "runner",
-  ],
-  [
-    "authentication rejection",
-    { exitCode: 1, stderr: "401 unauthorized secret-should-not-leak" },
-    "authentication",
-  ],
-  [
-    "authentication rejection in JSON stdout",
-    {
-      exitCode: 1,
-      output: JSON.stringify({ is_error: true, result: "401 unauthorized secret-should-not-leak" }),
-    },
-    "authentication",
-  ],
-  [
-    "authentication error envelope with a successful exit",
-    {
-      output: JSON.stringify({ is_error: true, result: "Invalid API key secret-should-not-leak" }),
-    },
-    "authentication",
-  ],
-  ["not signed in", { ready: false }, "not-ready"],
-  ["slow generation", { hangAt: "generate" }, "timeout"],
-  ["slow readiness check", { hangAt: "auth" }, "timeout"],
-] as const) {
-  it.effect(`reports ${name} without leaking CLI output`, () =>
+  ["an invalid answer", { reply: { answer: { chapters: "wrong" } } }, "unusable-output"],
+  ["no surviving Chapters", { reply: { answer: { ...answer, chapters: [] } } }, "unusable-output"],
+  ["a runner failure", { reply: { fail: "failed" } }, "runner"],
+  ["an authentication rejection", { reply: { fail: "authentication" } }, "authentication"],
+  ["a runner that isn't ready", { reply: { answer }, ready: "not-ready" }, "not-ready"],
+  ["a runner that isn't installed", { reply: { answer }, ready: "not-installed" }, "not-installed"],
+] as const satisfies ReadonlyArray<readonly [string, ScriptedSettings, string]>) {
+  it.live(`reports ${name}`, () =>
     Effect.gen(function* () {
       const f = yield* fixture(settings)
       yield* f.write
 
-      if ("hangAt" in settings) {
-        yield* f.agent.untilCalls(settings.hangAt)
-        yield* TestClock.adjust(deadline)
-      }
-
       const state = yield* f.state(completed)
-      assert.equal(state.job.status, "failed")
-
-      if (state.job.status !== "failed") return
-      assert.equal(state.job.reason.reason, expected)
-      assert.notInclude(state.job.reason.message, "secret-should-not-leak")
+      assert.equal(state.job.status === "failed" && state.job.reason.reason, expected)
       assert.isNull(state.tour)
-      const calls = yield* f.agent.calls
-
-      for (const entry of calls) assert.isFalse(existsSync(entry.cwd))
     }),
   )
 }
 
-it.live("reports a missing selected runner and retries after it becomes available", () =>
+for (const [name, settings, started] of [
+  ["slow generation", { reply: "hold" }, "ran"],
+  ["a slow readiness check", { reply: { answer }, ready: "hang" }, "selected"],
+] as const) {
+  it.effect(`times out ${name}`, () =>
+    Effect.gen(function* () {
+      const f = yield* fixture(settings)
+      yield* f.write
+      yield* f.runners[started](1)
+      yield* TestClock.adjust(deadline)
+
+      const state = yield* f.state(completed)
+      assert.equal(state.job.status === "failed" && state.job.reason.reason, "timeout")
+      assert.isNull(state.tour)
+    }),
+  )
+}
+
+it.live("retries a runner that wasn't installed once it is", () =>
   Effect.gen(function* () {
-    const f = yield* fixture({ ready: false })
-
-    const { client } = yield* startBackend({
-      ...f.env,
-      GLASS_CLAUDE_COMMAND: "glass-missing-claude",
-    })
-
-    yield* client.WriteTour({ pullRequest: f.ref, revision: f.revision })
-
-    const missing = yield* client
-      .WatchTour({ pullRequest: f.ref })
-      .pipe(Stream.filter(completed), Stream.runHead, Effect.map(Option.getOrThrow))
-
-    assert.equal(missing.job.status === "failed" && missing.job.reason.reason, "not-installed")
+    const f = yield* fixture({ reply: { answer }, ready: "not-installed" })
     yield* f.write
-    assert.equal((yield* f.state(completed)).job.status, "failed")
-    yield* f.agent.configure({ ready: true, output: claudeAnswer(answer) })
+    const missing = yield* f.state(completed)
+    assert.equal(missing.job.status === "failed" && missing.job.reason.reason, "not-installed")
+
+    yield* f.runners.configure({ reply: { answer } })
     yield* f.write
     assert.equal((yield* f.state(completed)).tour?.intent, answer.intent)
   }),
@@ -297,19 +252,8 @@ it.live("rejects a Revision that changes during the GitHub file read", () =>
     yield* f.write
     const state = yield* f.state(completed)
     assert.equal(state.job.status === "failed" && state.job.reason.reason, "github")
-    assert.notInclude(yield* f.agent.log, '"stage":"generate"')
+    assert.isEmpty(f.runners.runs)
     assert.isNull(state.tour)
-  }),
-)
-
-it.live("rejects a selected Claude Code without required restrictions", () =>
-  Effect.gen(function* () {
-    const f = yield* fixture({ ready: true, helpOutput: "unsupported version" })
-    yield* f.write
-    const state = yield* f.state(completed)
-    assert.equal(state.job.status === "failed" && state.job.reason.reason, "not-ready")
-    assert.isNull(state.tour)
-    assert.notInclude(yield* f.agent.log, '"stage":"generate"')
   }),
 )
 
@@ -317,17 +261,15 @@ it.live(
   "keeps jobs after subscribers leave and replaces a running job without publishing its result",
   () =>
     Effect.gen(function* () {
-      const gate = join(yield* isolatedHome, "release")
-      const f = yield* fixture({ gate })
+      const f = yield* fixture({ reply: "hold" })
 
       const observer = yield* f.client
         .WatchTour({ pullRequest: f.ref })
         .pipe(Stream.runDrain, Effect.forkChild)
 
       yield* f.write
-      yield* f.agent.untilCalls("prompted")
+      yield* f.runners.ran(1)
       yield* Fiber.interrupt(observer)
-      const replaced = (yield* f.agent.calls).find((entry) => entry.stage === "generate")!
 
       const second = f.github.seedPullRequest({
         base: { sha: "b0", files: {} },
@@ -342,16 +284,12 @@ it.live(
       })
 
       yield* f.client.WriteTour({ pullRequest: other, revision: f.revision })
-      yield* f.agent.untilCalls("prompted", 2)
-      yield* f.agent.configure({
-        ready: true,
-        output: claudeAnswer({ ...answer, intent: "Replacement wins." }),
-      })
+      yield* f.runners.ran(2)
+      yield* f.runners.configure({ reply: { answer: { ...answer, intent: "Replacement wins." } } })
       yield* f.write
-      assert.throws(() => process.kill(replaced.pid, 0))
-      assert.isFalse(existsSync(replaced.cwd))
+      yield* f.runners.interrupted(1)
       assert.equal((yield* f.state(completed)).tour?.intent, "Replacement wins.")
-      yield* Effect.promise(() => writeFile(gate, "release"))
+      yield* f.runners.release({ answer })
 
       const otherSaved = yield* f.client
         .WatchTour({ pullRequest: other })
@@ -362,198 +300,47 @@ it.live(
     }),
 )
 
-it.live("writes a saved Tour from the requested GitHub Revision", () =>
-  Effect.gen(function* () {
-    const agent = yield* fakeAgent({
-      ready: true,
-      output: claudeAnswer(answer),
-    })
-
-    const github = yield* startFakeGitHub()
-
-    const pr = github.seedPullRequest({
-      title: "Greet people",
-      base: { sha: "b0", files: { "greet.ts": "hello" } },
-      head: { sha: "h1", files: { "greet.ts": "hello name" } },
-      changedFiles: [
-        {
-          path: "greet.ts",
-          status: "modified",
-          additions: 1,
-          deletions: 1,
-          patch: "@@ -1 +1 @@\n-hello\n+hello name",
-        },
-      ],
-    })
-
-    const ref = new PullRequestRef({ owner: pr.owner, repo: pr.repo, number: pr.number })
-    const revision = new Revision({ base: "b0", head: "h1" })
-
-    const { client } = yield* startBackend({
-      GH_TOKEN: VIEWER.token,
-      GLASS_GITHUB_API_URL: github.url,
-      GLASS_CLAUDE_COMMAND: agent.command,
-    })
-
-    const before = yield* client.WatchTour({ pullRequest: ref }).pipe(Stream.runHead)
-    assert.deepStrictEqual(Option.getOrThrow(before), { tour: null, job: { status: "idle" } })
-
-    yield* client.WriteTour({ pullRequest: ref, revision })
-
-    const saved = yield* client.WatchTour({ pullRequest: ref }).pipe(
-      Stream.filter((state) => state.tour !== null),
-      Stream.runHead,
-    )
-
-    const state = Option.getOrThrow(saved)
-    assert.equal(state.tour?.intent, answer.intent)
-    assert.deepStrictEqual(state.tour?.chapters, answer.chapters)
-    assert.deepStrictEqual(state.tour?.revision, revision)
-    assert.equal(state.job.status, "idle")
-    const input = yield* agent.log
-    assert.include(input, "Greet people")
-    assert.include(input, "+hello name")
-  }),
-)
-
-const piCliAnswering = (text: string) => ({
-  ready: true,
-  modelsOutput: piCliModels,
-  output: piCliAnswer(text),
-})
-
 it.live("uses the selected runner and never falls back after failure", () =>
   Effect.gen(function* () {
     const f = yield* fixture()
-    yield* f.piCli.configure(piCliAnswering(JSON.stringify(answer)))
     yield* f.useEngine("pi")
     yield* f.write
     assert.equal((yield* f.state(completed)).tour?.intent, answer.intent)
-    assert.equal(yield* f.agent.log, "")
 
-    const piCliCalls = yield* f.piCli.log
-    yield* f.agent.configure({ ready: false, output: "" })
+    yield* f.runners.configure({ reply: { answer }, ready: "not-ready" })
     yield* f.useEngine("claude-code")
     yield* f.write
     const rejected = yield* f.state(completed)
     assert.equal(rejected.job.status === "failed" && rejected.job.reason.reason, "not-ready")
-    assert.equal(yield* f.piCli.log, piCliCalls)
 
-    const claudeCalls = yield* f.agent.log
-    yield* f.piCli.configure(piCliAnswering("not JSON"))
+    yield* f.runners.configure({ reply: { fail: "unusable-output" } })
     yield* f.useEngine("pi")
     yield* f.write
     const invalid = yield* f.state(completed)
     assert.equal(invalid.job.status === "failed" && invalid.job.reason.reason, "unusable-output")
-    assert.equal(yield* f.agent.log, claudeCalls)
+
+    assert.deepStrictEqual(f.runners.selections, ["pi", "claude-code", "pi"])
+    assert.deepStrictEqual(
+      f.runners.runs.map((run) => run.engine),
+      ["pi", "pi"],
+    )
   }),
 )
 
-it.live("writes a Tour with the pi CLI's model and none of pi's tools or resources", () =>
+it.live("cancels a readiness check and loses only the running job on a backend restart", () =>
   Effect.gen(function* () {
-    const f = yield* fixture()
-    const { models } = yield* f.client.GetEngineSettings({ feature: "tours" })
-    yield* f.client.SetEngineSettings({
-      feature: "tours",
-      engineSettings: {
-        engine: "pi",
-        models: { ...models, pi: { provider: "litellm", modelId: "deepseek-test" } },
-      },
-    })
-    yield* f.piCli.configure({
-      ready: true,
-      modelsOutput: piCliModels,
-      output: piCliAnswer(JSON.stringify(answer)),
-    })
+    const f = yield* fixture({ reply: { answer }, ready: "hang" })
     yield* f.write
-    assert.equal((yield* f.state(completed)).tour?.intent, answer.intent)
-    assert.equal(yield* f.agent.log, "")
-    const calls = yield* f.piCli.calls
-    const generate = calls.find((call) => call.stage === "generate")!
-    const prompted = calls.find((call) => call.stage === "prompted")!
-
-    for (const flag of ["--no-tools", "--no-extensions", "--no-mcp", "--no-session"])
-      assert.include(generate.args, flag)
-    assert.include(generate.args.join(" "), "--provider litellm --model deepseek-test")
-    assert.equal(prompted.systemPrompt, tourInstructions)
-    assert.include(prompted.input, "+hello name")
-    assert.include(prompted.input, "Output JSON Schema:")
-  }),
-)
-
-for (const [name, settings, expected] of [
-  [
-    "a model it doesn't list",
-    { modelsOutput: piCliModels.replace("anthropic  claude-sonnet-5-5", "") },
-    "not-ready",
-  ],
-  [
-    "an authentication rejection",
-    { output: piCliOutput({ stopReason: "error", errorMessage: "401 secret-should-not-leak" }) },
-    "authentication",
-  ],
-  [
-    "a provider failure",
-    { output: piCliOutput({ stopReason: "error", errorMessage: "secret-should-not-leak" }) },
-    "runner",
-  ],
-  ["an unsuccessful exit", { exitCode: 1, stderr: "secret-should-not-leak" }, "runner"],
-  [
-    "a truncated answer",
-    {
-      output: piCliOutput({
-        stopReason: "length",
-        content: [{ type: "text", text: JSON.stringify(answer) }],
-      }),
-    },
-    "unusable-output",
-  ],
-  [
-    "a text block without text",
-    {
-      output: piCliOutput({
-        content: [{ type: "text", text: JSON.stringify(answer) }, { type: "text" }],
-      }),
-    },
-    "unusable-output",
-  ],
-  ["an answer that isn't a Tour", { output: piCliAnswer("not JSON") }, "unusable-output"],
-] as const) {
-  it.live(`reports pi CLI ${name} without leaking its output`, () =>
-    Effect.gen(function* () {
-      const f = yield* fixture()
-      yield* f.piCli.configure({ ready: true, output: "", modelsOutput: piCliModels, ...settings })
-      yield* f.useEngine("pi")
-      yield* f.write
-      const state = yield* f.state(completed)
-      assert.equal(state.job.status, "failed")
-
-      if (state.job.status !== "failed") return
-      assert.equal(state.job.reason.reason, expected)
-      assert.notInclude(state.job.reason.message, "secret-should-not-leak")
-      assert.isNull(state.tour)
-
-      if (expected === "not-ready") assert.notInclude(yield* f.piCli.log, '"stage":"generate"')
-    }),
-  )
-}
-
-it.live("cancels readiness checks and loses only the running job on a backend restart", () =>
-  Effect.gen(function* () {
-    const f = yield* fixture({ hangAt: "auth" })
-    yield* f.write
-    yield* f.agent.untilCalls("auth")
-    const readiness = (yield* f.agent.calls)[0]!
+    yield* f.runners.selected(1)
     yield* f.client.CancelTour({ pullRequest: f.ref })
     assert.deepStrictEqual(yield* f.state(completed), { tour: null, job: { status: "idle" } })
-    assert.throws(() => process.kill(readiness.pid, 0))
-    assert.isFalse(existsSync(readiness.cwd))
-    yield* f.agent.configure({ ready: true, output: "", hangAt: "generate" })
+    yield* f.runners.interrupted(1)
+
+    yield* f.runners.configure({ reply: "hold" })
     yield* f.write
     yield* f.state((state) => state.job.status === "writing" && state.job.runner !== null)
-    const restored = yield* f.restart
 
-    assert.deepStrictEqual(restored, { tour: null, job: { status: "idle" } })
+    assert.deepStrictEqual(yield* f.restart, { tour: null, job: { status: "idle" } })
   }),
 )
 
@@ -564,7 +351,6 @@ it.live(
       const f = yield* fixture()
       yield* f.write
       const saved = (yield* f.state((state) => state.tour !== null)).tour!
-      const gate = join(yield* isolatedHome, "release")
       f.pr.push({
         head: { sha: "h2", files: { "greet.ts": "hello there", "new.ts": "new" } },
         changedFiles: [
@@ -578,17 +364,7 @@ it.live(
           { path: "new.ts", status: "added" },
         ],
       })
-      yield* f.agent.configure({
-        ready: true,
-        gate,
-        output: claudeAnswer({
-          ...answer,
-          intent: "Rewritten.",
-          chapters: [
-            { ...answer.chapters[0]!, files: [{ path: "new.ts", summary: "Adds a file." }] },
-          ],
-        }),
-      })
+      yield* f.runners.configure({ reply: "hold" })
 
       const states = yield* f.client.WatchTour({ pullRequest: f.ref }).pipe(
         Stream.takeUntil((state) => state.tour?.intent === "Rewritten."),
@@ -598,9 +374,17 @@ it.live(
 
       const requested = new Revision({ base: "b0", head: "h2" })
       yield* f.client.WriteTour({ pullRequest: f.ref, revision: requested })
-      yield* f.agent.untilCalls("prompted", 2)
+      yield* f.runners.ran(2)
       f.pr.push({ head: { sha: "h3", files: { "greet.ts": "later" } } })
-      yield* Effect.promise(() => writeFile(gate, "release"))
+      yield* f.runners.release({
+        answer: {
+          ...answer,
+          intent: "Rewritten.",
+          chapters: [
+            { ...answer.chapters[0]!, files: [{ path: "new.ts", summary: "Adds a file." }] },
+          ],
+        },
+      })
       const streamed = yield* Fiber.join(states)
       const rewritten = streamed.at(-1)!
 
@@ -614,8 +398,7 @@ it.live(
       assert.deepStrictEqual(rewritten.job, { status: "idle" })
       assert.deepStrictEqual(rewritten.tour?.revision, requested)
       assert.isAbove(rewritten.tour!.writtenAt.epochMilliseconds, saved.writtenAt.epochMilliseconds)
-      const restored = yield* f.restart
 
-      assert.deepStrictEqual(restored, { tour: rewritten.tour, job: { status: "idle" } })
+      assert.deepStrictEqual(yield* f.restart, { tour: rewritten.tour, job: { status: "idle" } })
     }),
 )

@@ -39,6 +39,12 @@ export default defineConfig({
       outDir: "dist-fake",
     },
     agentHost("dist-fake"),
+    {
+      ...node,
+      entry: { scriptedAgentHost: "test/scriptedAgentHost.ts" },
+      outDir: "dist-test",
+      outputOptions: { codeSplitting: false },
+    },
   ],
   test: {
     include: ["src/**/*.test.ts", "test/**/*.test.ts"],

@@ -1,6 +1,7 @@
 import { Config, Context, Effect, Layer, type Redacted, Schema } from "effect"
 import { homedir } from "node:os"
 import { join } from "node:path"
+import { bundledEntry } from "./processes"
 
 export class ServerConfig extends Context.Service<
   ServerConfig,
@@ -11,6 +12,7 @@ export class ServerConfig extends Context.Service<
     readonly githubApiUrl: string
     readonly claudeCommand: string
     readonly piCommand: string
+    readonly agentHostBundle: string
     readonly tourTimeoutMs: number
     readonly agentReviewTimeoutMs: number
     readonly askTimeoutMs: number
@@ -65,6 +67,10 @@ export class ServerConfig extends Context.Service<
 
       const home = yield* Config.String("GLASS_HOME").pipe(Config.withDefault(""))
 
+      const agentHostBundle = yield* Config.String("GLASS_AGENT_HOST_BUNDLE").pipe(
+        Config.withDefault(bundledEntry("agentHost", import.meta.url)),
+      )
+
       return ServerConfig.of({
         port,
         token,
@@ -77,6 +83,7 @@ export class ServerConfig extends Context.Service<
         githubApiUrl,
         claudeCommand,
         piCommand,
+        agentHostBundle,
         tourTimeoutMs,
         agentReviewTimeoutMs,
         askTimeoutMs,

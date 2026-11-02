@@ -1,0 +1,2428 @@
+{
+  "scenario": "claude-long-reply",
+  "processes": [
+    {
+      "args": [
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--input-format",
+        "stream-json",
+        "--permission-prompt-tool=stdio",
+        "--allow-dangerously-skip-permissions",
+        "--include-partial-messages",
+        "--session-id=6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
+      ],
+      "frames": [
+        {
+          "out": {
+            "request_id": "67fbux3y8jh",
+            "type": "control_request",
+            "request": {
+              "subtype": "initialize"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "control_response",
+            "response": {
+              "subtype": "success",
+              "request_id": "67fbux3y8jh",
+              "response": {
+                "commands": [
+                  {
+                    "name": "deep-research",
+                    "description": "Deep research harness — fan-out web searches, fetch sources, adversarially verify claims, synthesize a cited report. (dynamic workflow)",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "dataviz",
+                    "description": "Use this skill whenever you are about to create ANY chart, graph, plot, dashboard, or data visualization, in ANY output medium — an HTML or React artifact, inline SVG, plotting code in any library (matplotlib, plotly, d3, Recharts, …), an image/PNG you will render and upload, or a chart shared into Slack. Read it BEFORE writing the first line of chart code, choosing chart colors, building a stat tile / meter / KPI row, or laying out a dashboard. When the destination is a first-party document connector (host-designated, never self-described) that renders live charts, hand it the rows (inline, or as an uploaded data file the chart cites) rather than a rendered PNG/SVG — a picture of a chart loses hover, data inspection and per-value comments. Produces visualizations that read as one system — elegant, accessible, consistent in light and dark — using a brand-neutral placeholder palette you swap for your own. Teaches a design-system-agnostic method: a form heuristic, a color formula with a runnable validator, mark specs, and interaction rules. A validated default palette is documented in `references/palette.md` — swap that file's values for your brand's. Triggers on: \"chart\", \"graph\", \"plot\", \"data viz\", \"visualization\", \"dashboard\", \"analytics\", \"visualize data\", \"categorical colors\", \"sequential / diverging palette\", \"stat tile\", \"sparkline\", \"heatmap\", \"legend\", \"axis\", \"tooltip\", \"chart colors\", \"color by series\".",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "update-config",
+                    "description": "Use this skill to configure the Claude Code harness via settings.json. Automated behaviors (\"from now on when X\", \"each time X\", \"whenever X\", \"before/after X\") require hooks configured in settings.json - the harness executes these, not Claude, so memory/preferences cannot fulfill them. Also use for: permissions (\"allow X\", \"add permission\", \"move permission to\"), env vars (\"set X=Y\"), hook troubleshooting, or any changes to settings.json/settings.local.json files. Examples: \"allow npm commands\", \"add bq permission to global settings\", \"move permission to user settings\", \"set DEBUG=true\", \"when claude stops show X\". For simple settings like theme/model, suggest the /config command.",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "verify",
+                    "description": "Verify that a code change actually does what it's supposed to by exercising it end-to-end and observing behavior — drive the affected flow, not just tests or typecheck. Run before committing nontrivial changes; bootstraps this repo's project verify skill if none exists yet. Don't invoke it on a diff that only touches tests, docs, or other code with no runtime surface to drive (a change to product source always has one) — there's nothing to observe.",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "debug",
+                    "description": "Enable debug logging for this session and help diagnose issues",
+                    "argumentHint": "[issue description]",
+                    "builtin": true
+                  },
+                  {
+                    "name": "code-review",
+                    "description": "Review the current diff, or a PR number/branch/path target, for correctness bugs (plus reuse/simplification/efficiency cleanups where the model's review recipe covers them) at the given effort level (low|medium|high|xhigh|max: from few high-confidence findings up to many, some of them uncertain); with no level given, it reuses the level you typed last. Pass --comment to post findings as inline PR comments, or --fix to apply the findings to the working tree after the review. Pass --max-findings <n> to report up to n findings, or --max-findings all for every finding. The choice stays until you pass --max-findings default.",
+                    "argumentHint": "[low|medium|high|xhigh|max] [--fix] [--comment] [<pr#>|<branch>|<path>] [--max-findings <n>|all]",
+                    "aliases": ["review"],
+                    "builtin": true
+                  },
+                  {
+                    "name": "simplify",
+                    "description": "Review the changed code for reuse, simplification, efficiency, and altitude cleanups, then apply the fixes. Quality only — it does not hunt for bugs; use /code-review for that.",
+                    "argumentHint": "[<target>]",
+                    "builtin": true
+                  },
+                  {
+                    "name": "batch",
+                    "description": "Research and plan a large-scale change, then execute it in parallel across 5–30 isolated worktree agents that each open a PR.",
+                    "argumentHint": "<instruction>",
+                    "builtin": true
+                  },
+                  {
+                    "name": "fewer-permission-prompts",
+                    "description": "Scan your transcripts for common read-only Bash and MCP tool calls, then add a prioritized allowlist to project .claude/settings.json to reduce permission prompts.",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "doctor",
+                    "description": "Health-check the user's Claude Code setup and fix issues: diagnose installation health — what the `claude doctor` terminal diagnostics cover — from local data (duplicate or leftover installs, PATH, unparseable settings files, broken or colliding agent definitions, skills whose frontmatter fails to parse); find unused skills, MCP servers, and plugins versus their context cost and disable dead weight; deduplicate local CLAUDE.md files against checked-in ones; trim checked-in CLAUDE.md files by cutting content a session could derive from the codebase (directory layouts, tech-stack lists, architecture overviews) while keeping gotchas, rationale, and non-standard conventions; migrate always-loaded CLAUDE.md guidance into lazy skills and nested CLAUDE.md files; flag slow hooks and context-heavy extensions; check the installed version is current; make auto mode the default permission mode; and pre-approve frequently denied read-only commands. Use when the user asks for a doctor run, checkup, audit, tune-up, or cleanup of their Claude Code setup or configuration.",
+                    "argumentHint": "[prompt-audit [<path>]]",
+                    "aliases": ["checkup"],
+                    "builtin": true
+                  },
+                  {
+                    "name": "loop",
+                    "description": "Run a prompt or slash command on a recurring interval (e.g. /loop 5m /foo). Omit the interval to let the model self-pace.",
+                    "argumentHint": "[interval] [prompt]",
+                    "aliases": ["proactive"],
+                    "builtin": true
+                  },
+                  {
+                    "name": "claude-api",
+                    "description": "Reference for the Claude API / Anthropic SDK — model ids, pricing, params, streaming, tool use, MCP, agents, caching, token counting, model migration.\nTRIGGER — read BEFORE opening the target file; don't skip because it \"looks like a one-liner\" — whenever: the prompt names Claude/Anthropic in any form (Claude, Anthropic, Fable, Opus, Sonnet, Haiku, `anthropic`, `@anthropic-ai`, `claude-*`, `us.anthropic.*`, `[1m]`); the user asks about an LLM (pricing/model choice/limits/caching) — never answer from memory; OR the task is LLM-shaped with provider unstated (agent/MCP/tool-definition/multi-agent/RAG/LLM-judge/computer-use; generate/summarize/extract/classify/rewrite/converse over NL; debugging refusals/cutoffs/streaming/tool-calls/tokens).\nSKIP only when another provider is being worked on (overrides all triggers): OpenAI/GPT/Gemini/Llama/Mistral/Cohere/Ollama named in the query; OR `grep -rE 'openai|langchain_openai|google.generativeai|genai|mistralai|cohere|ollama'` over the project hits (run this grep FIRST if no provider named — don't Read the file).",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "workflow-authoring",
+                    "description": "Reference for writing a Workflow tool script (script API and gotchas, resume, quality patterns, worked examples). Load before authoring a script for a workflow the user already opted into; it does not itself authorize running one.",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "run",
+                    "description": "Launch and drive this project's app to see a change working. Use when asked to run, start, or screenshot the app, or to confirm a change works in the real app (not just tests). First looks for a project skill that already covers launching the app; otherwise falls back to built-in patterns per project type (CLI, server, TUI, Electron, browser-driven, library).",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "run-skill-generator",
+                    "description": "Author or improve the run-<unit> skill - a per-project skill that tells agents how to build, launch, and drive this project's app. Use when the user asks to set up the project, get it running, write run instructions, or verify build/run steps work from a clean environment.",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "plugin-authoring",
+                    "description": "Make a mod: a change to Claude's own interface or behaviour, such as a panel or pane that stays beside the chat and updates, a band, status line, toast, slash command, or hook on tool calls. Use to make, change or debug a mod or its hooks module.",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "agents",
+                    "description": "(removed) Ask Claude to create/manage subagents, or edit .claude/agents/",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "auto-mode-setup",
+                    "description": "Teach auto mode about your environment, plus optional rule tweaks",
+                    "argumentHint": "[--request-id <uuid>] (--wizard posture=… scope=… depth=… --propose | --expect-sha256 <64-hex> --apply-file <path>)",
+                    "builtin": true
+                  },
+                  {
+                    "name": "autocompact",
+                    "description": "Configure the auto-compact window size",
+                    "argumentHint": "[auto|<tokens>]",
+                    "builtin": true
+                  },
+                  {
+                    "name": "clear",
+                    "description": "Start a new session with empty context; previous session stays on disk (resumable with /resume)",
+                    "argumentHint": "[name]",
+                    "aliases": ["reset", "new"],
+                    "builtin": true
+                  },
+                  {
+                    "name": "color",
+                    "description": "Set the prompt bar color for this session",
+                    "argumentHint": "[red|blue|green|yellow|purple|orange|pink|cyan|default]",
+                    "builtin": true
+                  },
+                  {
+                    "name": "compact",
+                    "description": "Free up context by summarizing the conversation so far",
+                    "argumentHint": "<optional custom summarization instructions>",
+                    "builtin": true
+                  },
+                  {
+                    "name": "config",
+                    "description": "Set a setting by key",
+                    "argumentHint": "key=value",
+                    "aliases": ["settings"],
+                    "builtin": true
+                  },
+                  {
+                    "name": "output-style",
+                    "description": "List output styles or switch to one",
+                    "argumentHint": "[style]",
+                    "builtin": true
+                  },
+                  {
+                    "name": "context",
+                    "description": "Show current context usage",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "effort",
+                    "description": "Set effort level for model usage",
+                    "argumentHint": "<low|medium|high|xhigh|max|auto|ultracode [on|off]>",
+                    "builtin": true
+                  },
+                  {
+                    "name": "fast",
+                    "description": "Toggle fast mode (Opus 5.5)",
+                    "argumentHint": "[on|off]",
+                    "builtin": true
+                  },
+                  {
+                    "name": "focus",
+                    "description": "Toggle focus view: just your prompt, summary, and response",
+                    "argumentHint": "[on|off]",
+                    "builtin": true
+                  },
+                  {
+                    "name": "heapdump",
+                    "description": "Dump the JS heap to the Desktop; on Linux with no Desktop folder, the home directory",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "init",
+                    "description": "Initialize a new CLAUDE.md file with codebase documentation",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "mcp",
+                    "description": "Manage MCP servers",
+                    "argumentHint": "[reconnect|enable|disable [<server>|all]]",
+                    "builtin": true
+                  },
+                  {
+                    "name": "model",
+                    "description": "Set the AI model for Claude Code",
+                    "argumentHint": "<model>",
+                    "builtin": true
+                  },
+                  {
+                    "name": "__remote-workflow",
+                    "description": "Run the workflow script delivered in this session environment (server-launched sessions only)",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "workflow-launch-exec",
+                    "description": "Execute a server-launched workflow handoff (workflow_launch event sessions only)",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "reload-plugins",
+                    "description": "Activate pending plugin changes in the current session",
+                    "argumentHint": "[--force]",
+                    "builtin": true
+                  },
+                  {
+                    "name": "reload-skills",
+                    "description": "Pick up skills added or changed on disk during this session",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "rename",
+                    "description": "Rename the current conversation",
+                    "argumentHint": "[name]",
+                    "aliases": ["name"],
+                    "builtin": true
+                  },
+                  {
+                    "name": "security-review",
+                    "description": "Complete a security review of the pending changes on the current branch",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "usage",
+                    "description": "Show session cost, plan usage, and what's contributing to your limits",
+                    "argumentHint": "",
+                    "aliases": ["cost", "stats"],
+                    "builtin": true
+                  },
+                  {
+                    "name": "insights",
+                    "description": "Generate a report analyzing your Claude Code sessions",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "recap",
+                    "description": "Generate a one-line session recap now",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "goal",
+                    "description": "Set a goal — keep working until the condition is met",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "list-agents",
+                    "description": "List subagents, teammates, and other Claude sessions you can message",
+                    "argumentHint": "",
+                    "aliases": ["peers"],
+                    "builtin": true
+                  },
+                  {
+                    "name": "team-onboarding",
+                    "description": "Help teammates ramp on Claude Code with a guide from your usage",
+                    "argumentHint": "",
+                    "builtin": true
+                  }
+                ],
+                "agents": [
+                  {
+                    "name": "claude",
+                    "description": "Catch-all for any task that doesn't fit a more specific agent. FleetView's default when no agent name is typed."
+                  },
+                  {
+                    "name": "Explore",
+                    "description": "Fast read-only search agent for locating code. Use it to find files by pattern (eg. \"src/components/**/*.tsx\"), grep for symbols or keywords (eg. \"API endpoints\"), or answer \"where is X defined / which files reference Y.\" Do NOT use it for code review, design-doc auditing, cross-file consistency checks, or open-ended analysis — it reads excerpts rather than whole files and will miss content past its read window. When calling, specify search breadth: \"quick\" for a single targeted lookup, \"medium\" for moderate exploration, or \"very thorough\" to search across multiple locations and naming conventions.",
+                    "model": "inherit"
+                  },
+                  {
+                    "name": "general-purpose",
+                    "description": "General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks. When you are searching for a keyword or file and are not confident that you will find the right match in the first few tries use this agent to perform the search for you."
+                  },
+                  {
+                    "name": "Plan",
+                    "description": "Software architect agent for designing implementation plans. Use this when you need to plan the implementation strategy for a task. Returns step-by-step plans, identifies critical files, and considers architectural trade-offs.",
+                    "model": "inherit"
+                  },
+                  {
+                    "name": "statusline-setup",
+                    "description": "Use this agent to configure the user's Claude Code status line setting.",
+                    "model": "sonnet"
+                  }
+                ],
+                "output_style": "default",
+                "available_output_styles": [
+                  "default",
+                  "Proactive",
+                  "Concise",
+                  "Explanatory",
+                  "Learning"
+                ],
+                "user_output_styles_dir": "<folder>/.claude/output-styles",
+                "models": [
+                  {
+                    "value": "default",
+                    "resolvedModel": "claude-opus-5-5",
+                    "displayName": "Default (recommended)",
+                    "description": "Use the default model (currently Opus 5.5) · $4/$20 per Mtok",
+                    "supportsEffort": true,
+                    "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"],
+                    "supportsAdaptiveThinking": true,
+                    "supportsFastMode": true,
+                    "supportsAutoMode": true,
+                    "supportsThinkingOff": false
+                  },
+                  {
+                    "value": "opus",
+                    "resolvedModel": "claude-opus-5-5",
+                    "displayName": "Opus",
+                    "description": "Opus 5.5 · Best for everyday, complex tasks · $4/$20 per Mtok",
+                    "supportsEffort": true,
+                    "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"],
+                    "supportsAdaptiveThinking": true,
+                    "supportsFastMode": true,
+                    "supportsAutoMode": true,
+                    "supportsThinkingOff": false
+                  },
+                  {
+                    "value": "fable",
+                    "resolvedModel": "claude-fable-5-1",
+                    "displayName": "Fable",
+                    "description": "Fable 5.1 · Most capable for your hardest and longest-running tasks · $10/$50 per Mtok",
+                    "supportsEffort": true,
+                    "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"],
+                    "supportsAdaptiveThinking": true,
+                    "supportsAutoMode": true,
+                    "supportsThinkingOff": false
+                  },
+                  {
+                    "value": "sonnet",
+                    "resolvedModel": "claude-sonnet-5-5",
+                    "displayName": "Sonnet",
+                    "description": "Sonnet 5.5 · Efficient for routine tasks · $2/$10 per Mtok",
+                    "supportsEffort": true,
+                    "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"],
+                    "supportsAdaptiveThinking": true,
+                    "supportsAutoMode": true,
+                    "supportsThinkingOff": false
+                  },
+                  {
+                    "value": "haiku",
+                    "resolvedModel": "claude-haiku-5-5",
+                    "displayName": "Haiku",
+                    "description": "Haiku 5.5 · Fastest for quick answers · $0.10/$0.50 per Mtok ($0.50/$2.50 for prompts over 100k)",
+                    "supportsEffort": true,
+                    "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"],
+                    "supportsAdaptiveThinking": true,
+                    "supportsAutoMode": true,
+                    "supportsThinkingOff": false
+                  }
+                ],
+                "account": {
+                  "tokenSource": "none",
+                  "apiKeySource": "ANTHROPIC_API_KEY",
+                  "apiProvider": "firstParty"
+                },
+                "pid": 16656,
+                "claude_code_version": "2.1.309",
+                "current_permission_mode": "default",
+                "feedback_mode": {
+                  "kind": "disabled"
+                },
+                "analytics_disabled": true,
+                "remote_control_auto_enable": false,
+                "remote_control_auto_connect_default": false,
+                "remote_control_available": false,
+                "remote_control_auto_on_by_default": false,
+                "ide_rc_auto_enable_gate": false,
+                "fast_mode_state": "off",
+                "fast_mode_disabled_reason": "sdk_opt_in_required",
+                "session_state": "idle",
+                "capabilities": ["ui_surface_v1", "mcp_call_result_not_for_model_v1"]
+              },
+              "pending_permission_requests": [],
+              "pending_user_dialog_requests": []
+            }
+          }
+        },
+        {
+          "out": {
+            "type": "user",
+            "message": {
+              "role": "user",
+              "content": "Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece."
+            },
+            "parent_tool_use_id": null,
+            "uuid": "517a1d8f-4a7f-43c0-88ff-7fea208f3850"
+          }
+        },
+        {
+          "in": {
+            "type": "system",
+            "subtype": "session_state_changed",
+            "state": "running",
+            "sdk_host_only": true,
+            "uuid": "a43991f2-573b-4872-a2e6-eeec3a9be57a",
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
+          }
+        },
+        {
+          "in": {
+            "type": "command_lifecycle",
+            "command_uuid": "517a1d8f-4a7f-43c0-88ff-7fea208f3850",
+            "state": "queued",
+            "uuid": "d8938081-4e2f-4f9b-b5e9-a494c6d668c7",
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
+          }
+        },
+        {
+          "in": {
+            "type": "command_lifecycle",
+            "command_uuid": "517a1d8f-4a7f-43c0-88ff-7fea208f3850",
+            "state": "started",
+            "uuid": "ff773420-87ca-4050-975d-21a4ef27181d",
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
+          }
+        },
+        {
+          "in": {
+            "type": "system",
+            "subtype": "init",
+            "cwd": "<folder>",
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "tools": [
+              "Task",
+              "AskUserQuestion",
+              "Bash",
+              "CronCreate",
+              "CronDelete",
+              "CronList",
+              "Edit",
+              "EnterPlanMode",
+              "EnterWorktree",
+              "ExitPlanMode",
+              "ExitWorktree",
+              "Glob",
+              "Grep",
+              "ListAgents",
+              "NotebookEdit",
+              "Read",
+              "ReportFindings",
+              "ScheduleWakeup",
+              "SendMessage",
+              "Skill",
+              "TaskStop",
+              "ToolSearch",
+              "WebFetch",
+              "WebSearch",
+              "Workflow",
+              "Write"
+            ],
+            "mcp_servers": [],
+            "model": "claude-opus-5-5",
+            "permissionMode": "default",
+            "slash_commands": [
+              "deep-research",
+              "dataviz",
+              "update-config",
+              "verify",
+              "debug",
+              "code-review",
+              "simplify",
+              "batch",
+              "fewer-permission-prompts",
+              "doctor",
+              "loop",
+              "claude-api",
+              "workflow-authoring",
+              "run",
+              "run-skill-generator",
+              "plugin-authoring",
+              "agents",
+              "auto-mode-setup",
+              "autocompact",
+              "clear",
+              "color",
+              "compact",
+              "config",
+              "output-style",
+              "context",
+              "effort",
+              "fast",
+              "focus",
+              "heapdump",
+              "init",
+              "mcp",
+              "model",
+              "__remote-workflow",
+              "workflow-launch-exec",
+              "reload-plugins",
+              "reload-skills",
+              "rename",
+              "security-review",
+              "usage",
+              "insights",
+              "recap",
+              "goal",
+              "list-agents",
+              "team-onboarding"
+            ],
+            "terminal_slash_commands": ["doctor", "color", "focus", "reload-plugins"],
+            "apiKeySource": "ANTHROPIC_API_KEY",
+            "claude_code_version": "2.1.309",
+            "output_style": "default",
+            "agents": ["claude", "Explore", "general-purpose", "Plan", "statusline-setup"],
+            "skills": [
+              "deep-research",
+              "dataviz",
+              "update-config",
+              "verify",
+              "debug",
+              "code-review",
+              "simplify",
+              "batch",
+              "fewer-permission-prompts",
+              "doctor",
+              "loop",
+              "claude-api",
+              "workflow-authoring",
+              "run",
+              "run-skill-generator",
+              "plugin-authoring"
+            ],
+            "plugins": [
+              {
+                "name": "cc-plugin-agents-md",
+                "path": "builtin",
+                "source": "cc-plugin-agents-md@builtin"
+              },
+              {
+                "name": "cc-plugin-plugin-authoring",
+                "path": "builtin",
+                "source": "cc-plugin-plugin-authoring@builtin"
+              }
+            ],
+            "capabilities": [
+              "interrupt_receipt_v1",
+              "interrupt_cancel_queued_v1",
+              "interrupt_send_now_v1",
+              "interrupt_requeue_taken_v1",
+              "msg_lifecycle_v1",
+              "request_marker_lists_v1",
+              "lifecycle_wakeup_source_v1",
+              "sdk_mcp_tools_list_changed",
+              "sdk_mcp_manifests",
+              "mcp_read_resource_v1",
+              "mcp_tool_ui_meta_v1",
+              "ui_surface_v1",
+              "mcp_call_result_not_for_model_v1"
+            ],
+            "analytics_disabled": true,
+            "product_feedback_disabled": true,
+            "uuid": "dfab3b96-f934-48fd-8ee6-d34103263a4d",
+            "memory_paths": {
+              "auto": "<folder>/.claude/projects\\<folder>/memory\\"
+            },
+            "original_cwd": "<folder>",
+            "additional_directories": [],
+            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-00e6d7e09ddc1a9824059441067c8ca1",
+            "fast_mode_state": "off",
+            "fast_mode_disabled_reason": "sdk_opt_in_required",
+            "per_turn_effort_active": true,
+            "view_mode": "default",
+            "powershell_path": "<home>/AppData/Local/Programs/PowerShell/7/pwsh.exe",
+            "user_message_uuids": ["517a1d8f-4a7f-43c0-88ff-7fea208f3850"]
+          }
+        },
+        {
+          "in": {
+            "type": "system",
+            "subtype": "status",
+            "status": "requesting",
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "uuid": "4ad99f36-390e-4e47-8379-3d1cc11ef9fc",
+            "user_message_uuids": ["517a1d8f-4a7f-43c0-88ff-7fea208f3850"]
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "message_start",
+              "message": {
+                "id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e",
+                "type": "message",
+                "role": "assistant",
+                "model": "claude-opus-5-5",
+                "content": [],
+                "stop_reason": null,
+                "stop_sequence": null,
+                "usage": {
+                  "input_tokens": 1,
+                  "output_tokens": 0
+                }
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "32aef052-9522-4d6f-9c7c-00bd31ebfe1c",
+            "ttft_ms": 25,
+            "thinking_display": "updates",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e",
+            "user_message_uuid": "517a1d8f-4a7f-43c0-88ff-7fea208f3850",
+            "user_message_uuids": ["517a1d8f-4a7f-43c0-88ff-7fea208f3850"]
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_start",
+              "index": 0,
+              "content_block": {
+                "type": "text",
+                "text": ""
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "bce780dc-75fe-4d37-a6ea-8dfb81927145",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "Fake "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "95065bb3-07ee-4c87-866e-3f726b8c5e77",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "reply "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "dcf5b2b6-b060-47d7-a1f6-31f0aaaf6fbd",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "to: "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "75ead54c-0c1c-4096-a362-3ba8d5aa43ab",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "Every "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "f3191fb2-1242-48fb-9f4b-19f38b5ba8e7",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "word "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "0a4c6dcf-4686-458f-bb16-727f530f4593",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "of "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "709f49a2-11a2-4c66-9c15-8d3c8edfab9c",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "this "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "b0cfdfeb-8339-4cec-a0bd-9a8ce941064c",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "reply "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "4f0df080-3881-43c5-8307-bacaf0e202b6",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "streams "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "91d2e0f1-85aa-4ad4-8cc1-30dfc05f7c2b",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "in "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "1920ebc5-5701-4fd5-80e0-3bc66ad548ba",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "its "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "a5974f56-2128-45cc-aae4-9eeb12a06bf7",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "own "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "4dd1688b-ed2d-422c-870f-38130eebd61b",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "small "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "454fe0eb-8611-4b1d-9289-e808168f0fa4",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "piece. "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "b747a640-82f3-435e-9aed-a0d078ca21e9",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "Every "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "08456d3f-f653-4479-82fe-89969b3623e8",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "word "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "1cb424da-688a-45f2-8e1f-a3ae0772b966",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "of "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "b5b636d2-67b1-4cda-8e61-701126348d29",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "this "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "65bb1736-821d-40c3-81b2-ad87db35e572",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "reply "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "4d2c4aac-27b0-425b-a6cf-590588fa9fb7",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "streams "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "d390b584-d988-48c1-9cc2-e5798f5842f2",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "in "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "5dfd8b15-9328-4db0-b0ca-c7cb414cf682",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "its "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "c8d54376-eec9-47e0-8221-81b81a4c2e65",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "own "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "6141a201-d9fd-4800-a065-19abc3ca3271",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "small "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "d4442dea-1057-431f-afa0-b0759a580738",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "piece. "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "c243d383-57aa-4212-a689-e25418330255",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "Every "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "46fa1000-2545-4b30-9938-68fe2e282864",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "word "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "6241ead1-b91a-4a5f-9b8f-7eb4886e4b23",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "of "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "afbca57f-aca8-4e29-8127-fa72430e43a0",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "this "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "2790f765-90d5-496c-8f0d-24ad2bf0a956",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "reply "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "d3157da0-028c-4cfe-9040-c6d5f22db376",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "streams "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "ed2d7fdb-52fa-46fc-b040-8925dcdc4924",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "in "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "dfef2057-e433-4a36-b530-0a272279c5a6",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "its "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "382b9573-822e-43b8-a354-67ef00cc3b53",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "own "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "caaf388c-730a-4231-bc3f-05713a6624c7",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "small "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "50f27530-6b59-43ae-b36f-20bf65c3c90b",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "piece. "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "6f8dcff1-116f-4603-b216-4558b7f0dc1b",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "Every "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "00f87f29-942c-45eb-8536-6e4d357d8500",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "word "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "0677d067-f083-478e-b590-30c1d41732bd",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "of "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "7c94cb5a-0362-4be0-b38f-5d1c3c35e74d",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "this "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "a18b8cc9-2e9c-42de-b902-1eed08569ac0",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "reply "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "7e2f1107-a98f-4485-a07d-78f368e736cc",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "streams "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "a1087a80-757a-4249-a910-034a53fbb424",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "in "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "11bfefea-bb35-4792-ba54-9a69c8e45432",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "its "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "de8c258a-fe38-485a-84c1-c51a0da49009",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "own "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "1dece20a-c28c-4193-8b0c-5df9bb4839f6",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "small "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "218041ee-71d9-4f3a-99f3-4ed575df5738",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "piece. "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "29107e62-4b5a-49db-ae51-10656937c039",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "Every "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "3f376b7d-77b7-41ba-8f37-7085173c7043",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "word "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "29237161-3018-4880-8696-326da6db3265",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "of "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "ebea56e2-a2ea-4de4-8572-ccd3ccdff783",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "this "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "36d9b6ba-fca8-4967-86ab-039562a50321",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "reply "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "3c2360e0-ed2b-4053-9eb8-88ef70f7a61e",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "streams "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "25eda92f-50cf-4a99-a1a4-4fd1cfe54fd3",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "in "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "613fbc45-8a12-4f8a-b3fb-821d2de51be8",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "its "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "2ec8c3d8-d39c-4d9b-b8b6-f3b315cd5079",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "own "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "439eeefe-ce4c-47c5-b299-0ee392c2aa4a",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "small "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "d453c707-0860-4322-8df1-35b7921bb17c",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "piece. "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "7a7d001c-572f-469b-8601-0165d9da0572",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "Every "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "09cc50d0-1234-42ac-93a8-ea3c691868bf",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "word "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "d26ed57a-15e5-41d8-a4d1-903ccce5503a",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "of "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "ca35f0a8-a6ea-4509-909e-87af00b35cf1",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "this "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "8fe8affe-5ca1-40fb-a383-f11de675edfe",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "reply "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "b5c217e6-b592-4e4b-8d09-7e7b420041c8",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "streams "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "fd77d00f-c661-40cc-ab22-dd2d62a859c9",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "in "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "0303a012-0a84-4c28-9738-30bb050c567f",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "its "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "91ec5c51-45f1-4ea9-bf0e-b7c700e9971f",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "own "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "1c6e1e1f-842d-47e4-815d-a77bd7c6213f",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "small "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "5709935c-24b3-4f39-8ef2-2f7bc7a24a53",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "piece. "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "eab66011-e8bd-4136-bf2e-f1067230fbd3",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "Every "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "9f2157ca-bc42-486b-ac76-df05f6defe22",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "word "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "60a0df6a-3493-46fd-987a-705c57d7f830",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "of "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "4b255307-c717-4ce9-8257-aa647c11a527",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "this "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "01d34535-4570-4c0c-8a48-deaf6ba9b1d5",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "reply "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "004552de-2a29-4f3b-8682-9be9f78db4c5",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "streams "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "ca81b589-076a-460f-903b-576699b1fea8",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "in "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "9139ce91-a836-4505-a213-21c03f0f4a76",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "its "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "8fdcc705-dfe8-4081-90b2-1419dc56028d",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "own "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "0f853579-128a-4cd3-a057-d6bc5b8827aa",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "small "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "cf8947a9-e3ca-4803-a82d-b2928ed9b390",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "piece. "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "057cc746-1ed8-413c-9007-e1270e81c9d1",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "Every "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "e948bf9e-a91f-49c4-9fab-6096cc0886e9",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "word "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "099577bf-d365-42a0-8e57-d765d0be5f50",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "of "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "aa25c0bd-cc99-4ab6-8557-c58dd65a2168",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "this "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "4543e445-bd37-4cf3-be23-dcc88f8ebd30",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "reply "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "6d7c745c-d12a-4a0b-ac76-f7bbb2f6e686",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "streams "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "e70c2816-7a7a-49ce-b852-6cda4d50fb1d",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "in "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "458a4bdf-f234-4524-aad6-45b763851ea8",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "its "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "80bf8fc9-7228-4202-8fe3-f7902c382ef3",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "own "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "be449c66-4737-419d-9567-860509bbbd4f",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "small "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "3db215db-17c4-4eb4-8bb7-2a8175bd534b",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "text_delta",
+                "text": "piece."
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "269f000e-9651-483b-9864-573cfc366f0c",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "assistant",
+            "message": {
+              "id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e",
+              "type": "message",
+              "role": "assistant",
+              "model": "claude-opus-5-5",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Fake reply to: Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece."
+                }
+              ],
+              "stop_reason": null,
+              "stop_sequence": null,
+              "usage": {
+                "input_tokens": 1,
+                "output_tokens": 0
+              },
+              "context_management": null
+            },
+            "parent_tool_use_id": null,
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "uuid": "a4ef5196-b665-49f7-9bdf-94d7e644d51e",
+            "timestamp": "2026-11-02T10:12:36.842Z",
+            "user_message_uuid": "517a1d8f-4a7f-43c0-88ff-7fea208f3850",
+            "user_message_uuids": ["517a1d8f-4a7f-43c0-88ff-7fea208f3850"]
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_stop",
+              "index": 0
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "b56caf37-3f07-4123-a361-0ca1c67f8b8b",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "message_delta",
+              "delta": {
+                "stop_reason": "end_turn",
+                "stop_sequence": null
+              },
+              "usage": {
+                "output_tokens": 1
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "794f673f-b74d-4dc3-8593-4b83d5ba4a9f",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "message_stop"
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "65d314b2-09c4-4fae-87e6-b6f21f4e70e9",
+            "api_message_id": "msg_a0d77fc6-14a8-44f8-acb3-336f8357be6e"
+          }
+        },
+        {
+          "in": {
+            "duration_api_ms": 43,
+            "stop_reason": "end_turn",
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "total_cost_usd": 0.000023999999999999997,
+            "usage": {
+              "input_tokens": 1,
+              "cache_creation_input_tokens": 0,
+              "cache_read_input_tokens": 0,
+              "output_tokens": 1,
+              "output_tokens_details": {
+                "thinking_tokens": 0
+              },
+              "server_tool_use": {
+                "web_search_requests": 0,
+                "web_fetch_requests": 0
+              },
+              "service_tier": "standard",
+              "cache_creation": {
+                "ephemeral_1h_input_tokens": 0,
+                "ephemeral_5m_input_tokens": 0
+              },
+              "inference_geo": "",
+              "iterations": [],
+              "speed": "standard",
+              "fallback_credit": null
+            },
+            "modelUsage": {
+              "claude-opus-5-5": {
+                "inputTokens": 1,
+                "outputTokens": 1,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0,
+                "webSearchRequests": 0,
+                "costUSD": 0.000023999999999999997,
+                "contextWindow": 1000000,
+                "maxOutputTokens": 128000,
+                "thinkingTokens": 0,
+                "canonicalModel": "claude-opus-5-5",
+                "provider": "firstParty",
+                "costBasis": "list"
+              }
+            },
+            "permission_denials": [],
+            "terminal_reason": "completed",
+            "fast_mode_state": "off",
+            "fast_mode_disabled_reason": "sdk_opt_in_required",
+            "subagent_stats": {
+              "spawned": 0,
+              "requested": {
+                "background": 0,
+                "foreground": 0,
+                "unset": 0
+              },
+              "started_in_background": 0,
+              "max_depth": 0,
+              "spawned_by_subagents": 0,
+              "completed": 0,
+              "failed": 0,
+              "killed": {
+                "parent": 0,
+                "user": 0,
+                "system": 0
+              },
+              "refused": {
+                "depth_limit": 0,
+                "concurrency_limit": 0,
+                "budget": 0
+              },
+              "by_type": {}
+            },
+            "safety_stops": 0,
+            "is_error": false,
+            "num_turns": 1,
+            "subtype": "success",
+            "api_error_status": null,
+            "result": "Fake reply to: Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece.",
+            "ttft_ms": 81,
+            "type": "result",
+            "duration_ms": 88,
+            "uuid": "fee5485d-b31d-4e39-9ace-e00efe2c7674",
+            "ttft_stream_ms": 69,
+            "time_to_request_ms": 45,
+            "first_content_frame_ms": 70,
+            "user_message_uuid": "517a1d8f-4a7f-43c0-88ff-7fea208f3850",
+            "user_message_uuids": ["517a1d8f-4a7f-43c0-88ff-7fea208f3850"],
+            "request_sent_wall_ms": 1793614356807,
+            "first_request_input_tokens": 1,
+            "queued_turn_count": 0,
+            "result_index": 0,
+            "model_usage_since_last_result": {
+              "claude-opus-5-5": {
+                "inputTokens": 1,
+                "outputTokens": 1,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0,
+                "webSearchRequests": 0,
+                "costUSD": 0.000023999999999999997,
+                "contextWindow": 1000000,
+                "maxOutputTokens": 128000,
+                "thinkingTokens": 0,
+                "canonicalModel": "claude-opus-5-5",
+                "provider": "firstParty",
+                "costBasis": "list"
+              }
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "command_lifecycle",
+            "command_uuid": "517a1d8f-4a7f-43c0-88ff-7fea208f3850",
+            "state": "completed",
+            "uuid": "ba7a0ffa-5f13-4174-9a6d-d023110ccd18",
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
+          }
+        },
+        {
+          "in": {
+            "type": "system",
+            "subtype": "session_state_changed",
+            "state": "idle",
+            "sdk_host_only": true,
+            "uuid": "c0016f8a-8f70-42bd-ab00-cec7bee3f8dc",
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
+          }
+        },
+        {
+          "exit": 0
+        }
+      ]
+    }
+  ],
+  "calls": [null]
+}

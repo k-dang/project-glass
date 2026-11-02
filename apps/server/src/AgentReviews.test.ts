@@ -9,16 +9,10 @@ import {
 import { Effect, Exit, Option, Scope, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { existsSync } from "node:fs"
-import { fakeAgent } from "../test/fakeAgent"
-import {
-  claudeAnswer,
-  type FakeAgentSettings,
-  piCliAnswer,
-  piCliModels,
-} from "../test/fakeAgentFiles"
 import { startFakeGitHub } from "../test/fakeGitHub"
 import { VIEWER } from "../test/fakePullRequest"
 import { isolatedHome, startBackend } from "../test/harness"
+import { type ScriptedSettings, scriptedAgentRunners } from "../test/scriptedAgentRunners"
 
 const answer = {
   markdown: [
@@ -30,16 +24,10 @@ const answer = {
 const deadline = 60_000
 
 const fixture = Effect.fnUntraced(function* (
-  settings: Partial<FakeAgentSettings> = {},
-  timeout = deadline,
+  settings: ScriptedSettings = { reply: { answer } },
   engine: AgentEngine = "pi",
 ) {
-  const piCli = yield* fakeAgent({
-    ready: true,
-    output: piCliAnswer(JSON.stringify(answer)),
-    modelsOutput: piCliModels,
-    ...settings,
-  })
+  const runners = yield* scriptedAgentRunners(settings)
 
   const github = yield* startFakeGitHub({ git: true })
   const home = yield* isolatedHome
@@ -92,15 +80,13 @@ const fixture = Effect.fnUntraced(function* (
     GH_TOKEN: VIEWER.token,
     GLASS_GITHUB_API_URL: github.url,
     GLASS_GIT_REMOTE: github.gitUrl,
-    GLASS_PI_COMMAND: piCli.command,
-    GLASS_CLAUDE_COMMAND: piCli.command,
-    GLASS_AGENT_REVIEW_TIMEOUT_MS: String(timeout),
+    GLASS_AGENT_REVIEW_TIMEOUT_MS: String(deadline),
   }
 
   const serverScope = yield* Scope.make()
   yield* Effect.addFinalizer((exit) => Scope.close(serverScope, exit))
 
-  const { client } = yield* startBackend(env, home).pipe(
+  const { client } = yield* startBackend(env, home, runners.layer).pipe(
     Effect.provideService(Scope.Scope, serverScope),
   )
 
@@ -120,7 +106,7 @@ const fixture = Effect.fnUntraced(function* (
   )
 
   return {
-    piCli,
+    runners,
     github,
     pr,
     ref,
@@ -131,7 +117,7 @@ const fixture = Effect.fnUntraced(function* (
     start: client.StartAgentReview({ pullRequest: ref, revision }),
     restart: Effect.gen(function* () {
       yield* Scope.close(serverScope, Exit.void)
-      const restarted = yield* startBackend(env, home)
+      const restarted = yield* startBackend(env, home, runners.layer)
 
       return yield* restarted.client
         .WatchAgentReview({ pullRequest: ref })
@@ -150,14 +136,15 @@ it.live(
       yield* f.start
       const { review } = yield* f.state(reviewed)
 
-      const prompted = (yield* f.piCli.calls).find((call) => call.stage === "prompted")!
-      assert.deepStrictEqual(prompted.files, ["greet.ts", "main.ts", "src/name.ts"])
-      assert.include(prompted.systemPrompt, defaultReviewPrompt)
-      assert.include(prompted.input, "Use the person's name.")
-      assert.include(prompted.input, "+hello name")
-      assert.include(prompted.input, "Why a name?")
-      assert.notInclude(prompted.input, "My own note")
-      assert.isFalse(existsSync(prompted.cwd))
+      const [run] = f.runners.runs
+      assert.strictEqual(run?.engine, "pi")
+      assert.deepStrictEqual(run?.files, ["greet.ts", "main.ts", "src/name.ts"])
+      assert.include(run?.task.instructions, defaultReviewPrompt)
+      assert.include(run?.task.prompt, "Use the person's name.")
+      assert.include(run?.task.prompt, "+hello name")
+      assert.include(run?.task.prompt, "Why a name?")
+      assert.notInclude(run?.task.prompt, "My own note")
+      assert.isFalse(existsSync(run!.directory!))
 
       assert.deepStrictEqual(review?.revision, f.revision)
       assert.strictEqual(review?.markdown, answer.markdown)
@@ -182,10 +169,10 @@ it.live("reviews with the prompt saved in Settings, leaving the last Agent revie
     assert.deepStrictEqual(yield* f.state(reviewed), first)
 
     yield* f.start
-    yield* f.piCli.untilCalls("prompted", 2)
-    const prompted = (yield* f.piCli.calls).filter((call) => call.stage === "prompted").at(-1)!
-    assert.include(prompted.systemPrompt, prompt)
-    assert.notInclude(prompted.systemPrompt, defaultReviewPrompt)
+    yield* f.runners.ran(2)
+    const instructions = f.runners.runs.at(-1)!.task.instructions
+    assert.include(instructions, prompt)
+    assert.notInclude(instructions, defaultReviewPrompt)
   }),
 )
 
@@ -195,32 +182,23 @@ it.live("cancels a running review, removing its checkout, and replaces the last 
     yield* f.start
     const first = (yield* f.state(reviewed)).review!
 
-    yield* f.piCli.configure({
-      ready: true,
-      output: "",
-      modelsOutput: piCliModels,
-      hangAt: "generate",
-    })
+    yield* f.runners.configure({ reply: "hold" })
     yield* f.start
     yield* f.state((state) => state.job.status === "reviewing" && state.job.runner !== null)
-    yield* f.piCli.untilCalls("generate", 2)
-    const hung = (yield* f.piCli.calls).filter((call) => call.stage === "generate").at(-1)!
-    assert.isTrue(existsSync(hung.cwd))
+    yield* f.runners.ran(2)
+    const checkout = f.runners.runs.at(-1)!.directory!
+    assert.isTrue(existsSync(checkout))
 
     yield* f.client.CancelAgentReview({ pullRequest: f.ref })
     const cancelled = yield* f.state((state) => state.job.status === "idle")
     assert.deepStrictEqual(cancelled.review, first)
-    assert.throws(() => process.kill(hung.pid, 0))
-    assert.isFalse(existsSync(hung.cwd))
+    yield* f.runners.interrupted(1)
+    assert.isFalse(existsSync(checkout))
 
     const replacement = { markdown: "**Nothing stands out.**" }
     yield* f.start
-    yield* f.piCli.untilCalls("generate", 3)
-    yield* f.piCli.configure({
-      ready: true,
-      output: piCliAnswer(JSON.stringify(replacement)),
-      modelsOutput: piCliModels,
-    })
+    yield* f.runners.ran(3)
+    yield* f.runners.configure({ reply: { answer: replacement } })
     yield* f.start
 
     const replaced = yield* f.state((state) => reviewed(state) && state.review !== first)
@@ -230,27 +208,19 @@ it.live("cancels a running review, removing its checkout, and replaces the last 
 
 it.live("drops a running review on restart", () =>
   Effect.gen(function* () {
-    const f = yield* fixture({ hangAt: "generate" })
+    const f = yield* fixture({ reply: "hold" })
     yield* f.start
-    yield* f.piCli.untilCalls("generate")
+    yield* f.runners.ran(1)
 
     assert.deepStrictEqual(yield* f.restart, { review: null, job: { status: "idle" } })
   }),
 )
 
-it.live("fails as unusable output for an answer that doesn't decode or is empty", () =>
+it.live("fails as unusable output for an empty review", () =>
   Effect.gen(function* () {
-    const f = yield* fixture({ output: piCliAnswer("not JSON") })
+    const f = yield* fixture({ reply: { answer: { markdown: " \n" } } })
     yield* f.start
-    assert.strictEqual((yield* f.failed).reason, "unusable-output")
 
-    yield* f.piCli.configure({
-      ready: true,
-      output: piCliAnswer(JSON.stringify({ markdown: " \n" })),
-      modelsOutput: piCliModels,
-    })
-    yield* f.start
-    yield* f.state((state) => state.job.status === "reviewing")
     assert.strictEqual((yield* f.failed).reason, "unusable-output")
   }),
 )
@@ -262,7 +232,7 @@ it.live("fails as a stale Revision when the PR has moved on", () =>
     yield* f.start
 
     assert.strictEqual((yield* f.failed).reason, "stale-revision")
-    assert.isEmpty((yield* f.piCli.calls).filter((call) => call.stage === "prompted"))
+    assert.isEmpty(f.runners.runs)
   }),
 )
 
@@ -284,20 +254,21 @@ it.live(
     }),
 )
 
-it.live("fails as not ready when the pi CLI lacks the saved model", () =>
-  Effect.gen(function* () {
-    const f = yield* fixture({ modelsOutput: "provider  model" })
-    yield* f.start
+for (const ready of ["not-ready", "not-installed"] as const)
+  it.live(`fails as not ready when the runner is ${ready}`, () =>
+    Effect.gen(function* () {
+      const f = yield* fixture({ reply: { answer }, ready })
+      yield* f.start
 
-    assert.strictEqual((yield* f.failed).reason, "not-ready")
-  }),
-)
+      assert.strictEqual((yield* f.failed).reason, "not-ready")
+    }),
+  )
 
 it.effect("fails as timed out when the agent passes its limit", () =>
   Effect.gen(function* () {
-    const f = yield* fixture({ hangAt: "generate" })
+    const f = yield* fixture({ reply: "hold" })
     yield* f.start
-    yield* f.piCli.untilCalls("generate")
+    yield* f.runners.ran(1)
     yield* TestClock.adjust(deadline)
 
     const failure = yield* f.failed
@@ -306,16 +277,12 @@ it.effect("fails as timed out when the agent passes its limit", () =>
   }),
 )
 
-it.live("reviews on Claude Code with only its restricted read tools in the checkout", () =>
+it.live("reviews on the engine chosen for Agent reviews", () =>
   Effect.gen(function* () {
-    const f = yield* fixture({ output: claudeAnswer(answer) }, 5000, "claude-code")
-
+    const f = yield* fixture({ reply: { answer } }, "claude-code")
     yield* f.start
-    const done = yield* f.state(reviewed)
+    yield* f.state(reviewed)
 
-    assert.strictEqual(done.review?.markdown, answer.markdown)
-    const prompted = (yield* f.piCli.calls).find((call) => call.stage === "prompted")!
-    assert.include(prompted.args.join(" "), "--restricted --tools Read,Grep,Glob")
-    assert.include(prompted.files ?? [], "greet.ts")
+    assert.deepStrictEqual(f.runners.selections, ["claude-code"])
   }),
 )

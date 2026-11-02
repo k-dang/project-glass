@@ -25,11 +25,9 @@ import { uniqueAgentName } from "./agentNames"
 import { followJournal } from "./hostJournal"
 import type { HostClient, LostAgentIds, PlacedAgent, Placement, SubscribeLost } from "./Placement"
 import { Plugins } from "./Plugins"
-import { bundledEntry } from "./processes"
 import { call, connectToHost, shutDownHost, waitForHost } from "./sandboxCalls"
+import { ServerConfig } from "./ServerConfig"
 import { Transcripts } from "./Transcripts"
-
-const hostBundle = bundledEntry("agentHost", import.meta.url)
 
 const hostPort = 7310
 
@@ -156,6 +154,7 @@ export class Sandboxes extends Context.Service<
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
       const transcripts = yield* Transcripts
+      const config = yield* ServerConfig
       const webSocketConstructor = yield* Socket.WebSocketConstructor
       const { sandboxProviders } = yield* Plugins
       const scope = yield* Scope.Scope
@@ -219,7 +218,7 @@ export class Sandboxes extends Context.Service<
               baseBranch: agent.baseBranch,
               folder,
               host: {
-                bundle: hostBundle,
+                bundle: config.agentHostBundle,
                 port: hostPort,
                 environment: {
                   GLASS_HOST_TOKEN: token,

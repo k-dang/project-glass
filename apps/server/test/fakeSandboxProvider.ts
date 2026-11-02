@@ -8,6 +8,7 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  watch,
   writeFileSync,
 } from "node:fs"
 import { connect, createServer, type Socket } from "node:net"
@@ -51,6 +52,8 @@ const FakeSandbox = Schema.Struct({
 const decodeSandbox = Schema.decodeUnknownSync(FakeSandbox)
 
 const dropping = (folder: string) => existsSync(join(folder, "dropped"))
+
+const droppedAll = (folder: string) => join(folder, "dropped-all")
 
 const INGRESS_PATH = "/fake-ingress"
 
@@ -131,6 +134,9 @@ const ingress = (folder: string, hostPort: number) =>
       const deleted = !existsSync(folder)
 
       if (deleted || dropping(folder)) for (const socket of open) socket.destroy()
+
+      if (!deleted && dropping(folder) && !existsSync(droppedAll(folder)))
+        writeFileSync(droppedAll(folder), "")
 
       if (deleted) {
         clearInterval(watching)
@@ -296,9 +302,28 @@ export const installFakeSandboxProvider = (
     configure: (change: Partial<FakeSandboxSettings>) =>
       writeFileSync(settingsPath, JSON.stringify({ ...settings, ...change })),
     sandboxFolder,
-    dropConnections: (agentId: string) =>
-      writeFileSync(join(sandboxFolder(agentId), "dropped"), ""),
-    reconnect: (agentId: string) => rmSync(join(sandboxFolder(agentId), "dropped")),
+    /** Resolves once the Sandbox's ingress has closed every open connection. */
+    dropConnections: (agentId: string) => {
+      const folder = sandboxFolder(agentId)
+      writeFileSync(join(folder, "dropped"), "")
+
+      return new Promise<void>((resolve) => {
+        const watcher = watch(folder, () => {
+          if (!existsSync(droppedAll(folder))) return
+          watcher.close()
+          resolve()
+        })
+
+        if (existsSync(droppedAll(folder))) {
+          watcher.close()
+          resolve()
+        }
+      })
+    },
+    reconnect: (agentId: string) => {
+      rmSync(join(sandboxFolder(agentId), "dropped"))
+      rmSync(droppedAll(sandboxFolder(agentId)), { force: true })
+    },
     host,
     hostPid,
     stopHosts: () => {
