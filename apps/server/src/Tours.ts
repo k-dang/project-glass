@@ -1,5 +1,6 @@
 import {
   Chapter,
+  type ChangedFile,
   type PullRequestRef,
   Revision,
   Tour,
@@ -25,6 +26,7 @@ import { engineSettingsOf, SettingsStore } from "./SettingsStore"
 import type { AgentFailure } from "./agentFailure"
 import { AgentRunners } from "./agentRunners"
 import { TourAnswer, tourInstructions, tourPrompt } from "./tourPrompt"
+import { repairChapterVisuals } from "./tourVisuals"
 
 const BACKGROUND_SLOTS = 2
 
@@ -68,14 +70,15 @@ const fromAgentFailure = ({ reason, message, runner }: AgentFailure) =>
     runner,
   })
 
-const repair = (answer: TourAnswer, paths: ReadonlyArray<string>) => {
-  const remaining = new Set(paths)
+const repair = (answer: TourAnswer, changedFiles: ReadonlyArray<ChangedFile>) => {
+  const remaining = new Set(changedFiles.map((file) => file.path))
   const chapters: Array<Chapter> = []
 
   for (const chapter of answer.chapters) {
     const files = chapter.files.filter(({ path }) => remaining.delete(path))
 
-    if (files.length > 0 || chapter.explanation.trim() !== "") chapters.push({ ...chapter, files })
+    if (files.length > 0 || chapter.explanation.trim() !== "")
+      chapters.push(repairChapterVisuals({ ...chapter, files }, changedFiles))
   }
 
   const everythingElse = [
@@ -184,10 +187,7 @@ export class Tours extends Context.Service<
             })
             .pipe(Effect.mapError(fromAgentFailure))
 
-          const repaired = repair(
-            answer,
-            input.files.map((file) => file.path),
-          )
+          const repaired = repair(answer, input.files)
 
           if (repaired.chapters.length === 0)
             return yield* new TourFailure({

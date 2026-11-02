@@ -1,12 +1,18 @@
 import { assert, it } from "@effect/vitest"
-import { type AgentEngine, PullRequestRef, Revision, type TourState } from "@glass/contracts"
+import {
+  type AgentEngine,
+  PullRequestRef,
+  Revision,
+  type TourDiagram,
+  type TourState,
+} from "@glass/contracts"
 import { Effect, Exit, Fiber, Option, Scope, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { existsSync } from "node:fs"
 import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { fakeAgent } from "../test/fakeAgent"
-import { tourInstructions } from "./tourPrompt"
+import { tourInstructions, type TourAnswer } from "./tourPrompt"
 import {
   claudeAnswer,
   type FakeAgentSettings,
@@ -129,6 +135,109 @@ const fixture = Effect.fnUntraced(function* (
 })
 
 const completed = (state: TourState) => state.job.status !== "writing"
+
+it.live(
+  "saves usable Chapters despite malformed optional visuals and reloads them after restart",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* fixture({
+        output: claudeAnswer({
+          ...answer,
+          chapters: [
+            {
+              ...answer.chapters[0]!,
+              diagram: { nodes: [], edges: [] },
+              callTree: "not a tree",
+              callouts: null,
+            },
+          ],
+        }),
+      })
+
+      yield* f.write
+      const saved = yield* f.state(completed)
+      assert.equal(saved.job.status, "idle")
+      assert.deepStrictEqual(saved.tour?.chapters, answer.chapters)
+      assert.deepStrictEqual((yield* f.restart).tour, saved.tour)
+    }),
+)
+
+it.live("persists generated call trees and callouts across a restart", () =>
+  Effect.gen(function* () {
+    const target = { path: "greet.ts", side: "new", startLine: 1, endLine: 1 } as const
+
+    const rich: TourAnswer = {
+      ...answer,
+      chapters: [
+        {
+          ...answer.chapters[0]!,
+          callTree: [
+            { id: "greet", parent: null, label: "Greet", change: "unchanged", target },
+            { id: "name", parent: "greet", label: "Use the name", change: "added", target },
+          ],
+          callouts: [{ label: "The supplied name reaches the greeting.", target }],
+        },
+      ],
+    }
+
+    const f = yield* fixture({ output: claudeAnswer(rich) })
+
+    yield* f.write
+    const saved = (yield* f.state(completed)).tour!
+    assert.deepStrictEqual(saved.chapters[0]?.callTree, rich.chapters[0]?.callTree)
+    assert.deepStrictEqual(saved.chapters[0]?.callouts, rich.chapters[0]?.callouts)
+
+    assert.deepStrictEqual((yield* f.restart).tour, saved)
+  }),
+)
+
+it.live(
+  "saves linked diagrams across a restart and drops invalid diagrams without losing Chapters",
+  () =>
+    Effect.gen(function* () {
+      const diagram: TourDiagram = {
+        nodes: [
+          {
+            id: "old",
+            label: "Original greeting",
+            change: "removed",
+            target: { path: "greet.ts", side: "old", startLine: 1, endLine: 1 },
+          },
+          {
+            id: "new",
+            label: "Named greeting",
+            change: "added",
+            target: { path: "greet.ts", side: "new", startLine: 1, endLine: 1 },
+          },
+        ],
+        edges: [{ from: "old", to: "new", change: "added" }],
+      }
+
+      const valid = { ...answer, chapters: [{ ...answer.chapters[0]!, diagram }] }
+
+      const invalid = {
+        ...valid,
+        chapters: [
+          {
+            ...valid.chapters[0]!,
+            diagram: { ...diagram, edges: [{ from: "old", to: "missing", change: "added" }] },
+          },
+        ],
+      }
+
+      const f = yield* fixture({ output: claudeAnswer(invalid) })
+      yield* f.write
+      const repaired = yield* f.state(completed)
+      assert.equal(repaired.tour?.chapters[0]?.diagram, null)
+      assert.equal(repaired.tour?.chapters[0]?.explanation, answer.chapters[0]!.explanation)
+
+      yield* f.agent.configure({ ready: true, output: claudeAnswer(valid) })
+      yield* f.write
+      const saved = yield* f.state(completed)
+      assert.deepStrictEqual(saved.tour?.chapters[0]?.diagram, diagram)
+      assert.deepStrictEqual((yield* f.restart).tour, saved.tour)
+    }),
+)
 
 it.live(
   "cancels an agent process and keeps a saved Tour after a failed replacement and restart",

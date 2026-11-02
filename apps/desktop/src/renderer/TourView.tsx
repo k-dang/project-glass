@@ -1,6 +1,8 @@
-import type { DiffSide } from "@glass/contracts"
-import { Check, ChevronRight, ChevronUp } from "lucide-react"
+import type { DiffSide, TourCodeTarget } from "@glass/contracts"
+import { cn } from "cn"
+import { Check, ChevronRight, ChevronUp, Maximize2, Minimize2 } from "lucide-react"
 import { useAtomValue } from "@effect/atom-react"
+import { DateTime } from "effect"
 import {
   type Ref,
   type RefObject,
@@ -22,6 +24,8 @@ import { plural } from "./plural"
 import { allViewed, twoDigits } from "./tourProgress"
 import type { TourChapter, TourReading } from "./tourReading"
 import { TourText } from "./TourText"
+import { TourDiagram } from "./TourDiagram"
+import { TourCallTree } from "./TourCallTree"
 import { useViewedFiles, type ViewedFilesStore } from "./useViewedFiles"
 
 type ScrollBehavior = "smooth" | "instant"
@@ -50,7 +54,7 @@ interface ChapterSection {
 }
 
 export function TourView(props: TourViewProps) {
-  const { reading, ref, onCurrentPathChange } = props
+  const { reading, ref, onCurrentPathChange, onOpenChange } = props
   const container = useRef<HTMLDivElement>(null)
   const sections = useRef(new Map<number, ChapterSection>())
 
@@ -254,6 +258,29 @@ export function TourView(props: TourViewProps) {
     [revealChapter, selectFile],
   )
 
+  const showTarget = useCallback(
+    (target: TourCodeTarget) => {
+      const { path, side, startLine, endLine } = target
+      const index = chapterOf(path)
+      selectFile(index, path)
+      onOpenChange(path, true)
+      const view = sections.current.get(index)?.view.current
+      view?.setSelectedLines({
+        id: path,
+        range: { start: startLine, end: endLine, side: annotationSides[side] },
+      })
+      view?.scrollTo({
+        type: "line",
+        id: path,
+        side: annotationSides[side],
+        lineNumber: startLine,
+        align: "center",
+        behavior: "instant",
+      })
+    },
+    [chapterOf, selectFile, onOpenChange],
+  )
+
   useImperativeHandle(
     ref,
     () => ({
@@ -280,23 +307,20 @@ export function TourView(props: TourViewProps) {
         const index = chapterOf(path)
         open(index)
         revealChapter(index, "instant")
-        selectFile(index, path)
-        const view = sections.current.get(index)?.view.current
-        view?.setSelectedLines({
-          id: path,
-          range: { start: line, end: line, side: annotationSides[side] },
-        })
-        view?.scrollTo({
-          type: "line",
-          id: path,
-          side: annotationSides[side],
-          lineNumber: line,
-          align: "center",
-          behavior: "smooth-auto",
-        })
+        showTarget({ path, side, startLine: line, endLine: line })
       },
     }),
-    [groups, currentChapter, revealChapter, selectFile, open, collapsed, scrollToFile, chapterOf],
+    [
+      groups,
+      currentChapter,
+      revealChapter,
+      selectFile,
+      open,
+      collapsed,
+      scrollToFile,
+      chapterOf,
+      showTarget,
+    ],
   )
 
   return (
@@ -317,7 +341,7 @@ export function TourView(props: TourViewProps) {
     >
       {groups.map(({ chapter, files }, index) => (
         <ChapterCard
-          key={index}
+          key={`${DateTime.formatIso(reading.writtenAt)}:${index}`}
           diff={props}
           searchGroup={searchGroup}
           chapter={chapter}
@@ -333,6 +357,7 @@ export function TourView(props: TourViewProps) {
             else sections.current.set(index, { element, view })
           }}
           onSelect={(path) => selectFile(index, path)}
+          onShowTarget={showTarget}
           onCurrentPath={(path) => {
             if (ready.current && currentChapter() === index) selectFile(index, path)
           }}
@@ -355,11 +380,15 @@ function ChapterCard(props: {
   initialPath: string | null
   register: (element: HTMLElement | null, view: RefObject<ViewHandle | null>) => void
   onSelect: (path: string) => void
+  onShowTarget: (target: TourCodeTarget) => void
   onCurrentPath: (path: string) => void
 }) {
   const view = useRef<ViewHandle>(null)
   const heading = useId()
+  const visuals = useId()
+  const [expanded, setExpanded] = useState(false)
   const { chapter, files } = props
+  const hasVisuals = chapter?.diagram != null || chapter?.callTree != null
   const paths = useMemo(() => files.map(({ file }) => file.path), [files])
   const title = chapter?.title ?? "Everything else"
 
@@ -385,7 +414,12 @@ function ChapterCard(props: {
       className={
         props.collapsed
           ? "[&+section]:mt-5"
-          : "grid grid-cols-[340px_minmax(0,1fr)] overflow-clip rounded-[10px] border bg-[color-mix(in_oklch,var(--muted)_35%,var(--background))] @max-[850px]/tour:grid-cols-[280px_minmax(0,1fr)] @max-[700px]/tour:grid-cols-1 [&+section]:mt-5"
+          : cn(
+              "grid overflow-clip rounded-[10px] border bg-[color-mix(in_oklch,var(--muted)_35%,var(--background))] [&+section]:mt-5",
+              expanded
+                ? "grid-cols-1"
+                : "grid-cols-[340px_minmax(0,1fr)] @max-[850px]/tour:grid-cols-[280px_minmax(0,1fr)] @max-[700px]/tour:grid-cols-1",
+            )
       }
       aria-labelledby={heading}
       ref={(element) => props.register(element, view)}
@@ -430,7 +464,13 @@ function ChapterCard(props: {
       ) : (
         <>
           <aside
-            className="max-h-(--tour-card-height) min-w-0 overflow-y-auto px-6 py-5.5 [scrollbar-width:thin] @max-[850px]/tour:p-4.5 @max-[700px]/tour:max-h-75"
+            className={cn(
+              "min-w-0 px-6 py-5.5 @max-[850px]/tour:p-4.5",
+              !expanded && "max-h-(--tour-card-height) overflow-y-auto [scrollbar-width:thin]",
+              !expanded && !hasVisuals
+                ? "@max-[700px]/tour:max-h-75"
+                : "@max-[700px]/tour:max-h-none",
+            )}
             aria-label={`Chapter explanation: ${title}`}
           >
             <div className="flex items-start gap-2">
@@ -460,13 +500,68 @@ function ChapterCard(props: {
               store={props.diff.viewedFiles}
               onChange={props.diff.onViewedChange}
             />
-            <div className="text-[13px] leading-[1.8] text-muted-foreground wrap-anywhere [&_code]:bg-transparent [&_code]:p-0 [&_code]:text-xs [&_code]:text-inherit [&_p+p]:mt-3">
+            {hasVisuals && (
+              <Button
+                variant="outline"
+                size="xs"
+                className="mb-4"
+                aria-expanded={expanded}
+                aria-controls={visuals}
+                onClick={() => setExpanded(!expanded)}
+              >
+                {expanded ? <Minimize2 aria-hidden /> : <Maximize2 aria-hidden />}
+                {expanded ? "Collapse" : "Expand"}{" "}
+                {chapter?.diagram != null ? "diagram" : "call tree"}
+              </Button>
+            )}
+            <div className="max-w-[80ch] text-[13px] leading-[1.8] text-muted-foreground wrap-anywhere [&_code]:bg-transparent [&_code]:p-0 [&_code]:text-xs [&_code]:text-inherit [&_p+p]:mt-3">
               {paragraphs.map((paragraph, index) => (
                 <p key={index}>
                   <TourText text={paragraph} />
                 </p>
               ))}
             </div>
+            {chapter !== null && chapter.callouts.length > 0 && (
+              <nav
+                className="mt-4 max-w-[80ch] space-y-2"
+                aria-label={`Code callouts for ${title}`}
+              >
+                {chapter.callouts.map((callout, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    className="block w-full cursor-pointer rounded-md border-l-2 border-(--viewed) px-3 py-2 text-left text-xs leading-5 wrap-anywhere hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                    onClick={() => props.onShowTarget(callout.target)}
+                  >
+                    <TourText text={callout.label} />
+                    <span className="ml-1 text-muted-foreground" aria-hidden>
+                      ↗
+                    </span>
+                  </button>
+                ))}
+              </nav>
+            )}
+            {hasVisuals && (
+              <div id={visuals}>
+                {chapter?.diagram != null && (
+                  <TourDiagram
+                    diagram={chapter.diagram}
+                    chapterTitle={title}
+                    expanded={expanded}
+                    path={props.path}
+                    onSelect={(node) => props.onShowTarget(node.target)}
+                  />
+                )}
+                {chapter?.callTree != null && (
+                  <TourCallTree
+                    tree={chapter.callTree}
+                    chapterTitle={title}
+                    expanded={expanded}
+                    onSelect={props.onShowTarget}
+                  />
+                )}
+              </div>
+            )}
             <ChapterFiles
               files={files}
               path={props.path}
@@ -477,9 +572,17 @@ function ChapterCard(props: {
                 view.current?.scrollTo({ type: "item", id: path, align: "start" })
               }}
               title={title}
+              expanded={expanded}
             />
           </aside>
-          <div className="flex h-(--tour-card-height) min-h-0 min-w-0 border-l px-4.5 pt-4 pb-4.5 @max-[850px]/tour:p-3.5 @max-[700px]/tour:h-115 @max-[700px]/tour:border-t @max-[700px]/tour:border-l-0">
+          <div
+            className={cn(
+              "flex h-(--tour-card-height) min-h-0 min-w-0 px-4.5 pt-4 pb-4.5 @max-[850px]/tour:p-3.5 @max-[700px]/tour:h-115",
+              expanded
+                ? "border-t"
+                : "border-l @max-[700px]/tour:border-t @max-[700px]/tour:border-l-0",
+            )}
+          >
             {files.length === 0 ? (
               <p className="p-4 text-sm text-muted-foreground">No files remain in this Chapter.</p>
             ) : (
@@ -562,11 +665,15 @@ function ChapterFiles(props: {
   store: ViewedFilesStore
   onSelect: (path: string) => void
   title: string
+  expanded: boolean
 }) {
   const viewed = useViewedFiles(props.store)
 
   return (
-    <nav className="mt-5.5 flex flex-col gap-1.75" aria-label={`Files in ${props.title}`}>
+    <nav
+      className={cn("mt-5.5 flex gap-1.75", props.expanded ? "flex-wrap" : "flex-col")}
+      aria-label={`Files in ${props.title}`}
+    >
       {props.files.map(({ file }) => {
         const slash = file.path.lastIndexOf("/")
 
@@ -574,7 +681,10 @@ function ChapterFiles(props: {
           <button
             type="button"
             key={file.path}
-            className="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-[7px] border bg-background px-2.5 py-2.25 text-left hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-ring aria-[current=location]:border-(--viewed) aria-[current=location]:bg-[color-mix(in_oklch,var(--viewed)_10%,var(--background))]"
+            className={cn(
+              "flex min-h-11 cursor-pointer items-center gap-2 rounded-[7px] border bg-background px-2.5 py-2.25 text-left hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-ring aria-[current=location]:border-(--viewed) aria-[current=location]:bg-[color-mix(in_oklch,var(--viewed)_10%,var(--background))]",
+              props.expanded ? "min-w-0 flex-1 basis-60" : "w-full",
+            )}
             aria-current={props.path === file.path ? "location" : undefined}
             onClick={() => props.onSelect(file.path)}
             title={file.path}

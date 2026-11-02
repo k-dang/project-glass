@@ -154,8 +154,8 @@ export function Workspace(props: {
   const { saved } = tour
 
   const reading = useMemo(
-    () => (saved === null ? null : readTour(layout.files, saved)),
-    [layout, saved],
+    () => (saved === null ? null : readTour(layout.files, saved, revision)),
+    [layout, saved, revision],
   )
 
   const tourShown = chosenOrder === "tour" ? reading : null
