@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
-import { Revision } from "@glass/contracts"
+import { AgentReviewFailure, Revision } from "@glass/contracts"
 import { screen, waitFor, within } from "@testing-library/react"
+import { Effect } from "effect"
 import { afterEach, expect, it } from "vite-plus/test"
 import { reviewOf } from "../../test/agentReview"
 import { changes, mountTourWorkspace, resetTourWorkspace } from "../../test/tourWorkspace"
@@ -101,6 +102,31 @@ it("follows up on the Agent review from beside the diff, on the workspace's Revi
 
   await waitFor(() => expect(f.followUp).toHaveBeenCalledOnce())
   expect(f.followUp.mock.calls[0]?.[0]).toMatchObject({ revision, message: "Is this blocking?" })
+  expect(screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Follow up" }).value).toBe("")
+})
+
+it("keeps a refused follow-up in the composer and says why", async () => {
+  const f = mountTourWorkspace({
+    files,
+    agentReview: { review: reviewOf(revision), job: { status: "idle" } },
+  })
+
+  f.followUp.mockImplementation(() =>
+    Effect.fail(
+      new AgentReviewFailure({
+        reason: "not-ready",
+        message: "Wait for the answer to your last Follow-up.",
+        runner: null,
+      }),
+    ),
+  )
+
+  await readBesideTheDiff(f)
+  const composer = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Follow up" })
+  await f.user.type(composer, "Is this blocking?{Enter}")
+
+  expect(await screen.findByText(/Wait for the answer to your last Follow-up/)).toBeDefined()
+  expect(composer.value).toBe("Is this blocking?")
 })
 
 it("adds a suggested Draft as the user edited it", async () => {

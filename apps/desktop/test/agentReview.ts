@@ -12,7 +12,7 @@ export const controls = (overrides: Partial<AgentReviewControls>): AgentReviewCo
   subscriptionProblem: null,
   reconnect: vi.fn<() => void>(),
   start: vi.fn<() => void>(),
-  followUp: vi.fn<(message: string) => void>(),
+  followUp: vi.fn<(message: string) => Promise<boolean>>(),
   cancel: vi.fn<() => void>(),
   ...overrides,
 })

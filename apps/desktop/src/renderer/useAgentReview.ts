@@ -1,6 +1,6 @@
-import { useAtom, useAtomRefresh, useAtomValue } from "@effect/atom-react"
+import { useAtom, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
 import type { PullRequestRef, Revision } from "@glass/contracts"
-import { Equal, Option, Predicate, Stream } from "effect"
+import { Equal, Exit, Option, Predicate, Stream } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
 import { useCallback, useMemo } from "react"
 import { Backend, backendRuntime } from "./backend"
@@ -44,7 +44,8 @@ export const useAgentReview = (
   const state = useAtomValue(stateAtom)
   const reconnect = useAtomRefresh(stateAtom)
   const [commandResult, runCommand] = useAtom(commandAtom)
-  const [followUpResult, runFollowUp] = useAtom(followUpAtom)
+  const followUpResult = useAtomValue(followUpAtom)
+  const runFollowUp = useAtomSet(followUpAtom, { mode: "promiseExit" })
   const latest = Option.getOrNull(AsyncResult.value(state))
 
   const subscriptionProblem = AsyncResult.matchWithWaiting(state, {
@@ -57,7 +58,12 @@ export const useAgentReview = (
 
   const start = useCallback(() => runCommand("start"), [runCommand])
   const cancel = useCallback(() => runCommand("cancel"), [runCommand])
-  const followUp = useCallback((message: string) => runFollowUp(message), [runFollowUp])
+
+  /** Resolves false when the backend refuses the message, so the composer can keep it. */
+  const followUp = useCallback(
+    async (message: string) => Exit.isSuccess(await runFollowUp(message)),
+    [runFollowUp],
+  )
 
   const review = latest?.review ?? null
   const current = review !== null && Equal.equals(review.revision, revision)

@@ -125,18 +125,20 @@ function FollowUpView(props: {
 function Composer(props: {
   disabled: boolean
   running: boolean
-  onSend: (message: string) => void
+  onSend: (message: string) => Promise<boolean>
   onStop: () => void
 }) {
   const [message, setMessage] = useState("")
 
-  const send = () => {
+  const send = async () => {
     const trimmed = message.trim()
 
     if (props.disabled || props.running || trimmed === "") return
 
-    props.onSend(trimmed)
     setMessage("")
+
+    if (!(await props.onSend(trimmed)))
+      setMessage((current) => (current === "" ? message : current))
   }
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -145,7 +147,7 @@ function Composer(props: {
 
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault()
-      send()
+      void send()
     }
   }
 
@@ -154,7 +156,7 @@ function Composer(props: {
       className="shrink-0 border-t px-5 py-3"
       onSubmit={(event) => {
         event.preventDefault()
-        send()
+        void send()
       }}
     >
       <InputGroup>
