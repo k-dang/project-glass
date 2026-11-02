@@ -140,8 +140,24 @@ const killTree = async (pid: number) => {
       // The host's programs hold their working directories open on Windows.
       await execFileAsync("taskkill", ["/PID", String(pid), "/T", "/F"], { windowsHide: true })
     } else {
-      // The host leads its own process group, so this ends its agent programs with it.
-      process.kill(-pid, "SIGKILL")
+      // Effect gives agent programs their own process groups, outside the host's group.
+      const { stdout } = await execFileAsync("ps", ["-A", "-o", "pid=,ppid="])
+
+      const processes = stdout
+        .trim()
+        .split("\n")
+        .map((line) => {
+          const [child, parent] = line.trim().split(/\s+/)
+
+          return { pid: Number(child), parent: Number(parent) }
+        })
+
+      const pids = [pid]
+
+      for (const parent of pids)
+        pids.push(...processes.filter((child) => child.parent === parent).map((child) => child.pid))
+
+      await execFileAsync("kill", ["-KILL", ...pids.toReversed().map(String)])
     }
   } catch {}
 }
