@@ -17,7 +17,6 @@ import {
   TurnEnd,
   type TurnEnding,
   TurnPart,
-  TurnCutOff,
   TurnStarted,
 } from "@glass/contracts"
 import {
@@ -124,8 +123,6 @@ const startsNext = (event: TranscriptUpdate) =>
   (Predicate.isTagged(event.ended.ending, "Done") ||
     Predicate.isTagged(event.ended.ending, "Failed"))
 
-const cutOffTag = TurnCutOff.fields._tag.schema.literal
-
 const storageFailure = () =>
   new AgentError({ message: "Couldn't read or save the Agent's transcript. Try again." })
 
@@ -228,7 +225,7 @@ export class Transcripts extends Context.Service<
               sql`
                 UPDATE agent_turn SET ended = ${encodeEnd(ended)}
                 WHERE id = ${turnId}
-                  AND (ended IS NULL OR json_extract(ended, '$.ending._tag') = ${cutOffTag})
+                  AND (ended IS NULL OR json_extract(ended, '$.ending._tag') = 'CutOff')
                 RETURNING id
               `.pipe(Effect.map((rows) => rows.length > 0)),
           }),

@@ -1,5 +1,5 @@
 import type { AgentEngine, SandboxProvider, SandboxState } from "@glass/plugin"
-import { Context, Deferred, Effect, Exit, Layer, Redacted, Schema, Scope } from "effect"
+import { Context, Deferred, Duration, Effect, Exit, Layer, Redacted, Schema, Scope } from "effect"
 import { NodeHttpServer } from "@effect/platform-node"
 import { HttpServer } from "effect/http"
 import { createServer } from "node:http"
@@ -21,7 +21,7 @@ export interface InProcessSandboxSettings {
   readonly maxLifetimeMillis?: number
 }
 
-const TWO_DAYS = 2 * 24 * 60 * 60 * 1000
+const TWO_DAYS = Duration.toMillis(Duration.days(2))
 
 export const steps = ["Creating the Sandbox", "Starting the agent"] as const
 

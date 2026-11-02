@@ -48,9 +48,7 @@ const expiryFormat = new Intl.DateTimeFormat(undefined, {
 })
 
 const sandboxLine = ({ reach, expiresAt }: SandboxStatus) => {
-  if (reach === "expired") return "Sandbox expired"
-
-  if (reach === "deleted") return "Sandbox deleted"
+  if (isGone(reach)) return `Sandbox ${reach}`
 
   const expiry =
     expiresAt === null ? null : `Expires ${expiryFormat.format(DateTime.toDateUtc(expiresAt))}`
@@ -290,7 +288,7 @@ function AgentRow(props: { agent: Agent }) {
             id={sandboxId}
             className={cn(
               "truncate text-xs text-muted-foreground",
-              sandbox !== null && isGone(sandbox.reach) && "text-destructive",
+              isGone(sandbox?.reach) && "text-destructive",
             )}
           >
             {sandboxText}

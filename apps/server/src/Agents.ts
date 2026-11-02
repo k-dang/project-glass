@@ -355,19 +355,17 @@ export class Agents extends Context.Service<
       const findWritable = (agentId: string) =>
         find(agentId).pipe(Effect.tap(() => sandboxes.refuseIfGone(agentId)))
 
-      const startOrQueue = (agentId: string, input: MessageInput) =>
-        refuseWhileWaiting(agentId).pipe(Effect.andThen(transcripts.startOrQueue(agentId, input)))
-
       const send = Effect.fn("Agents.send")(function* (agentId: string, input: MessageInput) {
         yield* findWritable(agentId)
-        yield* startOrQueue(agentId, input)
+        yield* refuseWhileWaiting(agentId)
+        yield* transcripts.startOrQueue(agentId, input)
       })
 
       const steer = Effect.fn("Agents.steer")(function* (agentId: string, input: MessageInput) {
         const row = yield* findWritable(agentId)
         yield* refuseWhileWaiting(agentId)
 
-        if (!(yield* trySteer(row, input))) yield* startOrQueue(agentId, input)
+        if (!(yield* trySteer(row, input))) yield* transcripts.startOrQueue(agentId, input)
       })
 
       const sendQueued = Effect.fn("Agents.sendQueued")(function* (

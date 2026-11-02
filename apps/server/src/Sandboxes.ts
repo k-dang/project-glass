@@ -385,11 +385,12 @@ export class Sandboxes extends Context.Service<
               if (record === null || isGone(reach)) return
 
               const expiresAt = yield* extendSandbox(provider, extend, record.state)
+
+              if (last !== undefined && !DateTime.isGreaterThan(expiresAt, last)) return
+
               const { record: current } = yield* knownOf(agentId)
 
               if (current !== null) yield* save(agentId, { ...current, expiresAt })
-
-              if (last !== undefined && !DateTime.isGreaterThan(expiresAt, last)) return
 
               last = expiresAt
 
@@ -521,7 +522,11 @@ export class Sandboxes extends Context.Service<
           host: (placed) =>
             connect(placed.agent.id, placed).pipe(
               Effect.catchTag("SandboxGone", () =>
-                refuseIfGone(placed.agent.id).pipe(Effect.andThen(Effect.fail(unreachable()))),
+                knownOf(placed.agent.id).pipe(
+                  Effect.flatMap(({ reach }) =>
+                    Effect.fail(isGone(reach) ? goneFailure(reach) : unreachable()),
+                  ),
+                ),
               ),
             ),
           runningHost: ({ agent }) =>

@@ -161,7 +161,7 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
   const registry = useContext(RegistryContext)
 
   const reach = agent.sandbox?.reach
-  const gone = reach !== undefined && isGone(reach) ? reach : null
+  const gone = isGone(reach) ? reach : null
 
   useEffect(() => {
     rememberPlace(registry, { area: "agents", agentId: agent.id })
