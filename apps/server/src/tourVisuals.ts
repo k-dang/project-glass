@@ -114,16 +114,16 @@ export const repairChapterVisuals = (
   chapter: Chapter,
   files: ReadonlyArray<ChangedFile>,
 ): Chapter => {
-  let repaired = chapter
+  const repaired = { ...chapter }
 
   if (chapter.diagram != null)
-    repaired = { ...repaired, diagram: validateTourDiagram(chapter.diagram, chapter, files) }
+    repaired.diagram = validateTourDiagram(chapter.diagram, chapter, files)
 
   if (chapter.callTree != null)
-    repaired = { ...repaired, callTree: validateTourCallTree(chapter.callTree, chapter, files) }
+    repaired.callTree = validateTourCallTree(chapter.callTree, chapter, files)
 
   if (chapter.callouts !== undefined)
-    repaired = { ...repaired, callouts: validateTourCallouts(chapter.callouts, chapter, files) }
+    repaired.callouts = validateTourCallouts(chapter.callouts, chapter, files)
 
   return repaired
 }
