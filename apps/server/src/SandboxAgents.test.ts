@@ -170,6 +170,29 @@ const failedReason = (turn: Turn | undefined) => {
   return Predicate.isTagged(ending, "Failed") ? ending.reason : ending?._tag
 }
 
+it.live("fails an Agent whose Sandbox is gone, and removes it without a warning", () =>
+  Effect.gen(function* () {
+    const f = yield* agentsFixture({ output: "Done." })
+    const agent = yield* f.startSandbox()
+    yield* f.transcript(agent.id, settled(1))
+
+    // Reclaimed while Glass was closed, so the relaunched Glass first learns of it on reaching it.
+    yield* Effect.promise(() => f.sandboxes.deleteSandbox(agent.id))
+    const relaunched = yield* f.restart
+    yield* relaunched.SendMessage({ agentId: agent.id, message: "Still there?", images: [] })
+
+    const [, turn] = yield* f.transcript(agent.id, settled(2), relaunched)
+    assert.equal(failedReason(turn), "This Agent's Sandbox no longer exists. Remove the Agent.")
+
+    const warnings = yield* relaunched.GetRemovalWarnings({ agentId: agent.id })
+    assert.equal(warnings.uncommittedChanges, "none")
+
+    yield* relaunched.RemoveAgent({ agentId: agent.id })
+    const left = yield* relaunched.WatchAgents().pipe(Stream.runHead)
+    assert.deepStrictEqual(Option.getOrThrow(left), [])
+  }),
+)
+
 it.live("deletes a Sandbox that fails part-way, failing the first message safely", () =>
   Effect.gen(function* () {
     const f = yield* agentsFixture({ output: "Hello" })
