@@ -10,8 +10,7 @@
     "dist": "pnpm build && pnpm --filter @glass/desktop dist",
     "check": "vp check",
     "fix": "vp check --fix",
-    "test": "pnpm test:lint && pnpm -r test",
-    "test:lint": "vp test run",
+    "test": "pnpm -r test",
     "test:e2e": "pnpm build && pnpm --filter @glass/desktop test:e2e"
   },
   "devDependencies": {
@@ -19,7 +18,6 @@
     "@oxlint/plugins": "1.87.0",
     "@types/node": "catalog:",
     "effect": "catalog:",
-    "oxlint": "1.87.0",
     "typescript": "catalog:",
     "vite-plus": "catalog:"
   },

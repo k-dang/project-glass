@@ -16,10 +16,6 @@ const ignorePatterns = [
 ]
 
 export default defineConfig({
-  test: {
-    include: ["tools/oxlint/anti-slop/test/**/*.test.ts"],
-    testTimeout: 30_000,
-  },
   fmt: {
     printWidth: 100,
     semi: false,

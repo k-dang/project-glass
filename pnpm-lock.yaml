@@ -139,9 +139,6 @@ importers:
       effect:
         specifier: 'catalog:'
         version: 4.0.5
-      oxlint:
-        specifier: 1.87.0
-        version: 1.87.0(oxlint-tsgolint@7.0.2003)(vite-plus@1.1.0(@types/node@24.19.2)(@vitest/ui@5.0.3)(happy-dom@21.0.3)(jiti@2.7.0)(playwright@1.64.1)(typescript@7.0.2)(yaml@2.9.0))
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
