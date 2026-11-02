@@ -37,6 +37,7 @@ import { App } from "./App"
 import { backendLayerAtom } from "./backend"
 import {
   confirmLeave,
+  discardPromptAtom,
   openPullRequest,
   openWorkspaceAtom,
   reloadPullRequest,
@@ -759,8 +760,8 @@ it.each(["resolution", "Viewed-file"])(
         AtomRegistry.getResult(registry, openWorkspaceAtom, { suspendOnWaiting: true }),
       )
 
-      if (writeKind === "resolution") first.resolutions.set("T1", true)
-      else first.viewedFiles.set("greet.ts", true)
+      if (writeKind === "resolution") first.feedback.resolutions.set("T1", true)
+      else first.feedback.viewedFiles.set("greet.ts", true)
 
       const write = await next(writes)
       const reloading = reloadPullRequest(registry)
@@ -771,15 +772,15 @@ it.each(["resolution", "Viewed-file"])(
       )
 
       await reloading
-      expect(first.drafts.locked()).toBe(false)
-      expect(first.replies.locked()).toBe(false)
-      expect(first.viewedFiles.snapshot().locked).toBe(false)
-      expect(registry.get(first.resolutions.lockedAtom)).toBe(false)
+      expect(first.feedback.drafts.locked()).toBe(false)
+      expect(first.feedback.replies.locked()).toBe(false)
+      expect(first.feedback.viewedFiles.snapshot().locked).toBe(false)
+      expect(registry.get(first.feedback.resolutions.lockedAtom)).toBe(false)
 
       write.answer(Effect.void)
       await eventually(() => {
-        expect(registry.get(first.resolutions.viewAtom("T1")).feedback).toBeNull()
-        expect(first.viewedFiles.snapshot().saving.size).toBe(0)
+        expect(registry.get(first.feedback.resolutions.viewAtom("T1")).feedback).toBeNull()
+        expect(first.feedback.viewedFiles.snapshot().saving.size).toBe(0)
       })
 
       const current = await Effect.runPromise(
@@ -847,6 +848,138 @@ it.each(["success", "failure"])(
     ;(await next(resolves)).answer(Effect.succeed(outcome !== "success"))
   },
 )
+
+it.each(["load failure", "target navigation"])(
+  "restores the old workspace's editability after Reload ends through %s",
+  async (ending) => {
+    const opens: Array<
+      Held<{ pullRequest: PullRequestRef }, PullRequestWorkspace, OpenPullRequestError>
+    > = []
+
+    const interrupted = vi.fn<() => void>()
+
+    const registry = testRegistry({
+      GetConnection: () =>
+        Effect.succeed(new GitHubConnection({ login: "kevin", tokenSource: "gh" })),
+      OpenPullRequest: (payload) =>
+        hold(opens)(payload).pipe(Effect.onInterrupt(() => Effect.sync(interrupted))),
+      SetFileViewed: () => Effect.void,
+      SetDiscussionResolved: () => Effect.succeed(true),
+    })
+
+    try {
+      openPullRequest(registry, greet.ref)
+      ;(await next(opens)).answer(Effect.succeed(withDiscussion("head001")))
+
+      const first = await Effect.runPromise(
+        AtomRegistry.getResult(registry, openWorkspaceAtom, { suspendOnWaiting: true }),
+      )
+
+      first.feedback.drafts.setSummary("Keep this summary")
+      first.feedback.replies.edit("T1", "Keep this Reply")
+      const reloading = reloadPullRequest(registry)
+      const replacement = await next(opens)
+      let current = first
+      let recalled = first
+
+      if (ending === "load failure") {
+        replacement.answer(Effect.fail(new GitHubUnavailable({ message: "Offline" })))
+        await reloading
+      } else {
+        openPullRequest(registry, wave.ref)
+        ;(await next(opens)).answer(Effect.succeed(workspaceOf(wave, "head002")))
+        await reloading
+        replacement.answer(Effect.succeed(withDiscussion("stale")))
+
+        current = await Effect.runPromise(
+          AtomRegistry.getResult(registry, openWorkspaceAtom, { suspendOnWaiting: true }),
+        )
+
+        openPullRequest(registry, greet.ref)
+
+        recalled = await Effect.runPromise(
+          AtomRegistry.getResult(registry, openWorkspaceAtom, { suspendOnWaiting: true }),
+        )
+      }
+
+      await eventually(() =>
+        expect(interrupted).toHaveBeenCalledTimes(ending === "target navigation" ? 1 : 0),
+      )
+      expect(current.workspace.pullRequest.ref).toEqual(
+        ending === "target navigation" ? wave.ref : greet.ref,
+      )
+      expect(recalled).toBe(first)
+      expect(first.feedback.drafts.summary()).toBe("Keep this summary")
+      expect(first.feedback.replies.view("T1").body).toBe("Keep this Reply")
+      first.feedback.drafts.start("greet.ts", "new", 2)
+      const draft = first.feedback.drafts.views()[0]!
+
+      first.feedback.drafts.edit(draft.key, "Editable Draft")
+      first.feedback.replies.edit("T1", "Editable Reply")
+      first.feedback.viewedFiles.set("greet.ts", true)
+      first.feedback.resolutions.set("T1", true)
+      expect(first.feedback.drafts.view(draft.key)?.body).toBe("Editable Draft")
+      expect(first.feedback.replies.view("T1").body).toBe("Editable Reply")
+      expect(first.feedback.viewedFiles.snapshot().viewed.has("greet.ts")).toBe(true)
+      await eventually(() =>
+        expect(registry.get(first.feedback.resolutions.viewAtom("T1")).confirmed).toBe(true),
+      )
+    } finally {
+      registry.dispose()
+    }
+  },
+)
+
+it("dismisses Reload's discard prompt when the target changes, preserving the old workspace's unsent work", async () => {
+  const opened: Array<PullRequestRef> = []
+
+  const registry = testRegistry({
+    GetConnection: () =>
+      Effect.succeed(new GitHubConnection({ login: "kevin", tokenSource: "gh" })),
+    OpenPullRequest: ({ pullRequest }) => {
+      opened.push(pullRequest)
+
+      return Effect.succeed(
+        referenceKey(pullRequest) === referenceKey(greet.ref)
+          ? withDiscussion("head001")
+          : workspaceOf(wave, "head002"),
+      )
+    },
+    CreateDraft: () => Effect.fail(new GitHubUnavailable({ message: "Offline" })),
+  })
+
+  try {
+    openPullRequest(registry, greet.ref)
+
+    const first = await Effect.runPromise(
+      AtomRegistry.getResult(registry, openWorkspaceAtom, { suspendOnWaiting: true }),
+    )
+
+    first.feedback.drafts.start("greet.ts", "new", 2)
+    const draft = first.feedback.drafts.views()[0]!
+
+    first.feedback.drafts.edit(draft.key, "Unsent Draft")
+    const reloading = reloadPullRequest(registry)
+
+    await eventually(() => expect(registry.get(discardPromptAtom)).not.toBeNull())
+    expect(opened).toEqual([greet.ref])
+    openPullRequest(registry, wave.ref)
+    await reloading
+
+    const current = await Effect.runPromise(
+      AtomRegistry.getResult(registry, openWorkspaceAtom, { suspendOnWaiting: true }),
+    )
+
+    expect(current.workspace.pullRequest.ref).toEqual(wave.ref)
+    expect(registry.get(discardPromptAtom)).toBeNull()
+    expect(first.feedback.drafts.view(draft.key)?.body).toBe("Unsent Draft")
+    first.feedback.drafts.edit(draft.key, "Editable Draft")
+    expect(first.feedback.drafts.view(draft.key)?.body).toBe("Editable Draft")
+    expect(opened).toEqual([greet.ref, wave.ref])
+  } finally {
+    registry.dispose()
+  }
+})
 
 it("leaves a PR while a resolution is in flight and shows its result when returning", async () => {
   const resolves: Array<

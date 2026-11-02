@@ -70,8 +70,16 @@ The stored destinations seed a fresh renderer until work is opened in their area
 or Tour viewer applies its initial file when it mounts, including when a Tour arrives after the
 workspace. Scroll callbacks report position only after that viewer applies its initial position.
 
-The per-PR Draft, Reply, and viewed-file stores stay classes with autosave timers, held by the
-workspace atom and given a `BackendRuntime` from the registry with `backendRuntimeOf`. The PR list
+The workspace atom owns a concrete `WorkspaceFeedback` module, which creates and disposes its
+Draft, Ask, Reply, resolution, and viewed-file stores. UI callers still use their atoms and actions.
+`prepareReload(confirm, replace)` holds Drafts and Replies, drains their writes together with
+viewed-file and resolution writes, and carries unsent Replies and the current Review summary into
+the replacement. `prepareLeave(confirm)` drains Drafts and Replies and discards applicable unsaved
+work only after confirmation; viewed-file and resolution writes may finish after leaving. Each
+operation owns its release through completion, failure, and interruption, including overlapping
+leave and reload holds. The route owner cancels reload on a target change and keeps responsibility
+for loading, caching, and replacing workspaces. AskStore only participates in creation and disposal.
+The stores retain their existing atom architecture and use `backendRuntimeOf` for backend calls. The PR list
 keeps its paging in component state, because it reloads whenever the list is shown. Async state
 renders from `AsyncResult` throughout, with `problemOf` turning a failure's cause into the alert.
 Followed repositories load when Settings first needs them, not at launch.

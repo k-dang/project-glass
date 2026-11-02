@@ -7,16 +7,12 @@ import {
 import { linkOptions } from "@tanstack/react-router"
 import { Effect, Option, Predicate, Schema, Stream } from "effect"
 import { AsyncResult, Atom, AtomRegistry } from "effect/reactivity"
-import { ActivityRecorder, activityPullRequest } from "./activity"
+import { ActivityRecorder } from "./activity"
 import { Backend, backendRuntime, backendRuntimeOf } from "./backend"
 import { connectionAtom } from "./connection"
 import { reviewedOutAtom, takeReviewedOut } from "./queue"
-import { AskStore } from "./useAsks"
-import { DraftStore } from "./useDrafts"
 import { reviewingRevisionAtom } from "./workspaceEvents"
-import { ReplyStore } from "./useReplies"
-import { createResolutions, type Resolutions } from "./useResolutions"
-import { ViewedFilesStore } from "./useViewedFiles"
+import { WorkspaceFeedback, type ReloadFeedback } from "./workspaceFeedback"
 import { savedDestinationsAtom, savedIn } from "./savedPlace"
 import { restoreReviewPosition } from "./reviewPosition"
 import { watched } from "./watched"
@@ -24,11 +20,7 @@ import { watched } from "./watched"
 interface OpenWorkspace {
   readonly workspace: PullRequestWorkspace
   readonly activity: ActivityRecorder
-  readonly drafts: DraftStore
-  readonly asks: AskStore
-  readonly replies: ReplyStore
-  readonly resolutions: Resolutions
-  readonly viewedFiles: ViewedFilesStore
+  readonly feedback: WorkspaceFeedback
 }
 
 export type WorkspaceTab = "overview" | "changes" | "files"
@@ -82,39 +74,27 @@ interface DiscardPrompt {
 
 export const discardPromptAtom = Atom.make<DiscardPrompt | null>(null).pipe(Atom.keepAlive)
 
-const confirmDiscarding = async (
+const confirmDiscarding = (
   registry: AtomRegistry.AtomRegistry,
   lost: ReadonlyArray<string>,
-) =>
-  lost.length === 0 ||
-  new Promise<boolean>((resolve) => {
-    registry.set(discardPromptAtom, {
-      description: `${conjunction.format(lost)} will be discarded.`,
-      answer: (discard) => {
-        registry.set(discardPromptAtom, null)
-        resolve(discard)
-      },
-    })
-  })
+): Effect.Effect<boolean> =>
+  lost.length === 0
+    ? Effect.succeed(true)
+    : Effect.callback<boolean>((resume) => {
+        const prompt: DiscardPrompt = {
+          description: `${conjunction.format(lost)} will be discarded.`,
+          answer: (discard) => {
+            registry.set(discardPromptAtom, null)
+            resume(Effect.succeed(discard))
+          },
+        }
 
-const unsavedDrafts = "Drafts that couldn't save to GitHub"
+        registry.set(discardPromptAtom, prompt)
 
-const lock = async (open: OpenWorkspace) => {
-  const [, unsent] = await Promise.all([open.drafts.lockAndSave(), open.replies.lock()])
-
-  return unsent
-}
-
-const discardUnsaved = (open: OpenWorkspace) => {
-  open.drafts.discardUnsaved()
-  open.replies.discardUnsaved()
-  open.viewedFiles.discardUnsaved()
-}
-
-const unlock = (open: OpenWorkspace) => {
-  open.drafts.unlock()
-  open.replies.unlock()
-}
+        return Effect.sync(() => {
+          if (registry.get(discardPromptAtom) === prompt) registry.set(discardPromptAtom, null)
+        })
+      })
 
 export const listSearchAtom = Atom.make(defaultListSearch).pipe(Atom.keepAlive)
 
@@ -142,10 +122,7 @@ export const reviewsLinkAtom = Atom.make((get) => {
 interface OpenRequest {
   readonly ref: PullRequestRef
   readonly loaded?: OpenWorkspace
-  readonly previous?: {
-    readonly open: OpenWorkspace
-    readonly replies: ReadonlyMap<string, string>
-  }
+  readonly previous?: ReloadFeedback
 }
 
 const LOADED_TTL = 5 * 60_000
@@ -166,12 +143,7 @@ const remember = (registry: AtomRegistry.AtomRegistry, ref: PullRequestRef, open
     for (const [url, entry] of loaded) {
       if (url !== urlOf(ref) && isFresh(entry)) continue
 
-      entry.open.drafts.dispose()
-      entry.open.asks.dispose()
-      entry.open.replies.dispose()
-      entry.open.viewedFiles.dispose()
-
-      entry.open.resolutions.dispose()
+      entry.open.feedback.dispose()
 
       next.delete(url)
     }
@@ -252,15 +224,6 @@ const load = (request: OpenRequest, registry: AtomRegistry.AtomRegistry) =>
 
       return open
     }),
-    Effect.onError(() =>
-      Effect.sync(() => {
-        if (request.previous !== undefined) {
-          unlock(request.previous.open)
-          request.previous.open.viewedFiles.unlock()
-          request.previous.open.resolutions.unlock()
-        }
-      }),
-    ),
   )
 
 export const openPullRequest = (registry: AtomRegistry.AtomRegistry, ref: PullRequestRef) => {
@@ -291,45 +254,25 @@ export const reloadPullRequest = async (registry: AtomRegistry.AtomRegistry) => 
   const target = registry.get(targetAtom)
   const current = Option.getOrNull(AsyncResult.value(registry.get(openWorkspaceAtom)))
 
-  if (target === null || current === null || current.drafts.locked()) return
+  if (target === null || current === null) return
 
-  let cancelled = false
-  let loading = false
-  const targetChanged = Promise.withResolvers<void>()
-
-  const stop = registry.subscribe(targetAtom, () => {
-    cancelled = true
-    targetChanged.resolve()
-  })
+  const cancellation = new AbortController()
+  const stop = registry.subscribe(targetAtom, () => cancellation.abort())
 
   try {
-    const saved = await Promise.race([
-      Promise.all([lock(current), current.viewedFiles.lock(), current.resolutions.lock()]),
-      targetChanged.promise,
-    ])
-
-    if (saved === undefined || cancelled || registry.get(targetAtom) !== target) return
-
-    const discard = await Promise.race([
-      confirmDiscarding(registry, current.drafts.hasUnsaved() ? [unsavedDrafts] : []),
-      targetChanged.promise,
-    ])
-
-    if (!discard || cancelled || registry.get(targetAtom) !== target) return
-
-    registry.set(openWorkspaceAtom, {
-      ref: target,
-      previous: { open: current, replies: saved[0] },
-    })
-    loading = true
+    await Effect.runPromiseExit(
+      current.feedback.prepareReload(
+        (lost) => confirmDiscarding(registry, lost),
+        (previous) =>
+          Effect.gen(function* () {
+            registry.set(openWorkspaceAtom, { ref: target, previous })
+            yield* AtomRegistry.getResult(registry, openWorkspaceAtom, { suspendOnWaiting: true })
+          }),
+      ),
+      { signal: cancellation.signal },
+    )
   } finally {
     stop()
-
-    if (!loading) {
-      unlock(current)
-      current.viewedFiles.unlock()
-      current.resolutions.unlock()
-    }
   }
 }
 
@@ -354,22 +297,9 @@ export const confirmLeave = async (registry: AtomRegistry.AtomRegistry) => {
 
   if (current === null) return true
 
-  const unsent = await lock(current)
-  const lost: Array<string> = []
-
-  if (current.drafts.hasUnsaved()) lost.push(unsavedDrafts)
-
-  if (unsent.size > 0) lost.push("Replies you haven't published")
-
-  if (current.drafts.summary().trim() !== "") lost.push("your Review summary")
-
-  const leaving = await confirmDiscarding(registry, lost)
-
-  if (leaving) discardUnsaved(current)
-
-  unlock(current)
-
-  return leaving
+  return Effect.runPromise(
+    current.feedback.prepareLeave((lost) => confirmDiscarding(registry, lost)),
+  )
 }
 
 export const closePullRequest = (registry: AtomRegistry.AtomRegistry) => {
@@ -385,9 +315,6 @@ const build = (
 ): OpenWorkspace => {
   const runtime = backendRuntimeOf(registry)
   const activity = new ActivityRecorder(workspace, runtime)
-  const { onLines, outdated } = workspace.discussions
-  const ids = new Set([...onLines, ...outdated].map((discussion) => discussion.id))
-  const replies = [...(previous?.replies ?? [])].filter(([id]) => ids.has(id))
 
   const record = (recorded: Activity) => {
     activity.record(recorded)
@@ -399,15 +326,6 @@ const build = (
   return {
     workspace,
     activity,
-    drafts: new DraftStore(workspace, registry, record, previous?.open.drafts.summary()),
-    asks: new AskStore(workspace, registry),
-    replies: new ReplyStore(
-      registry,
-      activityPullRequest(workspace),
-      activity.record,
-      new Map(replies),
-    ),
-    resolutions: createResolutions(registry),
-    viewedFiles: new ViewedFilesStore(workspace, registry),
+    feedback: new WorkspaceFeedback(workspace, registry, record, previous),
   }
 }
