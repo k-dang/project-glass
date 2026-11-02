@@ -5,11 +5,11 @@ import {
   type PullRequestRef,
   type Revision,
 } from "@glass/contracts"
-import { Context, Effect, Layer, Predicate } from "effect"
+import { Context, Effect, Layer } from "effect"
 import { AskAgentAnswer, askInstructions, askPrompt } from "./askPrompt"
 import { checkoutRunFailure, CheckoutRuns } from "./CheckoutRuns"
 import { GitHubClient } from "./github/GitHubClient"
-import { lineInPatch } from "./github/patchLines"
+import { lineInFiles } from "./github/patchLines"
 import { ServerConfig } from "./ServerConfig"
 
 export class Asks extends Context.Service<
@@ -41,14 +41,9 @@ export class Asks extends Context.Service<
             timeout: config.askTimeoutMs,
             read: github.tourInput,
             task: (input) => {
-              const file = input.files.find((candidate) => candidate.path === place.path)
+              const found = lineInFiles(input.files, place.path, place.side, place.line)
 
-              const lineText =
-                file !== undefined && Predicate.isTagged(file.patch, "TextPatch")
-                  ? lineInPatch(file.patch.hunks, place.side, place.line)
-                  : null
-
-              if (file === undefined || lineText === null)
+              if (found === null)
                 return Effect.fail(
                   checkoutRunFailure(
                     "stale-revision",
@@ -59,7 +54,7 @@ export class Asks extends Context.Service<
 
               return Effect.succeed({
                 instructions: askInstructions,
-                prompt: askPrompt(input, file, place, lineText, question),
+                prompt: askPrompt(input, found.file, place, found.text, question),
                 answer: AskAgentAnswer,
               })
             },

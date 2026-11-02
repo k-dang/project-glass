@@ -233,18 +233,14 @@ export class DraftStore {
       }
     }
 
-    const key = `new-${++this.#lastKey}`
-    this.#started = key
-    this.#add({ key, path, place: LinePlace.make({ side, line }), body: "", saved: null })
+    this.#started = this.#addLine(path, side, line, "")
   }
 
   /** Adds a written Draft on a line and saves it, as writing one there and leaving it would. */
   add(path: string, side: DiffSide, line: number, body: string) {
     if (this.locked()) return
 
-    const key = `new-${++this.#lastKey}`
-    this.#add({ key, path, place: LinePlace.make({ side, line }), body, saved: null })
-    this.save(key)
+    this.save(this.#addLine(path, side, line, body))
   }
 
   takeStarted(key: string) {
@@ -403,6 +399,14 @@ export class DraftStore {
     }
 
     return false
+  }
+
+  /** Adds an unsaved Draft on a line, returning its key. */
+  #addLine(path: string, side: DiffSide, line: number, body: string) {
+    const key = `new-${++this.#lastKey}`
+    this.#add({ key, path, place: LinePlace.make({ side, line }), body, saved: null })
+
+    return key
   }
 
   #add(fields: Pick<Entry, "key" | "path" | "place" | "body" | "saved">) {

@@ -2,9 +2,7 @@ import {
   AgentReview,
   AgentReviewFailure,
   type AgentReviewState,
-  type ChangedFile,
-  type FollowUp,
-  FollowUpMessage,
+  FollowUp,
   type PullRequestRef,
   Revision,
   type AgentRunnerIdentity,
@@ -18,7 +16,6 @@ import {
   Equal,
   Layer,
   Option,
-  Predicate,
   Result,
   Schema,
   Stream,
@@ -26,10 +23,10 @@ import {
 } from "effect"
 import { SqlClient } from "effect/sql"
 import { AgentReviewAnswer, agentReviewInstructions, agentReviewPrompt } from "./agentReviewPrompt"
-import { type CheckoutRunFailure, CheckoutRuns } from "./CheckoutRuns"
+import { type CheckoutRunFailure, CheckoutRuns, type CheckoutTask } from "./CheckoutRuns"
 import { FollowUpAnswer, followUpInstructions, followUpPrompt } from "./followUpPrompt"
-import { GitHubClient } from "./github/GitHubClient"
-import { lineInPatch } from "./github/patchLines"
+import { GitHubClient, type ReviewInput } from "./github/GitHubClient"
+import { lineInFiles } from "./github/patchLines"
 import { pullRequestJobs, type PullRequestJob } from "./pullRequestJobs"
 import { ServerConfig } from "./ServerConfig"
 import { SettingsStore } from "./SettingsStore"
@@ -51,11 +48,7 @@ const stored = Schema.Array(
 const SuggestedDraftsJson = Schema.fromJsonString(Schema.Array(SuggestedDraft))
 
 const storedFollowUps = Schema.Array(
-  Schema.Struct({
-    message: FollowUpMessage,
-    answer: Schema.String,
-    suggested_drafts: SuggestedDraftsJson,
-  }),
+  Schema.Struct({ ...FollowUp.fields, suggestedDrafts: SuggestedDraftsJson }),
 )
 
 const encodeSuggestedDrafts = Schema.encodeSync(SuggestedDraftsJson)
@@ -85,16 +78,6 @@ const stoppedRunner = (runner: AgentRunnerIdentity | null) =>
     "The agent runner stopped unexpectedly. Check its installation and try again.",
     runner,
   )
-
-const onDiffLine = (files: ReadonlyArray<ChangedFile>, draft: SuggestedDraft) => {
-  const file = files.find((candidate) => candidate.path === draft.path)
-
-  return (
-    file !== undefined &&
-    Predicate.isTagged(file.patch, "TextPatch") &&
-    lineInPatch(file.patch.hunks, draft.side, draft.line) !== null
-  )
-}
 
 /** A comment the agent placed off the diff can't be a Draft, so its text joins the answer. */
 const unplacedText = (drafts: ReadonlyArray<SuggestedDraft>) =>
@@ -152,7 +135,7 @@ export class AgentReviews extends Context.Service<
             return { review: null, job: { status: "idle" } } satisfies AgentReviewState
 
           const followUps =
-            yield* sql`SELECT message, answer, suggested_drafts FROM agent_review_follow_ups WHERE ${where(pr)} ORDER BY position`.pipe(
+            yield* sql`SELECT message, answer, suggested_drafts AS suggestedDrafts FROM agent_review_follow_ups WHERE ${where(pr)} ORDER BY position`.pipe(
               Effect.flatMap(Schema.decodeUnknownEffect(storedFollowUps)),
             )
 
@@ -160,11 +143,7 @@ export class AgentReviews extends Context.Service<
             revision: new Revision({ base: row.base, head: row.head }),
             writtenAt: row.written_at,
             markdown: row.markdown,
-            followUps: followUps.map(({ message, answer, suggested_drafts }) => ({
-              message,
-              answer,
-              suggestedDrafts: suggested_drafts,
-            })),
+            followUps,
           })
 
           return { review, job: { status: "idle" } } satisfies AgentReviewState
@@ -215,28 +194,50 @@ export class AgentReviews extends Context.Service<
         Effect.mapError((error) => failure("not-ready", error.message)),
       )
 
+      /**
+       * Runs an agent task over a checkout of the Revision, with the user's Review prompt, once
+       * the job names the runner. A Follow-up carries the whole PR and its thread, so it gets an
+       * Agent review's time too.
+       */
+      const runAgent = Effect.fnUntraced(function* <A>(
+        job: Job,
+        pr: PullRequestRef,
+        revision: Revision,
+        running: (runner: AgentRunnerIdentity) => AgentReviewState["job"],
+        subject: string,
+        task: (material: ReviewInput, reviewPrompt: string) => CheckoutTask<A>,
+      ) {
+        const runner = yield* checkoutRuns.select().pipe(Effect.mapError(fromCheckoutRunFailure))
+        const prompt = yield* reviewPrompt
+
+        yield* setJob(job, running(runner.identity))
+
+        return yield* runner
+          .run({
+            pr,
+            revision,
+            subject,
+            timeout: config.agentReviewTimeoutMs,
+            read: github.reviewInput,
+            task: (material) => Effect.succeed(task(material, prompt)),
+          })
+          .pipe(Effect.mapError(fromCheckoutRunFailure))
+      })
+
       const work = (job: Job, pr: PullRequestRef, revision: Revision, startedAt: number) =>
         Effect.gen(function* () {
-          const runner = yield* checkoutRuns.select().pipe(Effect.mapError(fromCheckoutRunFailure))
-          const prompt = yield* reviewPrompt
-
-          yield* setJob(job, { status: "reviewing", startedAt, runner: runner.identity })
-
-          const { answer } = yield* runner
-            .run({
-              pr,
-              revision,
-              subject: "Agent review",
-              timeout: config.agentReviewTimeoutMs,
-              read: github.reviewInput,
-              task: (material) =>
-                Effect.succeed({
-                  instructions: agentReviewInstructions(prompt),
-                  prompt: agentReviewPrompt(material),
-                  answer: AgentReviewAnswer,
-                }),
-            })
-            .pipe(Effect.mapError(fromCheckoutRunFailure))
+          const { answer } = yield* runAgent(
+            job,
+            pr,
+            revision,
+            (runner) => ({ status: "reviewing", startedAt, runner }),
+            "Agent review",
+            (material, prompt) => ({
+              instructions: agentReviewInstructions(prompt),
+              prompt: agentReviewPrompt(material),
+              answer: AgentReviewAnswer,
+            }),
+          )
 
           return AgentReview.make({
             revision,
@@ -267,35 +268,23 @@ export class AgentReviews extends Context.Service<
         startedAt: number,
       ) =>
         Effect.gen(function* () {
-          const runner = yield* checkoutRuns.select().pipe(Effect.mapError(fromCheckoutRunFailure))
-          const prompt = yield* reviewPrompt
-
-          yield* setJob(job, {
-            status: "following-up",
-            message,
-            startedAt,
-            runner: runner.identity,
-          })
-
-          // A Follow-up carries the whole PR and its thread, so it gets an Agent review's time.
-          const { input, answer } = yield* runner
-            .run({
-              pr,
-              revision: review.revision,
-              subject: "answer",
-              timeout: config.agentReviewTimeoutMs,
-              read: github.reviewInput,
-              task: (material) =>
-                Effect.succeed({
-                  instructions: followUpInstructions(prompt),
-                  prompt: followUpPrompt(material, review, message),
-                  answer: FollowUpAnswer,
-                }),
-            })
-            .pipe(Effect.mapError(fromCheckoutRunFailure))
+          const { input, answer } = yield* runAgent(
+            job,
+            pr,
+            review.revision,
+            (runner) => ({ status: "following-up", message, startedAt, runner }),
+            "answer",
+            (material, prompt) => ({
+              instructions: followUpInstructions(prompt),
+              prompt: followUpPrompt(material, review, message),
+              answer: FollowUpAnswer,
+            }),
+          )
 
           const [placed, unplaced] = Arr.partition(answer.suggestedDrafts, (draft) =>
-            onDiffLine(input.files, draft) ? Result.succeed(draft) : Result.fail(draft),
+            lineInFiles(input.files, draft.path, draft.side, draft.line) === null
+              ? Result.fail(draft)
+              : Result.succeed(draft),
           )
 
           return {

@@ -207,9 +207,6 @@ export function AgentReviewPanel(props: {
 
   if (review === null) return null
 
-  const reviewing = job?.status === "reviewing"
-  const running = job?.status === "following-up"
-
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <section aria-label="Agent review" className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
@@ -224,26 +221,24 @@ export function AgentReviewPanel(props: {
               show={props.show}
             />
           ))}
-          {job?.status === "following-up" && (
+          {(job?.status === "following-up" || job?.status === "follow-up-failed") && (
             <li className="flex flex-col gap-2">
               <UserMessage message={job.message} images={[]} />
-              <output className="flex items-center gap-2 text-sm text-muted-foreground">
-                <LoaderCircle
-                  aria-hidden
-                  className="size-3.5 shrink-0 animate-spin motion-reduce:animate-none"
+              {job.status === "following-up" ? (
+                <output className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <LoaderCircle
+                    aria-hidden
+                    className="size-3.5 shrink-0 animate-spin motion-reduce:animate-none"
+                  />
+                  <span className="flex-1">The agent is reading the PR's code…</span>
+                  <Elapsed startedAt={job.startedAt} />
+                </output>
+              ) : (
+                <ProblemAlert
+                  problem={{ title: "Follow-up failed", detail: job.reason.message }}
+                  action={{ label: "Retry", run: () => props.controls.followUp(job.message) }}
                 />
-                <span className="flex-1">The agent is reading the PR's code…</span>
-                <Elapsed startedAt={job.startedAt} />
-              </output>
-            </li>
-          )}
-          {job?.status === "follow-up-failed" && (
-            <li className="flex flex-col gap-2">
-              <UserMessage message={job.message} images={[]} />
-              <ProblemAlert
-                problem={{ title: "Follow-up failed", detail: job.reason.message }}
-                action={{ label: "Retry", run: () => props.controls.followUp(job.message) }}
-              />
+              )}
             </li>
           )}
         </ol>
@@ -259,8 +254,8 @@ export function AgentReviewPanel(props: {
         </p>
       ) : (
         <Composer
-          disabled={reviewing}
-          running={running}
+          disabled={job?.status === "reviewing"}
+          running={job?.status === "following-up"}
           onSend={props.controls.followUp}
           onStop={props.controls.cancel}
         />
