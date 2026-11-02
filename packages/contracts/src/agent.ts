@@ -104,7 +104,7 @@ export const SandboxReach = Schema.Literals([
 export type SandboxReach = typeof SandboxReach.Type
 
 export const isGone = (reach: SandboxReach): reach is GoneReach =>
-  GoneReach.literals.some((gone) => gone === reach)
+  reach === "expired" || reach === "deleted"
 
 /** Glass can't reach the Sandbox now, for a while or for good. */
 export const isOutOfReach = (reach: SandboxReach) => reach === "unreachable" || isGone(reach)

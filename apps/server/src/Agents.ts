@@ -88,7 +88,6 @@ const toRow = ({
     place:
       sandboxProvider === null ? thisMacPlace : SandboxPlace.make({ providerId: sandboxProvider }),
     repository: new FollowedRepository({ owner, repo }),
-    // Sandboxes knows this, and Agents adds it as it hands an Agent out.
     sandbox: null,
   }),
   folder,

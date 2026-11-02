@@ -119,10 +119,8 @@ const LOST_AFTER_MISSES = 4
 
 const RECONNECT_SPACING = "500 millis"
 
-/** How long Glass waits to extend a Sandbox again after its provider failed to. */
 const EXTEND_RETRY_SPACING = "1 minute"
 
-/** How long Glass waits between tries to reach a Sandbox it lost. */
 const UNREACHABLE_SPACING = "5 seconds"
 
 const reconnecting = <E, R>(
@@ -312,7 +310,6 @@ export class Sandboxes extends Context.Service<
           yield* setReach(agentId, gone)
         })
 
-      /** Fails with why the Agent can't take messages, if its Sandbox is gone. */
       const refuseIfGone = (agentId: string) =>
         knownOf(agentId).pipe(
           Effect.flatMap(({ reach }) =>

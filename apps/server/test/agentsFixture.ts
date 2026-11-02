@@ -96,9 +96,9 @@ const makeAgentsFixture = Effect.fnUntraced(function* <Claude extends { readonly
   ) =>
     backend.WatchAgents().pipe(
       Stream.map((agents) => agents.find(({ id }) => id === agentId)?.sandbox ?? null),
-      Stream.filter((status) => status !== null && until(status)),
+      Stream.filter((status): status is SandboxStatus => status !== null && until(status)),
       Stream.runHead,
-      Effect.map((found) => Option.getOrThrow(found)!),
+      Effect.map(Option.getOrThrow),
     )
 
   const send = (agentId: string, message: string, images: ReadonlyArray<Image> = []) =>
