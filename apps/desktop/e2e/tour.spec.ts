@@ -409,6 +409,30 @@ test("moves on to the next Chapter once the one in view is viewed", async ({
   await expect(changes.getByRole("heading", { name: "Document the greeting" })).toBeInViewport()
 })
 
+test("moves on to the next unviewed file once a file is viewed", async ({
+  github,
+  claude,
+  window,
+}) => {
+  await claude.answer(tour)
+  await openPullRequest(window, seedTourPullRequest(github))
+  await writeTour(window)
+
+  const first = window
+    .getByRole("tabpanel", { name: "Changes" })
+    .getByRole("region", { name: "Spell out the greeting" })
+
+  await first.getByRole("checkbox", { name: "Viewed: greet.ts", exact: true }).click()
+
+  await expect(
+    first.getByRole("button", { name: "Show greet.ts", exact: true }),
+  ).not.toBeInViewport()
+  await expect(first.getByRole("button", { name: "Hide big.ts", exact: true })).toBeInViewport()
+  await expect(
+    first.getByRole("navigation", { name: /^Files in/ }).getByRole("button", { name: /big.ts/ }),
+  ).toHaveAttribute("aria-current", "location")
+})
+
 test("finds matches across Chapters and Everything else", async ({ github, claude, window }) => {
   await claude.answer(tour)
   await openPullRequest(window, seedTourPullRequest(github))

@@ -382,9 +382,26 @@ export function ChangedFilesView(props: ChangedFilesViewProps) {
     [drafts],
   )
 
+  // Marking a file viewed moves on to the next unviewed file in this view.
+  const viewFile = useCallback(
+    (path: string, viewed: boolean) => {
+      onViewedChange([path], viewed)
+
+      if (!viewed) return
+
+      const done = viewedFiles.snapshot().viewed
+      const after = diff.files.slice(diff.files.findIndex(({ file }) => file.path === path) + 1)
+      const next = after.find(({ file }) => !done.has(file.path))
+
+      if (next !== undefined)
+        diff.ref.current?.scrollTo({ type: "item", id: next.file.path, align: "start" })
+    },
+    [onViewedChange, viewedFiles, diff.files, diff.ref],
+  )
+
   const renderFileActions = useCallback(
-    (path: string) => <ViewedCheckbox path={path} store={viewedFiles} onChange={onViewedChange} />,
-    [viewedFiles, onViewedChange],
+    (path: string) => <ViewedCheckbox path={path} store={viewedFiles} onChange={viewFile} />,
+    [viewedFiles, viewFile],
   )
 
   const renderAnnotation = useCallback(
@@ -456,7 +473,7 @@ function renderNote(note: LineNote, context: NoteContext) {
 function ViewedCheckbox(props: {
   path: string
   store: ViewedFilesStore
-  onChange: (paths: ReadonlyArray<string>, viewed: boolean) => void
+  onChange: (path: string, viewed: boolean) => void
 }) {
   const viewed = useViewedFiles(props.store)
   const id = useId()
@@ -473,7 +490,7 @@ function ViewedCheckbox(props: {
         disabled={viewed.locked}
         aria-label={`Viewed: ${props.path}`}
         aria-busy={viewed.saving.has(props.path)}
-        onCheckedChange={(checked) => props.onChange([props.path], checked)}
+        onCheckedChange={(checked) => props.onChange(props.path, checked)}
       />
       Viewed
     </Label>
