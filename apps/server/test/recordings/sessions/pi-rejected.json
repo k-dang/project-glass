@@ -20,11 +20,11 @@
             "success": true,
             "data": {
               "model": {
-                "id": "anthropic/claude-haiku-5.5",
+                "id": "<pi-model>",
                 "name": "Claude Haiku 5.5",
                 "api": "anthropic-messages",
-                "baseUrl": "https://ai-gateway.vercel.sh",
-                "provider": "vercel-ai-gateway",
+                "baseUrl": "<redacted>",
+                "provider": "<pi-provider>",
                 "reasoning": true,
                 "input": ["text", "image"],
                 "compat": {
@@ -70,7 +70,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T06-53-26-974Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T23-32-59-232Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -114,7 +114,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1793688807082,
+              "timestamp": 1793748779313,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -233,7 +233,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1793688807082,
+              "timestamp": 1793748779313,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -356,7 +356,7 @@
                   "text": "Say hello"
                 }
               ],
-              "timestamp": 1793688807081
+              "timestamp": 1793748779312
             }
           }
         },
@@ -371,7 +371,7 @@
                   "text": "Say hello"
                 }
               ],
-              "timestamp": 1793688807081
+              "timestamp": 1793748779312
             }
           }
         },
@@ -382,8 +382,8 @@
               "role": "assistant",
               "content": [],
               "api": "anthropic-messages",
-              "provider": "vercel-ai-gateway",
-              "model": "anthropic/claude-haiku-5.5",
+              "provider": "<pi-provider>",
+              "model": "<pi-model>",
               "usage": {
                 "input": 0,
                 "output": 0,
@@ -399,9 +399,9 @@
                 }
               },
               "stopReason": "error",
-              "timestamp": 1793688807109,
+              "timestamp": 1793748779338,
               "errorMessage": "401 {\"error\":{\"message\":\"Authentication failed. Create an API key and set in AI_GATEWAY_API_KEY environment variable: https://vercel.com/d?to=%2F%5Bteam%5D%2F%7E%2Fai-gateway%2Fapi-keys%3FshowCreateKeyModal\",\"type\":\"authentication_error\"}}",
-              "durationMs": 114,
+              "durationMs": 96,
               "thinkingLevel": "medium"
             }
           }
@@ -413,8 +413,8 @@
               "role": "assistant",
               "content": [],
               "api": "anthropic-messages",
-              "provider": "vercel-ai-gateway",
-              "model": "anthropic/claude-haiku-5.5",
+              "provider": "<pi-provider>",
+              "model": "<pi-model>",
               "usage": {
                 "input": 0,
                 "output": 0,
@@ -430,9 +430,9 @@
                 }
               },
               "stopReason": "error",
-              "timestamp": 1793688807109,
+              "timestamp": 1793748779338,
               "errorMessage": "401 {\"error\":{\"message\":\"Authentication failed. Create an API key and set in AI_GATEWAY_API_KEY environment variable: https://vercel.com/d?to=%2F%5Bteam%5D%2F%7E%2Fai-gateway%2Fapi-keys%3FshowCreateKeyModal\",\"type\":\"authentication_error\"}}",
-              "durationMs": 114,
+              "durationMs": 96,
               "thinkingLevel": "medium"
             }
           }
@@ -444,8 +444,8 @@
               "role": "assistant",
               "content": [],
               "api": "anthropic-messages",
-              "provider": "vercel-ai-gateway",
-              "model": "anthropic/claude-haiku-5.5",
+              "provider": "<pi-provider>",
+              "model": "<pi-model>",
               "usage": {
                 "input": 0,
                 "output": 0,
@@ -461,9 +461,9 @@
                 }
               },
               "stopReason": "error",
-              "timestamp": 1793688807109,
+              "timestamp": 1793748779338,
               "errorMessage": "401 {\"error\":{\"message\":\"Authentication failed. Create an API key and set in AI_GATEWAY_API_KEY environment variable: https://vercel.com/d?to=%2F%5Bteam%5D%2F%7E%2Fai-gateway%2Fapi-keys%3FshowCreateKeyModal\",\"type\":\"authentication_error\"}}",
-              "durationMs": 114,
+              "durationMs": 96,
               "thinkingLevel": "medium"
             },
             "toolResults": []
@@ -477,7 +477,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1793688807082,
+                "timestamp": 1793748779313,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -595,14 +595,14 @@
                     "text": "Say hello"
                   }
                 ],
-                "timestamp": 1793688807081
+                "timestamp": 1793748779312
               },
               {
                 "role": "assistant",
                 "content": [],
                 "api": "anthropic-messages",
-                "provider": "vercel-ai-gateway",
-                "model": "anthropic/claude-haiku-5.5",
+                "provider": "<pi-provider>",
+                "model": "<pi-model>",
                 "usage": {
                   "input": 0,
                   "output": 0,
@@ -618,9 +618,9 @@
                   }
                 },
                 "stopReason": "error",
-                "timestamp": 1793688807109,
+                "timestamp": 1793748779338,
                 "errorMessage": "401 {\"error\":{\"message\":\"Authentication failed. Create an API key and set in AI_GATEWAY_API_KEY environment variable: https://vercel.com/d?to=%2F%5Bteam%5D%2F%7E%2Fai-gateway%2Fapi-keys%3FshowCreateKeyModal\",\"type\":\"authentication_error\"}}",
-                "durationMs": 114,
+                "durationMs": 96,
                 "thinkingLevel": "medium"
               }
             ],
@@ -647,11 +647,11 @@
             "success": true,
             "data": {
               "model": {
-                "id": "anthropic/claude-haiku-5.5",
+                "id": "<pi-model>",
                 "name": "Claude Haiku 5.5",
                 "api": "anthropic-messages",
-                "baseUrl": "https://ai-gateway.vercel.sh",
-                "provider": "vercel-ai-gateway",
+                "baseUrl": "<redacted>",
+                "provider": "<pi-provider>",
                 "reasoning": true,
                 "input": ["text", "image"],
                 "compat": {
@@ -697,7 +697,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T06-53-26-974Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T23-32-59-232Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 3,

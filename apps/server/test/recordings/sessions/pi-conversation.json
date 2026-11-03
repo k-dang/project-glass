@@ -20,11 +20,11 @@
             "success": true,
             "data": {
               "model": {
-                "id": "anthropic/claude-haiku-5.5",
+                "id": "<pi-model>",
                 "name": "Claude Haiku 5.5",
                 "api": "anthropic-messages",
-                "baseUrl": "https://ai-gateway.vercel.sh",
-                "provider": "vercel-ai-gateway",
+                "baseUrl": "<redacted>",
+                "provider": "<pi-provider>",
                 "reasoning": true,
                 "input": ["text", "image"],
                 "compat": {
@@ -70,7 +70,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T06-53-29-398Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T23-32-59-977Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -114,7 +114,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1793688809521,
+              "timestamp": 1793748780060,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -233,7 +233,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1793688809521,
+              "timestamp": 1793748780060,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -356,7 +356,7 @@
                   "text": "Remember the word lantern. Reply with exactly: Noted."
                 }
               ],
-              "timestamp": 1793688809519
+              "timestamp": 1793748780058
             }
           }
         },
@@ -371,7 +371,7 @@
                   "text": "Remember the word lantern. Reply with exactly: Noted."
                 }
               ],
-              "timestamp": 1793688809519
+              "timestamp": 1793748780058
             }
           }
         },
@@ -382,8 +382,8 @@
               "role": "assistant",
               "content": [],
               "api": "anthropic-messages",
-              "provider": "vercel-ai-gateway",
-              "model": "anthropic/claude-haiku-5.5",
+              "provider": "<pi-provider>",
+              "model": "<pi-model>",
               "usage": {
                 "input": 0,
                 "output": 0,
@@ -399,7 +399,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1793688809546
+              "timestamp": 1793748780085
             }
           }
         },
@@ -489,8 +489,8 @@
                 }
               ],
               "api": "anthropic-messages",
-              "provider": "vercel-ai-gateway",
-              "model": "anthropic/claude-haiku-5.5",
+              "provider": "<pi-provider>",
+              "model": "<pi-model>",
               "usage": {
                 "input": 0,
                 "output": 0,
@@ -507,10 +507,10 @@
                 "cacheWrite1h": 0
               },
               "stopReason": "stop",
-              "timestamp": 1793688809546,
-              "responseId": "gen_01M6G2YC4M9FXPRV3VQZN2XCH8",
+              "timestamp": 1793748780085,
+              "responseId": "gen_01M6HW4H456RWZY57JF8KG033V",
               "rawStopReason": "end_turn",
-              "durationMs": 667,
+              "durationMs": 678,
               "thinkingLevel": "medium"
             }
           }
@@ -527,8 +527,8 @@
                 }
               ],
               "api": "anthropic-messages",
-              "provider": "vercel-ai-gateway",
-              "model": "anthropic/claude-haiku-5.5",
+              "provider": "<pi-provider>",
+              "model": "<pi-model>",
               "usage": {
                 "input": 0,
                 "output": 0,
@@ -545,10 +545,10 @@
                 "cacheWrite1h": 0
               },
               "stopReason": "stop",
-              "timestamp": 1793688809546,
-              "responseId": "gen_01M6G2YC4M9FXPRV3VQZN2XCH8",
+              "timestamp": 1793748780085,
+              "responseId": "gen_01M6HW4H456RWZY57JF8KG033V",
               "rawStopReason": "end_turn",
-              "durationMs": 667,
+              "durationMs": 678,
               "thinkingLevel": "medium"
             },
             "toolResults": []
@@ -562,7 +562,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1793688809521,
+                "timestamp": 1793748780060,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -680,7 +680,7 @@
                     "text": "Remember the word lantern. Reply with exactly: Noted."
                   }
                 ],
-                "timestamp": 1793688809519
+                "timestamp": 1793748780058
               },
               {
                 "role": "assistant",
@@ -691,8 +691,8 @@
                   }
                 ],
                 "api": "anthropic-messages",
-                "provider": "vercel-ai-gateway",
-                "model": "anthropic/claude-haiku-5.5",
+                "provider": "<pi-provider>",
+                "model": "<pi-model>",
                 "usage": {
                   "input": 0,
                   "output": 0,
@@ -709,10 +709,10 @@
                   "cacheWrite1h": 0
                 },
                 "stopReason": "stop",
-                "timestamp": 1793688809546,
-                "responseId": "gen_01M6G2YC4M9FXPRV3VQZN2XCH8",
+                "timestamp": 1793748780085,
+                "responseId": "gen_01M6HW4H456RWZY57JF8KG033V",
                 "rawStopReason": "end_turn",
-                "durationMs": 667,
+                "durationMs": 678,
                 "thinkingLevel": "medium"
               }
             ],
@@ -739,11 +739,11 @@
             "success": true,
             "data": {
               "model": {
-                "id": "anthropic/claude-haiku-5.5",
+                "id": "<pi-model>",
                 "name": "Claude Haiku 5.5",
                 "api": "anthropic-messages",
-                "baseUrl": "https://ai-gateway.vercel.sh",
-                "provider": "vercel-ai-gateway",
+                "baseUrl": "<redacted>",
+                "provider": "<pi-provider>",
                 "reasoning": true,
                 "input": ["text", "image"],
                 "compat": {
@@ -789,7 +789,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T06-53-29-398Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T23-32-59-977Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 3,
@@ -837,7 +837,7 @@
                   "text": "Which word did I ask you to remember? Reply with only that word, in lowercase."
                 }
               ],
-              "timestamp": 1793688810217
+              "timestamp": 1793748780767
             }
           }
         },
@@ -852,7 +852,7 @@
                   "text": "Which word did I ask you to remember? Reply with only that word, in lowercase."
                 }
               ],
-              "timestamp": 1793688810217
+              "timestamp": 1793748780767
             }
           }
         },
@@ -863,8 +863,8 @@
               "role": "assistant",
               "content": [],
               "api": "anthropic-messages",
-              "provider": "vercel-ai-gateway",
-              "model": "anthropic/claude-haiku-5.5",
+              "provider": "<pi-provider>",
+              "model": "<pi-model>",
               "usage": {
                 "input": 0,
                 "output": 0,
@@ -880,7 +880,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1793688810219
+              "timestamp": 1793748780769
             }
           }
         },
@@ -970,8 +970,8 @@
                 }
               ],
               "api": "anthropic-messages",
-              "provider": "vercel-ai-gateway",
-              "model": "anthropic/claude-haiku-5.5",
+              "provider": "<pi-provider>",
+              "model": "<pi-model>",
               "usage": {
                 "input": 0,
                 "output": 0,
@@ -988,10 +988,10 @@
                 "cacheWrite1h": 0
               },
               "stopReason": "stop",
-              "timestamp": 1793688810219,
-              "responseId": "gen_01M6G2YCRN7TPJPNN7S07ZTG9Q",
+              "timestamp": 1793748780769,
+              "responseId": "gen_01M6HW4HRCWPT8C1JXV699HX0G",
               "rawStopReason": "end_turn",
-              "durationMs": 635,
+              "durationMs": 819,
               "thinkingLevel": "medium"
             }
           }
@@ -1008,8 +1008,8 @@
                 }
               ],
               "api": "anthropic-messages",
-              "provider": "vercel-ai-gateway",
-              "model": "anthropic/claude-haiku-5.5",
+              "provider": "<pi-provider>",
+              "model": "<pi-model>",
               "usage": {
                 "input": 0,
                 "output": 0,
@@ -1026,10 +1026,10 @@
                 "cacheWrite1h": 0
               },
               "stopReason": "stop",
-              "timestamp": 1793688810219,
-              "responseId": "gen_01M6G2YCRN7TPJPNN7S07ZTG9Q",
+              "timestamp": 1793748780769,
+              "responseId": "gen_01M6HW4HRCWPT8C1JXV699HX0G",
               "rawStopReason": "end_turn",
-              "durationMs": 635,
+              "durationMs": 819,
               "thinkingLevel": "medium"
             },
             "toolResults": []
@@ -1047,7 +1047,7 @@
                     "text": "Which word did I ask you to remember? Reply with only that word, in lowercase."
                   }
                 ],
-                "timestamp": 1793688810217
+                "timestamp": 1793748780767
               },
               {
                 "role": "assistant",
@@ -1058,8 +1058,8 @@
                   }
                 ],
                 "api": "anthropic-messages",
-                "provider": "vercel-ai-gateway",
-                "model": "anthropic/claude-haiku-5.5",
+                "provider": "<pi-provider>",
+                "model": "<pi-model>",
                 "usage": {
                   "input": 0,
                   "output": 0,
@@ -1076,10 +1076,10 @@
                   "cacheWrite1h": 0
                 },
                 "stopReason": "stop",
-                "timestamp": 1793688810219,
-                "responseId": "gen_01M6G2YCRN7TPJPNN7S07ZTG9Q",
+                "timestamp": 1793748780769,
+                "responseId": "gen_01M6HW4HRCWPT8C1JXV699HX0G",
                 "rawStopReason": "end_turn",
-                "durationMs": 635,
+                "durationMs": 819,
                 "thinkingLevel": "medium"
               }
             ],
@@ -1106,11 +1106,11 @@
             "success": true,
             "data": {
               "model": {
-                "id": "anthropic/claude-haiku-5.5",
+                "id": "<pi-model>",
                 "name": "Claude Haiku 5.5",
                 "api": "anthropic-messages",
-                "baseUrl": "https://ai-gateway.vercel.sh",
-                "provider": "vercel-ai-gateway",
+                "baseUrl": "<redacted>",
+                "provider": "<pi-provider>",
                 "reasoning": true,
                 "input": ["text", "image"],
                 "compat": {
@@ -1156,7 +1156,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T06-53-29-398Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T23-32-59-977Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 5,

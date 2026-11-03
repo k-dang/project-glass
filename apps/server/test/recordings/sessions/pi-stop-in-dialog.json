@@ -20,11 +20,11 @@
             "success": true,
             "data": {
               "model": {
-                "id": "anthropic/claude-haiku-5.5",
+                "id": "<pi-model>",
                 "name": "Claude Haiku 5.5",
                 "api": "anthropic-messages",
-                "baseUrl": "https://ai-gateway.vercel.sh",
-                "provider": "vercel-ai-gateway",
+                "baseUrl": "<redacted>",
+                "provider": "<pi-provider>",
                 "reasoning": true,
                 "input": ["text", "image"],
                 "compat": {
@@ -70,7 +70,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T06-53-52-619Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T23-33-28-370Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -114,7 +114,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1793688832806,
+              "timestamp": 1793748808537,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -233,7 +233,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1793688832806,
+              "timestamp": 1793748808537,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -356,7 +356,7 @@
                   "text": "Use the bash tool to run exactly `echo hi` and nothing else, then reply with exactly: DONE"
                 }
               ],
-              "timestamp": 1793688832805
+              "timestamp": 1793748808536
             }
           }
         },
@@ -371,7 +371,7 @@
                   "text": "Use the bash tool to run exactly `echo hi` and nothing else, then reply with exactly: DONE"
                 }
               ],
-              "timestamp": 1793688832805
+              "timestamp": 1793748808536
             }
           }
         },
@@ -382,8 +382,8 @@
               "role": "assistant",
               "content": [],
               "api": "anthropic-messages",
-              "provider": "vercel-ai-gateway",
-              "model": "anthropic/claude-haiku-5.5",
+              "provider": "<pi-provider>",
+              "model": "<pi-model>",
               "usage": {
                 "input": 0,
                 "output": 0,
@@ -399,7 +399,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1793688832824
+              "timestamp": 1793748808561
             }
           }
         },
@@ -424,7 +424,7 @@
             "assistantMessageEvent": {
               "type": "toolcall_start",
               "contentIndex": 0,
-              "id": "toolu_01UF5zTso3ogAidyPmaAxv28",
+              "id": "toolu_01R5oYAY941tEFGGnJXwLHuf",
               "toolName": "bash"
             }
           }
@@ -502,7 +502,7 @@
               "contentIndex": 0,
               "toolCall": {
                 "type": "toolCall",
-                "id": "toolu_01UF5zTso3ogAidyPmaAxv28",
+                "id": "toolu_01R5oYAY941tEFGGnJXwLHuf",
                 "name": "bash",
                 "arguments": {
                   "command": "echo hi"
@@ -519,7 +519,7 @@
               "content": [
                 {
                   "type": "toolCall",
-                  "id": "toolu_01UF5zTso3ogAidyPmaAxv28",
+                  "id": "toolu_01R5oYAY941tEFGGnJXwLHuf",
                   "name": "bash",
                   "arguments": {
                     "command": "echo hi"
@@ -527,8 +527,8 @@
                 }
               ],
               "api": "anthropic-messages",
-              "provider": "vercel-ai-gateway",
-              "model": "anthropic/claude-haiku-5.5",
+              "provider": "<pi-provider>",
+              "model": "<pi-model>",
               "usage": {
                 "input": 0,
                 "output": 0,
@@ -545,10 +545,10 @@
                 "cacheWrite1h": 0
               },
               "stopReason": "toolUse",
-              "timestamp": 1793688832824,
-              "responseId": "gen_01M6G2Z2WA7STHQM4YHV34EX06",
+              "timestamp": 1793748808561,
+              "responseId": "gen_01M6HW5CXWYPCYGA8P92DAQBQX",
               "rawStopReason": "tool_use",
-              "durationMs": 869,
+              "durationMs": 839,
               "thinkingLevel": "medium"
             }
           }
@@ -556,7 +556,7 @@
         {
           "in": {
             "type": "tool_execution_start",
-            "toolCallId": "toolu_01UF5zTso3ogAidyPmaAxv28",
+            "toolCallId": "toolu_01R5oYAY941tEFGGnJXwLHuf",
             "toolName": "bash",
             "args": {
               "command": "echo hi"
@@ -566,7 +566,7 @@
         {
           "in": {
             "type": "extension_ui_request",
-            "id": "2517603f-5684-4887-9402-baaca7099e62",
+            "id": "97728542-c0b7-4d5d-b053-9c7986c46d80",
             "method": "confirm",
             "title": "Run it?",
             "message": "bash"
@@ -600,7 +600,7 @@
         {
           "out": {
             "type": "extension_ui_response",
-            "id": "2517603f-5684-4887-9402-baaca7099e62",
+            "id": "97728542-c0b7-4d5d-b053-9c7986c46d80",
             "cancelled": true
           }
         },
@@ -613,7 +613,7 @@
         {
           "in": {
             "type": "tool_execution_end",
-            "toolCallId": "toolu_01UF5zTso3ogAidyPmaAxv28",
+            "toolCallId": "toolu_01R5oYAY941tEFGGnJXwLHuf",
             "toolName": "bash",
             "result": {
               "content": [
@@ -632,7 +632,7 @@
             "type": "message_start",
             "message": {
               "role": "toolResult",
-              "toolCallId": "toolu_01UF5zTso3ogAidyPmaAxv28",
+              "toolCallId": "toolu_01R5oYAY941tEFGGnJXwLHuf",
               "toolName": "bash",
               "content": [
                 {
@@ -642,7 +642,7 @@
               ],
               "details": {},
               "isError": true,
-              "timestamp": 1793688833696
+              "timestamp": 1793748809404
             }
           }
         },
@@ -651,7 +651,7 @@
             "type": "message_end",
             "message": {
               "role": "toolResult",
-              "toolCallId": "toolu_01UF5zTso3ogAidyPmaAxv28",
+              "toolCallId": "toolu_01R5oYAY941tEFGGnJXwLHuf",
               "toolName": "bash",
               "content": [
                 {
@@ -661,7 +661,7 @@
               ],
               "details": {},
               "isError": true,
-              "timestamp": 1793688833696
+              "timestamp": 1793748809404
             }
           }
         },
@@ -673,7 +673,7 @@
               "content": [
                 {
                   "type": "toolCall",
-                  "id": "toolu_01UF5zTso3ogAidyPmaAxv28",
+                  "id": "toolu_01R5oYAY941tEFGGnJXwLHuf",
                   "name": "bash",
                   "arguments": {
                     "command": "echo hi"
@@ -681,8 +681,8 @@
                 }
               ],
               "api": "anthropic-messages",
-              "provider": "vercel-ai-gateway",
-              "model": "anthropic/claude-haiku-5.5",
+              "provider": "<pi-provider>",
+              "model": "<pi-model>",
               "usage": {
                 "input": 0,
                 "output": 0,
@@ -699,16 +699,16 @@
                 "cacheWrite1h": 0
               },
               "stopReason": "toolUse",
-              "timestamp": 1793688832824,
-              "responseId": "gen_01M6G2Z2WA7STHQM4YHV34EX06",
+              "timestamp": 1793748808561,
+              "responseId": "gen_01M6HW5CXWYPCYGA8P92DAQBQX",
               "rawStopReason": "tool_use",
-              "durationMs": 869,
+              "durationMs": 839,
               "thinkingLevel": "medium"
             },
             "toolResults": [
               {
                 "role": "toolResult",
-                "toolCallId": "toolu_01UF5zTso3ogAidyPmaAxv28",
+                "toolCallId": "toolu_01R5oYAY941tEFGGnJXwLHuf",
                 "toolName": "bash",
                 "content": [
                   {
@@ -718,7 +718,7 @@
                 ],
                 "details": {},
                 "isError": true,
-                "timestamp": 1793688833696
+                "timestamp": 1793748809404
               }
             ]
           }
@@ -735,8 +735,8 @@
               "role": "assistant",
               "content": [],
               "api": "anthropic-messages",
-              "provider": "vercel-ai-gateway",
-              "model": "anthropic/claude-haiku-5.5",
+              "provider": "<pi-provider>",
+              "model": "<pi-model>",
               "usage": {
                 "input": 0,
                 "output": 0,
@@ -752,7 +752,7 @@
                 }
               },
               "stopReason": "aborted",
-              "timestamp": 1793688833699,
+              "timestamp": 1793748809407,
               "errorMessage": "Request aborted",
               "durationMs": 3,
               "thinkingLevel": "medium"
@@ -766,8 +766,8 @@
               "role": "assistant",
               "content": [],
               "api": "anthropic-messages",
-              "provider": "vercel-ai-gateway",
-              "model": "anthropic/claude-haiku-5.5",
+              "provider": "<pi-provider>",
+              "model": "<pi-model>",
               "usage": {
                 "input": 0,
                 "output": 0,
@@ -783,7 +783,7 @@
                 }
               },
               "stopReason": "aborted",
-              "timestamp": 1793688833699,
+              "timestamp": 1793748809407,
               "errorMessage": "Request aborted",
               "durationMs": 3,
               "thinkingLevel": "medium"
@@ -797,8 +797,8 @@
               "role": "assistant",
               "content": [],
               "api": "anthropic-messages",
-              "provider": "vercel-ai-gateway",
-              "model": "anthropic/claude-haiku-5.5",
+              "provider": "<pi-provider>",
+              "model": "<pi-model>",
               "usage": {
                 "input": 0,
                 "output": 0,
@@ -814,7 +814,7 @@
                 }
               },
               "stopReason": "aborted",
-              "timestamp": 1793688833699,
+              "timestamp": 1793748809407,
               "errorMessage": "Request aborted",
               "durationMs": 3,
               "thinkingLevel": "medium"
@@ -830,7 +830,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1793688832806,
+                "timestamp": 1793748808537,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -948,14 +948,14 @@
                     "text": "Use the bash tool to run exactly `echo hi` and nothing else, then reply with exactly: DONE"
                   }
                 ],
-                "timestamp": 1793688832805
+                "timestamp": 1793748808536
               },
               {
                 "role": "assistant",
                 "content": [
                   {
                     "type": "toolCall",
-                    "id": "toolu_01UF5zTso3ogAidyPmaAxv28",
+                    "id": "toolu_01R5oYAY941tEFGGnJXwLHuf",
                     "name": "bash",
                     "arguments": {
                       "command": "echo hi"
@@ -963,8 +963,8 @@
                   }
                 ],
                 "api": "anthropic-messages",
-                "provider": "vercel-ai-gateway",
-                "model": "anthropic/claude-haiku-5.5",
+                "provider": "<pi-provider>",
+                "model": "<pi-model>",
                 "usage": {
                   "input": 0,
                   "output": 0,
@@ -981,15 +981,15 @@
                   "cacheWrite1h": 0
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1793688832824,
-                "responseId": "gen_01M6G2Z2WA7STHQM4YHV34EX06",
+                "timestamp": 1793748808561,
+                "responseId": "gen_01M6HW5CXWYPCYGA8P92DAQBQX",
                 "rawStopReason": "tool_use",
-                "durationMs": 869,
+                "durationMs": 839,
                 "thinkingLevel": "medium"
               },
               {
                 "role": "toolResult",
-                "toolCallId": "toolu_01UF5zTso3ogAidyPmaAxv28",
+                "toolCallId": "toolu_01R5oYAY941tEFGGnJXwLHuf",
                 "toolName": "bash",
                 "content": [
                   {
@@ -999,14 +999,14 @@
                 ],
                 "details": {},
                 "isError": true,
-                "timestamp": 1793688833696
+                "timestamp": 1793748809404
               },
               {
                 "role": "assistant",
                 "content": [],
                 "api": "anthropic-messages",
-                "provider": "vercel-ai-gateway",
-                "model": "anthropic/claude-haiku-5.5",
+                "provider": "<pi-provider>",
+                "model": "<pi-model>",
                 "usage": {
                   "input": 0,
                   "output": 0,
@@ -1022,7 +1022,7 @@
                   }
                 },
                 "stopReason": "aborted",
-                "timestamp": 1793688833699,
+                "timestamp": 1793748809407,
                 "errorMessage": "Request aborted",
                 "durationMs": 3,
                 "thinkingLevel": "medium"
@@ -1059,11 +1059,11 @@
             "success": true,
             "data": {
               "model": {
-                "id": "anthropic/claude-haiku-5.5",
+                "id": "<pi-model>",
                 "name": "Claude Haiku 5.5",
                 "api": "anthropic-messages",
-                "baseUrl": "https://ai-gateway.vercel.sh",
-                "provider": "vercel-ai-gateway",
+                "baseUrl": "<redacted>",
+                "provider": "<pi-provider>",
                 "reasoning": true,
                 "input": ["text", "image"],
                 "compat": {
@@ -1109,7 +1109,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T06-53-52-619Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T23-33-28-370Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 5,

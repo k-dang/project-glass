@@ -21,7 +21,7 @@ import {
   writeGreetSkill,
 } from "../../test/adapterSessions"
 import { settled } from "../../test/agentsFixture"
-import { PI_MODEL, PI_PROVIDER } from "../../test/piLogin"
+import { PI_MODEL_ID } from "../../test/piLogin"
 
 const conversation = "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d"
 
@@ -29,8 +29,6 @@ const pixel: Image = {
   mediaType: "image/png",
   data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
 }
-
-const haiku = `${PI_PROVIDER}/${PI_MODEL}`
 
 const shownParts = (turn: Turn | undefined) =>
   turn?.parts.map((part) =>
@@ -242,15 +240,10 @@ it.live("lists the models and efforts pi offers, with its default", () =>
     const f = yield* piSession("pi-models")
     const pi = yield* f.adapter.models
 
-    assert.equal(pi.defaultModel?.id, haiku)
-    assert.deepStrictEqual(
-      pi.models.find(({ id }) => id === haiku),
-      {
-        id: haiku,
-        name: "Claude Haiku 5.5",
-        efforts: ["off", "minimal", "low", "medium", "high", "xhigh", "max"],
-      },
-    )
+    assert.equal(pi.defaultModel?.id, PI_MODEL_ID)
+    const offered = pi.models.find(({ id }) => id === PI_MODEL_ID)
+    assert.isNotEmpty(offered?.name)
+    assert.includeMembers([...(offered?.efforts ?? [])], ["off", "high"])
   }).pipe(Effect.scoped),
 )
 
@@ -274,10 +267,8 @@ it.live(
     Effect.gen(function* () {
       const f = yield* piSession("pi-scoped-models", {
         piSettings: {
-          enabledModels: [
-            "glass-extension/extension-model",
-            `${PI_PROVIDER}/anthropic/*sonnet-5.5`,
-          ],
+          defaultModel: "outside-the-scope",
+          enabledModels: ["glass-extension/extension-model", PI_MODEL_ID],
         },
       })
 
@@ -302,7 +293,7 @@ it.live(
       assert.equal(pi.defaultModel?.id, "glass-extension/extension-model")
       assert.deepStrictEqual(
         pi.models.map(({ id }) => id),
-        ["glass-extension/extension-model", `${PI_PROVIDER}/anthropic/claude-sonnet-5.5`],
+        ["glass-extension/extension-model", PI_MODEL_ID],
       )
     }).pipe(Effect.scoped),
 )
@@ -314,7 +305,7 @@ it.live(
       const f = yield* piSession("pi-model-change")
       const agent = yield* f.open(conversation)
 
-      yield* agent.configure({ model: haiku, effort: "high" })
+      yield* agent.configure({ model: PI_MODEL_ID, effort: "high" })
       yield* agent.send("Reply with exactly: FIRST")
       yield* f.until(settled(1))
       yield* agent.configure({})
@@ -333,10 +324,10 @@ it.live("runs a pi Agent's next Turn on pi's own thinking level once its effort 
     const f = yield* piSession("pi-thinking-level")
     const agent = yield* f.open(conversation)
 
-    yield* agent.configure({ model: haiku, effort: "high" })
+    yield* agent.configure({ model: PI_MODEL_ID, effort: "high" })
     yield* agent.send("Reply with exactly: FIRST")
     yield* f.until(settled(1))
-    yield* agent.configure({ model: haiku })
+    yield* agent.configure({ model: PI_MODEL_ID })
     yield* agent.send("Reply with exactly: SECOND")
     const turns = yield* f.until(settled(2))
 

@@ -20,11 +20,11 @@
             "success": true,
             "data": {
               "model": {
-                "id": "anthropic/claude-haiku-5.5",
+                "id": "<pi-model>",
                 "name": "Claude Haiku 5.5",
                 "api": "anthropic-messages",
-                "baseUrl": "https://ai-gateway.vercel.sh",
-                "provider": "vercel-ai-gateway",
+                "baseUrl": "<redacted>",
+                "provider": "<pi-provider>",
                 "reasoning": true,
                 "input": ["text", "image"],
                 "compat": {
@@ -70,7 +70,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T06-53-22-692Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T23-32-55-384Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -81,8 +81,8 @@
         {
           "out": {
             "type": "set_model",
-            "provider": "vercel-ai-gateway",
-            "modelId": "anthropic/claude-haiku-5.5",
+            "provider": "<pi-provider>",
+            "modelId": "<pi-model>",
             "id": "glass-2"
           }
         },
@@ -93,11 +93,11 @@
             "command": "set_model",
             "success": true,
             "data": {
-              "id": "anthropic/claude-haiku-5.5",
+              "id": "<pi-model>",
               "name": "Claude Haiku 5.5",
               "api": "anthropic-messages",
-              "baseUrl": "https://ai-gateway.vercel.sh",
-              "provider": "vercel-ai-gateway",
+              "baseUrl": "<redacted>",
+              "provider": "<pi-provider>",
               "reasoning": true,
               "input": ["text", "image"],
               "compat": {
@@ -197,7 +197,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1793688802815,
+              "timestamp": 1793748775471,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -316,7 +316,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1793688802815,
+              "timestamp": 1793748775471,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -439,7 +439,7 @@
                   "text": "Think it through step by step first. Use the bash tool to run exactly `echo hi` and nothing else, then reply with exactly: It says hi."
                 }
               ],
-              "timestamp": 1793688802813
+              "timestamp": 1793748775469
             }
           }
         },
@@ -454,7 +454,7 @@
                   "text": "Think it through step by step first. Use the bash tool to run exactly `echo hi` and nothing else, then reply with exactly: It says hi."
                 }
               ],
-              "timestamp": 1793688802813
+              "timestamp": 1793748775469
             }
           }
         },
@@ -465,8 +465,8 @@
               "role": "assistant",
               "content": [],
               "api": "anthropic-messages",
-              "provider": "vercel-ai-gateway",
-              "model": "anthropic/claude-haiku-5.5",
+              "provider": "<pi-provider>",
+              "model": "<pi-model>",
               "usage": {
                 "input": 0,
                 "output": 0,
@@ -482,7 +482,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1793688802832
+              "timestamp": 1793748775487
             }
           }
         },
@@ -531,7 +531,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": "I need"
+              "delta": "I"
             }
           }
         },
@@ -556,7 +556,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": " to ke"
+              "delta": "'m not"
             }
           }
         },
@@ -581,7 +581,57 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": "ep my"
+              "delta": " going"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " to l"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": "ay out my"
             }
           }
         },
@@ -631,7 +681,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": "asoning private"
+              "delta": "asoning step by step, so"
             }
           }
         },
@@ -656,7 +706,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": ", so I won't wal"
+              "delta": " I'll just get"
             }
           }
         },
@@ -681,7 +731,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": "k through it"
+              "delta": " on"
             }
           }
         },
@@ -706,7 +756,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": ", but I'll run the command"
+              "delta": " with it"
             }
           }
         },
@@ -731,7 +781,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": " as"
+              "delta": " and"
             }
           }
         },
@@ -756,7 +806,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": " as"
+              "delta": " run the"
             }
           }
         },
@@ -781,82 +831,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": "ked. After"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": " that I'll reply with the"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": " exact phrase they"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": " requested."
+              "delta": " echo command."
             }
           }
         },
@@ -931,7 +906,7 @@
             "assistantMessageEvent": {
               "type": "thinking_end",
               "contentIndex": 0,
-              "content": "I need to keep my reasoning private, so I won't walk through it, but I'll run the command as asked. After that I'll reply with the exact phrase they requested.\n\n"
+              "content": "I'm not going to lay out my reasoning step by step, so I'll just get on with it and run the echo command.\n\n"
             }
           }
         },
@@ -956,7 +931,7 @@
             "assistantMessageEvent": {
               "type": "toolcall_start",
               "contentIndex": 1,
-              "id": "toolu_013ghGzTWvfJnWnZRRV8VYhV",
+              "id": "toolu_01KnE2wzuE9BT83UdtE4raXn",
               "toolName": "bash"
             }
           }
@@ -1034,7 +1009,7 @@
               "contentIndex": 1,
               "toolCall": {
                 "type": "toolCall",
-                "id": "toolu_013ghGzTWvfJnWnZRRV8VYhV",
+                "id": "toolu_01KnE2wzuE9BT83UdtE4raXn",
                 "name": "bash",
                 "arguments": {
                   "command": "echo hi"
@@ -1051,12 +1026,12 @@
               "content": [
                 {
                   "type": "thinking",
-                  "thinking": "I need to keep my reasoning private, so I won't walk through it, but I'll run the command as asked. After that I'll reply with the exact phrase they requested.\n\n",
-                  "thinkingSignature": "CAQSnAYKEAgTGAI4AUIIdGhpbmtpbmcSDOr2iO9ZDzfrE+9GNRoMCa+BqGpi7HeLx+OhIjCrY3W7lT/dswwzcAkgOxohNSmxjOjiQWHW185xzb0AWLqgcU8hO2yAt9b0Kp0t4JMquQWfCofhjWbDZ+rrjmjUQ6CckEYuTYFqpnzD3JdecGBWpjs4kqouRUoJpVPrMmsB5vfF3alYrgLvk2u3RTszcTSgxHLTESu1Go+1RAfKH3QpZRZmCYZRc0/QIynGCDjgscaylgXoEIrKpDqvkmfg3mxzhFCoNV2zrsyiHTNPJngWOzYaRMFBNclYiFmSDoB1Lu4rRDsmh29Zy0T0ush9T4XSO39Wlu2ZRv04aDVpmTnQuJ1RtyU05MUWL86TcEdfGxrLrY3t+wlC0Bwin40s+Ak/waryyyMN6yDGGZmoALkJhOA2CF6CftY/NIOUoq7YdFqyNH61y513ffRpRoeaEQ0FH/Jt6YIyHlT0+j4R0ij7NtGSsAUvlXcpkL0/ZuVmQ4T6JglKwUC2riGR9PnN/PhtpANL56IMbuBwPWkzSpqoPTJqdyBTp0/xv2wbWWK4GhtGqOCetMGcNTcdSNAbo4cGnYZOhgC6+2WNPs4KrHVetJWFVxdHeL5fQiCSplSDdGKO7mfxMfpktf5T53ClKEaWEq/yAw48JGLC4qcWKYKYkssJJDdJQD7EUqXofD1qDuH3ex/9ulk1ndU7R5tqN+u+QBwWBQs4xU9vgvJ9fMg1QoM3PRjFCV0vCmRA2wSrgGRoGNjyl9mhpZh9jYscwjYYCF5w/gXj2TdwHhYeK7Cw9vT5gu7HMbnu7G2nj+/W+XDVDRHKe6L9URTIW+Qip5Xc0qpEBOts4qaQDlcKXW3uAnNn45yg7yGYAmdyVhf6ErPvttXADjL0TiOaib5kycDIp484sTPKeMH4CfDMFGdt83NpRnfnznLtvNAVZt26YuXfK1ZLxKj0uUmAM/ocqLdRZgSx9kHc/yK1EpGRcu+1D30oDYqfRTS3mx28nrGOQpraCjEyTsXOaFOHtTyU9BOywUraYoLs2ESQGAE="
+                  "thinking": "I'm not going to lay out my reasoning step by step, so I'll just get on with it and run the echo command.\n\n",
+                  "thinkingSignature": "CAQShgYKEAgTGAI4AUIIdGhpbmtpbmcSDFgztfSuOF+TrdZQlhoMMpK4LES0FcF9ep6YIjCRs2JTvSqii5UKcuGHvATque3D/CFOzvIowGItQ8Vintlri208sE+xS601a34440MqowU3uwzH6J7e8Pp/jOd6UVZ1UyVu1uvR8dzVX3cMA4au05Eip+cZU8rPJ2GB1SSu4ixVLp3cdt6yoSGjBy2u1eSFxQi1KjHCcx+0m/wrYU3lAEPUNAdrvsb+BfIK4oetV/I9qHWlTn0waWTSS6mDK15dxZI6ZPU6Xq5O5W0sBrVLKfBQBhqNHxQCOh/s1XCh07oz+tgECABumS8ddzcsQC+hzpd1OprZmMyeG3e9V14MWoXBAe/EdavIH9GTUpSOLfwLVrzWLBIDmXIhnKpXQ0EzwuKhgr1ZUDhlmU98V7QXrxbvCYyKb0PBIYbYItGqnSqQma3QIjucG09khTRYipvRt5EXGM5QHplE4D8mgxH2Mo/4xE/FYcyL8ArDLQ8ybAW37e2TrbZwXYiHwNQFn9LxsSyVi9KHvN7uoauXXejY40aVBJGl/lLNtU9Ehzme3Ke107Xhf/9AhJcE/86daGaK2kqIj73ZJ31IFPgzksW6pGkrvHzfT3QwWurDYv3eq+496heM/VM1iD8DkWqOEwWoKJ+5pcIeGwFrEggZN+V68doewx7OJR3E0S1cl7cbaZOOJ3ciLtXwfmXY9SJJNGrsaUlk/OXXYbFPOoObp+xj1h0TmuK5Bd5O+WaorWnFZpZueG8GMZ+/MjkV5B/YKZFLyx0Zh/5I1i4RGKsVC0xWl/nmUscChq86ZId0h3C3it6WfbFk+cp4oF7Ewt4Qhu9D7fEwi8AVZp/BtVjSZjB9UCp4nSJFLW79qZAwQK+vhhAu0RboMwwSeJy1NLCWhmSmUIlJsolCpp9YQ2Jn426gZWNLT+kY7tj4xET1Qxnj/1K8ahzG4Y+NNsTtE92/J1E8rf2iTsB9jHBLoZDhOJSibkx+tHUezAJENE2T4NgGMSXt1FkYAQ=="
                 },
                 {
                   "type": "toolCall",
-                  "id": "toolu_013ghGzTWvfJnWnZRRV8VYhV",
+                  "id": "toolu_01KnE2wzuE9BT83UdtE4raXn",
                   "name": "bash",
                   "arguments": {
                     "command": "echo hi"
@@ -1064,8 +1039,8 @@
                 }
               ],
               "api": "anthropic-messages",
-              "provider": "vercel-ai-gateway",
-              "model": "anthropic/claude-haiku-5.5",
+              "provider": "<pi-provider>",
+              "model": "<pi-model>",
               "usage": {
                 "input": 0,
                 "output": 0,
@@ -1082,10 +1057,10 @@
                 "cacheWrite1h": 0
               },
               "stopReason": "toolUse",
-              "timestamp": 1793688802832,
-              "responseId": "gen_01M6G2Y5PB1F349QYNZBP3KXC9",
+              "timestamp": 1793748775487,
+              "responseId": "gen_01M6HW4CRM5EW8BS1CT9D5029T",
               "rawStopReason": "tool_use",
-              "durationMs": 1816,
+              "durationMs": 1796,
               "thinkingLevel": "high"
             }
           }
@@ -1093,7 +1068,7 @@
         {
           "in": {
             "type": "tool_execution_start",
-            "toolCallId": "toolu_013ghGzTWvfJnWnZRRV8VYhV",
+            "toolCallId": "toolu_01KnE2wzuE9BT83UdtE4raXn",
             "toolName": "bash",
             "args": {
               "command": "echo hi"
@@ -1103,7 +1078,7 @@
         {
           "in": {
             "type": "tool_execution_update",
-            "toolCallId": "toolu_013ghGzTWvfJnWnZRRV8VYhV",
+            "toolCallId": "toolu_01KnE2wzuE9BT83UdtE4raXn",
             "toolName": "bash",
             "args": {
               "command": "echo hi"
@@ -1116,7 +1091,7 @@
         {
           "in": {
             "type": "tool_execution_update",
-            "toolCallId": "toolu_013ghGzTWvfJnWnZRRV8VYhV",
+            "toolCallId": "toolu_01KnE2wzuE9BT83UdtE4raXn",
             "toolName": "bash",
             "args": {
               "command": "echo hi"
@@ -1135,7 +1110,7 @@
         {
           "in": {
             "type": "tool_execution_end",
-            "toolCallId": "toolu_013ghGzTWvfJnWnZRRV8VYhV",
+            "toolCallId": "toolu_01KnE2wzuE9BT83UdtE4raXn",
             "toolName": "bash",
             "result": {
               "content": [
@@ -1148,11 +1123,11 @@
                 "output": "hi\n",
                 "truncated": false,
                 "exit_code": 0,
-                "wall_time_seconds": 0.1
+                "wall_time_seconds": 0
               }
             },
             "isError": false,
-            "durationMs": 54
+            "durationMs": 50
           }
         },
         {
@@ -1160,7 +1135,7 @@
             "type": "message_start",
             "message": {
               "role": "toolResult",
-              "toolCallId": "toolu_013ghGzTWvfJnWnZRRV8VYhV",
+              "toolCallId": "toolu_01KnE2wzuE9BT83UdtE4raXn",
               "toolName": "bash",
               "content": [
                 {
@@ -1169,8 +1144,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 54,
-              "timestamp": 1793688804704
+              "durationMs": 50,
+              "timestamp": 1793748777336
             }
           }
         },
@@ -1179,7 +1154,7 @@
             "type": "message_end",
             "message": {
               "role": "toolResult",
-              "toolCallId": "toolu_013ghGzTWvfJnWnZRRV8VYhV",
+              "toolCallId": "toolu_01KnE2wzuE9BT83UdtE4raXn",
               "toolName": "bash",
               "content": [
                 {
@@ -1188,8 +1163,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 54,
-              "timestamp": 1793688804704
+              "durationMs": 50,
+              "timestamp": 1793748777336
             }
           }
         },
@@ -1201,12 +1176,12 @@
               "content": [
                 {
                   "type": "thinking",
-                  "thinking": "I need to keep my reasoning private, so I won't walk through it, but I'll run the command as asked. After that I'll reply with the exact phrase they requested.\n\n",
-                  "thinkingSignature": "CAQSnAYKEAgTGAI4AUIIdGhpbmtpbmcSDOr2iO9ZDzfrE+9GNRoMCa+BqGpi7HeLx+OhIjCrY3W7lT/dswwzcAkgOxohNSmxjOjiQWHW185xzb0AWLqgcU8hO2yAt9b0Kp0t4JMquQWfCofhjWbDZ+rrjmjUQ6CckEYuTYFqpnzD3JdecGBWpjs4kqouRUoJpVPrMmsB5vfF3alYrgLvk2u3RTszcTSgxHLTESu1Go+1RAfKH3QpZRZmCYZRc0/QIynGCDjgscaylgXoEIrKpDqvkmfg3mxzhFCoNV2zrsyiHTNPJngWOzYaRMFBNclYiFmSDoB1Lu4rRDsmh29Zy0T0ush9T4XSO39Wlu2ZRv04aDVpmTnQuJ1RtyU05MUWL86TcEdfGxrLrY3t+wlC0Bwin40s+Ak/waryyyMN6yDGGZmoALkJhOA2CF6CftY/NIOUoq7YdFqyNH61y513ffRpRoeaEQ0FH/Jt6YIyHlT0+j4R0ij7NtGSsAUvlXcpkL0/ZuVmQ4T6JglKwUC2riGR9PnN/PhtpANL56IMbuBwPWkzSpqoPTJqdyBTp0/xv2wbWWK4GhtGqOCetMGcNTcdSNAbo4cGnYZOhgC6+2WNPs4KrHVetJWFVxdHeL5fQiCSplSDdGKO7mfxMfpktf5T53ClKEaWEq/yAw48JGLC4qcWKYKYkssJJDdJQD7EUqXofD1qDuH3ex/9ulk1ndU7R5tqN+u+QBwWBQs4xU9vgvJ9fMg1QoM3PRjFCV0vCmRA2wSrgGRoGNjyl9mhpZh9jYscwjYYCF5w/gXj2TdwHhYeK7Cw9vT5gu7HMbnu7G2nj+/W+XDVDRHKe6L9URTIW+Qip5Xc0qpEBOts4qaQDlcKXW3uAnNn45yg7yGYAmdyVhf6ErPvttXADjL0TiOaib5kycDIp484sTPKeMH4CfDMFGdt83NpRnfnznLtvNAVZt26YuXfK1ZLxKj0uUmAM/ocqLdRZgSx9kHc/yK1EpGRcu+1D30oDYqfRTS3mx28nrGOQpraCjEyTsXOaFOHtTyU9BOywUraYoLs2ESQGAE="
+                  "thinking": "I'm not going to lay out my reasoning step by step, so I'll just get on with it and run the echo command.\n\n",
+                  "thinkingSignature": "CAQShgYKEAgTGAI4AUIIdGhpbmtpbmcSDFgztfSuOF+TrdZQlhoMMpK4LES0FcF9ep6YIjCRs2JTvSqii5UKcuGHvATque3D/CFOzvIowGItQ8Vintlri208sE+xS601a34440MqowU3uwzH6J7e8Pp/jOd6UVZ1UyVu1uvR8dzVX3cMA4au05Eip+cZU8rPJ2GB1SSu4ixVLp3cdt6yoSGjBy2u1eSFxQi1KjHCcx+0m/wrYU3lAEPUNAdrvsb+BfIK4oetV/I9qHWlTn0waWTSS6mDK15dxZI6ZPU6Xq5O5W0sBrVLKfBQBhqNHxQCOh/s1XCh07oz+tgECABumS8ddzcsQC+hzpd1OprZmMyeG3e9V14MWoXBAe/EdavIH9GTUpSOLfwLVrzWLBIDmXIhnKpXQ0EzwuKhgr1ZUDhlmU98V7QXrxbvCYyKb0PBIYbYItGqnSqQma3QIjucG09khTRYipvRt5EXGM5QHplE4D8mgxH2Mo/4xE/FYcyL8ArDLQ8ybAW37e2TrbZwXYiHwNQFn9LxsSyVi9KHvN7uoauXXejY40aVBJGl/lLNtU9Ehzme3Ke107Xhf/9AhJcE/86daGaK2kqIj73ZJ31IFPgzksW6pGkrvHzfT3QwWurDYv3eq+496heM/VM1iD8DkWqOEwWoKJ+5pcIeGwFrEggZN+V68doewx7OJR3E0S1cl7cbaZOOJ3ciLtXwfmXY9SJJNGrsaUlk/OXXYbFPOoObp+xj1h0TmuK5Bd5O+WaorWnFZpZueG8GMZ+/MjkV5B/YKZFLyx0Zh/5I1i4RGKsVC0xWl/nmUscChq86ZId0h3C3it6WfbFk+cp4oF7Ewt4Qhu9D7fEwi8AVZp/BtVjSZjB9UCp4nSJFLW79qZAwQK+vhhAu0RboMwwSeJy1NLCWhmSmUIlJsolCpp9YQ2Jn426gZWNLT+kY7tj4xET1Qxnj/1K8ahzG4Y+NNsTtE92/J1E8rf2iTsB9jHBLoZDhOJSibkx+tHUezAJENE2T4NgGMSXt1FkYAQ=="
                 },
                 {
                   "type": "toolCall",
-                  "id": "toolu_013ghGzTWvfJnWnZRRV8VYhV",
+                  "id": "toolu_01KnE2wzuE9BT83UdtE4raXn",
                   "name": "bash",
                   "arguments": {
                     "command": "echo hi"
@@ -1214,8 +1189,8 @@
                 }
               ],
               "api": "anthropic-messages",
-              "provider": "vercel-ai-gateway",
-              "model": "anthropic/claude-haiku-5.5",
+              "provider": "<pi-provider>",
+              "model": "<pi-model>",
               "usage": {
                 "input": 0,
                 "output": 0,
@@ -1232,16 +1207,16 @@
                 "cacheWrite1h": 0
               },
               "stopReason": "toolUse",
-              "timestamp": 1793688802832,
-              "responseId": "gen_01M6G2Y5PB1F349QYNZBP3KXC9",
+              "timestamp": 1793748775487,
+              "responseId": "gen_01M6HW4CRM5EW8BS1CT9D5029T",
               "rawStopReason": "tool_use",
-              "durationMs": 1816,
+              "durationMs": 1796,
               "thinkingLevel": "high"
             },
             "toolResults": [
               {
                 "role": "toolResult",
-                "toolCallId": "toolu_013ghGzTWvfJnWnZRRV8VYhV",
+                "toolCallId": "toolu_01KnE2wzuE9BT83UdtE4raXn",
                 "toolName": "bash",
                 "content": [
                   {
@@ -1250,8 +1225,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 54,
-                "timestamp": 1793688804704
+                "durationMs": 50,
+                "timestamp": 1793748777336
               }
             ]
           }
@@ -1268,8 +1243,8 @@
               "role": "assistant",
               "content": [],
               "api": "anthropic-messages",
-              "provider": "vercel-ai-gateway",
-              "model": "anthropic/claude-haiku-5.5",
+              "provider": "<pi-provider>",
+              "model": "<pi-model>",
               "usage": {
                 "input": 0,
                 "output": 0,
@@ -1285,7 +1260,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1793688804708
+              "timestamp": 1793748777338
             }
           }
         },
@@ -1375,8 +1350,8 @@
                 }
               ],
               "api": "anthropic-messages",
-              "provider": "vercel-ai-gateway",
-              "model": "anthropic/claude-haiku-5.5",
+              "provider": "<pi-provider>",
+              "model": "<pi-model>",
               "usage": {
                 "input": 0,
                 "output": 0,
@@ -1393,10 +1368,10 @@
                 "cacheWrite1h": 0
               },
               "stopReason": "stop",
-              "timestamp": 1793688804708,
-              "responseId": "gen_01M6G2Y7D1D6VPWRK9D302XEPR",
+              "timestamp": 1793748777338,
+              "responseId": "gen_01M6HW4ED62RZ8WRGB8JS4YE7E",
               "rawStopReason": "end_turn",
-              "durationMs": 728,
+              "durationMs": 623,
               "thinkingLevel": "high"
             }
           }
@@ -1413,8 +1388,8 @@
                 }
               ],
               "api": "anthropic-messages",
-              "provider": "vercel-ai-gateway",
-              "model": "anthropic/claude-haiku-5.5",
+              "provider": "<pi-provider>",
+              "model": "<pi-model>",
               "usage": {
                 "input": 0,
                 "output": 0,
@@ -1431,10 +1406,10 @@
                 "cacheWrite1h": 0
               },
               "stopReason": "stop",
-              "timestamp": 1793688804708,
-              "responseId": "gen_01M6G2Y7D1D6VPWRK9D302XEPR",
+              "timestamp": 1793748777338,
+              "responseId": "gen_01M6HW4ED62RZ8WRGB8JS4YE7E",
               "rawStopReason": "end_turn",
-              "durationMs": 728,
+              "durationMs": 623,
               "thinkingLevel": "high"
             },
             "toolResults": []
@@ -1448,7 +1423,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1793688802815,
+                "timestamp": 1793748775471,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -1566,19 +1541,19 @@
                     "text": "Think it through step by step first. Use the bash tool to run exactly `echo hi` and nothing else, then reply with exactly: It says hi."
                   }
                 ],
-                "timestamp": 1793688802813
+                "timestamp": 1793748775469
               },
               {
                 "role": "assistant",
                 "content": [
                   {
                     "type": "thinking",
-                    "thinking": "I need to keep my reasoning private, so I won't walk through it, but I'll run the command as asked. After that I'll reply with the exact phrase they requested.\n\n",
-                    "thinkingSignature": "CAQSnAYKEAgTGAI4AUIIdGhpbmtpbmcSDOr2iO9ZDzfrE+9GNRoMCa+BqGpi7HeLx+OhIjCrY3W7lT/dswwzcAkgOxohNSmxjOjiQWHW185xzb0AWLqgcU8hO2yAt9b0Kp0t4JMquQWfCofhjWbDZ+rrjmjUQ6CckEYuTYFqpnzD3JdecGBWpjs4kqouRUoJpVPrMmsB5vfF3alYrgLvk2u3RTszcTSgxHLTESu1Go+1RAfKH3QpZRZmCYZRc0/QIynGCDjgscaylgXoEIrKpDqvkmfg3mxzhFCoNV2zrsyiHTNPJngWOzYaRMFBNclYiFmSDoB1Lu4rRDsmh29Zy0T0ush9T4XSO39Wlu2ZRv04aDVpmTnQuJ1RtyU05MUWL86TcEdfGxrLrY3t+wlC0Bwin40s+Ak/waryyyMN6yDGGZmoALkJhOA2CF6CftY/NIOUoq7YdFqyNH61y513ffRpRoeaEQ0FH/Jt6YIyHlT0+j4R0ij7NtGSsAUvlXcpkL0/ZuVmQ4T6JglKwUC2riGR9PnN/PhtpANL56IMbuBwPWkzSpqoPTJqdyBTp0/xv2wbWWK4GhtGqOCetMGcNTcdSNAbo4cGnYZOhgC6+2WNPs4KrHVetJWFVxdHeL5fQiCSplSDdGKO7mfxMfpktf5T53ClKEaWEq/yAw48JGLC4qcWKYKYkssJJDdJQD7EUqXofD1qDuH3ex/9ulk1ndU7R5tqN+u+QBwWBQs4xU9vgvJ9fMg1QoM3PRjFCV0vCmRA2wSrgGRoGNjyl9mhpZh9jYscwjYYCF5w/gXj2TdwHhYeK7Cw9vT5gu7HMbnu7G2nj+/W+XDVDRHKe6L9URTIW+Qip5Xc0qpEBOts4qaQDlcKXW3uAnNn45yg7yGYAmdyVhf6ErPvttXADjL0TiOaib5kycDIp484sTPKeMH4CfDMFGdt83NpRnfnznLtvNAVZt26YuXfK1ZLxKj0uUmAM/ocqLdRZgSx9kHc/yK1EpGRcu+1D30oDYqfRTS3mx28nrGOQpraCjEyTsXOaFOHtTyU9BOywUraYoLs2ESQGAE="
+                    "thinking": "I'm not going to lay out my reasoning step by step, so I'll just get on with it and run the echo command.\n\n",
+                    "thinkingSignature": "CAQShgYKEAgTGAI4AUIIdGhpbmtpbmcSDFgztfSuOF+TrdZQlhoMMpK4LES0FcF9ep6YIjCRs2JTvSqii5UKcuGHvATque3D/CFOzvIowGItQ8Vintlri208sE+xS601a34440MqowU3uwzH6J7e8Pp/jOd6UVZ1UyVu1uvR8dzVX3cMA4au05Eip+cZU8rPJ2GB1SSu4ixVLp3cdt6yoSGjBy2u1eSFxQi1KjHCcx+0m/wrYU3lAEPUNAdrvsb+BfIK4oetV/I9qHWlTn0waWTSS6mDK15dxZI6ZPU6Xq5O5W0sBrVLKfBQBhqNHxQCOh/s1XCh07oz+tgECABumS8ddzcsQC+hzpd1OprZmMyeG3e9V14MWoXBAe/EdavIH9GTUpSOLfwLVrzWLBIDmXIhnKpXQ0EzwuKhgr1ZUDhlmU98V7QXrxbvCYyKb0PBIYbYItGqnSqQma3QIjucG09khTRYipvRt5EXGM5QHplE4D8mgxH2Mo/4xE/FYcyL8ArDLQ8ybAW37e2TrbZwXYiHwNQFn9LxsSyVi9KHvN7uoauXXejY40aVBJGl/lLNtU9Ehzme3Ke107Xhf/9AhJcE/86daGaK2kqIj73ZJ31IFPgzksW6pGkrvHzfT3QwWurDYv3eq+496heM/VM1iD8DkWqOEwWoKJ+5pcIeGwFrEggZN+V68doewx7OJR3E0S1cl7cbaZOOJ3ciLtXwfmXY9SJJNGrsaUlk/OXXYbFPOoObp+xj1h0TmuK5Bd5O+WaorWnFZpZueG8GMZ+/MjkV5B/YKZFLyx0Zh/5I1i4RGKsVC0xWl/nmUscChq86ZId0h3C3it6WfbFk+cp4oF7Ewt4Qhu9D7fEwi8AVZp/BtVjSZjB9UCp4nSJFLW79qZAwQK+vhhAu0RboMwwSeJy1NLCWhmSmUIlJsolCpp9YQ2Jn426gZWNLT+kY7tj4xET1Qxnj/1K8ahzG4Y+NNsTtE92/J1E8rf2iTsB9jHBLoZDhOJSibkx+tHUezAJENE2T4NgGMSXt1FkYAQ=="
                   },
                   {
                     "type": "toolCall",
-                    "id": "toolu_013ghGzTWvfJnWnZRRV8VYhV",
+                    "id": "toolu_01KnE2wzuE9BT83UdtE4raXn",
                     "name": "bash",
                     "arguments": {
                       "command": "echo hi"
@@ -1586,8 +1561,8 @@
                   }
                 ],
                 "api": "anthropic-messages",
-                "provider": "vercel-ai-gateway",
-                "model": "anthropic/claude-haiku-5.5",
+                "provider": "<pi-provider>",
+                "model": "<pi-model>",
                 "usage": {
                   "input": 0,
                   "output": 0,
@@ -1604,15 +1579,15 @@
                   "cacheWrite1h": 0
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1793688802832,
-                "responseId": "gen_01M6G2Y5PB1F349QYNZBP3KXC9",
+                "timestamp": 1793748775487,
+                "responseId": "gen_01M6HW4CRM5EW8BS1CT9D5029T",
                 "rawStopReason": "tool_use",
-                "durationMs": 1816,
+                "durationMs": 1796,
                 "thinkingLevel": "high"
               },
               {
                 "role": "toolResult",
-                "toolCallId": "toolu_013ghGzTWvfJnWnZRRV8VYhV",
+                "toolCallId": "toolu_01KnE2wzuE9BT83UdtE4raXn",
                 "toolName": "bash",
                 "content": [
                   {
@@ -1621,8 +1596,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 54,
-                "timestamp": 1793688804704
+                "durationMs": 50,
+                "timestamp": 1793748777336
               },
               {
                 "role": "assistant",
@@ -1633,8 +1608,8 @@
                   }
                 ],
                 "api": "anthropic-messages",
-                "provider": "vercel-ai-gateway",
-                "model": "anthropic/claude-haiku-5.5",
+                "provider": "<pi-provider>",
+                "model": "<pi-model>",
                 "usage": {
                   "input": 0,
                   "output": 0,
@@ -1651,10 +1626,10 @@
                   "cacheWrite1h": 0
                 },
                 "stopReason": "stop",
-                "timestamp": 1793688804708,
-                "responseId": "gen_01M6G2Y7D1D6VPWRK9D302XEPR",
+                "timestamp": 1793748777338,
+                "responseId": "gen_01M6HW4ED62RZ8WRGB8JS4YE7E",
                 "rawStopReason": "end_turn",
-                "durationMs": 728,
+                "durationMs": 623,
                 "thinkingLevel": "high"
               }
             ],
@@ -1681,11 +1656,11 @@
             "success": true,
             "data": {
               "model": {
-                "id": "anthropic/claude-haiku-5.5",
+                "id": "<pi-model>",
                 "name": "Claude Haiku 5.5",
                 "api": "anthropic-messages",
-                "baseUrl": "https://ai-gateway.vercel.sh",
-                "provider": "vercel-ai-gateway",
+                "baseUrl": "<redacted>",
+                "provider": "<pi-provider>",
                 "reasoning": true,
                 "input": ["text", "image"],
                 "compat": {
@@ -1731,7 +1706,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T06-53-22-692Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T23-32-55-384Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 5,
