@@ -1306,8 +1306,7 @@ it("saves what the user was still writing when they switch to another Agent", as
   })
 
   const composer = await screen.findByRole("textbox", { name: "Message" })
-  await user.click(composer)
-  await user.type(composer, "Half a thought", { skipClick: true })
+  await user.type(composer.firstElementChild!, "Half a thought")
   expect(saved).toEqual([])
   await user.click(screen.getByRole("link", { name: other.name }))
 
