@@ -231,7 +231,7 @@ it("starts an Agent from its first message, on the repository's default branch",
   const base = await within(draft).findByRole("combobox", { name: "Base branch" })
   expect(within(base).getByText("main")).toBeTruthy()
   const mode = await within(draft).findByRole("combobox", { name: "Permission mode" })
-  expect(within(mode).getByText("Default")).toBeTruthy()
+  expect(within(mode).getByText("Auto")).toBeTruthy()
   expect(within(draft).queryByRole("combobox", { name: "Where the Agent runs" })).toBeNull()
 
   await user.type(within(draft).getByRole("textbox", { name: "Message" }), "Fix the bug{Enter}")
@@ -612,7 +612,7 @@ it("keeps an unlinked Local place blocked and never inherits Sandbox bypass perm
   )
   expect(
     within(within(newAgentDraft()).getByRole("combobox", { name: "Permission mode" })).getByText(
-      "Default",
+      "Auto",
     ),
   ).toBeTruthy()
 })
