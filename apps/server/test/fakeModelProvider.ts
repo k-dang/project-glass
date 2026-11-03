@@ -71,7 +71,6 @@ export const runCommands =
 export interface FakeModelSettings {
   readonly output?: string | ((input: typeof request.Type) => string)
   readonly reply?: (input: FakeModelRequest) => ReadonlyArray<FakeModelDelta>
-  readonly status?: number
   readonly failFirst?: number
   readonly hang?: boolean
   readonly finishReason?: "stop" | "length"
@@ -186,17 +185,6 @@ export const fakeModelProvider = Effect.fnUntraced(function* (
     if (current.failFirst !== undefined && calls.length <= current.failFirst) {
       res.writeHead(500, { "content-type": "application/json" })
       res.end(JSON.stringify({ error: { message: "overloaded" } }))
-
-      return
-    }
-
-    if (current.status !== undefined) {
-      const output = Predicate.isFunction(current.output)
-        ? current.output(input)
-        : (current.output ?? "")
-
-      res.writeHead(current.status, { "content-type": "application/json" })
-      res.end(JSON.stringify({ error: { message: output } }))
 
       return
     }

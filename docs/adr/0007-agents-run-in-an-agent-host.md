@@ -39,11 +39,12 @@ Wiring to a program (continuing a conversation, images, model, effort and Permis
 Permission requests, Questions, Steers, Stop) replays a recording of the real program, matched
 launch by launch and message by message, so a change in what Glass sends fails until it is
 recorded again: Agent sessions are recorded from the pinned Claude Code CLI on the user's own
-login with Haiku, which costs a few cents, and from the bundled pi answering a fake model API
-(`record:sessions`), and the completion runners (ADR 0004) from the user's own `claude` and `pi`
-(`record:runners`). Claude Code scenarios ask for exact replies and act on what the session shows,
-such as a waiting Permission request, rather than on a held model, and recordings blank personal
-fields. Recordings also capture model
+login and from the bundled pi on the user's own Vercel AI Gateway key, both with Haiku, which costs
+a few cents (`record:sessions`), and the completion runners (ADR 0004) from the user's own `claude`
+and `pi` (`record:runners`). Scenarios ask for exact replies and act on what the session shows,
+such as a waiting Permission request or extension dialog, rather than on a held model, and
+recordings blank personal fields. A pi retry after a failed model request is still recorded
+against a fake model API, since a real one won't fail on demand. Recordings also capture model
 behaviour a hand-written fake can't, at the cost of recording again: each session recording names
 the pinned SDK or bundled pi version it came from, and its replay fails once that pin moves. A
 runner recording names the `claude` or `pi` version it came from too, but only as a note, since

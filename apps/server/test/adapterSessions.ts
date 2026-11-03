@@ -19,6 +19,7 @@ import type { TurnSettings } from "../src/agentHost/protocol"
 import { bundledPi, bundledPiProgram } from "./demoAgent"
 import { type FakeModelSettings, fakeModelProvider, type PiSettings } from "./fakeModelProvider"
 import { isolatedHome } from "./harness"
+import { writePiLogin, writePiSettings } from "./piLogin"
 import { claudeLoginEnvironment, pinnedClaude, pinnedClaudeProgram } from "./pinnedClaude"
 import { recordingSessions, sessionTape } from "./sessionTape"
 
@@ -95,20 +96,26 @@ export const claudeSession = Effect.fnUntraced(function* (scenario: string) {
   return yield* drive(claudeAdapter(pinnedClaude(), sdk), tape, folder, { model: "haiku" })
 })
 
+export interface PiSessionOptions {
+  readonly piSettings?: PiSettings
+  readonly fake?: FakeModelSettings
+  readonly apiKey?: string
+}
+
 export const piSession = Effect.fnUntraced(function* (
   scenario: string,
-  settings: FakeModelSettings = {},
-  piSettings: PiSettings = { retry: { enabled: false } },
+  { piSettings = { retry: { enabled: false } }, fake, apiKey }: PiSessionOptions = {},
 ) {
   const home = yield* isolatedHome
   const folder = join(home, "work")
   mkdirSync(folder)
 
-  const provider = yield* fakeModelProvider(home, settings, piSettings)
+  if (fake !== undefined) yield* fakeModelProvider(home, fake, piSettings)
+  else {
+    writePiSettings(home, piSettings)
 
-  const model: Pick<typeof provider, "received" | "cancelled" | "release"> = recordingSessions
-    ? provider
-    : { received: () => Effect.void, cancelled: () => Effect.void, release: () => Effect.void }
+    if (recordingSessions) writePiLogin(home, apiKey)
+  }
 
   vi.stubEnv("PI_CODING_AGENT_DIR", join(home, ".pi", "agent"))
   vi.stubEnv("PI_OFFLINE", "1")
@@ -125,5 +132,5 @@ export const piSession = Effect.fnUntraced(function* (
       writeFileSync(join(extensions, name), source)
     })
 
-  return { ...(yield* drive(adapter, tape, folder)), model, extension }
+  return { ...(yield* drive(adapter, tape, folder)), extension }
 })
