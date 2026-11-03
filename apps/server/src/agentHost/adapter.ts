@@ -1,4 +1,5 @@
 import type {
+  AgentCommand,
   AgentEvent,
   AgentModels,
   RequestAnswer,
@@ -34,6 +35,8 @@ export interface AgentSession {
 
 export interface AgentAdapter {
   readonly models: Effect.Effect<AgentModels, HostAgentError>
+  /** What the program runs as `/name` in `folder`: its skills, prompt templates, and commands. */
+  readonly commands: (folder: string) => Effect.Effect<ReadonlyArray<AgentCommand>, HostAgentError>
   /**
    * Starts the program in `folder` on the conversation named `conversation`, a UUID, continuing it
    * when the program has already saved it and starting it otherwise. With a `review`, the program

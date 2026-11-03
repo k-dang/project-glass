@@ -72,6 +72,8 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         LinkLocalCheckout: unused,
         ListBranches: unused,
         ListAgentModels: unused,
+        ListNewAgentCommands: () => Effect.succeed([]),
+        ListAgentCommands: () => Effect.succeed([]),
         ListSandboxProviders: () => Effect.succeed([]),
         ListGitHubBranches: unused,
         CreateAgent: unused,

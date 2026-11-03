@@ -20,7 +20,7 @@ import { piAdapter } from "../src/agentHost/piAdapter"
 import type { ReviewBrief, TurnSettings } from "../src/agentHost/protocol"
 import { bundledPi, bundledPiProgram } from "./demoAgent"
 import { type FakeModelSettings, fakeModelProvider } from "./fakeModelProvider"
-import { isolatedHome } from "./harness"
+import { isolatedHome, stubHome } from "./harness"
 import {
   gatewayKey,
   PI_MODEL,
@@ -101,6 +101,16 @@ export const reviewBrief: ReviewBrief = {
   diffLines: { old: {}, new: { "greet.ts": [1, 2] } },
 }
 
+/** Writes a skill named `greet` into the `skills` folder an agent program reads. */
+export const writeGreetSkill = (skills: string) =>
+  Effect.sync(() => {
+    mkdirSync(join(skills, "greet"), { recursive: true })
+    writeFileSync(
+      join(skills, "greet", "SKILL.md"),
+      "---\nname: greet\ndescription: Greets the user by name.\n---\n\nSay hello.\n",
+    )
+  })
+
 export const writeGreeter = (folder: string) =>
   Effect.sync(() => writeFileSync(join(folder, "greet.ts"), "hi\nhello name\nbye\n"))
 
@@ -123,6 +133,8 @@ export const claudeSession = Effect.fnUntraced(function* (scenario: string) {
   return yield* drive(claudeAdapter(pinnedClaude(), sdk), tape, folder, { model: "haiku" })
 })
 
+const PROVIDER_CREDENTIAL = /^(AWS|GOOGLE|GCLOUD|AZURE|ANTHROPIC)_|_(API_KEY|TOKEN)$/
+
 interface PiSessionOptions {
   readonly piSettings?: PiSettings
   readonly fake?: FakeModelSettings
@@ -144,7 +156,12 @@ export const piSession = Effect.fnUntraced(function* (
     if (recordingSessions) writePiLogin(home, PI_PROVIDER, apiKey ?? gatewayKey())
   }
 
-  vi.stubEnv("PI_CODING_AGENT_DIR", join(home, ".pi", "agent"))
+  // pi offers the models of every provider it finds credentials for, and reads the user's
+  // `~/.agents/skills`: either would put the recorder's machine in the recording.
+  for (const name of Object.keys(process.env))
+    if (PROVIDER_CREDENTIAL.test(name)) vi.stubEnv(name, "")
+
+  stubHome(home)
   vi.stubEnv("PI_OFFLINE", "1")
   const tape = sessionTape(scenario, bundledPiProgram(), { "<folder>": folder, "<pi-home>": home })
 
@@ -160,5 +177,5 @@ export const piSession = Effect.fnUntraced(function* (
       writeFileSync(join(extensions, name), source)
     })
 
-  return { ...(yield* drive(adapter, tape, folder)), extension }
+  return { ...(yield* drive(adapter, tape, folder)), home, extension }
 })

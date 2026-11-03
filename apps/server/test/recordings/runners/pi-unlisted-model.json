@@ -2,7 +2,7 @@
   "scenario": "pi-unlisted-model",
   "program": "1.4.0",
   "models": {
-    "claude-code": "haiku",
+    "claude-code": "unused",
     "pi": {
       "provider": "radius",
       "modelId": "glass-no-such-model"

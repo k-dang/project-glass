@@ -14,6 +14,7 @@ import {
   tool,
 } from "@anthropic-ai/claude-agent-sdk"
 import {
+  type AgentCommand,
   type AgentModel,
   AgentModels,
   QuestionPart,
@@ -56,7 +57,9 @@ const effortLevels = [
 const EffortLevel = Schema.NullOr(Schema.Literals(effortLevels))
 
 export interface ClaudeQuery extends AsyncIterable<SDKMessage> {
-  readonly initializationResult: () => Promise<Pick<SDKControlInitializeResponse, "models">>
+  readonly initializationResult: () => Promise<
+    Pick<SDKControlInitializeResponse, "models" | "commands">
+  >
   readonly close: Query["close"]
   readonly setModel: Query["setModel"]
   readonly setPermissionMode: Query["setPermissionMode"]
@@ -120,7 +123,7 @@ const startClaude = (
 ): Effect.Effect<
   {
     readonly session: ClaudeQuery
-    readonly initialized: Pick<SDKControlInitializeResponse, "models">
+    readonly initialized: Pick<SDKControlInitializeResponse, "models" | "commands">
   },
   HostAgentError,
   Scope.Scope
@@ -290,16 +293,23 @@ interface Asked {
   readonly answered: Deferred.Deferred<PermissionResult>
 }
 
+/**
+ * Starts Claude Code in `folder` only for its handshake, which sends the model nothing. It still
+ * starts what the folder's settings start, such as MCP servers, plugins, and SessionStart hooks.
+ */
+const handshake = (sdk: ClaudeSdk, command: string, folder: string) =>
+  startClaude(
+    sdk,
+    command,
+    folder,
+    Stream.toAsyncIterable(Stream.never),
+    // A handshake runs no tools.
+    () => Promise.resolve({ behavior: "deny", message: "Glass is only asking what it offers." }),
+  ).pipe(Effect.map(({ initialized }) => initialized))
+
 export const claudeAdapter = (command: string, sdk: ClaudeSdk = liveSdk): AgentAdapter => ({
   models: Effect.gen(function* () {
-    const { initialized } = yield* startClaude(
-      sdk,
-      command,
-      homedir(),
-      Stream.toAsyncIterable(Stream.never),
-      // Listing models runs no tools.
-      () => Promise.resolve({ behavior: "deny", message: "Glass is only listing models." }),
-    )
+    const initialized = yield* handshake(sdk, command, homedir())
 
     const { models } = initialized
     // Claude Code lists its default as a model called `default`, which a `null` model runs; it is
@@ -320,6 +330,15 @@ export const claudeAdapter = (command: string, sdk: ClaudeSdk = liveSdk): AgentA
       models: others.map(toModel),
     })
   }).pipe(Effect.scoped),
+
+  // Claude Code's own commands come too: its bundled skills are marked built-in like `/clear` is.
+  commands: (folder) =>
+    handshake(sdk, command, folder).pipe(
+      Effect.map(({ commands }) =>
+        commands.map(({ name, description }): AgentCommand => ({ name, description })),
+      ),
+      Effect.scoped,
+    ),
 
   start: Effect.fnUntraced(function* ({ folder, conversation, review, report }) {
     const prompts = yield* Queue.unbounded<SDKUserMessage>()

@@ -17,7 +17,7 @@
       "frames": [
         {
           "out": {
-            "request_id": "s8p11fms7x",
+            "request_id": "mp0sw5dhqb",
             "type": "control_request",
             "request": {
               "subtype": "initialize"
@@ -29,7 +29,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "s8p11fms7x",
+              "request_id": "mp0sw5dhqb",
               "response": {
                 "commands": [
                   {
@@ -99,13 +99,6 @@
                     "description": "Run a prompt or slash command on a recurring interval (e.g. /loop 5m /foo). Omit the interval to let the model self-pace.",
                     "argumentHint": "[interval] [prompt]",
                     "aliases": ["proactive"],
-                    "builtin": true
-                  },
-                  {
-                    "name": "schedule",
-                    "description": "Create, update, list, or run scheduled cloud agents (routines) that execute on a cron schedule.",
-                    "argumentHint": "",
-                    "aliases": ["routines"],
                     "builtin": true
                   },
                   {
@@ -337,7 +330,7 @@
                     "model": "sonnet"
                   }
                 ],
-                "output_style": "Concise",
+                "output_style": "<redacted>",
                 "available_output_styles": [
                   "default",
                   "Proactive",
@@ -405,7 +398,7 @@
                   }
                 ],
                 "account": "<redacted>",
-                "pid": 151732,
+                "pid": "<redacted>",
                 "claude_code_version": "2.1.309",
                 "current_permission_mode": "default",
                 "feedback_mode": {

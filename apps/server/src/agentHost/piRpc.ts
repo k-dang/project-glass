@@ -99,6 +99,7 @@ type PiCommand =
   | { readonly type: "abort" }
   | { readonly type: "get_state" }
   | { readonly type: "get_available_models" }
+  | { readonly type: "get_commands" }
   | { readonly type: "set_model"; readonly provider: string; readonly modelId: string }
   | { readonly type: "set_thinking_level"; readonly level: string }
   | { readonly type: "extension_ui_response"; readonly id: string; readonly cancelled: true }
@@ -129,6 +130,13 @@ export const SessionState = Schema.Struct({
 })
 
 export const AvailableModels = Schema.Struct({ models: Schema.Array(PiModel) })
+
+/** pi names a skill `skill:name`; an extension's command may have no description. */
+export const AvailableCommands = Schema.Struct({
+  commands: Schema.Array(
+    Schema.Struct({ name: Schema.String, description: Schema.optional(Schema.String) }),
+  ),
+})
 
 interface PiRpc {
   readonly events: Stream.Stream<PiEvent>

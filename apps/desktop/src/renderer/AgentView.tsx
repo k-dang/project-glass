@@ -88,6 +88,7 @@ import {
   type AgentTab,
   agentsAtom,
   cancelQueuedAtom,
+  agentCommandsAtom,
   changeModelAtom,
   changePermissionModeAtom,
   writtenAtom,
@@ -685,6 +686,7 @@ export function AgentComposer(props: {
   const running = turns.at(-1)?.ended === null
   const waiting = turns.at(-1)?.parts.find(isWaiting)
   const [composed, setComposed] = usePersistedComposer(agentId)
+  const commands = useAtomValue(agentCommandsAtom(agentId))
   const sent = useAtomValue(sendMessageAtom(agentId))
   const send = useAtomSet(sendMessageAtom(agentId), { mode: "promiseExit" })
   const steered = useAtomValue(steerAtom(agentId))
@@ -718,6 +720,7 @@ export function AgentComposer(props: {
         recall={lastSent(turns, props.queued)}
         onStop={running ? () => stop() : null}
         notice={waiting !== undefined && <WaitingNotice waiting={waiting} />}
+        commands={commands}
         pickers={props.pickers}
       />
     </>

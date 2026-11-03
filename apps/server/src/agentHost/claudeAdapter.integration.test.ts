@@ -13,7 +13,14 @@ import {
   TurnStopped,
 } from "@glass/contracts"
 import { Effect, Predicate } from "effect"
-import { claudeSession, reviewBrief, run, writeGreeter } from "../../test/adapterSessions"
+import { join } from "node:path"
+import {
+  claudeSession,
+  reviewBrief,
+  run,
+  writeGreeter,
+  writeGreetSkill,
+} from "../../test/adapterSessions"
 import { settled } from "../../test/agentsFixture"
 
 const conversation = "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
@@ -109,6 +116,21 @@ it.live("lists Claude Code's models and efforts, naming its default after the mo
       { id: "opus", name: "Opus", efforts },
       { id: "haiku", name: "Haiku", efforts },
     ])
+  }).pipe(Effect.scoped),
+)
+
+it.live("lists the folder's skills among what Claude Code runs as `/name`", () =>
+  Effect.gen(function* () {
+    const f = yield* claudeSession("claude-commands")
+    yield* writeGreetSkill(join(f.folder, ".claude", "skills"))
+
+    const commands = yield* f.adapter.commands(f.folder)
+
+    assert.deepStrictEqual(
+      commands.find(({ name }) => name === "greet"),
+      // Claude Code names where the skill comes from; this folder is also the home.
+      { name: "greet", description: "Greets the user by name. (user)" },
+    )
   }).pipe(Effect.scoped),
 )
 

@@ -124,6 +124,9 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       ListBranches: ({ repository }) => checkouts.branches(repository),
       ListGitHubBranches: ({ repository }) => github.repositoryBranches(repository),
       ListAgentModels: ({ engine, place }) => agents.models(engine, place),
+      ListNewAgentCommands: ({ engine, place, repository }) =>
+        agents.newAgentCommands(engine, place, repository),
+      ListAgentCommands: ({ agentId }) => agents.commands(agentId),
       ListSandboxProviders: () => Effect.succeed(sandboxes.providers),
       CreateAgent: (input) => agents.create(input),
       WatchWaitingAgents: () => agents.watchWaiting(),

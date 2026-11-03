@@ -4,8 +4,8 @@
   "models": {
     "claude-code": "haiku",
     "pi": {
-      "provider": "radius",
-      "modelId": "recursive/flint"
+      "provider": "unused",
+      "modelId": "unused"
     }
   },
   "outcome": {

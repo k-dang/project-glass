@@ -149,6 +149,7 @@ const notInstalled = (providerId: string): Placement => {
   return {
     engines: AgentEngine.literals,
     models: () => failure,
+    commands: () => Effect.succeed([]),
     place: () => failure,
     host: () => failure,
     runningHost: () => Effect.succeedNone,
@@ -472,6 +473,7 @@ export class Sandboxes extends Context.Service<
                 ),
               ),
             ),
+          commands: () => Effect.succeed([]),
           place: (repository) =>
             Effect.succeed({
               name: uniqueAgentName(),

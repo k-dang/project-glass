@@ -37,6 +37,7 @@ export const scriptedAdapter = (gates: string): AgentAdapter => ({
       models: [{ id: "scripted", name: "Scripted", efforts: [] }],
     }),
   ),
+  commands: () => Effect.succeed([]),
   start: ({ folder, review, report }) =>
     Effect.gen(function* () {
       const scope = yield* Scope.Scope

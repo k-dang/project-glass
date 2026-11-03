@@ -218,6 +218,12 @@ shows it by its title; the Agent reads the To-do's title and notes as they are w
 reaches it.
 _Avoid_: Reference, attachment, tag, chip
 
+**Command**:
+A skill, prompt template, or command the Agent program runs when a message starts with `/` and its
+name, as the program lists them for the Agent's folder. Glass offers them after a leading `/`; a
+Sandbox Agent has none until its Sandbox is up.
+_Avoid_: Slash command (in UI copy), skill (for the whole list)
+
 **Steer**:
 A message sent into the running Turn, for the Agent to take in before it finishes.
 _Avoid_: Interrupt, inject

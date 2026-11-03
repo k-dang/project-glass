@@ -83,6 +83,8 @@ export const agentServicesFixture = Effect.gen(function* () {
 
   const adapter: AgentAdapter = {
     models,
+    // Named after the folder, so a test sees where the program was asked.
+    commands: (folder) => Effect.succeed([{ name: "greet", description: folder }]),
     start: ({ conversation, report }) =>
       Effect.gen(function* () {
         starts.push(conversation)
@@ -163,6 +165,8 @@ export const agentServicesFixture = Effect.gen(function* () {
       const placement = LocalPlacement.of({
         engines: AgentEngine.literals,
         models: () => models,
+        commands: (engine) =>
+          client.ListCommands({ engine, folder: "checkout" }).pipe(Effect.orDie),
         place: () =>
           Effect.sync(() => {
             const name = `agent/test-${++nextName}`

@@ -2,7 +2,7 @@
   "scenario": "pi-answer",
   "program": "1.4.0",
   "models": {
-    "claude-code": "haiku",
+    "claude-code": "unused",
     "pi": {
       "provider": "radius",
       "modelId": "recursive/flint"

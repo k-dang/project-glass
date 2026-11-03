@@ -1,5 +1,6 @@
 import {
   Agent,
+  AgentCommand,
   AgentEngine,
   AgentEvent,
   AgentModels,
@@ -68,6 +69,11 @@ export class AgentHostRpcs extends RpcGroup.make(
   Rpc.make("ListModels", {
     payload: { engine: AgentEngine },
     success: AgentModels,
+    error: HostAgentError,
+  }),
+  Rpc.make("ListCommands", {
+    payload: { engine: AgentEngine, folder: HostFolder },
+    success: Schema.Array(AgentCommand),
     error: HostAgentError,
   }),
   Rpc.make("StartAgent", {

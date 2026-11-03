@@ -172,3 +172,15 @@ it.live("starts an Agent's program again for the next message after it exits", (
     assert.deepStrictEqual(f.starts, [agent.id, agent.id])
   }),
 )
+
+it.live("lists what an Agent's program runs as `/name` in the Agent's own folder", () =>
+  Effect.gen(function* () {
+    const f = yield* agentServicesFixture
+    const agent = yield* f.create()
+
+    const [command] = yield* f.agents.commands(agent.id)
+
+    assert.equal(command?.name, "greet")
+    assert.equal(command?.description, agent.name)
+  }),
+)

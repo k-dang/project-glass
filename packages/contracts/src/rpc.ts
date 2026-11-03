@@ -6,6 +6,7 @@ import { AskAnswer, AskFailure, AskPlace, AskQuestion } from "./ask"
 import {
   Agent,
   AgentBusy,
+  AgentCommand,
   AgentEngine,
   AgentError,
   AgentModels,
@@ -302,6 +303,21 @@ export class GlassRpcs extends RpcGroup.make(
     payload: { engine: AgentEngine, place: AgentPlace },
     success: AgentModels,
     error: AgentError,
+  }),
+  /**
+   * What the Agent program runs as `/name` for a new Agent of the repository in the place. Empty
+   * where no folder holds the repository yet: in a Sandbox.
+   */
+  Rpc.make("ListNewAgentCommands", {
+    payload: { engine: AgentEngine, place: AgentPlace, repository: FollowedRepository },
+    success: Schema.Array(AgentCommand),
+    error: Schema.Union([InvalidLocalCheckout, AgentError]),
+  }),
+  /** What the Agent's program runs as `/name` in its folder. Empty until that folder exists. */
+  Rpc.make("ListAgentCommands", {
+    payload: { agentId: Schema.String },
+    success: Schema.Array(AgentCommand),
+    error: Schema.Union([AgentNotFound, AgentError]),
   }),
   Rpc.make("ListSandboxProviders", { success: Schema.Array(SandboxProviderInfo) }),
   Rpc.make("CreateAgent", {

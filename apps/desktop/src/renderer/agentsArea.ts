@@ -1,5 +1,6 @@
 import {
   type Agent,
+  type AgentCommand,
   type AgentEngine,
   type AgentPlace,
   applyTranscriptUpdate,
@@ -17,8 +18,8 @@ import {
   repositoryKey,
   thisMac,
 } from "@glass/contracts"
-import { Data, Effect, Exit, Predicate, Schema, Stream } from "effect"
-import { Atom, type AtomRegistry } from "effect/reactivity"
+import { Data, Effect, Exit, Option, Predicate, Schema, Stream } from "effect"
+import { AsyncResult, Atom, type AtomRegistry } from "effect/reactivity"
 import { Cloud, Laptop, type LucideIcon } from "lucide-react"
 import { toast } from "@/components/ui/toast"
 import { Backend, backendRuntime, backendRuntimeOf } from "./backend"
@@ -121,6 +122,52 @@ const programModelsAtom = Atom.family((program: ProgramPlace) =>
 
 export const agentModelsAtom = (engine: AgentEngine, key: string) =>
   programModelsAtom(new ProgramPlace({ engine, placeKey: key }))
+
+class NewAgentOf extends Data.Class<{
+  readonly engine: AgentEngine
+  readonly place: string
+  readonly repository: FollowedRepository
+}> {}
+
+/** Kept a while, as asking costs starting the program; a skill added since shows after. */
+const COMMANDS_IDLE_TTL = "5 minutes"
+
+export const noCommands: ReadonlyArray<AgentCommand> = []
+
+/** None while the program is asked, or when it can't answer: the composer works the same without. */
+const commandsOf = (
+  listing: Atom.Atom<AsyncResult.AsyncResult<ReadonlyArray<AgentCommand>, unknown>>,
+) => Atom.map(listing, (listed) => Option.getOrElse(AsyncResult.value(listed), () => noCommands))
+
+const newAgentCommandsFamily = Atom.family((program: NewAgentOf) =>
+  commandsOf(
+    backendRuntime
+      .atom(
+        Backend.use((backend) =>
+          backend.ListNewAgentCommands({
+            engine: program.engine,
+            place: placeOfKey(program.place),
+            repository: program.repository,
+          }),
+        ),
+      )
+      .pipe(Atom.setIdleTTL(COMMANDS_IDLE_TTL)),
+  ),
+)
+
+export const newAgentCommandsAtom = (
+  engine: AgentEngine,
+  place: string,
+  repository: FollowedRepository,
+) => newAgentCommandsFamily(new NewAgentOf({ engine, place, repository }))
+
+export const agentCommandsAtom = Atom.family((agentId: string) =>
+  commandsOf(
+    backendRuntime
+      .atom(Backend.use((backend) => backend.ListAgentCommands({ agentId })))
+      .pipe(Atom.setIdleTTL(COMMANDS_IDLE_TTL)),
+  ),
+)
 
 export const changeModelAtom = Atom.family((agentId: string) =>
   backendRuntime.fn((choice: ModelChoice) =>
