@@ -37,7 +37,9 @@ test("starts a local Claude Code Agent and answers its Permission request", asyn
   await card.getByRole("button", { name: "Allow" }).click()
 
   const transcript = window.getByRole("region", { name: "Transcript" })
-  await expect(transcript).toContainText("The fake model saw")
+  await expect(
+    transcript.getByRole("button", { name: /^Done: Bash touch notes\.txt/ }),
+  ).toBeVisible()
   await expect(transcript).toContainText(/Done in/)
   await expect(card).toContainText("Allowed")
   await expect(window.getByText("Waiting on you")).toHaveCount(0)

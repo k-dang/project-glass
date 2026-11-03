@@ -124,6 +124,30 @@ const tryMatch = (recorded: Json, actual: Json, ids: Map<string, string>) => {
   return true
 }
 
+const personal =
+  /email|organization|account|subscription|rate_limit_info|username|team[_-]?id|(?:access|refresh|auth)[_-]?token|api[_-]?key|^sections$/i
+
+const usage = /usage|^total_cost_usd$|^estimated_tokens(?:_delta)?$|^first_request_input_tokens$/i
+
+const mapJson = (value: Json, change: (inner: Json, field: string) => Json): Json =>
+  isJsonArray(value)
+    ? value.map((item) => change(item, ""))
+    : isJsonObject(value)
+      ? Object.fromEntries(
+          Object.entries(value).map(([name, inner]) => [name, change(inner, name)]),
+        )
+      : value
+
+const zeroNumbers = (value: Json): Json =>
+  Predicate.isNumber(value) ? 0 : mapJson(value, zeroNumbers)
+
+const blankPersonal = (value: Json, field = ""): Json =>
+  personal.test(field)
+    ? "<redacted>"
+    : usage.test(field)
+      ? zeroNumbers(value)
+      : mapJson(value, blankPersonal)
+
 const lines = (onLine: (line: string) => void) => {
   const frame = lineFramer()
 
@@ -261,6 +285,7 @@ export const sessionTape = (
   const processes: Array<Process> = []
   const calls: Array<{ args: Json; info: Json }> = []
   const programs: Array<Program> = []
+  const exits: Array<Promise<void>> = []
   let nextProcess = 0
   let nextCall = 0
 
@@ -316,7 +341,7 @@ export const sessionTape = (
 
     return {
       out: lines((line) => frames.push({ out: normalize(parseLine(line)) })),
-      in: lines((line) => frames.push({ in: normalize(parseLine(line)) })),
+      in: lines((line) => frames.push({ in: blankPersonal(normalize(parseLine(line))) })),
       exit: (code: number | null) => frames.push({ exit: code }),
     }
   }
@@ -340,7 +365,14 @@ export const sessionTape = (
       stdin.pipe(child.stdin)
       child.stdout.on("data", (chunk: Buffer) => tape.in(saidText(chunk)))
       child.stdout.pipe(stdout)
-      child.on("close", (code) => tape.exit(code))
+      exits.push(
+        new Promise((resolve) =>
+          child.on("close", (code) => {
+            tape.exit(code)
+            resolve()
+          }),
+        ),
+      )
 
       return Object.assign(child, { stdin, stdout })
     }
@@ -446,7 +478,10 @@ export const sessionTape = (
 
     if (recordingSessions)
       return live().then((info) => {
-        calls.push({ args, info: normalize(parseLine(JSON.stringify(info ?? null))) })
+        calls.push({
+          args,
+          info: blankPersonal(normalize(parseLine(JSON.stringify(info ?? null)))),
+        })
 
         return info
       })
@@ -470,15 +505,14 @@ export const sessionTape = (
     return Promise.resolve(saved)
   }
 
-  const finish = Effect.sync(() => {
-    if (recordingSessions) {
-      const file = tapeFile(scenario)
-      mkdirSync(dirname(file), { recursive: true })
-      writeFileSync(file, `${JSON.stringify({ ...recorded, processes, calls }, null, 2)}\n`)
+  const record = Effect.promise(async () => {
+    await Promise.all(exits)
+    const file = tapeFile(scenario)
+    mkdirSync(dirname(file), { recursive: true })
+    writeFileSync(file, `${JSON.stringify({ ...recorded, processes, calls }, null, 2)}\n`)
+  })
 
-      return
-    }
-
+  const check = Effect.sync(() => {
     if (nextProcess < recorded.processes.length)
       problems.push(
         `Glass never started ${recorded.processes.length - nextProcess} recorded programs`,
@@ -493,6 +527,8 @@ export const sessionTape = (
 
     if (problems.length > 0) throw new Error(problems.join("\n"))
   })
+
+  const finish = recordingSessions ? record : check
 
   return { claude, spawner, sessionInfo, mismatch, finish }
 }

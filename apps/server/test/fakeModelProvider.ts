@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises"
 import { createServer, type ServerResponse } from "node:http"
 import { join } from "node:path"
 import { counter } from "./counter.ts"
+import { type PiSettings, writePiLogin, writePiSettings } from "./piLogin.ts"
 import { portOf } from "./ports.ts"
 
 const request = Schema.fromJsonString(
@@ -71,7 +72,6 @@ export const runCommands =
 export interface FakeModelSettings {
   readonly output?: string | ((input: typeof request.Type) => string)
   readonly reply?: (input: FakeModelRequest) => ReadonlyArray<FakeModelDelta>
-  readonly status?: number
   readonly failFirst?: number
   readonly hang?: boolean
   readonly finishReason?: "stop" | "length"
@@ -132,15 +132,6 @@ const replyChunks = (deltas: ReadonlyArray<FakeModelDelta>, finishReason = "stop
   ]
 }
 
-export interface PiSettings {
-  readonly enabledModels?: ReadonlyArray<string>
-  readonly retry?: {
-    readonly enabled: boolean
-    readonly maxRetries?: number
-    readonly baseDelayMs?: number
-  }
-}
-
 export const fakeModelProvider = Effect.fnUntraced(function* (
   home: string,
   initial: FakeModelSettings,
@@ -149,7 +140,6 @@ export const fakeModelProvider = Effect.fnUntraced(function* (
   let settings = initial
   const calls: Array<typeof request.Type> = []
   const received = counter()
-  const cancelled = counter()
   const hung: Array<{ readonly input: FakeModelRequest; readonly res: ServerResponse }> = []
 
   const reply = (current: FakeModelSettings, input: FakeModelRequest, res: ServerResponse) => {
@@ -190,22 +180,10 @@ export const fakeModelProvider = Effect.fnUntraced(function* (
       return
     }
 
-    if (current.status !== undefined) {
-      const output = Predicate.isFunction(current.output)
-        ? current.output(input)
-        : (current.output ?? "")
-
-      res.writeHead(current.status, { "content-type": "application/json" })
-      res.end(JSON.stringify({ error: { message: output } }))
-
-      return
-    }
-
     res.writeHead(200, { "content-type": "text/event-stream" })
     res.flushHeaders()
 
     if (current.hang) {
-      res.on("close", cancelled.add)
       hung.push({ input, res })
 
       return
@@ -227,15 +205,10 @@ export const fakeModelProvider = Effect.fnUntraced(function* (
   )
   const url = `http://127.0.0.1:${portOf(server)}/v1`
   const directory = join(home, ".pi", "agent")
+  writePiLogin(home, "glass-test", "test-pi-key")
+  writePiSettings(home, "glass-test", "gpt-test", piSettings)
   yield* Effect.promise(async () => {
-    await mkdir(directory, { recursive: true })
     await mkdir(join(home, ".project-glass"), { recursive: true })
-    await writeFile(
-      join(directory, "auth.json"),
-      JSON.stringify({
-        "glass-test": { type: "api_key", key: "test-pi-key" },
-      }),
-    )
     await writeFile(
       join(directory, "models.json"),
       JSON.stringify({
@@ -265,10 +238,6 @@ export const fakeModelProvider = Effect.fnUntraced(function* (
       }),
     )
     await writeFile(
-      join(directory, "settings.json"),
-      JSON.stringify({ defaultProvider: "glass-test", defaultModel: "gpt-test", ...piSettings }),
-    )
-    await writeFile(
       join(home, ".project-glass", "settings.json"),
       JSON.stringify({
         tourModels: { pi: { provider: "glass-test", modelId: "gpt-test" } },
@@ -281,7 +250,6 @@ export const fakeModelProvider = Effect.fnUntraced(function* (
     url,
     calls,
     received: received.reached,
-    cancelled: cancelled.reached,
     configure: (next: FakeModelSettings) =>
       Effect.sync(() => {
         settings = next
@@ -291,7 +259,6 @@ export const fakeModelProvider = Effect.fnUntraced(function* (
         settings = next
 
         for (const { input, res } of hung.splice(0)) {
-          res.off("close", cancelled.add)
           reply(next, input, res)
         }
       }),
