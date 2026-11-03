@@ -9,7 +9,6 @@ import {
   type Agent,
   emptyTranscript,
   asksPermission,
-  engineCapabilities,
   type Image,
   isWaiting,
   nothingUnsent,
@@ -124,9 +123,9 @@ const SAVE_DELAY_MS = 400
  * Shows some tool calls as something other than a call, such as a proposed Suggested draft, or
  * answers `null` to show the call itself.
  */
-export const ToolCallView = createContext<((call: typeof ToolCallPart.Type) => ReactNode) | null>(
-  null,
-)
+export const ToolCallView = createContext<
+  ((call: typeof ToolCallPart.Type) => ReactNode | null) | null
+>(null)
 
 const lastSent = (
   turns: ReadonlyArray<Turn>,
@@ -526,9 +525,9 @@ const PartView = memo(function PartView(props: {
         </Trace>
       ),
       ToolCall: (call) => {
-        const shown = toolCallView?.(call)
+        const shown = toolCallView?.(call) ?? null
 
-        if (shown != null) return shown
+        if (shown !== null) return shown
 
         const status = toolStatus[call.status]
 
@@ -588,16 +587,12 @@ const waitingNames = {
 
 const composerPlaceholder = (
   running: boolean,
-  canSteer: boolean,
   waiting: RequestPart | undefined,
+  idle = "Message the Agent",
 ) => {
   if (waiting !== undefined) return `Answer the ${waitingNames[waiting._tag]} above first`
 
-  if (!running) return "Message the Agent"
-
-  return canSteer
-    ? "Queue a message, or Steer the Agent with ⌘Enter"
-    : "Queue a message for when the Agent finishes"
+  return running ? "Queue a message, or Steer the Agent with ⌘Enter" : idle
 }
 
 function WaitingNotice(props: { waiting: RequestPart }) {
@@ -655,7 +650,6 @@ function Composer(props: {
   return (
     <AgentComposer
       agentId={agent.id}
-      canSteer={engineCapabilities[agent.engine].steer}
       turns={props.turns}
       queued={props.queued}
       problem={settledProblem(changed) ?? settledProblem(modeChanged)}
@@ -684,7 +678,6 @@ function Composer(props: {
 /** Sends, queues, Steers, and stops the Agent's Turns, keeping what the user hasn't sent. */
 export function AgentComposer(props: {
   agentId: string
-  canSteer: boolean
   turns: ReadonlyArray<Turn>
   queued: ReadonlyArray<QueuedMessage>
   label?: string
@@ -694,7 +687,7 @@ export function AgentComposer(props: {
   problem?: Problem | null
   pickers?: ReactNode
 }) {
-  const { agentId, canSteer, turns } = props
+  const { agentId, turns } = props
   const running = turns.at(-1)?.ended === null
   const waiting = turns.at(-1)?.parts.find(isWaiting)
   const [composed, setComposed] = usePersistedComposer(agentId)
@@ -717,11 +710,7 @@ export function AgentComposer(props: {
         setComposed={setComposed}
         label={props.label ?? "Message"}
         textOnly={props.textOnly ?? false}
-        placeholder={
-          !running && waiting === undefined && props.placeholder !== undefined
-            ? props.placeholder
-            : composerPlaceholder(running, canSteer, waiting)
-        }
+        placeholder={composerPlaceholder(running, waiting, props.placeholder)}
         blocked={sent.waiting || steered.waiting || waiting !== undefined}
         problem={
           settledProblem(sent) ??
@@ -731,7 +720,7 @@ export function AgentComposer(props: {
           null
         }
         send={async (message) => Exit.isSuccess(await send(message))}
-        steer={canSteer ? async (message) => Exit.isSuccess(await steer(message)) : null}
+        steer={async (message) => Exit.isSuccess(await steer(message))}
         recall={lastSent(turns, props.queued)}
         onStop={running ? () => stop() : null}
         notice={waiting !== undefined && <WaitingNotice waiting={waiting} />}

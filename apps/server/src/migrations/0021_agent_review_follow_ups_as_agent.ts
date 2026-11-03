@@ -7,11 +7,5 @@ export default Effect.gen(function* () {
 
   yield* sql`DROP TABLE agent_review_follow_ups`
   yield* sql`ALTER TABLE agent_reviews ADD COLUMN agent_id TEXT`
-
-  yield* sql`
-    CREATE TABLE agent_review_brief (
-      agent_id TEXT PRIMARY KEY,
-      brief TEXT NOT NULL
-    )
-  `
+  yield* sql`ALTER TABLE agent ADD COLUMN review_brief TEXT`
 })

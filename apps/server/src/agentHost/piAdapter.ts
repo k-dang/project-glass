@@ -48,6 +48,7 @@ import {
 } from "./piTurn"
 import { couldNotSwitch, HostAgentError, notRunning, type ReviewBrief } from "./protocol"
 import { settleWith } from "./requests"
+import { piLoadsNothing, piReadOnlyTools } from "../readOnlyTools"
 import { piSuggestDraftExtension } from "./suggestDraftTool"
 import { runTurns } from "./turnLoop"
 
@@ -148,9 +149,8 @@ const refused = (what: "model" | "effort") => (error: string) =>
 
 /**
  * An Agent review's Agent reads with pi's search tools and proposes Suggested drafts through Glass's
- * extension. Everything else pi would load, such as the user's extensions, skills, and the PR's
- * context files, stays off. pi reads the instructions from a file, keeping them out of argv. Both
- * files sit beside the checkout, out of the agent's sight, while the program runs.
+ * extension, loading nothing else. pi reads the instructions from a file, keeping them out of argv.
+ * Both files sit beside the checkout, out of the agent's sight, while the program runs.
  */
 const reviewFlags = Effect.fnUntraced(function* (folder: string, brief: ReviewBrief) {
   const fs = yield* FileSystem.FileSystem
@@ -168,16 +168,10 @@ const reviewFlags = Effect.fnUntraced(function* (folder: string, brief: ReviewBr
 
   return [
     "--tools",
-    `read,grep,find,ls,${SUGGEST_DRAFT_TOOL}`,
-    "--no-extensions",
+    [...piReadOnlyTools, SUGGEST_DRAFT_TOOL].join(","),
+    ...piLoadsNothing,
     "--extension",
     extension,
-    "--no-mcp",
-    "--no-skills",
-    "--no-prompt-templates",
-    "--no-themes",
-    "--no-context-files",
-    "--no-approve",
     "--append-system-prompt",
     instructions,
   ]

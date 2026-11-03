@@ -1,7 +1,6 @@
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
 import {
   emptyTranscript,
-  engineCapabilities,
   nothingUnsent,
   type SentMessage,
   type SuggestedDraft,
@@ -224,10 +223,8 @@ function ReviewAgent(props: {
     (call: typeof ToolCallPart.Type) => {
       const draft = suggestedDraftOf(call)
 
-      return (
-        draft !== null && (
-          <SuggestedDraftCard draft={draft} drafts={drafts} addable={!outdated} show={show} />
-        )
+      return draft === null ? null : (
+        <SuggestedDraftCard draft={draft} drafts={drafts} addable={!outdated} show={show} />
       )
     },
     [drafts, outdated, show],
@@ -259,8 +256,6 @@ function ReviewAgent(props: {
       ) : (
         <AgentComposer
           agentId={agentId}
-          // The panel doesn't know which program the Agent review engine runs.
-          canSteer={Object.values(engineCapabilities).every(({ steer }) => steer)}
           turns={turns}
           queued={queued}
           label="Follow up"

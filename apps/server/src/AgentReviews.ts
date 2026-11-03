@@ -2,8 +2,9 @@ import {
   AgentReview,
   AgentReviewFailure,
   type AgentReviewState,
+  agentModelOf,
   type ChangedFile,
-  diffLinesKey,
+  type DiffSide,
   FollowedRepository,
   type PullRequestRef,
   Revision,
@@ -20,6 +21,7 @@ import {
   Option,
   Predicate,
   Schema,
+  Scope,
   Stream,
   SubscriptionRef,
 } from "effect"
@@ -29,7 +31,7 @@ import { join } from "node:path"
 import { Agents } from "./Agents"
 import { AgentReviewAnswer, agentReviewInstructions, agentReviewPrompt } from "./agentReviewPrompt"
 import { type CheckoutRunFailure, CheckoutRuns } from "./CheckoutRuns"
-import { followUpInstructions } from "./followUpPrompt"
+import { followUpInstructions } from "./followUpInstructions"
 import { GitHubClient } from "./github/GitHubClient"
 import { patchLineNumbers } from "./github/patchLines"
 import { pullRequestJobs, type PullRequestJob } from "./pullRequestJobs"
@@ -51,16 +53,11 @@ const stored = Schema.Array(
   }),
 )
 
-/** Every line of the diff, where a Suggested draft may go. */
-const diffLines = (files: ReadonlyArray<ChangedFile>) =>
+/** Every line of the diff on one side, by path: where a Suggested draft may go. */
+const diffLinesOn = (files: ReadonlyArray<ChangedFile>, side: DiffSide) =>
   Object.fromEntries(
     files.flatMap(({ path, patch }) =>
-      Predicate.isTagged(patch, "TextPatch")
-        ? (["old", "new"] as const).map((side) => [
-            diffLinesKey(side, path),
-            patchLineNumbers(patch.hunks, side),
-          ])
-        : [],
+      Predicate.isTagged(patch, "TextPatch") ? [[path, patchLineNumbers(patch.hunks, side)]] : [],
     ),
   )
 
@@ -116,6 +113,7 @@ export class AgentReviews extends Context.Service<
       const settings = yield* SettingsStore
       const agents = yield* Agents
       const fs = yield* FileSystem.FileSystem
+      const scope = yield* Scope.Scope
 
       const where = (pr: PullRequestRef) =>
         sql`owner = ${pr.owner} AND repo = ${pr.repo} AND number = ${pr.number}`
@@ -161,10 +159,11 @@ export class AgentReviews extends Context.Service<
               ),
             )
 
-      // Writing the review again removes the Agent of the one it replaces.
+      // Writing the review again removes the Agent of the one it replaces, after showing the new
+      // review: removing deletes a whole checkout.
       const save = (job: Job, pr: PullRequestRef, review: AgentReview) =>
         Effect.gen(function* () {
-          yield* removeAgent((yield* SubscriptionRef.get(job.state)).review?.agentId ?? null)
+          const replaced = (yield* SubscriptionRef.get(job.state)).review?.agentId ?? null
 
           yield* jobs.commit(
             job,
@@ -176,6 +175,8 @@ export class AgentReviews extends Context.Service<
             ),
             { review, job: { status: "idle" } },
           )
+
+          yield* removeAgent(replaced).pipe(Effect.forkIn(scope))
         })
 
       const reviewPrompt = settings.read().pipe(
@@ -236,13 +237,15 @@ export class AgentReviews extends Context.Service<
         pr: PullRequestRef,
         review: AgentReview,
         message: string,
-        runner: AgentRunnerIdentity,
-        model: string,
+        {
+          runner,
+          model,
+          reviewPrompt: prompt,
+        }: { runner: AgentRunnerIdentity; model: string; reviewPrompt: string },
       ) =>
         // Only copying the checkout can be cancelled: an Agent that exists is saved on its review.
         Effect.uninterruptibleMask((restore) =>
           Effect.gen(function* () {
-            const prompt = yield* reviewPrompt
             const folder = join(config.dataDirectory, "agent-review-checkouts", randomUUID())
 
             const removeFolder = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
@@ -275,7 +278,10 @@ export class AgentReviews extends Context.Service<
                 folder,
                 review: {
                   instructions: followUpInstructions(prompt, input, review),
-                  diffLines: diffLines(input.files),
+                  diffLines: {
+                    old: diffLinesOn(input.files, "old"),
+                    new: diffLinesOn(input.files, "new"),
+                  },
                 },
                 message,
               })
@@ -347,23 +353,22 @@ export class AgentReviews extends Context.Service<
 
             if (review.agentId !== null) return review.agentId
 
-            const engineSettings = engineSettingsOf(
-              yield* settings
-                .read()
-                .pipe(Effect.mapError((error) => failure("not-ready", error.message))),
-              "agentReviews",
-            )
+            const saved = yield* settings
+              .read()
+              .pipe(Effect.mapError((error) => failure("not-ready", error.message)))
 
+            const engineSettings = engineSettingsOf(saved, "agentReviews")
             const runner = runnerIdentity(engineSettings)
-            const { models } = engineSettings
-
-            // Claude Code takes a bare model ID; pi, a provider and model ID.
-            const model =
-              engineSettings.engine === "claude-code" ? models["claude-code"] : runner.model
 
             const startedAt = DateTime.toEpochMillis(yield* DateTime.now)
             yield* setJob(job, { status: "following-up", message, startedAt, runner })
-            yield* replace(startAgent(job, pr, review, message, runner, model))
+            yield* replace(
+              startAgent(job, pr, review, message, {
+                runner,
+                model: agentModelOf(engineSettings),
+                reviewPrompt: saved.reviewPrompt,
+              }),
+            )
 
             return null
           }),

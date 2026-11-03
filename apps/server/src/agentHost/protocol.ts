@@ -51,13 +51,15 @@ export const TurnSettings = Schema.Struct({
 
 export type TurnSettings = typeof TurnSettings.Type
 
+const LinesByPath = Schema.Record(Schema.String, Schema.Array(Schema.Int))
+
 /**
  * What an Agent review's Agent is told and may do: Glass's instructions with the PR material and
- * the review, and the lines a Suggested draft may go on, keyed by `diffLinesKey`.
+ * the review, and, for each side and path of the diff, the lines a Suggested draft may go on.
  */
 export const ReviewBrief = Schema.Struct({
   instructions: Schema.String,
-  diffLines: Schema.Record(Schema.String, Schema.Array(Schema.Int)),
+  diffLines: Schema.Struct({ old: LinesByPath, new: LinesByPath }),
 })
 
 export type ReviewBrief = typeof ReviewBrief.Type

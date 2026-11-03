@@ -171,8 +171,7 @@ _Avoid_: Task, action item
 
 **Agent**:
 One named conversation, started from Glass, with Claude Code or pi working in one place: a worktree on
-this device, a Sandbox, or, for an Agent review's Follow-ups, Glass's cached clone at the review's
-Revision.
+this device, a Sandbox, or, for an Agent review's Follow-ups, a checkout of the review's Revision.
 _Avoid_: Session, thread, bot, box
 
 **Agent program**:

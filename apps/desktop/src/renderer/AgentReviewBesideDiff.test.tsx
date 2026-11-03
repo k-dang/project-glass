@@ -266,6 +266,7 @@ it("adds a suggested Draft as the user edited it", async () => {
 
   // A suggestion Glass refused stays a tool call.
   expect(screen.getAllByRole("region", { name: /^Suggested draft/ })).toHaveLength(1)
+  expect(screen.getByText("suggest_draft")).toBeDefined()
   await f.user.click(within(suggested).getByRole("button", { name: "Edit" }))
   const body = within(suggested).getByRole("textbox")
   await f.user.clear(body)

@@ -58,15 +58,13 @@ export type PermissionMode = typeof PermissionMode.Type
 export const defaultPermissionMode: PermissionMode = "default"
 
 export interface AgentCapabilities {
-  /** Whether a message can go into the running Turn rather than wait for it to end. */
-  readonly steer: boolean
   /** The Permission modes the program takes; none for a program that doesn't ask. */
   readonly permissionModes: ReadonlyArray<PermissionMode>
 }
 
 export const engineCapabilities: Record<AgentEngine, AgentCapabilities> = {
-  "claude-code": { steer: true, permissionModes: PermissionMode.literals },
-  pi: { steer: true, permissionModes: [] },
+  "claude-code": { permissionModes: PermissionMode.literals },
+  pi: { permissionModes: [] },
 }
 
 /** What an agent program offers in a place: its models. */

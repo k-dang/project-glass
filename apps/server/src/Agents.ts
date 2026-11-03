@@ -75,10 +75,16 @@ const StoredAgent = Schema.Struct({
   permissionMode: Agent.fields.permissionMode,
   folder: Schema.String,
   createdAt: Agent.fields.createdAt,
-  review: Schema.NullOr(Schema.fromJsonString(ReviewBrief)),
+  forReview: Schema.BooleanFromBit,
 })
 
-const encodeBrief = Schema.encodeSync(Schema.fromJsonString(ReviewBrief))
+const BriefJson = Schema.fromJsonString(ReviewBrief)
+
+const encodeBrief = Schema.encodeSync(BriefJson)
+
+const decodeBrief = Schema.decodeUnknownEffect(
+  Schema.Array(Schema.Struct({ brief: Schema.NullOr(BriefJson) })),
+)
 
 const decodeStored = Schema.decodeUnknownEffect(Schema.Array(StoredAgent))
 
@@ -89,7 +95,7 @@ const toRow = ({
   repo,
   folder,
   sandboxProvider,
-  review,
+  forReview,
   ...agent
 }: typeof StoredAgent.Type): PlacedAgent => ({
   agent: new Agent({
@@ -100,7 +106,7 @@ const toRow = ({
     sandbox: null,
   }),
   folder,
-  review,
+  forReview,
 })
 
 const withStatus = (agent: Agent, sandbox: SandboxStatus | null) =>
@@ -198,9 +204,8 @@ export class Agents extends Context.Service<
       const stored = yield* sql`
         SELECT id, name, sandbox_provider AS sandboxProvider, owner, repo, base_branch AS baseBranch,
           engine, model, effort, permission_mode AS permissionMode, folder, created_at AS createdAt,
-          brief AS review
-        FROM agent LEFT JOIN agent_review_brief ON agent_review_brief.agent_id = agent.id
-        ORDER BY created_at
+          review_brief IS NOT NULL AS forReview
+        FROM agent ORDER BY created_at
       `.pipe(Effect.flatMap(decodeStored), Effect.orDie)
 
       const rows = yield* SubscriptionRef.make<ReadonlyArray<PlacedAgent>>(stored.map(toRow))
@@ -218,7 +223,24 @@ export class Agents extends Context.Service<
           ? sandboxes.placement(place.providerId)
           : localPlacement
 
-      const placementOf = (row: PlacedAgent) => placementFor(row.agent.place)
+      /**
+       * An Agent review's Agent runs on this device in a checkout Glass wrote: it has no worktree
+       * whose changes to show or keep, and removing it deletes the checkout.
+       */
+      const reviewPlacement: Placement = {
+        ...localPlacement,
+        hostOnceMade: () => Effect.succeedNone,
+        remove: ({ folder }) =>
+          fs.remove(folder, { recursive: true, force: true }).pipe(
+            Effect.tapError((cause) =>
+              Effect.logWarning("Couldn't remove an Agent review's checkout", cause),
+            ),
+            Effect.mapError(storageFailure),
+          ),
+      }
+
+      const placementOf = (row: PlacedAgent) =>
+        row.forReview ? reviewPlacement : placementFor(row.agent.place)
 
       yield* Stream.merge(yield* localPlacement.subscribeLost, yield* sandboxes.subscribeLost).pipe(
         Stream.runForEach((agentIds) =>
@@ -258,6 +280,17 @@ export class Agents extends Context.Service<
         return { message, images, prompt: prompt(message, mentioned) } satisfies DeliveredMessage
       })
 
+      /** Read only when a Turn starts, since it holds the whole PR. */
+      const reviewBrief = (row: PlacedAgent) =>
+        row.forReview
+          ? sql`SELECT review_brief AS brief FROM agent WHERE id = ${row.agent.id}`.pipe(
+              Effect.flatMap(decodeBrief),
+              Effect.map(([found]) => found?.brief ?? null),
+              Effect.tapError((cause) => Effect.logWarning("Couldn't read a review brief", cause)),
+              Effect.mapError(storageFailure),
+            )
+          : Effect.succeed(null)
+
       const deliver = (row: PlacedAgent, turnId: string, input: MessageInput) =>
         Effect.gen(function* () {
           const client = yield* placementOf(row).host(row)
@@ -265,7 +298,11 @@ export class Agents extends Context.Service<
 
           const [, message] = yield* Effect.all(
             [
-              client.StartAgent({ agentId, engine, folder: row.folder, review: row.review }),
+              reviewBrief(row).pipe(
+                Effect.flatMap((review) =>
+                  client.StartAgent({ agentId, engine, folder: row.folder, review }),
+                ),
+              ),
               delivered(input),
             ],
             { concurrency: "unbounded" },
@@ -311,8 +348,8 @@ export class Agents extends Context.Service<
       )
 
       /** Saves the Agent and starts its first Turn. */
-      const insert = (row: PlacedAgent, first: MessageInput) => {
-        const { agent, folder, review } = row
+      const insert = (row: PlacedAgent, first: MessageInput, review: ReviewBrief | null) => {
+        const { agent, folder } = row
         const { place, repository } = agent
 
         const forget = SubscriptionRef.update(rows, (current) =>
@@ -335,13 +372,8 @@ export class Agents extends Context.Service<
                 permission_mode: agent.permissionMode,
                 folder,
                 created_at: DateTime.formatIso(agent.createdAt),
+                review_brief: review === null ? null : encodeBrief(review),
               })}`
-
-              if (review !== null)
-                yield* sql`INSERT INTO agent_review_brief ${sql.insert({
-                  agent_id: agent.id,
-                  brief: encodeBrief(review),
-                })}`
 
               yield* SubscriptionRef.update(rows, (current) => [...current, row])
               yield* transcripts.startOrQueue(agent.id, first)
@@ -373,8 +405,9 @@ export class Agents extends Context.Service<
         })
 
         yield* insert(
-          { agent, folder: input.folder, review: input.review },
+          { agent, folder: input.folder, forReview: true },
           { message: input.message, images: [] },
+          input.review,
         )
 
         return agent
@@ -413,7 +446,7 @@ export class Agents extends Context.Service<
           sandbox: null,
         })
 
-        yield* insert({ agent, folder, review: null }, { message, images }).pipe(
+        yield* insert({ agent, folder, forReview: false }, { message, images }, null).pipe(
           Effect.onError(() => discard),
         )
 
@@ -541,9 +574,6 @@ export class Agents extends Context.Service<
 
       const changes = Effect.fn("Agents.changes")(function* (agentId: string) {
         const row = yield* find(agentId)
-
-        if (row.review !== null) return []
-
         const placement = placementOf(row)
 
         const host = yield* placement.hostOnceMade(row)
@@ -621,8 +651,6 @@ export class Agents extends Context.Service<
       const removalWarnings = Effect.fn("Agents.removalWarnings")(function* (agentId: string) {
         const row = yield* find(agentId)
 
-        if (row.review !== null) return new RemovalWarnings({ uncommittedChanges: "none" })
-
         return yield* placementOf(row)
           .hostOnceMade(row)
           .pipe(
@@ -666,19 +694,11 @@ export class Agents extends Context.Service<
               Effect.ignore,
             )
 
-          yield* row.review === null
-            ? placement.remove(row)
-            : fs.remove(row.folder, { recursive: true, force: true }).pipe(
-                Effect.tapError((cause) =>
-                  Effect.logWarning("Couldn't remove an Agent review's checkout", cause),
-                ),
-                Effect.mapError(storageFailure),
-              )
+          yield* placement.remove(row)
 
           yield* Effect.gen(function* () {
             yield* transcripts.remove(agentId)
             yield* sql`DELETE FROM agent_unsent_message WHERE agent_id = ${agentId}`
-            yield* sql`DELETE FROM agent_review_brief WHERE agent_id = ${agentId}`
             yield* sql`DELETE FROM agent WHERE id = ${agentId}`
           }).pipe(sql.withTransaction, Effect.mapError(storageFailure))
         }).pipe(
@@ -696,8 +716,8 @@ export class Agents extends Context.Service<
         watch: () =>
           Stream.zipLatest(SubscriptionRef.changes(rows), sandboxes.statuses).pipe(
             Stream.map(([current, statuses]) =>
-              current.flatMap(({ agent, review }) =>
-                review === null ? [withStatus(agent, statuses.get(agent.id) ?? null)] : [],
+              current.flatMap(({ agent, forReview }) =>
+                forReview ? [] : [withStatus(agent, statuses.get(agent.id) ?? null)],
               ),
             ),
           ),

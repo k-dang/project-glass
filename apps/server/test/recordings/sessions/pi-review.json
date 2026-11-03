@@ -11,14 +11,14 @@
         "--tools",
         "read,grep,find,ls,suggest_draft",
         "--no-extensions",
-        "--extension",
-        "<folder>.pi/suggest-draft.js",
         "--no-mcp",
         "--no-skills",
         "--no-prompt-templates",
         "--no-themes",
         "--no-context-files",
         "--no-approve",
+        "--extension",
+        "<folder>.pi/suggest-draft.js",
         "--append-system-prompt",
         "<folder>.pi/instructions.md"
       ],
@@ -42,7 +42,7 @@
                 "name": "gpt-test",
                 "api": "openai-completions",
                 "provider": "glass-test",
-                "baseUrl": "http://127.0.0.1:54288/v1",
+                "baseUrl": "http://127.0.0.1:59112/v1",
                 "reasoning": false,
                 "input": ["text", "image"],
                 "cost": {
@@ -59,7 +59,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--private-var-folders-8q-032mrt6j4058214b17b3_gym0000gp-T-glass-test-vyII1v-work--/2026-11-03T15-21-43-819Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--private-var-folders-8q-032mrt6j4058214b17b3_gym0000gp-T-glass-test-Si1acH-work--/2026-11-03T16-20-45-586Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -103,7 +103,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1793719303908,
+              "timestamp": 1793722845679,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -248,7 +248,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1793719303908,
+              "timestamp": 1793722845679,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -397,7 +397,7 @@
                   "text": "Draft comments on greet.ts."
                 }
               ],
-              "timestamp": 1793719303908
+              "timestamp": 1793722845679
             }
           }
         },
@@ -412,7 +412,7 @@
                   "text": "Draft comments on greet.ts."
                 }
               ],
-              "timestamp": 1793719303908
+              "timestamp": 1793722845679
             }
           }
         },
@@ -440,7 +440,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1793719303923
+              "timestamp": 1793722845690
             }
           }
         },
@@ -557,10 +557,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1793719303923,
+              "timestamp": 1793722845690,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 16,
+              "durationMs": 15,
               "thinkingLevel": "off"
             }
           }
@@ -590,7 +590,7 @@
               "structuredContent": "hi\nhello name\nbye\n"
             },
             "isError": false,
-            "durationMs": 2
+            "durationMs": 3
           }
         },
         {
@@ -607,8 +607,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 2,
-              "timestamp": 1793719303943
+              "durationMs": 3,
+              "timestamp": 1793722845710
             }
           }
         },
@@ -626,8 +626,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 2,
-              "timestamp": 1793719303943
+              "durationMs": 3,
+              "timestamp": 1793722845710
             }
           }
         },
@@ -664,10 +664,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1793719303923,
+              "timestamp": 1793722845690,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 16,
+              "durationMs": 15,
               "thinkingLevel": "off"
             },
             "toolResults": [
@@ -682,8 +682,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 2,
-                "timestamp": 1793719303943
+                "durationMs": 3,
+                "timestamp": 1793722845710
               }
             ]
           }
@@ -717,7 +717,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1793719303944
+              "timestamp": 1793722845711
             }
           }
         },
@@ -840,7 +840,7 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1793719303944,
+              "timestamp": 1793722845711,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
               "durationMs": 2,
@@ -893,7 +893,7 @@
               ],
               "isError": false,
               "durationMs": 0,
-              "timestamp": 1793719303947
+              "timestamp": 1793722845714
             }
           }
         },
@@ -912,7 +912,7 @@
               ],
               "isError": false,
               "durationMs": 0,
-              "timestamp": 1793719303947
+              "timestamp": 1793722845714
             }
           }
         },
@@ -952,7 +952,7 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1793719303944,
+              "timestamp": 1793722845711,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
               "durationMs": 2,
@@ -971,7 +971,7 @@
                 ],
                 "isError": false,
                 "durationMs": 0,
-                "timestamp": 1793719303947
+                "timestamp": 1793722845714
               }
             ]
           }
@@ -1005,7 +1005,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1793719303947
+              "timestamp": 1793722845714
             }
           }
         },
@@ -1128,7 +1128,7 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1793719303947,
+              "timestamp": 1793722845714,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
               "durationMs": 2,
@@ -1183,7 +1183,7 @@
               "details": {},
               "isError": true,
               "durationMs": 0,
-              "timestamp": 1793719303950
+              "timestamp": 1793722845717
             }
           }
         },
@@ -1203,7 +1203,7 @@
               "details": {},
               "isError": true,
               "durationMs": 0,
-              "timestamp": 1793719303950
+              "timestamp": 1793722845717
             }
           }
         },
@@ -1243,7 +1243,7 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1793719303947,
+              "timestamp": 1793722845714,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
               "durationMs": 2,
@@ -1263,7 +1263,7 @@
                 "details": {},
                 "isError": true,
                 "durationMs": 0,
-                "timestamp": 1793719303950
+                "timestamp": 1793722845717
               }
             ]
           }
@@ -1297,7 +1297,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1793719303951
+              "timestamp": 1793722845717
             }
           }
         },
@@ -1401,10 +1401,10 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1793719303951,
+              "timestamp": 1793722845717,
               "responseId": "test-completion",
               "rawStopReason": "stop",
-              "durationMs": 2,
+              "durationMs": 1,
               "thinkingLevel": "off"
             }
           }
@@ -1438,10 +1438,10 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1793719303951,
+              "timestamp": 1793722845717,
               "responseId": "test-completion",
               "rawStopReason": "stop",
-              "durationMs": 2,
+              "durationMs": 1,
               "thinkingLevel": "off"
             },
             "toolResults": []
@@ -1455,7 +1455,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1793719303908,
+                "timestamp": 1793722845679,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -1599,7 +1599,7 @@
                     "text": "Draft comments on greet.ts."
                   }
                 ],
-                "timestamp": 1793719303908
+                "timestamp": 1793722845679
               },
               {
                 "role": "assistant",
@@ -1631,10 +1631,10 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1793719303923,
+                "timestamp": 1793722845690,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
-                "durationMs": 16,
+                "durationMs": 15,
                 "thinkingLevel": "off"
               },
               {
@@ -1648,8 +1648,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 2,
-                "timestamp": 1793719303943
+                "durationMs": 3,
+                "timestamp": 1793722845710
               },
               {
                 "role": "assistant",
@@ -1684,7 +1684,7 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1793719303944,
+                "timestamp": 1793722845711,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
                 "durationMs": 2,
@@ -1702,7 +1702,7 @@
                 ],
                 "isError": false,
                 "durationMs": 0,
-                "timestamp": 1793719303947
+                "timestamp": 1793722845714
               },
               {
                 "role": "assistant",
@@ -1737,7 +1737,7 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1793719303947,
+                "timestamp": 1793722845714,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
                 "durationMs": 2,
@@ -1756,7 +1756,7 @@
                 "details": {},
                 "isError": true,
                 "durationMs": 0,
-                "timestamp": 1793719303950
+                "timestamp": 1793722845717
               },
               {
                 "role": "assistant",
@@ -1784,10 +1784,10 @@
                   }
                 },
                 "stopReason": "stop",
-                "timestamp": 1793719303951,
+                "timestamp": 1793722845717,
                 "responseId": "test-completion",
                 "rawStopReason": "stop",
-                "durationMs": 2,
+                "durationMs": 1,
                 "thinkingLevel": "off"
               }
             ],
@@ -1818,7 +1818,7 @@
                 "name": "gpt-test",
                 "api": "openai-completions",
                 "provider": "glass-test",
-                "baseUrl": "http://127.0.0.1:54288/v1",
+                "baseUrl": "http://127.0.0.1:59112/v1",
                 "reasoning": false,
                 "input": ["text", "image"],
                 "cost": {
@@ -1835,7 +1835,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--private-var-folders-8q-032mrt6j4058214b17b3_gym0000gp-T-glass-test-vyII1v-work--/2026-11-03T15-21-43-819Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--private-var-folders-8q-032mrt6j4058214b17b3_gym0000gp-T-glass-test-Si1acH-work--/2026-11-03T16-20-45-586Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 9,

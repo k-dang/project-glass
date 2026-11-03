@@ -1,4 +1,4 @@
-import { diffLinesKey, SUGGEST_DRAFT_TOOL, type SuggestedDraft } from "@glass/contracts"
+import { SUGGEST_DRAFT_TOOL, type SuggestedDraft } from "@glass/contracts"
 import type { ReviewBrief } from "./protocol"
 
 export const suggestDraftDescription =
@@ -18,7 +18,7 @@ const refusal = (path: string, side: string, line: number) =>
 
 /** Glass's answer to a call of its Suggested-draft tool: a refusal unless the line is on the diff. */
 export const placeSuggestedDraft = (brief: ReviewBrief, draft: SuggestedDraft) =>
-  brief.diffLines[diffLinesKey(draft.side, draft.path)]?.includes(draft.line) === true
+  brief.diffLines[draft.side][draft.path]?.includes(draft.line) === true
     ? { placed: true, text: SUGGEST_DRAFT_PLACED }
     : { placed: false, text: refusal(draft.path, draft.side, draft.line) }
 
@@ -48,7 +48,7 @@ export default function (pi) {
     },
     async execute(_toolCallId, { path, side, line, body }) {
       if (typeof body !== "string" || body.trim() === "") throw new Error("The comment is empty.")
-      if (!(diffLines[side + ":" + path] ?? []).includes(line)) throw new Error(refusal(path, side, line))
+      if (!(diffLines[side]?.[path] ?? []).includes(line)) throw new Error(refusal(path, side, line))
       return { content: [{ type: "text", text: ${JSON.stringify(SUGGEST_DRAFT_PLACED)} }], details: undefined }
     },
   })

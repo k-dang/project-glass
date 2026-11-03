@@ -17,20 +17,14 @@ export const SuggestedDraft = Schema.Struct({
 
 export type SuggestedDraft = typeof SuggestedDraft.Type
 
-/** Names one side of a changed file, to look up the lines of the diff there. */
-export const diffLinesKey = (side: DiffSide, path: string) => `${side}:${path}`
-
 /** The tool an Agent review's Agent calls to propose a Suggested draft. */
 export const SUGGEST_DRAFT_TOOL = "suggest_draft"
-
-/** Claude Code names a tool from Glass's MCP server after the server. */
-const suggestDraftToolNames = new Set([SUGGEST_DRAFT_TOOL, `mcp__glass__${SUGGEST_DRAFT_TOOL}`])
 
 const decodeSuggestedDraft = Schema.decodeUnknownOption(Schema.fromJsonString(SuggestedDraft))
 
 /** The Suggested draft a tool call proposed, once Glass accepted its place on the diff. */
 export const suggestedDraftOf = (call: typeof ToolCallPart.Type): SuggestedDraft | null =>
-  suggestDraftToolNames.has(call.name) && call.status === "done"
+  call.name === SUGGEST_DRAFT_TOOL && call.status === "done"
     ? Option.getOrNull(decodeSuggestedDraft(call.input))
     : null
 
@@ -76,7 +70,7 @@ export const AgentReviewState = Schema.Struct({
       status: Schema.Literal("following-up"),
       message: FollowUpMessage,
       startedAt: Schema.Number,
-      runner: Schema.NullOr(AgentRunnerIdentity),
+      runner: AgentRunnerIdentity,
     }),
     /** Keeps the message so the user can send it again. */
     Schema.Struct({

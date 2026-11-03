@@ -268,11 +268,11 @@ it.live("reads its checkout and proposes Suggested drafts as an Agent review's A
 
     const calls = turn!.parts.filter((part) => Predicate.isTagged(part, "ToolCall"))
     assert.includeMembers(
-      ["Read", "Grep", "Glob", "mcp__glass__suggest_draft"],
+      ["Read", "Grep", "Glob", "suggest_draft"],
       [...new Set(calls.map(({ name }) => name))],
     )
 
-    const suggestions = calls.filter(({ name }) => name === "mcp__glass__suggest_draft")
+    const suggestions = calls.filter(({ name }) => name === "suggest_draft")
     assert.deepStrictEqual(
       suggestions.map(({ status }) => status),
       ["done", "failed"],

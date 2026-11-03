@@ -24,6 +24,7 @@ import { ChildProcessSpawner } from "effect/process"
 import { join } from "node:path"
 import { type AgentFailure, agentFailure, runnerFailureReason } from "./agentFailure"
 import { launchCommand } from "./processes"
+import { claudeReadOnlyTools, piLoadsNothing, piReadOnlyTools } from "./readOnlyTools"
 import { ServerConfig } from "./ServerConfig"
 
 export interface AgentTask<A> {
@@ -69,7 +70,7 @@ const claudeFlags = ["--strict-mcp-config", "--no-session-persistence", "--disab
 
 // `--restricted` confines the file tools to the working directory and skips the user's settings
 // files, so their hooks never see the PR's files.
-const claudeReadOnlyTools = ["--restricted", "--tools", "Read,Grep,Glob"]
+const claudeReadOnlyFlags = ["--restricted", "--tools", claudeReadOnlyTools.join(",")]
 
 const runnerStrategies = Effect.gen(function* () {
   const config = yield* ServerConfig
@@ -144,7 +145,7 @@ const runnerStrategies = Effect.gen(function* () {
       const files =
         task.files === "none"
           ? { directory: cwd, tools: ["--tools", ""] }
-          : { directory: task.files.readOnly, tools: claudeReadOnlyTools }
+          : { directory: task.files.readOnly, tools: claudeReadOnlyFlags }
 
       const unusable = unusableFailure("Claude Code", task.subject, identity)
 
@@ -220,22 +221,11 @@ const runnerStrategies = Effect.gen(function* () {
     return { identity, run: runClaudeCode(cwd, model, restricts, identity) } satisfies AgentRunner
   })
 
-  const piReadOnlyTools = ["--tools", "read,grep,find,ls"]
+  const piReadOnlyFlags = ["--tools", piReadOnlyTools.join(",")]
 
-  // Everything pi would load beyond the model, Glass's prompt, and a task's read-only tools stays
-  // off. The thinking level is left to pi's settings, which it fits to each model; a level a model
+  // The thinking level is left to pi's settings, which it fits to each model; a level a model
   // lacks fails the request.
-  const piCliFlags = [
-    "--offline",
-    "--no-session",
-    "--no-extensions",
-    "--no-mcp",
-    "--no-skills",
-    "--no-prompt-templates",
-    "--no-themes",
-    "--no-context-files",
-    "--no-approve",
-  ]
+  const piCliFlags = ["--offline", "--no-session", ...piLoadsNothing]
 
   // `--mode json` ends with an `agent_end` event carrying the conversation; its last message is
   // the model's answer after any tool calls.
@@ -287,7 +277,7 @@ const runnerStrategies = Effect.gen(function* () {
       const files =
         task.files === "none"
           ? { directory: cwd, tools: ["--no-tools"] }
-          : { directory: task.files.readOnly, tools: piReadOnlyTools }
+          : { directory: task.files.readOnly, tools: piReadOnlyFlags }
 
       const result = yield* execute(
         config.piCommand,

@@ -25,6 +25,9 @@ import { settledEvent } from "./requests"
 import type { Steer, Steering, TurnMachine } from "./turnLoop"
 import { runningToolCall, ToolInput, toolOutput } from "./toolCalls"
 
+/** Claude Code names the tools of Glass's own MCP server after it; the transcript names them plainly. */
+export const GLASS_MCP_PREFIX = "mcp__glass__"
+
 export type Input = Data.TaggedEnum<{
   Message: { readonly message: SDKMessage }
   Asked: { readonly part: RequestPart }
@@ -237,7 +240,9 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
           const index = addPart(
             runningToolCall(
               block.id,
-              block.name,
+              block.name.startsWith(GLASS_MCP_PREFIX)
+                ? block.name.slice(GLASS_MCP_PREFIX.length)
+                : block.name,
               Option.getOrElse(decodeToolInput(block.input), () => ({})),
               message.parent_tool_use_id,
             ),

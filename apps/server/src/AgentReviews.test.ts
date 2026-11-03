@@ -17,6 +17,7 @@ import { existsSync, mkdirSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { vi } from "vite-plus/test"
+import { eventually } from "../test/eventually"
 import { startFakeGitHub } from "../test/fakeGitHub"
 import { VIEWER } from "../test/fakePullRequest"
 import { isolatedHome, startBackend } from "../test/harness"
@@ -403,9 +404,9 @@ it.live("removes the Agent and its checkout when the Agent review is written aga
     const rewritten = yield* f.state((state) => reviewed(state) && state.review?.agentId === null)
     assert.strictEqual(rewritten.review?.markdown, answer.markdown)
 
+    yield* eventually(Effect.sync(() => assert.isEmpty(readdirSync(checkouts))))
     const gone = yield* f.client.WatchTranscript({ agentId }).pipe(Stream.runHead, Effect.flip)
     assert.strictEqual(gone._tag, "AgentNotFound")
-    assert.isEmpty(readdirSync(checkouts))
     assert.strictEqual((yield* f.restart).review?.agentId, null)
   }),
 )

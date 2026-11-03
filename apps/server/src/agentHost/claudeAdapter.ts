@@ -29,8 +29,9 @@ import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
 import * as z from "zod/v4"
 import { sdkExecutable } from "../processes"
+import { claudeReadOnlyTools } from "../readOnlyTools"
 import type { AgentAdapter } from "./adapter"
-import { Input, isFailure, machine } from "./claudeTurn"
+import { GLASS_MCP_PREFIX, Input, isFailure, machine } from "./claudeTurn"
 import type { DeliveredMessage } from "./deliveredMessage"
 import { couldNotSwitch, HostAgentError, notRunning, type ReviewBrief } from "./protocol"
 import { settleWith } from "./requests"
@@ -77,8 +78,6 @@ const startFailure = (cause: unknown) =>
       : "Claude Code could not start. Check its installation.",
   })
 
-const readOnlyTools = ["Read", "Grep", "Glob"]
-
 /**
  * An Agent review's Agent reads the checkout with Claude Code's search tools and proposes
  * Suggested drafts through Glass's own MCP server, all allowed without asking. It loads no
@@ -86,8 +85,8 @@ const readOnlyTools = ["Read", "Grep", "Glob"]
  */
 const reviewOptions = (brief: ReviewBrief): Options => ({
   systemPrompt: { type: "preset", preset: "claude_code", append: brief.instructions },
-  tools: readOnlyTools,
-  allowedTools: [...readOnlyTools, `mcp__glass__${SUGGEST_DRAFT_TOOL}`],
+  tools: claudeReadOnlyTools,
+  allowedTools: [...claudeReadOnlyTools, `${GLASS_MCP_PREFIX}${SUGGEST_DRAFT_TOOL}`],
   settingSources: [],
   strictMcpConfig: true,
   mcpServers: {

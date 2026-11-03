@@ -8,11 +8,11 @@ Following up is a conversation, so each Agent review gets one Agent (ADR 0007) a
 is a Turn of it. The agent keeps what it read in earlier Turns instead of rereading the checkout
 from a replayed transcript, and Follow-ups gain streamed answers, Steer, and Stop. Glass starts the
 Agent on the first Follow-up, on the Agent review engine and its model, seeded with the PR material
-and the review as data, never as instructions. The Agent works in Glass's cached clone at the
-review's Revision (ADR 0005) rather than a Local checkout worktree, with read, search, and list
-tools only, since it reads a Revision and never commits. The Agent belongs to its Agent review:
-it is reached beside the review, not from the Agents list, and its transcript is the record of the
-Follow-ups.
+and the review as data, never as instructions. The Agent works in a checkout of the review's
+Revision written from Glass's cached clone (ADR 0005), kept as long as the Agent, rather than a
+Local checkout worktree, with read, search, and list tools only, since it reads a Revision and
+never commits. The Agent belongs to its Agent review: it is reached beside the review, not from the
+Agents list, and its transcript is the record of the Follow-ups.
 
 The agent proposes a Suggested draft by calling Glass's own tool with a path, side, line, and body.
 Glass checks the line against the diff and rejects a call that misses it, so the agent can place it
