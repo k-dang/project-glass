@@ -113,9 +113,10 @@ it("offers a new Draft to the agent, but keeps a saved Draft a Draft", async () 
   )
   const user = userEvent.setup()
 
-  expect(screen.queryByRole("button", { name: /^Ask the agent/ })).toBeNull()
+  const ask = screen.getByRole("button", { name: "Ask the agent about greet.ts line +2" })
+  expect(ask).toHaveProperty("disabled", true)
   await user.keyboard("Who calls this?")
-  expect(screen.getByRole("button", { name: "Ask the agent about greet.ts line +2" })).toBeDefined()
+  expect(ask).toHaveProperty("disabled", false)
   expect(screen.queryByRole("button", { name: "Ask the agent about greet.ts line +3" })).toBeNull()
 
   await user.keyboard("{Meta>}{Enter}{/Meta}")
