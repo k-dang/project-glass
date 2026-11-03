@@ -29,10 +29,7 @@ test("runs an Agent review, reads it beside the diff, and shows its opening on O
   const changes = window.getByRole("tabpanel", { name: "Changes" })
   await changes.getByRole("button", { name: "Agent review" }).click()
 
-  await expect(changes.getByRole("status", { name: "Agent review" })).toHaveText(
-    "Agent review written·Read beside the diff",
-  )
-  await changes.getByRole("button", { name: "Read beside the diff" }).click()
+  await changes.getByRole("button", { name: "Read Agent review" }).click()
 
   await expect(window.getByRole("tab", { name: "Agent review" })).toHaveAttribute(
     "aria-selected",
