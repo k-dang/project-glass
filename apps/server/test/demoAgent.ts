@@ -4,6 +4,7 @@ import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { connectRpcClient } from "../src/rpcSocket"
+import { installedProgram } from "./replay"
 import { DEMO_REPOSITORY } from "./demoPullRequests"
 import { startFakeAnthropic } from "./fakeAnthropic"
 import {
@@ -16,9 +17,15 @@ import {
 import { seedClone } from "./gitRepositories"
 import { fakeAnthropicEnvironment } from "./pinnedClaude"
 
-export const bundledPi = fileURLToPath(
-  new URL("../node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js", import.meta.url),
+const bundledPiPackage = new URL(
+  "../node_modules/@earendil-works/pi-coding-agent/",
+  import.meta.url,
 )
+
+export const bundledPi = fileURLToPath(new URL("dist/bundle/cli.js", bundledPiPackage))
+
+export const bundledPiProgram = () =>
+  installedProgram(fileURLToPath(new URL("package.json", bundledPiPackage)))
 
 const textOf = (message: FakeModelRequest["messages"][number] | undefined) => {
   const content = message?.content

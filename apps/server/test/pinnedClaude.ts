@@ -1,17 +1,25 @@
 import { createRequire } from "node:module"
-import { join } from "node:path"
-
-export const pinnedClaudePackage = () => {
-  const sdk = createRequire(import.meta.url).resolve("@anthropic-ai/claude-agent-sdk")
-
-  return createRequire(sdk).resolve(
-    `@anthropic-ai/claude-agent-sdk-${process.platform}-${process.arch}/package.json`,
-  )
-}
+import { dirname, join } from "node:path"
+import { installedProgram } from "./replay"
 
 /** The executable shipped by the Claude Agent SDK version Glass pins. */
-export const pinnedClaude = () =>
-  join(pinnedClaudePackage(), "..", process.platform === "win32" ? "claude.exe" : "claude")
+export const pinnedClaude = () => {
+  const sdk = createRequire(import.meta.url).resolve("@anthropic-ai/claude-agent-sdk")
+
+  const platform = createRequire(sdk).resolve(
+    `@anthropic-ai/claude-agent-sdk-${process.platform}-${process.arch}/package.json`,
+  )
+
+  return join(platform, "..", process.platform === "win32" ? "claude.exe" : "claude")
+}
+
+export const pinnedClaudeProgram = () =>
+  installedProgram(
+    join(
+      dirname(createRequire(import.meta.url).resolve("@anthropic-ai/claude-agent-sdk")),
+      "package.json",
+    ),
+  )
 
 export const fakeAnthropicEnvironment = (home: string, url: string) => ({
   GLASS_CLAUDE_COMMAND: pinnedClaude(),

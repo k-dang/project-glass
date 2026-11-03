@@ -8,15 +8,15 @@ import {
   TurnStarted,
 } from "@glass/contracts"
 import { NodeServices } from "@effect/platform-node"
-import { DateTime, Effect, Layer, Option, Schema, Stream, SubscriptionRef } from "effect"
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { DateTime, Effect, Layer, Option, Stream, SubscriptionRef } from "effect"
+import { mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { vi } from "vite-plus/test"
 import type { AgentAdapter, AgentSession } from "../src/agentHost/adapter"
 import { claudeAdapter, type ClaudeSdk } from "../src/agentHost/claudeAdapter"
 import { piAdapter } from "../src/agentHost/piAdapter"
 import type { TurnSettings } from "../src/agentHost/protocol"
-import { bundledPi } from "./demoAgent"
+import { bundledPi, bundledPiProgram } from "./demoAgent"
 import {
   type FakeAnthropicReply,
   type FakeAnthropicRequest,
@@ -24,15 +24,8 @@ import {
 } from "./fakeAnthropic"
 import { type FakeModelSettings, fakeModelProvider, type PiSettings } from "./fakeModelProvider"
 import { isolatedHome } from "./harness"
-import { fakeAnthropicEnvironment, pinnedClaude, pinnedClaudePackage } from "./pinnedClaude"
+import { fakeAnthropicEnvironment, pinnedClaude, pinnedClaudeProgram } from "./pinnedClaude"
 import { recordingSessions, sessionTape } from "./sessionTape"
-
-const installed = (name: string, packageJson: string | URL) =>
-  `${name} ${
-    Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Struct({ version: Schema.String })))(
-      readFileSync(packageJson, "utf8"),
-    ).version
-  }`
 
 const drive = Effect.fnUntraced(function* (
   adapter: AgentAdapter,
@@ -87,13 +80,7 @@ export const claudeSession = Effect.fnUntraced(function* (
 ) {
   const folder = yield* isolatedHome
 
-  const tape = sessionTape(
-    scenario,
-    installed("@anthropic-ai/claude-agent-sdk", pinnedClaudePackage()),
-    {
-      "<folder>": folder,
-    },
-  )
+  const tape = sessionTape(scenario, pinnedClaudeProgram(), { "<folder>": folder })
 
   let api: Pick<Effect.Success<typeof startFakeAnthropic>, "hold" | "release" | "received"> = {
     hold: Effect.void,
@@ -139,17 +126,7 @@ export const piSession = Effect.fnUntraced(function* (
   vi.stubEnv("PI_CODING_AGENT_DIR", join(home, ".pi", "agent"))
   vi.stubEnv("PI_OFFLINE", "1")
 
-  const tape = sessionTape(
-    scenario,
-    installed(
-      "@earendil-works/pi-coding-agent",
-      new URL("../node_modules/@earendil-works/pi-coding-agent/package.json", import.meta.url),
-    ),
-    {
-      "<folder>": folder,
-      "<pi-home>": home,
-    },
-  )
+  const tape = sessionTape(scenario, bundledPiProgram(), { "<folder>": folder, "<pi-home>": home })
 
   const adapter = yield* piAdapter(bundledPi).pipe(
     Effect.provide(tape.spawner.pipe(Layer.provide(NodeServices.layer))),
