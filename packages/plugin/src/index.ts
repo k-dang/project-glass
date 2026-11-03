@@ -1,4 +1,4 @@
-/** What a Plugin adds to Glass: a kind of Sandbox to start Agents in (ADR 0008). */
+/** What a Plugin adds to Glass: a kind of Sandbox to start Agents in (ADR 0010). */
 export interface SandboxProvider {
   /** What the user sees for this kind of Sandbox, a plural such as "Acme Sandboxes". */
   readonly name: string
@@ -112,4 +112,15 @@ export interface Glass {
   readonly sandboxGone: () => Error
 }
 
+/**
+ * A Plugin's default export. Glass scans `~/.project-glass/plugins/*` at backend start. An entry is
+ * a file, a folder with an `index.ts` or `index.js`, or a folder whose `package.json` names its
+ * entry in a `"glass"` field. It may be TypeScript and bring its own `node_modules`, and runs in the
+ * backend process. A Plugin that fails to load, or whose factory takes over 10 seconds, is logged
+ * and skipped.
+ *
+ * A provider that throws anything but the errors `Glass` offers shows the user a safe failure, with
+ * the cause in the backend log. If `create` fails or is cancelled after `record`, Glass calls
+ * `remove` with that state.
+ */
 export type Plugin = (glass: Glass) => void | Promise<void>

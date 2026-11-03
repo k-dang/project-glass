@@ -13,10 +13,9 @@ passes its path, for Agent reviews and for Ask, which answers a question about o
 Agent review engine.
 
 A strategy that can't honour a task's read-only access refuses to run it, so no strategy runs a
-file task without restrictions. The pi CLI runs in the directory with only its read-only built-in tools (`--tools read,grep,find,ls`). Claude
-Code runs in the directory with only its read, search, and list tools in restricted mode
-(`--restricted --tools Read,Grep,Glob`), which confines those tools to the directory and skips the
-user's settings files and their hooks; a Claude Code without restricted mode can't read files.
+file task without restrictions. Each runs in the directory with only its read, search, and list
+tools. Claude Code's restricted mode also confines those tools to the directory and skips the user's
+settings files and their hooks, so a Claude Code without restricted mode can't read files.
 Agent reviews run on their own engine and models, chosen apart from the Tour engine, and Ask uses
 the same engine. Runners don't read settings.
 
@@ -26,3 +25,8 @@ the same engine. Runners don't read settings.
   login checks, flag probes, spawning, and output decoding drifting apart.
 - **Running a runner diff-only for Agent reviews**: works today, but quietly gives a weaker review
   depending on a setting.
+
+## Revisit when
+
+- A feature needs more from an agent than one answer to one prompt. ADR 0009 is the first such case,
+  and it uses an Agent instead of stretching this seam.

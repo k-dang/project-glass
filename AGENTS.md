@@ -1,9 +1,9 @@
 # Glass
 
-Electron app for reviewing GitHub pull requests, growing into a work hub with an AI agent UI.
+A desktop work hub for reviewing GitHub pull requests and working with coding Agents.
 
 - **Domain words** come from [`GLOSSARY.md`](GLOSSARY.md); use them in code, UI copy, and specs.
-- **Architecture decisions**: read the relevant ADRs in [`docs/adr/`](docs/adr/) before changing the architecture.
+- **Architecture decisions**: [`docs/adr/`](docs/adr/) records why past decisions were made under the conditions at the time. ADRs are context, not constraints: if a requirement challenges one, weigh the alternatives and propose replacing it.
 - **Import boundaries and test waits**: `pnpm check` enforces the [executable policies](tools/oxlint/glass/README.md); consult their syntax and exceptions when changing imports or test synchronization.
 
 ## Effect 4
@@ -20,6 +20,5 @@ The repo uses Effect 4, whose APIs differ from the Effect 3 most examples show (
 ## Tests
 
 - Wait on events, never on time: no elapsed-time assertions, no sleeps to order work, and product deadlines in success-path tests set far above the test timeout.
-- Backend tests use `it.live`, except deadline tests: those use `it.effect`, wait until the work is stuck, then `TestClock.adjust` past the deadline. The server runs in the test process, so its deadlines follow the `TestClock`; timers in child processes stay real.
-- Tests replay recordings of the real Agent programs (`apps/server/test/recordings/`, ADR 0007), so a change to what Glass sends Claude Code or pi, or a new pinned SDK or bundled pi version, fails until it is recorded again: run `pnpm --filter @glass/server record:sessions [claude|pi] --pi-model <provider/model>` for the Agent sessions (your own Claude Code login, with Haiku, and your own pi login, on any cheap model that reasons and reads images; a few cents) and `pnpm --filter @glass/server record:runners --pi-model <provider/model>` for the runners (your own logins and cheap models).
-- Wait with `eventually` from each app's `test/eventually.ts`, or Testing Library's `waitFor` in desktop tests with a DOM (it needs one), not `vi.waitFor` (its default gives up after 1s) or `Effect.repeat` on a `Schedule` (it stalls under the `TestClock`). Both wait up to 25s, inside each package's 30s `testTimeout`; don't add shorter `Effect.timeout` guards inside tests.
+- When what Glass sends Claude Code or pi changes, or a pinned SDK or bundled pi version moves, recording tests fail until you run `pnpm --filter @glass/server record:sessions [claude|pi] --pi-model <provider/model>` or `pnpm --filter @glass/server record:runners --pi-model <provider/model>`, which use your own logins (ADR 0011).
+- Wait with `eventually` from each app's `test/eventually.ts`, or Testing Library's `waitFor` in desktop tests with a DOM. Don't use `Effect.repeat` on a `Schedule`, which stalls under the `TestClock`, or add `Effect.timeout` guards inside tests.

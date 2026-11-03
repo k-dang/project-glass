@@ -73,7 +73,7 @@ const loadPlugin = (
 
       if (!Predicate.isFunction(exported)) throw new Error("Its default export isn't a function")
 
-      // SAFETY: a Plugin's default export is its factory (ADR 0008); a non-function is refused above.
+      // SAFETY: a Plugin's default export is its factory (ADR 0010); a non-function is refused above.
       // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- See SAFETY above.
       return exported as Plugin
     })
