@@ -1,20 +1,21 @@
-import type { FollowUp, SuggestedDraft } from "@glass/contracts"
+import {
+  type FollowUp,
+  nothingUnsent,
+  type SentMessage,
+  type SuggestedDraft,
+} from "@glass/contracts"
 import { cn } from "cn"
-import { ArrowUp, Check, LoaderCircle, MessageSquarePlus, Square } from "lucide-react"
-import { type KeyboardEvent, useState } from "react"
+import { Check, LoaderCircle, Pencil } from "lucide-react"
+import { useState } from "react"
 import { Streamdown } from "streamdown"
 import { Button } from "@/components/ui/button"
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupTextarea,
-} from "@/components/ui/input-group"
+import { Marker, MarkerContent } from "@/components/ui/marker"
 import { Textarea } from "@/components/ui/textarea"
 import { UserMessage } from "./AgentView"
 import type { ShowNote } from "./changesView"
 import { LineLocation, pathLineName } from "./Discussions"
 import { Elapsed } from "./Elapsed"
+import { MessageBox } from "./MessageBox"
 import { ProblemAlert } from "./ProblemAlert"
 import type { AgentReviewControls } from "./useAgentReview"
 import { type DraftStore, useDraftsLocked, useLineDraftPlaces } from "./useDrafts"
@@ -36,7 +37,9 @@ export function AgentReviewMarkdown(props: { markdown: string; className?: strin
 
 const fileName = (path: string) => path.split("/").at(-1) ?? path
 
-/** A Draft the agent proposed: the user edits it, then adds it to their pending Review. */
+const focusOnMount = (element: HTMLTextAreaElement | null) => element?.focus()
+
+/** A Draft the agent proposed: the user reads it, edits it if they like, then adds it to their pending Review. */
 function SuggestedDraftCard(props: {
   draft: SuggestedDraft
   drafts: DraftStore
@@ -45,6 +48,7 @@ function SuggestedDraftCard(props: {
 }) {
   const { draft } = props
   const [body, setBody] = useState(draft.body)
+  const [editing, setEditing] = useState(false)
   const locked = useDraftsLocked(props.drafts)
 
   const onLine = useLineDraftPlaces(props.drafts).some(
@@ -56,43 +60,63 @@ function SuggestedDraftCard(props: {
   return (
     <section
       aria-label={`Suggested draft on ${name}`}
-      className="flex flex-col gap-2 rounded-lg border bg-background p-2"
+      className={cn(
+        "flex flex-col rounded-lg border transition-[background-color] duration-200 ease-(--ease-out)",
+        onLine ? "border-dashed" : "bg-muted/30",
+      )}
     >
-      <button
-        type="button"
-        title={draft.path}
-        className="flex min-w-0 items-center gap-1.5 text-left text-xs text-muted-foreground hover:text-foreground"
-        onClick={() => props.show.line(draft.path, draft.side, draft.line)}
-      >
-        <MessageSquarePlus aria-hidden className="size-3.5 shrink-0" />
-        <span className="truncate">{fileName(draft.path)}</span>
-        <LineLocation side={draft.side} line={draft.line} />
-      </button>
-      {onLine ? (
-        <p className="m-0 flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Check aria-hidden className="size-3.5 shrink-0 text-added" />
-          You have a Draft on this line.
-        </p>
-      ) : props.addable ? (
-        <>
+      <header className="flex items-center gap-2 px-3 pt-2 text-xs text-muted-foreground">
+        <button
+          type="button"
+          title={draft.path}
+          className="flex min-w-0 items-center gap-1.5 text-left hover:text-foreground"
+          onClick={() => props.show.line(draft.path, draft.side, draft.line)}
+        >
+          <span className="truncate font-medium">{fileName(draft.path)}</span>
+          <LineLocation side={draft.side} line={draft.line} />
+        </button>
+        <span className="ml-auto shrink-0">Suggested Draft</span>
+      </header>
+      {editing && props.addable && !onLine ? (
+        <div className="px-3 pt-2">
           <Textarea
+            ref={focusOnMount}
             aria-label={`Suggested draft on ${name}`}
             value={body}
             onChange={(event) => setBody(event.target.value)}
-            className="text-sm"
+            className="min-h-12 resize-none bg-background text-sm"
           />
-          <div className="flex justify-end">
+        </div>
+      ) : (
+        <AgentReviewMarkdown
+          markdown={body}
+          className={cn("px-3 pt-1", onLine && "text-muted-foreground")}
+        />
+      )}
+      {onLine ? (
+        <p className="m-0 flex items-center justify-end gap-1.5 px-3 py-2 text-xs text-muted-foreground enter-motion">
+          <Check aria-hidden className="size-3.5 shrink-0 text-added" />
+          You have a Draft on this line.
+        </p>
+      ) : (
+        props.addable && (
+          <footer className="flex justify-end gap-1 p-2">
+            {!editing && (
+              <Button size="xs" variant="ghost" onClick={() => setEditing(true)}>
+                <Pencil />
+                Edit
+              </Button>
+            )}
             <Button
               size="xs"
+              variant="secondary"
               disabled={locked || body.trim() === ""}
               onClick={() => props.drafts.add(draft.path, draft.side, draft.line, body.trim())}
             >
               Add Draft
             </Button>
-          </div>
-        </>
-      ) : (
-        <AgentReviewMarkdown markdown={draft.body} />
+          </footer>
+        )
       )}
     </section>
   )
@@ -105,7 +129,7 @@ function FollowUpView(props: {
   show: ShowNote
 }) {
   return (
-    <li className="flex flex-col gap-2">
+    <li className="flex flex-col gap-3 enter-motion">
       <UserMessage message={props.followUp.message} images={[]} />
       <AgentReviewMarkdown markdown={props.followUp.answer} />
       {props.followUp.suggestedDrafts.map((draft, index) => (
@@ -123,75 +147,27 @@ function FollowUpView(props: {
 }
 
 function Composer(props: {
-  disabled: boolean
-  running: boolean
-  onSend: (message: string) => Promise<boolean>
-  onStop: () => void
+  controls: AgentReviewControls
+  reviewing: boolean
+  following: boolean
 }) {
-  const [message, setMessage] = useState("")
-
-  const send = async () => {
-    const trimmed = message.trim()
-
-    if (props.disabled || props.running || trimmed === "") return
-
-    if (await props.onSend(trimmed)) setMessage("")
-  }
-
-  const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    // Enter can confirm an input method's candidates.
-    if (event.nativeEvent.isComposing) return
-
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault()
-      void send()
-    }
-  }
+  const [composed, setComposed] = useState<SentMessage>(nothingUnsent)
 
   return (
-    <form
-      className="shrink-0 border-t px-5 py-3"
-      onSubmit={(event) => {
-        event.preventDefault()
-        void send()
-      }}
-    >
-      <InputGroup>
-        <InputGroupTextarea
-          aria-label="Follow up"
-          className="max-h-40 p-3"
-          placeholder="Ask about the review, or have it draft comments"
-          value={message}
-          disabled={props.disabled}
-          onChange={(event) => setMessage(event.target.value)}
-          onKeyDown={onKeyDown}
-        />
-        <InputGroupAddon align="block-end" className="justify-end gap-1">
-          {props.running ? (
-            <InputGroupButton
-              size="icon-sm"
-              variant="secondary"
-              className="rounded-full"
-              aria-label="Stop"
-              onClick={props.onStop}
-            >
-              <Square className="fill-current" />
-            </InputGroupButton>
-          ) : (
-            <InputGroupButton
-              type="submit"
-              size="icon-sm"
-              variant="default"
-              className="rounded-full"
-              disabled={props.disabled || message.trim() === ""}
-              aria-label="Send"
-            >
-              <ArrowUp />
-            </InputGroupButton>
-          )}
-        </InputGroupAddon>
-      </InputGroup>
-    </form>
+    <MessageBox
+      composed={composed}
+      setComposed={setComposed}
+      label="Follow up"
+      placeholder="Ask about the review, or have it draft comments"
+      textOnly
+      holdUntilAccepted
+      blocked={props.controls.followUpPending || props.reviewing || props.following}
+      problem={props.controls.followUpProblem}
+      send={({ message }) => props.controls.followUp(message)}
+      steer={null}
+      recall={null}
+      onStop={props.following ? props.controls.cancel : null}
+    />
   )
 }
 
@@ -208,11 +184,18 @@ export function AgentReviewPanel(props: {
 
   if (review === null) return null
 
+  const pending = job?.status === "following-up" || job?.status === "follow-up-failed"
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <section aria-label="Agent review" className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+      <section aria-label="Agent review" className="min-h-0 flex-1 overflow-y-auto px-5 pt-4 pb-8">
         <AgentReviewMarkdown markdown={review.markdown} />
-        <ol aria-label="Follow-ups" className="m-0 mt-4 flex list-none flex-col gap-4 p-0">
+        {(review.followUps.length > 0 || pending) && (
+          <Marker variant="separator" aria-hidden className="my-6 text-xs">
+            <MarkerContent>Follow-ups</MarkerContent>
+          </Marker>
+        )}
+        <ol aria-label="Follow-ups" className="m-0 flex list-none flex-col gap-6 p-0">
           {review.followUps.map((followUp, index) => (
             <FollowUpView
               key={index}
@@ -222,8 +205,8 @@ export function AgentReviewPanel(props: {
               show={props.show}
             />
           ))}
-          {(job?.status === "following-up" || job?.status === "follow-up-failed") && (
-            <li className="flex flex-col gap-2">
+          {pending && (
+            <li className="flex flex-col gap-3 enter-motion">
               <UserMessage message={job.message} images={[]} />
               {job.status === "following-up" ? (
                 <output className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -248,21 +231,19 @@ export function AgentReviewPanel(props: {
           )}
         </ol>
       </section>
-      {props.controls.followUpProblem !== null && (
-        <div className="px-5 pt-2">
-          <ProblemAlert problem={props.controls.followUpProblem} />
-        </div>
-      )}
+      <div
+        aria-hidden
+        className="pointer-events-none relative -mt-8 h-8 shrink-0 bg-linear-to-t from-background to-transparent"
+      />
       {outdated ? (
         <p className="m-0 shrink-0 border-t px-5 py-3 text-sm text-muted-foreground">
           Written for an older Revision. Review again to follow up.
         </p>
       ) : (
         <Composer
-          disabled={props.controls.followUpPending || job?.status === "reviewing"}
-          running={job?.status === "following-up"}
-          onSend={props.controls.followUp}
-          onStop={props.controls.cancel}
+          controls={props.controls}
+          reviewing={job?.status === "reviewing"}
+          following={job?.status === "following-up"}
         />
       )}
     </div>

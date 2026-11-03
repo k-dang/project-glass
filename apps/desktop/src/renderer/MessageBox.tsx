@@ -15,6 +15,8 @@ import {
   type KeyboardEvent,
   memo,
   type ReactNode,
+  useRef,
+  useState,
 } from "react"
 import {
   InputGroup,
@@ -63,7 +65,12 @@ const holdsFiles = (event: DragEvent) => event.dataTransfer.types.includes("File
 export function MessageBox(props: {
   composed: SentMessage
   setComposed: (update: (current: SentMessage) => SentMessage) => void
+  label: string
   placeholder: string
+  /** Takes no images or To-do mentions, for a message that carries only its text. */
+  textOnly?: boolean
+  /** Keeps the message, read-only, until it is accepted, for a send that shows nothing of it before then. */
+  holdUntilAccepted?: boolean
   blocked: boolean
   problem: Problem | null
   /** Why sending is blocked, when the placeholder alone can't say it. */
@@ -76,21 +83,40 @@ export function MessageBox(props: {
   children?: ReactNode
 }) {
   const { composed, setComposed } = props
+  const sending = useRef(false)
+  const [awaiting, setAwaiting] = useState(false)
 
-  const picker = useMentionPicker(composed.message, (message) =>
-    setComposed((current) => ({ ...current, message })),
+  const picker = useMentionPicker(
+    composed.message,
+    (message) => setComposed((current) => ({ ...current, message })),
+    !props.textOnly,
   )
 
   const submit = async (deliver: (message: MessageInput) => Promise<boolean>) => {
+    const message = composed.message.trim()
+
+    if (props.blocked || sending.current || message === "") return
+
     const sent = composed
-    const message = sent.message.trim()
 
-    if (props.blocked || message === "") return
+    if (!props.holdUntilAccepted) {
+      setComposed(() => nothingUnsent)
 
-    setComposed(() => nothingUnsent)
+      if (!(await deliver({ message, images: sent.images })))
+        setComposed((current) => (isNothingUnsent(current) ? sent : current))
 
-    if (!(await deliver({ message, images: sent.images })))
-      setComposed((current) => (isNothingUnsent(current) ? sent : current))
+      return
+    }
+
+    sending.current = true
+    setAwaiting(true)
+
+    try {
+      if (await deliver({ message, images: sent.images })) setComposed(() => nothingUnsent)
+    } finally {
+      sending.current = false
+      setAwaiting(false)
+    }
   }
 
   const addImages = (files: Iterable<File>) =>
@@ -119,7 +145,7 @@ export function MessageBox(props: {
   const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
     const files = Array.from(event.clipboardData.files)
 
-    if (!files.some(({ type }) => isMediaType(type))) return
+    if (props.textOnly || awaiting || !files.some(({ type }) => isMediaType(type))) return
 
     event.preventDefault()
     addImages(files)
@@ -167,10 +193,11 @@ export function MessageBox(props: {
           )}
           <InputGroupTextarea
             {...picker.textarea}
-            aria-label="Message"
+            aria-label={props.label}
             className="max-h-60 p-3"
             placeholder={props.placeholder}
             value={composed.message}
+            readOnly={awaiting}
             onChange={(event) => {
               const message = event.target.value
               picker.follow(event.target)
@@ -179,10 +206,10 @@ export function MessageBox(props: {
             onKeyDown={onKeyDown}
             onPaste={onPaste}
             onDragOver={(event) => {
-              if (holdsFiles(event)) event.preventDefault()
+              if (!props.textOnly && holdsFiles(event)) event.preventDefault()
             }}
             onDrop={(event) => {
-              if (!holdsFiles(event)) return
+              if (props.textOnly || awaiting || !holdsFiles(event)) return
 
               event.preventDefault()
               addImages(event.dataTransfer.files)
@@ -209,7 +236,7 @@ export function MessageBox(props: {
                 size="icon-sm"
                 variant="default"
                 className="rounded-full"
-                disabled={props.blocked || composed.message.trim() === ""}
+                disabled={props.blocked || awaiting || composed.message.trim() === ""}
                 aria-label="Send"
               >
                 <ArrowUp />
