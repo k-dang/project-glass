@@ -385,7 +385,18 @@ const runnerStrategies = Effect.gen(function* () {
   }
 
   return Effect.fn("selectAgentRunner")(({ engine, models }: EngineSettings) =>
-    runners[engine](models),
+    runners[engine](models).pipe(
+      Effect.timeoutOrElse({
+        duration: "30 seconds",
+        orElse: () =>
+          Effect.fail(
+            agentFailure(
+              "not-ready",
+              "Checking the agent's installation and model took too long. Try again.",
+            ),
+          ),
+      }),
+    ),
   )
 })
 

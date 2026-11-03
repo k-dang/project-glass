@@ -9,6 +9,7 @@ export const controls = (overrides: Partial<AgentReviewControls>): AgentReviewCo
   outdated: false,
   commandProblem: null,
   followUpProblem: null,
+  followUpPending: false,
   subscriptionProblem: null,
   reconnect: vi.fn<() => void>(),
   start: vi.fn<() => void>(),

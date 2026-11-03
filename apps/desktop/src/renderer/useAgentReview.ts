@@ -2,7 +2,7 @@ import { useAtom, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-
 import type { PullRequestRef, Revision } from "@glass/contracts"
 import { Equal, Exit, Option, Predicate, Stream } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
-import { useCallback, useMemo } from "react"
+import { useCallback, useMemo, useRef } from "react"
 import { Backend, backendRuntime } from "./backend"
 import { describeError, settledProblem, unexpectedProblem } from "./problems"
 
@@ -46,6 +46,7 @@ export const useAgentReview = (
   const [commandResult, runCommand] = useAtom(commandAtom)
   const followUpResult = useAtomValue(followUpAtom)
   const runFollowUp = useAtomSet(followUpAtom, { mode: "promiseExit" })
+  const sendingFollowUp = useRef(false)
   const latest = Option.getOrNull(AsyncResult.value(state))
 
   const subscriptionProblem = AsyncResult.matchWithWaiting(state, {
@@ -60,10 +61,17 @@ export const useAgentReview = (
   const cancel = useCallback(() => runCommand("cancel"), [runCommand])
 
   /** Resolves false when the backend refuses the message, so the composer can keep it. */
-  const followUp = useCallback(
-    async (message: string) => Exit.isSuccess(await runFollowUp(message)),
-    [runFollowUp],
-  )
+  const followUp = async (message: string) => {
+    if (sendingFollowUp.current) return false
+
+    sendingFollowUp.current = true
+
+    try {
+      return Exit.isSuccess(await runFollowUp(message))
+    } finally {
+      sendingFollowUp.current = false
+    }
+  }
 
   const review = latest?.review ?? null
   const current = review !== null && Equal.equals(review.revision, revision)
@@ -76,6 +84,7 @@ export const useAgentReview = (
     commandProblem: settledProblem(commandResult),
     /** Why the backend refused a Follow-up before the agent ran. */
     followUpProblem: settledProblem(followUpResult),
+    followUpPending: followUpResult.waiting,
     subscriptionProblem,
     reconnect,
     /** Null where no Agent review can start, such as a closed PR. */
