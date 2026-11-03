@@ -5,6 +5,8 @@
   "scripts": {
     "build": "vp pack",
     "dev": "vp pack --watch",
+    "record:runners": "jiti test/recordRunnerReplays.ts",
+    "record:sessions": "jiti test/recordSessions.ts",
     "test": "vp test run"
   },
   "devDependencies": {

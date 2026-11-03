@@ -4,7 +4,6 @@ import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { connectRpcClient } from "../src/rpcSocket"
-import { installedProgram } from "./replay"
 import { DEMO_REPOSITORY } from "./demoPullRequests"
 import { startFakeAnthropic } from "./fakeAnthropic"
 import {
@@ -16,6 +15,7 @@ import {
 } from "./fakeModelProvider"
 import { seedClone } from "./gitRepositories"
 import { fakeAnthropicEnvironment } from "./pinnedClaude"
+import { installedProgram } from "./replay"
 
 const bundledPiPackage = new URL(
   "../node_modules/@earendil-works/pi-coding-agent/",

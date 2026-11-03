@@ -236,7 +236,7 @@ const loadTape = (scenario: string, version: string) => {
 
   if (tape.program !== version)
     throw new Error(
-      `${scenario} was recorded from ${tape.program}, but this checkout has ${version}. Record it again with GLASS_RECORD_SESSIONS=1.`,
+      `${scenario} was recorded from ${tape.program}, but this checkout has ${version}. Record it again with pnpm --filter @glass/server record:sessions.`,
     )
 
   return tape

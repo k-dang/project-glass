@@ -79,7 +79,6 @@ export const claudeSession = Effect.fnUntraced(function* (
   reply?: (request: FakeAnthropicRequest) => FakeAnthropicReply,
 ) {
   const folder = yield* isolatedHome
-
   const tape = sessionTape(scenario, pinnedClaudeProgram(), { "<folder>": folder })
 
   let api: Pick<Effect.Success<typeof startFakeAnthropic>, "hold" | "release" | "received"> = {
@@ -125,7 +124,6 @@ export const piSession = Effect.fnUntraced(function* (
 
   vi.stubEnv("PI_CODING_AGENT_DIR", join(home, ".pi", "agent"))
   vi.stubEnv("PI_OFFLINE", "1")
-
   const tape = sessionTape(scenario, bundledPiProgram(), { "<folder>": folder, "<pi-home>": home })
 
   const adapter = yield* piAdapter(bundledPi).pipe(
