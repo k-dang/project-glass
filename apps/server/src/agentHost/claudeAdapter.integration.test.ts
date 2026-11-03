@@ -80,7 +80,13 @@ it.live("streams a long reply in small pieces to its end", () =>
 
     assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
     assert.deepStrictEqual(lastText(turn), TextPart.make({ text: long }))
-    assert.isAbove(f.events.filter((event) => Predicate.isTagged(event, "PartAppended")).length, 1)
+    const textIndex = turn?.parts.findLastIndex((part) => Predicate.isTagged(part, "Text"))
+    assert.isAbove(
+      f.events.filter(
+        (event) => Predicate.isTagged(event, "PartAppended") && event.index === textIndex,
+      ).length,
+      1,
+    )
   }).pipe(Effect.scoped),
 )
 
@@ -152,6 +158,7 @@ it.live("Steers a running Turn, showing the Steer where Claude Code takes it in"
       turn?.parts ?? [],
       SteerPart.make({ message: "Change course: reply with exactly STEERED instead.", images: [] }),
     )
+    assert.deepStrictEqual(lastText(turn), TextPart.make({ text: "STEERED" }))
   }).pipe(Effect.scoped),
 )
 

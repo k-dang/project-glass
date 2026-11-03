@@ -124,18 +124,27 @@ const tryMatch = (recorded: Json, actual: Json, ids: Map<string, string>) => {
   return true
 }
 
-const personal = /email|organization|account|subscription|rate_limit_info/i
+const personal =
+  /email|organization|account|subscription|rate_limit_info|username|team[_-]?id|(?:access|refresh|auth)[_-]?token|api[_-]?key/i
 
-const blankPersonal = (value: Json, field = ""): Json =>
-  personal.test(field)
-    ? "<redacted>"
+export const blankPersonal = (value: Json, field = "", usage = false): Json => {
+  if (personal.test(field)) return "<redacted>"
+
+  const metric = usage || /usage|cost|tokens/i.test(field)
+
+  return Predicate.isNumber(value) && metric
+    ? 0
     : isJsonArray(value)
-      ? value.map((item) => blankPersonal(item))
+      ? value.map((item) => blankPersonal(item, "", metric))
       : isJsonObject(value)
         ? Object.fromEntries(
-            Object.entries(value).map(([name, inner]) => [name, blankPersonal(inner, name)]),
+            Object.entries(value).map(([name, inner]) => [
+              name,
+              blankPersonal(inner, name, metric),
+            ]),
           )
         : value
+}
 
 const lines = (onLine: (line: string) => void) => {
   const frame = lineFramer()
@@ -467,7 +476,10 @@ export const sessionTape = (
 
     if (recordingSessions)
       return live().then((info) => {
-        calls.push({ args, info: normalize(parseLine(JSON.stringify(info ?? null))) })
+        calls.push({
+          args,
+          info: blankPersonal(normalize(parseLine(JSON.stringify(info ?? null)))),
+        })
 
         return info
       })

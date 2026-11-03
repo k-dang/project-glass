@@ -7,7 +7,8 @@ const USAGE = `Records the Agent session recordings that the adapter integration
 Claude Code sessions run the pinned claude on your own Claude Code login with Haiku, which costs a
 few cents; set CLAUDE_CODE_OAUTH_TOKEN where your login isn't in ~/.claude/.credentials.json. pi
 sessions run the bundled pi against a fake model API. Fields that look personal (email, org,
-account, rate limits) are blanked; check the files before committing them.`
+account, rate limits) are blanked and usage counters and costs are zeroed; check the files before
+committing them.`
 
 const pnpmPath = process.env["npm_execpath"]
 
