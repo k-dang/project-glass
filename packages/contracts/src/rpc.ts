@@ -136,9 +136,16 @@ export class GlassRpcs extends RpcGroup.make(
     success: EngineSettings,
     error: SettingsError,
   }),
-  /** Whether Glass writes a Tour for each open PR added to the Queue; off until the user turns it on. */
-  Rpc.make("GetQueueTours", { success: Schema.Boolean, error: SettingsError }),
-  Rpc.make("SetQueueTours", { payload: { enabled: Schema.Boolean }, error: SettingsError }),
+  /** Whether Glass writes a Tour or runs an Agent review for each open PR added to the Queue; off until the user turns it on. */
+  Rpc.make("GetQueueWork", {
+    payload: { feature: EngineFeature },
+    success: Schema.Boolean,
+    error: SettingsError,
+  }),
+  Rpc.make("SetQueueWork", {
+    payload: { feature: EngineFeature, enabled: Schema.Boolean },
+    error: SettingsError,
+  }),
   Rpc.make("ListFollowedRepositories", {
     success: Schema.Array(FollowedRepository),
     error: SettingsError,

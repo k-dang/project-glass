@@ -11,7 +11,7 @@ import { ProblemAlert } from "./ProblemAlert"
 import { problemOf } from "./problems"
 import { repositoryLabeller } from "./PullRequestRow"
 import { savedQueueAtom, watchedQueueAtom } from "./queue"
-import { QueueTourStatus } from "./QueueTourStatus"
+import { QueueWorkStatus } from "./QueueWorkStatus"
 import { ReviewContinueCard } from "./ReviewContinueCard"
 import { defaultListSearch } from "./reviewsArea"
 import { loadedPlacesAtom, savedDestinationsAtom, savedIn } from "./savedPlace"
@@ -143,7 +143,7 @@ function QueueItems(props: { entries: ReadonlyArray<QueuedPullRequest> }) {
                 {repositoryLabel(queued.pullRequest.ref)}
               </span>
             </span>
-            <QueueTourStatus queued={queued} />
+            <QueueWorkStatus queued={queued} />
           </Link>
         </li>
       ))}

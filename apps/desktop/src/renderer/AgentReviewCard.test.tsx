@@ -119,3 +119,14 @@ it("shows a running review with Cancel and a failed one with Retry", async () =>
   await userEvent.click(within(failed.card!).getByRole("button", { name: "Retry" }))
   expect(failed.controls.start).toHaveBeenCalledOnce()
 })
+
+it("shows a review the Queue started as waiting, and starts it now or cancels it", async () => {
+  const f = mount({ job: { status: "waiting" } })
+  const card = within(f.card!)
+
+  expect(card.getByText("Agent review waiting…")).toBeDefined()
+  await userEvent.click(card.getByRole("button", { name: "Review now" }))
+  expect(f.controls.start).toHaveBeenCalledOnce()
+  await userEvent.click(card.getByRole("button", { name: "Cancel" }))
+  expect(f.controls.cancel).toHaveBeenCalledOnce()
+})

@@ -11,7 +11,7 @@ import { EnginePicker, missingModel } from "./EnginePicker"
 import { engineNames } from "./engines"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf, settledProblem } from "./problems"
-import { QueueToursSetting } from "./QueueTours"
+import { QueueWorkSetting } from "./QueueWorkSetting"
 import { ReviewPromptField } from "./ReviewPromptField"
 import { SettingsSection } from "./SettingsSection"
 
@@ -140,8 +140,9 @@ function AgentSettingsEditor(props: { saved: AgentSettings }) {
         </ToursSection>
         <SettingsSection
           title="Agent reviews"
-          description="Choose which engine runs Agent reviews and how you review. Changes apply to the next Agent review."
+          description="Choose when and how Glass runs Agent reviews. Engine and prompt changes apply to the next Agent review."
         >
+          <QueueWorkSetting feature="agentReviews" />
           <EnginePicker
             legend="Agent review engine"
             description="Runs every Agent review and answers Ask."
@@ -186,7 +187,7 @@ function AgentSettingsEditor(props: { saved: AgentSettings }) {
 function ToursSection(props: { children: ReactNode }) {
   return (
     <SettingsSection title="Tours" description="Choose when and how Glass writes Tours.">
-      <QueueToursSetting />
+      <QueueWorkSetting feature="tours" />
       {props.children}
     </SettingsSection>
   )

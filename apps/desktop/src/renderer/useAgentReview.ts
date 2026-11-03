@@ -8,7 +8,7 @@ import { describeError, settledProblem, unexpectedProblem } from "./problems"
 
 type AgentReviewCommand = "start" | "cancel"
 
-const agentReviewStates = Atom.family((pullRequest: PullRequestRef) =>
+export const agentReviewStates = Atom.family((pullRequest: PullRequestRef) =>
   backendRuntime.atom(
     Stream.unwrap(Backend.useSync((backend) => backend.WatchAgentReview({ pullRequest }))),
   ),

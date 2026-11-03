@@ -31,6 +31,7 @@ const Settings = Schema.Struct({
   queueTours: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
   agentReviewModels: SavedModels,
   agentReviewEngine: AgentEngine.pipe(Schema.withDecodingDefaultKey(Effect.succeed("pi"))),
+  queueAgentReviews: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
   reviewPrompt: ReviewPrompt.pipe(
     Schema.withDecodingDefaultKey(Effect.succeed(defaultReviewPrompt)),
   ),
@@ -38,13 +39,30 @@ const Settings = Schema.Struct({
 
 export type Settings = typeof Settings.Type
 
-const engineKeys = {
-  tours: { engine: "tourEngine", models: "tourModels" },
-  agentReviews: { engine: "agentReviewEngine", models: "agentReviewModels" },
-} as const satisfies Record<EngineFeature, { engine: keyof Settings; models: keyof Settings }>
+const featureKeys = {
+  tours: { engine: "tourEngine", models: "tourModels", queue: "queueTours" },
+  agentReviews: {
+    engine: "agentReviewEngine",
+    models: "agentReviewModels",
+    queue: "queueAgentReviews",
+  },
+} as const satisfies Record<
+  EngineFeature,
+  { engine: keyof Settings; models: keyof Settings; queue: keyof Settings }
+>
+
+/** Whether the feature runs for each open PR that joins the Queue. */
+export const queueWorkOf = (settings: Settings, feature: EngineFeature): boolean =>
+  settings[featureKeys[feature].queue]
+
+export const withQueueWork = (
+  settings: Settings,
+  feature: EngineFeature,
+  enabled: boolean,
+): Settings => ({ ...settings, [featureKeys[feature].queue]: enabled })
 
 export const engineSettingsOf = (settings: Settings, feature: EngineFeature): EngineSettings => {
-  const keys = engineKeys[feature]
+  const keys = featureKeys[feature]
 
   return { engine: settings[keys.engine], models: settings[keys.models] }
 }
@@ -54,7 +72,7 @@ export const withEngineSettings = (
   feature: EngineFeature,
   { engine, models }: EngineSettings,
 ): Settings => {
-  const keys = engineKeys[feature]
+  const keys = featureKeys[feature]
 
   return { ...settings, [keys.engine]: engine, [keys.models]: models }
 }

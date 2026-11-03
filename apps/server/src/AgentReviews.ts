@@ -38,6 +38,8 @@ import { pullRequestJobs, type PullRequestJob } from "./pullRequestJobs"
 import { ServerConfig } from "./ServerConfig"
 import { engineSettingsOf, SettingsStore } from "./SettingsStore"
 
+const BACKGROUND_SLOTS = 1
+
 type Job = PullRequestJob<AgentReviewState>
 
 const setJob = (job: Job, status: AgentReviewState["job"]) =>
@@ -93,12 +95,17 @@ export class AgentReviews extends Context.Service<
       pr: PullRequestRef,
       revision: Revision,
     ) => Effect.Effect<void, AgentReviewFailure>
+    readonly startInBackground: (
+      pr: PullRequestRef,
+      revision: Revision,
+    ) => Effect.Effect<void, AgentReviewFailure>
     readonly followUp: (
       pr: PullRequestRef,
       revision: Revision,
       message: string,
     ) => Effect.Effect<void, AgentReviewFailure>
-    readonly cancel: (pr: PullRequestRef) => Effect.Effect<void, AgentReviewFailure>
+    readonly cancel: (pr: PullRequestRef) => Effect.Effect<void>
+    readonly cancelBackground: () => Effect.Effect<void>
     readonly watch: (pr: PullRequestRef) => Stream.Stream<AgentReviewState, AgentReviewFailure>
   }
 >()("@glass/server/AgentReviews") {
@@ -144,8 +151,12 @@ export class AgentReviews extends Context.Service<
 
       const jobs = yield* pullRequestJobs<AgentReviewState, AgentReviewFailure>({
         load,
-        inProgress: ({ job }) => job.status === "reviewing" || job.status === "starting-agent",
+        inProgress: ({ job }) =>
+          job.status === "waiting" || job.status === "reviewing" || job.status === "starting-agent",
         idle: ({ review }) => ({ review, job: { status: "idle" } }),
+        backgroundSlots: BACKGROUND_SLOTS,
+        needsBackground: ({ review, job }) => review === null && job.status === "idle",
+        waiting: ({ review }) => ({ review, job: { status: "waiting" } }),
       })
 
       const removeAgent = (agentId: string | null) =>
@@ -180,6 +191,13 @@ export class AgentReviews extends Context.Service<
         Effect.map((saved) => saved.reviewPrompt),
         Effect.mapError((error) => failure("not-ready", error.message)),
       )
+
+      const markReviewing = Effect.fnUntraced(function* (job: Job) {
+        const startedAt = DateTime.toEpochMillis(yield* DateTime.now)
+        yield* setJob(job, { status: "reviewing", startedAt, runner: null })
+
+        return startedAt
+      })
 
       const work = (job: Job, pr: PullRequestRef, revision: Revision, startedAt: number) =>
         Effect.gen(function* () {
@@ -311,10 +329,20 @@ export class AgentReviews extends Context.Service<
 
         yield* jobs.begin(job, (replace) =>
           Effect.gen(function* () {
-            const startedAt = DateTime.toEpochMillis(yield* DateTime.now)
-            yield* setJob(job, { status: "reviewing", startedAt, runner: null })
+            const startedAt = yield* markReviewing(job)
             yield* replace(work(job, pr, revision, startedAt))
           }),
+        )
+      })
+
+      const startInBackground = Effect.fn("AgentReviews.startInBackground")(function* (
+        pr: PullRequestRef,
+        revision: Revision,
+      ) {
+        yield* jobs.startInBackground(pr, (job) =>
+          markReviewing(job).pipe(
+            Effect.flatMap((startedAt) => work(job, pr, revision, startedAt)),
+          ),
         )
       })
 
@@ -329,7 +357,7 @@ export class AgentReviews extends Context.Service<
           Effect.gen(function* () {
             const { review, job: current } = yield* SubscriptionRef.get(job.state)
 
-            if (current.status === "reviewing")
+            if (current.status === "waiting" || current.status === "reviewing")
               return yield* failure("not-ready", "Wait for the Agent review to finish.")
 
             if (current.status === "starting-agent")
@@ -382,14 +410,12 @@ export class AgentReviews extends Context.Service<
           )
       })
 
-      const cancel = Effect.fn("AgentReviews.cancel")(function* (pr: PullRequestRef) {
-        yield* jobs.stop(yield* jobs.jobFor(pr))
-      })
-
       return AgentReviews.of({
         start,
+        startInBackground,
         followUp,
-        cancel,
+        cancel: jobs.stop,
+        cancelBackground: jobs.stopBackground,
         watch: jobs.watch,
       })
     }),
