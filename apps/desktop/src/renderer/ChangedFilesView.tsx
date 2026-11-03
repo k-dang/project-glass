@@ -363,7 +363,6 @@ export function ChangedFilesView(props: ChangedFilesViewProps) {
       <Button
         type="button"
         aria-label="Start a Draft on this line"
-        title="Comment on this line, or ask the agent about it"
         className="relative z-4 -mr-[calc(1lh-1ch)] size-[1lh] rounded-[4px] border-0 bg-(--diffs-modified-base) p-0 text-(--diffs-bg) hover:bg-(--diffs-modified-base)"
         onClick={() => {
           const hovered = getHoveredLine()
