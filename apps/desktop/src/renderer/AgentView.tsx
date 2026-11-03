@@ -119,10 +119,7 @@ interface AgentTabs {
 
 const SAVE_DELAY_MS = 400
 
-/**
- * Shows some tool calls as something other than a call, such as a proposed Suggested draft, or
- * answers `null` to show the call itself.
- */
+/** Shows some tool calls as something other than a call, or answers `null` to show the call itself. */
 export const ToolCallView = createContext<
   ((call: typeof ToolCallPart.Type) => ReactNode | null) | null
 >(null)
@@ -251,7 +248,6 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
   )
 }
 
-/** The Agent's Turns, newest at the bottom, under an optional `lead`. */
 export function Transcript(props: {
   agentId: string
   turns: ReadonlyArray<Turn>
@@ -675,14 +671,12 @@ function Composer(props: {
   )
 }
 
-/** Sends, queues, Steers, and stops the Agent's Turns, keeping what the user hasn't sent. */
 export function AgentComposer(props: {
   agentId: string
   turns: ReadonlyArray<Turn>
   queued: ReadonlyArray<QueuedMessage>
   label?: string
-  /** Shown while no Turn runs or waits on the user. */
-  placeholder?: string
+  idlePlaceholder?: string
   textOnly?: boolean
   problem?: Problem | null
   pickers?: ReactNode
@@ -710,7 +704,7 @@ export function AgentComposer(props: {
         setComposed={setComposed}
         label={props.label ?? "Message"}
         textOnly={props.textOnly ?? false}
-        placeholder={composerPlaceholder(running, waiting, props.placeholder)}
+        placeholder={composerPlaceholder(running, waiting, props.idlePlaceholder)}
         blocked={sent.waiting || steered.waiting || waiting !== undefined}
         problem={
           settledProblem(sent) ??

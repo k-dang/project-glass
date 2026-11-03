@@ -6,7 +6,7 @@ import {
   Image,
   isRequestPart,
   SteerPart,
-  suggestedDraftOf,
+  acceptedSuggestedDraftOf,
   TextPart,
   type Turn,
   TurnDone,
@@ -277,7 +277,7 @@ it.live("reads its checkout and proposes Suggested drafts as an Agent review's A
       suggestions.map(({ status }) => status),
       ["done", "failed"],
     )
-    assert.deepStrictEqual(suggestedDraftOf(suggestions[0]!), {
+    assert.deepStrictEqual(acceptedSuggestedDraftOf(suggestions[0]!), {
       path: "greet.ts",
       side: "new",
       line: 2,

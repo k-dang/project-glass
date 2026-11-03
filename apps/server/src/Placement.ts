@@ -24,7 +24,6 @@ export type SubscribeLost = Effect.Effect<Stream.Stream<LostAgentIds>, never, Sc
 export interface PlacedAgent {
   readonly agent: Agent
   readonly folder: string
-  /** An Agent review's Agent, whose folder is a checkout Glass wrote, not a worktree. */
   readonly forReview: boolean
 }
 

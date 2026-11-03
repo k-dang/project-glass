@@ -97,7 +97,6 @@ export interface CheckoutAnswer<I, A> {
   readonly answer: A
 }
 
-/** PR material read from GitHub beside a lasting checkout of the Revision in `folder`. */
 export interface CheckoutCopy<I> {
   readonly pr: PullRequestRef
   readonly revision: Revision
@@ -163,7 +162,6 @@ export class CheckoutRuns extends Context.Service<
   CheckoutRuns,
   {
     readonly select: () => Effect.Effect<CheckoutRunner, CheckoutRunFailure, Scope.Scope>
-    /** Reads the PR material and writes the checkout for an agent Glass runs elsewhere. */
     readonly copy: <I>(copy: CheckoutCopy<I>) => Effect.Effect<I, CheckoutRunFailure>
   }
 >()("@glass/server/CheckoutRuns") {

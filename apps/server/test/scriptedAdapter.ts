@@ -76,7 +76,6 @@ export const scriptedAdapter = (gates: string): AgentAdapter => ({
             }
           }
 
-          // `suggest new:greet.ts:2 Body` calls Glass's Suggested-draft tool as a review's Agent.
           const suggestion = /^suggest (new|old):(\S+):(\d+) (.+)$/.exec(message)
 
           if (suggestion !== null && review !== null) {
@@ -105,7 +104,6 @@ export const scriptedAdapter = (gates: string): AgentAdapter => ({
             )
           }
 
-          // A review's Agent reads its checkout and its instructions.
           if (message === "show the review" && review !== null) {
             yield* part(turnId, TextPart.make({ text: review.instructions }))
             yield* part(turnId, TextPart.make({ text: readdirSync(folder).toSorted().join(",") }))

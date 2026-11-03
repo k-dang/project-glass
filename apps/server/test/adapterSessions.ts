@@ -96,7 +96,6 @@ const drive = Effect.fnUntraced(function* (
   return { adapter, folder, events, turns: SubscriptionRef.get(turns), until, request, open }
 })
 
-/** An Agent review's Agent, on a checkout whose diff holds lines 1 and 2 of `greet.ts`. */
 export const reviewBrief: ReviewBrief = {
   instructions: "You answer a reviewer's questions about a pull request that changes greet.ts.",
   diffLines: { old: {}, new: { "greet.ts": [1, 2] } },

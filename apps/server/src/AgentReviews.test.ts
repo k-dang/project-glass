@@ -8,7 +8,7 @@ import {
   emptyTranscript,
   PullRequestRef,
   Revision,
-  suggestedDraftOf,
+  acceptedSuggestedDraftOf,
   type Turn,
 } from "@glass/contracts"
 import { Effect, Exit, Option, Predicate, Scope, Stream } from "effect"
@@ -354,7 +354,6 @@ it.live("starts the review's Agent in a checkout of its Revision, sending it eve
     const turns = yield* transcript(f.client, agentId, ended(2))
     assert.deepStrictEqual(texts(turns[1]), ["Reply to: And the rename?"])
 
-    // It lives beside its review, not in the Agents list.
     const listed = yield* f.client.WatchAgents().pipe(Stream.runHead)
     assert.deepStrictEqual(Option.getOrThrow(listed), [])
     assert.deepStrictEqual(yield* f.restart, started)
@@ -376,7 +375,7 @@ it.live("keeps the Suggested drafts the agent places on lines of the diff", () =
 
     const suggested = turns.map((turn) =>
       turn.parts.flatMap((part) =>
-        Predicate.isTagged(part, "ToolCall") ? [suggestedDraftOf(part)] : [],
+        Predicate.isTagged(part, "ToolCall") ? [acceptedSuggestedDraftOf(part)] : [],
       ),
     )
 
@@ -441,11 +440,11 @@ it.live("keeps the message of a follow-up whose Agent couldn't start", () =>
     yield* followUp(f, "Why?")
 
     const { job, review: after } = yield* f.state(
-      (state) => state.job.status === "follow-up-failed",
+      (state) => state.job.status === "agent-start-failed",
     )
 
-    assert.strictEqual(job.status === "follow-up-failed" && job.message, "Why?")
-    assert.strictEqual(job.status === "follow-up-failed" && job.reason.reason, "stale-revision")
+    assert.strictEqual(job.status === "agent-start-failed" && job.message, "Why?")
+    assert.strictEqual(job.status === "agent-start-failed" && job.reason.reason, "stale-revision")
     assert.deepStrictEqual(after, review)
     const checkouts = join(f.home, ".project-glass", "agent-review-checkouts")
     assert.isEmpty(existsSync(checkouts) ? readdirSync(checkouts) : [])

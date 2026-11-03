@@ -23,6 +23,7 @@ import {
   NoPermissionModes,
   type RequestNotWaiting,
   RequestWaiting,
+  type Revision,
   SandboxPlace,
   type SandboxStatus,
   thisMac as thisMacPlace,
@@ -116,14 +117,13 @@ const withStatus = (agent: Agent, sandbox: SandboxStatus | null) =>
 const storageFailure = () =>
   new AgentError({ message: "Couldn't read or save your Agents. Try again." })
 
-/** An Agent review's Agent, reading a checkout Glass already wrote to `folder`. */
 export interface NewReviewAgent {
   readonly name: string
   readonly repository: FollowedRepository
-  readonly baseBranch: string
+  readonly revision: Revision
   readonly engine: AgentEngine
   readonly model: string | null
-  readonly folder: string
+  readonly checkout: string
   readonly review: ReviewBrief
   readonly message: string
 }
@@ -141,7 +141,7 @@ export class Agents extends Context.Service<
       place: AgentPlace,
     ) => Effect.Effect<AgentModels, AgentError>
     readonly create: (input: NewAgent) => Effect.Effect<Agent, InvalidLocalCheckout | AgentError>
-    /** Starts the Agent on its first Turn. It stays out of the Agents list, and owns its folder. */
+    /** Starts the Agent on its first Turn. It stays out of the Agents list, and owns its checkout. */
     readonly createForReview: (input: NewReviewAgent) => Effect.Effect<Agent, AgentError>
     readonly send: (
       agentId: string,
@@ -223,10 +223,6 @@ export class Agents extends Context.Service<
           ? sandboxes.placement(place.providerId)
           : localPlacement
 
-      /**
-       * An Agent review's Agent runs on this device in a checkout Glass wrote: it has no worktree
-       * whose changes to show or keep, and removing it deletes the checkout.
-       */
       const reviewPlacement: Placement = {
         ...localPlacement,
         hostOnceMade: () => Effect.succeedNone,
@@ -280,7 +276,6 @@ export class Agents extends Context.Service<
         return { message, images, prompt: prompt(message, mentioned) } satisfies DeliveredMessage
       })
 
-      /** Read only when a Turn starts, since it holds the whole PR. */
       const reviewBrief = (row: PlacedAgent) =>
         row.forReview
           ? sql`SELECT review_brief AS brief FROM agent WHERE id = ${row.agent.id}`.pipe(
@@ -347,7 +342,6 @@ export class Agents extends Context.Service<
         Effect.forkIn(scope),
       )
 
-      /** Saves the Agent and starts its first Turn. */
       const insert = (row: PlacedAgent, first: MessageInput, review: ReviewBrief | null) => {
         const { agent, folder } = row
         const { place, repository } = agent
@@ -394,18 +388,17 @@ export class Agents extends Context.Service<
           name: input.name,
           place: thisMacPlace,
           repository: input.repository,
-          baseBranch: input.baseBranch,
+          baseBranch: input.revision.base,
           engine: input.engine,
           model: input.model,
           effort: null,
-          // It only reads, with tools allowed up front, so there's nothing to choose.
           permissionMode: null,
           createdAt: yield* DateTime.now,
           sandbox: null,
         })
 
         yield* insert(
-          { agent, folder: input.folder, forReview: true },
+          { agent, folder: input.checkout, forReview: true },
           { message: input.message, images: [] },
           input.review,
         )

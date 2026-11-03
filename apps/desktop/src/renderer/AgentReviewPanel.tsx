@@ -4,7 +4,7 @@ import {
   nothingUnsent,
   type SentMessage,
   type SuggestedDraft,
-  suggestedDraftOf,
+  acceptedSuggestedDraftOf,
   type ToolCallPart,
 } from "@glass/contracts"
 import { cn } from "cn"
@@ -137,18 +137,17 @@ function FollowUpsMarker() {
   )
 }
 
-/** The first Follow-up, sent while Glass starts the Agent it becomes the first Turn of. */
 function FirstFollowUp(props: { controls: AgentReviewControls }) {
   const { job } = props.controls
 
-  if (job?.status !== "following-up" && job?.status !== "follow-up-failed") return null
+  if (job?.status !== "starting-agent" && job?.status !== "agent-start-failed") return null
 
   return (
     <>
       <FollowUpsMarker />
       <div className="flex flex-col gap-3 enter-motion">
         <UserMessage message={job.message} images={[]} />
-        {job.status === "following-up" ? (
+        {job.status === "starting-agent" ? (
           <output className="flex items-center gap-2 text-sm text-muted-foreground">
             <LoaderCircle
               aria-hidden
@@ -184,12 +183,14 @@ function FirstFollowUpComposer(props: { controls: AgentReviewControls; reviewing
       placeholder="Ask about the review, or have it draft comments"
       textOnly
       holdUntilAccepted
-      blocked={props.controls.followUpPending || props.reviewing || job?.status === "following-up"}
+      blocked={
+        props.controls.followUpPending || props.reviewing || job?.status === "starting-agent"
+      }
       problem={props.controls.followUpProblem}
       send={({ message }) => props.controls.followUp(message)}
       steer={null}
       recall={null}
-      onStop={job?.status === "following-up" ? props.controls.cancel : null}
+      onStop={job?.status === "starting-agent" ? props.controls.cancel : null}
     />
   )
 }
@@ -202,7 +203,6 @@ function OutdatedNote() {
   )
 }
 
-/** The review's Agent: its Turns are the Follow-ups, under the review they follow up on. */
 function ReviewAgent(props: {
   agentId: string
   lead: ReactNode
@@ -221,7 +221,7 @@ function ReviewAgent(props: {
 
   const suggestedDraftView = useCallback(
     (call: typeof ToolCallPart.Type) => {
-      const draft = suggestedDraftOf(call)
+      const draft = acceptedSuggestedDraftOf(call)
 
       return draft === null ? null : (
         <SuggestedDraftCard draft={draft} drafts={drafts} addable={!outdated} show={show} />
@@ -259,7 +259,7 @@ function ReviewAgent(props: {
           turns={turns}
           queued={queued}
           label="Follow up"
-          placeholder="Ask about the review, or have it draft comments"
+          idlePlaceholder="Ask about the review, or have it draft comments"
           textOnly
         />
       )}
@@ -267,10 +267,6 @@ function ReviewAgent(props: {
   )
 }
 
-/**
- * The whole Agent review in the file panel, so it reads beside the diff, with its Follow-ups: the
- * Turns of the review's own Agent, which can suggest Drafts.
- */
 export function AgentReviewPanel(props: {
   controls: AgentReviewControls
   drafts: DraftStore

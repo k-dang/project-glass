@@ -31,7 +31,7 @@ import * as z from "zod/v4"
 import { sdkExecutable } from "../processes"
 import { claudeReadOnlyTools } from "../readOnlyTools"
 import type { AgentAdapter } from "./adapter"
-import { GLASS_MCP_PREFIX, Input, isFailure, machine } from "./claudeTurn"
+import { GLASS_MCP_PREFIX, GLASS_MCP_SERVER, Input, isFailure, machine } from "./claudeTurn"
 import type { DeliveredMessage } from "./deliveredMessage"
 import { couldNotSwitch, HostAgentError, notRunning, type ReviewBrief } from "./protocol"
 import { settleWith } from "./requests"
@@ -78,11 +78,7 @@ const startFailure = (cause: unknown) =>
       : "Claude Code could not start. Check its installation.",
   })
 
-/**
- * An Agent review's Agent reads the checkout with Claude Code's search tools and proposes
- * Suggested drafts through Glass's own MCP server, all allowed without asking. It loads no
- * settings files, so the user's hooks never see the PR's files.
- */
+/** Loads no settings files, so the user's hooks never see the PR's files. */
 const reviewOptions = (brief: ReviewBrief): Options => ({
   systemPrompt: { type: "preset", preset: "claude_code", append: brief.instructions },
   tools: claudeReadOnlyTools,
@@ -90,8 +86,8 @@ const reviewOptions = (brief: ReviewBrief): Options => ({
   settingSources: [],
   strictMcpConfig: true,
   mcpServers: {
-    glass: createSdkMcpServer({
-      name: "glass",
+    [GLASS_MCP_SERVER]: createSdkMcpServer({
+      name: GLASS_MCP_SERVER,
       tools: [
         tool(
           SUGGEST_DRAFT_TOOL,

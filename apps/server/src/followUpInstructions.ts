@@ -2,7 +2,6 @@ import { type AgentReview, SUGGEST_DRAFT_TOOL } from "@glass/contracts"
 import { agentReviewMaterial } from "./agentReviewPrompt"
 import type { ReviewInput } from "./github/GitHubClient"
 
-/** What an Agent review's Agent is told before the first Follow-up, with the PR and review as data. */
 export const followUpInstructions = (
   reviewPrompt: string,
   input: ReviewInput,

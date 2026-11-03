@@ -147,11 +147,7 @@ const refused = (what: "model" | "effort") => (error: string) =>
     Effect.andThen(Effect.fail(couldNotSwitch("pi", what))),
   )
 
-/**
- * An Agent review's Agent reads with pi's search tools and proposes Suggested drafts through Glass's
- * extension, loading nothing else. pi reads the instructions from a file, keeping them out of argv.
- * Both files sit beside the checkout, out of the agent's sight, while the program runs.
- */
+/** pi reads the instructions from a file, keeping them out of argv, where endpoint security tools may kill processes with long arguments. */
 const reviewFlags = Effect.fnUntraced(function* (folder: string, brief: ReviewBrief) {
   const fs = yield* FileSystem.FileSystem
   const directory = `${folder}.pi`

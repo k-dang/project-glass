@@ -16,18 +16,22 @@ export const SUGGEST_DRAFT_PLACED = "Glass shows this Suggested draft to the rev
 const refusal = (path: string, side: string, line: number) =>
   `${path} line ${line} on the ${side} side is not a line of the diff, so it can't be a Suggested draft. Place it on a line inside the diff's hunks, or put the comment in your answer.`
 
-/** Glass's answer to a call of its Suggested-draft tool: a refusal unless the line is on the diff. */
+const onDiff = (
+  diffLines: ReviewBrief["diffLines"],
+  side: "old" | "new",
+  path: string,
+  line: number,
+) => diffLines[side][path]?.includes(line) === true
+
 export const placeSuggestedDraft = (brief: ReviewBrief, draft: SuggestedDraft) =>
-  brief.diffLines[draft.side][draft.path]?.includes(draft.line) === true
+  onDiff(brief.diffLines, draft.side, draft.path, draft.line)
     ? { placed: true, text: SUGGEST_DRAFT_PLACED }
     : { placed: false, text: refusal(draft.path, draft.side, draft.line) }
 
-/**
- * A pi extension adding the Suggested-draft tool, with the diff's lines written into it: pi loads
- * it in its own process, out of the host's reach. It checks a line as `placeSuggestedDraft` does.
- */
+/** pi loads an extension in its own process, out of the host's reach, so the check goes into the file. */
 export const piSuggestDraftExtension = (brief: ReviewBrief) => `
 const diffLines = ${JSON.stringify(brief.diffLines)}
+const onDiff = ${onDiff.toString()}
 const refusal = ${refusal.toString()}
 
 export default function (pi) {
@@ -48,7 +52,7 @@ export default function (pi) {
     },
     async execute(_toolCallId, { path, side, line, body }) {
       if (typeof body !== "string" || body.trim() === "") throw new Error("The comment is empty.")
-      if (!(diffLines[side]?.[path] ?? []).includes(line)) throw new Error(refusal(path, side, line))
+      if (!onDiff(diffLines, side, path, line)) throw new Error(refusal(path, side, line))
       return { content: [{ type: "text", text: ${JSON.stringify(SUGGEST_DRAFT_PLACED)} }], details: undefined }
     },
   })

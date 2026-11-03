@@ -53,10 +53,6 @@ export type TurnSettings = typeof TurnSettings.Type
 
 const LinesByPath = Schema.Record(Schema.String, Schema.Array(Schema.Int))
 
-/**
- * What an Agent review's Agent is told and may do: Glass's instructions with the PR material and
- * the review, and, for each side and path of the diff, the lines a Suggested draft may go on.
- */
 export const ReviewBrief = Schema.Struct({
   instructions: Schema.String,
   diffLines: Schema.Struct({ old: LinesByPath, new: LinesByPath }),
@@ -74,7 +70,6 @@ export class AgentHostRpcs extends RpcGroup.make(
     success: AgentModels,
     error: HostAgentError,
   }),
-  /** `review` starts an Agent review's read-only Agent, with Glass's Suggested-draft tool. */
   Rpc.make("StartAgent", {
     payload: {
       agentId: Schema.String,

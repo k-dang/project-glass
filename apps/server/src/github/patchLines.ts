@@ -65,6 +65,5 @@ export const rangeInPatch = (hunks: string, side: DiffSide, start: number, end: 
   return count === end - start + 1
 }
 
-/** The numbers of a side's lines in the diff. */
 export const patchLineNumbers = (hunks: string, side: DiffSide) =>
   Array.from(patchLines(hunks, side), ({ number }) => number)

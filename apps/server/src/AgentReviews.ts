@@ -53,7 +53,6 @@ const stored = Schema.Array(
   }),
 )
 
-/** Every line of the diff on one side, by path: where a Suggested draft may go. */
 const diffLinesOn = (files: ReadonlyArray<ChangedFile>, side: DiffSide) =>
   Object.fromEntries(
     files.flatMap(({ path, patch }) =>
@@ -145,7 +144,7 @@ export class AgentReviews extends Context.Service<
 
       const jobs = yield* pullRequestJobs<AgentReviewState, AgentReviewFailure>({
         load,
-        inProgress: ({ job }) => job.status === "reviewing" || job.status === "following-up",
+        inProgress: ({ job }) => job.status === "reviewing" || job.status === "starting-agent",
         idle: ({ review }) => ({ review, job: { status: "idle" } }),
       })
 
@@ -159,8 +158,6 @@ export class AgentReviews extends Context.Service<
               ),
             )
 
-      // Writing the review again removes the Agent of the one it replaces, after showing the new
-      // review: removing deletes a whole checkout.
       const save = (job: Job, pr: PullRequestRef, review: AgentReview) =>
         Effect.gen(function* () {
           const replaced = (yield* SubscriptionRef.get(job.state)).review?.agentId ?? null
@@ -228,10 +225,6 @@ export class AgentReviews extends Context.Service<
           ),
         )
 
-      /**
-       * Starts the review's Agent in a lasting checkout of its Revision, with the first Follow-up
-       * as its first Turn. The checkout is the Agent's once it exists.
-       */
       const startAgent = (
         job: Job,
         pr: PullRequestRef,
@@ -243,7 +236,6 @@ export class AgentReviews extends Context.Service<
           reviewPrompt: prompt,
         }: { runner: AgentRunnerIdentity; model: string; reviewPrompt: string },
       ) =>
-        // Only copying the checkout can be cancelled: an Agent that exists is saved on its review.
         Effect.uninterruptibleMask((restore) =>
           Effect.gen(function* () {
             const folder = join(config.dataDirectory, "agent-review-checkouts", randomUUID())
@@ -271,11 +263,10 @@ export class AgentReviews extends Context.Service<
               .createForReview({
                 name: `Follow-ups on ${pr.owner}/${pr.repo}#${pr.number}`,
                 repository: new FollowedRepository({ owner: pr.owner, repo: pr.repo }),
-                // It works on no branch, only on the Revision.
-                baseBranch: review.revision.base,
+                revision: review.revision,
                 engine: runner.engine,
                 model,
-                folder,
+                checkout: folder,
                 review: {
                   instructions: followUpInstructions(prompt, input, review),
                   diffLines: {
@@ -305,7 +296,7 @@ export class AgentReviews extends Context.Service<
           jobs.settle(job, (state, error: Option.Option<AgentReviewFailure>) => ({
             review: state.review,
             job: {
-              status: "follow-up-failed",
+              status: "agent-start-failed",
               message,
               reason: Option.getOrElse(error, () => stoppedRunner(runner)),
             },
@@ -338,11 +329,10 @@ export class AgentReviews extends Context.Service<
           Effect.gen(function* () {
             const { review, job: current } = yield* SubscriptionRef.get(job.state)
 
-            // Writing the review again replaces its Agent, so it takes no Follow-up meanwhile.
             if (current.status === "reviewing")
               return yield* failure("not-ready", "Wait for the Agent review to finish.")
 
-            if (current.status === "following-up")
+            if (current.status === "starting-agent")
               return yield* failure("not-ready", "Wait for the agent to start.")
 
             if (review === null || !Equal.equals(review.revision, revision))
@@ -361,7 +351,7 @@ export class AgentReviews extends Context.Service<
             const runner = runnerIdentity(engineSettings)
 
             const startedAt = DateTime.toEpochMillis(yield* DateTime.now)
-            yield* setJob(job, { status: "following-up", message, startedAt, runner })
+            yield* setJob(job, { status: "starting-agent", message, startedAt, runner })
             yield* replace(
               startAgent(job, pr, review, message, {
                 runner,

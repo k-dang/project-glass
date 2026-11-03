@@ -17,13 +17,11 @@ export const SuggestedDraft = Schema.Struct({
 
 export type SuggestedDraft = typeof SuggestedDraft.Type
 
-/** The tool an Agent review's Agent calls to propose a Suggested draft. */
 export const SUGGEST_DRAFT_TOOL = "suggest_draft"
 
 const decodeSuggestedDraft = Schema.decodeUnknownOption(Schema.fromJsonString(SuggestedDraft))
 
-/** The Suggested draft a tool call proposed, once Glass accepted its place on the diff. */
-export const suggestedDraftOf = (call: typeof ToolCallPart.Type): SuggestedDraft | null =>
+export const acceptedSuggestedDraftOf = (call: typeof ToolCallPart.Type): SuggestedDraft | null =>
   call.name === SUGGEST_DRAFT_TOOL && call.status === "done"
     ? Option.getOrNull(decodeSuggestedDraft(call.input))
     : null
@@ -65,16 +63,15 @@ export const AgentReviewState = Schema.Struct({
       runner: Schema.NullOr(AgentRunnerIdentity),
     }),
     Schema.Struct({ status: Schema.Literal("failed"), reason: AgentReviewFailure }),
-    /** Glass is starting the Agent for the first Follow-up, which becomes its first Turn. */
     Schema.Struct({
-      status: Schema.Literal("following-up"),
+      status: Schema.Literal("starting-agent"),
       message: FollowUpMessage,
       startedAt: Schema.Number,
       runner: AgentRunnerIdentity,
     }),
     /** Keeps the message so the user can send it again. */
     Schema.Struct({
-      status: Schema.Literal("follow-up-failed"),
+      status: Schema.Literal("agent-start-failed"),
       message: FollowUpMessage,
       reason: AgentReviewFailure,
     }),

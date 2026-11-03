@@ -12,12 +12,9 @@ import { DEMO_REPOSITORY, seedDemoPullRequests } from "./demoPullRequests"
 import { startFakeGitHub } from "./fakeGitHub"
 import { VIEWER } from "./fakePullRequest"
 import { fakeAgentRunners } from "./fakeAgentRunners"
+import { FAKE_PI_MODEL } from "./fakeModelProvider"
 import { installFakeSandboxProvider } from "./fakeSandboxProvider"
 
-/**
- * On first launch, follows the demo repository and points Agent reviews' pi at the demo model
- * provider, which their Follow-ups' Agent runs on. Later launches keep the user's choices.
- */
 const seedDemoSettings = Effect.gen(function* () {
   const { dataDirectory } = yield* ServerConfig
   const settings = join(dataDirectory, "settings.json")
@@ -29,7 +26,7 @@ const seedDemoSettings = Effect.gen(function* () {
     settings,
     JSON.stringify({
       followedRepositories: [DEMO_REPOSITORY],
-      agentReviewModels: { pi: { provider: "glass-test", modelId: "gpt-test" } },
+      agentReviewModels: { pi: FAKE_PI_MODEL },
     }),
   )
 })

@@ -35,7 +35,6 @@ export const runnerIdentity = ({ engine, models }: EngineSettings): AgentRunnerI
   return { engine, model: `${provider}/${modelId}` }
 }
 
-/** The model an Agent runs: Claude Code takes a bare model ID, pi a provider and model ID. */
 export const agentModelOf = (settings: EngineSettings) =>
   settings.engine === "claude-code"
     ? settings.models["claude-code"]

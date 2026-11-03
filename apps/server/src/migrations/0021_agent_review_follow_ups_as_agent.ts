@@ -1,7 +1,6 @@
 import { Effect } from "effect"
 import { SqlClient } from "effect/sql"
 
-/** Follow-ups become the Turns of one Agent per Agent review; the old answers aren't carried over. */
 export default Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
 

@@ -25,8 +25,10 @@ import { settledEvent } from "./requests"
 import type { Steer, Steering, TurnMachine } from "./turnLoop"
 import { runningToolCall, ToolInput, toolOutput } from "./toolCalls"
 
-/** Claude Code names the tools of Glass's own MCP server after it; the transcript names them plainly. */
-export const GLASS_MCP_PREFIX = "mcp__glass__"
+export const GLASS_MCP_SERVER = "glass"
+
+/** Claude Code names an MCP server's tools `mcp__<server>__<tool>`. */
+export const GLASS_MCP_PREFIX = `mcp__${GLASS_MCP_SERVER}__`
 
 export type Input = Data.TaggedEnum<{
   Message: { readonly message: SDKMessage }

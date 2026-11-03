@@ -4,7 +4,7 @@ import {
   type Image,
   isRequestPart,
   type RequestPart,
-  suggestedDraftOf,
+  acceptedSuggestedDraftOf,
   TextPart,
   type Turn,
   TurnDone,
@@ -430,7 +430,6 @@ const draftOn = (line: number, body: string) => ({
   },
 })
 
-// Reads greet.ts, places one Suggested draft on the diff and one off it, then answers.
 const reviewReplies = [
   { toolCall: { id: "read-greet", name: "read", arguments: { path: "greet.ts" } } },
   draftOn(2, "Keep the name."),
@@ -465,7 +464,7 @@ it.live("reads its checkout and proposes Suggested drafts as an Agent review's A
       ],
     )
     assert.include(calls[0]?.output, "hello name")
-    assert.deepStrictEqual(suggestedDraftOf(calls[1]!), {
+    assert.deepStrictEqual(acceptedSuggestedDraftOf(calls[1]!), {
       path: "greet.ts",
       side: "new",
       line: 2,

@@ -58,7 +58,6 @@ const storageFailure = <A, E, R>(effect: Effect.Effect<A, E | PlatformError.Plat
 export class Checkouts extends Context.Service<
   Checkouts,
   {
-    /** A read-only copy of the Revision's files that lasts as long as the scope. */
     readonly checkout: (
       pr: PullRequestRef,
       revision: Revision,
@@ -141,7 +140,6 @@ export class Checkouts extends Context.Service<
         )
       })
 
-      /** Fills `files`, which must not exist yet, using an index file outside it. */
       const fill = Effect.fnUntraced(function* (
         pr: PullRequestRef,
         revision: Revision,

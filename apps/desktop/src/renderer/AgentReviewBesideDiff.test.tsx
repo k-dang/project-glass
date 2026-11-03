@@ -209,7 +209,7 @@ it("prevents Retry and Send from overlapping while a retry is being accepted", a
     agentReview: {
       review: reviewOf(revision),
       job: {
-        status: "follow-up-failed",
+        status: "agent-start-failed",
         message: "Why?",
         reason: new AgentReviewFailure({ reason: "runner", message: "Try again.", runner: null }),
       },
@@ -234,7 +234,7 @@ it("sends later Follow-ups to the review's Agent", async () => {
   const f = mountTourWorkspace({
     files,
     agentReview: { review: followedUp(revision), job: { status: "idle" } },
-    followUps,
+    reviewAgentTurns: followUps,
   })
 
   await readBesideTheDiff(f)
@@ -255,7 +255,7 @@ it("adds a suggested Draft as the user edited it", async () => {
   const f = mountTourWorkspace({
     files,
     agentReview: { review: followedUp(revision), job: { status: "idle" } },
-    followUps,
+    reviewAgentTurns: followUps,
   })
 
   await readBesideTheDiff(f)
@@ -264,7 +264,6 @@ it("adds a suggested Draft as the user edited it", async () => {
     name: "Suggested draft on greet.ts line +2",
   })
 
-  // A suggestion Glass refused stays a tool call.
   expect(screen.getAllByRole("region", { name: /^Suggested draft/ })).toHaveLength(1)
   expect(screen.getByText("suggest_draft")).toBeDefined()
   await f.user.click(within(suggested).getByRole("button", { name: "Edit" }))
@@ -290,7 +289,7 @@ it("only reads the Follow-ups of an outdated Agent review", async () => {
       review: followedUp(new Revision({ base: "b0", head: "0123456789abcdef" })),
       job: { status: "idle" },
     },
-    followUps,
+    reviewAgentTurns: followUps,
   })
 
   await readBesideTheDiff(f)
