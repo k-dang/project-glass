@@ -183,7 +183,8 @@ export function TourView(props: TourViewProps) {
     })
   }, [])
 
-  // Finishing the Chapter in view collapses it, so move on to the next unfinished one.
+  // Finishing the Chapter in view collapses it, so move on to the next unfinished one in the
+  // same frame; the collapse already moved it close, so a smooth scroll would only twitch.
   // The Chapter in view comes from the last scroll, since the collapse moves the layout.
   const inView = useRef(initial?.chapter ?? 0)
   const wasDone = useRef(done)
@@ -193,15 +194,16 @@ export function TourView(props: TourViewProps) {
     wasDone.current = done
     const finished = inView.current
 
-    if (done[finished] !== "1" || before[finished] !== "0") return undefined
+    if (done[finished] !== "1" || before[finished] !== "0") return
 
-    const next = done.indexOf("0", finished + 1)
-    const frame = next === -1 ? undefined : revealChapter(next, "smooth")
+    const root = container.current
+    const next = sections.current.get(done.indexOf("0", finished + 1))
 
-    return () => {
-      if (frame !== undefined) cancelAnimationFrame(frame)
-    }
-  }, [done, revealChapter])
+    if (root === null || next === undefined) return
+
+    root.scrollTop +=
+      next.element.getBoundingClientRect().top - root.getBoundingClientRect().top - 20
+  }, [done])
 
   useLayoutEffect(() => {
     if (initial === null) return undefined
