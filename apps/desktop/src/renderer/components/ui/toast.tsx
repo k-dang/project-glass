@@ -43,6 +43,9 @@ function Toast({ className, ...props }: ToastPrimitive.Root.Props) {
         "group/toast pointer-events-auto absolute right-0 bottom-0 z-[calc(1000-var(--toast-index))] w-full origin-bottom rounded-2xl border bg-popover text-popover-foreground shadow-lg will-change-transform outline-none select-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
         "[--gap:0.75rem] [--height:var(--toast-frontmost-height,var(--toast-height))] [--offset-y:calc(var(--toast-offset-y)*-1+calc(var(--toast-index)*var(--gap)*-1)+var(--toast-swipe-movement-y))] [--peek:0.75rem] [--scale:calc(max(0,1-(var(--toast-index)*0.1)))] [--shrink:calc(1-var(--scale))]",
         "h-(--height) [transform:translateX(var(--toast-swipe-movement-x))_translateY(calc(var(--toast-swipe-movement-y)-(var(--toast-index)*var(--peek))-(var(--shrink)*var(--height))))_scale(var(--scale))] [transition:transform_200ms_var(--ease-out),opacity_200ms_var(--ease-out)] data-ending-style:duration-150 motion-reduce:[transition-property:opacity] motion-reduce:data-starting-style:opacity-0 motion-reduce:data-ending-style:opacity-0",
+        "data-[type=success]:border-added/30 data-[type=success]:bg-[color-mix(in_oklab,var(--added)_8%,var(--popover))]",
+        "data-[type=warning]:border-modified/30 data-[type=warning]:bg-[color-mix(in_oklab,var(--modified)_8%,var(--popover))]",
+        "data-[type=error]:border-destructive/30 data-[type=error]:bg-[color-mix(in_oklab,var(--destructive)_8%,var(--popover))]",
         "after:absolute after:top-full after:left-0 after:h-[calc(var(--gap)+1px)] after:w-full after:content-['']",
         "data-expanded:h-(--toast-height) data-expanded:[transform:translateX(var(--toast-swipe-movement-x))_translateY(var(--offset-y))]",
         "data-limited:opacity-0 data-starting-style:[transform:translateY(150%)]",
@@ -136,7 +139,7 @@ function ToastIcon({ type }: { type: string | undefined }) {
   let icon: React.ReactNode = null
 
   if (type === "success") {
-    icon = <CircleCheckIcon aria-hidden="true" />
+    icon = <CircleCheckIcon className="text-added" aria-hidden="true" />
   }
 
   if (type === "info") {
@@ -144,7 +147,7 @@ function ToastIcon({ type }: { type: string | undefined }) {
   }
 
   if (type === "warning") {
-    icon = <TriangleAlertIcon aria-hidden="true" />
+    icon = <TriangleAlertIcon className="text-modified" aria-hidden="true" />
   }
 
   if (type === "error") {
@@ -173,7 +176,7 @@ function ToastList() {
   const { toasts } = ToastPrimitive.useToastManager()
 
   return toasts.map((toastItem) => (
-    <Toast key={toastItem.id} toast={toastItem}>
+    <Toast key={toastItem.id} toast={toastItem} data-type={toastItem.type}>
       <ToastContent>
         <ToastIcon type={toastItem.type} />
         <div className="flex min-w-0 flex-1 flex-col gap-1">
