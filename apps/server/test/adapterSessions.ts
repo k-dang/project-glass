@@ -11,7 +11,8 @@ import {
 } from "@glass/contracts"
 import { NodeServices } from "@effect/platform-node"
 import { DateTime, Effect, Layer, Option, Stream, SubscriptionRef } from "effect"
-import { mkdirSync, writeFileSync } from "node:fs"
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { homedir } from "node:os"
 import { join } from "node:path"
 import { vi } from "vite-plus/test"
 import type { AgentAdapter, AgentSession } from "../src/agentHost/adapter"
@@ -21,14 +22,7 @@ import type { ReviewBrief, TurnSettings } from "../src/agentHost/protocol"
 import { bundledPi, bundledPiProgram } from "./demoAgent"
 import { type FakeModelSettings, fakeModelProvider } from "./fakeModelProvider"
 import { isolatedHome, stubHome } from "./harness"
-import {
-  gatewayKey,
-  PI_MODEL,
-  PI_PROVIDER,
-  type PiSettings,
-  writePiLogin,
-  writePiSettings,
-} from "./piLogin"
+import { PI_MODEL, PI_PROVIDER, type PiSettings, writePiLogin, writePiSettings } from "./piLogin"
 import { claudeLoginEnvironment, pinnedClaude, pinnedClaudeProgram } from "./pinnedClaude"
 import { recordingSessions, sessionTape } from "./sessionTape"
 
@@ -135,6 +129,50 @@ export const claudeSession = Effect.fnUntraced(function* (scenario: string) {
 
 const PROVIDER_CREDENTIAL = /^(AWS|GOOGLE|GCLOUD|AZURE|ANTHROPIC)_|_(API_KEY|TOKEN)$/
 
+const PI_LOGIN_FILES = ["auth.json", "models.json", "models-store.json"]
+
+const CLOUD_LOGINS = {
+  AWS_SHARED_CREDENTIALS_FILE: [".aws", "credentials"],
+  AWS_CONFIG_FILE: [".aws", "config"],
+  GOOGLE_APPLICATION_CREDENTIALS: [".config", "gcloud", "application_default_credentials.json"],
+}
+
+/**
+ * Lends the recorder's own pi login to an isolated home, or a given API key in its place. pi may
+ * replace an OAuth refresh token while it runs, which voids the one in the real file, so the
+ * lent `auth.json` is copied back when the session ends.
+ */
+const lendPiLogin = Effect.fnUntraced(function* (home: string, apiKey: string | undefined) {
+  const real = process.env["PI_CODING_AGENT_DIR"] ?? join(homedir(), ".pi", "agent")
+  const lent = join(home, ".pi", "agent")
+
+  for (const file of PI_LOGIN_FILES)
+    if (existsSync(join(real, file))) copyFileSync(join(real, file), join(lent, file))
+
+  for (const [name, path] of Object.entries(CLOUD_LOGINS))
+    if (!process.env[name] && existsSync(join(homedir(), ...path)))
+      vi.stubEnv(name, join(homedir(), ...path))
+
+  if (apiKey !== undefined) {
+    writePiLogin(home, PI_PROVIDER, apiKey)
+
+    return
+  }
+
+  yield* Effect.addFinalizer(() =>
+    Effect.sync(() => {
+      const before = join(real, "auth.json")
+      const after = join(lent, "auth.json")
+
+      if (
+        existsSync(after) &&
+        (!existsSync(before) || readFileSync(before, "utf8") !== readFileSync(after, "utf8"))
+      )
+        copyFileSync(after, before)
+    }),
+  )
+})
+
 interface PiSessionOptions {
   readonly piSettings?: PiSettings
   readonly fake?: FakeModelSettings
@@ -149,21 +187,27 @@ export const piSession = Effect.fnUntraced(function* (
   const folder = join(home, "work")
   mkdirSync(folder)
 
-  if (fake !== undefined) yield* fakeModelProvider(home, fake, piSettings)
-  else {
+  if (fake !== undefined) {
+    yield* fakeModelProvider(home, fake, piSettings)
+
+    for (const name of Object.keys(process.env))
+      if (PROVIDER_CREDENTIAL.test(name)) vi.stubEnv(name, "")
+  } else {
     writePiSettings(home, PI_PROVIDER, PI_MODEL, piSettings)
 
-    if (recordingSessions) writePiLogin(home, PI_PROVIDER, apiKey ?? gatewayKey())
+    if (recordingSessions) yield* lendPiLogin(home, apiKey)
   }
 
-  // pi offers the models of every provider it finds credentials for, and reads the user's
-  // `~/.agents/skills`: either would put the recorder's machine in the recording.
-  for (const name of Object.keys(process.env))
-    if (PROVIDER_CREDENTIAL.test(name)) vi.stubEnv(name, "")
-
+  // pi reads the user's `~/.agents/skills`, which would put the machine in the recording.
   stubHome(home)
   vi.stubEnv("PI_OFFLINE", "1")
-  const tape = sessionTape(scenario, bundledPiProgram(), { "<folder>": folder, "<pi-home>": home })
+
+  const tape = sessionTape(scenario, bundledPiProgram(), {
+    "<folder>": folder,
+    "<pi-home>": home,
+    "<pi-model>": PI_MODEL,
+    "<pi-provider>": PI_PROVIDER,
+  })
 
   const adapter = yield* piAdapter(bundledPi).pipe(
     Effect.provide(tape.spawner.pipe(Layer.provide(NodeServices.layer))),

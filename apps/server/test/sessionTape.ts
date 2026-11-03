@@ -128,7 +128,7 @@ const personal =
   /email|organization|account|subscription|rate_limit_info|username|team[_-]?id|(?:access|refresh|auth)[_-]?token|api[_-]?key|^sections$/i
 
 /** What differs by the recorder's machine rather than by what Glass did. */
-const machine = /^pid$|^output_style$/
+const machine = /^pid$|^output_style$|^baseUrl$/
 
 const usage = /usage|^total_cost_usd$|^estimated_tokens(?:_delta)?$|^first_request_input_tokens$/i
 
@@ -144,12 +144,27 @@ const mapJson = (value: Json, change: (inner: Json, field: string) => Json): Jso
 const zeroNumbers = (value: Json): Json =>
   Predicate.isNumber(value) ? 0 : mapJson(value, zeroNumbers)
 
+/**
+ * pi offers the models of every provider it finds credentials for. Keeping only the recorded model
+ * and the ones a test registers keeps the recorder's other logins out of the recording.
+ */
+const isMachineModel = (model: Json) =>
+  isJsonObject(model) &&
+  Predicate.isString(model["provider"]) &&
+  !model["provider"].startsWith("glass-") &&
+  (model["provider"] !== "<pi-provider>" || model["id"] !== "<pi-model>")
+
 const blankPersonal = (value: Json, field = ""): Json =>
   personal.test(field) || machine.test(field)
     ? "<redacted>"
     : usage.test(field)
       ? zeroNumbers(value)
-      : mapJson(value, blankPersonal)
+      : mapJson(
+          field === "models" && isJsonArray(value)
+            ? value.filter((model) => !isMachineModel(model))
+            : value,
+          blankPersonal,
+        )
 
 /**
  * A hook the recorder's machine runs, such as one its managed settings add. Glass reads no hook

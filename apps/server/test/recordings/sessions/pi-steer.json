@@ -20,11 +20,11 @@
             "success": true,
             "data": {
               "model": {
-                "id": "anthropic/claude-haiku-5.5",
+                "id": "<pi-model>",
                 "name": "Claude Haiku 5.5",
                 "api": "anthropic-messages",
-                "baseUrl": "https://ai-gateway.vercel.sh",
-                "provider": "vercel-ai-gateway",
+                "baseUrl": "<redacted>",
+                "provider": "<pi-provider>",
                 "reasoning": true,
                 "input": ["text", "image"],
                 "compat": {
@@ -70,7 +70,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T06-53-31-624Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T23-33-02-124Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -114,7 +114,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1793688811825,
+              "timestamp": 1793748782291,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -233,7 +233,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1793688811825,
+              "timestamp": 1793748782291,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -356,7 +356,7 @@
                   "text": "Use the bash tool to run exactly `echo hi` and nothing else, then reply with exactly: FIRST"
                 }
               ],
-              "timestamp": 1793688811824
+              "timestamp": 1793748782289
             }
           }
         },
@@ -371,7 +371,7 @@
                   "text": "Use the bash tool to run exactly `echo hi` and nothing else, then reply with exactly: FIRST"
                 }
               ],
-              "timestamp": 1793688811824
+              "timestamp": 1793748782289
             }
           }
         },
@@ -382,8 +382,8 @@
               "role": "assistant",
               "content": [],
               "api": "anthropic-messages",
-              "provider": "vercel-ai-gateway",
-              "model": "anthropic/claude-haiku-5.5",
+              "provider": "<pi-provider>",
+              "model": "<pi-model>",
               "usage": {
                 "input": 0,
                 "output": 0,
@@ -399,7 +399,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1793688811843
+              "timestamp": 1793748782307
             }
           }
         },
@@ -424,7 +424,7 @@
             "assistantMessageEvent": {
               "type": "toolcall_start",
               "contentIndex": 0,
-              "id": "toolu_016LSBek3hPwY7i8tSj76n7S",
+              "id": "toolu_01Q9wdFoYK4aogkk1iDWS6zY",
               "toolName": "bash"
             }
           }
@@ -502,7 +502,7 @@
               "contentIndex": 0,
               "toolCall": {
                 "type": "toolCall",
-                "id": "toolu_016LSBek3hPwY7i8tSj76n7S",
+                "id": "toolu_01Q9wdFoYK4aogkk1iDWS6zY",
                 "name": "bash",
                 "arguments": {
                   "command": "echo hi"
@@ -519,7 +519,7 @@
               "content": [
                 {
                   "type": "toolCall",
-                  "id": "toolu_016LSBek3hPwY7i8tSj76n7S",
+                  "id": "toolu_01Q9wdFoYK4aogkk1iDWS6zY",
                   "name": "bash",
                   "arguments": {
                     "command": "echo hi"
@@ -527,8 +527,8 @@
                 }
               ],
               "api": "anthropic-messages",
-              "provider": "vercel-ai-gateway",
-              "model": "anthropic/claude-haiku-5.5",
+              "provider": "<pi-provider>",
+              "model": "<pi-model>",
               "usage": {
                 "input": 0,
                 "output": 0,
@@ -545,10 +545,10 @@
                 "cacheWrite1h": 0
               },
               "stopReason": "toolUse",
-              "timestamp": 1793688811843,
-              "responseId": "gen_01M6G2YECC6XT6R0E5D2RJYX81",
+              "timestamp": 1793748782307,
+              "responseId": "gen_01M6HW4K97VANMTP4KGH675Y6F",
               "rawStopReason": "tool_use",
-              "durationMs": 843,
+              "durationMs": 816,
               "thinkingLevel": "medium"
             }
           }
@@ -556,7 +556,7 @@
         {
           "in": {
             "type": "tool_execution_start",
-            "toolCallId": "toolu_016LSBek3hPwY7i8tSj76n7S",
+            "toolCallId": "toolu_01Q9wdFoYK4aogkk1iDWS6zY",
             "toolName": "bash",
             "args": {
               "command": "echo hi"
@@ -566,7 +566,7 @@
         {
           "in": {
             "type": "extension_ui_request",
-            "id": "9e5eee2f-baf4-4545-ad0f-c96a2984164e",
+            "id": "c366c9b9-189b-43fa-91aa-9cb18dcb8733",
             "method": "confirm",
             "title": "Run it?",
             "message": "bash"
@@ -601,14 +601,14 @@
         {
           "out": {
             "type": "extension_ui_response",
-            "id": "9e5eee2f-baf4-4545-ad0f-c96a2984164e",
+            "id": "c366c9b9-189b-43fa-91aa-9cb18dcb8733",
             "confirmed": true
           }
         },
         {
           "in": {
             "type": "tool_execution_update",
-            "toolCallId": "toolu_016LSBek3hPwY7i8tSj76n7S",
+            "toolCallId": "toolu_01Q9wdFoYK4aogkk1iDWS6zY",
             "toolName": "bash",
             "args": {
               "command": "echo hi"
@@ -621,7 +621,7 @@
         {
           "in": {
             "type": "tool_execution_update",
-            "toolCallId": "toolu_016LSBek3hPwY7i8tSj76n7S",
+            "toolCallId": "toolu_01Q9wdFoYK4aogkk1iDWS6zY",
             "toolName": "bash",
             "args": {
               "command": "echo hi"
@@ -640,7 +640,7 @@
         {
           "in": {
             "type": "tool_execution_end",
-            "toolCallId": "toolu_016LSBek3hPwY7i8tSj76n7S",
+            "toolCallId": "toolu_01Q9wdFoYK4aogkk1iDWS6zY",
             "toolName": "bash",
             "result": {
               "content": [
@@ -657,7 +657,7 @@
               }
             },
             "isError": false,
-            "durationMs": 53
+            "durationMs": 62
           }
         },
         {
@@ -665,7 +665,7 @@
             "type": "message_start",
             "message": {
               "role": "toolResult",
-              "toolCallId": "toolu_016LSBek3hPwY7i8tSj76n7S",
+              "toolCallId": "toolu_01Q9wdFoYK4aogkk1iDWS6zY",
               "toolName": "bash",
               "content": [
                 {
@@ -674,8 +674,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 53,
-              "timestamp": 1793688812743
+              "durationMs": 62,
+              "timestamp": 1793748783190
             }
           }
         },
@@ -684,7 +684,7 @@
             "type": "message_end",
             "message": {
               "role": "toolResult",
-              "toolCallId": "toolu_016LSBek3hPwY7i8tSj76n7S",
+              "toolCallId": "toolu_01Q9wdFoYK4aogkk1iDWS6zY",
               "toolName": "bash",
               "content": [
                 {
@@ -693,8 +693,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 53,
-              "timestamp": 1793688812743
+              "durationMs": 62,
+              "timestamp": 1793748783190
             }
           }
         },
@@ -706,7 +706,7 @@
               "content": [
                 {
                   "type": "toolCall",
-                  "id": "toolu_016LSBek3hPwY7i8tSj76n7S",
+                  "id": "toolu_01Q9wdFoYK4aogkk1iDWS6zY",
                   "name": "bash",
                   "arguments": {
                     "command": "echo hi"
@@ -714,8 +714,8 @@
                 }
               ],
               "api": "anthropic-messages",
-              "provider": "vercel-ai-gateway",
-              "model": "anthropic/claude-haiku-5.5",
+              "provider": "<pi-provider>",
+              "model": "<pi-model>",
               "usage": {
                 "input": 0,
                 "output": 0,
@@ -732,16 +732,16 @@
                 "cacheWrite1h": 0
               },
               "stopReason": "toolUse",
-              "timestamp": 1793688811843,
-              "responseId": "gen_01M6G2YECC6XT6R0E5D2RJYX81",
+              "timestamp": 1793748782307,
+              "responseId": "gen_01M6HW4K97VANMTP4KGH675Y6F",
               "rawStopReason": "tool_use",
-              "durationMs": 843,
+              "durationMs": 816,
               "thinkingLevel": "medium"
             },
             "toolResults": [
               {
                 "role": "toolResult",
-                "toolCallId": "toolu_016LSBek3hPwY7i8tSj76n7S",
+                "toolCallId": "toolu_01Q9wdFoYK4aogkk1iDWS6zY",
                 "toolName": "bash",
                 "content": [
                   {
@@ -750,8 +750,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 53,
-                "timestamp": 1793688812743
+                "durationMs": 62,
+                "timestamp": 1793748783190
               }
             ]
           }
@@ -779,7 +779,7 @@
                   "text": "Change course: reply with exactly STEERED instead."
                 }
               ],
-              "timestamp": 1793688812689
+              "timestamp": 1793748783126
             }
           }
         },
@@ -794,7 +794,7 @@
                   "text": "Change course: reply with exactly STEERED instead."
                 }
               ],
-              "timestamp": 1793688812689
+              "timestamp": 1793748783126
             }
           }
         },
@@ -805,8 +805,8 @@
               "role": "assistant",
               "content": [],
               "api": "anthropic-messages",
-              "provider": "vercel-ai-gateway",
-              "model": "anthropic/claude-haiku-5.5",
+              "provider": "<pi-provider>",
+              "model": "<pi-model>",
               "usage": {
                 "input": 0,
                 "output": 0,
@@ -822,7 +822,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1793688812746
+              "timestamp": 1793748783193
             }
           }
         },
@@ -912,8 +912,8 @@
                 }
               ],
               "api": "anthropic-messages",
-              "provider": "vercel-ai-gateway",
-              "model": "anthropic/claude-haiku-5.5",
+              "provider": "<pi-provider>",
+              "model": "<pi-model>",
               "usage": {
                 "input": 0,
                 "output": 0,
@@ -930,10 +930,10 @@
                 "cacheWrite1h": 0
               },
               "stopReason": "stop",
-              "timestamp": 1793688812746,
-              "responseId": "gen_01M6G2YF7EDFSXBWRMEGYMGRTY",
+              "timestamp": 1793748783193,
+              "responseId": "gen_01M6HW4M3AV98AV2FW7X69TJD8",
               "rawStopReason": "end_turn",
-              "durationMs": 573,
+              "durationMs": 718,
               "thinkingLevel": "medium"
             }
           }
@@ -950,8 +950,8 @@
                 }
               ],
               "api": "anthropic-messages",
-              "provider": "vercel-ai-gateway",
-              "model": "anthropic/claude-haiku-5.5",
+              "provider": "<pi-provider>",
+              "model": "<pi-model>",
               "usage": {
                 "input": 0,
                 "output": 0,
@@ -968,10 +968,10 @@
                 "cacheWrite1h": 0
               },
               "stopReason": "stop",
-              "timestamp": 1793688812746,
-              "responseId": "gen_01M6G2YF7EDFSXBWRMEGYMGRTY",
+              "timestamp": 1793748783193,
+              "responseId": "gen_01M6HW4M3AV98AV2FW7X69TJD8",
               "rawStopReason": "end_turn",
-              "durationMs": 573,
+              "durationMs": 718,
               "thinkingLevel": "medium"
             },
             "toolResults": []
@@ -985,7 +985,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1793688811825,
+                "timestamp": 1793748782291,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -1103,14 +1103,14 @@
                     "text": "Use the bash tool to run exactly `echo hi` and nothing else, then reply with exactly: FIRST"
                   }
                 ],
-                "timestamp": 1793688811824
+                "timestamp": 1793748782289
               },
               {
                 "role": "assistant",
                 "content": [
                   {
                     "type": "toolCall",
-                    "id": "toolu_016LSBek3hPwY7i8tSj76n7S",
+                    "id": "toolu_01Q9wdFoYK4aogkk1iDWS6zY",
                     "name": "bash",
                     "arguments": {
                       "command": "echo hi"
@@ -1118,8 +1118,8 @@
                   }
                 ],
                 "api": "anthropic-messages",
-                "provider": "vercel-ai-gateway",
-                "model": "anthropic/claude-haiku-5.5",
+                "provider": "<pi-provider>",
+                "model": "<pi-model>",
                 "usage": {
                   "input": 0,
                   "output": 0,
@@ -1136,15 +1136,15 @@
                   "cacheWrite1h": 0
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1793688811843,
-                "responseId": "gen_01M6G2YECC6XT6R0E5D2RJYX81",
+                "timestamp": 1793748782307,
+                "responseId": "gen_01M6HW4K97VANMTP4KGH675Y6F",
                 "rawStopReason": "tool_use",
-                "durationMs": 843,
+                "durationMs": 816,
                 "thinkingLevel": "medium"
               },
               {
                 "role": "toolResult",
-                "toolCallId": "toolu_016LSBek3hPwY7i8tSj76n7S",
+                "toolCallId": "toolu_01Q9wdFoYK4aogkk1iDWS6zY",
                 "toolName": "bash",
                 "content": [
                   {
@@ -1153,8 +1153,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 53,
-                "timestamp": 1793688812743
+                "durationMs": 62,
+                "timestamp": 1793748783190
               },
               {
                 "role": "user",
@@ -1164,7 +1164,7 @@
                     "text": "Change course: reply with exactly STEERED instead."
                   }
                 ],
-                "timestamp": 1793688812689
+                "timestamp": 1793748783126
               },
               {
                 "role": "assistant",
@@ -1175,8 +1175,8 @@
                   }
                 ],
                 "api": "anthropic-messages",
-                "provider": "vercel-ai-gateway",
-                "model": "anthropic/claude-haiku-5.5",
+                "provider": "<pi-provider>",
+                "model": "<pi-model>",
                 "usage": {
                   "input": 0,
                   "output": 0,
@@ -1193,10 +1193,10 @@
                   "cacheWrite1h": 0
                 },
                 "stopReason": "stop",
-                "timestamp": 1793688812746,
-                "responseId": "gen_01M6G2YF7EDFSXBWRMEGYMGRTY",
+                "timestamp": 1793748783193,
+                "responseId": "gen_01M6HW4M3AV98AV2FW7X69TJD8",
                 "rawStopReason": "end_turn",
-                "durationMs": 573,
+                "durationMs": 718,
                 "thinkingLevel": "medium"
               }
             ],
@@ -1223,11 +1223,11 @@
             "success": true,
             "data": {
               "model": {
-                "id": "anthropic/claude-haiku-5.5",
+                "id": "<pi-model>",
                 "name": "Claude Haiku 5.5",
                 "api": "anthropic-messages",
-                "baseUrl": "https://ai-gateway.vercel.sh",
-                "provider": "vercel-ai-gateway",
+                "baseUrl": "<redacted>",
+                "provider": "<pi-provider>",
                 "reasoning": true,
                 "input": ["text", "image"],
                 "compat": {
@@ -1273,7 +1273,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T06-53-31-624Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T23-33-02-124Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 6,
