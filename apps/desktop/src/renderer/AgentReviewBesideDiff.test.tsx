@@ -13,7 +13,6 @@ import { act, screen, waitFor, within } from "@testing-library/react"
 import { DateTime, Deferred, Effect } from "effect"
 import { afterEach, expect, it } from "vite-plus/test"
 import { reviewOf } from "../../test/agentReview"
-import { eventually } from "../../test/eventually"
 import { changes, mountTourWorkspace, resetTourWorkspace } from "../../test/tourWorkspace"
 import { changedFile, revision, savedTour } from "../../test/workspace"
 
@@ -192,7 +191,7 @@ for (const accepted of [true, false])
       )
     })
 
-    await eventually(() => {
+    await waitFor(() => {
       expect(composer.getAttribute("aria-readonly")).toBe("false")
       expect(composer.textContent).toBe(accepted ? "" : "Is this blocking?")
     })
@@ -201,7 +200,7 @@ for (const accepted of [true, false])
     await f.user.click(composer)
     await f.user.keyboard("{Control>}a{/Control}{Backspace}")
     await f.user.type(composer, "A second message{Enter}")
-    await eventually(() => expect(f.followUp).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(f.followUp).toHaveBeenCalledTimes(2))
   })
 
 it("prevents Retry and Send from overlapping while a retry is being accepted", async () => {

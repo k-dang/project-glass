@@ -12,8 +12,6 @@
 
 `tools/oxlint/anti-slop/` is authoritative for Glass's active lint behavior, local fixes, and provenance. The root `vite.config.ts` loads these entry points directly.
 
-`.agents/skills/install-anti-slop/assets/anti-slop/` is an installation template for the skill's copy operation, not a runtime dependency or a source of Glass rule coverage. `.claude/skills/install-anti-slop` links to that same skill directory. The template's inherited verification prose describes its source repository; it does not establish that those tests or commands exist in Glass. The local CRLF fix lives only in the active plugin copy. There is no `sync:skill-assets` script here.
+`.agents/skills/install-anti-slop/assets/anti-slop/` is an installation template for the skill's copy operation, not a runtime dependency. `.claude/skills/install-anti-slop` links to that same skill directory. The local CRLF fix lives only in the active plugin copy.
 
 For an update, stage an explicit incoming upstream revision and compare it with the recorded baseline and the active local tree. Port reviewed changes into the active tree, preserving local fixes; do not overwrite it from skill assets. Update this record and the nested Stylistic record when their source or adaptations change, and retain every license notice. Updating the installation template is a separate change with its own purpose. The recorded upstream revisions remain the baselines, not a claim that the locally adapted tree is pristine upstream code.
-
-`pnpm check` runs the registered rules on application code. The vendored tree is excluded from application lint/format checks, and Glass does not retain a dedicated rule test suite. `pnpm test` runs the workspace application suites; it does not establish custom-rule fixture coverage.

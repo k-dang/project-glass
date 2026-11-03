@@ -1,8 +1,16 @@
 // @vitest-environment happy-dom
 import type { ResourceUsage } from "@glass/contracts/desktop"
-import { act, cleanup, fireEvent, render, renderHook, screen, within } from "@testing-library/react"
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react"
 import { afterEach, expect, it, vi } from "vite-plus/test"
-import { eventually } from "../../test/eventually"
 import { ResourceUsage as ResourceUsageFooter, useResourceUsage } from "./ResourceUsage"
 
 afterEach(() => {
@@ -59,9 +67,7 @@ it("shows the latest reading in the footer and per process in the popover", asyn
   render(<ResourceUsageFooter />)
 
   const button = screen.getByRole("button", { name: "Show Glass resource usage" })
-  await eventually(() =>
-    expect(button.getAttribute("aria-description")).toBe("CPU 2.5%, RAM 1.5 GB"),
-  )
+  await waitFor(() => expect(button.getAttribute("aria-description")).toBe("CPU 2.5%, RAM 1.5 GB"))
   fireEvent.click(button)
   const backend = await screen.findByRole("row", { name: /^Backend / })
   expect(

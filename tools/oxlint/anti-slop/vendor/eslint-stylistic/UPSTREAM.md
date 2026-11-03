@@ -24,10 +24,6 @@ The rule is MIT-licensed. Keep `LICENSE` with every redistributed copy, includin
 
 The opinionated policy lives outside this directory in `../../rules/require-readable-spacing.ts`. It adds spacing without collapsing existing blank lines. Short local bindings, consecutive imports, and adjacent overload signatures/implementation remain grouped. Spacing is syntactic, not an inference of business-logic boundaries.
 
-## Updating and verification
+## Updating
 
 Fetch an explicit upstream revision, compare the original rule and types against the recorded revision, and port relevant fixes while retaining the adapters and local fix above. Update this record and preserve the license. The active Glass copy and installation templates have distinct roles, documented in [`../../UPSTREAM.md`](../../UPSTREAM.md).
-
-Run `pnpm check` for repository formatting/lint/type checks and `pnpm test` for the workspace application suites. These commands do not establish dedicated custom-rule coverage: the vendored directory is excluded from application lint/format checks, and Glass does not retain a dedicated RuleTester or CLI fixture suite.
-
-The upstream JS/TS suites have not been ported. Earlier references to tests under `../../rules/` and `pnpm sync:skill-assets` were inherited upstream prose; those files and that command do not exist in Glass. Glass's wrapper inserts spacing and deliberately does not collapse existing blank lines; it does not use the entire configurable upstream policy.

@@ -27,12 +27,11 @@ import {
   type SettingsError,
 } from "@glass/contracts"
 import { RegistryProvider } from "@effect/atom-react"
-import { act, cleanup, render, screen, within } from "@testing-library/react"
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { DateTime, Effect } from "effect"
 import { AtomRegistry } from "effect/reactivity"
 import { afterEach, expect, it, vi } from "vite-plus/test"
-import { eventually } from "../../test/eventually"
 import { App } from "./App"
 import { backendLayerAtom } from "./backend"
 import {
@@ -308,12 +307,12 @@ it("opens another PR from a PR workspace with ⌘L or Open another PR", async ()
   await user.click(trigger)
   await screen.findByRole("dialog", { name: "Open a PR" })
   await user.keyboard("{Escape}")
-  await eventually(() => expect(screen.queryByRole("dialog")).toBeNull())
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
   expect(document.activeElement).toBe(trigger)
 
   await user.keyboard("{Meta>}l{/Meta}")
   const input = await screen.findByRole<HTMLInputElement>("textbox", { name: "Open a PR" })
-  await eventually(() => expect(document.activeElement).toBe(input))
+  await waitFor(() => expect(document.activeElement).toBe(input))
   await user.type(input, "owner/repo#123")
   await user.keyboard("{Control>}l{/Control}")
 
@@ -382,7 +381,7 @@ it("refreshes on entry, window focus, every 30 seconds while visible, and on req
     },
   })
 
-  const refreshed = (count: number) => eventually(() => expect(requests).toHaveLength(count))
+  const refreshed = (count: number) => waitFor(() => expect(requests).toHaveLength(count))
   await refreshed(1)
   await rowFor("Greet the world")
 
@@ -451,7 +450,7 @@ it("shows the saved list while GitHub answers, and spins Refresh only when asked
   const asked = await next(calls)
   expect(refresh().getAttribute("aria-busy")).toBe("true")
   asked.answer(Effect.succeed(needing(listed(glass, [greet]))))
-  await eventually(() => expect(refresh().getAttribute("aria-busy")).toBe("false"))
+  await waitFor(() => expect(refresh().getAttribute("aria-busy")).toBe("false"))
 
   act(() => void window.dispatchEvent(new Event("focus")))
   const later = await next(calls)
@@ -490,7 +489,7 @@ it("keeps healthy repositories usable and a failed repository's rows marked not 
   const retry = await next(calls)
   expect(screen.getByRole("button", { name: /^Speed up streams/ })).toBeTruthy()
   retry.answer(Effect.succeed(needing(listed(effect, [streams]), listed(glass, [greet]))))
-  await eventually(() => expect(screen.queryByRole("button", { name: /^Wave/ })).toBeNull())
+  await waitFor(() => expect(screen.queryByRole("button", { name: /^Wave/ })).toBeNull())
   expect(screen.queryByText(/Not refreshed/)).toBeNull()
   await rowFor("Greet the world")
 })
@@ -586,7 +585,7 @@ it("goes Back to PRs with Escape once nothing else needs closing", async () => {
   await user.keyboard("c")
   await screen.findByRole("dialog", { name: "Copy" })
   await user.keyboard("{Escape}")
-  await eventually(() => expect(screen.queryByRole("dialog")).toBeNull())
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
   expect(screen.getByText("head001")).toBeTruthy()
 
   await user.keyboard("{Escape}")
@@ -638,7 +637,7 @@ it("reopens a PR as Glass last loaded it, marking Reload once GitHub says it cha
   expect(reloadHint()).not.toContain("Changed on GitHub")
 
   check.answer(Effect.succeed(true))
-  await eventually(() => expect(reloadHint()).toContain("Changed on GitHub"))
+  await waitFor(() => expect(reloadHint()).toContain("Changed on GitHub"))
   expect(opens).toHaveLength(0)
 
   await user.click(screen.getByRole("button", { name: "Reload" }))
@@ -778,7 +777,7 @@ it.each(["resolution", "Viewed-file"])(
       expect(registry.get(first.feedback.resolutions.lockedAtom)).toBe(false)
 
       write.answer(Effect.void)
-      await eventually(() => {
+      await waitFor(() => {
         expect(registry.get(first.feedback.resolutions.viewAtom("T1")).feedback).toBeNull()
         expect(first.feedback.viewedFiles.snapshot().saving.size).toBe(0)
       })
@@ -841,7 +840,7 @@ it.each(["success", "failure"])(
     await user.click(screen.getByRole("button", { name: "Reload" }))
     ;(await next(opens)).answer(Effect.fail(new GitHubUnavailable({ message: "Offline." })))
     await screen.findByRole("alert")
-    await eventually(() =>
+    await waitFor(() =>
       expect(screen.getByRole<HTMLButtonElement>("button", { name }).disabled).toBe(false),
     )
     await user.click(screen.getByRole("button", { name }))
@@ -902,7 +901,7 @@ it.each(["load failure", "target navigation"])(
         )
       }
 
-      await eventually(() =>
+      await waitFor(() =>
         expect(interrupted).toHaveBeenCalledTimes(ending === "target navigation" ? 1 : 0),
       )
       expect(current.workspace.pullRequest.ref).toEqual(
@@ -921,7 +920,7 @@ it.each(["load failure", "target navigation"])(
       expect(first.feedback.drafts.view(draft.key)?.body).toBe("Editable Draft")
       expect(first.feedback.replies.view("T1").body).toBe("Editable Reply")
       expect(first.feedback.viewedFiles.snapshot().viewed.has("greet.ts")).toBe(true)
-      await eventually(() =>
+      await waitFor(() =>
         expect(registry.get(first.feedback.resolutions.viewAtom("T1")).confirmed).toBe(true),
       )
     } finally {
@@ -961,7 +960,7 @@ it("dismisses Reload's discard prompt when the target changes, preserving the ol
     first.feedback.drafts.edit(draft.key, "Unsent Draft")
     const reloading = reloadPullRequest(registry)
 
-    await eventually(() => expect(registry.get(discardPromptAtom)).not.toBeNull())
+    await waitFor(() => expect(registry.get(discardPromptAtom)).not.toBeNull())
     expect(opened).toEqual([greet.ref])
     openPullRequest(registry, wave.ref)
     await reloading
@@ -1012,7 +1011,7 @@ it("reopens a PR with the Drafts GitHub saved or deleted since it loaded", async
 
   await user.click(await rowFor("Greet the world"))
   await user.click(await screen.findByRole("button", { name: /Delete Draft on greet.ts/ }))
-  await eventually(() => expect(screen.queryByText("Private feedback")).toBeNull())
+  await waitFor(() => expect(screen.queryByText("Private feedback")).toBeNull())
   await user.click(screen.getByRole("button", { name: "Back to PRs" }))
 
   await user.click(await rowFor("Greet the world"))
@@ -1039,7 +1038,7 @@ it("reopens a PR without discarded feedback, and keeps it open when a Reload can
   ;(await next(opens)).answer(Effect.fail(new GitHubUnavailable({ message: "Offline." })))
   expect((await screen.findByRole("alert")).textContent).toContain("Couldn't reach GitHub")
   expect(screen.getByText("head001")).toBeTruthy()
-  await eventually(() => expect(deleteDraft().disabled).toBe(false))
+  await waitFor(() => expect(deleteDraft().disabled).toBe(false))
   expect((await openReview(user)).value).toBe("")
 })
 
@@ -1099,7 +1098,7 @@ it("submits a Review with ⌘↵ from the Changes tab, staying open through a st
   await user.click(await rowFor("Greet the world"))
   await user.click(await screen.findByRole("tab", { name: "Changes" }))
   const summaryBox = await openReview(user)
-  await eventually(() => expect(document.activeElement).toBe(summaryBox))
+  await waitFor(() => expect(document.activeElement).toBe(summaryBox))
   await user.click(screen.getByRole("radio", { name: /^Approve/ }))
   await user.type(summaryBox, "Ship it")
   await user.keyboard("{Meta>}{Enter}{/Meta}")
@@ -1165,9 +1164,9 @@ it("asks before Back to PRs discards unsaved feedback, and stays on the PR when 
   const dialog = await screen.findByRole("alertdialog", { name: "Discard unpublished feedback?" })
   expect(dialog.textContent).toMatch(/Drafts that couldn't save to GitHub.*Review summary/)
   const cancel = within(dialog).getByRole("button", { name: "Cancel" })
-  await eventually(() => expect(document.activeElement).toBe(cancel))
+  await waitFor(() => expect(document.activeElement).toBe(cancel))
   await user.click(cancel)
-  await eventually(() => expect(screen.queryByRole("alertdialog")).toBeNull())
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull())
   expect((await openReview(user)).value).toBe("Almost there")
   expect(
     screen.getByRole<HTMLButtonElement>("button", { name: /Delete Draft on greet.ts/ }).disabled,
@@ -1217,9 +1216,9 @@ it("waits for the discard choice before reloading unsaved Drafts and unlocks the
   expect(opens).toHaveLength(0)
 
   await user.keyboard("{Escape}")
-  await eventually(() => expect(screen.queryByRole("alertdialog")).toBeNull())
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull())
   expect(opens).toHaveLength(0)
-  await eventually(() => {
+  await waitFor(() => {
     expect(
       screen.getByRole<HTMLButtonElement>("button", { name: /Delete Draft on greet.ts/ }).disabled,
     ).toBe(false)
