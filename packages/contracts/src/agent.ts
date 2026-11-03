@@ -67,6 +67,17 @@ export const engineCapabilities: Record<AgentEngine, AgentCapabilities> = {
   pi: { permissionModes: [] },
 }
 
+/**
+ * A skill, prompt template, or command the agent program runs when a message starts with `/name`,
+ * as the program lists it for a folder.
+ */
+export const AgentCommand = Schema.Struct({
+  name: Schema.String,
+  description: Schema.String,
+})
+
+export type AgentCommand = typeof AgentCommand.Type
+
 /** What an agent program offers in a place: its models. */
 
 export class AgentModels extends Schema.Class<AgentModels>("AgentModels")({

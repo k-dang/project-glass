@@ -33,6 +33,8 @@ import {
   gitHubBranchesAtom,
   linkCheckoutAtom,
   localCheckoutsAtom,
+  newAgentCommandsAtom,
+  noCommands,
   placeNames,
   sandboxProvidersAtom,
   placeIcons,
@@ -114,6 +116,8 @@ export const defaultPlace = (
 
   return hasCheckouts || first === undefined ? thisMac : SandboxPlace.make({ providerId: first.id })
 }
+
+const unlisted = Atom.make(noCommands)
 
 const noBranches: Atom.Atom<AsyncResult.AsyncResult<Branches, BackendError>> = Atom.make(
   AsyncResult.success(new Branches({ defaultBranch: null, branches: [] })),
@@ -295,6 +299,13 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
     null
 
   const offered = useAtomValue(agentModelsAtom(props.program.engine, placeKey(where.place)))
+
+  const commands = useAtomValue(
+    repository === undefined
+      ? unlisted
+      : newAgentCommandsAtom(props.program.engine, placeKey(where.place), repository),
+  )
+
   const models = Option.getOrNull(AsyncResult.value(offered))
 
   const model =
@@ -409,6 +420,7 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
         steer={null}
         recall={null}
         onStop={null}
+        commands={commands}
         pickers={
           <ModelPicker
             engine={program.engine}

@@ -32,6 +32,9 @@ export const parseLine = (line: string): Json => Option.getOrElse(decodeJson(lin
 const withMachinePlaces = (places: Readonly<Record<string, string>>) =>
   Object.entries({ ...places, "<home>": homedir(), "<tmp>": tmpdir() })
 
+/** The folder as pi names its sessions folder after it: `/` and `:` dashed, leading one dropped. */
+const piSessionsName = (path: string) => path.replace(/^[/\\]/, "").replace(/[/\\:]/g, "-")
+
 const spellings = (path: string) => {
   const dashed = path.replace(/[^A-Za-z0-9]/g, "-")
 
@@ -40,6 +43,7 @@ const spellings = (path: string) => {
     path.replaceAll("\\", "/"),
     path.replaceAll("\\", "\\\\"),
     ...(dashed.split("-").filter(Boolean).length > 1 ? [dashed] : []),
+    ...[piSessionsName(path)].filter((name) => name.includes("-")),
   ]
 }
 

@@ -1,5 +1,6 @@
 import { Schema } from "effect"
-import { readFileSync } from "node:fs"
+import { execFileSync } from "node:child_process"
+import { existsSync, readFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
@@ -55,10 +56,16 @@ const loginToken = () => {
   if (given !== undefined && given !== "") return given
 
   const config = process.env["CLAUDE_CONFIG_DIR"] ?? join(homedir(), ".claude")
+  const file = join(config, ".credentials.json")
 
-  const { claudeAiOauth } = Schema.decodeUnknownSync(Credentials)(
-    readFileSync(join(config, ".credentials.json"), "utf8"),
-  )
+  // On macOS, Claude Code keeps the login in the Keychain rather than the file.
+  const stored = existsSync(file)
+    ? readFileSync(file, "utf8")
+    : execFileSync("security", ["find-generic-password", "-s", "Claude Code-credentials", "-w"], {
+        encoding: "utf8",
+      })
+
+  const { claudeAiOauth } = Schema.decodeUnknownSync(Credentials)(stored)
 
   if (claudeAiOauth.expiresAt < Date.now())
     throw new Error("Your Claude Code login has expired. Run claude once to renew it.")

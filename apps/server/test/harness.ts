@@ -3,7 +3,7 @@ import { GlassRpcs, RPC_PATH, TOKEN_PARAM } from "@glass/contracts"
 import { Clock, ConfigProvider, Context, Effect, Layer, Option } from "effect"
 import { HttpServer } from "effect/http"
 import { Socket } from "effect/socket"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp, realpath, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, vi } from "vite-plus/test"
@@ -18,8 +18,16 @@ export const LAUNCH_TOKEN = "test-launch-token"
 
 export const RENDERER_ORIGIN = "glass://app"
 
+/** Points the user's home, and pi's own folder in it, at `home` for the programs Glass runs. */
+export const stubHome = (home: string) => {
+  vi.stubEnv("HOME", home)
+  vi.stubEnv("USERPROFILE", home)
+  vi.stubEnv("PI_CODING_AGENT_DIR", join(home, ".pi", "agent"))
+}
+
 export const isolatedHome = Effect.acquireRelease(
-  Effect.promise(() => mkdtemp(join(tmpdir(), "glass-test-"))),
+  // The real path, as programs print it: on macOS the temporary folder sits behind /private.
+  Effect.promise(() => mkdtemp(join(tmpdir(), "glass-test-")).then((made) => realpath(made))),
   (directory) => Effect.promise(() => rm(directory, { recursive: true, force: true })),
 )
 
@@ -41,9 +49,7 @@ export const startBackend = Effect.fnUntraced(function* (
   )
 
   const home = homeDirectory ?? (yield* isolatedHome)
-  vi.stubEnv("HOME", home)
-  vi.stubEnv("USERPROFILE", home)
-  vi.stubEnv("PI_CODING_AGENT_DIR", join(home, ".pi", "agent"))
+  stubHome(home)
 
   const github =
     "GLASS_GITHUB_API_URL" in env

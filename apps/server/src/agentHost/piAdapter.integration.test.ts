@@ -11,7 +11,15 @@ import {
   TurnStopped,
 } from "@glass/contracts"
 import { Effect, Predicate } from "effect"
-import { piSession, reviewBrief, run, waiting, writeGreeter } from "../../test/adapterSessions"
+import { join } from "node:path"
+import {
+  piSession,
+  reviewBrief,
+  run,
+  waiting,
+  writeGreeter,
+  writeGreetSkill,
+} from "../../test/adapterSessions"
 import { settled } from "../../test/agentsFixture"
 import { PI_MODEL, PI_PROVIDER } from "../../test/piLogin"
 
@@ -242,6 +250,20 @@ it.live("lists the models and efforts pi offers, with its default", () =>
         name: "Claude Haiku 5.5",
         efforts: ["off", "minimal", "low", "medium", "high", "xhigh", "max"],
       },
+    )
+  }).pipe(Effect.scoped),
+)
+
+it.live("lists the user's skills among what pi runs as `/name`, named as pi takes them", () =>
+  Effect.gen(function* () {
+    const f = yield* piSession("pi-commands")
+    yield* writeGreetSkill(join(f.home, ".pi", "agent", "skills"))
+
+    const commands = yield* f.adapter.commands(f.folder)
+
+    assert.deepStrictEqual(
+      commands.find(({ name }) => name === "skill:greet"),
+      { name: "skill:greet", description: "Greets the user by name." },
     )
   }).pipe(Effect.scoped),
 )

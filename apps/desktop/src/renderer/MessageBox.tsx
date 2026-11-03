@@ -1,4 +1,5 @@
 import {
+  type AgentCommand,
   type Image,
   ImageMediaType,
   isNothingUnsent,
@@ -18,6 +19,8 @@ import { Base64 } from "effect/encoding"
 import { ArrowUp, Square, X } from "lucide-react"
 import { memo, type ReactNode, useLayoutEffect, useRef, useState } from "react"
 import { InputGroup, InputGroupAddon, InputGroupButton } from "@/components/ui/input-group"
+import { noCommands } from "./agentsArea"
+import { CommandHighlight, useCommandPicker } from "./Commands"
 import { pastedSlice, toContent, ToDoMention, toMessage } from "./composerDocument"
 import { MarkdownStyling } from "./markdownStyling"
 import { useMentionPicker } from "./Mentions"
@@ -62,6 +65,7 @@ const extensions = [
   Text,
   ToDoMention,
   MarkdownStyling,
+  CommandHighlight,
   UndoRedo,
   Placeholder.configure({
     placeholder: ({ editor }) => {
@@ -103,6 +107,8 @@ export function MessageBox(props: {
   steer: ((message: MessageInput) => Promise<boolean>) | null
   recall: SentMessage | null
   onStop: (() => void) | null
+  /** What the Agent program runs as `/name` at the start of a message. */
+  commands?: ReadonlyArray<AgentCommand>
   pickers?: ReactNode
   children?: ReactNode
 }) {
@@ -121,7 +127,11 @@ export function MessageBox(props: {
     },
   })
 
-  const picker = useMentionPicker(editor, !props.textOnly)
+  const mentions = useMentionPicker(editor, !props.textOnly)
+  const commands = useCommandPicker(editor, props.commands ?? noCommands)
+  // `@` opens only after a space or at a line's start, and `/` only with no space after it, so
+  // the two are never open together.
+  const picker = mentions.activeDescendant === null ? commands : mentions
 
   useLayoutEffect(() => {
     if (composed.message === toMessage(editor.state.doc.content)) return

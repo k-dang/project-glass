@@ -4,7 +4,7 @@
   "processes": [
     {
       "args": ["--mode", "rpc"],
-      "cwd": "<home>",
+      "cwd": "<pi-home>",
       "frames": [
         {
           "out": {
@@ -9509,8 +9509,8 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<home>--\\2026-11-03T06-53-42-002Z_01a1a02f-60f1-710f-9cfa-50e41178bd1a.jsonl",
-              "sessionId": "01a1a02f-60f1-710f-9cfa-50e41178bd1a",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<pi-home>--/2026-11-03T19-23-55-799Z_01a1a2de-3c17-7544-b70b-3e0b6e077eae.jsonl",
+              "sessionId": "01a1a2de-3c17-7544-b70b-3e0b6e077eae",
               "autoCompactionEnabled": true,
               "messageCount": 0,
               "pendingMessageCount": 0

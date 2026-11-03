@@ -4,6 +4,7 @@ import {
   SettingsManager,
 } from "@earendil-works/pi-coding-agent"
 import {
+  type AgentCommand,
   type AgentModel,
   AgentModels,
   type RequestAnswer,
@@ -30,6 +31,7 @@ import { join } from "node:path"
 import type { AgentAdapter } from "./adapter"
 import type { DeliveredMessage } from "./deliveredMessage"
 import {
+  AvailableCommands,
   AvailableModels,
   ClearedQueue,
   type PiModel,
@@ -205,6 +207,23 @@ export const piAdapter = (command: string) =>
           models: (scoped.length > 0 ? scoped : available.models).map(toModel),
         })
       }).pipe(Effect.scoped),
+
+      commands: (folder: string) =>
+        Effect.gen(function* () {
+          const rpc = yield* startPi(folder)
+
+          const { commands } = yield* rpc.request({ type: "get_commands" }, AvailableCommands).pipe(
+            Effect.tapError((error) => Effect.logWarning("pi didn't list its commands", error)),
+            Effect.mapError(
+              () => new HostAgentError({ message: "pi didn't list its commands. Try again." }),
+            ),
+          )
+
+          return commands.map(({ name, description }): AgentCommand => ({
+            name,
+            description: description ?? "",
+          }))
+        }).pipe(Effect.scoped),
 
       start: Effect.fnUntraced(function* ({ folder, conversation, review, report }) {
         const scope = yield* Scope.Scope

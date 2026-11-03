@@ -1429,6 +1429,38 @@ it("keeps the To-do choices closed after Escape, so Enter sends the @ as written
   expect(sent).toEqual(["Ping @f"])
 })
 
+it("offers the program's commands after a leading /, and only there", async () => {
+  const sent: Array<string> = []
+
+  const user = mount({
+    ListAgentCommands: () =>
+      Effect.succeed([
+        { name: "greet", description: "Greets the user by name." },
+        { name: "review", description: "Reviews the diff." },
+      ]),
+    WatchTranscript: () =>
+      Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
+    SendMessage: ({ message }) => Effect.sync(() => void sent.push(message)),
+  })
+
+  const composer = await screen.findByRole("textbox", { name: "Message" })
+  await user.type(composer, "/gr")
+  const choices = await screen.findByRole("listbox", { name: "Commands" })
+  expect(
+    within(choices)
+      .getAllByRole("option")
+      .map((option) => option.textContent),
+  ).toEqual(["/greetGreets the user by name."])
+
+  await user.keyboard("{Enter}")
+  expect(screen.queryByRole("listbox", { name: "Commands" })).toBeNull()
+  await user.type(composer, "Ada{Enter}")
+  expect(sent).toEqual(["/greet Ada"])
+
+  await user.type(composer, "Run /gr")
+  expect(screen.queryByRole("listbox", { name: "Commands" })).toBeNull()
+})
+
 it("keeps pasted lines and To-do mentions as written", async () => {
   const sent: Array<string> = []
 

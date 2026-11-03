@@ -5,7 +5,7 @@ import { shortAgentNames, uniqueAgentName } from "./agentNames"
 import { Git, type GitFailed } from "./git"
 import { LocalAgentHost } from "./LocalAgentHost"
 import { LocalCheckouts } from "./LocalCheckouts"
-import { hostFailure, type Placement, type PlacedAgent, type SubscribeLost } from "./Placement"
+import { asAgentError, type Placement, type PlacedAgent, type SubscribeLost } from "./Placement"
 import { ServerConfig } from "./ServerConfig"
 
 const gitFailure =
@@ -121,8 +121,16 @@ export class LocalPlacement extends Context.Service<
         models: (engine) =>
           host.client.pipe(
             Effect.flatMap((client) => client.ListModels({ engine })),
-            Effect.mapError((error) => new AgentError({ message: hostFailure(error) })),
+            Effect.mapError(asAgentError),
           ),
+        commands: Effect.fnUntraced(function* (engine, repository) {
+          const { path } = yield* checkouts.get(repository)
+
+          return yield* host.client.pipe(
+            Effect.flatMap((client) => client.ListCommands({ engine, folder: path })),
+            Effect.mapError(asAgentError),
+          )
+        }),
         place,
         host: ({ agent }) =>
           host.client.pipe(Effect.tap(() => Effect.sync(() => void hosted.add(agent.id)))),

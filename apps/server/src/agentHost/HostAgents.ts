@@ -1,4 +1,5 @@
 import {
+  type AgentCommand,
   type AgentEngine,
   type AgentModels,
   type RequestAnswer,
@@ -24,6 +25,10 @@ export class HostAgents extends Context.Service<
   HostAgents,
   {
     readonly models: (engine: AgentEngine) => Effect.Effect<AgentModels, HostAgentError>
+    readonly commands: (
+      engine: AgentEngine,
+      folder: string,
+    ) => Effect.Effect<ReadonlyArray<AgentCommand>, HostAgentError>
     readonly start: (
       agentId: string,
       engine: AgentEngine,
@@ -117,6 +122,7 @@ export class HostAgents extends Context.Service<
 
         return HostAgents.of({
           models: (engine) => adapters[engine].models,
+          commands: (engine, folder) => adapters[engine].commands(folder),
           start,
           startTurn: Effect.fnUntraced(function* (agentId, turnId, message, settings) {
             const agent = yield* find(agentId)

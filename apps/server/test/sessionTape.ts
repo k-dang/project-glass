@@ -127,6 +127,9 @@ const tryMatch = (recorded: Json, actual: Json, ids: Map<string, string>) => {
 const personal =
   /email|organization|account|subscription|rate_limit_info|username|team[_-]?id|(?:access|refresh|auth)[_-]?token|api[_-]?key|^sections$/i
 
+/** What differs by the recorder's machine rather than by what Glass did. */
+const machine = /^pid$|^output_style$/
+
 const usage = /usage|^total_cost_usd$|^estimated_tokens(?:_delta)?$|^first_request_input_tokens$/i
 
 const mapJson = (value: Json, change: (inner: Json, field: string) => Json): Json =>
@@ -142,11 +145,21 @@ const zeroNumbers = (value: Json): Json =>
   Predicate.isNumber(value) ? 0 : mapJson(value, zeroNumbers)
 
 const blankPersonal = (value: Json, field = ""): Json =>
-  personal.test(field)
+  personal.test(field) || machine.test(field)
     ? "<redacted>"
     : usage.test(field)
       ? zeroNumbers(value)
       : mapJson(value, blankPersonal)
+
+/**
+ * A hook the recorder's machine runs, such as one its managed settings add. Glass reads no hook
+ * events, so leaving them out keeps the machine out of the recording.
+ */
+const isMachineHook = (frame: Json) =>
+  isJsonObject(frame) &&
+  frame["type"] === "system" &&
+  Predicate.isString(frame["subtype"]) &&
+  frame["subtype"].startsWith("hook_")
 
 const lines = (onLine: (line: string) => void) => {
   const frame = lineFramer()
@@ -341,7 +354,11 @@ export const sessionTape = (
 
     return {
       out: lines((line) => frames.push({ out: normalize(parseLine(line)) })),
-      in: lines((line) => frames.push({ in: blankPersonal(normalize(parseLine(line))) })),
+      in: lines((line) => {
+        const frame = parseLine(line)
+
+        if (!isMachineHook(frame)) frames.push({ in: blankPersonal(normalize(frame)) })
+      }),
       exit: (code: number | null) => frames.push({ exit: code }),
     }
   }

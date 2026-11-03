@@ -1,6 +1,7 @@
-import type {
-  Agent,
-  AgentEngine,
+import {
+  type Agent,
+  type AgentCommand,
+  type AgentEngine,
   AgentError,
   AgentModels,
   FollowedRepository,
@@ -16,6 +17,9 @@ export const hostFailure = (error: RpcClientError.RpcClientError | HostAgentErro
   Predicate.isTagged(error, "RpcClientError")
     ? "Glass lost the process that runs Agents. Try again."
     : error.message
+
+export const asAgentError = (error: RpcClientError.RpcClientError | HostAgentError | AgentError) =>
+  new AgentError({ message: hostFailure(error) })
 
 export type LostAgentIds = ReadonlyArray<string>
 
@@ -36,6 +40,14 @@ export interface Placed {
 export interface Placement {
   readonly engines: ReadonlyArray<AgentEngine>
   readonly models: (engine: AgentEngine) => Effect.Effect<AgentModels, AgentError>
+  /**
+   * What the program runs as `/name` for a new Agent of the repository. Empty in a Sandbox, which
+   * holds the repository only once it's made.
+   */
+  readonly commands: (
+    engine: AgentEngine,
+    repository: FollowedRepository,
+  ) => Effect.Effect<ReadonlyArray<AgentCommand>, InvalidLocalCheckout | AgentError>
   readonly place: (
     repository: FollowedRepository,
     baseBranch: string,

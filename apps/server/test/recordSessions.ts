@@ -5,9 +5,9 @@ const USAGE = `Records the Agent session recordings that the adapter integration
   pnpm --filter @glass/server record:sessions [claude|pi] [vitest options, such as -t <test name>]
 
 Both run on Haiku and cost a few cents. Claude Code sessions run the pinned claude on your own
-Claude Code login; set CLAUDE_CODE_OAUTH_TOKEN where your login isn't in
-~/.claude/.credentials.json. pi sessions run the bundled pi on your Vercel AI Gateway key from
-~/.pi/agent/auth.json, or AI_GATEWAY_API_KEY. Fields that look personal (email, org, account, rate
+Claude Code login, from ~/.claude/.credentials.json or, on macOS, the Keychain; set
+CLAUDE_CODE_OAUTH_TOKEN where your login is in neither. pi sessions run the bundled pi on your
+Vercel AI Gateway key from ~/.pi/agent/auth.json, or AI_GATEWAY_API_KEY. Fields that look personal (email, org, account, rate
 limits) are blanked and usage counters and costs are zeroed; check the files before committing
 them.`
 

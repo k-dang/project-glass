@@ -3,6 +3,7 @@ import {
   AgentBusy,
   type AgentEngine,
   AgentError,
+  type AgentCommand,
   AgentModels,
   AgentNotFound,
   type AgentPlace,
@@ -54,7 +55,7 @@ import {
 import { SqlClient } from "effect/sql"
 import { randomUUID } from "node:crypto"
 import { ActivityLog } from "./ActivityLog"
-import { hostFailure, type PlacedAgent, type Placement } from "./Placement"
+import { asAgentError, hostFailure, type PlacedAgent, type Placement } from "./Placement"
 import { Sandboxes } from "./Sandboxes"
 import { LocalPlacement } from "./LocalPlacement"
 import type { DeliveredMessage } from "./agentHost/deliveredMessage"
@@ -140,6 +141,15 @@ export class Agents extends Context.Service<
       engine: AgentEngine,
       place: AgentPlace,
     ) => Effect.Effect<AgentModels, AgentError>
+    readonly newAgentCommands: (
+      engine: AgentEngine,
+      place: AgentPlace,
+      repository: FollowedRepository,
+    ) => Effect.Effect<ReadonlyArray<AgentCommand>, InvalidLocalCheckout | AgentError>
+    /** Empty until the Agent's folder exists, and for an Agent review, which loads no settings. */
+    readonly commands: (
+      agentId: string,
+    ) => Effect.Effect<ReadonlyArray<AgentCommand>, AgentNotFound | AgentError>
     readonly create: (input: NewAgent) => Effect.Effect<Agent, InvalidLocalCheckout | AgentError>
     /** Starts the Agent on its first Turn. It stays out of the Agents list, and owns its checkout. */
     readonly createForReview: (input: NewReviewAgent) => Effect.Effect<Agent, AgentError>
@@ -577,7 +587,18 @@ export class Agents extends Context.Service<
 
         return yield* host.value
           .GetChanges({ folder: row.folder, baseRef })
-          .pipe(Effect.mapError((error) => new AgentError({ message: hostFailure(error) })))
+          .pipe(Effect.mapError(asAgentError))
+      })
+
+      const commands = Effect.fn("Agents.commands")(function* (agentId: string) {
+        const row = yield* find(agentId)
+        const host = yield* placementOf(row).hostOnceMade(row)
+
+        if (Option.isNone(host)) return []
+
+        return yield* host.value
+          .ListCommands({ engine: row.agent.engine, folder: row.folder })
+          .pipe(Effect.mapError(asAgentError))
       })
 
       const update = Effect.fn("Agents.update")(function* (
@@ -723,6 +744,14 @@ export class Agents extends Context.Service<
             ? placement.models(engine)
             : Effect.succeed(new AgentModels({ defaultModel: null, models: [] }))
         },
+        newAgentCommands: (engine, place, repository) => {
+          const placement = placementFor(place)
+
+          return placement.engines.includes(engine)
+            ? placement.commands(engine, repository)
+            : Effect.succeed([])
+        },
+        commands,
         create,
         createForReview,
         send,
