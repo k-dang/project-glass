@@ -3,7 +3,6 @@ import {
   AnswerQuestion,
   type Image,
   isRequestPart,
-  isWaiting,
   type RequestPart,
   TextPart,
   type Turn,
@@ -11,7 +10,7 @@ import {
   TurnStopped,
 } from "@glass/contracts"
 import { Effect, Predicate } from "effect"
-import { piSession } from "../../test/adapterSessions"
+import { piSession, run, waiting } from "../../test/adapterSessions"
 import { settled } from "../../test/agentsFixture"
 import { PI_MODEL, PI_PROVIDER } from "../../test/piLogin"
 
@@ -24,9 +23,6 @@ const pixel: Image = {
 
 const haiku = `${PI_PROVIDER}/${PI_MODEL}`
 
-const run = (command: string, reply: string) =>
-  `Use the bash tool to run exactly \`${command}\` and nothing else, then reply with exactly: ${reply}`
-
 const shownParts = (turn: Turn | undefined) =>
   turn?.parts.map((part) =>
     Predicate.isTagged(part, "Steer")
@@ -35,9 +31,6 @@ const shownParts = (turn: Turn | undefined) =>
         ? { text: part.text }
         : part._tag,
   )
-
-const waiting = (turns: ReadonlyArray<Turn>) =>
-  turns.at(-1)?.parts.findLast((part): part is RequestPart => isWaiting(part))
 
 const lastText = (turn: Turn | undefined) =>
   turn?.parts.findLast((part) => Predicate.isTagged(part, "Text"))
@@ -65,7 +58,9 @@ it.live("streams thinking, tool calls, and text into a Turn that ends done once 
     const agent = yield* f.open(conversation)
     yield* agent.configure({ effort: "high" })
 
-    yield* agent.send(`Think it through step by step first. ${run("echo hi", "It says hi.")}`)
+    yield* agent.send(
+      `Think it through step by step first. ${run("bash", "echo hi", "It says hi.")}`,
+    )
     const [turn] = yield* f.until(settled(1))
 
     assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
@@ -152,8 +147,8 @@ it.live("Steers a pi Turn, which takes the message in before it ends", () =>
     const agent = yield* f.open(conversation)
     const steer = "Change course: reply with exactly STEERED instead."
 
-    yield* agent.send(run("echo hi", "FIRST"))
-    const request = waiting(yield* f.until((turns) => waiting(turns) !== undefined))!
+    yield* agent.send(run("bash", "echo hi", "FIRST"))
+    const request = yield* f.request
     yield* agent.steer(steer)
     yield* agent.answer(request.requestId, yes)
 
@@ -169,8 +164,8 @@ it.live("stops a pi Turn, handing back a Steer pi hadn't taken in", () =>
     yield* f.extension("confirm.js", confirmExtension)
     const agent = yield* f.open(conversation)
 
-    yield* agent.send(run("echo hi", "DONE"))
-    yield* f.until((turns) => waiting(turns) !== undefined)
+    yield* agent.send(run("bash", "echo hi", "DONE"))
+    yield* f.request
     yield* agent.steer("Now, please")
     const handedBack = yield* agent.session.stopTurn
 
@@ -187,8 +182,8 @@ it.live("shows a Steer a pi extension handles itself", () =>
     yield* f.extension("confirm.js", confirmExtension)
     const agent = yield* f.open(conversation)
 
-    yield* agent.send(run("echo hi", "DONE"))
-    const request = waiting(yield* f.until((turns) => waiting(turns) !== undefined))!
+    yield* agent.send(run("bash", "echo hi", "DONE"))
+    const request = yield* f.request
     yield* agent.steer("ping")
     yield* agent.answer(request.requestId, yes)
 
@@ -205,8 +200,8 @@ it.live("hands back what pi held when the Turn stops: Steers as written, then pi
     yield* f.extension("confirm.js", confirmExtension)
     const agent = yield* f.open(conversation)
 
-    yield* agent.send(run("echo hi", "DONE"))
-    yield* f.until((turns) => waiting(turns) !== undefined)
+    yield* agent.send(run("bash", "echo hi", "DONE"))
+    yield* f.request
     yield* agent.steer("?quick tabs or spaces?", [pixel])
     yield* agent.steer("remind me")
     const handedBack = yield* agent.session.stopTurn
@@ -410,8 +405,8 @@ it.live("stops a pi Turn while its extension's dialog waits", () =>
     yield* f.extension("confirm.js", confirmExtension)
     const agent = yield* f.open(conversation)
 
-    yield* agent.send(run("echo hi", "DONE"))
-    const request = waiting(yield* f.until((turns) => waiting(turns) !== undefined))!
+    yield* agent.send(run("bash", "echo hi", "DONE"))
+    const request = yield* f.request
     yield* agent.session.stopTurn
 
     const [turn] = yield* f.until(settled(1))

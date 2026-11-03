@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises"
 import { createServer, type ServerResponse } from "node:http"
 import { join } from "node:path"
 import { counter } from "./counter.ts"
+import { type PiSettings, writePiLogin, writePiSettings } from "./piLogin.ts"
 import { portOf } from "./ports.ts"
 
 const request = Schema.fromJsonString(
@@ -131,15 +132,6 @@ const replyChunks = (deltas: ReadonlyArray<FakeModelDelta>, finishReason = "stop
   ]
 }
 
-export interface PiSettings {
-  readonly enabledModels?: ReadonlyArray<string>
-  readonly retry?: {
-    readonly enabled: boolean
-    readonly maxRetries?: number
-    readonly baseDelayMs?: number
-  }
-}
-
 export const fakeModelProvider = Effect.fnUntraced(function* (
   home: string,
   initial: FakeModelSettings,
@@ -213,15 +205,10 @@ export const fakeModelProvider = Effect.fnUntraced(function* (
   )
   const url = `http://127.0.0.1:${portOf(server)}/v1`
   const directory = join(home, ".pi", "agent")
+  writePiLogin(home, "glass-test", "test-pi-key")
+  writePiSettings(home, "glass-test", "gpt-test", piSettings)
   yield* Effect.promise(async () => {
-    await mkdir(directory, { recursive: true })
     await mkdir(join(home, ".project-glass"), { recursive: true })
-    await writeFile(
-      join(directory, "auth.json"),
-      JSON.stringify({
-        "glass-test": { type: "api_key", key: "test-pi-key" },
-      }),
-    )
     await writeFile(
       join(directory, "models.json"),
       JSON.stringify({
@@ -249,10 +236,6 @@ export const fakeModelProvider = Effect.fnUntraced(function* (
           },
         },
       }),
-    )
-    await writeFile(
-      join(directory, "settings.json"),
-      JSON.stringify({ defaultProvider: "glass-test", defaultModel: "gpt-test", ...piSettings }),
     )
     await writeFile(
       join(home, ".project-glass", "settings.json"),

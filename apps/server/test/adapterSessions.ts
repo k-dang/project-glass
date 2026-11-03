@@ -3,7 +3,9 @@ import {
   type AgentEvent,
   applyAgentEvent,
   type Image,
+  isWaiting,
   type RequestAnswer,
+  type RequestPart,
   type Turn,
   TurnStarted,
 } from "@glass/contracts"
@@ -17,11 +19,24 @@ import { claudeAdapter, type ClaudeSdk } from "../src/agentHost/claudeAdapter"
 import { piAdapter } from "../src/agentHost/piAdapter"
 import type { TurnSettings } from "../src/agentHost/protocol"
 import { bundledPi, bundledPiProgram } from "./demoAgent"
-import { type FakeModelSettings, fakeModelProvider, type PiSettings } from "./fakeModelProvider"
+import { type FakeModelSettings, fakeModelProvider } from "./fakeModelProvider"
 import { isolatedHome } from "./harness"
-import { writePiLogin, writePiSettings } from "./piLogin"
+import {
+  gatewayKey,
+  PI_MODEL,
+  PI_PROVIDER,
+  type PiSettings,
+  writePiLogin,
+  writePiSettings,
+} from "./piLogin"
 import { claudeLoginEnvironment, pinnedClaude, pinnedClaudeProgram } from "./pinnedClaude"
 import { recordingSessions, sessionTape } from "./sessionTape"
+
+export const run = (tool: string, command: string, reply: string) =>
+  `Use the ${tool} tool to run exactly \`${command}\` and nothing else, then reply with exactly: ${reply}`
+
+export const waiting = (turns: ReadonlyArray<Turn>) =>
+  turns.at(-1)?.parts.findLast((part): part is RequestPart => isWaiting(part))
 
 const drive = Effect.fnUntraced(function* (
   adapter: AgentAdapter,
@@ -46,6 +61,10 @@ const drive = Effect.fnUntraced(function* (
       Effect.map(Option.getOrThrow),
       Effect.raceFirst(tape.mismatch),
     )
+
+  const request = until((current) => waiting(current) !== undefined).pipe(
+    Effect.map((current) => waiting(current)!),
+  )
 
   const open = (conversation: string) =>
     adapter.start({ folder, conversation, report }).pipe(
@@ -74,7 +93,7 @@ const drive = Effect.fnUntraced(function* (
       })),
     )
 
-  return { adapter, events, turns: SubscriptionRef.get(turns), until, open }
+  return { adapter, events, turns: SubscriptionRef.get(turns), until, request, open }
 })
 
 export const claudeSession = Effect.fnUntraced(function* (scenario: string) {
@@ -96,7 +115,7 @@ export const claudeSession = Effect.fnUntraced(function* (scenario: string) {
   return yield* drive(claudeAdapter(pinnedClaude(), sdk), tape, folder, { model: "haiku" })
 })
 
-export interface PiSessionOptions {
+interface PiSessionOptions {
   readonly piSettings?: PiSettings
   readonly fake?: FakeModelSettings
   readonly apiKey?: string
@@ -112,9 +131,9 @@ export const piSession = Effect.fnUntraced(function* (
 
   if (fake !== undefined) yield* fakeModelProvider(home, fake, piSettings)
   else {
-    writePiSettings(home, piSettings)
+    writePiSettings(home, PI_PROVIDER, PI_MODEL, piSettings)
 
-    if (recordingSessions) writePiLogin(home, apiKey)
+    if (recordingSessions) writePiLogin(home, PI_PROVIDER, apiKey ?? gatewayKey())
   }
 
   vi.stubEnv("PI_CODING_AGENT_DIR", join(home, ".pi", "agent"))

@@ -2,7 +2,15 @@ import { Schema } from "effect"
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
-import type { PiSettings } from "./fakeModelProvider"
+
+export interface PiSettings {
+  readonly enabledModels?: ReadonlyArray<string>
+  readonly retry?: {
+    readonly enabled: boolean
+    readonly maxRetries?: number
+    readonly baseDelayMs?: number
+  }
+}
 
 export const PI_PROVIDER = "vercel-ai-gateway"
 
@@ -12,7 +20,7 @@ const Auth = Schema.fromJsonString(
   Schema.Struct({ [PI_PROVIDER]: Schema.Struct({ key: Schema.String }) }),
 )
 
-const gatewayKey = () => {
+export const gatewayKey = () => {
   const given = process.env["AI_GATEWAY_API_KEY"]
 
   if (given !== undefined && given !== "") return given
@@ -22,17 +30,26 @@ const gatewayKey = () => {
   return Schema.decodeUnknownSync(Auth)(auth)[PI_PROVIDER].key
 }
 
-export const writePiSettings = (home: string, settings: PiSettings) => {
-  const agent = join(home, ".pi", "agent")
-  mkdirSync(agent, { recursive: true })
-  writeFileSync(
-    join(agent, "settings.json"),
-    JSON.stringify({ defaultProvider: PI_PROVIDER, defaultModel: PI_MODEL, ...settings }),
-  )
+const agentDirectory = (home: string) => {
+  const directory = join(home, ".pi", "agent")
+  mkdirSync(directory, { recursive: true })
+
+  return directory
 }
 
-export const writePiLogin = (home: string, key = gatewayKey()) =>
+export const writePiSettings = (
+  home: string,
+  provider: string,
+  model: string,
+  settings: PiSettings,
+) =>
   writeFileSync(
-    join(home, ".pi", "agent", "auth.json"),
-    JSON.stringify({ [PI_PROVIDER]: { type: "api_key", key } }),
+    join(agentDirectory(home), "settings.json"),
+    JSON.stringify({ defaultProvider: provider, defaultModel: model, ...settings }),
+  )
+
+export const writePiLogin = (home: string, provider: string, key: string) =>
+  writeFileSync(
+    join(agentDirectory(home), "auth.json"),
+    JSON.stringify({ [provider]: { type: "api_key", key } }),
   )
