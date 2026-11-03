@@ -113,7 +113,8 @@ export const removeFromQueue = async (
 
   toast.add({
     type: "info",
-    title: `Removed ${referenceText(removed.pullRequest.ref)} from the Queue`,
+    title: "Removed from the Queue",
+    description: referenceText(removed.pullRequest.ref),
     actionProps: { children: "Undo", onClick: () => void restore(registry, removed) },
   })
 }
