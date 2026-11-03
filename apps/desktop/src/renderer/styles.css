@@ -374,6 +374,25 @@
   }
 }
 
+@utility enter-motion {
+  transition:
+    opacity 200ms var(--ease-out),
+    translate 200ms var(--ease-out);
+
+  @starting-style {
+    opacity: 0;
+    translate: 0 0.375rem;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition-property: opacity;
+
+    @starting-style {
+      translate: none;
+    }
+  }
+}
+
 @utility backdrop-motion {
   transition: opacity 150ms var(--ease-out);
 

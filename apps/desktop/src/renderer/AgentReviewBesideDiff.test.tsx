@@ -145,7 +145,7 @@ for (const accepted of [true, false])
     await f.user.type(composer, "Is this blocking?{Enter}")
 
     expect(composer.value).toBe("Is this blocking?")
-    expect(composer.disabled).toBe(true)
+    expect(composer.readOnly).toBe(true)
     const send = screen.getByRole<HTMLButtonElement>("button", { name: "Send" })
     expect(send.disabled).toBe(true)
     await f.user.click(send)
@@ -164,7 +164,7 @@ for (const accepted of [true, false])
     })
 
     await eventually(() => {
-      expect(composer.disabled).toBe(false)
+      expect(composer.readOnly).toBe(false)
       expect(composer.value).toBe(accepted ? "" : "Is this blocking?")
     })
 
@@ -193,10 +193,7 @@ it("prevents Retry and Send from overlapping while a retry is being accepted", a
   await f.user.click(screen.getByRole("button", { name: "Retry" }))
 
   expect(screen.queryByRole("button", { name: "Retry" })).toBeNull()
-  expect(screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Follow up" }).disabled).toBe(
-    true,
-  )
-  await f.user.keyboard("{Enter}")
+  await f.user.type(screen.getByRole("textbox", { name: "Follow up" }), "Meanwhile{Enter}")
   expect(f.followUp).toHaveBeenCalledOnce()
 
   await act(async () => {
@@ -212,6 +209,7 @@ it("adds a suggested Draft as the user edited it", async () => {
 
   await readBesideTheDiff(f)
   const suggested = screen.getByRole("region", { name: "Suggested draft on greet.ts line +2" })
+  await f.user.click(within(suggested).getByRole("button", { name: "Edit" }))
   const body = within(suggested).getByRole("textbox")
   await f.user.clear(body)
   await f.user.type(body, "Do callers still match?")

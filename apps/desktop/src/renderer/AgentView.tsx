@@ -649,6 +649,7 @@ function Composer(props: {
       <MessageBox
         composed={composed}
         setComposed={setComposed}
+        label="Message"
         placeholder={composerPlaceholder(running, canSteer, waiting)}
         blocked={sent.waiting || steered.waiting || waiting !== undefined}
         problem={

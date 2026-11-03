@@ -93,7 +93,11 @@ const insertMention = (message: string, { start, caret }: Picking, toDo: ToDo): 
   return { text: message.slice(0, start) + spaced + after, caret: start + link.length + 1 }
 }
 
-export function useMentionPicker(message: string, setMessage: (message: string) => void) {
+export function useMentionPicker(
+  message: string,
+  setMessage: (message: string) => void,
+  enabled: boolean,
+) {
   const ref = useRef<HTMLTextAreaElement>(null)
   const id = useId()
   const [measured, setMeasured] = useState<CaretInText>({ text: "", caret: 0 })
@@ -101,7 +105,10 @@ export function useMentionPicker(message: string, setMessage: (message: string) 
   const [dismissedThroughTrigger, setDismissedThroughTrigger] = useState<string | null>(null)
   const nextCaret = useRef<number | null>(null)
   const openToDos = Option.getOrElse(AsyncResult.value(useAtomValue(openToDosAtom)), () => [])
-  const open = picking(message, measured, dismissedThroughTrigger, openToDos, highlighted)
+
+  const open = enabled
+    ? picking(message, measured, dismissedThroughTrigger, openToDos, highlighted)
+    : null
 
   useLayoutEffect(() => {
     if (nextCaret.current === null) return

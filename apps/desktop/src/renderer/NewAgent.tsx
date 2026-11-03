@@ -401,6 +401,7 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
       <MessageBox
         composed={composed}
         setComposed={(update) => setWritten(update(composed))}
+        label="Message"
         placeholder="What should the Agent do?"
         blocked={created.waiting || baseBranch === null || awaitingModels}
         problem={settledProblem(created) ?? settledProblem(branches) ?? folder.problem}
