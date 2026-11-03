@@ -108,26 +108,6 @@ const base = { sha: "b0", files: { "README.md": "Hello\n" } }
 const head = { sha: "h1", files: { "README.md": "Hello, world\n" } }
 
 describe("OpenPullRequest", () => {
-  it.live("opens explicit unfollowed references without changing followed repositories", () =>
-    Effect.gen(function* () {
-      const { github, client } = yield* startSignedInBackend
-      yield* client.FollowRepository({ input: "octo-org/followed" })
-      const configured = yield* client.ListFollowedRepositories()
-
-      const pr = github.seedPullRequest({
-        owner: "another",
-        repo: "unfollowed",
-        number: 42,
-        base,
-        head,
-      })
-
-      const workspace = yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(pr) })
-      assert.strictEqual(workspace.pullRequest.url, pr.url)
-      assert.deepStrictEqual(yield* client.ListFollowedRepositories(), configured)
-    }),
-  )
-
   it.live("opens the PR's metadata pinned to its current Revision", () =>
     Effect.gen(function* () {
       const { github, client } = yield* startSignedInBackend

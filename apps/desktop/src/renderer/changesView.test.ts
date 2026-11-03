@@ -178,12 +178,18 @@ describe("collapsed", () => {
 })
 
 describe("inHunk", () => {
-  const { fileDiff } = layOut([changedFile("a.ts")]).files[0]!
+  const { fileDiff } = layOut([
+    changedFile("a.ts", TextPatch.make({ hunks: "@@ -10,2 +20,3 @@\n a\n-b\n+B\n+C" })),
+  ]).files[0]!
 
-  it("takes lines inside the diff's hunks only", () => {
-    expect(inHunk(fileDiff, "new", 2)).toBe(true)
-    expect(inHunk(fileDiff, "old", 3)).toBe(true)
-    expect(inHunk(fileDiff, "new", 4)).toBe(false)
+  it.each([
+    ["old", 10, 11],
+    ["new", 20, 22],
+  ] as const)("takes only lines in the %s side's hunks", (side, start, end) => {
+    expect(inHunk(fileDiff, side, start - 1)).toBe(false)
+    expect(inHunk(fileDiff, side, start)).toBe(true)
+    expect(inHunk(fileDiff, side, end)).toBe(true)
+    expect(inHunk(fileDiff, side, end + 1)).toBe(false)
   })
 })
 
