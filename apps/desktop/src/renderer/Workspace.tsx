@@ -80,13 +80,7 @@ import { useTour } from "./useTour"
 import { useAgentReview } from "./useAgentReview"
 import { positionOf } from "./reviewPosition"
 import { rememberPlace } from "./savedPlace"
-import {
-  OutdatedTourBanner,
-  RewriteTour,
-  TourCard,
-  TourSidebar,
-  useTourReadyToast,
-} from "./TourSidebar"
+import { OutdatedTourFlag, TourCard, TourSidebar, useTourReadyToast } from "./TourSidebar"
 
 const wideWorkspaceQuery = "(min-width: 1024px)"
 
@@ -458,10 +452,6 @@ export function Workspace(props: {
                 tour={tour}
                 reading={reading}
                 viewedFiles={props.viewedFiles}
-                outdatedBanner={
-                  !tourInChanges &&
-                  tour.outdated !== null && <OutdatedTourBanner revision={tour.outdated} />
-                }
                 onShowChapter={openChapter}
               />
             </TabsContent>
@@ -534,16 +524,12 @@ export function Workspace(props: {
             tourOrder={reading === null ? null : { current: chosenOrder, onChange: showOrder }}
             fullScreen={tourInChanges ? { on: fullScreen, onChange: setFullScreen } : null}
             agentReview={<AgentReviewButton controls={agentReview} onRead={readAgentReview} />}
+            outdatedTour={
+              tourInChanges &&
+              tour.outdated !== null && <OutdatedTourFlag revision={tour.outdated} tour={tour} />
+            }
           />
           <AgentReviewBanner controls={agentReview} onRead={readAgentReview} />
-          {tourInChanges && tour.outdated !== null && (
-            <div className="border-b px-6 py-3">
-              <OutdatedTourBanner
-                revision={tour.outdated}
-                action={<RewriteTour tour={tour} variant="outline" />}
-              />
-            </div>
-          )}
           {tourShown !== null ? (
             <TourView
               key={revisionKey}
