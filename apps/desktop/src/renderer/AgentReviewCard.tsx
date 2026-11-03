@@ -120,10 +120,13 @@ function AgentReviewLead(props: { review: AgentReview; onRead: () => void }) {
         markdown={leadOf(props.review.markdown)}
         className="min-w-0 flex-1 basis-64"
       />
-      <Button size="sm" variant="outline" onClick={props.onRead}>
-        <PanelLeft aria-hidden />
-        Read beside the diff
-      </Button>
+      {/* One line box of the lead's text, so the taller button centers on its first line. */}
+      <div className="flex h-[1lh] items-center text-sm leading-relaxed">
+        <Button size="sm" variant="outline" onClick={props.onRead}>
+          <PanelLeft aria-hidden />
+          Read beside the diff
+        </Button>
+      </div>
     </div>
   )
 }
