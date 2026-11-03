@@ -148,7 +148,6 @@ export const fakeModelProvider = Effect.fnUntraced(function* (
   let settings = initial
   const calls: Array<typeof request.Type> = []
   const received = counter()
-  const cancelled = counter()
   const hung: Array<{ readonly input: FakeModelRequest; readonly res: ServerResponse }> = []
 
   const reply = (current: FakeModelSettings, input: FakeModelRequest, res: ServerResponse) => {
@@ -193,7 +192,6 @@ export const fakeModelProvider = Effect.fnUntraced(function* (
     res.flushHeaders()
 
     if (current.hang) {
-      res.on("close", cancelled.add)
       hung.push({ input, res })
 
       return
@@ -269,7 +267,6 @@ export const fakeModelProvider = Effect.fnUntraced(function* (
     url,
     calls,
     received: received.reached,
-    cancelled: cancelled.reached,
     configure: (next: FakeModelSettings) =>
       Effect.sync(() => {
         settings = next
@@ -279,7 +276,6 @@ export const fakeModelProvider = Effect.fnUntraced(function* (
         settings = next
 
         for (const { input, res } of hung.splice(0)) {
-          res.off("close", cancelled.add)
           reply(next, input, res)
         }
       }),

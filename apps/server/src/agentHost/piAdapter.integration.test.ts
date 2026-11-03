@@ -69,7 +69,9 @@ it.live("streams thinking, tool calls, and text into a Turn that ends done once 
     const [turn] = yield* f.until(settled(1))
 
     assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
-    assert.equal(turn?.parts[0]?._tag, "Thinking")
+    const thinking = turn?.parts[0]
+    assert.ok(Predicate.isTagged(thinking, "Thinking"))
+    assert.isNotEmpty(thinking.text)
     assert.deepInclude(
       turn?.parts.map((part) =>
         Predicate.isTagged(part, "ToolCall")
@@ -84,6 +86,14 @@ it.live("streams thinking, tool calls, and text into a Turn that ends done once 
       { name: "bash", summary: "echo hi", output: "hi", status: "done" },
     )
     assert.deepStrictEqual(lastText(turn), TextPart.make({ text: "It says hi." }))
+    const textIndex = turn?.parts.findLastIndex((part) => Predicate.isTagged(part, "Text"))
+
+    for (const index of [0, textIndex])
+      assert.ok(
+        f.events.some(
+          (event) => Predicate.isTagged(event, "PartAppended") && event.index === index,
+        ),
+      )
   }).pipe(Effect.scoped),
 )
 
@@ -280,7 +290,7 @@ it.live(
 )
 
 it.live(
-  "starts a pi Agent on the chosen model and effort, and changes them for the next Turn",
+  "starts a pi Agent on the chosen model and effort, and clears the effort for the next Turn",
   () =>
     Effect.gen(function* () {
       const f = yield* piSession("pi-model-change")

@@ -125,12 +125,14 @@ const tryMatch = (recorded: Json, actual: Json, ids: Map<string, string>) => {
 }
 
 const personal =
-  /email|organization|account|subscription|rate_limit_info|username|team[_-]?id|(?:access|refresh|auth)[_-]?token|api[_-]?key/i
+  /email|organization|account|subscription|rate_limit_info|username|team[_-]?id|(?:access|refresh|auth)[_-]?token|api[_-]?key|^sections$/i
 
 export const blankPersonal = (value: Json, field = "", usage = false): Json => {
   if (personal.test(field)) return "<redacted>"
 
-  const metric = usage || /usage|cost|tokens/i.test(field)
+  const metric =
+    usage ||
+    /usage|^total_cost_usd$|^estimated_tokens(?:_delta)?$|^first_request_input_tokens$/i.test(field)
 
   return Predicate.isNumber(value) && metric
     ? 0
