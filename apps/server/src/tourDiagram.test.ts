@@ -149,7 +149,7 @@ it("rejects targets outside the Chapter and files without a text patch", () => {
 
 it.each([
   ["missing node", [{ from: "receive", to: "missing", change: "added" }]],
-  ["self connection", [{ from: "receive", to: "receive", change: "added" }]],
+  ["self connection", [diagram.edges[0]!, { from: "receive", to: "receive", change: "added" }]],
   ["duplicate connection", [diagram.edges[0]!, diagram.edges[0]!]],
 ] as const)("rejects an invalid graph: %s", (_, edges) => {
   expect(validateTourDiagram({ ...diagram, edges }, chapter, [file])).toBeNull()
@@ -157,7 +157,7 @@ it.each([
 
 it("rejects duplicate node ids and disconnected nodes", () => {
   expect(
-    validateTourDiagram({ ...diagram, nodes: [diagram.nodes[0]!, diagram.nodes[0]!] }, chapter, [
+    validateTourDiagram({ ...diagram, nodes: [...diagram.nodes, diagram.nodes[0]!] }, chapter, [
       file,
     ]),
   ).toBeNull()
