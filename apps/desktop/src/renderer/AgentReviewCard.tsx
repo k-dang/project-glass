@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Item, ItemActions, ItemContent, ItemDescription } from "@/components/ui/item"
-import { failureOf, ReviewAgain, ReviewingLine } from "./AgentReview"
+import { failureOf, ReviewAgain, ReviewingLine, WaitingLine } from "./AgentReview"
 import { AgentReviewMarkdown } from "./AgentReviewPanel"
 import { OutdatedNote } from "./OutdatedNote"
 import { ProblemAlert } from "./ProblemAlert"
@@ -52,6 +52,8 @@ function AgentReviewStatus(props: { controls: AgentReviewControls }) {
         action={{ label: "Reconnect", run: controls.reconnect }}
       />
     )
+
+  if (job?.status === "waiting") return <WaitingLine controls={controls} size="sm" />
 
   const reviewing = job?.status === "reviewing" ? job : null
   const failure = failureOf(controls)

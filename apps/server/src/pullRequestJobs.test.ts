@@ -5,12 +5,19 @@ import { pullRequestJobs } from "./pullRequestJobs"
 
 const pr = new PullRequestRef({ owner: "octo-org", repo: "hello-world", number: 1 })
 
+const noBackground = {
+  backgroundSlots: 1,
+  needsBackground: () => false,
+  waiting: (state: string) => state,
+}
+
 it.live("replaces work that waits to commit while the replacement holds the lock", () =>
   Effect.gen(function* () {
     const jobs = yield* pullRequestJobs({
       load: () => Effect.succeed("idle"),
       inProgress: (state) => state === "running",
       idle: () => "idle",
+      ...noBackground,
     })
 
     const job = yield* jobs.jobFor(pr)
@@ -46,6 +53,7 @@ it.live("logs the full unexpected defect before settling the job to a safe failu
         load: () => Effect.succeed("running"),
         inProgress: (state: string) => state === "running",
         idle: () => "idle",
+        ...noBackground,
       })
 
       const job = yield* jobs.jobFor(pr)

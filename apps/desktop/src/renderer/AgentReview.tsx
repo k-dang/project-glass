@@ -1,5 +1,5 @@
 import { cn } from "cn"
-import { LoaderCircle, ScanSearch, TriangleAlert } from "lucide-react"
+import { Clock, LoaderCircle, ScanSearch, TriangleAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Elapsed } from "./Elapsed"
 import { ProblemAlert, withCode } from "./ProblemAlert"
@@ -79,6 +79,35 @@ export function ReviewingLine(props: {
   )
 }
 
+/** An Agent review the Queue started, waiting for another to finish. */
+export function WaitingLine(props: {
+  controls: AgentReviewControls
+  size: "xs" | "sm"
+  className?: string
+}) {
+  const { start, cancel } = props.controls
+
+  return (
+    <output
+      aria-label="Agent review"
+      className={cn("flex items-center gap-2 text-sm", props.className)}
+    >
+      <Clock aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+      <span className="font-medium">Agent review waiting…</span>
+      <span className="text-muted-foreground">Starts when another queued review finishes.</span>
+      <span className="flex-1" />
+      {start !== null && (
+        <Button variant="outline" size={props.size} onClick={start}>
+          Review now
+        </Button>
+      )}
+      <Button variant="outline" size={props.size} onClick={cancel}>
+        Cancel
+      </Button>
+    </output>
+  )
+}
+
 export function ReviewAgain(props: { controls: AgentReviewControls; size: "xs" | "sm" }) {
   const { start } = props.controls
 
@@ -103,6 +132,9 @@ export function AgentReviewBanner(props: { controls: AgentReviewControls; onRead
         />
       </div>
     )
+
+  if (job?.status === "waiting")
+    return <WaitingLine controls={props.controls} size="xs" className="border-b px-6 py-1.5" />
 
   if (job?.status === "reviewing")
     return (

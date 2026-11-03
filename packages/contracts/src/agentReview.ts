@@ -57,6 +57,8 @@ export const AgentReviewState = Schema.Struct({
   review: Schema.NullOr(AgentReview),
   job: Schema.Union([
     Schema.Struct({ status: Schema.Literal("idle") }),
+    /** Queued behind other Agent reviews the Queue started. */
+    Schema.Struct({ status: Schema.Literal("waiting") }),
     Schema.Struct({
       status: Schema.Literal("reviewing"),
       startedAt: Schema.Number,

@@ -27,6 +27,7 @@ describe("settings file", () => {
         queueTours: false,
         agentReviewModels: defaultModels,
         agentReviewEngine: "pi",
+        queueAgentReviews: false,
         reviewPrompt: defaultReviewPrompt,
       })
     }),
@@ -58,6 +59,7 @@ describe("settings file", () => {
         queueTours: true,
         agentReviewModels: defaultModels,
         agentReviewEngine: "pi",
+        queueAgentReviews: false,
         reviewPrompt: defaultReviewPrompt,
       })
     }),

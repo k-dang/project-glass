@@ -7,17 +7,7 @@ import {
   TourFailure,
   type TourState,
 } from "@glass/contracts"
-import {
-  Context,
-  DateTime,
-  Effect,
-  Layer,
-  Option,
-  Schema,
-  Semaphore,
-  Stream,
-  SubscriptionRef,
-} from "effect"
+import { Context, DateTime, Effect, Layer, Option, Schema, Stream, SubscriptionRef } from "effect"
 import { SqlClient } from "effect/sql"
 import { GitHubClient } from "./github/GitHubClient"
 import { pullRequestJobs, type PullRequestJob } from "./pullRequestJobs"
@@ -46,8 +36,6 @@ const stored = Schema.Array(
     content: Schema.fromJsonString(content),
   }),
 )
-
-const needsTour = ({ tour, job }: TourState) => tour === null && job.status === "idle"
 
 const setJob = (job: Job, status: TourState["job"]) =>
   SubscriptionRef.update(job.state, ({ tour }) => ({ tour, job: status }))
@@ -96,7 +84,7 @@ export class Tours extends Context.Service<
       pr: PullRequestRef,
       revision: Revision,
     ) => Effect.Effect<void, TourFailure>
-    readonly cancel: (pr: PullRequestRef) => Effect.Effect<void, TourFailure>
+    readonly cancel: (pr: PullRequestRef) => Effect.Effect<void>
     readonly cancelBackground: () => Effect.Effect<void>
     readonly watch: (pr: PullRequestRef) => Stream.Stream<TourState, TourFailure>
   }
@@ -109,7 +97,6 @@ export class Tours extends Context.Service<
       const config = yield* ServerConfig
       const settings = yield* SettingsStore
       const runners = yield* AgentRunners
-      const backgroundSlots = yield* Semaphore.make(BACKGROUND_SLOTS)
 
       const engineSettings = settings.read().pipe(
         Effect.map((current) => engineSettingsOf(current, "tours")),
@@ -144,6 +131,9 @@ export class Tours extends Context.Service<
         load,
         inProgress: ({ job }) => job.status === "writing" || job.status === "waiting",
         idle: ({ tour }) => ({ tour, job: { status: "idle" } }),
+        backgroundSlots: BACKGROUND_SLOTS,
+        needsBackground: ({ tour, job }) => tour === null && job.status === "idle",
+        waiting: ({ tour }) => ({ tour, job: { status: "waiting" } }),
       })
 
       const markWriting = Effect.fnUntraced(function* (job: Job) {
@@ -256,38 +246,16 @@ export class Tours extends Context.Service<
         pr: PullRequestRef,
         revision: Revision,
       ) {
-        const job = yield* jobs.jobFor(pr)
-
-        yield* jobs.begin(job, (replace) =>
-          Effect.gen(function* () {
-            if (!needsTour(yield* SubscriptionRef.get(job.state))) return
-
-            yield* setJob(job, { status: "waiting" })
-
-            const writeInSlot = backgroundSlots.withPermits(1)(
-              markWriting(job).pipe(
-                Effect.flatMap((startedAt) => work(job, pr, revision, startedAt)),
-              ),
-            )
-
-            yield* replace(writeInSlot, true)
-          }),
+        yield* jobs.startInBackground(pr, (job) =>
+          markWriting(job).pipe(Effect.flatMap((startedAt) => work(job, pr, revision, startedAt))),
         )
-      })
-
-      const cancel = Effect.fn("Tours.cancel")(function* (pr: PullRequestRef) {
-        yield* jobs.stop(yield* jobs.jobFor(pr))
-      })
-
-      const cancelBackground = Effect.fn("Tours.cancelBackground")(function* () {
-        yield* jobs.stopBackground()
       })
 
       return Tours.of({
         write,
         writeInBackground,
-        cancel,
-        cancelBackground,
+        cancel: jobs.stop,
+        cancelBackground: jobs.stopBackground,
         watch: jobs.watch,
       })
     }),

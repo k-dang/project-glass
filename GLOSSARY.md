@@ -40,11 +40,12 @@ A PR can appear in both Reviewing and Needs review.
 
 **Queue**:
 The pull requests the user has added to review next, from any repository, kept on this device in the
-order added. When the user turns on Tours for the Queue in Settings, Glass writes a Tour for each
-open PR that joins it, a few at a time, and leaves that Tour outdated rather than rewriting it after new
-commits; turning them off cancels the ones still being written. A PR leaves the Queue when the user
-removes it or submits a Review on it, which cancels a Tour still being written. It sits beside the
-PR lists in Reviews but is not one of them.
+order added. When the user turns on Tours or Agent reviews for the Queue in Settings, Glass writes
+a Tour or runs an Agent review for each open PR that joins it without one: Tours a few at a time,
+Agent reviews one at a time. It leaves them outdated rather than redoing them after new commits;
+turning either off cancels the ones still in progress. A PR leaves the Queue when the user removes
+it or submits a Review on it, which cancels its Tour or Agent review still in progress. It sits
+beside the PR lists in Reviews but is not one of them.
 _Avoid_: Batch, backlog, review list
 
 **PR workspace**:

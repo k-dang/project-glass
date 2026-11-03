@@ -70,7 +70,7 @@ const fixture = Effect.fnUntraced(function* ({ queueTours = true } = {}) {
     Effect.provideService(Scope.Scope, serverScope),
   )
 
-  if (queueTours) yield* client.SetQueueTours({ enabled: true })
+  if (queueTours) yield* client.SetQueueWork({ feature: "tours", enabled: true })
 
   return {
     runners,
@@ -101,10 +101,10 @@ it.live(
       const before = f.seed("Greet")
       yield* f.client.AddToQueue({ references: [ref(before)] })
 
-      assert.isFalse(yield* f.client.GetQueueTours())
+      assert.isFalse(yield* f.client.GetQueueWork({ feature: "tours" }))
       assert.deepStrictEqual(yield* tourState(f.client, before), idle)
 
-      yield* f.client.SetQueueTours({ enabled: true })
+      yield* f.client.SetQueueWork({ feature: "tours", enabled: true })
       const after = f.seed("Wave")
       yield* f.client.AddToQueue({ references: [ref(after)] })
 
@@ -126,7 +126,7 @@ it.live("turning Tours off cancels the Queue's Tours but not one the user starte
     })
     yield* f.runners.ran(3)
 
-    yield* f.client.SetQueueTours({ enabled: false })
+    yield* f.client.SetQueueWork({ feature: "tours", enabled: false })
 
     for (const pr of queued) assert.deepStrictEqual(yield* tourState(f.client, pr), idle)
 

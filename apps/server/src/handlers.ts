@@ -57,8 +57,8 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
         settings
           .update((current) => withEngineSettings(current, feature, engineSettings))
           .pipe(Effect.map((updated) => engineSettingsOf(updated, feature))),
-      GetQueueTours: () => queue.toursEnabled(),
-      SetQueueTours: ({ enabled }) => queue.setToursEnabled(enabled),
+      GetQueueWork: ({ feature }) => queue.enabled(feature),
+      SetQueueWork: ({ feature, enabled }) => queue.setEnabled(feature, enabled),
       ListFollowedRepositories: () => repositories.list(),
       FollowRepository: ({ input }) => repositories.follow(input),
       UnfollowRepository: ({ repository }) => repositories.unfollow(repository),

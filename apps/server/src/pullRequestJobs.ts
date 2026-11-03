@@ -20,10 +20,17 @@ export const pullRequestJobs = Effect.fnUntraced(function* <S, E>(options: {
   readonly load: (pr: PullRequestRef) => Effect.Effect<S, E>
   readonly inProgress: (state: S) => boolean
   readonly idle: (state: S) => S
+  /** How many background jobs run at once; the rest wait for a slot. */
+  readonly backgroundSlots: number
+  /** Whether a background job should start from this state. */
+  readonly needsBackground: (state: S) => boolean
+  /** The state of a background job waiting for a slot; `inProgress` must count it. */
+  readonly waiting: (state: S) => S
 }) {
   const scope = yield* Scope.Scope
   const jobs = new Map<string, PullRequestJob<S>>()
   const jobsLock = yield* Semaphore.make(1)
+  const backgroundSlots = yield* Semaphore.make(options.backgroundSlots)
 
   const jobFor = Effect.fnUntraced(function* (pr: PullRequestRef) {
     const key = referenceKey(pr)
@@ -97,6 +104,31 @@ export const pullRequestJobs = Effect.fnUntraced(function* <S, E>(options: {
         ),
       )
 
+  /** Starts `run` in a background slot unless the PR's state says it isn't needed. */
+  const startInBackground = Effect.fnUntraced(function* (
+    pr: PullRequestRef,
+    run: (job: PullRequestJob<S>) => Effect.Effect<void>,
+  ) {
+    const job = yield* jobFor(pr)
+
+    yield* locked(
+      job,
+      Effect.gen(function* () {
+        if (!options.needsBackground(yield* SubscriptionRef.get(job.state))) return
+
+        yield* SubscriptionRef.update(job.state, options.waiting)
+        yield* replace(job, backgroundSlots.withPermits(1)(run(job)), true)
+      }),
+    )
+  })
+
+  /** Stops the PR's job, if one is in memory: without one, nothing is running. */
+  const stop = (pr: PullRequestRef) => {
+    const job = jobs.get(referenceKey(pr))
+
+    return job === undefined ? Effect.void : stopJob(job, false)
+  }
+
   const watch = (pr: PullRequestRef) =>
     Stream.unwrap(jobFor(pr).pipe(Effect.map((job) => SubscriptionRef.changes(job.state))))
 
@@ -113,7 +145,8 @@ export const pullRequestJobs = Effect.fnUntraced(function* <S, E>(options: {
         job,
         Effect.suspend(() => next((work, background) => replace(job, work, background))),
       ),
-    stop: (job: PullRequestJob<S>) => stopJob(job, false),
+    startInBackground,
+    stop,
     stopBackground: () =>
       Effect.forEach([...jobs.values()], (job) => stopJob(job, true), {
         concurrency: "unbounded",

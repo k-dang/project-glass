@@ -23,6 +23,7 @@ import {
   Revision,
   noListings,
   ToDoDone,
+  type EngineFeature,
   type EngineSettings,
 } from "@glass/contracts"
 import { RegistryProvider } from "@effect/atom-react"
@@ -105,8 +106,8 @@ afterEach(() => {
 })
 
 it("turns Tours for the Queue on from Settings, and back off if saving fails", async () => {
-  const saves: Array<Held<{ enabled: boolean }, void, SettingsError>> = []
-  const user = mount({ SetQueueTours: hold(saves) })
+  const saves: Array<Held<{ feature: EngineFeature; enabled: boolean }, void, SettingsError>> = []
+  const user = mount({ SetQueueWork: hold(saves) })
   await user.click(await screen.findByRole("link", { name: "Follow repositories" }))
   const tours = within(await screen.findByRole("region", { name: "Tours" }))
   const toggle = tours.getByRole("switch", { name: "Tours for the Queue" })
@@ -115,7 +116,7 @@ it("turns Tours for the Queue on from Settings, and back off if saving fails", a
   await user.click(toggle)
   expect(toggle.getAttribute("aria-checked")).toBe("true")
   const saving = await next(saves)
-  expect(saving.payload.enabled).toBe(true)
+  expect(saving.payload).toEqual({ feature: "tours", enabled: true })
   saving.answer(Effect.fail(new SettingsError({ message: "Couldn't save settings." })))
 
   await waitFor(() => expect(toggle.getAttribute("aria-checked")).toBe("false"))

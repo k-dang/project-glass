@@ -31,7 +31,7 @@ import {
   savedQueueAtom,
   watchedQueueAtom,
 } from "./queue"
-import { QueueTourStatus } from "./QueueTourStatus"
+import { QueueWorkStatus } from "./QueueWorkStatus"
 
 export function QueueTabTrigger() {
   const saved = useAtomValue(watchedQueueAtom)
@@ -136,7 +136,7 @@ function QueueRow(props: {
             </span>
           )
         }
-        lead={<QueueTourStatus queued={props.queued} />}
+        lead={<QueueWorkStatus queued={props.queued} />}
       />
       <Button
         variant="ghost"

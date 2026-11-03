@@ -14,7 +14,7 @@ export const tourStates = Atom.family((pullRequest: PullRequestRef) =>
   ),
 )
 
-export const isOutdated = (tour: Tour, revision: Revision) => !Equal.equals(tour.revision, revision)
+const isOutdated = (tour: Tour, revision: Revision) => !Equal.equals(tour.revision, revision)
 
 export const useTour = (pullRequest: PullRequestRef, revision: Revision) => {
   const stateAtom = tourStates(pullRequest)

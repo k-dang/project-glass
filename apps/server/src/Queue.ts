@@ -1,5 +1,6 @@
 import {
   type ConnectionError,
+  EngineFeature,
   GitHubUnavailable,
   type PullRequestRef,
   PullRequestState,
@@ -13,9 +14,10 @@ import {
 } from "@glass/contracts"
 import { Context, DateTime, Effect, Layer, Schema, Semaphore } from "effect"
 import { SqlClient } from "effect/sql"
+import { AgentReviews } from "./AgentReviews"
 import { GitHubClient } from "./github/GitHubClient"
 import type { LookedUpPullRequest } from "./github/queuedPullRequests"
-import { SettingsStore } from "./SettingsStore"
+import { queueWorkOf, SettingsStore, withQueueWork } from "./SettingsStore"
 import { Tours } from "./Tours"
 
 const decodeRows = Schema.decodeUnknownEffect(
@@ -49,7 +51,18 @@ const keyOf = (queued: QueuedPullRequest) => referenceKey(queued.pullRequest.ref
 
 type Saved = Omit<LookedUpPullRequest, "revision"> & { readonly revision: Revision | null }
 
-type TourCandidate = Pick<QueuedPullRequest, "pullRequest" | "state" | "revision" | "problem">
+type Candidate = Pick<QueuedPullRequest, "pullRequest" | "state" | "revision" | "problem">
+
+/**
+ * One kind of agent work the Queue starts in the background, when its setting is on. Whether a PR
+ * needs it is the feature's own call, made inside `start`.
+ */
+interface QueueWork {
+  readonly subject: string
+  readonly start: (pr: PullRequestRef, revision: Revision) => Effect.Effect<void, unknown>
+  readonly cancel: (pr: PullRequestRef) => Effect.Effect<void>
+  readonly cancelBackground: () => Effect.Effect<void>
+}
 
 export class Queue extends Context.Service<
   Queue,
@@ -65,8 +78,11 @@ export class Queue extends Context.Service<
     readonly restore: (queued: QueuedPullRequest) => Effect.Effect<void, QueueError>
     readonly opened: (reference: PullRequestRef) => Effect.Effect<void>
     readonly reviewed: (pullRequestId: string) => Effect.Effect<void>
-    readonly toursEnabled: () => Effect.Effect<boolean, SettingsError>
-    readonly setToursEnabled: (enabled: boolean) => Effect.Effect<void, SettingsError>
+    readonly enabled: (feature: EngineFeature) => Effect.Effect<boolean, SettingsError>
+    readonly setEnabled: (
+      feature: EngineFeature,
+      enabled: boolean,
+    ) => Effect.Effect<void, SettingsError>
   }
 >()("@glass/server/Queue") {
   static readonly layer = Layer.effect(
@@ -75,9 +91,10 @@ export class Queue extends Context.Service<
       const sql = yield* SqlClient.SqlClient
       const github = yield* GitHubClient
       const tours = yield* Tours
+      const agentReviews = yield* AgentReviews
       const settings = yield* SettingsStore
-      // Starting Tours and turning them off take turns, so none starts after they're off.
-      const toursLock = yield* Semaphore.make(1)
+      // Starting work and turning it off take turns, so none starts after it's off.
+      const workLock = yield* Semaphore.make(1)
       const now = DateTime.now.pipe(Effect.map(DateTime.formatIso))
 
       const read = Effect.gen(function* () {
@@ -112,36 +129,58 @@ export class Queue extends Context.Service<
         Effect.logWarning("Couldn't save the Queue", cause),
       )
 
-      const toursEnabled = () => settings.read().pipe(Effect.map(({ queueTours }) => queueTours))
+      const work: Record<EngineFeature, QueueWork> = {
+        tours: {
+          subject: "Tour",
+          start: tours.writeInBackground,
+          cancel: tours.cancel,
+          cancelBackground: tours.cancelBackground,
+        },
+        agentReviews: {
+          subject: "Agent review",
+          start: agentReviews.startInBackground,
+          cancel: agentReviews.cancel,
+          cancelBackground: agentReviews.cancelBackground,
+        },
+      }
 
-      const startTour = ({ pullRequest, state, revision, problem }: TourCandidate) =>
-        problem !== null || revision === null || state === "merged" || state === "closed"
-          ? Effect.void
-          : tours
-              .writeInBackground(pullRequest.ref, revision)
-              .pipe(
-                Effect.catch((cause) =>
-                  Effect.logWarning("Couldn't start a Tour for a queued PR", cause),
-                ),
-              )
+      const enabled = (feature: EngineFeature) =>
+        settings.read().pipe(Effect.map((saved) => queueWorkOf(saved, feature)))
 
-      const startTours = (candidates: ReadonlyArray<TourCandidate>) =>
-        toursEnabled().pipe(
-          Effect.flatMap((enabled) =>
-            enabled ? Effect.forEach(candidates, startTour, { discard: true }) : Effect.void,
-          ),
-          Effect.catch((cause) => Effect.logWarning("Couldn't start Tours for the Queue", cause)),
-          toursLock.withPermits(1),
+      const startWork = (candidates: ReadonlyArray<Candidate>) =>
+        Effect.gen(function* () {
+          const saved = yield* settings.read()
+          const turnedOn = EngineFeature.literals.filter((feature) => queueWorkOf(saved, feature))
+
+          for (const { pullRequest, state, revision, problem } of candidates) {
+            if (problem !== null || revision === null || state === "merged" || state === "closed")
+              continue
+
+            yield* Effect.forEach(
+              turnedOn,
+              (feature) =>
+                work[feature]
+                  .start(pullRequest.ref, revision)
+                  .pipe(
+                    Effect.catch((cause) =>
+                      Effect.logWarning(
+                        `Couldn't start a ${work[feature].subject} for a queued PR`,
+                        cause,
+                      ),
+                    ),
+                  ),
+              { discard: true },
+            )
+          }
+        }).pipe(
+          Effect.catch((cause) => Effect.logWarning("Couldn't start work for the Queue", cause)),
+          workLock.withPermits(1),
         )
 
-      const cancelTour = (ref: PullRequestRef) =>
-        tours
-          .cancel(ref)
-          .pipe(
-            Effect.catch((cause) =>
-              Effect.logWarning("Couldn't cancel the Tour of a PR leaving the Queue", cause),
-            ),
-          )
+      const cancelWork = (ref: PullRequestRef) =>
+        Effect.forEach(EngineFeature.literals, (feature) => work[feature].cancel(ref), {
+          discard: true,
+        })
 
       const insert = Effect.fnUntraced(function* (
         queuedAt: DateTime.Utc,
@@ -240,7 +279,7 @@ export class Queue extends Context.Service<
           )
           .pipe(logSaveFailure, Effect.mapError(saveFailed))
 
-        yield* startTours(
+        yield* startWork(
           added.map(({ summary, state, revision }) => ({
             pullRequest: summary,
             state,
@@ -283,7 +322,7 @@ export class Queue extends Context.Service<
           Effect.mapError(saveFailed),
         )
 
-        if (removed !== null) yield* cancelTour(removed.pullRequest.ref)
+        if (removed !== null) yield* cancelWork(removed.pullRequest.ref)
 
         return removed
       })
@@ -302,7 +341,7 @@ export class Queue extends Context.Service<
           { openedAt, missing: queued.problem !== null },
         ).pipe(logSaveFailure, Effect.mapError(saveFailed))
 
-        yield* startTours([queued])
+        yield* startWork([queued])
       })
 
       const opened = Effect.fn("Queue.opened")(
@@ -326,7 +365,7 @@ export class Queue extends Context.Service<
           yield* Effect.forEach(
             rows,
             ({ summary }) =>
-              decodeSummary(summary).pipe(Effect.flatMap(({ ref }) => cancelTour(ref))),
+              decodeSummary(summary).pipe(Effect.flatMap(({ ref }) => cancelWork(ref))),
             { discard: true },
           )
         },
@@ -335,11 +374,14 @@ export class Queue extends Context.Service<
         ),
       )
 
-      const setToursEnabled = Effect.fn("Queue.setToursEnabled")(function* (enabled: boolean) {
-        yield* settings.update((current) => ({ ...current, queueTours: enabled }))
+      const setEnabled = Effect.fn("Queue.setEnabled")(function* (
+        feature: EngineFeature,
+        on: boolean,
+      ) {
+        yield* settings.update((current) => withQueueWork(current, feature, on))
 
-        if (!enabled) yield* tours.cancelBackground()
-      }, toursLock.withPermits(1))
+        if (!on) yield* work[feature].cancelBackground()
+      }, workLock.withPermits(1))
 
       return Queue.of({
         saved: () => read,
@@ -349,8 +391,8 @@ export class Queue extends Context.Service<
         restore,
         opened,
         reviewed,
-        toursEnabled,
-        setToursEnabled,
+        enabled,
+        setEnabled,
       })
     }),
   )
