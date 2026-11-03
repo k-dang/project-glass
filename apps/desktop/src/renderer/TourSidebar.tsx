@@ -18,7 +18,6 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Item, ItemContent, ItemMedia, ItemTitle } from "@/components/ui/item"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { toast } from "@/components/ui/toast"
-import { TooltipHint } from "@/components/ui/tooltip"
 import { Elapsed } from "./Elapsed"
 import { ProblemAlert } from "./ProblemAlert"
 import { warningTone } from "./PullRequestRow"
@@ -79,15 +78,6 @@ function ChapterRow(props: {
   )
 }
 
-function OutdatedSentence(props: { revision: Revision }) {
-  return (
-    <>
-      Written for an older Revision (head <ShortSha sha={props.revision.head} />
-      ), so some Chapters may not match the diff.
-    </>
-  )
-}
-
 export function OutdatedTourFlag(props: { revision: Revision; tour: ReturnType<typeof useTour> }) {
   const [open, setOpen] = useState(false)
 
@@ -102,7 +92,8 @@ export function OutdatedTourFlag(props: { revision: Revision; tour: ReturnType<t
       </PopoverTrigger>
       <PopoverContent align="start">
         <p className="leading-relaxed break-words text-muted-foreground">
-          <OutdatedSentence revision={props.revision} />
+          Written for an older Revision (head <ShortSha sha={props.revision.head} />
+          ), so some Chapters may not match the diff.
         </p>
         <div className="flex justify-end">
           <RewriteTour tour={props.tour} variant="outline" />
@@ -337,12 +328,10 @@ export function TourSidebar(props: {
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               {tour.outdated !== null && (
                 <>
-                  <TooltipHint content={<OutdatedSentence revision={tour.outdated} />}>
-                    <span className={cn("flex items-center gap-1", warningTone)}>
-                      <TriangleAlert aria-hidden className="size-3.5" />
-                      Outdated
-                    </span>
-                  </TooltipHint>
+                  <span className={cn("flex items-center gap-1", warningTone)}>
+                    <TriangleAlert aria-hidden className="size-3.5" />
+                    Outdated
+                  </span>
                   <span aria-hidden>·</span>
                 </>
               )}

@@ -34,10 +34,7 @@ it("reads an outdated Tour against the files the PR has now", async () => {
   const f = mount(older)
   await f.user.click(await screen.findByRole("tab", { name: "Tour" }))
 
-  await f.user.hover(await within(sidebar()).findByText("Outdated"))
-  expect((await screen.findByRole("tooltip")).textContent).toContain(
-    "Written for an older Revision (head 0123456)",
-  )
+  expect(await within(sidebar()).findByText("Outdated")).toBeDefined()
   expect(within(sidebar()).getByText("Greet people by name.")).toBeDefined()
   expect(within(sidebar()).getAllByLabelText("0 of 1 files viewed")).toHaveLength(2)
   expect(
