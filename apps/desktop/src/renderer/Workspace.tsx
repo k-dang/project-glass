@@ -395,7 +395,11 @@ export function Workspace(props: {
           className={cn(
             // The Agent review is prose, so the panel widens while it shows.
             "flex shrink-0 flex-col border-r",
-            shownPanelTab === "agent-review" ? "w-[30rem]" : "w-80",
+            shownPanelTab === "agent-review"
+              ? "w-[30rem]"
+              : agentReview.review !== null
+                ? "w-[26rem]"
+                : "w-80",
             (!filePanelOpen || tab === "files" || tourInChanges) && "hidden",
           )}
         >
@@ -421,14 +425,9 @@ export function Workspace(props: {
                 Tour
               </TabsTrigger>
               {agentReview.review !== null && (
-                // Icon only: the panel is too narrow for a fourth labeled tab.
-                <TabsTrigger
-                  value="agent-review"
-                  aria-label="Agent review"
-                  title="Agent review"
-                  className="flex-none"
-                >
+                <TabsTrigger value="agent-review" className="flex-none">
                   <ScanSearch aria-hidden />
+                  Agent review
                 </TabsTrigger>
               )}
             </TabsList>
