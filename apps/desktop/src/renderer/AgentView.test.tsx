@@ -156,7 +156,22 @@ it("sends a message with Enter and clears the composer", async () => {
   await user.type(composer, "Add a test{Shift>}{Enter}{/Shift}for it{Enter}")
 
   expect(sent).toEqual(["Add a test\nfor it"])
-  expect(composer).toHaveProperty("value", "")
+  expect(composer).toHaveProperty("textContent", "")
+})
+
+it("sends Markdown and HTML exactly as written", async () => {
+  const sent: Array<string> = []
+
+  const user = mount({
+    WatchTranscript: () =>
+      Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
+    SendMessage: ({ message }) => Effect.sync(() => void sent.push(message)),
+  })
+
+  const composer = await screen.findByRole("textbox", { name: "Message" })
+  await user.type(composer, "Rename `foo_bar` in **<App>** *now*{Enter}")
+
+  expect(sent).toEqual(["Rename `foo_bar` in **<App>** *now*"])
 })
 
 it("keeps the hidden panel recoverable across Agent navigation", async () => {
@@ -231,7 +246,7 @@ it("starts an Agent from its first message, on the repository's default branch",
   const base = await within(draft).findByRole("combobox", { name: "Base branch" })
   expect(within(base).getByText("main")).toBeTruthy()
   const mode = await within(draft).findByRole("combobox", { name: "Permission mode" })
-  expect(within(mode).getByText("Default")).toBeTruthy()
+  expect(within(mode).getByText("Auto")).toBeTruthy()
   expect(within(draft).queryByRole("combobox", { name: "Where the Agent runs" })).toBeNull()
 
   await user.type(within(draft).getByRole("textbox", { name: "Message" }), "Fix the bug{Enter}")
@@ -278,7 +293,7 @@ it("shows the first message at once while the Agent starts", async () => {
   expect(
     within(draft).getByText(/Making the Agent's copy of glass-demo\/greeter from main/),
   ).toBeTruthy()
-  expect(composer).toHaveProperty("value", "")
+  expect(composer).toHaveProperty("textContent", "")
 
   Deferred.doneUnsafe(started, Exit.void)
   await waitFor(() => expect(window.location.hash).toBe(`#/agents/${agent.id}`))
@@ -379,7 +394,7 @@ it("keeps local branch, program, model, effort, and unsent work when exploring a
     ),
   ).toBeTruthy()
   expect(within(newAgentDraft()).getByRole("textbox", { name: "Message" })).toHaveProperty(
-    "value",
+    "textContent",
     "Keep my choices",
   )
   await user.type(within(newAgentDraft()).getByRole("textbox", { name: "Message" }), "{Enter}")
@@ -603,7 +618,7 @@ it("keeps an unlinked Local place blocked and never inherits Sandbox bypass perm
     ).toContain("No repositories"),
   )
   expect(within(newAgentDraft()).getByRole("textbox", { name: "Message" })).toHaveProperty(
-    "value",
+    "textContent",
     "Unsent work",
   )
   expect(within(newAgentDraft()).getByRole("button", { name: "Send" })).toHaveProperty(
@@ -612,7 +627,7 @@ it("keeps an unlinked Local place blocked and never inherits Sandbox bypass perm
   )
   expect(
     within(within(newAgentDraft()).getByRole("combobox", { name: "Permission mode" })).getByText(
-      "Default",
+      "Auto",
     ),
   ).toBeTruthy()
 })
@@ -997,7 +1012,9 @@ it("marks an Agent waiting on a Permission request, and denies it with a reason 
   ).toBeTruthy()
 
   const composer = await screen.findByRole("textbox", { name: "Message" })
-  expect(composer.getAttribute("placeholder")).toBe("Answer the Permission request above first")
+  expect(composer.getAttribute("aria-placeholder")).toBe(
+    "Answer the Permission request above first",
+  )
   expect(screen.getByRole("button", { name: "Show it" })).toBeTruthy()
 
   const card = await screen.findByRole("region", { name: "Allow Bash?" })
@@ -1141,7 +1158,7 @@ it("queues a message sent with Enter while a Turn runs, and Steers one sent with
   })
 
   const composer = await screen.findByRole("textbox", { name: "Message" })
-  await waitFor(() => expect(composer.getAttribute("placeholder")).toContain("⌘Enter"))
+  await waitFor(() => expect(composer.getAttribute("aria-placeholder")).toContain("⌘Enter"))
   await user.type(composer, "Then add docs{Enter}")
   await user.type(composer, "Use tabs{Meta>}{Enter}{/Meta}")
 
@@ -1229,7 +1246,7 @@ it("recalls the last message with ↑ in an empty composer", async () => {
   await user.click(composer)
   await user.keyboard("{ArrowUp}")
 
-  expect(composer).toHaveProperty("value", "Then docs")
+  expect(composer).toHaveProperty("textContent", "Then docs")
 })
 
 const pixel = {
@@ -1270,7 +1287,7 @@ it("shows the Agent's unsent message from before and saves what the user writes"
   })
 
   const composer = await screen.findByRole("textbox", { name: "Message" })
-  await waitFor(() => expect(composer).toHaveProperty("value", "Half a"))
+  await waitFor(() => expect(composer).toHaveProperty("textContent", "Half a"))
   await user.type(composer, " thought")
 
   await waitFor(() => expect(saved.at(-1)).toBe("Half a thought"))
@@ -1288,7 +1305,9 @@ it("saves what the user was still writing when they switch to another Agent", as
       Effect.sync(() => void saved.push({ agentId, message })),
   })
 
-  await user.type(await screen.findByRole("textbox", { name: "Message" }), "Half a thought")
+  const composer = await screen.findByRole("textbox", { name: "Message" })
+  await user.click(composer)
+  await user.type(composer, "Half a thought", { skipClick: true })
   expect(saved).toEqual([])
   await user.click(screen.getByRole("link", { name: other.name }))
 
@@ -1409,4 +1428,24 @@ it("keeps the To-do choices closed after Escape, so Enter sends the @ as written
   await user.keyboard("{Enter}")
 
   expect(sent).toEqual(["Ping @f"])
+})
+
+it("keeps pasted lines and To-do mentions as written", async () => {
+  const sent: Array<string> = []
+
+  const pasted = `First\n\nThen ${toDoMention(flaky)} after`
+
+  const user = mount({
+    WatchTranscript: () =>
+      Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
+    SendMessage: ({ message }) => Effect.sync(() => void sent.push(message)),
+  })
+
+  const composer = await screen.findByRole("textbox", { name: "Message" })
+  await user.click(composer)
+  await user.paste(pasted)
+  expect(within(composer).getByText("Fix the flaky test")).toBeTruthy()
+  await user.keyboard("{Enter}")
+
+  expect(sent).toEqual([pasted])
 })

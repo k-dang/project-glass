@@ -17,7 +17,11 @@ test("starts a local Claude Code Agent and answers its Permission request", asyn
   await window.getByRole("option", { name: "Choose folder…" }).click()
 
   const draft = window.getByRole("region", { name: "New Agent" })
-  await expect(draft.getByRole("combobox", { name: "Permission mode" })).toContainText("Default")
+  const mode = draft.getByRole("combobox", { name: "Permission mode" })
+  await expect(mode).toContainText("Auto")
+  await mode.click()
+  await window.getByRole("option", { name: "Default" }).click()
+  await expect(mode).toContainText("Default")
   await expect(draft.getByRole("combobox", { name: "Base branch" })).toContainText("main")
   await draft.getByRole("textbox", { name: "Message" }).fill("Please run `touch notes.txt`")
   await draft.getByRole("textbox", { name: "Message" }).press("Enter")
@@ -30,7 +34,7 @@ test("starts a local Claude Code Agent and answers its Permission request", asyn
       .getByRole("link", { description: /Waiting on you/ }),
   ).toHaveCount(1)
   await expect(window.getByRole("textbox", { name: "Message" })).toHaveAttribute(
-    "placeholder",
+    "aria-placeholder",
     "Answer the Permission request above first",
   )
 

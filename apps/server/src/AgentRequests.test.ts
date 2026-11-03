@@ -219,7 +219,7 @@ it.live("passes default and changed Permission modes to the host, and refuses mo
     const f = yield* agentServicesFixture
     const agent = yield* f.create()
     const first = yield* f.started
-    assert.equal(first.settings.permissionMode, "default")
+    assert.equal(first.settings.permissionMode, "auto")
     yield* finish(f, first)
     yield* f.agents.changePermissionMode(agent.id, "acceptEdits")
     yield* f.agents.send(agent.id, { message: "Next", images: [] })

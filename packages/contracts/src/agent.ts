@@ -54,8 +54,8 @@ export const PermissionMode = Schema.Literals([
 
 export type PermissionMode = typeof PermissionMode.Type
 
-/** The mode an Agent starts in unless the user picks another: the one that asks the most. */
-export const defaultPermissionMode: PermissionMode = "default"
+/** The mode an Agent starts in unless the user picks another. */
+export const defaultPermissionMode: PermissionMode = "auto"
 
 export interface AgentCapabilities {
   /** The Permission modes the program takes; none for a program that doesn't ask. */

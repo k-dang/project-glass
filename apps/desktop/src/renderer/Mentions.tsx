@@ -2,18 +2,12 @@ import { useAtomValue } from "@effect/atom-react"
 import { mapMentions, replaceMentions, type ToDo, toDoMention } from "@glass/contracts"
 import { Option } from "effect"
 import { AsyncResult } from "effect/reactivity"
+import { type Editor, useEditorState } from "@tiptap/react"
 import { ListTodo } from "lucide-react"
-import {
-  Fragment,
-  type KeyboardEvent,
-  type MouseEvent,
-  type SyntheticEvent,
-  useId,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react"
+import { Fragment, type MouseEvent, useId, useState } from "react"
 import { cn } from "cn"
+import { CHIP, ToDoMention } from "./composerDocument"
+import { MentionChip } from "./MentionChip"
 import { openToDosAtom } from "./toDoList"
 
 export const readableText = (message: string) => replaceMentions(message, ({ title }) => title)
@@ -21,16 +15,7 @@ export const readableText = (message: string) => replaceMentions(message, ({ tit
 export function MessageText(props: { text: string }) {
   return mapMentions(props.text, {
     text: (text, key) => <Fragment key={key}>{text}</Fragment>,
-    mention: ({ title }, key) => (
-      <span
-        key={key}
-        data-slot="mention"
-        className="inline-flex items-baseline gap-1 rounded-sm bg-background/70 px-1 font-medium"
-      >
-        <ListTodo aria-hidden className="size-3.5 shrink-0 self-center" />
-        {title}
-      </span>
-    ),
+    mention: ({ title }, key) => <MentionChip key={key} title={title} />,
   })
 }
 
@@ -38,40 +23,46 @@ const TRIGGER = /(?:^|\s)@([^\s@[\]()]*)$/
 
 const MAX_CHOICES = 6
 
-interface CaretInText {
-  readonly text: string
-  readonly caret: number
+interface Caret {
+  readonly before: string
+  readonly at: number
 }
 
+const caretOf = ({ editor }: { editor: Editor }): Caret => {
+  const { $head } = editor.state.selection
+
+  return { before: $head.parent.textBetween(0, $head.parentOffset, undefined, CHIP), at: $head.pos }
+}
+
+const sameCaret = (a: Caret, b: Caret | null) => a.before === b?.before && a.at === b.at
+
 interface Picking {
-  readonly start: number
-  readonly caret: number
+  readonly from: number
+  readonly to: number
+  readonly trigger: string
   readonly choices: ReadonlyArray<ToDo>
   readonly active: number
   readonly chosen: ToDo
 }
 
-const throughTrigger = (message: string, start: number) => message.slice(0, start + 1)
+const throughTrigger = (editor: Editor, from: number) =>
+  editor.state.doc.textBetween(0, from + 1, "\n", CHIP)
 
 const picking = (
-  message: string,
-  measured: CaretInText,
+  editor: Editor,
+  caret: Caret,
   dismissedThroughTrigger: string | null,
   toDos: ReadonlyArray<ToDo>,
   highlighted: number,
 ): Picking | null => {
-  const caretIsInMessage = measured.text === message
-
-  if (!caretIsInMessage) return null
-
-  const { caret } = measured
-  const typed = TRIGGER.exec(message.slice(0, caret))?.[1]
+  const typed = TRIGGER.exec(caret.before)?.[1]
 
   if (typed === undefined) return null
 
-  const start = caret - typed.length - 1
+  const from = caret.at - typed.length - 1
+  const trigger = throughTrigger(editor, from)
 
-  if (dismissedThroughTrigger === throughTrigger(message, start)) return null
+  if (dismissedThroughTrigger === trigger) return null
 
   const wanted = typed.toLowerCase()
 
@@ -82,66 +73,57 @@ const picking = (
   const active = Math.min(highlighted, choices.length - 1)
   const chosen = choices[active]
 
-  return chosen === undefined ? null : { start, caret, choices, active, chosen }
+  return chosen === undefined ? null : { from, to: caret.at, trigger, choices, active, chosen }
 }
 
-const insertMention = (message: string, { start, caret }: Picking, toDo: ToDo): CaretInText => {
-  const after = message.slice(caret)
-  const link = toDoMention(toDo)
-  const spaced = /^\s/.test(after) ? link : `${link} `
+const insertMention = (editor: Editor, { from, to }: Picking, { id, title }: ToDo) => {
+  const after = editor.state.doc.resolve(to).nodeAfter
+  const spaced = after?.isText === true && /^\s/.test(after.text ?? "")
 
-  return { text: message.slice(0, start) + spaced + after, caret: start + link.length + 1 }
+  editor
+    .chain()
+    .focus()
+    .insertContentAt({ from, to }, [
+      { type: ToDoMention.name, attrs: { title, link: toDoMention({ id, title }) } },
+      ...(spaced ? [] : [{ type: "text", text: " " }]),
+    ])
+    .setTextSelection(from + 2)
+    .run()
 }
 
-export function useMentionPicker(
-  message: string,
-  setMessage: (message: string) => void,
-  enabled: boolean,
-) {
-  const ref = useRef<HTMLTextAreaElement>(null)
+export function useMentionPicker(editor: Editor, enabled: boolean) {
   const id = useId()
-  const [measured, setMeasured] = useState<CaretInText>({ text: "", caret: 0 })
-  const [highlighted, setHighlighted] = useState(0)
+
+  const caret = useEditorState({
+    editor,
+    selector: caretOf,
+    equalityFn: sameCaret,
+  })
+
+  const [highlight, setHighlight] = useState({ caret, index: 0 })
+  const highlighted = highlight.caret === caret ? highlight.index : 0
   const [dismissedThroughTrigger, setDismissedThroughTrigger] = useState<string | null>(null)
-  const nextCaret = useRef<number | null>(null)
   const openToDos = Option.getOrElse(AsyncResult.value(useAtomValue(openToDosAtom)), () => [])
 
   const open = enabled
-    ? picking(message, measured, dismissedThroughTrigger, openToDos, highlighted)
+    ? picking(editor, caret, dismissedThroughTrigger, openToDos, highlighted)
     : null
-
-  useLayoutEffect(() => {
-    if (nextCaret.current === null) return
-    ref.current?.setSelectionRange(nextCaret.current, nextCaret.current)
-    nextCaret.current = null
-  })
-
-  const follow = ({ value, selectionEnd }: HTMLTextAreaElement) => {
-    setMeasured((current) =>
-      current.text === value && current.caret === selectionEnd
-        ? current
-        : { text: value, caret: selectionEnd },
-    )
-    setHighlighted(0)
-  }
 
   const choose = (toDo: ToDo) => {
     if (open === null) return
-    const next = insertMention(message, open, toDo)
-    nextCaret.current = next.caret
-    setMeasured(next)
-    setMessage(next.text)
+    insertMention(editor, open, toDo)
   }
 
-  const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+  const onKeyDown = (event: KeyboardEvent) => {
     if (open === null) return false
 
     const { choices, active, chosen } = open
 
-    if (event.key === "ArrowDown") setHighlighted((active + 1) % choices.length)
-    else if (event.key === "ArrowUp") setHighlighted((active + choices.length - 1) % choices.length)
+    if (event.key === "ArrowDown") setHighlight({ caret, index: (active + 1) % choices.length })
+    else if (event.key === "ArrowUp")
+      setHighlight({ caret, index: (active + choices.length - 1) % choices.length })
     else if (event.key === "Enter" || event.key === "Tab") choose(chosen)
-    else if (event.key === "Escape") setDismissedThroughTrigger(throughTrigger(message, open.start))
+    else if (event.key === "Escape") setDismissedThroughTrigger(open.trigger)
     else return false
 
     event.preventDefault()
@@ -150,13 +132,8 @@ export function useMentionPicker(
   }
 
   return {
-    textarea: {
-      ref,
-      "aria-controls": open === null ? undefined : id,
-      "aria-activedescendant": open === null ? undefined : `${id}-${open.chosen.id}`,
-      onSelect: (event: SyntheticEvent<HTMLTextAreaElement>) => follow(event.currentTarget),
-    },
-    follow,
+    activeDescendant: open === null ? null : `${id}-${open.chosen.id}`,
+    listbox: id,
     onKeyDown,
     choices: open === null ? null : <MentionChoices id={id} open={open} onChoose={choose} />,
   }
@@ -165,9 +142,9 @@ export function useMentionPicker(
 const keepComposerFocus = (event: MouseEvent) => event.preventDefault()
 
 /**
- * WAI-ARIA APG combobox: focus stays in the composer textarea, which drives these options through
+ * WAI-ARIA APG combobox: focus stays in the composer, which drives these options through
  * `aria-activedescendant`, so they take no focus. A native `select` would take focus, and
- * `datalist` can't attach to a textarea.
+ * `datalist` can't attach to an editor.
  */
 function MentionChoices(props: { id: string; open: Picking; onChoose: (toDo: ToDo) => void }) {
   return (

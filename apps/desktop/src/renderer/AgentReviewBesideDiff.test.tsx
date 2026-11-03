@@ -132,7 +132,7 @@ it("follows up on the Agent review from beside the diff, on the workspace's Revi
 
   await waitFor(() => expect(f.followUp).toHaveBeenCalledOnce())
   expect(f.followUp.mock.calls[0]?.[0]).toMatchObject({ revision, message: "Is this blocking?" })
-  expect(screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Follow up" }).value).toBe("")
+  expect(screen.getByRole("textbox", { name: "Follow up" }).textContent).toBe("")
 })
 
 it("keeps a refused follow-up in the composer and says why", async () => {
@@ -152,11 +152,11 @@ it("keeps a refused follow-up in the composer and says why", async () => {
   )
 
   await readBesideTheDiff(f)
-  const composer = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Follow up" })
+  const composer = screen.getByRole("textbox", { name: "Follow up" })
   await f.user.type(composer, "Is this blocking?{Enter}")
 
   expect(await screen.findByText(/Wait for the answer to your last Follow-up/)).toBeDefined()
-  expect(composer.value).toBe("Is this blocking?")
+  expect(composer.textContent).toBe("Is this blocking?")
 })
 
 for (const accepted of [true, false])
@@ -170,11 +170,11 @@ for (const accepted of [true, false])
     f.followUp.mockImplementation(() => Deferred.await(reply))
 
     await readBesideTheDiff(f)
-    const composer = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Follow up" })
+    const composer = screen.getByRole("textbox", { name: "Follow up" })
     await f.user.type(composer, "Is this blocking?{Enter}")
 
-    expect(composer.value).toBe("Is this blocking?")
-    expect(composer.readOnly).toBe(true)
+    expect(composer.textContent).toBe("Is this blocking?")
+    expect(composer.getAttribute("aria-readonly")).toBe("true")
     const send = screen.getByRole<HTMLButtonElement>("button", { name: "Send" })
     expect(send.disabled).toBe(true)
     await f.user.click(send)
@@ -193,12 +193,13 @@ for (const accepted of [true, false])
     })
 
     await eventually(() => {
-      expect(composer.readOnly).toBe(false)
-      expect(composer.value).toBe(accepted ? "" : "Is this blocking?")
+      expect(composer.getAttribute("aria-readonly")).toBe("false")
+      expect(composer.textContent).toBe(accepted ? "" : "Is this blocking?")
     })
 
     expect(screen.queryByText(/Try again/) !== null).toBe(!accepted)
-    await f.user.clear(composer)
+    await f.user.click(composer)
+    await f.user.keyboard("{Control>}a{/Control}{Backspace}")
     await f.user.type(composer, "A second message{Enter}")
     await eventually(() => expect(f.followUp).toHaveBeenCalledTimes(2))
   })

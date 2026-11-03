@@ -13,7 +13,7 @@ export const mapMentions = <A>(
   text: string,
   write: {
     readonly text: (text: string, key: number) => A
-    readonly mention: (mentioned: Mentioned, key: number) => A
+    readonly mention: (mentioned: Mentioned, key: number, link: string) => A
   },
 ): ReadonlyArray<A> => {
   const pieces: Array<A> = []
@@ -21,7 +21,7 @@ export const mapMentions = <A>(
 
   for (const { 0: link, 1: title = "", 2: id, index } of text.matchAll(MENTION)) {
     if (index > from) pieces.push(write.text(text.slice(from, index), from))
-    pieces.push(write.mention({ id: Number(id), title }, index))
+    pieces.push(write.mention({ id: Number(id), title }, index, link))
     from = index + link.length
   }
 
