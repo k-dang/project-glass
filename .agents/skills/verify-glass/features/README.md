@@ -37,7 +37,7 @@ Each feature file has an H1 title, one paragraph of user-visible behavior, then 
 - [App navigation](./app-navigation.md): the icon rail, app routes, keeping a PR workspace while switching areas, and Dashboard's Continue card restoring the Saved place.
 - [Changed files](./changed-files.md): the changed-files tree and each file's diff or placeholder.
 - [Tours](./tours.md): generating and reading a Tour through a local fake provider without model charges, or checking a live provider explicitly.
-- [Full context and repository files](./full-context.md): expanding a diff's collapsed context up to the whole file, and the Files tab for reading any file at the pinned head.
+- [Full context and repository files](./full-context.md): expanding a diff's collapsed context up to the whole file, and the Repository tab for reading any file at the pinned head.
 - [Agent composer](./agent-composer.md): Queueing, Steering, and stopping a running Agent Turn from its composer, on the fake backend's demo Agent.
 - [Permission requests and Questions](./agent-requests.md): a Claude Code Agent's Permission mode, answering its Permission requests and Questions from the transcript, and stopping while one waits, on the real pinned `claude` against a fake Anthropic API.
 - [Existing Discussions](./discussions.md): line Discussions in the diff with their resolved state, comments and Reviews on Overview, and the outdated list.

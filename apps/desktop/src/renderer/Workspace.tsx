@@ -19,7 +19,6 @@ import {
   type LucideIcon,
   MessageCircle,
   PanelLeft,
-  PanelsTopLeft,
   RotateCw,
   Route,
   ScanSearch,
@@ -379,10 +378,14 @@ export function Workspace(props: {
             />
           }
           tabs={
-            <TabsList variant="line" aria-label="PR workspace" className="shrink-0">
-              <WorkspaceTabTrigger value="overview" label="Overview" icon={PanelsTopLeft} />
-              <WorkspaceTabTrigger value="changes" label="Changes" icon={FileDiff} />
-              <WorkspaceTabTrigger value="files" label="Files" icon={FolderTree} />
+            <TabsList
+              variant="line"
+              aria-label="PR workspace"
+              className="shrink-0 justify-start gap-2 p-0 group-data-horizontal/tabs:h-9"
+            >
+              <WorkspaceTabTrigger value="overview" label="Overview" />
+              <WorkspaceTabTrigger value="changes" label="Changes" />
+              <WorkspaceTabTrigger value="files" label="Repository" />
             </TabsList>
           }
         />
@@ -612,12 +615,12 @@ export function Workspace(props: {
   )
 }
 
-function WorkspaceTabTrigger(props: { value: WorkspaceTab; label: string; icon: LucideIcon }) {
-  const Icon = props.icon
-
+function WorkspaceTabTrigger(props: { value: WorkspaceTab; label: string }) {
   return (
-    <TabsTrigger value={props.value} className="flex-none px-2">
-      <Icon aria-hidden />
+    <TabsTrigger
+      value={props.value}
+      className="h-full flex-none rounded-none px-2 transition-none after:transition-none group-data-horizontal/tabs:after:-bottom-px"
+    >
       {props.label}
     </TabsTrigger>
   )
@@ -706,23 +709,21 @@ function PullRequestHeader(props: {
           {props.review}
         </div>
       </div>
-      <div className="flex flex-col items-start gap-2 pb-2 xl:flex-row xl:items-center xl:gap-4">
-        <div className="flex w-full min-w-0 flex-1 flex-wrap items-center gap-2 text-sm text-muted-foreground xl:w-auto">
-          <StateBadge pullRequest={pullRequest} />
-          <span>
-            {owner}/{repo}
-          </span>
-          <span aria-hidden>·</span>
-          <span className="font-medium text-foreground">{pullRequest.author}</span>
-          <span aria-hidden>·</span>
-          <Branch name={pullRequest.baseBranch} />
-          <span aria-label="from">←</span>
-          <Branch name={pullRequest.headBranch} />
-          <span aria-hidden>·</span>
-          <StatusChips pullRequest={pullRequest} />
-        </div>
-        {props.tabs}
+      <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm text-muted-foreground">
+        <StateBadge pullRequest={pullRequest} />
+        <span>
+          {owner}/{repo}
+        </span>
+        <span aria-hidden>·</span>
+        <span className="font-medium text-foreground">{pullRequest.author}</span>
+        <span aria-hidden>·</span>
+        <Branch name={pullRequest.baseBranch} />
+        <span aria-label="from">←</span>
+        <Branch name={pullRequest.headBranch} />
+        <span aria-hidden>·</span>
+        <StatusChips pullRequest={pullRequest} />
       </div>
+      {props.tabs}
     </header>
   )
 }

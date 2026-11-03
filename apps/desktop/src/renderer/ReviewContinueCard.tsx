@@ -10,7 +10,7 @@ import { defaultListSearch } from "./reviewsArea"
 const positionLabel = (position: ReviewPosition) => {
   if (position.tab === "overview") return "Overview"
 
-  if (position.tab === "files") return "Files"
+  if (position.tab === "files") return "Repository"
 
   return position.order === "tour" ? "Changes · Tour order" : "Changes · Path order"
 }

@@ -197,7 +197,7 @@ it("selects and reveals the restored repository file when the tree finishes load
   await user.click(await screen.findByRole("link", { name: /^Continue / }))
   await screen.findByText("File too large to show")
   await screen.findByText("Loading files…")
-  expect(screen.getByRole("tab", { name: "Files" }).getAttribute("aria-selected")).toBe("true")
+  expect(screen.getByRole("tab", { name: "Repository" }).getAttribute("aria-selected")).toBe("true")
 
   const listing = await next(listings)
   await act(async () =>
@@ -213,7 +213,7 @@ it("selects and reveals the restored repository file when the tree finishes load
 
   const tree = await waitFor(() => {
     const element = screen
-      .getByRole("tabpanel", { name: "Files" })
+      .getByRole("tabpanel", { name: "Repository" })
       .querySelector("file-tree-container")
       ?.shadowRoot?.querySelector<HTMLElement>('[role="tree"]')
 

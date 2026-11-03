@@ -295,7 +295,7 @@ it("uses the supplied backend for repository file listing and reading", async ()
     workspace.pullRequest.url,
   )
   await user.keyboard("{Enter}")
-  await user.click(await screen.findByRole("tab", { name: "Files" }))
+  await user.click(await screen.findByRole("tab", { name: "Repository" }))
 
   const tree = await waitFor(() => {
     const element = document
