@@ -141,6 +141,7 @@ function Changes(props: { files: ReadonlyArray<ChangedFile> }) {
           tourOrder={null}
           fullScreen={null}
           agentReview={null}
+          outdatedTour={null}
         />
         {layout.files.length > 0 && (
           <ReadOnlyDiffView

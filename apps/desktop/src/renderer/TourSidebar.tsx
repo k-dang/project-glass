@@ -1,16 +1,28 @@
 import type { Revision, TourState } from "@glass/contracts"
 import { cn } from "cn"
 import { Equal } from "effect"
-import { BookOpen, Check, Clock, LoaderCircle, RotateCw, Route, Sparkles } from "lucide-react"
-import { type ReactNode, useEffect, useEffectEvent, useRef } from "react"
+import {
+  BookOpen,
+  Check,
+  Clock,
+  LoaderCircle,
+  RotateCw,
+  Route,
+  Sparkles,
+  TriangleAlert,
+} from "lucide-react"
+import { type ReactNode, useEffect, useEffectEvent, useRef, useState } from "react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Item, ItemContent, ItemMedia, ItemTitle } from "@/components/ui/item"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { toast } from "@/components/ui/toast"
 import { Elapsed } from "./Elapsed"
 import { OutdatedNote } from "./OutdatedNote"
 import { ProblemAlert } from "./ProblemAlert"
+import { warningTone } from "./PullRequestRow"
+import { ShortSha } from "./shortSha"
 import type { TourChapter, TourReading } from "./tourReading"
 import { twoDigits, useProgress } from "./tourProgress"
 import { plural } from "./plural"
@@ -67,13 +79,34 @@ function ChapterRow(props: {
   )
 }
 
-export function OutdatedTourBanner(props: { revision: Revision; action?: ReactNode }) {
+const outdatedConsequence = "some Chapters may not match the diff"
+
+export function OutdatedTourBanner(props: { revision: Revision }) {
+  return <OutdatedNote revision={props.revision} consequence={outdatedConsequence} />
+}
+
+export function OutdatedTourFlag(props: { revision: Revision; tour: ReturnType<typeof useTour> }) {
+  const [open, setOpen] = useState(false)
+
+  // Rewrite disappears while writing, so the popover closes with it.
   return (
-    <OutdatedNote
-      revision={props.revision}
-      consequence="some Chapters may not match the diff"
-      action={props.action}
-    />
+    <Popover open={open && !props.tour.writing} onOpenChange={setOpen}>
+      <PopoverTrigger
+        render={<Button variant="ghost" size="xs" className={cn("ml-1", warningTone)} />}
+      >
+        <TriangleAlert aria-hidden data-icon="inline-start" />
+        Tour outdated
+      </PopoverTrigger>
+      <PopoverContent align="start">
+        <p className="leading-relaxed break-words text-muted-foreground">
+          Written for an older Revision (head <ShortSha sha={props.revision.head} />
+          ), so {outdatedConsequence}.
+        </p>
+        <div className="flex justify-end">
+          <RewriteTour tour={props.tour} variant="outline" />
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 

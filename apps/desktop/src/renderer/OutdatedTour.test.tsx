@@ -47,8 +47,11 @@ it("reads an outdated Tour against the files the PR has now", async () => {
 
   await f.user.click(screen.getByRole("tab", { name: "Changes" }))
   await waitFor(() => expect(fileOrder()).toEqual(["greet.ts", "api.ts", "new.ts"]))
-  expect(screen.getAllByRole("note")).toHaveLength(1)
-  expect(within(changes()).getByRole("note")).toBeDefined()
+  expect(screen.queryByRole("note")).toBeNull()
+  await f.user.click(within(changes()).getByRole("button", { name: "Tour outdated" }))
+  expect((await screen.findByRole("dialog")).textContent).toContain(
+    "Written for an older Revision (head 0123456)",
+  )
   expect(within(changes()).getByText("greet.ts summary")).toBeDefined()
   expect(within(changes()).queryByText("gone.ts summary")).toBeNull()
   expect(chapter("Everything else").textContent).toContain("0/1 viewed")
@@ -89,7 +92,10 @@ it("keeps the old Tour readable through a rewrite until its replacement arrives"
   await f.user.click(await screen.findByRole("tab", { name: "Changes" }))
   await waitFor(() => expect(fileOrder()).toEqual(["greet.ts", "api.ts", "new.ts"]))
   await f.user.click(screen.getByRole("tab", { name: "Tour" }))
-  await f.user.click(within(changes()).getByRole("button", { name: "Rewrite" }))
+  await f.user.click(within(changes()).getByRole("button", { name: "Tour outdated" }))
+  await f.user.click(
+    within(await screen.findByRole("dialog")).getByRole("button", { name: "Rewrite" }),
+  )
   expect(f.write).toHaveBeenCalledWith({ pullRequest: pullRequestRef, revision }, expect.anything())
   expect(await screen.findByText("Checking agent…")).toBeDefined()
   expect(screen.queryByRole("button", { name: "Rewrite" })).toBeNull()
