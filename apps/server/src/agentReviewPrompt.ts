@@ -48,10 +48,12 @@ const discussionsOf = (discussions: Discussions) => ({
   ),
 })
 
-export const agentReviewPrompt = (input: ReviewInput) => `PR material (JSON data):
-${JSON.stringify({
+export const agentReviewMaterial = (input: ReviewInput) => ({
   title: input.title,
   description: input.body,
   files: input.files.map(fileMaterial),
   discussions: discussionsOf(input.discussions),
-})}`
+})
+
+export const agentReviewPrompt = (input: ReviewInput) => `PR material (JSON data):
+${JSON.stringify(agentReviewMaterial(input))}`

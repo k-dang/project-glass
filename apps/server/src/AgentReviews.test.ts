@@ -1,6 +1,7 @@
 import { assert, it } from "@effect/vitest"
 import {
   type AgentEngine,
+  AgentReviewFailure,
   type AgentReviewState,
   defaultReviewPrompt,
   PullRequestRef,
@@ -284,5 +285,142 @@ it.live("reviews on the engine chosen for Agent reviews", () =>
     yield* f.state(reviewed)
 
     assert.deepStrictEqual(f.runners.selections, ["claude-code"])
+  }),
+)
+
+const followUpAnswer = {
+  markdown: "Yes: `greet.ts` line 2 drops the `!`.",
+  suggestedDrafts: [
+    { path: "greet.ts", side: "new", line: 2, body: "Could this keep the caller's `!`?" },
+    { path: "main.ts", side: "new", line: 1, body: "Unrelated aside." },
+  ],
+} as const
+
+const followedUp = (state: AgentReviewState) =>
+  state.job.status === "idle" && (state.review?.followUps.length ?? 0) > 0
+
+it.live(
+  "follows up on the Agent review, keeping Drafts on diff lines and the thread across restarts",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* fixture()
+      yield* f.start
+      const { review } = yield* f.state(reviewed)
+
+      yield* f.runners.configure({ reply: { answer: followUpAnswer } })
+      const message = "Draft a comment for the punctuation point."
+      yield* f.client.FollowUpAgentReview({ pullRequest: f.ref, revision: f.revision, message })
+      const done = yield* f.state(followedUp)
+
+      const { prompt } = f.runners.runs.at(-1)!.task
+      assert.include(prompt, "+hello name")
+      assert.include(prompt, JSON.stringify(answer.markdown))
+      assert.include(prompt, message)
+
+      const [followUp] = done.review!.followUps
+      assert.strictEqual(followUp?.message, message)
+      assert.deepStrictEqual(followUp?.suggestedDrafts, [followUpAnswer.suggestedDrafts[0]])
+      assert.include(followUp?.answer, followUpAnswer.markdown)
+      assert.include(followUp?.answer, "`main.ts` line 1:\n\n> Unrelated aside.")
+      assert.strictEqual(done.review?.markdown, review?.markdown)
+
+      assert.deepStrictEqual(yield* f.restart, done)
+    }),
+)
+
+it.live("starts the thread over when the Agent review is written again", () =>
+  Effect.gen(function* () {
+    const f = yield* fixture()
+    yield* f.start
+    yield* f.state(reviewed)
+
+    yield* f.runners.configure({ reply: { answer: followUpAnswer } })
+    yield* f.client.FollowUpAgentReview({
+      pullRequest: f.ref,
+      revision: f.revision,
+      message: "Why?",
+    })
+    yield* f.state(followedUp)
+
+    yield* f.runners.configure({ reply: { answer: answer } })
+    yield* f.start
+
+    const rewritten = yield* f.state(
+      (state) => reviewed(state) && state.review?.followUps.length === 0,
+    )
+
+    assert.strictEqual(rewritten.review?.markdown, answer.markdown)
+    assert.deepStrictEqual((yield* f.restart).review?.followUps, [])
+  }),
+)
+
+it.live("refuses a follow-up on another Revision without running the agent", () =>
+  Effect.gen(function* () {
+    const f = yield* fixture()
+    yield* f.start
+    yield* f.state(reviewed)
+    const before = f.runners.runs.length
+
+    const error = yield* f.client
+      .FollowUpAgentReview({
+        pullRequest: f.ref,
+        revision: new Revision({ base: f.revision.base, head: "h2" }),
+        message: "Why?",
+      })
+      .pipe(Effect.flip)
+
+    assert.instanceOf(error, AgentReviewFailure)
+    assert.strictEqual(error.reason, "stale-revision")
+    assert.strictEqual(f.runners.runs.length, before)
+  }),
+)
+
+it.live("keeps the message of a failed follow-up and leaves the thread as it was", () =>
+  Effect.gen(function* () {
+    const f = yield* fixture()
+    yield* f.start
+    const { review } = yield* f.state(reviewed)
+
+    yield* f.runners.configure({ reply: { answer: { markdown: " \n", suggestedDrafts: [] } } })
+    yield* f.client.FollowUpAgentReview({
+      pullRequest: f.ref,
+      revision: f.revision,
+      message: "Why?",
+    })
+
+    const { job, review: after } = yield* f.state(
+      (state) => state.job.status === "follow-up-failed",
+    )
+
+    assert.strictEqual(job.status === "follow-up-failed" && job.message, "Why?")
+    assert.strictEqual(job.status === "follow-up-failed" && job.reason.reason, "unusable-output")
+    assert.deepStrictEqual(after, review)
+  }),
+)
+
+it.live("refuses a second follow-up while one runs, and lets writing the review replace it", () =>
+  Effect.gen(function* () {
+    const f = yield* fixture()
+    yield* f.start
+    yield* f.state(reviewed)
+
+    yield* f.runners.configure({ reply: "hold" })
+    const first = { pullRequest: f.ref, revision: f.revision, message: "Why?" }
+    yield* f.client.FollowUpAgentReview(first)
+    yield* f.runners.ran(2)
+
+    const error = yield* f.client
+      .FollowUpAgentReview({ ...first, message: "And this?" })
+      .pipe(Effect.flip)
+
+    assert.instanceOf(error, AgentReviewFailure)
+    assert.strictEqual(error.reason, "not-ready")
+    const running = yield* f.state((state) => state.job.status === "following-up")
+    assert.strictEqual(running.job.status === "following-up" && running.job.message, "Why?")
+
+    yield* f.runners.configure({ reply: { answer } })
+    yield* f.start
+    yield* f.runners.interrupted(1)
+    yield* f.state((state) => reviewed(state) && state.review?.followUps.length === 0)
   }),
 )

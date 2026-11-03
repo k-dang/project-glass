@@ -453,7 +453,7 @@ export function Workspace(props: {
               />
             </TabsContent>
             <TabsContent value="agent-review" className="flex min-h-0 flex-col">
-              {agentReview.review !== null && <AgentReviewPanel review={agentReview.review} />}
+              <AgentReviewPanel controls={agentReview} drafts={drafts} show={show} />
             </TabsContent>
             <TabsContent value="tour" className="flex min-h-0 flex-col">
               <TourSidebar

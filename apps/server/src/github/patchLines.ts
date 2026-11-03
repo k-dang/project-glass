@@ -1,4 +1,5 @@
-import type { DiffSide } from "@glass/contracts"
+import type { ChangedFile, DiffSide } from "@glass/contracts"
+import { Predicate } from "effect"
 
 function* patchLines(hunks: string, side: DiffSide) {
   let oldLine = 0
@@ -34,6 +35,22 @@ export const lineInPatch = (hunks: string, side: DiffSide, line: number) => {
   }
 
   return null
+}
+
+/** The changed file holding a line of the diff, with that line's text, or null off the diff. */
+export const lineInFiles = (
+  files: ReadonlyArray<ChangedFile>,
+  path: string,
+  side: DiffSide,
+  line: number,
+) => {
+  const file = files.find((candidate) => candidate.path === path)
+
+  if (file === undefined || !Predicate.isTagged(file.patch, "TextPatch")) return null
+
+  const text = lineInPatch(file.patch.hunks, side, line)
+
+  return text === null ? null : { file, text }
 }
 
 export const rangeInPatch = (hunks: string, side: DiffSide, start: number, end: number) => {

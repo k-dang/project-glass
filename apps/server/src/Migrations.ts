@@ -18,6 +18,7 @@ import agentSandboxes from "./migrations/0016_agent_sandboxes"
 import agentPlace from "./migrations/0017_agent_place"
 import savedPlacePerArea from "./migrations/0018_saved_place_per_area"
 import agentJournalSaved from "./migrations/0019_agent_journal_saved"
+import createAgentReviewFollowUps from "./migrations/0020_create_agent_review_follow_ups"
 
 export const migrations = {
   "0001_create_activity": createActivity,
@@ -39,6 +40,7 @@ export const migrations = {
   "0017_agent_place": agentPlace,
   "0018_saved_place_per_area": savedPlacePerArea,
   "0019_agent_journal_saved": agentJournalSaved,
+  "0020_create_agent_review_follow_ups": createAgentReviewFollowUps,
 }
 
 export const migrationLoader = SqliteMigrator.fromRecord(migrations)

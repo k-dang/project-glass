@@ -83,9 +83,17 @@ export interface CheckoutRun<I, A> {
   readonly task: (input: I) => Effect.Effect<CheckoutTask<A>, CheckoutRunFailure>
 }
 
+/** The agent's answer, with the PR material it was asked about. */
+export interface CheckoutAnswer<I, A> {
+  readonly input: I
+  readonly answer: A
+}
+
 export interface CheckoutRunner {
   readonly identity: AgentRunnerIdentity
-  readonly run: <I, A>(run: CheckoutRun<I, A>) => Effect.Effect<A, CheckoutRunFailure>
+  readonly run: <I, A>(
+    run: CheckoutRun<I, A>,
+  ) => Effect.Effect<CheckoutAnswer<I, A>, CheckoutRunFailure>
 }
 
 /**
@@ -145,7 +153,9 @@ export class CheckoutRuns extends Context.Service<
                     identity,
                   ),
             ),
-            Effect.flatMap(task),
+            Effect.flatMap((input) =>
+              task(input).pipe(Effect.map((prepared) => ({ input, prepared }))),
+            ),
           )
 
           const checkOut = checkouts.checkout(pr, revision).pipe(
@@ -165,11 +175,12 @@ export class CheckoutRuns extends Context.Service<
             }),
           )
 
-          const [prepared, checkout] = yield* Effect.all([prepare, checkOut], {
+          const [{ input, prepared }, checkout] = yield* Effect.all([prepare, checkOut], {
             concurrency: 2,
           })
 
           return yield* selected.run({ ...prepared, subject, files: { readOnly: checkout } }).pipe(
+            Effect.map((answer) => ({ input, answer })),
             Effect.mapError(fromAgentFailure),
             Effect.timeoutOrElse({
               duration: timeout,

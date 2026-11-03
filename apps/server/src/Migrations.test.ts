@@ -68,6 +68,7 @@ it.live("upgrades existing Activity history and uses its indexes after reopening
       [17, "agent_place"],
       [18, "saved_place_per_area"],
       [19, "agent_journal_saved"],
+      [20, "create_agent_review_follow_ups"],
     ] as const
 
     for (const expected of [upgrade, []] as const) {
