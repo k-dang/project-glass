@@ -124,6 +124,19 @@ const tryMatch = (recorded: Json, actual: Json, ids: Map<string, string>) => {
   return true
 }
 
+const personal = /email|organization|account|subscription|rate_limit_info/i
+
+const blankPersonal = (value: Json, field = ""): Json =>
+  personal.test(field)
+    ? "<redacted>"
+    : isJsonArray(value)
+      ? value.map((item) => blankPersonal(item))
+      : isJsonObject(value)
+        ? Object.fromEntries(
+            Object.entries(value).map(([name, inner]) => [name, blankPersonal(inner, name)]),
+          )
+        : value
+
 const lines = (onLine: (line: string) => void) => {
   const frame = lineFramer()
 
@@ -261,6 +274,7 @@ export const sessionTape = (
   const processes: Array<Process> = []
   const calls: Array<{ args: Json; info: Json }> = []
   const programs: Array<Program> = []
+  const exits: Array<Promise<void>> = []
   let nextProcess = 0
   let nextCall = 0
 
@@ -316,7 +330,7 @@ export const sessionTape = (
 
     return {
       out: lines((line) => frames.push({ out: normalize(parseLine(line)) })),
-      in: lines((line) => frames.push({ in: normalize(parseLine(line)) })),
+      in: lines((line) => frames.push({ in: blankPersonal(normalize(parseLine(line))) })),
       exit: (code: number | null) => frames.push({ exit: code }),
     }
   }
@@ -340,7 +354,14 @@ export const sessionTape = (
       stdin.pipe(child.stdin)
       child.stdout.on("data", (chunk: Buffer) => tape.in(saidText(chunk)))
       child.stdout.pipe(stdout)
-      child.on("close", (code) => tape.exit(code))
+      exits.push(
+        new Promise((resolve) =>
+          child.on("close", (code) => {
+            tape.exit(code)
+            resolve()
+          }),
+        ),
+      )
 
       return Object.assign(child, { stdin, stdout })
     }
@@ -470,15 +491,14 @@ export const sessionTape = (
     return Promise.resolve(saved)
   }
 
-  const finish = Effect.sync(() => {
-    if (recordingSessions) {
-      const file = tapeFile(scenario)
-      mkdirSync(dirname(file), { recursive: true })
-      writeFileSync(file, `${JSON.stringify({ ...recorded, processes, calls }, null, 2)}\n`)
+  const record = Effect.promise(async () => {
+    await Promise.all(exits)
+    const file = tapeFile(scenario)
+    mkdirSync(dirname(file), { recursive: true })
+    writeFileSync(file, `${JSON.stringify({ ...recorded, processes, calls }, null, 2)}\n`)
+  })
 
-      return
-    }
-
+  const check = Effect.sync(() => {
     if (nextProcess < recorded.processes.length)
       problems.push(
         `Glass never started ${recorded.processes.length - nextProcess} recorded programs`,
@@ -493,6 +513,8 @@ export const sessionTape = (
 
     if (problems.length > 0) throw new Error(problems.join("\n"))
   })
+
+  const finish = recordingSessions ? record : check
 
   return { claude, spawner, sessionInfo, mismatch, finish }
 }

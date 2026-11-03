@@ -25,6 +25,9 @@ const waiting = (turns: ReadonlyArray<Turn>) =>
 const lastText = (turn: Turn | undefined) =>
   turn?.parts.findLast((part) => Predicate.isTagged(part, "Text"))
 
+const run = (command: string, reply: string) =>
+  `Use the Bash tool to run exactly \`${command}\` and nothing else, then reply with exactly: ${reply}`
+
 const pixel = Image.make({
   mediaType: "image/png",
   data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
@@ -36,7 +39,7 @@ it.live("answers Claude Code's Permission requests and Questions through Glass",
     const agent = yield* f.open(conversation)
     yield* agent.configure({ permissionMode: "default" })
 
-    yield* agent.send("Please run `touch compatible.txt`")
+    yield* agent.send(run("touch compatible.txt", "DONE"))
     const permission = waiting(yield* f.until((turns) => waiting(turns) !== undefined))
     assert.ok(Predicate.isTagged(permission, "PermissionRequest"))
     assert.equal(permission.toolName, "Bash")
@@ -44,7 +47,9 @@ it.live("answers Claude Code's Permission requests and Questions through Glass",
     const allowed = yield* f.until(settled(1))
     assert.deepStrictEqual(allowed[0]?.ended?.ending, TurnDone.make({}))
 
-    yield* agent.send("Please ask which files to read")
+    yield* agent.send(
+      "Use the AskUserQuestion tool once to ask me which files to read, offering exactly two options labelled Only the README and Everything. After I answer, reply with exactly the label I chose.",
+    )
 
     const question = waiting(
       yield* f.until((turns) => turns.length === 2 && waiting(turns) !== undefined),
@@ -70,11 +75,11 @@ it.live("streams a long reply in small pieces to its end", () =>
     const agent = yield* f.open(conversation)
     const long = "Every word of this reply streams in its own small piece. ".repeat(8).trim()
 
-    yield* agent.send(long)
+    yield* agent.send(`Reply with exactly this text and nothing else: ${long}`)
     const [turn] = yield* f.until(settled(1))
 
     assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
-    assert.deepStrictEqual(lastText(turn), TextPart.make({ text: `Fake reply to: ${long}` }))
+    assert.deepStrictEqual(lastText(turn), TextPart.make({ text: long }))
     assert.isAbove(f.events.filter((event) => Predicate.isTagged(event, "PartAppended")).length, 1)
   }).pipe(Effect.scoped),
 )
@@ -84,7 +89,10 @@ it.live("sends a message's images to Claude Code", () =>
     const f = yield* claudeSession("claude-image")
     const agent = yield* f.open(conversation)
 
-    yield* agent.send("What's this?", [pixel])
+    yield* agent.send(
+      "What's in this image? Answer in one short sentence without using any tools.",
+      [pixel],
+    )
     const [turn] = yield* f.until(settled(1))
 
     assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
@@ -97,27 +105,27 @@ it.live("lists Claude Code's models and efforts, naming its default after the mo
     const listed = yield* f.adapter.models
     const efforts = ["low", "medium", "high", "xhigh", "max"]
 
-    assert.deepStrictEqual(listed.defaultModel, { id: "default", name: "Opus", efforts })
+    assert.deepStrictEqual(listed.defaultModel, { id: "default", name: "Sonnet", efforts })
     assert.deepStrictEqual(listed.models, [
-      { id: "opus", name: "Opus", efforts },
-      { id: "fable", name: "Fable", efforts },
       { id: "sonnet", name: "Sonnet", efforts },
+      { id: "fable", name: "Fable", efforts },
+      { id: "opus", name: "Opus", efforts },
       { id: "haiku", name: "Haiku", efforts },
     ])
   }).pipe(Effect.scoped),
 )
 
-it.live("starts on the chosen model and effort, and changes them for the next Turn", () =>
+it.live("starts on the chosen model and effort, and changes the effort for the next Turn", () =>
   Effect.gen(function* () {
     const f = yield* claudeSession("claude-model-change")
     const agent = yield* f.open(conversation)
 
-    yield* agent.configure({ model: "sonnet", effort: "high" })
-    yield* agent.send("Which model?")
+    yield* agent.configure({ model: "haiku", effort: "high" })
+    yield* agent.send("Reply with exactly: FIRST")
     yield* f.until(settled(1))
 
-    yield* agent.configure({})
-    yield* agent.send("And now?")
+    yield* agent.configure({ effort: "low" })
+    yield* agent.send("Reply with exactly: SECOND")
     const turns = yield* f.until(settled(2))
 
     assert.deepStrictEqual(
@@ -131,46 +139,41 @@ it.live("Steers a running Turn, showing the Steer where Claude Code takes it in"
   Effect.gen(function* () {
     const f = yield* claudeSession("claude-steer")
     const agent = yield* f.open(conversation)
-    yield* f.api.hold
+    yield* agent.configure({ permissionMode: "default" })
 
-    yield* agent.send("Start")
-    yield* f.api.received(1)
-    yield* agent.steer("Change course")
-    yield* f.api.release
+    yield* agent.send(run("touch steer.txt", "FIRST"))
+    const request = waiting(yield* f.until((turns) => waiting(turns) !== undefined))!
+    yield* agent.steer("Change course: reply with exactly STEERED instead.")
+    yield* agent.answer(request.requestId, AllowRequest.make({}))
 
     const [turn] = yield* f.until(settled(1))
     assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
-    assert.deepInclude(turn?.parts ?? [], SteerPart.make({ message: "Change course", images: [] }))
+    assert.deepInclude(
+      turn?.parts ?? [],
+      SteerPart.make({ message: "Change course: reply with exactly STEERED instead.", images: [] }),
+    )
   }).pipe(Effect.scoped),
 )
 
 it.live("continues a conversation when Claude Code starts again", () =>
   Effect.gen(function* () {
-    const f = yield* claudeSession("claude-resume", (request) => {
-      const said = JSON.stringify(request.messages ?? [])
-
-      return {
-        type: "text",
-        text:
-          said.includes("lantern") && said.includes("What was the word")
-            ? "You told me lantern."
-            : "Noted.",
-      }
-    })
+    const f = yield* claudeSession("claude-resume")
 
     yield* Effect.scoped(
       Effect.gen(function* () {
         const agent = yield* f.open(conversation)
-        yield* agent.send("Remember the word lantern")
+        yield* agent.send("Remember the word lantern. Reply with exactly: Noted.")
         yield* f.until(settled(1))
       }),
     )
 
     const again = yield* f.open(conversation)
-    yield* again.send("What was the word?")
+    yield* again.send(
+      "Which word did I ask you to remember? Reply with only that word, in lowercase.",
+    )
     const turns = yield* f.until(settled(2))
 
-    assert.deepStrictEqual(lastText(turns[1]), TextPart.make({ text: "You told me lantern." }))
+    assert.deepStrictEqual(lastText(turns[1]), TextPart.make({ text: "lantern" }))
   }).pipe(Effect.scoped),
 )
 
@@ -182,7 +185,7 @@ it.live(
       const agent = yield* f.open(conversation)
       yield* agent.configure({ permissionMode: "default" })
 
-      yield* agent.send("Please run `touch notes.txt`")
+      yield* agent.send(run("touch notes.txt", "DONE"))
       const request = waiting(yield* f.until((turns) => waiting(turns) !== undefined))!
 
       const refused = yield* agent
@@ -201,7 +204,8 @@ it.live(
       const [turn] = yield* f.until(settled(1))
 
       assert.equal(turn?.parts.find(isRequestPart)?.status, "denied")
-      assert.include(lastText(turn)?.text, "Leave the checkout alone")
+      const toolCall = turn?.parts.find((part) => Predicate.isTagged(part, "ToolCall"))
+      assert.include(toolCall?.output, "Leave the checkout alone")
 
       const late = yield* agent.answer(request.requestId, AllowRequest.make({})).pipe(Effect.flip)
 
@@ -217,7 +221,7 @@ it.live(
       const agent = yield* f.open(conversation)
       yield* agent.configure({ permissionMode: "default" })
 
-      yield* agent.send("Please run `touch notes.txt`")
+      yield* agent.send(run("touch notes.txt", "DONE"))
       const request = waiting(yield* f.until((turns) => waiting(turns) !== undefined))!
       yield* agent.session.stopTurn
 
@@ -237,13 +241,13 @@ it.live("runs the next Turn in a newly chosen Permission mode", () =>
     const agent = yield* f.open(conversation)
     yield* agent.configure({ permissionMode: "default" })
 
-    yield* agent.send("Please run `touch first.txt`")
+    yield* agent.send(run("touch first.txt", "DONE"))
     const request = waiting(yield* f.until((turns) => waiting(turns) !== undefined))!
     yield* agent.answer(request.requestId, AllowRequest.make({}))
     yield* f.until(settled(1))
 
     yield* agent.configure({ permissionMode: "bypassPermissions" })
-    yield* agent.send("Please run `touch second.txt`")
+    yield* agent.send(run("touch second.txt", "DONE"))
     const [, second] = yield* f.until(settled(2))
 
     assert.deepStrictEqual(second?.ended?.ending, TurnDone.make({}))

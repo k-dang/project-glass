@@ -17,20 +17,16 @@ import { claudeAdapter, type ClaudeSdk } from "../src/agentHost/claudeAdapter"
 import { piAdapter } from "../src/agentHost/piAdapter"
 import type { TurnSettings } from "../src/agentHost/protocol"
 import { bundledPi, bundledPiProgram } from "./demoAgent"
-import {
-  type FakeAnthropicReply,
-  type FakeAnthropicRequest,
-  startFakeAnthropic,
-} from "./fakeAnthropic"
 import { type FakeModelSettings, fakeModelProvider, type PiSettings } from "./fakeModelProvider"
 import { isolatedHome } from "./harness"
-import { fakeAnthropicEnvironment, pinnedClaude, pinnedClaudeProgram } from "./pinnedClaude"
+import { claudeLoginEnvironment, pinnedClaude, pinnedClaudeProgram } from "./pinnedClaude"
 import { recordingSessions, sessionTape } from "./sessionTape"
 
 const drive = Effect.fnUntraced(function* (
   adapter: AgentAdapter,
   tape: ReturnType<typeof sessionTape>,
   folder: string,
+  defaults: Partial<TurnSettings> = {},
 ) {
   yield* Effect.addFinalizer(() => tape.finish)
   const turns = yield* SubscriptionRef.make<ReadonlyArray<Turn>>([])
@@ -55,7 +51,13 @@ const drive = Effect.fnUntraced(function* (
       Effect.map((session: AgentSession) => ({
         session,
         configure: (settings: Partial<TurnSettings>) =>
-          session.configure({ model: null, effort: null, permissionMode: null, ...settings }),
+          session.configure({
+            model: null,
+            effort: null,
+            permissionMode: null,
+            ...defaults,
+            ...settings,
+          }),
         send: (message: string, images: ReadonlyArray<Image> = []) =>
           Effect.gen(function* () {
             const turnId = `turn-${++nextTurn}`
@@ -74,28 +76,13 @@ const drive = Effect.fnUntraced(function* (
   return { adapter, events, turns: SubscriptionRef.get(turns), until, open }
 })
 
-export const claudeSession = Effect.fnUntraced(function* (
-  scenario: string,
-  reply?: (request: FakeAnthropicRequest) => FakeAnthropicReply,
-) {
+export const claudeSession = Effect.fnUntraced(function* (scenario: string) {
   const folder = yield* isolatedHome
   const tape = sessionTape(scenario, pinnedClaudeProgram(), { "<folder>": folder })
 
-  let api: Pick<Effect.Success<typeof startFakeAnthropic>, "hold" | "release" | "received"> = {
-    hold: Effect.void,
-    release: Effect.void,
-    received: () => Effect.void,
-  }
-
-  if (recordingSessions) {
-    const anthropic = yield* startFakeAnthropic
-    api = anthropic
-
-    if (reply !== undefined) yield* anthropic.respond(reply)
-
-    for (const [name, value] of Object.entries(fakeAnthropicEnvironment(folder, anthropic.url)))
+  if (recordingSessions)
+    for (const [name, value] of Object.entries(claudeLoginEnvironment(folder)))
       vi.stubEnv(name, value)
-  }
 
   const sdk: ClaudeSdk = {
     query: (input) =>
@@ -104,7 +91,8 @@ export const claudeSession = Effect.fnUntraced(function* (
       tape.sessionInfo(id, options?.dir, () => getSessionInfo(id, options)),
   }
 
-  return { ...(yield* drive(claudeAdapter(pinnedClaude(), sdk), tape, folder)), api }
+  // Claude Code's own default model, which `null` picks, costs more than Haiku to record.
+  return yield* drive(claudeAdapter(pinnedClaude(), sdk), tape, folder, { model: "haiku" })
 })
 
 export const piSession = Effect.fnUntraced(function* (

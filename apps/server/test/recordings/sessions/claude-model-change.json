@@ -18,7 +18,7 @@
       "frames": [
         {
           "out": {
-            "request_id": "v1lli8kdn7s",
+            "request_id": "pllbli28qf",
             "type": "control_request",
             "request": {
               "subtype": "initialize"
@@ -30,7 +30,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "v1lli8kdn7s",
+              "request_id": "pllbli28qf",
               "response": {
                 "commands": [
                   {
@@ -100,6 +100,13 @@
                     "description": "Run a prompt or slash command on a recurring interval (e.g. /loop 5m /foo). Omit the interval to let the model self-pace.",
                     "argumentHint": "[interval] [prompt]",
                     "aliases": ["proactive"],
+                    "builtin": true
+                  },
+                  {
+                    "name": "schedule",
+                    "description": "Create, update, list, or run scheduled cloud agents (routines) that execute on a cron schedule.",
+                    "argumentHint": "",
+                    "aliases": ["routines"],
                     "builtin": true
                   },
                   {
@@ -343,33 +350,9 @@
                 "models": [
                   {
                     "value": "default",
-                    "resolvedModel": "claude-opus-5-5",
+                    "resolvedModel": "claude-sonnet-5-5",
                     "displayName": "Default (recommended)",
-                    "description": "Use the default model (currently Opus 5.5) · $4/$20 per Mtok",
-                    "supportsEffort": true,
-                    "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"],
-                    "supportsAdaptiveThinking": true,
-                    "supportsFastMode": true,
-                    "supportsAutoMode": true,
-                    "supportsThinkingOff": false
-                  },
-                  {
-                    "value": "opus",
-                    "resolvedModel": "claude-opus-5-5",
-                    "displayName": "Opus",
-                    "description": "Opus 5.5 · Best for everyday, complex tasks · $4/$20 per Mtok",
-                    "supportsEffort": true,
-                    "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"],
-                    "supportsAdaptiveThinking": true,
-                    "supportsFastMode": true,
-                    "supportsAutoMode": true,
-                    "supportsThinkingOff": false
-                  },
-                  {
-                    "value": "fable",
-                    "resolvedModel": "claude-fable-5-1",
-                    "displayName": "Fable",
-                    "description": "Fable 5.1 · Most capable for your hardest and longest-running tasks · $10/$50 per Mtok",
+                    "description": "Sonnet 5.5 · Efficient for routine tasks",
                     "supportsEffort": true,
                     "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"],
                     "supportsAdaptiveThinking": true,
@@ -380,7 +363,7 @@
                     "value": "sonnet",
                     "resolvedModel": "claude-sonnet-5-5",
                     "displayName": "Sonnet",
-                    "description": "Sonnet 5.5 · Efficient for routine tasks · $2/$10 per Mtok",
+                    "description": "Sonnet 5.5 · Efficient for routine tasks",
                     "supportsEffort": true,
                     "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"],
                     "supportsAdaptiveThinking": true,
@@ -388,10 +371,33 @@
                     "supportsThinkingOff": false
                   },
                   {
+                    "value": "fable",
+                    "resolvedModel": "claude-fable-5-1",
+                    "displayName": "Fable",
+                    "description": "Fable 5.1 · Most capable for your hardest and longest-running tasks",
+                    "supportsEffort": true,
+                    "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"],
+                    "supportsAdaptiveThinking": true,
+                    "supportsAutoMode": true,
+                    "supportsThinkingOff": false
+                  },
+                  {
+                    "value": "opus",
+                    "resolvedModel": "claude-opus-5-5",
+                    "displayName": "Opus",
+                    "description": "Opus 5.5 · Best for everyday, complex tasks",
+                    "supportsEffort": true,
+                    "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"],
+                    "supportsAdaptiveThinking": true,
+                    "supportsFastMode": true,
+                    "supportsAutoMode": true,
+                    "supportsThinkingOff": false
+                  },
+                  {
                     "value": "haiku",
                     "resolvedModel": "claude-haiku-5-5",
                     "displayName": "Haiku",
-                    "description": "Haiku 5.5 · Fastest for quick answers · $0.10/$0.50 per Mtok ($0.50/$2.50 for prompts over 100k)",
+                    "description": "Haiku 5.5 · Fastest for quick answers",
                     "supportsEffort": true,
                     "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"],
                     "supportsAdaptiveThinking": true,
@@ -399,12 +405,8 @@
                     "supportsThinkingOff": false
                   }
                 ],
-                "account": {
-                  "tokenSource": "none",
-                  "apiKeySource": "ANTHROPIC_API_KEY",
-                  "apiProvider": "firstParty"
-                },
-                "pid": 152452,
+                "account": "<redacted>",
+                "pid": 145820,
                 "claude_code_version": "2.1.309",
                 "current_permission_mode": "default",
                 "feedback_mode": {
@@ -413,7 +415,7 @@
                 "analytics_disabled": true,
                 "remote_control_auto_enable": false,
                 "remote_control_auto_connect_default": false,
-                "remote_control_available": false,
+                "remote_control_available": true,
                 "remote_control_auto_on_by_default": false,
                 "ide_rc_auto_enable_gate": false,
                 "fast_mode_state": "off",
@@ -428,11 +430,11 @@
         },
         {
           "out": {
-            "request_id": "fiej8cvxo9g",
+            "request_id": "kpxtuwqyvg8",
             "type": "control_request",
             "request": {
               "subtype": "set_model",
-              "model": "sonnet"
+              "model": "haiku"
             }
           }
         },
@@ -441,16 +443,16 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "fiej8cvxo9g",
+              "request_id": "kpxtuwqyvg8",
               "response": {
-                "model": "claude-sonnet-5-5"
+                "model": "claude-haiku-5-5"
               }
             }
           }
         },
         {
           "out": {
-            "request_id": "7ndo92ea36",
+            "request_id": "ug259qy1yge",
             "type": "control_request",
             "request": {
               "subtype": "apply_flag_settings",
@@ -465,7 +467,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "7ndo92ea36"
+              "request_id": "ug259qy1yge"
             }
           }
         },
@@ -474,10 +476,10 @@
             "type": "user",
             "message": {
               "role": "user",
-              "content": "Which model?"
+              "content": "Reply with exactly: FIRST"
             },
             "parent_tool_use_id": null,
-            "uuid": "3d788723-1df4-4e40-bd18-73f2f175de8a"
+            "uuid": "11dc9e78-923d-4cb3-8b37-2d15aebfb694"
           }
         },
         {
@@ -486,25 +488,25 @@
             "subtype": "session_state_changed",
             "state": "running",
             "sdk_host_only": true,
-            "uuid": "c7b35770-13b5-41c5-8577-6912e9c3b94e",
+            "uuid": "de11a020-4314-49ad-9d0f-23c9b9eff5be",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "3d788723-1df4-4e40-bd18-73f2f175de8a",
+            "command_uuid": "11dc9e78-923d-4cb3-8b37-2d15aebfb694",
             "state": "queued",
-            "uuid": "190673e1-5d40-4e73-a064-3029d0a28c65",
+            "uuid": "129374ab-0c1e-4e60-9c6e-707192876213",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "3d788723-1df4-4e40-bd18-73f2f175de8a",
+            "command_uuid": "11dc9e78-923d-4cb3-8b37-2d15aebfb694",
             "state": "started",
-            "uuid": "959ccdd4-2901-45cb-a7ed-732d534afe89",
+            "uuid": "a79ec4cd-3a56-4963-814b-0fa6cace23e6",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -531,6 +533,7 @@
               "ListAgents",
               "NotebookEdit",
               "Read",
+              "RemoteTrigger",
               "ReportFindings",
               "ScheduleWakeup",
               "SendMessage",
@@ -543,7 +546,7 @@
               "Write"
             ],
             "mcp_servers": [],
-            "model": "claude-sonnet-5-5",
+            "model": "claude-haiku-5-5",
             "permissionMode": "default",
             "slash_commands": [
               "deep-research",
@@ -557,6 +560,7 @@
               "fewer-permission-prompts",
               "doctor",
               "loop",
+              "schedule",
               "claude-api",
               "workflow-authoring",
               "run",
@@ -592,7 +596,7 @@
               "team-onboarding"
             ],
             "terminal_slash_commands": ["doctor", "color", "focus", "reload-plugins"],
-            "apiKeySource": "ANTHROPIC_API_KEY",
+            "apiKeySource": "none",
             "claude_code_version": "2.1.309",
             "output_style": "default",
             "agents": ["claude", "Explore", "general-purpose", "Plan", "statusline-setup"],
@@ -608,6 +612,7 @@
               "fewer-permission-prompts",
               "doctor",
               "loop",
+              "schedule",
               "claude-api",
               "workflow-authoring",
               "run",
@@ -642,20 +647,20 @@
               "mcp_call_result_not_for_model_v1"
             ],
             "analytics_disabled": true,
-            "product_feedback_disabled": true,
-            "uuid": "afbed689-6a27-4fc5-b141-546d45825b4f",
+            "product_feedback_disabled": false,
+            "uuid": "d695508f-4539-4027-8fce-7383365fa8f7",
             "memory_paths": {
               "auto": "<folder>/.claude/projects\\<folder>/memory\\"
             },
             "original_cwd": "<folder>",
             "additional_directories": [],
-            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-f2a4a90638b8a762ba7b95f5c75754fb",
+            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-2f910d142f76cd8bc11ebd635a108fcc",
             "fast_mode_state": "off",
             "fast_mode_disabled_reason": "sdk_opt_in_required",
             "per_turn_effort_active": true,
             "view_mode": "default",
             "powershell_path": "<home>/AppData/Local/Programs/PowerShell/7/pwsh.exe",
-            "user_message_uuids": ["3d788723-1df4-4e40-bd18-73f2f175de8a"]
+            "user_message_uuids": ["11dc9e78-923d-4cb3-8b37-2d15aebfb694"]
           }
         },
         {
@@ -664,8 +669,8 @@
             "subtype": "status",
             "status": "requesting",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "6bb35381-f96b-47bd-bc79-8fbdb20a07ba",
-            "user_message_uuids": ["3d788723-1df4-4e40-bd18-73f2f175de8a"]
+            "uuid": "e8832ff9-b53f-436e-97e9-ee2667c6ad36",
+            "user_message_uuids": ["11dc9e78-923d-4cb3-8b37-2d15aebfb694"]
           }
         },
         {
@@ -674,27 +679,41 @@
             "event": {
               "type": "message_start",
               "message": {
-                "id": "msg_a4d7c680-810b-4cf0-95a0-797a98c46334",
+                "model": "claude-haiku-5-5",
+                "id": "msg_011CgfWtU9vLR35tpDNx5WHM",
                 "type": "message",
                 "role": "assistant",
-                "model": "claude-sonnet-5-5",
                 "content": [],
+                "container": null,
                 "stop_reason": null,
                 "stop_sequence": null,
+                "stop_details": null,
                 "usage": {
-                  "input_tokens": 1,
-                  "output_tokens": 0
-                }
+                  "input_tokens": 2,
+                  "cache_creation_input_tokens": 6619,
+                  "cache_read_input_tokens": 14423,
+                  "cache_creation": {
+                    "ephemeral_5m_input_tokens": 0,
+                    "ephemeral_1h_input_tokens": 6619
+                  },
+                  "output_tokens": 6,
+                  "service_tier": "standard",
+                  "inference_geo": "global",
+                  "speed": "standard"
+                },
+                "input_transformations": [],
+                "diagnostics": null,
+                "context_management": null
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "9c50129b-1935-40ee-bcb6-32aa6352515b",
-            "ttft_ms": 7,
+            "uuid": "a3f57e71-b21a-4446-b259-52734363e766",
+            "ttft_ms": 1071,
             "thinking_display": "updates",
-            "api_message_id": "msg_a4d7c680-810b-4cf0-95a0-797a98c46334",
-            "user_message_uuid": "3d788723-1df4-4e40-bd18-73f2f175de8a",
-            "user_message_uuids": ["3d788723-1df4-4e40-bd18-73f2f175de8a"]
+            "api_message_id": "msg_011CgfWtU9vLR35tpDNx5WHM",
+            "user_message_uuid": "11dc9e78-923d-4cb3-8b37-2d15aebfb694",
+            "user_message_uuids": ["11dc9e78-923d-4cb3-8b37-2d15aebfb694"]
           }
         },
         {
@@ -710,8 +729,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "f9fa7033-734a-4160-b65f-b9b42c1ac1d7",
-            "api_message_id": "msg_a4d7c680-810b-4cf0-95a0-797a98c46334"
+            "uuid": "261cbd13-446d-4b80-9eb3-4842a01ce0be",
+            "api_message_id": "msg_011CgfWtU9vLR35tpDNx5WHM"
           }
         },
         {
@@ -722,111 +741,57 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": "Fake "
+                "text": "FIRST"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "e10ffe99-7f83-4ccf-b725-c6295355878a",
-            "api_message_id": "msg_a4d7c680-810b-4cf0-95a0-797a98c46334"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "reply "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "47da66cf-e312-4063-b98d-f22edc1e8f75",
-            "api_message_id": "msg_a4d7c680-810b-4cf0-95a0-797a98c46334"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "to: "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "3dc6d49d-7d72-485b-84ac-d73f3a8cb8e0",
-            "api_message_id": "msg_a4d7c680-810b-4cf0-95a0-797a98c46334"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "Which "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "60750350-eb59-4c5a-8610-6e22fb539286",
-            "api_message_id": "msg_a4d7c680-810b-4cf0-95a0-797a98c46334"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "model?"
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "1184941c-e9b4-4de6-aa6e-3bc1de55d78b",
-            "api_message_id": "msg_a4d7c680-810b-4cf0-95a0-797a98c46334"
+            "uuid": "e795885a-3b5c-4080-b7d3-82feb574b644",
+            "api_message_id": "msg_011CgfWtU9vLR35tpDNx5WHM"
           }
         },
         {
           "in": {
             "type": "assistant",
             "message": {
-              "id": "msg_a4d7c680-810b-4cf0-95a0-797a98c46334",
+              "model": "claude-haiku-5-5",
+              "id": "msg_011CgfWtU9vLR35tpDNx5WHM",
               "type": "message",
               "role": "assistant",
-              "model": "claude-sonnet-5-5",
               "content": [
                 {
                   "type": "text",
-                  "text": "Fake reply to: Which model?"
+                  "text": "FIRST"
                 }
               ],
+              "container": null,
               "stop_reason": null,
               "stop_sequence": null,
+              "stop_details": null,
               "usage": {
-                "input_tokens": 1,
-                "output_tokens": 0
+                "input_tokens": 2,
+                "cache_creation_input_tokens": 6619,
+                "cache_read_input_tokens": 14423,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 6619
+                },
+                "output_tokens": 6,
+                "service_tier": "standard",
+                "inference_geo": "global",
+                "speed": "standard"
               },
+              "input_transformations": [],
+              "diagnostics": null,
               "context_management": null
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "4024a6c5-5719-4063-81b5-7b70a630d11e",
-            "timestamp": "2026-11-02T23:40:12.203Z",
-            "user_message_uuid": "3d788723-1df4-4e40-bd18-73f2f175de8a",
-            "user_message_uuids": ["3d788723-1df4-4e40-bd18-73f2f175de8a"]
+            "uuid": "43eca3c9-8636-45bd-8408-281e1392b2a0",
+            "timestamp": "2026-11-03T06:24:24.692Z",
+            "request_id": "req_011CgfWtTx2EH37BXJgwkKxD",
+            "user_message_uuid": "11dc9e78-923d-4cb3-8b37-2d15aebfb694",
+            "user_message_uuids": ["11dc9e78-923d-4cb3-8b37-2d15aebfb694"]
           }
         },
         {
@@ -838,8 +803,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "ff24c5c7-7dcc-4bcf-90af-e6b4e17f803a",
-            "api_message_id": "msg_a4d7c680-810b-4cf0-95a0-797a98c46334"
+            "uuid": "0438f2c6-de23-4186-b003-78d71e25d368",
+            "api_message_id": "msg_011CgfWtU9vLR35tpDNx5WHM"
           }
         },
         {
@@ -849,16 +814,27 @@
               "type": "message_delta",
               "delta": {
                 "stop_reason": "end_turn",
-                "stop_sequence": null
+                "stop_sequence": null,
+                "stop_details": null,
+                "container": null
               },
               "usage": {
-                "output_tokens": 1
+                "input_tokens": 2,
+                "cache_creation_input_tokens": 6619,
+                "cache_read_input_tokens": 14423,
+                "output_tokens": 6,
+                "output_tokens_details": {
+                  "thinking_tokens": 0
+                }
+              },
+              "context_management": {
+                "applied_edits": []
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "db8d07cc-820b-4015-9721-408374c5cbed",
-            "api_message_id": "msg_a4d7c680-810b-4cf0-95a0-797a98c46334"
+            "uuid": "b7a1b0ba-a327-4612-8339-3ffb3436fc98",
+            "api_message_id": "msg_011CgfWtU9vLR35tpDNx5WHM"
           }
         },
         {
@@ -869,21 +845,29 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "5a52f292-3efc-49e9-8810-ca094a8f9d00",
-            "api_message_id": "msg_a4d7c680-810b-4cf0-95a0-797a98c46334"
+            "uuid": "c767be81-02e5-434e-914d-d78fa1cb913d",
+            "api_message_id": "msg_011CgfWtU9vLR35tpDNx5WHM"
           }
         },
         {
           "in": {
-            "duration_api_ms": 27,
+            "type": "rate_limit_event",
+            "rate_limit_info": "<redacted>",
+            "uuid": "660b7e3f-014b-44d8-9019-44bf78f5d497",
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
+          }
+        },
+        {
+          "in": {
+            "duration_api_ms": 1079,
             "stop_reason": "end_turn",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "total_cost_usd": 0.000011999999999999999,
+            "total_cost_usd": 0.00147123,
             "usage": {
-              "input_tokens": 1,
-              "cache_creation_input_tokens": 0,
-              "cache_read_input_tokens": 0,
-              "output_tokens": 1,
+              "input_tokens": 2,
+              "cache_creation_input_tokens": 6619,
+              "cache_read_input_tokens": 14423,
+              "output_tokens": 6,
               "output_tokens_details": {
                 "thinking_tokens": 0
               },
@@ -893,26 +877,26 @@
               },
               "service_tier": "standard",
               "cache_creation": {
-                "ephemeral_1h_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 6619,
                 "ephemeral_5m_input_tokens": 0
               },
-              "inference_geo": "",
+              "inference_geo": "global",
               "iterations": [],
               "speed": "standard",
               "fallback_credit": null
             },
             "modelUsage": {
-              "claude-sonnet-5-5": {
-                "inputTokens": 1,
-                "outputTokens": 1,
-                "cacheReadInputTokens": 0,
-                "cacheCreationInputTokens": 0,
+              "claude-haiku-5-5": {
+                "inputTokens": 2,
+                "outputTokens": 6,
+                "cacheReadInputTokens": 14423,
+                "cacheCreationInputTokens": 6619,
                 "webSearchRequests": 0,
-                "costUSD": 0.000011999999999999999,
+                "costUSD": 0.00147123,
                 "contextWindow": 1000000,
                 "maxOutputTokens": 128000,
                 "thinkingTokens": 0,
-                "canonicalModel": "claude-sonnet-5-5",
+                "canonicalModel": "claude-haiku-5-5",
                 "provider": "firstParty",
                 "costBasis": "list"
               }
@@ -950,32 +934,32 @@
             "num_turns": 1,
             "subtype": "success",
             "api_error_status": null,
-            "result": "Fake reply to: Which model?",
-            "ttft_ms": 72,
+            "result": "FIRST",
+            "ttft_ms": 1134,
             "type": "result",
-            "duration_ms": 78,
-            "uuid": "27fe9911-0a25-422a-8561-97877980c592",
-            "ttft_stream_ms": 70,
-            "time_to_request_ms": 65,
-            "first_content_frame_ms": 71,
-            "user_message_uuid": "3d788723-1df4-4e40-bd18-73f2f175de8a",
-            "user_message_uuids": ["3d788723-1df4-4e40-bd18-73f2f175de8a"],
-            "request_sent_wall_ms": 1793662812196,
-            "first_request_input_tokens": 1,
+            "duration_ms": 1142,
+            "uuid": "7fa47b03-f052-4b76-ba6d-ff6f1c9d1151",
+            "ttft_stream_ms": 1133,
+            "time_to_request_ms": 64,
+            "first_content_frame_ms": 1133,
+            "user_message_uuid": "11dc9e78-923d-4cb3-8b37-2d15aebfb694",
+            "user_message_uuids": ["11dc9e78-923d-4cb3-8b37-2d15aebfb694"],
+            "request_sent_wall_ms": 1793687063622,
+            "first_request_input_tokens": 21044,
             "queued_turn_count": 0,
             "result_index": 0,
             "model_usage_since_last_result": {
-              "claude-sonnet-5-5": {
-                "inputTokens": 1,
-                "outputTokens": 1,
-                "cacheReadInputTokens": 0,
-                "cacheCreationInputTokens": 0,
+              "claude-haiku-5-5": {
+                "inputTokens": 2,
+                "outputTokens": 6,
+                "cacheReadInputTokens": 14423,
+                "cacheCreationInputTokens": 6619,
                 "webSearchRequests": 0,
-                "costUSD": 0.000011999999999999999,
+                "costUSD": 0.00147123,
                 "contextWindow": 1000000,
                 "maxOutputTokens": 128000,
                 "thinkingTokens": 0,
-                "canonicalModel": "claude-sonnet-5-5",
+                "canonicalModel": "claude-haiku-5-5",
                 "provider": "firstParty",
                 "costBasis": "list"
               }
@@ -984,19 +968,20 @@
         },
         {
           "out": {
-            "request_id": "tdhrz3if91q",
+            "request_id": "m2qiuv6h4z",
             "type": "control_request",
             "request": {
-              "subtype": "set_model"
+              "subtype": "set_model",
+              "model": "haiku"
             }
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "3d788723-1df4-4e40-bd18-73f2f175de8a",
+            "command_uuid": "11dc9e78-923d-4cb3-8b37-2d15aebfb694",
             "state": "completed",
-            "uuid": "6fe31b4c-844e-422a-a399-d4f49cb1f67a",
+            "uuid": "d82b7b75-9f60-46ac-8fc7-010cf3fbb7b8",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1006,22 +991,8 @@
             "subtype": "session_state_changed",
             "state": "idle",
             "sdk_host_only": true,
-            "uuid": "a93fb0f8-03d3-4dac-a40b-748e26a2a9ce",
+            "uuid": "cce47385-6c9d-45cb-978d-6e9754e238bc",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
-          }
-        },
-        {
-          "in": {
-            "type": "user",
-            "message": {
-              "role": "user",
-              "content": "<local-command-stdout>Set model to `claude-opus-5-5`</local-command-stdout>"
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "dc028919-1b5e-4b90-825c-f897e875c6fd",
-            "timestamp": "2026-11-02T23:40:12.222Z",
-            "isReplay": true
           }
         },
         {
@@ -1029,21 +1000,21 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "tdhrz3if91q",
+              "request_id": "m2qiuv6h4z",
               "response": {
-                "model": "claude-opus-5-5"
+                "model": "claude-haiku-5-5"
               }
             }
           }
         },
         {
           "out": {
-            "request_id": "htaq9fio1lw",
+            "request_id": "b3sl75gnesn",
             "type": "control_request",
             "request": {
               "subtype": "apply_flag_settings",
               "settings": {
-                "effortLevel": null
+                "effortLevel": "low"
               }
             }
           }
@@ -1053,7 +1024,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "htaq9fio1lw"
+              "request_id": "b3sl75gnesn"
             }
           }
         },
@@ -1062,10 +1033,10 @@
             "type": "user",
             "message": {
               "role": "user",
-              "content": "And now?"
+              "content": "Reply with exactly: SECOND"
             },
             "parent_tool_use_id": null,
-            "uuid": "d954d078-d0c6-4d38-84a6-2eb9d83a351d"
+            "uuid": "cfb1d049-900c-4d7c-a073-4da951005a3b"
           }
         },
         {
@@ -1074,25 +1045,25 @@
             "subtype": "session_state_changed",
             "state": "running",
             "sdk_host_only": true,
-            "uuid": "d5be6dae-a35b-4120-b509-8cf25475aaa1",
+            "uuid": "868c32de-d04e-49c1-9b77-ee724c2a6ef6",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "d954d078-d0c6-4d38-84a6-2eb9d83a351d",
+            "command_uuid": "cfb1d049-900c-4d7c-a073-4da951005a3b",
             "state": "queued",
-            "uuid": "e57e0f61-9ff1-47a6-9554-6dcbebe28318",
+            "uuid": "0e80874e-7c12-41bf-a741-a970cf3de44a",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "d954d078-d0c6-4d38-84a6-2eb9d83a351d",
+            "command_uuid": "cfb1d049-900c-4d7c-a073-4da951005a3b",
             "state": "started",
-            "uuid": "5cbca614-79bf-4457-8358-2655481ae4ba",
+            "uuid": "d95e4f61-699b-4d14-9156-75b4e475c7d9",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1119,6 +1090,7 @@
               "ListAgents",
               "NotebookEdit",
               "Read",
+              "RemoteTrigger",
               "ReportFindings",
               "ScheduleWakeup",
               "SendMessage",
@@ -1131,7 +1103,7 @@
               "Write"
             ],
             "mcp_servers": [],
-            "model": "claude-opus-5-5",
+            "model": "claude-haiku-5-5",
             "permissionMode": "default",
             "slash_commands": [
               "deep-research",
@@ -1145,6 +1117,7 @@
               "fewer-permission-prompts",
               "doctor",
               "loop",
+              "schedule",
               "claude-api",
               "workflow-authoring",
               "run",
@@ -1180,7 +1153,7 @@
               "team-onboarding"
             ],
             "terminal_slash_commands": ["doctor", "color", "focus", "reload-plugins"],
-            "apiKeySource": "ANTHROPIC_API_KEY",
+            "apiKeySource": "none",
             "claude_code_version": "2.1.309",
             "output_style": "default",
             "agents": ["claude", "Explore", "general-purpose", "Plan", "statusline-setup"],
@@ -1196,6 +1169,7 @@
               "fewer-permission-prompts",
               "doctor",
               "loop",
+              "schedule",
               "claude-api",
               "workflow-authoring",
               "run",
@@ -1230,20 +1204,20 @@
               "mcp_call_result_not_for_model_v1"
             ],
             "analytics_disabled": true,
-            "product_feedback_disabled": true,
-            "uuid": "2e79a604-06ed-43ed-8c08-6b4a52d70f4e",
+            "product_feedback_disabled": false,
+            "uuid": "53617f99-c47f-4169-8490-63e7d925a8a3",
             "memory_paths": {
               "auto": "<folder>/.claude/projects\\<folder>/memory\\"
             },
             "original_cwd": "<folder>",
             "additional_directories": [],
-            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-f2a4a90638b8a762ba7b95f5c75754fb",
+            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-2f910d142f76cd8bc11ebd635a108fcc",
             "fast_mode_state": "off",
             "fast_mode_disabled_reason": "sdk_opt_in_required",
             "per_turn_effort_active": true,
             "view_mode": "default",
             "powershell_path": "<home>/AppData/Local/Programs/PowerShell/7/pwsh.exe",
-            "user_message_uuids": ["d954d078-d0c6-4d38-84a6-2eb9d83a351d"]
+            "user_message_uuids": ["cfb1d049-900c-4d7c-a073-4da951005a3b"]
           }
         },
         {
@@ -1252,8 +1226,8 @@
             "subtype": "status",
             "status": "requesting",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "10ae7bb1-b536-47af-aeba-a112b154986b",
-            "user_message_uuids": ["d954d078-d0c6-4d38-84a6-2eb9d83a351d"]
+            "uuid": "935f60d3-ac5b-431a-8813-c972744c9afe",
+            "user_message_uuids": ["cfb1d049-900c-4d7c-a073-4da951005a3b"]
           }
         },
         {
@@ -1262,27 +1236,45 @@
             "event": {
               "type": "message_start",
               "message": {
-                "id": "msg_645b311d-ab59-42af-8e65-7672eb036fa7",
+                "model": "claude-haiku-5-5",
+                "id": "msg_011CgfWtYzNsSS7EgspNnjNa",
                 "type": "message",
                 "role": "assistant",
-                "model": "claude-opus-5-5",
                 "content": [],
+                "container": null,
                 "stop_reason": null,
                 "stop_sequence": null,
+                "stop_details": null,
                 "usage": {
-                  "input_tokens": 1,
-                  "output_tokens": 0
-                }
+                  "input_tokens": 2,
+                  "cache_creation_input_tokens": 3382,
+                  "cache_read_input_tokens": 17704,
+                  "cache_creation": {
+                    "ephemeral_5m_input_tokens": 0,
+                    "ephemeral_1h_input_tokens": 3382
+                  },
+                  "output_tokens": 6,
+                  "service_tier": "standard",
+                  "inference_geo": "global",
+                  "speed": "standard"
+                },
+                "input_transformations": [],
+                "diagnostics": {
+                  "cache_miss_reason": {
+                    "type": "unavailable"
+                  }
+                },
+                "context_management": null
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "87669c86-79b1-4542-92b9-3884186cba3c",
-            "ttft_ms": 3,
+            "uuid": "a0302980-eef9-4e3e-b800-dd3ee17a587c",
+            "ttft_ms": 1297,
             "thinking_display": "updates",
-            "api_message_id": "msg_645b311d-ab59-42af-8e65-7672eb036fa7",
-            "user_message_uuid": "d954d078-d0c6-4d38-84a6-2eb9d83a351d",
-            "user_message_uuids": ["d954d078-d0c6-4d38-84a6-2eb9d83a351d"]
+            "api_message_id": "msg_011CgfWtYzNsSS7EgspNnjNa",
+            "user_message_uuid": "cfb1d049-900c-4d7c-a073-4da951005a3b",
+            "user_message_uuids": ["cfb1d049-900c-4d7c-a073-4da951005a3b"]
           }
         },
         {
@@ -1298,8 +1290,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "a193c271-4beb-4724-9c5d-bc3ce0a53f37",
-            "api_message_id": "msg_645b311d-ab59-42af-8e65-7672eb036fa7"
+            "uuid": "fdb1230f-636c-425a-9a90-b2ead1d00a21",
+            "api_message_id": "msg_011CgfWtYzNsSS7EgspNnjNa"
           }
         },
         {
@@ -1310,111 +1302,61 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": "Fake "
+                "text": "SECOND"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "cf787589-3317-4920-a129-64c793bf96c2",
-            "api_message_id": "msg_645b311d-ab59-42af-8e65-7672eb036fa7"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "reply "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "db3f11f1-9f06-40e0-9e22-ae94f94bcf19",
-            "api_message_id": "msg_645b311d-ab59-42af-8e65-7672eb036fa7"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "to: "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "d920b68d-ac6f-44f0-9ac9-80520688841f",
-            "api_message_id": "msg_645b311d-ab59-42af-8e65-7672eb036fa7"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "And "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "bfe2f4a3-6b71-46af-8de0-ee31c5d2bd51",
-            "api_message_id": "msg_645b311d-ab59-42af-8e65-7672eb036fa7"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "now?"
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "50740d1f-2d11-4179-be8b-f4650bc219e1",
-            "api_message_id": "msg_645b311d-ab59-42af-8e65-7672eb036fa7"
+            "uuid": "cd655ca9-9632-4a6f-868b-42cfcf1ec3f6",
+            "api_message_id": "msg_011CgfWtYzNsSS7EgspNnjNa"
           }
         },
         {
           "in": {
             "type": "assistant",
             "message": {
-              "id": "msg_645b311d-ab59-42af-8e65-7672eb036fa7",
+              "model": "claude-haiku-5-5",
+              "id": "msg_011CgfWtYzNsSS7EgspNnjNa",
               "type": "message",
               "role": "assistant",
-              "model": "claude-opus-5-5",
               "content": [
                 {
                   "type": "text",
-                  "text": "Fake reply to: And now?"
+                  "text": "SECOND"
                 }
               ],
+              "container": null,
               "stop_reason": null,
               "stop_sequence": null,
+              "stop_details": null,
               "usage": {
-                "input_tokens": 1,
-                "output_tokens": 0
+                "input_tokens": 2,
+                "cache_creation_input_tokens": 3382,
+                "cache_read_input_tokens": 17704,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 3382
+                },
+                "output_tokens": 6,
+                "service_tier": "standard",
+                "inference_geo": "global",
+                "speed": "standard"
+              },
+              "input_transformations": [],
+              "diagnostics": {
+                "cache_miss_reason": {
+                  "type": "unavailable"
+                }
               },
               "context_management": null
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "d89feaa3-15ec-4dba-8915-867eb1ac8e29",
-            "timestamp": "2026-11-02T23:40:12.255Z",
-            "user_message_uuid": "d954d078-d0c6-4d38-84a6-2eb9d83a351d",
-            "user_message_uuids": ["d954d078-d0c6-4d38-84a6-2eb9d83a351d"]
+            "uuid": "61e43b3b-1f81-454a-ae7b-4afd436c1de3",
+            "timestamp": "2026-11-03T06:24:26.043Z",
+            "request_id": "req_011CgfWtYjVwdmuKnk1GrhSE",
+            "user_message_uuid": "cfb1d049-900c-4d7c-a073-4da951005a3b",
+            "user_message_uuids": ["cfb1d049-900c-4d7c-a073-4da951005a3b"]
           }
         },
         {
@@ -1426,8 +1368,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "f4919399-5528-454f-b6c4-904c44c9ff98",
-            "api_message_id": "msg_645b311d-ab59-42af-8e65-7672eb036fa7"
+            "uuid": "8991a3d6-0a8a-4c5e-9e80-7bafe8ad4fe7",
+            "api_message_id": "msg_011CgfWtYzNsSS7EgspNnjNa"
           }
         },
         {
@@ -1437,16 +1379,27 @@
               "type": "message_delta",
               "delta": {
                 "stop_reason": "end_turn",
-                "stop_sequence": null
+                "stop_sequence": null,
+                "stop_details": null,
+                "container": null
               },
               "usage": {
-                "output_tokens": 1
+                "input_tokens": 2,
+                "cache_creation_input_tokens": 3382,
+                "cache_read_input_tokens": 17704,
+                "output_tokens": 6,
+                "output_tokens_details": {
+                  "thinking_tokens": 0
+                }
+              },
+              "context_management": {
+                "applied_edits": []
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "ffb76487-3532-447c-b1ad-56b800059524",
-            "api_message_id": "msg_645b311d-ab59-42af-8e65-7672eb036fa7"
+            "uuid": "2506dd28-b796-405b-8bef-a691af0bb29a",
+            "api_message_id": "msg_011CgfWtYzNsSS7EgspNnjNa"
           }
         },
         {
@@ -1457,21 +1410,21 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "23d44acf-1707-4ae4-b9c2-96167424c7df",
-            "api_message_id": "msg_645b311d-ab59-42af-8e65-7672eb036fa7"
+            "uuid": "cf4120f9-9a2e-47d1-8eeb-8ae01d3d1f23",
+            "api_message_id": "msg_011CgfWtYzNsSS7EgspNnjNa"
           }
         },
         {
           "in": {
-            "duration_api_ms": 34,
+            "duration_api_ms": 2381,
             "stop_reason": "end_turn",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "total_cost_usd": 0.000035999999999999994,
+            "total_cost_usd": 0.00232787,
             "usage": {
-              "input_tokens": 1,
-              "cache_creation_input_tokens": 0,
-              "cache_read_input_tokens": 0,
-              "output_tokens": 1,
+              "input_tokens": 2,
+              "cache_creation_input_tokens": 3382,
+              "cache_read_input_tokens": 17704,
+              "output_tokens": 6,
               "output_tokens_details": {
                 "thinking_tokens": 0
               },
@@ -1481,40 +1434,26 @@
               },
               "service_tier": "standard",
               "cache_creation": {
-                "ephemeral_1h_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 3382,
                 "ephemeral_5m_input_tokens": 0
               },
-              "inference_geo": "",
+              "inference_geo": "global",
               "iterations": [],
               "speed": "standard",
               "fallback_credit": null
             },
             "modelUsage": {
-              "claude-sonnet-5-5": {
-                "inputTokens": 1,
-                "outputTokens": 1,
-                "cacheReadInputTokens": 0,
-                "cacheCreationInputTokens": 0,
+              "claude-haiku-5-5": {
+                "inputTokens": 4,
+                "outputTokens": 12,
+                "cacheReadInputTokens": 32127,
+                "cacheCreationInputTokens": 10001,
                 "webSearchRequests": 0,
-                "costUSD": 0.000011999999999999999,
+                "costUSD": 0.00232787,
                 "contextWindow": 1000000,
                 "maxOutputTokens": 128000,
                 "thinkingTokens": 0,
-                "canonicalModel": "claude-sonnet-5-5",
-                "provider": "firstParty",
-                "costBasis": "list"
-              },
-              "claude-opus-5-5": {
-                "inputTokens": 1,
-                "outputTokens": 1,
-                "cacheReadInputTokens": 0,
-                "cacheCreationInputTokens": 0,
-                "webSearchRequests": 0,
-                "costUSD": 0.000023999999999999997,
-                "contextWindow": 1000000,
-                "maxOutputTokens": 128000,
-                "thinkingTokens": 0,
-                "canonicalModel": "claude-opus-5-5",
+                "canonicalModel": "claude-haiku-5-5",
                 "provider": "firstParty",
                 "costBasis": "list"
               }
@@ -1552,32 +1491,32 @@
             "num_turns": 1,
             "subtype": "success",
             "api_error_status": null,
-            "result": "Fake reply to: And now?",
-            "ttft_ms": 22,
+            "result": "SECOND",
+            "ttft_ms": 1315,
             "type": "result",
-            "duration_ms": 24,
-            "uuid": "0d249f18-9f87-4b11-911f-7238ce7f2e5f",
-            "ttft_stream_ms": 21,
+            "duration_ms": 1320,
+            "uuid": "07b66117-d182-4d33-b8c2-c815999c095c",
+            "ttft_stream_ms": 1314,
             "time_to_request_ms": 19,
-            "first_content_frame_ms": 21,
-            "user_message_uuid": "d954d078-d0c6-4d38-84a6-2eb9d83a351d",
-            "user_message_uuids": ["d954d078-d0c6-4d38-84a6-2eb9d83a351d"],
-            "request_sent_wall_ms": 1793662812252,
-            "first_request_input_tokens": 1,
+            "first_content_frame_ms": 1315,
+            "user_message_uuid": "cfb1d049-900c-4d7c-a073-4da951005a3b",
+            "user_message_uuids": ["cfb1d049-900c-4d7c-a073-4da951005a3b"],
+            "request_sent_wall_ms": 1793687064747,
+            "first_request_input_tokens": 21088,
             "queued_turn_count": 0,
             "result_index": 1,
             "model_usage_since_last_result": {
-              "claude-opus-5-5": {
-                "inputTokens": 1,
-                "outputTokens": 1,
-                "cacheReadInputTokens": 0,
-                "cacheCreationInputTokens": 0,
+              "claude-haiku-5-5": {
+                "inputTokens": 2,
+                "outputTokens": 6,
+                "cacheReadInputTokens": 17704,
+                "cacheCreationInputTokens": 3382,
                 "webSearchRequests": 0,
-                "costUSD": 0.000023999999999999997,
+                "costUSD": 0.0008566400000000001,
                 "contextWindow": 1000000,
                 "maxOutputTokens": 128000,
                 "thinkingTokens": 0,
-                "canonicalModel": "claude-opus-5-5",
+                "canonicalModel": "claude-haiku-5-5",
                 "provider": "firstParty",
                 "costBasis": "list"
               }
@@ -1587,9 +1526,9 @@
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "d954d078-d0c6-4d38-84a6-2eb9d83a351d",
+            "command_uuid": "cfb1d049-900c-4d7c-a073-4da951005a3b",
             "state": "completed",
-            "uuid": "3d85b88f-06f2-4d53-86d6-b9256b56c6f2",
+            "uuid": "ee7f768a-88a4-4656-b5b6-3261550fa1c8",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1599,7 +1538,7 @@
             "subtype": "session_state_changed",
             "state": "idle",
             "sdk_host_only": true,
-            "uuid": "2ab6b534-42f1-4cd5-a4a4-f9c869c7b92b",
+            "uuid": "29a11b05-856b-4f56-875b-a4c2f5f29331",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },

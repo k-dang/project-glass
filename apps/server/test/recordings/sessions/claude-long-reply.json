@@ -18,7 +18,7 @@
       "frames": [
         {
           "out": {
-            "request_id": "q8l88vzjxjm",
+            "request_id": "rb901ovxrfk",
             "type": "control_request",
             "request": {
               "subtype": "initialize"
@@ -30,7 +30,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "q8l88vzjxjm",
+              "request_id": "rb901ovxrfk",
               "response": {
                 "commands": [
                   {
@@ -100,6 +100,13 @@
                     "description": "Run a prompt or slash command on a recurring interval (e.g. /loop 5m /foo). Omit the interval to let the model self-pace.",
                     "argumentHint": "[interval] [prompt]",
                     "aliases": ["proactive"],
+                    "builtin": true
+                  },
+                  {
+                    "name": "schedule",
+                    "description": "Create, update, list, or run scheduled cloud agents (routines) that execute on a cron schedule.",
+                    "argumentHint": "",
+                    "aliases": ["routines"],
                     "builtin": true
                   },
                   {
@@ -343,33 +350,9 @@
                 "models": [
                   {
                     "value": "default",
-                    "resolvedModel": "claude-opus-5-5",
+                    "resolvedModel": "claude-sonnet-5-5",
                     "displayName": "Default (recommended)",
-                    "description": "Use the default model (currently Opus 5.5) · $4/$20 per Mtok",
-                    "supportsEffort": true,
-                    "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"],
-                    "supportsAdaptiveThinking": true,
-                    "supportsFastMode": true,
-                    "supportsAutoMode": true,
-                    "supportsThinkingOff": false
-                  },
-                  {
-                    "value": "opus",
-                    "resolvedModel": "claude-opus-5-5",
-                    "displayName": "Opus",
-                    "description": "Opus 5.5 · Best for everyday, complex tasks · $4/$20 per Mtok",
-                    "supportsEffort": true,
-                    "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"],
-                    "supportsAdaptiveThinking": true,
-                    "supportsFastMode": true,
-                    "supportsAutoMode": true,
-                    "supportsThinkingOff": false
-                  },
-                  {
-                    "value": "fable",
-                    "resolvedModel": "claude-fable-5-1",
-                    "displayName": "Fable",
-                    "description": "Fable 5.1 · Most capable for your hardest and longest-running tasks · $10/$50 per Mtok",
+                    "description": "Sonnet 5.5 · Efficient for routine tasks",
                     "supportsEffort": true,
                     "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"],
                     "supportsAdaptiveThinking": true,
@@ -380,7 +363,7 @@
                     "value": "sonnet",
                     "resolvedModel": "claude-sonnet-5-5",
                     "displayName": "Sonnet",
-                    "description": "Sonnet 5.5 · Efficient for routine tasks · $2/$10 per Mtok",
+                    "description": "Sonnet 5.5 · Efficient for routine tasks",
                     "supportsEffort": true,
                     "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"],
                     "supportsAdaptiveThinking": true,
@@ -388,10 +371,33 @@
                     "supportsThinkingOff": false
                   },
                   {
+                    "value": "fable",
+                    "resolvedModel": "claude-fable-5-1",
+                    "displayName": "Fable",
+                    "description": "Fable 5.1 · Most capable for your hardest and longest-running tasks",
+                    "supportsEffort": true,
+                    "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"],
+                    "supportsAdaptiveThinking": true,
+                    "supportsAutoMode": true,
+                    "supportsThinkingOff": false
+                  },
+                  {
+                    "value": "opus",
+                    "resolvedModel": "claude-opus-5-5",
+                    "displayName": "Opus",
+                    "description": "Opus 5.5 · Best for everyday, complex tasks",
+                    "supportsEffort": true,
+                    "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"],
+                    "supportsAdaptiveThinking": true,
+                    "supportsFastMode": true,
+                    "supportsAutoMode": true,
+                    "supportsThinkingOff": false
+                  },
+                  {
                     "value": "haiku",
                     "resolvedModel": "claude-haiku-5-5",
                     "displayName": "Haiku",
-                    "description": "Haiku 5.5 · Fastest for quick answers · $0.10/$0.50 per Mtok ($0.50/$2.50 for prompts over 100k)",
+                    "description": "Haiku 5.5 · Fastest for quick answers",
                     "supportsEffort": true,
                     "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"],
                     "supportsAdaptiveThinking": true,
@@ -399,12 +405,8 @@
                     "supportsThinkingOff": false
                   }
                 ],
-                "account": {
-                  "tokenSource": "none",
-                  "apiKeySource": "ANTHROPIC_API_KEY",
-                  "apiProvider": "firstParty"
-                },
-                "pid": 148392,
+                "account": "<redacted>",
+                "pid": 147168,
                 "claude_code_version": "2.1.309",
                 "current_permission_mode": "default",
                 "feedback_mode": {
@@ -413,7 +415,7 @@
                 "analytics_disabled": true,
                 "remote_control_auto_enable": false,
                 "remote_control_auto_connect_default": false,
-                "remote_control_available": false,
+                "remote_control_available": true,
                 "remote_control_auto_on_by_default": false,
                 "ide_rc_auto_enable_gate": false,
                 "fast_mode_state": "off",
@@ -431,10 +433,10 @@
             "type": "user",
             "message": {
               "role": "user",
-              "content": "Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece."
+              "content": "Reply with exactly this text and nothing else: Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece."
             },
             "parent_tool_use_id": null,
-            "uuid": "439e8c07-5826-4fd0-af8e-8cf4f83f0d40"
+            "uuid": "4835760f-e742-4284-8930-36bd8ba32086"
           }
         },
         {
@@ -443,25 +445,25 @@
             "subtype": "session_state_changed",
             "state": "running",
             "sdk_host_only": true,
-            "uuid": "f3e1c825-3fec-433c-936d-24934e465bf8",
+            "uuid": "e104084c-78ac-458b-a102-9169b4e3a0a4",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "439e8c07-5826-4fd0-af8e-8cf4f83f0d40",
+            "command_uuid": "4835760f-e742-4284-8930-36bd8ba32086",
             "state": "queued",
-            "uuid": "ab48e246-35c6-449b-a98c-c2001ba83108",
+            "uuid": "cc6d3f83-f1ad-4409-9672-f7246f307eb2",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "439e8c07-5826-4fd0-af8e-8cf4f83f0d40",
+            "command_uuid": "4835760f-e742-4284-8930-36bd8ba32086",
             "state": "started",
-            "uuid": "eb519c40-73bd-47cf-95d5-62b57c53dd73",
+            "uuid": "aa34121f-ba0d-40c8-b814-6941bc58384e",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -488,6 +490,7 @@
               "ListAgents",
               "NotebookEdit",
               "Read",
+              "RemoteTrigger",
               "ReportFindings",
               "ScheduleWakeup",
               "SendMessage",
@@ -500,7 +503,7 @@
               "Write"
             ],
             "mcp_servers": [],
-            "model": "claude-opus-5-5",
+            "model": "claude-haiku-5-5",
             "permissionMode": "default",
             "slash_commands": [
               "deep-research",
@@ -514,6 +517,7 @@
               "fewer-permission-prompts",
               "doctor",
               "loop",
+              "schedule",
               "claude-api",
               "workflow-authoring",
               "run",
@@ -549,7 +553,7 @@
               "team-onboarding"
             ],
             "terminal_slash_commands": ["doctor", "color", "focus", "reload-plugins"],
-            "apiKeySource": "ANTHROPIC_API_KEY",
+            "apiKeySource": "none",
             "claude_code_version": "2.1.309",
             "output_style": "default",
             "agents": ["claude", "Explore", "general-purpose", "Plan", "statusline-setup"],
@@ -565,6 +569,7 @@
               "fewer-permission-prompts",
               "doctor",
               "loop",
+              "schedule",
               "claude-api",
               "workflow-authoring",
               "run",
@@ -599,20 +604,20 @@
               "mcp_call_result_not_for_model_v1"
             ],
             "analytics_disabled": true,
-            "product_feedback_disabled": true,
-            "uuid": "f1de6c64-3716-456f-91ce-10e192841993",
+            "product_feedback_disabled": false,
+            "uuid": "ee41e42d-ad22-4e62-82fd-f9beb613df91",
             "memory_paths": {
               "auto": "<folder>/.claude/projects\\<folder>/memory\\"
             },
             "original_cwd": "<folder>",
             "additional_directories": [],
-            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-e61ae009adee3b8f966e62b45482a4b7",
+            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-eda284344422fe251a07a42b3c226c91",
             "fast_mode_state": "off",
             "fast_mode_disabled_reason": "sdk_opt_in_required",
             "per_turn_effort_active": true,
             "view_mode": "default",
             "powershell_path": "<home>/AppData/Local/Programs/PowerShell/7/pwsh.exe",
-            "user_message_uuids": ["439e8c07-5826-4fd0-af8e-8cf4f83f0d40"]
+            "user_message_uuids": ["4835760f-e742-4284-8930-36bd8ba32086"]
           }
         },
         {
@@ -621,8 +626,8 @@
             "subtype": "status",
             "status": "requesting",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "b3961a29-65aa-4494-8bb8-6ea62bf9af81",
-            "user_message_uuids": ["439e8c07-5826-4fd0-af8e-8cf4f83f0d40"]
+            "uuid": "ae21c453-72d3-40c5-bcbf-0c0ab0feece0",
+            "user_message_uuids": ["4835760f-e742-4284-8930-36bd8ba32086"]
           }
         },
         {
@@ -631,27 +636,41 @@
             "event": {
               "type": "message_start",
               "message": {
-                "id": "msg_bd9c8950-e797-470b-b51e-786c34742a21",
+                "model": "claude-haiku-5-5",
+                "id": "msg_011CgfWt54cBicHiNGtrbxXe",
                 "type": "message",
                 "role": "assistant",
-                "model": "claude-opus-5-5",
                 "content": [],
+                "container": null,
                 "stop_reason": null,
                 "stop_sequence": null,
+                "stop_details": null,
                 "usage": {
-                  "input_tokens": 1,
-                  "output_tokens": 0
-                }
+                  "input_tokens": 2,
+                  "cache_creation_input_tokens": 6753,
+                  "cache_read_input_tokens": 14423,
+                  "cache_creation": {
+                    "ephemeral_5m_input_tokens": 0,
+                    "ephemeral_1h_input_tokens": 6753
+                  },
+                  "output_tokens": 8,
+                  "service_tier": "standard",
+                  "inference_geo": "global",
+                  "speed": "standard"
+                },
+                "input_transformations": [],
+                "diagnostics": null,
+                "context_management": null
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "3bbd7d21-7c2b-4f27-a954-1d4edf726146",
-            "ttft_ms": 19,
+            "uuid": "7775cf25-23de-4126-b530-85a8117c8475",
+            "ttft_ms": 1138,
             "thinking_display": "updates",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21",
-            "user_message_uuid": "439e8c07-5826-4fd0-af8e-8cf4f83f0d40",
-            "user_message_uuids": ["439e8c07-5826-4fd0-af8e-8cf4f83f0d40"]
+            "api_message_id": "msg_011CgfWt54cBicHiNGtrbxXe",
+            "user_message_uuid": "4835760f-e742-4284-8930-36bd8ba32086",
+            "user_message_uuids": ["4835760f-e742-4284-8930-36bd8ba32086"]
           }
         },
         {
@@ -667,8 +686,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "d44ff1fd-0ddf-45ed-aca2-8a83194a8c75",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
+            "uuid": "8af3ec8a-e233-4068-8ce9-d289d4887a72",
+            "api_message_id": "msg_011CgfWt54cBicHiNGtrbxXe"
           }
         },
         {
@@ -679,13 +698,13 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": "Fake "
+                "text": "Every word of this reply stre"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "aa849f9d-7b53-4738-8a09-8288b25ab70d",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
+            "uuid": "199ba04e-465a-4376-9e9b-38fbc65a316a",
+            "api_message_id": "msg_011CgfWt54cBicHiNGtrbxXe"
           }
         },
         {
@@ -696,13 +715,13 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": "reply "
+                "text": "ams in its own small piece."
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "bb2b4014-c59f-42b7-af10-626508361abb",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
+            "uuid": "b4d3118e-b449-427a-a53f-b36e9124ebc0",
+            "api_message_id": "msg_011CgfWt54cBicHiNGtrbxXe"
           }
         },
         {
@@ -713,13 +732,13 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": "to: "
+                "text": " Every word of this reply stre"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "5930172c-1dfc-414b-971e-406dee549d9e",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
+            "uuid": "f5443398-9cd6-4210-b03b-0a7c2155de83",
+            "api_message_id": "msg_011CgfWt54cBicHiNGtrbxXe"
           }
         },
         {
@@ -730,13 +749,13 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": "Every "
+                "text": "ams in its own small piece."
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "87bed615-27f8-4bad-a9cd-9b595fe1fbc3",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
+            "uuid": "5c82642a-b3f7-4b5f-9a4c-7a5cf13667c0",
+            "api_message_id": "msg_011CgfWt54cBicHiNGtrbxXe"
           }
         },
         {
@@ -747,13 +766,13 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": "word "
+                "text": " Every word of this reply stre"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "3e2cf205-21d9-408c-8c50-be3822212548",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
+            "uuid": "762e6a4a-701e-4122-83da-b267c6b631b2",
+            "api_message_id": "msg_011CgfWt54cBicHiNGtrbxXe"
           }
         },
         {
@@ -764,13 +783,13 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": "of "
+                "text": "ams in its own small piece."
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "4eaa314e-4af5-48a1-a0e0-408a660848ed",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
+            "uuid": "7c9ead0e-19e7-4525-91c3-99c3d078ae21",
+            "api_message_id": "msg_011CgfWt54cBicHiNGtrbxXe"
           }
         },
         {
@@ -781,13 +800,13 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": "this "
+                "text": " Every word of this reply stre"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "b951d153-47cd-4d7b-b244-e9c582aaa994",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
+            "uuid": "8f1937d3-2338-4c00-8632-451f6eb2ad24",
+            "api_message_id": "msg_011CgfWt54cBicHiNGtrbxXe"
           }
         },
         {
@@ -798,13 +817,13 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": "reply "
+                "text": "ams in its own small piece."
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "69c76db5-7b10-464e-98bc-bd9c7a64fc31",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
+            "uuid": "4ebc4ca1-660d-4d4c-a18d-372563a0b3a1",
+            "api_message_id": "msg_011CgfWt54cBicHiNGtrbxXe"
           }
         },
         {
@@ -815,13 +834,13 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": "streams "
+                "text": " Every word of this reply stre"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "9b5d81b5-9145-4201-ba95-461db9a2a4eb",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
+            "uuid": "22d99c1d-a334-4469-b4d9-9787ab820ac2",
+            "api_message_id": "msg_011CgfWt54cBicHiNGtrbxXe"
           }
         },
         {
@@ -832,13 +851,13 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": "in "
+                "text": "ams in its own small piece."
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "77e67249-9a01-4303-8ead-6b29c9496526",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
+            "uuid": "594f506f-349d-4143-9104-40c2ecf3469f",
+            "api_message_id": "msg_011CgfWt54cBicHiNGtrbxXe"
           }
         },
         {
@@ -849,13 +868,13 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": "its "
+                "text": " Every word of this reply stre"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "be79ae0f-9762-4c8a-8b92-f967df46af73",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
+            "uuid": "76ac9783-39fd-479d-ba27-97a869c7a2f4",
+            "api_message_id": "msg_011CgfWt54cBicHiNGtrbxXe"
           }
         },
         {
@@ -866,13 +885,13 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": "own "
+                "text": "ams in its own small piece."
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "9d3a8d70-37f9-45d1-b175-f43f53a7956d",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
+            "uuid": "25921739-7a19-4e3b-8e2e-7d27dc592cc8",
+            "api_message_id": "msg_011CgfWt54cBicHiNGtrbxXe"
           }
         },
         {
@@ -883,13 +902,13 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": "small "
+                "text": " Every word of this reply stre"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "e78f3dd9-9c39-41d5-b682-48d280d7871a",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
+            "uuid": "3e98b47f-395e-44ec-842c-ddb9f41cef75",
+            "api_message_id": "msg_011CgfWt54cBicHiNGtrbxXe"
           }
         },
         {
@@ -900,13 +919,13 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": "piece. "
+                "text": "ams in its own small piece."
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "57a002fc-2561-4cd2-8d4a-93a08b684367",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
+            "uuid": "0df4e3bc-f99e-4a28-90f8-64a33f4ce0a7",
+            "api_message_id": "msg_011CgfWt54cBicHiNGtrbxXe"
           }
         },
         {
@@ -917,13 +936,13 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": "Every "
+                "text": " Every word of this reply stre"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "757f22c3-c99e-4ebe-819b-78f1086e8dc2",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
+            "uuid": "e74f5c44-8230-4f6c-bdf4-2919db82ade7",
+            "api_message_id": "msg_011CgfWt54cBicHiNGtrbxXe"
           }
         },
         {
@@ -934,1318 +953,57 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": "word "
+                "text": "ams in its own small piece."
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "670375bb-6bfb-444b-b118-ea3c20b94ffd",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "of "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "3f958747-6a39-47fe-8f4d-37b5a6e0b86e",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "this "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "5ab7f410-936e-4a01-b47c-92d6eac910a1",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "reply "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "1212fcf8-19a2-44d6-ac7d-ffeb84183986",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "streams "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "9c55e361-8a0b-43bf-bb86-bfa9b4847958",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "in "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "0c72c4a5-e38b-4c64-8831-58177716a125",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "its "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "4164c1d5-9f98-4e39-b48f-a58dd29c4995",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "own "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "509f2579-c71f-4117-9e4a-3c4e7dc4a569",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "small "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "9ae7a5ad-10fc-4725-b0a1-944ec6d3f316",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "piece. "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "6d85e208-b4a1-43a6-9ba4-2e8bbb624f7c",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "Every "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "344d9dc8-7e56-4eb3-a440-49b6ebd9186c",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "word "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "709a1af7-af26-4bf8-a526-0d0cdcf02a48",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "of "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "9c90891a-ea53-471a-84c4-1f3744260c84",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "this "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "3a92ba04-0cf5-4c65-82a7-56df9f6b44f9",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "reply "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "c455d820-84ac-4fe8-a993-606492bb4c20",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "streams "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "c78d6ecc-9536-4668-93b4-45ac89c7c082",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "in "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "b85d8acd-a5db-4d3a-ac0c-f2e8555c9114",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "its "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "244d4ea7-8e1c-4b7b-bd00-09266e0ac2f0",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "own "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "c102e489-46d1-4423-b6e8-2a81feec242f",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "small "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "5be50040-7f2a-4ffe-a4d9-fd02177b2b83",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "piece. "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "745fd949-d3d6-4daa-82e0-c03dd7622f71",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "Every "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "72baff96-a948-4859-8141-a23b1f6a804a",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "word "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "f9a669e0-eb83-4f7b-ba02-3065be5a9b2b",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "of "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "db59ff20-668d-4566-8c4a-7366a81941d4",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "this "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "a40a5b7d-1766-4d07-bc3f-fc4d4811f244",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "reply "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "4b1b253f-3277-4735-9e8a-15ebb4203086",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "streams "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "75ae502b-21ba-442b-a139-a674d78b31d6",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "in "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "5d079424-6c6a-4ef2-a0a9-3bfa5d93ef84",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "its "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "56f6540b-0c20-4d2a-9ca4-a64813ca6417",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "own "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "b39defbe-b251-42cb-8612-cb78e5313d02",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "small "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "a082b183-dc69-4687-9cbe-ed2a4335eabb",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "piece. "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "38a1dd1a-08ba-4d2a-bfde-65420c27660c",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "Every "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "22e5e281-7abd-4d93-a48e-9dd4ee245343",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "word "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "17fd6af4-9455-4f67-b83a-bd12557ed2b7",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "of "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "60db5a26-62c5-400c-bef7-1137c03cb678",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "this "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "6ecab83e-f8bd-41d3-aa71-d5e9abc58583",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "reply "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "a6ecf219-a5a8-4407-9353-78aa11c23e04",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "streams "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "c2543478-f2a1-49f5-b769-ac848e875a62",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "in "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "cd42dc52-0d70-4ac2-b799-9b9e2ed53a30",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "its "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "d3e4305e-b91d-47b3-85aa-ea73ef2106ba",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "own "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "97ce9a7f-1c18-4439-be85-4761ff126db7",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "small "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "20fd4b0c-7120-4568-bfcc-cc493e5b3929",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "piece. "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "79360562-2df4-4c8c-bfec-8266c441e195",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "Every "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "fe5c69e2-ef7f-40cc-a018-c65ee72c417e",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "word "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "bfeff892-6ea6-4526-8ac1-08c079c71b91",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "of "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "c896d92f-0e8e-40c7-8f04-81dc4ce128f3",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "this "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "d09f27f5-bb5f-402b-b9e2-662b0fd7c819",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "reply "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "68d28fca-4d7f-4086-b575-9efac163fdf1",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "streams "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "a425b661-8bd8-45a7-8d1a-fc0c7f2fb3b0",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "in "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "4c2145bd-6b82-4ef4-b419-91c96b088c16",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "its "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "a1634a1e-9c5b-496f-b926-c878b8d5c168",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "own "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "597ff0e7-2f45-4ea5-a149-c240a058e700",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "small "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "dcf7e0d1-0789-40b5-9ebb-b38d5d021669",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "piece. "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "811827a8-94c9-40bd-bc09-823b96665cbf",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "Every "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "5f9c06f0-1987-4062-85bb-fa2061652dbd",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "word "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "017b68f8-72c6-4142-95b3-ce9e115e7ffe",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "of "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "a3169491-a049-4ee1-a93f-59e0e5394b7c",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "this "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "5c9b091e-0f89-40ad-be4b-46b8f25dc90c",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "reply "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "a91be702-0378-43d3-82b8-207bdd69d269",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "streams "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "304c8911-051f-4e8f-9b2a-9a9500edf018",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "in "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "88bce016-869f-4454-95e5-80160c05fc72",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "its "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "5e5b2332-4a84-4bad-bf8d-0cebb95a0db8",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "own "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "f0cf9ed8-4d5d-456c-907f-c54c64b65624",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "small "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "4f8262fe-d5ae-4ea3-ad7c-4766cef68687",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "piece. "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "19256a0d-9034-46ae-a2e2-da7e696b10cd",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "Every "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "ca9de892-4f56-448e-825b-78a54dd877ad",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "word "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "08662a36-7b7c-4114-9c06-d73413f92020",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "of "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "4b63c0a5-e031-4bd6-b11b-4d293673d96b",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "this "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "22151fb0-7085-4cc8-bf75-91d64f24a119",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "reply "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "343ff9d5-dbd0-4a9a-a197-387378d72fcf",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "streams "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "ad16564e-7e9c-4137-808f-67df120f902f",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "in "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "af612c07-2d32-476e-8f3e-c495773de6a4",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "its "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "5dfbe3f4-8d19-48c8-b1e8-baf604b763c2",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "own "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "1b7e0c11-caa4-4f2b-b65c-bb83ef2877ff",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "small "
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "00afcb80-0d10-471b-a521-7a64e4203e0b",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "text_delta",
-                "text": "piece."
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "e14028af-76b6-4aef-af7c-b9db8fb35724",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
+            "uuid": "dd813939-bd5e-4df6-9511-60620f0f9a72",
+            "api_message_id": "msg_011CgfWt54cBicHiNGtrbxXe"
           }
         },
         {
           "in": {
             "type": "assistant",
             "message": {
-              "id": "msg_bd9c8950-e797-470b-b51e-786c34742a21",
+              "model": "claude-haiku-5-5",
+              "id": "msg_011CgfWt54cBicHiNGtrbxXe",
               "type": "message",
               "role": "assistant",
-              "model": "claude-opus-5-5",
               "content": [
                 {
                   "type": "text",
-                  "text": "Fake reply to: Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece."
+                  "text": "Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece."
                 }
               ],
+              "container": null,
               "stop_reason": null,
               "stop_sequence": null,
+              "stop_details": null,
               "usage": {
-                "input_tokens": 1,
-                "output_tokens": 0
+                "input_tokens": 2,
+                "cache_creation_input_tokens": 6753,
+                "cache_read_input_tokens": 14423,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 6753
+                },
+                "output_tokens": 8,
+                "service_tier": "standard",
+                "inference_geo": "global",
+                "speed": "standard"
               },
+              "input_transformations": [],
+              "diagnostics": null,
               "context_management": null
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "0c07e901-a191-4313-ba4f-32d085229dd2",
-            "timestamp": "2026-11-02T23:40:10.660Z",
-            "user_message_uuid": "439e8c07-5826-4fd0-af8e-8cf4f83f0d40",
-            "user_message_uuids": ["439e8c07-5826-4fd0-af8e-8cf4f83f0d40"]
+            "uuid": "aee5b926-39c5-405f-a9df-a784dc4136a5",
+            "timestamp": "2026-11-03T06:24:19.776Z",
+            "request_id": "req_011CgfWt4rxWSe5PhRkaB4r4",
+            "user_message_uuid": "4835760f-e742-4284-8930-36bd8ba32086",
+            "user_message_uuids": ["4835760f-e742-4284-8930-36bd8ba32086"]
           }
         },
         {
@@ -2257,8 +1015,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "92c742f9-76a4-4895-a824-485291619626",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
+            "uuid": "0650a3a1-b695-4e72-bd47-658c10bff068",
+            "api_message_id": "msg_011CgfWt54cBicHiNGtrbxXe"
           }
         },
         {
@@ -2268,16 +1026,27 @@
               "type": "message_delta",
               "delta": {
                 "stop_reason": "end_turn",
-                "stop_sequence": null
+                "stop_sequence": null,
+                "stop_details": null,
+                "container": null
               },
               "usage": {
-                "output_tokens": 1
+                "input_tokens": 2,
+                "cache_creation_input_tokens": 6753,
+                "cache_read_input_tokens": 14423,
+                "output_tokens": 130,
+                "output_tokens_details": {
+                  "thinking_tokens": 0
+                }
+              },
+              "context_management": {
+                "applied_edits": []
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "6d88223f-bc66-44d3-be44-f98300cbf0ec",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
+            "uuid": "48bd812f-cc77-413e-b1a0-42c6a29f2d3a",
+            "api_message_id": "msg_011CgfWt54cBicHiNGtrbxXe"
           }
         },
         {
@@ -2288,21 +1057,29 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "9eda25de-1516-4823-8eef-7cb452ee4c36",
-            "api_message_id": "msg_bd9c8950-e797-470b-b51e-786c34742a21"
+            "uuid": "1dcebc3c-a9ba-446e-bbb1-46e27945a774",
+            "api_message_id": "msg_011CgfWt54cBicHiNGtrbxXe"
           }
         },
         {
           "in": {
-            "duration_api_ms": 36,
+            "type": "rate_limit_event",
+            "rate_limit_info": "<redacted>",
+            "uuid": "18af6ea7-25a8-4126-99b4-1445d7e01c1d",
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
+          }
+        },
+        {
+          "in": {
+            "duration_api_ms": 1577,
             "stop_reason": "end_turn",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "total_cost_usd": 0.000023999999999999997,
+            "total_cost_usd": 0.0015600300000000002,
             "usage": {
-              "input_tokens": 1,
-              "cache_creation_input_tokens": 0,
-              "cache_read_input_tokens": 0,
-              "output_tokens": 1,
+              "input_tokens": 2,
+              "cache_creation_input_tokens": 6753,
+              "cache_read_input_tokens": 14423,
+              "output_tokens": 130,
               "output_tokens_details": {
                 "thinking_tokens": 0
               },
@@ -2312,26 +1089,26 @@
               },
               "service_tier": "standard",
               "cache_creation": {
-                "ephemeral_1h_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 6753,
                 "ephemeral_5m_input_tokens": 0
               },
-              "inference_geo": "",
+              "inference_geo": "global",
               "iterations": [],
               "speed": "standard",
               "fallback_credit": null
             },
             "modelUsage": {
-              "claude-opus-5-5": {
-                "inputTokens": 1,
-                "outputTokens": 1,
-                "cacheReadInputTokens": 0,
-                "cacheCreationInputTokens": 0,
+              "claude-haiku-5-5": {
+                "inputTokens": 2,
+                "outputTokens": 130,
+                "cacheReadInputTokens": 14423,
+                "cacheCreationInputTokens": 6753,
                 "webSearchRequests": 0,
-                "costUSD": 0.000023999999999999997,
+                "costUSD": 0.0015600300000000002,
                 "contextWindow": 1000000,
                 "maxOutputTokens": 128000,
                 "thinkingTokens": 0,
-                "canonicalModel": "claude-opus-5-5",
+                "canonicalModel": "claude-haiku-5-5",
                 "provider": "firstParty",
                 "costBasis": "list"
               }
@@ -2369,32 +1146,32 @@
             "num_turns": 1,
             "subtype": "success",
             "api_error_status": null,
-            "result": "Fake reply to: Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece.",
-            "ttft_ms": 83,
+            "result": "Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece.",
+            "ttft_ms": 1632,
             "type": "result",
-            "duration_ms": 89,
-            "uuid": "67ba7aea-0855-4c15-94e3-7457d8aedc7f",
-            "ttft_stream_ms": 73,
-            "time_to_request_ms": 55,
-            "first_content_frame_ms": 73,
-            "user_message_uuid": "439e8c07-5826-4fd0-af8e-8cf4f83f0d40",
-            "user_message_uuids": ["439e8c07-5826-4fd0-af8e-8cf4f83f0d40"],
-            "request_sent_wall_ms": 1793662810633,
-            "first_request_input_tokens": 1,
+            "duration_ms": 1644,
+            "uuid": "9e3f3b7e-094d-44c0-98d8-efdba90e5047",
+            "ttft_stream_ms": 1204,
+            "time_to_request_ms": 69,
+            "first_content_frame_ms": 1204,
+            "user_message_uuid": "4835760f-e742-4284-8930-36bd8ba32086",
+            "user_message_uuids": ["4835760f-e742-4284-8930-36bd8ba32086"],
+            "request_sent_wall_ms": 1793687058213,
+            "first_request_input_tokens": 21178,
             "queued_turn_count": 0,
             "result_index": 0,
             "model_usage_since_last_result": {
-              "claude-opus-5-5": {
-                "inputTokens": 1,
-                "outputTokens": 1,
-                "cacheReadInputTokens": 0,
-                "cacheCreationInputTokens": 0,
+              "claude-haiku-5-5": {
+                "inputTokens": 2,
+                "outputTokens": 130,
+                "cacheReadInputTokens": 14423,
+                "cacheCreationInputTokens": 6753,
                 "webSearchRequests": 0,
-                "costUSD": 0.000023999999999999997,
+                "costUSD": 0.0015600300000000002,
                 "contextWindow": 1000000,
                 "maxOutputTokens": 128000,
                 "thinkingTokens": 0,
-                "canonicalModel": "claude-opus-5-5",
+                "canonicalModel": "claude-haiku-5-5",
                 "provider": "firstParty",
                 "costBasis": "list"
               }
@@ -2404,9 +1181,9 @@
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "439e8c07-5826-4fd0-af8e-8cf4f83f0d40",
+            "command_uuid": "4835760f-e742-4284-8930-36bd8ba32086",
             "state": "completed",
-            "uuid": "1fb48e3d-d490-42f5-817e-df3f90413d52",
+            "uuid": "36148ead-74ce-46e0-a719-209df1470200",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -2416,7 +1193,7 @@
             "subtype": "session_state_changed",
             "state": "idle",
             "sdk_host_only": true,
-            "uuid": "af282248-e8c4-48f5-98ec-ebb05d3805db",
+            "uuid": "e602d126-2502-469a-85d5-645695531f48",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },

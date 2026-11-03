@@ -1,7 +1,6 @@
 import { Effect, Predicate, Result, Schema } from "effect"
 import { randomUUID } from "node:crypto"
 import { createServer, type ServerResponse } from "node:http"
-import { counter } from "./counter.ts"
 import { portOf } from "./ports.ts"
 
 const TextBlock = Schema.Struct({
@@ -36,9 +35,7 @@ type Block = typeof Block.Type
 
 type Message = typeof Message.Type
 
-export type FakeAnthropicRequest = typeof Request.Type
-
-export type FakeAnthropicReply = Reply
+type FakeAnthropicRequest = typeof Request.Type
 
 type Reply =
   | { readonly type: "text"; readonly text: string }
@@ -169,16 +166,7 @@ const message = (model: string, reply: Reply) => ({
 
 /** The shared Messages API boundary for real Claude CLI integration and app verification. */
 export const startFakeAnthropic = Effect.gen(function* () {
-  const received = counter()
   let respond: (request: FakeAnthropicRequest) => Reply = replyTo
-  let held: Array<() => void> | null = null
-
-  const releaseHeld = () => {
-    const hold = held ?? []
-    held = null
-
-    for (const resume of hold) resume()
-  }
 
   const server = createServer(async (request, response) => {
     const path = (request.url ?? "").split("?")[0] ?? ""
@@ -199,19 +187,6 @@ export const startFakeAnthropic = Effect.gen(function* () {
     const parsed = decoded.success
     const model = parsed.model ?? "claude-fake"
     const reply = respond(parsed)
-
-    const conversation = (parsed.tools ?? []).length > 0
-
-    if (conversation) {
-      received.add()
-
-      if (held !== null) {
-        const hold = held
-        await new Promise<void>((resolve) => hold.push(resolve))
-      }
-    }
-
-    if (response.destroyed) return
 
     console.log(
       `${new Date().toISOString()} messages ${model} -> ${reply.type === "text" ? "text" : reply.name}`,
@@ -234,7 +209,6 @@ export const startFakeAnthropic = Effect.gen(function* () {
       Effect.promise(
         () =>
           new Promise<void>((resolve, reject) => {
-            releaseHeld()
             server.closeAllConnections()
             server.close((error) => (error ? reject(error) : resolve()))
           }),
@@ -243,14 +217,9 @@ export const startFakeAnthropic = Effect.gen(function* () {
 
   return {
     url: `http://127.0.0.1:${portOf(server)}`,
-    received: received.reached,
     respond: (reply: (request: FakeAnthropicRequest) => Reply) =>
       Effect.sync(() => {
         respond = reply
       }),
-    hold: Effect.sync(() => {
-      held ??= []
-    }),
-    release: Effect.sync(releaseHeld),
   }
 })
