@@ -2,7 +2,7 @@
   "name": "@glass/desktop",
   "version": "0.0.0",
   "private": true,
-  "description": "Desktop app for reviewing GitHub pull requests",
+  "description": "A desktop work hub for reviewing GitHub pull requests and working with coding Agents",
   "author": "Kevin Dang",
   "type": "module",
   "main": "dist/main/index.cjs",

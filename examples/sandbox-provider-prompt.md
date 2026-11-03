@@ -8,10 +8,9 @@ Build a Glass Sandbox provider Plugin for my Sandbox platform.
 
 Glass is at https://github.com/k-dang/project-glass. Read these before writing code:
 
-- `docs/adr/0008-sandboxes-come-from-provider-plugins.md`: how Glass loads Plugins and what a
-  provider does.
-- `packages/plugin/src/index.ts`: the interface to implement. It isn't published, so copy it into
-  the Plugin folder as `glass-plugin.ts` and import its types from there.
+- `docs/adr/0010-sandboxes-come-from-provider-plugins.md`: why providers work the way they do.
+- `packages/plugin/src/index.ts`: how Glass loads Plugins and the interface to implement. It isn't
+  published, so copy it into the Plugin folder as `glass-plugin.ts` and import its types from there.
 - `examples/fake-sandboxes/`: a working provider that runs its "Sandboxes" on this device.
 
 Then ask me what you need to know about my platform, such as how it creates, reaches, and deletes

@@ -1,8 +1,9 @@
 # Every Agent runs in an agent host, on this device or in a Sandbox
 
-> Sandbox providers now create Sandboxes and start the host in them (ADR 0008); Glass no longer
+> Sandbox providers now create Sandboxes and start the host in them (ADR 0010); Glass no longer
 > provisions them itself. An Agent review's Follow-ups run as a read-only Agent in a checkout of
-> the review's Revision written from the cached clone, since it never commits (ADR 0009).
+> the review's Revision written from the cached clone, since it never commits (ADR 0009). Tests
+> replay recordings of the real programs (ADR 0011).
 
 Agents run on this device and in Sandboxes, and Glass must render a
 structured transcript, answer Permission requests, Steer, and survive dropped connections for both. So
@@ -27,31 +28,6 @@ Building Claude Code Agents confirmed the SDK over driving `claude` stream-json 
 the stream-json control protocol, already written and kept in step with the CLI. Glass pins its
 version, points it at the user's `claude`, and asks for Claude Code's own system prompt and the
 user, project, and local settings sources, since the SDK otherwise starts `claude` without them.
-Tests check Glass's own rules at seams Glass owns, and its use of each program against recordings
-of the real program. A hand-written fake `claude` came before this and encoded wrong beliefs about
-the CLI, such as its model list and asking before read-only commands, while its tests passed.
-Business-service tests supply an `AgentAdapter` and explicit domain events through the real host
-handlers and journal; a program that exits is a session that closes. Sandbox bookkeeping runs real
-host servers in the test process. Tests whose subject is a process (a host that dies, a dropped
-connection, a Sandbox that outlives Glass) run the agent host as a real process on a scripted
-adapter, and Tours, Agent reviews, and Asks supply scripted `AgentRunners`. Each program's
-translation into Glass's events is a pure `step`, tested by feeding it the program's messages.
-Wiring to a program (continuing a conversation, images, model, effort and Permission mode changes,
-Permission requests, Questions, Steers, Stop) replays a recording of the real program, matched
-launch by launch and message by message, so a change in what Glass sends fails until it is
-recorded again: Agent sessions are recorded from the pinned Claude Code CLI on the user's own
-login and from the bundled pi on the user's own Vercel AI Gateway key, both with Haiku, which costs
-a few cents (`record:sessions`), and the completion runners (ADR 0004) from the user's own `claude`
-and `pi` (`record:runners`). Scenarios ask for exact replies and act on what the session shows,
-such as a waiting Permission request or extension dialog, rather than on a held model, and
-recordings blank personal fields. A pi retry after a failed model request is still recorded
-against a fake model API, since a real one won't fail on demand. Recordings also capture model
-behaviour a hand-written fake can't, at the cost of recording again: each session recording names
-the pinned SDK or bundled pi version it came from, and its replay fails once that pin moves. A
-runner recording names the `claude` or `pi` version it came from too, but only as a note, since
-users run whichever version they have. Desktop end-to-end tests and `pnpm dev:fake` run the real
-programs against the fake model APIs. A fake SDK query stays only for failures the real CLI won't produce on demand,
-such as a failed handshake.
 
 ## Considered Options
 
@@ -71,3 +47,10 @@ such as a failed handshake.
 - **Raw `claude -p` stream-json**: Tours use the CLI because they need one completion; Agents need
   permission callbacks, questions, interrupts, and model and Permission mode changes, which the SDK
   already wraps.
+
+## Revisit when
+
+- An Agent program offers its own remote protocol that covers Permission requests, Steer, and
+  reconnecting, which could replace the host for that program.
+- The SDK falls behind the CLI, or hides something Glass needs from the control protocol.
+- Agents need to run without the user linking a clone.

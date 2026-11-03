@@ -19,9 +19,9 @@ index built from it when a reader exists, and can be rebuilt or replaced without
 
 ## Consequences
 
-The backend records opening a PR workspace before returning a successful `OpenPullRequest`
-response, using the PR, title, and Revision it just fetched. Reload uses the same flow. This makes
-the PR resumable when the renderer receives it, without a second RPC or a navigation wait.
-The renderer records file views, Reviews, and Replies through `RecordActivity` after those actions
-succeed. The backend records adding a To-do and marking one done as part of saving the change. The backend stamps the time and the Connection login. Recording is best-effort: a failure
-is logged, never shown, and does not turn a successful PR open into a failure.
+Recording is best-effort: a failure is logged, never shown, and does not turn a successful action
+into a failure.
+
+## Revisit when
+
+- The log needs to be shared across devices or users, which a local SQLite file can't do.

@@ -74,7 +74,3 @@ Computed module names, user-defined wait wrappers, re-exported test APIs, reassi
 aliases, and composed/piped sleeps need review. Unresolved imports remain the type
 checker's responsibility. Vite-only aliases must also be represented in TypeScript
 `paths` to participate in this resolver; the current `@/` alias is.
-
-Handler thickness, `it.live` versus `it.effect`, observable progress before advancing
-the clock, success-path deadlines, and elapsed-time assertions still need review;
-follow [AGENTS.md](../../../AGENTS.md). The lint does not infer these from timeout values.
