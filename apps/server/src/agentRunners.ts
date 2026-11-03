@@ -53,8 +53,20 @@ const answerSchema = (answer: Schema.Decoder<unknown>): JsonSchema.JsonSchema =>
 const promptWithSchema = (task: AgentTask<unknown>) =>
   `${task.prompt}\n\nOutput JSON Schema:\n${JSON.stringify(answerSchema(task.answer))}`
 
-const unusableFailure = (name: string, subject: string, identity: AgentRunnerIdentity) =>
-  agentFailure("unusable-output", `${name} returned an unusable ${subject}. Try again.`, identity)
+const unusableFailure =
+  (name: string, subject: string, identity: AgentRunnerIdentity) =>
+  (why: string, ...details: ReadonlyArray<unknown>) =>
+    Effect.logWarning(`${name} returned an unusable ${subject}: ${why}`, ...details).pipe(
+      Effect.andThen(
+        Effect.fail(
+          agentFailure(
+            "unusable-output",
+            `${name} returned an unusable ${subject}. Try again.`,
+            identity,
+          ),
+        ),
+      ),
+    )
 
 const startFailure = (name: string) => (error: { readonly reason: unknown }) => {
   const missing = Predicate.isTagged(error.reason, "NotFound")
@@ -168,11 +180,16 @@ const runnerStrategies = Effect.gen(function* () {
           identity,
         )
 
-      if (envelope?.result === undefined) return yield* unusable
+      if (envelope?.result === undefined)
+        return yield* unusable("its output had no result", result.stdout)
 
       return yield* Schema.decodeUnknownEffect(Schema.fromJsonString(task.answer))(
         envelope.result,
-      ).pipe(Effect.mapError(() => unusable))
+      ).pipe(
+        Effect.catch((error) =>
+          unusable("the answer didn't match the schema", error.message, envelope.result),
+        ),
+      )
     })
 
   const claudeReady = Schema.decodeUnknownEffect(
@@ -318,13 +335,16 @@ const runnerStrategies = Effect.gen(function* () {
         return yield* failed(runnerFailureReason(result.stderr))
       }
 
-      const answer = Arr.findLast(result.stdout.split("\n"), (line) => decodePiCliEnd(line)).pipe(
-        Option.flatMap((end) => decodePiCliAnswer(end.messages.at(-1))),
-      )
-
       const unusable = unusableFailure("pi", task.subject, identity)
 
-      if (Option.isNone(answer)) return yield* unusable
+      const end = Arr.findLast(result.stdout.split("\n"), (line) => decodePiCliEnd(line))
+
+      if (Option.isNone(end)) return yield* unusable("its output had no agent_end event")
+
+      const last = end.value.messages.at(-1)
+      const answer = decodePiCliAnswer(last)
+
+      if (Option.isNone(answer)) return yield* unusable("its last message wasn't an answer", last)
 
       const { stopReason, errorMessage = "", content } = answer.value
 
@@ -334,12 +354,15 @@ const runnerStrategies = Effect.gen(function* () {
         return yield* failed(runnerFailureReason(errorMessage))
       }
 
-      if (stopReason !== "stop") return yield* unusable
+      if (stopReason !== "stop")
+        return yield* unusable(`the model stopped with "${stopReason}"`, errorMessage)
 
       const text = content.flatMap((part) => ("text" in part ? [part.text] : [])).join("")
 
       return yield* Schema.decodeUnknownEffect(Schema.fromJsonString(task.answer))(text).pipe(
-        Effect.mapError(() => unusable),
+        Effect.catch((error) =>
+          unusable("the answer didn't match the schema", error.message, text),
+        ),
       )
     })
 
