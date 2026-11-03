@@ -183,26 +183,6 @@ export function TourView(props: TourViewProps) {
     })
   }, [])
 
-  // Finishing the Chapter in view collapses it, so move on to the next unfinished one.
-  // The Chapter in view comes from the last scroll, since the collapse moves the layout.
-  const inView = useRef(initial?.chapter ?? 0)
-  const wasDone = useRef(done)
-
-  useLayoutEffect(() => {
-    const before = wasDone.current
-    wasDone.current = done
-    const finished = inView.current
-
-    if (done[finished] !== "1" || before[finished] !== "0") return undefined
-
-    const next = done.indexOf("0", finished + 1)
-    const frame = next === -1 ? undefined : revealChapter(next, "smooth")
-
-    return () => {
-      if (frame !== undefined) cancelAnimationFrame(frame)
-    }
-  }, [done, revealChapter])
-
   useLayoutEffect(() => {
     if (initial === null) return undefined
 
@@ -330,7 +310,6 @@ export function TourView(props: TourViewProps) {
       aria-label="Tour Chapters"
       onScroll={() => {
         const index = currentChapter()
-        inView.current = index
 
         if (!ready.current) return
 
@@ -396,10 +375,20 @@ function ChapterCard(props: {
     "\n\n",
   )
 
+  // A Chapter collapsing while open folds into its row; one that opens collapsed just appears.
+  const [folded, setFolded] = useState(false)
+  const [lastCollapsed, setLastCollapsed] = useState(props.collapsed)
+
+  if (lastCollapsed !== props.collapsed) {
+    setLastCollapsed(props.collapsed)
+    setFolded(props.collapsed)
+  }
+
   const toggle = useRef<HTMLButtonElement>(null)
   const wasCollapsed = useRef(props.collapsed)
 
   // Opening or collapsing unmounts the focused control, so focus the one that replaced it.
+  // Focusing scrolls it into view, which keeps a just-viewed Chapter's row on screen.
   useLayoutEffect(() => {
     if (wasCollapsed.current === props.collapsed) return
 
@@ -430,7 +419,11 @@ function ChapterCard(props: {
           ref={toggle}
           aria-expanded={false}
           onClick={props.onOpen}
-          className="flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-[10px] border bg-[color-mix(in_oklch,var(--muted)_35%,var(--background))] px-4 py-2.5 text-left hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          className={cn(
+            "flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-[10px] border bg-[color-mix(in_oklch,var(--muted)_35%,var(--background))] px-4 py-2.5 text-left hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+            folded &&
+              "origin-top transition-[opacity,scale] duration-200 ease-(--ease-out) starting:scale-[0.98] starting:opacity-50 motion-reduce:transition-opacity motion-reduce:starting:scale-100",
+          )}
         >
           <ChevronRight aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
           <span
