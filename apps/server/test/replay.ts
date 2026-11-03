@@ -57,7 +57,7 @@ export const normalizer = (places: Readonly<Record<string, string>>) => {
       .reduce((current, [name, spelling]) => current.replaceAll(spelling, name), text)
       .replace(/<tmp>(?:\\\\|\\|\/)+glass-agent-[A-Za-z0-9]+/g, "<workdir>")
       .replace(
-        /(<[a-z-]+>)((?:(?:\\\\|\\|\/)[\w.@-]+)*)/g,
+        /(<[a-z-]+>)([\w.@-]*(?:(?:\\\\|\\|\/)[\w.@-]+)*)/g,
         (_, place: string, rest: string) => `${place}${rest.replace(/\\\\|\\/g, "/")}`,
       )
 }
