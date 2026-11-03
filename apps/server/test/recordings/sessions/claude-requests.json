@@ -1,5 +1,6 @@
 {
   "scenario": "claude-requests",
+  "program": "@anthropic-ai/claude-agent-sdk 0.3.309",
   "processes": [
     {
       "args": [
@@ -17,7 +18,7 @@
       "frames": [
         {
           "out": {
-            "request_id": "almiahezk7a",
+            "request_id": "xqt9k2mwkoa",
             "type": "control_request",
             "request": {
               "subtype": "initialize"
@@ -29,7 +30,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "almiahezk7a",
+              "request_id": "xqt9k2mwkoa",
               "response": {
                 "commands": [
                   {
@@ -403,7 +404,7 @@
                   "apiKeySource": "ANTHROPIC_API_KEY",
                   "apiProvider": "firstParty"
                 },
-                "pid": 138096,
+                "pid": 152876,
                 "claude_code_version": "2.1.309",
                 "current_permission_mode": "default",
                 "feedback_mode": {
@@ -427,7 +428,7 @@
         },
         {
           "out": {
-            "request_id": "5gxk7edygim",
+            "request_id": "fhh81jbhqif",
             "type": "control_request",
             "request": {
               "subtype": "set_model"
@@ -439,7 +440,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "5gxk7edygim",
+              "request_id": "fhh81jbhqif",
               "response": {
                 "model": "claude-opus-5-5"
               }
@@ -448,7 +449,7 @@
         },
         {
           "out": {
-            "request_id": "xvbd14falbr",
+            "request_id": "d7cwm7jpxi5",
             "type": "control_request",
             "request": {
               "subtype": "apply_flag_settings",
@@ -463,13 +464,13 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "xvbd14falbr"
+              "request_id": "d7cwm7jpxi5"
             }
           }
         },
         {
           "out": {
-            "request_id": "okclruz7g3",
+            "request_id": "ocz0f3xkzcf",
             "type": "control_request",
             "request": {
               "subtype": "set_permission_mode",
@@ -482,7 +483,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "okclruz7g3",
+              "request_id": "ocz0f3xkzcf",
               "response": {
                 "mode": "default"
               }
@@ -497,7 +498,7 @@
               "content": "Please run `touch compatible.txt`"
             },
             "parent_tool_use_id": null,
-            "uuid": "1f678b55-51b3-441a-bff8-a2dc8bb2316f"
+            "uuid": "dde2b5f9-daba-41b9-a8cc-c9dd1627561c"
           }
         },
         {
@@ -506,25 +507,25 @@
             "subtype": "session_state_changed",
             "state": "running",
             "sdk_host_only": true,
-            "uuid": "1a5093b4-6404-4a72-8808-65638c2865e4",
+            "uuid": "372f63a0-d854-4523-862a-3940f5ffd82e",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "1f678b55-51b3-441a-bff8-a2dc8bb2316f",
+            "command_uuid": "dde2b5f9-daba-41b9-a8cc-c9dd1627561c",
             "state": "queued",
-            "uuid": "c90ddad9-ef60-47d8-96fc-e314141a4991",
+            "uuid": "1153d507-1a16-4113-b46e-754f1dc001b8",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "1f678b55-51b3-441a-bff8-a2dc8bb2316f",
+            "command_uuid": "dde2b5f9-daba-41b9-a8cc-c9dd1627561c",
             "state": "started",
-            "uuid": "c556d0ef-0dd7-4ef0-afff-534750b4a55d",
+            "uuid": "8bcbd7f4-ff70-4196-a08c-040deaedc3bd",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -663,19 +664,19 @@
             ],
             "analytics_disabled": true,
             "product_feedback_disabled": true,
-            "uuid": "e526f06d-15fc-43f0-9c59-a74d2a5d137f",
+            "uuid": "099d7ea1-6f99-4be7-8fa8-849142d7fe70",
             "memory_paths": {
               "auto": "<folder>/.claude/projects\\<folder>/memory\\"
             },
             "original_cwd": "<folder>",
             "additional_directories": [],
-            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-e5e87e82eea76062ecf4a26ab720f602",
+            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-88aafc9cca50dc5339cc3db2d259afea",
             "fast_mode_state": "off",
             "fast_mode_disabled_reason": "sdk_opt_in_required",
             "per_turn_effort_active": true,
             "view_mode": "default",
             "powershell_path": "<home>/AppData/Local/Programs/PowerShell/7/pwsh.exe",
-            "user_message_uuids": ["1f678b55-51b3-441a-bff8-a2dc8bb2316f"]
+            "user_message_uuids": ["dde2b5f9-daba-41b9-a8cc-c9dd1627561c"]
           }
         },
         {
@@ -684,8 +685,8 @@
             "subtype": "status",
             "status": "requesting",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "02acafd0-7d60-419a-ad29-234ab5b66204",
-            "user_message_uuids": ["1f678b55-51b3-441a-bff8-a2dc8bb2316f"]
+            "uuid": "8a9bae21-1613-4a53-9a1f-47f671fc570e",
+            "user_message_uuids": ["dde2b5f9-daba-41b9-a8cc-c9dd1627561c"]
           }
         },
         {
@@ -694,7 +695,7 @@
             "event": {
               "type": "message_start",
               "message": {
-                "id": "msg_84c4b8d5-426c-47e5-8710-7c7a4eafa4b3",
+                "id": "msg_c8d2a9b3-12d3-4488-8319-c98e9c45af60",
                 "type": "message",
                 "role": "assistant",
                 "model": "claude-opus-5-5",
@@ -709,12 +710,12 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "3408824b-8b00-4788-8dc6-b500672f19ea",
-            "ttft_ms": 10,
+            "uuid": "3505ad2b-525c-4a5e-88cf-acf8a75306d5",
+            "ttft_ms": 11,
             "thinking_display": "updates",
-            "api_message_id": "msg_84c4b8d5-426c-47e5-8710-7c7a4eafa4b3",
-            "user_message_uuid": "1f678b55-51b3-441a-bff8-a2dc8bb2316f",
-            "user_message_uuids": ["1f678b55-51b3-441a-bff8-a2dc8bb2316f"]
+            "api_message_id": "msg_c8d2a9b3-12d3-4488-8319-c98e9c45af60",
+            "user_message_uuid": "dde2b5f9-daba-41b9-a8cc-c9dd1627561c",
+            "user_message_uuids": ["dde2b5f9-daba-41b9-a8cc-c9dd1627561c"]
           }
         },
         {
@@ -725,15 +726,15 @@
               "index": 0,
               "content_block": {
                 "type": "tool_use",
-                "id": "toolu_b4acac01-545c-44ad-a208-34a941b6c612",
+                "id": "toolu_21f10ac9-c346-452c-8bb3-d8a5fb09cf1c",
                 "name": "Bash",
                 "input": {}
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "29e5175a-a0d1-4e69-8864-7ae23656f89c",
-            "api_message_id": "msg_84c4b8d5-426c-47e5-8710-7c7a4eafa4b3"
+            "uuid": "1da64239-e9b3-47e5-8280-ca9dbf588b40",
+            "api_message_id": "msg_c8d2a9b3-12d3-4488-8319-c98e9c45af60"
           }
         },
         {
@@ -749,22 +750,22 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "f59ca8e1-aaa6-472c-9adf-3861f0a3254d",
-            "api_message_id": "msg_84c4b8d5-426c-47e5-8710-7c7a4eafa4b3"
+            "uuid": "4daf86db-cbe2-4631-846d-54181f618b2c",
+            "api_message_id": "msg_c8d2a9b3-12d3-4488-8319-c98e9c45af60"
           }
         },
         {
           "in": {
             "type": "assistant",
             "message": {
-              "id": "msg_84c4b8d5-426c-47e5-8710-7c7a4eafa4b3",
+              "id": "msg_c8d2a9b3-12d3-4488-8319-c98e9c45af60",
               "type": "message",
               "role": "assistant",
               "model": "claude-opus-5-5",
               "content": [
                 {
                   "type": "tool_use",
-                  "id": "toolu_b4acac01-545c-44ad-a208-34a941b6c612",
+                  "id": "toolu_21f10ac9-c346-452c-8bb3-d8a5fb09cf1c",
                   "name": "Bash",
                   "input": {
                     "command": "touch compatible.txt",
@@ -782,10 +783,10 @@
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "cf13212d-e54b-436b-b04e-21b515dc0eed",
-            "timestamp": "2026-11-02T10:12:35.224Z",
-            "user_message_uuid": "1f678b55-51b3-441a-bff8-a2dc8bb2316f",
-            "user_message_uuids": ["1f678b55-51b3-441a-bff8-a2dc8bb2316f"]
+            "uuid": "8fc5dd93-f2f7-4072-a519-eaa0a38d0a3b",
+            "timestamp": "2026-11-02T23:40:08.841Z",
+            "user_message_uuid": "dde2b5f9-daba-41b9-a8cc-c9dd1627561c",
+            "user_message_uuids": ["dde2b5f9-daba-41b9-a8cc-c9dd1627561c"]
           }
         },
         {
@@ -797,8 +798,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "80bb948c-5272-4070-bf74-d57344049651",
-            "api_message_id": "msg_84c4b8d5-426c-47e5-8710-7c7a4eafa4b3"
+            "uuid": "eeb47eed-d805-4fea-9388-e43ecbbdf13f",
+            "api_message_id": "msg_c8d2a9b3-12d3-4488-8319-c98e9c45af60"
           }
         },
         {
@@ -807,14 +808,14 @@
             "subtype": "session_state_changed",
             "state": "requires_action",
             "sdk_host_only": true,
-            "uuid": "d39ab4a1-eb09-415d-80c7-3dc758d44fba",
+            "uuid": "d197524a-ee15-4041-9431-699cf428822e",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "control_request",
-            "request_id": "1f9a9309-9cc6-49a7-bc82-bfb91167e1b0",
+            "request_id": "647ae0a0-216c-40bd-ad03-1436875d62fd",
             "request": {
               "subtype": "can_use_tool",
               "tool_name": "Bash",
@@ -848,7 +849,7 @@
                 }
               ],
               "blocked_path": "<folder>/compatible.txt",
-              "tool_use_id": "toolu_b4acac01-545c-44ad-a208-34a941b6c612"
+              "tool_use_id": "toolu_21f10ac9-c346-452c-8bb3-d8a5fb09cf1c"
             }
           }
         },
@@ -857,14 +858,14 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "1f9a9309-9cc6-49a7-bc82-bfb91167e1b0",
+              "request_id": "647ae0a0-216c-40bd-ad03-1436875d62fd",
               "response": {
                 "behavior": "allow",
                 "updatedInput": {
                   "command": "touch compatible.txt",
                   "description": "Run touch compatible.txt"
                 },
-                "toolUseID": "toolu_b4acac01-545c-44ad-a208-34a941b6c612"
+                "toolUseID": "toolu_21f10ac9-c346-452c-8bb3-d8a5fb09cf1c"
               }
             }
           }
@@ -884,8 +885,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "c619f8ee-56b4-4227-9931-1a61517aa701",
-            "api_message_id": "msg_84c4b8d5-426c-47e5-8710-7c7a4eafa4b3"
+            "uuid": "ea18ea80-5e4c-4d3f-9188-8a528610cf4e",
+            "api_message_id": "msg_c8d2a9b3-12d3-4488-8319-c98e9c45af60"
           }
         },
         {
@@ -896,8 +897,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "32f80163-97b4-43ef-8270-c2c4d3c015d2",
-            "api_message_id": "msg_84c4b8d5-426c-47e5-8710-7c7a4eafa4b3"
+            "uuid": "3438067b-14c3-4a6d-a9c3-ad651c9e6bb2",
+            "api_message_id": "msg_c8d2a9b3-12d3-4488-8319-c98e9c45af60"
           }
         },
         {
@@ -906,7 +907,7 @@
             "subtype": "session_state_changed",
             "state": "running",
             "sdk_host_only": true,
-            "uuid": "935981bd-4adc-4440-aa0d-b4f522ac1d8d",
+            "uuid": "c43b53ce-d982-4c5e-9362-67aa575cfe3d",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -917,7 +918,7 @@
               "role": "user",
               "content": [
                 {
-                  "tool_use_id": "toolu_b4acac01-545c-44ad-a208-34a941b6c612",
+                  "tool_use_id": "toolu_21f10ac9-c346-452c-8bb3-d8a5fb09cf1c",
                   "type": "tool_result",
                   "content": "Shell cwd was reset to <folder>",
                   "is_error": false
@@ -926,8 +927,8 @@
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "ba9a8f8d-4f6f-4a85-918c-5953c768f1a7",
-            "timestamp": "2026-11-02T10:12:36.315Z",
+            "uuid": "4e4aa669-333e-4aff-88e0-254b8b09f4cf",
+            "timestamp": "2026-11-02T23:40:10.034Z",
             "tool_use_result": {
               "stdout": "",
               "stderr": "\nShell cwd was reset to <folder>",
@@ -937,7 +938,7 @@
             },
             "tool_result_meta": [
               {
-                "id": "toolu_b4acac01-545c-44ad-a208-34a941b6c612",
+                "id": "toolu_21f10ac9-c346-452c-8bb3-d8a5fb09cf1c",
                 "permission_decision": {
                   "decision": "accept",
                   "source": "user_temporary"
@@ -952,8 +953,8 @@
             "subtype": "status",
             "status": "requesting",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "1814d68d-6302-44ef-984a-e4c661809e94",
-            "user_message_uuids": ["1f678b55-51b3-441a-bff8-a2dc8bb2316f"]
+            "uuid": "82379004-75c1-41d8-bf34-e83a5b464b6a",
+            "user_message_uuids": ["dde2b5f9-daba-41b9-a8cc-c9dd1627561c"]
           }
         },
         {
@@ -962,7 +963,7 @@
             "event": {
               "type": "message_start",
               "message": {
-                "id": "msg_69a6d5c1-361a-42cc-92c3-737de631a405",
+                "id": "msg_3ac3a90b-65fe-4116-a69f-1240950c44cc",
                 "type": "message",
                 "role": "assistant",
                 "model": "claude-opus-5-5",
@@ -977,10 +978,10 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "4b36a986-5640-4b18-a4df-bbc3a9187141",
+            "uuid": "53c0f112-a77c-42ee-a8c4-8e716e48de53",
             "ttft_ms": 4,
             "thinking_display": "updates",
-            "api_message_id": "msg_69a6d5c1-361a-42cc-92c3-737de631a405"
+            "api_message_id": "msg_3ac3a90b-65fe-4116-a69f-1240950c44cc"
           }
         },
         {
@@ -996,8 +997,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "319fd3f8-b32c-4859-b3ef-821ac726febd",
-            "api_message_id": "msg_69a6d5c1-361a-42cc-92c3-737de631a405"
+            "uuid": "67cce4a4-68e1-40d1-8dde-b5759666400a",
+            "api_message_id": "msg_3ac3a90b-65fe-4116-a69f-1240950c44cc"
           }
         },
         {
@@ -1013,8 +1014,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "d9f9f5a6-7e3d-463f-a1ab-d2d563face66",
-            "api_message_id": "msg_69a6d5c1-361a-42cc-92c3-737de631a405"
+            "uuid": "bc909cda-de11-4208-b020-e326b81735fc",
+            "api_message_id": "msg_3ac3a90b-65fe-4116-a69f-1240950c44cc"
           }
         },
         {
@@ -1030,8 +1031,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "705e65a8-f6ad-44c5-be6d-8af95e21a8ec",
-            "api_message_id": "msg_69a6d5c1-361a-42cc-92c3-737de631a405"
+            "uuid": "3cdc099c-77a6-43e0-9683-145c6f5b5378",
+            "api_message_id": "msg_3ac3a90b-65fe-4116-a69f-1240950c44cc"
           }
         },
         {
@@ -1047,8 +1048,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "a903667e-9f95-4a6f-8053-27e59ba25073",
-            "api_message_id": "msg_69a6d5c1-361a-42cc-92c3-737de631a405"
+            "uuid": "cf0029f9-18a5-4b06-8f9a-55fb7d0c1fc6",
+            "api_message_id": "msg_3ac3a90b-65fe-4116-a69f-1240950c44cc"
           }
         },
         {
@@ -1064,8 +1065,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "339549c0-27a8-4c0f-948e-dbfb3b96feb6",
-            "api_message_id": "msg_69a6d5c1-361a-42cc-92c3-737de631a405"
+            "uuid": "d9c0c756-9a62-42c7-a558-0a7dab7b539d",
+            "api_message_id": "msg_3ac3a90b-65fe-4116-a69f-1240950c44cc"
           }
         },
         {
@@ -1081,8 +1082,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "ecb5c6c2-e4b3-4d77-9531-b0eba3d2ac8d",
-            "api_message_id": "msg_69a6d5c1-361a-42cc-92c3-737de631a405"
+            "uuid": "76c011e8-6ed1-41af-bc47-81205fb17f60",
+            "api_message_id": "msg_3ac3a90b-65fe-4116-a69f-1240950c44cc"
           }
         },
         {
@@ -1098,8 +1099,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "9b198dea-cbf1-4633-8f33-3bf0cf6cb2b8",
-            "api_message_id": "msg_69a6d5c1-361a-42cc-92c3-737de631a405"
+            "uuid": "d7600175-1ba9-4ce4-b63d-72d937c893d8",
+            "api_message_id": "msg_3ac3a90b-65fe-4116-a69f-1240950c44cc"
           }
         },
         {
@@ -1115,8 +1116,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "e04c769b-0251-4d59-b6da-da843317c0ed",
-            "api_message_id": "msg_69a6d5c1-361a-42cc-92c3-737de631a405"
+            "uuid": "8dd22cb5-ef77-4295-9e41-0e318ee8d8ea",
+            "api_message_id": "msg_3ac3a90b-65fe-4116-a69f-1240950c44cc"
           }
         },
         {
@@ -1132,8 +1133,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "46fd3fa8-108b-4b1f-92da-8eca2db6b1a6",
-            "api_message_id": "msg_69a6d5c1-361a-42cc-92c3-737de631a405"
+            "uuid": "a042cfd7-c832-41e0-806a-a5f7049fd921",
+            "api_message_id": "msg_3ac3a90b-65fe-4116-a69f-1240950c44cc"
           }
         },
         {
@@ -1149,8 +1150,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "96e02e5f-d452-4b9a-8a7f-ed840f01a9c8",
-            "api_message_id": "msg_69a6d5c1-361a-42cc-92c3-737de631a405"
+            "uuid": "121e31c6-2024-49e9-a23d-41d5f32bb815",
+            "api_message_id": "msg_3ac3a90b-65fe-4116-a69f-1240950c44cc"
           }
         },
         {
@@ -1166,15 +1167,15 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "c9101e9a-9137-4525-ac86-cfd282f68b46",
-            "api_message_id": "msg_69a6d5c1-361a-42cc-92c3-737de631a405"
+            "uuid": "939deeb7-c126-4cfd-8479-e93bc697c887",
+            "api_message_id": "msg_3ac3a90b-65fe-4116-a69f-1240950c44cc"
           }
         },
         {
           "in": {
             "type": "assistant",
             "message": {
-              "id": "msg_69a6d5c1-361a-42cc-92c3-737de631a405",
+              "id": "msg_3ac3a90b-65fe-4116-a69f-1240950c44cc",
               "type": "message",
               "role": "assistant",
               "model": "claude-opus-5-5",
@@ -1194,8 +1195,8 @@
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "8cf154a5-e20d-40e5-8faf-1fad95e892d4",
-            "timestamp": "2026-11-02T10:12:36.330Z"
+            "uuid": "6f970b1a-ed44-4443-b6b4-475d715a422f",
+            "timestamp": "2026-11-02T23:40:10.051Z"
           }
         },
         {
@@ -1207,8 +1208,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "760bdbe2-92ce-4fc9-9683-db1ead1ce3fb",
-            "api_message_id": "msg_69a6d5c1-361a-42cc-92c3-737de631a405"
+            "uuid": "8ce638ff-8708-45b7-82fc-3765bbc9261d",
+            "api_message_id": "msg_3ac3a90b-65fe-4116-a69f-1240950c44cc"
           }
         },
         {
@@ -1226,8 +1227,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "243404bc-7e92-49e7-bd8f-2c64d502ff58",
-            "api_message_id": "msg_69a6d5c1-361a-42cc-92c3-737de631a405"
+            "uuid": "60db6ab5-5864-42dc-a6c2-8365fd4f05d8",
+            "api_message_id": "msg_3ac3a90b-65fe-4116-a69f-1240950c44cc"
           }
         },
         {
@@ -1238,13 +1239,13 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "8e01106b-e602-4bf1-8cec-030bc35f57c0",
-            "api_message_id": "msg_69a6d5c1-361a-42cc-92c3-737de631a405"
+            "uuid": "4eb44fbe-a253-4ede-bfcc-a1901602030d",
+            "api_message_id": "msg_3ac3a90b-65fe-4116-a69f-1240950c44cc"
           }
         },
         {
           "in": {
-            "duration_api_ms": 60,
+            "duration_api_ms": 68,
             "stop_reason": "end_turn",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "total_cost_usd": 0.000047999999999999994,
@@ -1320,16 +1321,16 @@
             "subtype": "success",
             "api_error_status": null,
             "result": "The fake model saw: Shell cwd was reset to <folder>",
-            "ttft_ms": 52,
+            "ttft_ms": 63,
             "type": "result",
-            "duration_ms": 1162,
-            "uuid": "6e273450-a31c-433f-a4fe-e6e95c60b24a",
-            "ttft_stream_ms": 51,
-            "time_to_request_ms": 43,
-            "first_content_frame_ms": 52,
-            "user_message_uuid": "1f678b55-51b3-441a-bff8-a2dc8bb2316f",
-            "user_message_uuids": ["1f678b55-51b3-441a-bff8-a2dc8bb2316f"],
-            "request_sent_wall_ms": 1793614355215,
+            "duration_ms": 1277,
+            "uuid": "6ffe0b22-8b62-446b-b5e7-d726ae949285",
+            "ttft_stream_ms": 62,
+            "time_to_request_ms": 53,
+            "first_content_frame_ms": 62,
+            "user_message_uuid": "dde2b5f9-daba-41b9-a8cc-c9dd1627561c",
+            "user_message_uuids": ["dde2b5f9-daba-41b9-a8cc-c9dd1627561c"],
+            "request_sent_wall_ms": 1793662808830,
             "first_request_input_tokens": 1,
             "queued_turn_count": 0,
             "result_index": 0,
@@ -1354,9 +1355,9 @@
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "1f678b55-51b3-441a-bff8-a2dc8bb2316f",
+            "command_uuid": "dde2b5f9-daba-41b9-a8cc-c9dd1627561c",
             "state": "completed",
-            "uuid": "dc299ac4-5582-4b7b-a043-94fb410fb70b",
+            "uuid": "abb4780c-c3c5-439f-94e5-99502987496f",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1368,7 +1369,7 @@
               "content": "Please ask which files to read"
             },
             "parent_tool_use_id": null,
-            "uuid": "9c067a80-09ae-4724-a0ca-a240a5aad49b"
+            "uuid": "c2d40746-ee3e-4a0f-9ad5-3d742e2cc83a"
           }
         },
         {
@@ -1377,7 +1378,7 @@
             "subtype": "session_state_changed",
             "state": "idle",
             "sdk_host_only": true,
-            "uuid": "adc1a452-6e68-46b2-ab6a-ce2dde3609ea",
+            "uuid": "1c9eeeec-8416-420d-81ac-873ebee2e0c2",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1387,25 +1388,25 @@
             "subtype": "session_state_changed",
             "state": "running",
             "sdk_host_only": true,
-            "uuid": "1615fb72-757b-4900-8b7f-64074a10128a",
+            "uuid": "e83c6f65-5ea9-49b2-b8c0-ec518bbf4386",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "9c067a80-09ae-4724-a0ca-a240a5aad49b",
+            "command_uuid": "c2d40746-ee3e-4a0f-9ad5-3d742e2cc83a",
             "state": "queued",
-            "uuid": "8ad2d9fa-0113-456d-8a90-518fe3415fd4",
+            "uuid": "7b564540-e56a-40a8-be44-bd925d923733",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "9c067a80-09ae-4724-a0ca-a240a5aad49b",
+            "command_uuid": "c2d40746-ee3e-4a0f-9ad5-3d742e2cc83a",
             "state": "started",
-            "uuid": "68883ed8-60e4-42df-a147-cfe5db25abab",
+            "uuid": "1ef13cdf-2b99-473f-ad27-43fdf5692477",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1544,19 +1545,19 @@
             ],
             "analytics_disabled": true,
             "product_feedback_disabled": true,
-            "uuid": "d019951d-9212-4401-a933-daa9c95d6aad",
+            "uuid": "fe40c028-6db1-4f55-ac4a-2053d17bc62e",
             "memory_paths": {
               "auto": "<folder>/.claude/projects\\<folder>/memory\\"
             },
             "original_cwd": "<folder>",
             "additional_directories": [],
-            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-e5e87e82eea76062ecf4a26ab720f602",
+            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-88aafc9cca50dc5339cc3db2d259afea",
             "fast_mode_state": "off",
             "fast_mode_disabled_reason": "sdk_opt_in_required",
             "per_turn_effort_active": true,
             "view_mode": "default",
             "powershell_path": "<home>/AppData/Local/Programs/PowerShell/7/pwsh.exe",
-            "user_message_uuids": ["9c067a80-09ae-4724-a0ca-a240a5aad49b"]
+            "user_message_uuids": ["c2d40746-ee3e-4a0f-9ad5-3d742e2cc83a"]
           }
         },
         {
@@ -1565,8 +1566,8 @@
             "subtype": "status",
             "status": "requesting",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "d1498b07-8f04-4922-9286-c24d54a00397",
-            "user_message_uuids": ["9c067a80-09ae-4724-a0ca-a240a5aad49b"]
+            "uuid": "9b12d118-eb6f-42f9-b2f2-a1d61a75c72d",
+            "user_message_uuids": ["c2d40746-ee3e-4a0f-9ad5-3d742e2cc83a"]
           }
         },
         {
@@ -1575,7 +1576,7 @@
             "event": {
               "type": "message_start",
               "message": {
-                "id": "msg_7a90ad93-c79c-4e8d-9e67-4856d09b615a",
+                "id": "msg_a05a0ce0-e5e7-4274-b102-a69897f41083",
                 "type": "message",
                 "role": "assistant",
                 "model": "claude-opus-5-5",
@@ -1590,12 +1591,12 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "cbdfe644-7c3e-4c9e-aaa9-92593f508ce2",
+            "uuid": "79e2e66e-f7e2-45d2-a988-8dca5f2ea115",
             "ttft_ms": 3,
             "thinking_display": "updates",
-            "api_message_id": "msg_7a90ad93-c79c-4e8d-9e67-4856d09b615a",
-            "user_message_uuid": "9c067a80-09ae-4724-a0ca-a240a5aad49b",
-            "user_message_uuids": ["9c067a80-09ae-4724-a0ca-a240a5aad49b"]
+            "api_message_id": "msg_a05a0ce0-e5e7-4274-b102-a69897f41083",
+            "user_message_uuid": "c2d40746-ee3e-4a0f-9ad5-3d742e2cc83a",
+            "user_message_uuids": ["c2d40746-ee3e-4a0f-9ad5-3d742e2cc83a"]
           }
         },
         {
@@ -1606,15 +1607,15 @@
               "index": 0,
               "content_block": {
                 "type": "tool_use",
-                "id": "toolu_efeb0c69-8ad3-46c2-ae5c-40881032a7b5",
+                "id": "toolu_4660373c-e739-46f1-8d34-f7572d50be8b",
                 "name": "AskUserQuestion",
                 "input": {}
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "119ab11b-5660-4e59-8b80-514512b0d30f",
-            "api_message_id": "msg_7a90ad93-c79c-4e8d-9e67-4856d09b615a"
+            "uuid": "53c82f33-114d-4be1-81f6-577ce23e04ea",
+            "api_message_id": "msg_a05a0ce0-e5e7-4274-b102-a69897f41083"
           }
         },
         {
@@ -1630,22 +1631,22 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "e96888df-7846-4d6b-be80-f6bd9ae361f7",
-            "api_message_id": "msg_7a90ad93-c79c-4e8d-9e67-4856d09b615a"
+            "uuid": "0d44a89e-f26c-495f-8fd3-d1ef64e83801",
+            "api_message_id": "msg_a05a0ce0-e5e7-4274-b102-a69897f41083"
           }
         },
         {
           "in": {
             "type": "assistant",
             "message": {
-              "id": "msg_7a90ad93-c79c-4e8d-9e67-4856d09b615a",
+              "id": "msg_a05a0ce0-e5e7-4274-b102-a69897f41083",
               "type": "message",
               "role": "assistant",
               "model": "claude-opus-5-5",
               "content": [
                 {
                   "type": "tool_use",
-                  "id": "toolu_efeb0c69-8ad3-46c2-ae5c-40881032a7b5",
+                  "id": "toolu_4660373c-e739-46f1-8d34-f7572d50be8b",
                   "name": "AskUserQuestion",
                   "input": {
                     "questions": [
@@ -1678,10 +1679,10 @@
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "0897f380-e63f-4914-8894-6a476d1bf82e",
-            "timestamp": "2026-11-02T10:12:36.357Z",
-            "user_message_uuid": "9c067a80-09ae-4724-a0ca-a240a5aad49b",
-            "user_message_uuids": ["9c067a80-09ae-4724-a0ca-a240a5aad49b"]
+            "uuid": "2534d59d-1b5a-4844-bf80-b4cc9e69e2ee",
+            "timestamp": "2026-11-02T23:40:10.082Z",
+            "user_message_uuid": "c2d40746-ee3e-4a0f-9ad5-3d742e2cc83a",
+            "user_message_uuids": ["c2d40746-ee3e-4a0f-9ad5-3d742e2cc83a"]
           }
         },
         {
@@ -1690,14 +1691,14 @@
             "subtype": "session_state_changed",
             "state": "requires_action",
             "sdk_host_only": true,
-            "uuid": "9ef877bf-84d3-4c70-9875-b11c4d717416",
+            "uuid": "48d81604-fc7c-4ca9-a39a-75bc023e254e",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "control_request",
-            "request_id": "fa281e5b-b9d9-41b4-8577-4344ab075b19",
+            "request_id": "597cb18b-f3f4-40b7-8b55-956500dd3468",
             "request": {
               "subtype": "can_use_tool",
               "tool_name": "AskUserQuestion",
@@ -1721,7 +1722,7 @@
                   }
                 ]
               },
-              "tool_use_id": "toolu_efeb0c69-8ad3-46c2-ae5c-40881032a7b5",
+              "tool_use_id": "toolu_4660373c-e739-46f1-8d34-f7572d50be8b",
               "requires_user_interaction": true
             }
           }
@@ -1735,8 +1736,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "38fc9495-bf52-444d-8db5-65ecca4bb0e8",
-            "api_message_id": "msg_7a90ad93-c79c-4e8d-9e67-4856d09b615a"
+            "uuid": "3bd291a8-2b39-4ef2-b1f0-fc498f28096f",
+            "api_message_id": "msg_a05a0ce0-e5e7-4274-b102-a69897f41083"
           }
         },
         {
@@ -1744,7 +1745,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "fa281e5b-b9d9-41b4-8577-4344ab075b19",
+              "request_id": "597cb18b-f3f4-40b7-8b55-956500dd3468",
               "response": {
                 "behavior": "allow",
                 "updatedInput": {
@@ -1769,7 +1770,7 @@
                     "Which files should I look at?": "Only the README"
                   }
                 },
-                "toolUseID": "toolu_efeb0c69-8ad3-46c2-ae5c-40881032a7b5"
+                "toolUseID": "toolu_4660373c-e739-46f1-8d34-f7572d50be8b"
               }
             }
           }
@@ -1789,8 +1790,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "c0e45da1-7718-4e31-bebf-51701a67b7c9",
-            "api_message_id": "msg_7a90ad93-c79c-4e8d-9e67-4856d09b615a"
+            "uuid": "65dfeaf3-171b-4089-a475-851374cd13b8",
+            "api_message_id": "msg_a05a0ce0-e5e7-4274-b102-a69897f41083"
           }
         },
         {
@@ -1801,8 +1802,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "e85a8d34-e2cd-46ad-94eb-14b1c290039e",
-            "api_message_id": "msg_7a90ad93-c79c-4e8d-9e67-4856d09b615a"
+            "uuid": "b4879039-5914-47a4-9050-47e526f9e0a7",
+            "api_message_id": "msg_a05a0ce0-e5e7-4274-b102-a69897f41083"
           }
         },
         {
@@ -1811,7 +1812,7 @@
             "subtype": "session_state_changed",
             "state": "running",
             "sdk_host_only": true,
-            "uuid": "9dc7ab75-350c-4457-87d5-a4a18516fa2b",
+            "uuid": "271d9762-aec7-415d-b866-173b20e07b18",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1824,14 +1825,14 @@
                 {
                   "type": "tool_result",
                   "content": "Your questions have been answered: \"Which files should I look at?\"=\"Only the README\". You can now continue with these answers in mind.",
-                  "tool_use_id": "toolu_efeb0c69-8ad3-46c2-ae5c-40881032a7b5"
+                  "tool_use_id": "toolu_4660373c-e739-46f1-8d34-f7572d50be8b"
                 }
               ]
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "9c27c103-acc8-483c-a390-5279dae08da6",
-            "timestamp": "2026-11-02T10:12:36.361Z",
+            "uuid": "7b634dc4-3eba-48ed-b1c7-979cc8dec92d",
+            "timestamp": "2026-11-02T23:40:10.088Z",
             "tool_use_result": {
               "questions": [
                 {
@@ -1856,7 +1857,7 @@
             },
             "tool_result_meta": [
               {
-                "id": "toolu_efeb0c69-8ad3-46c2-ae5c-40881032a7b5",
+                "id": "toolu_4660373c-e739-46f1-8d34-f7572d50be8b",
                 "permission_decision": {
                   "decision": "accept",
                   "source": "user_temporary"
@@ -1871,8 +1872,8 @@
             "subtype": "status",
             "status": "requesting",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "f7386955-6ede-4ca7-b99a-31de8bebb136",
-            "user_message_uuids": ["9c067a80-09ae-4724-a0ca-a240a5aad49b"]
+            "uuid": "53846d8d-3d7a-4edb-a710-b95867c72f7c",
+            "user_message_uuids": ["c2d40746-ee3e-4a0f-9ad5-3d742e2cc83a"]
           }
         },
         {
@@ -1881,7 +1882,7 @@
             "event": {
               "type": "message_start",
               "message": {
-                "id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465",
+                "id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122",
                 "type": "message",
                 "role": "assistant",
                 "model": "claude-opus-5-5",
@@ -1896,10 +1897,10 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "91ffb332-8eaf-47e2-9a02-5b757068e77b",
+            "uuid": "058d1d12-7a3c-4d16-a88e-45e3db2e97bb",
             "ttft_ms": 3,
             "thinking_display": "updates",
-            "api_message_id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465"
+            "api_message_id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122"
           }
         },
         {
@@ -1915,8 +1916,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "ccee76f7-f59b-42d0-8a0e-6b83e3fee19a",
-            "api_message_id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465"
+            "uuid": "2099c7cb-89f2-4ebb-a37f-5acf4d040154",
+            "api_message_id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122"
           }
         },
         {
@@ -1932,8 +1933,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "628867e8-2a9b-4632-a070-6df9f2ebc2c3",
-            "api_message_id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465"
+            "uuid": "56125f5a-3d3b-4951-abc1-ddc81bd52067",
+            "api_message_id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122"
           }
         },
         {
@@ -1949,8 +1950,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "b98d2ed0-64af-48cc-900a-8a68231c3c45",
-            "api_message_id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465"
+            "uuid": "a0b75041-f7ca-477d-a080-257a5f4827f9",
+            "api_message_id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122"
           }
         },
         {
@@ -1966,8 +1967,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "d0a84c44-d06d-40ca-ac2c-f1d18a35d147",
-            "api_message_id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465"
+            "uuid": "42c62ea8-06f5-4ea0-93e2-ad003ee7919e",
+            "api_message_id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122"
           }
         },
         {
@@ -1983,8 +1984,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "4446138e-4c1f-4cb1-8fff-ad92d9d2e4ea",
-            "api_message_id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465"
+            "uuid": "e33046c2-34be-4630-a2ac-86fc54f00865",
+            "api_message_id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122"
           }
         },
         {
@@ -2000,8 +2001,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "e676053d-58c1-4708-940f-f0d48ced0a35",
-            "api_message_id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465"
+            "uuid": "6815a38f-a293-467b-b371-ca521be1726e",
+            "api_message_id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122"
           }
         },
         {
@@ -2017,8 +2018,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "ded77d48-379e-4993-ad17-b9dbecd4f67a",
-            "api_message_id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465"
+            "uuid": "2f2a1def-6599-4ebe-95c9-8b9fcd902b3c",
+            "api_message_id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122"
           }
         },
         {
@@ -2034,8 +2035,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "3efcf5f3-1c8e-4809-b4ef-dcbe7716a91e",
-            "api_message_id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465"
+            "uuid": "bf7bdfd5-7dd2-45d8-b368-654050bc5f27",
+            "api_message_id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122"
           }
         },
         {
@@ -2051,8 +2052,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "1d9494f3-f8da-4311-8403-1f06bd7b6b93",
-            "api_message_id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465"
+            "uuid": "13e05aaa-4a6f-4da9-8a2c-fc839adb0057",
+            "api_message_id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122"
           }
         },
         {
@@ -2068,8 +2069,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "3f226cdb-0bcc-49ad-b4cd-44ef905ab8fa",
-            "api_message_id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465"
+            "uuid": "c8408f60-2c62-4446-ab35-384f27818922",
+            "api_message_id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122"
           }
         },
         {
@@ -2085,8 +2086,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "7cda7f6c-0602-4173-afb0-ff9af84878be",
-            "api_message_id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465"
+            "uuid": "68c97c8f-7038-4c04-9b0e-1a9207f1b482",
+            "api_message_id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122"
           }
         },
         {
@@ -2102,8 +2103,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "641139b0-df8d-40b3-90af-104bce00ae3c",
-            "api_message_id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465"
+            "uuid": "8da27cb7-eef5-4b56-9f68-814b0c00a0c8",
+            "api_message_id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122"
           }
         },
         {
@@ -2119,8 +2120,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "f072b562-af24-427a-98b1-15f86905edf0",
-            "api_message_id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465"
+            "uuid": "3485cbc9-2e55-49ef-b0cb-f78d1fb12583",
+            "api_message_id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122"
           }
         },
         {
@@ -2136,8 +2137,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "f0a13365-e7f0-49e8-9b09-119a98944cc6",
-            "api_message_id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465"
+            "uuid": "ab35d7e0-1493-427a-99f0-7bbadf8a0e51",
+            "api_message_id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122"
           }
         },
         {
@@ -2153,8 +2154,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "c0c382da-6767-4018-be6f-b6a84a973c9e",
-            "api_message_id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465"
+            "uuid": "cee9dcdc-0f2d-4e87-a448-2d48215d25fe",
+            "api_message_id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122"
           }
         },
         {
@@ -2170,8 +2171,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "2bdafb72-c413-4fdf-b65e-c49ecfd81687",
-            "api_message_id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465"
+            "uuid": "1db8052b-f846-4c68-8bfa-beeb323044f3",
+            "api_message_id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122"
           }
         },
         {
@@ -2187,8 +2188,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "5e6b4481-6825-410f-a508-1452625a0465",
-            "api_message_id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465"
+            "uuid": "32a99e7b-0ef6-4b94-b182-83113e931c70",
+            "api_message_id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122"
           }
         },
         {
@@ -2204,8 +2205,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "b7ef57f7-b3ec-4a0c-aa1d-0d4cdc93089b",
-            "api_message_id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465"
+            "uuid": "112a394f-cbdb-4a14-97a8-4f00b915d400",
+            "api_message_id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122"
           }
         },
         {
@@ -2221,8 +2222,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "f2b4404b-925c-401f-af44-5c239a6b5736",
-            "api_message_id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465"
+            "uuid": "58e6f84f-5497-4985-b5c2-f39c6155b4ae",
+            "api_message_id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122"
           }
         },
         {
@@ -2238,8 +2239,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "3940eca9-45fd-41b6-afc5-ee6b3e75364a",
-            "api_message_id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465"
+            "uuid": "9ef8d31e-1eee-4675-a6e7-8922dda8b2b2",
+            "api_message_id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122"
           }
         },
         {
@@ -2255,8 +2256,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "31ffa0a1-059e-419d-b785-6c2adb397fdc",
-            "api_message_id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465"
+            "uuid": "d796e2a6-5c4f-4933-8647-79bc1543df70",
+            "api_message_id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122"
           }
         },
         {
@@ -2272,8 +2273,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "3df585ed-9200-423e-9b5d-bcc91fb85a98",
-            "api_message_id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465"
+            "uuid": "44736925-a465-4718-a35b-12822204edbd",
+            "api_message_id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122"
           }
         },
         {
@@ -2289,8 +2290,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "8e5be46a-e578-475a-8ca7-025f02838c79",
-            "api_message_id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465"
+            "uuid": "017b1272-7af6-481a-8242-d2edafd33be4",
+            "api_message_id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122"
           }
         },
         {
@@ -2306,8 +2307,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "77615496-75e1-4f3a-a1c2-85b3fa3fcbec",
-            "api_message_id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465"
+            "uuid": "8e593787-b9ca-486f-b28d-b096761a76b3",
+            "api_message_id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122"
           }
         },
         {
@@ -2323,8 +2324,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "308760f9-aad3-4e6d-a902-d47e91803b9e",
-            "api_message_id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465"
+            "uuid": "e9d5d905-3367-4c80-a974-7f9ceb1e82aa",
+            "api_message_id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122"
           }
         },
         {
@@ -2340,8 +2341,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "6ae4e3a8-e367-403a-9aa8-ac6ec57ff4b9",
-            "api_message_id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465"
+            "uuid": "82ea4161-d891-4359-8fc5-8399477478d9",
+            "api_message_id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122"
           }
         },
         {
@@ -2357,15 +2358,15 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "e64bb4d5-4e99-4f12-8edb-79e7c27b80c7",
-            "api_message_id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465"
+            "uuid": "66ada26b-b105-4044-b03d-da2e0cc31559",
+            "api_message_id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122"
           }
         },
         {
           "in": {
             "type": "assistant",
             "message": {
-              "id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465",
+              "id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122",
               "type": "message",
               "role": "assistant",
               "model": "claude-opus-5-5",
@@ -2385,8 +2386,8 @@
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "0ad7ed07-e275-4cb3-9b7b-522d7057f541",
-            "timestamp": "2026-11-02T10:12:36.372Z"
+            "uuid": "979f7a09-d7ca-45f2-97c8-9b5424d6df87",
+            "timestamp": "2026-11-02T23:40:10.100Z"
           }
         },
         {
@@ -2398,8 +2399,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "3bbb7df5-58e9-41db-a543-1bc7ead9fb3c",
-            "api_message_id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465"
+            "uuid": "c7cbf934-d33b-4b06-a917-62aa8557d0c5",
+            "api_message_id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122"
           }
         },
         {
@@ -2417,8 +2418,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "8d847303-663d-41ad-92e0-8ad6d3f0e26e",
-            "api_message_id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465"
+            "uuid": "57f0a89d-6a48-46a0-ab7b-3ad24138814c",
+            "api_message_id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122"
           }
         },
         {
@@ -2429,13 +2430,13 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "973094ea-70d9-43f7-9830-aaececb3ac1e",
-            "api_message_id": "msg_91d6b033-3a1d-4ee9-9e69-4f932176d465"
+            "uuid": "64553018-7cc5-4187-827c-a39643bf4fd9",
+            "api_message_id": "msg_7abde865-fca2-4240-ba9a-a93af97fc122"
           }
         },
         {
           "in": {
-            "duration_api_ms": 74,
+            "duration_api_ms": 83,
             "stop_reason": "end_turn",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "total_cost_usd": 0.00009599999999999999,
@@ -2511,16 +2512,16 @@
             "subtype": "success",
             "api_error_status": null,
             "result": "The fake model saw: Your questions have been answered: \"Which files should I look at?\"=\"Only the README\". You can now continue with these answers in mind.",
-            "ttft_ms": 12,
+            "ttft_ms": 15,
             "type": "result",
-            "duration_ms": 29,
-            "uuid": "125dafd9-3087-408f-b453-771fe51af77c",
-            "ttft_stream_ms": 11,
-            "time_to_request_ms": 10,
-            "first_content_frame_ms": 12,
-            "user_message_uuid": "9c067a80-09ae-4724-a0ca-a240a5aad49b",
-            "user_message_uuids": ["9c067a80-09ae-4724-a0ca-a240a5aad49b"],
-            "request_sent_wall_ms": 1793614356354,
+            "duration_ms": 35,
+            "uuid": "1ce6afd3-376f-4639-ba65-3e2b68faafea",
+            "ttft_stream_ms": 14,
+            "time_to_request_ms": 12,
+            "first_content_frame_ms": 14,
+            "user_message_uuid": "c2d40746-ee3e-4a0f-9ad5-3d742e2cc83a",
+            "user_message_uuids": ["c2d40746-ee3e-4a0f-9ad5-3d742e2cc83a"],
+            "request_sent_wall_ms": 1793662810080,
             "first_request_input_tokens": 1,
             "queued_turn_count": 0,
             "result_index": 1,
@@ -2545,9 +2546,9 @@
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "9c067a80-09ae-4724-a0ca-a240a5aad49b",
+            "command_uuid": "c2d40746-ee3e-4a0f-9ad5-3d742e2cc83a",
             "state": "completed",
-            "uuid": "927855dd-f9bb-4a37-b2a4-3e9419182bb4",
+            "uuid": "91017fa4-72a2-4667-9688-249aef5b95ea",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -2557,7 +2558,7 @@
             "subtype": "session_state_changed",
             "state": "idle",
             "sdk_host_only": true,
-            "uuid": "19275fad-c83a-4545-b137-fce5303228ba",
+            "uuid": "8dd83c5a-d171-4f2e-8701-3dcd953a7d9c",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },

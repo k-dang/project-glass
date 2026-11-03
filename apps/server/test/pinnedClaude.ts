@@ -1,5 +1,6 @@
 import { createRequire } from "node:module"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
+import { installedProgram } from "./replay"
 
 /** The executable shipped by the Claude Agent SDK version Glass pins. */
 export const pinnedClaude = () => {
@@ -11,6 +12,14 @@ export const pinnedClaude = () => {
 
   return join(platform, "..", process.platform === "win32" ? "claude.exe" : "claude")
 }
+
+export const pinnedClaudeProgram = () =>
+  installedProgram(
+    join(
+      dirname(createRequire(import.meta.url).resolve("@anthropic-ai/claude-agent-sdk")),
+      "package.json",
+    ),
+  )
 
 export const fakeAnthropicEnvironment = (home: string, url: string) => ({
   GLASS_CLAUDE_COMMAND: pinnedClaude(),

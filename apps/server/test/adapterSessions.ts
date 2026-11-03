@@ -16,7 +16,7 @@ import type { AgentAdapter, AgentSession } from "../src/agentHost/adapter"
 import { claudeAdapter, type ClaudeSdk } from "../src/agentHost/claudeAdapter"
 import { piAdapter } from "../src/agentHost/piAdapter"
 import type { TurnSettings } from "../src/agentHost/protocol"
-import { bundledPi } from "./demoAgent"
+import { bundledPi, bundledPiProgram } from "./demoAgent"
 import {
   type FakeAnthropicReply,
   type FakeAnthropicRequest,
@@ -24,7 +24,7 @@ import {
 } from "./fakeAnthropic"
 import { type FakeModelSettings, fakeModelProvider, type PiSettings } from "./fakeModelProvider"
 import { isolatedHome } from "./harness"
-import { fakeAnthropicEnvironment, pinnedClaude } from "./pinnedClaude"
+import { fakeAnthropicEnvironment, pinnedClaude, pinnedClaudeProgram } from "./pinnedClaude"
 import { recordingSessions, sessionTape } from "./sessionTape"
 
 const drive = Effect.fnUntraced(function* (
@@ -79,7 +79,7 @@ export const claudeSession = Effect.fnUntraced(function* (
   reply?: (request: FakeAnthropicRequest) => FakeAnthropicReply,
 ) {
   const folder = yield* isolatedHome
-  const tape = sessionTape(scenario, { "<folder>": folder })
+  const tape = sessionTape(scenario, pinnedClaudeProgram(), { "<folder>": folder })
 
   let api: Pick<Effect.Success<typeof startFakeAnthropic>, "hold" | "release" | "received"> = {
     hold: Effect.void,
@@ -124,7 +124,7 @@ export const piSession = Effect.fnUntraced(function* (
 
   vi.stubEnv("PI_CODING_AGENT_DIR", join(home, ".pi", "agent"))
   vi.stubEnv("PI_OFFLINE", "1")
-  const tape = sessionTape(scenario, { "<folder>": folder, "<pi-home>": home })
+  const tape = sessionTape(scenario, bundledPiProgram(), { "<folder>": folder, "<pi-home>": home })
 
   const adapter = yield* piAdapter(bundledPi).pipe(
     Effect.provide(tape.spawner.pipe(Layer.provide(NodeServices.layer))),

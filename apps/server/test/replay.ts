@@ -1,5 +1,6 @@
 import { Effect, Option, Predicate, Schema, Sink, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
+import { readFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 
 export type Json = Schema.Json
@@ -64,6 +65,16 @@ export const denormalizer = (places: Readonly<Record<string, string>>) => {
     mapStrings(value, (text) =>
       known.reduce((current, [name, path]) => current.replaceAll(name, path), text),
     )
+}
+
+const Package = Schema.fromJsonString(
+  Schema.Struct({ name: Schema.String, version: Schema.String }),
+)
+
+export const installedProgram = (packageJson: string) => {
+  const { name, version } = Schema.decodeUnknownSync(Package)(readFileSync(packageJson, "utf8"))
+
+  return `${name} ${version}`
 }
 
 export const singleCommand = (command: ChildProcess.Command) =>

@@ -41,6 +41,7 @@ type Process = typeof Process.Type
 
 const Tape = Schema.Struct({
   scenario: Schema.String,
+  program: Schema.String,
   processes: Schema.Array(Process),
   calls: Schema.Array(Schema.Struct({ args: Schema.Json, info: Schema.Json })),
 })
@@ -228,7 +229,24 @@ const replayProgram = (
   }
 }
 
-export const sessionTape = (scenario: string, places: Readonly<Record<string, string>>) => {
+const loadTape = (scenario: string, version: string) => {
+  const tape = Schema.decodeUnknownSync(Schema.fromJsonString(Tape))(
+    readFileSync(tapeFile(scenario), "utf8"),
+  )
+
+  if (tape.program !== version)
+    throw new Error(
+      `${scenario} was recorded from ${tape.program}, but this checkout has ${version}. Record it again with pnpm --filter @glass/server record:sessions.`,
+    )
+
+  return tape
+}
+
+export const sessionTape = (
+  scenario: string,
+  version: string,
+  places: Readonly<Record<string, string>>,
+) => {
   const normalizeText = normalizer(places)
   const normalize = (value: Json) => mapStrings(value, normalizeText)
   const denormalize = denormalizer(places)
@@ -237,10 +255,8 @@ export const sessionTape = (scenario: string, places: Readonly<Record<string, st
   const ids = new Map<string, string>()
 
   const recorded: Tape = recordingSessions
-    ? { scenario, processes: [], calls: [] }
-    : Schema.decodeUnknownSync(Schema.fromJsonString(Tape))(
-        readFileSync(tapeFile(scenario), "utf8"),
-      )
+    ? { scenario, program: version, processes: [], calls: [] }
+    : loadTape(scenario, version)
 
   const processes: Array<Process> = []
   const calls: Array<{ args: Json; info: Json }> = []
@@ -458,7 +474,7 @@ export const sessionTape = (scenario: string, places: Readonly<Record<string, st
     if (recordingSessions) {
       const file = tapeFile(scenario)
       mkdirSync(dirname(file), { recursive: true })
-      writeFileSync(file, `${JSON.stringify({ scenario, processes, calls }, null, 2)}\n`)
+      writeFileSync(file, `${JSON.stringify({ ...recorded, processes, calls }, null, 2)}\n`)
 
       return
     }

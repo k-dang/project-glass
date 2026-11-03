@@ -20,7 +20,7 @@ import {
 
 const USAGE = `Records how the real Claude Code and pi CLIs answer Glass's agent runners.
 
-  pnpm --filter @glass/server exec jiti test/recordRunnerReplays.ts --pi-model <provider/model> [--claude-model haiku] [--only <scenario>]
+  pnpm --filter @glass/server record:runners --pi-model <provider/model> [--claude-model haiku] [--only <scenario>]
 
 Uses your own claude and pi logins (GLASS_CLAUDE_COMMAND and GLASS_PI_COMMAND pick other
 executables) and writes test/recordings/runners/<scenario>.json. Pick cheap models. Fields
