@@ -3,7 +3,7 @@ import { AgentReviewFailure, Revision } from "@glass/contracts"
 import { cleanup, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, expect, it, vi } from "vite-plus/test"
-import { AgentReviewBanner } from "./AgentReview"
+import { AgentReviewBanner, AgentReviewButton } from "./AgentReview"
 import { controls, reviewOf } from "../../test/agentReview"
 
 afterEach(cleanup)
@@ -42,14 +42,18 @@ it("says why a review failed and retries it", async () => {
 
 const review = reviewOf(new Revision({ base: "b", head: "0123456789abcdef" }))
 
-it("links a finished review to its place beside the diff", async () => {
+it("opens a current review beside the diff from the toolbar, with no banner", async () => {
   const onRead = vi.fn<() => void>()
-  render(<AgentReviewBanner controls={controls({ review })} onRead={onRead} />)
-
-  expect(screen.getByRole("status", { name: "Agent review" }).textContent).toBe(
-    "Agent review written·Read beside the diff",
+  const current = controls({ review })
+  render(
+    <>
+      <AgentReviewButton controls={current} onRead={onRead} />
+      <AgentReviewBanner controls={current} onRead={onRead} />
+    </>,
   )
-  await userEvent.click(screen.getByRole("button", { name: "Read beside the diff" }))
+
+  expect(screen.queryByRole("status", { name: "Agent review" })).toBeNull()
+  await userEvent.click(screen.getByRole("button", { name: "Read Agent review" }))
   expect(onRead).toHaveBeenCalledOnce()
 })
 

@@ -1,5 +1,5 @@
 import { cn } from "cn"
-import { Clock, LoaderCircle, ScanSearch, TriangleAlert } from "lucide-react"
+import { Clock, LoaderCircle, PanelLeft, ScanSearch, TriangleAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Elapsed } from "./Elapsed"
 import { ProblemAlert, withCode } from "./ProblemAlert"
@@ -7,8 +7,17 @@ import { warningTone } from "./PullRequestRow"
 import { ShortSha } from "./shortSha"
 import type { AgentReviewControls } from "./useAgentReview"
 
-export function AgentReviewButton(props: { controls: AgentReviewControls }) {
-  const { job, start } = props.controls
+/** Starts an Agent review, or opens a current one beside the diff. */
+export function AgentReviewButton(props: { controls: AgentReviewControls; onRead: () => void }) {
+  const { job, review, outdated, start } = props.controls
+
+  if (review !== null && !outdated)
+    return (
+      <Button variant="ghost" size="sm" onClick={props.onRead}>
+        <PanelLeft aria-hidden />
+        Read Agent review
+      </Button>
+    )
 
   if (start === null) return null
 
@@ -150,36 +159,23 @@ export function AgentReviewBanner(props: { controls: AgentReviewControls; onRead
 
   if (failure !== null) return <FailureLine detail={failure} onRetry={props.controls.start} />
 
-  if (review === null) return null
+  if (review === null || !outdated) return null
 
   return (
     <output
       aria-label="Agent review"
       className="flex items-center gap-2 border-b px-6 py-1.5 text-sm text-muted-foreground"
     >
-      {outdated ? (
-        <>
-          <TriangleAlert aria-hidden className={cn("size-4 shrink-0", warningTone)} />
-          <span>
-            Outdated: written for an older Revision (head <ShortSha sha={review.revision.head} />)
-          </span>
-        </>
-      ) : (
-        <>
-          <ScanSearch aria-hidden className="size-4 shrink-0" />
-          <span>Agent review written</span>
-        </>
-      )}
+      <TriangleAlert aria-hidden className={cn("size-4 shrink-0", warningTone)} />
+      <span>
+        Outdated: written for an older Revision (head <ShortSha sha={review.revision.head} />)
+      </span>
       <span aria-hidden>·</span>
       <Button variant="link" size="xs" className="h-auto p-0 text-sm" onClick={props.onRead}>
         Read beside the diff
       </Button>
-      {outdated && (
-        <>
-          <span className="flex-1" />
-          <ReviewAgain controls={props.controls} size="xs" />
-        </>
-      )}
+      <span className="flex-1" />
+      <ReviewAgain controls={props.controls} size="xs" />
     </output>
   )
 }

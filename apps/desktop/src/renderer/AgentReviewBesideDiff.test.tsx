@@ -57,7 +57,7 @@ it("leaves the Tour order, which hides the file panel, to read the Agent review"
   const tourOrder = await screen.findByRole("button", { name: "Tour" })
   expect(tourOrder.getAttribute("aria-pressed")).toBe("true")
 
-  await f.user.click(within(changes()).getByRole("button", { name: "Read beside the diff" }))
+  await f.user.click(within(changes()).getByRole("button", { name: "Read Agent review" }))
   expect(tourOrder.getAttribute("aria-pressed")).toBe("false")
   expect(agentReviewTab().getAttribute("aria-selected")).toBe("true")
 })

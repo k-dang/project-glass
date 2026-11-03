@@ -523,7 +523,7 @@ export function Workspace(props: {
             onAllChange={showAll}
             tourOrder={reading === null ? null : { current: chosenOrder, onChange: showOrder }}
             fullScreen={tourInChanges ? { on: fullScreen, onChange: setFullScreen } : null}
-            agentReview={<AgentReviewButton controls={agentReview} />}
+            agentReview={<AgentReviewButton controls={agentReview} onRead={readAgentReview} />}
             outdatedTour={
               tourInChanges &&
               tour.outdated !== null && <OutdatedTourFlag revision={tour.outdated} tour={tour} />
