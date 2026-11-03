@@ -5,7 +5,10 @@ import type { ReviewInput } from "./github/GitHubClient"
 
 export const FollowUpAnswer = Schema.Struct({
   markdown: Schema.Trim.check(Schema.isNonEmpty()),
-  suggestedDrafts: Schema.Array(SuggestedDraft),
+  // A readable comment survives a bad placement; only validated suggestions become Drafts.
+  suggestedDrafts: Schema.Array(
+    Schema.Union([SuggestedDraft, Schema.Struct({ body: Schema.String })]),
+  ),
 })
 
 export type FollowUpAnswer = typeof FollowUpAnswer.Type

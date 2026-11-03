@@ -85,6 +85,9 @@ export const pullRequestJobs = Effect.fnUntraced(function* <S, E>(options: {
         Effect.asVoid,
         Effect.catchCause((cause) =>
           Effect.gen(function* () {
+            if (Cause.hasDies(cause))
+              yield* Effect.logError("Unexpected failure in a PR background job", cause)
+
             if (Cause.hasInterrupts(cause)) yield* Effect.interrupt
 
             yield* SubscriptionRef.update(job.state, (state) =>

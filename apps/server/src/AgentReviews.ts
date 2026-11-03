@@ -79,19 +79,25 @@ const stoppedRunner = (runner: AgentRunnerIdentity | null) =>
     runner,
   )
 
+const isSuggestedDraft = Schema.is(SuggestedDraft)
+
 /** A comment the agent placed off the diff can't be a Draft, so its text joins the answer. */
-const unplacedText = (drafts: ReadonlyArray<SuggestedDraft>) =>
+const unplacedText = (drafts: FollowUpAnswer["suggestedDrafts"]) =>
   drafts.length === 0
     ? ""
     : [
         "\n\n**Not on a line of the diff, so not a Draft:**",
-        ...drafts.map(
-          ({ path, line, body }) =>
-            `\`${path}\` line ${line}:\n\n${body
+        ...drafts.map((draft) => {
+          const location = "path" in draft ? `\`${draft.path}\` line ${draft.line}:\n\n` : ""
+
+          return (
+            location +
+            draft.body
               .split("\n")
               .map((text) => `> ${text}`)
-              .join("\n")}`,
-        ),
+              .join("\n")
+          )
+        }),
       ].join("\n\n")
 
 export class AgentReviews extends Context.Service<
@@ -278,9 +284,10 @@ export class AgentReviews extends Context.Service<
           )
 
           const [placed, unplaced] = Arr.partition(answer.suggestedDrafts, (draft) =>
-            lineInFiles(input.files, draft.path, draft.side, draft.line) === null
-              ? Result.fail(draft)
-              : Result.succeed(draft),
+            isSuggestedDraft(draft) &&
+            lineInFiles(input.files, draft.path, draft.side, draft.line) !== null
+              ? Result.succeed(draft)
+              : Result.fail(draft),
           )
 
           return {

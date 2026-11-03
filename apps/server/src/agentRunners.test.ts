@@ -1,5 +1,6 @@
 import { assert, it } from "@effect/vitest"
 import { Effect, Fiber } from "effect"
+import { TestClock } from "effect/testing"
 import { mkdirSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { vi } from "vite-plus/test"
@@ -96,6 +97,32 @@ for (const name of ["claude-answer", "pi-answer"])
 
       yield* f.replay.stopped(1)
       assert.isEmpty(f.leftovers())
+    }),
+  )
+
+for (const name of ["claude-answer", "pi-answer"])
+  it.effect(`times out ${name}'s readiness check, stops the CLI, and removes its directory`, () =>
+    Effect.gen(function* () {
+      const recording = readRecording(name)
+
+      const readiness = {
+        ...recording,
+        spawns: recording.spawns.filter((spawn) => !spawn.args.includes("-p")),
+      }
+
+      const f = yield* fixture(scenarioNamed(name), { hold: true, recording: readiness })
+      const running = yield* Effect.forkChild(f.run)
+      yield* f.replay.served(readiness.spawns.length)
+      yield* TestClock.adjust("30 seconds")
+
+      const failure = yield* Fiber.join(running).pipe(Effect.flip)
+      assert.strictEqual(failure.reason, "not-ready")
+      assert.include(failure.message, "took too long")
+      yield* f.replay.stopped(1)
+      assert.isEmpty(f.leftovers())
+
+      const retry = yield* fixture(scenarioNamed(name))
+      assert.deepStrictEqual(yield* retry.run, { summary: "Fine." })
     }),
   )
 

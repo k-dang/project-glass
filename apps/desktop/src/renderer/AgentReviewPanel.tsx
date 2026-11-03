@@ -135,10 +135,7 @@ function Composer(props: {
 
     if (props.disabled || props.running || trimmed === "") return
 
-    setMessage("")
-
-    if (!(await props.onSend(trimmed)))
-      setMessage((current) => (current === "" ? message : current))
+    if (await props.onSend(trimmed)) setMessage("")
   }
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -240,7 +237,11 @@ export function AgentReviewPanel(props: {
               ) : (
                 <ProblemAlert
                   problem={{ title: "Follow-up failed", detail: job.reason.message }}
-                  action={{ label: "Retry", run: () => props.controls.followUp(job.message) }}
+                  action={
+                    props.controls.followUpPending
+                      ? undefined
+                      : { label: "Retry", run: () => props.controls.followUp(job.message) }
+                  }
                 />
               )}
             </li>
@@ -258,7 +259,7 @@ export function AgentReviewPanel(props: {
         </p>
       ) : (
         <Composer
-          disabled={job?.status === "reviewing"}
+          disabled={props.controls.followUpPending || job?.status === "reviewing"}
           running={job?.status === "following-up"}
           onSend={props.controls.followUp}
           onStop={props.controls.cancel}

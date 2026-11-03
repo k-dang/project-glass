@@ -354,6 +354,43 @@ it.live("starts the thread over when the Agent review is written again", () =>
   }),
 )
 
+it.live("keeps the answer and valid Drafts when other suggestions have malformed placements", () =>
+  Effect.gen(function* () {
+    const f = yield* fixture()
+    yield* f.start
+    yield* f.state(reviewed)
+
+    const valid = followUpAnswer.suggestedDrafts[0]
+
+    const unplaced = [
+      { ...valid, line: 0, body: "A comment on line zero." },
+      { ...valid, line: 1.5, body: "A comment on a fractional line." },
+      { ...valid, side: "RIGHT", body: "A comment with an invalid side." },
+      { body: "A comment without a location." },
+    ]
+
+    yield* f.runners.configure({
+      reply: {
+        answer: { markdown: followUpAnswer.markdown, suggestedDrafts: [valid, ...unplaced] },
+      },
+    })
+    yield* f.client.FollowUpAgentReview({
+      pullRequest: f.ref,
+      revision: f.revision,
+      message: "Draft these comments.",
+    })
+
+    const done = yield* f.state(followedUp)
+    const [followUp] = done.review!.followUps
+    assert.deepStrictEqual(followUp!.suggestedDrafts, [valid])
+    assert.include(followUp!.answer, followUpAnswer.markdown)
+
+    for (const { body } of unplaced) assert.include(followUp!.answer, `> ${body}`)
+
+    assert.deepStrictEqual(yield* f.restart, done)
+  }),
+)
+
 it.live("refuses a follow-up on another Revision without running the agent", () =>
   Effect.gen(function* () {
     const f = yield* fixture()

@@ -1,9 +1,10 @@
 // @vitest-environment happy-dom
 import { AgentReviewFailure, Revision } from "@glass/contracts"
-import { screen, waitFor, within } from "@testing-library/react"
-import { Effect } from "effect"
+import { act, screen, waitFor, within } from "@testing-library/react"
+import { Deferred, Effect } from "effect"
 import { afterEach, expect, it } from "vite-plus/test"
 import { reviewOf } from "../../test/agentReview"
+import { eventually } from "../../test/eventually"
 import { changes, mountTourWorkspace, resetTourWorkspace } from "../../test/tourWorkspace"
 import { changedFile, revision, savedTour } from "../../test/workspace"
 
@@ -127,6 +128,80 @@ it("keeps a refused follow-up in the composer and says why", async () => {
 
   expect(await screen.findByText(/Wait for the answer to your last Follow-up/)).toBeDefined()
   expect(composer.value).toBe("Is this blocking?")
+})
+
+for (const accepted of [true, false])
+  it(`keeps a pending message and prevents another send until it is ${accepted ? "accepted" : "refused"}`, async () => {
+    const f = mountTourWorkspace({
+      files,
+      agentReview: { review: reviewOf(revision), job: { status: "idle" } },
+    })
+
+    const reply = Deferred.makeUnsafe<void, AgentReviewFailure>()
+    f.followUp.mockImplementation(() => Deferred.await(reply))
+
+    await readBesideTheDiff(f)
+    const composer = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Follow up" })
+    await f.user.type(composer, "Is this blocking?{Enter}")
+
+    expect(composer.value).toBe("Is this blocking?")
+    expect(composer.disabled).toBe(true)
+    const send = screen.getByRole<HTMLButtonElement>("button", { name: "Send" })
+    expect(send.disabled).toBe(true)
+    await f.user.click(send)
+    await f.user.keyboard("{Enter}")
+    expect(f.followUp).toHaveBeenCalledOnce()
+
+    await act(async () => {
+      await Effect.runPromise(
+        accepted
+          ? Deferred.succeed(reply, undefined)
+          : Deferred.fail(
+              reply,
+              new AgentReviewFailure({ reason: "not-ready", message: "Try again.", runner: null }),
+            ),
+      )
+    })
+
+    await eventually(() => {
+      expect(composer.disabled).toBe(false)
+      expect(composer.value).toBe(accepted ? "" : "Is this blocking?")
+    })
+
+    expect(screen.queryByText(/Try again/) !== null).toBe(!accepted)
+    await f.user.clear(composer)
+    await f.user.type(composer, "A second message{Enter}")
+    await eventually(() => expect(f.followUp).toHaveBeenCalledTimes(2))
+  })
+
+it("prevents Retry and Send from overlapping while a retry is being accepted", async () => {
+  const f = mountTourWorkspace({
+    files,
+    agentReview: {
+      review: reviewOf(revision),
+      job: {
+        status: "follow-up-failed",
+        message: "Why?",
+        reason: new AgentReviewFailure({ reason: "runner", message: "Try again.", runner: null }),
+      },
+    },
+  })
+
+  const reply = Deferred.makeUnsafe<void>()
+  f.followUp.mockImplementation(() => Deferred.await(reply))
+  await readBesideTheDiff(f)
+  await f.user.click(screen.getByRole("button", { name: "Retry" }))
+
+  expect(screen.queryByRole("button", { name: "Retry" })).toBeNull()
+  expect(screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Follow up" }).disabled).toBe(
+    true,
+  )
+  await f.user.keyboard("{Enter}")
+  expect(f.followUp).toHaveBeenCalledOnce()
+
+  await act(async () => {
+    await Effect.runPromise(Deferred.succeed(reply, undefined))
+  })
 })
 
 it("adds a suggested Draft as the user edited it", async () => {
