@@ -138,6 +138,7 @@ function DraftCard(props: {
 function DraftActions(props: {
   draft: DraftView
   disabled: boolean
+  empty: boolean
   canComment: boolean
   canAsk: boolean
   submission: Submission
@@ -146,12 +147,10 @@ function DraftActions(props: {
   onReload: () => void
   onAsk: () => void
 }) {
-  const { draft, disabled, canComment, canAsk, submission } = props
+  const { draft, disabled, empty, canComment, canAsk, submission } = props
   const failure = submission.type === "failed" ? submission.problem : null
   const awaitingReload = failure?.fixedByReload === true
   const unsaved = draft.feedback?.type === "unsaved"
-
-  if (!unsaved && !canComment && !canAsk) return null
 
   return (
     <div className="flex flex-col gap-2 px-3 pb-3">
@@ -160,7 +159,7 @@ function DraftActions(props: {
           <Button
             size="sm"
             variant="ghost"
-            disabled={disabled}
+            disabled={disabled || empty}
             onClick={props.onAsk}
             aria-label={`Ask the agent about ${draftName(draft)}`}
             title="Ask the agent instead. Only you see the answer; nothing goes to GitHub."
@@ -171,11 +170,9 @@ function DraftActions(props: {
             <Kbd>{shortcutLabel("↵")}</Kbd>
           </Button>
         )}
-        {unsaved && (
-          <span>
-            <Kbd>↵</Kbd> saves it for your Review
-          </span>
-        )}
+        <span>
+          <Kbd>↵</Kbd> saves it for your Review
+        </span>
         {canComment && (
           <span>
             <Kbd>⇧↵</Kbd> comments now
@@ -184,20 +181,18 @@ function DraftActions(props: {
         <span>
           <Kbd>{optionLabel("↵")}</Kbd> adds a line
         </span>
-        {unsaved && (
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={disabled}
-            onClick={props.onSave}
-            aria-label={`Save Draft on ${draftName(draft)}`}
-          >
-            Save Draft
-          </Button>
-        )}
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={disabled || !unsaved}
+          onClick={props.onSave}
+          aria-label={`Save Draft on ${draftName(draft)}`}
+        >
+          Save Draft
+        </Button>
         {canComment && (
           <Button
-            disabled={disabled || awaitingReload}
+            disabled={disabled || empty || awaitingReload}
             onClick={props.onComment}
             aria-label={`Comment with Draft on ${draftName(draft)}`}
           >
@@ -252,8 +247,8 @@ export function LineDraft(props: {
 
   const readOnly = draft.deleting || locked
   const empty = draft.body.trim() === ""
-  const canComment = draftCount === 1 && !empty
-  const canAsk = draft.local && !empty
+  const canComment = draftCount === 1
+  const canAsk = draft.local
 
   const comment = async () => {
     if ((await store.submit("comment", "")).type === "submitted") props.onReload()
@@ -274,7 +269,7 @@ export function LineDraft(props: {
             if (event.key === "Enter") {
               event.preventDefault()
 
-              if ((event.metaKey || event.ctrlKey) && canAsk) {
+              if ((event.metaKey || event.ctrlKey) && canAsk && !empty) {
                 props.onAsk()
               } else if (event.altKey) {
                 const field = event.currentTarget
@@ -282,7 +277,7 @@ export function LineDraft(props: {
                 props.store.edit(draft.key, field.value)
               } else if (!event.shiftKey) {
                 props.store.save(draft.key)
-              } else if (canComment) {
+              } else if (canComment && !empty) {
                 void comment()
               }
             }
@@ -310,6 +305,7 @@ export function LineDraft(props: {
       <DraftActions
         draft={draft}
         disabled={readOnly}
+        empty={empty}
         canComment={canComment}
         canAsk={canAsk}
         submission={submission}
