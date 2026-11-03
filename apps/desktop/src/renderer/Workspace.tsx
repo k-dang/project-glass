@@ -80,13 +80,7 @@ import { useTour } from "./useTour"
 import { useAgentReview } from "./useAgentReview"
 import { positionOf } from "./reviewPosition"
 import { rememberPlace } from "./savedPlace"
-import {
-  OutdatedTourBanner,
-  OutdatedTourFlag,
-  TourCard,
-  TourSidebar,
-  useTourReadyToast,
-} from "./TourSidebar"
+import { OutdatedTourFlag, TourCard, TourSidebar, useTourReadyToast } from "./TourSidebar"
 
 const wideWorkspaceQuery = "(min-width: 1024px)"
 
@@ -458,10 +452,6 @@ export function Workspace(props: {
                 tour={tour}
                 reading={reading}
                 viewedFiles={props.viewedFiles}
-                outdatedBanner={
-                  !tourInChanges &&
-                  tour.outdated !== null && <OutdatedTourBanner revision={tour.outdated} />
-                }
                 onShowChapter={openChapter}
               />
             </TabsContent>

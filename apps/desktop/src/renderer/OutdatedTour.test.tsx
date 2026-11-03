@@ -34,9 +34,10 @@ it("reads an outdated Tour against the files the PR has now", async () => {
   const f = mount(older)
   await f.user.click(await screen.findByRole("tab", { name: "Tour" }))
 
-  const banner = await screen.findByRole("note")
-  expect(banner.textContent).toContain("Written for an older Revision (head 0123456)")
-  expect(within(banner).queryByRole("button")).toBeNull()
+  await f.user.hover(await within(sidebar()).findByText("Outdated"))
+  expect((await screen.findByRole("tooltip")).textContent).toContain(
+    "Written for an older Revision (head 0123456)",
+  )
   expect(within(sidebar()).getByText("Greet people by name.")).toBeDefined()
   expect(within(sidebar()).getAllByLabelText("0 of 1 files viewed")).toHaveLength(2)
   expect(
@@ -47,7 +48,6 @@ it("reads an outdated Tour against the files the PR has now", async () => {
 
   await f.user.click(screen.getByRole("tab", { name: "Changes" }))
   await waitFor(() => expect(fileOrder()).toEqual(["greet.ts", "api.ts", "new.ts"]))
-  expect(screen.queryByRole("note")).toBeNull()
   await f.user.click(within(changes()).getByRole("button", { name: "Tour outdated" }))
   expect((await screen.findByRole("dialog")).textContent).toContain(
     "Written for an older Revision (head 0123456)",
@@ -79,10 +79,10 @@ it("reads an outdated Tour against the files the PR has now", async () => {
 it("treats a Tour as outdated when only its base differs, and current when both match", async () => {
   const f = mount({ ...older, revision: new Revision({ base: "a0", head: revision.head }) })
   await f.user.click(await screen.findByRole("tab", { name: "Tour" }))
-  expect((await screen.findByRole("note")).textContent).toContain("(head h1)")
+  expect(await within(sidebar()).findByText("Outdated")).toBeDefined()
 
   await f.publish(idle({ ...older, revision }))
-  await waitFor(() => expect(screen.queryByRole("note")).toBeNull())
+  await waitFor(() => expect(within(sidebar()).queryByText("Outdated")).toBeNull())
   await f.user.click(within(sidebar()).getByRole("button", { name: "Rewrite" }))
   expect(f.write).toHaveBeenCalledWith({ pullRequest: pullRequestRef, revision }, expect.anything())
 })
@@ -136,7 +136,7 @@ it("keeps the old Tour readable through a rewrite until its replacement arrives"
     }),
   )
   expect(await within(sidebar()).findByText("Welcome newcomers.")).toBeDefined()
-  expect(screen.queryByRole("note")).toBeNull()
+  expect(screen.queryByRole("button", { name: "Tour outdated" })).toBeNull()
   expect(within(sidebar()).queryByText("Greet by name")).toBeNull()
   await waitFor(() => expect(fileOrder()).toEqual(["new.ts", "greet.ts", "api.ts"]))
   expect(chapter("Add the welcome").textContent).toContain("CHAPTER 01 / 01")

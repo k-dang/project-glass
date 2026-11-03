@@ -11,15 +11,15 @@ import {
   Sparkles,
   TriangleAlert,
 } from "lucide-react"
-import { type ReactNode, useEffect, useEffectEvent, useRef, useState } from "react"
+import { useEffect, useEffectEvent, useRef, useState } from "react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Item, ItemContent, ItemMedia, ItemTitle } from "@/components/ui/item"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { toast } from "@/components/ui/toast"
+import { TooltipHint } from "@/components/ui/tooltip"
 import { Elapsed } from "./Elapsed"
-import { OutdatedNote } from "./OutdatedNote"
 import { ProblemAlert } from "./ProblemAlert"
 import { warningTone } from "./PullRequestRow"
 import { ShortSha } from "./shortSha"
@@ -79,10 +79,13 @@ function ChapterRow(props: {
   )
 }
 
-const outdatedConsequence = "some Chapters may not match the diff"
-
-export function OutdatedTourBanner(props: { revision: Revision }) {
-  return <OutdatedNote revision={props.revision} consequence={outdatedConsequence} />
+function OutdatedSentence(props: { revision: Revision }) {
+  return (
+    <>
+      Written for an older Revision (head <ShortSha sha={props.revision.head} />
+      ), so some Chapters may not match the diff.
+    </>
+  )
 }
 
 export function OutdatedTourFlag(props: { revision: Revision; tour: ReturnType<typeof useTour> }) {
@@ -99,8 +102,7 @@ export function OutdatedTourFlag(props: { revision: Revision; tour: ReturnType<t
       </PopoverTrigger>
       <PopoverContent align="start">
         <p className="leading-relaxed break-words text-muted-foreground">
-          Written for an older Revision (head <ShortSha sha={props.revision.head} />
-          ), so {outdatedConsequence}.
+          <OutdatedSentence revision={props.revision} />
         </p>
         <div className="flex justify-end">
           <RewriteTour tour={props.tour} variant="outline" />
@@ -214,7 +216,6 @@ export function TourSidebar(props: {
   tour: ReturnType<typeof useTour>
   reading: TourReading | null
   viewedFiles: ViewedFilesStore
-  outdatedBanner: ReactNode
   onShowChapter: (index: number) => void
 }) {
   const { tour } = props
@@ -326,7 +327,6 @@ export function TourSidebar(props: {
       )}
       {reading !== null && (
         <section aria-label="Saved Tour" className="space-y-4 py-3">
-          {props.outdatedBanner}
           <div className="px-1">
             <StartReading onShowChapter={props.onShowChapter} />
           </div>
@@ -334,7 +334,18 @@ export function TourSidebar(props: {
             <TourText text={reading.intent} />
           </p>
           <div className="flex items-center justify-between gap-2 px-1">
-            <p className="text-xs text-muted-foreground">
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              {tour.outdated !== null && (
+                <>
+                  <TooltipHint content={<OutdatedSentence revision={tour.outdated} />}>
+                    <span className={cn("flex items-center gap-1", warningTone)}>
+                      <TriangleAlert aria-hidden className="size-3.5" />
+                      Outdated
+                    </span>
+                  </TooltipHint>
+                  <span aria-hidden>·</span>
+                </>
+              )}
               {plural(reading.chapters.length, "Chapter")}
             </p>
             <RewriteTour tour={tour} variant="ghost" />
