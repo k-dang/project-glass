@@ -56,7 +56,7 @@ file constantly and the workspace's handlers scroll right after switching tabs, 
 change applied synchronously; navigation isn't. A window reload restores the matching Saved place
 when its GitHub identity and Revision still match; a changed Revision opens Overview with a notice.
 SQLite keeps one Saved place per area, each the latest resumable destination there with a
-feature-owned position. Settings and Activity leave them unchanged. The Files tab's selected repository file also
+feature-owned position. Settings and Activity leave them unchanged. The Repository tab's selected repository file also
 lives in the workspace atom. Position writes are ordered, with superseded pending positions skipped;
 the Activity log remains history rather than the source of the current position. The destination
 carries the identity from its loaded workspace, so saving a position stays local and works when

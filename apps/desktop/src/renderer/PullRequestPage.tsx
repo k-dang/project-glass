@@ -4,14 +4,7 @@ import { getRouteApi } from "@tanstack/react-router"
 import { Option } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import { cn } from "cn"
-import {
-  FileDiff,
-  FolderTree,
-  type LucideIcon,
-  MessageCircle,
-  PanelsTopLeft,
-  Route,
-} from "lucide-react"
+import { FolderTree, MessageCircle, Route } from "lucide-react"
 import { type ReactNode, useCallback, useContext } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { BackToPullRequests } from "./BackToPullRequests"
@@ -113,30 +106,44 @@ function LoadingState(props: { pullRequest: PullRequestRef; onBack: () => void }
             <Skeleton className="h-7 w-28" />
           </div>
         </div>
-        <div className="flex flex-col items-start gap-2 pb-2 xl:flex-row xl:items-center xl:gap-4">
-          <div className="flex w-full min-w-0 flex-1 flex-wrap items-center gap-2 text-sm text-muted-foreground xl:w-auto">
-            <Skeleton className="h-5 w-14 rounded-full" />
-            <span className="truncate">
-              {owner}/{repo}
-            </span>
-            <span aria-hidden>·</span>
-            <Skeleton className="h-4 w-20" />
-            <span aria-hidden>·</span>
-            <Skeleton className="h-4 w-40" />
-          </div>
-          <div className="flex shrink-0 gap-4" aria-hidden>
-            <TabStub icon={PanelsTopLeft} label="Overview" selected />
-            <TabStub icon={FileDiff} label="Changes" />
-            <TabStub icon={FolderTree} label="Files" />
-          </div>
+        <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm text-muted-foreground">
+          <Skeleton className="h-5 w-14 rounded-full" />
+          <span className="truncate">
+            {owner}/{repo}
+          </span>
+          <span aria-hidden>·</span>
+          <Skeleton className="h-4 w-20" />
+          <span aria-hidden>·</span>
+          <Skeleton className="h-4 w-40" />
+        </div>
+        <div
+          className="flex h-9 shrink-0 gap-2 [&>span]:h-full [&>span]:px-2 [&>span]:pb-0"
+          aria-hidden
+        >
+          <TabStub label="Overview" selected />
+          <TabStub label="Changes" />
+          <TabStub label="Repository" />
         </div>
       </header>
       <div className="flex min-h-0 flex-1" aria-hidden>
         <div className="hidden w-80 shrink-0 flex-col border-r lg:flex">
-          <div className="mt-1 flex gap-4 border-b px-4 pt-2">
-            <TabStub icon={FolderTree} label="Tree" selected />
-            <TabStub icon={MessageCircle} label="Notes" />
-            <TabStub icon={Route} label="Tour" />
+          <div className="flex h-9 items-center gap-1 border-b px-2 py-1">
+            {[
+              { icon: FolderTree, label: "Tree" },
+              { icon: MessageCircle, label: "Notes" },
+              { icon: Route, label: "Tour" },
+            ].map(({ icon: Icon, label }, index) => (
+              <span
+                key={label}
+                className={cn(
+                  "flex h-6 items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground/60",
+                  index === 0 && "bg-muted",
+                )}
+              >
+                <Icon className="size-3" />
+                {label}
+              </span>
+            ))}
           </div>
           <div className="flex flex-col gap-2.5 p-4">
             {treeRows.map(({ depth, width }, index) => (
@@ -186,7 +193,7 @@ const treeRows = [
   { depth: 1, width: 65 },
 ]
 
-function TabStub(props: { icon: LucideIcon; label: string; selected?: boolean }) {
+function TabStub(props: { label: string; selected?: boolean }) {
   return (
     <span
       className={cn(
@@ -194,7 +201,6 @@ function TabStub(props: { icon: LucideIcon; label: string; selected?: boolean })
         props.selected && "border-foreground/30",
       )}
     >
-      <props.icon className="size-4" />
       {props.label}
     </span>
   )

@@ -19,7 +19,6 @@ import {
   type LucideIcon,
   MessageCircle,
   PanelLeft,
-  PanelsTopLeft,
   RotateCw,
   Route,
   ScanSearch,
@@ -332,6 +331,7 @@ export function Workspace(props: {
   const additions = files.reduce((sum, file) => sum + file.additions, 0)
   const deletions = files.reduce((sum, file) => sum + file.deletions, 0)
   const filePanelLabel = filePanelOpen ? "Hide file panel" : "Show file panel"
+  const noteCount = discussions.onLines.length + draftCount
 
   const filePanelToggle = (
     <Button
@@ -379,10 +379,14 @@ export function Workspace(props: {
             />
           }
           tabs={
-            <TabsList variant="line" aria-label="PR workspace" className="shrink-0">
-              <WorkspaceTabTrigger value="overview" label="Overview" icon={PanelsTopLeft} />
-              <WorkspaceTabTrigger value="changes" label="Changes" icon={FileDiff} />
-              <WorkspaceTabTrigger value="files" label="Files" icon={FolderTree} />
+            <TabsList
+              variant="line"
+              aria-label="PR workspace"
+              className="shrink-0 justify-start gap-2 p-0 group-data-horizontal/tabs:h-9"
+            >
+              <WorkspaceTabTrigger value="overview" label="Overview" />
+              <WorkspaceTabTrigger value="changes" label="Changes" />
+              <WorkspaceTabTrigger value="files" label="Repository" />
             </TabsList>
           }
         />
@@ -405,30 +409,25 @@ export function Workspace(props: {
         >
           <Tabs value={shownPanelTab} onValueChange={setPanelTab} className="min-h-0 flex-1 gap-0">
             <TabsList
-              variant="line"
               aria-label="File panel"
-              className="mt-1 w-full justify-start border-b px-2"
+              className="w-full justify-start gap-1 rounded-none border-b bg-transparent px-2 py-1 group-data-horizontal/tabs:h-9"
             >
-              <TabsTrigger value="tree" className="flex-none">
-                <FolderTree aria-hidden />
+              <FilePanelTabTrigger value="tree" icon={FolderTree}>
                 Tree
-              </TabsTrigger>
-              <TabsTrigger value="notes" className="flex-none">
-                <MessageCircle aria-hidden />
+              </FilePanelTabTrigger>
+              <FilePanelTabTrigger value="notes" icon={MessageCircle}>
                 Notes
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {discussions.onLines.length + draftCount}
-                </span>
-              </TabsTrigger>
-              <TabsTrigger value="tour" className="flex-none">
-                <Route aria-hidden />
+                {noteCount > 0 && (
+                  <span className="text-xs text-muted-foreground tabular-nums">{noteCount}</span>
+                )}
+              </FilePanelTabTrigger>
+              <FilePanelTabTrigger value="tour" icon={Route}>
                 Tour
-              </TabsTrigger>
+              </FilePanelTabTrigger>
               {agentReview.review !== null && (
-                <TabsTrigger value="agent-review" className="flex-none">
-                  <ScanSearch aria-hidden />
+                <FilePanelTabTrigger value="agent-review" icon={ScanSearch}>
                   Agent review
-                </TabsTrigger>
+                </FilePanelTabTrigger>
               )}
             </TabsList>
             <TabsContent value="tree" keepMounted className="flex min-h-0 flex-col">
@@ -612,12 +611,28 @@ export function Workspace(props: {
   )
 }
 
-function WorkspaceTabTrigger(props: { value: WorkspaceTab; label: string; icon: LucideIcon }) {
-  const Icon = props.icon
-
+function FilePanelTabTrigger(props: {
+  value: FilePanelTab
+  icon: LucideIcon
+  children: ReactNode
+}) {
   return (
-    <TabsTrigger value={props.value} className="flex-none px-2">
-      <Icon aria-hidden />
+    <TabsTrigger
+      value={props.value}
+      className="h-6 flex-none rounded-md px-2 text-xs font-normal transition-none data-active:bg-muted dark:data-active:border-transparent dark:data-active:bg-muted group-data-[variant=default]/tabs-list:data-active:shadow-none"
+    >
+      <props.icon aria-hidden className="size-3" />
+      {props.children}
+    </TabsTrigger>
+  )
+}
+
+function WorkspaceTabTrigger(props: { value: WorkspaceTab; label: string }) {
+  return (
+    <TabsTrigger
+      value={props.value}
+      className="h-full flex-none rounded-none px-2 transition-none after:transition-none group-data-horizontal/tabs:after:-bottom-px"
+    >
       {props.label}
     </TabsTrigger>
   )
@@ -706,23 +721,21 @@ function PullRequestHeader(props: {
           {props.review}
         </div>
       </div>
-      <div className="flex flex-col items-start gap-2 pb-2 xl:flex-row xl:items-center xl:gap-4">
-        <div className="flex w-full min-w-0 flex-1 flex-wrap items-center gap-2 text-sm text-muted-foreground xl:w-auto">
-          <StateBadge pullRequest={pullRequest} />
-          <span>
-            {owner}/{repo}
-          </span>
-          <span aria-hidden>·</span>
-          <span className="font-medium text-foreground">{pullRequest.author}</span>
-          <span aria-hidden>·</span>
-          <Branch name={pullRequest.baseBranch} />
-          <span aria-label="from">←</span>
-          <Branch name={pullRequest.headBranch} />
-          <span aria-hidden>·</span>
-          <StatusChips pullRequest={pullRequest} />
-        </div>
-        {props.tabs}
+      <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm text-muted-foreground">
+        <StateBadge pullRequest={pullRequest} />
+        <span>
+          {owner}/{repo}
+        </span>
+        <span aria-hidden>·</span>
+        <span className="font-medium text-foreground">{pullRequest.author}</span>
+        <span aria-hidden>·</span>
+        <Branch name={pullRequest.baseBranch} />
+        <span aria-label="from">←</span>
+        <Branch name={pullRequest.headBranch} />
+        <span aria-hidden>·</span>
+        <StatusChips pullRequest={pullRequest} />
       </div>
+      {props.tabs}
     </header>
   )
 }

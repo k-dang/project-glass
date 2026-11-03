@@ -325,7 +325,7 @@ export function TourView(props: TourViewProps) {
 
   return (
     <div
-      className="@container/tour relative min-h-0 flex-1 overflow-auto border-t px-6 py-5 [--tour-card-height:clamp(420px,calc(100dvh_-_235px),720px)] [scrollbar-gutter:stable]"
+      className="@container-size/tour relative min-h-0 flex-1 overflow-auto border-t px-6 py-5 [--tour-card-height:clamp(420px,100cqh,720px)] [scrollbar-gutter:stable]"
       ref={container}
       aria-label="Tour Chapters"
       onScroll={() => {

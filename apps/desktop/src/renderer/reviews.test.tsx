@@ -333,7 +333,7 @@ it("scopes Copy to every loaded PR workspace tab and removes it when leaving", a
   await user.click(await rowFor("Greet the world"))
   await screen.findByText("head001")
 
-  for (const tab of ["Overview", "Changes", "Files"]) {
+  for (const tab of ["Overview", "Changes", "Repository"]) {
     await user.click(screen.getByRole("tab", { name: tab }))
     await user.keyboard("c")
     await screen.findByRole("dialog", { name: "Copy" })
