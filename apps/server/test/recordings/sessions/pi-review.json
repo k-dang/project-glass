@@ -42,7 +42,7 @@
                 "name": "gpt-test",
                 "api": "openai-completions",
                 "provider": "glass-test",
-                "baseUrl": "http://127.0.0.1:59112/v1",
+                "baseUrl": "<redacted>",
                 "reasoning": false,
                 "input": ["text", "image"],
                 "cost": {
@@ -59,7 +59,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--private-var-folders-8q-032mrt6j4058214b17b3_gym0000gp-T-glass-test-Si1acH-work--/2026-11-03T16-20-45-586Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-03T23-38-57-413Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -103,7 +103,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1793722845679,
+              "timestamp": 1793749137560,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -248,7 +248,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1793722845679,
+              "timestamp": 1793749137560,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -397,7 +397,7 @@
                   "text": "Draft comments on greet.ts."
                 }
               ],
-              "timestamp": 1793722845679
+              "timestamp": 1793749137558
             }
           }
         },
@@ -412,7 +412,7 @@
                   "text": "Draft comments on greet.ts."
                 }
               ],
-              "timestamp": 1793722845679
+              "timestamp": 1793749137558
             }
           }
         },
@@ -440,7 +440,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1793722845690
+              "timestamp": 1793749137582
             }
           }
         },
@@ -557,10 +557,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1793722845690,
+              "timestamp": 1793749137582,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 15,
+              "durationMs": 23,
               "thinkingLevel": "off"
             }
           }
@@ -590,7 +590,7 @@
               "structuredContent": "hi\nhello name\nbye\n"
             },
             "isError": false,
-            "durationMs": 3
+            "durationMs": 1
           }
         },
         {
@@ -607,8 +607,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 3,
-              "timestamp": 1793722845710
+              "durationMs": 1,
+              "timestamp": 1793749137608
             }
           }
         },
@@ -626,8 +626,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 3,
-              "timestamp": 1793722845710
+              "durationMs": 1,
+              "timestamp": 1793749137608
             }
           }
         },
@@ -664,10 +664,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1793722845690,
+              "timestamp": 1793749137582,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 15,
+              "durationMs": 23,
               "thinkingLevel": "off"
             },
             "toolResults": [
@@ -682,8 +682,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 3,
-                "timestamp": 1793722845710
+                "durationMs": 1,
+                "timestamp": 1793749137608
               }
             ]
           }
@@ -698,7 +698,21 @@
             "type": "message_start",
             "message": {
               "role": "assistant",
-              "content": [],
+              "content": [
+                {
+                  "type": "toolCall",
+                  "id": "suggest-2",
+                  "name": "suggest_draft",
+                  "arguments": {
+                    "path": "greet.ts",
+                    "side": "new",
+                    "line": 2,
+                    "body": "Keep the name."
+                  },
+                  "partialArgs": "{\"path\":\"greet.ts\",\"side\":\"new\",\"line\":2,\"body\":\"Keep the name.\"}",
+                  "streamIndex": 0
+                }
+              ],
               "api": "openai-completions",
               "provider": "glass-test",
               "model": "gpt-test",
@@ -717,7 +731,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1793722845711
+              "timestamp": 1793749137611
             }
           }
         },
@@ -840,10 +854,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1793722845711,
+              "timestamp": 1793749137611,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 2,
+              "durationMs": 5,
               "thinkingLevel": "off"
             }
           }
@@ -893,7 +907,7 @@
               ],
               "isError": false,
               "durationMs": 0,
-              "timestamp": 1793722845714
+              "timestamp": 1793749137617
             }
           }
         },
@@ -912,7 +926,7 @@
               ],
               "isError": false,
               "durationMs": 0,
-              "timestamp": 1793722845714
+              "timestamp": 1793749137617
             }
           }
         },
@@ -952,10 +966,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1793722845711,
+              "timestamp": 1793749137611,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 2,
+              "durationMs": 5,
               "thinkingLevel": "off"
             },
             "toolResults": [
@@ -971,7 +985,7 @@
                 ],
                 "isError": false,
                 "durationMs": 0,
-                "timestamp": 1793722845714
+                "timestamp": 1793749137617
               }
             ]
           }
@@ -1005,7 +1019,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1793722845714
+              "timestamp": 1793749137619
             }
           }
         },
@@ -1128,7 +1142,7 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1793722845714,
+              "timestamp": 1793749137619,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
               "durationMs": 2,
@@ -1183,7 +1197,7 @@
               "details": {},
               "isError": true,
               "durationMs": 0,
-              "timestamp": 1793722845717
+              "timestamp": 1793749137622
             }
           }
         },
@@ -1203,7 +1217,7 @@
               "details": {},
               "isError": true,
               "durationMs": 0,
-              "timestamp": 1793722845717
+              "timestamp": 1793749137622
             }
           }
         },
@@ -1243,7 +1257,7 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1793722845714,
+              "timestamp": 1793749137619,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
               "durationMs": 2,
@@ -1263,7 +1277,7 @@
                 "details": {},
                 "isError": true,
                 "durationMs": 0,
-                "timestamp": 1793722845717
+                "timestamp": 1793749137622
               }
             ]
           }
@@ -1297,7 +1311,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1793722845717
+              "timestamp": 1793749137623
             }
           }
         },
@@ -1401,10 +1415,10 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1793722845717,
+              "timestamp": 1793749137623,
               "responseId": "test-completion",
               "rawStopReason": "stop",
-              "durationMs": 1,
+              "durationMs": 2,
               "thinkingLevel": "off"
             }
           }
@@ -1438,10 +1452,10 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1793722845717,
+              "timestamp": 1793749137623,
               "responseId": "test-completion",
               "rawStopReason": "stop",
-              "durationMs": 1,
+              "durationMs": 2,
               "thinkingLevel": "off"
             },
             "toolResults": []
@@ -1455,7 +1469,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1793722845679,
+                "timestamp": 1793749137560,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -1599,7 +1613,7 @@
                     "text": "Draft comments on greet.ts."
                   }
                 ],
-                "timestamp": 1793722845679
+                "timestamp": 1793749137558
               },
               {
                 "role": "assistant",
@@ -1631,10 +1645,10 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1793722845690,
+                "timestamp": 1793749137582,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
-                "durationMs": 15,
+                "durationMs": 23,
                 "thinkingLevel": "off"
               },
               {
@@ -1648,8 +1662,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 3,
-                "timestamp": 1793722845710
+                "durationMs": 1,
+                "timestamp": 1793749137608
               },
               {
                 "role": "assistant",
@@ -1684,10 +1698,10 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1793722845711,
+                "timestamp": 1793749137611,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
-                "durationMs": 2,
+                "durationMs": 5,
                 "thinkingLevel": "off"
               },
               {
@@ -1702,7 +1716,7 @@
                 ],
                 "isError": false,
                 "durationMs": 0,
-                "timestamp": 1793722845714
+                "timestamp": 1793749137617
               },
               {
                 "role": "assistant",
@@ -1737,7 +1751,7 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1793722845714,
+                "timestamp": 1793749137619,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
                 "durationMs": 2,
@@ -1756,7 +1770,7 @@
                 "details": {},
                 "isError": true,
                 "durationMs": 0,
-                "timestamp": 1793722845717
+                "timestamp": 1793749137622
               },
               {
                 "role": "assistant",
@@ -1784,10 +1798,10 @@
                   }
                 },
                 "stopReason": "stop",
-                "timestamp": 1793722845717,
+                "timestamp": 1793749137623,
                 "responseId": "test-completion",
                 "rawStopReason": "stop",
-                "durationMs": 1,
+                "durationMs": 2,
                 "thinkingLevel": "off"
               }
             ],
@@ -1818,7 +1832,7 @@
                 "name": "gpt-test",
                 "api": "openai-completions",
                 "provider": "glass-test",
-                "baseUrl": "http://127.0.0.1:59112/v1",
+                "baseUrl": "<redacted>",
                 "reasoning": false,
                 "input": ["text", "image"],
                 "cost": {
@@ -1835,7 +1849,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--private-var-folders-8q-032mrt6j4058214b17b3_gym0000gp-T-glass-test-Si1acH-work--/2026-11-03T16-20-45-586Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-03T23-38-57-413Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 9,

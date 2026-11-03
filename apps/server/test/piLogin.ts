@@ -1,9 +1,8 @@
-import { Schema } from "effect"
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
-import { homedir } from "node:os"
+import { mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 export interface PiSettings {
+  readonly defaultModel?: string
   readonly enabledModels?: ReadonlyArray<string>
   readonly retry?: {
     readonly enabled: boolean
@@ -12,23 +11,15 @@ export interface PiSettings {
   }
 }
 
-export const PI_PROVIDER = "vercel-ai-gateway"
+const [recordedProvider = "", ...recordedModel] = (
+  process.env["GLASS_RECORD_PI_MODEL"] ?? "recorded-provider/recorded-model"
+).split("/")
 
-export const PI_MODEL = "anthropic/claude-haiku-5.5"
+export const PI_PROVIDER = recordedProvider
 
-const Auth = Schema.fromJsonString(
-  Schema.Struct({ [PI_PROVIDER]: Schema.Struct({ key: Schema.String }) }),
-)
+export const PI_MODEL = recordedModel.join("/")
 
-export const gatewayKey = () => {
-  const given = process.env["AI_GATEWAY_API_KEY"]
-
-  if (given !== undefined && given !== "") return given
-
-  const auth = readFileSync(join(homedir(), ".pi", "agent", "auth.json"), "utf8")
-
-  return Schema.decodeUnknownSync(Auth)(auth)[PI_PROVIDER].key
-}
+export const PI_MODEL_ID = `${PI_PROVIDER}/${PI_MODEL}`
 
 const agentDirectory = (home: string) => {
   const directory = join(home, ".pi", "agent")

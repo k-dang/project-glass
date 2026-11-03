@@ -20,5 +20,5 @@ The repo uses Effect 4, whose APIs differ from the Effect 3 most examples show (
 ## Tests
 
 - Wait on events, never on time: no elapsed-time assertions, no sleeps to order work, and product deadlines in success-path tests set far above the test timeout.
-- When what Glass sends Claude Code or pi changes, or a pinned SDK or bundled pi version moves, recording tests fail until you run `pnpm --filter @glass/server record:sessions [claude|pi]` or `pnpm --filter @glass/server record:runners --pi-model <provider/model>`, which use your own logins (ADR 0011).
+- When what Glass sends Claude Code or pi changes, or a pinned SDK or bundled pi version moves, recording tests fail until you run `pnpm --filter @glass/server record:sessions [claude|pi] --pi-model <provider/model>` or `pnpm --filter @glass/server record:runners --pi-model <provider/model>`, which use your own logins (ADR 0011).
 - Wait with `eventually` from each app's `test/eventually.ts`, or Testing Library's `waitFor` in desktop tests with a DOM. Don't use `Effect.repeat` on a `Schedule`, which stalls under the `TestClock`, or add `Effect.timeout` guards inside tests.

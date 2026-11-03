@@ -20,11 +20,11 @@
             "success": true,
             "data": {
               "model": {
-                "id": "anthropic/claude-haiku-5.5",
+                "id": "<pi-model>",
                 "name": "Claude Haiku 5.5",
                 "api": "anthropic-messages",
-                "baseUrl": "https://ai-gateway.vercel.sh",
-                "provider": "vercel-ai-gateway",
+                "baseUrl": "<redacted>",
+                "provider": "<pi-provider>",
                 "reasoning": true,
                 "input": ["text", "image"],
                 "compat": {
@@ -70,7 +70,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T06-53-39-368Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T23-33-11-644Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -120,7 +120,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1793688819505,
+              "timestamp": 1793748791778,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -239,7 +239,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1793688819505,
+              "timestamp": 1793748791778,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -367,7 +367,7 @@
                   "mimeType": "image/png"
                 }
               ],
-              "timestamp": 1793688819504
+              "timestamp": 1793748791777
             }
           }
         },
@@ -387,7 +387,7 @@
                   "mimeType": "image/png"
                 }
               ],
-              "timestamp": 1793688819504
+              "timestamp": 1793748791777
             }
           }
         },
@@ -398,8 +398,8 @@
               "role": "assistant",
               "content": [],
               "api": "anthropic-messages",
-              "provider": "vercel-ai-gateway",
-              "model": "anthropic/claude-haiku-5.5",
+              "provider": "<pi-provider>",
+              "model": "<pi-model>",
               "usage": {
                 "input": 0,
                 "output": 0,
@@ -415,7 +415,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1793688819533
+              "timestamp": 1793748791798
             }
           }
         },
@@ -464,32 +464,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": "The"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": " image is so"
+              "delta": "The image is so"
             }
           }
         },
@@ -539,7 +514,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": " that I can only"
+              "delta": " and blurry that it's"
             }
           }
         },
@@ -564,7 +539,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": " make"
+              "delta": " hard to make"
             }
           }
         },
@@ -589,7 +564,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": " out a pale green blur,"
+              "delta": " out much"
             }
           }
         },
@@ -614,7 +589,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": " with no clear details"
+              "delta": ", though it looks like a pl"
             }
           }
         },
@@ -639,7 +614,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": " I"
+              "delta": "ain green-ish g"
             }
           }
         },
@@ -664,7 +639,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": " can p"
+              "delta": "radient. I'll"
             }
           }
         },
@@ -689,7 +664,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": "ick"
+              "delta": " ke"
             }
           }
         },
@@ -714,7 +689,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": " out. Honestly, that"
+              "delta": "ep my"
             }
           }
         },
@@ -739,7 +714,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": "'s about"
+              "delta": " answer to"
             }
           }
         },
@@ -764,7 +739,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": " all I can say from"
+              "delta": " one short sentence and be up"
             }
           }
         },
@@ -789,7 +764,82 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": " it."
+              "delta": "front about how"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " little"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " I can act"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": "ually see."
             }
           }
         },
@@ -864,7 +914,7 @@
             "assistantMessageEvent": {
               "type": "thinking_end",
               "contentIndex": 0,
-              "content": "The image is so small that I can only make out a pale green blur, with no clear details I can pick out. Honestly, that's about all I can say from it.\n\n"
+              "content": "The image is so small and blurry that it's hard to make out much, though it looks like a plain green-ish gradient. I'll keep my answer to one short sentence and be upfront about how little I can actually see.\n\n"
             }
           }
         },
@@ -938,7 +988,82 @@
             "assistantMessageEvent": {
               "type": "text_delta",
               "contentIndex": 1,
-              "delta": "'s a very small, blurry"
+              "delta": "'s"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 1,
+              "delta": " a t"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 1,
+              "delta": "iny, bl"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 1,
+              "delta": "urry"
             }
           }
         },
@@ -988,7 +1113,7 @@
             "assistantMessageEvent": {
               "type": "text_delta",
               "contentIndex": 1,
-              "delta": " looks like a pl"
+              "delta": " app"
             }
           }
         },
@@ -1013,7 +1138,7 @@
             "assistantMessageEvent": {
               "type": "text_delta",
               "contentIndex": 1,
-              "delta": "ain pale green field, with no"
+              "delta": "ears to be a"
             }
           }
         },
@@ -1038,7 +1163,7 @@
             "assistantMessageEvent": {
               "type": "text_delta",
               "contentIndex": 1,
-              "delta": " details"
+              "delta": " pl"
             }
           }
         },
@@ -1063,7 +1188,7 @@
             "assistantMessageEvent": {
               "type": "text_delta",
               "contentIndex": 1,
-              "delta": " I can cl"
+              "delta": "ain pale green field"
             }
           }
         },
@@ -1088,7 +1213,82 @@
             "assistantMessageEvent": {
               "type": "text_delta",
               "contentIndex": 1,
-              "delta": "early make out."
+              "delta": ","
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 1,
+              "delta": " with no disc"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 1,
+              "delta": "ernible obj"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 1,
+              "delta": "ects."
             }
           }
         },
@@ -1113,7 +1313,7 @@
             "assistantMessageEvent": {
               "type": "text_end",
               "contentIndex": 1,
-              "content": "It's a very small, blurry image that looks like a plain pale green field, with no details I can clearly make out."
+              "content": "It's a tiny, blurry image that appears to be a plain pale green field, with no discernible objects."
             }
           }
         },
@@ -1125,17 +1325,17 @@
               "content": [
                 {
                   "type": "thinking",
-                  "thinking": "The image is so small that I can only make out a pale green blur, with no clear details I can pick out. Honestly, that's about all I can say from it.\n\n",
-                  "thinkingSignature": "CAQShgcKEAgTGAI4AUIIdGhpbmtpbmcSDEENlvcb4DJVbGJdXRoMkoYxkzftw2ysOlQxIjB1NkjSSw5QejS/rwUKmQKY2xjpZgTp27nWsnfVWQrHjn/uJMQu3axEUyOxJHBOdd8qowaPEohrRWtCqBsxDV5G4o3B3mm8WAzXYs0f/VZ5orLI26ogJWSpf6wiOnqN92EVMSTdyTzg0XxUT9eYQpkLnCa7kd6lFfBc7RJObFwn/GnYzeFhP80Vho+YgpV9gkMLGSKqB8ABM6U/iSmiNscSkWZLMs209UCiLOGKf0swUxasgZ1za207p51x1G8uARpSDN1EuceK0gObx9Zr726mj3goDzoLe6s6mXWhaRuJuNx8AdgDEb4GATqyqytM+GUQuVKahEZz2+IqZHgeH8eqhR3j5K+tFlhyrmly/n9UkHPabnWsWJ8RxfG07N68pyhH0ujlImoRHs3WK3l1JH06wKsAdT5JueoAqfibsaWfTsPF7lmf22hPDXCZzY96XSTnE1TV9VREFoGj0f21IezYla/ZIrzjwqm5VL5h8rcL9Wt/9Q7chvyKWn2ZFKpp25ym2t5qMCy++5/8YDuitW7Fuw2/5elAdZF2jxi/NjHwbJC9WuY1XRjZSqO0wrHyNi61unsX/JOjJEQQ9ayPfSnffQT645rJJliSNbnk8gzUC9U6TuklvYf5US7qciOdrcCiAiWToWY//ICyvMcr5qX0QkoGpdIF6cjfuWLq5PQL8acQXNX0tLWyEO1PgrNToxJ/ArAelBs03M1N3dRFMJshqtjejcwHceHYxb82pwKUX6jUnnx2h56InnUQ2j5yabU0NtTVuX/w9uScNjVdy/Ersnrvr0Gq+mUjnONg8ff1YKqaIr5F4I4LKu39j0yar9voyznrhjCSgvdH6ilfMWlKuBrWau1kIK3xf4+pRnL6baF/794f7YJCBzMecVu/LbghPEvtYPu+bs38k3ujQszefOkep9Yxe7nzKQZuxbRg1358GvwMFpu5Zc/QcFb0HybJXWShusuDzm9sPWaPW7Rklwne5BGJnXC50tXWTxyw9jRY5Pyt+PanRqV9mosReO0bXi5dqTCEHhQ5b/lueZBZMTFaKIx8FaWAQjMF1u8q7EEov4oZYENAciP3Psc2hElv7rkCrHjD1tYvYN4FjgPnPleXfpeg13as2md0rahXwh3W9COuhhgB"
+                  "thinking": "The image is so small and blurry that it's hard to make out much, though it looks like a plain green-ish gradient. I'll keep my answer to one short sentence and be upfront about how little I can actually see.\n\n",
+                  "thinkingSignature": "CAQS7QYKEAgTGAI4AUIIdGhpbmtpbmcSDMfaN9w7ZyUuE9HCvxoMHMQTXAIN3Y2nZ3m8IjCFdCg7IpKoOJnayXkhCFrWGan6odGKNgi6B4Xg6Z7qIjM49QIWaXiKksd8hMdCODIqigYgNauqHde9Aoi/i/sf5FrRA91p1n9d21PfbKQPJPnsVGYmfFXWxceSP/hDVY+/c499vlaqJIRI+Ltd4XJZcTvQsWUi40nYUqcNrRRk1pUJAUmnoVAQJUXvOucy3DF1D/yQ7aREh2j0n/shXabm0DWEINs/C50GRfvvkUvxmhQnfUU5HCi0wd3B5Lcx0GRBKbn0nas4uX6ncdfuCUgmKCK/TYybUQmCxRjZjHR318v/6sRUzJkmotEHQWSB2Nw9bIBlTqK78p9h1MiN9aWSInYDxavjuFu4Y1DnUAkoXWavnNJ0XIyvxcio8BT5rHIXsjF3SKm1dbMF/LAzvqVRFJtxKCD5K2f68QndGqF8H8HD16PRESOcnZX2j/yoRM5tixYaaOsdEIGD26AKVKxT3Bji4x0/VHdOnRqIlo6e0ZHWmYxARIVvpS39nSZpT7VJqW9d7fFHHPpXMSV1TFnW/xL8pukGzddPOIackUuibI+YYNYfU81507A7uqvWmrsOZFUnprYHPTQT6iTMBup1zEjDBW8QNquHBZ98bI8WEiccotsZRfYqgCjkopMNMm8hfHjTsqilS+ABHU3pK66acivlZEqwLxx1RTXnQGLa52wUBF1kok8T/cBJrQI5j6fCOKURYxVIqYvV+D+iT5tdzDPw8i8XOG/NZcJWHG12SHa9TJ3bwrNZgIAbyFs1CkwTBIjrJP1yi2HmA7m18ohAqeqpyZXLH3mZFHYNB0p8JfPTfj0uwOKJpsxIdnwOEd6pyWwbREDn0oz4Vi467P+M0YGA5+MoQMsi871SSmJau8WXaLRC2tnbwzD2qSCGh9MuVf8ZMzuMgiK18dM6nzdziDBXux1sN2oM0h/oKCjsOPe0QZHrhb385WpM6uqayjkYrrFdPUal8wHpA3ZmtKIuXZ2OxYpPbpESad6EZEhSyS1g1dN+WMnhfOoaisakzG84rBiCN4wdO1WQAvN8dJNxKhHRnMcwuJVAHHpmGDRK+zSmgEvtMRaL+hOR+wxLLXJymjKLWXHwmAum8mJ8GAE="
                 },
                 {
                   "type": "text",
-                  "text": "It's a very small, blurry image that looks like a plain pale green field, with no details I can clearly make out."
+                  "text": "It's a tiny, blurry image that appears to be a plain pale green field, with no discernible objects."
                 }
               ],
               "api": "anthropic-messages",
-              "provider": "vercel-ai-gateway",
-              "model": "anthropic/claude-haiku-5.5",
+              "provider": "<pi-provider>",
+              "model": "<pi-model>",
               "usage": {
                 "input": 0,
                 "output": 0,
@@ -1152,10 +1352,10 @@
                 "cacheWrite1h": 0
               },
               "stopReason": "stop",
-              "timestamp": 1793688819533,
-              "responseId": "gen_01M6G2YNX69TCDVYEWBPBVFHQA",
+              "timestamp": 1793748791798,
+              "responseId": "gen_01M6HW4WJ1WZXQTSJWAYHR6M6F",
               "rawStopReason": "end_turn",
-              "durationMs": 1860,
+              "durationMs": 1835,
               "thinkingLevel": "medium"
             }
           }
@@ -1168,17 +1368,17 @@
               "content": [
                 {
                   "type": "thinking",
-                  "thinking": "The image is so small that I can only make out a pale green blur, with no clear details I can pick out. Honestly, that's about all I can say from it.\n\n",
-                  "thinkingSignature": "CAQShgcKEAgTGAI4AUIIdGhpbmtpbmcSDEENlvcb4DJVbGJdXRoMkoYxkzftw2ysOlQxIjB1NkjSSw5QejS/rwUKmQKY2xjpZgTp27nWsnfVWQrHjn/uJMQu3axEUyOxJHBOdd8qowaPEohrRWtCqBsxDV5G4o3B3mm8WAzXYs0f/VZ5orLI26ogJWSpf6wiOnqN92EVMSTdyTzg0XxUT9eYQpkLnCa7kd6lFfBc7RJObFwn/GnYzeFhP80Vho+YgpV9gkMLGSKqB8ABM6U/iSmiNscSkWZLMs209UCiLOGKf0swUxasgZ1za207p51x1G8uARpSDN1EuceK0gObx9Zr726mj3goDzoLe6s6mXWhaRuJuNx8AdgDEb4GATqyqytM+GUQuVKahEZz2+IqZHgeH8eqhR3j5K+tFlhyrmly/n9UkHPabnWsWJ8RxfG07N68pyhH0ujlImoRHs3WK3l1JH06wKsAdT5JueoAqfibsaWfTsPF7lmf22hPDXCZzY96XSTnE1TV9VREFoGj0f21IezYla/ZIrzjwqm5VL5h8rcL9Wt/9Q7chvyKWn2ZFKpp25ym2t5qMCy++5/8YDuitW7Fuw2/5elAdZF2jxi/NjHwbJC9WuY1XRjZSqO0wrHyNi61unsX/JOjJEQQ9ayPfSnffQT645rJJliSNbnk8gzUC9U6TuklvYf5US7qciOdrcCiAiWToWY//ICyvMcr5qX0QkoGpdIF6cjfuWLq5PQL8acQXNX0tLWyEO1PgrNToxJ/ArAelBs03M1N3dRFMJshqtjejcwHceHYxb82pwKUX6jUnnx2h56InnUQ2j5yabU0NtTVuX/w9uScNjVdy/Ersnrvr0Gq+mUjnONg8ff1YKqaIr5F4I4LKu39j0yar9voyznrhjCSgvdH6ilfMWlKuBrWau1kIK3xf4+pRnL6baF/794f7YJCBzMecVu/LbghPEvtYPu+bs38k3ujQszefOkep9Yxe7nzKQZuxbRg1358GvwMFpu5Zc/QcFb0HybJXWShusuDzm9sPWaPW7Rklwne5BGJnXC50tXWTxyw9jRY5Pyt+PanRqV9mosReO0bXi5dqTCEHhQ5b/lueZBZMTFaKIx8FaWAQjMF1u8q7EEov4oZYENAciP3Psc2hElv7rkCrHjD1tYvYN4FjgPnPleXfpeg13as2md0rahXwh3W9COuhhgB"
+                  "thinking": "The image is so small and blurry that it's hard to make out much, though it looks like a plain green-ish gradient. I'll keep my answer to one short sentence and be upfront about how little I can actually see.\n\n",
+                  "thinkingSignature": "CAQS7QYKEAgTGAI4AUIIdGhpbmtpbmcSDMfaN9w7ZyUuE9HCvxoMHMQTXAIN3Y2nZ3m8IjCFdCg7IpKoOJnayXkhCFrWGan6odGKNgi6B4Xg6Z7qIjM49QIWaXiKksd8hMdCODIqigYgNauqHde9Aoi/i/sf5FrRA91p1n9d21PfbKQPJPnsVGYmfFXWxceSP/hDVY+/c499vlaqJIRI+Ltd4XJZcTvQsWUi40nYUqcNrRRk1pUJAUmnoVAQJUXvOucy3DF1D/yQ7aREh2j0n/shXabm0DWEINs/C50GRfvvkUvxmhQnfUU5HCi0wd3B5Lcx0GRBKbn0nas4uX6ncdfuCUgmKCK/TYybUQmCxRjZjHR318v/6sRUzJkmotEHQWSB2Nw9bIBlTqK78p9h1MiN9aWSInYDxavjuFu4Y1DnUAkoXWavnNJ0XIyvxcio8BT5rHIXsjF3SKm1dbMF/LAzvqVRFJtxKCD5K2f68QndGqF8H8HD16PRESOcnZX2j/yoRM5tixYaaOsdEIGD26AKVKxT3Bji4x0/VHdOnRqIlo6e0ZHWmYxARIVvpS39nSZpT7VJqW9d7fFHHPpXMSV1TFnW/xL8pukGzddPOIackUuibI+YYNYfU81507A7uqvWmrsOZFUnprYHPTQT6iTMBup1zEjDBW8QNquHBZ98bI8WEiccotsZRfYqgCjkopMNMm8hfHjTsqilS+ABHU3pK66acivlZEqwLxx1RTXnQGLa52wUBF1kok8T/cBJrQI5j6fCOKURYxVIqYvV+D+iT5tdzDPw8i8XOG/NZcJWHG12SHa9TJ3bwrNZgIAbyFs1CkwTBIjrJP1yi2HmA7m18ohAqeqpyZXLH3mZFHYNB0p8JfPTfj0uwOKJpsxIdnwOEd6pyWwbREDn0oz4Vi467P+M0YGA5+MoQMsi871SSmJau8WXaLRC2tnbwzD2qSCGh9MuVf8ZMzuMgiK18dM6nzdziDBXux1sN2oM0h/oKCjsOPe0QZHrhb385WpM6uqayjkYrrFdPUal8wHpA3ZmtKIuXZ2OxYpPbpESad6EZEhSyS1g1dN+WMnhfOoaisakzG84rBiCN4wdO1WQAvN8dJNxKhHRnMcwuJVAHHpmGDRK+zSmgEvtMRaL+hOR+wxLLXJymjKLWXHwmAum8mJ8GAE="
                 },
                 {
                   "type": "text",
-                  "text": "It's a very small, blurry image that looks like a plain pale green field, with no details I can clearly make out."
+                  "text": "It's a tiny, blurry image that appears to be a plain pale green field, with no discernible objects."
                 }
               ],
               "api": "anthropic-messages",
-              "provider": "vercel-ai-gateway",
-              "model": "anthropic/claude-haiku-5.5",
+              "provider": "<pi-provider>",
+              "model": "<pi-model>",
               "usage": {
                 "input": 0,
                 "output": 0,
@@ -1195,10 +1395,10 @@
                 "cacheWrite1h": 0
               },
               "stopReason": "stop",
-              "timestamp": 1793688819533,
-              "responseId": "gen_01M6G2YNX69TCDVYEWBPBVFHQA",
+              "timestamp": 1793748791798,
+              "responseId": "gen_01M6HW4WJ1WZXQTSJWAYHR6M6F",
               "rawStopReason": "end_turn",
-              "durationMs": 1860,
+              "durationMs": 1835,
               "thinkingLevel": "medium"
             },
             "toolResults": []
@@ -1212,7 +1412,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1793688819505,
+                "timestamp": 1793748791778,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -1335,24 +1535,24 @@
                     "mimeType": "image/png"
                   }
                 ],
-                "timestamp": 1793688819504
+                "timestamp": 1793748791777
               },
               {
                 "role": "assistant",
                 "content": [
                   {
                     "type": "thinking",
-                    "thinking": "The image is so small that I can only make out a pale green blur, with no clear details I can pick out. Honestly, that's about all I can say from it.\n\n",
-                    "thinkingSignature": "CAQShgcKEAgTGAI4AUIIdGhpbmtpbmcSDEENlvcb4DJVbGJdXRoMkoYxkzftw2ysOlQxIjB1NkjSSw5QejS/rwUKmQKY2xjpZgTp27nWsnfVWQrHjn/uJMQu3axEUyOxJHBOdd8qowaPEohrRWtCqBsxDV5G4o3B3mm8WAzXYs0f/VZ5orLI26ogJWSpf6wiOnqN92EVMSTdyTzg0XxUT9eYQpkLnCa7kd6lFfBc7RJObFwn/GnYzeFhP80Vho+YgpV9gkMLGSKqB8ABM6U/iSmiNscSkWZLMs209UCiLOGKf0swUxasgZ1za207p51x1G8uARpSDN1EuceK0gObx9Zr726mj3goDzoLe6s6mXWhaRuJuNx8AdgDEb4GATqyqytM+GUQuVKahEZz2+IqZHgeH8eqhR3j5K+tFlhyrmly/n9UkHPabnWsWJ8RxfG07N68pyhH0ujlImoRHs3WK3l1JH06wKsAdT5JueoAqfibsaWfTsPF7lmf22hPDXCZzY96XSTnE1TV9VREFoGj0f21IezYla/ZIrzjwqm5VL5h8rcL9Wt/9Q7chvyKWn2ZFKpp25ym2t5qMCy++5/8YDuitW7Fuw2/5elAdZF2jxi/NjHwbJC9WuY1XRjZSqO0wrHyNi61unsX/JOjJEQQ9ayPfSnffQT645rJJliSNbnk8gzUC9U6TuklvYf5US7qciOdrcCiAiWToWY//ICyvMcr5qX0QkoGpdIF6cjfuWLq5PQL8acQXNX0tLWyEO1PgrNToxJ/ArAelBs03M1N3dRFMJshqtjejcwHceHYxb82pwKUX6jUnnx2h56InnUQ2j5yabU0NtTVuX/w9uScNjVdy/Ersnrvr0Gq+mUjnONg8ff1YKqaIr5F4I4LKu39j0yar9voyznrhjCSgvdH6ilfMWlKuBrWau1kIK3xf4+pRnL6baF/794f7YJCBzMecVu/LbghPEvtYPu+bs38k3ujQszefOkep9Yxe7nzKQZuxbRg1358GvwMFpu5Zc/QcFb0HybJXWShusuDzm9sPWaPW7Rklwne5BGJnXC50tXWTxyw9jRY5Pyt+PanRqV9mosReO0bXi5dqTCEHhQ5b/lueZBZMTFaKIx8FaWAQjMF1u8q7EEov4oZYENAciP3Psc2hElv7rkCrHjD1tYvYN4FjgPnPleXfpeg13as2md0rahXwh3W9COuhhgB"
+                    "thinking": "The image is so small and blurry that it's hard to make out much, though it looks like a plain green-ish gradient. I'll keep my answer to one short sentence and be upfront about how little I can actually see.\n\n",
+                    "thinkingSignature": "CAQS7QYKEAgTGAI4AUIIdGhpbmtpbmcSDMfaN9w7ZyUuE9HCvxoMHMQTXAIN3Y2nZ3m8IjCFdCg7IpKoOJnayXkhCFrWGan6odGKNgi6B4Xg6Z7qIjM49QIWaXiKksd8hMdCODIqigYgNauqHde9Aoi/i/sf5FrRA91p1n9d21PfbKQPJPnsVGYmfFXWxceSP/hDVY+/c499vlaqJIRI+Ltd4XJZcTvQsWUi40nYUqcNrRRk1pUJAUmnoVAQJUXvOucy3DF1D/yQ7aREh2j0n/shXabm0DWEINs/C50GRfvvkUvxmhQnfUU5HCi0wd3B5Lcx0GRBKbn0nas4uX6ncdfuCUgmKCK/TYybUQmCxRjZjHR318v/6sRUzJkmotEHQWSB2Nw9bIBlTqK78p9h1MiN9aWSInYDxavjuFu4Y1DnUAkoXWavnNJ0XIyvxcio8BT5rHIXsjF3SKm1dbMF/LAzvqVRFJtxKCD5K2f68QndGqF8H8HD16PRESOcnZX2j/yoRM5tixYaaOsdEIGD26AKVKxT3Bji4x0/VHdOnRqIlo6e0ZHWmYxARIVvpS39nSZpT7VJqW9d7fFHHPpXMSV1TFnW/xL8pukGzddPOIackUuibI+YYNYfU81507A7uqvWmrsOZFUnprYHPTQT6iTMBup1zEjDBW8QNquHBZ98bI8WEiccotsZRfYqgCjkopMNMm8hfHjTsqilS+ABHU3pK66acivlZEqwLxx1RTXnQGLa52wUBF1kok8T/cBJrQI5j6fCOKURYxVIqYvV+D+iT5tdzDPw8i8XOG/NZcJWHG12SHa9TJ3bwrNZgIAbyFs1CkwTBIjrJP1yi2HmA7m18ohAqeqpyZXLH3mZFHYNB0p8JfPTfj0uwOKJpsxIdnwOEd6pyWwbREDn0oz4Vi467P+M0YGA5+MoQMsi871SSmJau8WXaLRC2tnbwzD2qSCGh9MuVf8ZMzuMgiK18dM6nzdziDBXux1sN2oM0h/oKCjsOPe0QZHrhb385WpM6uqayjkYrrFdPUal8wHpA3ZmtKIuXZ2OxYpPbpESad6EZEhSyS1g1dN+WMnhfOoaisakzG84rBiCN4wdO1WQAvN8dJNxKhHRnMcwuJVAHHpmGDRK+zSmgEvtMRaL+hOR+wxLLXJymjKLWXHwmAum8mJ8GAE="
                   },
                   {
                     "type": "text",
-                    "text": "It's a very small, blurry image that looks like a plain pale green field, with no details I can clearly make out."
+                    "text": "It's a tiny, blurry image that appears to be a plain pale green field, with no discernible objects."
                   }
                 ],
                 "api": "anthropic-messages",
-                "provider": "vercel-ai-gateway",
-                "model": "anthropic/claude-haiku-5.5",
+                "provider": "<pi-provider>",
+                "model": "<pi-model>",
                 "usage": {
                   "input": 0,
                   "output": 0,
@@ -1369,10 +1569,10 @@
                   "cacheWrite1h": 0
                 },
                 "stopReason": "stop",
-                "timestamp": 1793688819533,
-                "responseId": "gen_01M6G2YNX69TCDVYEWBPBVFHQA",
+                "timestamp": 1793748791798,
+                "responseId": "gen_01M6HW4WJ1WZXQTSJWAYHR6M6F",
                 "rawStopReason": "end_turn",
-                "durationMs": 1860,
+                "durationMs": 1835,
                 "thinkingLevel": "medium"
               }
             ],
@@ -1399,11 +1599,11 @@
             "success": true,
             "data": {
               "model": {
-                "id": "anthropic/claude-haiku-5.5",
+                "id": "<pi-model>",
                 "name": "Claude Haiku 5.5",
                 "api": "anthropic-messages",
-                "baseUrl": "https://ai-gateway.vercel.sh",
-                "provider": "vercel-ai-gateway",
+                "baseUrl": "<redacted>",
+                "provider": "<pi-provider>",
                 "reasoning": true,
                 "input": ["text", "image"],
                 "compat": {
@@ -1449,7 +1649,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T06-53-39-368Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T23-33-11-644Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 3,

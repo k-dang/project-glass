@@ -24,7 +24,7 @@
                 "name": "gpt-test",
                 "api": "openai-completions",
                 "provider": "glass-test",
-                "baseUrl": "http://127.0.0.1:62044/v1",
+                "baseUrl": "<redacted>",
                 "reasoning": false,
                 "input": ["text", "image"],
                 "cost": {
@@ -41,7 +41,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T06-53-26-139Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T23-32-58-528Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -85,7 +85,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1793688806247,
+              "timestamp": 1793748778593,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -204,7 +204,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1793688806247,
+              "timestamp": 1793748778593,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -327,7 +327,7 @@
                   "text": "Say hello"
                 }
               ],
-              "timestamp": 1793688806246
+              "timestamp": 1793748778591
             }
           }
         },
@@ -342,7 +342,7 @@
                   "text": "Say hello"
                 }
               ],
-              "timestamp": 1793688806246
+              "timestamp": 1793748778591
             }
           }
         },
@@ -370,9 +370,9 @@
                 }
               },
               "stopReason": "error",
-              "timestamp": 1793688806279,
+              "timestamp": 1793748778623,
               "errorMessage": "500: {\"message\":\"overloaded\"}",
-              "durationMs": 20,
+              "durationMs": 18,
               "thinkingLevel": "off"
             }
           }
@@ -401,9 +401,9 @@
                 }
               },
               "stopReason": "error",
-              "timestamp": 1793688806279,
+              "timestamp": 1793748778623,
               "errorMessage": "500: {\"message\":\"overloaded\"}",
-              "durationMs": 20,
+              "durationMs": 18,
               "thinkingLevel": "off"
             }
           }
@@ -432,9 +432,9 @@
                 }
               },
               "stopReason": "error",
-              "timestamp": 1793688806279,
+              "timestamp": 1793748778623,
               "errorMessage": "500: {\"message\":\"overloaded\"}",
-              "durationMs": 20,
+              "durationMs": 18,
               "thinkingLevel": "off"
             },
             "toolResults": []
@@ -448,7 +448,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1793688806247,
+                "timestamp": 1793748778593,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -566,7 +566,7 @@
                     "text": "Say hello"
                   }
                 ],
-                "timestamp": 1793688806246
+                "timestamp": 1793748778591
               },
               {
                 "role": "assistant",
@@ -589,9 +589,9 @@
                   }
                 },
                 "stopReason": "error",
-                "timestamp": 1793688806279,
+                "timestamp": 1793748778623,
                 "errorMessage": "500: {\"message\":\"overloaded\"}",
-                "durationMs": 20,
+                "durationMs": 18,
                 "thinkingLevel": "off"
               }
             ],
@@ -612,10 +612,10 @@
             "type": "entry_appended",
             "entry": {
               "type": "context_edit",
-              "id": "13ed2f32",
-              "parentId": "c4a7e5a0",
-              "timestamp": "2026-11-03T06:53:26.301Z",
-              "targetId": "c4a7e5a0",
+              "id": "eba04fb6",
+              "parentId": "ae9fcc06",
+              "timestamp": "2026-11-03T23:32:58.643Z",
+              "targetId": "ae9fcc06",
               "replacement": null
             }
           }
@@ -654,7 +654,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1793688806368
+              "timestamp": 1793748778708
             }
           }
         },
@@ -758,10 +758,10 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1793688806368,
+              "timestamp": 1793748778708,
               "responseId": "test-completion",
               "rawStopReason": "stop",
-              "durationMs": 4,
+              "durationMs": 5,
               "thinkingLevel": "off"
             }
           }
@@ -802,10 +802,10 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1793688806368,
+              "timestamp": 1793748778708,
               "responseId": "test-completion",
               "rawStopReason": "stop",
-              "durationMs": 4,
+              "durationMs": 5,
               "thinkingLevel": "off"
             },
             "toolResults": []
@@ -841,10 +841,10 @@
                   }
                 },
                 "stopReason": "stop",
-                "timestamp": 1793688806368,
+                "timestamp": 1793748778708,
                 "responseId": "test-completion",
                 "rawStopReason": "stop",
-                "durationMs": 4,
+                "durationMs": 5,
                 "thinkingLevel": "off"
               }
             ],
@@ -875,7 +875,7 @@
                 "name": "gpt-test",
                 "api": "openai-completions",
                 "provider": "glass-test",
-                "baseUrl": "http://127.0.0.1:62044/v1",
+                "baseUrl": "<redacted>",
                 "reasoning": false,
                 "input": ["text", "image"],
                 "cost": {
@@ -892,7 +892,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T06-53-26-139Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T23-32-58-528Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 3,
