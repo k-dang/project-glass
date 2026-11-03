@@ -127,24 +127,26 @@ const tryMatch = (recorded: Json, actual: Json, ids: Map<string, string>) => {
 const personal =
   /email|organization|account|subscription|rate_limit_info|username|team[_-]?id|(?:access|refresh|auth)[_-]?token|api[_-]?key/i
 
-export const blankPersonal = (value: Json, field = "", usage = false): Json => {
-  if (personal.test(field)) return "<redacted>"
+const usage = /usage|cost|tokens/i
 
-  const metric = usage || /usage|cost|tokens/i.test(field)
+const mapJson = (value: Json, change: (inner: Json, field: string) => Json): Json =>
+  isJsonArray(value)
+    ? value.map((item) => change(item, ""))
+    : isJsonObject(value)
+      ? Object.fromEntries(
+          Object.entries(value).map(([name, inner]) => [name, change(inner, name)]),
+        )
+      : value
 
-  return Predicate.isNumber(value) && metric
-    ? 0
-    : isJsonArray(value)
-      ? value.map((item) => blankPersonal(item, "", metric))
-      : isJsonObject(value)
-        ? Object.fromEntries(
-            Object.entries(value).map(([name, inner]) => [
-              name,
-              blankPersonal(inner, name, metric),
-            ]),
-          )
-        : value
-}
+const zeroNumbers = (value: Json): Json =>
+  Predicate.isNumber(value) ? 0 : mapJson(value, zeroNumbers)
+
+const blankPersonal = (value: Json, field = ""): Json =>
+  personal.test(field)
+    ? "<redacted>"
+    : usage.test(field)
+      ? zeroNumbers(value)
+      : mapJson(value, blankPersonal)
 
 const lines = (onLine: (line: string) => void) => {
   const frame = lineFramer()

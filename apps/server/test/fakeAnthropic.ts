@@ -164,7 +164,7 @@ const message = (model: string, reply: Reply) => ({
   usage: { input_tokens: 1, output_tokens: 1 },
 })
 
-/** The shared Messages API boundary for real Claude CLI integration and app verification. */
+/** The Messages API the real Claude CLI talks to in desktop end-to-end tests and `pnpm dev:fake`. */
 export const startFakeAnthropic = Effect.gen(function* () {
   let respond: (request: FakeAnthropicRequest) => Reply = replyTo
 

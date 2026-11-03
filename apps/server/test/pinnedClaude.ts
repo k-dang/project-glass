@@ -24,17 +24,23 @@ export const pinnedClaudeProgram = () =>
     ),
   )
 
-export const fakeAnthropicEnvironment = (home: string, url: string) => ({
-  GLASS_CLAUDE_COMMAND: pinnedClaude(),
+const isolatedEnvironment = (home: string) => ({
   CLAUDE_CONFIG_DIR: join(home, ".claude"),
-  ANTHROPIC_BASE_URL: url,
-  ANTHROPIC_API_KEY: "sk-ant-glass-test-fake",
+  ANTHROPIC_BASE_URL: "",
+  ANTHROPIC_API_KEY: "",
   ANTHROPIC_AUTH_TOKEN: "",
   CLAUDE_CODE_OAUTH_TOKEN: "",
   CLAUDE_CODE_USE_BEDROCK: "",
   CLAUDE_CODE_USE_VERTEX: "",
   CLAUDE_CODE_USE_FOUNDRY: "",
   CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
+})
+
+export const fakeAnthropicEnvironment = (home: string, url: string) => ({
+  ...isolatedEnvironment(home),
+  GLASS_CLAUDE_COMMAND: pinnedClaude(),
+  ANTHROPIC_BASE_URL: url,
+  ANTHROPIC_API_KEY: "sk-ant-glass-test-fake",
 })
 
 const Credentials = Schema.fromJsonString(
@@ -63,14 +69,7 @@ const loginToken = () => {
 // The login's access token, not a copy of its credentials file: Claude Code may renew a copied
 // login, rotating the refresh token the user's own Claude Code still holds.
 export const claudeLoginEnvironment = (home: string) => ({
-  CLAUDE_CONFIG_DIR: join(home, ".claude"),
+  ...isolatedEnvironment(home),
   CLAUDE_CODE_OAUTH_TOKEN: loginToken(),
   ANTHROPIC_MODEL: "haiku",
-  ANTHROPIC_BASE_URL: "",
-  ANTHROPIC_API_KEY: "",
-  ANTHROPIC_AUTH_TOKEN: "",
-  CLAUDE_CODE_USE_BEDROCK: "",
-  CLAUDE_CODE_USE_VERTEX: "",
-  CLAUDE_CODE_USE_FOUNDRY: "",
-  CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
 })

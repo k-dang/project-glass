@@ -3,7 +3,9 @@ import {
   type AgentEvent,
   applyAgentEvent,
   type Image,
+  isWaiting,
   type RequestAnswer,
+  type RequestPart,
   type Turn,
   TurnStarted,
 } from "@glass/contracts"
@@ -21,6 +23,12 @@ import { type FakeModelSettings, fakeModelProvider, type PiSettings } from "./fa
 import { isolatedHome } from "./harness"
 import { claudeLoginEnvironment, pinnedClaude, pinnedClaudeProgram } from "./pinnedClaude"
 import { recordingSessions, sessionTape } from "./sessionTape"
+
+export const run = (tool: string, command: string, reply: string) =>
+  `Use the ${tool} tool to run exactly \`${command}\` and nothing else, then reply with exactly: ${reply}`
+
+export const waiting = (turns: ReadonlyArray<Turn>) =>
+  turns.at(-1)?.parts.findLast((part): part is RequestPart => isWaiting(part))
 
 const drive = Effect.fnUntraced(function* (
   adapter: AgentAdapter,
@@ -45,6 +53,10 @@ const drive = Effect.fnUntraced(function* (
       Effect.map(Option.getOrThrow),
       Effect.raceFirst(tape.mismatch),
     )
+
+  const request = until((current) => waiting(current) !== undefined).pipe(
+    Effect.map((current) => waiting(current)!),
+  )
 
   const open = (conversation: string) =>
     adapter.start({ folder, conversation, report }).pipe(
@@ -73,7 +85,7 @@ const drive = Effect.fnUntraced(function* (
       })),
     )
 
-  return { adapter, events, turns: SubscriptionRef.get(turns), until, open }
+  return { adapter, events, turns: SubscriptionRef.get(turns), until, request, open }
 })
 
 export const claudeSession = Effect.fnUntraced(function* (scenario: string) {

@@ -5,8 +5,6 @@ import {
   DenyRequest,
   Image,
   isRequestPart,
-  isWaiting,
-  type RequestPart,
   SteerPart,
   TextPart,
   type Turn,
@@ -14,19 +12,13 @@ import {
   TurnStopped,
 } from "@glass/contracts"
 import { Effect, Predicate } from "effect"
-import { claudeSession } from "../../test/adapterSessions"
+import { claudeSession, run } from "../../test/adapterSessions"
 import { settled } from "../../test/agentsFixture"
 
 const conversation = "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
 
-const waiting = (turns: ReadonlyArray<Turn>) =>
-  turns.at(-1)?.parts.find((part): part is RequestPart => isWaiting(part))
-
 const lastText = (turn: Turn | undefined) =>
   turn?.parts.findLast((part) => Predicate.isTagged(part, "Text"))
-
-const run = (command: string, reply: string) =>
-  `Use the Bash tool to run exactly \`${command}\` and nothing else, then reply with exactly: ${reply}`
 
 const pixel = Image.make({
   mediaType: "image/png",
@@ -39,8 +31,8 @@ it.live("answers Claude Code's Permission requests and Questions through Glass",
     const agent = yield* f.open(conversation)
     yield* agent.configure({ permissionMode: "default" })
 
-    yield* agent.send(run("touch compatible.txt", "DONE"))
-    const permission = waiting(yield* f.until((turns) => waiting(turns) !== undefined))
+    yield* agent.send(run("Bash", "touch compatible.txt", "DONE"))
+    const permission = yield* f.request
     assert.ok(Predicate.isTagged(permission, "PermissionRequest"))
     assert.equal(permission.toolName, "Bash")
     yield* agent.answer(permission.requestId, AllowRequest.make({}))
@@ -51,9 +43,7 @@ it.live("answers Claude Code's Permission requests and Questions through Glass",
       "Use the AskUserQuestion tool once to ask me which files to read, offering exactly two options labelled Only the README and Everything. After I answer, reply with exactly the label I chose.",
     )
 
-    const question = waiting(
-      yield* f.until((turns) => turns.length === 2 && waiting(turns) !== undefined),
-    )
+    const question = yield* f.request
 
     assert.ok(Predicate.isTagged(question, "Question"))
     yield* agent.answer(
@@ -147,8 +137,8 @@ it.live("Steers a running Turn, showing the Steer where Claude Code takes it in"
     const agent = yield* f.open(conversation)
     yield* agent.configure({ permissionMode: "default" })
 
-    yield* agent.send(run("touch steer.txt", "FIRST"))
-    const request = waiting(yield* f.until((turns) => waiting(turns) !== undefined))!
+    yield* agent.send(run("Bash", "touch steer.txt", "FIRST"))
+    const request = yield* f.request
     yield* agent.steer("Change course: reply with exactly STEERED instead.")
     yield* agent.answer(request.requestId, AllowRequest.make({}))
 
@@ -192,8 +182,8 @@ it.live(
       const agent = yield* f.open(conversation)
       yield* agent.configure({ permissionMode: "default" })
 
-      yield* agent.send(run("touch notes.txt", "DONE"))
-      const request = waiting(yield* f.until((turns) => waiting(turns) !== undefined))!
+      yield* agent.send(run("Bash", "touch notes.txt", "DONE"))
+      const request = yield* f.request
 
       const refused = yield* agent
         .answer(
@@ -228,8 +218,8 @@ it.live(
       const agent = yield* f.open(conversation)
       yield* agent.configure({ permissionMode: "default" })
 
-      yield* agent.send(run("touch notes.txt", "DONE"))
-      const request = waiting(yield* f.until((turns) => waiting(turns) !== undefined))!
+      yield* agent.send(run("Bash", "touch notes.txt", "DONE"))
+      const request = yield* f.request
       yield* agent.session.stopTurn
 
       const [turn] = yield* f.until(settled(1))
@@ -248,13 +238,13 @@ it.live("runs the next Turn in a newly chosen Permission mode", () =>
     const agent = yield* f.open(conversation)
     yield* agent.configure({ permissionMode: "default" })
 
-    yield* agent.send(run("touch first.txt", "DONE"))
-    const request = waiting(yield* f.until((turns) => waiting(turns) !== undefined))!
+    yield* agent.send(run("Bash", "touch first.txt", "DONE"))
+    const request = yield* f.request
     yield* agent.answer(request.requestId, AllowRequest.make({}))
     yield* f.until(settled(1))
 
     yield* agent.configure({ permissionMode: "bypassPermissions" })
-    yield* agent.send(run("touch second.txt", "DONE"))
+    yield* agent.send(run("Bash", "touch second.txt", "DONE"))
     const [, second] = yield* f.until(settled(2))
 
     assert.deepStrictEqual(second?.ended?.ending, TurnDone.make({}))
