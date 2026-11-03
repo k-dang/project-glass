@@ -6,24 +6,20 @@ import {
   nothingUnsent,
   type SentMessage,
 } from "@glass/contracts"
+import { Document } from "@tiptap/extension-document"
+import { Paragraph } from "@tiptap/extension-paragraph"
+import { Text } from "@tiptap/extension-text"
+import { Placeholder, UndoRedo } from "@tiptap/extensions"
+import { Selection, TextSelection } from "@tiptap/pm/state"
+import { type EditorView } from "@tiptap/pm/view"
+import { EditorContent, useEditor } from "@tiptap/react"
 import { Predicate, Schema } from "effect"
 import { Base64 } from "effect/encoding"
 import { ArrowUp, Square, X } from "lucide-react"
-import {
-  type ClipboardEvent,
-  type DragEvent,
-  type KeyboardEvent,
-  memo,
-  type ReactNode,
-  useRef,
-  useState,
-} from "react"
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupTextarea,
-} from "@/components/ui/input-group"
+import { memo, type ReactNode, useLayoutEffect, useRef, useState } from "react"
+import { InputGroup, InputGroupAddon, InputGroupButton } from "@/components/ui/input-group"
+import { pastedSlice, toContent, ToDoMention, toMessage } from "./composerDocument"
+import { MarkdownStyling } from "./markdownStyling"
 import { useMentionPicker } from "./Mentions"
 import { type Problem } from "./problems"
 import { ProblemAlert } from "./ProblemAlert"
@@ -60,7 +56,35 @@ export const Attachment = memo(function Attachment(props: {
   )
 })
 
-const holdsFiles = (event: DragEvent) => event.dataTransfer.types.includes("Files")
+const extensions = [
+  Document,
+  Paragraph,
+  Text,
+  ToDoMention,
+  MarkdownStyling,
+  UndoRedo,
+  Placeholder.configure({
+    placeholder: ({ editor }) => {
+      const { attributes } = editor.options.editorProps
+
+      return Predicate.isFunction(attributes) ? "" : (attributes?.["aria-placeholder"] ?? "")
+    },
+  }),
+]
+
+const takeText = (view: EditorView, data: DataTransfer | null, from: number, to = from) => {
+  const text = data?.getData("text/plain") ?? ""
+
+  if (text === "") return false
+
+  const { tr } = view.state
+  tr.replaceRange(from, to, pastedSlice(view.state.schema, text))
+  view.dispatch(
+    tr.setSelection(TextSelection.near(tr.doc.resolve(tr.mapping.map(to, 1)), -1)).scrollIntoView(),
+  )
+
+  return true
+}
 
 export function MessageBox(props: {
   composed: SentMessage
@@ -86,18 +110,39 @@ export function MessageBox(props: {
   const sending = useRef(false)
   const [awaiting, setAwaiting] = useState(false)
 
-  const picker = useMentionPicker(
-    composed.message,
-    (message) => setComposed((current) => ({ ...current, message })),
-    !props.textOnly,
-  )
+  const [content] = useState(() => toContent(composed.message))
+
+  const editor = useEditor({
+    extensions,
+    content,
+    onUpdate: (event) => {
+      const message = toMessage(event.editor.state.doc.content)
+      setComposed((current) => ({ ...current, message }))
+    },
+  })
+
+  const picker = useMentionPicker(editor, !props.textOnly)
+
+  useLayoutEffect(() => {
+    if (composed.message === toMessage(editor.state.doc.content)) return
+    editor
+      .chain()
+      .setContent(toContent(composed.message), { emitUpdate: false })
+      .command(({ tr }) => {
+        tr.setSelection(Selection.atEnd(tr.doc)).setMeta("addToHistory", false)
+
+        return true
+      })
+      .run()
+  }, [editor, composed.message])
+
+  const written = (): SentMessage => ({ ...composed, message: toMessage(editor.state.doc.content) })
 
   const submit = async (deliver: (message: MessageInput) => Promise<boolean>) => {
-    const message = composed.message.trim()
+    const sent = written()
+    const message = sent.message.trim()
 
     if (props.blocked || sending.current || message === "") return
-
-    const sent = composed
 
     if (!props.holdUntilAccepted) {
       setComposed(() => nothingUnsent)
@@ -125,31 +170,94 @@ export function MessageBox(props: {
         setComposed((current) => ({ ...current, images: [...current.images, ...images] }))
     })
 
-  const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+  const onKeyDown = (event: KeyboardEvent) => {
     // Enter can confirm an input method's candidates.
-    if (event.nativeEvent.isComposing) return
+    if (event.isComposing) return false
 
-    if (picker.onKeyDown(event)) return
+    if (picker.onKeyDown(event)) return true
 
-    if (event.key === "Enter" && !event.shiftKey) {
+    if (event.key === "Enter" && event.shiftKey) {
+      event.preventDefault()
+
+      editor.commands.splitBlock()
+    } else if (event.key === "Enter") {
       event.preventDefault()
       const steer = event.metaKey || event.ctrlKey ? props.steer : null
       void submit(steer ?? props.send)
-    } else if (event.key === "ArrowUp" && isNothingUnsent(composed) && props.recall !== null) {
+    } else if (event.key === "ArrowUp" && isNothingUnsent(written()) && props.recall !== null) {
       event.preventDefault()
       const { recall } = props
       setComposed(() => recall)
-    }
+    } else return false
+
+    return true
   }
 
-  const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
-    const files = Array.from(event.clipboardData.files)
+  const takeImages = (data: DataTransfer | null) => {
+    const files = Array.from(data?.files ?? [])
 
-    if (props.textOnly || awaiting || !files.some(({ type }) => isMediaType(type))) return
-
-    event.preventDefault()
+    if (props.textOnly || !files.some(({ type }) => isMediaType(type))) return false
     addImages(files)
+
+    return true
   }
+
+  const onPaste = (view: EditorView, { clipboardData }: ClipboardEvent) => {
+    const { from, to } = view.state.selection
+
+    return takeImages(clipboardData) || takeText(view, clipboardData, from, to)
+  }
+
+  const onDrop = (view: EditorView, event: DragEvent, moved: boolean) => {
+    const at = view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos
+
+    const taken =
+      takeImages(event.dataTransfer) ||
+      (!moved && at !== undefined && takeText(view, event.dataTransfer, at))
+
+    if (taken) {
+      event.preventDefault()
+      view.focus()
+    }
+
+    return taken
+  }
+
+  const handlers = useRef({ onKeyDown, onPaste, onDrop })
+
+  useLayoutEffect(() => {
+    handlers.current = { onKeyDown, onPaste, onDrop }
+  })
+
+  const { label, placeholder } = props
+  const { activeDescendant, listbox } = picker
+
+  useLayoutEffect(() => {
+    const combobox =
+      activeDescendant === null
+        ? {}
+        : { "aria-controls": listbox, "aria-activedescendant": activeDescendant }
+
+    editor.setOptions({
+      editable: !awaiting,
+      editorProps: {
+        attributes: {
+          ...combobox,
+          role: "textbox",
+          "aria-multiline": "true",
+          "aria-label": label,
+          "aria-placeholder": placeholder,
+          "aria-readonly": String(awaiting),
+          "data-slot": "input-group-control",
+          class: "max-h-60 w-full flex-1 overflow-y-auto p-3 text-base outline-none md:text-sm",
+        },
+        handleKeyDown: (_view, event) => handlers.current.onKeyDown(event),
+        handlePaste: (view, event) => handlers.current.onPaste(view, event),
+        handleDrop: (view, event, _slice, moved) => handlers.current.onDrop(view, event, moved),
+        clipboardTextSerializer: (slice) => toMessage(slice.content),
+      },
+    })
+  }, [editor, label, placeholder, awaiting, activeDescendant, listbox])
 
   return (
     <form
@@ -191,30 +299,7 @@ export function MessageBox(props: {
               ))}
             </InputGroupAddon>
           )}
-          <InputGroupTextarea
-            {...picker.textarea}
-            aria-label={props.label}
-            className="max-h-60 p-3"
-            placeholder={props.placeholder}
-            value={composed.message}
-            readOnly={awaiting}
-            onChange={(event) => {
-              const message = event.target.value
-              picker.follow(event.target)
-              setComposed((current) => ({ ...current, message }))
-            }}
-            onKeyDown={onKeyDown}
-            onPaste={onPaste}
-            onDragOver={(event) => {
-              if (!props.textOnly && holdsFiles(event)) event.preventDefault()
-            }}
-            onDrop={(event) => {
-              if (props.textOnly || awaiting || !holdsFiles(event)) return
-
-              event.preventDefault()
-              addImages(event.dataTransfer.files)
-            }}
-          />
+          <EditorContent editor={editor} className="w-full min-w-0" />
           <InputGroupAddon align="block-end" className="min-w-0 items-end gap-1">
             <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1 [&>button]:min-w-0">
               {props.pickers}
