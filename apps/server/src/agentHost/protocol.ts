@@ -51,6 +51,17 @@ export const TurnSettings = Schema.Struct({
 
 export type TurnSettings = typeof TurnSettings.Type
 
+/**
+ * What an Agent review's Agent is told and may do: Glass's instructions with the PR material and
+ * the review, and the lines a Suggested draft may go on, keyed by `diffLinesKey`.
+ */
+export const ReviewBrief = Schema.Struct({
+  instructions: Schema.String,
+  diffLines: Schema.Record(Schema.String, Schema.Array(Schema.Int)),
+})
+
+export type ReviewBrief = typeof ReviewBrief.Type
+
 export class HostAgentError extends Schema.TaggedError<HostAgentError>()("HostAgentError", {
   message: Schema.String,
 }) {}
@@ -61,8 +72,14 @@ export class AgentHostRpcs extends RpcGroup.make(
     success: AgentModels,
     error: HostAgentError,
   }),
+  /** `review` starts an Agent review's read-only Agent, with Glass's Suggested-draft tool. */
   Rpc.make("StartAgent", {
-    payload: { agentId: Schema.String, engine: AgentEngine, folder: HostFolder },
+    payload: {
+      agentId: Schema.String,
+      engine: AgentEngine,
+      folder: HostFolder,
+      review: Schema.NullOr(ReviewBrief),
+    },
     error: HostAgentError,
   }),
   /** Starts a Turn the backend has recorded; its parts and ending arrive through WatchJournal. */

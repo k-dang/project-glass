@@ -9,7 +9,7 @@ import { Context, Effect, Exit, Layer, Scope, Semaphore } from "effect"
 import type { AgentAdapter, AgentSession } from "./adapter"
 import type { DeliveredMessage } from "./deliveredMessage"
 import { Journal } from "./Journal"
-import { HostAgentError, type TurnSettings } from "./protocol"
+import { HostAgentError, type ReviewBrief, type TurnSettings } from "./protocol"
 
 interface Running {
   readonly scope: Scope.Closeable
@@ -28,6 +28,7 @@ export class HostAgents extends Context.Service<
       agentId: string,
       engine: AgentEngine,
       folder: string,
+      review: ReviewBrief | null,
     ) => Effect.Effect<void, HostAgentError>
     readonly startTurn: (
       agentId: string,
@@ -58,7 +59,12 @@ export class HostAgents extends Context.Service<
         const lock = yield* Semaphore.make(1)
 
         const start = Effect.fn("HostAgents.start")(
-          function* (agentId: string, engine: AgentEngine, folder: string) {
+          function* (
+            agentId: string,
+            engine: AgentEngine,
+            folder: string,
+            review: ReviewBrief | null,
+          ) {
             const current = running.get(agentId)
 
             if (current !== undefined && !(yield* current.session.stopped)) return
@@ -69,6 +75,7 @@ export class HostAgents extends Context.Service<
               .start({
                 folder,
                 conversation: agentId,
+                review,
                 report: (event) => journal.append(agentId, event),
               })
               .pipe(

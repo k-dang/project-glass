@@ -7,7 +7,7 @@ import type {
 } from "@glass/contracts"
 import type { Effect, Scope } from "effect"
 import type { DeliveredMessage } from "./deliveredMessage"
-import type { HostAgentError, TurnSettings } from "./protocol"
+import type { HostAgentError, ReviewBrief, TurnSettings } from "./protocol"
 
 export interface AgentSession {
   /**
@@ -36,11 +36,13 @@ export interface AgentAdapter {
   readonly models: Effect.Effect<AgentModels, HostAgentError>
   /**
    * Starts the program in `folder` on the conversation named `conversation`, a UUID, continuing it
-   * when the program has already saved it and starting it otherwise.
+   * when the program has already saved it and starting it otherwise. With a `review`, the program
+   * only reads the folder and may propose Suggested drafts.
    */
   readonly start: (options: {
     readonly folder: string
     readonly conversation: string
+    readonly review: ReviewBrief | null
     readonly report: (event: AgentEvent) => Effect.Effect<void>
   }) => Effect.Effect<AgentSession, HostAgentError, Scope.Scope>
 }

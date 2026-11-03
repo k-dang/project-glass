@@ -1,4 +1,4 @@
-import { NodeSocket } from "@effect/platform-node"
+import { NodeFileSystem, NodeSocket } from "@effect/platform-node"
 import { SqliteClient, SqliteMigrator } from "@effect/sql-sqlite-node"
 import {
   AgentEngine,
@@ -203,6 +203,7 @@ export const agentServicesFixture = Effect.gen(function* () {
           Layer.provide(Layer.succeed(LocalPlacement, placement)),
           Layer.provide(ToDos.layer),
           Layer.provide(Layer.mock(ActivityLog)({ record: () => Effect.void })),
+          Layer.provide(NodeFileSystem.layer),
         ),
       )
 

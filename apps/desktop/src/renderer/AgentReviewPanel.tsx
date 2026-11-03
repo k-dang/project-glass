@@ -1,22 +1,30 @@
+import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
 import {
-  type FollowUp,
+  emptyTranscript,
+  engineCapabilities,
   nothingUnsent,
   type SentMessage,
   type SuggestedDraft,
+  suggestedDraftOf,
+  type ToolCallPart,
 } from "@glass/contracts"
 import { cn } from "cn"
+import { Option } from "effect"
+import { AsyncResult } from "effect/reactivity"
 import { Check, LoaderCircle, Pencil } from "lucide-react"
-import { useState } from "react"
+import { type ReactNode, useCallback, useState } from "react"
 import { Streamdown } from "streamdown"
 import { Button } from "@/components/ui/button"
 import { Marker, MarkerContent } from "@/components/ui/marker"
 import { Textarea } from "@/components/ui/textarea"
-import { UserMessage } from "./AgentView"
+import { transcriptAtom } from "./agentsArea"
+import { AgentComposer, ToolCallView, Transcript, UserMessage } from "./AgentView"
 import type { ShowNote } from "./changesView"
 import { LineLocation, pathLineName } from "./Discussions"
 import { Elapsed } from "./Elapsed"
 import { MessageBox } from "./MessageBox"
 import { ProblemAlert } from "./ProblemAlert"
+import { streamProblem } from "./problems"
 import type { AgentReviewControls } from "./useAgentReview"
 import { type DraftStore, useDraftsLocked, useLineDraftPlaces } from "./useDrafts"
 
@@ -122,36 +130,52 @@ function SuggestedDraftCard(props: {
   )
 }
 
-function FollowUpView(props: {
-  followUp: FollowUp
-  drafts: DraftStore
-  addable: boolean
-  show: ShowNote
-}) {
+function FollowUpsMarker() {
   return (
-    <li className="flex flex-col gap-3 enter-motion">
-      <UserMessage message={props.followUp.message} images={[]} />
-      <AgentReviewMarkdown markdown={props.followUp.answer} />
-      {props.followUp.suggestedDrafts.map((draft, index) => (
-        // A saved Follow-up never changes, and two may share a line, so the place can't key it.
-        <SuggestedDraftCard
-          key={index}
-          draft={draft}
-          drafts={props.drafts}
-          addable={props.addable}
-          show={props.show}
-        />
-      ))}
-    </li>
+    <Marker variant="separator" aria-hidden className="my-6 text-xs">
+      <MarkerContent>Follow-ups</MarkerContent>
+    </Marker>
   )
 }
 
-function Composer(props: {
-  controls: AgentReviewControls
-  reviewing: boolean
-  following: boolean
-}) {
+/** The first Follow-up, sent while Glass starts the Agent it becomes the first Turn of. */
+function FirstFollowUp(props: { controls: AgentReviewControls }) {
+  const { job } = props.controls
+
+  if (job?.status !== "following-up" && job?.status !== "follow-up-failed") return null
+
+  return (
+    <>
+      <FollowUpsMarker />
+      <div className="flex flex-col gap-3 enter-motion">
+        <UserMessage message={job.message} images={[]} />
+        {job.status === "following-up" ? (
+          <output className="flex items-center gap-2 text-sm text-muted-foreground">
+            <LoaderCircle
+              aria-hidden
+              className="size-3.5 shrink-0 animate-spin motion-reduce:animate-none"
+            />
+            <span className="flex-1">Copying the PR's code for the agent…</span>
+            <Elapsed startedAt={job.startedAt} />
+          </output>
+        ) : (
+          <ProblemAlert
+            problem={{ title: "Follow-up failed", detail: job.reason.message }}
+            action={
+              props.controls.followUpPending
+                ? undefined
+                : { label: "Retry", run: () => props.controls.followUp(job.message) }
+            }
+          />
+        )}
+      </div>
+    </>
+  )
+}
+
+function FirstFollowUpComposer(props: { controls: AgentReviewControls; reviewing: boolean }) {
   const [composed, setComposed] = useState<SentMessage>(nothingUnsent)
+  const { job } = props.controls
 
   return (
     <MessageBox
@@ -161,19 +185,96 @@ function Composer(props: {
       placeholder="Ask about the review, or have it draft comments"
       textOnly
       holdUntilAccepted
-      blocked={props.controls.followUpPending || props.reviewing || props.following}
+      blocked={props.controls.followUpPending || props.reviewing || job?.status === "following-up"}
       problem={props.controls.followUpProblem}
       send={({ message }) => props.controls.followUp(message)}
       steer={null}
       recall={null}
-      onStop={props.following ? props.controls.cancel : null}
+      onStop={job?.status === "following-up" ? props.controls.cancel : null}
     />
   )
 }
 
+function OutdatedNote() {
+  return (
+    <p className="m-0 shrink-0 border-t px-5 py-3 text-sm text-muted-foreground">
+      Written for an older Revision. Review again to follow up.
+    </p>
+  )
+}
+
+/** The review's Agent: its Turns are the Follow-ups, under the review they follow up on. */
+function ReviewAgent(props: {
+  agentId: string
+  lead: ReactNode
+  outdated: boolean
+  drafts: DraftStore
+  show: ShowNote
+}) {
+  const { agentId, drafts, show, outdated } = props
+  const transcript = useAtomValue(transcriptAtom(agentId))
+  const reconnect = useAtomRefresh(transcriptAtom(agentId))
+
+  const { turns, queued, status } = Option.getOrElse(
+    AsyncResult.value(transcript),
+    () => emptyTranscript,
+  )
+
+  const suggestedDraftView = useCallback(
+    (call: typeof ToolCallPart.Type) => {
+      const draft = suggestedDraftOf(call)
+
+      return (
+        draft !== null && (
+          <SuggestedDraftCard draft={draft} drafts={drafts} addable={!outdated} show={show} />
+        )
+      )
+    },
+    [drafts, outdated, show],
+  )
+
+  return (
+    <ToolCallView value={suggestedDraftView}>
+      {AsyncResult.isFailure(transcript) && !transcript.waiting && (
+        <div className="px-5 pt-4">
+          <ProblemAlert
+            problem={streamProblem(transcript.cause)}
+            action={{ label: "Reconnect", run: reconnect }}
+          />
+        </div>
+      )}
+      <Transcript
+        agentId={agentId}
+        turns={turns}
+        status={status}
+        lead={
+          <>
+            {props.lead}
+            <FollowUpsMarker />
+          </>
+        }
+      />
+      {outdated ? (
+        <OutdatedNote />
+      ) : (
+        <AgentComposer
+          agentId={agentId}
+          // The panel doesn't know which program the Agent review engine runs.
+          canSteer={Object.values(engineCapabilities).every(({ steer }) => steer)}
+          turns={turns}
+          queued={queued}
+          label="Follow up"
+          placeholder="Ask about the review, or have it draft comments"
+          textOnly
+        />
+      )}
+    </ToolCallView>
+  )
+}
+
 /**
- * The whole Agent review in the file panel, so it reads beside the diff, with its Follow-ups:
- * the user's messages about it and the agent's answers, which can suggest Drafts.
+ * The whole Agent review in the file panel, so it reads beside the diff, with its Follow-ups: the
+ * Turns of the review's own Agent, which can suggest Drafts.
  */
 export function AgentReviewPanel(props: {
   controls: AgentReviewControls
@@ -184,67 +285,36 @@ export function AgentReviewPanel(props: {
 
   if (review === null) return null
 
-  const pending = job?.status === "following-up" || job?.status === "follow-up-failed"
+  const markdown = <AgentReviewMarkdown markdown={review.markdown} />
+
+  if (review.agentId !== null)
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <ReviewAgent
+          key={review.agentId}
+          agentId={review.agentId}
+          lead={markdown}
+          outdated={outdated}
+          drafts={props.drafts}
+          show={props.show}
+        />
+      </div>
+    )
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <section aria-label="Agent review" className="min-h-0 flex-1 overflow-y-auto px-5 pt-4 pb-8">
-        <AgentReviewMarkdown markdown={review.markdown} />
-        {(review.followUps.length > 0 || pending) && (
-          <Marker variant="separator" aria-hidden className="my-6 text-xs">
-            <MarkerContent>Follow-ups</MarkerContent>
-          </Marker>
-        )}
-        <ol aria-label="Follow-ups" className="m-0 flex list-none flex-col gap-6 p-0">
-          {review.followUps.map((followUp, index) => (
-            <FollowUpView
-              key={index}
-              followUp={followUp}
-              drafts={props.drafts}
-              addable={!outdated}
-              show={props.show}
-            />
-          ))}
-          {pending && (
-            <li className="flex flex-col gap-3 enter-motion">
-              <UserMessage message={job.message} images={[]} />
-              {job.status === "following-up" ? (
-                <output className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <LoaderCircle
-                    aria-hidden
-                    className="size-3.5 shrink-0 animate-spin motion-reduce:animate-none"
-                  />
-                  <span className="flex-1">The agent is reading the PR's code…</span>
-                  <Elapsed startedAt={job.startedAt} />
-                </output>
-              ) : (
-                <ProblemAlert
-                  problem={{ title: "Follow-up failed", detail: job.reason.message }}
-                  action={
-                    props.controls.followUpPending
-                      ? undefined
-                      : { label: "Retry", run: () => props.controls.followUp(job.message) }
-                  }
-                />
-              )}
-            </li>
-          )}
-        </ol>
+        {markdown}
+        <FirstFollowUp controls={props.controls} />
       </section>
       <div
         aria-hidden
         className="pointer-events-none relative -mt-8 h-8 shrink-0 bg-linear-to-t from-background to-transparent"
       />
       {outdated ? (
-        <p className="m-0 shrink-0 border-t px-5 py-3 text-sm text-muted-foreground">
-          Written for an older Revision. Review again to follow up.
-        </p>
+        <OutdatedNote />
       ) : (
-        <Composer
-          controls={props.controls}
-          reviewing={job?.status === "reviewing"}
-          following={job?.status === "following-up"}
-        />
+        <FirstFollowUpComposer controls={props.controls} reviewing={job?.status === "reviewing"} />
       )}
     </div>
   )

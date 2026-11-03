@@ -23,5 +23,5 @@ export const reviewOf = (revision: Revision): AgentReview => ({
   writtenAt: DateTime.makeUnsafe(0),
   markdown:
     "**The greeting changes a letter callers match on.** One line changes.\n\n## Callers expect the old letter\n\n`main.ts` matches on `b`.",
-  followUps: [],
+  agentId: null,
 })

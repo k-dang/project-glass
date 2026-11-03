@@ -14,15 +14,24 @@ import { VIEWER } from "./fakePullRequest"
 import { fakeAgentRunners } from "./fakeAgentRunners"
 import { installFakeSandboxProvider } from "./fakeSandboxProvider"
 
-/** Follows the demo repository on first launch; later launches keep the user's choices. */
-const followDemoRepository = Effect.gen(function* () {
+/**
+ * On first launch, follows the demo repository and points Agent reviews' pi at the demo model
+ * provider, which their Follow-ups' Agent runs on. Later launches keep the user's choices.
+ */
+const seedDemoSettings = Effect.gen(function* () {
   const { dataDirectory } = yield* ServerConfig
   const settings = join(dataDirectory, "settings.json")
 
   if (existsSync(settings)) return
 
   mkdirSync(dirname(settings), { recursive: true })
-  writeFileSync(settings, JSON.stringify({ followedRepositories: [DEMO_REPOSITORY] }))
+  writeFileSync(
+    settings,
+    JSON.stringify({
+      followedRepositories: [DEMO_REPOSITORY],
+      agentReviewModels: { pi: { provider: "glass-test", modelId: "gpt-test" } },
+    }),
+  )
 })
 
 /**
@@ -75,7 +84,7 @@ const main = Effect.gen(function* () {
 
   yield* Layer.build(
     serve(fakeAgentRunners).pipe(
-      Layer.provide(Layer.effectDiscard(followDemoRepository)),
+      Layer.provide(Layer.effectDiscard(seedDemoSettings)),
       Layer.provide(ServerConfig.layer),
       Layer.provide(configured),
     ),

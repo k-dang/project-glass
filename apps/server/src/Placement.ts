@@ -8,7 +8,7 @@ import type {
 } from "@glass/contracts"
 import { type Effect, type Option, Predicate, type Scope, type Stream } from "effect"
 import type { RpcClient, RpcClientError } from "effect/rpc"
-import type { AgentHostRpcs, HostAgentError } from "./agentHost/protocol"
+import type { AgentHostRpcs, HostAgentError, ReviewBrief } from "./agentHost/protocol"
 
 export type HostClient = RpcClient.FromGroup<typeof AgentHostRpcs, RpcClientError.RpcClientError>
 
@@ -24,6 +24,8 @@ export type SubscribeLost = Effect.Effect<Stream.Stream<LostAgentIds>, never, Sc
 export interface PlacedAgent {
   readonly agent: Agent
   readonly folder: string
+  /** What an Agent review's Agent is told; `null` for every other Agent. */
+  readonly review: ReviewBrief | null
 }
 
 export interface Placed {

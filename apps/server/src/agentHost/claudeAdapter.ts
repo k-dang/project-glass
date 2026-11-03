@@ -1,7 +1,9 @@
 import {
   type CanUseTool,
+  createSdkMcpServer,
   type EffortLevel as SdkEffortLevel,
   getSessionInfo,
+  type Options,
   type ModelInfo,
   type PermissionResult,
   type Query,
@@ -9,6 +11,7 @@ import {
   type SDKControlInitializeResponse,
   type SDKMessage,
   type SDKUserMessage,
+  tool,
 } from "@anthropic-ai/claude-agent-sdk"
 import {
   type AgentModel,
@@ -18,17 +21,24 @@ import {
   type RequestAnswer,
   RequestNotWaiting,
   type RequestPart,
+  SUGGEST_DRAFT_TOOL,
   sentOf,
 } from "@glass/contracts"
 import { Deferred, Effect, Option, Predicate, Queue, Schema, type Scope, Stream } from "effect"
 import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
+import * as z from "zod/v4"
 import { sdkExecutable } from "../processes"
 import type { AgentAdapter } from "./adapter"
 import { Input, isFailure, machine } from "./claudeTurn"
 import type { DeliveredMessage } from "./deliveredMessage"
-import { couldNotSwitch, HostAgentError, notRunning } from "./protocol"
+import { couldNotSwitch, HostAgentError, notRunning, type ReviewBrief } from "./protocol"
 import { settleWith } from "./requests"
+import {
+  placeSuggestedDraft,
+  suggestDraftDescription,
+  suggestDraftFields,
+} from "./suggestDraftTool"
 import { permissionRequest, ToolInput } from "./toolCalls"
 import { runTurns } from "./turnLoop"
 
@@ -67,6 +77,43 @@ const startFailure = (cause: unknown) =>
       : "Claude Code could not start. Check its installation.",
   })
 
+const readOnlyTools = ["Read", "Grep", "Glob"]
+
+/**
+ * An Agent review's Agent reads the checkout with Claude Code's search tools and proposes
+ * Suggested drafts through Glass's own MCP server, all allowed without asking. It loads no
+ * settings files, so the user's hooks never see the PR's files.
+ */
+const reviewOptions = (brief: ReviewBrief): Options => ({
+  systemPrompt: { type: "preset", preset: "claude_code", append: brief.instructions },
+  tools: readOnlyTools,
+  allowedTools: [...readOnlyTools, `mcp__glass__${SUGGEST_DRAFT_TOOL}`],
+  settingSources: [],
+  strictMcpConfig: true,
+  mcpServers: {
+    glass: createSdkMcpServer({
+      name: "glass",
+      tools: [
+        tool(
+          SUGGEST_DRAFT_TOOL,
+          suggestDraftDescription,
+          {
+            path: z.string().describe(suggestDraftFields.path),
+            side: z.enum(["new", "old"]).describe(suggestDraftFields.side),
+            line: z.number().int().positive().describe(suggestDraftFields.line),
+            body: z.string().trim().min(1).describe(suggestDraftFields.body),
+          },
+          (draft) => {
+            const { placed, text } = placeSuggestedDraft(brief, draft)
+
+            return Promise.resolve({ content: [{ type: "text", text }], isError: !placed })
+          },
+        ),
+      ],
+    }),
+  },
+})
+
 const startClaude = (
   sdk: ClaudeSdk,
   command: string,
@@ -74,6 +121,7 @@ const startClaude = (
   prompt: AsyncIterable<SDKUserMessage>,
   canUseTool: CanUseTool,
   sessionOption?: { readonly resume: string } | { readonly sessionId: string },
+  extra: Options = {},
 ): Effect.Effect<
   {
     readonly session: ClaudeQuery
@@ -94,6 +142,7 @@ const startClaude = (
             systemPrompt: { type: "preset", preset: "claude_code" },
             includePartialMessages: true,
             ...sessionOption,
+            ...extra,
             canUseTool,
             // The user may pick bypassPermissions between Turns.
             allowDangerouslySkipPermissions: true,
@@ -277,7 +326,7 @@ export const claudeAdapter = (command: string, sdk: ClaudeSdk = liveSdk): AgentA
     })
   }).pipe(Effect.scoped),
 
-  start: Effect.fnUntraced(function* ({ folder, conversation, report }) {
+  start: Effect.fnUntraced(function* ({ folder, conversation, review, report }) {
     const prompts = yield* Queue.unbounded<SDKUserMessage>()
     const requests = yield* Queue.unbounded<Input>()
     const waiting = new Map<string, Asked>()
@@ -325,6 +374,7 @@ export const claudeAdapter = (command: string, sdk: ClaudeSdk = liveSdk): AgentA
           { signal },
         ),
       saved === undefined ? { sessionId: conversation } : { resume: conversation },
+      review === null ? {} : reviewOptions(review),
     )
 
     const turns = yield* runTurns({

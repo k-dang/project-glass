@@ -90,7 +90,10 @@ export class GlassRpcs extends RpcGroup.make(
     payload: { pullRequest: PullRequestRef, revision: Revision },
     error: AgentReviewFailure,
   }),
-  /** Answers a message about the Agent review on its own Revision; cancelling it cancels this. */
+  /**
+   * Sends a Follow-up to the Agent review's Agent, on the review's own Revision. The first starts
+   * the Agent; cancelling the Agent review cancels that start.
+   */
   Rpc.make("FollowUpAgentReview", {
     payload: { pullRequest: PullRequestRef, revision: Revision, message: FollowUpMessage },
     error: AgentReviewFailure,

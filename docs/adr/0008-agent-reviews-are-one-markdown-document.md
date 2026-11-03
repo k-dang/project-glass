@@ -1,7 +1,7 @@
 # Agent reviews are one Markdown document read beside the diff
 
-> The user can now follow up on an Agent review, one run per message, and the agent can suggest
-> Drafts on diff lines in its answers (ADR 0009). The review itself stays one Markdown document.
+> The user can now follow up on an Agent review in a conversation with an Agent seeded with it, and
+> the agent can suggest Drafts on diff lines (ADR 0009). The review itself stays one Markdown document.
 
 An Agent review is the agent's own Markdown, opening with a paragraph whose bold first sentence
 names the PR's main risk. Glass places nothing on the diff. Overview shows that opening paragraph,

@@ -9,12 +9,24 @@ import {
   type RequestAnswer,
   RequestNotWaiting,
   type RequestPart,
+  SUGGEST_DRAFT_TOOL,
   sentOf,
 } from "@glass/contracts"
-import { Duration, Effect, Option, Predicate, Queue, Schema, Scope, Stream } from "effect"
+import {
+  Duration,
+  Effect,
+  FileSystem,
+  Option,
+  Predicate,
+  Queue,
+  Schema,
+  Scope,
+  Stream,
+} from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
+import { join } from "node:path"
 import type { AgentAdapter } from "./adapter"
 import type { DeliveredMessage } from "./deliveredMessage"
 import {
@@ -34,8 +46,9 @@ import {
   machine,
   stoppedReason,
 } from "./piTurn"
-import { couldNotSwitch, HostAgentError, notRunning } from "./protocol"
+import { couldNotSwitch, HostAgentError, notRunning, type ReviewBrief } from "./protocol"
 import { settleWith } from "./requests"
+import { piSuggestDraftExtension } from "./suggestDraftTool"
 import { runTurns } from "./turnLoop"
 
 const thinkingLevels = ["off", "minimal", "low", "medium", "high", "xhigh", "max"]
@@ -133,12 +146,50 @@ const refused = (what: "model" | "effort") => (error: string) =>
     Effect.andThen(Effect.fail(couldNotSwitch("pi", what))),
   )
 
+/**
+ * An Agent review's Agent reads with pi's search tools and proposes Suggested drafts through Glass's
+ * extension. Everything else pi would load, such as the user's extensions, skills, and the PR's
+ * context files, stays off. pi reads the instructions from a file, keeping them out of argv. Both
+ * files sit beside the checkout, out of the agent's sight, while the program runs.
+ */
+const reviewFlags = Effect.fnUntraced(function* (folder: string, brief: ReviewBrief) {
+  const fs = yield* FileSystem.FileSystem
+  const directory = `${folder}.pi`
+
+  yield* Effect.acquireRelease(fs.makeDirectory(directory, { recursive: true }), () =>
+    fs.remove(directory, { recursive: true, force: true }).pipe(Effect.ignore),
+  )
+
+  const extension = join(directory, "suggest-draft.js")
+  const instructions = join(directory, "instructions.md")
+
+  yield* fs.writeFileString(extension, piSuggestDraftExtension(brief))
+  yield* fs.writeFileString(instructions, brief.instructions)
+
+  return [
+    "--tools",
+    `read,grep,find,ls,${SUGGEST_DRAFT_TOOL}`,
+    "--no-extensions",
+    "--extension",
+    extension,
+    "--no-mcp",
+    "--no-skills",
+    "--no-prompt-templates",
+    "--no-themes",
+    "--no-context-files",
+    "--no-approve",
+    "--append-system-prompt",
+    instructions,
+  ]
+})
+
 export const piAdapter = (command: string) =>
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+    const fs = yield* FileSystem.FileSystem
 
-    const startPi = (folder: string, conversation?: string) =>
-      startPiRpc(command, folder, conversation).pipe(
+    const startPi = (folder: string, conversation?: string, flags?: ReadonlyArray<string>) =>
+      startPiRpc(command, folder, conversation, flags).pipe(
         Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
       )
 
@@ -165,9 +216,23 @@ export const piAdapter = (command: string) =>
         })
       }).pipe(Effect.scoped),
 
-      start: Effect.fnUntraced(function* ({ folder, conversation, report }) {
+      start: Effect.fnUntraced(function* ({ folder, conversation, review, report }) {
         const scope = yield* Scope.Scope
-        const rpc = yield* startPi(folder, conversation)
+
+        const flags =
+          review === null
+            ? []
+            : yield* reviewFlags(folder, review).pipe(
+                Effect.provideService(FileSystem.FileSystem, fs),
+                Effect.tapError((error) =>
+                  Effect.logWarning("Couldn't prepare pi's review tools", error),
+                ),
+                Effect.mapError(
+                  () => new HostAgentError({ message: "Couldn't prepare pi's tools. Try again." }),
+                ),
+              )
+
+        const rpc = yield* startPi(folder, conversation, flags)
 
         const startingModel = (yield* rpc.request({ type: "get_state" }, SessionState).pipe(
           Effect.tapError((error) => Effect.logWarning("pi didn't report its state", error)),

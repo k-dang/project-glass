@@ -1,7 +1,16 @@
 // @vitest-environment happy-dom
-import { AgentReviewFailure, Revision } from "@glass/contracts"
+import {
+  AgentReviewFailure,
+  Revision,
+  SUGGEST_DRAFT_TOOL,
+  type SuggestedDraft,
+  TextPart,
+  ToolCallPart,
+  type Turn,
+  TurnDone,
+} from "@glass/contracts"
 import { act, screen, waitFor, within } from "@testing-library/react"
-import { Deferred, Effect } from "effect"
+import { DateTime, Deferred, Effect } from "effect"
 import { afterEach, expect, it } from "vite-plus/test"
 import { reviewOf } from "../../test/agentReview"
 import { eventually } from "../../test/eventually"
@@ -76,16 +85,36 @@ it("marks an outdated Agent review on Changes and still reads it", async () => {
 
 const followedUp = (reviewRevision: Revision) => ({
   ...reviewOf(reviewRevision),
-  followUps: [
-    {
-      message: "Draft a comment for the letter change.",
-      answer: "Here is one for `greet.ts`.",
-      suggestedDrafts: [
-        { path: "greet.ts", side: "new" as const, line: 2, body: "Callers match on `b`." },
-      ],
-    },
-  ],
+  agentId: "review-agent",
 })
+
+const suggestion = (input: SuggestedDraft, status: "done" | "failed") =>
+  ToolCallPart.make({
+    toolCallId: `call-${status}`,
+    name: SUGGEST_DRAFT_TOOL,
+    inputSummary: "greet.ts",
+    input: JSON.stringify(input),
+    output: status === "done" ? "Glass shows this Suggested draft." : "Not a line of the diff.",
+    status,
+    parentToolCallId: null,
+  })
+
+const sentAt = DateTime.makeUnsafe(0)
+
+const followUps: ReadonlyArray<Turn> = [
+  {
+    id: "turn-1",
+    message: "Draft a comment for the letter change.",
+    images: [],
+    sentAt,
+    ended: { at: sentAt, ending: TurnDone.make({}) },
+    parts: [
+      suggestion({ path: "greet.ts", side: "new", line: 9, body: "Off the diff." }, "failed"),
+      suggestion({ path: "greet.ts", side: "new", line: 2, body: "Callers match on `b`." }, "done"),
+      TextPart.make({ text: "Here is one for `greet.ts`." }),
+    ],
+  },
+]
 
 const readBesideTheDiff = async (f: ReturnType<typeof mountTourWorkspace>) => {
   const card = await screen.findByRole("region", { name: "Agent review" })
@@ -201,14 +230,42 @@ it("prevents Retry and Send from overlapping while a retry is being accepted", a
   })
 })
 
+it("sends later Follow-ups to the review's Agent", async () => {
+  const f = mountTourWorkspace({
+    files,
+    agentReview: { review: followedUp(revision), job: { status: "idle" } },
+    followUps,
+  })
+
+  await readBesideTheDiff(f)
+  await f.user.type(
+    await screen.findByRole("textbox", { name: "Follow up" }),
+    "And the other caller?{Enter}",
+  )
+
+  await waitFor(() => expect(f.sendMessage).toHaveBeenCalledOnce())
+  expect(f.sendMessage.mock.calls[0]?.[0]).toMatchObject({
+    agentId: "review-agent",
+    message: "And the other caller?",
+  })
+  expect(f.followUp).not.toHaveBeenCalled()
+})
+
 it("adds a suggested Draft as the user edited it", async () => {
   const f = mountTourWorkspace({
     files,
     agentReview: { review: followedUp(revision), job: { status: "idle" } },
+    followUps,
   })
 
   await readBesideTheDiff(f)
-  const suggested = screen.getByRole("region", { name: "Suggested draft on greet.ts line +2" })
+
+  const suggested = await screen.findByRole("region", {
+    name: "Suggested draft on greet.ts line +2",
+  })
+
+  // A suggestion Glass refused stays a tool call.
+  expect(screen.getAllByRole("region", { name: /^Suggested draft/ })).toHaveLength(1)
   await f.user.click(within(suggested).getByRole("button", { name: "Edit" }))
   const body = within(suggested).getByRole("textbox")
   await f.user.clear(body)
@@ -232,12 +289,12 @@ it("only reads the Follow-ups of an outdated Agent review", async () => {
       review: followedUp(new Revision({ base: "b0", head: "0123456789abcdef" })),
       job: { status: "idle" },
     },
+    followUps,
   })
 
   await readBesideTheDiff(f)
-  const panel = screen.getByRole("region", { name: "Agent review" })
 
-  expect(within(panel).getByText(/Here is one for/)).toBeDefined()
+  expect(await screen.findByText(/Here is one for/)).toBeDefined()
   expect(
     screen.getByText("Written for an older Revision. Review again to follow up."),
   ).toBeDefined()

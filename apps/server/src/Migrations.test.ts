@@ -69,6 +69,7 @@ it.live("upgrades existing Activity history and uses its indexes after reopening
       [18, "saved_place_per_area"],
       [19, "agent_journal_saved"],
       [20, "create_agent_review_follow_ups"],
+      [21, "agent_review_follow_ups_as_agent"],
     ] as const
 
     for (const expected of [upgrade, []] as const) {
@@ -262,6 +263,7 @@ it.live("rewrites saved Agent reviews as Markdown and drops those that no longer
           "## Old wording\n\nNit · `greet.ts:1` (old)\n\nIt read better.",
           "## No tests\n\nShould fix\n\nAdd one.",
         ].join("\n\n"),
+        agent_id: null,
       },
     ])
   }),
