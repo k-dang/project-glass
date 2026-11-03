@@ -46,7 +46,6 @@ import { placeKey } from "./agentsArea"
 import { App } from "./App"
 import { backendLayerAtom } from "./backend"
 import { agent, agentFields } from "../../test/agent"
-import { eventually } from "../../test/eventually"
 import { testLayer } from "../../test/testBackend"
 
 const sentAt = DateTime.makeUnsafe("2026-10-26T12:00:00Z")
@@ -514,7 +513,7 @@ it("keeps branches per repository and falls back when a remembered branch disapp
 
   await select("Base branch", "develop")
   await select("Repository", "glass-demo/lamp")
-  await eventually(() =>
+  await waitFor(() =>
     expect(
       within(within(newAgentDraft()).getByRole("combobox", { name: "Base branch" })).getByText(
         "trunk",
@@ -522,7 +521,7 @@ it("keeps branches per repository and falls back when a remembered branch disapp
     ).toBeTruthy(),
   )
   await select("Repository", "glass-demo/greeter")
-  await eventually(() =>
+  await waitFor(() =>
     expect(
       within(within(newAgentDraft()).getByRole("combobox", { name: "Base branch" })).getByText(
         "develop",
@@ -539,7 +538,7 @@ it("keeps branches per repository and falls back when a remembered branch disapp
   )
   localBranches = ["main"]
   await select("Where the Agent runs", "Local")
-  await eventually(() =>
+  await waitFor(() =>
     expect(
       within(within(newAgentDraft()).getByRole("combobox", { name: "Base branch" })).getByText(
         "main",
@@ -612,7 +611,7 @@ it("keeps an unlinked Local place blocked and never inherits Sandbox bypass perm
   expect(within(draft).queryByRole("combobox", { name: "Permission mode" })).toBeNull()
   await user.click(await within(draft).findByRole("combobox", { name: "Where the Agent runs" }))
   await user.click(await screen.findByRole("option", { name: "Local" }))
-  await eventually(() =>
+  await waitFor(() =>
     expect(
       within(newAgentDraft()).getByRole("combobox", { name: "Repository" }).textContent,
     ).toContain("No repositories"),
@@ -707,7 +706,7 @@ it("lists every Agent program's models before one is chosen", async () => {
   )
 
   await screen.findByRole("region", { name: "New Agent" })
-  await eventually(() => expect(listed).toContain("pi"))
+  await waitFor(() => expect(listed).toContain("pi"))
   expect(listed).toContain("claude-code")
 })
 
@@ -873,7 +872,7 @@ it("changes the open Agent's model from the composer, closing the picker", async
   await user.click(choice(await screen.findByRole("dialog"), "Model", "Thinker"))
 
   expect(changes).toEqual([{ model: "glass-test/thinker", effort: null }])
-  await eventually(() => expect(screen.queryByRole("dialog")).toBeNull())
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
 })
 
 const call = (toolCallId: string, name: string, parentToolCallId: string | null) =>
@@ -1347,7 +1346,7 @@ it("dims a Sandbox Agent Glass can't reach, and makes one whose Sandbox expired 
   expect(screen.getByRole("textbox", { name: "Message" })).toBeTruthy()
 
   await user.click(screen.getByRole("button", { name: "Try again" }))
-  await eventually(() => expect(reached).toEqual([agentFields.id]))
+  await waitFor(() => expect(reached).toEqual([agentFields.id]))
 
   cleanup()
   mount({

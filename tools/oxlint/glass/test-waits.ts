@@ -65,9 +65,9 @@ export const testWaits = defineRule({
     type: "problem",
     schema: [],
     messages: {
-      wait: "Use eventually from {{helper}} instead of direct vi.waitFor (the default stops after 1s).",
+      wait: "Use {{helper}} instead of direct vi.waitFor (the default stops after 1s).",
       sleep:
-        "Wait for an observable event or use eventually from {{helper}} instead of a sequencing sleep. For deadlines, fork the work and advance TestClock after it is stuck.",
+        "Wait for an observable event or use {{helper}} instead of a sequencing sleep. For deadlines, fork the work and advance TestClock after it is stuck.",
     },
   },
   create(context) {
@@ -76,8 +76,8 @@ export const testWaits = defineRule({
     if (!isTest(filename)) return {}
 
     const helper = filename.startsWith("apps/desktop/")
-      ? "apps/desktop/test/eventually.ts"
-      : "apps/server/test/eventually.ts"
+      ? "Testing Library's waitFor in DOM tests, or eventually from apps/desktop/test/eventually.ts without a DOM,"
+      : "eventually from apps/server/test/eventually.ts"
 
     if (
       filename === "apps/desktop/test/eventually.ts" ||

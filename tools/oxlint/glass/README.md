@@ -47,7 +47,7 @@ code cannot use those fixtures as an import bridge.
 - Direct `vi.waitFor`/`vitest.waitFor` from `vitest`, `vite-plus/test`, or `@effect/vitest`,
   including renamed imports, namespace imports, static property access, and immutable local aliases or
   destructuring. Unshadowed global `vi`/`vitest` are covered too. Diagnostics point to
-  that app's `test/eventually.ts`.
+  that app's `test/eventually.ts`, and desktop DOM tests to Testing Library's `waitFor`.
 - Directly awaited/yielded `Effect.sleep` or Node `timers/promises.setTimeout` calls,
   including import/local aliases. These forms sequence work by waiting on time.
 - Directly awaited/yielded Promises whose executor only schedules a native/Node
@@ -63,7 +63,9 @@ stuck and then advance the clock.
 
 These checks prevent the short-default Vitest wait removed from Discussions by
 `3511ddf`, without blocking the clock-controlled deadline tests from `86fe313`.
-Testing Library's DOM-aware `waitFor` is a separate API and is outside this rule.
+Testing Library's `waitFor` is the desktop DOM tests' wait and is outside this rule; its
+generous limit comes from `asyncUtilTimeout` in `apps/desktop/test/setup.ts`. It needs a DOM,
+so tests in the Node environment use `eventually`.
 
 ## Review still required
 

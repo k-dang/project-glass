@@ -17,11 +17,10 @@ import {
   TourFailure,
   type TourState,
 } from "@glass/contracts"
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { DateTime, Effect, Stream, SubscriptionRef } from "effect"
 import { afterEach, expect, it } from "vite-plus/test"
-import { eventually } from "../../test/eventually"
 import { App } from "./App"
 import { backendLayerAtom } from "./backend"
 import { openReview } from "../../test/finishReview"
@@ -181,7 +180,7 @@ it("queues every PR in a paste at once, and reports duplicates and problems", as
 
   await user.click(field())
   await user.paste(`Could you look at ${greet.url} and mona/elsewhere#7 today?`)
-  await eventually(() => expect(field().value).toBe(""))
+  await waitFor(() => expect(field().value).toBe(""))
   expect(note().textContent).toBe("")
   expect(rows(panel)).toEqual([
     expect.stringMatching(/Greet the worldglass#42/),
@@ -191,12 +190,12 @@ it("queues every PR in a paste at once, and reports duplicates and problems", as
   expect(field().value).toBe("")
 
   await user.paste(`OCTO-ORG/Glass#42 and ${fibers.url}`)
-  await eventually(() => expect(note().textContent).toBe("1 already queued"))
+  await waitFor(() => expect(note().textContent).toBe("1 already queued"))
   await user.paste("octo-org/glass#42")
-  await eventually(() => expect(note().textContent).toBe("Already queued"))
+  await waitFor(() => expect(note().textContent).toBe("Already queued"))
 
   await user.type(field(), "nobody/nothing#1{Enter}")
-  await eventually(() => expect(note().textContent).toBe("Couldn't find nobody/nothing#1"))
+  await waitFor(() => expect(note().textContent).toBe("Couldn't find nobody/nothing#1"))
   expect(field().value).toBe("nobody/nothing#1")
 
   await user.clear(field())
@@ -226,7 +225,7 @@ it("keeps pasted text in the field when GitHub can't be reached", async () => {
   await screen.findByText("Your Queue is empty")
   await user.click(field())
   await user.paste(greet.url)
-  await eventually(() => expect(note().textContent).toBe("Couldn't reach GitHub. Offline."))
+  await waitFor(() => expect(note().textContent).toBe("Couldn't reach GitHub. Offline."))
   expect(field().value).toBe(greet.url)
 })
 
@@ -248,9 +247,9 @@ it("marks unopened and finished PRs, and Undo puts a removed PR back in its plac
   ])
 
   await user.click(screen.getByRole("button", { name: "Remove mona/elsewhere#7 from the Queue" }))
-  await eventually(() => expect(rows(panel)).toHaveLength(2))
+  await waitFor(() => expect(rows(panel)).toHaveLength(2))
   await user.click(await screen.findByRole("button", { name: "Undo" }))
-  await eventually(() =>
+  await waitFor(() =>
     expect(rows(panel)).toEqual([
       expect.stringContaining("Greet the world"),
       expect.stringContaining("Wave at the world"),
@@ -281,13 +280,13 @@ it.each([
     expect(document.activeElement).toBe(row)
     expect((await screen.findByRole("tooltip")).textContent).toBe(label)
     await user.keyboard("{Escape}")
-    await eventually(() => expect(screen.queryByRole("tooltip")).toBeNull())
+    await waitFor(() => expect(screen.queryByRole("tooltip")).toBeNull())
 
     await user.tab()
     await user.hover(row.querySelector("svg")!)
     expect((await screen.findByRole("tooltip")).textContent).toBe(label)
     await user.unhover(row.querySelector("svg")!)
-    await eventually(() => expect(screen.queryByRole("tooltip")).toBeNull())
+    await waitFor(() => expect(screen.queryByRole("tooltip")).toBeNull())
   },
 )
 
@@ -332,7 +331,7 @@ it("shows where each queued PR's Tour stands as it changes", async () => {
   )
 
   const panel = await screen.findByRole("tabpanel", { name: /^Queue/ })
-  await eventually(() =>
+  await waitFor(() =>
     expect(rows(panel)).toEqual([
       expect.stringContaining("Tour waiting"),
       expect.stringContaining("Tour failed: Claude Code is not signed in."),
@@ -347,9 +346,9 @@ it("shows where each queued PR's Tour stands as it changes", async () => {
       job: { status: "writing", startedAt, runner: null },
     }),
   )
-  await eventually(() => expect(rows(panel)[0]).toContain("Writing Tour"))
+  await waitFor(() => expect(rows(panel)[0]).toContain("Writing Tour"))
   await Effect.runPromise(SubscriptionRef.set(greetTour, savedTour(revisionOf(greet).head)))
-  await eventually(() => expect(rows(panel)[0]).toContain("Tour ready"))
+  await waitFor(() => expect(rows(panel)[0]).toContain("Tour ready"))
 })
 
 const bar = () => screen.getByRole("region", { name: "Queue" })
@@ -406,7 +405,7 @@ it.each(["Control", "Meta"])(
     expect(within(bar()).queryByRole("button", { name: "Next PR" })).toBeNull()
 
     await user.click(within(bar()).getByRole("button", { name: /^Remove/ }))
-    await eventually(() => expect(screen.queryByRole("region", { name: "Queue" })).toBeNull())
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Queue" })).toBeNull())
     await showing("Speed up fibers")
 
     await user.click(screen.getByRole("button", { name: "Back to PRs" }))
@@ -424,7 +423,7 @@ it("keeps the bar while a reviewed PR stays open, offering the next one, until t
   await showing("Greet the world")
   await user.type(await openReview(user), "Looks good")
   await user.click(screen.getByRole("button", { name: /^Submit Review/ }))
-  await eventually(() => expect(bar().textContent).toContain("Reviewed · out of the Queue"))
+  await waitFor(() => expect(bar().textContent).toContain("Reviewed · out of the Queue"))
 
   await user.click(screen.getByRole("link", { name: "Settings" }))
   await user.click(screen.getByRole("link", { name: "Reviews" }))
@@ -435,7 +434,7 @@ it("keeps the bar while a reviewed PR stays open, offering the next one, until t
   await showing("Wave at the world")
   expect(bar().textContent).toContain("1 of 1")
   await user.click(within(bar()).getByRole("button", { name: /^Remove/ }))
-  await eventually(() => expect(screen.queryByRole("region", { name: "Queue" })).toBeNull())
+  await waitFor(() => expect(screen.queryByRole("region", { name: "Queue" })).toBeNull())
 
   await user.click(screen.getByRole("button", { name: "Back to PRs" }))
   await user.click(await screen.findByRole("textbox", { name: "Add to the Queue" }))
@@ -444,7 +443,7 @@ it("keeps the bar while a reviewed PR stays open, offering the next one, until t
   await showing("Greet the world")
   expect(bar().textContent).toContain("1 of 1")
   await user.click(within(bar()).getByRole("button", { name: /^Remove/ }))
-  await eventually(() => expect(screen.queryByRole("region", { name: "Queue" })).toBeNull())
+  await waitFor(() => expect(screen.queryByRole("region", { name: "Queue" })).toBeNull())
 })
 
 it("adds PRs to the Queue from the bar without leaving the PR under review", async () => {
@@ -458,11 +457,11 @@ it("adds PRs to the Queue from the bar without leaving the PR under review", asy
   await user.click(within(bar()).getByRole("button", { name: "Add" }))
   await user.click(await screen.findByRole("textbox", { name: "Add to the Queue" }))
   await user.paste(greet.url)
-  await eventually(() => expect(note().textContent).toBe("Already queued"))
+  await waitFor(() => expect(note().textContent).toBe("Already queued"))
 
   await user.paste(`${wave.url} ${fibers.url}`)
-  await eventually(() => expect(bar().textContent).toContain("1 of 3"))
-  await eventually(() =>
+  await waitFor(() => expect(bar().textContent).toContain("1 of 3"))
+  await waitFor(() =>
     expect(screen.queryByRole("textbox", { name: "Add to the Queue" })).toBeNull(),
   )
   await showing("Greet the world")
