@@ -392,7 +392,7 @@ test("moves between Chapters from the keyboard and the sidebar in a tall window"
   await expect(second).toBeInViewport()
 })
 
-test("keeps a viewed Chapter's row in view above the next Chapter", async ({
+test("moves on to the next Chapter once the one in view is viewed", async ({
   github,
   claude,
   window,
@@ -405,7 +405,7 @@ test("keeps a viewed Chapter's row in view above the next Chapter", async ({
   const first = changes.getByRole("region", { name: "Spell out the greeting" })
   await first.getByRole("checkbox", { name: "Chapter viewed: Spell out the greeting" }).click()
 
-  await expect(first.getByRole("button", { expanded: false })).toBeInViewport()
+  await expect(first.getByRole("button", { expanded: false })).not.toBeInViewport()
   await expect(changes.getByRole("heading", { name: "Document the greeting" })).toBeInViewport()
 })
 
