@@ -8,7 +8,8 @@ Both run on Haiku and cost a few cents. Claude Code sessions run the pinned clau
 Claude Code login; set CLAUDE_CODE_OAUTH_TOKEN where your login isn't in
 ~/.claude/.credentials.json. pi sessions run the bundled pi on your Vercel AI Gateway key from
 ~/.pi/agent/auth.json, or AI_GATEWAY_API_KEY. Fields that look personal (email, org, account, rate
-limits) are blanked; check the files before committing them.`
+limits) are blanked and usage counters and costs are zeroed; check the files before committing
+them.`
 
 const pnpmPath = process.env["npm_execpath"]
 
