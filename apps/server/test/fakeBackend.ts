@@ -12,17 +12,23 @@ import { DEMO_REPOSITORY, seedDemoPullRequests } from "./demoPullRequests"
 import { startFakeGitHub } from "./fakeGitHub"
 import { VIEWER } from "./fakePullRequest"
 import { fakeAgentRunners } from "./fakeAgentRunners"
+import { FAKE_PI_MODEL } from "./fakeModelProvider"
 import { installFakeSandboxProvider } from "./fakeSandboxProvider"
 
-/** Follows the demo repository on first launch; later launches keep the user's choices. */
-const followDemoRepository = Effect.gen(function* () {
+const seedDemoSettings = Effect.gen(function* () {
   const { dataDirectory } = yield* ServerConfig
   const settings = join(dataDirectory, "settings.json")
 
   if (existsSync(settings)) return
 
   mkdirSync(dirname(settings), { recursive: true })
-  writeFileSync(settings, JSON.stringify({ followedRepositories: [DEMO_REPOSITORY] }))
+  writeFileSync(
+    settings,
+    JSON.stringify({
+      followedRepositories: [DEMO_REPOSITORY],
+      agentReviewModels: { pi: FAKE_PI_MODEL },
+    }),
+  )
 })
 
 /**
@@ -75,7 +81,7 @@ const main = Effect.gen(function* () {
 
   yield* Layer.build(
     serve(fakeAgentRunners).pipe(
-      Layer.provide(Layer.effectDiscard(followDemoRepository)),
+      Layer.provide(Layer.effectDiscard(seedDemoSettings)),
       Layer.provide(ServerConfig.layer),
       Layer.provide(configured),
     ),

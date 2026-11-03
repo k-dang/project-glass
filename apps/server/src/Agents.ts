@@ -23,6 +23,7 @@ import {
   NoPermissionModes,
   type RequestNotWaiting,
   RequestWaiting,
+  type Revision,
   SandboxPlace,
   type SandboxStatus,
   thisMac as thisMacPlace,
@@ -40,6 +41,7 @@ import {
   Context,
   DateTime,
   Effect,
+  FileSystem,
   Layer,
   Option,
   Predicate,
@@ -56,6 +58,7 @@ import { hostFailure, type PlacedAgent, type Placement } from "./Placement"
 import { Sandboxes } from "./Sandboxes"
 import { LocalPlacement } from "./LocalPlacement"
 import type { DeliveredMessage } from "./agentHost/deliveredMessage"
+import { ReviewBrief } from "./agentHost/protocol"
 import { encodeImages, StoredMessage, Transcripts } from "./Transcripts"
 import { prompt } from "./prompt"
 import { ToDos } from "./ToDos"
@@ -73,7 +76,16 @@ const StoredAgent = Schema.Struct({
   permissionMode: Agent.fields.permissionMode,
   folder: Schema.String,
   createdAt: Agent.fields.createdAt,
+  forReview: Schema.BooleanFromBit,
 })
+
+const BriefJson = Schema.fromJsonString(ReviewBrief)
+
+const encodeBrief = Schema.encodeSync(BriefJson)
+
+const decodeBrief = Schema.decodeUnknownEffect(
+  Schema.Array(Schema.Struct({ brief: Schema.NullOr(BriefJson) })),
+)
 
 const decodeStored = Schema.decodeUnknownEffect(Schema.Array(StoredAgent))
 
@@ -84,6 +96,7 @@ const toRow = ({
   repo,
   folder,
   sandboxProvider,
+  forReview,
   ...agent
 }: typeof StoredAgent.Type): PlacedAgent => ({
   agent: new Agent({
@@ -94,6 +107,7 @@ const toRow = ({
     sandbox: null,
   }),
   folder,
+  forReview,
 })
 
 const withStatus = (agent: Agent, sandbox: SandboxStatus | null) =>
@@ -102,6 +116,17 @@ const withStatus = (agent: Agent, sandbox: SandboxStatus | null) =>
 
 const storageFailure = () =>
   new AgentError({ message: "Couldn't read or save your Agents. Try again." })
+
+export interface NewReviewAgent {
+  readonly name: string
+  readonly repository: FollowedRepository
+  readonly revision: Revision
+  readonly engine: AgentEngine
+  readonly model: string | null
+  readonly checkout: string
+  readonly review: ReviewBrief
+  readonly message: string
+}
 
 export class Agents extends Context.Service<
   Agents,
@@ -116,6 +141,8 @@ export class Agents extends Context.Service<
       place: AgentPlace,
     ) => Effect.Effect<AgentModels, AgentError>
     readonly create: (input: NewAgent) => Effect.Effect<Agent, InvalidLocalCheckout | AgentError>
+    /** Starts the Agent on its first Turn. It stays out of the Agents list, and owns its checkout. */
+    readonly createForReview: (input: NewReviewAgent) => Effect.Effect<Agent, AgentError>
     readonly send: (
       agentId: string,
       input: MessageInput,
@@ -170,12 +197,14 @@ export class Agents extends Context.Service<
       const sandboxes = yield* Sandboxes
       const activityLog = yield* ActivityLog
       const toDos = yield* ToDos
+      const fs = yield* FileSystem.FileSystem
       const lock = yield* Semaphore.make(1)
       const scope = yield* Scope.Scope
 
       const stored = yield* sql`
         SELECT id, name, sandbox_provider AS sandboxProvider, owner, repo, base_branch AS baseBranch,
-          engine, model, effort, permission_mode AS permissionMode, folder, created_at AS createdAt
+          engine, model, effort, permission_mode AS permissionMode, folder, created_at AS createdAt,
+          review_brief IS NOT NULL AS forReview
         FROM agent ORDER BY created_at
       `.pipe(Effect.flatMap(decodeStored), Effect.orDie)
 
@@ -194,7 +223,20 @@ export class Agents extends Context.Service<
           ? sandboxes.placement(place.providerId)
           : localPlacement
 
-      const placementOf = (row: PlacedAgent) => placementFor(row.agent.place)
+      const reviewPlacement: Placement = {
+        ...localPlacement,
+        hostOnceMade: () => Effect.succeedNone,
+        remove: ({ folder }) =>
+          fs.remove(folder, { recursive: true, force: true }).pipe(
+            Effect.tapError((cause) =>
+              Effect.logWarning("Couldn't remove an Agent review's checkout", cause),
+            ),
+            Effect.mapError(storageFailure),
+          ),
+      }
+
+      const placementOf = (row: PlacedAgent) =>
+        row.forReview ? reviewPlacement : placementFor(row.agent.place)
 
       yield* Stream.merge(yield* localPlacement.subscribeLost, yield* sandboxes.subscribeLost).pipe(
         Stream.runForEach((agentIds) =>
@@ -234,13 +276,30 @@ export class Agents extends Context.Service<
         return { message, images, prompt: prompt(message, mentioned) } satisfies DeliveredMessage
       })
 
+      const reviewBrief = (row: PlacedAgent) =>
+        row.forReview
+          ? sql`SELECT review_brief AS brief FROM agent WHERE id = ${row.agent.id}`.pipe(
+              Effect.flatMap(decodeBrief),
+              Effect.map(([found]) => found?.brief ?? null),
+              Effect.tapError((cause) => Effect.logWarning("Couldn't read a review brief", cause)),
+              Effect.mapError(storageFailure),
+            )
+          : Effect.succeed(null)
+
       const deliver = (row: PlacedAgent, turnId: string, input: MessageInput) =>
         Effect.gen(function* () {
           const client = yield* placementOf(row).host(row)
           const { id: agentId, engine, model, effort, permissionMode } = row.agent
 
           const [, message] = yield* Effect.all(
-            [client.StartAgent({ agentId, engine, folder: row.folder }), delivered(input)],
+            [
+              reviewBrief(row).pipe(
+                Effect.flatMap((review) =>
+                  client.StartAgent({ agentId, engine, folder: row.folder, review }),
+                ),
+              ),
+              delivered(input),
+            ],
             { concurrency: "unbounded" },
           )
 
@@ -283,6 +342,70 @@ export class Agents extends Context.Service<
         Effect.forkIn(scope),
       )
 
+      const insert = (row: PlacedAgent, first: MessageInput, review: ReviewBrief | null) => {
+        const { agent, folder } = row
+        const { place, repository } = agent
+
+        const forget = SubscriptionRef.update(rows, (current) =>
+          current.filter((kept) => kept !== row),
+        )
+
+        return lock
+          .withPermits(1)(
+            Effect.gen(function* () {
+              yield* sql`INSERT INTO agent ${sql.insert({
+                id: agent.id,
+                name: agent.name,
+                sandbox_provider: Predicate.isTagged(place, "sandbox") ? place.providerId : null,
+                owner: repository.owner,
+                repo: repository.repo,
+                base_branch: agent.baseBranch,
+                engine: agent.engine,
+                model: agent.model,
+                effort: agent.effort,
+                permission_mode: agent.permissionMode,
+                folder,
+                created_at: DateTime.formatIso(agent.createdAt),
+                review_brief: review === null ? null : encodeBrief(review),
+              })}`
+
+              yield* SubscriptionRef.update(rows, (current) => [...current, row])
+              yield* transcripts.startOrQueue(agent.id, first)
+            }).pipe(sql.withTransaction),
+          )
+          .pipe(
+            Effect.tapError((cause) => Effect.logWarning("Couldn't save an Agent", cause)),
+            Effect.mapError(storageFailure),
+            Effect.onError(() => forget),
+          )
+      }
+
+      const createForReview = Effect.fn("Agents.createForReview")(function* (
+        input: NewReviewAgent,
+      ) {
+        const agent = new Agent({
+          id: randomUUID(),
+          name: input.name,
+          place: thisMacPlace,
+          repository: input.repository,
+          baseBranch: input.revision.base,
+          engine: input.engine,
+          model: input.model,
+          effort: null,
+          permissionMode: null,
+          createdAt: yield* DateTime.now,
+          sandbox: null,
+        })
+
+        yield* insert(
+          { agent, folder: input.checkout, forReview: true },
+          { message: input.message, images: [] },
+          input.review,
+        )
+
+        return agent
+      })
+
       const create = Effect.fn("Agents.create")(function* (input: NewAgent) {
         const { repository, baseBranch, engine, model, effort, place } = input
         const { message, images } = input
@@ -316,38 +439,9 @@ export class Agents extends Context.Service<
           sandbox: null,
         })
 
-        const row: PlacedAgent = { agent, folder }
-
-        const forget = SubscriptionRef.update(rows, (current) =>
-          current.filter((kept) => kept !== row),
+        yield* insert({ agent, folder, forReview: false }, { message, images }, null).pipe(
+          Effect.onError(() => discard),
         )
-
-        yield* lock
-          .withPermits(1)(
-            Effect.gen(function* () {
-              yield* sql`INSERT INTO agent ${sql.insert({
-                id: agent.id,
-                name: agent.name,
-                sandbox_provider: Predicate.isTagged(place, "sandbox") ? place.providerId : null,
-                owner: repository.owner,
-                repo: repository.repo,
-                base_branch: agent.baseBranch,
-                engine: agent.engine,
-                model: agent.model,
-                effort: agent.effort,
-                permission_mode: agent.permissionMode,
-                folder,
-                created_at: DateTime.formatIso(agent.createdAt),
-              })}`
-              yield* SubscriptionRef.update(rows, (current) => [...current, row])
-              yield* transcripts.startOrQueue(agent.id, { message, images })
-            }).pipe(sql.withTransaction),
-          )
-          .pipe(
-            Effect.tapError((cause) => Effect.logWarning("Couldn't save an Agent", cause)),
-            Effect.mapError(storageFailure),
-            Effect.onError(() => forget.pipe(Effect.andThen(discard))),
-          )
 
         yield* activityLog.record(
           AgentStarted.make({
@@ -615,7 +709,9 @@ export class Agents extends Context.Service<
         watch: () =>
           Stream.zipLatest(SubscriptionRef.changes(rows), sandboxes.statuses).pipe(
             Stream.map(([current, statuses]) =>
-              current.map(({ agent }) => withStatus(agent, statuses.get(agent.id) ?? null)),
+              current.flatMap(({ agent, forReview }) =>
+                forReview ? [] : [withStatus(agent, statuses.get(agent.id) ?? null)],
+              ),
             ),
           ),
         transcript: (agentId) =>
@@ -628,6 +724,7 @@ export class Agents extends Context.Service<
             : Effect.succeed(new AgentModels({ defaultModel: null, models: [] }))
         },
         create,
+        createForReview,
         send,
         changes,
         steer,

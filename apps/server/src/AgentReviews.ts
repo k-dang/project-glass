@@ -2,34 +2,41 @@ import {
   AgentReview,
   AgentReviewFailure,
   type AgentReviewState,
-  FollowUp,
+  agentModelOf,
+  type ChangedFile,
+  type DiffSide,
+  FollowedRepository,
   type PullRequestRef,
   Revision,
   type AgentRunnerIdentity,
-  SuggestedDraft,
+  runnerIdentity,
 } from "@glass/contracts"
 import {
-  Array as Arr,
   Context,
   DateTime,
   Effect,
   Equal,
+  FileSystem,
   Layer,
   Option,
-  Result,
+  Predicate,
   Schema,
+  Scope,
   Stream,
   SubscriptionRef,
 } from "effect"
 import { SqlClient } from "effect/sql"
+import { randomUUID } from "node:crypto"
+import { join } from "node:path"
+import { Agents } from "./Agents"
 import { AgentReviewAnswer, agentReviewInstructions, agentReviewPrompt } from "./agentReviewPrompt"
-import { type CheckoutRunFailure, CheckoutRuns, type CheckoutTask } from "./CheckoutRuns"
-import { FollowUpAnswer, followUpInstructions, followUpPrompt } from "./followUpPrompt"
-import { GitHubClient, type ReviewInput } from "./github/GitHubClient"
-import { lineInFiles } from "./github/patchLines"
+import { type CheckoutRunFailure, CheckoutRuns } from "./CheckoutRuns"
+import { followUpInstructions } from "./followUpInstructions"
+import { GitHubClient } from "./github/GitHubClient"
+import { patchLineNumbers } from "./github/patchLines"
 import { pullRequestJobs, type PullRequestJob } from "./pullRequestJobs"
 import { ServerConfig } from "./ServerConfig"
-import { SettingsStore } from "./SettingsStore"
+import { engineSettingsOf, SettingsStore } from "./SettingsStore"
 
 type Job = PullRequestJob<AgentReviewState>
 
@@ -42,16 +49,16 @@ const stored = Schema.Array(
     head: Schema.String,
     written_at: Schema.DateTimeUtcFromString,
     markdown: Schema.String,
+    agent_id: Schema.NullOr(Schema.String),
   }),
 )
 
-const SuggestedDraftsJson = Schema.fromJsonString(Schema.Array(SuggestedDraft))
-
-const storedFollowUps = Schema.Array(
-  Schema.Struct({ ...FollowUp.fields, suggestedDrafts: SuggestedDraftsJson }),
-)
-
-const encodeSuggestedDrafts = Schema.encodeSync(SuggestedDraftsJson)
+const diffLinesOn = (files: ReadonlyArray<ChangedFile>, side: DiffSide) =>
+  Object.fromEntries(
+    files.flatMap(({ path, patch }) =>
+      Predicate.isTagged(patch, "TextPatch") ? [[path, patchLineNumbers(patch.hunks, side)]] : [],
+    ),
+  )
 
 /** The runner of the work in progress, for a failure that names none. */
 const runnerOf = (job: AgentReviewState["job"]) => ("runner" in job ? job.runner : null)
@@ -79,27 +86,6 @@ const stoppedRunner = (runner: AgentRunnerIdentity | null) =>
     runner,
   )
 
-const isSuggestedDraft = Schema.is(SuggestedDraft)
-
-/** A comment the agent placed off the diff can't be a Draft, so its text joins the answer. */
-const unplacedText = (drafts: FollowUpAnswer["suggestedDrafts"]) =>
-  drafts.length === 0
-    ? ""
-    : [
-        "\n\n**Not on a line of the diff, so not a Draft:**",
-        ...drafts.map((draft) => {
-          const location = "path" in draft ? `\`${draft.path}\` line ${draft.line}:\n\n` : ""
-
-          return (
-            location +
-            draft.body
-              .split("\n")
-              .map((text) => `> ${text}`)
-              .join("\n")
-          )
-        }),
-      ].join("\n\n")
-
 export class AgentReviews extends Context.Service<
   AgentReviews,
   {
@@ -124,6 +110,9 @@ export class AgentReviews extends Context.Service<
       const github = yield* GitHubClient
       const config = yield* ServerConfig
       const settings = yield* SettingsStore
+      const agents = yield* Agents
+      const fs = yield* FileSystem.FileSystem
+      const scope = yield* Scope.Scope
 
       const where = (pr: PullRequestRef) =>
         sql`owner = ${pr.owner} AND repo = ${pr.repo} AND number = ${pr.number}`
@@ -131,26 +120,21 @@ export class AgentReviews extends Context.Service<
       const load = Effect.fnUntraced(
         function* (pr: PullRequestRef) {
           const rows =
-            yield* sql`SELECT base, head, written_at, markdown FROM agent_reviews WHERE ${where(pr)}`.pipe(
+            yield* sql`SELECT base, head, written_at, markdown, agent_id FROM agent_reviews WHERE ${where(pr)}`.pipe(
               Effect.flatMap(Schema.decodeUnknownEffect(stored)),
             )
 
           const row = rows[0]
 
-          if (row === undefined)
-            return { review: null, job: { status: "idle" } } satisfies AgentReviewState
-
-          const followUps =
-            yield* sql`SELECT message, answer, suggested_drafts AS suggestedDrafts FROM agent_review_follow_ups WHERE ${where(pr)} ORDER BY position`.pipe(
-              Effect.flatMap(Schema.decodeUnknownEffect(storedFollowUps)),
-            )
-
-          const review = AgentReview.make({
-            revision: new Revision({ base: row.base, head: row.head }),
-            writtenAt: row.written_at,
-            markdown: row.markdown,
-            followUps,
-          })
+          const review =
+            row === undefined
+              ? null
+              : AgentReview.make({
+                  revision: new Revision({ base: row.base, head: row.head }),
+                  writtenAt: row.written_at,
+                  markdown: row.markdown,
+                  agentId: row.agent_id,
+                })
 
           return { review, job: { status: "idle" } } satisfies AgentReviewState
         },
@@ -160,92 +144,71 @@ export class AgentReviews extends Context.Service<
 
       const jobs = yield* pullRequestJobs<AgentReviewState, AgentReviewFailure>({
         load,
-        inProgress: ({ job }) => job.status === "reviewing" || job.status === "following-up",
+        inProgress: ({ job }) => job.status === "reviewing" || job.status === "starting-agent",
         idle: ({ review }) => ({ review, job: { status: "idle" } }),
       })
 
-      const save = (job: Job, pr: PullRequestRef, review: AgentReview) =>
-        jobs.commit(
-          job,
-          Effect.gen(function* () {
-            yield* sql`INSERT INTO agent_reviews (owner, repo, number, base, head, written_at, markdown)
-              VALUES (${pr.owner}, ${pr.repo}, ${pr.number}, ${review.revision.base}, ${review.revision.head}, ${DateTime.formatIso(review.writtenAt)}, ${review.markdown})
-              ON CONFLICT (owner, repo, number) DO UPDATE SET base = excluded.base, head = excluded.head, written_at = excluded.written_at, markdown = excluded.markdown`
-            yield* sql`DELETE FROM agent_review_follow_ups WHERE ${where(pr)}`
-          }).pipe(sql.withTransaction, logStorageFailure, Effect.mapError(storageFailure)),
-          { review, job: { status: "idle" } },
-        )
+      const removeAgent = (agentId: string | null) =>
+        agentId === null
+          ? Effect.void
+          : agents.remove(agentId).pipe(
+              Effect.catchTag("AgentNotFound", () => Effect.void),
+              Effect.catch((cause) =>
+                Effect.logWarning("Couldn't remove an Agent review's Agent", cause),
+              ),
+            )
 
-      const saveFollowUp = (
-        job: Job,
-        pr: PullRequestRef,
-        review: AgentReview,
-        followUp: FollowUp,
-      ) =>
-        jobs.commit(
-          job,
-          sql`INSERT INTO agent_review_follow_ups (owner, repo, number, position, message, answer, suggested_drafts)
-            VALUES (${pr.owner}, ${pr.repo}, ${pr.number}, ${review.followUps.length}, ${followUp.message}, ${followUp.answer}, ${encodeSuggestedDrafts(followUp.suggestedDrafts)})`.pipe(
-            logStorageFailure,
-            Effect.mapError(storageFailure),
-          ),
-          {
-            review: { ...review, followUps: [...review.followUps, followUp] },
-            job: { status: "idle" },
-          },
-        )
+      const save = (job: Job, pr: PullRequestRef, review: AgentReview) =>
+        Effect.gen(function* () {
+          const replaced = (yield* SubscriptionRef.get(job.state)).review?.agentId ?? null
+
+          yield* jobs.commit(
+            job,
+            sql`INSERT INTO agent_reviews (owner, repo, number, base, head, written_at, markdown, agent_id)
+              VALUES (${pr.owner}, ${pr.repo}, ${pr.number}, ${review.revision.base}, ${review.revision.head}, ${DateTime.formatIso(review.writtenAt)}, ${review.markdown}, NULL)
+              ON CONFLICT (owner, repo, number) DO UPDATE SET base = excluded.base, head = excluded.head, written_at = excluded.written_at, markdown = excluded.markdown, agent_id = NULL`.pipe(
+              logStorageFailure,
+              Effect.mapError(storageFailure),
+            ),
+            { review, job: { status: "idle" } },
+          )
+
+          yield* removeAgent(replaced).pipe(Effect.forkIn(scope))
+        })
 
       const reviewPrompt = settings.read().pipe(
         Effect.map((saved) => saved.reviewPrompt),
         Effect.mapError((error) => failure("not-ready", error.message)),
       )
 
-      // A Follow-up carries the whole PR and its thread, so it gets an Agent review's time too.
-      const runAgent = Effect.fnUntraced(function* <A>(
-        job: Job,
-        pr: PullRequestRef,
-        revision: Revision,
-        running: (runner: AgentRunnerIdentity) => AgentReviewState["job"],
-        subject: string,
-        task: (material: ReviewInput, reviewPrompt: string) => CheckoutTask<A>,
-      ) {
-        const runner = yield* checkoutRuns.select().pipe(Effect.mapError(fromCheckoutRunFailure))
-        const prompt = yield* reviewPrompt
-
-        yield* setJob(job, running(runner.identity))
-
-        return yield* runner
-          .run({
-            pr,
-            revision,
-            subject,
-            timeout: config.agentReviewTimeoutMs,
-            read: github.reviewInput,
-            task: (material) => Effect.succeed(task(material, prompt)),
-          })
-          .pipe(Effect.mapError(fromCheckoutRunFailure))
-      })
-
       const work = (job: Job, pr: PullRequestRef, revision: Revision, startedAt: number) =>
         Effect.gen(function* () {
-          const { answer } = yield* runAgent(
-            job,
-            pr,
-            revision,
-            (runner) => ({ status: "reviewing", startedAt, runner }),
-            "Agent review",
-            (material, prompt) => ({
-              instructions: agentReviewInstructions(prompt),
-              prompt: agentReviewPrompt(material),
-              answer: AgentReviewAnswer,
-            }),
-          )
+          const runner = yield* checkoutRuns.select().pipe(Effect.mapError(fromCheckoutRunFailure))
+          const prompt = yield* reviewPrompt
+
+          yield* setJob(job, { status: "reviewing", startedAt, runner: runner.identity })
+
+          const { answer } = yield* runner
+            .run({
+              pr,
+              revision,
+              subject: "Agent review",
+              timeout: config.agentReviewTimeoutMs,
+              read: github.reviewInput,
+              task: (material) =>
+                Effect.succeed({
+                  instructions: agentReviewInstructions(prompt),
+                  prompt: agentReviewPrompt(material),
+                  answer: AgentReviewAnswer,
+                }),
+            })
+            .pipe(Effect.mapError(fromCheckoutRunFailure))
 
           return AgentReview.make({
             revision,
             writtenAt: yield* DateTime.now,
             markdown: answer.markdown,
-            followUps: [],
+            agentId: null,
           })
         }).pipe(
           Effect.scoped,
@@ -262,48 +225,80 @@ export class AgentReviews extends Context.Service<
           ),
         )
 
-      const followUpWork = (
+      const startAgent = (
         job: Job,
         pr: PullRequestRef,
         review: AgentReview,
         message: string,
-        startedAt: number,
+        {
+          runner,
+          model,
+          reviewPrompt: prompt,
+        }: { runner: AgentRunnerIdentity; model: string; reviewPrompt: string },
       ) =>
-        Effect.gen(function* () {
-          const { input, answer } = yield* runAgent(
-            job,
-            pr,
-            review.revision,
-            (runner) => ({ status: "following-up", message, startedAt, runner }),
-            "answer",
-            (material, prompt) => ({
-              instructions: followUpInstructions(prompt),
-              prompt: followUpPrompt(material, review, message),
-              answer: FollowUpAnswer,
-            }),
-          )
+        Effect.uninterruptibleMask((restore) =>
+          Effect.gen(function* () {
+            const folder = join(config.dataDirectory, "agent-review-checkouts", randomUUID())
 
-          const [placed, unplaced] = Arr.partition(answer.suggestedDrafts, (draft) =>
-            isSuggestedDraft(draft) &&
-            lineInFiles(input.files, draft.path, draft.side, draft.line) !== null
-              ? Result.succeed(draft)
-              : Result.fail(draft),
-          )
+            const removeFolder = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+              effect.pipe(
+                Effect.onError(() =>
+                  fs.remove(folder, { recursive: true, force: true }).pipe(Effect.ignore),
+                ),
+              )
 
-          return {
-            message,
-            answer: answer.markdown + unplacedText(unplaced),
-            suggestedDrafts: placed,
-          } satisfies FollowUp
-        }).pipe(
-          Effect.scoped,
-          Effect.flatMap((followUp) => saveFollowUp(job, pr, review, followUp)),
+            const input = yield* restore(
+              checkoutRuns
+                .copy({
+                  pr,
+                  revision: review.revision,
+                  subject: "Follow-up",
+                  folder,
+                  read: github.reviewInput,
+                })
+                .pipe(Effect.mapError(fromCheckoutRunFailure)),
+            ).pipe(removeFolder)
+
+            const agent = yield* agents
+              .createForReview({
+                name: `Follow-ups on ${pr.owner}/${pr.repo}#${pr.number}`,
+                repository: new FollowedRepository({ owner: pr.owner, repo: pr.repo }),
+                revision: review.revision,
+                engine: runner.engine,
+                model,
+                checkout: folder,
+                review: {
+                  instructions: followUpInstructions(prompt, input, review),
+                  diffLines: {
+                    old: diffLinesOn(input.files, "old"),
+                    new: diffLinesOn(input.files, "new"),
+                  },
+                },
+                message,
+              })
+              .pipe(
+                Effect.mapError(({ message: reason }) => failure("runner", reason, runner)),
+                removeFolder,
+              )
+
+            yield* jobs
+              .commit(
+                job,
+                sql`UPDATE agent_reviews SET agent_id = ${agent.id} WHERE ${where(pr)}`.pipe(
+                  logStorageFailure,
+                  Effect.mapError(storageFailure),
+                ),
+                { review: { ...review, agentId: agent.id }, job: { status: "idle" } },
+              )
+              .pipe(Effect.onError(() => removeAgent(agent.id)))
+          }),
+        ).pipe(
           jobs.settle(job, (state, error: Option.Option<AgentReviewFailure>) => ({
             review: state.review,
             job: {
-              status: "follow-up-failed",
+              status: "agent-start-failed",
               message,
-              reason: Option.getOrElse(error, () => stoppedRunner(runnerOf(state.job))),
+              reason: Option.getOrElse(error, () => stoppedRunner(runner)),
             },
           })),
         )
@@ -330,17 +325,15 @@ export class AgentReviews extends Context.Service<
       ) {
         const job = yield* jobs.jobFor(pr)
 
-        yield* jobs.begin(job, (replace) =>
+        const agentId = yield* jobs.begin(job, (replace) =>
           Effect.gen(function* () {
             const { review, job: current } = yield* SubscriptionRef.get(job.state)
 
-            // One run at a time: a Follow-up never replaces running work. Starting the review
-            // again does, since it starts the thread over.
             if (current.status === "reviewing")
               return yield* failure("not-ready", "Wait for the Agent review to finish.")
 
-            if (current.status === "following-up")
-              return yield* failure("not-ready", "Wait for the answer to your last Follow-up.")
+            if (current.status === "starting-agent")
+              return yield* failure("not-ready", "Wait for the agent to start.")
 
             if (review === null || !Equal.equals(review.revision, revision))
               return yield* failure(
@@ -348,12 +341,45 @@ export class AgentReviews extends Context.Service<
                 "This Agent review was written for another Revision. Review again to follow up.",
               )
 
-            const startedAt = DateTime.toEpochMillis(yield* DateTime.now)
-            yield* setJob(job, { status: "following-up", message, startedAt, runner: null })
+            if (review.agentId !== null) return review.agentId
 
-            return yield* replace(followUpWork(job, pr, review, message, startedAt))
+            const saved = yield* settings
+              .read()
+              .pipe(Effect.mapError((error) => failure("not-ready", error.message)))
+
+            const engineSettings = engineSettingsOf(saved, "agentReviews")
+            const runner = runnerIdentity(engineSettings)
+
+            const startedAt = DateTime.toEpochMillis(yield* DateTime.now)
+            yield* setJob(job, { status: "starting-agent", message, startedAt, runner })
+            yield* replace(
+              startAgent(job, pr, review, message, {
+                runner,
+                model: agentModelOf(engineSettings),
+                reviewPrompt: saved.reviewPrompt,
+              }),
+            )
+
+            return null
           }),
         )
+
+        if (agentId === null) return
+
+        yield* agents
+          .send(agentId, { message, images: [] })
+          .pipe(
+            Effect.mapError((error) =>
+              Predicate.isTagged(error, "RequestWaiting")
+                ? failure("not-ready", "Answer the agent's request first.")
+                : failure(
+                    "runner",
+                    Predicate.isTagged(error, "AgentNotFound")
+                      ? "This Agent review's Agent is gone. Review again to follow up."
+                      : error.message,
+                  ),
+            ),
+          )
       })
 
       const cancel = Effect.fn("AgentReviews.cancel")(function* (pr: PullRequestRef) {

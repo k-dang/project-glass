@@ -1,0 +1,3005 @@
+{
+  "scenario": "claude-review",
+  "program": "@anthropic-ai/claude-agent-sdk 0.3.309",
+  "processes": [
+    {
+      "args": [
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--input-format",
+        "stream-json",
+        "--permission-prompt-tool=stdio",
+        "--allowedTools=Read,Grep,Glob,mcp__glass__suggest_draft",
+        "--tools=Read,Grep,Glob",
+        "--setting-sources=",
+        "--strict-mcp-config",
+        "--allow-dangerously-skip-permissions",
+        "--include-partial-messages",
+        "--session-id=6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
+      ],
+      "cwd": "<folder>",
+      "frames": [
+        {
+          "out": {
+            "request_id": "r9fx5tw8d8",
+            "type": "control_request",
+            "request": {
+              "subtype": "initialize",
+              "sdkMcpServers": ["glass"],
+              "sdkMcpServerManifests": {
+                "glass": {
+                  "initializeResult": {
+                    "protocolVersion": "2025-11-25",
+                    "capabilities": {
+                      "tools": {
+                        "listChanged": true
+                      }
+                    },
+                    "serverInfo": {
+                      "name": "glass",
+                      "version": "1.0.0"
+                    }
+                  },
+                  "toolsListResult": {
+                    "tools": [
+                      {
+                        "name": "suggest_draft",
+                        "description": "Propose a comment for the PR's author on one line of the diff, for the reviewer to edit and add as a Draft. Glass refuses a line outside the diff's hunks.",
+                        "inputSchema": {
+                          "$schema": "http://json-schema.org/draft-07/schema#",
+                          "type": "object",
+                          "properties": {
+                            "path": {
+                              "type": "string",
+                              "description": "The file's path relative to the checkout root."
+                            },
+                            "side": {
+                              "type": "string",
+                              "enum": ["new", "old"],
+                              "description": "Either \"new\", for a line of the PR's head, or \"old\", for a line only in its base."
+                            },
+                            "line": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991,
+                              "description": "The line's number on that side."
+                            },
+                            "body": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "The comment in GitHub Markdown, written to the PR's author in the reviewer's voice."
+                            }
+                          },
+                          "required": ["path", "side", "line", "body"]
+                        },
+                        "execution": {
+                          "taskSupport": "forbidden"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              "appendSystemPrompt": "You answer a reviewer's questions about a pull request that changes greet.ts."
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "control_response",
+            "response": {
+              "subtype": "success",
+              "request_id": "r9fx5tw8d8",
+              "response": {
+                "commands": [
+                  {
+                    "name": "deep-research",
+                    "description": "Deep research harness — fan-out web searches, fetch sources, adversarially verify claims, synthesize a cited report. (dynamic workflow)",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "dataviz",
+                    "description": "Use this skill whenever you are about to create ANY chart, graph, plot, dashboard, or data visualization, in ANY output medium — an HTML or React artifact, inline SVG, plotting code in any library (matplotlib, plotly, d3, Recharts, …), an image/PNG you will render and upload, or a chart shared into Slack. Read it BEFORE writing the first line of chart code, choosing chart colors, building a stat tile / meter / KPI row, or laying out a dashboard. When the destination is a first-party document connector (host-designated, never self-described) that renders live charts, hand it the rows (inline, or as an uploaded data file the chart cites) rather than a rendered PNG/SVG — a picture of a chart loses hover, data inspection and per-value comments. Produces visualizations that read as one system — elegant, accessible, consistent in light and dark — using a brand-neutral placeholder palette you swap for your own. Teaches a design-system-agnostic method: a form heuristic, a color formula with a runnable validator, mark specs, and interaction rules. A validated default palette is documented in `references/palette.md` — swap that file's values for your brand's. Triggers on: \"chart\", \"graph\", \"plot\", \"data viz\", \"visualization\", \"dashboard\", \"analytics\", \"visualize data\", \"categorical colors\", \"sequential / diverging palette\", \"stat tile\", \"sparkline\", \"heatmap\", \"legend\", \"axis\", \"tooltip\", \"chart colors\", \"color by series\".",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "update-config",
+                    "description": "Use this skill to configure the Claude Code harness via settings.json. Automated behaviors (\"from now on when X\", \"each time X\", \"whenever X\", \"before/after X\") require hooks configured in settings.json - the harness executes these, not Claude, so memory/preferences cannot fulfill them. Also use for: permissions (\"allow X\", \"add permission\", \"move permission to\"), env vars (\"set X=Y\"), hook troubleshooting, or any changes to settings.json/settings.local.json files. Examples: \"allow npm commands\", \"add bq permission to global settings\", \"move permission to user settings\", \"set DEBUG=true\", \"when claude stops show X\". For simple settings like theme/model, suggest the /config command.",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "verify",
+                    "description": "Verify that a code change actually does what it's supposed to by exercising it end-to-end and observing behavior — drive the affected flow, not just tests or typecheck. Run before committing nontrivial changes; bootstraps this repo's project verify skill if none exists yet. Don't invoke it on a diff that only touches tests, docs, or other code with no runtime surface to drive (a change to product source always has one) — there's nothing to observe.",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "debug",
+                    "description": "Enable debug logging for this session and help diagnose issues",
+                    "argumentHint": "[issue description]",
+                    "builtin": true
+                  },
+                  {
+                    "name": "code-review",
+                    "description": "Review the current diff, or a PR number/branch/path target, for correctness bugs (plus reuse/simplification/efficiency cleanups where the model's review recipe covers them) at the given effort level (low|medium|high|xhigh|max: from few high-confidence findings up to many, some of them uncertain); with no level given, it reuses the level you typed last. Pass --comment to post findings as inline PR comments, or --fix to apply the findings to the working tree after the review. Pass --max-findings <n> to report up to n findings, or --max-findings all for every finding. The choice stays until you pass --max-findings default.",
+                    "argumentHint": "[low|medium|high|xhigh|max] [--fix] [--comment] [<pr#>|<branch>|<path>] [--max-findings <n>|all]",
+                    "aliases": ["review"],
+                    "builtin": true
+                  },
+                  {
+                    "name": "simplify",
+                    "description": "Review the changed code for reuse, simplification, efficiency, and altitude cleanups, then apply the fixes. Quality only — it does not hunt for bugs; use /code-review for that.",
+                    "argumentHint": "[<target>]",
+                    "builtin": true
+                  },
+                  {
+                    "name": "batch",
+                    "description": "Research and plan a large-scale change, then execute it in parallel across 5–30 isolated worktree agents that each open a PR.",
+                    "argumentHint": "<instruction>",
+                    "builtin": true
+                  },
+                  {
+                    "name": "fewer-permission-prompts",
+                    "description": "Scan your transcripts for common read-only Bash and MCP tool calls, then add a prioritized allowlist to project .claude/settings.json to reduce permission prompts.",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "doctor",
+                    "description": "Health-check the user's Claude Code setup and fix issues: diagnose installation health — what the `claude doctor` terminal diagnostics cover — from local data (duplicate or leftover installs, PATH, unparseable settings files, broken or colliding agent definitions, skills whose frontmatter fails to parse); find unused skills, MCP servers, and plugins versus their context cost and disable dead weight; deduplicate local CLAUDE.md files against checked-in ones; trim checked-in CLAUDE.md files by cutting content a session could derive from the codebase (directory layouts, tech-stack lists, architecture overviews) while keeping gotchas, rationale, and non-standard conventions; migrate always-loaded CLAUDE.md guidance into lazy skills and nested CLAUDE.md files; flag slow hooks and context-heavy extensions; check the installed version is current; make auto mode the default permission mode; and pre-approve frequently denied read-only commands. Use when the user asks for a doctor run, checkup, audit, tune-up, or cleanup of their Claude Code setup or configuration.",
+                    "argumentHint": "[prompt-audit [<path>]]",
+                    "aliases": ["checkup"],
+                    "builtin": true
+                  },
+                  {
+                    "name": "loop",
+                    "description": "Run a prompt or slash command on a recurring interval (e.g. /loop 5m /foo). Omit the interval to let the model self-pace.",
+                    "argumentHint": "[interval] [prompt]",
+                    "aliases": ["proactive"],
+                    "builtin": true
+                  },
+                  {
+                    "name": "claude-api",
+                    "description": "Reference for the Claude API / Anthropic SDK — model ids, pricing, params, streaming, tool use, MCP, agents, caching, token counting, model migration.\nTRIGGER — read BEFORE opening the target file; don't skip because it \"looks like a one-liner\" — whenever: the prompt names Claude/Anthropic in any form (Claude, Anthropic, Fable, Opus, Sonnet, Haiku, `anthropic`, `@anthropic-ai`, `claude-*`, `us.anthropic.*`, `[1m]`); the user asks about an LLM (pricing/model choice/limits/caching) — never answer from memory; OR the task is LLM-shaped with provider unstated (agent/MCP/tool-definition/multi-agent/RAG/LLM-judge/computer-use; generate/summarize/extract/classify/rewrite/converse over NL; debugging refusals/cutoffs/streaming/tool-calls/tokens).\nSKIP only when another provider is being worked on (overrides all triggers): OpenAI/GPT/Gemini/Llama/Mistral/Cohere/Ollama named in the query; OR `grep -rE 'openai|langchain_openai|google.generativeai|genai|mistralai|cohere|ollama'` over the project hits (run this grep FIRST if no provider named — don't Read the file).",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "workflow-authoring",
+                    "description": "Reference for writing a Workflow tool script (script API and gotchas, resume, quality patterns, worked examples). Load before authoring a script for a workflow the user already opted into; it does not itself authorize running one.",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "run",
+                    "description": "Launch and drive this project's app to see a change working. Use when asked to run, start, or screenshot the app, or to confirm a change works in the real app (not just tests). First looks for a project skill that already covers launching the app; otherwise falls back to built-in patterns per project type (CLI, server, TUI, Electron, browser-driven, library).",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "run-skill-generator",
+                    "description": "Author or improve the run-<unit> skill - a per-project skill that tells agents how to build, launch, and drive this project's app. Use when the user asks to set up the project, get it running, write run instructions, or verify build/run steps work from a clean environment.",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "plugin-authoring",
+                    "description": "Make a mod: a change to Claude's own interface or behaviour, such as a panel or pane that stays beside the chat and updates, a band, status line, toast, slash command, or hook on tool calls. Use to make, change or debug a mod or its hooks module.",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "agents",
+                    "description": "(removed) Ask Claude to create/manage subagents, or edit .claude/agents/",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "auto-mode-setup",
+                    "description": "Teach auto mode about your environment, plus optional rule tweaks",
+                    "argumentHint": "[--request-id <uuid>] (--wizard posture=… scope=… depth=… --propose | --expect-sha256 <64-hex> --apply-file <path>)",
+                    "builtin": true
+                  },
+                  {
+                    "name": "autocompact",
+                    "description": "Configure the auto-compact window size",
+                    "argumentHint": "[auto|<tokens>]",
+                    "builtin": true
+                  },
+                  {
+                    "name": "clear",
+                    "description": "Start a new session with empty context; previous session stays on disk (resumable with /resume)",
+                    "argumentHint": "[name]",
+                    "aliases": ["reset", "new"],
+                    "builtin": true
+                  },
+                  {
+                    "name": "color",
+                    "description": "Set the prompt bar color for this session",
+                    "argumentHint": "[red|blue|green|yellow|purple|orange|pink|cyan|default]",
+                    "builtin": true
+                  },
+                  {
+                    "name": "compact",
+                    "description": "Free up context by summarizing the conversation so far",
+                    "argumentHint": "<optional custom summarization instructions>",
+                    "builtin": true
+                  },
+                  {
+                    "name": "config",
+                    "description": "Set a setting by key",
+                    "argumentHint": "key=value",
+                    "aliases": ["settings"],
+                    "builtin": true
+                  },
+                  {
+                    "name": "output-style",
+                    "description": "List output styles or switch to one",
+                    "argumentHint": "[style]",
+                    "builtin": true
+                  },
+                  {
+                    "name": "context",
+                    "description": "Show current context usage",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "effort",
+                    "description": "Set effort level for model usage",
+                    "argumentHint": "<low|medium|high|xhigh|max|auto|ultracode [on|off]>",
+                    "builtin": true
+                  },
+                  {
+                    "name": "fast",
+                    "description": "Toggle fast mode (Opus 5.5)",
+                    "argumentHint": "[on|off]",
+                    "builtin": true
+                  },
+                  {
+                    "name": "focus",
+                    "description": "Toggle focus view: just your prompt, summary, and response",
+                    "argumentHint": "[on|off]",
+                    "builtin": true
+                  },
+                  {
+                    "name": "heapdump",
+                    "description": "Dump the JS heap to the Desktop; on Linux with no Desktop folder, the home directory",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "init",
+                    "description": "Initialize a new CLAUDE.md file with codebase documentation",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "mcp",
+                    "description": "Manage MCP servers",
+                    "argumentHint": "[reconnect|enable|disable [<server>|all]]",
+                    "builtin": true
+                  },
+                  {
+                    "name": "model",
+                    "description": "Set the AI model for Claude Code",
+                    "argumentHint": "<model>",
+                    "builtin": true
+                  },
+                  {
+                    "name": "__remote-workflow",
+                    "description": "Run the workflow script delivered in this session environment (server-launched sessions only)",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "workflow-launch-exec",
+                    "description": "Execute a server-launched workflow handoff (workflow_launch event sessions only)",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "reload-plugins",
+                    "description": "Activate pending plugin changes in the current session",
+                    "argumentHint": "[--force]",
+                    "builtin": true
+                  },
+                  {
+                    "name": "reload-skills",
+                    "description": "Pick up skills added or changed on disk during this session",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "rename",
+                    "description": "Rename the current conversation",
+                    "argumentHint": "[name]",
+                    "aliases": ["name"],
+                    "builtin": true
+                  },
+                  {
+                    "name": "security-review",
+                    "description": "Complete a security review of the pending changes on the current branch",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "usage",
+                    "description": "Show session cost, plan usage, and what's contributing to your limits",
+                    "argumentHint": "",
+                    "aliases": ["cost", "stats"],
+                    "builtin": true
+                  },
+                  {
+                    "name": "insights",
+                    "description": "Generate a report analyzing your Claude Code sessions",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "recap",
+                    "description": "Generate a one-line session recap now",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "goal",
+                    "description": "Set a goal — keep working until the condition is met",
+                    "argumentHint": "",
+                    "builtin": true
+                  },
+                  {
+                    "name": "list-agents",
+                    "description": "List subagents, teammates, and other Claude sessions you can message",
+                    "argumentHint": "",
+                    "aliases": ["peers"],
+                    "builtin": true
+                  },
+                  {
+                    "name": "team-onboarding",
+                    "description": "Help teammates ramp on Claude Code with a guide from your usage",
+                    "argumentHint": "",
+                    "builtin": true
+                  }
+                ],
+                "agents": [
+                  {
+                    "name": "claude",
+                    "description": "Catch-all for any task that doesn't fit a more specific agent. FleetView's default when no agent name is typed."
+                  },
+                  {
+                    "name": "Explore",
+                    "description": "Fast read-only search agent for locating code. Use it to find files by pattern (eg. \"src/components/**/*.tsx\"), grep for symbols or keywords (eg. \"API endpoints\"), or answer \"where is X defined / which files reference Y.\" Do NOT use it for code review, design-doc auditing, cross-file consistency checks, or open-ended analysis — it reads excerpts rather than whole files and will miss content past its read window. When calling, specify search breadth: \"quick\" for a single targeted lookup, \"medium\" for moderate exploration, or \"very thorough\" to search across multiple locations and naming conventions.",
+                    "model": "inherit"
+                  },
+                  {
+                    "name": "general-purpose",
+                    "description": "General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks. When you are searching for a keyword or file and are not confident that you will find the right match in the first few tries use this agent to perform the search for you."
+                  },
+                  {
+                    "name": "Plan",
+                    "description": "Software architect agent for designing implementation plans. Use this when you need to plan the implementation strategy for a task. Returns step-by-step plans, identifies critical files, and considers architectural trade-offs.",
+                    "model": "inherit"
+                  },
+                  {
+                    "name": "statusline-setup",
+                    "description": "Use this agent to configure the user's Claude Code status line setting.",
+                    "model": "sonnet"
+                  }
+                ],
+                "output_style": "default",
+                "available_output_styles": [
+                  "default",
+                  "Proactive",
+                  "Concise",
+                  "Explanatory",
+                  "Learning"
+                ],
+                "user_output_styles_dir": "<folder>/.claude/output-styles",
+                "models": [
+                  {
+                    "value": "default",
+                    "resolvedModel": "claude-sonnet-5-5",
+                    "displayName": "Default (recommended)",
+                    "description": "Sonnet 5.5 · Efficient for routine tasks",
+                    "supportsEffort": true,
+                    "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"],
+                    "supportsAdaptiveThinking": true,
+                    "supportsAutoMode": true,
+                    "supportsThinkingOff": false
+                  },
+                  {
+                    "value": "sonnet",
+                    "resolvedModel": "claude-sonnet-5-5",
+                    "displayName": "Sonnet",
+                    "description": "Sonnet 5.5 · Efficient for routine tasks",
+                    "supportsEffort": true,
+                    "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"],
+                    "supportsAdaptiveThinking": true,
+                    "supportsAutoMode": true,
+                    "supportsThinkingOff": false
+                  },
+                  {
+                    "value": "fable",
+                    "resolvedModel": "claude-fable-5-1",
+                    "displayName": "Fable",
+                    "description": "Fable 5.1 · Most capable for your hardest and longest-running tasks",
+                    "supportsEffort": true,
+                    "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"],
+                    "supportsAdaptiveThinking": true,
+                    "supportsAutoMode": true,
+                    "supportsThinkingOff": false
+                  },
+                  {
+                    "value": "opus",
+                    "resolvedModel": "claude-opus-5-5",
+                    "displayName": "Opus",
+                    "description": "Opus 5.5 · Best for everyday, complex tasks",
+                    "supportsEffort": true,
+                    "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"],
+                    "supportsAdaptiveThinking": true,
+                    "supportsFastMode": true,
+                    "supportsAutoMode": true,
+                    "supportsThinkingOff": false
+                  },
+                  {
+                    "value": "haiku",
+                    "resolvedModel": "claude-haiku-5-5",
+                    "displayName": "Haiku",
+                    "description": "Haiku 5.5 · Fastest for quick answers",
+                    "supportsEffort": true,
+                    "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"],
+                    "supportsAdaptiveThinking": true,
+                    "supportsAutoMode": true,
+                    "supportsThinkingOff": false
+                  }
+                ],
+                "account": "<redacted>",
+                "pid": 2803,
+                "claude_code_version": "2.1.309",
+                "current_permission_mode": "default",
+                "sdk_mcp_manifests_parked": {
+                  "glass": "parked"
+                },
+                "feedback_mode": {
+                  "kind": "disabled"
+                },
+                "analytics_disabled": true,
+                "remote_control_auto_enable": false,
+                "remote_control_auto_connect_default": false,
+                "remote_control_available": true,
+                "remote_control_auto_on_by_default": false,
+                "ide_rc_auto_enable_gate": false,
+                "fast_mode_state": "off",
+                "fast_mode_disabled_reason": "sdk_opt_in_required",
+                "session_state": "idle",
+                "capabilities": ["ui_surface_v1", "mcp_call_result_not_for_model_v1"]
+              },
+              "pending_permission_requests": [],
+              "pending_user_dialog_requests": []
+            }
+          }
+        },
+        {
+          "out": {
+            "type": "user",
+            "message": {
+              "role": "user",
+              "content": "Read greet.ts with the Read tool. Then call the suggest_draft tool exactly twice, one call after the other: first with path greet.ts, side new, line 2, and body \"Keep the name.\"; then with path greet.ts, side new, line 40, and body \"Off the diff.\". Then reply with exactly: DONE"
+            },
+            "parent_tool_use_id": null,
+            "uuid": "92ff52e0-5ef6-4eff-9020-896ac40a9e2f"
+          }
+        },
+        {
+          "in": {
+            "type": "system",
+            "subtype": "session_state_changed",
+            "state": "running",
+            "sdk_host_only": true,
+            "uuid": "803e9f2d-c480-420b-b2b3-7ec3a75ed8bf",
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
+          }
+        },
+        {
+          "in": {
+            "type": "command_lifecycle",
+            "command_uuid": "92ff52e0-5ef6-4eff-9020-896ac40a9e2f",
+            "state": "queued",
+            "uuid": "3e2abddd-7f35-4191-8384-e1640c099463",
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
+          }
+        },
+        {
+          "in": {
+            "type": "command_lifecycle",
+            "command_uuid": "92ff52e0-5ef6-4eff-9020-896ac40a9e2f",
+            "state": "started",
+            "uuid": "f715b17c-1f9d-4119-bd6b-80a09942756e",
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
+          }
+        },
+        {
+          "in": {
+            "type": "system",
+            "subtype": "init",
+            "cwd": "/private<folder>",
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "tools": ["Glob", "Grep", "Read", "mcp__glass__suggest_draft"],
+            "mcp_servers": [
+              {
+                "name": "glass",
+                "status": "connected",
+                "source": "sdk"
+              }
+            ],
+            "model": "claude-haiku-5-5",
+            "permissionMode": "default",
+            "slash_commands": [
+              "deep-research",
+              "dataviz",
+              "update-config",
+              "verify",
+              "debug",
+              "code-review",
+              "simplify",
+              "batch",
+              "fewer-permission-prompts",
+              "doctor",
+              "loop",
+              "claude-api",
+              "workflow-authoring",
+              "run",
+              "run-skill-generator",
+              "plugin-authoring",
+              "agents",
+              "auto-mode-setup",
+              "autocompact",
+              "clear",
+              "color",
+              "compact",
+              "config",
+              "output-style",
+              "context",
+              "effort",
+              "fast",
+              "focus",
+              "heapdump",
+              "init",
+              "mcp",
+              "model",
+              "__remote-workflow",
+              "workflow-launch-exec",
+              "reload-plugins",
+              "reload-skills",
+              "rename",
+              "security-review",
+              "usage",
+              "insights",
+              "recap",
+              "goal",
+              "list-agents",
+              "team-onboarding"
+            ],
+            "terminal_slash_commands": ["doctor", "color", "focus", "reload-plugins"],
+            "apiKeySource": "<redacted>",
+            "claude_code_version": "2.1.309",
+            "output_style": "default",
+            "agents": ["claude", "Explore", "general-purpose", "Plan", "statusline-setup"],
+            "skills": [
+              "deep-research",
+              "dataviz",
+              "update-config",
+              "verify",
+              "debug",
+              "code-review",
+              "simplify",
+              "batch",
+              "fewer-permission-prompts",
+              "doctor",
+              "loop",
+              "claude-api",
+              "workflow-authoring",
+              "run",
+              "run-skill-generator",
+              "plugin-authoring"
+            ],
+            "plugins": [
+              {
+                "name": "cc-plugin-sec-default",
+                "path": "builtin",
+                "source": "cc-plugin-sec-default@builtin"
+              },
+              {
+                "name": "cc-plugin-agents-md",
+                "path": "builtin",
+                "source": "cc-plugin-agents-md@builtin"
+              },
+              {
+                "name": "cc-plugin-plugin-authoring",
+                "path": "builtin",
+                "source": "cc-plugin-plugin-authoring@builtin"
+              }
+            ],
+            "capabilities": [
+              "interrupt_receipt_v1",
+              "interrupt_cancel_queued_v1",
+              "interrupt_send_now_v1",
+              "interrupt_requeue_taken_v1",
+              "msg_lifecycle_v1",
+              "request_marker_lists_v1",
+              "lifecycle_wakeup_source_v1",
+              "sdk_mcp_tools_list_changed",
+              "sdk_mcp_manifests",
+              "mcp_read_resource_v1",
+              "mcp_tool_ui_meta_v1",
+              "ui_surface_v1",
+              "mcp_call_result_not_for_model_v1"
+            ],
+            "analytics_disabled": true,
+            "product_feedback_disabled": true,
+            "uuid": "ee0aab7c-463a-4f91-9f31-307900be5a18",
+            "memory_paths": {
+              "auto": "<folder>/.claude/projects/-private<folder>/memory/"
+            },
+            "original_cwd": "/private<folder>",
+            "additional_directories": [],
+            "messaging_socket_path": "/tmp/cc-socks/2803.sock",
+            "fast_mode_state": "off",
+            "fast_mode_disabled_reason": "sdk_opt_in_required",
+            "per_turn_effort_active": true,
+            "view_mode": "default",
+            "user_message_uuids": ["92ff52e0-5ef6-4eff-9020-896ac40a9e2f"]
+          }
+        },
+        {
+          "in": {
+            "type": "system",
+            "subtype": "status",
+            "status": "requesting",
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "uuid": "af37be17-8100-4f8b-afb3-ae1f09dbb33d",
+            "user_message_uuids": ["92ff52e0-5ef6-4eff-9020-896ac40a9e2f"]
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "message_start",
+              "message": {
+                "model": "claude-haiku-5-5",
+                "id": "msg_011CggH55Y4tvXPVfSr4i93h",
+                "type": "message",
+                "role": "assistant",
+                "content": [],
+                "container": null,
+                "stop_reason": null,
+                "stop_sequence": null,
+                "stop_details": null,
+                "usage": {
+                  "input_tokens": 0,
+                  "cache_creation_input_tokens": 0,
+                  "cache_read_input_tokens": 0,
+                  "cache_creation": {
+                    "ephemeral_5m_input_tokens": 0,
+                    "ephemeral_1h_input_tokens": 0
+                  },
+                  "output_tokens": 0,
+                  "service_tier": "standard",
+                  "inference_geo": "global",
+                  "speed": "standard"
+                },
+                "input_transformations": [],
+                "diagnostics": null,
+                "context_management": null
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "34f592c0-edab-4cad-9211-a951b3d897e5",
+            "ttft_ms": 658,
+            "thinking_display": "updates",
+            "api_message_id": "msg_011CggH55Y4tvXPVfSr4i93h",
+            "user_message_uuid": "92ff52e0-5ef6-4eff-9020-896ac40a9e2f",
+            "user_message_uuids": ["92ff52e0-5ef6-4eff-9020-896ac40a9e2f"]
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_start",
+              "index": 0,
+              "content_block": {
+                "type": "tool_use",
+                "id": "toolu_012zbSXTdGwzCmqNyL6je32u",
+                "name": "Read",
+                "input": {},
+                "caller": {
+                  "type": "direct"
+                }
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "6a9c214a-4759-4e59-a88a-22646a748d89",
+            "api_message_id": "msg_011CggH55Y4tvXPVfSr4i93h"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": ""
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "43055b96-beba-438e-8394-fc698648c691",
+            "api_message_id": "msg_011CggH55Y4tvXPVfSr4i93h"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": "{\"file_"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "b234bce2-3cd7-479d-8f7d-e741eb499576",
+            "api_message_id": "msg_011CggH55Y4tvXPVfSr4i93h"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": "path\": "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "00e2a8d3-ac86-4e32-983b-12339c2ef271",
+            "api_message_id": "msg_011CggH55Y4tvXPVfSr4i93h"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": "\"/priva"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "c4c5a6fd-405e-48c5-b118-75b84a28bc56",
+            "api_message_id": "msg_011CggH55Y4tvXPVfSr4i93h"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": "te/var/"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "183e8a55-f79c-4fce-9d6c-f3af3fe379e8",
+            "api_message_id": "msg_011CggH55Y4tvXPVfSr4i93h"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": "folders"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "f19f9cf5-d0de-4d02-ba86-02bc05332c7c",
+            "api_message_id": "msg_011CggH55Y4tvXPVfSr4i93h"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": "/8q/032"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "27c96641-ddf3-4ac0-a519-fcf5f88dfbbc",
+            "api_message_id": "msg_011CggH55Y4tvXPVfSr4i93h"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": "mrt6j40"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "65fe9a9a-96fc-49e5-979d-e65a4f21a296",
+            "api_message_id": "msg_011CggH55Y4tvXPVfSr4i93h"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": "58214b1"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "ecd26ee3-f734-4a66-882a-4df8e1788c7e",
+            "api_message_id": "msg_011CggH55Y4tvXPVfSr4i93h"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": "7b3_gym"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "cf2ee2e2-ec9e-48f6-bf58-9173d53552a3",
+            "api_message_id": "msg_011CggH55Y4tvXPVfSr4i93h"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": "0000gp/"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "6b389c19-428a-41a4-8d5d-d48402593138",
+            "api_message_id": "msg_011CggH55Y4tvXPVfSr4i93h"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": "T/glass"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "5029c413-d1ef-44a3-826d-3aabf16d2fdb",
+            "api_message_id": "msg_011CggH55Y4tvXPVfSr4i93h"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": "-test-m"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "13df33ff-1303-4018-870e-3bc7ed463e8f",
+            "api_message_id": "msg_011CggH55Y4tvXPVfSr4i93h"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": "Sbu6F/g"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "3a71c0ba-a8b9-470e-b1b0-942799d151fb",
+            "api_message_id": "msg_011CggH55Y4tvXPVfSr4i93h"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": "reet.ts"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "7ec112ea-bf96-4ad5-a8f4-3b975e0150b5",
+            "api_message_id": "msg_011CggH55Y4tvXPVfSr4i93h"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": "\"}"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "90684c7f-018f-4ba9-ba74-3345b41919a2",
+            "api_message_id": "msg_011CggH55Y4tvXPVfSr4i93h"
+          }
+        },
+        {
+          "in": {
+            "type": "assistant",
+            "message": {
+              "model": "claude-haiku-5-5",
+              "id": "msg_011CggH55Y4tvXPVfSr4i93h",
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "tool_use",
+                  "id": "toolu_012zbSXTdGwzCmqNyL6je32u",
+                  "name": "Read",
+                  "input": {
+                    "file_path": "/private<folder>/greet.ts"
+                  },
+                  "caller": {
+                    "type": "direct"
+                  }
+                }
+              ],
+              "container": null,
+              "stop_reason": null,
+              "stop_sequence": null,
+              "stop_details": null,
+              "usage": {
+                "input_tokens": 0,
+                "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": 0,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 0
+                },
+                "output_tokens": 0,
+                "service_tier": "standard",
+                "inference_geo": "global",
+                "speed": "standard"
+              },
+              "input_transformations": [],
+              "diagnostics": null,
+              "context_management": null
+            },
+            "parent_tool_use_id": null,
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "uuid": "95f187fa-5676-46e1-9a40-97ddb0fd5a5b",
+            "timestamp": "2026-11-03T16:03:48.528Z",
+            "request_id": "req_011CggH5572FNtgewWKYhQaA",
+            "user_message_uuid": "92ff52e0-5ef6-4eff-9020-896ac40a9e2f",
+            "user_message_uuids": ["92ff52e0-5ef6-4eff-9020-896ac40a9e2f"]
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_stop",
+              "index": 0
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "d8a749b3-5cbf-4ddb-9d9d-66d492f5403e",
+            "api_message_id": "msg_011CggH55Y4tvXPVfSr4i93h"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "message_delta",
+              "delta": {
+                "stop_reason": "tool_use",
+                "stop_sequence": null,
+                "stop_details": null,
+                "container": null
+              },
+              "usage": {
+                "input_tokens": 0,
+                "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": 0,
+                "output_tokens": 0,
+                "output_tokens_details": {
+                  "thinking_tokens": 0
+                }
+              },
+              "context_management": {
+                "applied_edits": []
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "651495d4-f75a-4e53-a724-d641dfda8ccf",
+            "api_message_id": "msg_011CggH55Y4tvXPVfSr4i93h"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "message_stop"
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "b4996657-59ef-42ac-a38e-a5dfc9a863f8",
+            "api_message_id": "msg_011CggH55Y4tvXPVfSr4i93h"
+          }
+        },
+        {
+          "in": {
+            "type": "rate_limit_event",
+            "rate_limit_info": "<redacted>",
+            "uuid": "6da02807-9373-4b65-9b9b-8dd0d1f4313d",
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
+          }
+        },
+        {
+          "in": {
+            "type": "user",
+            "message": {
+              "role": "user",
+              "content": [
+                {
+                  "tool_use_id": "toolu_012zbSXTdGwzCmqNyL6je32u",
+                  "type": "tool_result",
+                  "content": "1\thi\n2\thello name\n3\tbye\n4\t"
+                }
+              ]
+            },
+            "parent_tool_use_id": null,
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "uuid": "1ca47643-926a-43ad-8c91-0fa982960389",
+            "timestamp": "2026-11-03T16:03:48.558Z",
+            "tool_use_result": {
+              "type": "text",
+              "file": {
+                "filePath": "/private<folder>/greet.ts",
+                "content": "hi\nhello name\nbye\n",
+                "numLines": 4,
+                "startLine": 1,
+                "totalLines": 4
+              }
+            },
+            "tool_result_meta": [
+              {
+                "id": "toolu_012zbSXTdGwzCmqNyL6je32u",
+                "permission_decision": {
+                  "decision": "accept",
+                  "source": "config",
+                  "reason_type": "rule"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "in": {
+            "type": "system",
+            "subtype": "status",
+            "status": "requesting",
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "uuid": "210895e9-1070-4166-9cbb-afffdd5fee1f",
+            "user_message_uuids": ["92ff52e0-5ef6-4eff-9020-896ac40a9e2f"]
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "message_start",
+              "message": {
+                "model": "claude-haiku-5-5",
+                "id": "msg_011CggH59VSqLq4JtkBkkap9",
+                "type": "message",
+                "role": "assistant",
+                "content": [],
+                "container": null,
+                "stop_reason": null,
+                "stop_sequence": null,
+                "stop_details": null,
+                "usage": {
+                  "input_tokens": 0,
+                  "cache_creation_input_tokens": 0,
+                  "cache_read_input_tokens": 0,
+                  "cache_creation": {
+                    "ephemeral_5m_input_tokens": 0,
+                    "ephemeral_1h_input_tokens": 0
+                  },
+                  "output_tokens": 0,
+                  "service_tier": "standard",
+                  "inference_geo": "global",
+                  "speed": "standard"
+                },
+                "input_transformations": [],
+                "diagnostics": null,
+                "context_management": null
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "23ec4c8c-4736-4b94-b402-e5da81a5302d",
+            "ttft_ms": 682,
+            "thinking_display": "updates",
+            "api_message_id": "msg_011CggH59VSqLq4JtkBkkap9"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_start",
+              "index": 0,
+              "content_block": {
+                "type": "tool_use",
+                "id": "toolu_01Ww6Z42hHg1PFWpddQVTdSV",
+                "name": "mcp__glass__suggest_draft",
+                "input": {},
+                "caller": {
+                  "type": "direct"
+                }
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "9d0ce9a9-ca88-4068-a37c-05789550ca03",
+            "api_message_id": "msg_011CggH59VSqLq4JtkBkkap9"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": ""
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "fc643e53-06d9-46b7-9f00-ea8dc6be3c43",
+            "api_message_id": "msg_011CggH59VSqLq4JtkBkkap9"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": "{\"path\""
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "f8e9ffe0-e06e-461d-8e35-12cb229f0721",
+            "api_message_id": "msg_011CggH59VSqLq4JtkBkkap9"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": ": \"gree"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "2eed8b92-785a-47ee-b271-7744f162f297",
+            "api_message_id": "msg_011CggH59VSqLq4JtkBkkap9"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": "t.ts\""
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "8d3be51d-b965-4493-9ef4-f6f7a3f783e6",
+            "api_message_id": "msg_011CggH59VSqLq4JtkBkkap9"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": ", \"side"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "acf2508c-2e94-4ce7-a246-a952d9a2a46e",
+            "api_message_id": "msg_011CggH59VSqLq4JtkBkkap9"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": "\": \"new"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "616b891c-9e23-4553-99c7-703eec5f0db6",
+            "api_message_id": "msg_011CggH59VSqLq4JtkBkkap9"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": "\""
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "7c36636f-9290-484d-a4ca-c26713f3ca91",
+            "api_message_id": "msg_011CggH59VSqLq4JtkBkkap9"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": ", \"line"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "2085285f-df18-43bc-ad3c-2f7586616fac",
+            "api_message_id": "msg_011CggH59VSqLq4JtkBkkap9"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": "\": 2"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "fff0d069-079f-4085-be7e-7e489b5940f9",
+            "api_message_id": "msg_011CggH59VSqLq4JtkBkkap9"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": ", \"body"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "aad9008f-dbc2-4be9-882e-48b13ccb55f0",
+            "api_message_id": "msg_011CggH59VSqLq4JtkBkkap9"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": "\": \"Kee"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "c94273d9-e8b7-4071-b4ae-54514384a178",
+            "api_message_id": "msg_011CggH59VSqLq4JtkBkkap9"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": "p the n"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "f487e5fc-427a-495f-9b13-ab39dd015f50",
+            "api_message_id": "msg_011CggH59VSqLq4JtkBkkap9"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": "ame.\"}"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "c433b3b6-ed4d-4a96-aa32-a983edc8b874",
+            "api_message_id": "msg_011CggH59VSqLq4JtkBkkap9"
+          }
+        },
+        {
+          "in": {
+            "type": "assistant",
+            "message": {
+              "model": "claude-haiku-5-5",
+              "id": "msg_011CggH59VSqLq4JtkBkkap9",
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "tool_use",
+                  "id": "toolu_01Ww6Z42hHg1PFWpddQVTdSV",
+                  "name": "mcp__glass__suggest_draft",
+                  "input": {
+                    "path": "greet.ts",
+                    "side": "new",
+                    "line": 2,
+                    "body": "Keep the name."
+                  },
+                  "caller": {
+                    "type": "direct"
+                  }
+                }
+              ],
+              "container": null,
+              "stop_reason": null,
+              "stop_sequence": null,
+              "stop_details": null,
+              "usage": {
+                "input_tokens": 0,
+                "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": 0,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 0
+                },
+                "output_tokens": 0,
+                "service_tier": "standard",
+                "inference_geo": "global",
+                "speed": "standard"
+              },
+              "input_transformations": [],
+              "diagnostics": null,
+              "context_management": null
+            },
+            "parent_tool_use_id": null,
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "uuid": "b423dc7e-af2c-4f4e-b8eb-830a514c7012",
+            "timestamp": "2026-11-03T16:03:49.530Z",
+            "request_id": "req_011CggH591uv2ivh4n5eMU6E",
+            "tool_use_meta": [
+              {
+                "id": "toolu_01Ww6Z42hHg1PFWpddQVTdSV",
+                "display_name": "Suggest Draft",
+                "server_display_name": "glass",
+                "tool_name": "suggest_draft"
+              }
+            ]
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_stop",
+              "index": 0
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "57e37809-c36e-4ede-bdf8-b84dee216901",
+            "api_message_id": "msg_011CggH59VSqLq4JtkBkkap9"
+          }
+        },
+        {
+          "in": {
+            "type": "control_request",
+            "request_id": "d85fad03-7085-4b6e-a2ff-ae94b9e24c83",
+            "request": {
+              "subtype": "mcp_message",
+              "server_name": "glass",
+              "message": {
+                "method": "tools/call",
+                "params": {
+                  "name": "suggest_draft",
+                  "arguments": {
+                    "path": "greet.ts",
+                    "side": "new",
+                    "line": 2,
+                    "body": "Keep the name."
+                  },
+                  "_meta": {
+                    "claudecode/toolUseId": "toolu_01Ww6Z42hHg1PFWpddQVTdSV",
+                    "progressToken": 2
+                  }
+                },
+                "jsonrpc": "2.0",
+                "id": 2
+              }
+            }
+          }
+        },
+        {
+          "out": {
+            "type": "control_response",
+            "response": {
+              "subtype": "success",
+              "request_id": "d85fad03-7085-4b6e-a2ff-ae94b9e24c83",
+              "response": {
+                "mcp_response": {
+                  "result": {
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Glass shows this Suggested draft to the reviewer."
+                      }
+                    ],
+                    "isError": false
+                  },
+                  "jsonrpc": "2.0",
+                  "id": 2
+                }
+              }
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "message_delta",
+              "delta": {
+                "stop_reason": "tool_use",
+                "stop_sequence": null,
+                "stop_details": null,
+                "container": null
+              },
+              "usage": {
+                "input_tokens": 0,
+                "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": 0,
+                "output_tokens": 0,
+                "output_tokens_details": {
+                  "thinking_tokens": 0
+                }
+              },
+              "context_management": {
+                "applied_edits": []
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "c8e50e77-185f-41d4-b079-8b3b957618d3",
+            "api_message_id": "msg_011CggH59VSqLq4JtkBkkap9"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "message_stop"
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "17ec7335-0a06-4b28-9194-2c08dec88714",
+            "api_message_id": "msg_011CggH59VSqLq4JtkBkkap9"
+          }
+        },
+        {
+          "in": {
+            "type": "user",
+            "message": {
+              "role": "user",
+              "content": [
+                {
+                  "tool_use_id": "toolu_01Ww6Z42hHg1PFWpddQVTdSV",
+                  "type": "tool_result",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Glass shows this Suggested draft to the reviewer."
+                    }
+                  ]
+                }
+              ]
+            },
+            "parent_tool_use_id": null,
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "uuid": "bacc4ce3-dae2-42d5-9567-215a3de73a5b",
+            "timestamp": "2026-11-03T16:03:49.546Z",
+            "tool_use_result": [
+              {
+                "type": "text",
+                "text": "Glass shows this Suggested draft to the reviewer."
+              }
+            ],
+            "tool_result_meta": [
+              {
+                "id": "toolu_01Ww6Z42hHg1PFWpddQVTdSV",
+                "permission_decision": {
+                  "decision": "accept",
+                  "source": "config",
+                  "reason_type": "rule"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "in": {
+            "type": "system",
+            "subtype": "status",
+            "status": "requesting",
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "uuid": "e82b04b5-f49b-4454-b57a-5c73c6b24cd9",
+            "user_message_uuids": ["92ff52e0-5ef6-4eff-9020-896ac40a9e2f"]
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "message_start",
+              "message": {
+                "model": "claude-haiku-5-5",
+                "id": "msg_011CggH5DkvjWNuKae8GGpL7",
+                "type": "message",
+                "role": "assistant",
+                "content": [],
+                "container": null,
+                "stop_reason": null,
+                "stop_sequence": null,
+                "stop_details": null,
+                "usage": {
+                  "input_tokens": 0,
+                  "cache_creation_input_tokens": 0,
+                  "cache_read_input_tokens": 0,
+                  "cache_creation": {
+                    "ephemeral_5m_input_tokens": 0,
+                    "ephemeral_1h_input_tokens": 0
+                  },
+                  "output_tokens": 0,
+                  "service_tier": "standard",
+                  "inference_geo": "global",
+                  "speed": "standard"
+                },
+                "input_transformations": [],
+                "diagnostics": null,
+                "context_management": null
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "7907a990-7d9c-4422-88c3-3cbf6593ca78",
+            "ttft_ms": 746,
+            "thinking_display": "updates",
+            "api_message_id": "msg_011CggH5DkvjWNuKae8GGpL7"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_start",
+              "index": 0,
+              "content_block": {
+                "type": "tool_use",
+                "id": "toolu_01XA5LvLSAZEij1hzyk3Ae5T",
+                "name": "mcp__glass__suggest_draft",
+                "input": {},
+                "caller": {
+                  "type": "direct"
+                }
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "072e77f5-8908-4428-afb2-0dc769e8b853",
+            "api_message_id": "msg_011CggH5DkvjWNuKae8GGpL7"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": ""
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "4e2622c0-cce9-4f48-b771-710acfe7f4cd",
+            "api_message_id": "msg_011CggH5DkvjWNuKae8GGpL7"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": "{\"path\""
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "e54aad7b-97b6-43a9-856d-707578788d88",
+            "api_message_id": "msg_011CggH5DkvjWNuKae8GGpL7"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": ": \"gree"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "5cf70245-da45-4f1d-9bb5-dc271061ad5a",
+            "api_message_id": "msg_011CggH5DkvjWNuKae8GGpL7"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": "t.ts\""
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "49422fdd-2031-4a65-ae32-ea21e538a481",
+            "api_message_id": "msg_011CggH5DkvjWNuKae8GGpL7"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": ", \"side"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "f418e05d-eabc-4c89-b678-a24393e24257",
+            "api_message_id": "msg_011CggH5DkvjWNuKae8GGpL7"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": "\": \"new"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "ebe59644-7b9f-40ae-8f74-8c856bfc2d6c",
+            "api_message_id": "msg_011CggH5DkvjWNuKae8GGpL7"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": "\""
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "06111ece-a0a4-4f84-abea-daf709d9871a",
+            "api_message_id": "msg_011CggH5DkvjWNuKae8GGpL7"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": ", \"line"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "dc06332e-9d0a-4e3e-85e8-73bb5808aff5",
+            "api_message_id": "msg_011CggH5DkvjWNuKae8GGpL7"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": "\": 40"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "47cdc0e4-775a-487e-8f87-82ba039d1fdf",
+            "api_message_id": "msg_011CggH5DkvjWNuKae8GGpL7"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": ", \"body"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "0e45eab4-2307-49c6-a07f-b9d6dc873bec",
+            "api_message_id": "msg_011CggH5DkvjWNuKae8GGpL7"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": "\": \"Off"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "3a60f50c-065d-4e5d-a122-27d20ea3ff8e",
+            "api_message_id": "msg_011CggH5DkvjWNuKae8GGpL7"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": " the di"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "53949b84-a851-4a75-9ff2-b853f6ebb333",
+            "api_message_id": "msg_011CggH5DkvjWNuKae8GGpL7"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "input_json_delta",
+                "partial_json": "ff.\"}"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "2b9adb69-8405-411b-91df-0bc753de67ab",
+            "api_message_id": "msg_011CggH5DkvjWNuKae8GGpL7"
+          }
+        },
+        {
+          "in": {
+            "type": "assistant",
+            "message": {
+              "model": "claude-haiku-5-5",
+              "id": "msg_011CggH5DkvjWNuKae8GGpL7",
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "tool_use",
+                  "id": "toolu_01XA5LvLSAZEij1hzyk3Ae5T",
+                  "name": "mcp__glass__suggest_draft",
+                  "input": {
+                    "path": "greet.ts",
+                    "side": "new",
+                    "line": 40,
+                    "body": "Off the diff."
+                  },
+                  "caller": {
+                    "type": "direct"
+                  }
+                }
+              ],
+              "container": null,
+              "stop_reason": null,
+              "stop_sequence": null,
+              "stop_details": null,
+              "usage": {
+                "input_tokens": 0,
+                "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": 0,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 0
+                },
+                "output_tokens": 0,
+                "service_tier": "standard",
+                "inference_geo": "global",
+                "speed": "standard"
+              },
+              "input_transformations": [],
+              "diagnostics": null,
+              "context_management": null
+            },
+            "parent_tool_use_id": null,
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "uuid": "d1be1734-2bb9-485a-9943-5e73ae3c1fa1",
+            "timestamp": "2026-11-03T16:03:50.576Z",
+            "request_id": "req_011CggH5DJ9NPnvGPMRfQtUS",
+            "tool_use_meta": [
+              {
+                "id": "toolu_01XA5LvLSAZEij1hzyk3Ae5T",
+                "display_name": "Suggest Draft",
+                "server_display_name": "glass",
+                "tool_name": "suggest_draft"
+              }
+            ]
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_stop",
+              "index": 0
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "2ee45777-afee-468f-b2fc-045d392c067b",
+            "api_message_id": "msg_011CggH5DkvjWNuKae8GGpL7"
+          }
+        },
+        {
+          "in": {
+            "type": "control_request",
+            "request_id": "a873477d-631d-4466-a6ea-71c565b163be",
+            "request": {
+              "subtype": "mcp_message",
+              "server_name": "glass",
+              "message": {
+                "method": "tools/call",
+                "params": {
+                  "name": "suggest_draft",
+                  "arguments": {
+                    "path": "greet.ts",
+                    "side": "new",
+                    "line": 40,
+                    "body": "Off the diff."
+                  },
+                  "_meta": {
+                    "claudecode/toolUseId": "toolu_01XA5LvLSAZEij1hzyk3Ae5T",
+                    "progressToken": 3
+                  }
+                },
+                "jsonrpc": "2.0",
+                "id": 3
+              }
+            }
+          }
+        },
+        {
+          "out": {
+            "type": "control_response",
+            "response": {
+              "subtype": "success",
+              "request_id": "a873477d-631d-4466-a6ea-71c565b163be",
+              "response": {
+                "mcp_response": {
+                  "result": {
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "greet.ts line 40 on the new side is not a line of the diff, so it can't be a Suggested draft. Place it on a line inside the diff's hunks, or put the comment in your answer."
+                      }
+                    ],
+                    "isError": true
+                  },
+                  "jsonrpc": "2.0",
+                  "id": 3
+                }
+              }
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "message_delta",
+              "delta": {
+                "stop_reason": "tool_use",
+                "stop_sequence": null,
+                "stop_details": null,
+                "container": null
+              },
+              "usage": {
+                "input_tokens": 0,
+                "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": 0,
+                "output_tokens": 0,
+                "output_tokens_details": {
+                  "thinking_tokens": 0
+                }
+              },
+              "context_management": {
+                "applied_edits": []
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "c5f1b8a3-fe4f-47ac-a9c7-f7334816f833",
+            "api_message_id": "msg_011CggH5DkvjWNuKae8GGpL7"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "message_stop"
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "bb76f048-fa36-4bca-ade0-ab776d300b19",
+            "api_message_id": "msg_011CggH5DkvjWNuKae8GGpL7"
+          }
+        },
+        {
+          "in": {
+            "type": "user",
+            "message": {
+              "role": "user",
+              "content": [
+                {
+                  "type": "tool_result",
+                  "content": "greet.ts line 40 on the new side is not a line of the diff, so it can't be a Suggested draft. Place it on a line inside the diff's hunks, or put the comment in your answer.",
+                  "is_error": true,
+                  "tool_use_id": "toolu_01XA5LvLSAZEij1hzyk3Ae5T"
+                }
+              ]
+            },
+            "parent_tool_use_id": null,
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "uuid": "9482cebe-9a6f-4d91-bf92-50276f37bd1e",
+            "timestamp": "2026-11-03T16:03:50.586Z",
+            "tool_use_result": "Error: greet.ts line 40 on the new side is not a line of the diff, so it can't be a Suggested draft. Place it on a line inside the diff's hunks, or put the comment in your answer.",
+            "tool_result_meta": [
+              {
+                "id": "toolu_01XA5LvLSAZEij1hzyk3Ae5T",
+                "permission_decision": {
+                  "decision": "accept",
+                  "source": "config",
+                  "reason_type": "rule"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "in": {
+            "type": "system",
+            "subtype": "status",
+            "status": "requesting",
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "uuid": "8d904694-3499-48b9-8b9c-6d7dd286f786",
+            "user_message_uuids": ["92ff52e0-5ef6-4eff-9020-896ac40a9e2f"]
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "message_start",
+              "message": {
+                "model": "claude-haiku-5-5",
+                "id": "msg_011CggH5JEJbCb6o9qjnqTcf",
+                "type": "message",
+                "role": "assistant",
+                "content": [],
+                "container": null,
+                "stop_reason": null,
+                "stop_sequence": null,
+                "stop_details": null,
+                "usage": {
+                  "input_tokens": 0,
+                  "cache_creation_input_tokens": 0,
+                  "cache_read_input_tokens": 0,
+                  "cache_creation": {
+                    "ephemeral_5m_input_tokens": 0,
+                    "ephemeral_1h_input_tokens": 0
+                  },
+                  "output_tokens": 0,
+                  "service_tier": "standard",
+                  "inference_geo": "global",
+                  "speed": "standard"
+                },
+                "input_transformations": [],
+                "diagnostics": null,
+                "context_management": null
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "c908a5ae-301d-4063-9157-dd1e63976e88",
+            "ttft_ms": 667,
+            "thinking_display": "updates",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_start",
+              "index": 0,
+              "content_block": {
+                "type": "thinking",
+                "thinking": "",
+                "signature": ""
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "d5d7c595-5217-4c45-9a3e-0d85314b95bc",
+            "thinking_display": "updates",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "system",
+            "subtype": "thinking_tokens",
+            "estimated_tokens": 0,
+            "estimated_tokens_delta": 0,
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "uuid": "5e7d6888-24e5-4e42-9683-8a328f4ccd38",
+            "user_message_uuid": "92ff52e0-5ef6-4eff-9020-896ac40a9e2f"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "thinking_delta",
+                "thinking": "",
+                "estimated_tokens": 0
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "e12c5218-80d9-4078-80fc-7e4db6870148",
+            "thinking_display": "updates",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "thinking_delta",
+                "thinking": "",
+                "estimated_tokens": null
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "1ac7d145-438d-4298-bc41-1ba21e150099",
+            "thinking_display": "updates",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "system",
+            "subtype": "thinking_tokens",
+            "estimated_tokens": 0,
+            "estimated_tokens_delta": 0,
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "uuid": "c49383d6-a03e-496b-a4ac-16f75fee79bc",
+            "user_message_uuid": "92ff52e0-5ef6-4eff-9020-896ac40a9e2f"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 0,
+              "delta": {
+                "type": "signature_delta",
+                "signature": "CAQS8QkKEAgTGAI4AUIIdGhpbmtpbmcSDHzhdxxegLrzC1Tq8xoMK2lT0U7MJc9DUPkkIjBkCn6jm4UYP5I8+5Nt8jW6KEMeP0fSLvovx2AqsgB6beskixFvVDz99g0S5//LmDQqjgn6HxAtmDoviXo8Hut625N/cdugBHFN4SbeY+4pi4LM8LY4WBjZNrc0REMkCUhb+GEEHDcYaK7NZNHd4smdHkYszV7f+wzzazZ61DxbxJFbCxMH+uM90q6Whg9YeNidMb3j98W7sqylplu7ra/F38+DgnYR4Bq++SRAO7AAdH3TiGgevwBzzZ33xuwdsZlzY51nM9PAvRYCJXOtjq39FLlAeE4yElgBb8DbKUSzaiwLy93YagauLMjCT4Rw02Mh9/cZaNLoStwxcnnukMhebBJQtc8nxnJModqTv4Cl4MsVjlaJM1/fAPm8/1ux4g0WOw5iXG/v7/Lf5HyHs7ufSSuzcB5JrKN3hL5k+OoxAYV0k1ofRtb7l5JqvO8Ljgf57mLzZoNnFuQhN6OR1SXK5UPpL6jrmnGLnidhKD9t7VdLe4wmCrnVJIKDxqM8P3STLfq8L6G1YaBFLdIk+btxuXh7KfgoXBvrQZe6XqoRV4y0N3VDpvWeXcXuv3W8WwY5/Vg82tG1b6ghRggodnr3hp56TOQYipxa5khWBZ2QPUBs4VzcRvpxEorbblw7mnhMcMO68BeqbDvvxPxToS6pvdNk2VAP7NDb4lYCOHLyKpPs8lFa5Zbzp/TqeNdEj+paf1f1h0/OOWwYrtQPoIVCt0LQ2KVQ05tR32Y3TOnks4euIrT5FJo4h0TUc1DXGtrsM4MYfkaEluWGd2gptY2yYFLJzR5FYh3EoeVlWoeICgPJVANAOhdGueO6taQbz18Z63yVkPq/jv2gpdtv4ddMWUbTRKtEUQA6hpQb4Ipv+JLKVhj0F8qsQ0XHJ6S9t/Ks2MRRt7D/Y0gIf1parvC6jahR76O1wfdKzl2GGOiWqnVa7YJikLCvBAlijJbAlKjBWlO5JMrWPTWjhdO6oObqp8/xIcxFnA54jRgzq3UUi8VFSEAkijv/XKVMIDzD7x7jQyuOD8O5Uyj/pZ5mB+ErRCD6OWIQSGuQEdyf0KDhShuNeK9NmulEBr5kqxBykee2HiL62o9FMeYu8ylhaOeX1HYvhHeFCHECUofRBU6L0ydbZu0vjBhOT8hKmyq678jPvZiNNqIqHhna8KGYwkqCWuAqYP4LqzAm2j92WHTxkCGjYF5K38/tQtqBz9UFDD7gVFIKbST03TFgBdWIBvf5l8BuaQF5XnimBuqOI1MHW8KP45ht7IorC5ZVOWCYKjog9HEPsS6n3Zvzp0lv8V7kp0dnpW2VawRx5Y2mbEhWSuw9UiyeWyFT1wGpf7pS6Jy1e1DeY41c6HRV74gYozgBNH0KWOaGsLcr1KzAAXugWpwZrmV3O/xFFTnO9JKWOlg0aARH3BFHR/n10TXFJnidgZVVnWgi369FHVqLtRIRJ5NQKKHDn6KnNZUc52K0SNR+sT0hnfb8X/AhQeFdhukMfPFuqfOjC2VcKKhwESK+Rj6rWOXZ82q/9XYzGpFxnfRhEG9LMHN0q7AgwfPh9biWwD7pgH9TJeml1xVPa1FsTdQQWt1HeU2KhJWqsDj8kLD4B7QQdmWPQ0IDw4QLurBtixgB"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "1fff3b27-cea6-41dc-bd69-80aa9bf4560e",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "assistant",
+            "message": {
+              "model": "claude-haiku-5-5",
+              "id": "msg_011CggH5JEJbCb6o9qjnqTcf",
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "thinking",
+                  "thinking": "",
+                  "signature": "CAQS8QkKEAgTGAI4AUIIdGhpbmtpbmcSDHzhdxxegLrzC1Tq8xoMK2lT0U7MJc9DUPkkIjBkCn6jm4UYP5I8+5Nt8jW6KEMeP0fSLvovx2AqsgB6beskixFvVDz99g0S5//LmDQqjgn6HxAtmDoviXo8Hut625N/cdugBHFN4SbeY+4pi4LM8LY4WBjZNrc0REMkCUhb+GEEHDcYaK7NZNHd4smdHkYszV7f+wzzazZ61DxbxJFbCxMH+uM90q6Whg9YeNidMb3j98W7sqylplu7ra/F38+DgnYR4Bq++SRAO7AAdH3TiGgevwBzzZ33xuwdsZlzY51nM9PAvRYCJXOtjq39FLlAeE4yElgBb8DbKUSzaiwLy93YagauLMjCT4Rw02Mh9/cZaNLoStwxcnnukMhebBJQtc8nxnJModqTv4Cl4MsVjlaJM1/fAPm8/1ux4g0WOw5iXG/v7/Lf5HyHs7ufSSuzcB5JrKN3hL5k+OoxAYV0k1ofRtb7l5JqvO8Ljgf57mLzZoNnFuQhN6OR1SXK5UPpL6jrmnGLnidhKD9t7VdLe4wmCrnVJIKDxqM8P3STLfq8L6G1YaBFLdIk+btxuXh7KfgoXBvrQZe6XqoRV4y0N3VDpvWeXcXuv3W8WwY5/Vg82tG1b6ghRggodnr3hp56TOQYipxa5khWBZ2QPUBs4VzcRvpxEorbblw7mnhMcMO68BeqbDvvxPxToS6pvdNk2VAP7NDb4lYCOHLyKpPs8lFa5Zbzp/TqeNdEj+paf1f1h0/OOWwYrtQPoIVCt0LQ2KVQ05tR32Y3TOnks4euIrT5FJo4h0TUc1DXGtrsM4MYfkaEluWGd2gptY2yYFLJzR5FYh3EoeVlWoeICgPJVANAOhdGueO6taQbz18Z63yVkPq/jv2gpdtv4ddMWUbTRKtEUQA6hpQb4Ipv+JLKVhj0F8qsQ0XHJ6S9t/Ks2MRRt7D/Y0gIf1parvC6jahR76O1wfdKzl2GGOiWqnVa7YJikLCvBAlijJbAlKjBWlO5JMrWPTWjhdO6oObqp8/xIcxFnA54jRgzq3UUi8VFSEAkijv/XKVMIDzD7x7jQyuOD8O5Uyj/pZ5mB+ErRCD6OWIQSGuQEdyf0KDhShuNeK9NmulEBr5kqxBykee2HiL62o9FMeYu8ylhaOeX1HYvhHeFCHECUofRBU6L0ydbZu0vjBhOT8hKmyq678jPvZiNNqIqHhna8KGYwkqCWuAqYP4LqzAm2j92WHTxkCGjYF5K38/tQtqBz9UFDD7gVFIKbST03TFgBdWIBvf5l8BuaQF5XnimBuqOI1MHW8KP45ht7IorC5ZVOWCYKjog9HEPsS6n3Zvzp0lv8V7kp0dnpW2VawRx5Y2mbEhWSuw9UiyeWyFT1wGpf7pS6Jy1e1DeY41c6HRV74gYozgBNH0KWOaGsLcr1KzAAXugWpwZrmV3O/xFFTnO9JKWOlg0aARH3BFHR/n10TXFJnidgZVVnWgi369FHVqLtRIRJ5NQKKHDn6KnNZUc52K0SNR+sT0hnfb8X/AhQeFdhukMfPFuqfOjC2VcKKhwESK+Rj6rWOXZ82q/9XYzGpFxnfRhEG9LMHN0q7AgwfPh9biWwD7pgH9TJeml1xVPa1FsTdQQWt1HeU2KhJWqsDj8kLD4B7QQdmWPQ0IDw4QLurBtixgB"
+                }
+              ],
+              "container": null,
+              "stop_reason": null,
+              "stop_sequence": null,
+              "stop_details": null,
+              "usage": {
+                "input_tokens": 0,
+                "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": 0,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 0
+                },
+                "output_tokens": 0,
+                "service_tier": "standard",
+                "inference_geo": "global",
+                "speed": "standard"
+              },
+              "input_transformations": [],
+              "diagnostics": null,
+              "context_management": null
+            },
+            "parent_tool_use_id": null,
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "uuid": "f9e213c1-2a46-4211-beeb-c5c5fa355282",
+            "timestamp": "2026-11-03T16:03:52.062Z",
+            "request_id": "req_011CggH5Hk3Xbjgq6zCRWFkT",
+            "thinking_duration_ms": 660,
+            "thinking_display": "updates"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_stop",
+              "index": 0
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "482e51ad-2018-4d44-a38e-24799adbbf82",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_start",
+              "index": 1,
+              "content_block": {
+                "type": "text",
+                "text": ""
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "3aed217a-6426-4de6-b1ae-016412f42edb",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 1,
+              "delta": {
+                "type": "text_delta",
+                "text": "D"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "cf03b0a0-8df5-44b6-9820-91a38165a85c",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 1,
+              "delta": {
+                "type": "text_delta",
+                "text": "ONE\n\nThe"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "e3dc412d-2ceb-4e17-bda9-265a18ad9d53",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 1,
+              "delta": {
+                "type": "text_delta",
+                "text": " second dra"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "bbe17a2b-ff77-4540-8970-9b2306b9aa35",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 1,
+              "delta": {
+                "type": "text_delta",
+                "text": "ft was not posted."
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "4108d0d7-4159-4925-ac31-76eaf4e4ab5e",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 1,
+              "delta": {
+                "type": "text_delta",
+                "text": " Glass r"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "30f83584-fd03-4d26-9a44-7e6a4f94b736",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 1,
+              "delta": {
+                "type": "text_delta",
+                "text": "ejected line 40 "
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "e846c438-2429-4a99-8878-feaf98a2db65",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 1,
+              "delta": {
+                "type": "text_delta",
+                "text": "on the new side because it is"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "879b644f-73e0-4171-bd79-559117f5ad4f",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 1,
+              "delta": {
+                "type": "text_delta",
+                "text": " outside the diff's hun"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "c0b8eb48-0fe5-44d5-b28e-d8b251cc47bd",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 1,
+              "delta": {
+                "type": "text_delta",
+                "text": "ks."
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "aef719c0-5cf3-481f-bd27-1b9c237665b8",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 1,
+              "delta": {
+                "type": "text_delta",
+                "text": " The first draft on"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "bebfe7fb-c9ea-46ef-9fe3-64aa1626ab73",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 1,
+              "delta": {
+                "type": "text_delta",
+                "text": " line 2 went"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "ce66f0f2-da02-4686-8d9c-fbccdf5ca464",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 1,
+              "delta": {
+                "type": "text_delta",
+                "text": " through. The file has only"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "1af4ad14-503a-46d6-9084-da5749eb96cc",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 1,
+              "delta": {
+                "type": "text_delta",
+                "text": " 4 lines, so there"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "4d0ef397-9e9b-4e2c-baae-d3b6c67fabc6",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 1,
+              "delta": {
+                "type": "text_delta",
+                "text": " is no line 40 to att"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "f071261e-32f4-44bf-ae86-6669a885d7e4",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 1,
+              "delta": {
+                "type": "text_delta",
+                "text": "ach to. If"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "ffbe7b88-56e5-417e-8483-04b697858176",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 1,
+              "delta": {
+                "type": "text_delta",
+                "text": " you want that"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "2158f6b0-5df6-47ca-8281-7968be8a8a4f",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 1,
+              "delta": {
+                "type": "text_delta",
+                "text": " comment,"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "3468d500-9a68-46b3-9cf7-d2454f1dbd24",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 1,
+              "delta": {
+                "type": "text_delta",
+                "text": " I can"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "cc5bfb51-6fb8-441a-bacb-4854ff9e7778",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 1,
+              "delta": {
+                "type": "text_delta",
+                "text": " put it on a line inside the"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "ea5da04f-2d98-49bc-a7a5-52471d6c2994",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 1,
+              "delta": {
+                "type": "text_delta",
+                "text": " diff or"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "b90bc953-d587-4fd2-8f8b-99303c64187f",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 1,
+              "delta": {
+                "type": "text_delta",
+                "text": " include"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "cf740b1d-d7d9-4101-ba33-6cc0c8f219de",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 1,
+              "delta": {
+                "type": "text_delta",
+                "text": " it in my"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "538f9088-8e08-45e0-b01e-2d9fc56b3c23",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 1,
+              "delta": {
+                "type": "text_delta",
+                "text": " answer instead."
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "43c10581-4a32-4f51-b57e-67dd4dbad4f2",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "assistant",
+            "message": {
+              "model": "claude-haiku-5-5",
+              "id": "msg_011CggH5JEJbCb6o9qjnqTcf",
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "DONE\n\nThe second draft was not posted. Glass rejected line 40 on the new side because it is outside the diff's hunks. The first draft on line 2 went through. The file has only 4 lines, so there is no line 40 to attach to. If you want that comment, I can put it on a line inside the diff or include it in my answer instead."
+                }
+              ],
+              "container": null,
+              "stop_reason": null,
+              "stop_sequence": null,
+              "stop_details": null,
+              "usage": {
+                "input_tokens": 0,
+                "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": 0,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 0
+                },
+                "output_tokens": 0,
+                "service_tier": "standard",
+                "inference_geo": "global",
+                "speed": "standard"
+              },
+              "input_transformations": [],
+              "diagnostics": null,
+              "context_management": null
+            },
+            "parent_tool_use_id": null,
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "uuid": "1310a7c7-5fdc-47cf-98f5-7ff4d927a6bb",
+            "timestamp": "2026-11-03T16:03:52.528Z",
+            "request_id": "req_011CggH5Hk3Xbjgq6zCRWFkT"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_stop",
+              "index": 1
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "e3b93e90-03f1-4285-a9d1-3cdf2c8b74cc",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "message_delta",
+              "delta": {
+                "stop_reason": "end_turn",
+                "stop_sequence": null,
+                "stop_details": null,
+                "container": null
+              },
+              "usage": {
+                "input_tokens": 0,
+                "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": 0,
+                "output_tokens": 0,
+                "output_tokens_details": {
+                  "thinking_tokens": 0
+                }
+              },
+              "context_management": {
+                "applied_edits": []
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "b67f6bef-1790-4ccf-bca4-9f9a77534b10",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "message_stop"
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "45e9fee2-189f-4149-8243-c168aed138ff",
+            "api_message_id": "msg_011CggH5JEJbCb6o9qjnqTcf"
+          }
+        },
+        {
+          "in": {
+            "duration_api_ms": 4873,
+            "stop_reason": "end_turn",
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "total_cost_usd": 0,
+            "usage": {
+              "input_tokens": 0,
+              "cache_creation_input_tokens": 0,
+              "cache_read_input_tokens": 0,
+              "output_tokens": 0,
+              "output_tokens_details": {
+                "thinking_tokens": 0
+              },
+              "server_tool_use": {
+                "web_search_requests": 0,
+                "web_fetch_requests": 0
+              },
+              "service_tier": "standard",
+              "cache_creation": {
+                "ephemeral_1h_input_tokens": 0,
+                "ephemeral_5m_input_tokens": 0
+              },
+              "inference_geo": "global",
+              "iterations": [],
+              "speed": "standard",
+              "fallback_credit": null
+            },
+            "modelUsage": {
+              "claude-haiku-5-5": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0,
+                "webSearchRequests": 0,
+                "costUSD": 0,
+                "contextWindow": 0,
+                "maxOutputTokens": 0,
+                "thinkingTokens": 0,
+                "canonicalModel": "claude-haiku-5-5",
+                "provider": "firstParty",
+                "costBasis": "list"
+              }
+            },
+            "permission_denials": [],
+            "terminal_reason": "completed",
+            "fast_mode_state": "off",
+            "fast_mode_disabled_reason": "sdk_opt_in_required",
+            "subagent_stats": {
+              "spawned": 0,
+              "requested": {
+                "background": 0,
+                "foreground": 0,
+                "unset": 0
+              },
+              "started_in_background": 0,
+              "max_depth": 0,
+              "spawned_by_subagents": 0,
+              "completed": 0,
+              "failed": 0,
+              "killed": {
+                "parent": 0,
+                "user": 0,
+                "system": 0
+              },
+              "refused": {
+                "depth_limit": 0,
+                "concurrency_limit": 0,
+                "budget": 0
+              },
+              "by_type": {}
+            },
+            "safety_stops": 0,
+            "is_error": false,
+            "num_turns": 4,
+            "subtype": "success",
+            "api_error_status": null,
+            "result": "DONE\n\nThe second draft was not posted. Glass rejected line 40 on the new side because it is outside the diff's hunks. The first draft on line 2 went through. The file has only 4 lines, so there is no line 40 to attach to. If you want that comment, I can put it on a line inside the diff or include it in my answer instead.",
+            "ttft_ms": 927,
+            "type": "result",
+            "duration_ms": 4946,
+            "uuid": "9c4087bc-ce47-4454-a4ae-bc02f2fb64dc",
+            "ttft_stream_ms": 689,
+            "time_to_request_ms": 31,
+            "first_content_frame_ms": 690,
+            "user_message_uuid": "92ff52e0-5ef6-4eff-9020-896ac40a9e2f",
+            "user_message_uuids": ["92ff52e0-5ef6-4eff-9020-896ac40a9e2f"],
+            "request_sent_wall_ms": 1793721827634,
+            "first_request_input_tokens": 0,
+            "queued_turn_count": 0,
+            "result_index": 0,
+            "model_usage_since_last_result": {
+              "claude-haiku-5-5": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0,
+                "webSearchRequests": 0,
+                "costUSD": 0,
+                "contextWindow": 0,
+                "maxOutputTokens": 0,
+                "thinkingTokens": 0,
+                "canonicalModel": "claude-haiku-5-5",
+                "provider": "firstParty",
+                "costBasis": "list"
+              }
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "command_lifecycle",
+            "command_uuid": "92ff52e0-5ef6-4eff-9020-896ac40a9e2f",
+            "state": "completed",
+            "uuid": "b6d76971-ea3a-4e08-a10e-9ff3493ee2a2",
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
+          }
+        },
+        {
+          "in": {
+            "type": "system",
+            "subtype": "session_state_changed",
+            "state": "idle",
+            "sdk_host_only": true,
+            "uuid": "6cd8b86d-d84e-4c8b-bb97-9d4ffa657c1f",
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
+          }
+        },
+        {
+          "exit": 0
+        }
+      ]
+    }
+  ],
+  "calls": [
+    {
+      "args": {
+        "conversation": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+        "dir": "<folder>"
+      },
+      "info": null
+    }
+  ]
+}

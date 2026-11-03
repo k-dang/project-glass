@@ -161,6 +161,7 @@ export const startPiRpc = Effect.fnUntraced(function* (
   piCommand: string,
   folder: string,
   conversation?: string,
+  flags: ReadonlyArray<string> = [],
 ) {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
   const scope = yield* Scope.Scope
@@ -169,7 +170,12 @@ export const startPiRpc = Effect.fnUntraced(function* (
     .spawn(
       launchCommand(
         piCommand,
-        ["--mode", "rpc", ...(conversation === undefined ? [] : ["--session-id", conversation])],
+        [
+          "--mode",
+          "rpc",
+          ...(conversation === undefined ? [] : ["--session-id", conversation]),
+          ...flags,
+        ],
         { cwd: folder, extendEnv: true, forceKillAfter: "1 second" },
       ),
     )

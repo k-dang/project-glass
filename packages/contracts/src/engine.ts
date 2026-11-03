@@ -35,6 +35,11 @@ export const runnerIdentity = ({ engine, models }: EngineSettings): AgentRunnerI
   return { engine, model: `${provider}/${modelId}` }
 }
 
+export const agentModelOf = (settings: EngineSettings) =>
+  settings.engine === "claude-code"
+    ? settings.models["claude-code"]
+    : runnerIdentity(settings).model
+
 export const EngineFeature = Schema.Literals(["tours", "agentReviews"])
 
 export type EngineFeature = typeof EngineFeature.Type

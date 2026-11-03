@@ -1,4 +1,5 @@
-import { Schema } from "effect"
+import { Option, Schema } from "effect"
+import type { ToolCallPart } from "./agent"
 import { Revision } from "./revision"
 import { CheckoutRunReason } from "./checkoutRun"
 import { DiffSide } from "./discussion"
@@ -16,21 +17,25 @@ export const SuggestedDraft = Schema.Struct({
 
 export type SuggestedDraft = typeof SuggestedDraft.Type
 
-export const FollowUp = Schema.Struct({
-  message: FollowUpMessage,
-  answer: Schema.String,
-  suggestedDrafts: Schema.Array(SuggestedDraft),
-})
+export const SUGGEST_DRAFT_TOOL = "suggest_draft"
 
-export type FollowUp = typeof FollowUp.Type
+const decodeSuggestedDraft = Schema.decodeUnknownOption(Schema.fromJsonString(SuggestedDraft))
+
+export const acceptedSuggestedDraftOf = (call: typeof ToolCallPart.Type): SuggestedDraft | null =>
+  call.name === SUGGEST_DRAFT_TOOL && call.status === "done"
+    ? Option.getOrNull(decodeSuggestedDraft(call.input))
+    : null
 
 export const AgentReview = Schema.Struct({
   revision: Revision,
   writtenAt: Schema.DateTimeUtcFromString,
   /** The agent's whole review, opening with a bold sentence naming the PR's main risk. */
   markdown: Schema.String,
-  /** Oldest first. Writing the Agent review again starts without them. */
-  followUps: Schema.Array(FollowUp),
+  /**
+   * The Agent whose Turns are the Follow-ups, `null` until the first. Writing the Agent review again
+   * removes it.
+   */
+  agentId: Schema.NullOr(Schema.String),
 })
 
 export type AgentReview = typeof AgentReview.Type
@@ -59,14 +64,14 @@ export const AgentReviewState = Schema.Struct({
     }),
     Schema.Struct({ status: Schema.Literal("failed"), reason: AgentReviewFailure }),
     Schema.Struct({
-      status: Schema.Literal("following-up"),
+      status: Schema.Literal("starting-agent"),
       message: FollowUpMessage,
       startedAt: Schema.Number,
-      runner: Schema.NullOr(AgentRunnerIdentity),
+      runner: AgentRunnerIdentity,
     }),
     /** Keeps the message so the user can send it again. */
     Schema.Struct({
-      status: Schema.Literal("follow-up-failed"),
+      status: Schema.Literal("agent-start-failed"),
       message: FollowUpMessage,
       reason: AgentReviewFailure,
     }),

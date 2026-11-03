@@ -6,6 +6,8 @@ import {
   GitHubConnection,
   LinePlace,
   type TourState,
+  TranscriptSnapshot,
+  type Turn,
 } from "@glass/contracts"
 import { act, cleanup, render, screen, within } from "@testing-library/react"
 import userEvent, { PointerEventsCheckLevel } from "@testing-library/user-event"
@@ -28,6 +30,7 @@ export const mountTourWorkspace = (
     readonly viewedPaths?: ReadonlyArray<string>
     readonly initial?: TourState
     readonly agentReview?: AgentReviewState
+    readonly reviewAgentTurns?: ReadonlyArray<Turn>
   } = {},
 ) => {
   // happy-dom lays nothing out; give each diff scroller a viewport so its files render.
@@ -62,6 +65,8 @@ export const mountTourWorkspace = (
 
   const followUp = vi.fn<Handlers["FollowUpAgentReview"]>(() => Effect.void)
 
+  const sendMessage = vi.fn<Handlers["SendMessage"]>(() => Effect.void)
+
   const createDraft = vi.fn<Handlers["CreateDraft"]>(({ path, side, line, body }) =>
     Effect.succeed(
       new Draft({ id: `draft-${line}`, path, place: LinePlace.make({ side, line }), body }),
@@ -84,6 +89,15 @@ export const mountTourWorkspace = (
     WatchAgentReview: () =>
       Stream.make(options.agentReview ?? { review: null, job: { status: "idle" } }),
     FollowUpAgentReview: followUp,
+    WatchTranscript: () =>
+      Stream.make(
+        TranscriptSnapshot.make({
+          turns: options.reviewAgentTurns ?? [],
+          queued: [],
+          status: null,
+        }),
+      ),
+    SendMessage: sendMessage,
     CreateDraft: createDraft,
   })
 
@@ -99,6 +113,7 @@ export const mountTourWorkspace = (
     cancel,
     setViewed,
     followUp,
+    sendMessage,
     createDraft,
     startedAt,
     user: userEvent.setup({ pointerEventsCheck: PointerEventsCheckLevel.Never }),

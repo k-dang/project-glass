@@ -24,6 +24,7 @@ export type SubscribeLost = Effect.Effect<Stream.Stream<LostAgentIds>, never, Sc
 export interface PlacedAgent {
   readonly agent: Agent
   readonly folder: string
+  readonly forReview: boolean
 }
 
 export interface Placed {

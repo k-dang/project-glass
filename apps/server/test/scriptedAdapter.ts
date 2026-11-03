@@ -6,7 +6,9 @@ import {
   RequestNotWaiting,
   type SentMessage,
   SteerPart,
+  SUGGEST_DRAFT_TOOL,
   TextPart,
+  ToolCallPart,
   TurnDone,
   TurnEnded,
   type TurnEnding,
@@ -14,10 +16,12 @@ import {
 } from "@glass/contracts"
 import { DateTime, Deferred, Effect, Fiber, Scope } from "effect"
 import { randomUUID } from "node:crypto"
+import { readdirSync } from "node:fs"
 import { join } from "node:path"
 import type { AgentAdapter, AgentSession } from "../src/agentHost/adapter"
 import { notRunning } from "../src/agentHost/protocol"
 import { settleWith } from "../src/agentHost/requests"
+import { placeSuggestedDraft } from "../src/agentHost/suggestDraftTool"
 import { whenExists } from "./whenExists"
 
 interface Waiting {
@@ -33,7 +37,7 @@ export const scriptedAdapter = (gates: string): AgentAdapter => ({
       models: [{ id: "scripted", name: "Scripted", efforts: [] }],
     }),
   ),
-  start: ({ report }) =>
+  start: ({ folder, review, report }) =>
     Effect.gen(function* () {
       const scope = yield* Scope.Scope
 
@@ -70,6 +74,39 @@ export const scriptedAdapter = (gates: string): AgentAdapter => ({
               yield* part(turnId, SteerPart.make({ message: steer.message, images: steer.images }))
               yield* part(turnId, TextPart.make({ text: `Reply to: ${steer.message}` }))
             }
+          }
+
+          const suggestion = /^suggest (new|old):(\S+):(\d+) (.+)$/.exec(message)
+
+          if (suggestion !== null && review !== null) {
+            const [, side, path, line, body] = suggestion
+
+            const draft = {
+              path: path!,
+              side: side === "old" ? ("old" as const) : ("new" as const),
+              line: Number(line),
+              body: body!,
+            }
+
+            const { placed, text } = placeSuggestedDraft(review, draft)
+
+            yield* part(
+              turnId,
+              ToolCallPart.make({
+                toolCallId: randomUUID(),
+                name: SUGGEST_DRAFT_TOOL,
+                inputSummary: path!,
+                input: JSON.stringify(draft),
+                output: text,
+                status: placed ? "done" : "failed",
+                parentToolCallId: null,
+              }),
+            )
+          }
+
+          if (message === "show the review" && review !== null) {
+            yield* part(turnId, TextPart.make({ text: review.instructions }))
+            yield* part(turnId, TextPart.make({ text: readdirSync(folder).toSorted().join(",") }))
           }
 
           if (/ask permission/i.test(message)) {

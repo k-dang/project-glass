@@ -17,7 +17,7 @@ import { vi } from "vite-plus/test"
 import type { AgentAdapter, AgentSession } from "../src/agentHost/adapter"
 import { claudeAdapter, type ClaudeSdk } from "../src/agentHost/claudeAdapter"
 import { piAdapter } from "../src/agentHost/piAdapter"
-import type { TurnSettings } from "../src/agentHost/protocol"
+import type { ReviewBrief, TurnSettings } from "../src/agentHost/protocol"
 import { bundledPi, bundledPiProgram } from "./demoAgent"
 import { type FakeModelSettings, fakeModelProvider } from "./fakeModelProvider"
 import { isolatedHome } from "./harness"
@@ -66,8 +66,8 @@ const drive = Effect.fnUntraced(function* (
     Effect.map((current) => waiting(current)!),
   )
 
-  const open = (conversation: string) =>
-    adapter.start({ folder, conversation, report }).pipe(
+  const open = (conversation: string, review: ReviewBrief | null = null) =>
+    adapter.start({ folder, conversation, review, report }).pipe(
       Effect.map((session: AgentSession) => ({
         session,
         configure: (settings: Partial<TurnSettings>) =>
@@ -93,8 +93,16 @@ const drive = Effect.fnUntraced(function* (
       })),
     )
 
-  return { adapter, events, turns: SubscriptionRef.get(turns), until, request, open }
+  return { adapter, folder, events, turns: SubscriptionRef.get(turns), until, request, open }
 })
+
+export const reviewBrief: ReviewBrief = {
+  instructions: "You answer a reviewer's questions about a pull request that changes greet.ts.",
+  diffLines: { old: {}, new: { "greet.ts": [1, 2] } },
+}
+
+export const writeGreeter = (folder: string) =>
+  Effect.sync(() => writeFileSync(join(folder, "greet.ts"), "hi\nhello name\nbye\n"))
 
 export const claudeSession = Effect.fnUntraced(function* (scenario: string) {
   const folder = yield* isolatedHome
@@ -142,6 +150,7 @@ export const piSession = Effect.fnUntraced(function* (
 
   const adapter = yield* piAdapter(bundledPi).pipe(
     Effect.provide(tape.spawner.pipe(Layer.provide(NodeServices.layer))),
+    Effect.provide(NodeServices.layer),
   )
 
   const extension = (name: string, source: string) =>

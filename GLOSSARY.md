@@ -99,9 +99,10 @@ _Avoid_: AI review, code review, critique
 
 **Follow-up**:
 A message the user sends about an Agent review, read beside it, and the agent's answer, which may
-include Suggested drafts. An Agent review keeps its Follow-ups until it is written again, and takes
-new ones only while it is current.
-_Avoid_: Chat, conversation, thread, Turn (a Turn belongs to an Agent)
+include Suggested drafts. Each one is a Turn of the Agent review's own Agent, which Glass starts on
+the first Follow-up. An Agent review keeps its Follow-ups until it is written again, and takes new
+ones only while it is current.
+_Avoid_: Chat, thread
 
 **Suggested draft**:
 A comment for the PR's author that the agent proposes in a Follow-up, on a line of the diff. It
@@ -170,7 +171,7 @@ _Avoid_: Task, action item
 
 **Agent**:
 One named conversation, started from Glass, with Claude Code or pi working in one place: a worktree on
-this device or a Sandbox.
+this device, a Sandbox, or, for an Agent review's Follow-ups, a checkout of the review's Revision.
 _Avoid_: Session, thread, bot, box
 
 **Agent program**:

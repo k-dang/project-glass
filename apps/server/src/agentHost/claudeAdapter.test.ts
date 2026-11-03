@@ -24,7 +24,7 @@ it.live("reports a failed SDK handshake as a host error and closes the query", (
       query: () => query,
       getSessionInfo: async () => undefined,
     })
-      .start({ folder: "checkout", conversation: "new", report: () => Effect.void })
+      .start({ folder: "checkout", conversation: "new", review: null, report: () => Effect.void })
       .pipe(Effect.scoped, Effect.flip)
 
     assert.equal(failed._tag, "HostAgentError")

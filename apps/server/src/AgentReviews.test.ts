@@ -3,13 +3,21 @@ import {
   type AgentEngine,
   AgentReviewFailure,
   type AgentReviewState,
+  applyTranscriptUpdate,
   defaultReviewPrompt,
+  emptyTranscript,
   PullRequestRef,
   Revision,
+  acceptedSuggestedDraftOf,
+  type Turn,
 } from "@glass/contracts"
-import { Effect, Exit, Option, Scope, Stream } from "effect"
+import { Effect, Exit, Option, Predicate, Scope, Stream } from "effect"
 import { TestClock } from "effect/testing"
-import { existsSync } from "node:fs"
+import { existsSync, mkdirSync, readdirSync } from "node:fs"
+import { join } from "node:path"
+import { fileURLToPath } from "node:url"
+import { vi } from "vite-plus/test"
+import { eventually } from "../test/eventually"
 import { startFakeGitHub } from "../test/fakeGitHub"
 import { VIEWER } from "../test/fakePullRequest"
 import { isolatedHome, startBackend } from "../test/harness"
@@ -24,6 +32,10 @@ const answer = {
 
 const deadline = 60_000
 
+const scriptedHost = fileURLToPath(new URL("../dist-test/scriptedAgentHost.mjs", import.meta.url))
+
+type BackendClient = Effect.Success<ReturnType<typeof startBackend>>["client"]
+
 const fixture = Effect.fnUntraced(function* (
   settings: ScriptedSettings = { reply: { answer } },
   engine: AgentEngine = "pi",
@@ -32,6 +44,9 @@ const fixture = Effect.fnUntraced(function* (
 
   const github = yield* startFakeGitHub({ git: true })
   const home = yield* isolatedHome
+  const gates = join(home, "gates")
+  mkdirSync(gates)
+  vi.stubEnv("GLASS_SCRIPTED_GATES", gates)
 
   const pr = github.seedPullRequest({
     title: "Greet people",
@@ -82,6 +97,7 @@ const fixture = Effect.fnUntraced(function* (
     GLASS_GITHUB_API_URL: github.url,
     GLASS_GIT_REMOTE: github.gitUrl,
     GLASS_AGENT_REVIEW_TIMEOUT_MS: String(deadline),
+    GLASS_AGENT_HOST_BUNDLE: scriptedHost,
   }
 
   const serverScope = yield* Scope.make()
@@ -109,6 +125,7 @@ const fixture = Effect.fnUntraced(function* (
   return {
     runners,
     github,
+    home,
     pr,
     ref,
     revision,
@@ -288,115 +305,116 @@ it.live("reviews on the engine chosen for Agent reviews", () =>
   }),
 )
 
-const followUpAnswer = {
-  markdown: "Yes: `greet.ts` line 2 drops the `!`.",
-  suggestedDrafts: [
-    { path: "greet.ts", side: "new", line: 2, body: "Could this keep the caller's `!`?" },
-    { path: "main.ts", side: "new", line: 1, body: "Unrelated aside." },
-  ],
-} as const
+const transcript = (
+  client: BackendClient,
+  agentId: string,
+  until: (turns: ReadonlyArray<Turn>) => boolean,
+) =>
+  client.WatchTranscript({ agentId }).pipe(
+    Stream.scan(() => emptyTranscript, applyTranscriptUpdate),
+    Stream.map(({ turns }) => turns),
+    Stream.filter(until),
+    Stream.runHead,
+    Effect.map(Option.getOrThrow),
+  )
 
-const followedUp = (state: AgentReviewState) =>
-  state.job.status === "idle" && (state.review?.followUps.length ?? 0) > 0
+const ended = (count: number) => (turns: ReadonlyArray<Turn>) =>
+  turns.length === count && turns.every((turn) => turn.ended !== null)
 
-it.live(
-  "follows up on the Agent review, keeping Drafts on diff lines and the thread across restarts",
-  () =>
-    Effect.gen(function* () {
-      const f = yield* fixture()
-      yield* f.start
-      const { review } = yield* f.state(reviewed)
+const texts = (turn: Turn | undefined) =>
+  (turn?.parts ?? []).flatMap((part) => (Predicate.isTagged(part, "Text") ? [part.text] : []))
 
-      yield* f.runners.configure({ reply: { answer: followUpAnswer } })
-      const message = "Draft a comment for the punctuation point."
-      yield* f.client.FollowUpAgentReview({ pullRequest: f.ref, revision: f.revision, message })
-      const done = yield* f.state(followedUp)
+const withAgent = (state: AgentReviewState) =>
+  state.job.status === "idle" && state.review?.agentId != null
 
-      const { prompt } = f.runners.runs.at(-1)!.task
-      assert.include(prompt, "+hello name")
-      assert.include(prompt, JSON.stringify(answer.markdown))
-      assert.include(prompt, message)
+const followUp = (f: Effect.Success<ReturnType<typeof fixture>>, message: string) =>
+  f.client.FollowUpAgentReview({ pullRequest: f.ref, revision: f.revision, message })
 
-      const [followUp] = done.review!.followUps
-      assert.strictEqual(followUp?.message, message)
-      assert.deepStrictEqual(followUp?.suggestedDrafts, [followUpAnswer.suggestedDrafts[0]])
-      assert.include(followUp?.answer, followUpAnswer.markdown)
-      assert.include(followUp?.answer, "`main.ts` line 1:\n\n> Unrelated aside.")
-      assert.strictEqual(done.review?.markdown, review?.markdown)
+it.live("starts the review's Agent in a checkout of its Revision, sending it every Follow-up", () =>
+  Effect.gen(function* () {
+    const f = yield* fixture()
+    yield* f.start
+    const { review } = yield* f.state(reviewed)
 
-      assert.deepStrictEqual(yield* f.restart, done)
-    }),
+    yield* followUp(f, "show the review")
+    const started = yield* f.state(withAgent)
+    const agentId = started.review!.agentId!
+    assert.strictEqual(started.review?.markdown, review?.markdown)
+
+    const [first] = yield* transcript(f.client, agentId, ended(1))
+    const [instructions, files] = texts(first)
+    assert.strictEqual(first?.message, "show the review")
+    assert.include(instructions, defaultReviewPrompt)
+    assert.include(instructions, "+hello name")
+    assert.include(instructions, "Why a name?")
+    assert.include(instructions, JSON.stringify(answer.markdown))
+    assert.strictEqual(files, "greet.ts,main.ts,src")
+
+    yield* followUp(f, "And the rename?")
+    const turns = yield* transcript(f.client, agentId, ended(2))
+    assert.deepStrictEqual(texts(turns[1]), ["Reply to: And the rename?"])
+
+    const listed = yield* f.client.WatchAgents().pipe(Stream.runHead)
+    assert.deepStrictEqual(Option.getOrThrow(listed), [])
+    assert.deepStrictEqual(yield* f.restart, started)
+  }),
 )
 
-it.live("starts the thread over when the Agent review is written again", () =>
+it.live("keeps the Suggested drafts the agent places on lines of the diff", () =>
   Effect.gen(function* () {
     const f = yield* fixture()
     yield* f.start
     yield* f.state(reviewed)
 
-    yield* f.runners.configure({ reply: { answer: followUpAnswer } })
-    yield* f.client.FollowUpAgentReview({
-      pullRequest: f.ref,
-      revision: f.revision,
-      message: "Why?",
-    })
-    yield* f.state(followedUp)
+    yield* followUp(f, "suggest new:greet.ts:2 Could this keep the caller's `!`?")
+    const agentId = (yield* f.state(withAgent)).review!.agentId!
+    yield* followUp(f, "suggest new:main.ts:1 Unrelated aside.")
+    yield* followUp(f, "suggest old:greet.ts:1 Why drop hello?")
 
-    yield* f.runners.configure({ reply: { answer: answer } })
-    yield* f.start
+    const turns = yield* transcript(f.client, agentId, ended(3))
 
-    const rewritten = yield* f.state(
-      (state) => reviewed(state) && state.review?.followUps.length === 0,
+    const suggested = turns.map((turn) =>
+      turn.parts.flatMap((part) =>
+        Predicate.isTagged(part, "ToolCall") ? [acceptedSuggestedDraftOf(part)] : [],
+      ),
     )
 
+    assert.deepStrictEqual(suggested, [
+      [{ path: "greet.ts", side: "new", line: 2, body: "Could this keep the caller's `!`?" }],
+      [null],
+      [{ path: "greet.ts", side: "old", line: 1, body: "Why drop hello?" }],
+    ])
+  }),
+)
+
+it.live("removes the Agent and its checkout when the Agent review is written again", () =>
+  Effect.gen(function* () {
+    const f = yield* fixture()
+    yield* f.start
+    yield* f.state(reviewed)
+
+    yield* followUp(f, "Why?")
+    const agentId = (yield* f.state(withAgent)).review!.agentId!
+    yield* transcript(f.client, agentId, ended(1))
+    const checkouts = join(f.home, ".project-glass", "agent-review-checkouts")
+    assert.lengthOf(readdirSync(checkouts), 1)
+
+    yield* f.start
+    const rewritten = yield* f.state((state) => reviewed(state) && state.review?.agentId === null)
     assert.strictEqual(rewritten.review?.markdown, answer.markdown)
-    assert.deepStrictEqual((yield* f.restart).review?.followUps, [])
+
+    yield* eventually(Effect.sync(() => assert.isEmpty(readdirSync(checkouts))))
+    const gone = yield* f.client.WatchTranscript({ agentId }).pipe(Stream.runHead, Effect.flip)
+    assert.strictEqual(gone._tag, "AgentNotFound")
+    assert.strictEqual((yield* f.restart).review?.agentId, null)
   }),
 )
 
-it.live("keeps the answer and valid Drafts when other suggestions have malformed placements", () =>
+it.live("refuses a follow-up on another Revision without starting the Agent", () =>
   Effect.gen(function* () {
     const f = yield* fixture()
     yield* f.start
-    yield* f.state(reviewed)
-
-    const valid = followUpAnswer.suggestedDrafts[0]
-
-    const unplaced = [
-      { ...valid, line: 0, body: "A comment on line zero." },
-      { ...valid, line: 1.5, body: "A comment on a fractional line." },
-      { ...valid, side: "RIGHT", body: "A comment with an invalid side." },
-      { body: "A comment without a location." },
-    ]
-
-    yield* f.runners.configure({
-      reply: {
-        answer: { markdown: followUpAnswer.markdown, suggestedDrafts: [valid, ...unplaced] },
-      },
-    })
-    yield* f.client.FollowUpAgentReview({
-      pullRequest: f.ref,
-      revision: f.revision,
-      message: "Draft these comments.",
-    })
-
-    const done = yield* f.state(followedUp)
-    const [followUp] = done.review!.followUps
-    assert.deepStrictEqual(followUp!.suggestedDrafts, [valid])
-    assert.include(followUp!.answer, followUpAnswer.markdown)
-
-    for (const { body } of unplaced) assert.include(followUp!.answer, `> ${body}`)
-
-    assert.deepStrictEqual(yield* f.restart, done)
-  }),
-)
-
-it.live("refuses a follow-up on another Revision without running the agent", () =>
-  Effect.gen(function* () {
-    const f = yield* fixture()
-    yield* f.start
-    yield* f.state(reviewed)
-    const before = f.runners.runs.length
+    const { review } = yield* f.state(reviewed)
 
     const error = yield* f.client
       .FollowUpAgentReview({
@@ -408,56 +426,44 @@ it.live("refuses a follow-up on another Revision without running the agent", () 
 
     assert.instanceOf(error, AgentReviewFailure)
     assert.strictEqual(error.reason, "stale-revision")
-    assert.strictEqual(f.runners.runs.length, before)
+    assert.deepStrictEqual((yield* f.state(reviewed)).review, review)
   }),
 )
 
-it.live("keeps the message of a failed follow-up and leaves the thread as it was", () =>
+it.live("keeps the message of a follow-up whose Agent couldn't start", () =>
   Effect.gen(function* () {
     const f = yield* fixture()
     yield* f.start
     const { review } = yield* f.state(reviewed)
+    f.pr.push({ head: { sha: "h2", files: { "greet.ts": "hey\n" } } })
 
-    yield* f.runners.configure({ reply: { answer: { markdown: " \n", suggestedDrafts: [] } } })
-    yield* f.client.FollowUpAgentReview({
-      pullRequest: f.ref,
-      revision: f.revision,
-      message: "Why?",
-    })
+    yield* followUp(f, "Why?")
 
     const { job, review: after } = yield* f.state(
-      (state) => state.job.status === "follow-up-failed",
+      (state) => state.job.status === "agent-start-failed",
     )
 
-    assert.strictEqual(job.status === "follow-up-failed" && job.message, "Why?")
-    assert.strictEqual(job.status === "follow-up-failed" && job.reason.reason, "unusable-output")
+    assert.strictEqual(job.status === "agent-start-failed" && job.message, "Why?")
+    assert.strictEqual(job.status === "agent-start-failed" && job.reason.reason, "stale-revision")
     assert.deepStrictEqual(after, review)
+    const checkouts = join(f.home, ".project-glass", "agent-review-checkouts")
+    assert.isEmpty(existsSync(checkouts) ? readdirSync(checkouts) : [])
   }),
 )
 
-it.live("refuses a second follow-up while one runs, and lets writing the review replace it", () =>
+it.live("refuses a follow-up while the Agent review is written again", () =>
   Effect.gen(function* () {
     const f = yield* fixture()
     yield* f.start
     yield* f.state(reviewed)
 
     yield* f.runners.configure({ reply: "hold" })
-    const first = { pullRequest: f.ref, revision: f.revision, message: "Why?" }
-    yield* f.client.FollowUpAgentReview(first)
+    yield* f.start
     yield* f.runners.ran(2)
 
-    const error = yield* f.client
-      .FollowUpAgentReview({ ...first, message: "And this?" })
-      .pipe(Effect.flip)
+    const error = yield* followUp(f, "Why?").pipe(Effect.flip)
 
     assert.instanceOf(error, AgentReviewFailure)
     assert.strictEqual(error.reason, "not-ready")
-    const running = yield* f.state((state) => state.job.status === "following-up")
-    assert.strictEqual(running.job.status === "following-up" && running.job.message, "Why?")
-
-    yield* f.runners.configure({ reply: { answer } })
-    yield* f.start
-    yield* f.runners.interrupted(1)
-    yield* f.state((state) => reviewed(state) && state.review?.followUps.length === 0)
   }),
 )

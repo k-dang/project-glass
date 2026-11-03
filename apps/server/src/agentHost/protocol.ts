@@ -51,6 +51,15 @@ export const TurnSettings = Schema.Struct({
 
 export type TurnSettings = typeof TurnSettings.Type
 
+const LinesByPath = Schema.Record(Schema.String, Schema.Array(Schema.Int))
+
+export const ReviewBrief = Schema.Struct({
+  instructions: Schema.String,
+  diffLines: Schema.Struct({ old: LinesByPath, new: LinesByPath }),
+})
+
+export type ReviewBrief = typeof ReviewBrief.Type
+
 export class HostAgentError extends Schema.TaggedError<HostAgentError>()("HostAgentError", {
   message: Schema.String,
 }) {}
@@ -62,7 +71,12 @@ export class AgentHostRpcs extends RpcGroup.make(
     error: HostAgentError,
   }),
   Rpc.make("StartAgent", {
-    payload: { agentId: Schema.String, engine: AgentEngine, folder: HostFolder },
+    payload: {
+      agentId: Schema.String,
+      engine: AgentEngine,
+      folder: HostFolder,
+      review: Schema.NullOr(ReviewBrief),
+    },
     error: HostAgentError,
   }),
   /** Starts a Turn the backend has recorded; its parts and ending arrive through WatchJournal. */

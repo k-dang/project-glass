@@ -1,7 +1,8 @@
 # Every Agent runs in an agent host, on this device or in a Sandbox
 
 > Sandbox providers now create Sandboxes and start the host in them (ADR 0008); Glass no longer
-> provisions them itself.
+> provisions them itself. An Agent review's Follow-ups run as a read-only Agent in a checkout of
+> the review's Revision written from the cached clone, since it never commits (ADR 0009).
 
 Agents run on this device and in Sandboxes, and Glass must render a
 structured transcript, answer Permission requests, Steer, and survive dropped connections for both. So

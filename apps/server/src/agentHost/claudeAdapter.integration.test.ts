@@ -6,13 +6,14 @@ import {
   Image,
   isRequestPart,
   SteerPart,
+  acceptedSuggestedDraftOf,
   TextPart,
   type Turn,
   TurnDone,
   TurnStopped,
 } from "@glass/contracts"
 import { Effect, Predicate } from "effect"
-import { claudeSession, run } from "../../test/adapterSessions"
+import { claudeSession, reviewBrief, run, writeGreeter } from "../../test/adapterSessions"
 import { settled } from "../../test/agentsFixture"
 
 const conversation = "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
@@ -249,5 +250,39 @@ it.live("runs the next Turn in a newly chosen Permission mode", () =>
 
     assert.deepStrictEqual(second?.ended?.ending, TurnDone.make({}))
     assert.isUndefined(second?.parts.find(isRequestPart))
+  }).pipe(Effect.scoped),
+)
+
+it.live("reads its checkout and proposes Suggested drafts as an Agent review's Agent", () =>
+  Effect.gen(function* () {
+    const f = yield* claudeSession("claude-review")
+    yield* writeGreeter(f.folder)
+    const agent = yield* f.open(conversation, reviewBrief)
+
+    yield* agent.send(
+      'Read greet.ts with the Read tool. Then call the suggest_draft tool exactly twice, one call after the other: first with path greet.ts, side new, line 2, and body "Keep the name."; then with path greet.ts, side new, line 40, and body "Off the diff.". Then reply with exactly: DONE',
+    )
+    const [turn] = yield* f.until(settled(1))
+    assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
+    assert.isFalse(turn!.parts.some(isRequestPart))
+
+    const calls = turn!.parts.filter((part) => Predicate.isTagged(part, "ToolCall"))
+    assert.includeMembers(
+      ["Read", "Grep", "Glob", "suggest_draft"],
+      [...new Set(calls.map(({ name }) => name))],
+    )
+
+    const suggestions = calls.filter(({ name }) => name === "suggest_draft")
+    assert.deepStrictEqual(
+      suggestions.map(({ status }) => status),
+      ["done", "failed"],
+    )
+    assert.deepStrictEqual(acceptedSuggestedDraftOf(suggestions[0]!), {
+      path: "greet.ts",
+      side: "new",
+      line: 2,
+      body: "Keep the name.",
+    })
+    assert.include(suggestions[1]?.output, "not a line of the diff")
   }).pipe(Effect.scoped),
 )

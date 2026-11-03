@@ -4,13 +4,14 @@ import {
   type Image,
   isRequestPart,
   type RequestPart,
+  acceptedSuggestedDraftOf,
   TextPart,
   type Turn,
   TurnDone,
   TurnStopped,
 } from "@glass/contracts"
 import { Effect, Predicate } from "effect"
-import { piSession, run, waiting } from "../../test/adapterSessions"
+import { piSession, reviewBrief, run, waiting, writeGreeter } from "../../test/adapterSessions"
 import { settled } from "../../test/agentsFixture"
 import { PI_MODEL, PI_PROVIDER } from "../../test/piLogin"
 
@@ -418,5 +419,57 @@ it.live("stops a pi Turn while its extension's dialog waits", () =>
       .pipe(Effect.flip)
 
     assert.equal(refused._tag, "RequestNotWaiting")
+  }).pipe(Effect.scoped),
+)
+
+const draftOn = (line: number, body: string) => ({
+  toolCall: {
+    id: `suggest-${line}`,
+    name: "suggest_draft",
+    arguments: { path: "greet.ts", side: "new", line, body },
+  },
+})
+
+const reviewReplies = [
+  { toolCall: { id: "read-greet", name: "read", arguments: { path: "greet.ts" } } },
+  draftOn(2, "Keep the name."),
+  draftOn(40, "Off the diff."),
+  { text: "DONE" },
+]
+
+it.live("reads its checkout and proposes Suggested drafts as an Agent review's Agent", () =>
+  Effect.gen(function* () {
+    const f = yield* piSession("pi-review", {
+      fake: {
+        reply: ({ messages }) => [
+          reviewReplies[messages.filter(({ role }) => role === "tool").length] ?? { text: "DONE" },
+        ],
+      },
+    })
+
+    yield* writeGreeter(f.folder)
+    const agent = yield* f.open(conversation, reviewBrief)
+
+    yield* agent.send("Draft comments on greet.ts.")
+    const [turn] = yield* f.until(settled(1))
+    assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
+
+    const calls = turn!.parts.filter((part) => Predicate.isTagged(part, "ToolCall"))
+    assert.deepStrictEqual(
+      calls.map(({ name, status }) => [name, status]),
+      [
+        ["read", "done"],
+        ["suggest_draft", "done"],
+        ["suggest_draft", "failed"],
+      ],
+    )
+    assert.include(calls[0]?.output, "hello name")
+    assert.deepStrictEqual(acceptedSuggestedDraftOf(calls[1]!), {
+      path: "greet.ts",
+      side: "new",
+      line: 2,
+      body: "Keep the name.",
+    })
+    assert.include(calls[2]?.output, "not a line of the diff")
   }).pipe(Effect.scoped),
 )

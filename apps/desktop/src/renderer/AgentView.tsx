@@ -9,7 +9,6 @@ import {
   type Agent,
   emptyTranscript,
   asksPermission,
-  engineCapabilities,
   type Image,
   isWaiting,
   nothingUnsent,
@@ -18,6 +17,7 @@ import {
   type RequestPart,
   type SentMessage,
   sentOf,
+  type ToolCallPart,
   type Turn,
   type TurnEnd,
   type TurnPart,
@@ -41,7 +41,16 @@ import {
   Wrench,
   X,
 } from "lucide-react"
-import { memo, useCallback, useContext, useEffect, useRef, useState } from "react"
+import {
+  createContext,
+  memo,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react"
 import { Streamdown } from "streamdown"
 import { Button } from "@/components/ui/button"
 import { Bubble, BubbleContent } from "@/components/ui/bubble"
@@ -98,7 +107,7 @@ import { ModelPicker } from "./ModelPicker"
 import { PermissionModePicker } from "./PermissionModePicker"
 import { RequestCard, requestElementId } from "./RequestCard"
 import { ProblemAlert } from "./ProblemAlert"
-import { problemText, settledProblem, streamProblem } from "./problems"
+import { type Problem, problemText, settledProblem, streamProblem } from "./problems"
 import { rememberPlace } from "./savedPlace"
 
 const TURNS_PER_PAGE = 20
@@ -109,6 +118,11 @@ interface AgentTabs {
 }
 
 const SAVE_DELAY_MS = 400
+
+/** Shows some tool calls as something other than a call, or answers `null` to show the call itself. */
+export const ToolCallView = createContext<
+  ((call: typeof ToolCallPart.Type) => ReactNode | null) | null
+>(null)
 
 const lastSent = (
   turns: ReadonlyArray<Turn>,
@@ -154,12 +168,10 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
     () => emptyTranscript,
   )
 
-  const running = turns.at(-1)?.ended === null
   const [changesOpened, setChangesOpened] = useState(tab === "changes")
 
   if (tab === "changes" && !changesOpened) setChangesOpened(true)
 
-  const waiting = turns.at(-1)?.parts.find(isWaiting)
   const registry = useContext(RegistryContext)
 
   const reach = agent.sandbox?.reach
@@ -218,13 +230,7 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
         <Transcript agentId={agent.id} turns={turns} status={status} />
         {reach === "unreachable" && <UnreachableNotice agentId={agent.id} />}
         {gone === null ? (
-          <Composer
-            agent={agent}
-            running={running}
-            waiting={waiting}
-            turns={turns}
-            queued={queued}
-          />
+          <Composer agent={agent} turns={turns} queued={queued} />
         ) : (
           <output className="mx-auto block w-full max-w-3xl px-6 py-4 text-sm text-muted-foreground">
             {goneExplanation(gone)}
@@ -242,7 +248,12 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
   )
 }
 
-function Transcript(props: { agentId: string; turns: ReadonlyArray<Turn>; status: string | null }) {
+export function Transcript(props: {
+  agentId: string
+  turns: ReadonlyArray<Turn>
+  status: string | null
+  lead?: ReactNode
+}) {
   const [shown, setShown] = useState(TURNS_PER_PAGE)
   const hidden = Math.max(0, props.turns.length - shown)
   const showMore = () => setShown((count) => count + TURNS_PER_PAGE)
@@ -265,6 +276,7 @@ function Transcript(props: { agentId: string; turns: ReadonlyArray<Turn>; status
         <MessageScroller className="min-h-0 flex-1">
           <MessageScrollerViewport className="px-6 py-4">
             <MessageScrollerContent className="mx-auto w-full max-w-3xl">
+              {props.lead}
               {hidden > 0 && (
                 <div className="text-center">
                   <Button ref={showMoreWhenSeen} variant="ghost" size="sm" onClick={showMore}>
@@ -483,6 +495,8 @@ const PartView = memo(function PartView(props: {
   part: TurnPart
   nested: ReadonlyArray<NestedPart>
 }) {
+  const toolCallView = useContext(ToolCallView)
+
   return Match.value(props.part).pipe(
     Match.tagsExhaustive({
       Text: ({ text }) => <Streamdown className="text-sm">{text}</Streamdown>,
@@ -507,6 +521,10 @@ const PartView = memo(function PartView(props: {
         </Trace>
       ),
       ToolCall: (call) => {
+        const shown = toolCallView?.(call) ?? null
+
+        if (shown !== null) return shown
+
         const status = toolStatus[call.status]
 
         return (
@@ -565,16 +583,12 @@ const waitingNames = {
 
 const composerPlaceholder = (
   running: boolean,
-  canSteer: boolean,
   waiting: RequestPart | undefined,
+  idle = "Message the Agent",
 ) => {
   if (waiting !== undefined) return `Answer the ${waitingNames[waiting._tag]} above first`
 
-  if (!running) return "Message the Agent"
-
-  return canSteer
-    ? "Queue a message, or Steer the Agent with ⌘Enter"
-    : "Queue a message for when the Agent finishes"
+  return running ? "Queue a message, or Steer the Agent with ⌘Enter" : idle
 }
 
 function WaitingNotice(props: { waiting: RequestPart }) {
@@ -620,68 +634,91 @@ function UnreachableNotice({ agentId }: { agentId: string }) {
 
 function Composer(props: {
   agent: Agent
-  running: boolean
-  waiting: RequestPart | undefined
   turns: ReadonlyArray<Turn>
   queued: ReadonlyArray<QueuedMessage>
 }) {
-  const { agent, running, waiting } = props
-  const [composed, setComposed] = usePersistedComposer(agent.id)
-  const sent = useAtomValue(sendMessageAtom(agent.id))
-  const send = useAtomSet(sendMessageAtom(agent.id), { mode: "promiseExit" })
-  const steered = useAtomValue(steerAtom(agent.id))
-  const steer = useAtomSet(steerAtom(agent.id), { mode: "promiseExit" })
-  const stopped = useAtomValue(stopTurnAtom(agent.id))
-  const stop = useAtomSet(stopTurnAtom(agent.id))
+  const { agent } = props
   const changed = useAtomValue(changeModelAtom(agent.id))
   const changeModel = useAtomSet(changeModelAtom(agent.id))
   const modeChanged = useAtomValue(changePermissionModeAtom(agent.id))
   const changePermissionMode = useAtomSet(changePermissionModeAtom(agent.id))
-  const canSteer = engineCapabilities[agent.engine].steer
+
+  return (
+    <AgentComposer
+      agentId={agent.id}
+      turns={props.turns}
+      queued={props.queued}
+      problem={settledProblem(changed) ?? settledProblem(modeChanged)}
+      pickers={
+        <>
+          <ModelPicker
+            engine={agent.engine}
+            placeKey={placeKey(agent.place)}
+            model={agent.model}
+            effort={agent.effort}
+            onChange={changeModel}
+          />
+          {asksPermission(agent.place) && (
+            <PermissionModePicker
+              engine={agent.engine}
+              permissionMode={agent.permissionMode}
+              onChange={changePermissionMode}
+            />
+          )}
+        </>
+      }
+    />
+  )
+}
+
+export function AgentComposer(props: {
+  agentId: string
+  turns: ReadonlyArray<Turn>
+  queued: ReadonlyArray<QueuedMessage>
+  label?: string
+  idlePlaceholder?: string
+  textOnly?: boolean
+  problem?: Problem | null
+  pickers?: ReactNode
+}) {
+  const { agentId, turns } = props
+  const running = turns.at(-1)?.ended === null
+  const waiting = turns.at(-1)?.parts.find(isWaiting)
+  const [composed, setComposed] = usePersistedComposer(agentId)
+  const sent = useAtomValue(sendMessageAtom(agentId))
+  const send = useAtomSet(sendMessageAtom(agentId), { mode: "promiseExit" })
+  const steered = useAtomValue(steerAtom(agentId))
+  const steer = useAtomSet(steerAtom(agentId), { mode: "promiseExit" })
+  const stopped = useAtomValue(stopTurnAtom(agentId))
+  const stop = useAtomSet(stopTurnAtom(agentId))
 
   return (
     <>
       {props.queued.length > 0 && (
         <div className="px-6">
-          <QueuedMessages agentId={agent.id} queued={props.queued} running={running} />
+          <QueuedMessages agentId={agentId} queued={props.queued} running={running} />
         </div>
       )}
       <MessageBox
         composed={composed}
         setComposed={setComposed}
-        label="Message"
-        placeholder={composerPlaceholder(running, canSteer, waiting)}
+        label={props.label ?? "Message"}
+        textOnly={props.textOnly ?? false}
+        placeholder={composerPlaceholder(running, waiting, props.idlePlaceholder)}
         blocked={sent.waiting || steered.waiting || waiting !== undefined}
         problem={
           settledProblem(sent) ??
           settledProblem(steered) ??
           settledProblem(stopped) ??
-          settledProblem(changed) ??
-          settledProblem(modeChanged)
+          props.problem ??
+          null
         }
         send={async (message) => Exit.isSuccess(await send(message))}
-        steer={canSteer ? async (message) => Exit.isSuccess(await steer(message)) : null}
-        recall={lastSent(props.turns, props.queued)}
+        steer={async (message) => Exit.isSuccess(await steer(message))}
+        recall={lastSent(turns, props.queued)}
         onStop={running ? () => stop() : null}
         notice={waiting !== undefined && <WaitingNotice waiting={waiting} />}
-        pickers={
-          <>
-            <ModelPicker
-              engine={agent.engine}
-              placeKey={placeKey(agent.place)}
-              model={agent.model}
-              effort={agent.effort}
-              onChange={changeModel}
-            />
-            {asksPermission(agent.place) && (
-              <PermissionModePicker
-                engine={agent.engine}
-                permissionMode={agent.permissionMode}
-                onChange={changePermissionMode}
-              />
-            )}
-          </>
-        }
+        pickers={props.pickers}
       />
     </>
   )

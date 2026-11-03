@@ -42,7 +42,7 @@ export type FakeModelDelta =
       readonly toolCall: {
         readonly id: string
         readonly name: string
-        readonly arguments: Readonly<Record<string, string>>
+        readonly arguments: Readonly<Record<string, string | number>>
       }
     }
 
@@ -68,6 +68,9 @@ export const runCommands =
             },
           },
         ]
+
+/** The model the fake provider serves, as Glass's Settings name a pi model. */
+export const FAKE_PI_MODEL = { provider: "glass-test", modelId: "gpt-test" }
 
 export interface FakeModelSettings {
   readonly output?: string | ((input: typeof request.Type) => string)
@@ -240,8 +243,8 @@ export const fakeModelProvider = Effect.fnUntraced(function* (
     await writeFile(
       join(home, ".project-glass", "settings.json"),
       JSON.stringify({
-        tourModels: { pi: { provider: "glass-test", modelId: "gpt-test" } },
-        agentReviewModels: { pi: { provider: "glass-test", modelId: "gpt-test" } },
+        tourModels: { pi: FAKE_PI_MODEL },
+        agentReviewModels: { pi: FAKE_PI_MODEL },
       }),
     )
   })
