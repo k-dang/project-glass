@@ -331,6 +331,7 @@ export function Workspace(props: {
   const additions = files.reduce((sum, file) => sum + file.additions, 0)
   const deletions = files.reduce((sum, file) => sum + file.deletions, 0)
   const filePanelLabel = filePanelOpen ? "Hide file panel" : "Show file panel"
+  const noteCount = discussions.onLines.length + draftCount
 
   const filePanelToggle = (
     <Button
@@ -408,30 +409,25 @@ export function Workspace(props: {
         >
           <Tabs value={shownPanelTab} onValueChange={setPanelTab} className="min-h-0 flex-1 gap-0">
             <TabsList
-              variant="line"
               aria-label="File panel"
-              className="mt-1 w-full justify-start border-b px-2"
+              className="w-full justify-start gap-1 rounded-none border-b bg-transparent px-2 py-1 group-data-horizontal/tabs:h-9"
             >
-              <TabsTrigger value="tree" className="flex-none">
-                <FolderTree aria-hidden />
+              <FilePanelTabTrigger value="tree" icon={FolderTree}>
                 Tree
-              </TabsTrigger>
-              <TabsTrigger value="notes" className="flex-none">
-                <MessageCircle aria-hidden />
+              </FilePanelTabTrigger>
+              <FilePanelTabTrigger value="notes" icon={MessageCircle}>
                 Notes
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {discussions.onLines.length + draftCount}
-                </span>
-              </TabsTrigger>
-              <TabsTrigger value="tour" className="flex-none">
-                <Route aria-hidden />
+                {noteCount > 0 && (
+                  <span className="text-xs text-muted-foreground tabular-nums">{noteCount}</span>
+                )}
+              </FilePanelTabTrigger>
+              <FilePanelTabTrigger value="tour" icon={Route}>
                 Tour
-              </TabsTrigger>
+              </FilePanelTabTrigger>
               {agentReview.review !== null && (
-                <TabsTrigger value="agent-review" className="flex-none">
-                  <ScanSearch aria-hidden />
+                <FilePanelTabTrigger value="agent-review" icon={ScanSearch}>
                   Agent review
-                </TabsTrigger>
+                </FilePanelTabTrigger>
               )}
             </TabsList>
             <TabsContent value="tree" keepMounted className="flex min-h-0 flex-col">
@@ -612,6 +608,22 @@ export function Workspace(props: {
         <ReviewShortcutsDialog />
       </footer>
     </Tabs>
+  )
+}
+
+function FilePanelTabTrigger(props: {
+  value: FilePanelTab
+  icon: LucideIcon
+  children: ReactNode
+}) {
+  return (
+    <TabsTrigger
+      value={props.value}
+      className="h-6 flex-none rounded-md px-2 text-xs font-normal transition-none data-active:bg-muted dark:data-active:border-transparent dark:data-active:bg-muted group-data-[variant=default]/tabs-list:data-active:shadow-none"
+    >
+      <props.icon aria-hidden className="size-3" />
+      {props.children}
+    </TabsTrigger>
   )
 }
 

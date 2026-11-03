@@ -4,7 +4,7 @@ import { getRouteApi } from "@tanstack/react-router"
 import { Option } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import { cn } from "cn"
-import { FolderTree, type LucideIcon, MessageCircle, Route } from "lucide-react"
+import { FolderTree, MessageCircle, Route } from "lucide-react"
 import { type ReactNode, useCallback, useContext } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { BackToPullRequests } from "./BackToPullRequests"
@@ -127,10 +127,23 @@ function LoadingState(props: { pullRequest: PullRequestRef; onBack: () => void }
       </header>
       <div className="flex min-h-0 flex-1" aria-hidden>
         <div className="hidden w-80 shrink-0 flex-col border-r lg:flex">
-          <div className="mt-1 flex gap-4 border-b px-4 pt-2">
-            <TabStub icon={FolderTree} label="Tree" selected />
-            <TabStub icon={MessageCircle} label="Notes" />
-            <TabStub icon={Route} label="Tour" />
+          <div className="flex h-9 items-center gap-1 border-b px-2 py-1">
+            {[
+              { icon: FolderTree, label: "Tree" },
+              { icon: MessageCircle, label: "Notes" },
+              { icon: Route, label: "Tour" },
+            ].map(({ icon: Icon, label }, index) => (
+              <span
+                key={label}
+                className={cn(
+                  "flex h-6 items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground/60",
+                  index === 0 && "bg-muted",
+                )}
+              >
+                <Icon className="size-3" />
+                {label}
+              </span>
+            ))}
           </div>
           <div className="flex flex-col gap-2.5 p-4">
             {treeRows.map(({ depth, width }, index) => (
@@ -180,7 +193,7 @@ const treeRows = [
   { depth: 1, width: 65 },
 ]
 
-function TabStub(props: { icon?: LucideIcon; label: string; selected?: boolean }) {
+function TabStub(props: { label: string; selected?: boolean }) {
   return (
     <span
       className={cn(
@@ -188,7 +201,6 @@ function TabStub(props: { icon?: LucideIcon; label: string; selected?: boolean }
         props.selected && "border-foreground/30",
       )}
     >
-      {props.icon !== undefined && <props.icon className="size-4" />}
       {props.label}
     </span>
   )
