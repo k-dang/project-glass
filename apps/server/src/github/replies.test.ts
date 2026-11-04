@@ -88,6 +88,7 @@ describe("Replies", () => {
           avatarUrl: avatarUrl(VIEWER.login),
           bodyHtml: "<p>To greet them.</p>",
           createdAt: DateTime.makeUnsafe(published.createdAt),
+          reactions: [],
         }),
       )
 

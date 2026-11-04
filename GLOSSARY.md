@@ -144,6 +144,10 @@ _Avoid_: Conversation, comment chain
 A comment added to an existing Discussion.
 _Avoid_: Response, answer
 
+**Reaction**:
+One of GitHub's eight emoji a person gives a published comment, which publishes right away.
+_Avoid_: Emoji, like
+
 **Feedback state**:
 Where a piece of the user's feedback stands: draft, sending, confirmed by GitHub, or failed.
 _Avoid_: Sync status

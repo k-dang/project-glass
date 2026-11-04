@@ -10,12 +10,33 @@ export const OriginalLine = Schema.Union([Schema.Int, Schema.Literal("whole-file
 
 export type OriginalLine = typeof OriginalLine.Type
 
+export const Reaction = Schema.Literals([
+  "thumbs-up",
+  "thumbs-down",
+  "laugh",
+  "hooray",
+  "confused",
+  "heart",
+  "rocket",
+  "eyes",
+])
+
+export type Reaction = typeof Reaction.Type
+
+/** One Reaction on a comment that at least one person gave. */
+export class ReactionGroup extends Schema.Class<ReactionGroup>("ReactionGroup")({
+  reaction: Reaction,
+  count: Schema.Int,
+  reacted: Schema.Boolean,
+}) {}
+
 export class PublishedComment extends Schema.TaggedClass<PublishedComment>()("PublishedComment", {
   id: Schema.String,
   author: Schema.String,
   avatarUrl: Schema.NullOr(Schema.String),
   bodyHtml: Schema.String,
   createdAt: Schema.DateTimeUtcFromString,
+  reactions: Schema.Array(ReactionGroup),
 }) {}
 
 /** GitHub anchors multiline comments on their last line. */
@@ -56,3 +77,9 @@ export class DraftsBlockReply extends Schema.TaggedError<DraftsBlockReply>()(
 export const ReplyError = Schema.Union([DiscussionNotFound, DraftsBlockReply, ConnectionError])
 
 export const DiscussionResolutionError = Schema.Union([DiscussionNotFound, ConnectionError])
+
+export class CommentNotFound extends Schema.TaggedError<CommentNotFound>()("CommentNotFound", {
+  id: Schema.String,
+}) {}
+
+export const ReactionError = Schema.Union([CommentNotFound, ConnectionError])

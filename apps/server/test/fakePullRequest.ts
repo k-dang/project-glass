@@ -32,6 +32,16 @@ export interface FakeComment {
   readonly createdAt: string
 }
 
+export type FakeReactionContent =
+  | "THUMBS_UP"
+  | "THUMBS_DOWN"
+  | "LAUGH"
+  | "HOORAY"
+  | "CONFUSED"
+  | "HEART"
+  | "ROCKET"
+  | "EYES"
+
 export interface FakeReviewThread {
   readonly id: string
   readonly path: string
@@ -165,6 +175,7 @@ export class FakePullRequest {
   readonly comments: Array<FakeComment> = []
   readonly reviews: Array<FakeReview> = []
   readonly viewedPaths = new Set<string>()
+  readonly reactions = new Map<string, Map<FakeReactionContent, Set<string>>>()
   private readonly publishCommits: PublishCommits
   private readonly nextId: (prefix: string) => string
   private readonly now: () => string
@@ -375,6 +386,22 @@ export class FakePullRequest {
     this.addReview({ author: VIEWER.login, state: "COMMENTED" })
 
     return { comment, pending: false }
+  }
+
+  react(commentId: string, content: FakeReactionContent, login: string, reacted = true): boolean {
+    const comments = [...this.comments, ...this.reviewThreads.flatMap((thread) => thread.comments)]
+
+    if (!comments.some((comment) => comment.id === commentId)) return false
+
+    const groups = this.reactions.get(commentId) ?? new Map<FakeReactionContent, Set<string>>()
+    const logins = groups.get(content) ?? new Set<string>()
+
+    if (reacted) logins.add(login)
+    else logins.delete(login)
+
+    this.reactions.set(commentId, groups.set(content, logins))
+
+    return true
   }
 
   setResolved(threadId: string, resolved: boolean): boolean | undefined {

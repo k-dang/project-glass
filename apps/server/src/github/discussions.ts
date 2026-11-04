@@ -10,6 +10,7 @@ import {
 import { Array as Arr, DateTime, Predicate, Schema } from "effect"
 import { avatarUrl, GitHubAuthor, login } from "./author"
 import { fromGitHubSide, GitHubDiffSide } from "./diffSide"
+import { GitHubReactionGroups, REACTION_GROUPS, toReactionGroups } from "./reactions"
 
 export const REVIEW_THREADS_QUERY = `query PullRequestReviewThreads($id: ID!, $after: String) {
   node(id: $id) {
@@ -26,7 +27,7 @@ export const REVIEW_THREADS_QUERY = `query PullRequestReviewThreads($id: ID!, $a
           diffSide
           subjectType
           comments(first: 100) {
-            nodes { id author { login avatarUrl(size: 48) } body bodyHTML createdAt state diffHunk }
+            nodes { id author { login avatarUrl(size: 48) } body bodyHTML createdAt state diffHunk ${REACTION_GROUPS} }
           }
         }
       }
@@ -39,7 +40,7 @@ export const COMMENTS_QUERY = `query PullRequestComments($id: ID!, $after: Strin
     ... on PullRequest {
       connection: comments(first: 100, after: $after) {
         pageInfo { hasNextPage endCursor }
-        nodes { id author { login avatarUrl(size: 48) } bodyHTML createdAt }
+        nodes { id author { login avatarUrl(size: 48) } bodyHTML createdAt ${REACTION_GROUPS} }
       }
     }
   }
@@ -92,6 +93,7 @@ export const GitHubReviewThread = Schema.Struct({
         createdAt: Schema.DateTimeUtcFromString,
         state: Schema.Literals(["PENDING", "SUBMITTED"]),
         diffHunk: Schema.String,
+        reactionGroups: Schema.NullOr(GitHubReactionGroups),
       }),
     ),
   }),
@@ -102,6 +104,7 @@ export const GitHubComment = Schema.Struct({
   author: GitHubAuthor,
   bodyHTML: Schema.String,
   createdAt: Schema.DateTimeUtcFromString,
+  reactionGroups: Schema.NullOr(GitHubReactionGroups),
 })
 
 export const GitHubReview = Schema.Struct({
@@ -126,6 +129,7 @@ export const toComment = (comment: typeof GitHubComment.Type) =>
     avatarUrl: avatarUrl(comment.author),
     bodyHtml: comment.bodyHTML,
     createdAt: comment.createdAt,
+    reactions: toReactionGroups(comment.reactionGroups ?? []),
   })
 
 const timelineTime = (item: PublishedComment | Review) =>

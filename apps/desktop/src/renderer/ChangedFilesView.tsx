@@ -38,6 +38,7 @@ import { cn } from "cn"
 import { type AskStore, useLineAskPlaces } from "./useAsks"
 import { type DraftStore, useLineDraftPlaces } from "./useDrafts"
 import type { ReplyStore } from "./useReplies"
+import type { Reactions } from "./useReactions"
 import type { Resolutions } from "./useResolutions"
 import { type ViewedFilesStore, useViewedFiles } from "./useViewedFiles"
 
@@ -341,6 +342,7 @@ export interface ChangedFilesViewProps extends Omit<
   asks: AskStore
   replies: ReplyStore
   resolutions: Resolutions
+  reactions: Reactions
   onReload: () => void
   viewedFiles: ViewedFilesStore
   onViewedChange: (paths: ReadonlyArray<string>, viewed: boolean) => void
@@ -348,7 +350,7 @@ export interface ChangedFilesViewProps extends Omit<
 }
 
 export function ChangedFilesView(props: ChangedFilesViewProps) {
-  const { discussions, drafts, asks, replies, resolutions, ...rest } = props
+  const { discussions, drafts, asks, replies, resolutions, reactions, ...rest } = props
   const { onReload, viewedFiles, onViewedChange, ...diff } = rest
   const draftPlaces = useLineDraftPlaces(drafts)
   const askPlaces = useLineAskPlaces(asks)
@@ -410,9 +412,10 @@ export function ChangedFilesView(props: ChangedFilesViewProps) {
         asks,
         replies,
         resolutions,
+        reactions,
         onReload,
       }),
-    [drafts, asks, replies, resolutions, onReload],
+    [drafts, asks, replies, resolutions, reactions, onReload],
   )
 
   return (
@@ -431,11 +434,12 @@ interface NoteContext {
   readonly asks: AskStore
   readonly replies: ReplyStore
   readonly resolutions: Resolutions
+  readonly reactions: Reactions
   readonly onReload: () => void
 }
 
 function renderNote(note: LineNote, context: NoteContext) {
-  const { drafts, asks, replies, resolutions, onReload } = context
+  const { drafts, asks, replies, resolutions, reactions, onReload } = context
 
   if (note.type === "ask") {
     return (
@@ -464,7 +468,12 @@ function renderNote(note: LineNote, context: NoteContext) {
 
   return (
     <div className="px-3 py-2">
-      <DiscussionThread discussion={note.discussion} replies={replies} resolutions={resolutions} />
+      <DiscussionThread
+        discussion={note.discussion}
+        replies={replies}
+        resolutions={resolutions}
+        reactions={reactions}
+      />
     </div>
   )
 }

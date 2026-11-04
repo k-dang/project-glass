@@ -27,6 +27,7 @@ const comment = (id: string) =>
     avatarUrl: null,
     bodyHtml: "<p>Why?</p>",
     createdAt: DateTime.makeUnsafe("2026-01-01T00:00:00Z"),
+    reactions: [],
   })
 
 const discussion = (path: string, line: number, resolved = false, replies = 0) =>

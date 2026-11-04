@@ -2,6 +2,7 @@ import { Schema } from "effect"
 import { GitHubAuthor } from "./author"
 import { AddedDraft, DraftState } from "./drafts"
 import { ThreadResolution } from "./discussions"
+import { ReactionMutationPayload } from "./reactions"
 import { AddedReply } from "./replies"
 import { PULL_REQUEST_STATUS_FIELDS, PullRequestStatusFields } from "./pullRequestStatus"
 import {
@@ -197,6 +198,8 @@ export const DraftStateResponse = GraphQLResponse(DraftState)
 export const AddReplyResponse = GraphQLResponse(AddedReply)
 
 export const ThreadResolutionResponse = GraphQLResponse(ThreadResolution)
+
+export const ReactionMutationResponse = GraphQLResponse(ReactionMutationPayload)
 
 export const MutationResponse = GraphQLResponse(Schema.Record(Schema.String, Schema.Unknown))
 

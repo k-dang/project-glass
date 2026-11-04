@@ -33,6 +33,7 @@ const published = (comment: FakeComment) =>
     avatarUrl: comment.author === null ? null : avatarUrl(comment.author),
     bodyHtml: comment.bodyHtml,
     createdAt: DateTime.makeUnsafe(comment.createdAt),
+    reactions: [],
   })
 
 const review = (fake: FakeReview, state: ReviewState) =>

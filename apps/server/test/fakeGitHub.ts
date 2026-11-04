@@ -10,6 +10,7 @@ import { lineInPatch } from "../src/github/patchLines.ts"
 import {
   type FakeCheck,
   type FakeComment,
+  type FakeReactionContent,
   type FakeCommit,
   FakePullRequest,
   type FakePullRequestSeed,
@@ -187,6 +188,22 @@ const GraphQLRequest = Schema.Union([
     variables: Schema.Struct({ threadId: Schema.String }),
   }),
   Schema.Struct({
+    operationName: Schema.Literals(["AddReaction", "RemoveReaction"]),
+    variables: Schema.Struct({
+      subjectId: Schema.String,
+      content: Schema.Literals([
+        "THUMBS_UP",
+        "THUMBS_DOWN",
+        "LAUGH",
+        "HOORAY",
+        "CONFUSED",
+        "HEART",
+        "ROCKET",
+        "EYES",
+      ]),
+    }),
+  }),
+  Schema.Struct({
     operationName: Schema.Literal("RepositoryBranches"),
     variables: Schema.Struct({
       owner: Schema.String,
@@ -200,11 +217,19 @@ const GraphQLDocument = Schema.Struct({ operationName: Schema.String, query: Sch
 
 export type FakeGraphQLRequest = typeof GraphQLRequest.Type
 
-const commentNode = (comment: FakeComment) => ({
+const reactionGroups = (pr: FakePullRequest | undefined, commentId: string) =>
+  [...(pr?.reactions.get(commentId) ?? [])].map(([content, logins]) => ({
+    content,
+    reactors: { totalCount: logins.size },
+    viewerHasReacted: logins.has(VIEWER.login),
+  }))
+
+const commentNode = (comment: FakeComment, pr?: FakePullRequest) => ({
   id: comment.id,
   author: author(comment.author),
   bodyHTML: comment.bodyHtml,
   createdAt: comment.createdAt,
+  reactionGroups: reactionGroups(pr, comment.id),
 })
 
 const DRAFT_CREATED_AT = "2026-01-01T00:00:00Z"
@@ -221,6 +246,7 @@ const reviewThreads = (pr: FakePullRequest) => [
         createdAt: comment.createdAt,
         state: "SUBMITTED",
         diffHunk: thread.diffHunk,
+        reactionGroups: reactionGroups(pr, comment.id),
       })),
     ),
   ),
@@ -234,6 +260,7 @@ const reviewThreads = (pr: FakePullRequest) => [
         createdAt: DRAFT_CREATED_AT,
         state: "PENDING",
         diffHunk: draft.diffHunk,
+        reactionGroups: [],
       },
     ]),
   ),
@@ -303,7 +330,8 @@ const connections = {
     })),
   PullRequestReviewRequests: reviewRequestNodes,
   PullRequestReviewThreads: reviewThreads,
-  PullRequestComments: (pr: FakePullRequest) => pr.comments.map(commentNode),
+  PullRequestComments: (pr: FakePullRequest) =>
+    pr.comments.map((comment) => commentNode(comment, pr)),
   PullRequestReviews: (pr: FakePullRequest) => [
     ...pr.reviews.map((review) => ({
       id: review.id,
@@ -781,6 +809,21 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
     return unresolvedMutationNode(field, threadId)
   }
 
+  const setReaction = (
+    operationName: "AddReaction" | "RemoveReaction",
+    { subjectId, content }: { readonly subjectId: string; readonly content: FakeReactionContent },
+  ) => {
+    const field = operationName === "AddReaction" ? "addReaction" : "removeReaction"
+
+    const pr = pullRequests.find((candidate) =>
+      candidate.react(subjectId, content, VIEWER.login, operationName === "AddReaction"),
+    )
+
+    if (pr === undefined) return unresolvedMutationNode(field, subjectId)
+
+    return { data: { [field]: { subject: { reactionGroups: reactionGroups(pr, subjectId) } } } }
+  }
+
   const answerGraphQL = (request: typeof GraphQLRequest.Type) => {
     switch (request.operationName) {
       case "PullRequest":
@@ -873,6 +916,10 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
       case "ResolveReviewThread":
       case "UnresolveReviewThread":
         return setThreadResolved(request.operationName, request.variables.threadId)
+
+      case "AddReaction":
+      case "RemoveReaction":
+        return setReaction(request.operationName, request.variables)
 
       case "RepositoryBranches": {
         const { owner, name, after } = request.variables

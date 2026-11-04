@@ -29,7 +29,15 @@ import {
   TranscriptUpdate,
 } from "./agent"
 import { ConnectionError, GitHubConnection } from "./connection"
-import { DiffSide, DiscussionResolutionError, PublishedComment, ReplyError } from "./discussion"
+import {
+  DiffSide,
+  DiscussionResolutionError,
+  PublishedComment,
+  Reaction,
+  ReactionError,
+  ReactionGroup,
+  ReplyError,
+} from "./discussion"
 import { CreateDraftError, Draft, UpdateDraftError } from "./draft"
 import { EngineFeature, EngineSettings } from "./engine"
 import { FollowedRepository, InvalidRepositoryInput } from "./followedRepository"
@@ -249,6 +257,11 @@ export class GlassRpcs extends RpcGroup.make(
     payload: { discussionId: Schema.String, resolved: Schema.Boolean },
     success: Schema.Boolean,
     error: DiscussionResolutionError,
+  }),
+  Rpc.make("SetReaction", {
+    payload: { commentId: Schema.String, reaction: Reaction, reacted: Schema.Boolean },
+    success: Schema.Array(ReactionGroup),
+    error: ReactionError,
   }),
   Rpc.make("RecordActivity", { payload: Activity }),
   Rpc.make("ListActivity", {

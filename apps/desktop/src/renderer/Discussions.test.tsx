@@ -7,6 +7,7 @@ import { DateTime, Effect } from "effect"
 import { afterEach, expect, it } from "vite-plus/test"
 import { DiscussionThread } from "./Discussions"
 import { ReplyStore } from "./useReplies"
+import { createReactions } from "./useReactions"
 import { createResolutions } from "./useResolutions"
 import { type Held, hold, next, testRegistry } from "../../test/testBackend"
 import { recordedPullRequest } from "../../test/workspace"
@@ -25,6 +26,7 @@ const discussion = (resolved: boolean) =>
         avatarUrl: null,
         bodyHtml: "<p>Why there?</p>",
         createdAt: DateTime.makeUnsafe("2026-01-01T00:00:00Z"),
+        reactions: [],
       }),
     ],
   })
@@ -54,6 +56,7 @@ const renderThread = (resolved: boolean) => {
         discussion={discussion(resolved)}
         replies={new ReplyStore(registry, recordedPullRequest, () => {})}
         resolutions={resolutions}
+        reactions={createReactions(registry)}
       />
     </RegistryContext.Provider>,
   )
