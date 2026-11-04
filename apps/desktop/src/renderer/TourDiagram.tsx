@@ -1,6 +1,6 @@
 import type { TourDiagram as Diagram, TourDiagramNode } from "@glass/contracts"
-import { useEffect, useEffectEvent, useId, useLayoutEffect, useRef, useState } from "react"
-import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react"
+import { useId, useLayoutEffect, useRef, useState } from "react"
+import { ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 interface Box {
@@ -44,12 +44,10 @@ export function TourDiagram(props: {
 }) {
   const { diagram } = props
   const marker = useId().replaceAll(":", "")
-  const playback = useRef<HTMLFieldSetElement>(null)
   const container = useRef<HTMLDivElement>(null)
   const [boxes, setBoxes] = useState<ReadonlyMap<string, Box>>(new Map())
   const [selected, setSelected] = useState<string | null>(null)
   const [stepIndex, setStepIndex] = useState(-1)
-  const [playing, setPlaying] = useState(false)
   const steps = diagram.steps ?? []
   const step = stepIndex < 0 ? null : steps[stepIndex]!
 
@@ -66,43 +64,6 @@ export function TourDiagram(props: {
       ?.scrollIntoView({ block: "nearest", inline: "nearest" })
   }
 
-  const advance = useEffectEvent(() => {
-    const next = stepIndex + 1
-    selectStep(next)
-
-    if (next === steps.length - 1) setPlaying(false)
-  })
-
-  useEffect(() => {
-    if (!playing) return undefined
-    const timer = window.setInterval(advance, 2500)
-
-    return () => window.clearInterval(timer)
-  }, [playing])
-
-  useEffect(() => {
-    const pauseWhenHidden = () => {
-      if (document.hidden) setPlaying(false)
-    }
-
-    document.addEventListener("visibilitychange", pauseWhenHidden)
-
-    return () => document.removeEventListener("visibilitychange", pauseWhenHidden)
-  }, [])
-
-  useEffect(() => {
-    const element = playback.current
-
-    if (element === null) return undefined
-
-    const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => !entry.isIntersecting)) setPlaying(false)
-    })
-
-    observer.observe(element)
-
-    return () => observer.disconnect()
-  }, [])
   const order = new Map(diagram.nodes.map((node, index) => [node.id, index]))
   const routed = diagram.edges.filter((edge) => order.get(edge.to)! !== order.get(edge.from)! + 1)
   const gutter = routed.length === 0 ? 0 : 16 + routed.length * 10
@@ -158,48 +119,23 @@ export function TourDiagram(props: {
       aria-label={`Change diagram for ${props.chapterTitle}`}
     >
       {steps.length > 0 && (
-        <fieldset
-          ref={playback}
-          className="mb-2 flex min-w-0 items-start gap-2"
-          aria-label="Flow playback"
-        >
+        <fieldset className="mb-2 flex min-w-0 items-start gap-2" aria-label="Flow steps">
           <div className="flex shrink-0 items-center gap-0.5">
             <Button
               variant="ghost"
               size="icon-xs"
               aria-label="Previous flow step"
               disabled={stepIndex < 0}
-              onClick={() => {
-                setPlaying(false)
-                selectStep(stepIndex - 1)
-              }}
+              onClick={() => selectStep(stepIndex - 1)}
             >
               <ChevronLeft aria-hidden />
-            </Button>
-            <Button
-              variant="outline"
-              size="xs"
-              aria-label={playing ? "Pause flow" : "Play flow"}
-              onClick={() => {
-                if (playing) setPlaying(false)
-                else {
-                  if (stepIndex < 0 || stepIndex === steps.length - 1) selectStep(0)
-                  setPlaying(true)
-                }
-              }}
-            >
-              {playing ? <Pause aria-hidden /> : <Play aria-hidden />}
-              {playing ? "Pause" : "Play"}
             </Button>
             <Button
               variant="ghost"
               size="icon-xs"
               aria-label="Next flow step"
               disabled={stepIndex === steps.length - 1}
-              onClick={() => {
-                setPlaying(false)
-                selectStep(stepIndex + 1)
-              }}
+              onClick={() => selectStep(stepIndex + 1)}
             >
               <ChevronRight aria-hidden />
             </Button>
@@ -307,7 +243,6 @@ export function TourDiagram(props: {
                     title={`${node.label}\n${target.path}:${range} (${target.side})`}
                     onClick={() => {
                       setSelected(node.id)
-                      setPlaying(false)
                       props.onSelect(node)
                     }}
                     className="h-full w-full cursor-pointer rounded-[7px] border bg-background px-2.5 py-2 text-left transition-transform duration-150 ease-out hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring active:scale-[0.98] aria-pressed:border-(--viewed) aria-pressed:bg-[color-mix(in_oklch,var(--viewed)_10%,var(--background))] data-flow-active:border-(--viewed)"

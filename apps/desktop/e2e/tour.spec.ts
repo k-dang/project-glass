@@ -76,7 +76,7 @@ const seedTourPullRequest = (github: FakeGitHub) =>
     ],
   })
 
-test("reads linked visuals and plays flows without changing viewed progress", async ({
+test("reads linked visuals and steps through flows without changing viewed progress", async ({
   github,
   claude,
   window,
@@ -243,7 +243,7 @@ test("reads linked visuals and plays flows without changing viewed progress", as
     chapter.locator("[data-selected-line]").filter({ hasText: "if (problem)" }),
   ).toBeVisible()
 
-  const flow = diagram.getByRole("group", { name: "Flow playback" })
+  const flow = diagram.getByRole("group", { name: "Flow steps" })
   await flow.getByRole("button", { name: "Next flow step" }).click()
   await expect(flow).toContainText("The handler receives input.")
   await flow.getByRole("button", { name: "Next flow step" }).click()
@@ -271,19 +271,7 @@ test("reads linked visuals and plays flows without changing viewed progress", as
   await flow.getByRole("button", { name: "Next flow step" }).click()
   await expect(flow.getByRole("button", { name: "Next flow step" })).toBeDisabled()
   await flow.getByRole("button", { name: "Previous flow step" }).click()
-  await flow.getByRole("button", { name: "Play flow" }).click()
-  await expect(flow).toContainText("Only valid input reaches the write.")
-  await expect(flow.getByRole("button", { name: "Play flow" })).toBeVisible()
-  await flow.getByRole("button", { name: "Play flow" }).click()
-  await flow.getByRole("button", { name: "Pause flow" }).click()
-  await expect(flow.getByRole("button", { name: "Play flow" })).toBeVisible()
-  await window.screenshot({ path: testInfo.outputPath("flow-playback.png") })
-
-  await flow.getByRole("button", { name: "Play flow" }).click()
-  await window.getByRole("tab", { name: "Overview", exact: true }).click()
-  await expect(window.getByRole("tabpanel", { name: "Overview", exact: true })).toBeVisible()
-  await window.getByRole("tab", { name: "Changes", exact: true }).click()
-  await expect(flow.getByRole("button", { name: "Play flow" })).toBeVisible()
+  await expect(flow).toContainText("Validation checks the name before storage.")
 
   await diagram.getByRole("button", { name: /^Write immediately,/ }).click()
   await expect(
