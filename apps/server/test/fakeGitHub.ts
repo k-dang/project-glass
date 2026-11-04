@@ -1,5 +1,7 @@
 import { NodeHttpServer, NodeHttpServerRequest } from "@effect/platform-node"
+import { validate } from "@octokit/graphql-schema"
 import { absurd, Context, Effect, Layer, Schema } from "effect"
+import { getOperationAST, parse } from "graphql"
 import { HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from "effect/http"
 import { createHash } from "node:crypto"
 import { createServer } from "node:http"
@@ -193,6 +195,8 @@ const GraphQLRequest = Schema.Union([
     }),
   }),
 ])
+
+const GraphQLDocument = Schema.Struct({ operationName: Schema.String, query: Schema.String })
 
 export type FakeGraphQLRequest = typeof GraphQLRequest.Type
 
@@ -973,6 +977,23 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
       "POST",
       "/graphql",
       Effect.gen(function* () {
+        const errors = yield* HttpServerRequest.schemaBodyJson(GraphQLDocument).pipe(
+          Effect.flatMap(({ operationName, query }) =>
+            Effect.try(() =>
+              getOperationAST(parse(query), operationName) === null
+                ? ["The document has no matching operation"]
+                : validate(query).map(({ message }) => message),
+            ),
+          ),
+          Effect.catch(() => Effect.succeed(["Invalid GraphQL document"])),
+        )
+
+        if (errors.length > 0)
+          return HttpServerResponse.jsonUnsafe(
+            { errors: errors.map((message) => ({ message })) },
+            { status: 400 },
+          )
+
         const request = yield* Effect.orDie(HttpServerRequest.schemaBodyJson(GraphQLRequest))
         graphQLRequests.push(request)
 

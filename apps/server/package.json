@@ -17,8 +17,10 @@
     "@effect/vitest": "catalog:",
     "@glass/contracts": "workspace:*",
     "@glass/plugin": "workspace:*",
+    "@octokit/graphql-schema": "15.26.1",
     "@types/node": "catalog:",
     "effect": "catalog:",
+    "graphql": "16.14.2",
     "jiti": "2.7.0",
     "vite-plus": "catalog:",
     "zod": "3.25.76"

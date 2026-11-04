@@ -1,5 +1,17 @@
 import type { AgentEngine, SandboxProvider, SandboxState } from "@glass/plugin"
-import { Context, Deferred, Duration, Effect, Exit, Layer, Redacted, Schema, Scope } from "effect"
+import {
+  Clock,
+  Context,
+  Deferred,
+  Duration,
+  Effect,
+  Exit,
+  Fiber,
+  Layer,
+  Redacted,
+  Schema,
+  Scope,
+} from "effect"
 import { NodeHttpServer } from "@effect/platform-node"
 import { HttpServer } from "effect/http"
 import { createServer } from "node:http"
@@ -33,14 +45,20 @@ const agentIdOf = (state: SandboxState) => Schema.decodeUnknownSync(SandboxId)(s
  * A Sandbox provider whose Sandboxes are agent hosts in this process, each built with the services
  * `host` makes, reached over HTTP like any Sandbox's.
  */
-export const inProcessSandboxes = (host: () => Layer.Layer<HostAgents | Journal | Changes>) => {
+export const inProcessSandboxes = Effect.fnUntraced(function* (
+  host: () => Layer.Layer<HostAgents | Journal | Changes>,
+) {
+  const clock = yield* Clock.Clock
+  const context = yield* Effect.context()
+  const runPromise = Effect.runPromiseWith(context)
+  const runFork = Effect.runForkWith(context)
   let settings: InProcessSandboxSettings = {}
 
   const waiting: Array<() => void> = []
   const urls = new Map<string, string>()
   const gone = new Set<string>()
   const createdAt = new Map<string, number>()
-  const expiries = new Map<string, NodeJS.Timeout>()
+  const expiries = new Map<string, Fiber.Fiber<void>>()
 
   const hosts = new Map<
     string,
@@ -96,7 +114,7 @@ export const inProcessSandboxes = (host: () => Layer.Layer<HostAgents | Journal 
       socket.once("close", () => sockets.delete(socket))
     })
 
-    const context = await Effect.runPromise(
+    const services = await runPromise(
       Layer.buildWithScope(
         hostServer({ token: Redacted.make(token), shutDown }).pipe(
           Layer.provideMerge(NodeHttpServer.layer(() => server, { port: 0, host: "127.0.0.1" })),
@@ -108,9 +126,12 @@ export const inProcessSandboxes = (host: () => Layer.Layer<HostAgents | Journal 
 
     hosts.set(agentId, { scope, sockets })
     shutDowns.set(agentId, shutDown)
-    urls.set(agentId, HttpServer.formatAddress(Context.get(context, HttpServer.HttpServer).address))
+    urls.set(
+      agentId,
+      HttpServer.formatAddress(Context.get(services, HttpServer.HttpServer).address),
+    )
 
-    Effect.runFork(
+    runFork(
       Deferred.await(shutDown).pipe(
         Effect.andThen(Effect.sync(() => noteEnded(agentId))),
         Effect.andThen(stop(agentId)),
@@ -129,7 +150,7 @@ export const inProcessSandboxes = (host: () => Layer.Layer<HostAgents | Journal 
       if (settings.noCapacity !== undefined) throw new NoCapacity(settings.noCapacity)
 
       record({ agentId: request.agentId })
-      createdAt.set(request.agentId, Date.now())
+      createdAt.set(request.agentId, clock.currentTimeMillisUnsafe())
 
       for (const step of steps) {
         progress(step)
@@ -157,8 +178,9 @@ export const inProcessSandboxes = (host: () => Layer.Layer<HostAgents | Journal 
       if (gone.has(agentId)) throw new SandboxGone()
 
       const expiresAt = Math.min(
-        Date.now() + (settings.extensionMillis ?? TWO_DAYS),
-        (createdAt.get(agentId) ?? Date.now()) + (settings.maxLifetimeMillis ?? TWO_DAYS),
+        clock.currentTimeMillisUnsafe() + (settings.extensionMillis ?? TWO_DAYS),
+        (createdAt.get(agentId) ?? clock.currentTimeMillisUnsafe()) +
+          (settings.maxLifetimeMillis ?? TWO_DAYS),
       )
 
       reclaimAt(agentId, expiresAt)
@@ -173,7 +195,7 @@ export const inProcessSandboxes = (host: () => Layer.Layer<HostAgents | Journal 
 
       if (shutDown !== undefined && Deferred.isDoneUnsafe(shutDown)) noteEnded(agentId)
 
-      await Effect.runPromise(stop(agentId))
+      await runPromise(stop(agentId))
       urls.delete(agentId)
       events.push(`removed ${agentId}`)
     },
@@ -184,17 +206,26 @@ export const inProcessSandboxes = (host: () => Layer.Layer<HostAgents | Journal 
     stop(agentId).pipe(
       Effect.andThen(
         Effect.sync(() => {
-          clearTimeout(expiries.get(agentId))
+          expiries.get(agentId)?.interruptUnsafe()
+          expiries.delete(agentId)
           gone.add(agentId)
         }),
       ),
     )
 
   const reclaimAt = (agentId: string, expiresAt: number) => {
-    clearTimeout(expiries.get(agentId))
+    expiries.get(agentId)?.interruptUnsafe()
     expiries.set(
       agentId,
-      setTimeout(() => Effect.runFork(reclaim(agentId)), expiresAt - Date.now()).unref(),
+      runFork(
+        clock.sleep(Duration.millis(expiresAt - clock.currentTimeMillisUnsafe())).pipe(
+          Effect.andThen(() => {
+            expiries.delete(agentId)
+
+            return reclaim(agentId)
+          }),
+        ),
+      ),
     )
   }
 
@@ -212,9 +243,9 @@ export const inProcessSandboxes = (host: () => Layer.Layer<HostAgents | Journal 
     /** Deletes a Sandbox behind Glass's back, as a platform reclaiming it would. */
     reclaim,
     closeAll: Effect.suspend(() => {
-      for (const timer of expiries.values()) clearTimeout(timer)
-
-      return Effect.forEach([...hosts.keys()], stop, { discard: true })
+      return Effect.forEach(expiries.values(), Fiber.interrupt, { discard: true }).pipe(
+        Effect.andThen(Effect.forEach([...hosts.keys()], stop, { discard: true })),
+      )
     }),
   }
-}
+})

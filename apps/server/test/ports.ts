@@ -1,16 +1,19 @@
 import { Schema } from "effect"
-import { createServer, type Server } from "node:net"
+import type { ChildProcess } from "node:child_process"
+import type { Server } from "node:net"
+import { Readable } from "node:stream"
+import { text } from "node:stream/consumers"
 
-const decodeAddress = Schema.decodeUnknownSync(Schema.Struct({ port: Schema.Int }))
+const Address = Schema.Struct({ port: Schema.Int })
+
+const decodeAddress = Schema.decodeUnknownSync(Address)
 
 export const portOf = (server: Server) => decodeAddress(server.address()).port
 
-export const freePort = () =>
-  new Promise<number>((resolve, reject) => {
-    const server = createServer()
-    server.once("error", reject)
-    server.listen(0, "127.0.0.1", () => {
-      const port = portOf(server)
-      server.close(() => resolve(port))
-    })
-  })
+export const hostPort = async (host: ChildProcess) => {
+  const ready = host.stdio[3]
+
+  if (!(ready instanceof Readable)) throw new Error("The host has no readiness pipe")
+
+  return Schema.decodeUnknownSync(Schema.fromJsonString(Address))(await text(ready)).port
+}

@@ -147,7 +147,7 @@ export const agentServicesFixture = Effect.gen(function* () {
       Layer.succeed(Changes, changes),
     )
 
-  const sandboxes = inProcessSandboxes(hostServices)
+  const sandboxes = yield* inProcessSandboxes(hostServices)
   yield* Effect.addFinalizer(() => sandboxes.closeAll)
 
   const boot = Effect.gen(function* () {

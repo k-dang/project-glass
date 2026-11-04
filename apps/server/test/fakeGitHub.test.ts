@@ -2,6 +2,7 @@ import { assert, describe, it } from "@effect/vitest"
 import { Effect, Schema } from "effect"
 import { GitHubDiffSide } from "../src/github/diffSide"
 import { AddedDraft, ADD_DRAFT_MUTATION } from "../src/github/drafts"
+import { MARK_FILE_VIEWED_MUTATION } from "../src/github/viewedFiles"
 import { startFakeGitHub } from "./fakeGitHub"
 import { VIEWER } from "./fakePullRequest"
 
@@ -52,6 +53,42 @@ const head = {
 }
 
 const patch = "@@ -2,2 +2,3 @@\n keep\n-before\n+after\n+extra\n@@ -8 +9 @@\n-old\n+new"
+
+it.live("validates GraphQL documents before changing fake GitHub state", () =>
+  Effect.gen(function* () {
+    const github = yield* startFakeGitHub()
+
+    const pr = github.seedPullRequest({
+      base,
+      head,
+      changedFiles: [{ path: "greet.ts", status: "modified", patch }],
+    })
+
+    for (const [operationName, query] of [
+      ["MarkFileAsViewed", undefined],
+      ["MarkFileAsViewed", "this is not GraphQL"],
+      ["MarkFileAsViewed", MARK_FILE_VIEWED_MUTATION.replace("clientMutationId", "missingField")],
+      ["UnmarkFileAsViewed", MARK_FILE_VIEWED_MUTATION],
+      ["MarkFileAsViewed", MARK_FILE_VIEWED_MUTATION],
+    ] as const) {
+      const response = yield* Effect.promise(() =>
+        fetch(`${github.url}/graphql`, {
+          method: "POST",
+          headers: { authorization: `Bearer ${VIEWER.token}`, "content-type": "application/json" },
+          body: JSON.stringify({
+            operationName,
+            query,
+            variables: { pullRequestId: pr.id, path: "greet.ts" },
+          }),
+        }),
+      )
+
+      const valid = operationName === "MarkFileAsViewed" && query === MARK_FILE_VIEWED_MUTATION
+      assert.strictEqual(response.status, valid ? 200 : 400)
+      assert.strictEqual(pr.viewedPaths.has("greet.ts"), valid)
+    }
+  }),
+)
 
 describe("fake GitHub Draft lines", () => {
   it.live(
