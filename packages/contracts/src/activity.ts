@@ -68,6 +68,17 @@ export const Activity = Schema.Union([
 
 export type Activity = typeof Activity.Type
 
+export const ActivityKind = Schema.Literals(
+  Activity.members.map((member) => member.fields._tag.schema.literal),
+)
+
+export type ActivityKind = typeof ActivityKind.Type
+
+export class ActivityStamp extends Schema.Class<ActivityStamp>("ActivityStamp")({
+  kind: ActivityKind,
+  occurredAt: Schema.DateTimeUtcFromString,
+}) {}
+
 export class LoggedActivity extends Schema.Class<LoggedActivity>("LoggedActivity")({
   id: Schema.Int,
   occurredAt: Schema.DateTimeUtcFromString,

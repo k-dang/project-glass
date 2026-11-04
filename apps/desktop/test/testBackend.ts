@@ -60,6 +60,7 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         SetDiscussionResolved: unused,
         RecordActivity: unused,
         ListActivity: unused,
+        ListActivityStamps: () => Effect.succeed([]),
         ListToDos: () => Effect.succeed([]),
         AddToDo: unused,
         EditToDo: unused,

@@ -70,6 +70,7 @@ it.live("upgrades existing Activity history and uses its indexes after reopening
       [19, "agent_journal_saved"],
       [20, "create_agent_review_follow_ups"],
       [21, "agent_review_follow_ups_as_agent"],
+      [22, "index_activity_by_kind"],
     ] as const
 
     for (const expected of [upgrade, []] as const) {
@@ -142,6 +143,20 @@ it.live("upgrades existing Activity history and uses its indexes after reopening
         assert.deepStrictEqual(
           newestFirst.map(({ detail }) => detail),
           ["SEARCH activity USING INDEX activity_login_id (<expr>=?)"],
+        )
+
+        const stamps = yield* sql<{ detail: string }>`
+          EXPLAIN QUERY PLAN
+          SELECT kind, occurred_at FROM activity
+          WHERE lower(login) = lower(${"kevin"})
+            AND occurred_at >= ${occurredAt}
+            AND kind IN ('ReplySent', 'ToDoDone')
+        `
+
+        assert.isTrue(
+          stamps.some(({ detail }) =>
+            detail.includes("USING COVERING INDEX activity_login_kind_time"),
+          ),
         )
       }).pipe(Effect.provide(SqliteClient.layer({ filename })), Effect.scoped)
     }

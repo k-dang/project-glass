@@ -51,6 +51,7 @@
     "marked": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
+    "recharts": "catalog:",
     "shadcn": "catalog:",
     "streamdown": "catalog:",
     "tailwindcss": "catalog:",

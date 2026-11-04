@@ -2,11 +2,12 @@ import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
 import type { QueuedPullRequest } from "@glass/contracts"
 import { Link, type LinkProps } from "@tanstack/react-router"
 import { AsyncResult } from "effect/reactivity"
-import { ArrowRight, Circle } from "lucide-react"
+import { Circle } from "lucide-react"
 import { type ReactNode, useId } from "react"
+import { ActivityChart } from "./ActivityChart"
 import { AgentContinueCard } from "./AgentContinueCard"
 import type { BackendError } from "./backend"
-import { Count } from "./Lists"
+import { Count, SectionLink } from "./Lists"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf } from "./problems"
 import { repositoryLabeller } from "./PullRequestRow"
@@ -24,6 +25,7 @@ export function Dashboard() {
     <div className="page-content @container flex flex-col gap-8 py-6">
       <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
       <Continue />
+      <ActivityChart />
       <div className="grid gap-8 @3xl:grid-cols-2">
         <QueuePanel />
         <ToDosPanel />
@@ -77,12 +79,7 @@ function Panel<A>(props: {
           {props.title}
         </h2>
         <Count count={AsyncResult.isSuccess(props.result) ? props.result.value.length : 0} />
-        <Link
-          {...props.link}
-          className="ml-auto flex items-center gap-1 rounded-sm text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          {props.linkLabel} <ArrowRight className="size-3.5" aria-hidden />
-        </Link>
+        <SectionLink link={props.link}>{props.linkLabel}</SectionLink>
       </div>
       <div className="border-t pt-1">
         {AsyncResult.builder(props.result)

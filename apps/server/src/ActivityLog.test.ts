@@ -250,6 +250,43 @@ describe("Activity log", () => {
     }),
   )
 
+  it.live("stamps the asked kinds of the current Connection's Activity since a moment", () =>
+    Effect.gen(function* () {
+      const home = yield* isolatedHome
+      const { client } = yield* startSignedInBackend(home)
+      const database = new DatabaseSync(join(home, ".project-glass", "glass.db"))
+
+      try {
+        const insert = database.prepare(
+          "INSERT INTO activity (kind, payload, occurred_at, login) VALUES (?, ?, ?, ?)",
+        )
+
+        insert.run("ReplySent", "{}", "2026-10-31T23:59:59.999Z", VIEWER.login)
+        insert.run("ReplySent", "{}", "2026-11-01T00:00:00.000Z", VIEWER.login)
+        insert.run("FileViewed", "{}", "2026-11-02T00:00:00.000Z", VIEWER.login)
+        insert.run("ToDoDone", "{}", "2026-11-02T09:00:00.000Z", VIEWER.login)
+        insert.run("ToDoDone", "{}", "2026-11-03T09:00:00.000Z", "another-user")
+      } finally {
+        database.close()
+      }
+
+      const stamps = yield* client.ListActivityStamps({
+        since: DateTime.makeUnsafe("2026-11-01T00:00:00Z"),
+        kinds: ["ReplySent", "ToDoDone"],
+      })
+
+      assert.deepStrictEqual(
+        stamps
+          .map(({ kind, occurredAt }) => [kind, DateTime.formatIso(occurredAt)] as const)
+          .toSorted(([, a], [, b]) => a.localeCompare(b)),
+        [
+          ["ReplySent", "2026-11-01T00:00:00.000Z"],
+          ["ToDoDone", "2026-11-02T09:00:00.000Z"],
+        ],
+      )
+    }),
+  )
+
   it.live("skips an unreadable Activity and keeps listing the rest", () =>
     Effect.gen(function* () {
       const home = yield* isolatedHome

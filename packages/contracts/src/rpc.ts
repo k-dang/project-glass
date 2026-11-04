@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { Rpc, RpcGroup } from "effect/rpc"
-import { Activity, ActivityLogError, ActivityPage } from "./activity"
+import { Activity, ActivityKind, ActivityLogError, ActivityPage, ActivityStamp } from "./activity"
 import { AgentReviewFailure, AgentReviewState, FollowUpMessage, ReviewPrompt } from "./agentReview"
 import { AskAnswer, AskFailure, AskPlace, AskQuestion } from "./ask"
 import {
@@ -254,6 +254,11 @@ export class GlassRpcs extends RpcGroup.make(
   Rpc.make("ListActivity", {
     payload: { limit: Schema.Int.check(Schema.isGreaterThan(0)) },
     success: ActivityPage,
+    error: Schema.Union([ConnectionError, ActivityLogError]),
+  }),
+  Rpc.make("ListActivityStamps", {
+    payload: { since: Schema.DateTimeUtcFromString, kinds: Schema.NonEmptyArray(ActivityKind) },
+    success: Schema.Array(ActivityStamp),
     error: Schema.Union([ConnectionError, ActivityLogError]),
   }),
   Rpc.make("ListToDos", toDoList),
