@@ -103,7 +103,7 @@ import {
   unsentMessageAtom,
 } from "./agentsArea"
 import { MessageText, readableText } from "./Mentions"
-import { Attachment, MessageBox } from "./MessageBox"
+import { Attachment, type ComposerSuggestion, MessageBox } from "./MessageBox"
 import { ModelPicker } from "./ModelPicker"
 import { PermissionModePicker } from "./PermissionModePicker"
 import { RequestCard, requestElementId } from "./RequestCard"
@@ -675,6 +675,7 @@ export function AgentComposer(props: {
   textOnly?: boolean
   problem?: Problem | null
   pickers?: ReactNode
+  suggestions?: ReadonlyArray<ComposerSuggestion>
 }) {
   const { agentId, turns } = props
   const running = turns.at(-1)?.ended === null
@@ -716,6 +717,7 @@ export function AgentComposer(props: {
         notice={waiting !== undefined && <WaitingNotice waiting={waiting} />}
         commands={commands}
         pickers={props.pickers}
+        suggestions={props.suggestions ?? []}
       />
     </>
   )
