@@ -8,9 +8,7 @@ export interface Steer extends DeliveredMessage {
 }
 
 export interface Steering {
-  /** Steers sent to the program and not yet taken in, oldest first. */
   readonly steers: ReadonlyArray<Steer>
-  /** The user stopped the Turn, so however the program finishes it, it ends stopped. */
   readonly stopping: boolean
 }
 
@@ -98,7 +96,6 @@ export const runTurns = Effect.fnUntraced(function* <
         if (state !== null)
           state = { ...state, steers: state.steers.filter((steer) => steer.id !== id) }
       }),
-    /** Marks the running Turn stopping, answering its Steers not taken in, or `null` between Turns. */
     stop: Effect.sync(() => {
       if (state === null) return null
       state = { ...state, stopping: true }

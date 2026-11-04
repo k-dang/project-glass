@@ -1,7 +1,6 @@
 import type { FakeGitHub } from "./fakeGitHub"
 import { type FakeChangedFile, VIEWER } from "./fakePullRequest"
 
-/** The repository the demo PRs live in, followed so they show in Reviews. */
 export const DEMO_REPOSITORY = { owner: "octo-org", repo: "hello-world" } as const
 
 export const RATE_LIMIT_TITLE = "Rate-limit the public API"
@@ -26,7 +25,6 @@ interface DemoFile {
   readonly change: FakeChangedFile
 }
 
-/** A changed file as one hunk spanning the whole file. */
 const modified = (path: string, diff: ReadonlyArray<Line>): DemoFile => {
   const base = diff.flatMap(([prefix, text]) => (prefix === "+" ? [] : [text]))
   const head = diff.flatMap(([prefix, text]) => (prefix === "-" ? [] : [text]))
@@ -242,7 +240,6 @@ export const rateLimitFiles = [
   ]),
 ]
 
-/** A nine-file PR awaiting the viewer's review, a one-line fix, and one of the viewer's own. */
 export const seedDemoPullRequests = (github: FakeGitHub) => {
   seed(
     github,

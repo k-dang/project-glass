@@ -26,7 +26,6 @@ import {
   RequestWaiting,
   type Revision,
   SandboxPlace,
-  type SandboxStatus,
   thisMac as thisMacPlace,
   type TranscriptUpdate,
   TurnCutOff,
@@ -111,9 +110,9 @@ const toRow = ({
   forReview,
 })
 
-const withStatus = (agent: Agent, sandbox: SandboxStatus | null) =>
+const agentWith = (agent: Agent, change: Partial<typeof Agent.Type>) =>
   // oxlint-disable-next-line typescript/no-misused-spread -- The fields go straight back into Agent.
-  new Agent({ ...agent, sandbox })
+  new Agent({ ...agent, ...change })
 
 const storageFailure = () =>
   new AgentError({ message: "Couldn't read or save your Agents. Try again." })
@@ -146,12 +145,10 @@ export class Agents extends Context.Service<
       place: AgentPlace,
       repository: FollowedRepository,
     ) => Effect.Effect<ReadonlyArray<AgentCommand>, InvalidLocalCheckout | AgentError>
-    /** Empty until the Agent's folder exists, and for an Agent review, which loads no settings. */
     readonly commands: (
       agentId: string,
     ) => Effect.Effect<ReadonlyArray<AgentCommand>, AgentNotFound | AgentError>
     readonly create: (input: NewAgent) => Effect.Effect<Agent, InvalidLocalCheckout | AgentError>
-    /** Starts the Agent on its first Turn. It stays out of the Agents list, and owns its checkout. */
     readonly createForReview: (input: NewReviewAgent) => Effect.Effect<Agent, AgentError>
     readonly send: (
       agentId: string,
@@ -266,7 +263,7 @@ export class Agents extends Context.Service<
         .pipe(Effect.orDie)
 
       const withSandbox = (agent: Agent) =>
-        sandboxes.status(agent.id).pipe(Effect.map((sandbox) => withStatus(agent, sandbox)))
+        sandboxes.status(agent.id).pipe(Effect.map((sandbox) => agentWith(agent, { sandbox })))
 
       const delivered = Effect.fnUntraced(function* ({ message, images }: MessageInput) {
         const ids = mentionedToDoIds(message)
@@ -486,7 +483,6 @@ export class Agents extends Context.Service<
           )
         })
 
-      // The Agent can't take a message in while it waits on the user's answer.
       const refuseWhileWaiting = (agentId: string) =>
         transcripts
           .isWaiting(agentId)
@@ -608,8 +604,7 @@ export class Agents extends Context.Service<
         return yield* lock.withPermits(1)(
           Effect.gen(function* () {
             const found = yield* find(agentId)
-            // oxlint-disable-next-line typescript/no-misused-spread -- The fields go straight back into Agent.
-            const agent = new Agent({ ...found.agent, ...change })
+            const agent = agentWith(found.agent, change)
 
             yield* sql`
               UPDATE agent SET model = ${agent.model}, effort = ${agent.effort},
@@ -649,7 +644,6 @@ export class Agents extends Context.Service<
       ) {
         const row = yield* find(agentId)
 
-        // The host holds what waits, so it says when a request no longer does.
         return yield* placementOf(row)
           .host(row)
           .pipe(
@@ -731,7 +725,7 @@ export class Agents extends Context.Service<
           Stream.zipLatest(SubscriptionRef.changes(rows), sandboxes.statuses).pipe(
             Stream.map(([current, statuses]) =>
               current.flatMap(({ agent, forReview }) =>
-                forReview ? [] : [withStatus(agent, statuses.get(agent.id) ?? null)],
+                forReview ? [] : [agentWith(agent, { sandbox: statuses.get(agent.id) ?? null })],
               ),
             ),
           ),

@@ -32,7 +32,6 @@ export function AgentReviewMarkdown(props: { markdown: string; className?: strin
     <Streamdown
       className={cn(
         "text-sm leading-relaxed break-words [&_h2]:mt-5 [&_h2]:mb-1 [&_h2]:text-sm [&_h2]:font-semibold",
-        // Long inline code such as paths wraps often here, so its chip is slim and wraps cleanly.
         "[&_:not(pre)>code]:px-1 [&_:not(pre)>code]:py-0 [&_:not(pre)>code]:text-[0.8125rem] [&_:not(pre)>code]:[box-decoration-break:clone]",
         props.className,
       )}
@@ -46,7 +45,6 @@ const fileName = (path: string) => path.split("/").at(-1) ?? path
 
 const focusOnMount = (element: HTMLTextAreaElement | null) => element?.focus()
 
-/** A Draft the agent proposed: the user reads it, edits it if they like, then adds it to their pending Review. */
 function SuggestedDraftCard(props: {
   draft: SuggestedDraft
   drafts: DraftStore

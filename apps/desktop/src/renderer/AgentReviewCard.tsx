@@ -110,7 +110,6 @@ function AgentReviewStatus(props: { controls: AgentReviewControls }) {
   )
 }
 
-/** The review's opening paragraph: the bold main risk and the sentences summing up the PR. */
 const leadOf = (markdown: string) => markdown.split(/\n\s*\n/, 1)[0] ?? ""
 
 function AgentReviewLead(props: { review: AgentReview; onRead: () => void }) {
@@ -120,7 +119,6 @@ function AgentReviewLead(props: { review: AgentReview; onRead: () => void }) {
         markdown={leadOf(props.review.markdown)}
         className="min-w-0 flex-1 basis-64"
       />
-      {/* One line box of the lead's text, so the taller button centers on its first line. */}
       <div className="flex h-[1lh] items-center text-sm leading-relaxed">
         <Button size="sm" variant="outline" onClick={props.onRead}>
           <PanelLeft aria-hidden />

@@ -1,11 +1,4 @@
-import { createRequire } from "node:module"
-import { dirname } from "node:path"
 import { defineConfig } from "vite-plus"
-
-// pnpm resolves @effect/vitest to a different vitest copy than vp test.
-const vitest = dirname(
-  createRequire(import.meta.resolve("vite-plus")).resolve("vitest/package.json"),
-)
 
 const node = {
   format: "esm",
@@ -15,7 +8,6 @@ const node = {
   deps: { onlyBundle: false },
 } as const
 
-// One file sharing no chunks, because a Sandbox provider copies only the bundle into the Sandbox.
 const agentHost = (
   outDir: string,
   entry: Record<string, string> = { agentHost: "src/agentHost.ts" },
@@ -35,7 +27,6 @@ export default defineConfig({
       outDir: "dist",
     },
     agentHost("dist"),
-    // `pnpm dev:fake`'s backend, kept out of `dist` so it never ships.
     {
       ...node,
       entry: { fakeBackend: "test/fakeBackend.ts" },
@@ -51,7 +42,5 @@ export default defineConfig({
     testTimeout: 30_000,
     silent: "passed-only",
     globalSetup: ["test/buildBundles.ts"],
-    alias: { vitest },
-    server: { deps: { inline: ["@effect/vitest"] } },
   },
 })

@@ -1,11 +1,12 @@
 import { assert, it } from "@effect/vitest"
 import { type AskPlace, PullRequestRef, Revision } from "@glass/contracts"
-import { Effect, Fiber, Scope } from "effect"
+import { Clock, Effect, Fiber, Scope } from "effect"
 import { TestClock } from "effect/testing"
 import { existsSync } from "node:fs"
 import { eventually } from "../test/eventually"
 import { startFakeGitHub } from "../test/fakeGitHub"
 import { VIEWER } from "../test/fakePullRequest"
+import { watchDeadlines } from "../test/deadlines"
 import { isolatedHome, startBackend } from "../test/harness"
 import { type ScriptedSettings, scriptedAgentRunners } from "../test/scriptedAgentRunners"
 
@@ -19,6 +20,7 @@ const fixture = Effect.fnUntraced(function* (
   const runners = yield* scriptedAgentRunners(settings)
   const github = yield* startFakeGitHub({ git: true })
   const home = yield* isolatedHome
+  const { watched, deadlineSet } = yield* watchDeadlines(deadline)
 
   const pr = github.seedPullRequest({
     title: "Greet people",
@@ -48,7 +50,7 @@ const fixture = Effect.fnUntraced(function* (
     },
     home,
     runners.layer,
-  ).pipe(Effect.provideService(Scope.Scope, scope))
+  ).pipe(Effect.provideService(Scope.Scope, scope), Effect.provideService(Clock.Clock, watched))
 
   const ref = new PullRequestRef({ owner: pr.owner, repo: pr.repo, number: pr.number })
   const revision = new Revision({ base: pr.base.sha, head: pr.head.sha })
@@ -56,7 +58,7 @@ const fixture = Effect.fnUntraced(function* (
   const ask = (place: AskPlace, question = "Who calls this?") =>
     client.Ask({ pullRequest: ref, revision, place, question })
 
-  return { runners, ask }
+  return { runners, ask, deadlineSet }
 })
 
 const helloName: AskPlace = { path: "greet.ts", side: "new", line: 2 }
@@ -117,6 +119,7 @@ it.effect("fails as timed out when the agent passes its limit", () =>
 
     const asking = yield* Effect.forkChild(f.ask(helloName).pipe(Effect.flip))
     yield* f.runners.ran(1)
+    yield* f.deadlineSet
     yield* TestClock.adjust(deadline)
     const failure = yield* Fiber.join(asking)
 

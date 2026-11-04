@@ -31,7 +31,6 @@ const resources = app.isPackaged
       renderer: join(process.resourcesPath, "renderer"),
     }
   : {
-      // `pnpm dev:fake` swaps in the backend that runs on fakes.
       server: join(
         __dirname,
         "../../../server",
@@ -133,7 +132,6 @@ const createWindow = () => {
     return { action: "deny" }
   })
   window.webContents.on("will-navigate", (event) => {
-    // Reloads, such as the Vite dev client's, stay in the window.
     if (event.url.startsWith(`${rendererOrigin}/`)) return
 
     event.preventDefault()
@@ -207,7 +205,6 @@ void app.whenReady().then(() => {
 
   if (devServerUrl === undefined) serveRenderer()
 
-  // Packaged builds get their icon from electron-builder.
   if (!app.isPackaged) app.dock?.setIcon(join(__dirname, "../../build/icon.png"))
 
   createWindow()

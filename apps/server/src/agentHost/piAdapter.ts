@@ -99,7 +99,7 @@ const inScope = (models: ReadonlyArray<PiModel>) =>
 
     // SAFETY: pi-coding-agent 1.3.0's resolver reads only `getAvailable()` from the runtime, and
     // only the `provider`, `id`, `name`, and `type` (absent, meaning a chat model) of its models.
-    // The scope test in Agents.test.ts catches a pi bump that reads more.
+    // The scope test in piAdapter.integration.test.ts catches a pi bump that reads more.
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- See SAFETY above.
     const reported = { getAvailable: () => Promise.resolve(models) } as ModelRuntime
     const scope = await resolveModelScopeWithDiagnostics(patterns, reported)
@@ -149,7 +149,6 @@ const refused = (what: "model" | "effort") => (error: string) =>
     Effect.andThen(Effect.fail(couldNotSwitch("pi", what))),
   )
 
-/** pi reads the instructions from a file, keeping them out of argv, where endpoint security tools may kill processes with long arguments. */
 const reviewFlags = Effect.fnUntraced(function* (folder: string, brief: ReviewBrief) {
   const fs = yield* FileSystem.FileSystem
   const directory = `${folder}.pi`
@@ -249,13 +248,12 @@ export const piAdapter = (command: string) =>
         )).model
 
         const settles = yield* Queue.unbounded<Input>()
-        // Each dialog pi waits on an answer to, with the method that says how to answer it.
         const dialogs = new Map<string, { readonly method: string; readonly part: RequestPart }>()
 
         const expire = (id: string) =>
           Effect.suspend(() =>
             dialogs.delete(id)
-              ? Queue.offer(settles, Input.Settled({ requestId: id, answer: null }))
+              ? Queue.offer(settles, Input.Expired({ requestId: id }))
               : Effect.void,
           )
 
@@ -374,7 +372,7 @@ export const piAdapter = (command: string) =>
             const value = reply?.text ?? reply?.chosen[0] ?? ""
 
             dialogs.delete(requestId)
-            yield* Queue.offer(settles, Input.Settled({ requestId, answer }))
+            yield* Queue.offer(settles, Input.Answered({ requestId, answer }))
             yield* rpc.send(
               dialog.method === "confirm"
                 ? { type: "extension_ui_response", id: requestId, confirmed: value === "Yes" }

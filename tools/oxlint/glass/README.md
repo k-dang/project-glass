@@ -17,6 +17,8 @@ source as in the app's bundler configuration.
   Electron, or Node builtins (including bare names such as `fs/promises`). Use
   `@glass/contracts` and the renderer RPC client.
 - Contracts cannot import anything under `apps/`.
+- `apps/server/src/gitEnv.ts` imports nothing at runtime: the verify-glass helper loads it under
+  plain Node, which can't resolve the server's extensionless imports.
 - Backend production code cannot import the transport entry points listed in
   `entryPoints`, or runtime HTTP/RPC implementations, unless it is a named transport
   owner. This reserves transport imports explicitly rather than treating every Effect

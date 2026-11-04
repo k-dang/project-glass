@@ -21,7 +21,7 @@ import {
 } from "@glass/contracts"
 import { Data, type DateTime, Option, Schema } from "effect"
 import { saysSignInFailed } from "../agentFailure"
-import { settledEvent } from "./requests"
+import { answeredEvent, expiredEvent } from "./requests"
 import type { Steer, Steering, TurnMachine } from "./turnLoop"
 import { runningToolCall, ToolInput, toolOutput } from "./toolCalls"
 
@@ -33,8 +33,8 @@ export const GLASS_MCP_PREFIX = `mcp__${GLASS_MCP_SERVER}__`
 export type Input = Data.TaggedEnum<{
   Message: { readonly message: SDKMessage }
   Asked: { readonly part: RequestPart }
-  /** A `null` answer leaves the request no longer answerable. */
-  Settled: { readonly requestId: string; readonly answer: RequestAnswer | null }
+  Answered: { readonly requestId: string; readonly answer: RequestAnswer }
+  Expired: { readonly requestId: string }
   Exited: {}
 }>
 
@@ -291,8 +291,13 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
     Asked: ({ part }) => {
       addPart(part)
     },
-    Settled: ({ requestId, answer }) => {
-      const settled = settledEvent(state.turn, requestId, answer)
+    Answered: ({ requestId, answer }) => {
+      const settled = answeredEvent(state.turn, requestId, answer)
+
+      if (settled !== undefined) emit(settled)
+    },
+    Expired: ({ requestId }) => {
+      const settled = expiredEvent(state.turn, requestId)
 
       if (settled !== undefined) emit(settled)
     },

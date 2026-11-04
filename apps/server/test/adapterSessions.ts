@@ -95,7 +95,6 @@ export const reviewBrief: ReviewBrief = {
   diffLines: { old: {}, new: { "greet.ts": [1, 2] } },
 }
 
-/** Writes a skill named `greet` into the `skills` folder an agent program reads. */
 export const writeGreetSkill = (skills: string) =>
   Effect.sync(() => {
     mkdirSync(join(skills, "greet"), { recursive: true })
@@ -123,7 +122,6 @@ export const claudeSession = Effect.fnUntraced(function* (scenario: string) {
       tape.sessionInfo(id, options?.dir, () => getSessionInfo(id, options)),
   }
 
-  // Claude Code's own default model, which `null` picks, costs more than Haiku to record.
   return yield* drive(claudeAdapter(pinnedClaude(), sdk), tape, folder, { model: "haiku" })
 })
 
@@ -137,11 +135,7 @@ const CLOUD_LOGINS = {
   GOOGLE_APPLICATION_CREDENTIALS: [".config", "gcloud", "application_default_credentials.json"],
 }
 
-/**
- * Lends the recorder's own pi login to an isolated home, or a given API key in its place. pi may
- * replace an OAuth refresh token while it runs, which voids the one in the real file, so the
- * lent `auth.json` is copied back when the session ends.
- */
+// pi may replace an OAuth refresh token while it runs, which voids the one in the real file.
 const lendPiLogin = Effect.fnUntraced(function* (home: string, apiKey: string | undefined) {
   const real = process.env["PI_CODING_AGENT_DIR"] ?? join(homedir(), ".pi", "agent")
   const lent = join(home, ".pi", "agent")

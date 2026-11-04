@@ -18,8 +18,7 @@ interface ChipItem<Value extends string> {
   readonly title?: string | undefined
 }
 
-/** The key the action item has, which no listed value can take. */
-const ACTION = "\0action"
+const ACTION_KEY = "\0action"
 
 export function ChipSelect<Value extends string>(props: {
   label: string
@@ -43,7 +42,7 @@ export function ChipSelect<Value extends string>(props: {
       items={props.items}
       disabled={props.disabled}
       onValueChange={(chosen) => {
-        if (chosen === ACTION) props.action?.onSelect()
+        if (chosen === ACTION_KEY) props.action?.onSelect()
         else if (chosen !== null) props.onValueChange(chosen)
       }}
     >
@@ -79,7 +78,7 @@ export function ChipSelect<Value extends string>(props: {
           <>
             {props.items.length > 0 && <SelectSeparator />}
             <SelectItem
-              value={ACTION}
+              value={ACTION_KEY}
               disabled={props.action.disabled}
               className="py-1.5 text-xs text-muted-foreground"
             >

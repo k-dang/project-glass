@@ -11,7 +11,7 @@ import {
   ReviewRequestsConnection,
 } from "./repositoryPullRequests"
 
-/** GitHub can return GraphQL errors with HTTP 200. */
+// GitHub can return GraphQL errors with HTTP 200.
 export interface GraphQLBody<Data> {
   readonly data?: Data | null | undefined
   readonly errors?: ReadonlyArray<GraphQLError> | undefined

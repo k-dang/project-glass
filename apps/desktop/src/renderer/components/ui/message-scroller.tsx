@@ -65,15 +65,17 @@ function MessageScrollerContent({
 
 function MessageScrollerItem({
   className,
+  exactHeight = false,
   scrollAnchor = false,
   ...props
-}: React.ComponentProps<typeof MessageScrollerPrimitive.Item>) {
+}: React.ComponentProps<typeof MessageScrollerPrimitive.Item> & { exactHeight?: boolean }) {
   return (
     <MessageScrollerPrimitive.Item
       data-slot="message-scroller-item"
       scrollAnchor={scrollAnchor}
       className={cn(
         "min-w-0 shrink-0 [contain-intrinsic-size:auto_10rem] [content-visibility:auto]",
+        exactHeight && "[content-visibility:visible]",
         className,
       )}
       {...props}

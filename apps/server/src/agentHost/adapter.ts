@@ -4,27 +4,19 @@ import type {
   AgentModels,
   RequestAnswer,
   RequestNotWaiting,
-  SentMessage,
 } from "@glass/contracts"
 import type { Effect, Scope } from "effect"
 import type { DeliveredMessage } from "./deliveredMessage"
-import type { HostAgentError, ReviewBrief, TurnSettings } from "./protocol"
+import type { HostAgentError, ReviewBrief, SteersNotTakenIn, TurnSettings } from "./protocol"
 
 export interface AgentSession {
-  /**
-   * Sets what later Turns run with: ids and efforts the adapter's `models` offered, and a mode from
-   * `engineCapabilities`. The program refuses anything else. A fresh session runs its defaults.
-   */
   readonly configure: (settings: TurnSettings) => Effect.Effect<void, HostAgentError>
   readonly startTurn: (
     turnId: string,
     message: DeliveredMessage,
   ) => Effect.Effect<void, HostAgentError>
-  /** Fails when no Turn runs. The Turn shows the Steer once the program takes it in. */
   readonly steer: (message: DeliveredMessage) => Effect.Effect<void, HostAgentError>
-  /** Answers with the Steers not taken in, which the program drops, or `null` when no Turn ran. */
-  readonly stopTurn: Effect.Effect<ReadonlyArray<SentMessage> | null>
-  /** Fails when the request no longer waits, or the answer doesn't fit it. */
+  readonly stopTurn: Effect.Effect<SteersNotTakenIn | null>
   readonly answer: (
     requestId: string,
     answer: RequestAnswer,
@@ -35,13 +27,7 @@ export interface AgentSession {
 
 export interface AgentAdapter {
   readonly models: Effect.Effect<AgentModels, HostAgentError>
-  /** What the program runs as `/name` in `folder`: its skills, prompt templates, and commands. */
   readonly commands: (folder: string) => Effect.Effect<ReadonlyArray<AgentCommand>, HostAgentError>
-  /**
-   * Starts the program in `folder` on the conversation named `conversation`, a UUID, continuing it
-   * when the program has already saved it and starting it otherwise. With a `review`, the program
-   * only reads the folder and may propose Suggested drafts.
-   */
   readonly start: (options: {
     readonly folder: string
     readonly conversation: string

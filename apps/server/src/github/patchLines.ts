@@ -37,7 +37,6 @@ export const lineInPatch = (hunks: string, side: DiffSide, line: number) => {
   return null
 }
 
-/** The changed file holding a line of the diff, with that line's text, or null off the diff. */
 export const lineInFiles = (
   files: ReadonlyArray<ChangedFile>,
   path: string,

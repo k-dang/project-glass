@@ -28,7 +28,7 @@ import {
 import { Deferred, Effect, Option, Predicate, Queue, Schema, type Scope, Stream } from "effect"
 import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
-import * as z from "zod/v4"
+import * as z from "zod"
 import { sdkExecutable } from "../processes"
 import { claudeReadOnlyTools } from "../readOnlyTools"
 import type { AgentAdapter } from "./adapter"
@@ -81,7 +81,6 @@ const startFailure = (cause: unknown) =>
       : "Claude Code could not start. Check its installation.",
   })
 
-/** Loads no settings files, so the user's hooks never see the PR's files. */
 const reviewOptions = (brief: ReviewBrief): Options => ({
   systemPrompt: { type: "preset", preset: "claude_code", append: brief.instructions },
   tools: claudeReadOnlyTools,
@@ -231,7 +230,6 @@ const decodeQuestions = Schema.decodeUnknownOption(AskedQuestions)
 
 const decodeToolInput = Schema.decodeUnknownOption(ToolInput)
 
-/** What Claude Code asks before running a tool: AskUserQuestion asks the user a Question. */
 const requestOf = (requestId: string, toolName: string, input: ToolInput) => {
   if (toolName === "AskUserQuestion") {
     const asked = decodeQuestions(input)
@@ -298,13 +296,8 @@ interface Asked {
  * starts what the folder's settings start, such as MCP servers, plugins, and SessionStart hooks.
  */
 const handshake = (sdk: ClaudeSdk, command: string, folder: string) =>
-  startClaude(
-    sdk,
-    command,
-    folder,
-    Stream.toAsyncIterable(Stream.never),
-    // A handshake runs no tools.
-    () => Promise.resolve({ behavior: "deny", message: "Glass is only asking what it offers." }),
+  startClaude(sdk, command, folder, Stream.toAsyncIterable(Stream.never), () =>
+    Promise.resolve({ behavior: "deny", message: "Glass is only asking what it offers." }),
   ).pipe(Effect.map(({ initialized }) => initialized))
 
 export const claudeAdapter = (command: string, sdk: ClaudeSdk = liveSdk): AgentAdapter => ({
@@ -331,7 +324,6 @@ export const claudeAdapter = (command: string, sdk: ClaudeSdk = liveSdk): AgentA
     })
   }).pipe(Effect.scoped),
 
-  // Claude Code's own commands come too: its bundled skills are marked built-in like `/clear` is.
   commands: (folder) =>
     handshake(sdk, command, folder).pipe(
       Effect.map(({ commands }) =>
@@ -354,7 +346,7 @@ export const claudeAdapter = (command: string, sdk: ClaudeSdk = liveSdk): AgentA
 
         return yield* Deferred.await(answered)
       }).pipe(
-        Effect.onInterrupt(() => Queue.offer(requests, Input.Settled({ requestId, answer: null }))),
+        Effect.onInterrupt(() => Queue.offer(requests, Input.Expired({ requestId }))),
         Effect.ensuring(Effect.sync(() => waiting.delete(requestId))),
       )
 
@@ -453,7 +445,7 @@ export const claudeAdapter = (command: string, sdk: ClaudeSdk = liveSdk): AgentA
 
         const settled = yield* settleWith(asked.part, answer)
         waiting.delete(requestId)
-        yield* Queue.offer(requests, Input.Settled({ requestId, answer }))
+        yield* Queue.offer(requests, Input.Answered({ requestId, answer }))
         yield* Deferred.succeed(asked.answered, permissionResult(settled, asked.input))
 
         return undefined

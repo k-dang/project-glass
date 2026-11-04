@@ -24,11 +24,6 @@ const questionsAtom = Atom.family((_pullRequestAndRevision: string) =>
 
 const settled = ({ state }: AskView) => state.status !== "pending"
 
-/**
- * The questions asked in one PR workspace and their answers, kept in memory for its PR and
- * Revision until Glass quits, even when the workspace itself is opened afresh.
- * Nothing here is feedback: none of it reaches GitHub.
- */
 export class AskStore {
   readonly #runtime: BackendRuntime
   readonly #runs = new Map<string, AbortController>()

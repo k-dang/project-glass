@@ -6,7 +6,6 @@ import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 import { installedProgram } from "./replay"
 
-/** The executable shipped by the Claude Agent SDK version Glass pins. */
 export const pinnedClaude = () => {
   const sdk = createRequire(import.meta.url).resolve("@anthropic-ai/claude-agent-sdk")
 
@@ -73,8 +72,6 @@ const loginToken = () => {
   return claudeAiOauth.accessToken
 }
 
-// The login's access token, not a copy of its credentials file: Claude Code may renew a copied
-// login, rotating the refresh token the user's own Claude Code still holds.
 export const claudeLoginEnvironment = (home: string) => ({
   ...isolatedEnvironment(home),
   CLAUDE_CODE_OAUTH_TOKEN: loginToken(),

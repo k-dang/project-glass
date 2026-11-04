@@ -40,10 +40,6 @@ export interface Placed {
 export interface Placement {
   readonly engines: ReadonlyArray<AgentEngine>
   readonly models: (engine: AgentEngine) => Effect.Effect<AgentModels, AgentError>
-  /**
-   * What the program runs as `/name` for a new Agent of the repository. Empty in a Sandbox, which
-   * holds the repository only once it's made.
-   */
   readonly commands: (
     engine: AgentEngine,
     repository: FollowedRepository,

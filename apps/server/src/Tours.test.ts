@@ -6,10 +6,11 @@ import {
   type TourDiagram,
   type TourState,
 } from "@glass/contracts"
-import { Effect, Exit, Fiber, Option, Scope, Stream } from "effect"
+import { Clock, Effect, Exit, Fiber, Option, Scope, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { startFakeGitHub } from "../test/fakeGitHub"
 import { VIEWER } from "../test/fakePullRequest"
+import { watchDeadlines } from "../test/deadlines"
 import { isolatedHome, startBackend } from "../test/harness"
 import { type ScriptedSettings, scriptedAgentRunners } from "../test/scriptedAgentRunners"
 import { type TourAnswer, tourInstructions } from "./tourPrompt"
@@ -32,6 +33,7 @@ const fixture = Effect.fnUntraced(function* (settings: ScriptedSettings = { repl
   const runners = yield* scriptedAgentRunners(settings)
   const github = yield* startFakeGitHub()
   const home = yield* isolatedHome
+  const { watched, deadlineSet } = yield* watchDeadlines(deadline)
 
   const pr = github.seedPullRequest({
     title: "Greet people",
@@ -68,6 +70,7 @@ const fixture = Effect.fnUntraced(function* (settings: ScriptedSettings = { repl
 
   const { client } = yield* startBackend(env, home, runners.layer).pipe(
     Effect.provideService(Scope.Scope, serverScope),
+    Effect.provideService(Clock.Clock, watched),
   )
 
   const state = (predicate: (state: TourState) => boolean) =>
@@ -76,6 +79,7 @@ const fixture = Effect.fnUntraced(function* (settings: ScriptedSettings = { repl
       .pipe(Stream.filter(predicate), Stream.runHead, Effect.map(Option.getOrThrow))
 
   return {
+    deadlineSet,
     runners,
     github,
     pr,
@@ -332,6 +336,7 @@ for (const [name, settings, started] of [
       const f = yield* fixture(settings)
       yield* f.write
       yield* f.runners[started](1)
+      yield* f.deadlineSet
       yield* TestClock.adjust(deadline)
 
       const state = yield* f.state(completed)

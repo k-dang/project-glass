@@ -21,7 +21,7 @@ import {
 import { Data, type DateTime, Predicate } from "effect"
 import type { AssistantUpdate, ClearedQueue, PiEvent, ToolResult } from "./piRpc"
 import { saysSignInFailed } from "../agentFailure"
-import { settledEvent } from "./requests"
+import { answeredEvent, expiredEvent } from "./requests"
 import type { Steer, Steering, TurnMachine } from "./turnLoop"
 import { runningToolCall, type ToolInput, toolOutput } from "./toolCalls"
 
@@ -30,8 +30,8 @@ export type Input = Data.TaggedEnum<{
   Accepted: { readonly turnId: string; readonly handled: boolean }
   Refused: { readonly turnId: string }
   Idle: { readonly idle: boolean; readonly generation: number }
-  /** A `null` answer leaves the dialog no longer answerable. */
-  Settled: { readonly requestId: string; readonly answer: RequestAnswer | null }
+  Answered: { readonly requestId: string; readonly answer: RequestAnswer }
+  Expired: { readonly requestId: string }
   SteerHandled: { readonly steer: Steer }
   Exited: {}
 }>
@@ -41,7 +41,7 @@ export const Input = Data.taggedEnum<Input>()
 export type Command = Data.TaggedEnum<{
   CheckIdle: { readonly generation: number }
   DeclineDialog: { readonly id: string }
-  /** Starts pi on the Steers it went idle holding, which pi only sends with a later prompt. */
+  // pi only sends the Steers it went idle holding with a later prompt.
   Resume: { readonly turnId: string; readonly steers: ReadonlyArray<Steer> }
 }>
 
@@ -68,7 +68,6 @@ const confirmOptions = ["Yes", "No"]
 
 type Dialog = Extract<PiEvent, { readonly type: "extension_ui_request" }>
 
-/** An extension's dialog as a Question: a choice from options, a yes or no, or text. */
 export const dialogQuestion = (dialog: Dialog) =>
   QuestionPart.make({
     requestId: dialog.id,
@@ -248,8 +247,13 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
 
       if (state !== null) onEvent(state, event)
     },
-    Settled: ({ requestId, answer }) => {
-      const settled = state === null ? undefined : settledEvent(state.turn, requestId, answer)
+    Answered: ({ requestId, answer }) => {
+      const settled = state === null ? undefined : answeredEvent(state.turn, requestId, answer)
+
+      if (settled !== undefined) emit(settled)
+    },
+    Expired: ({ requestId }) => {
+      const settled = state === null ? undefined : expiredEvent(state.turn, requestId)
 
       if (settled !== undefined) emit(settled)
     },
@@ -286,11 +290,7 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
   return { state, events, commands }
 }
 
-/**
- * What pi held when it stopped. pi takes Steers in the order they were sent, so the ones it cleared
- * are Glass's newest; they come back as the user wrote them, before pi expanded any template, with
- * their images. Anything else pi held, such as an extension's follow-up, comes back as pi's text.
- */
+// pi takes Steers in the order they were sent, so the ones it cleared are Glass's newest.
 export const leftover = (
   steers: ReadonlyArray<Steer>,
   cleared: typeof ClearedQueue.Type,

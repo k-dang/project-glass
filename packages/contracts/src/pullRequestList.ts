@@ -22,7 +22,6 @@ export class PullRequestSummary extends Schema.Class<PullRequestSummary>("PullRe
   updatedAt: Schema.DateTimeUtcFromString,
 }) {}
 
-/** Every PR in the repository that belongs on the list, newest activity first. */
 export class RepositoryPullRequests extends Schema.TaggedClass<RepositoryPullRequests>()(
   "RepositoryPullRequests",
   {
@@ -31,7 +30,6 @@ export class RepositoryPullRequests extends Schema.TaggedClass<RepositoryPullReq
   },
 ) {}
 
-/** One repository failing leaves the others' results usable; its last known rows stay listed. */
 export class RepositoryUnavailable extends Schema.TaggedClass<RepositoryUnavailable>()(
   "RepositoryUnavailable",
   {
@@ -51,7 +49,6 @@ export const PullRequestListings = Schema.Struct({
   "needs-review": Listings,
   "my-prs": Listings,
   reviewing: Listings,
-  /** Reading the PRs touched in Glass failed, so Reviewing lists only Drafts and Reviews. */
   reviewingProblem: Schema.NullOr(ActivityLogError),
 })
 

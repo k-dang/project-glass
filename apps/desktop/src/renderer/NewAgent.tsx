@@ -54,7 +54,6 @@ import { problemOf, settledProblem } from "./problems"
 
 const NEW_AGENT_TEXT = "new"
 
-/** A `null` Permission mode starts a program that has them in `defaultPermissionMode`. */
 type Program = {
   readonly engine: AgentEngine
   readonly permissionMode: PermissionMode | null

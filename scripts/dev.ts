@@ -15,7 +15,6 @@ const pnpmPath = process.env["npm_execpath"]
 
 if (!pnpmPath) throw new Error("Start the dev launcher with pnpm dev")
 
-/** `--fake` runs the backend on a fake GitHub and Tour runners, with data in a fresh directory. */
 const fake = process.argv.includes("--fake")
 
 const outputs = [
@@ -33,7 +32,6 @@ const start = (command: string, args: Array<string>, env: NodeJS.ProcessEnv = pr
     cwd: root,
     env,
     stdio: "inherit",
-    // POSIX detached children lead a new process group, addressable by -pid.
     detached: !isWindows,
   })
 

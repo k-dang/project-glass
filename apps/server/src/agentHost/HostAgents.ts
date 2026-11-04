@@ -4,13 +4,17 @@ import {
   type AgentModels,
   type RequestAnswer,
   RequestNotWaiting,
-  type SentMessage,
 } from "@glass/contracts"
 import { Context, Effect, Exit, Layer, Scope, Semaphore } from "effect"
 import type { AgentAdapter, AgentSession } from "./adapter"
 import type { DeliveredMessage } from "./deliveredMessage"
 import { Journal } from "./Journal"
-import { HostAgentError, type ReviewBrief, type TurnSettings } from "./protocol"
+import {
+  HostAgentError,
+  type ReviewBrief,
+  type SteersNotTakenIn,
+  type TurnSettings,
+} from "./protocol"
 
 interface Running {
   readonly scope: Scope.Closeable
@@ -45,7 +49,7 @@ export class HostAgents extends Context.Service<
       agentId: string,
       message: DeliveredMessage,
     ) => Effect.Effect<void, HostAgentError>
-    readonly stopTurn: (agentId: string) => Effect.Effect<ReadonlyArray<SentMessage> | null>
+    readonly stopTurn: (agentId: string) => Effect.Effect<SteersNotTakenIn | null>
     readonly answer: (
       agentId: string,
       requestId: string,
@@ -142,7 +146,6 @@ export class HostAgents extends Context.Service<
             Effect.suspend(() => {
               const agent = running.get(agentId)
 
-              // A stopped program's requests ended with its Turn.
               return agent === undefined
                 ? Effect.fail(new RequestNotWaiting())
                 : agent.session.answer(requestId, answer)

@@ -25,7 +25,6 @@ const descriptions: Record<PermissionMode, string> = {
   bypassPermissions: "Never asks. Only for a sandbox you can throw away.",
 }
 
-/** Shown only for an agent program that takes Permission modes. */
 export function PermissionModePicker(props: {
   engine: AgentEngine
   permissionMode: PermissionMode | null

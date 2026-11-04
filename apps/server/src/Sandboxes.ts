@@ -492,7 +492,6 @@ export class Sandboxes extends Context.Service<
             ),
           runningHost: ({ agent }) =>
             Effect.sync(() => Option.fromNullishOr(links.get(agent.id)?.connection)),
-          // A gone Sandbox took everything in it, so like one never made, it holds nothing to lose.
           hostOnceMade: ({ agent }) =>
             knownOf(agent.id).pipe(
               Effect.flatMap(({ record }) =>

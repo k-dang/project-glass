@@ -30,7 +30,6 @@ export const newHostToken = () => randomBytes(32).toString("base64url")
 
 export const HEALTH_PATH = "/healthz"
 
-/** A `POST` here ends the host, and with it every agent program. */
 export const SHUTDOWN_PATH = "/shutdown"
 
 const HostFolder = Schema.String.pipe(
@@ -65,6 +64,10 @@ export class HostAgentError extends Schema.TaggedError<HostAgentError>()("HostAg
   message: Schema.String,
 }) {}
 
+export const SteersNotTakenIn = Schema.Array(SentMessage)
+
+export type SteersNotTakenIn = typeof SteersNotTakenIn.Type
+
 export class AgentHostRpcs extends RpcGroup.make(
   Rpc.make("ListModels", {
     payload: { engine: AgentEngine },
@@ -85,7 +88,6 @@ export class AgentHostRpcs extends RpcGroup.make(
     },
     error: HostAgentError,
   }),
-  /** Starts a Turn the backend has recorded; its parts and ending arrive through WatchJournal. */
   Rpc.make("StartTurn", {
     payload: {
       agentId: Schema.String,
@@ -95,7 +97,6 @@ export class AgentHostRpcs extends RpcGroup.make(
     },
     error: HostAgentError,
   }),
-  /** Answers a request the journal reported waiting. */
   Rpc.make("AnswerRequest", {
     payload: { agentId: Schema.String, requestId: Schema.String, answer: RequestAnswer },
     error: Schema.Union([RequestNotWaiting, HostAgentError]),
@@ -104,17 +105,11 @@ export class AgentHostRpcs extends RpcGroup.make(
     payload: { agentId: Schema.String, ...DeliveredMessage.fields },
     error: HostAgentError,
   }),
-  /**
-   * Ends the running Turn as stopped, answering with the Steers the program hadn't taken in yet, or
-   * `null` when no Turn was running.
-   */
   Rpc.make("StopTurn", {
     payload: { agentId: Schema.String },
-    success: Schema.NullOr(Schema.Array(SentMessage)),
+    success: Schema.NullOr(SteersNotTakenIn),
   }),
-  /** Ends the agent program, and with it any running Turn, without reporting it. */
   Rpc.make("StopAgent", { payload: { agentId: Schema.String } }),
-  /** Every change in the folder since it forked from `baseRef`, uncommitted and untracked work included. */
   Rpc.make("GetChanges", {
     payload: { folder: HostFolder, baseRef: Schema.String },
     success: Schema.Array(ChangedFile),

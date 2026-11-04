@@ -128,7 +128,6 @@ it.live("lists the folder's skills among what Claude Code runs as `/name`", () =
 
     assert.deepStrictEqual(
       commands.find(({ name }) => name === "greet"),
-      // Claude Code names where the skill comes from; this folder is also the home.
       { name: "greet", description: "Greets the user by name. (user)" },
     )
   }).pipe(Effect.scoped),

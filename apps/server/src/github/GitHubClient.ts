@@ -137,11 +137,9 @@ import {
 
 const GitHubUser = Schema.Struct({ login: Schema.String })
 
-/** GitHub's REST file list returns at most 100 files per page. */
-const FILES_PAGE_SIZE = 100
+const GITHUB_MAX_FILES_PER_PAGE = 100
 
-/** REST lists at most 3,000 files for a pull request. */
-const MAX_FILE_PAGES = 30
+const GITHUB_MAX_LISTED_FILES = 3000
 
 const MAX_OPEN_ATTEMPTS = 3
 
@@ -222,7 +220,6 @@ export class GitHubClient extends Context.Service<
   GitHubClient,
   {
     readonly viewer: Effect.Effect<GitHubConnection, ConnectionError>
-    /** The Connection `viewer` last returned, asking GitHub only before it has returned one. */
     readonly knownViewer: Effect.Effect<GitHubConnection, ConnectionError>
     readonly pullRequest: (
       ref: PullRequestRef,
@@ -662,17 +659,17 @@ export class GitHubClient extends Context.Service<
       const changedFiles = Effect.fnUntraced(function* ({ owner, repo, number }: PullRequestRef) {
         const files: Array<GitHubChangedFile> = []
 
-        for (let page = 1; page <= MAX_FILE_PAGES; page++) {
+        for (let page = 1; page <= GITHUB_MAX_LISTED_FILES / GITHUB_MAX_FILES_PER_PAGE; page++) {
           const { body } = yield* send(
             HttpClientRequest.get(`/repos/${owner}/${repo}/pulls/${number}/files`).pipe(
-              HttpClientRequest.setUrlParams({ per_page: FILES_PAGE_SIZE, page }),
+              HttpClientRequest.setUrlParams({ per_page: GITHUB_MAX_FILES_PER_PAGE, page }),
             ),
             Schema.Array(GitHubChangedFile),
           )
 
           files.push(...body)
 
-          if (body.length < FILES_PAGE_SIZE) break
+          if (body.length < GITHUB_MAX_FILES_PER_PAGE) break
         }
 
         return files

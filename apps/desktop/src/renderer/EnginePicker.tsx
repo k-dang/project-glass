@@ -103,7 +103,6 @@ function PiModelInputs(props: { value: PiModel; onChange: (value: PiModel) => vo
   )
 }
 
-// Model IDs never contain spaces, so typing keeps each value trimmed.
 function ModelInput(props: {
   label: string
   name: string

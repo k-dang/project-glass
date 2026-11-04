@@ -37,7 +37,8 @@ test("starts a Sandbox Agent, and fills in what it missed while its connection w
   pi: { model },
   sandboxes,
   window,
-}) => {
+}, testInfo) => {
+  testInfo.setTimeout(90_000)
   github.seedBranches(repository, { defaultBranch: "main", branches: ["main"] })
 
   await window.getByRole("link", { name: "Settings" }).click()

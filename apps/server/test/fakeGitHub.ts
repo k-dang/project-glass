@@ -21,7 +21,7 @@ import {
 import { author, connectionPage, inRepo, PAGE_SIZE, reviewRequestNodes } from "./fakeNodes.ts"
 import { answerListing, ListingRequest } from "./fakePullRequestListing.ts"
 import { startFakeGitRemote, type TrafficMeter, trafficMeter } from "./fakeGitRemote.ts"
-import { basicAuthorization } from "../src/gitEnv.ts"
+import { gitBasicAuthorization } from "../src/gitEnv.ts"
 
 export interface FakeGraphQLError {
   readonly type: string
@@ -454,8 +454,7 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
   const commitIn = (owner: string, repo: string, sha: string) =>
     pullRequests.find((pr) => inRepo(owner, repo)(pr) && pr.commits.has(sha))?.commits.get(sha)
 
-  // GitHub takes the token as a Bearer token, or as Basic credentials from git.
-  const validCredentials = new Set([`Bearer ${VIEWER.token}`, basicAuthorization(VIEWER.token)])
+  const validCredentials = new Set([`Bearer ${VIEWER.token}`, gitBasicAuthorization(VIEWER.token)])
 
   const FailuresAndAuth = HttpRouter.middleware(
     (route) =>
@@ -1020,7 +1019,6 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
     ),
   )
 
-  // Failed responses can leave fetch connections open until their keep-alive timeout.
   yield* Effect.addFinalizer(() => Effect.sync(() => server.closeAllConnections()))
 
   const url = HttpServer.formatAddress(Context.get(services, HttpServer.HttpServer).address)

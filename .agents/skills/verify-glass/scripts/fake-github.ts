@@ -98,7 +98,6 @@ const repositoryOf = ({ path, graphql }: FakeGitHubRequest) => {
   }
 }
 
-/** One PR wide enough to fill the diff cache and every Shiki worker, so memory runs compare. */
 const WIDE_FILE_COUNT = 150
 const WIDE_FILE_LINES = 40
 

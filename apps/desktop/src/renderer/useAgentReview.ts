@@ -60,7 +60,6 @@ export const useAgentReview = (
   const start = useCallback(() => runCommand("start"), [runCommand])
   const cancel = useCallback(() => runCommand("cancel"), [runCommand])
 
-  /** Resolves false when the backend refuses the message, so the composer can keep it. */
   const followUp = async (message: string) => {
     if (sendingFollowUp.current) return false
 
@@ -80,14 +79,11 @@ export const useAgentReview = (
     job: latest?.job ?? null,
     review,
     outdated: review !== null && !current,
-    /** Why starting or cancelling the Agent review failed. */
     commandProblem: settledProblem(commandResult),
-    /** Why the backend refused a Follow-up before the agent ran. */
     followUpProblem: settledProblem(followUpResult),
     followUpPending: followUpResult.waiting,
     subscriptionProblem,
     reconnect,
-    /** Null where no Agent review can start, such as a closed PR. */
     start: startable ? start : null,
     followUp,
     cancel,

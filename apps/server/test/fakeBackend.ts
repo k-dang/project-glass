@@ -31,11 +31,6 @@ const seedDemoSettings = Effect.gen(function* () {
   )
 })
 
-/**
- * The backend `pnpm dev:fake` runs: signed in to the tests' fake GitHub, seeded with demo PRs
- * whose commits it also serves over git, and writing Tours without a model. The fake GitHub
- * starts fresh with each backend.
- */
 const main = Effect.gen(function* () {
   const github = yield* startFakeGitHub({ git: true })
   seedDemoPullRequests(github)

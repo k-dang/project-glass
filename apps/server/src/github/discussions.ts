@@ -11,7 +11,6 @@ import { Array as Arr, DateTime, Predicate, Schema } from "effect"
 import { avatarUrl, GitHubAuthor, login } from "./author"
 import { fromGitHubSide, GitHubDiffSide } from "./diffSide"
 
-/** GitHub returns at most 100 comments per page. */
 export const REVIEW_THREADS_QUERY = `query PullRequestReviewThreads($id: ID!, $after: String) {
   node(id: $id) {
     ... on PullRequest {

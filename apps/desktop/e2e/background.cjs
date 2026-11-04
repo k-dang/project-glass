@@ -9,9 +9,16 @@ if (process.platform === "darwin") {
   app.on("ready", prohibit)
 }
 
-// CI shows windows inside Xvfb: hidden Linux windows slow Playwright's frame waits.
 if (!process.env.CI) {
+  // Hidden windows render at 1 frame per second, and each Playwright click waits on those frames.
   app.on("browser-window-created", (_event, window) => {
-    window.show = () => {}
+    window.show = () => {
+      // setOpacity does nothing on Linux, so a shown window would appear on the desktop.
+      if (process.platform === "linux") return
+
+      window.setOpacity(0)
+      window.setIgnoreMouseEvents(true)
+      window.showInactive()
+    }
   })
 }

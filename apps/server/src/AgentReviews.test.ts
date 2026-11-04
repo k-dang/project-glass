@@ -11,7 +11,7 @@ import {
   acceptedSuggestedDraftOf,
   type Turn,
 } from "@glass/contracts"
-import { Effect, Exit, Option, Predicate, Scope, Stream } from "effect"
+import { Clock, Effect, Exit, Option, Predicate, Scope, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { existsSync, mkdirSync, readdirSync } from "node:fs"
 import { join } from "node:path"
@@ -20,6 +20,7 @@ import { vi } from "vite-plus/test"
 import { eventually } from "../test/eventually"
 import { startFakeGitHub } from "../test/fakeGitHub"
 import { VIEWER } from "../test/fakePullRequest"
+import { watchDeadlines } from "../test/deadlines"
 import { isolatedHome, startBackend } from "../test/harness"
 import { type ScriptedSettings, scriptedAgentRunners } from "../test/scriptedAgentRunners"
 
@@ -44,6 +45,7 @@ const fixture = Effect.fnUntraced(function* (
 
   const github = yield* startFakeGitHub({ git: true })
   const home = yield* isolatedHome
+  const { watched, deadlineSet } = yield* watchDeadlines(deadline)
   const gates = join(home, "gates")
   mkdirSync(gates)
   vi.stubEnv("GLASS_SCRIPTED_GATES", gates)
@@ -105,6 +107,7 @@ const fixture = Effect.fnUntraced(function* (
 
   const { client } = yield* startBackend(env, home, runners.layer).pipe(
     Effect.provideService(Scope.Scope, serverScope),
+    Effect.provideService(Clock.Clock, watched),
   )
 
   const engineSettings = yield* client.GetEngineSettings({ feature: "agentReviews" })
@@ -123,6 +126,7 @@ const fixture = Effect.fnUntraced(function* (
   )
 
   return {
+    deadlineSet,
     runners,
     github,
     home,
@@ -287,6 +291,7 @@ it.effect("fails as timed out when the agent passes its limit", () =>
     const f = yield* fixture({ reply: "hold" })
     yield* f.start
     yield* f.runners.ran(1)
+    yield* f.deadlineSet
     yield* TestClock.adjust(deadline)
 
     const failure = yield* f.failed

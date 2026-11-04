@@ -24,8 +24,7 @@ function bodyExpression(body: ESTree.Node | null): ESTree.Node | null {
   return null
 }
 
-// An awaited Promise whose executor only schedules its resolver is a sleep.
-function resolvesPromise(node: ESTree.CallExpression, source: Parameters<typeof binding>[0]) {
+function isSleepResolver(node: ESTree.CallExpression, source: Parameters<typeof binding>[0]) {
   let callback = node.arguments[0]
 
   if (callback?.type === "ArrowFunctionExpression" && callback.params.length === 0) {
@@ -96,7 +95,7 @@ export const testWaits = defineRule({
         } else if (
           (sleep.test(path) &&
             (node.parent.type === "AwaitExpression" || node.parent.type === "YieldExpression")) ||
-          (timer.test(path) && resolvesPromise(node, context.sourceCode))
+          (timer.test(path) && isSleepResolver(node, context.sourceCode))
         ) {
           context.report({ node, messageId: "sleep", data: { helper } })
         }

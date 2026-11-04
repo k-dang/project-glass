@@ -7,7 +7,6 @@ import { CHIP } from "./composerDocument"
 const MAX_CHOICES = 6
 
 export interface Caret {
-  /** The caret's paragraph up to the caret, with each chip as one character. */
   readonly before: string
   readonly at: number
 }
@@ -25,14 +24,11 @@ export interface Range {
   readonly to: number
 }
 
-/** What a one-character trigger, such as `@` or `/`, offers while the caret is after it. */
 export interface PickerSource<T> {
   readonly label: string
-  /** What's typed between the trigger and the caret, while the caret is after one. */
   readonly typed: (caret: Caret, doc: ProseMirrorNode) => string | undefined
   readonly choices: (typed: string) => ReadonlyArray<T>
   readonly key: (choice: T) => string
-  /** Replaces the trigger and what's typed after it with the choice. */
   readonly insert: (editor: Editor, range: Range, choice: T) => void
   readonly render: (choice: T) => ReactNode
 }
@@ -73,7 +69,6 @@ const opened = <T,>(
     : { from, to: caret.at, source, trigger, choices, active, chosen }
 }
 
-/** Offers the source's choices under the composer while the caret is after its trigger. */
 export function usePicker<T>(editor: Editor, source: PickerSource<T> | null) {
   const id = useId()
 

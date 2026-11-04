@@ -69,7 +69,6 @@ export const runCommands =
           },
         ]
 
-/** The model the fake provider serves, as Glass's Settings name a pi model. */
 export const FAKE_PI_MODEL = { provider: "glass-test", modelId: "gpt-test" }
 
 export interface FakeModelSettings {
@@ -78,7 +77,6 @@ export interface FakeModelSettings {
   readonly failFirst?: number
   readonly hang?: boolean
   readonly finishReason?: "stop" | "length"
-  /** How long to wait between the reply's chunks; replies stream at once without it. */
   readonly chunkDelay?: (input: FakeModelRequest) => number
 }
 

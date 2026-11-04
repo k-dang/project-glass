@@ -1,9 +1,10 @@
 import { assert, it } from "@effect/vitest"
 import { PullRequestRef, type TourState } from "@glass/contracts"
-import { Effect, Exit, Option, Scope, Stream } from "effect"
+import { Clock, Effect, Exit, Option, Scope, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { startFakeGitHub } from "../test/fakeGitHub"
 import { type FakePullRequest, type FakePullRequestState, VIEWER } from "../test/fakePullRequest"
+import { watchDeadlines } from "../test/deadlines"
 import { isolatedHome, startBackend } from "../test/harness"
 import { scriptedAgentRunners } from "../test/scriptedAgentRunners"
 
@@ -37,6 +38,7 @@ const deadline = 60_000
 
 const fixture = Effect.fnUntraced(function* ({ queueTours = true } = {}) {
   const home = yield* isolatedHome
+  const { watched, deadlineSet } = yield* watchDeadlines(deadline)
   const runners = yield* scriptedAgentRunners({ reply: "hold" })
   const github = yield* startFakeGitHub()
 
@@ -68,11 +70,13 @@ const fixture = Effect.fnUntraced(function* ({ queueTours = true } = {}) {
 
   const { client } = yield* startBackend(env, home, runners.layer).pipe(
     Effect.provideService(Scope.Scope, serverScope),
+    Effect.provideService(Clock.Clock, watched),
   )
 
   if (queueTours) yield* client.SetQueueWork({ feature: "tours", enabled: true })
 
   return {
+    deadlineSet,
     runners,
     seed,
     client,
@@ -168,8 +172,11 @@ it.effect("starts a waiting Tour's timeout only once a slot is free", () =>
     yield* f.client.AddToQueue({ references: prs.map(ref) })
 
     yield* f.runners.ran(2)
+    yield* f.deadlineSet
+    yield* f.deadlineSet
     yield* TestClock.adjust(deadline)
     yield* f.runners.ran(3)
+    yield* f.deadlineSet
     yield* TestClock.adjust(deadline)
 
     const failed = yield* Effect.forEach(

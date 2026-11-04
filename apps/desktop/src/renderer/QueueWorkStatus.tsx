@@ -98,7 +98,6 @@ function StatusIcon(props: { status: WorkStatus | null }) {
   )
 }
 
-/** The Tour and Agent review of a queued PR, each as an icon once there's something to show. */
 export function QueueWorkStatus(props: { queued: QueuedPullRequest }) {
   const { pullRequest, revision } = props.queued
   const tour = Option.getOrNull(AsyncResult.value(useAtomValue(tourStates(pullRequest.ref))))
