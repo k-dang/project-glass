@@ -269,14 +269,16 @@ it("disposes its stores, cancelling an Ask and releasing workspace atoms", async
   try {
     await Effect.runPromise(AtomRegistry.getResult(registry, backendRuntime))
     const baseline = registry.getNodes().size
+    const askAnswersKeptPerRevision = 1
     const feedback = new WorkspaceFeedback(withDiscussion(), registry, () => {})
 
     feedback.asks.ask({ path: "greet.ts", side: "new", line: 2 }, "Why?")
     await asking.promise
     feedback.dispose()
     await eventually(() => expect(interrupted).toHaveBeenCalledOnce())
-    // Only the per-Revision Ask answers deliberately remain after workspace disposal.
-    await eventually(() => expect(registry.getNodes().size).toBe(baseline + 1))
+    await eventually(() =>
+      expect(registry.getNodes().size).toBe(baseline + askAnswersKeptPerRevision),
+    )
   } finally {
     registry.dispose()
   }

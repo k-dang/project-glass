@@ -1,14 +1,6 @@
-import { Schema } from "effect"
+import { Option, Schema } from "effect"
 import { spawnSync } from "node:child_process"
 import type { Cdp } from "./cdp.ts"
-
-/**
- * Memory sampling for an agent feedback loop.
- *
- * Two sources that don't overlap: CDP reports what the renderer holds (V8 heap, Blink counters, worker
- * heaps), and the OS process tree reports what the processes cost. CDP alone can't see RSS, the GPU
- * process, or the backend; the process tree alone can't tell a diff cache from a React tree.
- */
 
 const HeapUsage = Schema.Struct({
   usedSize: Schema.Number,
@@ -42,8 +34,7 @@ const DetachedFromTarget = Schema.Struct({ sessionId: Schema.String })
 
 const Empty = Schema.Struct({})
 
-/** Counters that only grow, so a sample reports the change since the one before it. */
-const CUMULATIVE = new Set([
+const ALWAYS_GROWING_COUNTERS = new Set([
   "LayoutCount",
   "RecalcStyleCount",
   "LayoutDuration",
@@ -59,9 +50,7 @@ export type ProcessRole = "main" | "renderer" | "gpu" | "backend" | "utility" | 
 export interface ProcessRow {
   readonly pid: number
   readonly role: ProcessRole
-  /** Working set, the number the app's own RAM readout sums. Shared pages count in every process. */
   readonly rss: number
-  /** Commit charge: the process's own pages. Steadier than the working set, which the OS trims. */
   readonly private: number
 }
 
@@ -74,7 +63,6 @@ export interface WorkerSample {
 export interface MemorySample {
   readonly at: string
   readonly seq: number
-  /** Which area the sweep was showing when this sample was taken. */
   readonly label?: string
   readonly renderer: {
     readonly heap: HeapUsage
@@ -170,14 +158,12 @@ const roleOf = (process: RawProcess, parentRole: ProcessRole): ProcessRole => {
     case "utility":
       return /node\.mojom\.NodeService/.test(process.command) ? "backend" : "utility"
     case undefined:
-      // Agent CLIs the backend spawns carry no `--type`, and they are worth their own row.
       return parentRole === "main" ? "other" : "child"
     default:
       return "other"
   }
 }
 
-/** Every process below the app's main process, with the role its command line and parent imply. */
 export const processTree = (rootPid: number | undefined): ReadonlyArray<ProcessRow> => {
   if (rootPid === undefined) return []
   const processes = readProcesses()
@@ -232,23 +218,21 @@ export interface Sampler {
  */
 export const startSampler = async (page: Cdp, rootPid: number | undefined): Promise<Sampler> => {
   const sessions = new Map<string, { type: string; url: string }>()
-  const decodeAttached = Schema.decodeUnknownSync(AttachedToTarget)
-  const decodeDetached = Schema.decodeUnknownSync(DetachedFromTarget)
+  const decodeAttached = Schema.decodeUnknownOption(AttachedToTarget)
+  const decodeDetached = Schema.decodeUnknownOption(DetachedFromTarget)
 
   const stopAttach = page.on("Target.attachedToTarget", (params) => {
-    try {
-      const { sessionId, targetInfo } = decodeAttached(params)
+    const attached = decodeAttached(params)
+
+    if (Option.isSome(attached)) {
+      const { sessionId, targetInfo } = attached.value
       sessions.set(sessionId, { type: targetInfo.type, url: targetInfo.url })
-    } catch {
-      // A target shape we don't understand is not worth failing a sample over.
     }
   })
   const stopDetach = page.on("Target.detachedFromTarget", (params) => {
-    try {
-      sessions.delete(decodeDetached(params).sessionId)
-    } catch {
-      // Same.
-    }
+    const detached = decodeDetached(params)
+
+    if (Option.isSome(detached)) sessions.delete(detached.value.sessionId)
   })
 
   await page.send("Performance.enable", Empty)
@@ -272,7 +256,7 @@ export const startSampler = async (page: Cdp, rootPid: number | undefined): Prom
 
     const sincePrevious: Record<string, number> = {}
     for (const [name, value] of Object.entries(values)) {
-      if (!CUMULATIVE.has(name)) continue
+      if (!ALWAYS_GROWING_COUNTERS.has(name)) continue
       const before = previous[name]
       if (before !== undefined) sincePrevious[name] = Math.max(0, value - before)
     }
@@ -325,9 +309,6 @@ const mb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`
 
 const pad = (text: string, width: number) => text.padStart(width)
 
-/**
- * The block an agent reads first: what each bucket costs at the start, at the end, and at its worst.
- */
 export const formatSummary = (
   samples: ReadonlyArray<MemorySample>,
   file: string,
@@ -418,7 +399,6 @@ export const formatSummary = (
   ].join("\n")
 }
 
-/** One row per visited area, from the last sample taken while it was showing. */
 export const formatAreas = (
   samples: ReadonlyArray<MemorySample>,
   file: string,

@@ -26,7 +26,6 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { answerRequestAtom } from "./agentsArea"
 import { settledProblem } from "./problems"
 
-/** The element id of a request's card, which the composer points at while it waits. */
 export const requestElementId = (requestId: string) => `request-${requestId}`
 
 const useAnswer = (agentId: string, requestId: string) => {
@@ -171,7 +170,6 @@ function Questions(props: {
   const [typed, setTyped] = useState<ReadonlyArray<string>>(() => question.questions.map(() => ""))
   const titleId = useId()
 
-  // Words the user typed answer a question in place of the options they picked.
   const replies = question.questions.map((_, index): QuestionReply => {
     const text = typed[index]?.trim() ?? ""
 
@@ -186,7 +184,6 @@ function Questions(props: {
       </ConfirmationTitle>
       {question.questions.map((asked, index) => (
         <QuestionView
-          // oxlint-disable-next-line react/no-array-index-key -- A Question's questions never change.
           key={index}
           asked={asked}
           waiting={question.status === "waiting"}

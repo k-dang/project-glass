@@ -14,7 +14,6 @@ export const PiModel = Schema.Struct({ provider: ModelSetting, modelId: ModelSet
 
 export type PiModel = typeof PiModel.Type
 
-/** Claude Code takes a bare model ID; the pi CLI selects a provider and model ID. */
 export const EngineModels = Schema.Struct({
   "claude-code": ModelSetting,
   pi: PiModel,
@@ -22,7 +21,6 @@ export const EngineModels = Schema.Struct({
 
 export type EngineModels = typeof EngineModels.Type
 
-/** The Tour engine and the Agent review engine are chosen apart; each keeps a model per engine. */
 export const EngineSettings = Schema.Struct({ engine: AgentEngine, models: EngineModels })
 
 export type EngineSettings = typeof EngineSettings.Type

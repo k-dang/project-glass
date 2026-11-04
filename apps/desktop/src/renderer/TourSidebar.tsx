@@ -81,7 +81,6 @@ function ChapterRow(props: {
 export function OutdatedTourFlag(props: { revision: Revision; tour: ReturnType<typeof useTour> }) {
   const [open, setOpen] = useState(false)
 
-  // Rewrite disappears while writing, so the popover closes with it.
   return (
     <Popover open={open && !props.tour.writing} onOpenChange={setOpen}>
       <PopoverTrigger

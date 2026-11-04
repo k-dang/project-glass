@@ -1,7 +1,6 @@
 const { app } = require("electron")
 
 if (process.platform === "darwin") {
-  // Setting this policy at only one launch stage still let Electron activate.
   const prohibit = () => app.setActivationPolicy("prohibited")
 
   prohibit()
@@ -9,9 +8,13 @@ if (process.platform === "darwin") {
   app.on("ready", prohibit)
 }
 
-// CI shows windows inside Xvfb: hidden Linux windows slow Playwright's frame waits.
 if (!process.env.CI) {
+  // Hidden windows render at 1 frame per second, and each Playwright click waits on those frames.
   app.on("browser-window-created", (_event, window) => {
-    window.show = () => {}
+    window.show = () => {
+      window.setOpacity(0)
+      window.setIgnoreMouseEvents(true)
+      window.showInactive()
+    }
   })
 }

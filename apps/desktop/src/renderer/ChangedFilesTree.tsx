@@ -82,8 +82,7 @@ export function ChangedFilesTree(props: {
 
   const viewed = useAtomValue(viewedAtom)
   const [shown, setShown] = useState<ReadonlySet<ChangeType>>(new Set())
-  // Trees reports selection changes without the input event.
-  const selectionBehavior = useRef<"instant" | "smooth">("instant")
+  const nextSelectionScroll = useRef<"instant" | "smooth">("instant")
 
   const offered = changeTypes.flatMap((entry) => {
     const count = files.filter((file) => file.changeType === entry.type).length
@@ -134,7 +133,7 @@ export function ChangedFilesTree(props: {
       }
     `,
     onSelectionChange: ([path]) => {
-      if (path !== undefined && filesByPath.has(path)) onSelect(path, selectionBehavior.current)
+      if (path !== undefined && filesByPath.has(path)) onSelect(path, nextSelectionScroll.current)
     },
   })
 
@@ -162,11 +161,11 @@ export function ChangedFilesTree(props: {
       <FileTree
         model={model}
         onKeyDownCapture={() => {
-          selectionBehavior.current = "instant"
+          nextSelectionScroll.current = "instant"
         }}
         // Trees does not fire onSelectionChange when the selected row is clicked again.
         onClickCapture={(event) => {
-          selectionBehavior.current = event.detail === 0 ? "instant" : "smooth"
+          nextSelectionScroll.current = event.detail === 0 ? "instant" : "smooth"
 
           if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey) return
 
@@ -185,7 +184,7 @@ export function ChangedFilesTree(props: {
             .composedPath()
             .some((node) => node instanceof HTMLElement && node.dataset.itemPath === path)
 
-          if (clickedSelected) onSelect(path, selectionBehavior.current)
+          if (clickedSelected) onSelect(path, nextSelectionScroll.current)
         }}
         className="file-tree min-h-0 flex-1"
       />

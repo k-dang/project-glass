@@ -1,7 +1,6 @@
 import type * as Plugin from "@glass/plugin"
 import type { AgentModel, AgentModels } from "./agent"
 
-// Both directions matter: either independently authored shape can gain a required field.
 type Assert<T extends true> = T
 
 type Extends<A, B> = [A] extends [B] ? true : false

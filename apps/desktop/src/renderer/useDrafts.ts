@@ -33,7 +33,6 @@ export interface DraftView {
   readonly feedback: Feedback
   readonly deleting: boolean
   readonly published: boolean
-  /** GitHub has never seen this Draft, so dropping it touches nothing there. */
   readonly local: boolean
 }
 
@@ -84,7 +83,6 @@ interface Entry {
   readonly body: string
   readonly saved: Saved | null
   readonly sending: DraftAction | null
-  /** The user asked for this text on GitHub and no call has carried it yet. */
   readonly requested: boolean
   readonly deleting: boolean
   readonly failure: { readonly action: DraftAction; readonly problem: Problem } | null
@@ -101,7 +99,6 @@ const pendingAction = (entry: Entry): DraftAction | null => {
   return Predicate.isTagged(entry.place, "LinePlace") ? "save" : null
 }
 
-// While a call is out, `saved` is stale, so only its landing can tell whether another is needed.
 const mayNeedCall = (entry: Entry) => entry.sending !== null || pendingAction(entry) !== null
 
 const feedbackOf = (entry: Entry): Feedback => {
@@ -236,7 +233,6 @@ export class DraftStore {
     this.#started = this.#addLine(path, side, line, "")
   }
 
-  /** Adds a written Draft on a line and saves it, as writing one there and leaving it would. */
   add(path: string, side: DiffSide, line: number, body: string) {
     if (this.locked()) return
 
@@ -267,7 +263,6 @@ export class DraftStore {
     this.#save({ ...entry, deleting: true })
   }
 
-  /** Drops a Draft GitHub has never seen, handing back its line and text. */
   takeLocal(key: string) {
     const entry = this.registry.get(this.#entriesAtom).get(key)
 

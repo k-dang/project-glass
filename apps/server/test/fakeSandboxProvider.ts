@@ -139,40 +139,52 @@ const ingress = (folder: string, upstreamPort: number) =>
 
 const execFileAsync = promisify(execFile)
 
-/** Ends a host and the programs it started. */
+const killAndAwaitExit = (pid: number) =>
+  [
+    `$target = Get-Process -Id ${pid} -ErrorAction SilentlyContinue`,
+    "if (-not $target) { exit 0 }",
+    "$null = $target.Handle",
+    `taskkill /PID ${pid} /T /F | Out-Null`,
+    "if ($LASTEXITCODE -ne 0 -and -not $target.HasExited) { exit 1 }",
+    "$target.WaitForExit()",
+  ].join("; ")
+
 const killTree = async (pid: number) => {
-  try {
-    if (process.platform === "win32") {
-      // The host's programs hold their working directories open on Windows.
-      await execFileAsync("taskkill", ["/PID", String(pid), "/T", "/F"], { windowsHide: true })
-    } else {
-      // Effect gives agent programs their own process groups, outside the host's group.
-      const { stdout } = await execFileAsync("ps", ["-A", "-o", "pid=,ppid="])
+  if (process.platform === "win32") {
+    // taskkill returns before a process lets go of its working directory, which blocks deleting it.
+    await execFileAsync(
+      "powershell",
+      ["-NoProfile", "-NonInteractive", "-Command", killAndAwaitExit(pid)],
+      { windowsHide: true },
+    )
 
-      const processes = stdout
-        .trim()
-        .split("\n")
-        .map((line) => {
-          const [child, parent] = line.trim().split(/\s+/)
+    return
+  }
 
-          return { pid: Number(child), parent: Number(parent) }
-        })
+  // Effect gives agent programs their own process groups, outside the host's group.
+  const { stdout } = await execFileAsync("ps", ["-A", "-o", "pid=,ppid="])
 
-      const pids = [pid]
+  const processes = stdout
+    .trim()
+    .split("\n")
+    .map((line) => {
+      const [child, parent] = line.trim().split(/\s+/)
 
-      for (const parent of pids)
-        pids.push(...processes.filter((child) => child.parent === parent).map((child) => child.pid))
+      return { pid: Number(child), parent: Number(parent) }
+    })
 
-      await execFileAsync("kill", ["-KILL", ...pids.toReversed().map(String)])
-    }
-  } catch {}
+  const pids = [pid]
+
+  for (const parent of pids)
+    pids.push(...processes.filter((child) => child.parent === parent).map((child) => child.pid))
+
+  await execFileAsync("kill", ["-KILL", ...pids.toReversed().map(String)]).catch(() => {})
 }
 
 const claudeEfforts = ["low", "medium", "high", "xhigh", "max"]
 
 const piModel = { id: "glass-test/gpt-test", name: "gpt-test", efforts: [] }
 
-/** What the pinned Claude Code and the fake model provider's pi offer once a Sandbox runs them. */
 const sandboxModels: Record<AgentEngine, AgentModels> = {
   "claude-code": {
     defaultModel: { id: "default", name: "Opus", efforts: claudeEfforts },
@@ -221,7 +233,6 @@ export const fakeSandboxProvider =
         )
 
         progress("Starting the agent")
-        // Copied alone, as a real provider uploads it, so a bundle that needs its neighbours fails here.
         const bundle = join(folder, "agentHost.mjs")
         copyFileSync(request.host.bundle, bundle)
 
@@ -271,7 +282,7 @@ export const fakeSandboxProvider =
         if (existsSync(hostPath))
           await killTree(Schema.decodeUnknownSync(HostFile)(readFileSync(hostPath, "utf8")).pid)
 
-        rmSync(folder, { recursive: true, force: true, maxRetries: 10 })
+        rmSync(folder, { recursive: true, force: true })
       },
       models: async (engine) => sandboxModels[engine],
     })
@@ -311,7 +322,6 @@ export const installFakeSandboxProvider = (
       rmSync(droppedAll(sandboxFolder(agentId)), { force: true })
     },
     host,
-    /** Ends a Sandbox's host and its programs, as a crash would. */
     killHost: (agentId: string) => killTree(host(agentId).pid),
     stopHosts: async () => {
       for (const agentId of readdirSync(settings.root))

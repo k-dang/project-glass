@@ -53,24 +53,26 @@ const textOf = (content: typeof Content.Type | undefined): string =>
     ? content
     : (content ?? []).map((block) => block.text ?? "").join("\n")
 
-// The CLI wraps a prompt in system reminders; the user's words are the last text block.
+const isSystemReminder = (text: string | undefined) => (text ?? "").startsWith("<system-reminder>")
+
 const lastWords = (message: Message | undefined) =>
   blocks(message)
-    .filter((block) => block.type === "text" && !(block.text ?? "").startsWith("<system-reminder>"))
+    .filter((block) => block.type === "text" && !isSystemReminder(block.text))
     .at(-1)?.text ?? ""
 
+const isSideRequest = (request: FakeAnthropicRequest) => (request.tools ?? []).length === 0
+
 const replyTo = (request: FakeAnthropicRequest): Reply => {
-  // The CLI can end the conversation with its own system messages; the user's turn is what answers.
   const last = request.messages?.findLast((message) => message.role === "user")
 
-  // Side requests, such as the CLI naming the session, carry no tools.
-  if ((request.tools ?? []).length === 0) return { type: "text", text: "Fake session" }
+  if (isSideRequest(request)) return { type: "text", text: "Fake session" }
 
   const words = lastWords(last)
   const result = blocks(last).find((block) => block.type === "tool_result")
 
-  // After a stopped Turn the CLI sends the cancelled tool's result along with the next message.
-  if (result !== undefined && words === "")
+  const onlyCancelledToolResult = result !== undefined && words === ""
+
+  if (onlyCancelledToolResult)
     return { type: "text", text: `The fake model saw: ${textOf(result.content).slice(0, 200)}` }
   const command = /`([^`]+)`/.exec(words)?.[1]
 
@@ -164,7 +166,6 @@ const message = (model: string, reply: Reply) => ({
   usage: { input_tokens: 1, output_tokens: 1 },
 })
 
-/** The Messages API the real Claude CLI talks to in desktop end-to-end tests and `pnpm dev:fake`. */
 export const startFakeAnthropic = Effect.gen(function* () {
   let respond: (request: FakeAnthropicRequest) => Reply = replyTo
 

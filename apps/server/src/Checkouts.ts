@@ -18,7 +18,7 @@ import {
 import { randomUUID } from "node:crypto"
 import { dirname, join } from "node:path"
 import { Git } from "./git"
-import { basicAuthorization } from "./gitEnv"
+import { gitBasicAuthorization } from "./gitEnv"
 import { GitHubAuth } from "./github/GitHubAuth"
 import { ServerConfig } from "./ServerConfig"
 
@@ -36,14 +36,13 @@ const failureReason = (output: string): CheckoutFailure["reason"] => {
   return "fetch-failed"
 }
 
-/** Sends the token with each request of one git command, without git saving it anywhere. */
 const authenticatedEnv = (token: Redacted.Redacted) => ({
   GIT_TERMINAL_PROMPT: "0",
   GIT_CONFIG_COUNT: "2",
   GIT_CONFIG_KEY_0: "credential.helper",
   GIT_CONFIG_VALUE_0: "",
   GIT_CONFIG_KEY_1: "http.extraHeader",
-  GIT_CONFIG_VALUE_1: `Authorization: ${basicAuthorization(Redacted.value(token))}`,
+  GIT_CONFIG_VALUE_1: `Authorization: ${gitBasicAuthorization(Redacted.value(token))}`,
 })
 
 const storageFailure = <A, E, R>(effect: Effect.Effect<A, E | PlatformError.PlatformError, R>) =>
@@ -62,7 +61,6 @@ export class Checkouts extends Context.Service<
       pr: PullRequestRef,
       revision: Revision,
     ) => Effect.Effect<string, CheckoutFailure | StaleRevision | NoCredentials, Scope.Scope>
-    /** Writes the Revision's files into `folder`, a new directory that stays until it's removed. */
     readonly checkoutInto: (
       pr: PullRequestRef,
       revision: Revision,
@@ -103,7 +101,6 @@ export class Checkouts extends Context.Service<
           ),
         )
 
-      /** Holding the clone's lock means no git runs on it, so any lock file is a killed git's. */
       const removeStaleLockFiles = Effect.fnUntraced(function* (clone: string) {
         const top = yield* fs.readDirectory(clone)
         const refs = yield* fs.readDirectory(join(clone, "refs"), { recursive: true })

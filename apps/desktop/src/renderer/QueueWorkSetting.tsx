@@ -39,7 +39,6 @@ const copy = {
   },
 } satisfies Record<EngineFeature, { label: string; description: string }>
 
-/** The Switch that turns on a feature's work for each open PR that joins the Queue. */
 export function QueueWorkSetting(props: { feature: EngineFeature }) {
   const { label, description } = copy[props.feature]
   const enabledAtom = enabledAtoms(props.feature)

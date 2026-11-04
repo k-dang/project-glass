@@ -74,8 +74,6 @@ export const scriptedAgentRunners = Effect.fnUntraced(function* (initial: Script
             identity,
             run: <A>(task: AgentTask<A>) =>
               Effect.suspend(() => {
-                // Effect resumes a waiting test synchronously inside `started.add()`, before this
-                // returns, so the reply and any hold are fixed first.
                 const answering = answer(task)
                 runs.push({
                   engine: engineSettings.engine,

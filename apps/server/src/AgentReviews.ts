@@ -62,7 +62,6 @@ const diffLinesOn = (files: ReadonlyArray<ChangedFile>, side: DiffSide) =>
     ),
   )
 
-/** The runner of the work in progress, for a failure that names none. */
 const runnerOf = (job: AgentReviewState["job"]) => ("runner" in job ? job.runner : null)
 
 const failure = (

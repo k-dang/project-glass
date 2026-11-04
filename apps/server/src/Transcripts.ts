@@ -9,6 +9,7 @@ import {
   AgentBusy,
   QueuedMessagesChanged,
   QueuedMessage,
+  requestPartTags,
   SentMessage,
   StatusChanged,
   TranscriptSnapshot,
@@ -151,7 +152,6 @@ export class Transcripts extends Context.Service<
       queuedId: string,
     ) => Effect.Effect<void, AgentBusy | AgentError>
     readonly subscribeStarted: Effect.Effect<Stream.Stream<StartedTurn>, never, Scope.Scope>
-    /** The Agents with a request waiting, again after every change. */
     readonly waiting: Stream.Stream<ReadonlySet<string>>
     readonly isWaiting: (agentId: string) => Effect.Effect<boolean>
     readonly setStatus: (agentId: string, status: string | null) => Effect.Effect<void>
@@ -167,13 +167,12 @@ export class Transcripts extends Context.Service<
       const statuses = new Map<string, string>()
       const waitingAgents = yield* SubscriptionRef.make<ReadonlySet<string>>(new Set())
 
-      // `isWaiting` as SQL, over the request parts `isRequestPart` names.
       const hasWaitingRequest = (agentId: string) =>
         sql`
           SELECT EXISTS (
             SELECT 1 FROM agent_turn_part p JOIN agent_turn t ON t.id = p.turn_id
             WHERE t.agent_id = ${agentId}
-              AND json_extract(p.part, '$._tag') IN ('PermissionRequest', 'Question')
+              AND json_extract(p.part, '$._tag') IN ${sql.in(requestPartTags)}
               AND json_extract(p.part, '$.status') = 'waiting'
           ) AS found
         `.pipe(

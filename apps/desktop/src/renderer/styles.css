@@ -167,26 +167,26 @@
 /* Catppuccin Mocha, from https://catppuccin.com/palette/. Diff colors follow its Shiki theme. */
 :root[data-theme="catppuccin-mocha"] {
   color-scheme: dark;
-  --background: #181825; /* mantle */
-  --foreground: #cdd6f4; /* text */
-  --card: #1e1e2e; /* base */
+  --background: #181825;
+  --foreground: #cdd6f4;
+  --card: #1e1e2e;
   --card-foreground: #cdd6f4;
-  --popover: #313244; /* surface0 */
+  --popover: #313244;
   --popover-foreground: #cdd6f4;
-  --primary: #cba6f7; /* mauve */
-  --primary-foreground: #11111b; /* crust */
+  --primary: #cba6f7;
+  --primary-foreground: #11111b;
   --secondary: #313244;
   --secondary-foreground: #cdd6f4;
   --muted: #313244;
-  --muted-foreground: #a6adc8; /* subtext0 */
-  --accent: #45475a; /* surface1 */
+  --muted-foreground: #a6adc8;
+  --accent: #45475a;
   --accent-foreground: #cdd6f4;
-  --destructive: #f38ba8; /* red */
+  --destructive: #f38ba8;
   --border: #313244;
   --input: #45475a;
-  --ring: #b4befe; /* lavender */
-  --added: #a6e3a1; /* green */
-  --modified: #fab387; /* peach */
+  --ring: #b4befe;
+  --added: #a6e3a1;
+  --modified: #fab387;
   --deleted: #f38ba8;
   --viewed: #b4befe;
 }
@@ -194,7 +194,7 @@
 :root[data-theme="catppuccin-mocha"] .markdown-body {
   --fgColor-default: var(--foreground);
   --fgColor-muted: var(--muted-foreground);
-  --fgColor-accent: #89b4fa; /* blue */
+  --fgColor-accent: #89b4fa;
   --fgColor-success: var(--added);
   --fgColor-danger: var(--deleted);
   --fgColor-attention: var(--modified);
@@ -210,7 +210,7 @@
   --borderColor-danger-emphasis: var(--deleted);
   --borderColor-attention-emphasis: var(--modified);
   --borderColor-done-emphasis: var(--viewed);
-  --color-prettylights-syntax-comment: #9399b2; /* overlay2 */
+  --color-prettylights-syntax-comment: #9399b2;
   --color-prettylights-syntax-constant: #fab387;
   --color-prettylights-syntax-constant-other-reference-link: #89b4fa;
   --color-prettylights-syntax-entity: #89b4fa;
@@ -218,7 +218,7 @@
   --color-prettylights-syntax-keyword: #cba6f7;
   --color-prettylights-syntax-storage-modifier-import: var(--foreground);
   --color-prettylights-syntax-string: #a6e3a1;
-  --color-prettylights-syntax-string-regexp: #f5c2e7; /* pink */
+  --color-prettylights-syntax-string-regexp: #f5c2e7;
   --color-prettylights-syntax-variable: #fab387;
   --color-prettylights-syntax-markup-heading: #89b4fa;
   --color-prettylights-syntax-markup-bold: var(--foreground);

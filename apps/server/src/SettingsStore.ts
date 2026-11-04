@@ -51,7 +51,6 @@ const featureKeys = {
   { engine: keyof Settings; models: keyof Settings; queue: keyof Settings }
 >
 
-/** Whether the feature runs for each open PR that joins the Queue. */
 export const queueWorkOf = (settings: Settings, feature: EngineFeature): boolean =>
   settings[featureKeys[feature].queue]
 

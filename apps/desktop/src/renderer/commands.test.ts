@@ -18,7 +18,6 @@ const shown = (message: string) => {
 it("shows a command only where the message starts with one the program offers", () => {
   expect(shown("/greet Ada")).toBe("/greet")
   expect(shown("/skill:pdf report.pdf")).toBe("/skill:pdf")
-  // Glass sends the message trimmed.
   expect(shown("\n  /greet")).toBe("/greet")
   expect(shown("/greeter")).toBeNull()
   expect(shown("Say /greet")).toBeNull()

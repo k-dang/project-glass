@@ -1,8 +1,6 @@
 import { Effect, Option, Schema } from "effect"
 import { SqlClient } from "effect/sql"
 
-// The shape Agent reviews were saved in before they became one Markdown document. It is spelled
-// out here so this migration keeps working as the contracts move on.
 const Saved = Schema.fromJsonString(
   Schema.Struct({
     headline: Schema.String,
@@ -64,7 +62,6 @@ export default Effect.gen(function* () {
     SELECT owner, repo, number, content FROM agent_reviews
   `
 
-  // A review that no longer decodes can be written again, so it goes rather than failing startup.
   for (const row of rows) {
     const saved = yield* Schema.decodeUnknownEffect(Saved)(row.content).pipe(Effect.option)
     const where = sql`owner = ${row.owner} AND repo = ${row.repo} AND number = ${row.number}`

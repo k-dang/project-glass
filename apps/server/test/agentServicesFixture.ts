@@ -55,10 +55,6 @@ interface Started {
   readonly emit: (event: AgentEvent) => Effect.Effect<void>
 }
 
-/**
- * Real business services and host handlers, with execution replaced at AgentAdapter and Changes. A
- * Sandbox's host runs in this process too, behind the real Sandboxes service and its HTTP protocol.
- */
 export const agentServicesFixture = Effect.gen(function* () {
   const database = yield* Layer.build(
     SqliteMigrator.layer({ loader: migrationLoader }).pipe(
@@ -83,7 +79,6 @@ export const agentServicesFixture = Effect.gen(function* () {
 
   const adapter: AgentAdapter = {
     models,
-    // Named after the folder, so a test sees where the program was asked.
     commands: (folder) => Effect.succeed([{ name: "greet", description: folder }]),
     start: ({ conversation, report }) =>
       Effect.gen(function* () {
@@ -250,7 +245,6 @@ export const agentServicesFixture = Effect.gen(function* () {
     steers,
     sandboxes,
     changesAsked,
-    /** What the host's Changes report: `files` since the base, and whether any are uncommitted. */
     setChanges: (next: {
       readonly files: ReadonlyArray<ChangedFile>
       readonly uncommitted: boolean

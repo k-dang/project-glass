@@ -136,11 +136,8 @@ export class GitHubRequestPolicy extends Context.Service<
 
         const previous = pauses.get(credential)
 
-        // Concurrent refusals belong to the same cooldown, not successive retry attempts.
-        const attempt =
-          previous !== undefined && previous.retryAt > now
-            ? previous.attempt
-            : (previous?.attempt ?? 0) + 1
+        const inSameCooldown = previous !== undefined && previous.retryAt > now
+        const attempt = inSameCooldown ? previous.attempt : (previous?.attempt ?? 0) + 1
 
         const retryAfter = headers["retry-after"]?.trim()
 

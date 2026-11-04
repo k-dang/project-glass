@@ -35,7 +35,6 @@ export class Branches extends Schema.Class<Branches>("Branches")({
   branches: Schema.Array(Schema.String),
 }) {}
 
-/** A model an agent program offers, with the efforts it takes, from lowest to highest. */
 export const AgentModel = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
@@ -44,7 +43,6 @@ export const AgentModel = Schema.Struct({
 
 export type AgentModel = typeof AgentModel.Type
 
-/** How much a Claude Code Agent asks before it acts: Claude Code's own modes of these names. */
 export const PermissionMode = Schema.Literals([
   "default",
   "acceptEdits",
@@ -54,11 +52,9 @@ export const PermissionMode = Schema.Literals([
 
 export type PermissionMode = typeof PermissionMode.Type
 
-/** The mode an Agent starts in unless the user picks another. */
 export const defaultPermissionMode: PermissionMode = "auto"
 
 export interface AgentCapabilities {
-  /** The Permission modes the program takes; none for a program that doesn't ask. */
   readonly permissionModes: ReadonlyArray<PermissionMode>
 }
 
@@ -67,10 +63,6 @@ export const engineCapabilities: Record<AgentEngine, AgentCapabilities> = {
   pi: { permissionModes: [] },
 }
 
-/**
- * A skill, prompt template, or command the agent program runs when a message starts with `/name`,
- * as the program lists it for a folder.
- */
 export const AgentCommand = Schema.Struct({
   name: Schema.String,
   description: Schema.String,
@@ -78,15 +70,11 @@ export const AgentCommand = Schema.Struct({
 
 export type AgentCommand = typeof AgentCommand.Type
 
-/** What an agent program offers in a place: its models. */
-
 export class AgentModels extends Schema.Class<AgentModels>("AgentModels")({
-  /** What a `null` model runs: the program's own default, if it has one. */
   defaultModel: Schema.NullOr(AgentModel),
   models: Schema.Array(AgentModel),
 }) {}
 
-/** `null` leaves the choice to the agent program: its default model, or the model's default effort. */
 export const ModelChoice = Schema.Struct({
   model: Schema.NullOr(Schema.String),
   effort: Schema.NullOr(Schema.String),
@@ -115,24 +103,20 @@ export const goneExplanation = (reach: GoneReach) =>
   `This Agent's Sandbox ${reach === "expired" ? "expired" : "was deleted"}, so it can't take messages. Its transcript stays until you remove the Agent.`
 
 export class SandboxStatus extends Schema.Class<SandboxStatus>("SandboxStatus")({
-  /** `null` until the Sandbox's provider says when it expires, and for one whose Sandboxes don't. */
   expiresAt: Schema.NullOr(Schema.DateTimeUtcFromString),
   reach: SandboxReach,
 }) {}
 
 export class Agent extends Schema.Class<Agent>("Agent")({
   id: Schema.String,
-  /** Also the name of the branch the Agent works on. */
   name: Schema.String,
   place: AgentPlace,
   repository: FollowedRepository,
   baseBranch: Schema.String,
   engine: AgentEngine,
   ...ModelChoice.fields,
-  /** `null` for a program without Permission modes. */
   permissionMode: Schema.NullOr(PermissionMode),
   createdAt: Schema.DateTimeUtcFromString,
-  /** `null` for a local Agent, and for a Sandbox Agent whose Sandbox doesn't exist yet. */
   sandbox: Schema.NullOr(SandboxStatus),
 }) {}
 
@@ -145,7 +129,6 @@ export const ImageMediaType = Schema.Literals([
 
 export type ImageMediaType = typeof ImageMediaType.Type
 
-/** An image attached to a message, its bytes in base64. */
 export const Image = Schema.Struct({ mediaType: ImageMediaType, data: Schema.String })
 
 export type Image = typeof Image.Type
@@ -174,7 +157,6 @@ export const ToolCallPart = Schema.TaggedStruct("ToolCall", {
 
 const Decision = Schema.Literals(["waiting", "allowed", "denied", "expired"])
 
-/** `reason` is what the user told the Agent when they denied it. */
 export const PermissionRequestPart = Schema.TaggedStruct("PermissionRequest", {
   requestId: Schema.String,
   toolName: Schema.String,
@@ -185,7 +167,6 @@ export const PermissionRequestPart = Schema.TaggedStruct("PermissionRequest", {
 })
 
 export const AskedQuestion = Schema.Struct({
-  /** A short label for the question, when the program gives one. */
   header: Schema.NullOr(Schema.String),
   question: Schema.String,
   detail: Schema.NullOr(Schema.String),
@@ -193,13 +174,11 @@ export const AskedQuestion = Schema.Struct({
     Schema.Struct({ label: Schema.String, description: Schema.NullOr(Schema.String) }),
   ),
   multiSelect: Schema.Boolean,
-  /** Whether the user may answer in their own words instead of with an option. */
   freeText: Schema.Boolean,
 })
 
 export type AskedQuestion = typeof AskedQuestion.Type
 
-/** The user's answer to one question: the options they chose, or their own words. */
 export const QuestionReply = Schema.Struct({
   chosen: Schema.Array(Schema.String),
   text: Schema.NullOr(Schema.String),
@@ -207,7 +186,6 @@ export const QuestionReply = Schema.Struct({
 
 export type QuestionReply = typeof QuestionReply.Type
 
-/** `answers` holds one reply per question once answered. */
 export const QuestionPart = Schema.TaggedStruct("Question", {
   requestId: Schema.String,
   questions: Schema.Array(AskedQuestion),
@@ -215,7 +193,6 @@ export const QuestionPart = Schema.TaggedStruct("Question", {
   answers: Schema.NullOr(Schema.Array(QuestionReply)),
 })
 
-/** A message the user Steered into the Turn, placed where the agent program took it in. */
 export const SteerPart = Schema.TaggedStruct("Steer", SentMessage.fields)
 
 export const TurnPart = Schema.Union([
@@ -229,12 +206,14 @@ export const TurnPart = Schema.Union([
 
 export type TurnPart = typeof TurnPart.Type
 
-/** A Permission request or a Question: a part the user answers. */
 export type RequestPart = Extract<TurnPart, { readonly requestId: string }>
 
-/** Transcripts' SQL finds request parts by these tags too. */
+export const requestPartTags = ["PermissionRequest", "Question"] as const satisfies ReadonlyArray<
+  RequestPart["_tag"]
+>
+
 export const isRequestPart = (part: TurnPart): part is RequestPart =>
-  Predicate.isTagged(part, "PermissionRequest") || Predicate.isTagged(part, "Question")
+  requestPartTags.some((tag) => tag === part._tag)
 
 export const isWaiting = (part: TurnPart): part is RequestPart =>
   isRequestPart(part) && part.status === "waiting"
@@ -247,12 +226,10 @@ export const AnswerQuestion = Schema.TaggedStruct("Answer", {
   answers: Schema.Array(QuestionReply),
 })
 
-/** Allow or Deny answers a Permission request; Answer answers a Question. */
 export const RequestAnswer = Schema.Union([AllowRequest, DenyRequest, AnswerQuestion])
 
 export type RequestAnswer = typeof RequestAnswer.Type
 
-/** One reply answers a question with its own options, or in words where it takes them. */
 const fits = (asked: AskedQuestion, reply: QuestionReply | undefined) =>
   reply !== undefined &&
   reply.chosen.length > 0 !== (reply.text !== null) &&
@@ -260,16 +237,12 @@ const fits = (asked: AskedQuestion, reply: QuestionReply | undefined) =>
   (asked.multiSelect || reply.chosen.length <= 1) &&
   reply.chosen.every((label) => asked.options.some((option) => option.label === label))
 
-/**
- * The request as it reads once answered, or once it can no longer be answered when `answer` is
- * `null`; `undefined` when the answer doesn't fit the request.
- */
-export const settleRequest = (
-  part: RequestPart,
-  answer: RequestAnswer | null,
-): RequestPart | undefined => {
-  if (answer === null) return { ...part, status: "expired" }
+export const expireRequest = (part: RequestPart): RequestPart => ({ ...part, status: "expired" })
 
+export const answerRequest = (
+  part: RequestPart,
+  answer: RequestAnswer,
+): RequestPart | undefined => {
   if (Predicate.isTagged(part, "Question"))
     return Predicate.isTagged(answer, "Answer") &&
       answer.answers.length === part.questions.length &&
@@ -288,15 +261,12 @@ export const settleRequest = (
 
 export const TurnDone = Schema.TaggedStruct("Done", {})
 
-/** `reason` is written for the user and never carries raw agent output. */
 export const TurnFailed = Schema.TaggedStruct("Failed", { reason: Schema.String })
 
 export const TurnStopped = Schema.TaggedStruct("Stopped", {})
 
-/** Glass lost the Agent while the Turn ran. */
 export const TurnCutOff = Schema.TaggedStruct("CutOff", {})
 
-/** The Turn was running when Glass quit. */
 export const TurnInterrupted = Schema.TaggedStruct("Interrupted", {})
 
 export const TurnEnding = Schema.Union([
@@ -353,7 +323,6 @@ export type QueuedMessage = typeof QueuedMessage.Type
 
 export const Transcript = Schema.Struct({
   turns: Schema.Array(Turn),
-  /** In the order they start. */
   queued: Schema.Array(QueuedMessage),
   status: Schema.NullOr(Schema.String),
 })
@@ -401,7 +370,7 @@ export const endTurnEvents = (
     if (Predicate.isTagged(part, "ToolCall") && part.status === "running")
       return [PartSet.make({ turnId, index, part: { ...part, status: "failed" } })]
 
-    const expired = isWaiting(part) ? settleRequest(part, null) : undefined
+    const expired = isWaiting(part) ? expireRequest(part) : undefined
 
     return expired === undefined ? [] : [PartSet.make({ turnId, index, part: expired })]
   }),
@@ -465,8 +434,7 @@ export const NewAgent = Schema.Struct({
   baseBranch: Schema.String,
   engine: AgentEngine,
   ...ModelChoice.fields,
-  /** `null` starts a program with Permission modes in `defaultPermissionMode`. */
-  permissionMode: Agent.fields.permissionMode,
+  permissionMode: Schema.NullOr(PermissionMode),
   place: AgentPlace,
   ...MessageInput.fields,
 })
@@ -494,16 +462,13 @@ export class AgentNotFound extends Schema.TaggedError<AgentNotFound>()("AgentNot
 
 export class AgentBusy extends Schema.TaggedError<AgentBusy>()("AgentBusy", {}) {}
 
-/** A Permission request or Question waits on the user, who answers it before sending more. */
 export class RequestWaiting extends Schema.TaggedError<RequestWaiting>()("RequestWaiting", {}) {}
 
-/** The request was answered already, or its Turn ended. */
 export class RequestNotWaiting extends Schema.TaggedError<RequestNotWaiting>()(
   "RequestNotWaiting",
   {},
 ) {}
 
-/** The Agent's program has no Permission modes. */
 export class NoPermissionModes extends Schema.TaggedError<NoPermissionModes>()(
   "NoPermissionModes",
   {},

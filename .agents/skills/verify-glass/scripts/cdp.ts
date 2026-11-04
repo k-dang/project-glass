@@ -48,7 +48,6 @@ export class Cdp {
     socket.addEventListener("close", () => this.rejectPending(new Error("CDP target closed")))
   }
 
-  /** Listens for a CDP event, as `Target.attachedToTarget` reports a new worker target. */
   on(method: string, listener: (params: unknown) => void) {
     const listeners = this.listeners.get(method) ?? new Set()
     listeners.add(listener)

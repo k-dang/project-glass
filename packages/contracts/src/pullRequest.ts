@@ -4,11 +4,12 @@ import { Discussions } from "./discussion"
 import { Draft } from "./draft"
 import { Revision } from "./revision"
 
+const GRAPHQL_INT_MAX = 2 ** 31 - 1
+
 export class PullRequestRef extends Schema.Class<PullRequestRef>("PullRequestRef")({
   owner: Schema.String.check(Schema.isPattern(/^[A-Za-z0-9-]+$/)),
   repo: Schema.String.check(Schema.isPattern(/^[\w.-]+$/)),
-  // GitHub's GraphQL Int is signed 32-bit.
-  number: Schema.Int.check(Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(2 ** 31 - 1)),
+  number: Schema.Int.check(Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(GRAPHQL_INT_MAX)),
 }) {}
 
 /** GitHub matches owner and repository names ignoring case, so this identifies one PR. */
@@ -19,7 +20,6 @@ export const PullRequestState = Schema.Literals(["draft", "open", "closed", "mer
 
 export type PullRequestState = typeof PullRequestState.Type
 
-/** Whether the PR's Reviews satisfy its repository's rules, or null when the rules require none. */
 export const Approval = Schema.Literals(["approved", "changes-requested", "review-required"])
 
 export type Approval = typeof Approval.Type
@@ -97,7 +97,6 @@ export class ChangedFile extends Schema.Class<ChangedFile>("ChangedFile")({
   patch: FilePatch,
 }) {}
 
-/** The GitHub user Glass acts as, who writes the workspace's Drafts. */
 export class Viewer extends Schema.Class<Viewer>("Viewer")({
   login: Schema.String,
   avatarUrl: Schema.String,

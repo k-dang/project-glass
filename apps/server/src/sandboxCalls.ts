@@ -103,7 +103,6 @@ export const extendSandbox = (
 const didntStart = () =>
   new AgentError({ message: "The agent in the Sandbox didn't start. Try again." })
 
-// A Sandbox gone while being made is one Glass discards and makes again, not one left to remove.
 export const waitForHost = (provider: SandboxProvider, state: SandboxState) =>
   targetOf(provider, state).pipe(
     Effect.catchTag("SandboxGone", () => Effect.fail(didntStart())),

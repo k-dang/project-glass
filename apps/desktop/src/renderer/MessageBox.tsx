@@ -95,19 +95,15 @@ export function MessageBox(props: {
   setComposed: (update: (current: SentMessage) => SentMessage) => void
   label: string
   placeholder: string
-  /** Takes no images or To-do mentions, for a message that carries only its text. */
   textOnly?: boolean
-  /** Keeps the message, read-only, until it is accepted, for a send that shows nothing of it before then. */
   holdUntilAccepted?: boolean
   blocked: boolean
   problem: Problem | null
-  /** Why sending is blocked, when the placeholder alone can't say it. */
   notice?: ReactNode
   send: (message: MessageInput) => Promise<boolean>
   steer: ((message: MessageInput) => Promise<boolean>) | null
   recall: SentMessage | null
   onStop: (() => void) | null
-  /** What the Agent program runs as `/name` at the start of a message. */
   commands?: ReadonlyArray<AgentCommand>
   pickers?: ReactNode
   children?: ReactNode
@@ -129,8 +125,6 @@ export function MessageBox(props: {
 
   const mentions = useMentionPicker(editor, !props.textOnly)
   const commands = useCommandPicker(editor, props.commands ?? noCommands)
-  // `@` opens only after a space or at a line's start, and `/` only with no space after it, so
-  // the two are never open together.
   const picker = mentions.activeDescendant === null ? commands : mentions
 
   useLayoutEffect(() => {
@@ -181,7 +175,6 @@ export function MessageBox(props: {
     })
 
   const onKeyDown = (event: KeyboardEvent) => {
-    // Enter can confirm an input method's candidates.
     if (event.isComposing) return false
 
     if (picker.onKeyDown(event)) return true

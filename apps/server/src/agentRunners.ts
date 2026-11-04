@@ -46,11 +46,6 @@ const answerSchema = (answer: Schema.Decoder<unknown>): JsonSchema.JsonSchema =>
   return { ...document.schema, $defs: document.definitions }
 }
 
-/**
- * Every runner asks for the answer as text matching a schema sent with the prompt. pi has no
- * schema-constrained output, and Claude Code's `--json-schema` would put the schema in argv, where
- * endpoint security tools kill processes with long arguments.
- */
 const promptWithSchema = (task: AgentTask<unknown>) =>
   `${task.prompt}\n\nOutput JSON Schema:\n${JSON.stringify(answerSchema(task.answer))}`
 
@@ -240,8 +235,6 @@ const runnerStrategies = Effect.gen(function* () {
 
   const piReadOnlyFlags = ["--tools", piReadOnlyTools.join(",")]
 
-  // The thinking level is left to pi's settings, which it fits to each model; a level a model
-  // lacks fails the request.
   const piCliFlags = ["--offline", "--no-session", ...piLoadsNothing]
 
   // `--mode json` ends with an `agent_end` event carrying the conversation; its last message is
@@ -280,8 +273,6 @@ const runnerStrategies = Effect.gen(function* () {
           identity,
         )
 
-      // pi reads `--system-prompt` from a file when given a path. A file keeps the instructions
-      // out of argv, where endpoint security tools may kill processes with long arguments.
       const instructions = join(cwd, "instructions.md")
       yield* fs
         .writeFileString(instructions, task.instructions)

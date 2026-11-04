@@ -120,7 +120,6 @@ interface AgentTabs {
 
 const SAVE_DELAY_MS = 400
 
-/** Shows some tool calls as something other than a call, or answers `null` to show the call itself. */
 export const ToolCallView = createContext<
   ((call: typeof ToolCallPart.Type) => ReactNode | null) | null
 >(null)
@@ -351,12 +350,7 @@ const TurnView = memo(function TurnView(props: {
   const { turn } = props
 
   return (
-    // Sized from the 10rem estimate, the latest Turn would anchor short and jump.
-    <MessageScrollerItem
-      messageId={turn.id}
-      scrollAnchor
-      className={props.latest ? "[content-visibility:visible]" : undefined}
-    >
+    <MessageScrollerItem messageId={turn.id} scrollAnchor exactHeight={props.latest}>
       <MessageGroup className="gap-4">
         <UserMessage message={turn.message} images={turn.images} />
         <Message>

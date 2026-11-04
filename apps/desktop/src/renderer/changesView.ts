@@ -211,10 +211,7 @@ const hash = (text: string) => {
   return value >>> 0
 }
 
-/**
- * Diffs accepts controlled item-data updates only when the item's version changes. `leads` gives
- * the files that show content above their header, with its estimated height.
- */
+/** Diffs accepts controlled item-data updates only when the item's version changes. */
 export const toItems = (
   files: ReadonlyArray<ParsedFile>,
   notes: LineNotes,

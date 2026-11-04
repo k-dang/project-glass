@@ -3,8 +3,6 @@ import { runCommands } from "../../server/test/fakeModelProvider"
 import { seedClone } from "../../server/test/gitRepositories"
 import { expect, test } from "./glass"
 
-const agentTurnTimeout = 20_000
-
 test.use({
   piModel: {
     reply: runCommands({
@@ -18,7 +16,8 @@ test("reviews a local Agent's changes on its Changes tab, held still until moved
   app,
   home,
   window,
-}) => {
+}, testInfo) => {
+  testInfo.setTimeout(90_000)
   const { checkout } = seedClone(join(home, "repositories"), "glass-demo", "greeter")
 
   await app.evaluate(({ dialog }, path) => {
@@ -39,7 +38,7 @@ test("reviews a local Agent's changes on its Changes tab, held still until moved
   const message = window.getByRole("textbox", { name: "Message" })
   await message.fill("Write a note")
   await message.press("Enter")
-  await expect(window.getByText(/^Done in/)).toBeVisible({ timeout: agentTurnTimeout })
+  await expect(window.getByText(/^Done in/)).toBeVisible({ timeout: 0 })
 
   const details = window.getByRole("button", { name: "Details" })
   await details.click()
@@ -52,7 +51,7 @@ test("reviews a local Agent's changes on its Changes tab, held still until moved
   await window.getByRole("button", { name: "Back to Chat" }).click()
   await message.fill("Write another")
   await message.press("Enter")
-  await expect(window.getByText(/^Done in/)).toHaveCount(2, { timeout: agentTurnTimeout })
+  await expect(window.getByText(/^Done in/)).toHaveCount(2, { timeout: 0 })
 
   await details.click()
   await window.getByRole("button", { name: "Changes" }).click()

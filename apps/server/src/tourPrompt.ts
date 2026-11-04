@@ -27,8 +27,6 @@ export const TourAnswer = Schema.Struct({
 
 export type TourAnswer = typeof TourAnswer.Type
 
-// Adapted from Plannotator's guided-review prompt (MIT):
-// https://github.com/backnotprop/plannotator/blob/main/packages/core/guide-prompt.ts
 export const tourInstructions = `You write Tours that help a reviewer understand a pull request.
 You are a knowledgeable colleague guiding a first reading, not performing a code review.
 Explain the change in direct, plain language. Be concrete, concise, and grounded in the supplied material.

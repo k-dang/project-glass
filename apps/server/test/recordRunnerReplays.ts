@@ -76,7 +76,6 @@ const withEnv = <A>(env: Readonly<Record<string, string | undefined>>, run: () =
 const record = async (scenario: RunnerScenario) => {
   const pi = { provider: provider!, modelId: scenario.piModelId ?? modelId.join("/") }
 
-  // Only the model the scenario runs: the other program's is the recorder's own and never used.
   const models: EngineModels =
     scenario.engine === "pi"
       ? { "claude-code": "unused", pi }

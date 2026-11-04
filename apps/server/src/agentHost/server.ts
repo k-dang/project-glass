@@ -24,7 +24,6 @@ const RequireToken = (token: Redacted.Redacted) =>
     { global: true },
   )
 
-/** The agent host's routes on an HTTP server: its RPCs over WebSocket, health check, and shutdown. */
 export const hostServer = (options: {
   readonly token: Redacted.Redacted
   readonly shutDown: Deferred.Deferred<void>

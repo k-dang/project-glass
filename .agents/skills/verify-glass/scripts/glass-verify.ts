@@ -279,7 +279,6 @@ const clickElement = async (page: Cdp, role: string, name: string) => {
   const { object } = await page.send("DOM.resolveNode", RemoteObject, {
     backendNodeId: node?.backendDOMNodeId,
   })
-  // A control the pointer can't reach, like an `sr-only` radio, takes the click through its label.
   const {
     result: { value: at },
   } = await page.send("Runtime.callFunctionOn", Point, {

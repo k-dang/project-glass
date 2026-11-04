@@ -22,7 +22,9 @@
     "effect": "catalog:",
     "graphql": "16.14.2",
     "jiti": "2.7.0",
+    "vite": "catalog:",
     "vite-plus": "catalog:",
-    "zod": "3.25.76"
+    "vitest": "catalog:",
+    "zod": "4.6.7"
   }
 }

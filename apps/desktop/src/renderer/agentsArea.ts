@@ -129,12 +129,10 @@ class NewAgentOf extends Data.Class<{
   readonly repository: FollowedRepository
 }> {}
 
-/** Kept a while, as asking costs starting the program; a skill added since shows after. */
 const COMMANDS_IDLE_TTL = "5 minutes"
 
 export const noCommands: ReadonlyArray<AgentCommand> = []
 
-/** None while the program is asked, or when it can't answer: the composer works the same without. */
 const commandsOf = (
   listing: Atom.Atom<AsyncResult.AsyncResult<ReadonlyArray<AgentCommand>, unknown>>,
 ) => Atom.map(listing, (listed) => Option.getOrElse(AsyncResult.value(listed), () => noCommands))
@@ -188,7 +186,6 @@ export const changePermissionModeAtom = Atom.family((agentId: string) =>
   ),
 )
 
-/** One per request, so a failed answer shows only on its own card. */
 export const answerRequestAtom = Atom.family((requestId: string) =>
   backendRuntime.fn((answered: { readonly agentId: string; readonly answer: RequestAnswer }) =>
     Backend.use((backend) => backend.AnswerRequest({ requestId, ...answered })),

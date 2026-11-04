@@ -34,7 +34,6 @@ export function propertyName(
   return literalString(key)
 }
 
-// Follow imports and immutable local aliases, respecting lexical shadowing.
 export function importedPath(
   source: SourceCode,
   node: ESTree.Node,

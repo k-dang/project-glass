@@ -134,7 +134,6 @@ export const openPullRequest = async (window: Page, pr: FakePullRequest) => {
 export const startLineDraft = async (changes: Locator, line: string) => {
   const start = changes.getByRole("button", { name: "Start a Draft on this line" })
 
-  // The diff can render again after the hover, dropping the gutter button until the pointer moves.
   await expect(async () => {
     await changes.getByText(line, { exact: true }).hover()
     await start.click({ timeout: 5000 })

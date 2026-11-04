@@ -32,7 +32,6 @@ type ScrollBehavior = "smooth" | "instant"
 
 export interface TourViewHandle {
   showFile: (path: string, behavior?: ScrollBehavior) => void
-  /** Scrolls back to the current file, leaving a collapsed Chapter collapsed. */
   returnTo: (path: string) => void
   showLine: (path: string, side: DiffSide, line: number) => void
   showChapter: (index: number, behavior: ScrollBehavior) => void
@@ -51,6 +50,51 @@ interface TourViewProps extends Omit<
 interface ChapterSection {
   element: HTMLElement
   view: RefObject<ViewHandle | null>
+}
+
+const useChapterDoneFlags = (
+  viewedFiles: TourViewProps["viewedFiles"],
+  groups: ReadonlyArray<{ readonly files: ReadonlyArray<ParsedFile> }>,
+) =>
+  useAtomValue(viewedFiles.stateAtom, ({ viewed }) =>
+    groups
+      .map(({ files }) =>
+        Number(
+          allViewed(
+            files.map(({ file }) => file.path),
+            viewed,
+          ),
+        ),
+      )
+      .join(""),
+  )
+
+const useReopenedChapters = (done: string) => {
+  const [opened, setOpened] = useState<ReadonlySet<number>>(new Set())
+
+  const collapsed = useCallback(
+    (index: number) => done[index] === "1" && !opened.has(index),
+    [done, opened],
+  )
+
+  const stillDone = [...opened].filter((index) => done[index] === "1")
+
+  if (stillDone.length !== opened.size) setOpened(new Set(stillDone))
+
+  const setChapterOpen = useCallback(
+    (index: number, open: boolean) =>
+      setOpened((before) => {
+        const after = new Set(before)
+
+        if (open) after.add(index)
+        else after.delete(index)
+
+        return after
+      }),
+    [],
+  )
+
+  return { opened, collapsed, setChapterOpen }
 }
 
 export function TourView(props: TourViewProps) {
@@ -75,9 +119,6 @@ export function TourView(props: TourViewProps) {
     () => new Map(initial === null ? [] : [[initial.chapter, initial.path]]),
   )
 
-  // Viewed Chapters collapse to a row unless the user reopened them.
-  const [opened, setOpened] = useState<ReadonlySet<number>>(new Set())
-
   const groups = useMemo(() => {
     const byPath = new Map(reading.files.map((entry) => [entry.file.path, entry]))
 
@@ -91,42 +132,8 @@ export function TourView(props: TourViewProps) {
     return rest.length === 0 ? chapters : [...chapters, { chapter: null, files: rest }]
   }, [reading])
 
-  // A string, so the Tour re-renders only when a Chapter becomes viewed or unviewed.
-  const done = useAtomValue(props.viewedFiles.stateAtom, ({ viewed }) =>
-    groups
-      .map(({ files }) =>
-        Number(
-          allViewed(
-            files.map(({ file }) => file.path),
-            viewed,
-          ),
-        ),
-      )
-      .join(""),
-  )
-
-  const collapsed = useCallback(
-    (index: number) => done[index] === "1" && !opened.has(index),
-    [done, opened],
-  )
-
-  // Unviewing a reopened Chapter forgets it, so viewing it again collapses it again.
-  const stillDone = [...opened].filter((index) => done[index] === "1")
-
-  if (stillDone.length !== opened.size) setOpened(new Set(stillDone))
-
-  const setChapterOpen = useCallback(
-    (index: number, open: boolean) =>
-      setOpened((before) => {
-        const after = new Set(before)
-
-        if (open) after.add(index)
-        else after.delete(index)
-
-        return after
-      }),
-    [],
-  )
+  const done = useChapterDoneFlags(props.viewedFiles, groups)
+  const { opened, collapsed, setChapterOpen } = useReopenedChapters(done)
 
   const open = useCallback(
     (index: number) => {
@@ -163,7 +170,6 @@ export function TourView(props: TourViewProps) {
 
     if (root === null || section === undefined) return undefined
 
-    // Container queries settle after a newly mounted Tour's first layout.
     return requestAnimationFrame(() => {
       if (!root.isConnected || !section.element.isConnected) return
 
@@ -183,26 +189,23 @@ export function TourView(props: TourViewProps) {
     })
   }, [])
 
-  // Finishing the Chapter in view collapses it, so move on to the next unfinished one in the
-  // same frame; the collapse already moved it close, so a smooth scroll would only twitch.
-  // The Chapter in view comes from the last scroll, since the collapse moves the layout.
   const inView = useRef(initial?.chapter ?? 0)
   const wasDone = useRef(done)
 
   useLayoutEffect(() => {
     const before = wasDone.current
     wasDone.current = done
-    const finished = inView.current
+    const finishedChapter = inView.current
 
-    if (done[finished] !== "1" || before[finished] !== "0") return
+    if (done[finishedChapter] !== "1" || before[finishedChapter] !== "0") return
 
     const root = container.current
-    const next = sections.current.get(done.indexOf("0", finished + 1))
+    const nextUnfinished = sections.current.get(done.indexOf("0", finishedChapter + 1))
 
-    if (root === null || next === undefined) return
+    if (root === null || nextUnfinished === undefined) return
 
     root.scrollTop +=
-      next.element.getBoundingClientRect().top - root.getBoundingClientRect().top - 20
+      nextUnfinished.element.getBoundingClientRect().top - root.getBoundingClientRect().top - 20
   }, [done])
 
   useLayoutEffect(() => {
@@ -401,7 +404,6 @@ function ChapterCard(props: {
   const toggle = useRef<HTMLButtonElement>(null)
   const wasCollapsed = useRef(props.collapsed)
 
-  // Opening or collapsing unmounts the focused control, so focus the one that replaced it.
   useLayoutEffect(() => {
     if (wasCollapsed.current === props.collapsed) return
 

@@ -7,7 +7,6 @@ import { warningTone } from "./PullRequestRow"
 import { ShortSha } from "./shortSha"
 import type { AgentReviewControls } from "./useAgentReview"
 
-/** Starts an Agent review, or opens a current one beside the diff. */
 export function AgentReviewButton(props: { controls: AgentReviewControls; onRead: () => void }) {
   const { job, review, outdated, start } = props.controls
 
@@ -88,7 +87,6 @@ export function ReviewingLine(props: {
   )
 }
 
-/** An Agent review the Queue started, waiting for another to finish. */
 export function WaitingLine(props: {
   controls: AgentReviewControls
   size: "xs" | "sm"

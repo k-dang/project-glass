@@ -14,8 +14,7 @@ const git = (directory: string, args: ReadonlyArray<string>, input?: Buffer) =>
 
 const data = (text: string) => [`data ${Buffer.byteLength(text)}\n`, text, "\n"]
 
-// Fixed metadata makes a commit's SHA depend only on its files and parent, so publishing again keeps it.
-const fastImportCommit = (ref: string, files: FakeCommit["files"]) => [
+const deterministicCommit = (ref: string, files: FakeCommit["files"]) => [
   `commit ${ref}\n`,
   "committer Glass Fake <fake@glass.test> 0 +0000\n",
   ...data("Fake commit"),
@@ -75,7 +74,6 @@ export const trafficMeter = (): TrafficMeter => {
   }
 }
 
-/** Runs `git http-backend`, the CGI program behind git's smart HTTP, for one request. */
 const httpBackend = (
   root: string,
   request: HttpServerRequest.HttpServerRequest,
@@ -128,6 +126,10 @@ const httpBackend = (
     })
 
     backend.stdin.end(body)
+
+    return Effect.callback<void>((closed) => {
+      backend.once("close", () => closed(Effect.void))
+    })
   })
 
 export interface FakeGitRemote {
@@ -163,8 +165,8 @@ export const startFakeGitRemote = Effect.fnUntraced(function* (options: {
 
     const stream = [
       `reset ${ref}\n`,
-      ...fastImportCommit(ref, base.files),
-      ...fastImportCommit(ref, head.files),
+      ...deterministicCommit(ref, base.files),
+      ...deterministicCommit(ref, head.files),
     ]
 
     git(directory, ["fast-import", "--quiet", "--force"], Buffer.from(stream.join("")))

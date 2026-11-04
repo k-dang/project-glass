@@ -16,11 +16,9 @@ const material = Schema.fromJsonString(
   }),
 )
 
-/** The PR material is the prompt's first JSON line. */
 const decodeMaterial = (prompt: string) =>
   Schema.decodeUnknownSync(material)(prompt.slice(prompt.indexOf("{")).split("\n")[0])
 
-/** Pairs the files into Chapters, leaving the last for Everything else once there are three. */
 const syntheticTour = (prompt: string): TourAnswer => {
   const { title, files } = decodeMaterial(prompt)
 

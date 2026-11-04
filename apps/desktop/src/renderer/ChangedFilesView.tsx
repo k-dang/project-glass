@@ -382,7 +382,6 @@ export function ChangedFilesView(props: ChangedFilesViewProps) {
     [drafts],
   )
 
-  // Marking a file viewed moves on to the next unviewed file in this view.
   const viewFile = useCallback(
     (path: string, viewed: boolean) => {
       onViewedChange([path], viewed)

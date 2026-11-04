@@ -12,8 +12,6 @@ const resolver = new ResolverFactory({
   builtinModules: true,
 })
 
-// These files assemble or implement transports. A service calling LocalAgentHost or
-// sandboxCalls is using an adapter; it still cannot import handlers or server setup.
 const transportOwners = new Set([
   "bin.ts",
   "server.ts",
@@ -111,6 +109,8 @@ export const architecture = defineRule({
         "Shared contracts cannot import app implementations or app test fixtures ({{target}}).",
       transport:
         "Keep backend logic independent of HTTP/RPC transport implementation ({{target}}). Use contracts or a service adapter; transport owners are listed in tools/oxlint/glass/architecture.ts.",
+      standalone:
+        "The verify-glass helper loads the fakes that import this file under plain Node, which can't resolve the server's extensionless imports, so it imports nothing ({{target}}).",
     },
   },
   create(context) {
@@ -127,7 +127,7 @@ export const architecture = defineRule({
     function check(node: ESTree.Node, specifier: string, onlyTypes = false) {
       const resolved = resolver.resolveFileSync(context.filename, specifier)
       const target = resolved.path ? projectPath(resolved.path) : specifier
-      let messageId: "renderer" | "contracts" | "transport" | undefined
+      let messageId: "renderer" | "contracts" | "transport" | "standalone" | undefined
 
       if (
         renderer &&
@@ -143,12 +143,13 @@ export const architecture = defineRule({
 
       if (contracts && target.startsWith("apps/")) messageId = "contracts"
 
+      if (filename === "apps/server/src/gitEnv.ts" && !onlyTypes) messageId = "standalone"
+
       if (backend && !transportOwners.has(backendFile)) {
         const localTransport =
           target.startsWith("apps/server/src/") &&
           entryPoints.has(target.slice("apps/server/src/".length))
 
-        // Resolve first so aliases to Effect's entry points get the same treatment.
         const effectModule = target
           .replaceAll("\\", "/")
           .match(/\/effect\/(?:dist|src)\/(.+?)(?:\.js|\.ts)$/)?.[1]

@@ -9,7 +9,6 @@ export class QueuedPullRequest extends Schema.Class<QueuedPullRequest>("QueuedPu
   queuedAt: Schema.DateTimeUtcFromString,
   pullRequest: PullRequestSummary,
   state: PullRequestState,
-  /** As GitHub last answered; null for a PR queued before Glass kept it, until it refreshes. */
   revision: Schema.NullOr(Revision),
   openedSinceQueued: Schema.Boolean,
   problem: Schema.NullOr(GitHubUnavailable),

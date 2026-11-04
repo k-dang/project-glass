@@ -20,11 +20,8 @@ export const pullRequestJobs = Effect.fnUntraced(function* <S, E>(options: {
   readonly load: (pr: PullRequestRef) => Effect.Effect<S, E>
   readonly inProgress: (state: S) => boolean
   readonly idle: (state: S) => S
-  /** How many background jobs run at once; the rest wait for a slot. */
   readonly backgroundSlots: number
-  /** Whether a background job should start from this state. */
   readonly needsBackground: (state: S) => boolean
-  /** The state of a background job waiting for a slot; `inProgress` must count it. */
   readonly waiting: (state: S) => S
 }) {
   const scope = yield* Scope.Scope
@@ -104,7 +101,6 @@ export const pullRequestJobs = Effect.fnUntraced(function* <S, E>(options: {
         ),
       )
 
-  /** Starts `run` in a background slot unless the PR's state says it isn't needed. */
   const startInBackground = Effect.fnUntraced(function* (
     pr: PullRequestRef,
     run: (job: PullRequestJob<S>) => Effect.Effect<void>,
@@ -122,7 +118,6 @@ export const pullRequestJobs = Effect.fnUntraced(function* <S, E>(options: {
     )
   })
 
-  /** Stops the PR's job, if one is in memory: without one, nothing is running. */
   const stop = (pr: PullRequestRef) => {
     const job = jobs.get(referenceKey(pr))
 

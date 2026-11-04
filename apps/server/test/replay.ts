@@ -86,7 +86,6 @@ export const singleCommand = (command: ChildProcess.Command) =>
     ? Effect.succeed(command)
     : Effect.die(new Error("Recordings cover single commands only"))
 
-// A JavaScript CLI runs as `node <script> ...args`; only its own arguments are the run's.
 export const programArgs = (command: ChildProcess.StandardCommand) =>
   command.command === process.execPath ? command.args.slice(1) : command.args
 

@@ -53,10 +53,6 @@ type Saved = Omit<LookedUpPullRequest, "revision"> & { readonly revision: Revisi
 
 type Candidate = Pick<QueuedPullRequest, "pullRequest" | "state" | "revision" | "problem">
 
-/**
- * One kind of agent work the Queue starts in the background, when its setting is on. Whether a PR
- * needs it is the feature's own call, made inside `start`.
- */
 interface QueueWork {
   readonly subject: string
   readonly start: (pr: PullRequestRef, revision: Revision) => Effect.Effect<void, unknown>
@@ -93,8 +89,7 @@ export class Queue extends Context.Service<
       const tours = yield* Tours
       const agentReviews = yield* AgentReviews
       const settings = yield* SettingsStore
-      // Starting work and turning it off take turns, so none starts after it's off.
-      const workLock = yield* Semaphore.make(1)
+      const workToggleLock = yield* Semaphore.make(1)
       const now = DateTime.now.pipe(Effect.map(DateTime.formatIso))
 
       const read = Effect.gen(function* () {
@@ -174,7 +169,7 @@ export class Queue extends Context.Service<
           }
         }).pipe(
           Effect.catch((cause) => Effect.logWarning("Couldn't start work for the Queue", cause)),
-          workLock.withPermits(1),
+          workToggleLock.withPermits(1),
         )
 
       const cancelWork = (ref: PullRequestRef) =>
@@ -381,7 +376,7 @@ export class Queue extends Context.Service<
         yield* settings.update((current) => withQueueWork(current, feature, on))
 
         if (!on) yield* work[feature].cancelBackground()
-      }, workLock.withPermits(1))
+      }, workToggleLock.withPermits(1))
 
       return Queue.of({
         saved: () => read,

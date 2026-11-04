@@ -91,7 +91,6 @@ export interface CheckoutRun<I, A> {
   readonly task: (input: I) => Effect.Effect<CheckoutTask<A>, CheckoutRunFailure>
 }
 
-/** The agent's answer, with the PR material it was asked about. */
 export interface CheckoutAnswer<I, A> {
   readonly input: I
   readonly answer: A
@@ -153,11 +152,6 @@ const checkoutError =
     return checkoutRunFailure(reason, message, identity)
   }
 
-/**
- * Picks the Agent review engine, which must read a PR's code, then runs agent tasks over a
- * read-only checkout of a Revision beside PR material read from GitHub. Each run removes its
- * checkout when it ends; a copy's checkout lasts until its owner removes it.
- */
 export class CheckoutRuns extends Context.Service<
   CheckoutRuns,
   {

@@ -67,14 +67,12 @@ export type NewDraft = typeof NewDraft.Type
 const toDoList = { success: Schema.Array(ToDo), error: ToDoError }
 
 export class GlassRpcs extends RpcGroup.make(
-  /** One per area, newest first. */
   Rpc.make("GetSavedPlaces", { success: Schema.Array(SavedPlace), error: SavedPlaceError }),
   Rpc.make("SavePlace", {
     payload: { destination: ResumableDestination },
     success: SavedPlace,
     error: SavedPlaceError,
   }),
-  /** Writes with the Tour engine. */
   Rpc.make("WriteTour", {
     payload: { pullRequest: PullRequestRef, revision: Revision },
     error: TourFailure,
@@ -86,15 +84,10 @@ export class GlassRpcs extends RpcGroup.make(
     error: TourFailure,
     stream: true,
   }),
-  /** Starting again cancels a running Agent review; the finished one replaces the last. */
   Rpc.make("StartAgentReview", {
     payload: { pullRequest: PullRequestRef, revision: Revision },
     error: AgentReviewFailure,
   }),
-  /**
-   * Sends a Follow-up to the Agent review's Agent, on the review's own Revision. The first starts
-   * the Agent; cancelling the Agent review cancels that start.
-   */
   Rpc.make("FollowUpAgentReview", {
     payload: { pullRequest: PullRequestRef, revision: Revision, message: FollowUpMessage },
     error: AgentReviewFailure,
@@ -109,7 +102,6 @@ export class GlassRpcs extends RpcGroup.make(
     error: AgentReviewFailure,
     stream: true,
   }),
-  /** Answers privately, saving nothing; interrupting the call cancels the agent. */
   Rpc.make("Ask", {
     payload: {
       pullRequest: PullRequestRef,
@@ -136,7 +128,6 @@ export class GlassRpcs extends RpcGroup.make(
     success: EngineSettings,
     error: SettingsError,
   }),
-  /** Whether Glass writes a Tour or runs an Agent review for each open PR added to the Queue; off until the user turns it on. */
   Rpc.make("GetQueueWork", {
     payload: { feature: EngineFeature },
     success: Schema.Boolean,
@@ -160,12 +151,10 @@ export class GlassRpcs extends RpcGroup.make(
     success: Schema.Array(FollowedRepository),
     error: SettingsError,
   }),
-  /** Catches up with GitHub, then lists every PR list. */
   Rpc.make("ListPullRequests", {
     success: PullRequestListings,
     error: Schema.Union([SettingsError, ConnectionError]),
   }),
-  /** The PR lists as GitHub last answered, without asking GitHub again; null before any answer. */
   Rpc.make("ListSavedPullRequests", {
     success: Schema.NullOr(PullRequestListings),
     error: SettingsError,
@@ -195,7 +184,6 @@ export class GlassRpcs extends RpcGroup.make(
     success: PullRequestWorkspace,
     error: OpenPullRequestError,
   }),
-  /** Misses changes GitHub makes without touching the PR's updatedAt, like a removed Review request. */
   Rpc.make("HasPullRequestChanged", {
     payload: {
       pullRequestId: Schema.String,
@@ -275,15 +263,12 @@ export class GlassRpcs extends RpcGroup.make(
   }),
   Rpc.make("SetToDoDone", { payload: { id: Schema.Int, done: Schema.Boolean }, ...toDoList }),
   Rpc.make("DeleteToDo", { payload: { id: Schema.Int }, ...toDoList }),
-  /** The Agents list, again after every change to it. */
   Rpc.make("WatchAgents", { success: Schema.Array(Agent), error: AgentError, stream: true }),
-  /** The ids of the Agents with a Permission request or Question waiting, again after every change. */
   Rpc.make("WatchWaitingAgents", {
     success: Schema.Array(Schema.String),
     error: AgentError,
     stream: true,
   }),
-  /** One Agent's transcript as a snapshot, then each event after it. */
   Rpc.make("WatchTranscript", {
     payload: { agentId: Schema.String },
     success: TranscriptUpdate,
@@ -311,16 +296,11 @@ export class GlassRpcs extends RpcGroup.make(
     success: AgentModels,
     error: AgentError,
   }),
-  /**
-   * What the Agent program runs as `/name` for a new Agent of the repository in the place. Empty
-   * where no folder holds the repository yet: in a Sandbox.
-   */
   Rpc.make("ListNewAgentCommands", {
     payload: { engine: AgentEngine, place: AgentPlace, repository: FollowedRepository },
     success: Schema.Array(AgentCommand),
     error: Schema.Union([InvalidLocalCheckout, AgentError]),
   }),
-  /** What the Agent's program runs as `/name` in its folder. Empty until that folder exists. */
   Rpc.make("ListAgentCommands", {
     payload: { agentId: Schema.String },
     success: Schema.Array(AgentCommand),
@@ -332,12 +312,10 @@ export class GlassRpcs extends RpcGroup.make(
     success: Agent,
     error: Schema.Union([InvalidLocalCheckout, AgentError]),
   }),
-  /** Starts a Turn, or while one runs, Queues the message. */
   Rpc.make("SendMessage", {
     payload: { agentId: Schema.String, ...MessageInput.fields },
     error: Schema.Union([AgentNotFound, RequestWaiting, AgentError]),
   }),
-  /** Sends the message into the running Turn, or as SendMessage does when it can't. */
   Rpc.make("Steer", {
     payload: { agentId: Schema.String, ...MessageInput.fields },
     error: Schema.Union([AgentNotFound, RequestWaiting, AgentError]),
@@ -346,17 +324,14 @@ export class GlassRpcs extends RpcGroup.make(
     payload: { agentId: Schema.String, queuedMessageId: Schema.String },
     error: Schema.Union([AgentNotFound, AgentError]),
   }),
-  /** Starts a Queued message's Turn now. */
   Rpc.make("SendQueuedMessage", {
     payload: { agentId: Schema.String, queuedMessageId: Schema.String },
     error: Schema.Union([AgentNotFound, AgentBusy, AgentError]),
   }),
-  /** Ends the running Turn as stopped and leaves the Queued messages waiting. */
   Rpc.make("StopTurn", {
     payload: { agentId: Schema.String },
     error: Schema.Union([AgentNotFound, AgentError]),
   }),
-  /** Tries again to reach the Sandbox of an Agent Glass can't reach. */
   Rpc.make("ReachSandbox", {
     payload: { agentId: Schema.String },
     error: Schema.Union([AgentNotFound, AgentError]),
@@ -370,13 +345,11 @@ export class GlassRpcs extends RpcGroup.make(
     payload: { agentId: Schema.String, ...SentMessage.fields },
     error: Schema.Union([AgentNotFound, AgentError]),
   }),
-  /** Applies from the Agent's next Turn. */
   Rpc.make("ChangeAgentModel", {
     payload: { agentId: Schema.String, ...ModelChoice.fields },
     success: Agent,
     error: Schema.Union([AgentNotFound, AgentError]),
   }),
-  /** Applies from the Agent's next Turn. */
   Rpc.make("ChangePermissionMode", {
     payload: { agentId: Schema.String, permissionMode: PermissionMode },
     success: Agent,
@@ -391,13 +364,11 @@ export class GlassRpcs extends RpcGroup.make(
     success: RemovalWarnings,
     error: Schema.Union([AgentNotFound, AgentError]),
   }),
-  /** The Agent's changes since its base branch, uncommitted work included. */
   Rpc.make("GetAgentChanges", {
     payload: { agentId: Schema.String },
     success: Schema.Array(ChangedFile),
     error: Schema.Union([AgentNotFound, AgentError]),
   }),
-  /** Stops the Agent, removes its worktree and transcript, and keeps its branch. */
   Rpc.make("RemoveAgent", {
     payload: { agentId: Schema.String },
     error: Schema.Union([AgentNotFound, AgentError]),

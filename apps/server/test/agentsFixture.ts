@@ -134,7 +134,6 @@ export const agentsFixture = Effect.gen(function* () {
       ...program,
     })
 
-  /** Watches an Agent's Turns until `until` holds, answering each request as it comes to wait. */
   const answering = (
     agentId: string,
     until: (turns: ReadonlyArray<Turn>) => boolean,
@@ -193,7 +192,6 @@ export const agentsFixture = Effect.gen(function* () {
 export const settled = (count: number) => (turns: ReadonlyArray<Turn>) =>
   turns.length === count && turns.every((turn) => turn.ended !== null)
 
-/** A Claude Code Agent that asks nothing, for tests about something else. */
 export const claudeCode = {
   engine: "claude-code",
   model: null,

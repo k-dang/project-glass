@@ -7,7 +7,6 @@ import { AgentRunnerIdentity } from "./engine"
 
 export const FollowUpMessage = Schema.Trimmed.check(Schema.isNonEmpty())
 
-/** A Draft the agent proposed in a Follow-up, on a line of the Agent review's diff. */
 export const SuggestedDraft = Schema.Struct({
   path: Schema.String,
   side: DiffSide,
@@ -29,12 +28,7 @@ export const acceptedSuggestedDraftOf = (call: typeof ToolCallPart.Type): Sugges
 export const AgentReview = Schema.Struct({
   revision: Revision,
   writtenAt: Schema.DateTimeUtcFromString,
-  /** The agent's whole review, opening with a bold sentence naming the PR's main risk. */
   markdown: Schema.String,
-  /**
-   * The Agent whose Turns are the Follow-ups, `null` until the first. Writing the Agent review again
-   * removes it.
-   */
   agentId: Schema.NullOr(Schema.String),
 })
 
@@ -57,7 +51,6 @@ export const AgentReviewState = Schema.Struct({
   review: Schema.NullOr(AgentReview),
   job: Schema.Union([
     Schema.Struct({ status: Schema.Literal("idle") }),
-    /** Queued behind other Agent reviews the Queue started. */
     Schema.Struct({ status: Schema.Literal("waiting") }),
     Schema.Struct({
       status: Schema.Literal("reviewing"),
@@ -71,7 +64,6 @@ export const AgentReviewState = Schema.Struct({
       startedAt: Schema.Number,
       runner: AgentRunnerIdentity,
     }),
-    /** Keeps the message so the user can send it again. */
     Schema.Struct({
       status: Schema.Literal("agent-start-failed"),
       message: FollowUpMessage,

@@ -24,7 +24,6 @@ import { MissingLogin, NoCapacity, SandboxGone } from "../src/sandboxFailures"
 
 export interface InProcessSandboxSettings {
   readonly engines?: readonly [AgentEngine, ...Array<AgentEngine>]
-  /** Keeps `create` at this step until settings name another. */
   readonly holdAt?: string
   readonly failAt?: string
   readonly missingLogin?: { readonly login: string; readonly fix: string }
@@ -41,10 +40,6 @@ const SandboxId = Schema.Struct({ agentId: Schema.String })
 
 const agentIdOf = (state: SandboxState) => Schema.decodeUnknownSync(SandboxId)(state).agentId
 
-/**
- * A Sandbox provider whose Sandboxes are agent hosts in this process, each built with the services
- * `host` makes, reached over HTTP like any Sandbox's.
- */
 export const inProcessSandboxes = Effect.fnUntraced(function* (
   host: () => Layer.Layer<HostAgents | Journal | Changes>,
 ) {
@@ -231,16 +226,13 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
 
   return {
     provider,
-    /** What happened to the Sandboxes, in order: `ended <agentId>` and `removed <agentId>`. */
     events,
     configure: (next: InProcessSandboxSettings) => {
       settings = next
 
       for (const check of waiting.splice(0)) check()
     },
-    /** Ends a Sandbox's agent host as a crash would, leaving the Sandbox. */
     stopHost: stop,
-    /** Deletes a Sandbox behind Glass's back, as a platform reclaiming it would. */
     reclaim,
     closeAll: Effect.suspend(() => {
       return Effect.forEach(expiries.values(), Fiber.interrupt, { discard: true }).pipe(

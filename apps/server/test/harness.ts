@@ -14,11 +14,12 @@ import { ServerConfig } from "../src/ServerConfig"
 import { startFakeGitHub } from "./fakeGitHub"
 import { VIEWER } from "./fakePullRequest"
 
+const withRealTimeHeartbeat = Effect.provideService(Clock.Clock, Clock.Clock.defaultValue())
+
 export const LAUNCH_TOKEN = "test-launch-token"
 
 export const RENDERER_ORIGIN = "glass://app"
 
-/** Points the user's home, and pi's own folder in it, at `home` for the programs Glass runs. */
 export const stubHome = (home: string) => {
   vi.stubEnv("HOME", home)
   vi.stubEnv("USERPROFILE", home)
@@ -66,7 +67,6 @@ export const startBackend = Effect.fnUntraced(function* (
             GLASS_TOKEN: LAUNCH_TOKEN,
             GLASS_ALLOWED_ORIGINS: RENDERER_ORIGIN,
             GLASS_HOME: home,
-            // A test that forgets these fails fast instead of reaching github.com or your installed agents.
             GLASS_GIT_REMOTE: join(home, "no-git-remote"),
             GLASS_CLAUDE_COMMAND: "glass-missing-claude",
             GLASS_PI_COMMAND: "glass-missing-pi",
@@ -82,11 +82,9 @@ export const startBackend = Effect.fnUntraced(function* (
 
   const rpcUrl = `${baseUrl.replace(/^http/, "ws")}${RPC_PATH}?${TOKEN_PARAM}=${LAUNCH_TOKEN}`
 
-  // The client's heartbeat runs on real time: a deadline test's `TestClock.adjust` would otherwise
-  // time out its ping before the backend's real answer arrives.
   const client = yield* connectRpcClient(GlassRpcs, rpcUrl).pipe(
     Effect.provideService(Socket.WebSocketConstructor, webSocketConstructor),
-    Effect.provideService(Clock.Clock, Clock.Clock.defaultValue()),
+    withRealTimeHeartbeat,
   )
 
   // Effect closes a still-connecting WebSocket after dropping its error listener, which `ws` then

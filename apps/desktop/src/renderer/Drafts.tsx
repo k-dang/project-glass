@@ -263,7 +263,6 @@ export function LineDraft(props: {
           ref={focusStarted}
           readOnly={readOnly}
           onKeyDown={(event) => {
-            // Enter and Escape can confirm or dismiss an input method's candidates.
             if (event.nativeEvent.isComposing || readOnly) return
 
             if (event.key === "Enter") {

@@ -87,9 +87,7 @@ export class LocalAgentHost extends Context.Service<
               Effect.flatMap(Schema.decodeUnknownEffect(HostReady)),
             )
 
-          // Its own scope, so the backend can hang up before stopping the host: the host waits
-          // for open connections before it exits.
-          const connection = yield* Scope.fork(scope)
+          const connectionScope = yield* Scope.fork(scope)
 
           const client = yield* connectRpcClient(
             AgentHostRpcs,
@@ -97,7 +95,7 @@ export class LocalAgentHost extends Context.Service<
             { [HOST_TOKEN_HEADER]: token },
           ).pipe(
             Effect.provideService(Socket.WebSocketConstructor, webSocketConstructor),
-            Scope.provide(connection),
+            Scope.provide(connectionScope),
           )
 
           yield* followJournal((agentId, events) => transcripts.save(agentId, events), client, {
@@ -109,8 +107,7 @@ export class LocalAgentHost extends Context.Service<
               schedule: Schedule.spaced("1 second"),
             }),
             Effect.catch(() =>
-              Scope.close(connection, Exit.void).pipe(
-                // `kill` takes its own options, not the spawn's.
+              Scope.close(connectionScope, Exit.void).pipe(
                 Effect.andThen(child.kill({ forceKillAfter: FORCE_KILL_AFTER })),
                 Effect.ignore,
               ),

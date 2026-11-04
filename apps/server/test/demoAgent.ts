@@ -35,7 +35,6 @@ const textOf = (message: FakeModelRequest["messages"][number] | undefined) => {
     : (content ?? []).map((part) => part.text ?? "").join("")
 }
 
-/** A message that asks the demo Agent to work "slowly" keeps its Turn running long enough to Queue, Steer, or Stop. */
 const workingSlowly = ({ messages }: FakeModelRequest) => textOf(messages.at(-1)).includes("slowly")
 
 const slowReply = `Working through it one step at a time. ${Array.from(

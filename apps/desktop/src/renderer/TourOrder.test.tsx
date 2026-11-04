@@ -42,7 +42,6 @@ const tour = savedTour([
 
 const all = ["greet.ts", "greet.test.ts", "api.ts", "logo.png", "notes.md"]
 
-/** Each file's chevron: "Show" while collapsed, "Hide" while open. */
 const toggles = (...paths: Array<string>) =>
   paths.map((path) =>
     within(changes())

@@ -73,7 +73,6 @@ export class WorkspaceFeedback {
 
             yield* replace({
               replies,
-              // The summary remains editable while the replacement workspace loads.
               get summary() {
                 return drafts.summary()
               },

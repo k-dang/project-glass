@@ -307,7 +307,6 @@ export function Workspace(props: {
     if (next === "changes") returnToCurrent(tourShown !== null)
   }
 
-  // The Tour order hides the file panel, so reading the Agent review switches back to paths.
   const readAgentReview = () => {
     flushSync(() => {
       setPanelTab("agent-review")
@@ -318,7 +317,6 @@ export function Workspace(props: {
     returnToCurrent(false)
   }
 
-  // Without a review there is no Agent review tab, so the panel falls back to the tree.
   const shownPanelTab =
     panelTab === "agent-review" && agentReview.review === null ? "tree" : panelTab
 
@@ -345,11 +343,7 @@ export function Workspace(props: {
     <Tabs
       value={tab}
       onValueChange={showTab}
-      className={cn(
-        "min-h-0 flex-1 gap-0",
-        // Full screen covers the app rail, the Queue bar and the PR header; only the title strip stays.
-        fullScreen && "fixed inset-0 z-40 bg-background",
-      )}
+      className={cn("min-h-0 flex-1 gap-0", fullScreen && "fixed inset-0 z-40 bg-background")}
     >
       <CopyMenu pullRequest={pullRequest} />
       {fullScreen ? (
@@ -391,7 +385,6 @@ export function Workspace(props: {
         <aside
           id={filePanelId}
           className={cn(
-            // The Agent review is prose, so the panel widens while it shows.
             "flex shrink-0 flex-col border-r",
             shownPanelTab === "agent-review"
               ? "w-[30rem]"
