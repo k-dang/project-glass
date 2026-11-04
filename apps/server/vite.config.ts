@@ -31,6 +31,8 @@ export default defineConfig({
       ...node,
       entry: { fakeBackend: "test/fakeBackend.ts" },
       outDir: "dist-fake",
+      // It reads ../schema.json relative to its own module, which breaks once bundled.
+      deps: { ...node.deps, neverBundle: ["@octokit/graphql-schema"] },
     },
     agentHost("dist-fake"),
     ...(process.env["GLASS_PACK_TEST_HOST"] === "1"
