@@ -79,7 +79,12 @@ export function Settings() {
 
   return (
     <div className="page-content flex flex-col gap-8 py-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Changes save automatically. Text fields save when you leave them.
+        </p>
+      </div>
       <SettingsSection title="GitHub connection" description="The identity Glass uses on GitHub.">
         <ConnectionDetails />
       </SettingsSection>

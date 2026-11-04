@@ -4,13 +4,22 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 
-export function ReviewPromptField(props: { value: string; onChange: (value: string) => void }) {
+export function ReviewPromptField(props: {
+  value: string
+  onChange: (value: string) => void
+  onCommit: (value: string) => void
+}) {
   const id = useId()
   const prompt = props.value.trim()
   const isDefault = prompt === defaultReviewPrompt
 
   return (
-    <div className="flex flex-col gap-2.5 border-t border-dashed pt-5">
+    <div
+      className="flex flex-col gap-2.5 border-t border-dashed pt-5"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) props.onCommit(props.value)
+      }}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-0.5">
           <h3 id={`${id}-heading`} className="font-semibold">
@@ -43,7 +52,10 @@ export function ReviewPromptField(props: { value: string; onChange: (value: stri
           variant="ghost"
           size="sm"
           disabled={isDefault}
-          onClick={() => props.onChange(defaultReviewPrompt)}
+          onClick={() => {
+            props.onChange(defaultReviewPrompt)
+            props.onCommit(defaultReviewPrompt)
+          }}
         >
           Restore default
         </Button>

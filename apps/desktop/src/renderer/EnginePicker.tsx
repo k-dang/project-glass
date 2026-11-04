@@ -17,6 +17,7 @@ export function EnginePicker(props: {
   description: string
   value: EngineSettings
   onChange: (value: EngineSettings) => void
+  onCommit: (value: EngineSettings) => void
 }) {
   const id = useId()
   const { engine, models } = props.value
@@ -38,7 +39,11 @@ export function EnginePicker(props: {
               name={id}
               value={option}
               checked={engine === option}
-              onChange={() => props.onChange({ ...props.value, engine: option })}
+              onChange={() => {
+                const next = { ...props.value, engine: option }
+                props.onChange(next)
+                props.onCommit(next)
+              }}
               className="peer sr-only"
             />
             <span className="block cursor-pointer rounded-md px-3.5 py-1 text-sm font-medium text-muted-foreground peer-checked:bg-card peer-checked:text-foreground peer-checked:shadow-sm peer-checked:ring-1 peer-checked:ring-border peer-focus-visible:outline-2 peer-focus-visible:outline-offset-1 peer-focus-visible:outline-ring">
@@ -56,6 +61,7 @@ export function EnginePicker(props: {
         ))}
       </div>
       <div
+        onBlur={() => props.onCommit(props.value)}
         className={cn(
           "grid gap-2.5 rounded-lg border bg-card p-3",
           engine !== "claude-code" && "grid-cols-[minmax(6rem,10rem)_1fr] max-sm:grid-cols-1",

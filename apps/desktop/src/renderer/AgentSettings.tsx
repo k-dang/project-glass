@@ -1,194 +1,171 @@
-import { useAtom, useAtomRefresh, useAtomValue } from "@effect/atom-react"
-import { type EngineSettings, ReviewPrompt } from "@glass/contracts"
-import { Effect, Equal, Exit, Option, Schema } from "effect"
+import { useAtom, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
+import { type EngineFeature, type EngineSettings, ReviewPrompt } from "@glass/contracts"
+import { Equal, identity, Schema } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
-import { cn } from "cn"
-import { type ReactNode, useState } from "react"
-import { Button } from "@/components/ui/button"
-import { toast } from "@/components/ui/toast"
-import { Backend, backendRuntime } from "./backend"
+import type { ReactNode } from "react"
+import { autosaveSetting } from "./autosaveSetting"
+import { Backend } from "./backend"
 import { EnginePicker, missingModel } from "./EnginePicker"
 import { engineNames } from "./engines"
 import { ProblemAlert } from "./ProblemAlert"
-import { problemOf, settledProblem } from "./problems"
+import { problemOf, streamProblem } from "./problems"
 import { QueueWorkSetting } from "./QueueWorkSetting"
 import { ReviewPromptField } from "./ReviewPromptField"
 import { SettingsSection } from "./SettingsSection"
 
-interface AgentSettings {
-  readonly tours: EngineSettings
-  readonly agentReviews: EngineSettings
-  readonly reviewPrompt: string
+const engineAtoms = Atom.family((feature: EngineFeature) =>
+  autosaveSetting(
+    Backend.use((backend) => backend.GetEngineSettings({ feature })),
+    (engineSettings) =>
+      Backend.use((backend) => backend.SetEngineSettings({ feature, engineSettings })),
+    identity,
+  ),
+)
+
+const promptAtoms = autosaveSetting(
+  Backend.use((backend) => backend.GetReviewPrompt()),
+  (prompt) => Backend.use((backend) => backend.SetReviewPrompt({ prompt })),
+  (prompt) => prompt.trim(),
+)
+
+function useSetting<A>(atoms: ReturnType<typeof autosaveSetting<A>>, saved: A) {
+  const [draft, setDraft] = useAtom(atoms.draft)
+  const save = useAtomValue(atoms.save)
+  const commit = useAtomSet(atoms.commit)
+  const value = draft ?? saved
+
+  return {
+    value,
+    changed: !Equal.equals(atoms.normalize(value), saved),
+    change: setDraft,
+    commit,
+    save,
+  }
 }
 
-const loadAtom = backendRuntime
-  .atom(
-    Backend.use((backend) =>
-      Effect.all(
-        {
-          tours: backend.GetEngineSettings({ feature: "tours" }),
-          agentReviews: backend.GetEngineSettings({ feature: "agentReviews" }),
-          reviewPrompt: backend.GetReviewPrompt(),
-        },
-        { concurrency: "unbounded" },
-      ),
-    ),
+function SettingLoader<A>(props: {
+  atoms: ReturnType<typeof autosaveSetting<A>>
+  label: string
+  children: (saved: A) => ReactNode
+}) {
+  const saved = useAtomValue(props.atoms.saved)
+  const retry = useAtomRefresh(props.atoms.load)
+
+  if (AsyncResult.isSuccess(saved)) return props.children(saved.value)
+
+  return AsyncResult.isFailure(saved) ? (
+    <ProblemAlert problem={problemOf(saved.cause)} action={{ label: "Retry", run: retry }} />
+  ) : (
+    <output>Loading {props.label}…</output>
   )
-  .pipe(Atom.keepAlive)
+}
 
-const ifChanged = <A, E, R>(draft: A, saved: A, write: (value: A) => Effect.Effect<A, E, R>) =>
-  Equal.equals(draft, saved) ? Effect.succeed(saved) : write(draft)
-
-const saveAtom = backendRuntime
-  .fn(({ saved, draft }: { saved: AgentSettings; draft: AgentSettings }, get) =>
-    Backend.use((backend) =>
-      Effect.all(
-        {
-          tours: ifChanged(draft.tours, saved.tours, (engineSettings) =>
-            backend.SetEngineSettings({ feature: "tours", engineSettings }),
-          ),
-          agentReviews: ifChanged(draft.agentReviews, saved.agentReviews, (engineSettings) =>
-            backend.SetEngineSettings({ feature: "agentReviews", engineSettings }),
-          ),
-          reviewPrompt: ifChanged(draft.reviewPrompt, saved.reviewPrompt, (prompt) =>
-            backend.SetReviewPrompt({ prompt }),
-          ),
-        },
-        { concurrency: "unbounded" },
-      ),
-    ).pipe(
-      Effect.onError(() =>
-        Effect.suspend(() => {
-          get.refresh(loadAtom)
-
-          return get.result(loadAtom, { suspendOnWaiting: true })
-        }).pipe(Effect.ignore),
-      ),
-    ),
+export function AgentSettings() {
+  return (
+    <>
+      <SettingsSection title="Tours" description="Choose when and how Glass writes Tours.">
+        <QueueWorkSetting feature="tours" />
+        <EngineSetting feature="tours" />
+      </SettingsSection>
+      <SettingsSection
+        title="Agent reviews"
+        description="Choose when and how Glass runs Agent reviews. Engine and prompt changes apply to the next Agent review."
+      >
+        <QueueWorkSetting feature="agentReviews" />
+        <EngineSetting feature="agentReviews" />
+        <SettingLoader atoms={promptAtoms} label="review prompt">
+          {(saved) => <PromptEditor saved={saved} />}
+        </SettingLoader>
+      </SettingsSection>
+    </>
   )
-  .pipe(Atom.keepAlive)
+}
 
-const savedAtom = Atom.make((get) => {
-  const save = get(saveAtom)
+function EngineSetting(props: { feature: EngineFeature }) {
+  return (
+    <SettingLoader atoms={engineAtoms(props.feature)} label="engine settings">
+      {(saved) => <EngineEditor feature={props.feature} saved={saved} />}
+    </SettingLoader>
+  )
+}
 
-  return AsyncResult.isSuccess(save) ? save : get(loadAtom)
-})
+function EngineEditor(props: { feature: EngineFeature; saved: EngineSettings }) {
+  const setting = useSetting(engineAtoms(props.feature), props.saved)
+  const name = props.feature === "tours" ? "Tour engine" : "Agent review engine"
+  const missing = missingModel(setting.value)
+  const invalid = missing ? `The ${engineNames[missing]} ${name} needs a model.` : null
+
+  const commit = (value: EngineSettings) => {
+    if (!missingModel(value)) setting.commit(value)
+  }
+
+  return (
+    <div className="flex flex-col gap-3" aria-busy={setting.save.waiting}>
+      <EnginePicker
+        legend={name}
+        description={
+          props.feature === "tours"
+            ? "Writes Queue Tours and the Tours you start from a PR."
+            : "Runs every Agent review and answers Ask."
+        }
+        value={setting.value}
+        onChange={setting.change}
+        onCommit={commit}
+      />
+      <SaveStatus setting={setting} invalid={invalid} retry={() => commit(setting.value)} />
+    </div>
+  )
+}
 
 const isReviewPrompt = Schema.is(ReviewPrompt)
 
-export function AgentSettings() {
-  const saved = useAtomValue(savedAtom)
-  const retry = useAtomRefresh(loadAtom)
+function PromptEditor(props: { saved: string }) {
+  const setting = useSetting(promptAtoms, props.saved)
+  const trimmed = setting.value.trim()
 
-  return Option.match(AsyncResult.value(saved), {
-    onSome: (settings) => <AgentSettingsEditor saved={settings} />,
-    onNone: () => (
-      <ToursSection>
-        {AsyncResult.isFailure(saved) ? (
-          <ProblemAlert problem={problemOf(saved.cause)} action={{ label: "Retry", run: retry }} />
-        ) : (
-          <output>Loading Tour and Agent review settings…</output>
-        )}
-      </ToursSection>
-    ),
-  })
-}
+  const invalid = isReviewPrompt(trimmed)
+    ? null
+    : "Write a review prompt. Agent reviews need it to know how you review."
 
-function AgentSettingsEditor(props: { saved: AgentSettings }) {
-  const [draft, setDraft] = useState(props.saved)
-  const [save, setSave] = useAtom(saveAtom, { mode: "promiseExit" })
-  const trimmed = { ...draft, reviewPrompt: draft.reviewPrompt.trim() }
-  const unchanged = Equal.equals(trimmed, props.saved)
-  const problem = settledProblem(save)
-  const change = (changed: Partial<AgentSettings>) => setDraft({ ...draft, ...changed })
-
-  const missingTourModel = missingModel(draft.tours)
-  const missingReviewModel = missingModel(draft.agentReviews)
-
-  const invalid = missingTourModel
-    ? `The ${engineNames[missingTourModel]} Tour engine needs a model.`
-    : missingReviewModel
-      ? `The ${engineNames[missingReviewModel]} Agent review engine needs a model.`
-      : !isReviewPrompt(trimmed.reviewPrompt)
-        ? "Write a review prompt. Agent reviews need it to know how you review."
-        : null
-
-  const status = save.waiting ? "Saving…" : (invalid ?? (unchanged ? "" : "Unsaved changes."))
+  const commit = (value: string) => {
+    if (isReviewPrompt(value.trim())) setting.commit(value)
+  }
 
   return (
-    <form
-      aria-busy={save.waiting}
-      className="flex flex-col gap-8"
-      onSubmit={async (event) => {
-        event.preventDefault()
-        setDraft(trimmed)
-        const result = await setSave({ saved: props.saved, draft: trimmed })
-
-        if (Exit.isSuccess(result)) {
-          toast.add({ type: "success", title: "Settings saved.", timeout: 2500 })
-        }
-      }}
-    >
-      <fieldset disabled={save.waiting} className="contents">
-        <ToursSection>
-          <EnginePicker
-            legend="Tour engine"
-            description="Writes Queue Tours and the Tours you start from a PR."
-            value={draft.tours}
-            onChange={(tours) => change({ tours })}
-          />
-        </ToursSection>
-        <SettingsSection
-          title="Agent reviews"
-          description="Choose when and how Glass runs Agent reviews. Engine and prompt changes apply to the next Agent review."
-        >
-          <QueueWorkSetting feature="agentReviews" />
-          <EnginePicker
-            legend="Agent review engine"
-            description="Runs every Agent review and answers Ask."
-            value={draft.agentReviews}
-            onChange={(agentReviews) => change({ agentReviews })}
-          />
-          <ReviewPromptField
-            value={draft.reviewPrompt}
-            onChange={(reviewPrompt) => change({ reviewPrompt })}
-          />
-        </SettingsSection>
-        {problem !== null && <ProblemAlert problem={problem} />}
-        <div
-          className={cn(
-            "sticky bottom-4 z-10 flex items-center gap-3 self-end rounded-xl border bg-card p-1.5",
-            (!unchanged || save.waiting) && "shadow-lg",
-          )}
-        >
-          <output
-            aria-live="polite"
-            className={status ? "pl-2.5 text-sm text-muted-foreground" : "sr-only"}
-          >
-            {status}
-          </output>
-          <Button
-            type="button"
-            variant="ghost"
-            disabled={unchanged}
-            onClick={() => setDraft(props.saved)}
-          >
-            Discard
-          </Button>
-          <Button type="submit" className="min-w-28" disabled={unchanged || invalid !== null}>
-            {save.waiting ? "Saving…" : "Save changes"}
-          </Button>
-        </div>
-      </fieldset>
-    </form>
+    <div className="flex flex-col gap-3" aria-busy={setting.save.waiting}>
+      <ReviewPromptField value={setting.value} onChange={setting.change} onCommit={commit} />
+      <SaveStatus setting={setting} invalid={invalid} retry={() => commit(setting.value)} />
+    </div>
   )
 }
 
-function ToursSection(props: { children: ReactNode }) {
+function SaveStatus<A>(props: {
+  setting: ReturnType<typeof useSetting<A>>
+  invalid: string | null
+  retry: () => void
+}) {
+  const save = props.setting.save
+
+  const problem =
+    props.setting.changed && AsyncResult.isFailure(save) && !save.waiting
+      ? streamProblem(save.cause)
+      : null
+
+  const status = save.waiting
+    ? "Saving…"
+    : (props.invalid ??
+      (problem
+        ? "Changes weren't saved."
+        : props.setting.changed
+          ? "Changes save when you leave the field."
+          : "Saved automatically."))
+
   return (
-    <SettingsSection title="Tours" description="Choose when and how Glass writes Tours.">
-      <QueueWorkSetting feature="tours" />
-      {props.children}
-    </SettingsSection>
+    <>
+      <output aria-live="polite" className="text-sm text-muted-foreground">
+        {status}
+      </output>
+      {problem && <ProblemAlert problem={problem} action={{ label: "Retry", run: props.retry }} />}
+    </>
   )
 }
