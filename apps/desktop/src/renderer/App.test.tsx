@@ -237,6 +237,27 @@ it("distinguishes configuration loading and failure from an empty configuration 
   await within(settings).findByText("No followed repositories yet.")
 })
 
+it("jumps between rail areas with Mod and the area's number, even while typing", async () => {
+  const user = mount({})
+  await user.type(await screen.findByRole("textbox", { name: "Open a PR" }), "octo")
+  await user.keyboard("{Control>}4{/Control}")
+  await waitFor(() =>
+    expect(screen.getByRole("link", { name: "Agents" }).getAttribute("aria-current")).toBe("page"),
+  )
+  await user.keyboard("{Meta>}2{/Meta}")
+  await waitFor(() =>
+    expect(screen.getByRole("link", { name: "Reviews" }).getAttribute("aria-current")).toBe("page"),
+  )
+})
+
+it("opens the keyboard shortcuts from any area, not only a PR workspace", async () => {
+  const user = mount({})
+  await user.click(await screen.findByRole("link", { name: "To-dos" }))
+  await user.keyboard("?")
+  const dialog = await screen.findByRole("dialog", { name: "Keyboard shortcuts" })
+  expect(within(dialog).getByText("Agents")).toBeTruthy()
+})
+
 it("preserves a pending follow and its failure when leaving and returning to Settings", async () => {
   const follows: Array<Held<{ input: string }, ReadonlyArray<FollowedRepository>, SettingsError>> =
     []

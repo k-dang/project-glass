@@ -1,5 +1,5 @@
 import { RegistryContext, useAtomValue } from "@effect/atom-react"
-import { Link, Outlet, useBlocker } from "@tanstack/react-router"
+import { Link, type LinkOptions, Outlet, useBlocker, useNavigate } from "@tanstack/react-router"
 import { cn } from "cn"
 import {
   LayoutDashboard,
@@ -18,20 +18,31 @@ import { ConfirmationDialog } from "./ConfirmationDialog"
 import { confirmLeave, discardPromptAtom, leavesPullRequest, reviewsLinkAtom } from "./reviewsArea"
 import { ConnectionAvatar } from "./Settings"
 import { ResourceUsage } from "./ResourceUsage"
+import { ShortcutsDialog } from "./ShortcutsDialog"
+import { useShortcuts } from "./useShortcuts"
 
 const railLink =
   "relative flex size-8 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-accent aria-[current=page]:text-accent-foreground aria-[current=page]:before:absolute aria-[current=page]:before:-left-2 aria-[current=page]:before:h-3 aria-[current=page]:before:w-0.5 aria-[current=page]:before:rounded-full aria-[current=page]:before:bg-foreground"
 
-const areas: ReadonlyArray<{
-  readonly to: "/to-dos" | "/activity" | "/agents" | "/settings"
+interface Area {
   readonly label: string
   readonly icon: LucideIcon
-}> = [
-  { to: "/to-dos", label: "To-dos", icon: ListTodo },
-  { to: "/agents", label: "Agents", icon: Sparkles },
-  { to: "/activity", label: "Activity", icon: History },
-  { to: "/settings", label: "Settings", icon: Settings },
-]
+  readonly link: LinkOptions
+}
+
+// Rail order is shortcut order: Mod+1 opens the first area.
+function useAreas(): ReadonlyArray<Area> {
+  const reviewsLink = useAtomValue(reviewsLinkAtom)
+
+  return [
+    { label: "Dashboard", icon: LayoutDashboard, link: { to: "/dashboard" } },
+    { label: "Reviews", icon: GitPullRequest, link: reviewsLink },
+    { label: "To-dos", icon: ListTodo, link: { to: "/to-dos" } },
+    { label: "Agents", icon: Sparkles, link: { to: "/agents" } },
+    { label: "Activity", icon: History, link: { to: "/activity" } },
+    { label: "Settings", icon: Settings, link: { to: "/settings" } },
+  ]
+}
 
 function GlassMark() {
   return (
@@ -53,7 +64,17 @@ function GlassMark() {
 
 export function AppShell() {
   const registry = useContext(RegistryContext)
-  const reviewsLink = useAtomValue(reviewsLinkAtom)
+  const areas = useAreas()
+  const navigate = useNavigate()
+
+  useShortcuts(
+    areas.map(({ link }, index) => ({
+      key: `${index + 1}`,
+      mod: true,
+      allowInEditable: true,
+      run: () => void navigate(link),
+    })),
+  )
 
   useBlocker({
     enableBeforeUnload: false,
@@ -73,27 +94,14 @@ export function AppShell() {
             </div>
           </TooltipHint>
           <nav aria-label="App areas" className="flex w-full flex-1 flex-col items-center gap-2">
-            <TooltipHint content="Dashboard" side="right">
-              <Link to="/dashboard" aria-label="Dashboard" className={railLink}>
-                <LayoutDashboard className="size-4" aria-hidden />
-              </Link>
-            </TooltipHint>
-            <TooltipHint content="Reviews" side="right">
-              <Link
-                {...reviewsLink}
-                activeOptions={{ includeSearch: false }}
-                aria-label="Reviews"
-                className={railLink}
-              >
-                <GitPullRequest className="size-4" aria-hidden />
-              </Link>
-            </TooltipHint>
-            {areas.map(({ to, label, icon: Icon }) => (
-              <TooltipHint key={to} content={label} side="right">
+            {areas.map(({ label, icon: Icon, link }, index) => (
+              <TooltipHint key={label} content={label} side="right">
                 <Link
-                  to={to}
+                  {...link}
+                  activeOptions={{ includeSearch: false }}
                   aria-label={label}
-                  className={cn(railLink, to === "/settings" && "mt-auto")}
+                  aria-keyshortcuts={`Meta+${index + 1} Control+${index + 1}`}
+                  className={cn(railLink, label === "Settings" && "mt-auto")}
                 >
                   <Icon className="size-4" aria-hidden />
                 </Link>
@@ -107,7 +115,10 @@ export function AppShell() {
         <div className="title-strip shrink-0 border-b" aria-hidden />
         <Reconnecting />
         <Outlet />
-        <ResourceUsage />
+        <footer className="flex h-7 shrink-0 items-center justify-end gap-1 border-t bg-muted/20 px-3">
+          <ShortcutsDialog />
+          <ResourceUsage />
+        </footer>
       </div>
       <DiscardDialog />
     </div>

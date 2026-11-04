@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/button"
-import { useReviewShortcuts } from "./useReviewShortcuts"
+import { useShortcuts } from "./useShortcuts"
 
 export function BackToPullRequests(props: { onBack: () => void; disabled?: boolean }) {
-  useReviewShortcuts([
+  useShortcuts([
     {
       key: "Escape",
       run: () => {

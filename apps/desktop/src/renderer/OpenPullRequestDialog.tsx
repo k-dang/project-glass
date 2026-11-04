@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/
 import { Kbd } from "@/components/ui/kbd"
 import { sameRef } from "./reviewsArea"
 import { shortcutLabel } from "./shortcutLabel"
-import { useReviewShortcuts } from "./useReviewShortcuts"
+import { useShortcuts } from "./useShortcuts"
 
 export function OpenPullRequestDialog(props: {
   current: PullRequestRef
@@ -29,7 +29,7 @@ export function OpenPullRequestDialog(props: {
     setOpen(next)
   }
 
-  useReviewShortcuts([
+  useShortcuts([
     {
       key: "l",
       mod: true,

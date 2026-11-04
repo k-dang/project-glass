@@ -1,17 +1,25 @@
-import { ArrowUpRight, Copy, Keyboard, type LucideIcon, Route, Search, XIcon } from "lucide-react"
+import {
+  AppWindow,
+  ArrowUpRight,
+  Copy,
+  Keyboard,
+  type LucideIcon,
+  Route,
+  Search,
+  XIcon,
+} from "lucide-react"
 import { useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogClose,
   DialogContent,
-  DialogDescription,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Kbd } from "@/components/ui/kbd"
-import { useReviewShortcuts } from "./useReviewShortcuts"
+import { useShortcuts } from "./useShortcuts"
 
 interface ShortcutGroup {
   readonly title: string
@@ -25,22 +33,35 @@ interface ShortcutGroup {
 
 const groups: ReadonlyArray<ShortcutGroup> = [
   {
+    title: "Anywhere",
+    icon: AppWindow,
+    note: "Work in every area of Glass. Shortcuts with ⌘ or Ctrl also work while typing.",
+    shortcuts: [
+      { label: "Dashboard", keys: ["Mod", "1"] },
+      { label: "Reviews", keys: ["Mod", "2"] },
+      { label: "To-dos", keys: ["Mod", "3"] },
+      { label: "Agents", keys: ["Mod", "4"] },
+      { label: "Activity", keys: ["Mod", "5"] },
+      { label: "Settings", keys: ["Mod", "6"] },
+      { label: "Show keyboard shortcuts", keys: ["?"] },
+    ],
+  },
+  {
     title: "Workspace",
     icon: ArrowUpRight,
-    note: "Queue commands work when this PR is in the Queue. Next PR needs another queued PR.",
+    note: "In a PR workspace. Queue commands work when this PR is in the Queue; Next PR needs another queued PR.",
     shortcuts: [
       { label: "Back to PRs", keys: ["Escape"] },
       { label: "Open another PR", keys: ["Mod", "L"] },
       { label: "Open Copy menu", keys: ["C"] },
       { label: "Remove from Queue & advance", keys: ["Mod", "]"] },
       { label: "Next queued PR", keys: ["Mod", "Shift", "]"] },
-      { label: "Show keyboard shortcuts", keys: ["?"] },
     ],
   },
   {
     title: "Copy",
     icon: Copy,
-    note: "Press C, then the next key. Escape closes the menu.",
+    note: "In a PR workspace, press C, then the next key. Escape closes the menu.",
     shortcuts: [
       { label: "PR link", keys: ["C", "then", "G"] },
       { label: "PR title", keys: ["C", "then", "T"] },
@@ -61,7 +82,7 @@ const groups: ReadonlyArray<ShortcutGroup> = [
   },
 ]
 
-export function ReviewShortcutsDialog() {
+export function ShortcutsDialog() {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
   const search = useRef<HTMLInputElement>(null)
@@ -93,7 +114,7 @@ export function ReviewShortcutsDialog() {
     setOpen(true)
   }
 
-  useReviewShortcuts([{ key: "?", allowShift: true, run: show }])
+  useShortcuts([{ key: "?", allowShift: true, run: show }])
 
   return (
     <Dialog
@@ -117,7 +138,7 @@ export function ReviewShortcutsDialog() {
           <Button
             variant="ghost"
             size="sm"
-            className="gap-2 text-xs text-muted-foreground"
+            className="h-6 gap-1.5 px-1.5 text-[11px] font-normal text-muted-foreground"
             aria-keyshortcuts="?"
             title="Keyboard shortcuts (?)"
           />
@@ -135,10 +156,7 @@ export function ReviewShortcutsDialog() {
         className="flex max-h-[min(48rem,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
       >
         <header className="flex items-start justify-between gap-4 px-5 pt-5 pb-4">
-          <div>
-            <DialogTitle className="text-sm">Keyboard shortcuts</DialogTitle>
-            <DialogDescription className="mt-1.5 text-xs">PR workspace</DialogDescription>
-          </div>
+          <DialogTitle className="text-sm">Keyboard shortcuts</DialogTitle>
           <DialogClose
             render={<Button variant="ghost" size="icon-sm" aria-label="Close shortcuts" />}
           >

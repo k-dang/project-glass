@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent } from "react"
 
-interface ReviewShortcut {
+interface Shortcut {
   readonly key: string
   readonly mod?: boolean
   readonly allowShift?: boolean
@@ -9,7 +9,7 @@ interface ReviewShortcut {
   readonly run: () => void
 }
 
-export function useReviewShortcuts(shortcuts: ReadonlyArray<ReviewShortcut>) {
+export function useShortcuts(shortcuts: ReadonlyArray<Shortcut>) {
   const handle = useEffectEvent((event: KeyboardEvent) => {
     if (event.defaultPrevented || event.isComposing || event.repeat) return
     const elements = event.composedPath().filter((target) => target instanceof Element)

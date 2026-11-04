@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import userEvent from "@testing-library/user-event"
 import { afterEach, expect, it, vi } from "vite-plus/test"
 import { BackToPullRequests } from "./BackToPullRequests"
-import { ReviewShortcutsDialog } from "./ReviewShortcutsDialog"
+import { ShortcutsDialog } from "./ShortcutsDialog"
 
 afterEach(() => {
   cleanup()
@@ -17,7 +17,7 @@ it("opens with Shift+? and Escape returns focus without leaving the PR workspace
     <>
       <BackToPullRequests onBack={back} />
       <button>Read diff</button>
-      <ReviewShortcutsDialog />
+      <ShortcutsDialog />
     </>,
   )
   const opener = screen.getByRole("button", { name: "Read diff" })
@@ -37,7 +37,7 @@ it("opens with Shift+? and Escape returns focus without leaving the PR workspace
 
 it("searches shortcuts, recovers from no results, and starts fresh when reopened", async () => {
   const user = userEvent.setup()
-  render(<ReviewShortcutsDialog />)
+  render(<ShortcutsDialog />)
   const trigger = screen.getByRole("button", { name: "Keyboard shortcuts ?" })
   await user.click(trigger)
   const dialog = await screen.findByRole("dialog", { name: "Keyboard shortcuts" })
@@ -66,7 +66,7 @@ it("searches shortcuts, recovers from no results, and starts fresh when reopened
 it("opens without Shift and leaves typing and other dialogs alone", () => {
   const { container } = render(
     <>
-      <ReviewShortcutsDialog />
+      <ShortcutsDialog />
       <textarea />
       <dialog open aria-label="Another dialog">
         <button>Another action</button>
@@ -86,7 +86,7 @@ it("opens without Shift and leaves typing and other dialogs alone", () => {
 it.each(["MacIntel", "Win32"])("shows platform keys on %s", async (platform) => {
   vi.spyOn(navigator, "platform", "get").mockReturnValue(platform)
   const user = userEvent.setup()
-  render(<ReviewShortcutsDialog />)
+  render(<ShortcutsDialog />)
   await user.click(screen.getByRole("button", { name: "Keyboard shortcuts ?" }))
   const dialog = await screen.findByRole("dialog", { name: "Keyboard shortcuts" })
   expect(within(dialog).getAllByText(platform === "MacIntel" ? "⌘" : "Ctrl")).not.toHaveLength(0)
