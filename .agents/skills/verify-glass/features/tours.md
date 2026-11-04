@@ -10,12 +10,12 @@ A Tour orders a PR's changed files into Chapters with explanations and file summ
 
 ## How to get to it (user POV)
 
-In Settings → Tours, choose pi as the Tour engine and Save changes. Open a PR, select the Tour tab, then Write Tour. When the Tour is saved, choose Start reading.
+In Settings → Tours, choose pi as the Tour engine; it saves automatically. Open a PR, select the Tour tab, then Write Tour. When the Tour is saved, choose Start reading.
 
 ## Driving it with glass-verify
 
 1. Launch `node $V launch` and run `node $V doctor`. This defaults to fake GitHub for PR reads and a local synthetic provider for Tour generation.
-2. Open Settings, `node $V click --role radio --name "pi"`, then `node $V click --role button --name "Save changes"` and `node $V wait --text "Settings saved."`.
+2. Open Settings, `node $V click --role radio --name "pi"`, then `node $V wait --text "Saved automatically."`. Snapshot and confirm the Tour engine has pi selected.
 3. In Reviews, type `https://github.com/glass-demo/greeter/pull/100` into the Open a PR textbox, choose Open, and wait for Reload. `node $V click --role tab --name "Tour"`, then capture a snapshot and screenshot before writing.
 4. `node $V click --role button --name "Write Tour"`, then `node $V wait --text "Development Tour"`. Capture a snapshot and screenshot of the saved Tour.
 5. `node $V click --role button --name "Start reading"`. Capture the Chapter and its `Synthetic file summary.` entries in Changes. Confirm its file paths match the PR's changed files.
