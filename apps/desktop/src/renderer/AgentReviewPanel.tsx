@@ -21,7 +21,7 @@ import { AgentComposer, ToolCallView, Transcript, UserMessage } from "./AgentVie
 import type { ShowNote } from "./changesView"
 import { LineLocation, pathLineName } from "./Discussions"
 import { Elapsed } from "./Elapsed"
-import { MessageBox } from "./MessageBox"
+import { type ComposerSuggestion, MessageBox } from "./MessageBox"
 import { ProblemAlert } from "./ProblemAlert"
 import { streamProblem } from "./problems"
 import type { AgentReviewControls } from "./useAgentReview"
@@ -40,6 +40,14 @@ export function AgentReviewMarkdown(props: { markdown: string; className?: strin
     </Streamdown>
   )
 }
+
+const followUpSuggestions: ReadonlyArray<ComposerSuggestion> = [
+  {
+    label: "Draft PR comments",
+    prompt:
+      "Draft PR comments without using jargon and speak coherently. State it more simply and concisely, like one human talking to another.",
+  },
+]
 
 const fileName = (path: string) => path.split("/").at(-1) ?? path
 
@@ -189,6 +197,7 @@ function FirstFollowUpComposer(props: { controls: AgentReviewControls; reviewing
       steer={null}
       recall={null}
       onStop={job?.status === "starting-agent" ? props.controls.cancel : null}
+      suggestions={followUpSuggestions}
     />
   )
 }
@@ -259,6 +268,7 @@ function ReviewAgent(props: {
           label="Follow up"
           idlePlaceholder="Ask about the review, or have it draft comments"
           textOnly
+          suggestions={followUpSuggestions}
         />
       )}
     </ToolCallView>

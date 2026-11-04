@@ -19,6 +19,7 @@ import { Base64 } from "effect/encoding"
 import { ArrowUp, Square, X } from "lucide-react"
 import { memo, type ReactNode, useLayoutEffect, useRef, useState } from "react"
 import { InputGroup, InputGroupAddon, InputGroupButton } from "@/components/ui/input-group"
+import { Suggestion, Suggestions } from "@/components/ui/suggestion"
 import { noCommands } from "./agentsArea"
 import { CommandHighlight, useCommandPicker } from "./Commands"
 import { pastedSlice, toContent, ToDoMention, toMessage } from "./composerDocument"
@@ -76,6 +77,8 @@ const extensions = [
   }),
 ]
 
+export type ComposerSuggestion = { label: string; prompt: string }
+
 const takeText = (view: EditorView, data: DataTransfer | null, from: number, to = from) => {
   const text = data?.getData("text/plain") ?? ""
 
@@ -106,6 +109,7 @@ export function MessageBox(props: {
   onStop: (() => void) | null
   commands?: ReadonlyArray<AgentCommand>
   pickers?: ReactNode
+  suggestions?: ReadonlyArray<ComposerSuggestion>
   children?: ReactNode
 }) {
   const { composed, setComposed } = props
@@ -141,6 +145,20 @@ export function MessageBox(props: {
   }, [editor, composed.message])
 
   const written = (): SentMessage => ({ ...composed, message: toMessage(editor.state.doc.content) })
+
+  const suggest = async (prompt: string) => {
+    if (props.blocked || sending.current) return
+
+    sending.current = true
+    setAwaiting(true)
+
+    try {
+      await props.send({ message: prompt, images: [] })
+    } finally {
+      sending.current = false
+      setAwaiting(false)
+    }
+  }
 
   const submit = async (deliver: (message: MessageInput) => Promise<boolean>) => {
     const sent = written()
@@ -274,6 +292,19 @@ export function MessageBox(props: {
         {props.problem !== null && <ProblemAlert problem={props.problem} />}
         {props.notice}
         {picker.choices}
+        {props.suggestions !== undefined && props.suggestions.length > 0 && (
+          <Suggestions>
+            {props.suggestions.map((suggestion) => (
+              <Suggestion
+                key={suggestion.label}
+                disabled={props.blocked || awaiting}
+                onClick={() => void suggest(suggestion.prompt)}
+              >
+                {suggestion.label}
+              </Suggestion>
+            ))}
+          </Suggestions>
+        )}
         <InputGroup>
           {composed.images.length > 0 && (
             <InputGroupAddon align="block-start" className="flex-wrap gap-2">

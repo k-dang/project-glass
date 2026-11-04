@@ -230,6 +230,39 @@ it("prevents Retry and Send from overlapping while a retry is being accepted", a
   })
 })
 
+const draftPrComments =
+  "Draft PR comments without using jargon and speak coherently. State it more simply and concisely, like one human talking to another."
+
+it("sends a suggestion's prompt as the first Follow-up", async () => {
+  const f = mountTourWorkspace({
+    files,
+    agentReview: { review: reviewOf(revision), job: { status: "idle" } },
+  })
+
+  await readBesideTheDiff(f)
+  await f.user.click(screen.getByRole("button", { name: "Draft PR comments" }))
+
+  await waitFor(() => expect(f.followUp).toHaveBeenCalledOnce())
+  expect(f.followUp.mock.calls[0]?.[0]).toMatchObject({ revision, message: draftPrComments })
+})
+
+it("sends a suggestion's prompt to the review's Agent", async () => {
+  const f = mountTourWorkspace({
+    files,
+    agentReview: { review: followedUp(revision), job: { status: "idle" } },
+    reviewAgentTurns: followUps,
+  })
+
+  await readBesideTheDiff(f)
+  await f.user.click(await screen.findByRole("button", { name: "Draft PR comments" }))
+
+  await waitFor(() => expect(f.sendMessage).toHaveBeenCalledOnce())
+  expect(f.sendMessage.mock.calls[0]?.[0]).toMatchObject({
+    agentId: "review-agent",
+    message: draftPrComments,
+  })
+})
+
 it("sends later Follow-ups to the review's Agent", async () => {
   const f = mountTourWorkspace({
     files,
