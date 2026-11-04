@@ -46,6 +46,7 @@ const answerSchema = (answer: Schema.Decoder<unknown>): JsonSchema.JsonSchema =>
   return { ...document.schema, $defs: document.definitions }
 }
 
+// Not `--json-schema`: endpoint security tools may kill processes with long arguments.
 const promptWithSchema = (task: AgentTask<unknown>) =>
   `${task.prompt}\n\nOutput JSON Schema:\n${JSON.stringify(answerSchema(task.answer))}`
 
@@ -274,7 +275,8 @@ const runnerStrategies = Effect.gen(function* () {
           identity,
         )
 
-      // pi reads `--system-prompt` from a file when given a path.
+      // pi reads `--system-prompt` from a file when given a path. A file keeps the instructions
+      // out of argv, where endpoint security tools may kill processes with long arguments.
       const instructions = join(cwd, "instructions.md")
       yield* fs
         .writeFileString(instructions, task.instructions)
