@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { cleanup, fireEvent, render } from "@testing-library/react"
 import { afterEach, expect, it, vi } from "vite-plus/test"
-import { useReviewShortcuts } from "./useReviewShortcuts"
+import { useShortcuts } from "./useShortcuts"
 
 afterEach(() => {
   cleanup()
@@ -9,7 +9,7 @@ afterEach(() => {
 })
 
 function Shortcuts(props: { run: () => void; allow?: boolean }) {
-  useReviewShortcuts([
+  useShortcuts([
     {
       key: "j",
       run: props.run,

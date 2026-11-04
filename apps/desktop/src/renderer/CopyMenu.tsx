@@ -3,12 +3,12 @@ import { type KeyboardEvent, useEffect, useRef, useState } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { Kbd, KbdGroup } from "@/components/ui/kbd"
 import { toast } from "@/components/ui/toast"
-import { useReviewShortcuts } from "./useReviewShortcuts"
+import { useShortcuts } from "./useShortcuts"
 
 export function CopyMenu(props: { pullRequest: PullRequest }) {
   const [opener, setOpener] = useState<HTMLElement | null>(null)
 
-  useReviewShortcuts([
+  useShortcuts([
     {
       key: "c",
       run: () => {

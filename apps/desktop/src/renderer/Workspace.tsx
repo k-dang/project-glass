@@ -65,7 +65,6 @@ import { FinishReview } from "./FinishReview"
 import { OpenPullRequestDialog } from "./OpenPullRequestDialog"
 import { isOpen, StatusChips } from "./PullRequestStatus"
 import { type ChangesOrder, type WorkspaceTab, workspaceViewAtom } from "./reviewsArea"
-import { ReviewShortcutsDialog } from "./ReviewShortcutsDialog"
 import { ShortSha } from "./shortSha"
 import type { AskStore } from "./useAsks"
 import { type DraftStore, useDraftCount, useDraftsLocked } from "./useDrafts"
@@ -73,7 +72,7 @@ import { useFullFiles } from "./useFullFiles"
 import type { ReplyStore } from "./useReplies"
 import type { Resolutions } from "./useResolutions"
 import { type ViewedFilesStore, useViewedFiles } from "./useViewedFiles"
-import { useReviewShortcuts } from "./useReviewShortcuts"
+import { useShortcuts } from "./useShortcuts"
 import { TourView, type TourViewHandle } from "./TourView"
 import { readTour } from "./tourReading"
 import { useTour } from "./useTour"
@@ -231,7 +230,7 @@ export function Workspace(props: {
     tourView.current?.showChapter(index, behavior)
   }
 
-  useReviewShortcuts(
+  useShortcuts(
     tourInChanges
       ? [
           { key: "f", run: () => setFullScreen(!fullScreen) },
@@ -583,9 +582,6 @@ export function Workspace(props: {
           )}
         </TabsContent>
       </div>
-      <footer className="flex shrink-0 justify-end border-t px-3 py-1.5">
-        <ReviewShortcutsDialog />
-      </footer>
     </Tabs>
   )
 }

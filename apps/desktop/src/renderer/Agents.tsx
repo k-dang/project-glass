@@ -35,7 +35,7 @@ import { ConfirmationDialog } from "./ConfirmationDialog"
 import { settledProblem, streamProblem } from "./problems"
 import { ProblemAlert } from "./ProblemAlert"
 import { shortcutLabel } from "./shortcutLabel"
-import { useReviewShortcuts } from "./useReviewShortcuts"
+import { useShortcuts } from "./useShortcuts"
 
 const groupNames: Record<PlaceTag, string> = { ...placeNames, sandbox: "Sandboxes" }
 
@@ -69,7 +69,7 @@ export function AgentsLayout() {
   const [panelOpen, setPanelOpen] = useAtom(agentsPanelOpenAtom)
   const navigate = useNavigate()
 
-  useReviewShortcuts([
+  useShortcuts([
     {
       key: "n",
       mod: true,
