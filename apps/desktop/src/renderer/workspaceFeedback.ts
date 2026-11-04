@@ -4,6 +4,7 @@ import type { AtomRegistry } from "effect/reactivity"
 import { activityPullRequest } from "./activity"
 import { AskStore } from "./useAsks"
 import { DraftStore } from "./useDrafts"
+import { createReactions, type Reactions } from "./useReactions"
 import { ReplyStore } from "./useReplies"
 import { createResolutions, type Resolutions } from "./useResolutions"
 import { ViewedFilesStore } from "./useViewedFiles"
@@ -22,6 +23,7 @@ export class WorkspaceFeedback {
   readonly asks: AskStore
   readonly replies: ReplyStore
   readonly resolutions: Resolutions
+  readonly reactions: Reactions
   readonly viewedFiles: ViewedFilesStore
   #disposed = false
 
@@ -44,6 +46,7 @@ export class WorkspaceFeedback {
       new Map(replies),
     )
     this.resolutions = createResolutions(registry)
+    this.reactions = createReactions(registry)
     this.viewedFiles = new ViewedFilesStore(workspace, registry)
   }
 
@@ -61,6 +64,7 @@ export class WorkspaceFeedback {
             this.replies.lock(),
             this.viewedFiles.lock(),
             this.resolutions.lock(),
+            this.reactions.lock(),
           ]),
         ),
         (pending) =>
@@ -86,6 +90,7 @@ export class WorkspaceFeedback {
             this.replies.unlock()
             this.viewedFiles.unlock()
             this.resolutions.unlock()
+            this.reactions.unlock()
           }),
       )
     })
@@ -133,6 +138,7 @@ export class WorkspaceFeedback {
     this.asks.dispose()
     this.replies.dispose()
     this.resolutions.dispose()
+    this.reactions.dispose()
     this.viewedFiles.dispose()
   }
 }

@@ -58,6 +58,7 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         SubmitReview: unused,
         ReplyToDiscussion: unused,
         SetDiscussionResolved: unused,
+        SetReaction: unused,
         RecordActivity: unused,
         ListActivity: unused,
         ListActivityStamps: () => Effect.succeed([]),

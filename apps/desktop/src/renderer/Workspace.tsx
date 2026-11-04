@@ -70,6 +70,7 @@ import type { AskStore } from "./useAsks"
 import { type DraftStore, useDraftCount, useDraftsLocked } from "./useDrafts"
 import { useFullFiles } from "./useFullFiles"
 import type { ReplyStore } from "./useReplies"
+import type { Reactions } from "./useReactions"
 import type { Resolutions } from "./useResolutions"
 import { type ViewedFilesStore, useViewedFiles } from "./useViewedFiles"
 import { useShortcuts } from "./useShortcuts"
@@ -92,6 +93,7 @@ export function Workspace(props: {
   asks: AskStore
   replies: ReplyStore
   resolutions: Resolutions
+  reactions: Reactions
   viewedFiles: ViewedFilesStore
   reloading: boolean
   changedOnGitHub: boolean
@@ -127,7 +129,7 @@ export function Workspace(props: {
   const tourView = useRef<TourViewHandle>(null)
   const [panelTab, setPanelTab] = useState<FilePanelTab>("tree")
   const fullFiles = useFullFiles(pullRequest.ref, revision)
-  const { activity, drafts, asks, replies, resolutions } = props
+  const { activity, drafts, asks, replies, resolutions, reactions } = props
   const draftCount = useDraftCount(drafts)
   const draftsLocked = useDraftsLocked(drafts)
   const viewed = useViewedFiles(props.viewedFiles)
@@ -495,11 +497,12 @@ export function Workspace(props: {
               <AgentReviewCard controls={agentReview} onRead={readAgentReview} />
               <Description html={pullRequest.descriptionHtml} />
               <DraftList store={drafts} onShow={(draft) => showDraft(show, draft)} />
-              <Timeline items={discussions.timeline} />
+              <Timeline items={discussions.timeline} reactions={reactions} />
               <OutdatedDiscussions
                 discussions={discussions.outdated}
                 replies={replies}
                 resolutions={resolutions}
+                reactions={reactions}
               />
             </div>
           </div>
@@ -533,6 +536,7 @@ export function Workspace(props: {
               asks={asks}
               replies={replies}
               resolutions={resolutions}
+              reactions={reactions}
               onReload={props.onReload}
               viewedFiles={props.viewedFiles}
               onViewedChange={setViewed}
@@ -555,6 +559,7 @@ export function Workspace(props: {
                 asks={asks}
                 replies={replies}
                 resolutions={resolutions}
+                reactions={reactions}
                 onReload={props.onReload}
                 viewedFiles={props.viewedFiles}
                 onViewedChange={setViewed}

@@ -172,13 +172,14 @@ const seedRepository = (github: FakeGitHub, owner: string, repo: string) => {
     }
 
     if (sample.list === "my-prs" && !sample.isDraft) {
-      pr.addReviewThread({
+      const thread = pr.addReviewThread({
         path: "greet.ts",
         line: 1,
         side: "RIGHT",
         diffHunk: patch,
         comments: [{ author: "mona", bodyHtml: "<p>Cache the list, or the lookup?</p>" }],
       })
+      pr.react(thread.comments[0]!.id, "EYES", "hubot")
     }
   }
 }

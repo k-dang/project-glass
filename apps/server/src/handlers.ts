@@ -109,6 +109,8 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       ReplyToDiscussion: ({ discussionId, body }) => github.replyToDiscussion(discussionId, body),
       SetDiscussionResolved: ({ discussionId, resolved }) =>
         github.setDiscussionResolved(discussionId, resolved),
+      SetReaction: ({ commentId, reaction, reacted }) =>
+        github.setReaction(commentId, reaction, reacted),
       RecordActivity: (activity) => activityLog.record(activity),
       ListActivity: ({ limit }) =>
         github.viewer.pipe(Effect.flatMap(({ login }) => activityLog.list(login, limit))),

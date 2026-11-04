@@ -34,6 +34,8 @@ import { GitHubHtml } from "./GitHubHtml"
 import { plural } from "./plural"
 import { submitOnShortcut } from "./submitShortcut"
 import { problemText } from "./problems"
+import { CommentReactions } from "./Reactions"
+import { type Reactions } from "./useReactions"
 import { type ReplyStore, usePublishedReplies, useRepliesLocked, useReply } from "./useReplies"
 import { type Resolutions, type ResolutionView, useResolution } from "./useResolutions"
 
@@ -80,7 +82,12 @@ function CommentLayout(props: {
   )
 }
 
-function Comment(props: { comment: PublishedComment; aside?: ReactNode; className?: string }) {
+function Comment(props: {
+  comment: PublishedComment
+  reactions: Reactions
+  aside?: ReactNode
+  className?: string
+}) {
   const { author, avatarUrl, bodyHtml, createdAt } = props.comment
 
   return (
@@ -96,6 +103,7 @@ function Comment(props: { comment: PublishedComment; aside?: ReactNode; classNam
       className={props.className}
     >
       <GitHubHtml html={bodyHtml} className="text-sm" />
+      <CommentReactions store={props.reactions} comment={props.comment} />
     </CommentLayout>
   )
 }
@@ -167,6 +175,7 @@ export function DiscussionThread(props: {
   discussion: LineDiscussion | OutdatedDiscussion
   replies: ReplyStore
   resolutions: Resolutions
+  reactions: Reactions
 }) {
   const { id, comments } = props.discussion
   const resolution = useResolution(props.resolutions, id)
@@ -215,7 +224,7 @@ export function DiscussionThread(props: {
       </header>
       {failed !== null && (
         <p className="border-t px-3 py-2 text-sm text-destructive">
-          Couldn't {failed.resolved ? "resolve" : "unresolve"} this Discussion.{" "}
+          Couldn't {failed.input ? "resolve" : "unresolve"} this Discussion.{" "}
           {problemText(failed.problem)}
         </p>
       )}
@@ -223,12 +232,18 @@ export function DiscussionThread(props: {
         {context}
         <div className={threadComments}>
           {comments.map((comment) => (
-            <Comment key={comment.id} comment={comment} className={threadLine} />
+            <Comment
+              key={comment.id}
+              comment={comment}
+              reactions={props.reactions}
+              className={threadLine}
+            />
           ))}
           {published.map((comment) => (
             <Comment
               key={comment.id}
               comment={comment}
+              reactions={props.reactions}
               className={threadLine}
               aside={<Published />}
             />
@@ -271,7 +286,7 @@ function ResolutionControl(props: {
 
   const accessible =
     failed !== null
-      ? `Retry ${failed.resolved ? "resolving" : "unresolving"} thread on ${props.name}`
+      ? `Retry ${failed.input ? "resolving" : "unresolving"} thread on ${props.name}`
       : `${label} thread on ${props.name}`
 
   return (
@@ -279,7 +294,7 @@ function ResolutionControl(props: {
       {sending !== null && (
         <span className="flex items-center gap-1 text-muted-foreground">
           <LoaderCircle className="size-3.5 animate-spin" aria-hidden />
-          {sending.resolved ? "Resolving…" : "Unresolving…"}
+          {sending.input ? "Resolving…" : "Unresolving…"}
         </span>
       )}
       <Button
@@ -289,7 +304,7 @@ function ResolutionControl(props: {
         disabled={sending !== null || locked}
         aria-label={accessible}
         onClick={() =>
-          props.store.set(props.discussionId, failed !== null ? failed.resolved : !props.resolved)
+          props.store.set(props.discussionId, failed !== null ? failed.input : !props.resolved)
         }
       >
         {failed !== null && <RotateCw data-icon="inline-start" aria-hidden />}
@@ -393,7 +408,10 @@ function ReviewEntry(props: { review: Review }) {
   )
 }
 
-export function Timeline(props: { items: ReadonlyArray<PublishedComment | Review> }) {
+export function Timeline(props: {
+  items: ReadonlyArray<PublishedComment | Review>
+  reactions: Reactions
+}) {
   if (props.items.length === 0) return null
 
   return (
@@ -405,7 +423,7 @@ export function Timeline(props: { items: ReadonlyArray<PublishedComment | Review
             <ReviewEntry key={item.id} review={item} />
           ) : (
             <li key={item.id} className="rounded-lg border px-4 py-3">
-              <Comment comment={item} />
+              <Comment comment={item} reactions={props.reactions} />
             </li>
           ),
         )}
@@ -438,6 +456,7 @@ export function OutdatedDiscussions(props: {
   discussions: ReadonlyArray<OutdatedDiscussion>
   replies: ReplyStore
   resolutions: Resolutions
+  reactions: Reactions
 }) {
   if (props.discussions.length === 0) return null
 
@@ -455,6 +474,7 @@ export function OutdatedDiscussions(props: {
               discussion={discussion}
               replies={props.replies}
               resolutions={props.resolutions}
+              reactions={props.reactions}
             />
           </li>
         ))}

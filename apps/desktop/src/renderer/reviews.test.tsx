@@ -722,6 +722,7 @@ const withDiscussion = (head: string, resolved = false) =>
               avatarUrl: null,
               bodyHtml: "<p>Why there?</p>",
               createdAt: DateTime.makeUnsafe("2026-01-01T00:00:00Z"),
+              reactions: [],
             }),
           ],
         }),

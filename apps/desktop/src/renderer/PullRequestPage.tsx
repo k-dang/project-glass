@@ -76,6 +76,7 @@ export function PullRequestPage() {
             asks={open.feedback.asks}
             replies={open.feedback.replies}
             resolutions={open.feedback.resolutions}
+            reactions={open.feedback.reactions}
             viewedFiles={open.feedback.viewedFiles}
             reloading={result.waiting}
             changedOnGitHub={changed === open.workspace}

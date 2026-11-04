@@ -97,6 +97,11 @@ export const describeError = (error: BackendError): Problem =>
         title: "GitHub didn't accept the Review",
         detail: message === "" ? "GitHub didn't say why." : message,
       }),
+      CommentNotFound: () => ({
+        title: "This comment is gone from GitHub",
+        detail: "It was deleted. Reload to see the Discussion as it is now.",
+        fixedByReload: true,
+      }),
       DiscussionNotFound: () => ({
         title: "This Discussion is gone from GitHub",
         detail:

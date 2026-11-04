@@ -2,6 +2,7 @@ import {
   BinaryFile,
   Branches,
   type ChangedFile,
+  CommentNotFound,
   type ConnectionError,
   DiscussionNotFound,
   type Discussions,
@@ -22,6 +23,8 @@ import {
   PullRequestRef,
   type PublishedComment,
   type PullRequestState,
+  type Reaction,
+  type ReactionGroup,
   PullRequestWorkspace,
   RepositoryFiles,
   type ReviewDecision,
@@ -64,6 +67,7 @@ import {
   toDiscussions,
   UNRESOLVE_THREAD_MUTATION,
 } from "./discussions"
+import { reactionContents, reactionMutation, toReactionGroups } from "./reactions"
 import {
   ADD_DRAFT_MUTATION,
   DELETE_COMMENT_MUTATION,
@@ -131,6 +135,7 @@ import {
   AddReplyResponse,
   MutationResponse,
   ThreadResolutionResponse,
+  ReactionMutationResponse,
   REPOSITORY_BRANCHES_QUERY,
   RepositoryBranchesResponse,
 } from "./queries"
@@ -301,6 +306,11 @@ export class GitHubClient extends Context.Service<
       discussionId: string,
       resolved: boolean,
     ) => Effect.Effect<boolean, DiscussionNotFound | ConnectionError>
+    readonly setReaction: (
+      commentId: string,
+      reaction: Reaction,
+      reacted: boolean,
+    ) => Effect.Effect<ReadonlyArray<ReactionGroup>, CommentNotFound | ConnectionError>
   }
 >()("@glass/server/github/GitHubClient") {
   static readonly layerNoDeps = Layer.effect(
@@ -1127,6 +1137,33 @@ export class GitHubClient extends Context.Service<
         return thread.isResolved
       })
 
+      const setReaction = Effect.fn("GitHubClient.setReaction")(function* (
+        commentId: string,
+        reaction: Reaction,
+        reacted: boolean,
+      ) {
+        const { name, field, query } = reactionMutation(reacted)
+
+        const data = yield* graphql({
+          name,
+          query,
+          variables: { subjectId: commentId, content: reactionContents[reaction] },
+          response: ReactionMutationResponse,
+          domainError: ({ type }) =>
+            type === "NOT_FOUND" ? new CommentNotFound({ id: commentId }) : undefined,
+        })
+
+        const groups = data[field]?.subject?.reactionGroups
+
+        if (groups == null) {
+          return yield* unavailable("GitHub didn't update the Reaction. Try again in a moment.")({
+            message: `GraphQL ${name} returned no reactions for ${commentId}`,
+          })
+        }
+
+        return toReactionGroups(groups)
+      })
+
       return GitHubClient.of({
         viewer,
         knownViewer,
@@ -1150,6 +1187,7 @@ export class GitHubClient extends Context.Service<
         submitReview,
         replyToDiscussion,
         setDiscussionResolved,
+        setReaction,
       })
     }),
   )
