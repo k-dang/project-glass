@@ -11,8 +11,7 @@ const readPath = (shell: string) =>
       new Promise<string | undefined>((resolve) => {
         const child = execFile(
           shell,
-          // Interactive and login, so both profile and rc files run. The markers fence the
-          // PATH off from anything those files print.
+          // zsh reads .zshrc, where installers usually add to PATH, only in interactive shells.
           ["-ilc", `printf '${MARKER}%s${MARKER}' "$PATH"`],
           { encoding: "utf8", timeout: TIMEOUT_MS },
           (_error, stdout) => resolve(stdout.split(MARKER)[1] || undefined),
@@ -27,10 +26,9 @@ const mergePaths = (...paths: ReadonlyArray<string | undefined>) =>
 
 /**
  * Apps opened from Finder or the Dock inherit launchd's bare PATH, which misses where
- * claude, pi, and git usually live (~/.local/bin, Homebrew, version managers). Prepends the
- * first PATH a login shell reports, and leaves PATH alone when none of the shells answer.
+ * claude, pi, and git usually live (~/.local/bin, Homebrew, version managers).
  */
-export const installLoginShellPath = (
+export const prependLoginShellPath = (
   env: NodeJS.ProcessEnv,
   shells: ReadonlyArray<string | undefined>,
 ) =>

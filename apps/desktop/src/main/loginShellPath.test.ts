@@ -3,18 +3,17 @@ import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vite-plus/test"
-import { installLoginShellPath } from "./loginShellPath"
+import { prependLoginShellPath } from "./loginShellPath"
 
 const tempDirectory = Effect.acquireRelease(
   Effect.promise(() => mkdtemp(join(tmpdir(), "glass-login-shell-"))),
   (path) => Effect.promise(() => rm(path, { recursive: true, force: true })),
 )
 
-// Stands in for a login shell; `$2` is the command Glass passes after `-ilc`.
-const fakeShell = (directory: string, name: string, body: string) =>
+const fakeShell = (directory: string, name: string, profile: string) =>
   Effect.promise(async () => {
     const path = join(directory, name)
-    await writeFile(path, `#!/bin/sh\n${body}\n`)
+    await writeFile(path, `#!/bin/sh\n${profile}\ncommand=$2\neval "$command"\n`)
     await chmod(path, 0o755)
 
     return path
@@ -29,12 +28,12 @@ describe("login shell PATH", () => {
         const shell = yield* fakeShell(
           directory,
           "zsh",
-          'echo "Welcome back"\nPATH=/home/me/.local/bin:/usr/bin; export PATH\neval "$2"',
+          'echo "Welcome back"\nPATH=/home/me/.local/bin:/usr/bin; export PATH',
         )
 
         const env: NodeJS.ProcessEnv = { PATH: "/usr/bin:/bin" }
 
-        yield* installLoginShellPath(env, [shell])
+        yield* prependLoginShellPath(env, [shell])
 
         expect(env["PATH"]).toBe("/home/me/.local/bin:/usr/bin:/bin")
       }).pipe(Effect.scoped),
@@ -46,15 +45,11 @@ describe("login shell PATH", () => {
         const directory = yield* tempDirectory
         const silent = yield* fakeShell(directory, "silent", "exit 1")
 
-        const bash = yield* fakeShell(
-          directory,
-          "bash",
-          'PATH=/opt/homebrew/bin; export PATH\neval "$2"',
-        )
+        const bash = yield* fakeShell(directory, "bash", "PATH=/opt/homebrew/bin; export PATH")
 
         const env: NodeJS.ProcessEnv = { PATH: "/usr/bin" }
 
-        yield* installLoginShellPath(env, [undefined, join(directory, "missing"), silent, bash])
+        yield* prependLoginShellPath(env, [undefined, join(directory, "missing"), silent, bash])
 
         expect(env["PATH"]).toBe("/opt/homebrew/bin:/usr/bin")
       }).pipe(Effect.scoped),
@@ -65,7 +60,7 @@ describe("login shell PATH", () => {
       Effect.gen(function* () {
         const env: NodeJS.ProcessEnv = { PATH: "/usr/bin:/bin" }
 
-        yield* installLoginShellPath(env, ["/nonexistent/shell"])
+        yield* prependLoginShellPath(env, ["/nonexistent/shell"])
 
         expect(env["PATH"]).toBe("/usr/bin:/bin")
       }),
