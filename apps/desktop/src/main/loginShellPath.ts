@@ -23,11 +23,7 @@ const readPath = (shell: string) =>
   )
 
 const mergePaths = (...paths: ReadonlyArray<string | undefined>) =>
-  [
-    ...new Set(
-      paths.flatMap((path) => (path ?? "").split(":").map((entry) => entry.trim())).filter(Boolean),
-    ),
-  ].join(":")
+  [...new Set(paths.flatMap((path) => (path ?? "").split(":")).filter(Boolean))].join(":")
 
 /**
  * Apps opened from Finder or the Dock inherit launchd's bare PATH, which misses where

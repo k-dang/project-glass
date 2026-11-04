@@ -10,7 +10,7 @@ const tempDirectory = Effect.acquireRelease(
   (path) => Effect.promise(() => rm(path, { recursive: true, force: true })),
 )
 
-// Stands in for a login shell: chatters like a noisy rc file, then runs the command it's given.
+// Stands in for a login shell; `$2` is the command Glass passes after `-ilc`.
 const fakeShell = (directory: string, name: string, body: string) =>
   Effect.promise(async () => {
     const path = join(directory, name)
