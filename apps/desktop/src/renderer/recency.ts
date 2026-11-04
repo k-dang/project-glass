@@ -2,13 +2,18 @@ export const recency = ["Today", "Yesterday", "Past week", "Older"] as const
 
 export type Recency = (typeof recency)[number]
 
-const startOfDay = (date: Date) =>
-  new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
-
 const DAY = 24 * 60 * 60 * 1000
 
+const dayNumber = (date: Date) =>
+  Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY
+
+export const daysBetween = (from: Date, to: Date) => dayNumber(to) - dayNumber(from)
+
+export const daysAgo = (days: number, now: Date) =>
+  new Date(now.getFullYear(), now.getMonth(), now.getDate() - days)
+
 export const recencyOf = (date: Date, now: Date): Recency => {
-  const days = Math.round((startOfDay(now) - startOfDay(date)) / DAY)
+  const days = daysBetween(date, now)
 
   if (days <= 0) return "Today"
 

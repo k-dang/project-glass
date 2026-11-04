@@ -1,3 +1,5 @@
+import { Link, type LinkProps } from "@tanstack/react-router"
+import { ArrowRight } from "lucide-react"
 import type { ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 
@@ -17,6 +19,17 @@ export function Count(props: { count: number }) {
     <span className="rounded-full bg-muted px-1.5 text-xs text-muted-foreground tabular-nums">
       {props.count}
     </span>
+  )
+}
+
+export function SectionLink(props: { link: LinkProps; children: ReactNode }) {
+  return (
+    <Link
+      {...props.link}
+      className="ml-auto flex items-center gap-1 rounded-sm text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      {props.children} <ArrowRight className="size-3.5" aria-hidden />
+    </Link>
   )
 }
 

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { RegistryProvider } from "@effect/atom-react"
 import {
+  ActivityStamp,
   PullRequestRef,
   PullRequestSummary,
   QueuedPullRequest,
@@ -8,6 +9,7 @@ import {
   ToDo,
 } from "@glass/contracts"
 import { cleanup, render, screen, within } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import { DateTime, Effect } from "effect"
 import { afterEach, expect, it } from "vite-plus/test"
 import { App } from "./App"
@@ -32,6 +34,9 @@ const queued = (number: number, title: string) =>
     openedSinceQueued: false,
     problem: null,
   })
+
+const stamp = (kind: ActivityStamp["kind"], occurredAt: Date) =>
+  new ActivityStamp({ kind, occurredAt: DateTime.fromDateUnsafe(occurredAt) })
 
 const mount = (handlers: Partial<Handlers>) => {
   window.history.replaceState(null, "", "#/dashboard")
@@ -91,4 +96,35 @@ it("shows the first five queued PRs", async () => {
     "Change 4 glass",
     "Change 5 glass",
   ])
+})
+
+it("totals what the user got done over the chosen days", async () => {
+  const now = new Date()
+
+  const today = (offset: number) =>
+    new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset)
+
+  mount({
+    ListActivityStamps: () =>
+      Effect.succeed([
+        stamp("ReplySent", today(-10)),
+        stamp("ReplySent", now),
+        stamp("ToDoDone", now),
+        stamp("ReviewSubmitted", today(-40)),
+      ]),
+  })
+
+  const totals = await screen.findByRole("list", { name: "Activity totals" })
+  expect(
+    within(totals)
+      .getAllByRole("listitem")
+      .map((item) => item.textContent),
+  ).toEqual(["Reviews 0", "Replies 2", "Agents started 0", "To-dos done 1"])
+
+  await userEvent.setup().click(screen.getByRole("button", { name: "7 days" }))
+  expect(
+    within(screen.getByRole("list", { name: "Activity totals" }))
+      .getAllByRole("listitem")
+      .map((item) => item.textContent),
+  ).toEqual(["Reviews 0", "Replies 1", "Agents started 0", "To-dos done 1"])
 })

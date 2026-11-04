@@ -1,7 +1,9 @@
 import {
   Activity,
+  type ActivityKind,
   ActivityLogError,
   ActivityPage,
+  ActivityStamp,
   LoggedActivity,
   PullRequestRef,
 } from "@glass/contracts"
@@ -15,6 +17,8 @@ const decodeReferences = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ ref: Schema.fromJsonString(PullRequestRef) })),
 )
 
+const decodeStamps = Schema.decodeUnknownEffect(Schema.Array(ActivityStamp))
+
 const decodeLogged = Schema.decodeUnknownEffect(
   Schema.Struct({ ...LoggedActivity.fields, activity: Schema.fromJsonString(Activity) }),
 )
@@ -27,6 +31,11 @@ export class ActivityLog extends Context.Service<
       login: string,
     ) => Effect.Effect<ReadonlyArray<PullRequestRef>, ActivityLogError>
     readonly list: (login: string, limit: number) => Effect.Effect<ActivityPage, ActivityLogError>
+    readonly stamps: (
+      login: string,
+      since: DateTime.Utc,
+      kinds: ReadonlyArray<ActivityKind>,
+    ) => Effect.Effect<ReadonlyArray<ActivityStamp>, ActivityLogError>
   }
 >()("@glass/server/ActivityLog") {
   static readonly layer = Layer.effect(
@@ -105,7 +114,25 @@ export class ActivityLog extends Context.Service<
         ),
       )
 
-      return ActivityLog.of({ record, touchedPullRequests, list })
+      const stamps = Effect.fn("ActivityLog.stamps")(
+        function* (viewer: string, since: DateTime.Utc, kinds: ReadonlyArray<ActivityKind>) {
+          const rows = yield* sql`
+            SELECT kind, occurred_at AS occurredAt
+            FROM activity
+            WHERE lower(login) = lower(${viewer})
+              AND occurred_at >= ${DateTime.formatIso(since)}
+              AND kind IN ${sql.in(kinds)}
+          `
+
+          return yield* decodeStamps(rows)
+        },
+        Effect.tapError((cause) => Effect.logWarning("Couldn't read the Activity stamps", cause)),
+        Effect.mapError(
+          () => new ActivityLogError({ message: "Couldn't load your Activity. Try again." }),
+        ),
+      )
+
+      return ActivityLog.of({ record, touchedPullRequests, list, stamps })
     }),
   )
 }
