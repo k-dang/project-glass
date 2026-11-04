@@ -17,14 +17,12 @@ const backendExited = Effect.callback<void>((resume) => {
   process.stdin.resume()
 })
 
-const servingBackend = (address: Parameters<typeof HttpServer.formatAddress>[0]) =>
-  Effect.gen(function* () {
+const reportReady = (address: Parameters<typeof HttpServer.formatAddress>[0]) =>
+  Effect.sync(() => {
     const listening = new URL(HttpServer.formatAddress(address))
 
     writeSync(3, Schema.encodeSync(HostReady)({ port: Number(listening.port) }))
     closeSync(3)
-
-    yield* backendExited
   })
 
 export const serveAgentHost = <E, R>(
@@ -32,7 +30,12 @@ export const serveAgentHost = <E, R>(
 ) =>
   Effect.gen(function* () {
     const token = yield* Config.Redacted("GLASS_HOST_TOKEN")
-    const port = yield* Config.Port("GLASS_HOST_PORT").pipe(Config.option)
+
+    const port = yield* Config.schema(
+      Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 65535 })),
+      "GLASS_HOST_PORT",
+    ).pipe(Config.option)
+
     const standalone = Option.isSome(port)
     const address = yield* Config.String("GLASS_HOST_ADDRESS").pipe(Config.withDefault("127.0.0.1"))
 
@@ -55,10 +58,8 @@ export const serveAgentHost = <E, R>(
       ),
     )
 
-    yield* Effect.race(
-      Deferred.await(shutDown),
-      standalone
-        ? Effect.never
-        : servingBackend(Context.get(services, HttpServer.HttpServer).address),
-    )
+    if (!standalone || port.value === 0)
+      yield* reportReady(Context.get(services, HttpServer.HttpServer).address)
+
+    yield* Effect.race(Deferred.await(shutDown), standalone ? Effect.never : backendExited)
   })

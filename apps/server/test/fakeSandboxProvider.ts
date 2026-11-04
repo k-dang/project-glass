@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
 import { isolatedGitEnv } from "../src/gitEnv.ts"
 import type { AgentModels, Plugin } from "@glass/plugin"
-import { freePort, portOf } from "./ports.ts"
+import { hostPort, portOf } from "./ports.ts"
 import { whenExists } from "./whenExists.ts"
 
 const FakeSandboxSettings = Schema.Struct({
@@ -64,7 +64,7 @@ const fromIngressPath = (text: string) => {
   return outside ? null : rewritten
 }
 
-const ingress = (folder: string, hostPort: number) =>
+const ingress = (folder: string, upstreamPort: number) =>
   new Promise<number>((resolve, reject) => {
     const open = new Set<Socket>()
 
@@ -75,7 +75,7 @@ const ingress = (folder: string, hostPort: number) =>
         return
       }
 
-      const upstream = connect(hostPort, "127.0.0.1")
+      const upstream = connect(upstreamPort, "127.0.0.1")
       let upgraded = false
       let pending = ""
 
@@ -221,7 +221,6 @@ export const fakeSandboxProvider =
         )
 
         progress("Starting the agent")
-        const freeHostPort = await freePort()
         // Copied alone, as a real provider uploads it, so a bundle that needs its neighbours fails here.
         const bundle = join(folder, "agentHost.mjs")
         copyFileSync(request.host.bundle, bundle)
@@ -232,25 +231,26 @@ export const fakeSandboxProvider =
             ...process.env,
             ...request.host.environment,
             ELECTRON_RUN_AS_NODE: "1",
-            GLASS_HOST_PORT: String(freeHostPort),
+            GLASS_HOST_PORT: "0",
             GLASS_HOST_ADDRESS: "127.0.0.1",
             GLASS_PI_COMMAND: settings.piCommand,
             GLASS_CLAUDE_COMMAND: settings.claudeCommand,
           },
-          stdio: ["ignore", "inherit", "inherit"],
+          stdio: ["ignore", "inherit", "inherit", "pipe"],
           detached: process.platform !== "win32",
         })
 
         if (host.pid === undefined) throw new Error("The agent host didn't start")
+        const port = await hostPort(host)
         writeFileSync(
           join(folder, "host.json"),
           Schema.encodeSync(HostFile)({
             pid: host.pid,
-            port: freeHostPort,
+            port,
             token: request.host.environment["GLASS_HOST_TOKEN"] ?? "",
           }),
         )
-        record({ folder, ingressPort: await ingress(folder, freeHostPort) })
+        record({ folder, ingressPort: await ingress(folder, port) })
       },
       target: async (state) => {
         const { folder, ingressPort } = decodeSandbox(state)

@@ -13,6 +13,7 @@ import {
   TurnStopped,
 } from "@glass/contracts"
 import { DateTime, Effect, Option, Predicate, Stream } from "effect"
+import { TestClock } from "effect/testing"
 import { resolve } from "node:path"
 import { agentServicesFixture } from "../test/agentServicesFixture"
 import { eventually } from "../test/eventually"
@@ -315,7 +316,7 @@ it.live(
     }),
 )
 
-it.live(
+it.effect(
   "extends a Sandbox ahead of expiry up to its cap, then makes its Agent read-only once it expires",
   () =>
     Effect.gen(function* () {
@@ -324,25 +325,33 @@ it.live(
       const agent = yield* createSandboxed(f)
       yield* end(yield* f.started)
 
-      const expiries: Array<number> = []
+      for (const expiry of [1000, 1500, 2000, 2500, 3000]) {
+        yield* sandboxOf(f.agents, agent.id).pipe(
+          Stream.filter(
+            ({ expiresAt }) => expiresAt !== null && DateTime.toEpochMillis(expiresAt) === expiry,
+          ),
+          Stream.runHead,
+          Effect.map(Option.getOrThrow),
+        )
+        yield* TestClock.adjust(500)
+      }
 
-      yield* sandboxOf(f.agents, agent.id).pipe(
-        Stream.tap(({ expiresAt }) =>
-          Effect.sync(() => {
-            const at = expiresAt === null ? null : DateTime.toEpochMillis(expiresAt)
+      const expired = yield* eventually(
+        Effect.gen(function* () {
+          yield* TestClock.adjust(500)
 
-            if (at !== null && at !== expiries.at(-1)) expiries.push(at)
-          }),
-        ),
-        Stream.filter(({ reach }) => reach === "expired"),
-        Stream.runHead,
+          const status = yield* sandboxOf(f.agents, agent.id).pipe(
+            Stream.runHead,
+            Effect.map(Option.getOrThrow),
+          )
+
+          assert.equal(status.reach, "expired")
+
+          return status
+        }),
       )
 
-      assert.isAbove(expiries.length, 2)
-      assert.deepStrictEqual(
-        expiries,
-        expiries.toSorted((a, b) => a - b),
-      )
+      assert.equal(expired.expiresAt && DateTime.toEpochMillis(expired.expiresAt), 3000)
 
       const refused = yield* f.agents.send(agent.id, say("Still there?")).pipe(Effect.flip)
       assert.equal(
