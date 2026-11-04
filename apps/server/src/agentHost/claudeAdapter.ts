@@ -135,6 +135,7 @@ const startClaude = (
           options: {
             pathToClaudeCodeExecutable: sdkExecutable(command),
             cwd: folder,
+            // The SDK's own default system prompt is empty, unlike the terminal `claude`'s.
             systemPrompt: { type: "preset", preset: "claude_code" },
             includePartialMessages: true,
             ...sessionOption,

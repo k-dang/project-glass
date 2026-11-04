@@ -118,6 +118,7 @@ it.effect("fails as timed out when the agent passes its limit", () =>
     const f = yield* fixture({ reply: "hold" })
 
     const asking = yield* Effect.forkChild(f.ask(helloName).pipe(Effect.flip))
+    yield* f.runners.ran(1)
     yield* f.deadlineSet
     yield* TestClock.adjust(deadline)
     const failure = yield* Fiber.join(asking)

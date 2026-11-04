@@ -38,7 +38,7 @@ test("reviews a local Agent's changes on its Changes tab, held still until moved
   const message = window.getByRole("textbox", { name: "Message" })
   await message.fill("Write a note")
   await message.press("Enter")
-  await expect(window.getByText(/^Done in/)).toBeVisible({ timeout: 0 })
+  await expect(window.getByText(/^Done in/)).toBeVisible()
 
   const details = window.getByRole("button", { name: "Details" })
   await details.click()
@@ -51,7 +51,7 @@ test("reviews a local Agent's changes on its Changes tab, held still until moved
   await window.getByRole("button", { name: "Back to Chat" }).click()
   await message.fill("Write another")
   await message.press("Enter")
-  await expect(window.getByText(/^Done in/)).toHaveCount(2, { timeout: 0 })
+  await expect(window.getByText(/^Done in/)).toHaveCount(2)
 
   await details.click()
   await window.getByRole("button", { name: "Changes" }).click()

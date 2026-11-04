@@ -235,6 +235,7 @@ const runnerStrategies = Effect.gen(function* () {
 
   const piReadOnlyFlags = ["--tools", piReadOnlyTools.join(",")]
 
+  // The thinking level is left to pi's settings: a level a model lacks fails the request.
   const piCliFlags = ["--offline", "--no-session", ...piLoadsNothing]
 
   // `--mode json` ends with an `agent_end` event carrying the conversation; its last message is
@@ -273,6 +274,7 @@ const runnerStrategies = Effect.gen(function* () {
           identity,
         )
 
+      // pi reads `--system-prompt` from a file when given a path.
       const instructions = join(cwd, "instructions.md")
       yield* fs
         .writeFileString(instructions, task.instructions)

@@ -184,6 +184,7 @@ export class GlassRpcs extends RpcGroup.make(
     success: PullRequestWorkspace,
     error: OpenPullRequestError,
   }),
+  /** Misses changes GitHub makes without touching the PR's updatedAt, like a removed Review request. */
   Rpc.make("HasPullRequestChanged", {
     payload: {
       pullRequestId: Schema.String,

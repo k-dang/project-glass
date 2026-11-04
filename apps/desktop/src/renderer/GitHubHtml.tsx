@@ -11,6 +11,7 @@ function imagePreviewSource(image: HTMLImageElement): string | null {
 
   if (!url) return null
 
+  // GitHub file and directory pages are HTML, even when their paths end with an image extension.
   if (url.hostname === "github.com" && /^\/[^/]+\/[^/]+\/(?:blob|tree)(?:\/|$)/.test(url.pathname))
     return null
 

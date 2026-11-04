@@ -672,6 +672,7 @@ export class Agents extends Context.Service<
             Effect.map(
               (some) => new RemovalWarnings({ uncommittedChanges: some ? "some" : "none" }),
             ),
+            // A connection to a host that just died ends interrupted, not failed.
             Effect.catchCause((cause) =>
               Effect.logWarning("Couldn't check an Agent for uncommitted work", cause).pipe(
                 Effect.as(new RemovalWarnings({ uncommittedChanges: "unchecked" })),

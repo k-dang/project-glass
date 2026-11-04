@@ -41,6 +41,7 @@ export const Input = Data.taggedEnum<Input>()
 export type Command = Data.TaggedEnum<{
   CheckIdle: { readonly generation: number }
   DeclineDialog: { readonly id: string }
+  // pi only sends the Steers it went idle holding with a later prompt.
   Resume: { readonly turnId: string; readonly steers: ReadonlyArray<Steer> }
 }>
 
@@ -289,6 +290,7 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
   return { state, events, commands }
 }
 
+// pi takes Steers in the order they were sent, so the ones it cleared are Glass's newest.
 export const leftover = (
   steers: ReadonlyArray<Steer>,
   cleared: typeof ClearedQueue.Type,

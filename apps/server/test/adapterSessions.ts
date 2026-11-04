@@ -135,6 +135,7 @@ const CLOUD_LOGINS = {
   GOOGLE_APPLICATION_CREDENTIALS: [".config", "gcloud", "application_default_credentials.json"],
 }
 
+// pi may replace an OAuth refresh token while it runs, which voids the one in the real file.
 const lendPiLogin = Effect.fnUntraced(function* (home: string, apiKey: string | undefined) {
   const real = process.env["PI_CODING_AGENT_DIR"] ?? join(homedir(), ".pi", "agent")
   const lent = join(home, ".pi", "agent")
