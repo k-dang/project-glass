@@ -77,8 +77,8 @@ _Avoid_: Code tour, guided review, guide, walkthrough
 
 **Chapter**:
 One step of a Tour: a group of changed files that belong together, with an explanation of what
-they do and why. A Chapter may include diagrams, call trees, flows the reader can step through,
-and callouts linked to diff lines.
+they do and why. A Chapter may include one map, either a diagram (optionally with a flow the reader
+can step through) or a call tree, plus callouts linked to diff lines.
 _Avoid_: Section, stop, step
 
 **Tour engine**:

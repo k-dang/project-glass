@@ -99,12 +99,18 @@ test("reads linked visuals and plays flows without changing viewed progress", as
     "}",
   ]
 
+  const storage = ["export function save(input) {", "  return db.insert(input)", "}"]
+
   const pr = github.seedPullRequest({
     title: "Validate before writing",
     base: { sha: "b0", files: { "handler.ts": `${before.join("\n")}\n` } },
     head: {
       sha: "h1",
-      files: { "handler.ts": `${after.join("\n")}\n`, "validate.ts": `${validation.join("\n")}\n` },
+      files: {
+        "handler.ts": `${after.join("\n")}\n`,
+        "validate.ts": `${validation.join("\n")}\n`,
+        "store.ts": `${storage.join("\n")}\n`,
+      },
     },
     changedFiles: [
       {
@@ -116,6 +122,7 @@ test("reads linked visuals and plays flows without changing viewed progress", as
           "@@ -1,3 +1,5 @@\n async function handle(input) {\n+  const problem = validate(input)\n+  if (problem) return { status: 400 }\n   return save(input)\n }",
       },
       { path: "validate.ts", status: "added", additions: 3, patch: added(validation) },
+      { path: "store.ts", status: "added", additions: 3, patch: added(storage) },
     ],
   })
 
@@ -134,29 +141,6 @@ test("reads linked visuals and plays flows without changing viewed progress", as
           {
             label: "Invalid input returns before the write.",
             target: { path: "handler.ts", side: "new", startLine: 2, endLine: 3 },
-          },
-        ],
-        callTree: [
-          {
-            id: "handle",
-            parent: null,
-            label: "handle(input)",
-            change: "unchanged",
-            target: { path: "handler.ts", side: "new", startLine: 1, endLine: 1 },
-          },
-          {
-            id: "validate",
-            parent: "handle",
-            label: "validate(input)",
-            change: "added",
-            target: { path: "validate.ts", side: "new", startLine: 1, endLine: 3 },
-          },
-          {
-            id: "save",
-            parent: "handle",
-            label: "save(input)",
-            change: "unchanged",
-            target: { path: "handler.ts", side: "new", startLine: 4, endLine: 4 },
           },
         ],
         diagram: {
@@ -213,6 +197,27 @@ test("reads linked visuals and plays flows without changing viewed progress", as
           ],
         },
       },
+      {
+        title: "Store valid input",
+        explanation: "Saving now goes through a single insert.",
+        files: [{ path: "store.ts", summary: "Inserts the input." }],
+        callTree: [
+          {
+            id: "save",
+            parent: null,
+            label: "save(input)",
+            change: "added",
+            target: { path: "store.ts", side: "new", startLine: 1, endLine: 3 },
+          },
+          {
+            id: "insert",
+            parent: "save",
+            label: "db.insert(input)",
+            change: "added",
+            target: { path: "store.ts", side: "new", startLine: 2, endLine: 2 },
+          },
+        ],
+      },
     ],
     unplacedFiles: [],
   }
@@ -244,32 +249,25 @@ test("reads linked visuals and plays flows without changing viewed progress", as
   await flow.getByRole("button", { name: "Next flow step" }).click()
   await expect(flow).toContainText("Validation checks the name before storage.")
   await expect(flow).toContainText("unchecked → validated")
-  await chapter.getByRole("button", { name: "Expand diagram", exact: true }).click()
-  const collapse = chapter.getByRole("button", { name: "Collapse diagram", exact: true })
-  await expect(collapse).toBeFocused()
-  await expect(collapse).toHaveAttribute("aria-expanded", "true")
-  await expect(flow).toContainText("unchecked → validated")
-  await expect
-    .poll(() =>
-      chapter.evaluate((element) => {
-        const figure = element.querySelector("figure")!.getBoundingClientRect()
 
-        const nodes = [...element.querySelectorAll("[data-diagram-node]")].map((node) =>
-          node.getBoundingClientRect(),
-        )
+  const rail = () =>
+    chapter.evaluate((element) => {
+      const diff = element.querySelector("aside")!.nextElementSibling!
+      const figure = diff.querySelector("figure")!.getBoundingClientRect()
+      const code = diff.lastElementChild!.getBoundingClientRect()
 
-        const explanation = element.querySelector("aside")!.getBoundingClientRect()
-        const diff = element.querySelector("aside")!.nextElementSibling!.getBoundingClientRect()
+      const nodes = [...element.querySelectorAll("[data-diagram-node]")].map((node) =>
+        node.getBoundingClientRect(),
+      )
 
-        return {
-          wide: figure.width > element.clientWidth * 0.85,
-          horizontal: nodes.every((node) => Math.abs(node.top - nodes[0]!.top) < 1),
-          stacked: diff.top >= explanation.bottom,
-        }
-      }),
-    )
-    .toEqual({ wide: true, horizontal: true, stacked: true })
-  await window.screenshot({ path: testInfo.outputPath("diagram-expanded.png") })
+      return {
+        aboveCode: figure.bottom <= code.top,
+        horizontal: nodes.every((node) => Math.abs(node.top - nodes[0]!.top) < 1),
+        fits: element.scrollWidth <= element.clientWidth,
+      }
+    })
+
+  await expect.poll(rail).toEqual({ aboveCode: true, horizontal: true, fits: true })
   await flow.getByRole("button", { name: "Next flow step" }).click()
   await expect(flow.getByRole("button", { name: "Next flow step" })).toBeDisabled()
   await flow.getByRole("button", { name: "Previous flow step" }).click()
@@ -286,8 +284,6 @@ test("reads linked visuals and plays flows without changing viewed progress", as
   await expect(window.getByRole("tabpanel", { name: "Overview", exact: true })).toBeVisible()
   await window.getByRole("tab", { name: "Changes", exact: true }).click()
   await expect(flow.getByRole("button", { name: "Play flow" })).toBeVisible()
-  await chapter.getByRole("button", { name: "Expand diagram", exact: true }).focus()
-  await window.keyboard.press("Enter")
 
   await diagram.getByRole("button", { name: /^Write immediately,/ }).click()
   await expect(
@@ -305,11 +301,6 @@ test("reads linked visuals and plays flows without changing viewed progress", as
   ).toBeVisible()
   await expect(chapter).toContainText("0/2 viewed")
   await window.screenshot({ path: testInfo.outputPath("diagram-selected.png") })
-  const caption = await flow.locator("p").innerText()
-  await collapse.click()
-  await expect(chapter.getByRole("button", { name: "Expand diagram", exact: true })).toBeFocused()
-  await expect(check).toHaveAttribute("aria-pressed", "true")
-  await expect(flow).toContainText(caption)
 
   await chapter.getByRole("checkbox", { name: "Viewed: validate.ts", exact: true }).click()
   await expect(chapter.getByRole("button", { name: "Show validate.ts", exact: true })).toBeVisible()
@@ -317,37 +308,23 @@ test("reads linked visuals and plays flows without changing viewed progress", as
   await expect(chapter.getByRole("button", { name: "Hide validate.ts", exact: true })).toBeVisible()
   await expect(chapter).toContainText("1/2 viewed")
 
-  const tree = chapter.getByRole("region", { name: "Call tree for Validate before writing" })
-  await tree.getByRole("button", { name: /validate\(input\)/ }).click()
+  const storing = window.getByRole("region", { name: "Store valid input", exact: true })
+  const tree = storing.getByRole("region", { name: "Call tree for Store valid input" })
+  await tree.getByRole("button", { name: /db\.insert\(input\)/ }).click()
   await expect(
-    chapter.locator("[data-selected-line]").filter({ hasText: "export function validate(input)" }),
+    storing.locator("[data-selected-line]").filter({ hasText: "return db.insert(input)" }),
   ).toBeVisible()
-  await tree.getByRole("button", { name: "Collapse calls from handle(input)" }).click()
-  await expect(tree.getByRole("button", { name: /validate\(input\)/ })).toHaveCount(0)
-  await chapter.getByRole("button", { name: "Expand diagram", exact: true }).click()
-  await expect(tree.getByRole("button", { name: /validate\(input\)/ })).toHaveCount(0)
-  await tree.getByRole("button", { name: "Expand calls from handle(input)" }).click()
-  await expect(tree.getByRole("button", { name: /validate\(input\)/ })).toBeVisible()
+  await tree.getByRole("button", { name: "Collapse calls from save(input)" }).click()
+  await expect(tree.getByRole("button", { name: /db\.insert\(input\)/ })).toHaveCount(0)
+  await tree.getByRole("button", { name: "Expand calls from save(input)" }).click()
+  await expect(tree.getByRole("button", { name: /db\.insert\(input\)/ })).toBeVisible()
   await window.screenshot({ path: testInfo.outputPath("call-tree.png") })
 
   await window.setViewportSize({ width: 800, height: 1000 })
   await expect(diagram).toBeVisible()
 
-  const positions = await chapter.evaluate((element) => {
-    const figure = element.querySelector("figure")!.getBoundingClientRect()
-    const diff = element.querySelector("aside")!.nextElementSibling!.getBoundingClientRect()
-
-    return { stacked: diff.top >= figure.bottom, fits: element.scrollWidth <= element.clientWidth }
-  })
-
-  expect(positions).toEqual({ stacked: true, fits: true })
-  const nodes = diagram.locator("[data-diagram-node]")
-  const first = await nodes.nth(0).boundingBox()
-  const second = await nodes.nth(1).boundingBox()
-  expect(second!.y).toBeGreaterThan(first!.y)
+  await expect.poll(rail).toEqual({ aboveCode: true, horizontal: true, fits: true })
   await window.screenshot({ path: testInfo.outputPath("diagram-narrow.png") })
-  await collapse.click()
-  await expect(chapter).toContainText("1/2 viewed")
 })
 
 test("moves between Chapters from the keyboard and the sidebar in a tall window", async ({

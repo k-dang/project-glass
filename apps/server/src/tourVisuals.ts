@@ -125,5 +125,9 @@ export const repairChapterVisuals = (
   if (chapter.callouts !== undefined)
     repaired.callouts = validateTourCallouts(chapter.callouts, chapter, files)
 
+  // A Chapter shows one map. The diagram wins because it also carries branches and
+  // flow steps; a call tree survives only when no usable diagram does.
+  if (repaired.diagram != null && repaired.callTree != null) repaired.callTree = null
+
   return repaired
 }
