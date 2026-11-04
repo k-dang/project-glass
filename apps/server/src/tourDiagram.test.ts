@@ -7,7 +7,12 @@ import {
   type TourCallTree,
 } from "@glass/contracts"
 import { expect, it } from "vite-plus/test"
-import { validateTourDiagram, validateTourCallTree, validateTourCallouts } from "./tourVisuals"
+import {
+  repairChapterVisuals,
+  validateTourDiagram,
+  validateTourCallTree,
+  validateTourCallouts,
+} from "./tourVisuals"
 
 const file = new ChangedFile({
   path: "handler.ts",
@@ -84,6 +89,21 @@ it("accepts a rooted call tree and rejects unknown callers, cycles, and multiple
   }
 
   expect(validateTourCallTree([tree[1]!, tree[0]!], chapter, [file])).toBeNull()
+})
+
+it("keeps one map per Chapter, preferring the diagram over a call tree", () => {
+  const callTree: TourCallTree = [
+    { ...diagram.nodes[0]!, parent: null },
+    { ...diagram.nodes[1]!, parent: "receive" },
+  ]
+
+  expect(repairChapterVisuals({ ...chapter, callTree }, [file])).toMatchObject({
+    diagram,
+    callTree: null,
+  })
+  expect(
+    repairChapterVisuals({ ...chapter, diagram: { ...diagram, edges: [] }, callTree }, [file]),
+  ).toMatchObject({ diagram: null, callTree })
 })
 
 it("keeps callouts anchored to the Chapter diff and drops invalid targets", () => {
