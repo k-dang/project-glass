@@ -23,7 +23,7 @@ export const demoTour: TourAnswer = {
     {
       title: "Gate requests before the handler",
       explanation:
-        "Previously, middleware only logged requests. When rate limiting is enabled, it now looks up a bucket by API key or IP address and takes a token before calling the handler. An empty bucket returns 429 with a retry-after header. This is the closest read: the new gate decides whether the handler runs. Play the diagram for an illustrative last-token example, or click a node to read its code.",
+        "Previously, middleware only logged requests. When rate limiting is enabled, it now looks up a bucket by API key or IP address and takes a token before calling the handler. An empty bucket returns 429 with a retry-after header. This is the closest read: the new gate decides whether the handler runs. Step through the diagram for an illustrative last-token example, or click a node to read its code.",
       files: [
         { path: middleware, summary: "Adds a per-client gate inside the request logger." },
         {
