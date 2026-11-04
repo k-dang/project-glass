@@ -1,8 +1,7 @@
-import type { AgentReview } from "@glass/contracts"
 import { PanelLeft, ScanSearch } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Item, ItemActions, ItemContent, ItemDescription } from "@/components/ui/item"
 import { failureOf, ReviewAgain, ReviewingLine, WaitingLine } from "./AgentReview"
 import { AgentReviewMarkdown } from "./AgentReviewPanel"
@@ -35,8 +34,16 @@ export function AgentReviewCard(props: { controls: AgentReviewControls; onRead: 
       </CardHeader>
       <CardContent className="space-y-4">
         <AgentReviewStatus controls={controls} />
-        {review !== null && <AgentReviewLead review={review} onRead={onRead} />}
+        {review !== null && <AgentReviewMarkdown markdown={leadOf(review.markdown)} />}
       </CardContent>
+      {review !== null && (
+        <CardFooter>
+          <Button size="sm" onClick={onRead}>
+            <PanelLeft aria-hidden />
+            Read beside the diff
+          </Button>
+        </CardFooter>
+      )}
     </Card>
   )
 }
@@ -111,20 +118,3 @@ function AgentReviewStatus(props: { controls: AgentReviewControls }) {
 }
 
 const leadOf = (markdown: string) => markdown.split(/\n\s*\n/, 1)[0] ?? ""
-
-function AgentReviewLead(props: { review: AgentReview; onRead: () => void }) {
-  return (
-    <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
-      <AgentReviewMarkdown
-        markdown={leadOf(props.review.markdown)}
-        className="min-w-0 flex-1 basis-64"
-      />
-      <div className="flex h-[1lh] items-center text-sm leading-relaxed">
-        <Button size="sm" variant="outline" onClick={props.onRead}>
-          <PanelLeft aria-hidden />
-          Read beside the diff
-        </Button>
-      </div>
-    </div>
-  )
-}
