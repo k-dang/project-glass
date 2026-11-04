@@ -15,6 +15,7 @@ import { homedir } from "node:os"
 import { join, relative } from "node:path"
 import { pathToFileURL } from "node:url"
 import { startBackend } from "./backend"
+import { installLoginShellPath } from "./loginShellPath"
 import { summarizeResourceUsage } from "./resourceUsage"
 
 const devServerUrl = process.env["VITE_DEV_SERVER_URL"]
@@ -150,6 +151,14 @@ const reportFailure = (kind: BackendFailure["kind"], message: string) =>
   backendFailed.resolve({ kind, message, logFile })
 
 const program = Effect.gen(function* () {
+  // Launched from a terminal, the app already has the shell's PATH.
+  if (app.isPackaged && process.platform !== "win32") {
+    yield* installLoginShellPath(process.env, [
+      process.env["SHELL"],
+      process.platform === "darwin" ? "/bin/zsh" : "/bin/bash",
+    ])
+  }
+
   const backend = yield* startBackend({
     entry: resources.server,
     rendererOrigin,
