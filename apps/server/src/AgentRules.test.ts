@@ -103,7 +103,7 @@ it.live(
       const turn = yield* f.started
       yield* f.agents.send(agent.id, say("Later"))
       yield* f.agents.steer(agent.id, say("Also this"))
-      yield* f.leaveOnStop([say("Also this")])
+      yield* f.leaveOnStop([{ ...say("Also this"), context: null }])
 
       yield* f.agents.stop(agent.id)
       assert.deepStrictEqual(f.stops, [agent.id])

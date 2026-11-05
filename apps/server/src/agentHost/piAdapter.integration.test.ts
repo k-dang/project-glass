@@ -21,7 +21,9 @@ import {
   writeGreetSkill,
 } from "../../test/adapterSessions"
 import { settled } from "../../test/agentsFixture"
+import type { FakeModelDelta } from "../../test/fakeModelProvider"
 import { PI_MODEL_ID } from "../../test/piLogin"
+import { GlobalRole, ReviewRole } from "./protocol"
 
 const conversation = "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d"
 
@@ -178,7 +180,7 @@ it.live("stops a pi Turn, handing back a Steer pi hadn't taken in", () =>
 
     const [turn] = yield* f.until(settled(1))
     assert.deepStrictEqual(turn?.ended?.ending, TurnStopped.make({}))
-    assert.deepStrictEqual(handedBack, [{ message: "Now, please", images: [] }])
+    assert.deepStrictEqual(handedBack, [{ message: "Now, please", images: [], context: null }])
   }).pipe(Effect.scoped),
 )
 
@@ -214,8 +216,8 @@ it.live("hands back what pi held when the Turn stops: Steers as written, then pi
     const handedBack = yield* agent.session.stopTurn
 
     assert.deepStrictEqual(handedBack, [
-      { message: "?quick tabs or spaces?", images: [pixel] },
-      { message: "Check the tests", images: [] },
+      { message: "?quick tabs or spaces?", images: [pixel], context: null },
+      { message: "Check the tests", images: [], context: null },
     ])
   }).pipe(Effect.scoped),
 )
@@ -461,7 +463,7 @@ it.live("reads its checkout and proposes Suggested drafts as an Agent review's A
     })
 
     yield* writeGreeter(f.folder)
-    const agent = yield* f.open(conversation, reviewBrief)
+    const agent = yield* f.open(conversation, ReviewRole.make({ brief: reviewBrief }))
 
     yield* agent.send("Draft comments on greet.ts.")
     const [turn] = yield* f.until(settled(1))
@@ -484,5 +486,51 @@ it.live("reads its checkout and proposes Suggested drafts as an Agent review's A
       body: "Keep the name.",
     })
     assert.include(calls[2]?.output, "not a line of the diff")
+  }).pipe(Effect.scoped),
+)
+
+it.live("asks a Question as the Global conversation, with no other tools", () =>
+  Effect.gen(function* () {
+    const f = yield* piSession("pi-global", {
+      fake: {
+        reply: ({ messages }): ReadonlyArray<FakeModelDelta> => {
+          const answered = messages.find(({ role }) => role === "tool")
+
+          return answered === undefined
+            ? [
+                {
+                  toolCall: {
+                    id: "ask-greeting",
+                    name: "ask_user",
+                    arguments: { question: "Which greeting?", options: ["Hi", "Hello"] },
+                  },
+                },
+              ]
+            : [{ text: `You chose ${JSON.stringify(answered.content)}` }]
+        },
+      },
+    })
+
+    const agent = yield* f.open(conversation, GlobalRole.make({}))
+
+    yield* agent.send("Ask me which greeting I prefer.")
+    const question = yield* f.request
+    assert.ok(Predicate.isTagged(question, "Question"))
+    assert.deepStrictEqual(question.questions[0]?.question, "Which greeting?")
+    assert.deepStrictEqual(
+      question.questions[0]?.options.map(({ label }) => label),
+      ["Hi", "Hello"],
+    )
+
+    yield* agent.answer(
+      question.requestId,
+      AnswerQuestion.make({ answers: [{ chosen: ["Hello"], text: null }] }),
+    )
+    const [turn] = yield* f.until(settled(1))
+
+    assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
+    const answer = lastText(turn)
+    assert.ok(Predicate.isTagged(answer, "Text"))
+    assert.include(answer.text, "Hello")
   }).pipe(Effect.scoped),
 )

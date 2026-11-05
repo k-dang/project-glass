@@ -16,8 +16,8 @@ import {
   TurnFailed,
   type TurnPart,
   TurnStopped,
-  type SentMessage,
-  sentOf,
+  type MessageWithContext,
+  withContextOf,
 } from "@glass/contracts"
 import { Data, type DateTime, Option, Schema } from "effect"
 import { saysSignInFailed } from "../agentFailure"
@@ -62,7 +62,11 @@ interface Step {
 export const stoppedReason =
   "Claude Code stopped unexpectedly. Check its installation, then send your message again."
 
-export const beginTurn = (turnId: string, sent: SentMessage, at: DateTime.Utc): TurnState => ({
+export const beginTurn = (
+  turnId: string,
+  sent: MessageWithContext,
+  at: DateTime.Utc,
+): TurnState => ({
   turn: { id: turnId, ...sent, sentAt: at, ended: null, parts: [] },
   partByBlock: new Map(),
   toolCalls: new Map(),
@@ -204,7 +208,7 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
   }
 
   const showSteers = (taken: ReadonlyArray<Steer>) => {
-    for (const steer of taken) addPart(SteerPart.make(sentOf(steer)))
+    for (const steer of taken) addPart(SteerPart.make(withContextOf(steer)))
 
     state = { ...state, steers: state.steers.filter((steer) => !taken.includes(steer)) }
   }

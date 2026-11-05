@@ -1,10 +1,11 @@
 import {
   AgentError,
   type AgentEvent,
+  CapturedContext,
   endTurnEvents,
   isRequestPart,
   Image,
-  type MessageInput,
+  type MessageWithContext,
   PartAppended,
   AgentBusy,
   QueuedMessagesChanged,
@@ -45,12 +46,17 @@ export const ImagesJson = Schema.fromJsonString(Schema.Array(Image))
 
 export const encodeImages = Schema.encodeSync(ImagesJson)
 
+const ContextJson = Schema.NullOr(Schema.fromJsonString(CapturedContext))
+
+const encodeContext = Schema.encodeSync(ContextJson)
+
 const decodeTurns = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({
       id: Turn.fields.id,
       message: Turn.fields.message,
       images: ImagesJson,
+      context: ContextJson,
       sentAt: Turn.fields.sentAt,
       ended: Schema.NullOr(Schema.fromJsonString(TurnEnd)),
     }),
@@ -76,7 +82,9 @@ const decodeExists = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ fou
 export const StoredMessage = Schema.Struct({ ...SentMessage.fields, images: ImagesJson })
 
 const decodeQueued = Schema.decodeUnknownEffect(
-  Schema.Array(Schema.Struct({ ...QueuedMessage.fields, ...StoredMessage.fields })),
+  Schema.Array(
+    Schema.Struct({ ...QueuedMessage.fields, ...StoredMessage.fields, context: ContextJson }),
+  ),
 )
 
 const decodeTurnIds = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ id: Schema.String })))
@@ -141,10 +149,13 @@ export class Transcripts extends Context.Service<
       agentIds: ReadonlyArray<string>,
     ) => Effect.Effect<void, AgentError>
     readonly runningTurn: (agentId: string) => Effect.Effect<string | null, AgentError>
-    readonly startOrQueue: (agentId: string, input: MessageInput) => Effect.Effect<void, AgentError>
+    readonly startOrQueue: (
+      agentId: string,
+      input: MessageWithContext,
+    ) => Effect.Effect<void, AgentError>
     readonly prependQueued: (
       agentId: string,
-      inputs: ReadonlyArray<MessageInput>,
+      inputs: ReadonlyArray<MessageWithContext>,
     ) => Effect.Effect<void, AgentError>
     readonly cancelQueued: (agentId: string, queuedId: string) => Effect.Effect<void, AgentError>
     readonly startQueued: (
@@ -201,12 +212,13 @@ export class Transcripts extends Context.Service<
       const writeApplied = (agentId: string, event: AgentEvent) =>
         Match.value(event).pipe(
           Match.tagsExhaustive({
-            TurnStarted: ({ turnId, message, images, sentAt }) =>
+            TurnStarted: ({ turnId, message, images, context, sentAt }) =>
               sql`INSERT INTO agent_turn ${sql.insert({
                 id: turnId,
                 agent_id: agentId,
                 message,
                 images: encodeImages(images),
+                context: encodeContext(context),
                 sent_at: DateTime.formatIso(sentAt),
               })}`.pipe(Effect.as(true)),
             PartSet: ({ turnId, index, part }) =>
@@ -238,7 +250,7 @@ export class Transcripts extends Context.Service<
 
       const queued = (agentId: string) =>
         sql`
-          SELECT id, message, images FROM agent_queued_message
+          SELECT id, message, images, context FROM agent_queued_message
           WHERE agent_id = ${agentId} ORDER BY position
         `.pipe(Effect.flatMap(decodeQueued))
 
@@ -247,13 +259,14 @@ export class Transcripts extends Context.Service<
           Effect.map((current) => QueuedMessagesChanged.make({ queued: current })),
         )
 
-      const insertQueued = (agentId: string, position: number, input: MessageInput) =>
+      const insertQueued = (agentId: string, position: number, input: MessageWithContext) =>
         sql`INSERT INTO agent_queued_message ${sql.insert({
           id: randomUUID(),
           agent_id: agentId,
           position,
           message: input.message,
           images: encodeImages(input.images),
+          context: encodeContext(input.context),
         })}`
 
       const queuedPositions = (agentId: string) =>
@@ -265,11 +278,12 @@ export class Transcripts extends Context.Service<
           Effect.map(([found]) => ({ first: found?.first ?? 0, last: found?.last ?? 0 })),
         )
 
-      const startTurn = Effect.fnUntraced(function* (agentId: string, input: MessageInput) {
+      const startTurn = Effect.fnUntraced(function* (agentId: string, input: MessageWithContext) {
         const event = TurnStarted.make({
           turnId: randomUUID(),
           message: input.message,
           images: input.images,
+          context: input.context,
           sentAt: yield* DateTime.now,
         })
 
@@ -336,7 +350,7 @@ export class Transcripts extends Context.Service<
       const snapshot = Effect.fnUntraced(function* (agentId: string) {
         const turns = yield* decodeTurns(
           yield* sql`
-            SELECT id, message, images, sent_at AS sentAt, ended
+            SELECT id, message, images, context, sent_at AS sentAt, ended
             FROM agent_turn WHERE agent_id = ${agentId} ORDER BY rowid
           `,
         )

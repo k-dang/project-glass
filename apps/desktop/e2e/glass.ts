@@ -42,6 +42,38 @@ interface Glass {
   }
   readonly app: ElectronApplication
   readonly window: Page
+  readonly relaunch: () => Promise<Page>
+}
+
+const launch = (glass: Pick<Glass, "github" | "claude" | "pi" | "home">) => {
+  const { github, claude, pi, home } = glass
+
+  const inherited = Object.entries(process.env).flatMap(([key, value]) =>
+    value === undefined || UNINHERITED.has(key) ? [] : [[key, value]],
+  )
+
+  return _electron.launch({
+    executablePath: electronPath,
+    args: [
+      "-r",
+      join(import.meta.dirname, "background.cjs"),
+      desktopDir,
+      `--user-data-dir=${join(home, "user-data")}`,
+    ],
+    env: {
+      ...Object.fromEntries(inherited),
+      HOME: home,
+      USERPROFILE: home,
+      PI_CODING_AGENT_DIR: join(home, ".pi", "agent"),
+      GH_TOKEN: VIEWER.token,
+      GLASS_GITHUB_API_URL: github.url,
+      ...claude.environment,
+      GLASS_PI_COMMAND: pi.command,
+      // Keeps pi from refreshing its model catalog over the network.
+      PI_OFFLINE: "1",
+      GLASS_GIT_REMOTE: github.gitUrl,
+    },
+  })
 }
 
 export const test = base.extend<Glass>({
@@ -88,38 +120,26 @@ export const test = base.extend<Glass>({
     )
   },
   app: async ({ github, claude, pi, home }, use) => {
-    const inherited = Object.entries(process.env).flatMap(([key, value]) =>
-      value === undefined || UNINHERITED.has(key) ? [] : [[key, value]],
-    )
-
-    const app = await _electron.launch({
-      executablePath: electronPath,
-      args: [
-        "-r",
-        join(import.meta.dirname, "background.cjs"),
-        desktopDir,
-        `--user-data-dir=${join(home, "user-data")}`,
-      ],
-      env: {
-        ...Object.fromEntries(inherited),
-        HOME: home,
-        USERPROFILE: home,
-        PI_CODING_AGENT_DIR: join(home, ".pi", "agent"),
-        GH_TOKEN: VIEWER.token,
-        GLASS_GITHUB_API_URL: github.url,
-        ...claude.environment,
-        GLASS_PI_COMMAND: pi.command,
-        // Keeps pi from refreshing its model catalog over the network.
-        PI_OFFLINE: "1",
-        GLASS_GIT_REMOTE: github.gitUrl,
-      },
-    })
+    const app = await launch({ github, claude, pi, home })
 
     await use(app)
     await app.close()
   },
   window: async ({ app }, use) => {
     await use(await app.firstWindow())
+  },
+  relaunch: async ({ app, github, claude, pi, home }, use) => {
+    const relaunched: Array<ElectronApplication> = []
+
+    await use(async () => {
+      await (relaunched.at(-1) ?? app).close()
+      const next = await launch({ github, claude, pi, home })
+      relaunched.push(next)
+
+      return next.firstWindow()
+    })
+
+    for (const launched of relaunched) await launched.close()
   },
 })
 

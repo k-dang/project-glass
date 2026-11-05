@@ -6,7 +6,7 @@ import { beginTurn, Command, Input, leftover, step, stoppedReason, type TurnStat
 
 const now = DateTime.makeUnsafe("2026-10-26T12:00:00Z")
 
-const started = beginTurn("turn-1", { message: "Say hello", images: [] }, now)
+const started = beginTurn("turn-1", { message: "Say hello", images: [], context: null }, now)
 
 const run = (inputs: ReadonlyArray<Input | PiEvent>, from: TurnState | null = started) => {
   let state = from
@@ -118,6 +118,7 @@ it("goes on with the Steers pi went idle holding, sending each prompt again and 
   const steer = {
     message: "Use tabs",
     images: [],
+    context: null,
     prompt: "Use tabs, as To-do 3 says",
     id: "steer-1",
   }
@@ -143,7 +144,7 @@ it("goes on with the Steers pi went idle holding, sending each prompt again and 
   )
 
   assert.deepStrictEqual(resumed.state?.turn.parts, [
-    SteerPart.make({ message: "Use tabs", images: [] }),
+    SteerPart.make({ message: "Use tabs", images: [], context: null }),
   ])
   assert.deepStrictEqual(resumed.state?.steers, [])
 
@@ -158,10 +159,10 @@ it("goes on with the Steers pi went idle holding, sending each prompt again and 
 
 const image = { mediaType: "image/png", data: "AA==" } as const
 
-const tabs = { message: "/tabs", images: [image], prompt: "/tabs", id: "steer-2" }
+const tabs = { message: "/tabs", images: [image], context: null, prompt: "/tabs", id: "steer-2" }
 
 it("gives back the Steers pi held as the user wrote them, and its follow-ups as its text", () => {
-  const lint = { message: "Run lint", images: [], prompt: "Run lint", id: "steer-1" }
+  const lint = { message: "Run lint", images: [], context: null, prompt: "Run lint", id: "steer-1" }
 
   assert.deepStrictEqual(
     leftover([lint, tabs], {
@@ -169,8 +170,8 @@ it("gives back the Steers pi held as the user wrote them, and its follow-ups as 
       followUp: ["Then run the tests"],
     }),
     [
-      { message: "/tabs", images: [image] },
-      { message: "Then run the tests", images: [] },
+      { message: "/tabs", images: [image], context: null },
+      { message: "Then run the tests", images: [], context: null },
     ],
   )
 })
@@ -179,8 +180,8 @@ it("gives back an extension's own Steer, queued before the user's, as pi's text"
   assert.deepStrictEqual(
     leftover([tabs], { steering: ["From an extension", "Use tabs, not spaces"], followUp: [] }),
     [
-      { message: "/tabs", images: [image] },
-      { message: "From an extension", images: [] },
+      { message: "/tabs", images: [image], context: null },
+      { message: "From an extension", images: [], context: null },
     ],
   )
 })

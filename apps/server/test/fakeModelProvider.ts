@@ -42,7 +42,7 @@ export type FakeModelDelta =
       readonly toolCall: {
         readonly id: string
         readonly name: string
-        readonly arguments: Readonly<Record<string, string | number>>
+        readonly arguments: Readonly<Record<string, string | number | ReadonlyArray<string>>>
       }
     }
 

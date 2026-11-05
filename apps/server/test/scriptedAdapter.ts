@@ -4,7 +4,7 @@ import {
   PermissionRequestPart,
   type RequestPart,
   RequestNotWaiting,
-  type SentMessage,
+  type MessageWithContext,
   SteerPart,
   SUGGEST_DRAFT_TOOL,
   TextPart,
@@ -13,8 +13,9 @@ import {
   TurnEnded,
   type TurnEnding,
   TurnStopped,
+  withContextOf,
 } from "@glass/contracts"
-import { DateTime, Deferred, Effect, Fiber, Scope } from "effect"
+import { DateTime, Deferred, Effect, Fiber, Predicate, Scope } from "effect"
 import { randomUUID } from "node:crypto"
 import { readdirSync } from "node:fs"
 import { join } from "node:path"
@@ -38,14 +39,15 @@ export const scriptedAdapter = (gates: string): AgentAdapter => ({
     }),
   ),
   commands: () => Effect.succeed([]),
-  start: ({ folder, review, report }) =>
+  start: ({ folder, role, report }) =>
     Effect.gen(function* () {
+      const review = Predicate.isTagged(role, "Review") ? role.brief : null
       const scope = yield* Scope.Scope
 
       let turn: {
         readonly id: string
         readonly fiber: Fiber.Fiber<void>
-        steers: Array<SentMessage>
+        steers: Array<MessageWithContext>
         index: number
         waiting: Waiting | null
       } | null = null
@@ -63,7 +65,7 @@ export const scriptedAdapter = (gates: string): AgentAdapter => ({
           yield* report(TurnEnded.make({ turnId, ended: { at: yield* DateTime.now, ending } }))
         })
 
-      const run = (turnId: string, { message }: SentMessage) =>
+      const run = (turnId: string, { message }: MessageWithContext) =>
         Effect.gen(function* () {
           const hold = /^hold:(\S+)/.exec(message)?.[1]
 
@@ -72,7 +74,7 @@ export const scriptedAdapter = (gates: string): AgentAdapter => ({
             yield* Effect.promise((signal) => whenExists(join(gates, hold), signal))
 
             for (const steer of turn!.steers.splice(0)) {
-              yield* part(turnId, SteerPart.make({ message: steer.message, images: steer.images }))
+              yield* part(turnId, SteerPart.make(withContextOf(steer)))
               yield* part(turnId, TextPart.make({ text: `Reply to: ${steer.message}` }))
             }
           }

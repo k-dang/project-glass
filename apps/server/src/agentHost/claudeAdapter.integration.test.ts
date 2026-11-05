@@ -22,6 +22,7 @@ import {
   writeGreetSkill,
 } from "../../test/adapterSessions"
 import { settled } from "../../test/agentsFixture"
+import { GlobalRole, ReviewRole } from "./protocol"
 
 const conversation = "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
 
@@ -168,7 +169,11 @@ it.live("Steers a running Turn, showing the Steer where Claude Code takes it in"
     assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
     assert.deepInclude(
       turn?.parts ?? [],
-      SteerPart.make({ message: "Change course: reply with exactly STEERED instead.", images: [] }),
+      SteerPart.make({
+        message: "Change course: reply with exactly STEERED instead.",
+        images: [],
+        context: null,
+      }),
     )
     assert.deepStrictEqual(lastText(turn), TextPart.make({ text: "STEERED" }))
   }).pipe(Effect.scoped),
@@ -278,7 +283,7 @@ it.live("reads its checkout and proposes Suggested drafts as an Agent review's A
   Effect.gen(function* () {
     const f = yield* claudeSession("claude-review")
     yield* writeGreeter(f.folder)
-    const agent = yield* f.open(conversation, reviewBrief)
+    const agent = yield* f.open(conversation, ReviewRole.make({ brief: reviewBrief }))
 
     yield* agent.send(
       'Read greet.ts with the Read tool. Then call the suggest_draft tool exactly twice, one call after the other: first with path greet.ts, side new, line 2, and body "Keep the name."; then with path greet.ts, side new, line 40, and body "Off the diff.". Then reply with exactly: DONE',
@@ -305,5 +310,33 @@ it.live("reads its checkout and proposes Suggested drafts as an Agent review's A
       body: "Keep the name.",
     })
     assert.include(suggestions[1]?.output, "not a line of the diff")
+  }).pipe(Effect.scoped),
+)
+
+it.live("asks a Question as the Global conversation, with no other tools", () =>
+  Effect.gen(function* () {
+    const f = yield* claudeSession("claude-global")
+    const agent = yield* f.open(conversation, GlobalRole.make({}))
+
+    yield* agent.send(
+      "Ask me with your question tool whether I prefer Hi or Hello, offering exactly those two options. Then reply with exactly the option I chose.",
+    )
+    const question = yield* f.request
+    assert.ok(Predicate.isTagged(question, "Question"))
+    assert.deepStrictEqual(
+      question.questions[0]?.options.map(({ label }) => label),
+      ["Hi", "Hello"],
+    )
+
+    yield* agent.answer(
+      question.requestId,
+      AnswerQuestion.make({ answers: [{ chosen: ["Hello"], text: null }] }),
+    )
+    const [turn] = yield* f.until(settled(1))
+
+    assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
+    const answer = lastText(turn)
+    assert.ok(Predicate.isTagged(answer, "Text"))
+    assert.include(answer.text, "Hello")
   }).pipe(Effect.scoped),
 )

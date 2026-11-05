@@ -10,7 +10,7 @@ import {
   FollowedRepository,
   type AgentEvent,
   type RequestAnswer,
-  type SentMessage,
+  type MessageWithContext,
   type Transcript,
   type RequestNotWaiting,
   thisMac,
@@ -37,6 +37,7 @@ import { Journal } from "../src/agentHost/Journal"
 import { AgentHostRpcs, type HostAgentError, type TurnSettings } from "../src/agentHost/protocol"
 import { ActivityLog } from "../src/ActivityLog"
 import { Agents } from "../src/Agents"
+import { ConversationTurns } from "../src/ConversationTurns"
 import { followJournal } from "../src/hostJournal"
 import { migrationLoader } from "../src/Migrations"
 import { Plugins } from "../src/Plugins"
@@ -73,7 +74,7 @@ export const agentServicesFixture = Effect.gen(function* () {
   const starts: Array<string> = []
   const exits = new Map<string, Deferred.Deferred<void>>()
   let starting: Deferred.Deferred<void> | null = null
-  let leftOnStop: ReadonlyArray<SentMessage> = []
+  let leftOnStop: ReadonlyArray<MessageWithContext> = []
   let nextAnswer: Effect.Effect<void, HostAgentError | RequestNotWaiting> = Effect.void
   let nextName = 0
   const models = Effect.succeed(new AgentModels({ defaultModel: null, models: [] }))
@@ -202,6 +203,7 @@ export const agentServicesFixture = Effect.gen(function* () {
               ),
             ),
           ),
+          Layer.provide(ConversationTurns.layer),
           Layer.provideMerge(Transcripts.layer),
           Layer.provide(Layer.succeed(LocalPlacement, placement)),
           Layer.provide(ToDos.layer),
@@ -276,7 +278,7 @@ export const agentServicesFixture = Effect.gen(function* () {
 
         return exited === undefined ? Effect.void : Deferred.succeed(exited, undefined)
       }).pipe(Effect.asVoid),
-    leaveOnStop: (messages: ReadonlyArray<SentMessage>) =>
+    leaveOnStop: (messages: ReadonlyArray<MessageWithContext>) =>
       Effect.sync(() => {
         leftOnStop = messages
       }),

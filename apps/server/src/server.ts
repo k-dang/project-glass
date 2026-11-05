@@ -12,11 +12,13 @@ import { Asks } from "./Asks"
 import { CheckoutRuns } from "./CheckoutRuns"
 import { Checkouts } from "./Checkouts"
 import { Agents } from "./Agents"
+import { ConversationTurns } from "./ConversationTurns"
 import { DatabaseLive } from "./Database"
 import { Git } from "./git"
 import { GitHubAuth } from "./github/GitHubAuth"
 import { GitHubClient } from "./github/GitHubClient"
 import { GlassRpcHandlers } from "./handlers"
+import { GlobalConversation } from "./GlobalConversation"
 import { LocalAgentHost } from "./LocalAgentHost"
 import { LocalCheckouts } from "./LocalCheckouts"
 import { Plugins } from "./Plugins"
@@ -55,9 +57,10 @@ type AgentRunnersLayer = Layer.Layer<
   ServerConfig | SettingsStore | ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem
 >
 
-const AgentsLive = Agents.layer.pipe(
+const AgentsLive = Layer.merge(Agents.layer, GlobalConversation.layer).pipe(
   Layer.provide(LocalPlacement.layer),
   Layer.provideMerge(Sandboxes.layer),
+  Layer.provide(ConversationTurns.layer),
   Layer.provide(LocalAgentHost.layer),
   Layer.provide(Transcripts.layer),
   Layer.provide(ToDos.layer),

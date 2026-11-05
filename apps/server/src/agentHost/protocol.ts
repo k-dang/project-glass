@@ -5,10 +5,10 @@ import {
   AgentEvent,
   AgentModels,
   ChangedFile,
+  MessageWithContext,
   ModelChoice,
   RequestAnswer,
   RequestNotWaiting,
-  SentMessage,
 } from "@glass/contracts"
 import { Schema, SchemaTransformation } from "effect"
 import { randomBytes } from "node:crypto"
@@ -60,11 +60,21 @@ export const ReviewBrief = Schema.Struct({
 
 export type ReviewBrief = typeof ReviewBrief.Type
 
+export const WorkRole = Schema.TaggedStruct("Work", {})
+
+export const ReviewRole = Schema.TaggedStruct("Review", { brief: ReviewBrief })
+
+export const GlobalRole = Schema.TaggedStruct("Global", {})
+
+export const ConversationRole = Schema.Union([WorkRole, ReviewRole, GlobalRole])
+
+export type ConversationRole = typeof ConversationRole.Type
+
 export class HostAgentError extends Schema.TaggedError<HostAgentError>()("HostAgentError", {
   message: Schema.String,
 }) {}
 
-export const SteersNotTakenIn = Schema.Array(SentMessage)
+export const SteersNotTakenIn = Schema.Array(MessageWithContext)
 
 export type SteersNotTakenIn = typeof SteersNotTakenIn.Type
 
@@ -84,7 +94,7 @@ export class AgentHostRpcs extends RpcGroup.make(
       agentId: Schema.String,
       engine: AgentEngine,
       folder: HostFolder,
-      review: Schema.NullOr(ReviewBrief),
+      role: ConversationRole,
     },
     error: HostAgentError,
   }),

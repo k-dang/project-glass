@@ -1,6 +1,11 @@
 // @vitest-environment happy-dom
 import {
+  AgentModels,
   defaultReviewPrompt,
+  PullRequestContext,
+  TextPart,
+  TranscriptSnapshot,
+  TurnDone,
   type Activity,
   ActivityPage,
   ActivityPullRequest,
@@ -31,7 +36,7 @@ import {
 import { RegistryProvider } from "@effect/atom-react"
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { DateTime, Effect } from "effect"
+import { DateTime, Effect, Stream } from "effect"
 import { afterEach, expect, it } from "vite-plus/test"
 import { ACTIVITY_PAGE_SIZE } from "./ActivityLogPage"
 import { App } from "./App"
@@ -444,4 +449,51 @@ it("lists to-do Activity", async () => {
   expect(within(today).getByRole("listitem").textContent).toContain(
     "Marked doneWrite the release notes",
   )
+})
+
+it("opens the Global conversation beside the current area, labelling each message with where it was sent from", async () => {
+  const sentAt = DateTime.makeUnsafe("2026-11-05T12:00:00Z")
+
+  const user = mount({
+    ListAgentModels: () => Effect.succeed(new AgentModels({ defaultModel: null, models: [] })),
+    WatchGlobalTranscript: () =>
+      Stream.make(
+        TranscriptSnapshot.make({
+          turns: [
+            {
+              id: "turn-1",
+              message: "Is this ready?",
+              images: [],
+              context: PullRequestContext.make({
+                pullRequest: workspace.pullRequest.ref,
+                revision: workspace.revision,
+              }),
+              sentAt,
+              ended: { at: sentAt, ending: TurnDone.make({}) },
+              parts: [TextPart.make({ text: "Nearly." })],
+            },
+          ],
+          queued: [],
+          status: null,
+        }),
+      ),
+  })
+
+  await user.click(await screen.findByRole("link", { name: "To-dos" }))
+  await user.keyboard("{Meta>}j{/Meta}")
+
+  const conversation = await screen.findByRole("complementary", { name: "Global conversation" })
+  await within(conversation).findByText("Nearly.")
+  expect(within(conversation).getByText("From octo-org/glass#42 at head001")).toBeTruthy()
+  expect(screen.getByRole("link", { name: "To-dos" }).getAttribute("aria-current")).toBe("page")
+
+  await user.click(
+    within(conversation).getByRole("button", { name: "Close the Global conversation" }),
+  )
+  expect(screen.queryByRole("complementary", { name: "Global conversation" })).toBeNull()
+
+  await user.click(screen.getByRole("button", { name: "Global conversation" }))
+  await within(
+    await screen.findByRole("complementary", { name: "Global conversation" }),
+  ).findByText("Nearly.")
 })

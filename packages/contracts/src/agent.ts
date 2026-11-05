@@ -1,6 +1,8 @@
 import { agentEngines } from "@glass/plugin"
 import { Match, Predicate, Schema } from "effect"
 import { FollowedRepository } from "./followedRepository"
+import { PullRequestRef } from "./pullRequest"
+import { Revision } from "./revision"
 
 export const AgentEngine = Schema.Literals(agentEngines)
 
@@ -139,6 +141,33 @@ export type SentMessage = typeof SentMessage.Type
 
 export const sentOf = ({ message, images }: SentMessage): SentMessage => ({ message, images })
 
+export const PullRequestContext = Schema.TaggedStruct("PullRequest", {
+  pullRequest: PullRequestRef,
+  revision: Revision,
+})
+
+export const AgentContext = Schema.TaggedStruct("Agent", {
+  agentId: Schema.String,
+  name: Schema.String,
+})
+
+export const CapturedContext = Schema.Union([PullRequestContext, AgentContext])
+
+export type CapturedContext = typeof CapturedContext.Type
+
+export const MessageWithContext = Schema.Struct({
+  ...SentMessage.fields,
+  context: Schema.NullOr(CapturedContext),
+})
+
+export type MessageWithContext = typeof MessageWithContext.Type
+
+export const withContextOf = ({
+  message,
+  images,
+  context,
+}: MessageWithContext): MessageWithContext => ({ message, images, context })
+
 export const TextPart = Schema.TaggedStruct("Text", { text: Schema.String })
 
 export const ThinkingPart = Schema.TaggedStruct("Thinking", { text: Schema.String })
@@ -193,7 +222,7 @@ export const QuestionPart = Schema.TaggedStruct("Question", {
   answers: Schema.NullOr(Schema.Array(QuestionReply)),
 })
 
-export const SteerPart = Schema.TaggedStruct("Steer", SentMessage.fields)
+export const SteerPart = Schema.TaggedStruct("Steer", MessageWithContext.fields)
 
 export const TurnPart = Schema.Union([
   TextPart,
@@ -285,7 +314,7 @@ export type TurnEnd = typeof TurnEnd.Type
 
 export const Turn = Schema.Struct({
   id: Schema.String,
-  ...SentMessage.fields,
+  ...MessageWithContext.fields,
   sentAt: Schema.DateTimeUtcFromString,
   ended: Schema.NullOr(TurnEnd),
   parts: Schema.Array(TurnPart),
@@ -295,7 +324,7 @@ export type Turn = typeof Turn.Type
 
 export const TurnStarted = Schema.TaggedStruct("TurnStarted", {
   turnId: Schema.String,
-  ...SentMessage.fields,
+  ...MessageWithContext.fields,
   sentAt: Schema.DateTimeUtcFromString,
 })
 
@@ -317,7 +346,7 @@ export const AgentEvent = Schema.Union([TurnStarted, PartSet, PartAppended, Turn
 
 export type AgentEvent = typeof AgentEvent.Type
 
-export const QueuedMessage = Schema.Struct({ id: Schema.String, ...SentMessage.fields })
+export const QueuedMessage = Schema.Struct({ id: Schema.String, ...MessageWithContext.fields })
 
 export type QueuedMessage = typeof QueuedMessage.Type
 
@@ -383,9 +412,9 @@ export const applyAgentEvent = (
 ): ReadonlyArray<Turn> =>
   Match.value(event).pipe(
     Match.tagsExhaustive({
-      TurnStarted: ({ turnId, message, images, sentAt }) => [
+      TurnStarted: ({ turnId, message, images, context, sentAt }) => [
         ...turns,
-        { id: turnId, message, images, sentAt, ended: null, parts: [] },
+        { id: turnId, message, images, context, sentAt, ended: null, parts: [] },
       ],
       PartSet: ({ turnId, index, part }) =>
         changeTurn(turns, turnId, (turn) => {
@@ -423,6 +452,13 @@ export const MessageText = Schema.Trimmed.check(Schema.isNonEmpty())
 export const MessageInput = Schema.Struct({ ...SentMessage.fields, message: MessageText })
 
 export type MessageInput = typeof MessageInput.Type
+
+export const MessageInputWithContext = Schema.Struct({
+  ...MessageInput.fields,
+  context: MessageWithContext.fields.context,
+})
+
+export type MessageInputWithContext = typeof MessageInputWithContext.Type
 
 export const nothingUnsent: SentMessage = { message: "", images: [] }
 

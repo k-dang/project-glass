@@ -1,4 +1,4 @@
-import { RegistryContext, useAtomValue } from "@effect/atom-react"
+import { RegistryContext, useAtom, useAtomValue } from "@effect/atom-react"
 import { Link, type LinkOptions, Outlet, useBlocker, useNavigate } from "@tanstack/react-router"
 import { cn } from "cn"
 import {
@@ -8,6 +8,7 @@ import {
   ListTodo,
   LoaderCircle,
   type LucideIcon,
+  MessagesSquare,
   Settings,
   Sparkles,
 } from "lucide-react"
@@ -15,6 +16,8 @@ import { useContext } from "react"
 import { TooltipHint } from "@/components/ui/tooltip"
 import { backendReachableAtom } from "./backend"
 import { ConfirmationDialog } from "./ConfirmationDialog"
+import { globalConversationOpenAtom } from "./globalConversation"
+import { GlobalConversationPanel } from "./GlobalConversationPanel"
 import { confirmLeave, discardPromptAtom, leavesPullRequest, reviewsLinkAtom } from "./reviewsArea"
 import { ConnectionAvatar } from "./Settings"
 import { ResourceUsage } from "./ResourceUsage"
@@ -66,15 +69,17 @@ export function AppShell() {
   const registry = useContext(RegistryContext)
   const areas = useAreas()
   const navigate = useNavigate()
+  const [conversing, setConversing] = useAtom(globalConversationOpenAtom)
 
-  useShortcuts(
-    areas.map(({ link }, index) => ({
+  useShortcuts([
+    ...areas.map(({ link }, index) => ({
       key: `${index + 1}`,
       mod: true,
       allowInEditable: true,
       run: () => void navigate(link),
     })),
-  )
+    { key: "j", mod: true, allowInEditable: true, run: () => setConversing((open) => !open) },
+  ])
 
   useBlocker({
     enableBeforeUnload: false,
@@ -108,13 +113,30 @@ export function AppShell() {
               </TooltipHint>
             ))}
           </nav>
+          <TooltipHint content="Global conversation" side="right">
+            <button
+              type="button"
+              aria-label="Global conversation"
+              aria-pressed={conversing}
+              aria-keyshortcuts="Meta+J Control+J"
+              className={cn(railLink, "aria-pressed:bg-accent aria-pressed:text-accent-foreground")}
+              onClick={() => setConversing((open) => !open)}
+            >
+              <MessagesSquare className="size-4" aria-hidden />
+            </button>
+          </TooltipHint>
           <ConnectionAvatar />
         </div>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="title-strip shrink-0 border-b" aria-hidden />
         <Reconnecting />
-        <Outlet />
+        <div className="flex min-h-0 flex-1">
+          <div className="flex min-w-0 flex-1 flex-col">
+            <Outlet />
+          </div>
+          {conversing && <GlobalConversationPanel />}
+        </div>
         <footer className="flex h-7 shrink-0 items-center justify-end gap-1 border-t bg-muted/20 px-3">
           <ShortcutsDialog />
           <ResourceUsage />
