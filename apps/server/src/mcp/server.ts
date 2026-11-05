@@ -1,11 +1,10 @@
 import { Effect, Layer, Option } from "effect"
 import { McpProtocol, McpServer } from "effect/ai"
-import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http"
+import { HttpRouter, HttpServerResponse } from "effect/http"
+import { HttpApiBuilder, HttpApiSecurity } from "effect/http-api"
 import { McpCaller, McpCredentials } from "./McpCredentials"
 
 export const MCP_PATH = "/mcp"
-
-const BEARER = /^Bearer (\S+)$/i
 
 // Each request authenticates on its own: an MCP session id only correlates requests, so the caller
 // comes from the bearer every time. A missing, wrong or revoked credential gets the same 401.
@@ -15,9 +14,8 @@ const McpAccess = HttpRouter.middleware(
 
     return (httpEffect) =>
       Effect.gen(function* () {
-        const request = yield* HttpServerRequest.HttpServerRequest
-        const bearer = request.headers["authorization"]?.match(BEARER)?.[1]
-        const caller = bearer === undefined ? Option.none() : credentials.authenticate(bearer)
+        const bearer = yield* HttpApiBuilder.securityDecode(HttpApiSecurity.bearer)
+        const caller = credentials.authenticate(bearer)
 
         if (Option.isNone(caller)) {
           return HttpServerResponse.empty({
@@ -43,6 +41,8 @@ export const McpRoutes = (tools: Layer.Layer<never>) =>
       version: "1.0.0",
       path: MCP_PATH,
       protocols: [McpProtocol.v2025_11_25],
+      // The session map has no expiry; a client ending its runtime frees its session.
+      allowSessionTermination: true,
     }).pipe(Layer.provide(McpAccess.layer), Layer.orDie),
     tools,
   )

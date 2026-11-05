@@ -27,8 +27,7 @@ source as in the app's bundler configuration.
 Transport owners are `bin.ts`, `server.ts`, `handlers.ts`, `access.ts`, `agentHost.ts`,
 `agentHost/handlers.ts`, `agentHost/server.ts`, `rpcSocket.ts`, `mcp/server.ts`, `LocalAgentHost.ts`,
 and `sandboxCalls.ts` under `apps/server/src/`. The last two are connection adapters that services may call;
-other code cannot import the entry points or socket implementation directly. `mcp/server.ts`
-serves the MCP endpoint, so it is an entry point too.
+other code cannot import the entry points or socket implementation directly.
 `github/GitHubClient.ts` may import the named outbound Effect HTTP client modules in
 `httpClient`, but cannot import inbound routing/server implementations.
 

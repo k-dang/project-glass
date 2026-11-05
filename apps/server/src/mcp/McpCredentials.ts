@@ -45,7 +45,7 @@ export class McpCredentials extends Context.Service<
       caller: McpCallerIdentity,
     ) => Effect.Effect<Redacted.Redacted, never, Scope.Scope>
     /** Resolves a bearer credential to the caller it was issued to, while it is unrevoked. */
-    readonly authenticate: (bearer: string) => Option.Option<McpCallerIdentity>
+    readonly authenticate: (bearer: Redacted.Redacted) => Option.Option<McpCallerIdentity>
   }
 >()("@glass/server/McpCredentials") {
   static readonly layer = Layer.sync(McpCredentials, () => {
@@ -53,18 +53,16 @@ export class McpCredentials extends Context.Service<
 
     return McpCredentials.of({
       issue: (caller) =>
-        Effect.acquireRelease(
-          Effect.sync(() => {
-            const bearer = randomBytes(32).toString("base64url")
-            const key = digest(bearer)
+        Effect.suspend(() => {
+          const bearer = randomBytes(32).toString("base64url")
+          const key = digest(bearer)
 
-            callers.set(key, caller)
-
-            return { bearer: Redacted.make(bearer), key }
-          }),
-          ({ key }) => Effect.sync(() => callers.delete(key)),
-        ).pipe(Effect.map(({ bearer }) => bearer)),
-      authenticate: (bearer) => Option.fromNullishOr(callers.get(digest(bearer))),
+          return Effect.acquireRelease(
+            Effect.sync(() => callers.set(key, caller)),
+            () => Effect.sync(() => callers.delete(key)),
+          ).pipe(Effect.as(Redacted.make(bearer)))
+        }),
+      authenticate: (bearer) => Option.fromNullishOr(callers.get(digest(Redacted.value(bearer)))),
     })
   })
 }

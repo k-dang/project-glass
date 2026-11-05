@@ -1,4 +1,5 @@
 import { Effect, Redacted, Schema } from "effect"
+import { McpSchema } from "effect/ai"
 import { MCP_PATH } from "../src/mcp/server"
 
 export interface JsonRpcMessage {
@@ -8,28 +9,8 @@ export interface JsonRpcMessage {
   readonly params?: Schema.JsonObject
 }
 
-const McpResult = Schema.Struct({
-  isError: Schema.optional(Schema.Boolean),
-  content: Schema.optional(
-    Schema.Array(Schema.Struct({ type: Schema.String, text: Schema.String })),
-  ),
-  structuredContent: Schema.optional(Schema.Unknown),
-  tools: Schema.optional(
-    Schema.Array(
-      Schema.Struct({
-        name: Schema.String,
-        inputSchema: Schema.Struct({ required: Schema.optional(Schema.Array(Schema.String)) }),
-      }),
-    ),
-  ),
-})
-
 const JsonRpcResponse = Schema.fromJsonString(
-  Schema.Struct({
-    id: Schema.optional(Schema.Union([Schema.Number, Schema.Null])),
-    result: Schema.optional(McpResult),
-    error: Schema.optional(Schema.Struct({ code: Schema.Number, message: Schema.String })),
-  }),
+  Schema.Struct({ result: Schema.optional(Schema.Unknown) }),
 )
 
 const decodeResponse = Schema.decodeUnknownSync(JsonRpcResponse)
@@ -75,7 +56,7 @@ export const mcpPost = (
 
     const bodies = response.headers.get("content-type")?.startsWith("text/event-stream")
       ? text.split("\n").flatMap((line) => (line.startsWith("data:") ? [line.slice(5)] : []))
-      : text.split("\n")
+      : [text]
 
     return {
       status: response.status,
@@ -120,3 +101,14 @@ export const connectMcp = Effect.fnUntraced(function* (baseUrl: string, bearer: 
     },
   }
 })
+
+const decodeTools = Schema.decodeUnknownSync(McpSchema.ListToolsResult)
+
+const decodeToolResult = Schema.decodeUnknownSync(McpSchema.CallToolResult)
+
+/** The tools a `tools/list` response lists. */
+export const listedTools = (response: McpResponse) =>
+  decodeTools(response.messages[0]?.result).tools
+
+/** The result a `tools/call` response carries. */
+export const toolResult = (response: McpResponse) => decodeToolResult(response.messages[0]?.result)

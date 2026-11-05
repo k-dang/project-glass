@@ -42,10 +42,6 @@ const RendererRoutes = Layer.mergeAll(
   HttpRouter.add("GET", "/health", HttpServerResponse.empty()),
 ).pipe(Layer.provide(AccessControl.layer))
 
-// Each transport authenticates its own routes: the renderer with its launch secret, conversation
-// runtimes with their MCP credentials.
-const routes = (mcpTools: Layer.Layer<never>) => Layer.mergeAll(RendererRoutes, McpRoutes(mcpTools))
-
 const NodeServerLive = Layer.unwrap(
   Effect.gen(function* () {
     const config = yield* ServerConfig
@@ -94,7 +90,9 @@ const services = (agentRunners: AgentRunnersLayer) =>
   )
 
 export const serve = (agentRunners: AgentRunnersLayer, mcpTools: Layer.Layer<never>) =>
-  HttpRouter.serve(routes(mcpTools), {
+  // Each transport authenticates its own routes: the renderer with its launch secret, conversation
+  // runtimes with their MCP credentials.
+  HttpRouter.serve(Layer.merge(RendererRoutes, McpRoutes(mcpTools)), {
     disableLogger: true,
   }).pipe(
     // Provided first so it listens last: Effect's Node server leaves connections hanging until it serves.
