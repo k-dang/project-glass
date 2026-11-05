@@ -18,7 +18,9 @@ export const hostFailure = (error: RpcClientError.RpcClientError | HostAgentErro
     ? "Glass lost the process that runs Agents. Try again."
     : error.message
 
-export const asAgentError = (error: RpcClientError.RpcClientError | HostAgentError | AgentError) =>
+export type HostCallError = RpcClientError.RpcClientError | HostAgentError | AgentError
+
+export const asAgentError = (error: HostCallError) =>
   new AgentError({ message: hostFailure(error) })
 
 export type LostAgentIds = ReadonlyArray<string>
@@ -44,6 +46,10 @@ export interface Placement {
     engine: AgentEngine,
     repository: FollowedRepository,
   ) => Effect.Effect<ReadonlyArray<AgentCommand>, InvalidLocalCheckout | AgentError>
+  readonly files: (
+    repository: FollowedRepository,
+    baseBranch: string,
+  ) => Effect.Effect<ReadonlyArray<string>, InvalidLocalCheckout | AgentError>
   readonly place: (
     repository: FollowedRepository,
     baseBranch: string,

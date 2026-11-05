@@ -42,6 +42,7 @@ import { migrationLoader } from "../src/Migrations"
 import { Plugins } from "../src/Plugins"
 import { Sandboxes } from "../src/Sandboxes"
 import { ServerConfig } from "../src/ServerConfig"
+import { GitHubClient } from "../src/github/GitHubClient"
 import { LocalPlacement } from "../src/LocalPlacement"
 import { ToDos } from "../src/ToDos"
 import { Transcripts } from "../src/Transcripts"
@@ -132,6 +133,7 @@ export const agentServicesFixture = Effect.gen(function* () {
         return changed
       }),
     uncommitted: () => Effect.sync(() => uncommitted),
+    files: () => Effect.succeed([]),
   })
 
   const hostServices = () =>
@@ -162,6 +164,7 @@ export const agentServicesFixture = Effect.gen(function* () {
         models: () => models,
         commands: (engine) =>
           client.ListCommands({ engine, folder: "checkout" }).pipe(Effect.orDie),
+        files: () => Effect.succeed([]),
         place: () =>
           Effect.sync(() => {
             const name = `agent/test-${++nextName}`
@@ -187,6 +190,7 @@ export const agentServicesFixture = Effect.gen(function* () {
                 ),
               ),
               Layer.provide(NodeSocket.layerWebSocketConstructor),
+              Layer.provide(Layer.mock(GitHubClient)({})),
               Layer.provide(
                 ServerConfig.layer.pipe(
                   Layer.provide(

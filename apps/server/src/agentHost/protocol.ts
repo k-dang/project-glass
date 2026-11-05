@@ -115,6 +115,11 @@ export class AgentHostRpcs extends RpcGroup.make(
     success: Schema.Array(ChangedFile),
     error: HostAgentError,
   }),
+  Rpc.make("ListFiles", {
+    payload: { folder: HostFolder },
+    success: Schema.Array(Schema.String),
+    error: HostAgentError,
+  }),
   Rpc.make("HasUncommittedChanges", {
     payload: { folder: HostFolder },
     success: Schema.Boolean,

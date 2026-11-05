@@ -35,6 +35,7 @@ import { SqlClient } from "effect/sql"
 import { Socket } from "effect/socket"
 import { newHostToken } from "./agentHost/protocol"
 import { uniqueAgentName } from "./agentNames"
+import { GitHubClient } from "./github/GitHubClient"
 import { followJournal, type JournalPosition } from "./hostJournal"
 import type { HostClient, LostAgentIds, PlacedAgent, Placement, SubscribeLost } from "./Placement"
 import { Plugins } from "./Plugins"
@@ -150,6 +151,7 @@ const notInstalled = (providerId: string): Placement => {
     engines: AgentEngine.literals,
     models: () => failure,
     commands: () => Effect.succeed([]),
+    files: () => Effect.succeed([]),
     place: () => failure,
     host: () => failure,
     runningHost: () => Effect.succeedNone,
@@ -184,6 +186,7 @@ export class Sandboxes extends Context.Service<
       const config = yield* ServerConfig
       const webSocketConstructor = yield* Socket.WebSocketConstructor
       const { sandboxProviders } = yield* Plugins
+      const github = yield* GitHubClient
       const scope = yield* Scope.Scope
       const sandboxFibers = yield* FiberMap.make<string>()
       const lost = yield* PubSub.unbounded<LostAgentIds>()
@@ -474,6 +477,21 @@ export class Sandboxes extends Context.Service<
               ),
             ),
           commands: () => Effect.succeed([]),
+          files: (repository, baseBranch) =>
+            github.repositoryFiles(repository, baseBranch).pipe(
+              Effect.tap(({ truncated }) =>
+                truncated
+                  ? Effect.logWarning("GitHub listed only some of a branch's files", baseBranch)
+                  : Effect.void,
+              ),
+              Effect.map(({ paths }) => paths),
+              Effect.tapError((cause) =>
+                Effect.logWarning("Couldn't list a branch's files", cause),
+              ),
+              Effect.mapError(
+                () => new AgentError({ message: `Couldn't list the files on ${baseBranch}.` }),
+              ),
+            ),
           place: (repository) =>
             Effect.succeed({
               name: uniqueAgentName(),

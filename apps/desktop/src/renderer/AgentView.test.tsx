@@ -30,6 +30,7 @@ import {
   ThinkingPart,
   ToDo,
   toDoMention,
+  fileMention,
   ToolCallPart,
   TranscriptSnapshot,
   TurnCutOff,
@@ -1394,7 +1395,7 @@ it("mentions an open To-do picked after @, and shows the Mention as its title", 
 
   const composer = await screen.findByRole("textbox", { name: "Message" })
   await user.type(composer, "Look at @fix")
-  const choices = await screen.findByRole("listbox", { name: "To-dos" })
+  const choices = await screen.findByRole("listbox", { name: "Mentions" })
   expect(
     within(choices)
       .getAllByRole("option")
@@ -1402,10 +1403,36 @@ it("mentions an open To-do picked after @, and shows the Mention as its title", 
   ).toEqual(["Fix the flaky test"])
 
   await user.keyboard("{Enter}")
-  expect(screen.queryByRole("listbox", { name: "To-dos" })).toBeNull()
+  expect(screen.queryByRole("listbox", { name: "Mentions" })).toBeNull()
   await user.type(composer, "now{Enter}")
 
   expect(sent).toEqual([`Look at ${toDoMention(flaky)} now`])
+})
+
+it("offers the Agent's files after its To-dos, those named after what's typed first", async () => {
+  const sent: Array<string> = []
+
+  const user = mount({
+    ListToDos: () => Effect.succeed([flaky]),
+    ListAgentFiles: () => Effect.succeed(["fixtures/readme.md", "src/fix.ts", "docs/notes.md"]),
+    WatchTranscript: () =>
+      Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
+    SendMessage: ({ message }) => Effect.sync(() => void sent.push(message)),
+  })
+
+  const composer = await screen.findByRole("textbox", { name: "Message" })
+  await user.type(composer, "Open @fix")
+  const choices = await screen.findByRole("listbox", { name: "Mentions" })
+  expect(
+    within(choices)
+      .getAllByRole("option")
+      .map((option) => option.textContent),
+  ).toEqual(["Fix the flaky test", "fix.tssrc", "readme.mdfixtures"])
+
+  await user.keyboard("{ArrowDown}{Enter}")
+  await user.type(composer, "{Enter}")
+
+  expect(sent).toEqual([`Open ${fileMention("src/fix.ts")}`])
 })
 
 it("keeps the To-do choices closed after Escape, so Enter sends the @ as written", async () => {
@@ -1420,9 +1447,9 @@ it("keeps the To-do choices closed after Escape, so Enter sends the @ as written
 
   const composer = await screen.findByRole("textbox", { name: "Message" })
   await user.type(composer, "Ping @f")
-  await screen.findByRole("listbox", { name: "To-dos" })
+  await screen.findByRole("listbox", { name: "Mentions" })
   await user.keyboard("{Escape}")
-  expect(screen.queryByRole("listbox", { name: "To-dos" })).toBeNull()
+  expect(screen.queryByRole("listbox", { name: "Mentions" })).toBeNull()
   await user.keyboard("{Enter}")
 
   expect(sent).toEqual(["Ping @f"])

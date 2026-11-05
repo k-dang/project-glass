@@ -99,7 +99,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       GetFileContents: ({ pullRequest, revision, side, path }) =>
         github.fileContents(pullRequest, revision, side, path),
       ListRepositoryFiles: ({ pullRequest, revision }) =>
-        github.repositoryFiles(pullRequest, revision),
+        github.repositoryFiles(pullRequest, revision.head),
       SetFileViewed: ({ pullRequestId, revision, path, viewed }) =>
         github.setFileViewed(pullRequestId, revision, path, viewed),
       CreateDraft: (draft) => github.createDraft(draft),
@@ -134,6 +134,9 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       ListNewAgentCommands: ({ engine, place, repository }) =>
         agents.newAgentCommands(engine, place, repository),
       ListAgentCommands: ({ agentId }) => agents.commands(agentId),
+      ListNewAgentFiles: ({ place, repository, baseBranch }) =>
+        agents.newAgentFiles(place, repository, baseBranch),
+      ListAgentFiles: ({ agentId }) => agents.files(agentId),
       ListSandboxProviders: () => Effect.succeed(sandboxes.providers),
       CreateAgent: (input) => agents.create(input),
       WatchWaitingAgents: () => agents.watchWaiting(),

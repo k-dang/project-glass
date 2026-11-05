@@ -274,8 +274,8 @@ export class GitHubClient extends Context.Service<
       path: string,
     ) => Effect.Effect<FileContents, FileNotFound | PullRequestNotFound | ConnectionError>
     readonly repositoryFiles: (
-      ref: PullRequestRef,
-      revision: Revision,
+      repository: Pick<FollowedRepository, "owner" | "repo">,
+      ref: string,
     ) => Effect.Effect<RepositoryFiles, ConnectionError>
     readonly repositoryBranches: (
       repository: FollowedRepository,
@@ -910,13 +910,13 @@ export class GitHubClient extends Context.Service<
       })
 
       const repositoryFiles = Effect.fn("GitHubClient.repositoryFiles")(function* (
-        { owner, repo }: PullRequestRef,
-        revision: Revision,
+        { owner, repo }: Pick<FollowedRepository, "owner" | "repo">,
+        ref: string,
       ) {
         const { body } = yield* send(
-          HttpClientRequest.get(`/repos/${owner}/${repo}/git/trees/${revision.head}`).pipe(
-            HttpClientRequest.setUrlParams({ recursive: 1 }),
-          ),
+          HttpClientRequest.get(
+            `/repos/${owner}/${repo}/git/trees/${encodeURIComponent(ref)}`,
+          ).pipe(HttpClientRequest.setUrlParams({ recursive: 1 })),
           GitTree,
         )
 

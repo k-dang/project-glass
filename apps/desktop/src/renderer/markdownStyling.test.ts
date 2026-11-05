@@ -4,10 +4,10 @@ import { Document } from "@tiptap/extension-document"
 import { Paragraph } from "@tiptap/extension-paragraph"
 import { Text } from "@tiptap/extension-text"
 import { expect, it } from "vite-plus/test"
-import { CHIP, toContent, ToDoMention } from "./composerDocument"
+import { CHIP, toContent, Mention } from "./composerDocument"
 import { markdownSpans } from "./markdownStyling"
 
-const schema = getSchema([Document, Paragraph, Text, ToDoMention])
+const schema = getSchema([Document, Paragraph, Text, Mention])
 
 const docOf = (message: string) => schema.nodeFromJSON(toContent(message))
 

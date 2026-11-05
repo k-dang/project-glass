@@ -107,6 +107,7 @@ export class Changes extends Context.Service<
       baseRef: string,
     ) => Effect.Effect<ReadonlyArray<ChangedFile>, HostAgentError>
     readonly uncommitted: (folder: string) => Effect.Effect<boolean, HostAgentError>
+    readonly files: (folder: string) => Effect.Effect<ReadonlyArray<string>, HostAgentError>
   }
 >()("@glass/server/agentHost/Changes") {
   static readonly layer = Layer.effect(
@@ -180,6 +181,15 @@ export class Changes extends Context.Service<
             Effect.map((status) => status !== ""),
             failure("Couldn't check the Agent's folder for changes."),
           ),
+        files: (folder) =>
+          git
+            .runUntrimmed(folder, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"])
+            .pipe(
+              Effect.map((listed) => [
+                ...new Set(listed.split("\0").filter((path) => path !== "")),
+              ]),
+              failure("Couldn't list the files in the Agent's folder."),
+            ),
       })
     }),
   )

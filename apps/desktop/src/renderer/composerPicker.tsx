@@ -4,7 +4,7 @@ import { type MouseEvent, type ReactNode, useId, useState } from "react"
 import { cn } from "cn"
 import { CHIP } from "./composerDocument"
 
-const MAX_CHOICES = 6
+export const MAX_CHOICES = 6
 
 export interface Caret {
   readonly before: string
@@ -115,7 +115,7 @@ export function usePicker<T>(editor: Editor, source: PickerSource<T> | null) {
 }
 
 const optionId = <T,>(listbox: string, { source }: Open<T>, choice: T) =>
-  `${listbox}-${source.key(choice)}`
+  `${listbox}-${encodeURIComponent(source.key(choice))}`
 
 const keepComposerFocus = (event: MouseEvent) => event.preventDefault()
 

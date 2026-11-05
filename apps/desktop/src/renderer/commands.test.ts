@@ -4,9 +4,9 @@ import { Paragraph } from "@tiptap/extension-paragraph"
 import { Text } from "@tiptap/extension-text"
 import { expect, it } from "vite-plus/test"
 import { leadingCommand } from "./Commands"
-import { toContent, ToDoMention } from "./composerDocument"
+import { toContent, Mention } from "./composerDocument"
 
-const schema = getSchema([Document, Paragraph, Text, ToDoMention])
+const schema = getSchema([Document, Paragraph, Text, Mention])
 
 const shown = (message: string) => {
   const doc = schema.nodeFromJSON(toContent(message))

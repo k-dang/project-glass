@@ -131,6 +131,15 @@ export class LocalPlacement extends Context.Service<
             Effect.mapError(asAgentError),
           )
         }),
+        files: Effect.fnUntraced(function* (repository, baseBranch) {
+          const { path, remote } = yield* checkouts.get(repository)
+
+          const listed = yield* git
+            .runUntrimmed(path, ["ls-tree", "-r", "-z", "--name-only", `${remote}/${baseBranch}`])
+            .pipe(gitFailure(`Couldn't list the files on ${baseBranch}. Try again.`))
+
+          return listed.split("\0").filter((file) => file !== "")
+        }),
         place,
         host: ({ agent }) =>
           host.client.pipe(Effect.tap(() => Effect.sync(() => void hosted.add(agent.id)))),

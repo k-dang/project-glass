@@ -12,7 +12,11 @@ const entry = ({ id, title, notes, done }: ToDo) =>
   ].join("\n")
 
 export const prompt = (message: string, toDos: ReadonlyArray<ToDo>) => {
-  const marked = replaceMentions(message, ({ id, title }) => `To-do ${id} ("${title}")`)
+  const marked = replaceMentions(message, (mentioned) =>
+    mentioned.kind === "toDo"
+      ? `To-do ${mentioned.id} ("${mentioned.title}")`
+      : `the file \`${mentioned.path}\``,
+  )
 
   if (toDos.length === 0) return marked
 
