@@ -317,6 +317,8 @@ export class Transcripts extends Context.Service<
               published,
               updates.map((update) => ({ agentId, update })),
             )
+
+            return updates
           }),
         )
 
@@ -451,27 +453,24 @@ export class Transcripts extends Context.Service<
           ),
         runningTurn: (agentId) => withStorageFailure("read a running Turn", runningTurn(agentId)),
         startOrQueue: (agentId, input) =>
-          Effect.suspend(() => {
-            let delivery: MessageDelivery = "queued"
+          withStorageFailure(
+            "send a message",
+            change(
+              agentId,
+              Effect.gen(function* () {
+                if ((yield* runningTurn(agentId)) === null)
+                  return [yield* startTurn(agentId, input)]
 
-            return withStorageFailure(
-              "send a message",
-              change(
-                agentId,
-                Effect.gen(function* () {
-                  if ((yield* runningTurn(agentId)) === null) {
-                    delivery = "started"
+                yield* insertQueued(agentId, (yield* queuedPositions(agentId)).last + 1, input)
 
-                    return [yield* startTurn(agentId, input)]
-                  }
-
-                  yield* insertQueued(agentId, (yield* queuedPositions(agentId)).last + 1, input)
-
-                  return [yield* queuedChanged(agentId)]
-                }),
-              ),
-            ).pipe(Effect.map(() => delivery))
-          }),
+                return [yield* queuedChanged(agentId)]
+              }),
+            ),
+          ).pipe(
+            Effect.map(([update]): MessageDelivery =>
+              Predicate.isTagged(update, "TurnStarted") ? "started" : "queued",
+            ),
+          ),
         prependQueued: (agentId, inputs) =>
           withStorageFailure(
             "put messages back in front of the Queued ones",

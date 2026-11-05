@@ -22,7 +22,7 @@ import { join } from "node:path"
 import type { AgentAdapter, AgentSession } from "../src/agentHost/adapter"
 import { GlassToolsAccess, notRunning } from "../src/agentHost/protocol"
 import { MCP_PATH } from "../src/mcp/server"
-import { connectMcp, initialize, mcpPost, toolResult } from "./mcpClient"
+import { connectMcp, initialize, mcpPost } from "./mcpClient"
 import { settleWith } from "../src/agentHost/requests"
 import { placeSuggestedDraft } from "../src/agentHost/suggestDraftTool"
 import { whenExists } from "./whenExists"
@@ -42,7 +42,7 @@ const callGlass = (access: GlassToolsAccess, name: string, args: Schema.JsonObje
     if (opened.status !== 200) return { output: `Refused with ${opened.status}`, done: false }
 
     const mcp = yield* connectMcp(baseUrl, access.bearer)
-    const result = toolResult(yield* mcp.request("tools/call", { name, arguments: args }).response)
+    const result = yield* mcp.call(name, args)
 
     return { output: JSON.stringify(result.content), done: result.isError !== true }
   })

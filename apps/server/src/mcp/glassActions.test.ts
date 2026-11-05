@@ -231,20 +231,20 @@ describe("Glass's Agent review tools over MCP", () => {
     }),
   )
 
-  it.live("refuses to start an Agent review of a stale Revision", () =>
+  it.live("reads why an Agent review of a stale Revision failed", () =>
     Effect.gen(function* () {
       const f = yield* startReviewing
       const { revision } = f
       f.pr.push({ head: { sha: "h2", files: { "greet.ts": "hello again\n" } } })
 
-      const result = yield* f.call("start_agent_review", {
-        pullRequest: f.pullRequest,
-        revision,
-      })
+      yield* f.call("start_agent_review", { pullRequest: f.pullRequest, revision })
+      yield* f.review(({ job }) => job.status === "failed")
 
-      assert.isTrue(result.isError)
-      assert.include(textOf(result), "changed since that Revision")
-      assert.equal((yield* f.review(() => true)).job.status, "idle")
+      const { job } = decodeReview(
+        (yield* f.call("read_agent_review", { pullRequest: f.pullRequest })).structuredContent,
+      )
+
+      assert.equal(job.status === "failed" && job.reason.reason, "stale-revision")
     }),
   )
 })

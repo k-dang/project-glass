@@ -21,7 +21,7 @@ import {
   type RequestWaiting,
   SandboxProviderInfo,
   type SettingsError,
-  StaleRevision,
+  type StaleRevision,
   type ToDoError,
   PullRequestListings,
   PullRequestRef,
@@ -188,6 +188,7 @@ const ListAgentOptions = Tool.make("list_agent_options", {
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)
 
+/** An action changes the user's work, so its service call finishes even when the call is cancelled. */
 const action = Context.make(Tool.Readonly, false).pipe(
   Context.add(Tool.Destructive, false),
   Context.add(Tool.Idempotent, false),
@@ -244,7 +245,7 @@ const ReadAgentReview = Tool.make("read_agent_review", {
 
 const StartAgentReview = Tool.make("start_agent_review", {
   description:
-    "Starts an Agent review of a PR at a Revision, as the user would from the PR. It appears beside the PR's diff once written. This returns once the review started, not when it is written, which takes minutes: read_agent_review shows its progress and result. Starting one replaces any review being written for the PR, so read_agent_review first and ask the user before replacing one.",
+    "Starts an Agent review of a PR at a Revision, as the user would from the PR. It appears beside the PR's diff once written. This returns once the review started, not when it is written, which takes minutes: read_agent_review shows its progress and result, or why it failed, such as the PR having changed since that Revision. Starting one replaces any review being written for the PR, so read_agent_review first and ask the user before replacing one.",
   parameters: Schema.Struct({
     pullRequest: PullRequestRef,
     revision: Revision.annotate({
@@ -291,7 +292,7 @@ const explained = (error: ServiceFailure) =>
     message: Match.value(error).pipe(
       Match.tagsExhaustive({
         StaleRevision: () =>
-          "The PR has changed since that Revision. Tell the user what changed: read_pull_request without a Revision reads the PR as it is now.",
+          "The PR has changed since that Revision. Read it as it is now, and tell the user what changed.",
         PullRequestNotFound: () =>
           "GitHub has no such PR, or the user's GitHub login can't see it.",
         NoCredentials: () => "Glass isn't signed in to GitHub.",
@@ -351,17 +352,6 @@ const withinBudget = (files: ReadonlyArray<FileMaterial>) => {
   }
 }
 
-interface ModelChoiceAt {
-  readonly engine: AgentEngine
-  readonly place: AgentPlace
-  readonly model: string | null
-  readonly effort: string | null
-}
-
-/** An action changes the user's work, so a cancelled call still finishes what it started. */
-const acted = <A, R>(effect: Effect.Effect<A, ServiceFailure, R>) =>
-  effect.pipe(Effect.mapError(explained), Effect.uninterruptible)
-
 const first = <A, E, R>(stream: Stream.Stream<A, E, R>) =>
   stream.pipe(Stream.runHead, Effect.map(Option.getOrThrow))
 
@@ -378,28 +368,15 @@ export const GlassToolHandlers = GlassTools.toLayer(
     const sandboxes = yield* Sandboxes
     const agentReviews = yield* AgentReviews
 
-    /** The UI offers only the models and Efforts a place lists, so the conversation can't invent one. */
-    const offered = Effect.fnUntraced(function* ({ engine, place, model, effort }: ModelChoiceAt) {
-      const { defaultModel, models } = yield* agents.models(engine, place)
-      const chosen = model === null ? defaultModel : models.find(({ id }) => id === model)
-
-      if (chosen === undefined)
-        yield* new AgentError({
-          message: `${model === null ? "That place has no default model" : `That place has no model "${model}"`}. list_agent_options lists the models a place offers.`,
-        })
-
-      if (effort !== null && !(chosen?.efforts.includes(effort) ?? false))
-        yield* new AgentError({
-          message: `That model has no Effort "${effort}". list_agent_options lists each model's Efforts.`,
-        })
-    })
-
     const branchesAt = (place: AgentPlace, repository: FollowedRepository) =>
       Predicate.isTagged(place, "sandbox")
-        ? Effect.all({
-            defaultBranch: github.repositoryDefaultBranch(repository),
-            branches: github.repositoryBranches(repository),
-          })
+        ? Effect.all(
+            {
+              defaultBranch: github.repositoryDefaultBranch(repository),
+              branches: github.repositoryBranches(repository),
+            },
+            { concurrency: "unbounded" },
+          )
         : checkouts.branches(repository)
 
     return GlassTools.of({
@@ -454,26 +431,20 @@ export const GlassToolHandlers = GlassTools.toLayer(
       read_agent_review: ({ pullRequest }) =>
         first(agentReviews.watch(pullRequest)).pipe(Effect.mapError(explained)),
       start_agent_review: ({ pullRequest, revision }) =>
-        Effect.gen(function* () {
-          const current = (yield* github.pullRequest(pullRequest)).revision
-
-          if (current.base !== revision.base || current.head !== revision.head)
-            return yield* new StaleRevision()
-
-          yield* agentReviews.start(pullRequest, revision)
-
-          return yield* first(agentReviews.watch(pullRequest))
-        }).pipe(acted),
-      list_agent_places: () =>
-        Effect.all({
-          thisMac: checkouts.list().pipe(
-            Effect.map((localCheckouts) => ({
-              engines: agents.engines(thisMac),
-              localCheckouts,
-            })),
+        agentReviews
+          .start(pullRequest, revision)
+          .pipe(
+            Effect.uninterruptible,
+            Effect.andThen(first(agentReviews.watch(pullRequest))),
+            Effect.mapError(explained),
           ),
-          sandboxProviders: Effect.succeed(sandboxes.providers),
-          followedRepositories: followed.list(),
+      list_agent_places: () =>
+        Effect.gen(function* () {
+          return {
+            thisMac: { engines: agents.engines(thisMac), localCheckouts: yield* checkouts.list() },
+            sandboxProviders: sandboxes.providers,
+            followedRepositories: yield* followed.list(),
+          }
         }).pipe(Effect.mapError(explained)),
       list_agent_options: ({ place, repository, engine }) =>
         Effect.gen(function* () {
@@ -483,20 +454,41 @@ export const GlassToolHandlers = GlassTools.toLayer(
                 "That place doesn't run that Agent program. list_agent_places names the Agent programs each place runs.",
             })
 
-          const { defaultBranch, branches } = yield* branchesAt(place, repository)
+          const [{ defaultBranch, branches }, models] = yield* Effect.all(
+            [branchesAt(place, repository), agents.models(engine, place)],
+            { concurrency: "unbounded" },
+          )
 
-          return { defaultBranch, branches, models: yield* agents.models(engine, place) }
+          return { defaultBranch, branches, models }
         }).pipe(Effect.mapError(explained)),
       create_agent: (input) =>
         Effect.gen(function* () {
-          yield* offered(input)
+          // The UI offers only the models and Efforts a place lists, so the conversation can't invent one.
+          const { engine, place, model, effort } = input
+          const { defaultModel, models } = yield* agents.models(engine, place)
+          const chosen = model === null ? defaultModel : models.find(({ id }) => id === model)
 
-          return { agent: yield* agents.create({ ...input, permissionMode: null, images: [] }) }
-        }).pipe(acted),
+          if (chosen === undefined)
+            return yield* new AgentError({
+              message: `${model === null ? "That place has no default model" : `That place has no model "${model}"`}. list_agent_options lists the models a place offers.`,
+            })
+
+          if (effort !== null && !(chosen?.efforts.includes(effort) ?? false))
+            return yield* new AgentError({
+              message: `That model has no Effort "${effort}". list_agent_options lists each model's Efforts.`,
+            })
+
+          const agent = yield* agents
+            .create({ ...input, permissionMode: null, images: [] })
+            .pipe(Effect.uninterruptible)
+
+          return { agent }
+        }).pipe(Effect.mapError(explained)),
       send_agent_message: ({ agentId, message }) =>
         agents.send(agentId, { message, images: [] }).pipe(
+          Effect.uninterruptible,
           Effect.map((delivery) => ({ delivery })),
-          acted,
+          Effect.mapError(explained),
         ),
     })
   }),
