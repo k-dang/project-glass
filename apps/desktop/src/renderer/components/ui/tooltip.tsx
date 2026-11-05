@@ -14,7 +14,11 @@ function TooltipHint({
   const descriptionId = useId()
 
   return (
-    <Tooltip>
+    <Tooltip
+      onOpenChange={(open, details) => {
+        if (open && details.reason === "trigger-focus") details.cancel()
+      }}
+    >
       <TooltipTrigger render={children} aria-describedby={descriptionId} />
       <TooltipContent id={descriptionId} side={side}>
         {content}
