@@ -23,6 +23,8 @@ import { Plugins } from "./Plugins"
 import { Sandboxes } from "./Sandboxes"
 import { ServerConfig } from "./ServerConfig"
 import { LocalPlacement } from "./LocalPlacement"
+import { McpCredentials } from "./mcp/McpCredentials"
+import { McpRoutes } from "./mcp/server"
 import { FollowedRepositories } from "./FollowedRepositories"
 import { PullRequestLists } from "./PullRequestLists"
 import { PullRequestMirror } from "./PullRequestMirror"
@@ -35,11 +37,14 @@ import { AgentRunners } from "./agentRunners"
 import { Tours } from "./Tours"
 import { Transcripts } from "./Transcripts"
 
-const Routes = Layer.mergeAll(
+const RendererRoutes = Layer.mergeAll(
   RpcServer.layerHttp({ group: GlassRpcs, path: RPC_PATH, protocol: "websocket" }),
   HttpRouter.add("GET", "/health", HttpServerResponse.empty()),
-  AccessControl,
-)
+).pipe(Layer.provide(AccessControl.layer))
+
+// Each transport authenticates its own routes: the renderer with its launch secret, conversation
+// runtimes with their MCP credentials.
+const routes = (mcpTools: Layer.Layer<never>) => Layer.mergeAll(RendererRoutes, McpRoutes(mcpTools))
 
 const NodeServerLive = Layer.unwrap(
   Effect.gen(function* () {
@@ -88,15 +93,16 @@ const services = (agentRunners: AgentRunnersLayer) =>
     Layer.provide(GitHubAuth.layer),
   )
 
-export const serve = (agentRunners: AgentRunnersLayer) =>
-  HttpRouter.serve(Routes, {
+export const serve = (agentRunners: AgentRunnersLayer, mcpTools: Layer.Layer<never>) =>
+  HttpRouter.serve(routes(mcpTools), {
     disableLogger: true,
   }).pipe(
     // Provided first so it listens last: Effect's Node server leaves connections hanging until it serves.
     Layer.provideMerge(NodeServerLive),
     Layer.provide(services(agentRunners)),
+    Layer.provideMerge(McpCredentials.layer),
     Layer.provide(RpcSerialization.layerJson),
     Layer.provide(NodeServices.layer),
   )
 
-export const ServerLive = serve(AgentRunners.layer)
+export const ServerLive = serve(AgentRunners.layer, Layer.empty)

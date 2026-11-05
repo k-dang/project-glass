@@ -1,4 +1,5 @@
 import { assert, describe, it } from "@effect/vitest"
+import { RPC_PATH } from "@glass/contracts"
 import { Effect } from "effect"
 import { LAUNCH_TOKEN, RENDERER_ORIGIN, startBackend } from "../test/harness"
 
@@ -18,6 +19,10 @@ describe("access control", () => {
       assert.strictEqual(yield* health(baseUrl, { token: "wrong" }), 401)
       assert.strictEqual(yield* health(baseUrl, { origin: RENDERER_ORIGIN }), 401)
       assert.strictEqual(yield* health(baseUrl, { token: "wrong", origin: RENDERER_ORIGIN }), 401)
+
+      const rpc = yield* Effect.promise(() => fetch(`${baseUrl}${RPC_PATH}`))
+
+      assert.strictEqual(rpc.status, 401)
     }),
   )
 

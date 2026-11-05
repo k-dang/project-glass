@@ -9,6 +9,7 @@ import { join } from "node:path"
 import { afterEach, vi } from "vite-plus/test"
 import { connectRpcClient } from "../src/rpcSocket"
 import { AgentRunners } from "../src/agentRunners"
+import { McpCredentials } from "../src/mcp/McpCredentials"
 import { serve } from "../src/server"
 import { ServerConfig } from "../src/ServerConfig"
 import { startFakeGitHub } from "./fakeGitHub"
@@ -38,6 +39,7 @@ export const startBackend = Effect.fnUntraced(function* (
   env: Record<string, string>,
   homeDirectory?: string,
   agentRunners: Parameters<typeof serve>[0] = AgentRunners.layer,
+  mcpTools: Parameters<typeof serve>[1] = Layer.empty,
 ) {
   const webSocketConstructor = yield* Effect.serviceOption(Socket.WebSocketConstructor).pipe(
     Effect.flatMap(
@@ -58,7 +60,7 @@ export const startBackend = Effect.fnUntraced(function* (
       : { GH_TOKEN: VIEWER.token, GLASS_GITHUB_API_URL: (yield* startFakeGitHub()).url }
 
   const services = yield* Layer.build(
-    serve(agentRunners).pipe(
+    serve(agentRunners, mcpTools).pipe(
       Layer.provide(ServerConfig.layer),
       Layer.provide(
         ConfigProvider.layer(
@@ -91,7 +93,7 @@ export const startBackend = Effect.fnUntraced(function* (
   // throws as an uncaught exception; a test that never calls the client would end that way.
   yield* client.ListSandboxProviders()
 
-  return { baseUrl, client }
+  return { baseUrl, client, mcpCredentials: Context.get(services, McpCredentials) }
 })
 
 export const startSignedInBackend = Effect.gen(function* () {

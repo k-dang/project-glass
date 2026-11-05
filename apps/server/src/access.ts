@@ -20,6 +20,7 @@ const carriesToken = (token: Redacted.Redacted) => {
   return (url: URL) => matches(url.searchParams.get(TOKEN_PARAM))
 }
 
+/** Guards the renderer's routes with the per-launch secret and the allowed origins. */
 export const AccessControl = HttpRouter.middleware(
   Effect.gen(function* () {
     const config = yield* ServerConfig
@@ -43,5 +44,4 @@ export const AccessControl = HttpRouter.middleware(
         return HttpServerResponse.text("Forbidden origin", { status: 403 })
       })
   }),
-  { global: true },
 )

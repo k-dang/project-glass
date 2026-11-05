@@ -75,7 +75,7 @@ const main = Effect.gen(function* () {
   )
 
   yield* Layer.build(
-    serve(fakeAgentRunners).pipe(
+    serve(fakeAgentRunners, Layer.empty).pipe(
       Layer.provide(Layer.effectDiscard(seedDemoSettings)),
       Layer.provide(ServerConfig.layer),
       Layer.provide(configured),
