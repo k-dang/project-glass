@@ -112,7 +112,7 @@ function EngineEditor(props: { feature: EngineFeature; saved: EngineSettings }) 
         onChange={setting.change}
         onCommit={commit}
       />
-      <SaveStatus setting={setting} invalid={invalid} retry={() => commit(setting.value)} />
+      <SettingProblems setting={setting} invalid={invalid} retry={() => commit(setting.value)} />
     </div>
   )
 }
@@ -134,12 +134,12 @@ function PromptEditor(props: { saved: string }) {
   return (
     <div className="flex flex-col gap-3" aria-busy={setting.save.waiting}>
       <ReviewPromptField value={setting.value} onChange={setting.change} onCommit={commit} />
-      <SaveStatus setting={setting} invalid={invalid} retry={() => commit(setting.value)} />
+      <SettingProblems setting={setting} invalid={invalid} retry={() => commit(setting.value)} />
     </div>
   )
 }
 
-function SaveStatus<A>(props: {
+function SettingProblems<A>(props: {
   setting: ReturnType<typeof useSetting<A>>
   invalid: string | null
   retry: () => void
@@ -151,20 +151,9 @@ function SaveStatus<A>(props: {
       ? streamProblem(save.cause)
       : null
 
-  const status = save.waiting
-    ? "Saving…"
-    : (props.invalid ??
-      (problem
-        ? "Changes weren't saved."
-        : props.setting.changed
-          ? "Changes save when you leave the field."
-          : "Saved automatically."))
-
   return (
     <>
-      <output aria-live="polite" className="text-sm text-muted-foreground">
-        {status}
-      </output>
+      {props.invalid && <p className="text-sm text-muted-foreground">{props.invalid}</p>}
       {problem && <ProblemAlert problem={problem} action={{ label: "Retry", run: props.retry }} />}
     </>
   )
