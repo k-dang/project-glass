@@ -218,7 +218,7 @@ export class GlobalConversation extends Context.Service<
         program: SubscriptionRef.get(program),
         changeProgram,
         transcript: transcripts.watch(id),
-        send: (input) => turns.send(id, input),
+        send: (input) => turns.send(id, input).pipe(Effect.asVoid),
         steer: (input) =>
           conversation.pipe(Effect.flatMap((current) => turns.steer(current, input))),
         cancelQueued: (queuedId) => transcripts.cancelQueued(id, queuedId),

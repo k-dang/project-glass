@@ -34,7 +34,7 @@ interface Waiting {
 }
 
 /** Calls one of Glass's tools as a conversation's program would, saying how it went. */
-const callGlass = (access: GlassToolsAccess, name: string) =>
+const callGlass = (access: GlassToolsAccess, name: string, args: Schema.JsonObject) =>
   Effect.gen(function* () {
     const baseUrl = access.url.slice(0, -MCP_PATH.length)
     const opened = yield* mcpPost(baseUrl, initialize, { bearer: access.bearer })
@@ -42,7 +42,7 @@ const callGlass = (access: GlassToolsAccess, name: string) =>
     if (opened.status !== 200) return { output: `Refused with ${opened.status}`, done: false }
 
     const mcp = yield* connectMcp(baseUrl, access.bearer)
-    const result = toolResult(yield* mcp.request("tools/call", { name, arguments: {} }).response)
+    const result = toolResult(yield* mcp.request("tools/call", { name, arguments: args }).response)
 
     return { output: JSON.stringify(result.content), done: result.isError !== true }
   })
@@ -52,6 +52,8 @@ const AccessJson = Schema.fromJsonString(GlassToolsAccess)
 const encodeAccess = Schema.encodeSync(AccessJson)
 
 const decodeAccess = Schema.decodeSync(AccessJson)
+
+const decodeArgs = Schema.decodeSync(Schema.fromJsonString(Schema.JsonObject))
 
 export const scriptedAdapter = (gates: string): AgentAdapter => {
   // The Global conversation's starts are kept beside the gates, so they outlive this host.
@@ -106,7 +108,28 @@ export const scriptedAdapter = (gates: string): AgentAdapter => {
 
         const run = (turnId: string, { message }: MessageWithContext) =>
           Effect.gen(function* () {
-            const hold = /^hold:(\S+)/.exec(message)?.[1]
+            const called = /^call(-ended)?:(\S+)(?: (.+))?$/m.exec(message)
+
+            if (called !== null && glass !== null) {
+              const [, ended, name, args = "{}"] = called
+              const access = ended === undefined ? glass : yield* earlierStart
+              const { output, done } = yield* callGlass(access, name!, decodeArgs(args))
+
+              yield* part(
+                turnId,
+                ToolCallPart.make({
+                  toolCallId: randomUUID(),
+                  name: name!,
+                  inputSummary: "",
+                  input: args,
+                  output,
+                  status: done ? "done" : "failed",
+                  parentToolCallId: null,
+                }),
+              )
+            }
+
+            const hold = /^hold:(\S+)/m.exec(message)?.[1]
 
             if (hold !== undefined) {
               yield* part(turnId, TextPart.make({ text: "Holding." }))
@@ -141,27 +164,6 @@ export const scriptedAdapter = (gates: string): AgentAdapter => {
                   input: JSON.stringify(draft),
                   output: text,
                   status: placed ? "done" : "failed",
-                  parentToolCallId: null,
-                }),
-              )
-            }
-
-            const called = /^call(-ended)?:(\S+)$/.exec(message)
-
-            if (called !== null && glass !== null) {
-              const [, ended, name] = called
-              const access = ended === undefined ? glass : yield* earlierStart
-              const { output, done } = yield* callGlass(access, name!)
-
-              yield* part(
-                turnId,
-                ToolCallPart.make({
-                  toolCallId: randomUUID(),
-                  name: name!,
-                  inputSummary: "",
-                  input: "{}",
-                  output,
-                  status: done ? "done" : "failed",
                   parentToolCallId: null,
                 }),
               )

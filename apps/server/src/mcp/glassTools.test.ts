@@ -47,25 +47,30 @@ const textOf = (result: ReturnType<typeof toolResult>) =>
   result.content.map((block) => ("text" in block ? block.text : "")).join("\n")
 
 describe("Glass tools over MCP", () => {
-  it.live("lists the read-only tools", () =>
+  it.live("lists Glass's tools, marking which only read", () =>
     Effect.gen(function* () {
       const { mcp } = yield* startGlass
 
       const tools = listedTools(yield* mcp.request("tools/list", {}).response)
 
       assert.deepStrictEqual(
-        tools.map(({ name }) => name),
+        tools.map(({ name, annotations }) => [name, annotations?.readOnlyHint]),
         [
-          "list_pull_requests",
-          "list_queue",
-          "list_to_dos",
-          "list_recent_activity",
-          "list_agents",
-          "read_agent_transcript",
-          "read_pull_request",
+          ["list_pull_requests", true],
+          ["list_queue", true],
+          ["list_to_dos", true],
+          ["list_recent_activity", true],
+          ["list_agents", true],
+          ["read_agent_transcript", true],
+          ["read_pull_request", true],
+          ["read_agent_review", true],
+          ["start_agent_review", false],
+          ["list_agent_places", true],
+          ["list_agent_options", true],
+          ["create_agent", false],
+          ["send_agent_message", false],
         ],
       )
-      assert.isTrue(tools.every(({ annotations }) => annotations?.readOnlyHint === true))
     }),
   )
 

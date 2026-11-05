@@ -153,7 +153,8 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       ChangePermissionMode: ({ agentId, permissionMode }) =>
         agents.changePermissionMode(agentId, permissionMode),
       AnswerRequest: ({ agentId, requestId, answer }) => agents.answer(agentId, requestId, answer),
-      SendMessage: ({ agentId, message, images }) => agents.send(agentId, { message, images }),
+      SendMessage: ({ agentId, message, images }) =>
+        agents.send(agentId, { message, images }).pipe(Effect.asVoid),
       Steer: ({ agentId, message, images }) => agents.steer(agentId, { message, images }),
       CancelQueuedMessage: ({ agentId, queuedMessageId }) =>
         agents.cancelQueued(agentId, queuedMessageId),

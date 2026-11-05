@@ -5,6 +5,7 @@ import {
   endTurnEvents,
   isRequestPart,
   Image,
+  type MessageDelivery,
   type MessageWithContext,
   PartAppended,
   AgentBusy,
@@ -154,7 +155,7 @@ export class Transcripts extends Context.Service<
     readonly startOrQueue: (
       agentId: string,
       input: MessageWithContext,
-    ) => Effect.Effect<void, AgentError>
+    ) => Effect.Effect<MessageDelivery, AgentError>
     readonly prependQueued: (
       agentId: string,
       inputs: ReadonlyArray<MessageWithContext>,
@@ -450,20 +451,27 @@ export class Transcripts extends Context.Service<
           ),
         runningTurn: (agentId) => withStorageFailure("read a running Turn", runningTurn(agentId)),
         startOrQueue: (agentId, input) =>
-          withStorageFailure(
-            "send a message",
-            change(
-              agentId,
-              Effect.gen(function* () {
-                if ((yield* runningTurn(agentId)) === null)
-                  return [yield* startTurn(agentId, input)]
+          Effect.suspend(() => {
+            let delivery: MessageDelivery = "queued"
 
-                yield* insertQueued(agentId, (yield* queuedPositions(agentId)).last + 1, input)
+            return withStorageFailure(
+              "send a message",
+              change(
+                agentId,
+                Effect.gen(function* () {
+                  if ((yield* runningTurn(agentId)) === null) {
+                    delivery = "started"
 
-                return [yield* queuedChanged(agentId)]
-              }),
-            ),
-          ),
+                    return [yield* startTurn(agentId, input)]
+                  }
+
+                  yield* insertQueued(agentId, (yield* queuedPositions(agentId)).last + 1, input)
+
+                  return [yield* queuedChanged(agentId)]
+                }),
+              ),
+            ).pipe(Effect.map(() => delivery))
+          }),
         prependQueued: (agentId, inputs) =>
           withStorageFailure(
             "put messages back in front of the Queued ones",

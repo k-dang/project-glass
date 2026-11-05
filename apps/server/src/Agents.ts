@@ -12,6 +12,7 @@ import {
   type ChangedFile,
   FollowedRepository,
   type InvalidLocalCheckout,
+  type MessageDelivery,
   type MessageInput,
   type ModelChoice,
   defaultPermissionMode,
@@ -134,6 +135,7 @@ export class Agents extends Context.Service<
     readonly transcript: (
       agentId: string,
     ) => Stream.Stream<TranscriptUpdate, AgentNotFound | AgentError>
+    readonly engines: (place: AgentPlace) => ReadonlyArray<AgentEngine>
     readonly models: (
       engine: AgentEngine,
       place: AgentPlace,
@@ -159,7 +161,7 @@ export class Agents extends Context.Service<
     readonly send: (
       agentId: string,
       input: MessageInput,
-    ) => Effect.Effect<void, AgentNotFound | RequestWaiting | AgentError>
+    ) => Effect.Effect<MessageDelivery, AgentNotFound | RequestWaiting | AgentError>
     readonly steer: (
       agentId: string,
       input: MessageInput,
@@ -433,7 +435,8 @@ export class Agents extends Context.Service<
 
       const send = Effect.fn("Agents.send")(function* (agentId: string, input: MessageInput) {
         yield* findWritable(agentId)
-        yield* turns.send(agentId, { ...input, context: null })
+
+        return yield* turns.send(agentId, { ...input, context: null })
       })
 
       const steer = Effect.fn("Agents.steer")(function* (agentId: string, input: MessageInput) {
@@ -631,6 +634,7 @@ export class Agents extends Context.Service<
         transcript: (agentId) =>
           Stream.unwrap(find(agentId).pipe(Effect.as(transcripts.watch(agentId)))),
         readTranscript: (agentId) => find(agentId).pipe(Effect.andThen(transcripts.read(agentId))),
+        engines: (place) => placementFor(place).engines,
         models: (engine, place) => {
           const placement = placementFor(place)
 
