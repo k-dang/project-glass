@@ -14,11 +14,13 @@ import {
 import {
   Context,
   Effect,
+  Exit,
   FileSystem,
   Layer,
   Option,
   Schema,
   Scope,
+  Semaphore,
   Stream,
   SubscriptionRef,
 } from "effect"
@@ -28,7 +30,8 @@ import { join } from "node:path"
 import { GlobalRole } from "./agentHost/protocol"
 import { type Conversation, ConversationTurns } from "./ConversationTurns"
 import { LocalAgentHost } from "./LocalAgentHost"
-import { asAgentError } from "./Placement"
+import { McpCredentials } from "./mcp/McpCredentials"
+import { asAgentError, type HostClient } from "./Placement"
 import { ServerConfig } from "./ServerConfig"
 import { Transcripts } from "./Transcripts"
 
@@ -41,6 +44,8 @@ const firstProgram = new GlobalConversationProgram({
   model: null,
   effort: null,
 })
+
+const hostGone = new AgentError({ message: "Glass lost the process that runs Agents. Try again." })
 
 const storageFailure = () =>
   new AgentError({ message: "Couldn't read or save the Global conversation. Try again." })
@@ -79,6 +84,7 @@ export class GlobalConversation extends Context.Service<
       const transcripts = yield* Transcripts
       const turns = yield* ConversationTurns
       const host = yield* LocalAgentHost
+      const credentials = yield* McpCredentials
       const scope = yield* Scope.Scope
       const folder = join(config.dataDirectory, "global-conversation")
 
@@ -102,6 +108,49 @@ export class GlobalConversation extends Context.Service<
 
       yield* fs.makeDirectory(folder, { recursive: true }).pipe(Effect.orDie)
 
+      // Each start of the program gets a fresh credential, revoked when it is replaced or the
+      // program is switched, and with the host's lifetime when the host stops.
+      const starting = yield* Semaphore.make(1)
+      let runningCredential: Scope.Closeable | null = null
+
+      const replaceRunning = (next: Scope.Closeable | null) =>
+        Effect.suspend(() => {
+          const ending = runningCredential
+          runningCredential = next
+
+          return ending === null ? Effect.void : Scope.close(ending, Exit.void)
+        })
+
+      const revokeRunning = starting.withPermits(1)(replaceRunning(null))
+
+      const start = (engine: GlobalConversationProgram["engine"]) => (client: HostClient) =>
+        starting.withPermits(1)(
+          Effect.gen(function* () {
+            const lifetime = yield* host.lifetimeOf(client).pipe(
+              Effect.flatMap(Effect.fromOption),
+              Effect.mapError(() => hostGone),
+            )
+
+            const credential = yield* Scope.fork(lifetime)
+            const revoke = Scope.close(credential, Exit.void)
+
+            const role = GlobalRole.make({
+              tools: {
+                url: yield* credentials.endpoint,
+                bearer: yield* credentials
+                  .issue({ conversationId: id })
+                  .pipe(Scope.provide(credential)),
+              },
+            })
+
+            const started = yield* client
+              .StartAgent({ agentId: id, engine, folder, role })
+              .pipe(Effect.onError(() => revoke))
+
+            yield* started ? replaceRunning(credential) : revoke
+          }),
+        )
+
       yield* (yield* host.subscribeStopped).pipe(
         Stream.runForEach(() =>
           transcripts
@@ -114,9 +163,7 @@ export class GlobalConversation extends Context.Service<
       const conversation = SubscriptionRef.get(program).pipe(
         Effect.map(({ engine, model, effort }): Conversation => ({
           id,
-          engine,
-          folder,
-          role: Effect.succeed(GlobalRole.make({})),
+          start: start(engine),
           settings: { model, effort, permissionMode: null },
           host: host.client,
           runningHost: host.running,
@@ -154,6 +201,7 @@ export class GlobalConversation extends Context.Service<
                   running.StopAgent({ agentId: id }).pipe(Effect.mapError(asAgentError)),
               }),
             ),
+            Effect.andThen(revokeRunning),
             Effect.andThen(saveProgram(next)),
           ),
         )

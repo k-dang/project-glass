@@ -9,7 +9,7 @@
         "--session-id",
         "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
         "--tools",
-        "ask_user",
+        "ask_user,mcp__glass__*",
         "--no-extensions",
         "--no-mcp",
         "--no-skills",
@@ -19,6 +19,8 @@
         "--no-approve",
         "--extension",
         "<folder>.pi/ask-user.js",
+        "--extension",
+        "<folder>.pi/glass-tools.js",
         "--append-system-prompt",
         "<folder>.pi/instructions.md"
       ],
@@ -59,7 +61,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-05T21-14-24-851Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-05T22-43-12-285Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -103,7 +105,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1793913264932,
+              "timestamp": 1793918592382,
               "toolsAdded": [
                 {
                   "name": "ask_user",
@@ -126,6 +128,141 @@
                     "required": ["question"],
                     "additionalProperties": false
                   }
+                },
+                {
+                  "name": "mcp__glass__list_pull_requests",
+                  "description": "Lists the user's PR lists in Glass: PRs that need their review, their own PRs, and PRs they are reviewing, grouped by followed repository.",
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": false
+                  }
+                },
+                {
+                  "name": "mcp__glass__list_queue",
+                  "description": "Lists the PRs in the user's Queue: the PRs they lined up to review next, in order, each with the Revision Glass last saw.",
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": false
+                  }
+                },
+                {
+                  "name": "mcp__glass__list_to_dos",
+                  "description": "Lists the user's To-dos in Glass, done or not, with their notes.",
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": false
+                  }
+                },
+                {
+                  "name": "mcp__glass__list_recent_activity",
+                  "description": "Lists the user's most recent Activity in Glass, newest first: PRs they opened, reviewed, and commented on, and other work they did.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100,
+                        "description": "How many Activities to list, at most 100."
+                      }
+                    },
+                    "required": ["limit"],
+                    "additionalProperties": true
+                  }
+                },
+                {
+                  "name": "mcp__glass__list_agents",
+                  "description": "Lists the user's Agents: the named coding conversations working in a repository, with each one's repository, base branch, program, and whether it waits for the user's answer.",
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": false
+                  }
+                },
+                {
+                  "name": "mcp__glass__read_agent_transcript",
+                  "description": "Reads an Agent's most recent Turns: each message the user sent, what the Agent wrote and which tools it used, and how the Turn ended. Includes Queued messages not yet delivered.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "agentId": {
+                        "type": "string",
+                        "description": "The Agent's id, from list_agents."
+                      },
+                      "turns": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 20,
+                        "description": "How many of the latest Turns to read, at most 20."
+                      }
+                    },
+                    "required": ["agentId", "turns"],
+                    "additionalProperties": true
+                  }
+                },
+                {
+                  "name": "mcp__glass__read_pull_request",
+                  "description": "Reads a PR's title, description, changed files with their diffs, and published Discussions at one Revision. Pass the Revision the user means, such as the one in a message's glass_context; leave it out to read the PR as it is now.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "pullRequest": {
+                        "$ref": "#/$defs/PullRequestRefEncoded"
+                      },
+                      "revision": {
+                        "anyOf": [
+                          {
+                            "$ref": "#/$defs/RevisionEncoded"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": ["pullRequest"],
+                    "additionalProperties": true,
+                    "$defs": {
+                      "PullRequestRefEncoded": {
+                        "type": "object",
+                        "properties": {
+                          "owner": {
+                            "type": "string"
+                          },
+                          "repo": {
+                            "type": "string"
+                          },
+                          "number": {
+                            "type": "integer",
+                            "maximum": 2147483647,
+                            "exclusiveMinimum": 0
+                          }
+                        },
+                        "required": ["owner", "repo", "number"],
+                        "additionalProperties": true
+                      },
+                      "RevisionEncoded": {
+                        "type": "object",
+                        "properties": {
+                          "base": {
+                            "type": "string"
+                          },
+                          "head": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["base", "head"],
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "mcp__glass__wait_for_release",
+                  "description": "Waits until Glass releases it. Call it only when the user asks you to.",
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": false
+                  }
                 }
               ]
             }
@@ -138,7 +275,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1793913264932,
+              "timestamp": 1793918592382,
               "toolsAdded": [
                 {
                   "name": "ask_user",
@@ -159,6 +296,141 @@
                       }
                     },
                     "required": ["question"],
+                    "additionalProperties": false
+                  }
+                },
+                {
+                  "name": "mcp__glass__list_pull_requests",
+                  "description": "Lists the user's PR lists in Glass: PRs that need their review, their own PRs, and PRs they are reviewing, grouped by followed repository.",
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": false
+                  }
+                },
+                {
+                  "name": "mcp__glass__list_queue",
+                  "description": "Lists the PRs in the user's Queue: the PRs they lined up to review next, in order, each with the Revision Glass last saw.",
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": false
+                  }
+                },
+                {
+                  "name": "mcp__glass__list_to_dos",
+                  "description": "Lists the user's To-dos in Glass, done or not, with their notes.",
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": false
+                  }
+                },
+                {
+                  "name": "mcp__glass__list_recent_activity",
+                  "description": "Lists the user's most recent Activity in Glass, newest first: PRs they opened, reviewed, and commented on, and other work they did.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100,
+                        "description": "How many Activities to list, at most 100."
+                      }
+                    },
+                    "required": ["limit"],
+                    "additionalProperties": true
+                  }
+                },
+                {
+                  "name": "mcp__glass__list_agents",
+                  "description": "Lists the user's Agents: the named coding conversations working in a repository, with each one's repository, base branch, program, and whether it waits for the user's answer.",
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": false
+                  }
+                },
+                {
+                  "name": "mcp__glass__read_agent_transcript",
+                  "description": "Reads an Agent's most recent Turns: each message the user sent, what the Agent wrote and which tools it used, and how the Turn ended. Includes Queued messages not yet delivered.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "agentId": {
+                        "type": "string",
+                        "description": "The Agent's id, from list_agents."
+                      },
+                      "turns": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 20,
+                        "description": "How many of the latest Turns to read, at most 20."
+                      }
+                    },
+                    "required": ["agentId", "turns"],
+                    "additionalProperties": true
+                  }
+                },
+                {
+                  "name": "mcp__glass__read_pull_request",
+                  "description": "Reads a PR's title, description, changed files with their diffs, and published Discussions at one Revision. Pass the Revision the user means, such as the one in a message's glass_context; leave it out to read the PR as it is now.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "pullRequest": {
+                        "$ref": "#/$defs/PullRequestRefEncoded"
+                      },
+                      "revision": {
+                        "anyOf": [
+                          {
+                            "$ref": "#/$defs/RevisionEncoded"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": ["pullRequest"],
+                    "additionalProperties": true,
+                    "$defs": {
+                      "PullRequestRefEncoded": {
+                        "type": "object",
+                        "properties": {
+                          "owner": {
+                            "type": "string"
+                          },
+                          "repo": {
+                            "type": "string"
+                          },
+                          "number": {
+                            "type": "integer",
+                            "maximum": 2147483647,
+                            "exclusiveMinimum": 0
+                          }
+                        },
+                        "required": ["owner", "repo", "number"],
+                        "additionalProperties": true
+                      },
+                      "RevisionEncoded": {
+                        "type": "object",
+                        "properties": {
+                          "base": {
+                            "type": "string"
+                          },
+                          "head": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["base", "head"],
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "mcp__glass__wait_for_release",
+                  "description": "Waits until Glass releases it. Call it only when the user asks you to.",
+                  "parameters": {
+                    "type": "object",
                     "additionalProperties": false
                   }
                 }
@@ -177,7 +449,7 @@
                   "text": "Ask me which greeting I prefer."
                 }
               ],
-              "timestamp": 1793913264931
+              "timestamp": 1793918592381
             }
           }
         },
@@ -192,7 +464,7 @@
                   "text": "Ask me which greeting I prefer."
                 }
               ],
-              "timestamp": 1793913264931
+              "timestamp": 1793918592381
             }
           }
         },
@@ -220,7 +492,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1793913264942
+              "timestamp": 1793918592394
             }
           }
         },
@@ -244,7 +516,7 @@
             "assistantMessageEvent": {
               "type": "toolcall_start",
               "contentIndex": 0,
-              "id": "ask-greeting",
+              "id": "call-2",
               "toolName": "ask_user"
             }
           }
@@ -295,7 +567,7 @@
               "contentIndex": 0,
               "toolCall": {
                 "type": "toolCall",
-                "id": "ask-greeting",
+                "id": "call-2",
                 "name": "ask_user",
                 "arguments": {
                   "question": "Which greeting?",
@@ -313,7 +585,7 @@
               "content": [
                 {
                   "type": "toolCall",
-                  "id": "ask-greeting",
+                  "id": "call-2",
                   "name": "ask_user",
                   "arguments": {
                     "question": "Which greeting?",
@@ -339,10 +611,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1793913264942,
+              "timestamp": 1793918592394,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 15,
+              "durationMs": 6,
               "thinkingLevel": "off"
             }
           }
@@ -350,7 +622,7 @@
         {
           "in": {
             "type": "tool_execution_start",
-            "toolCallId": "ask-greeting",
+            "toolCallId": "call-2",
             "toolName": "ask_user",
             "args": {
               "question": "Which greeting?",
@@ -361,7 +633,7 @@
         {
           "in": {
             "type": "extension_ui_request",
-            "id": "e5454285-b283-49b0-b9c7-ec1db54c73a3",
+            "id": "aa266111-5a37-41cf-9ec5-d8aa35d08a62",
             "method": "select",
             "title": "Which greeting?",
             "options": ["Hi", "Hello"]
@@ -370,14 +642,14 @@
         {
           "out": {
             "type": "extension_ui_response",
-            "id": "e5454285-b283-49b0-b9c7-ec1db54c73a3",
+            "id": "aa266111-5a37-41cf-9ec5-d8aa35d08a62",
             "value": "Hello"
           }
         },
         {
           "in": {
             "type": "tool_execution_end",
-            "toolCallId": "ask-greeting",
+            "toolCallId": "call-2",
             "toolName": "ask_user",
             "result": {
               "content": [
@@ -388,7 +660,7 @@
               ]
             },
             "isError": false,
-            "durationMs": 2
+            "durationMs": 4
           }
         },
         {
@@ -396,7 +668,7 @@
             "type": "message_start",
             "message": {
               "role": "toolResult",
-              "toolCallId": "ask-greeting",
+              "toolCallId": "call-2",
               "toolName": "ask_user",
               "content": [
                 {
@@ -405,8 +677,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 2,
-              "timestamp": 1793913264960
+              "durationMs": 4,
+              "timestamp": 1793918592406
             }
           }
         },
@@ -415,7 +687,7 @@
             "type": "message_end",
             "message": {
               "role": "toolResult",
-              "toolCallId": "ask-greeting",
+              "toolCallId": "call-2",
               "toolName": "ask_user",
               "content": [
                 {
@@ -424,8 +696,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 2,
-              "timestamp": 1793913264960
+              "durationMs": 4,
+              "timestamp": 1793918592406
             }
           }
         },
@@ -437,7 +709,7 @@
               "content": [
                 {
                   "type": "toolCall",
-                  "id": "ask-greeting",
+                  "id": "call-2",
                   "name": "ask_user",
                   "arguments": {
                     "question": "Which greeting?",
@@ -463,16 +735,16 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1793913264942,
+              "timestamp": 1793918592394,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 15,
+              "durationMs": 6,
               "thinkingLevel": "off"
             },
             "toolResults": [
               {
                 "role": "toolResult",
-                "toolCallId": "ask-greeting",
+                "toolCallId": "call-2",
                 "toolName": "ask_user",
                 "content": [
                   {
@@ -481,8 +753,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 2,
-                "timestamp": 1793913264960
+                "durationMs": 4,
+                "timestamp": 1793918592406
               }
             ]
           }
@@ -497,12 +769,7 @@
             "type": "message_start",
             "message": {
               "role": "assistant",
-              "content": [
-                {
-                  "type": "text",
-                  "text": "You chose \"Hello\""
-                }
-              ],
+              "content": [],
               "api": "openai-completions",
               "provider": "glass-test",
               "model": "gpt-test",
@@ -521,7 +788,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1793913264961
+              "timestamp": 1793918592408
             }
           }
         },
@@ -568,7 +835,7 @@
             "assistantMessageEvent": {
               "type": "text_delta",
               "contentIndex": 0,
-              "delta": "You chose \"Hello\""
+              "delta": "The tool said: Hello"
             }
           }
         },
@@ -592,7 +859,7 @@
             "assistantMessageEvent": {
               "type": "text_end",
               "contentIndex": 0,
-              "content": "You chose \"Hello\""
+              "content": "The tool said: Hello"
             }
           }
         },
@@ -604,7 +871,7 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "You chose \"Hello\""
+                  "text": "The tool said: Hello"
                 }
               ],
               "api": "openai-completions",
@@ -625,10 +892,10 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1793913264961,
+              "timestamp": 1793918592408,
               "responseId": "test-completion",
               "rawStopReason": "stop",
-              "durationMs": 4,
+              "durationMs": 2,
               "thinkingLevel": "off"
             }
           }
@@ -641,7 +908,7 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "You chose \"Hello\""
+                  "text": "The tool said: Hello"
                 }
               ],
               "api": "openai-completions",
@@ -662,10 +929,10 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1793913264961,
+              "timestamp": 1793918592408,
               "responseId": "test-completion",
               "rawStopReason": "stop",
-              "durationMs": 4,
+              "durationMs": 2,
               "thinkingLevel": "off"
             },
             "toolResults": []
@@ -679,7 +946,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1793913264932,
+                "timestamp": 1793918592382,
                 "toolsAdded": [
                   {
                     "name": "ask_user",
@@ -702,6 +969,141 @@
                       "required": ["question"],
                       "additionalProperties": false
                     }
+                  },
+                  {
+                    "name": "mcp__glass__list_pull_requests",
+                    "description": "Lists the user's PR lists in Glass: PRs that need their review, their own PRs, and PRs they are reviewing, grouped by followed repository.",
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": false
+                    }
+                  },
+                  {
+                    "name": "mcp__glass__list_queue",
+                    "description": "Lists the PRs in the user's Queue: the PRs they lined up to review next, in order, each with the Revision Glass last saw.",
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": false
+                    }
+                  },
+                  {
+                    "name": "mcp__glass__list_to_dos",
+                    "description": "Lists the user's To-dos in Glass, done or not, with their notes.",
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": false
+                    }
+                  },
+                  {
+                    "name": "mcp__glass__list_recent_activity",
+                    "description": "Lists the user's most recent Activity in Glass, newest first: PRs they opened, reviewed, and commented on, and other work they did.",
+                    "parameters": {
+                      "type": "object",
+                      "properties": {
+                        "limit": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 100,
+                          "description": "How many Activities to list, at most 100."
+                        }
+                      },
+                      "required": ["limit"],
+                      "additionalProperties": true
+                    }
+                  },
+                  {
+                    "name": "mcp__glass__list_agents",
+                    "description": "Lists the user's Agents: the named coding conversations working in a repository, with each one's repository, base branch, program, and whether it waits for the user's answer.",
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": false
+                    }
+                  },
+                  {
+                    "name": "mcp__glass__read_agent_transcript",
+                    "description": "Reads an Agent's most recent Turns: each message the user sent, what the Agent wrote and which tools it used, and how the Turn ended. Includes Queued messages not yet delivered.",
+                    "parameters": {
+                      "type": "object",
+                      "properties": {
+                        "agentId": {
+                          "type": "string",
+                          "description": "The Agent's id, from list_agents."
+                        },
+                        "turns": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 20,
+                          "description": "How many of the latest Turns to read, at most 20."
+                        }
+                      },
+                      "required": ["agentId", "turns"],
+                      "additionalProperties": true
+                    }
+                  },
+                  {
+                    "name": "mcp__glass__read_pull_request",
+                    "description": "Reads a PR's title, description, changed files with their diffs, and published Discussions at one Revision. Pass the Revision the user means, such as the one in a message's glass_context; leave it out to read the PR as it is now.",
+                    "parameters": {
+                      "type": "object",
+                      "properties": {
+                        "pullRequest": {
+                          "$ref": "#/$defs/PullRequestRefEncoded"
+                        },
+                        "revision": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/$defs/RevisionEncoded"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": ["pullRequest"],
+                      "additionalProperties": true,
+                      "$defs": {
+                        "PullRequestRefEncoded": {
+                          "type": "object",
+                          "properties": {
+                            "owner": {
+                              "type": "string"
+                            },
+                            "repo": {
+                              "type": "string"
+                            },
+                            "number": {
+                              "type": "integer",
+                              "maximum": 2147483647,
+                              "exclusiveMinimum": 0
+                            }
+                          },
+                          "required": ["owner", "repo", "number"],
+                          "additionalProperties": true
+                        },
+                        "RevisionEncoded": {
+                          "type": "object",
+                          "properties": {
+                            "base": {
+                              "type": "string"
+                            },
+                            "head": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["base", "head"],
+                          "additionalProperties": true
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "name": "mcp__glass__wait_for_release",
+                    "description": "Waits until Glass releases it. Call it only when the user asks you to.",
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": false
+                    }
                   }
                 ]
               },
@@ -713,14 +1115,14 @@
                     "text": "Ask me which greeting I prefer."
                   }
                 ],
-                "timestamp": 1793913264931
+                "timestamp": 1793918592381
               },
               {
                 "role": "assistant",
                 "content": [
                   {
                     "type": "toolCall",
-                    "id": "ask-greeting",
+                    "id": "call-2",
                     "name": "ask_user",
                     "arguments": {
                       "question": "Which greeting?",
@@ -746,15 +1148,15 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1793913264942,
+                "timestamp": 1793918592394,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
-                "durationMs": 15,
+                "durationMs": 6,
                 "thinkingLevel": "off"
               },
               {
                 "role": "toolResult",
-                "toolCallId": "ask-greeting",
+                "toolCallId": "call-2",
                 "toolName": "ask_user",
                 "content": [
                   {
@@ -763,15 +1165,15 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 2,
-                "timestamp": 1793913264960
+                "durationMs": 4,
+                "timestamp": 1793918592406
               },
               {
                 "role": "assistant",
                 "content": [
                   {
                     "type": "text",
-                    "text": "You chose \"Hello\""
+                    "text": "The tool said: Hello"
                   }
                 ],
                 "api": "openai-completions",
@@ -792,10 +1194,10 @@
                   }
                 },
                 "stopReason": "stop",
-                "timestamp": 1793913264961,
+                "timestamp": 1793918592408,
                 "responseId": "test-completion",
                 "rawStopReason": "stop",
-                "durationMs": 4,
+                "durationMs": 2,
                 "thinkingLevel": "off"
               }
             ],
@@ -843,7 +1245,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-05T21-14-24-851Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-05T22-43-12-285Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 5,

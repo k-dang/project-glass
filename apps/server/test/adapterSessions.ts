@@ -10,7 +10,19 @@ import {
   TurnStarted,
 } from "@glass/contracts"
 import { NodeServices } from "@effect/platform-node"
-import { DateTime, Effect, Layer, Option, Stream, SubscriptionRef } from "effect"
+import {
+  DateTime,
+  Deferred,
+  Effect,
+  Layer,
+  Option,
+  Predicate,
+  Redacted,
+  Schema,
+  Stream,
+  SubscriptionRef,
+} from "effect"
+import { McpServer, Tool, Toolkit } from "effect/ai"
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
@@ -18,21 +30,40 @@ import { vi } from "vite-plus/test"
 import type { AgentAdapter, AgentSession } from "../src/agentHost/adapter"
 import { claudeAdapter, type ClaudeSdk } from "../src/agentHost/claudeAdapter"
 import { piAdapter } from "../src/agentHost/piAdapter"
+import { AgentRunners } from "../src/agentRunners"
+import { GlassMcpTools } from "../src/mcp/server"
 import {
   type ConversationRole,
+  GlobalRole,
   type ReviewBrief,
   type TurnSettings,
   WorkRole,
 } from "../src/agentHost/protocol"
 import { bundledPi, bundledPiProgram } from "./demoAgent"
 import { type FakeModelSettings, fakeModelProvider } from "./fakeModelProvider"
-import { isolatedHome, stubHome } from "./harness"
+import { startFakeGitHub } from "./fakeGitHub"
+import { VIEWER } from "./fakePullRequest"
+import { isolatedHome, startBackend, stubHome } from "./harness"
 import { PI_MODEL, PI_PROVIDER, type PiSettings, writePiLogin, writePiSettings } from "./piLogin"
 import { claudeLoginEnvironment, pinnedClaude, pinnedClaudeProgram } from "./pinnedClaude"
 import { recordingSessions, sessionTape } from "./sessionTape"
 
 export const run = (tool: string, command: string, reply: string) =>
   `Use the ${tool} tool to run exactly \`${command}\` and nothing else, then reply with exactly: ${reply}`
+
+export const runningTool = (name: string) => (turns: ReadonlyArray<Turn>) =>
+  turns
+    .at(-1)
+    ?.parts.some(
+      (part) =>
+        Predicate.isTagged(part, "ToolCall") && part.name === name && part.status === "running",
+    ) ?? false
+
+export const lastTextOf = (turn: Turn | undefined) => {
+  const text = turn?.parts.findLast((part) => Predicate.isTagged(part, "Text"))
+
+  return Predicate.isTagged(text, "Text") ? text.text : ""
+}
 
 export const waiting = (turns: ReadonlyArray<Turn>) =>
   turns.at(-1)?.parts.findLast((part): part is RequestPart => isWaiting(part))
@@ -112,9 +143,89 @@ export const writeGreetSkill = (skills: string) =>
 export const writeGreeter = (folder: string) =>
   Effect.sync(() => writeFileSync(join(folder, "greet.ts"), "hi\nhello name\nbye\n"))
 
-export const claudeSession = Effect.fnUntraced(function* (scenario: string) {
+const WaitForRelease = Tool.make("wait_for_release", {
+  description: "Waits until Glass releases it. Call it only when the user asks you to.",
+  success: Schema.String,
+})
+
+const ReleaseTools = Toolkit.make(WaitForRelease)
+
+/**
+ * A backend serving Glass's tools, with one To-do and one PR, beside a tool that waits until the
+ * test stops the Turn calling it. Its endpoint and credential reach recordings only by placeholder.
+ */
+export const glassToolsBackend = Effect.fnUntraced(function* (conversationId: string) {
+  const github = yield* startFakeGitHub()
+
+  github.seedPullRequest({
+    owner: "acme",
+    repo: "api",
+    number: 42,
+    title: "Greet by name",
+    base: { sha: "b0", files: { "greet.ts": "hi\n" } },
+    head: { sha: "h1", files: { "greet.ts": "hello name\n" } },
+    changedFiles: [
+      {
+        path: "greet.ts",
+        status: "modified",
+        additions: 1,
+        deletions: 1,
+        patch: "@@ -1 +1 @@\n-hi\n+hello name",
+      },
+    ],
+  })
+
+  const waitStarted = yield* Deferred.make<void>()
+  const waitInterrupted = yield* Deferred.make<void>()
+
+  const tools = Layer.merge(
+    GlassMcpTools,
+    McpServer.toolkit(ReleaseTools).pipe(
+      Layer.provide(
+        ReleaseTools.toLayer({
+          wait_for_release: () =>
+            Deferred.succeed(waitStarted, undefined).pipe(
+              Effect.andThen(Effect.never),
+              Effect.onInterrupt(() => Deferred.succeed(waitInterrupted, undefined)),
+            ),
+        }),
+      ),
+    ),
+  )
+
+  // The backend's home would hide the user's own logins from a session that records.
+  const homes = ["HOME", "USERPROFILE", "PI_CODING_AGENT_DIR"].map(
+    (name) => [name, process.env[name]] as const,
+  )
+
+  const { client, mcpCredentials } = yield* startBackend(
+    { GH_TOKEN: VIEWER.token, GLASS_GITHUB_API_URL: github.url },
+    yield* isolatedHome,
+    AgentRunners.layer,
+    tools,
+  )
+
+  for (const [name, value] of homes) vi.stubEnv(name, value)
+
+  yield* client.AddToDo({ title: "Reply to Sam" })
+
+  const url = yield* mcpCredentials.endpoint
+  const bearer = yield* mcpCredentials.issue({ conversationId })
+
+  return {
+    role: GlobalRole.make({ tools: { url, bearer } }),
+    places: { "<glass-tools-url>": url, "<glass-tools-bearer>": Redacted.value(bearer) },
+    waitStarted: Deferred.await(waitStarted),
+    waitInterrupted: Deferred.await(waitInterrupted),
+  }
+})
+
+export const claudeSession = Effect.fnUntraced(function* (
+  scenario: string,
+  places: Readonly<Record<string, string>> = {},
+) {
   const folder = yield* isolatedHome
-  const tape = sessionTape(scenario, pinnedClaudeProgram(), { "<folder>": folder })
+  const tape = sessionTape(scenario, pinnedClaudeProgram(), { "<folder>": folder, ...places })
 
   if (recordingSessions)
     for (const [name, value] of Object.entries(claudeLoginEnvironment(folder)))
@@ -176,11 +287,12 @@ interface PiSessionOptions {
   readonly piSettings?: PiSettings
   readonly fake?: FakeModelSettings
   readonly apiKey?: string
+  readonly places?: Readonly<Record<string, string>>
 }
 
 export const piSession = Effect.fnUntraced(function* (
   scenario: string,
-  { piSettings = { retry: { enabled: false } }, fake, apiKey }: PiSessionOptions = {},
+  { piSettings = { retry: { enabled: false } }, fake, apiKey, places = {} }: PiSessionOptions = {},
 ) {
   const home = yield* isolatedHome
   const folder = join(home, "work")
@@ -206,6 +318,7 @@ export const piSession = Effect.fnUntraced(function* (
     "<pi-home>": home,
     "<pi-model>": PI_MODEL,
     "<pi-provider>": PI_PROVIDER,
+    ...places,
   })
 
   const adapter = yield* piAdapter(bundledPi).pipe(

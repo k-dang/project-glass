@@ -20,9 +20,13 @@ import {
   run,
   writeGreeter,
   writeGreetSkill,
+  glassToolsBackend,
+  runningTool,
+  lastTextOf,
 } from "../../test/adapterSessions"
 import { settled } from "../../test/agentsFixture"
-import { GlobalRole, ReviewRole } from "./protocol"
+import { recordingSessions } from "../../test/sessionTape"
+import { ReviewRole } from "./protocol"
 
 const conversation = "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
 
@@ -313,10 +317,11 @@ it.live("reads its checkout and proposes Suggested drafts as an Agent review's A
   }).pipe(Effect.scoped),
 )
 
-it.live("asks a Question as the Global conversation, with no other tools", () =>
+it.live("asks a Question as the Global conversation", () =>
   Effect.gen(function* () {
-    const f = yield* claudeSession("claude-global")
-    const agent = yield* f.open(conversation, GlobalRole.make({}))
+    const glass = yield* glassToolsBackend(conversation)
+    const f = yield* claudeSession("claude-global", glass.places)
+    const agent = yield* f.open(conversation, glass.role)
 
     yield* agent.send(
       "Ask me with your question tool whether I prefer Hi or Hello, offering exactly those two options. Then reply with exactly the option I chose.",
@@ -338,5 +343,54 @@ it.live("asks a Question as the Global conversation, with no other tools", () =>
     const answer = lastText(turn)
     assert.ok(Predicate.isTagged(answer, "Text"))
     assert.include(answer.text, "Hello")
+  }).pipe(Effect.scoped),
+)
+
+it.live("reads Glass through its tools as the Global conversation, explaining a failed read", () =>
+  Effect.gen(function* () {
+    const glass = yield* glassToolsBackend(conversation)
+    const f = yield* claudeSession("claude-global-tools", glass.places)
+    const agent = yield* f.open(conversation, glass.role)
+
+    yield* agent.send(
+      "Use the list_to_dos tool, then reply with exactly the title of my first To-do and nothing else.",
+    )
+    const [read] = yield* f.until(settled(1))
+    const listed = read?.parts.find((part) => Predicate.isTagged(part, "ToolCall"))
+
+    assert.deepStrictEqual(read?.ended?.ending, TurnDone.make({}))
+    assert.deepInclude(listed, { name: "list_to_dos", status: "done" })
+    assert.include(listed?.output, "Reply to Sam")
+    assert.include(lastTextOf(read), "Reply to Sam")
+
+    yield* agent.send(
+      "Use the read_pull_request tool once for acme/api#42 at Revision base b0 and head h0, without retrying. Then tell me in one sentence why it failed.",
+    )
+    const [, failed] = yield* f.until(settled(2))
+    const stale = failed?.parts.find((part) => Predicate.isTagged(part, "ToolCall"))
+
+    assert.deepInclude(stale, { name: "read_pull_request", status: "failed" })
+    assert.include(stale?.output, "changed since that Revision")
+  }).pipe(Effect.scoped),
+)
+
+it.live("stops the Global conversation's Turn while a Glass tool runs, cancelling the call", () =>
+  Effect.gen(function* () {
+    const glass = yield* glassToolsBackend(conversation)
+    const f = yield* claudeSession("claude-global-tool-stop", glass.places)
+    const agent = yield* f.open(conversation, glass.role)
+
+    yield* agent.send("Call the wait_for_release tool once.")
+
+    // Replayed, Claude Code calls no endpoint, so only its own report shows the call.
+    if (recordingSessions) yield* glass.waitStarted
+    else yield* f.until(runningTool("wait_for_release"))
+
+    yield* agent.session.stopTurn
+    const [turn] = yield* f.until(settled(1))
+
+    assert.deepStrictEqual(turn?.ended?.ending, TurnStopped.make({}))
+
+    if (recordingSessions) yield* glass.waitInterrupted
   }).pipe(Effect.scoped),
 )

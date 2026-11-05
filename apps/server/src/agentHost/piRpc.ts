@@ -1,7 +1,8 @@
 import { Cause, Deferred, Effect, Option, Predicate, Queue, Schema, Scope, Stream } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import { launchCommand } from "../processes"
-import { HostAgentError } from "./protocol"
+import { piGlassToolsEnvironment } from "./piGlassTools"
+import { type GlassToolsAccess, HostAgentError } from "./protocol"
 import { ToolInput } from "./toolCalls"
 
 // Longer than the 30 seconds pi waits on a lock a crashed pi left behind.
@@ -170,6 +171,7 @@ export const startPiRpc = Effect.fnUntraced(function* (
   folder: string,
   conversation?: string,
   flags: ReadonlyArray<string> = [],
+  tools?: GlassToolsAccess,
 ) {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
   const scope = yield* Scope.Scope
@@ -184,7 +186,12 @@ export const startPiRpc = Effect.fnUntraced(function* (
           ...(conversation === undefined ? [] : ["--session-id", conversation]),
           ...flags,
         ],
-        { cwd: folder, extendEnv: true, forceKillAfter: "1 second" },
+        {
+          cwd: folder,
+          env: piGlassToolsEnvironment(tools),
+          extendEnv: true,
+          forceKillAfter: "1 second",
+        },
       ),
     )
     .pipe(

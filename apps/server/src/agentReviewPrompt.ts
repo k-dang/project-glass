@@ -1,7 +1,48 @@
-import { type Discussions, PublishedComment } from "@glass/contracts"
+import {
+  DiffSide,
+  type Discussions,
+  OriginalLine,
+  PublishedComment,
+  ReviewState,
+} from "@glass/contracts"
 import { Schema } from "effect"
 import type { ReviewInput } from "./github/GitHubClient"
-import { fileMaterial } from "./tourPrompt"
+import { FileMaterial, fileMaterial } from "./tourPrompt"
+
+const CommentMaterial = Schema.Struct({ author: Schema.String, bodyHtml: Schema.String })
+
+export const PullRequestMaterial = Schema.Struct({
+  title: Schema.String,
+  description: Schema.String,
+  files: Schema.Array(FileMaterial),
+  discussions: Schema.Struct({
+    onLines: Schema.Array(
+      Schema.Struct({
+        path: Schema.String,
+        side: DiffSide,
+        line: Schema.Int,
+        resolved: Schema.Boolean,
+        comments: Schema.Array(CommentMaterial),
+      }),
+    ),
+    outdated: Schema.Array(
+      Schema.Struct({
+        path: Schema.String,
+        originalLine: OriginalLine,
+        resolved: Schema.Boolean,
+        comments: Schema.Array(CommentMaterial),
+      }),
+    ),
+    timeline: Schema.Array(
+      Schema.Union([
+        Schema.Struct({ ...CommentMaterial.fields, review: ReviewState }),
+        CommentMaterial,
+      ]),
+    ),
+  }),
+})
+
+export type PullRequestMaterial = typeof PullRequestMaterial.Type
 
 export const AgentReviewAnswer = Schema.Struct({
   markdown: Schema.Trim.check(Schema.isNonEmpty()),
@@ -48,7 +89,7 @@ const discussionsOf = (discussions: Discussions) => ({
   ),
 })
 
-export const agentReviewMaterial = (input: ReviewInput) => ({
+export const agentReviewMaterial = (input: ReviewInput): PullRequestMaterial => ({
   title: input.title,
   description: input.body,
   files: input.files.map(fileMaterial),

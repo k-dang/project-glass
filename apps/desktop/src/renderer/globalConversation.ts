@@ -1,9 +1,18 @@
-import type { GlobalConversationProgram, MessageInput, RequestAnswer } from "@glass/contracts"
-import { Effect, Stream } from "effect"
-import { Atom } from "effect/reactivity"
-import { noCommands, noFiles, TRANSCRIPT_IDLE_TTL, transcriptOf } from "./agentsArea"
+import {
+  AgentContext,
+  type CapturedContext,
+  type GlobalConversationProgram,
+  type MessageInput,
+  PullRequestContext,
+  type PullRequestRef,
+  type RequestAnswer,
+} from "@glass/contracts"
+import { Data, Effect, Option, Stream } from "effect"
+import { AsyncResult, Atom } from "effect/reactivity"
+import { agentsAtom, noCommands, noFiles, TRANSCRIPT_IDLE_TTL, transcriptOf } from "./agentsArea"
 import { Backend, backendRuntime, backendRuntimeOf } from "./backend"
 import type { Conversation } from "./conversation"
+import { openWorkspaceAtom, sameRef } from "./reviewsArea"
 
 export const globalConversationOpenAtom = Atom.make(false).pipe(Atom.keepAlive)
 
@@ -18,7 +27,47 @@ export const changeGlobalProgramAtom = backendRuntime.fn(
     ),
 )
 
-const sending = (sent: MessageInput) => ({ ...sent, context: null })
+/** The PR workspace or Agent the current route shows, which the router keeps up to date. */
+export type Viewed = Data.TaggedEnum<{
+  PullRequest: { readonly ref: PullRequestRef }
+  Agent: { readonly agentId: string }
+}>
+
+export const Viewed = Data.taggedEnum<Viewed>()
+
+export const viewedAtom = Atom.make<Viewed | null>(null).pipe(Atom.keepAlive)
+
+/** What a message sent now carries: the PR at the Revision on screen, or the Agent on screen. */
+export const capturedContextAtom = Atom.make((get): CapturedContext | null => {
+  const viewed = get(viewedAtom)
+
+  if (viewed === null) return null
+
+  return Viewed.$match(viewed, {
+    PullRequest: ({ ref }) => {
+      const workspace = Option.getOrNull(AsyncResult.value(get(openWorkspaceAtom)))?.workspace
+
+      return workspace === undefined || !sameRef(workspace.pullRequest.ref, ref)
+        ? null
+        : PullRequestContext.make({
+            pullRequest: workspace.pullRequest.ref,
+            revision: workspace.revision,
+          })
+    },
+    Agent: ({ agentId }) => {
+      const agent = Option.getOrNull(AsyncResult.value(get(agentsAtom)))?.find(
+        ({ id }) => id === agentId,
+      )
+
+      return agent === undefined ? null : AgentContext.make({ agentId: agent.id, name: agent.name })
+    },
+  })
+})
+
+const sending = (sent: MessageInput, get: Atom.FnContext) => ({
+  ...sent,
+  context: get(capturedContextAtom),
+})
 
 export const globalConversation: Conversation = {
   composerKey: "global-conversation",
@@ -27,11 +76,11 @@ export const globalConversation: Conversation = {
       transcriptOf(Stream.unwrap(Backend.useSync((backend) => backend.WatchGlobalTranscript()))),
     )
     .pipe(Atom.setIdleTTL(TRANSCRIPT_IDLE_TTL)),
-  send: backendRuntime.fn((sent: MessageInput) =>
-    Backend.use((backend) => backend.SendGlobalMessage(sending(sent))),
+  send: backendRuntime.fn((sent: MessageInput, get) =>
+    Backend.use((backend) => backend.SendGlobalMessage(sending(sent, get))),
   ),
-  steer: backendRuntime.fn((sent: MessageInput) =>
-    Backend.use((backend) => backend.SteerGlobal(sending(sent))),
+  steer: backendRuntime.fn((sent: MessageInput, get) =>
+    Backend.use((backend) => backend.SteerGlobal(sending(sent, get))),
   ),
   stop: backendRuntime.fn(() => Backend.use((backend) => backend.StopGlobalTurn())),
   cancelQueued: backendRuntime.fn((queuedMessageId: string) =>

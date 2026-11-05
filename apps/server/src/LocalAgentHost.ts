@@ -41,6 +41,8 @@ export class LocalAgentHost extends Context.Service<
   {
     readonly client: Effect.Effect<HostClient, AgentError>
     readonly running: Effect.Effect<Option.Option<HostClient>>
+    /** A scope that closes when `client`'s host stops, or none once it has. */
+    readonly lifetimeOf: (client: HostClient) => Effect.Effect<Option.Option<Scope.Scope>>
     readonly subscribeStopped: Effect.Effect<Stream.Stream<void>, never, Scope.Scope>
   }
 >()("@glass/server/LocalAgentHost") {
@@ -154,6 +156,10 @@ export class LocalAgentHost extends Context.Service<
             Effect.mapError(unavailable),
           ),
         running: Effect.sync(() => Option.fromNullishOr(current?.client)),
+        lifetimeOf: (client) =>
+          Effect.sync(() =>
+            current?.client === client ? Option.some(current.scope) : Option.none(),
+          ),
         subscribeStopped: PubSub.subscribe(stopped).pipe(Effect.map(Stream.fromSubscription)),
       })
     }),

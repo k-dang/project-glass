@@ -38,7 +38,7 @@ export class HostAgents extends Context.Service<
       engine: AgentEngine,
       folder: string,
       role: ConversationRole,
-    ) => Effect.Effect<void, HostAgentError>
+    ) => Effect.Effect<boolean, HostAgentError>
     readonly startTurn: (
       agentId: string,
       turnId: string,
@@ -71,7 +71,7 @@ export class HostAgents extends Context.Service<
           function* (agentId: string, engine: AgentEngine, folder: string, role: ConversationRole) {
             const current = running.get(agentId)
 
-            if (current !== undefined && !(yield* current.session.stopped)) return
+            if (current !== undefined && !(yield* current.session.stopped)) return false
 
             const scope = yield* Scope.fork(hostScope)
 
@@ -106,6 +106,8 @@ export class HostAgents extends Context.Service<
               Effect.andThen(Scope.close(scope, Exit.void)),
               Effect.forkIn(scope),
             )
+
+            return true
           },
           (effect) => lock.withPermits(1)(effect),
         )

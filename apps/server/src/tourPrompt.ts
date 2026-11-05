@@ -1,4 +1,4 @@
-import { Chapter, Tour, TourDiagram, type ChangedFile } from "@glass/contracts"
+import { ChangeType, Chapter, Tour, TourDiagram, type ChangedFile } from "@glass/contracts"
 import { Effect, Option, Predicate, Schema } from "effect"
 import type { TourInput } from "./github/GitHubClient"
 
@@ -57,7 +57,18 @@ A Chapter may include up to six callouts: short explanatory labels with targets 
 Intent and explanations may use backticks for inline code and at most one bold clause each. Use no other Markdown, em-dashes, or emoji.
 Return only the JSON answer matching the supplied schema, without a code fence or surrounding prose.`
 
-export const fileMaterial = (file: ChangedFile) => ({
+export const FileMaterial = Schema.Struct({
+  path: Schema.String,
+  previousPath: Schema.NullOr(Schema.String),
+  changeType: ChangeType,
+  additions: Schema.Int,
+  deletions: Schema.Int,
+  diff: Schema.NullOr(Schema.String),
+})
+
+export type FileMaterial = typeof FileMaterial.Type
+
+export const fileMaterial = (file: ChangedFile): FileMaterial => ({
   path: file.path,
   previousPath: file.previousPath,
   changeType: file.changeType,

@@ -10,7 +10,7 @@ import {
   TurnDone,
   TurnStopped,
 } from "@glass/contracts"
-import { Effect, Predicate } from "effect"
+import { Effect, Predicate, Schema } from "effect"
 import { join } from "node:path"
 import {
   piSession,
@@ -19,11 +19,19 @@ import {
   waiting,
   writeGreeter,
   writeGreetSkill,
+  glassToolsBackend,
+  lastTextOf,
+  runningTool,
 } from "../../test/adapterSessions"
 import { settled } from "../../test/agentsFixture"
-import type { FakeModelDelta } from "../../test/fakeModelProvider"
+import {
+  type FakeModelDelta,
+  type FakeModelRequest,
+  lastUserText,
+} from "../../test/fakeModelProvider"
+import { recordingSessions } from "../../test/sessionTape"
 import { PI_MODEL_ID } from "../../test/piLogin"
-import { GlobalRole, ReviewRole } from "./protocol"
+import { ReviewRole } from "./protocol"
 
 const conversation = "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d"
 
@@ -489,29 +497,41 @@ it.live("reads its checkout and proposes Suggested drafts as an Agent review's A
   }).pipe(Effect.scoped),
 )
 
-it.live("asks a Question as the Global conversation, with no other tools", () =>
-  Effect.gen(function* () {
-    const f = yield* piSession("pi-global", {
-      fake: {
-        reply: ({ messages }): ReadonlyArray<FakeModelDelta> => {
-          const answered = messages.find(({ role }) => role === "tool")
+const toolContent = ({ content }: FakeModelRequest["messages"][number]) =>
+  Predicate.isString(content) ? content : (content ?? []).map(({ text }) => text ?? "").join("")
 
-          return answered === undefined
-            ? [
-                {
-                  toolCall: {
-                    id: "ask-greeting",
-                    name: "ask_user",
-                    arguments: { question: "Which greeting?", options: ["Hi", "Hello"] },
-                  },
-                },
-              ]
-            : [{ text: `You chose ${JSON.stringify(answered.content)}` }]
-        },
-      },
+/** Calls the tool a message names, then repeats what the tool returned. */
+const globalReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
+  const last = input.messages.at(-1)
+
+  if (last?.role === "tool") return [{ text: `The tool said: ${toolContent(last)}` }]
+
+  const words = lastUserText(input)
+
+  const call = (name: string, args: Schema.JsonObject = {}): ReadonlyArray<FakeModelDelta> => [
+    { toolCall: { id: `call-${input.messages.length}`, name, arguments: args } },
+  ]
+
+  if (words.includes("greeting"))
+    return call("ask_user", { question: "Which greeting?", options: ["Hi", "Hello"] })
+
+  if (words.includes("To-dos")) return call("mcp__glass__list_to_dos")
+
+  if (words.includes("stale"))
+    return call("mcp__glass__read_pull_request", {
+      pullRequest: { owner: "acme", repo: "api", number: 42 },
+      revision: { base: "b0", head: "h0" },
     })
 
-    const agent = yield* f.open(conversation, GlobalRole.make({}))
+  return call("mcp__glass__wait_for_release")
+}
+
+it.live("asks a Question as the Global conversation", () =>
+  Effect.gen(function* () {
+    const glass = yield* glassToolsBackend(conversation)
+    const f = yield* piSession("pi-global", { fake: { reply: globalReply }, places: glass.places })
+
+    const agent = yield* f.open(conversation, glass.role)
 
     yield* agent.send("Ask me which greeting I prefer.")
     const question = yield* f.request
@@ -529,8 +549,61 @@ it.live("asks a Question as the Global conversation, with no other tools", () =>
     const [turn] = yield* f.until(settled(1))
 
     assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
-    const answer = lastText(turn)
-    assert.ok(Predicate.isTagged(answer, "Text"))
-    assert.include(answer.text, "Hello")
+    assert.include(lastTextOf(turn), "Hello")
+  }).pipe(Effect.scoped),
+)
+
+it.live("reads Glass through its tools as the Global conversation, explaining a failed read", () =>
+  Effect.gen(function* () {
+    const glass = yield* glassToolsBackend(conversation)
+
+    const f = yield* piSession("pi-global-tools", {
+      fake: { reply: globalReply },
+      places: glass.places,
+    })
+
+    const agent = yield* f.open(conversation, glass.role)
+
+    yield* agent.send("What are my To-dos?")
+    const [read] = yield* f.until(settled(1))
+    const listed = read?.parts.find((part) => Predicate.isTagged(part, "ToolCall"))
+
+    assert.deepStrictEqual(read?.ended?.ending, TurnDone.make({}))
+    assert.deepInclude(listed, { name: "list_to_dos", status: "done" })
+    assert.include(listed?.output, "Reply to Sam")
+    assert.include(lastTextOf(read), "Reply to Sam")
+
+    yield* agent.send("Read acme/api#42 at a stale Revision.")
+    const [, failed] = yield* f.until(settled(2))
+    const stale = failed?.parts.find((part) => Predicate.isTagged(part, "ToolCall"))
+
+    assert.deepInclude(stale, { name: "read_pull_request", status: "failed" })
+    assert.include(stale?.output, "changed since that Revision")
+  }).pipe(Effect.scoped),
+)
+
+it.live("stops the Global conversation's Turn while a Glass tool runs, cancelling the call", () =>
+  Effect.gen(function* () {
+    const glass = yield* glassToolsBackend(conversation)
+
+    const f = yield* piSession("pi-global-tool-stop", {
+      fake: { reply: globalReply },
+      places: glass.places,
+    })
+
+    const agent = yield* f.open(conversation, glass.role)
+
+    yield* agent.send("Wait for release.")
+
+    // Replayed, pi calls no endpoint, so only its own report shows the call.
+    if (recordingSessions) yield* glass.waitStarted
+    else yield* f.until(runningTool("wait_for_release"))
+
+    yield* agent.session.stopTurn
+    const [turn] = yield* f.until(settled(1))
+
+    assert.deepStrictEqual(turn?.ended?.ending, TurnStopped.make({}))
+
+    if (recordingSessions) yield* glass.waitInterrupted
   }).pipe(Effect.scoped),
 )

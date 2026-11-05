@@ -10,9 +10,10 @@ import { AsyncResult } from "effect/reactivity"
 import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { placeKey } from "./agentsArea"
-import { AgentComposer, Transcript } from "./AgentView"
+import { AgentComposer, contextLabel, Transcript } from "./AgentView"
 import { ConversationContext } from "./conversation"
 import {
+  capturedContextAtom,
   changeGlobalProgramAtom,
   globalConversation,
   globalConversationOpenAtom,
@@ -47,6 +48,7 @@ export function GlobalConversationPanel() {
   const reconnect = useAtomRefresh(globalConversation.transcript)
   const program = Option.getOrNull(AsyncResult.value(useAtomValue(globalProgramAtom)))
   const changed = useAtomValue(changeGlobalProgramAtom)
+  const context = useAtomValue(capturedContextAtom)
 
   const { turns, queued, status } = Option.getOrElse(
     AsyncResult.value(transcript),
@@ -79,6 +81,9 @@ export function GlobalConversationPanel() {
           </div>
         )}
         <Transcript turns={turns} status={status} />
+        <p className="truncate px-6 pb-1 text-xs text-muted-foreground">
+          {context === null ? "No PR or Agent in view" : `Sends with ${contextLabel(context)}`}
+        </p>
         <AgentComposer
           turns={turns}
           queued={queued}

@@ -26,7 +26,7 @@ import { Sandboxes } from "./Sandboxes"
 import { ServerConfig } from "./ServerConfig"
 import { LocalPlacement } from "./LocalPlacement"
 import { McpCredentials } from "./mcp/McpCredentials"
-import { McpRoutes } from "./mcp/server"
+import { GlassMcpTools, McpRoutes } from "./mcp/server"
 import { FollowedRepositories } from "./FollowedRepositories"
 import { PullRequestLists } from "./PullRequestLists"
 import { PullRequestMirror } from "./PullRequestMirror"
@@ -68,41 +68,45 @@ const AgentsLive = Layer.merge(Agents.layer, GlobalConversation.layer).pipe(
   Layer.provideMerge(LocalCheckouts.layer),
 )
 
-const services = (agentRunners: AgentRunnersLayer) =>
-  GlassRpcHandlers.pipe(
-    Layer.provide(PullRequestLists.layer),
-    Layer.provide(PullRequestMirror.layer),
-    Layer.provide(ToDos.layer),
-    Layer.provide(SavedPlaces.layer),
-    Layer.provide(Queue.layer),
-    Layer.provide(Tours.layer),
-    Layer.provide(AgentReviews.layer),
-    Layer.provide(Asks.layer),
-    Layer.provide(AgentsLive),
-    Layer.provide(Plugins.layer),
-    Layer.provide(CheckoutRuns.layer),
-    Layer.provide(Checkouts.layer),
-    Layer.provide(Git.layer),
-  ).pipe(
-    Layer.provide(agentRunners),
-    Layer.provide(Layer.merge(ActivityLog.layer, Storage.layer)),
-    Layer.provide(DatabaseLive),
-    Layer.provide(FollowedRepositories.layer),
-    Layer.provide(SettingsStore.layer),
-    Layer.provide(GitHubClient.layer),
-    Layer.provide(GitHubAuth.layer),
-    Layer.provideMerge(McpCredentials.layer),
-  )
+type McpToolsLayer = Layer.Layer<never, never, Layer.Services<typeof GlassMcpTools>>
 
-export const serve = (agentRunners: AgentRunnersLayer, mcpTools: Layer.Layer<never>) =>
-  HttpRouter.serve(Layer.merge(RendererRoutes, McpRoutes(mcpTools)), {
+const services = (agentRunners: AgentRunnersLayer, mcpTools: McpToolsLayer) =>
+  Layer.merge(GlassRpcHandlers, mcpTools)
+    .pipe(
+      Layer.provide(PullRequestLists.layer),
+      Layer.provide(PullRequestMirror.layer),
+      Layer.provide(ToDos.layer),
+      Layer.provide(SavedPlaces.layer),
+      Layer.provide(Queue.layer),
+      Layer.provide(Tours.layer),
+      Layer.provide(AgentReviews.layer),
+      Layer.provide(Asks.layer),
+      Layer.provide(AgentsLive),
+      Layer.provide(Plugins.layer),
+      Layer.provide(CheckoutRuns.layer),
+      Layer.provide(Checkouts.layer),
+      Layer.provide(Git.layer),
+    )
+    .pipe(
+      Layer.provide(agentRunners),
+      Layer.provide(Layer.merge(ActivityLog.layer, Storage.layer)),
+      Layer.provide(DatabaseLive),
+      Layer.provide(FollowedRepositories.layer),
+      Layer.provide(SettingsStore.layer),
+      Layer.provide(GitHubClient.layer),
+      Layer.provide(GitHubAuth.layer),
+      Layer.provideMerge(McpCredentials.layer),
+    )
+
+export const serve = (agentRunners: AgentRunnersLayer, mcpTools: McpToolsLayer) =>
+  HttpRouter.serve(Layer.merge(RendererRoutes, McpRoutes), {
     disableLogger: true,
   }).pipe(
     // Provided first so it listens last: Effect's Node server leaves connections hanging until it serves.
     Layer.provideMerge(NodeServerLive),
-    Layer.provideMerge(services(agentRunners)),
+    Layer.provideMerge(services(agentRunners, mcpTools)),
     Layer.provide(RpcSerialization.layerJson),
     Layer.provide(NodeServices.layer),
   )
 
-export const ServerLive = serve(AgentRunners.layer, Layer.empty)
+export const ServerLive = serve(AgentRunners.layer, GlassMcpTools)
