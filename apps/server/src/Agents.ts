@@ -26,6 +26,7 @@ import {
   type Revision,
   SandboxPlace,
   thisMac as thisMacPlace,
+  type Transcript,
   type TranscriptUpdate,
   TurnCutOff,
   TurnInterrupted,
@@ -127,6 +128,9 @@ export class Agents extends Context.Service<
   {
     readonly watch: () => Stream.Stream<ReadonlyArray<Agent>, AgentError>
     readonly watchWaiting: () => Stream.Stream<ReadonlyArray<string>>
+    readonly readTranscript: (
+      agentId: string,
+    ) => Effect.Effect<Transcript, AgentNotFound | AgentError>
     readonly transcript: (
       agentId: string,
     ) => Stream.Stream<TranscriptUpdate, AgentNotFound | AgentError>
@@ -626,6 +630,7 @@ export class Agents extends Context.Service<
           ),
         transcript: (agentId) =>
           Stream.unwrap(find(agentId).pipe(Effect.as(transcripts.watch(agentId)))),
+        readTranscript: (agentId) => find(agentId).pipe(Effect.andThen(transcripts.read(agentId))),
         models: (engine, place) => {
           const placement = placementFor(place)
 

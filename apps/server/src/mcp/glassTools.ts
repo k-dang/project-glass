@@ -19,7 +19,7 @@ import {
   type Turn,
   TurnEnding,
 } from "@glass/contracts"
-import { Context, Effect, Match, Option, Predicate, Schema, Stream } from "effect"
+import { Context, Effect, Match, Option, Schema, Stream } from "effect"
 import { Tool, Toolkit } from "effect/ai"
 import { ActivityLog } from "../ActivityLog"
 import { agentReviewMaterial } from "../agentReviewPrompt"
@@ -257,7 +257,7 @@ export const GlassToolHandlers = GlassTools.toLayer(
           Effect.mapError(explained),
         ),
       list_recent_activity: ({ limit }) =>
-        github.viewer.pipe(
+        github.knownViewer.pipe(
           Effect.flatMap(({ login }) => activityLog.list(login, limit)),
           Effect.mapError(explained),
         ),
@@ -269,12 +269,7 @@ export const GlassToolHandlers = GlassTools.toLayer(
           Effect.mapError(explained),
         ),
       read_agent_transcript: ({ agentId, turns }) =>
-        first(agents.transcript(agentId)).pipe(
-          Effect.flatMap((update) =>
-            Predicate.isTagged(update, "Snapshot")
-              ? Effect.succeed(update)
-              : Effect.die("An Agent's transcript opens with a snapshot"),
-          ),
+        agents.readTranscript(agentId).pipe(
           Effect.map((transcript) => ({
             turns: transcript.turns.slice(-turns).map((turn) => ({
               message: textOf(turn.message),

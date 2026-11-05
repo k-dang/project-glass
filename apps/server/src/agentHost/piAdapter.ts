@@ -173,11 +173,11 @@ const lockedDownFlags = Effect.fnUntraced(function* (
 
   const instructions = join(directory, "instructions.md")
 
-  const extensionFlags = yield* Effect.forEach(extensions, ({ name, source }) =>
-    fs
-      .writeFileString(join(directory, name), source)
-      .pipe(Effect.as(["--extension", join(directory, name)])),
-  )
+  const extensionFlags = yield* Effect.forEach(extensions, ({ name, source }) => {
+    const file = join(directory, name)
+
+    return fs.writeFileString(file, source).pipe(Effect.as(["--extension", file]))
+  })
 
   yield* fs.writeFileString(instructions, instructionsText)
 

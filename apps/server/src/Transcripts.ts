@@ -14,6 +14,7 @@ import {
   SentMessage,
   StatusChanged,
   TranscriptSnapshot,
+  type Transcript,
   type TranscriptUpdate,
   Turn,
   TurnEnd,
@@ -144,6 +145,7 @@ export class Transcripts extends Context.Service<
       throughJournalEntry?: number,
     ) => Effect.Effect<void, AgentError>
     readonly watch: (agentId: string) => Stream.Stream<TranscriptUpdate, AgentError>
+    readonly read: (agentId: string) => Effect.Effect<Transcript, AgentError>
     readonly endRunning: (
       ending: TurnEnding,
       agentIds: ReadonlyArray<string>,
@@ -440,6 +442,11 @@ export class Transcripts extends Context.Service<
           ).pipe(
             Stream.tapError((cause) => Effect.logWarning("Couldn't read a transcript", cause)),
             Stream.mapError(storageFailure),
+          ),
+        read: (agentId) =>
+          withStorageFailure(
+            "read a transcript",
+            lockFor(agentId).withPermits(1)(snapshot(agentId)),
           ),
         runningTurn: (agentId) => withStorageFailure("read a running Turn", runningTurn(agentId)),
         startOrQueue: (agentId, input) =>

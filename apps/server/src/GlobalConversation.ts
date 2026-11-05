@@ -110,12 +110,15 @@ export class GlobalConversation extends Context.Service<
       const starting = yield* Semaphore.make(1)
       let runningCredential: Scope.Closeable | null = null
 
-      const revokeRunning = Effect.suspend(() => {
-        const ending = runningCredential
-        runningCredential = null
+      const replaceRunning = (next: Scope.Closeable | null) =>
+        Effect.suspend(() => {
+          const ending = runningCredential
+          runningCredential = next
 
-        return ending === null ? Effect.void : Scope.close(ending, Exit.void)
-      })
+          return ending === null ? Effect.void : Scope.close(ending, Exit.void)
+        })
+
+      const revokeRunning = starting.withPermits(1)(replaceRunning(null))
 
       const start = (engine: GlobalConversationProgram["engine"]) => (client: HostClient) =>
         starting.withPermits(1)(
@@ -136,21 +139,16 @@ export class GlobalConversation extends Context.Service<
               .StartAgent({ agentId: id, engine, folder, role })
               .pipe(Effect.onError(() => revoke))
 
-            if (started) {
-              yield* revokeRunning
-              runningCredential = credential
-            } else yield* revoke
+            yield* started ? replaceRunning(credential) : revoke
           }),
         )
 
       yield* (yield* host.subscribeStopped).pipe(
         Stream.runForEach(() =>
-          starting
-            .withPermits(1)(revokeRunning)
-            .pipe(
-              Effect.andThen(transcripts.endRunning(TurnCutOff.make({}), [id])),
-              Effect.catch((cause) => Effect.logWarning("Couldn't cut off a Turn", cause)),
-            ),
+          revokeRunning.pipe(
+            Effect.andThen(transcripts.endRunning(TurnCutOff.make({}), [id])),
+            Effect.catch((cause) => Effect.logWarning("Couldn't cut off a Turn", cause)),
+          ),
         ),
         Effect.forkIn(scope),
       )
@@ -196,7 +194,7 @@ export class GlobalConversation extends Context.Service<
                   running.StopAgent({ agentId: id }).pipe(Effect.mapError(asAgentError)),
               }),
             ),
-            Effect.andThen(starting.withPermits(1)(revokeRunning)),
+            Effect.andThen(revokeRunning),
             Effect.andThen(saveProgram(next)),
           ),
         )
