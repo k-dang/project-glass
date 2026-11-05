@@ -12,8 +12,9 @@ routes: the renderer's routes check the launch secret and origin, and `/mcp` che
 credential. The backend issues a credential when a conversation runtime starts and binds it to that
 conversation. It revokes the credential when the runtime ends and issues a fresh one on restart.
 Every request resolves its caller from its credential, not from its MCP session id or tool
-arguments, so a model cannot pick who it acts as. Any request with an `Origin` header is refused,
-which keeps browser pages off the endpoint. Credentials are held in memory, keyed by digest, and
+arguments, so a model cannot pick who it acts as. A session belongs to the credential that opened
+it, and revoking a credential ends that credential's requests that are still in flight. Any request
+with an `Origin` header is refused, which keeps browser pages off the endpoint. Credentials are held in memory, keyed by digest, and
 never logged or persisted.
 
 ## Considered Options
@@ -28,6 +29,8 @@ never logged or persisted.
 ## Consequences
 
 A backend restart drops every credential, so a running conversation runtime must get a fresh one
-before its next call. The endpoint speaks MCP `2025-11-25`. In that version, invalid tool input
-comes back as a tool error that the model can correct, not as a protocol error. Repository and
+before its next call. Effect's MCP server never expires sessions. A runtime that ends cleanly
+deletes its own session, but a revoked credential's sessions stay in memory until the backend
+restarts. The endpoint speaks MCP `2025-11-25`. In that version, invalid tool input comes back as
+a tool error that the model can correct, not as a protocol error. Repository and
 Sandbox Agents are not given credentials, and the endpoint has no remote ingress.

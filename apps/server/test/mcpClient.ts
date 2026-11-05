@@ -10,7 +10,10 @@ export interface JsonRpcMessage {
 }
 
 const JsonRpcResponse = Schema.fromJsonString(
-  Schema.Struct({ result: Schema.optional(Schema.Unknown) }),
+  Schema.Struct({
+    result: Schema.optional(Schema.Unknown),
+    error: Schema.optional(Schema.Unknown),
+  }),
 )
 
 const decodeResponse = Schema.decodeUnknownSync(JsonRpcResponse)
@@ -106,9 +109,19 @@ const decodeTools = Schema.decodeUnknownSync(McpSchema.ListToolsResult)
 
 const decodeToolResult = Schema.decodeUnknownSync(McpSchema.CallToolResult)
 
+// A JSON-RPC error fails with the server's own message rather than a schema mismatch.
+const resultOf = (response: McpResponse) => {
+  const message = response.messages[0]
+
+  if (message?.result === undefined) {
+    throw new Error(`MCP ${response.status} without a result: ${JSON.stringify(message?.error)}`)
+  }
+
+  return message.result
+}
+
 /** The tools a `tools/list` response lists. */
-export const listedTools = (response: McpResponse) =>
-  decodeTools(response.messages[0]?.result).tools
+export const listedTools = (response: McpResponse) => decodeTools(resultOf(response)).tools
 
 /** The result a `tools/call` response carries. */
-export const toolResult = (response: McpResponse) => decodeToolResult(response.messages[0]?.result)
+export const toolResult = (response: McpResponse) => decodeToolResult(resultOf(response))

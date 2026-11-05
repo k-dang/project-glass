@@ -1,4 +1,4 @@
-import { Context, Effect, Layer, Option, Redacted, type Scope } from "effect"
+import { Context, Deferred, Effect, Layer, Option, Redacted, type Scope } from "effect"
 import { createHash, randomBytes } from "node:crypto"
 
 /**
@@ -31,6 +31,15 @@ export class McpCaller extends Context.Service<McpCaller, McpCallerIdentity>()(
 // Credentials are kept by digest: a lookup compares no secret bytes, and memory holds no bearer.
 const digest = (bearer: string) => createHash("sha256").update(bearer).digest("hex")
 
+/** An unrevoked credential, as a request presenting it sees it. */
+export interface McpCredential {
+  readonly caller: McpCallerIdentity
+  /** The MCP sessions this credential opened; no other credential may use them. */
+  readonly sessions: Set<string>
+  /** Completes when the credential is revoked. */
+  readonly revoked: Effect.Effect<void>
+}
+
 /**
  * Bearer credentials for conversation runtimes calling the MCP endpoint. A credential is issued
  * when a runtime starts, is bound to that runtime's conversation, and is revoked when the runtime
@@ -44,25 +53,32 @@ export class McpCredentials extends Context.Service<
     readonly issue: (
       caller: McpCallerIdentity,
     ) => Effect.Effect<Redacted.Redacted, never, Scope.Scope>
-    /** Resolves a bearer credential to the caller it was issued to, while it is unrevoked. */
-    readonly authenticate: (bearer: Redacted.Redacted) => Option.Option<McpCallerIdentity>
+    /** Resolves a bearer to its credential while the credential is unrevoked. */
+    readonly authenticate: (bearer: Redacted.Redacted) => Option.Option<McpCredential>
   }
 >()("@glass/server/McpCredentials") {
   static readonly layer = Layer.sync(McpCredentials, () => {
-    const callers = new Map<string, McpCallerIdentity>()
+    const credentials = new Map<string, McpCredential>()
 
     return McpCredentials.of({
       issue: (caller) =>
-        Effect.suspend(() => {
-          const bearer = randomBytes(32).toString("base64url")
-          const key = digest(bearer)
+        Effect.acquireRelease(
+          Effect.gen(function* () {
+            const bearer = randomBytes(32).toString("base64url")
+            const key = digest(bearer)
+            const revoked = yield* Deferred.make<void>()
 
-          return Effect.acquireRelease(
-            Effect.sync(() => callers.set(key, caller)),
-            () => Effect.sync(() => callers.delete(key)),
-          ).pipe(Effect.as(Redacted.make(bearer)))
-        }),
-      authenticate: (bearer) => Option.fromNullishOr(callers.get(digest(Redacted.value(bearer)))),
+            credentials.set(key, { caller, sessions: new Set(), revoked: Deferred.await(revoked) })
+
+            return { bearer: Redacted.make(bearer), key, revoked }
+          }),
+          ({ key, revoked }) =>
+            Effect.sync(() => credentials.delete(key)).pipe(
+              Effect.andThen(Deferred.succeed(revoked, undefined)),
+            ),
+        ).pipe(Effect.map(({ bearer }) => bearer)),
+      authenticate: (bearer) =>
+        Option.fromNullishOr(credentials.get(digest(Redacted.value(bearer)))),
     })
   })
 }

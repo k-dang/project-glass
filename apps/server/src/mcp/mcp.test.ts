@@ -74,14 +74,20 @@ describe("MCP endpoint", () => {
         target: "another-conversation",
       })
 
-      // The session id only correlates requests: each request's own credential names its caller.
+      // A session belongs to the credential that opened it; another runtime's credential opens
+      // its own session, where calls name that runtime as the caller.
       const other = yield* mcpCredentials.issue({ conversationId: "other-runtime" })
 
-      const calledAsOther = yield* mcp.request(
-        "tools/call",
-        { name: "describe_target", arguments: { conversationId: "another-conversation" } },
-        other,
-      ).response
+      const intruding = yield* mcp.request("tools/list", {}, other).response
+
+      assert.strictEqual(intruding.status, 404)
+
+      const otherMcp = yield* connectMcp(baseUrl, other)
+
+      const calledAsOther = yield* otherMcp.request("tools/call", {
+        name: "describe_target",
+        arguments: { conversationId: "another-conversation" },
+      }).response
 
       assert.deepStrictEqual(toolResult(calledAsOther).structuredContent, {
         caller: "other-runtime",
@@ -139,7 +145,28 @@ describe("MCP endpoint", () => {
       const second = yield* mcpCredentials.issue(GLOBAL)
 
       assert.notStrictEqual(Redacted.value(second), Redacted.value(first))
-      assert.strictEqual((yield* mcp.request("tools/list", {}, second).response).status, 200)
+      const restarted = yield* connectMcp(baseUrl, second)
+
+      assert.strictEqual((yield* restarted.request("tools/list", {}).response).status, 200)
+    }),
+  )
+
+  it.live("ends a revoked credential's call that is still in flight", () =>
+    Effect.gen(function* () {
+      const { baseUrl, mcpCredentials, started, interrupted } = yield* startMcpBackend
+      const runtime = yield* Scope.make()
+      const bearer = yield* mcpCredentials.issue(GLOBAL).pipe(Scope.provide(runtime))
+      const mcp = yield* connectMcp(baseUrl, bearer)
+
+      const inFlight = yield* Effect.forkChild(
+        mcp.request("tools/call", { name: "await_release", arguments: {} }).response,
+      )
+
+      yield* Deferred.await(started)
+      yield* Scope.close(runtime, Exit.void)
+      yield* Deferred.await(interrupted)
+
+      assert.strictEqual((yield* Fiber.join(inFlight)).status, 401)
     }),
   )
 

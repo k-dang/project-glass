@@ -80,6 +80,7 @@ const services = (agentRunners: AgentRunnersLayer) =>
     Layer.provide(CheckoutRuns.layer),
     Layer.provide(Checkouts.layer),
     Layer.provide(Git.layer),
+  ).pipe(
     Layer.provide(agentRunners),
     Layer.provide(Layer.merge(ActivityLog.layer, Storage.layer)),
     Layer.provide(DatabaseLive),
@@ -87,18 +88,19 @@ const services = (agentRunners: AgentRunnersLayer) =>
     Layer.provide(SettingsStore.layer),
     Layer.provide(GitHubClient.layer),
     Layer.provide(GitHubAuth.layer),
+    // Merged out too: the MCP routes authenticate with the credentials services issue.
+    Layer.provideMerge(McpCredentials.layer),
   )
 
 export const serve = (agentRunners: AgentRunnersLayer, mcpTools: Layer.Layer<never>) =>
   // Each transport authenticates its own routes: the renderer with its launch secret, conversation
-  // runtimes with their MCP credentials.
+  // runtimes with their MCP credentials. Unmatched paths get a 404 without authentication.
   HttpRouter.serve(Layer.merge(RendererRoutes, McpRoutes(mcpTools)), {
     disableLogger: true,
   }).pipe(
     // Provided first so it listens last: Effect's Node server leaves connections hanging until it serves.
     Layer.provideMerge(NodeServerLive),
-    Layer.provide(services(agentRunners)),
-    Layer.provideMerge(McpCredentials.layer),
+    Layer.provideMerge(services(agentRunners)),
     Layer.provide(RpcSerialization.layerJson),
     Layer.provide(NodeServices.layer),
   )
