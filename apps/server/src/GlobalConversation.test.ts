@@ -18,6 +18,7 @@ import { Effect, Option, Predicate, Stream } from "effect"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { agentsFixture, holding, lastText, settled } from "../test/agentsFixture"
+import { childProcesses, startedHost } from "../test/agentHostProcesses"
 
 type Client = Effect.Success<typeof agentsFixture>["client"]
 
@@ -147,4 +148,24 @@ it.live(
         ["done"],
       )
     }),
+)
+
+it.live("revokes its program's credential when the agent host stops", () =>
+  Effect.gen(function* () {
+    const f = yield* agentsFixture
+    const earlierHosts = childProcesses(process.pid, "scriptedAgentHost.mjs")
+
+    yield* send(f.client, "hold:never")
+    yield* globalTurns(f.client, holding)
+
+    const host = startedHost(earlierHosts)
+    assert.isDefined(host, "the backend has no agent host running")
+    process.kill(host, "SIGKILL")
+    yield* globalTurns(f.client, settled(1))
+
+    yield* send(f.client, "call-ended:list_to_dos")
+    const [, ended] = yield* globalTurns(f.client, settled(2))
+
+    assert.deepStrictEqual(glassCalls(ended), [{ status: "failed", output: "Refused with 401" }])
+  }),
 )

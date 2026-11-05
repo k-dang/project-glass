@@ -45,6 +45,8 @@ const firstProgram = new GlobalConversationProgram({
   effort: null,
 })
 
+const hostGone = new AgentError({ message: "Glass lost the process that runs Agents. Try again." })
+
 const storageFailure = () =>
   new AgentError({ message: "Couldn't read or save the Global conversation. Try again." })
 
@@ -106,7 +108,8 @@ export class GlobalConversation extends Context.Service<
 
       yield* fs.makeDirectory(folder, { recursive: true }).pipe(Effect.orDie)
 
-      // Each start of the program gets a fresh credential, revoked once that program has ended.
+      // Each start of the program gets a fresh credential, revoked when it is replaced or the
+      // program is switched, and with the host's lifetime when the host stops.
       const starting = yield* Semaphore.make(1)
       let runningCredential: Scope.Closeable | null = null
 
@@ -123,7 +126,12 @@ export class GlobalConversation extends Context.Service<
       const start = (engine: GlobalConversationProgram["engine"]) => (client: HostClient) =>
         starting.withPermits(1)(
           Effect.gen(function* () {
-            const credential = yield* Scope.make()
+            const lifetime = yield* host.lifetimeOf(client).pipe(
+              Effect.flatMap(Effect.fromOption),
+              Effect.mapError(() => hostGone),
+            )
+
+            const credential = yield* Scope.fork(lifetime)
             const revoke = Scope.close(credential, Exit.void)
 
             const role = GlobalRole.make({
@@ -145,10 +153,9 @@ export class GlobalConversation extends Context.Service<
 
       yield* (yield* host.subscribeStopped).pipe(
         Stream.runForEach(() =>
-          revokeRunning.pipe(
-            Effect.andThen(transcripts.endRunning(TurnCutOff.make({}), [id])),
-            Effect.catch((cause) => Effect.logWarning("Couldn't cut off a Turn", cause)),
-          ),
+          transcripts
+            .endRunning(TurnCutOff.make({}), [id])
+            .pipe(Effect.catch((cause) => Effect.logWarning("Couldn't cut off a Turn", cause))),
         ),
         Effect.forkIn(scope),
       )

@@ -15,12 +15,12 @@ import {
   TurnStopped,
   withContextOf,
 } from "@glass/contracts"
-import { DateTime, Deferred, Effect, Fiber, Predicate, Scope } from "effect"
+import { DateTime, Deferred, Effect, Fiber, Predicate, Schema, Scope } from "effect"
 import { randomUUID } from "node:crypto"
-import { readdirSync } from "node:fs"
+import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import type { AgentAdapter, AgentSession } from "../src/agentHost/adapter"
-import { type GlassToolsAccess, notRunning } from "../src/agentHost/protocol"
+import { GlassToolsAccess, notRunning } from "../src/agentHost/protocol"
 import { MCP_PATH } from "../src/mcp/server"
 import { connectMcp, initialize, mcpPost, toolResult } from "./mcpClient"
 import { settleWith } from "../src/agentHost/requests"
@@ -47,9 +47,22 @@ const callGlass = (access: GlassToolsAccess, name: string) =>
     return { output: JSON.stringify(result.content), done: result.isError !== true }
   })
 
+const AccessJson = Schema.fromJsonString(GlassToolsAccess)
+
+const encodeAccess = Schema.encodeSync(AccessJson)
+
+const decodeAccess = Schema.decodeSync(AccessJson)
+
 export const scriptedAdapter = (gates: string): AgentAdapter => {
-  // Each start of a Global conversation's program, oldest first, so a test can use an ended one's.
-  const globalStarts: Array<GlassToolsAccess> = []
+  // The Global conversation's starts are kept beside the gates, so they outlive this host.
+  const currentStart = join(gates, "global-start.json")
+  const previousStart = join(gates, "previous-global-start.json")
+
+  const earlierStart = Effect.suspend(() =>
+    existsSync(previousStart)
+      ? Effect.succeed(decodeAccess(readFileSync(previousStart, "utf8")))
+      : Effect.die("The Global conversation has no earlier start"),
+  )
 
   return {
     models: Effect.succeed(
@@ -65,7 +78,10 @@ export const scriptedAdapter = (gates: string): AgentAdapter => {
         const glass = Predicate.isTagged(role, "Global") ? role.tools : null
         const scope = yield* Scope.Scope
 
-        if (glass !== null) globalStarts.push(glass)
+        if (glass !== null) {
+          if (existsSync(currentStart)) renameSync(currentStart, previousStart)
+          writeFileSync(currentStart, encodeAccess(glass))
+        }
 
         let turn: {
           readonly id: string
@@ -134,7 +150,7 @@ export const scriptedAdapter = (gates: string): AgentAdapter => {
 
             if (called !== null && glass !== null) {
               const [, ended, name] = called
-              const access = ended === undefined ? glass : globalStarts.at(-2)!
+              const access = ended === undefined ? glass : yield* earlierStart
               const { output, done } = yield* callGlass(access, name!)
 
               yield* part(

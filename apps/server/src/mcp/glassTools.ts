@@ -22,7 +22,8 @@ import {
 import { Context, Effect, Match, Option, Schema, Stream } from "effect"
 import { Tool, Toolkit } from "effect/ai"
 import { ActivityLog } from "../ActivityLog"
-import { agentReviewMaterial } from "../agentReviewPrompt"
+import { agentReviewMaterial, PullRequestMaterial } from "../agentReviewPrompt"
+import type { FileMaterial } from "../tourPrompt"
 import { Agents } from "../Agents"
 import { GitHubClient } from "../github/GitHubClient"
 import { BackgroundGitHubRequest } from "../github/GitHubRequestPolicy"
@@ -41,7 +42,7 @@ const MAX_TURNS = 20
 
 const MAX_TEXT_CHARS = 4_000
 
-/** Keeps a PR's material within what the Agent programs take from one tool result. */
+/** Caps a PR's diffs, the bulk of its material, within what the Agent programs take from one tool result. */
 const MAX_DIFF_CHARS = 60_000
 
 const readOnly = Context.make(Tool.Readonly, true).pipe(
@@ -133,10 +134,7 @@ const ReadPullRequest = Tool.make("read_pull_request", {
   }),
   success: Schema.Struct({
     revision: Revision,
-    title: Schema.String,
-    description: Schema.String,
-    files: Schema.Array(Schema.Json),
-    discussions: Schema.Json,
+    ...PullRequestMaterial.fields,
     diffsLeftOut: Schema.Array(Schema.String).annotate({
       description: "Files whose diff was left out to keep the material readable.",
     }),
@@ -210,10 +208,8 @@ const activityOf = (turn: Turn) =>
   )
 
 /** Leaves out the largest diffs first until the rest fit. */
-const withinBudget = (
-  files: ReadonlyArray<ReturnType<typeof agentReviewMaterial>["files"][number]>,
-) => {
-  const sizes = files.map((file) => JSON.stringify(file.diff).length)
+const withinBudget = (files: ReadonlyArray<FileMaterial>) => {
+  const sizes = files.map((file) => file.diff?.length ?? 0)
   const leftOut = new Set<number>()
   let total = sizes.reduce((sum, size) => sum + size, 0)
 

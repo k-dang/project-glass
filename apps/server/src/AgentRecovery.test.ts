@@ -13,43 +13,13 @@ import {
 } from "@glass/contracts"
 import { Effect, Option, Predicate, Stream } from "effect"
 import { Socket } from "effect/socket"
-import { execFileSync } from "node:child_process"
 import { join } from "node:path"
 import { DatabaseSync } from "node:sqlite"
 import { agentsFixture, holding, lastText, settled } from "../test/agentsFixture"
+import { childProcesses, startedHost } from "../test/agentHostProcesses"
 import { LAUNCH_TOKEN } from "../test/harness"
 import { AgentHostRpcs } from "./agentHost/protocol"
 import { connectRpcClient } from "./rpcSocket"
-
-const processes = (): ReadonlyArray<{ pid: number; ppid: number; command: string }> =>
-  process.platform === "win32"
-    ? JSON.parse(
-        execFileSync(
-          "powershell.exe",
-          [
-            "-NoProfile",
-            "-Command",
-            "Get-CimInstance Win32_Process | ForEach-Object { @{ pid = $_.ProcessId; ppid = $_.ParentProcessId; command = [string]$_.CommandLine } } | ConvertTo-Json -Compress",
-          ],
-          { encoding: "utf8" },
-        ),
-      )
-    : execFileSync("ps", ["-A", "-o", "pid=,ppid=,command="], { encoding: "utf8" })
-        .split("\n")
-        .map((line) => line.trim().split(/\s+/))
-        .map(([pid, ppid, ...words]) => ({
-          pid: Number(pid),
-          ppid: Number(ppid),
-          command: words.join(" "),
-        }))
-
-const childProcesses = (parent: number, command: string) =>
-  processes()
-    .filter((child) => child.ppid === parent && child.command.includes(command))
-    .map((child) => child.pid)
-
-const startedHost = (before: ReadonlyArray<number>) =>
-  childProcesses(process.pid, "scriptedAgentHost.mjs").find((pid) => !before.includes(pid))
 
 const toTestBackend = (url: string | URL) => String(url).includes(`${TOKEN_PARAM}=${LAUNCH_TOKEN}`)
 
