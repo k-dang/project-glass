@@ -9,7 +9,9 @@ export default Effect.gen(function* () {
       id TEXT PRIMARY KEY,
       engine TEXT NOT NULL,
       model TEXT,
-      effort TEXT
+      effort TEXT,
+      -- Glass has one Global conversation.
+      singleton INTEGER NOT NULL DEFAULT 1 UNIQUE CHECK (singleton = 1)
     )
   `
 

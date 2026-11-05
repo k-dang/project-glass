@@ -256,27 +256,19 @@ export class Agents extends Context.Service<
         Effect.forkIn(scope),
       )
 
-      const outlivedGlass = yield* sandboxes.resume
-      yield* transcripts
-        .endRunning(
-          TurnInterrupted.make({}),
-          stored.flatMap(({ id }) => (outlivedGlass.has(id) ? [] : [id])),
-        )
-        .pipe(Effect.orDie)
-
       const withSandbox = (agent: Agent) =>
         sandboxes.status(agent.id).pipe(Effect.map((sandbox) => agentWith(agent, { sandbox })))
 
       const reviewBrief = (row: PlacedAgent) =>
         sql`SELECT review_brief AS brief FROM agent WHERE id = ${row.agent.id}`.pipe(
           Effect.flatMap(decodeBrief),
-          Effect.flatMap(([found]) =>
-            found === undefined
-              ? Effect.fail("An Agent review's Agent is gone")
-              : Effect.succeed(found.brief),
-          ),
           Effect.tapError((cause) => Effect.logWarning("Couldn't read a review brief", cause)),
           Effect.mapError(storageFailure),
+          Effect.flatMap(([found]) =>
+            found === undefined
+              ? Effect.fail(new AgentError({ message: "This Agent was removed." }))
+              : Effect.succeed(found.brief),
+          ),
         )
 
       const conversationOf = (row: PlacedAgent): Conversation => {
@@ -302,6 +294,14 @@ export class Agents extends Context.Service<
           Effect.catchTag("AgentNotFound", () => Effect.succeedNone),
         ),
       )
+
+      const outlivedGlass = yield* sandboxes.resume
+      yield* transcripts
+        .endRunning(
+          TurnInterrupted.make({}),
+          stored.flatMap(({ id }) => (outlivedGlass.has(id) ? [] : [id])),
+        )
+        .pipe(Effect.orDie)
 
       const insert = (row: PlacedAgent, first: MessageInput, review: ReviewBrief | null) => {
         const { agent, folder } = row
@@ -436,7 +436,7 @@ export class Agents extends Context.Service<
         queuedId: string,
       ) {
         yield* findWritable(agentId)
-        yield* transcripts.startQueued(agentId, queuedId)
+        yield* turns.sendQueued(agentId, queuedId)
       })
 
       const stop = Effect.fn("Agents.stop")(function* (agentId: string) {

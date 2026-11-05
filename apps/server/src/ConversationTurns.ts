@@ -1,4 +1,5 @@
 import {
+  AgentBusy,
   type AgentEngine,
   AgentError,
   isNothingUnsent,
@@ -44,7 +45,7 @@ export interface Conversation {
   readonly runningHost: Effect.Effect<Option.Option<HostClient>>
 }
 
-/** Finds the conversation a started Turn belongs to, if it is one the caller owns. */
+/** Finds the conversation a started Turn belongs to, or none when the caller doesn't own it. */
 export type FindConversation = (
   conversationId: string,
 ) => Effect.Effect<Option.Option<Conversation>, AgentError>
@@ -61,8 +62,16 @@ const unsentFailure = () =>
 export class ConversationTurns extends Context.Service<
   ConversationTurns,
   {
-    /** Delivers each Turn that starts in a conversation `find` resolves to its host. */
+    /**
+     * Delivers each Turn that starts from now on in a conversation `find` claims, leaving the rest
+     * to their own owners.
+     */
     readonly deliverTurnsOf: (find: FindConversation) => Effect.Effect<void>
+    /** Runs `effect` only while the conversation has no Turn running, so none starts meanwhile. */
+    readonly whileIdle: <A, E>(
+      conversationId: string,
+      effect: Effect.Effect<A, E>,
+    ) => Effect.Effect<A, E | AgentBusy | AgentError>
     readonly send: (
       conversationId: string,
       message: MessageWithContext,
@@ -71,6 +80,10 @@ export class ConversationTurns extends Context.Service<
       conversation: Conversation,
       message: MessageWithContext,
     ) => Effect.Effect<void, RequestWaiting | AgentError>
+    readonly sendQueued: (
+      conversationId: string,
+      queuedId: string,
+    ) => Effect.Effect<void, AgentBusy | AgentError>
     readonly stop: (conversation: Conversation) => Effect.Effect<void, AgentError>
     readonly answer: (
       conversation: Conversation,
@@ -93,7 +106,6 @@ export class ConversationTurns extends Context.Service<
       const toDos = yield* ToDos
       const lock = yield* Semaphore.make(1)
       const scope = yield* Scope.Scope
-      const finders: Array<FindConversation> = []
 
       const delivered = Effect.fnUntraced(function* (sent: MessageWithContext) {
         const ids = mentionedToDoIds(sent.message)
@@ -135,46 +147,40 @@ export class ConversationTurns extends Context.Service<
               yield* client.StartTurn({ agentId, turnId, ...message, ...conversation.settings })
             }),
           )
-        }).pipe(
-          Effect.catch((error) =>
-            Effect.gen(function* () {
-              const reason = hostFailure(error)
-              const ended = { at: yield* DateTime.now, ending: TurnFailed.make({ reason }) }
+        }).pipe(Effect.catch((error) => failTurn(conversation.id, turnId, hostFailure(error))))
 
-              yield* transcripts.save(conversation.id, [TurnEnded.make({ turnId, ended })])
-            }),
-          ),
+      /** Ends a Turn Glass couldn't deliver, so it never shows as running with nothing behind it. */
+      const failTurn = (conversationId: string, turnId: string, reason: string) =>
+        Effect.gen(function* () {
+          const ended = { at: yield* DateTime.now, ending: TurnFailed.make({ reason }) }
+
+          yield* transcripts.save(conversationId, [TurnEnded.make({ turnId, ended })])
+        }).pipe(
           Effect.catch((cause) => Effect.logWarning("Couldn't fail an undelivered Turn", cause)),
         )
 
-      const findConversation = Effect.fnUntraced(function* (conversationId: string) {
-        for (const find of finders) {
-          const found = yield* find(conversationId)
+      const deliverTurnsOf = Effect.fnUntraced(function* (find: FindConversation) {
+        const started = yield* transcripts.subscribeStarted.pipe(Scope.provide(scope))
 
-          if (Option.isSome(found)) return found
-        }
-
-        return Option.none<Conversation>()
-      })
-
-      yield* (yield* transcripts.subscribeStarted).pipe(
-        Stream.runForEach(({ agentId, turnId, message, images, context }) =>
-          findConversation(agentId).pipe(
-            Effect.flatMap(
-              Option.match({
-                onNone: () => Effect.logWarning("A Turn started in no known conversation", agentId),
-                onSome: (conversation) =>
-                  deliver(conversation, turnId, { message, images, context }).pipe(
-                    Effect.forkIn(scope),
-                    Effect.asVoid,
-                  ),
-              }),
+        yield* started.pipe(
+          Stream.runForEach(({ agentId, turnId, message, images, context }) =>
+            find(agentId).pipe(
+              Effect.flatMap(
+                Option.match({
+                  onNone: () => Effect.void,
+                  onSome: (conversation) =>
+                    deliver(conversation, turnId, { message, images, context }).pipe(
+                      Effect.forkIn(scope),
+                      Effect.asVoid,
+                    ),
+                }),
+              ),
+              Effect.catch((error) => failTurn(agentId, turnId, error.message)),
             ),
-            Effect.catch((cause) => Effect.logWarning("Couldn't deliver a Turn", cause)),
           ),
-        ),
-        Effect.forkIn(scope),
-      )
+          Effect.forkIn(scope),
+        )
+      })
 
       const refuseWhileWaiting = (conversationId: string) =>
         transcripts
@@ -272,18 +278,32 @@ export class ConversationTurns extends Context.Service<
         )
       })
 
+      // Starting Turns under the lock keeps one from starting while `whileIdle` runs.
+      const startOrQueue = (conversationId: string, sent: MessageWithContext) =>
+        lock.withPermits(1)(transcripts.startOrQueue(conversationId, sent))
+
       return ConversationTurns.of({
-        deliverTurnsOf: (find) => Effect.sync(() => void finders.push(find)),
+        deliverTurnsOf,
+        whileIdle: (conversationId, effect) =>
+          lock.withPermits(1)(
+            Effect.gen(function* () {
+              if ((yield* transcripts.runningTurn(conversationId)) !== null)
+                return yield* new AgentBusy()
+
+              return yield* effect
+            }),
+          ),
         send: Effect.fn("ConversationTurns.send")(function* (conversationId, sent) {
           yield* refuseWhileWaiting(conversationId)
-          yield* transcripts.startOrQueue(conversationId, sent)
+          yield* startOrQueue(conversationId, sent)
         }),
         steer: Effect.fn("ConversationTurns.steer")(function* (conversation, sent) {
           yield* refuseWhileWaiting(conversation.id)
 
-          if (!(yield* trySteer(conversation, sent)))
-            yield* transcripts.startOrQueue(conversation.id, sent)
+          if (!(yield* trySteer(conversation, sent))) yield* startOrQueue(conversation.id, sent)
         }),
+        sendQueued: (conversationId, queuedId) =>
+          lock.withPermits(1)(transcripts.startQueued(conversationId, queuedId)),
         stop,
         answer,
         unsent,

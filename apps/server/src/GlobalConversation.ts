@@ -19,7 +19,6 @@ import {
   Option,
   Schema,
   Scope,
-  Semaphore,
   Stream,
   SubscriptionRef,
 } from "effect"
@@ -85,7 +84,6 @@ export class GlobalConversation extends Context.Service<
       const turns = yield* ConversationTurns
       const host = yield* LocalAgentHost
       const scope = yield* Scope.Scope
-      const lock = yield* Semaphore.make(1)
       const folder = join(config.dataDirectory, "global-conversation")
 
       const [stored] = yield* sql`
@@ -95,16 +93,18 @@ export class GlobalConversation extends Context.Service<
       const id = stored?.id ?? randomUUID()
 
       if (stored === undefined)
-        yield* sql`INSERT INTO global_conversation ${sql.insert({ id, engine: firstProgram.engine, model: null, effort: null })}`.pipe(
-          Effect.orDie,
-        )
+        yield* sql`INSERT INTO global_conversation ${sql.insert({
+          id,
+          engine: firstProgram.engine,
+          model: firstProgram.model,
+          effort: firstProgram.effort,
+        })}`.pipe(Effect.orDie)
 
       const program = yield* SubscriptionRef.make(
         stored === undefined ? firstProgram : new GlobalConversationProgram(stored),
       )
 
       yield* fs.makeDirectory(folder, { recursive: true }).pipe(Effect.orDie)
-      yield* transcripts.endRunning(TurnInterrupted.make({}), [id]).pipe(Effect.orDie)
 
       yield* (yield* host.subscribeStopped).pipe(
         Stream.runForEach(() =>
@@ -131,38 +131,45 @@ export class GlobalConversation extends Context.Service<
         conversationId === id ? conversation.pipe(Effect.map(Option.some)) : Effect.succeedNone,
       )
 
+      yield* transcripts.endRunning(TurnInterrupted.make({}), [id]).pipe(Effect.orDie)
+
+      const saveProgram = (next: GlobalConversationProgram) =>
+        sql`
+          UPDATE global_conversation
+          SET engine = ${next.engine}, model = ${next.model}, effort = ${next.effort}
+          WHERE id = ${id}
+        `.pipe(
+          Effect.tapError((cause) =>
+            Effect.logWarning("Couldn't save the Global conversation's program", cause),
+          ),
+          Effect.mapError(storageFailure),
+          Effect.andThen(SubscriptionRef.set(program, next)),
+          Effect.as(next),
+        )
+
+      // A new Agent program takes over only while no Turn runs, so none starts on the old one. The
+      // next message starts it, and it keeps only its own earlier Turns.
+      const switchProgram = (next: GlobalConversationProgram) =>
+        turns.whileIdle(
+          id,
+          host.running.pipe(
+            Effect.flatMap(
+              Option.match({
+                onNone: () => Effect.void,
+                onSome: (running) =>
+                  running.StopAgent({ agentId: id }).pipe(Effect.mapError(asAgentError)),
+              }),
+            ),
+            Effect.andThen(saveProgram(next)),
+          ),
+        )
+
       const changeProgram = Effect.fn("GlobalConversation.changeProgram")(function* (
         next: GlobalConversationProgram,
       ) {
-        return yield* lock.withPermits(1)(
-          Effect.gen(function* () {
-            const current = yield* SubscriptionRef.get(program)
+        const current = yield* SubscriptionRef.get(program)
 
-            if (next.engine !== current.engine) {
-              if ((yield* transcripts.runningTurn(id)) !== null) return yield* new AgentBusy()
-
-              // The next message starts the newly chosen program, which keeps only its own earlier Turns.
-              const running = yield* host.running
-
-              if (Option.isSome(running))
-                yield* running.value.StopAgent({ agentId: id }).pipe(Effect.mapError(asAgentError))
-            }
-
-            yield* sql`
-              UPDATE global_conversation
-              SET engine = ${next.engine}, model = ${next.model}, effort = ${next.effort}
-              WHERE id = ${id}
-            `.pipe(
-              Effect.tapError((cause) =>
-                Effect.logWarning("Couldn't save the Global conversation's program", cause),
-              ),
-              Effect.mapError(storageFailure),
-            )
-            yield* SubscriptionRef.set(program, next)
-
-            return next
-          }),
-        )
+        return yield* next.engine === current.engine ? saveProgram(next) : switchProgram(next)
       })
 
       return GlobalConversation.of({
@@ -173,7 +180,7 @@ export class GlobalConversation extends Context.Service<
         steer: (input) =>
           conversation.pipe(Effect.flatMap((current) => turns.steer(current, input))),
         cancelQueued: (queuedId) => transcripts.cancelQueued(id, queuedId),
-        sendQueued: (queuedId) => transcripts.startQueued(id, queuedId),
+        sendQueued: (queuedId) => turns.sendQueued(id, queuedId),
         stop: conversation.pipe(Effect.flatMap(turns.stop)),
         answer: (requestId, answer) =>
           conversation.pipe(Effect.flatMap((current) => turns.answer(current, requestId, answer))),
