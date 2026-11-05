@@ -20,7 +20,7 @@ const carriesToken = (token: Redacted.Redacted) => {
   return (url: URL) => matches(url.searchParams.get(TOKEN_PARAM))
 }
 
-export const AccessControl = HttpRouter.middleware(
+export const RendererAccess = HttpRouter.middleware(
   Effect.gen(function* () {
     const config = yield* ServerConfig
     const hasToken = carriesToken(config.token)
@@ -43,5 +43,4 @@ export const AccessControl = HttpRouter.middleware(
         return HttpServerResponse.text("Forbidden origin", { status: 403 })
       })
   }),
-  { global: true },
 )

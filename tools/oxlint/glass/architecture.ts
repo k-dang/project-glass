@@ -24,6 +24,7 @@ const transportOwners = new Set([
   "rpcSocket.ts",
   "LocalAgentHost.ts",
   "sandboxCalls.ts",
+  "mcp/server.ts",
 ])
 
 const entryPoints = new Set([
@@ -36,11 +37,14 @@ const entryPoints = new Set([
   "agentHost/server.ts",
   "agentHost/serve.ts",
   "rpcSocket.ts",
+  "mcp/server.ts",
 ])
 
 const rpcContracts = new Set(["Rpc", "RpcGroup", "RpcSchema", "RpcMessage", "RpcClientError"])
 
 const httpContracts = new Set(["HttpClientError", "HttpServerError", "HttpMethod"])
+
+const mcpTransport = new Set(["McpServer", "McpProtocol"])
 
 const httpClient = new Set([
   ...httpContracts,
@@ -169,6 +173,10 @@ export const architecture = defineRule({
             : platformModule?.startsWith("NodeHttp") ||
               platformModule?.startsWith("NodeClusterHttp")
 
+        const mcp =
+          effectModule === "ai/index" &&
+          (names === null || names.some((name) => mcpTransport.has(name)))
+
         const nativeHttp = ["http", "https", "http2"].includes(
           (resolved.builtin?.resolved ?? specifier).replace(/^node:/, ""),
         )
@@ -189,6 +197,7 @@ export const architecture = defineRule({
           ((rpc && !rpcContract) ||
             (http && !httpContract && !githubClient) ||
             platformHttp ||
+            mcp ||
             nativeHttp)
 
         if (localTransport || externalTransport) messageId = "transport"

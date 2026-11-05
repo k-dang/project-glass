@@ -5,7 +5,7 @@ import { HttpRouter, HttpServerResponse } from "effect/http"
 import type { ChildProcessSpawner } from "effect/process"
 import { RpcSerialization, RpcServer } from "effect/rpc"
 import { createServer } from "node:http"
-import { AccessControl } from "./access"
+import { RendererAccess } from "./access"
 import { ActivityLog } from "./ActivityLog"
 import { AgentReviews } from "./AgentReviews"
 import { Asks } from "./Asks"
@@ -25,6 +25,8 @@ import { Plugins } from "./Plugins"
 import { Sandboxes } from "./Sandboxes"
 import { ServerConfig } from "./ServerConfig"
 import { LocalPlacement } from "./LocalPlacement"
+import { McpCredentials } from "./mcp/McpCredentials"
+import { McpRoutes } from "./mcp/server"
 import { FollowedRepositories } from "./FollowedRepositories"
 import { PullRequestLists } from "./PullRequestLists"
 import { PullRequestMirror } from "./PullRequestMirror"
@@ -37,11 +39,10 @@ import { AgentRunners } from "./agentRunners"
 import { Tours } from "./Tours"
 import { Transcripts } from "./Transcripts"
 
-const Routes = Layer.mergeAll(
+const RendererRoutes = Layer.mergeAll(
   RpcServer.layerHttp({ group: GlassRpcs, path: RPC_PATH, protocol: "websocket" }),
   HttpRouter.add("GET", "/health", HttpServerResponse.empty()),
-  AccessControl,
-)
+).pipe(Layer.provide(RendererAccess.layer))
 
 const NodeServerLive = Layer.unwrap(
   Effect.gen(function* () {
@@ -82,6 +83,7 @@ const services = (agentRunners: AgentRunnersLayer) =>
     Layer.provide(CheckoutRuns.layer),
     Layer.provide(Checkouts.layer),
     Layer.provide(Git.layer),
+  ).pipe(
     Layer.provide(agentRunners),
     Layer.provide(Layer.merge(ActivityLog.layer, Storage.layer)),
     Layer.provide(DatabaseLive),
@@ -89,17 +91,18 @@ const services = (agentRunners: AgentRunnersLayer) =>
     Layer.provide(SettingsStore.layer),
     Layer.provide(GitHubClient.layer),
     Layer.provide(GitHubAuth.layer),
+    Layer.provideMerge(McpCredentials.layer),
   )
 
-export const serve = (agentRunners: AgentRunnersLayer) =>
-  HttpRouter.serve(Routes, {
+export const serve = (agentRunners: AgentRunnersLayer, mcpTools: Layer.Layer<never>) =>
+  HttpRouter.serve(Layer.merge(RendererRoutes, McpRoutes(mcpTools)), {
     disableLogger: true,
   }).pipe(
     // Provided first so it listens last: Effect's Node server leaves connections hanging until it serves.
     Layer.provideMerge(NodeServerLive),
-    Layer.provide(services(agentRunners)),
+    Layer.provideMerge(services(agentRunners)),
     Layer.provide(RpcSerialization.layerJson),
     Layer.provide(NodeServices.layer),
   )
 
-export const ServerLive = serve(AgentRunners.layer)
+export const ServerLive = serve(AgentRunners.layer, Layer.empty)

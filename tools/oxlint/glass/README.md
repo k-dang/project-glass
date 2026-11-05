@@ -25,8 +25,8 @@ source as in the app's bundler configuration.
   service or every file in a subdirectory as domain logic.
 
 Transport owners are `bin.ts`, `server.ts`, `handlers.ts`, `access.ts`, `agentHost.ts`,
-`agentHost/handlers.ts`, `agentHost/server.ts`, `rpcSocket.ts`, `LocalAgentHost.ts`, and `sandboxCalls.ts`
-under `apps/server/src/`. The last two are connection adapters that services may call;
+`agentHost/handlers.ts`, `agentHost/server.ts`, `rpcSocket.ts`, `mcp/server.ts`, `LocalAgentHost.ts`,
+and `sandboxCalls.ts` under `apps/server/src/`. The last two are connection adapters that services may call;
 other code cannot import the entry points or socket implementation directly.
 `github/GitHubClient.ts` may import the named outbound Effect HTTP client modules in
 `httpClient`, but cannot import inbound routing/server implementations.
@@ -36,7 +36,8 @@ External type-only imports remain valid. Runtime RPC schema/error modules (`Rpc`
 (`HttpClientError`, `HttpServerError`, `HttpMethod`) remain available, including the
 Agent host's protocol definitions. Namespace runtime transport imports are rejected
 because they expose implementation APIs too. Effect HTTP, HTTP API, RPC, Node HTTP,
-and the Node platform's HTTP exports are covered.
+the Node platform's HTTP exports, and `effect/ai`'s `McpServer` and `McpProtocol` are covered;
+`effect/ai`'s `Tool`, `Toolkit` and `McpSchema` remain available for tool contracts.
 
 `*.test.*`, `*.spec.*`, and files under `apps/*/test/` or `apps/*/e2e/` may import across
 tiers. This preserves fixtures such as `apps/desktop/e2e/glass.ts`. Production renderer
