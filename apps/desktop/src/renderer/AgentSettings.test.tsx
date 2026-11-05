@@ -32,6 +32,9 @@ const tourSettings: EngineSettings = {
   },
 }
 
+const settled = (field: HTMLElement) =>
+  waitFor(() => expect(field.closest("[aria-busy]")?.getAttribute("aria-busy")).toBe("false"))
+
 const mount = (handlers: Partial<Handlers> = {}) => {
   const setEngine = vi.fn<Handlers["SetEngineSettings"]>(({ engineSettings }) =>
     Effect.succeed(engineSettings),
@@ -76,11 +79,11 @@ it("saves engine choices immediately and model edits on blur, without saving oth
     feature: "tours",
     engineSettings: { ...tourSettings, engine: "pi" },
   })
-  expect(tours.getByRole("status").textContent).toBe("Saving…")
-  saving.answer(Effect.succeed(saving.payload.engineSettings))
-  await waitFor(() => expect(tours.getByRole("status").textContent).toBe(""))
-
   const model = tours.getByRole("textbox", { name: "pi model" })
+  expect(model.closest("[aria-busy]")?.getAttribute("aria-busy")).toBe("true")
+  saving.answer(Effect.succeed(saving.payload.engineSettings))
+  await settled(model)
+
   await user.clear(model)
   await user.type(model, " gpt-test ")
   expect(saves).toHaveLength(0)
@@ -91,7 +94,7 @@ it("saves engine choices immediately and model edits on blur, without saving oth
     modelId: "gpt-test",
   })
   edit.answer(Effect.succeed(edit.payload.engineSettings))
-  await waitFor(() => expect(tours.getByRole("status").textContent).toBe(""))
+  await settled(model)
   expect(setPrompt).not.toHaveBeenCalled()
 })
 
@@ -102,7 +105,7 @@ it("keeps incomplete model edits local while other settings can save", async () 
   await user.clear(model)
   await user.tab()
   expect(setEngine).not.toHaveBeenCalled()
-  expect(tours.getByRole("status").textContent).toBe("The Claude Code Tour engine needs a model.")
+  expect(tours.getByText("The Claude Code Tour engine needs a model.")).toBeDefined()
 
   const reviews = within(screen.getByRole("region", { name: "Agent reviews" }))
   await user.click(reviews.getByRole("radio", { name: "Claude Code" }))
@@ -144,7 +147,6 @@ it("keeps failed edits visible and retries them without repeating another settin
   saving.answer(Effect.fail(new SettingsError({ message: "Disk full." })))
   expect((await tours.findByRole("alert")).textContent).toContain("Disk full.")
   expect(tours.getByRole<HTMLInputElement>("radio", { name: "pi" }).checked).toBe(true)
-  expect(tours.getByRole("status").textContent).toBe("Changes weren't saved.")
   await user.click(tours.getByRole("button", { name: "Retry" }))
   const retry = await next(saves)
   expect(retry.payload).toEqual(saving.payload)
@@ -183,7 +185,7 @@ it("keeps a visible engine selection made while the previous model saves", async
     models: { ...tourSettings.models, "claude-code": "claude-sonnet-5-5-updated" },
   })
   latest.answer(Effect.succeed(latest.payload.engineSettings))
-  await waitFor(() => expect(tours.getByRole("status").textContent).toBe(""))
+  await settled(tours.getByRole("radio", { name: "pi" }))
 })
 
 it("keeps typing in the next model field while a provider save is pending", async () => {
@@ -192,7 +194,6 @@ it("keeps typing in the next model field while a provider save is pending", asyn
   const reviews = within(await screen.findByRole("region", { name: "Agent reviews" }))
   const provider = await reviews.findByRole("textbox", { name: "pi provider" })
   const model = reviews.getByRole("textbox", { name: "pi model" })
-  const [engineStatus] = reviews.getAllByRole("status")
   await user.type(provider, "-updated")
   await user.click(model)
   const saving = await next(saves)
@@ -200,9 +201,7 @@ it("keeps typing in the next model field while a provider save is pending", asyn
   expect(model).toHaveProperty("value", "claude-sonnet-5-5-new")
 
   saving.answer(Effect.succeed(saving.payload.engineSettings))
-  await waitFor(() =>
-    expect(engineStatus).toHaveProperty("textContent", "Changes save when you leave the field."),
-  )
+  await settled(model)
   expect(model).toHaveProperty("value", "claude-sonnet-5-5-new")
   expect(saves).toHaveLength(0)
   await user.tab()
@@ -212,7 +211,7 @@ it("keeps typing in the next model field while a provider save is pending", asyn
     modelId: "claude-sonnet-5-5-new",
   })
   latest.answer(Effect.succeed(latest.payload.engineSettings))
-  await waitFor(() => expect(engineStatus).toHaveProperty("textContent", ""))
+  await settled(model)
 })
 
 it("normalizes whitespace-only prompt edits without writing or leaving a dirty draft", async () => {
@@ -222,8 +221,6 @@ it("normalizes whitespace-only prompt edits without writing or leaving a dirty d
   await user.click(screen.getByRole("heading", { name: "Agent reviews" }))
   expect(box).toHaveProperty("value", defaultReviewPrompt)
   expect(setPrompt).not.toHaveBeenCalled()
-  const reviews = within(screen.getByRole("region", { name: "Agent reviews" }))
-  expect(reviews.getAllByRole("status").map((status) => status.textContent)).toEqual(["", ""])
 })
 
 it("saves the latest committed prompt after an earlier write fails, even after leaving Settings", async () => {
@@ -248,11 +245,9 @@ it("saves the latest committed prompt after an earlier write fails, even after l
   latest.answer(Effect.succeed(latest.payload.prompt))
   show(true)
   const reviews = within(await screen.findByRole("region", { name: "Agent reviews" }))
-  await waitFor(() => expect(reviews.queryByText("Saving…")).toBeNull())
-  expect(await screen.findByRole("textbox", { name: "Review prompt" })).toHaveProperty(
-    "value",
-    latest.payload.prompt,
-  )
+  const returned = await screen.findByRole("textbox", { name: "Review prompt" })
+  await settled(returned)
+  expect(returned).toHaveProperty("value", latest.payload.prompt)
   expect(reviews.queryByRole("alert")).toBeNull()
 })
 
