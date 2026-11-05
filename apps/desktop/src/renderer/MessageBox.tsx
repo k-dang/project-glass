@@ -291,7 +291,6 @@ export function MessageBox(props: {
       <div className="mx-auto flex max-w-3xl flex-col gap-2">
         {props.problem !== null && <ProblemAlert problem={props.problem} />}
         {props.notice}
-        {picker.choices}
         {props.suggestions !== undefined && props.suggestions.length > 0 && (
           <Suggestions>
             {props.suggestions.map((suggestion) => (
@@ -305,64 +304,69 @@ export function MessageBox(props: {
             ))}
           </Suggestions>
         )}
-        <InputGroup>
-          {composed.images.length > 0 && (
-            <InputGroupAddon align="block-start" className="flex-wrap gap-2">
-              {composed.images.map((image, index) => (
-                <span key={index} className="relative">
-                  <Attachment
-                    image={image}
-                    index={index}
-                    className="size-14 rounded-md border object-cover"
-                  />
-                  <InputGroupButton
-                    size="icon-xs"
-                    variant="secondary"
-                    className="absolute -top-1.5 -right-1.5 rounded-full"
-                    aria-label={`Remove attachment ${index + 1}`}
-                    onClick={() =>
-                      setComposed((current) => ({
-                        ...current,
-                        images: current.images.filter((_, at) => at !== index),
-                      }))
-                    }
-                  >
-                    <X />
-                  </InputGroupButton>
-                </span>
-              ))}
-            </InputGroupAddon>
+        <div className="relative">
+          {picker.choices !== null && (
+            <div className="absolute inset-x-0 bottom-full z-50 mb-2">{picker.choices}</div>
           )}
-          <EditorContent editor={editor} className="w-full min-w-0" />
-          <InputGroupAddon align="block-end" className="min-w-0 items-end gap-1">
-            <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1 [&>button]:min-w-0">
-              {props.pickers}
-            </div>
-            <div className="ml-auto flex shrink-0 gap-1">
-              {props.onStop !== null && (
+          <InputGroup>
+            {composed.images.length > 0 && (
+              <InputGroupAddon align="block-start" className="flex-wrap gap-2">
+                {composed.images.map((image, index) => (
+                  <span key={index} className="relative">
+                    <Attachment
+                      image={image}
+                      index={index}
+                      className="size-14 rounded-md border object-cover"
+                    />
+                    <InputGroupButton
+                      size="icon-xs"
+                      variant="secondary"
+                      className="absolute -top-1.5 -right-1.5 rounded-full"
+                      aria-label={`Remove attachment ${index + 1}`}
+                      onClick={() =>
+                        setComposed((current) => ({
+                          ...current,
+                          images: current.images.filter((_, at) => at !== index),
+                        }))
+                      }
+                    >
+                      <X />
+                    </InputGroupButton>
+                  </span>
+                ))}
+              </InputGroupAddon>
+            )}
+            <EditorContent editor={editor} className="w-full min-w-0" />
+            <InputGroupAddon align="block-end" className="min-w-0 items-end gap-1">
+              <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1 [&>button]:min-w-0">
+                {props.pickers}
+              </div>
+              <div className="ml-auto flex shrink-0 gap-1">
+                {props.onStop !== null && (
+                  <InputGroupButton
+                    size="icon-sm"
+                    variant="secondary"
+                    className="rounded-full"
+                    aria-label="Stop"
+                    onClick={props.onStop}
+                  >
+                    <Square className="fill-current" />
+                  </InputGroupButton>
+                )}
                 <InputGroupButton
+                  type="submit"
                   size="icon-sm"
-                  variant="secondary"
+                  variant="default"
                   className="rounded-full"
-                  aria-label="Stop"
-                  onClick={props.onStop}
+                  disabled={props.blocked || awaiting || composed.message.trim() === ""}
+                  aria-label="Send"
                 >
-                  <Square className="fill-current" />
+                  <ArrowUp />
                 </InputGroupButton>
-              )}
-              <InputGroupButton
-                type="submit"
-                size="icon-sm"
-                variant="default"
-                className="rounded-full"
-                disabled={props.blocked || awaiting || composed.message.trim() === ""}
-                aria-label="Send"
-              >
-                <ArrowUp />
-              </InputGroupButton>
-            </div>
-          </InputGroupAddon>
-        </InputGroup>
+              </div>
+            </InputGroupAddon>
+          </InputGroup>
+        </div>
         {props.children}
       </div>
     </form>
