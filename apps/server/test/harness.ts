@@ -10,6 +10,7 @@ import { afterEach, vi } from "vite-plus/test"
 import { connectRpcClient } from "../src/rpcSocket"
 import { AgentRunners } from "../src/agentRunners"
 import { McpCredentials } from "../src/mcp/McpCredentials"
+import { GlassMcpTools } from "../src/mcp/server"
 import { serve } from "../src/server"
 import { ServerConfig } from "../src/ServerConfig"
 import { startFakeGitHub } from "./fakeGitHub"
@@ -39,7 +40,7 @@ export const startBackend = Effect.fnUntraced(function* (
   env: Record<string, string>,
   homeDirectory?: string,
   agentRunners: Parameters<typeof serve>[0] = AgentRunners.layer,
-  mcpTools: Parameters<typeof serve>[1] = Layer.empty,
+  mcpTools: Parameters<typeof serve>[1] = GlassMcpTools,
 ) {
   const webSocketConstructor = yield* Effect.serviceOption(Socket.WebSocketConstructor).pipe(
     Effect.flatMap(

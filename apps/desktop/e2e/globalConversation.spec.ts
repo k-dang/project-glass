@@ -62,3 +62,43 @@ test("restores the Global conversation after Glass restarts, with its waiting Tu
   await expect(restored.getByText("Interrupted when Glass quit")).toBeVisible()
   await expect(restored.getByText("No longer answerable: its Turn ended.")).toBeVisible()
 })
+
+test("reads the PR in view through Glass's tools, keeping that PR after navigating away", async ({
+  github,
+  window,
+}) => {
+  const pr = github.seedPullRequest({
+    title: "Greet by name",
+    base: { sha: "b0", files: { "greet.ts": "hi\n" } },
+    head: { sha: "h1", files: { "greet.ts": "hello name\n" } },
+    changedFiles: [
+      {
+        path: "greet.ts",
+        status: "modified",
+        additions: 1,
+        deletions: 1,
+        patch: "@@ -1 +1 @@\n-hi\n+hello name",
+      },
+    ],
+  })
+
+  const reference = `${pr.owner}/${pr.repo}#${pr.number}`
+
+  await openPullRequest(window, pr)
+  await window.getByRole("button", { name: "Global conversation" }).click()
+  const conversation = window.getByRole("complementary", { name: "Global conversation" })
+  await expect(conversation.getByText(`Sends with ${reference} at h1`)).toBeVisible()
+
+  const message = conversation.getByRole("textbox", { name: "Message" })
+  await message.fill("Summarize this PR")
+  await message.press("Enter")
+  await window.getByRole("link", { name: "To-dos" }).click()
+
+  await expect(conversation.getByText("No PR or Agent in view")).toBeVisible()
+  await expect(conversation.getByText(`From ${reference} at h1`)).toBeVisible()
+  await expect(conversation.getByText("read_pull_request")).toBeVisible()
+  await expect(
+    conversation.getByText(/The fake model saw: .*"title":"Greet by name"/),
+  ).toBeVisible()
+  await expect(conversation).toContainText(/Done in/)
+})

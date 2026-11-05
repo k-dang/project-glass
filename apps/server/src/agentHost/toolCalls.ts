@@ -1,6 +1,14 @@
 import { PermissionRequestPart, ToolCallPart } from "@glass/contracts"
 import { Predicate, Schema } from "effect"
 
+export const GLASS_MCP_SERVER = "glass"
+
+/** Claude Code names an MCP server's tools `mcp__<server>__<tool>`, and pi's Glass tools match. */
+export const GLASS_MCP_PREFIX = `mcp__${GLASS_MCP_SERVER}__`
+
+const shownName = (name: string) =>
+  name.startsWith(GLASS_MCP_PREFIX) ? name.slice(GLASS_MCP_PREFIX.length) : name
+
 export const ToolInput = Schema.Record(Schema.String, Schema.Json)
 
 export type ToolInput = typeof ToolInput.Type
@@ -31,7 +39,7 @@ export const runningToolCall = (
 ) =>
   ToolCallPart.make({
     toolCallId,
-    name,
+    name: shownName(name),
     inputSummary: summarizeInput(input),
     input: JSON.stringify(input, null, 2),
     output: null,

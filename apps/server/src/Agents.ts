@@ -58,7 +58,7 @@ import {
 } from "./Placement"
 import { Sandboxes } from "./Sandboxes"
 import { LocalPlacement } from "./LocalPlacement"
-import { ReviewBrief, ReviewRole, WorkRole } from "./agentHost/protocol"
+import { type ConversationRole, ReviewBrief, ReviewRole, WorkRole } from "./agentHost/protocol"
 import { Transcripts } from "./Transcripts"
 
 const StoredAgent = Schema.Struct({
@@ -275,13 +275,19 @@ export class Agents extends Context.Service<
         const placement = placementOf(row)
         const { id, engine, model, effort, permissionMode } = row.agent
 
+        const role: Effect.Effect<ConversationRole, AgentError> = row.forReview
+          ? reviewBrief(row).pipe(Effect.map((brief) => ReviewRole.make({ brief })))
+          : Effect.succeed(WorkRole.make({}))
+
         return {
           id,
-          engine,
-          folder: row.folder,
-          role: row.forReview
-            ? reviewBrief(row).pipe(Effect.map((brief) => ReviewRole.make({ brief })))
-            : Effect.succeed(WorkRole.make({})),
+          start: (client) =>
+            role.pipe(
+              Effect.flatMap((started) =>
+                client.StartAgent({ agentId: id, engine, folder: row.folder, role: started }),
+              ),
+              Effect.asVoid,
+            ),
           settings: { model, effort, permissionMode },
           host: placement.host(row),
           runningHost: placement.runningHost(row),

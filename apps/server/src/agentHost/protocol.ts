@@ -64,7 +64,15 @@ export const WorkRole = Schema.TaggedStruct("Work", {})
 
 export const ReviewRole = Schema.TaggedStruct("Review", { brief: ReviewBrief })
 
-export const GlobalRole = Schema.TaggedStruct("Global", {})
+/** Where a conversation's runtime reaches Glass's tools, and the credential it calls them with. */
+export const GlassToolsAccess = Schema.Struct({
+  url: Schema.String,
+  bearer: Schema.RedactedFromValue(Schema.String),
+})
+
+export type GlassToolsAccess = typeof GlassToolsAccess.Type
+
+export const GlobalRole = Schema.TaggedStruct("Global", { tools: GlassToolsAccess })
 
 export const ConversationRole = Schema.Union([WorkRole, ReviewRole, GlobalRole])
 
@@ -96,6 +104,8 @@ export class AgentHostRpcs extends RpcGroup.make(
       folder: HostFolder,
       role: ConversationRole,
     },
+    /** Whether it started the program, rather than finding it already running. */
+    success: Schema.Boolean,
     error: HostAgentError,
   }),
   Rpc.make("StartTurn", {

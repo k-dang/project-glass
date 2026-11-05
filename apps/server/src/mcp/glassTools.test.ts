@@ -1,0 +1,149 @@
+import { assert, describe, it } from "@effect/vitest"
+import { PullRequestRef, Revision } from "@glass/contracts"
+import { Effect, Schema } from "effect"
+import { startFakeGitHub } from "../../test/fakeGitHub"
+import { VIEWER } from "../../test/fakePullRequest"
+import { isolatedHome, startBackend } from "../../test/harness"
+import { connectMcp, listedTools, toolResult } from "../../test/mcpClient"
+
+const startGlass = Effect.gen(function* () {
+  const github = yield* startFakeGitHub()
+
+  const pr = github.seedPullRequest({
+    owner: "acme",
+    repo: "api",
+    number: 42,
+    title: "Greet by name",
+    base: { sha: "b0", files: { "greet.ts": "hi\n" } },
+    head: { sha: "h1", files: { "greet.ts": "hello name\n" } },
+    changedFiles: [
+      {
+        path: "greet.ts",
+        status: "modified",
+        additions: 1,
+        deletions: 1,
+        patch: "@@ -1 +1 @@\n-hi\n+hello name",
+      },
+    ],
+  })
+
+  const backend = yield* startBackend(
+    { GH_TOKEN: VIEWER.token, GLASS_GITHUB_API_URL: github.url },
+    yield* isolatedHome,
+  )
+
+  const mcp = yield* connectMcp(
+    backend.baseUrl,
+    yield* backend.mcpCredentials.issue({ conversationId: "global-conversation" }),
+  )
+
+  const call = (name: string, args: Schema.JsonObject = {}) =>
+    mcp.request("tools/call", { name, arguments: args }).response.pipe(Effect.map(toolResult))
+
+  return { ...backend, github, pr, mcp, call }
+})
+
+const textOf = (result: ReturnType<typeof toolResult>) =>
+  result.content.map((block) => ("text" in block ? block.text : "")).join("\n")
+
+describe("Glass tools over MCP", () => {
+  it.live("lists the read-only tools", () =>
+    Effect.gen(function* () {
+      const { mcp } = yield* startGlass
+
+      const tools = listedTools(yield* mcp.request("tools/list", {}).response)
+
+      assert.deepStrictEqual(
+        tools.map(({ name }) => name),
+        [
+          "list_pull_requests",
+          "list_queue",
+          "list_to_dos",
+          "list_recent_activity",
+          "list_agents",
+          "read_agent_transcript",
+          "read_pull_request",
+        ],
+      )
+      assert.isTrue(tools.every(({ annotations }) => annotations?.readOnlyHint === true))
+    }),
+  )
+
+  it.live("reads the user's To-dos", () =>
+    Effect.gen(function* () {
+      const { client, call } = yield* startGlass
+      yield* client.AddToDo({ title: "Reply to Sam" })
+
+      const result = yield* call("list_to_dos")
+
+      assert.deepStrictEqual(result.structuredContent, {
+        toDos: [{ id: 1, title: "Reply to Sam", notes: "", done: false }],
+      })
+    }),
+  )
+
+  it.live("reads a PR at a Revision without recording an opening or changing the Queue", () =>
+    Effect.gen(function* () {
+      const { client, pr, call } = yield* startGlass
+      const ref = new PullRequestRef(pr)
+      yield* client.AddToQueue({ references: [ref] })
+      const before = yield* client.ListActivity({ limit: 10 })
+
+      const result = yield* call("read_pull_request", {
+        pullRequest: { owner: "acme", repo: "api", number: 42 },
+        revision: { base: "b0", head: "h1" },
+      })
+
+      assert.isFalse(result.isError)
+      assert.include(textOf(result), "Greet by name")
+      assert.include(textOf(result), "hello name")
+      assert.deepStrictEqual(yield* client.ListActivity({ limit: 10 }), before)
+
+      const [queued] = yield* client.ListSavedQueue()
+
+      assert.isFalse(queued?.openedSinceQueued)
+    }),
+  )
+
+  it.live("reads the PR as it is now when no Revision is given", () =>
+    Effect.gen(function* () {
+      const { pr, call } = yield* startGlass
+      pr.push({ head: { sha: "h2", files: { "greet.ts": "hello again\n" } } })
+
+      const result = yield* call("read_pull_request", {
+        pullRequest: { owner: "acme", repo: "api", number: 42 },
+      })
+
+      assert.deepInclude(
+        Schema.decodeUnknownSync(Schema.Struct({ revision: Revision }))(result.structuredContent),
+        { revision: new Revision({ base: "b0", head: "h2" }) },
+      )
+    }),
+  )
+
+  it.live("explains a stale Revision as a tool failure", () =>
+    Effect.gen(function* () {
+      const { pr, call } = yield* startGlass
+      pr.push({ head: { sha: "h2", files: {} } })
+
+      const result = yield* call("read_pull_request", {
+        pullRequest: { owner: "acme", repo: "api", number: 42 },
+        revision: { base: "b0", head: "h1" },
+      })
+
+      assert.isTrue(result.isError)
+      assert.include(textOf(result), "changed since that Revision")
+    }),
+  )
+
+  it.live("explains an Agent that doesn't exist as a tool failure", () =>
+    Effect.gen(function* () {
+      const { call } = yield* startGlass
+
+      const result = yield* call("read_agent_transcript", { agentId: "no-such-agent", turns: 3 })
+
+      assert.isTrue(result.isError)
+      assert.include(textOf(result), "no Agent with that id")
+    }),
+  )
+})

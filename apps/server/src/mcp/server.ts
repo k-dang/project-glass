@@ -1,7 +1,14 @@
 import { Effect, Layer, Option } from "effect"
 import { McpProtocol, McpServer } from "effect/ai"
-import { HttpEffect, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http"
+import {
+  HttpEffect,
+  HttpRouter,
+  HttpServer,
+  HttpServerRequest,
+  HttpServerResponse,
+} from "effect/http"
 import { HttpApiBuilder, HttpApiSecurity } from "effect/http-api"
+import { GlassToolHandlers, GlassTools } from "./glassTools"
 import { McpCaller, McpCredentials } from "./McpCredentials"
 
 export const MCP_PATH = "/mcp"
@@ -53,16 +60,26 @@ const McpAccess = HttpRouter.middleware(
   }),
 )
 
-export const McpRoutes = (tools: Layer.Layer<never>) =>
-  Layer.merge(
-    McpServer.layerHttp({
-      name: "glass",
-      version: "1.0.0",
-      path: MCP_PATH,
-      protocols: [McpProtocol.v2025_11_25],
-      allowedOrigins: [],
-      // Effect never expires sessions, so a runtime ending cleanly frees its own.
-      allowSessionTermination: true,
-    }).pipe(Layer.provide(McpAccess.layer), Layer.orDie),
-    tools,
-  )
+const Endpoint = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const { address } = yield* HttpServer.HttpServer
+    const credentials = yield* McpCredentials
+
+    yield* credentials.listening(`${HttpServer.formatAddress(address)}${MCP_PATH}`)
+  }),
+)
+
+export const McpRoutes = Layer.merge(
+  Endpoint,
+  McpServer.layerHttp({
+    name: "glass",
+    version: "1.0.0",
+    path: MCP_PATH,
+    protocols: [McpProtocol.v2025_11_25],
+    allowedOrigins: [],
+    // Effect never expires sessions, so a runtime ending cleanly frees its own.
+    allowSessionTermination: true,
+  }).pipe(Layer.provide(McpAccess.layer), Layer.orDie),
+)
+
+export const GlassMcpTools = McpServer.toolkit(GlassTools).pipe(Layer.provide(GlassToolHandlers))

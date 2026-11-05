@@ -21,6 +21,7 @@ import { AppShell } from "./AppShell"
 import { Dashboard } from "./Dashboard"
 import { Connecting, ConnectionProblem } from "./ConnectionProblem"
 import { useConnection } from "./connection"
+import { Viewed, viewedAtom } from "./globalConversation"
 import { NewAgent } from "./NewAgent"
 import { PullRequestListPage } from "./PullRequestListPage"
 import { PullRequestPage } from "./PullRequestPage"
@@ -155,7 +156,17 @@ const routeTree = rootRoute.addChildren([
   settingsRoute,
 ])
 
-export const createAppRouter = (registry: AtomRegistry.AtomRegistry) =>
+const viewedIn = (router: ReturnType<typeof makeRouter>): Viewed | null => {
+  for (const match of router.state.matches) {
+    if (match.routeId === pullRequestRoute.id) return Viewed.PullRequest({ ref: match.params })
+
+    if (match.routeId === agentRoute.id) return Viewed.Agent({ agentId: match.params.agentId })
+  }
+
+  return null
+}
+
+const makeRouter = (registry: AtomRegistry.AtomRegistry) =>
   createRouter({
     routeTree,
     history: createHashHistory(),
@@ -164,9 +175,17 @@ export const createAppRouter = (registry: AtomRegistry.AtomRegistry) =>
     stringifySearch,
   })
 
+export const createAppRouter = (registry: AtomRegistry.AtomRegistry) => {
+  const router = makeRouter(registry)
+
+  router.subscribe("onResolved", () => registry.set(viewedAtom, viewedIn(router)))
+
+  return router
+}
+
 declare module "@tanstack/react-router" {
   interface Register {
-    router: ReturnType<typeof createAppRouter>
+    router: ReturnType<typeof makeRouter>
   }
 }
 

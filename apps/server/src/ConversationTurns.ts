@@ -1,6 +1,5 @@
 import {
   AgentBusy,
-  type AgentEngine,
   AgentError,
   isNothingUnsent,
   mentionedToDoIds,
@@ -28,17 +27,16 @@ import {
 } from "effect"
 import { SqlClient } from "effect/sql"
 import type { DeliveredMessage } from "./agentHost/deliveredMessage"
-import type { ConversationRole, TurnSettings } from "./agentHost/protocol"
-import { type HostClient, hostFailure } from "./Placement"
+import type { TurnSettings } from "./agentHost/protocol"
+import { type HostCallError, type HostClient, hostFailure } from "./Placement"
 import { prompt } from "./prompt"
 import { ToDos } from "./ToDos"
 import { encodeImages, StoredMessage, Transcripts } from "./Transcripts"
 
 export interface Conversation {
   readonly id: string
-  readonly engine: AgentEngine
-  readonly folder: string
-  readonly role: Effect.Effect<ConversationRole, AgentError>
+  /** Starts the conversation's program on `client` unless it is already running there. */
+  readonly start: (client: HostClient) => Effect.Effect<void, HostCallError>
   readonly settings: TurnSettings
   readonly host: Effect.Effect<HostClient, AgentError>
   readonly runningHost: Effect.Effect<Option.Option<HostClient>>
@@ -111,23 +109,20 @@ export class ConversationTurns extends Context.Service<
 
         const mentioned = ids.flatMap((id) => listed.find((toDo) => toDo.id === id) ?? [])
 
-        return { ...sent, prompt: prompt(sent.message, mentioned) } satisfies DeliveredMessage
+        return {
+          ...sent,
+          prompt: prompt(sent.message, mentioned, sent.context),
+        } satisfies DeliveredMessage
       })
 
       const deliver = (conversation: Conversation, turnId: string, sent: MessageWithContext) =>
         Effect.gen(function* () {
           const client = yield* conversation.host
-          const { id: agentId, engine, folder } = conversation
+          const agentId = conversation.id
 
-          const [, message] = yield* Effect.all(
-            [
-              conversation.role.pipe(
-                Effect.flatMap((role) => client.StartAgent({ agentId, engine, folder, role })),
-              ),
-              delivered(sent),
-            ],
-            { concurrency: "unbounded" },
-          )
+          const [, message] = yield* Effect.all([conversation.start(client), delivered(sent)], {
+            concurrency: "unbounded",
+          })
 
           yield* turnLock.withPermits(1)(
             Effect.gen(function* () {

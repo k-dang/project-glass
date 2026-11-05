@@ -74,6 +74,21 @@ const replyTo = (request: FakeAnthropicRequest): Reply => {
 
   if (onlyCancelledToolResult)
     return { type: "text", text: `The fake model saw: ${textOf(result.content).slice(0, 200)}` }
+
+  const viewed = /viewing PR ([\w-]+)\/([\w.-]+)#(\d+) at Revision base (\w+), head (\w+)\./.exec(
+    words,
+  )
+
+  if (viewed !== null && /\bthis PR\b/i.test(words)) {
+    const [, owner = "", repo = "", number = "", base = "", head = ""] = viewed
+
+    return {
+      type: "tool_use",
+      name: "mcp__glass__read_pull_request",
+      input: { pullRequest: { owner, repo, number: Number(number) }, revision: { base, head } },
+    }
+  }
+
   const command = /`([^`]+)`/.exec(words)?.[1]
 
   if (command !== undefined)

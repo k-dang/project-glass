@@ -14,11 +14,13 @@ import {
 import {
   Context,
   Effect,
+  Exit,
   FileSystem,
   Layer,
   Option,
   Schema,
   Scope,
+  Semaphore,
   Stream,
   SubscriptionRef,
 } from "effect"
@@ -28,7 +30,8 @@ import { join } from "node:path"
 import { GlobalRole } from "./agentHost/protocol"
 import { type Conversation, ConversationTurns } from "./ConversationTurns"
 import { LocalAgentHost } from "./LocalAgentHost"
-import { asAgentError } from "./Placement"
+import { McpCredentials } from "./mcp/McpCredentials"
+import { asAgentError, type HostClient } from "./Placement"
 import { ServerConfig } from "./ServerConfig"
 import { Transcripts } from "./Transcripts"
 
@@ -79,6 +82,7 @@ export class GlobalConversation extends Context.Service<
       const transcripts = yield* Transcripts
       const turns = yield* ConversationTurns
       const host = yield* LocalAgentHost
+      const credentials = yield* McpCredentials
       const scope = yield* Scope.Scope
       const folder = join(config.dataDirectory, "global-conversation")
 
@@ -102,11 +106,51 @@ export class GlobalConversation extends Context.Service<
 
       yield* fs.makeDirectory(folder, { recursive: true }).pipe(Effect.orDie)
 
+      // Each start of the program gets a fresh credential, revoked once that program has ended.
+      const starting = yield* Semaphore.make(1)
+      let runningCredential: Scope.Closeable | null = null
+
+      const revokeRunning = Effect.suspend(() => {
+        const ending = runningCredential
+        runningCredential = null
+
+        return ending === null ? Effect.void : Scope.close(ending, Exit.void)
+      })
+
+      const start = (engine: GlobalConversationProgram["engine"]) => (client: HostClient) =>
+        starting.withPermits(1)(
+          Effect.gen(function* () {
+            const credential = yield* Scope.make()
+            const revoke = Scope.close(credential, Exit.void)
+
+            const role = GlobalRole.make({
+              tools: {
+                url: yield* credentials.endpoint,
+                bearer: yield* credentials
+                  .issue({ conversationId: id })
+                  .pipe(Scope.provide(credential)),
+              },
+            })
+
+            const started = yield* client
+              .StartAgent({ agentId: id, engine, folder, role })
+              .pipe(Effect.onError(() => revoke))
+
+            if (started) {
+              yield* revokeRunning
+              runningCredential = credential
+            } else yield* revoke
+          }),
+        )
+
       yield* (yield* host.subscribeStopped).pipe(
         Stream.runForEach(() =>
-          transcripts
-            .endRunning(TurnCutOff.make({}), [id])
-            .pipe(Effect.catch((cause) => Effect.logWarning("Couldn't cut off a Turn", cause))),
+          starting
+            .withPermits(1)(revokeRunning)
+            .pipe(
+              Effect.andThen(transcripts.endRunning(TurnCutOff.make({}), [id])),
+              Effect.catch((cause) => Effect.logWarning("Couldn't cut off a Turn", cause)),
+            ),
         ),
         Effect.forkIn(scope),
       )
@@ -114,9 +158,7 @@ export class GlobalConversation extends Context.Service<
       const conversation = SubscriptionRef.get(program).pipe(
         Effect.map(({ engine, model, effort }): Conversation => ({
           id,
-          engine,
-          folder,
-          role: Effect.succeed(GlobalRole.make({})),
+          start: start(engine),
           settings: { model, effort, permissionMode: null },
           host: host.client,
           runningHost: host.running,
@@ -154,6 +196,7 @@ export class GlobalConversation extends Context.Service<
                   running.StopAgent({ agentId: id }).pipe(Effect.mapError(asAgentError)),
               }),
             ),
+            Effect.andThen(starting.withPermits(1)(revokeRunning)),
             Effect.andThen(saveProgram(next)),
           ),
         )

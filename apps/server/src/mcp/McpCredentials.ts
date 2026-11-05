@@ -36,34 +36,43 @@ export class McpCredentials extends Context.Service<
       caller: McpCallerIdentity,
     ) => Effect.Effect<Redacted.Redacted, never, Scope.Scope>
     readonly authenticate: (bearer: Redacted.Redacted) => Option.Option<McpCredential>
+    /** The endpoint's URL, once the backend listens. */
+    readonly endpoint: Effect.Effect<string>
+    readonly listening: (url: string) => Effect.Effect<void>
   }
 >()("@glass/server/McpCredentials") {
-  static readonly layer = Layer.sync(McpCredentials, () => {
-    const credentialsByDigest = new Map<string, McpCredential>()
+  static readonly layer = Layer.effect(
+    McpCredentials,
+    Effect.gen(function* () {
+      const credentialsByDigest = new Map<string, McpCredential>()
+      const endpoint = yield* Deferred.make<string>()
 
-    return McpCredentials.of({
-      issue: (caller) =>
-        Effect.acquireRelease(
-          Effect.gen(function* () {
-            const bearer = randomBytes(32).toString("base64url")
-            const key = digest(bearer)
-            const revoked = yield* Deferred.make<void>()
+      return McpCredentials.of({
+        issue: (caller) =>
+          Effect.acquireRelease(
+            Effect.gen(function* () {
+              const bearer = randomBytes(32).toString("base64url")
+              const key = digest(bearer)
+              const revoked = yield* Deferred.make<void>()
 
-            credentialsByDigest.set(key, {
-              caller,
-              ownedSessions: new Set(),
-              revoked: Deferred.await(revoked),
-            })
+              credentialsByDigest.set(key, {
+                caller,
+                ownedSessions: new Set(),
+                revoked: Deferred.await(revoked),
+              })
 
-            return { bearer: Redacted.make(bearer), key, revoked }
-          }),
-          ({ key, revoked }) =>
-            Effect.sync(() => credentialsByDigest.delete(key)).pipe(
-              Effect.andThen(Deferred.succeed(revoked, undefined)),
-            ),
-        ).pipe(Effect.map(({ bearer }) => bearer)),
-      authenticate: (bearer) =>
-        Option.fromNullishOr(credentialsByDigest.get(digest(Redacted.value(bearer)))),
-    })
-  })
+              return { bearer: Redacted.make(bearer), key, revoked }
+            }),
+            ({ key, revoked }) =>
+              Effect.sync(() => credentialsByDigest.delete(key)).pipe(
+                Effect.andThen(Deferred.succeed(revoked, undefined)),
+              ),
+          ).pipe(Effect.map(({ bearer }) => bearer)),
+        authenticate: (bearer) =>
+          Option.fromNullishOr(credentialsByDigest.get(digest(Redacted.value(bearer)))),
+        endpoint: Deferred.await(endpoint),
+        listening: (url) => Deferred.succeed(endpoint, url).pipe(Effect.asVoid),
+      })
+    }),
+  )
 }

@@ -50,7 +50,14 @@ import {
   stoppedReason,
 } from "./piTurn"
 import { globalInstructions, PI_QUESTION_TOOL, piQuestionExtension } from "./globalRole"
-import { type ConversationRole, couldNotSwitch, HostAgentError, notRunning } from "./protocol"
+import { PI_GLASS_TOOLS, piGlassToolsExtension } from "./piGlassTools"
+import {
+  type ConversationRole,
+  couldNotSwitch,
+  type GlassToolsAccess,
+  HostAgentError,
+  notRunning,
+} from "./protocol"
 import { settleWith } from "./requests"
 import { piLoadsNothing, piReadOnlyTools } from "../readOnlyTools"
 import { piSuggestDraftExtension } from "./suggestDraftTool"
@@ -154,7 +161,7 @@ const refused = (what: "model" | "effort") => (error: string) =>
 const lockedDownFlags = Effect.fnUntraced(function* (
   folder: string,
   tools: ReadonlyArray<string>,
-  extension: { readonly name: string; readonly source: string },
+  extensions: ReadonlyArray<{ readonly name: string; readonly source: string }>,
   instructionsText: string,
 ) {
   const fs = yield* FileSystem.FileSystem
@@ -164,18 +171,21 @@ const lockedDownFlags = Effect.fnUntraced(function* (
     fs.remove(directory, { recursive: true, force: true }).pipe(Effect.ignore),
   )
 
-  const extensionFile = join(directory, extension.name)
   const instructions = join(directory, "instructions.md")
 
-  yield* fs.writeFileString(extensionFile, extension.source)
+  const extensionFlags = yield* Effect.forEach(extensions, ({ name, source }) =>
+    fs
+      .writeFileString(join(directory, name), source)
+      .pipe(Effect.as(["--extension", join(directory, name)])),
+  )
+
   yield* fs.writeFileString(instructions, instructionsText)
 
   return [
     "--tools",
     tools.join(","),
     ...piLoadsNothing,
-    "--extension",
-    extensionFile,
+    ...extensionFlags.flat(),
     "--append-system-prompt",
     instructions,
   ]
@@ -189,14 +199,17 @@ const roleFlags = (folder: string, role: ConversationRole) =>
         lockedDownFlags(
           folder,
           [...piReadOnlyTools, SUGGEST_DRAFT_TOOL],
-          { name: "suggest-draft.js", source: piSuggestDraftExtension(brief) },
+          [{ name: "suggest-draft.js", source: piSuggestDraftExtension(brief) }],
           brief.instructions,
         ),
       Global: () =>
         lockedDownFlags(
           folder,
-          [PI_QUESTION_TOOL],
-          { name: "ask-user.js", source: piQuestionExtension },
+          [PI_QUESTION_TOOL, PI_GLASS_TOOLS],
+          [
+            { name: "ask-user.js", source: piQuestionExtension },
+            { name: "glass-tools.js", source: piGlassToolsExtension },
+          ],
           globalInstructions(PI_QUESTION_TOOL),
         ),
     }),
@@ -207,8 +220,13 @@ export const piAdapter = (command: string) =>
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const fs = yield* FileSystem.FileSystem
 
-    const startPi = (folder: string, conversation?: string, flags?: ReadonlyArray<string>) =>
-      startPiRpc(command, folder, conversation, flags).pipe(
+    const startPi = (
+      folder: string,
+      conversation?: string,
+      flags?: ReadonlyArray<string>,
+      tools?: GlassToolsAccess,
+    ) =>
+      startPiRpc(command, folder, conversation, flags, tools).pipe(
         Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
       )
 
@@ -263,7 +281,12 @@ export const piAdapter = (command: string) =>
           ),
         )
 
-        const rpc = yield* startPi(folder, conversation, flags)
+        const rpc = yield* startPi(
+          folder,
+          conversation,
+          flags,
+          Predicate.isTagged(role, "Global") ? role.tools : undefined,
+        )
 
         const startingModel = (yield* rpc.request({ type: "get_state" }, SessionState).pipe(
           Effect.tapError((error) => Effect.logWarning("pi didn't report its state", error)),

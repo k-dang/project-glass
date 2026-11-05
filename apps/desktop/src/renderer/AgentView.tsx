@@ -321,7 +321,7 @@ function AttachedImages(props: { images: ReadonlyArray<Image> }) {
   )
 }
 
-const contextLabel = (context: CapturedContext) =>
+export const contextLabel = (context: CapturedContext) =>
   Match.value(context).pipe(
     Match.tagsExhaustive({
       PullRequest: ({ pullRequest, revision }) =>
