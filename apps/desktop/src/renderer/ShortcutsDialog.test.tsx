@@ -37,7 +37,7 @@ it("opens with Shift+? and Escape returns focus without leaving the PR workspace
   expect(back).toHaveBeenCalledOnce()
 })
 
-it("shows an opener's tooltip when tabbing to it, but not when closing returns focus", async () => {
+it("shows an opener's tooltip on hover, not when tabbing to it or closing back to it", async () => {
   const user = userEvent.setup()
   render(
     <TooltipProvider>
@@ -49,15 +49,16 @@ it("shows an opener's tooltip when tabbing to it, but not when closing returns f
 
   await user.tab()
   expect(document.activeElement).toBe(opener)
-  await screen.findByRole("tooltip", { name: "Read the diff" })
+  expect(screen.queryByRole("tooltip")).toBeNull()
 
   fireEvent.keyDown(opener, { key: "?", shiftKey: true })
   await screen.findByRole("dialog", { name: "Keyboard shortcuts" })
-  await waitFor(() => expect(screen.queryByRole("tooltip")).toBeNull())
-
   await user.keyboard("{Escape}")
   await waitFor(() => expect(document.activeElement).toBe(opener))
   expect(screen.queryByRole("tooltip")).toBeNull()
+
+  await user.hover(opener)
+  await screen.findByRole("tooltip", { name: "Read the diff" })
 })
 
 it("searches shortcuts, recovers from no results, and starts fresh when reopened", async () => {

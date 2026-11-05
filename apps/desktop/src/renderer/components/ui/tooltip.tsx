@@ -2,10 +2,6 @@ import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip"
 import { cn } from "cn"
 import { type ReactElement, type ReactNode, useId } from "react"
 
-let lastKey = ""
-
-window.addEventListener("keydown", (event) => (lastKey = event.key), true)
-
 function TooltipHint({
   children,
   content,
@@ -20,7 +16,7 @@ function TooltipHint({
   return (
     <Tooltip
       onOpenChange={(open, details) => {
-        if (open && details.reason === "trigger-focus" && lastKey !== "Tab") details.cancel()
+        if (open && details.reason === "trigger-focus") details.cancel()
       }}
     >
       <TooltipTrigger render={children} aria-describedby={descriptionId} />
