@@ -2,6 +2,7 @@ import {
   AppWindow,
   ArrowUpRight,
   Copy,
+  GitPullRequestArrow,
   Keyboard,
   type LucideIcon,
   Route,
@@ -45,6 +46,12 @@ const groups: ReadonlyArray<ShortcutGroup> = [
       { label: "Settings", keys: ["Mod", "6"] },
       { label: "Show keyboard shortcuts", keys: ["?"] },
     ],
+  },
+  {
+    title: "Reviews",
+    icon: GitPullRequestArrow,
+    note: "On the Reviews list.",
+    shortcuts: [{ label: "Open a PR", keys: ["Mod", "L"] }],
   },
   {
     title: "Workspace",

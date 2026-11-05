@@ -321,9 +321,16 @@ it("opens another PR from a PR workspace with ⌘L or Open another PR", async ()
   await user.keyboard(`${wave.url}{Enter}`)
   await screen.findByText("head002")
   expect(screen.queryByRole("dialog")).toBeNull()
+})
 
-  await user.click(screen.getByRole("button", { name: "Back to PRs" }))
-  await user.keyboard("{Control>}l{/Control}")
+it("opens a PR from the Reviews list with ⌘L", async () => {
+  const user = mount({ OpenPullRequest: () => Effect.succeed(workspaceOf(greet, "head001")) })
+  await rowFor("Greet the world")
+
+  await user.keyboard("{Meta>}l{/Meta}")
+  await screen.findByRole("dialog", { name: "Open a PR" })
+  await user.keyboard(`${greet.url}{Enter}`)
+  await screen.findByText("head001")
   expect(screen.queryByRole("dialog")).toBeNull()
 })
 

@@ -30,6 +30,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Backend, type BackendError, backendRuntime } from "./backend"
 import { followedRepositoriesRevisionAtom } from "./FollowedRepositories"
 import { Empty } from "./Lists"
+import { OpenPullRequestDialog } from "./OpenPullRequestDialog"
 import { plural } from "./plural"
 import { ProblemAlert } from "./ProblemAlert"
 import { describeError, type Problem, problemOf, problemText } from "./problems"
@@ -210,6 +211,7 @@ export function PullRequestListPage(props: {
           {props.search.list !== "queue" && <NotRefreshedNote list={props.search.list} />}
           <span className="ml-auto flex items-center gap-2">
             <PullRequestUrlForm onOpen={props.onOpen} />
+            <OpenPullRequestDialog onOpen={props.onOpen} />
             <ToggleGroup
               variant="outline"
               size="sm"
