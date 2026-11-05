@@ -158,15 +158,6 @@ export const CapturedContext = Schema.Union([PullRequestContext, AgentContext])
 
 export type CapturedContext = typeof CapturedContext.Type
 
-export const contextLabel = (context: CapturedContext) =>
-  Match.value(context).pipe(
-    Match.tagsExhaustive({
-      PullRequest: ({ pullRequest: { owner, repo, number }, revision }) =>
-        `${owner}/${repo}#${number} at ${revision.head.slice(0, 7)}`,
-      Agent: ({ name }) => name,
-    }),
-  )
-
 /** A message with the context it was sent from, which only the Global conversation captures. */
 export const MessageWithContext = Schema.Struct({
   ...SentMessage.fields,

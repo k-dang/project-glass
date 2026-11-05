@@ -13,7 +13,18 @@ import {
   TurnFailed,
   TurnStopped,
 } from "@glass/contracts"
-import { Context, DateTime, Effect, Layer, Option, Predicate, Schema, Semaphore } from "effect"
+import {
+  Context,
+  DateTime,
+  Effect,
+  Layer,
+  Option,
+  Predicate,
+  Schema,
+  Scope,
+  Semaphore,
+  Stream,
+} from "effect"
 import { SqlClient } from "effect/sql"
 import type { DeliveredMessage } from "./agentHost/deliveredMessage"
 import type { ConversationRole, TurnSettings } from "./agentHost/protocol"
@@ -33,6 +44,11 @@ export interface Conversation {
   readonly runningHost: Effect.Effect<Option.Option<HostClient>>
 }
 
+/** Finds the conversation a started Turn belongs to, if it is one the caller owns. */
+export type FindConversation = (
+  conversationId: string,
+) => Effect.Effect<Option.Option<Conversation>, AgentError>
+
 const decodeUnsent = Schema.decodeUnknownEffect(Schema.Array(StoredMessage))
 
 const unsentFailure = () =>
@@ -45,11 +61,8 @@ const unsentFailure = () =>
 export class ConversationTurns extends Context.Service<
   ConversationTurns,
   {
-    readonly deliver: (
-      conversation: Conversation,
-      turnId: string,
-      message: MessageWithContext,
-    ) => Effect.Effect<void>
+    /** Delivers each Turn that starts in a conversation `find` resolves to its host. */
+    readonly deliverTurnsOf: (find: FindConversation) => Effect.Effect<void>
     readonly send: (
       conversationId: string,
       message: MessageWithContext,
@@ -79,6 +92,8 @@ export class ConversationTurns extends Context.Service<
       const transcripts = yield* Transcripts
       const toDos = yield* ToDos
       const lock = yield* Semaphore.make(1)
+      const scope = yield* Scope.Scope
+      const finders: Array<FindConversation> = []
 
       const delivered = Effect.fnUntraced(function* (sent: MessageWithContext) {
         const ids = mentionedToDoIds(sent.message)
@@ -131,6 +146,35 @@ export class ConversationTurns extends Context.Service<
           ),
           Effect.catch((cause) => Effect.logWarning("Couldn't fail an undelivered Turn", cause)),
         )
+
+      const findConversation = Effect.fnUntraced(function* (conversationId: string) {
+        for (const find of finders) {
+          const found = yield* find(conversationId)
+
+          if (Option.isSome(found)) return found
+        }
+
+        return Option.none<Conversation>()
+      })
+
+      yield* (yield* transcripts.subscribeStarted).pipe(
+        Stream.runForEach(({ agentId, turnId, message, images, context }) =>
+          findConversation(agentId).pipe(
+            Effect.flatMap(
+              Option.match({
+                onNone: () => Effect.logWarning("A Turn started in no known conversation", agentId),
+                onSome: (conversation) =>
+                  deliver(conversation, turnId, { message, images, context }).pipe(
+                    Effect.forkIn(scope),
+                    Effect.asVoid,
+                  ),
+              }),
+            ),
+            Effect.catch((cause) => Effect.logWarning("Couldn't deliver a Turn", cause)),
+          ),
+        ),
+        Effect.forkIn(scope),
+      )
 
       const refuseWhileWaiting = (conversationId: string) =>
         transcripts
@@ -229,7 +273,7 @@ export class ConversationTurns extends Context.Service<
       })
 
       return ConversationTurns.of({
-        deliver,
+        deliverTurnsOf: (find) => Effect.sync(() => void finders.push(find)),
         send: Effect.fn("ConversationTurns.send")(function* (conversationId, sent) {
           yield* refuseWhileWaiting(conversationId)
           yield* transcripts.startOrQueue(conversationId, sent)

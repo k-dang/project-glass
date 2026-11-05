@@ -11,7 +11,7 @@ import { cn } from "cn"
 import { Option } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import { Check, LoaderCircle, Pencil } from "lucide-react"
-import { type ReactNode, useCallback, useState } from "react"
+import { type ReactNode, useCallback, useMemo, useState } from "react"
 import { Streamdown } from "streamdown"
 import { Button } from "@/components/ui/button"
 import { Marker, MarkerContent } from "@/components/ui/marker"
@@ -217,7 +217,7 @@ function ReviewAgent(props: {
   show: ShowNote
 }) {
   const { agentId, drafts, show, outdated } = props
-  const conversation = agentConversation(agentId)
+  const conversation = useMemo(() => agentConversation(agentId), [agentId])
   const transcript = useAtomValue(conversation.transcript)
   const reconnect = useAtomRefresh(conversation.transcript)
 

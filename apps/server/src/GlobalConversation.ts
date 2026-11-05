@@ -103,6 +103,7 @@ export class GlobalConversation extends Context.Service<
         stored === undefined ? firstProgram : new GlobalConversationProgram(stored),
       )
 
+      yield* fs.makeDirectory(folder, { recursive: true }).pipe(Effect.orDie)
       yield* transcripts.endRunning(TurnInterrupted.make({}), [id]).pipe(Effect.orDie)
 
       yield* (yield* host.subscribeStopped).pipe(
@@ -121,28 +122,13 @@ export class GlobalConversation extends Context.Service<
           folder,
           role: Effect.succeed(GlobalRole.make({})),
           settings: { model, effort, permissionMode: null },
-          host: fs.makeDirectory(folder, { recursive: true }).pipe(
-            Effect.tapError((cause) =>
-              Effect.logWarning("Couldn't make the Global conversation's folder", cause),
-            ),
-            Effect.mapError(storageFailure),
-            Effect.andThen(host.client),
-          ),
+          host: host.client,
           runningHost: host.running,
         })),
       )
 
-      yield* (yield* transcripts.subscribeStarted).pipe(
-        Stream.filter(({ agentId }) => agentId === id),
-        Stream.runForEach(({ turnId, message, images, context }) =>
-          conversation.pipe(
-            Effect.flatMap((current) =>
-              turns.deliver(current, turnId, { message, images, context }),
-            ),
-            Effect.forkIn(scope),
-          ),
-        ),
-        Effect.forkIn(scope),
+      yield* turns.deliverTurnsOf((conversationId) =>
+        conversationId === id ? conversation.pipe(Effect.map(Option.some)) : Effect.succeedNone,
       )
 
       const changeProgram = Effect.fn("GlobalConversation.changeProgram")(function* (

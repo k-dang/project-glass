@@ -10,7 +10,6 @@ import {
   emptyTranscript,
   asksPermission,
   type CapturedContext,
-  contextLabel,
   type Image,
   isWaiting,
   nothingUnsent,
@@ -50,6 +49,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react"
@@ -108,7 +108,9 @@ import { PermissionModePicker } from "./PermissionModePicker"
 import { RequestCard, requestElementId } from "./RequestCard"
 import { ProblemAlert } from "./ProblemAlert"
 import { type Problem, problemText, settledProblem, streamProblem } from "./problems"
+import { referenceText } from "./queue"
 import { rememberPlace } from "./savedPlace"
+import { shortSha } from "./shortSha"
 
 const TURNS_PER_PAGE = 20
 
@@ -159,7 +161,7 @@ export function AgentView(props: { agentId: string } & AgentTabs) {
 
 function OpenAgent(props: { agent: Agent } & AgentTabs) {
   const { agent, tab, onTabChange } = props
-  const conversation = agentConversation(agent.id)
+  const conversation = useMemo(() => agentConversation(agent.id), [agent.id])
   const transcript = useAtomValue(conversation.transcript)
   const reconnect = useAtomRefresh(conversation.transcript)
 
@@ -318,6 +320,15 @@ function AttachedImages(props: { images: ReadonlyArray<Image> }) {
     )
   )
 }
+
+const contextLabel = (context: CapturedContext) =>
+  Match.value(context).pipe(
+    Match.tagsExhaustive({
+      PullRequest: ({ pullRequest, revision }) =>
+        `${referenceText(pullRequest)} at ${shortSha(revision.head)}`,
+      Agent: ({ name }) => name,
+    }),
+  )
 
 const sentFrom = (context: CapturedContext | null) =>
   context === null ? undefined : `From ${contextLabel(context)}`

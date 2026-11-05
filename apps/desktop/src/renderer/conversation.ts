@@ -26,7 +26,7 @@ import type { BackendError } from "./backend"
 
 /**
  * Everything a transcript and its composer read and do, for an Agent or the Global conversation.
- * Each conversation's atoms are made once, so the same conversation always gets the same ones.
+ * Its atoms come from families, so the same conversation always gets the same ones.
  */
 export interface Conversation {
   /** Keys what the user is writing, kept apart for each conversation. */
@@ -46,32 +46,20 @@ export interface Conversation {
   readonly files: Atom.Atom<ReadonlyArray<string>>
 }
 
-const agentConversations = new Map<string, Conversation>()
-
-export const agentConversation = (agentId: string): Conversation => {
-  const made = agentConversations.get(agentId)
-
-  if (made !== undefined) return made
-
-  const conversation: Conversation = {
-    key: agentId,
-    transcript: transcriptAtom(agentId),
-    send: sendMessageAtom(agentId),
-    steer: steerAtom(agentId),
-    stop: stopTurnAtom(agentId),
-    cancelQueued: cancelQueuedAtom(agentId),
-    sendQueued: sendQueuedAtom(agentId),
-    answer: (requestId) => answerRequestAtom(new AgentRequest({ agentId, requestId })),
-    unsent: unsentMessageAtom(agentId),
-    saveUnsent: (registry, composed) => saveUnsent(registry, agentId, composed),
-    commands: agentCommandsAtom(agentId),
-    files: agentFilesAtom(agentId),
-  }
-
-  agentConversations.set(agentId, conversation)
-
-  return conversation
-}
+export const agentConversation = (agentId: string): Conversation => ({
+  key: agentId,
+  transcript: transcriptAtom(agentId),
+  send: sendMessageAtom(agentId),
+  steer: steerAtom(agentId),
+  stop: stopTurnAtom(agentId),
+  cancelQueued: cancelQueuedAtom(agentId),
+  sendQueued: sendQueuedAtom(agentId),
+  answer: (requestId) => answerRequestAtom(new AgentRequest({ agentId, requestId })),
+  unsent: unsentMessageAtom(agentId),
+  saveUnsent: (registry, composed) => saveUnsent(registry, agentId, composed),
+  commands: agentCommandsAtom(agentId),
+  files: agentFilesAtom(agentId),
+})
 
 export const ConversationContext = createContext<Conversation | null>(null)
 

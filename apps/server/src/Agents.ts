@@ -296,22 +296,11 @@ export class Agents extends Context.Service<
         }
       }
 
-      const startedTurns = yield* transcripts.subscribeStarted
-
-      // Turns of conversations that aren't Agents, such as the Global conversation, are left to
-      // their own services.
-      yield* startedTurns.pipe(
-        Stream.runForEach(({ agentId, turnId, message, images, context }) =>
-          find(agentId).pipe(
-            Effect.flatMap((row) =>
-              turns
-                .deliver(conversationOf(row), turnId, { message, images, context })
-                .pipe(Effect.forkIn(scope)),
-            ),
-            Effect.catchTag("AgentNotFound", () => Effect.void),
-          ),
+      yield* turns.deliverTurnsOf((agentId) =>
+        find(agentId).pipe(
+          Effect.map((row) => Option.some(conversationOf(row))),
+          Effect.catchTag("AgentNotFound", () => Effect.succeedNone),
         ),
-        Effect.forkIn(scope),
       )
 
       const insert = (row: PlacedAgent, first: MessageInput, review: ReviewBrief | null) => {
