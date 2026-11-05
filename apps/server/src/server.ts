@@ -5,7 +5,7 @@ import { HttpRouter, HttpServerResponse } from "effect/http"
 import type { ChildProcessSpawner } from "effect/process"
 import { RpcSerialization, RpcServer } from "effect/rpc"
 import { createServer } from "node:http"
-import { AccessControl } from "./access"
+import { RendererAccess } from "./access"
 import { ActivityLog } from "./ActivityLog"
 import { AgentReviews } from "./AgentReviews"
 import { Asks } from "./Asks"
@@ -40,7 +40,7 @@ import { Transcripts } from "./Transcripts"
 const RendererRoutes = Layer.mergeAll(
   RpcServer.layerHttp({ group: GlassRpcs, path: RPC_PATH, protocol: "websocket" }),
   HttpRouter.add("GET", "/health", HttpServerResponse.empty()),
-).pipe(Layer.provide(AccessControl.layer))
+).pipe(Layer.provide(RendererAccess.layer))
 
 const NodeServerLive = Layer.unwrap(
   Effect.gen(function* () {
@@ -92,8 +92,6 @@ const services = (agentRunners: AgentRunnersLayer) =>
   )
 
 export const serve = (agentRunners: AgentRunnersLayer, mcpTools: Layer.Layer<never>) =>
-  // Each transport authenticates its own routes: the renderer with its launch secret, conversation
-  // runtimes with their MCP credentials. Unmatched paths get a 404 without authentication.
   HttpRouter.serve(Layer.merge(RendererRoutes, McpRoutes(mcpTools)), {
     disableLogger: true,
   }).pipe(

@@ -13,9 +13,6 @@ const unauthorized = HttpServerResponse.empty({
   headers: { "www-authenticate": "Bearer" },
 })
 
-// Each request authenticates on its own, and its caller comes from its credential. A session
-// belongs to the credential that opened it: another credential gets the 404 of an unknown session.
-// Revoking a credential ends its requests still in flight, which interrupts their tool calls.
 const McpAccess = HttpRouter.middleware(
   Effect.gen(function* () {
     const credentials = yield* McpCredentials
@@ -27,11 +24,11 @@ const McpAccess = HttpRouter.middleware(
 
         if (Option.isNone(credential)) return unauthorized
 
-        const { caller, sessions, revoked } = credential.value
+        const { caller, ownedSessions, revoked } = credential.value
         const request = yield* HttpServerRequest.HttpServerRequest
         const session = request.headers[SESSION_HEADER]
 
-        if (session !== undefined && !sessions.has(session)) {
+        if (session !== undefined && !ownedSessions.has(session)) {
           return HttpServerResponse.empty({ status: 404 })
         }
 
@@ -45,7 +42,7 @@ const McpAccess = HttpRouter.middleware(
           Effect.sync(() => {
             const opened = final.headers[SESSION_HEADER]
 
-            if (opened !== undefined) sessions.add(opened)
+            if (opened !== undefined) ownedSessions.add(opened)
 
             return final
           }),
@@ -56,11 +53,6 @@ const McpAccess = HttpRouter.middleware(
   }),
 )
 
-/**
- * Glass's MCP endpoint for conversation runtimes, on the backend's listener beside the renderer's
- * RPC. It authenticates with `McpCredentials` instead of the renderer's launch secret.
- * `McpServer.layerHttp` refuses any request with an `Origin` header, keeping browser pages out.
- */
 export const McpRoutes = (tools: Layer.Layer<never>) =>
   Layer.merge(
     McpServer.layerHttp({
@@ -68,6 +60,7 @@ export const McpRoutes = (tools: Layer.Layer<never>) =>
       version: "1.0.0",
       path: MCP_PATH,
       protocols: [McpProtocol.v2025_11_25],
+      allowedOrigins: [],
       // Effect never expires sessions, so a runtime ending cleanly frees its own.
       allowSessionTermination: true,
     }).pipe(Layer.provide(McpAccess.layer), Layer.orDie),

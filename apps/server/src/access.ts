@@ -20,8 +20,7 @@ const carriesToken = (token: Redacted.Redacted) => {
   return (url: URL) => matches(url.searchParams.get(TOKEN_PARAM))
 }
 
-/** Guards the renderer's routes with the per-launch secret and the allowed origins. */
-export const AccessControl = HttpRouter.middleware(
+export const RendererAccess = HttpRouter.middleware(
   Effect.gen(function* () {
     const config = yield* ServerConfig
     const hasToken = carriesToken(config.token)

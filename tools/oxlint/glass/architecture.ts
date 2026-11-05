@@ -44,8 +44,6 @@ const rpcContracts = new Set(["Rpc", "RpcGroup", "RpcSchema", "RpcMessage", "Rpc
 
 const httpContracts = new Set(["HttpClientError", "HttpServerError", "HttpMethod"])
 
-// Unlike RPC and HTTP, `effect/ai` is mostly model tooling, so only its MCP server and protocol
-// adapters, which serve HTTP, are reserved; its tool and schema modules stay available.
 const mcpTransport = new Set(["McpServer", "McpProtocol"])
 
 const httpClient = new Set([

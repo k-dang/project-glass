@@ -21,11 +21,9 @@ const decodeResponse = Schema.decodeUnknownSync(JsonRpcResponse)
 export interface McpResponse {
   readonly status: number
   readonly sessionId: string | undefined
-  /** JSON-RPC messages from a JSON body or a server-sent event stream. */
   readonly messages: ReadonlyArray<typeof JsonRpcResponse.Type>
 }
 
-/** One Streamable HTTP POST to Glass's MCP endpoint, as an MCP client sends it. */
 export const mcpPost = (
   baseUrl: string,
   message: JsonRpcMessage,
@@ -79,7 +77,6 @@ export const initialize: JsonRpcMessage = {
   },
 }
 
-/** Initializes an MCP session with `bearer`, then sends requests and notifications within it. */
 export const connectMcp = Effect.fnUntraced(function* (baseUrl: string, bearer: Redacted.Redacted) {
   const initialized = yield* mcpPost(baseUrl, initialize, { bearer })
   const sessionId = initialized.sessionId
@@ -109,8 +106,7 @@ const decodeTools = Schema.decodeUnknownSync(McpSchema.ListToolsResult)
 
 const decodeToolResult = Schema.decodeUnknownSync(McpSchema.CallToolResult)
 
-// A JSON-RPC error fails with the server's own message rather than a schema mismatch.
-const resultOf = (response: McpResponse) => {
+const resultOrThrow = (response: McpResponse) => {
   const message = response.messages[0]
 
   if (message?.result === undefined) {
@@ -120,8 +116,6 @@ const resultOf = (response: McpResponse) => {
   return message.result
 }
 
-/** The tools a `tools/list` response lists. */
-export const listedTools = (response: McpResponse) => decodeTools(resultOf(response)).tools
+export const listedTools = (response: McpResponse) => decodeTools(resultOrThrow(response)).tools
 
-/** The result a `tools/call` response carries. */
-export const toolResult = (response: McpResponse) => decodeToolResult(resultOf(response))
+export const toolResult = (response: McpResponse) => decodeToolResult(resultOrThrow(response))

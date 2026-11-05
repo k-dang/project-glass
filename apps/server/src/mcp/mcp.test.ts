@@ -73,9 +73,13 @@ describe("MCP endpoint", () => {
         caller: "global-conversation",
         target: "another-conversation",
       })
+    }),
+  )
 
-      // A session belongs to the credential that opened it; another runtime's credential opens
-      // its own session, where calls name that runtime as the caller.
+  it.live("binds a session to the credential that opened it", () =>
+    Effect.gen(function* () {
+      const { baseUrl, mcpCredentials } = yield* startMcpBackend
+      const mcp = yield* connectMcp(baseUrl, yield* mcpCredentials.issue(GLOBAL))
       const other = yield* mcpCredentials.issue({ conversationId: "other-runtime" })
 
       const intruding = yield* mcp.request("tools/list", {}, other).response
@@ -202,7 +206,6 @@ describe("MCP endpoint", () => {
         params: { requestId: call.id, reason: "Turn stopped" },
       })
       yield* Deferred.await(interrupted)
-      // Released after cancellation, the call has no result left to deliver.
       yield* Deferred.succeed(released, undefined)
 
       const response = yield* Fiber.join(inFlight)
