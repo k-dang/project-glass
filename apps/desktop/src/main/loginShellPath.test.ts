@@ -19,8 +19,10 @@ const fakeShell = (directory: string, name: string, profile: string) =>
     return path
   })
 
+const runsShellScripts = it.skipIf(process.platform === "win32")
+
 describe("login shell PATH", () => {
-  it("prepends the shell's PATH, ignoring rc output and dropping duplicates", () =>
+  runsShellScripts("prepends the shell's PATH, ignoring rc output and dropping duplicates", () =>
     Effect.runPromise(
       Effect.gen(function* () {
         const directory = yield* tempDirectory
@@ -37,9 +39,10 @@ describe("login shell PATH", () => {
 
         expect(env["PATH"]).toBe("/home/me/.local/bin:/usr/bin:/bin")
       }).pipe(Effect.scoped),
-    ))
+    ),
+  )
 
-  it("falls through shells that are missing or report nothing", () =>
+  runsShellScripts("falls through shells that are missing or report nothing", () =>
     Effect.runPromise(
       Effect.gen(function* () {
         const directory = yield* tempDirectory
@@ -53,7 +56,8 @@ describe("login shell PATH", () => {
 
         expect(env["PATH"]).toBe("/opt/homebrew/bin:/usr/bin")
       }).pipe(Effect.scoped),
-    ))
+    ),
+  )
 
   it("keeps the inherited PATH when no shell answers", () =>
     Effect.runPromise(
