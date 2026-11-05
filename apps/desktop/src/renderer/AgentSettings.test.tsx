@@ -78,7 +78,7 @@ it("saves engine choices immediately and model edits on blur, without saving oth
   })
   expect(tours.getByRole("status").textContent).toBe("Saving…")
   saving.answer(Effect.succeed(saving.payload.engineSettings))
-  await waitFor(() => expect(tours.getByRole("status").textContent).toBe("Saved automatically."))
+  await waitFor(() => expect(tours.getByRole("status").textContent).toBe(""))
 
   const model = tours.getByRole("textbox", { name: "pi model" })
   await user.clear(model)
@@ -91,7 +91,7 @@ it("saves engine choices immediately and model edits on blur, without saving oth
     modelId: "gpt-test",
   })
   edit.answer(Effect.succeed(edit.payload.engineSettings))
-  await waitFor(() => expect(tours.getByRole("status").textContent).toBe("Saved automatically."))
+  await waitFor(() => expect(tours.getByRole("status").textContent).toBe(""))
   expect(setPrompt).not.toHaveBeenCalled()
 })
 
@@ -183,7 +183,7 @@ it("keeps a visible engine selection made while the previous model saves", async
     models: { ...tourSettings.models, "claude-code": "claude-sonnet-5-5-updated" },
   })
   latest.answer(Effect.succeed(latest.payload.engineSettings))
-  await waitFor(() => expect(tours.getByRole("status").textContent).toBe("Saved automatically."))
+  await waitFor(() => expect(tours.getByRole("status").textContent).toBe(""))
 })
 
 it("keeps typing in the next model field while a provider save is pending", async () => {
@@ -212,7 +212,7 @@ it("keeps typing in the next model field while a provider save is pending", asyn
     modelId: "claude-sonnet-5-5-new",
   })
   latest.answer(Effect.succeed(latest.payload.engineSettings))
-  await waitFor(() => expect(engineStatus).toHaveProperty("textContent", "Saved automatically."))
+  await waitFor(() => expect(engineStatus).toHaveProperty("textContent", ""))
 })
 
 it("normalizes whitespace-only prompt edits without writing or leaving a dirty draft", async () => {
@@ -223,10 +223,7 @@ it("normalizes whitespace-only prompt edits without writing or leaving a dirty d
   expect(box).toHaveProperty("value", defaultReviewPrompt)
   expect(setPrompt).not.toHaveBeenCalled()
   const reviews = within(screen.getByRole("region", { name: "Agent reviews" }))
-  expect(reviews.getAllByRole("status").map((status) => status.textContent)).toEqual([
-    "Saved automatically.",
-    "Saved automatically.",
-  ])
+  expect(reviews.getAllByRole("status").map((status) => status.textContent)).toEqual(["", ""])
 })
 
 it("saves the latest committed prompt after an earlier write fails, even after leaving Settings", async () => {

@@ -158,11 +158,11 @@ function SaveStatus<A>(props: {
         ? "Changes weren't saved."
         : props.setting.changed
           ? "Changes save when you leave the field."
-          : "Saved automatically."))
+          : null))
 
   return (
     <>
-      <output aria-live="polite" className="text-sm text-muted-foreground">
+      <output aria-live="polite" className="min-h-5 text-sm text-muted-foreground">
         {status}
       </output>
       {problem && <ProblemAlert problem={problem} action={{ label: "Retry", run: props.retry }} />}
