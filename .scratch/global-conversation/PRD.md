@@ -105,7 +105,6 @@ The T3 Code source inspection supports an app-owned HTTP MCP endpoint, conversat
 
 The relevant architectural context is the backend's ownership of credentials and persistence, renderer state in routes and Effect atoms, execution through an agent host, reuse of existing program credentials, and tests replaying real Agent-program sessions. The Global conversation extends the repository-scoped model deliberately; it does not require moving execution into the renderer or backend service process.
 
-
 ## Comments
 
 - Kevin confirmed: “Yes, use these test boundaries.” Use the existing Electron end-to-end boundary to send a Global conversation message, exercise the real MCP bridge, and verify the result in Glass; add focused backend credential-rejection and cancellation tests, and reuse Claude Code/pi recording tests for provider compatibility.
