@@ -4,8 +4,6 @@
 > provisions them itself. An Agent review's Follow-ups run as a read-only Agent in a checkout of
 > the review's Revision written from the cached clone, since it never commits (ADR 0009). Tests
 > replay recordings of the real programs (ADR 0011).
-> The Global conversation also runs in the local host, in Glass's own folder rather than a
-> repository (ADR 0013).
 
 Agents run on this device and in Sandboxes, and Glass must render a
 structured transcript, answer Permission requests, Steer, and survive dropped connections for both. So
