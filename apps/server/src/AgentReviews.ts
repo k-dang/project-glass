@@ -200,7 +200,10 @@ export class AgentReviews extends Context.Service<
 
       const work = (job: Job, pr: PullRequestRef, revision: Revision, startedAt: number) =>
         Effect.gen(function* () {
-          const runner = yield* checkoutRuns.select().pipe(Effect.mapError(fromCheckoutRunFailure))
+          const runner = yield* checkoutRuns
+            .select("agentReviews")
+            .pipe(Effect.mapError(fromCheckoutRunFailure))
+
           const prompt = yield* reviewPrompt
 
           yield* setJob(job, { status: "reviewing", startedAt, runner: runner.identity })

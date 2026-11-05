@@ -143,13 +143,14 @@ export class Checkouts extends Context.Service<
         files: string,
         index: string,
       ) {
-        const { token } = yield* auth.resolveToken
-        const env = authenticatedEnv(token)
         const repository = `${pr.owner.toLowerCase()}/${pr.repo.toLowerCase()}`
         const clone = join(config.dataDirectory, "repos", repository)
         const ref = `refs/pull/${pr.number}/head`
 
         yield* Effect.gen(function* () {
+          const { token } = yield* auth.resolveToken
+          const env = authenticatedEnv(token)
+
           yield* ensureClone(repository, clone, env)
           yield* git(
             ["--git-dir", clone, "fetch", "--quiet", "--no-tags", "origin", `+${ref}:${ref}`],

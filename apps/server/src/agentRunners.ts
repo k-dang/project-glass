@@ -32,7 +32,7 @@ export interface AgentTask<A> {
   readonly instructions: string
   readonly prompt: string
   readonly answer: Schema.Decoder<A>
-  readonly files: "none" | { readonly readOnly: string }
+  readonly checkout: string
 }
 
 export interface AgentRunner {
@@ -136,31 +136,14 @@ const runnerStrategies = Effect.gen(function* () {
     ),
   )
 
-  const runClaudeCode = (
-    cwd: string,
-    model: string,
-    restricts: boolean,
-    identity: AgentRunnerIdentity,
-  ): AgentRunner["run"] =>
+  const runClaudeCode = (model: string, identity: AgentRunnerIdentity): AgentRunner["run"] =>
     Effect.fn("runClaudeCode")(function* <A>(task: AgentTask<A>) {
-      if (task.files !== "none" && !restricts)
-        return yield* agentFailure(
-          "not-ready",
-          "Claude Code can't be limited to reading the PR's code. Update it, then try again.",
-          identity,
-        )
-
-      const files =
-        task.files === "none"
-          ? { directory: cwd, tools: ["--tools", ""] }
-          : { directory: task.files.readOnly, tools: claudeReadOnlyFlags }
-
       const unusable = unusableFailure("Claude Code", task.subject, identity)
 
       const result = yield* execute(
         config.claudeCommand,
-        ["-p", ...files.tools, ...claudeFlags, "--model", model, "--output-format", "json"],
-        files.directory,
+        ["-p", ...claudeReadOnlyFlags, ...claudeFlags, "--model", model, "--output-format", "json"],
+        task.checkout,
         `${task.instructions}\n\n${promptWithSchema(task)}`,
       ).pipe(
         Effect.mapError(() =>
@@ -221,7 +204,9 @@ const runnerStrategies = Effect.gen(function* () {
     if (
       Result.isFailure(help) ||
       help.success.code !== 0 ||
-      [...claudeFlags, "--tools"].some((flag) => !help.success.stdout.includes(flag))
+      [...claudeFlags, "--restricted", "--tools"].some(
+        (flag) => !help.success.stdout.includes(flag),
+      )
     )
       return yield* agentFailure(
         "not-ready",
@@ -229,15 +214,18 @@ const runnerStrategies = Effect.gen(function* () {
       )
 
     const identity = runnerIdentity({ engine: "claude-code", models })
-    const restricts = help.success.stdout.includes("--restricted")
 
-    return { identity, run: runClaudeCode(cwd, model, restricts, identity) } satisfies AgentRunner
+    return { identity, run: runClaudeCode(model, identity) } satisfies AgentRunner
   })
 
-  const piReadOnlyFlags = ["--tools", piReadOnlyTools.join(",")]
-
   // The thinking level is left to pi's settings: a level a model lacks fails the request.
-  const piCliFlags = ["--offline", "--no-session", ...piLoadsNothing]
+  const piCliFlags = [
+    "--offline",
+    "--no-session",
+    ...piLoadsNothing,
+    "--tools",
+    piReadOnlyTools.join(","),
+  ]
 
   // `--mode json` ends with an `agent_end` event carrying the conversation; its last message is
   // the model's answer after any tool calls.
@@ -263,7 +251,7 @@ const runnerStrategies = Effect.gen(function* () {
   )
 
   const runPiCli = (
-    cwd: string,
+    instructionsDirectory: string,
     selection: PiModel,
     identity: AgentRunnerIdentity,
   ): AgentRunner["run"] =>
@@ -277,7 +265,7 @@ const runnerStrategies = Effect.gen(function* () {
 
       // pi reads `--system-prompt` from a file when given a path. A file keeps the instructions
       // out of argv, where endpoint security tools may kill processes with long arguments.
-      const instructions = join(cwd, "instructions.md")
+      const instructions = join(instructionsDirectory, "instructions.md")
       yield* fs
         .writeFileString(instructions, task.instructions)
         .pipe(
@@ -286,11 +274,6 @@ const runnerStrategies = Effect.gen(function* () {
           ),
         )
 
-      const files =
-        task.files === "none"
-          ? { directory: cwd, tools: ["--no-tools"] }
-          : { directory: task.files.readOnly, tools: piReadOnlyFlags }
-
       const result = yield* execute(
         config.piCommand,
         [
@@ -298,7 +281,6 @@ const runnerStrategies = Effect.gen(function* () {
           "--mode",
           "json",
           ...piCliFlags,
-          ...files.tools,
           "--provider",
           selection.provider,
           "--model",
@@ -306,7 +288,7 @@ const runnerStrategies = Effect.gen(function* () {
           "--system-prompt",
           instructions,
         ],
-        files.directory,
+        task.checkout,
         promptWithSchema(task),
       ).pipe(
         Effect.mapError(() =>

@@ -232,6 +232,12 @@ export function Workspace(props: {
     tourView.current?.showChapter(index, behavior)
   }
 
+  const startReading = () => {
+    openChapter(0)
+
+    if (reading?.beforeAfter != null) tourView.current?.showOverview()
+  }
+
   useShortcuts(
     tourInChanges
       ? [
@@ -243,13 +249,18 @@ export function Workspace(props: {
           },
           {
             key: "[",
-            run: () => openChapter((tourView.current?.currentChapter() ?? 0) - 1, "instant"),
+            run: () => {
+              const inView = tourView.current?.currentChapter() ?? 0
+
+              if (inView === 0 && reading?.beforeAfter != null) tourView.current?.showOverview()
+              else openChapter(inView - 1, "instant")
+            },
           },
         ]
       : [],
   )
 
-  useTourReadyToast(tour.latest, reading, openChapter)
+  useTourReadyToast(tour.latest, reading, startReading)
 
   const openInChanges = (path: string) =>
     flushSync(() => {
@@ -447,6 +458,7 @@ export function Workspace(props: {
                 reading={reading}
                 viewedFiles={props.viewedFiles}
                 onShowChapter={openChapter}
+                onStartReading={startReading}
               />
             </TabsContent>
           </Tabs>
@@ -493,7 +505,7 @@ export function Workspace(props: {
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]">
             <div className="flex flex-col gap-8 px-6 py-8">
-              {reading !== null && <TourCard reading={reading} onShowChapter={openChapter} />}
+              {reading !== null && <TourCard reading={reading} onStartReading={startReading} />}
               <AgentReviewCard controls={agentReview} onRead={readAgentReview} />
               <Description html={pullRequest.descriptionHtml} />
               <DraftList store={drafts} onShow={(draft) => showDraft(show, draft)} />

@@ -71,14 +71,26 @@ An automated run reporting on a PR's head commit, such as a CI job: passed, fail
 skipped.
 
 **Tour**:
-An agent-written reading order for one Revision of a PR: why the change exists, then Chapters
-ordered from the part that matters most to the glue.
+An agent-written reading order for one Revision of a PR: why the change exists, a Before / after
+of the whole change when it has one, then Chapters ordered from the part that matters most to the
+glue.
 _Avoid_: Code tour, guided review, guide, walkthrough
+
+**Before / after**:
+A short plain-language outline of how something worked and how it works now, with removed and added
+lines beside the unchanged ones that place them. A Tour may open with one for the whole PR, and a
+Chapter may carry one for its own part.
+_Avoid_: Call tree, show me, summary diagram
+
+**Tour overview**:
+The card that opens a Tour with a Before / after: why the change exists beside its Before / after,
+above the first Chapter.
+_Avoid_: Overview (the PR's Overview tab is a different place)
 
 **Chapter**:
 One step of a Tour: a group of changed files that belong together, with an explanation of what
 they do and why. A Chapter may include one map, either a diagram (optionally with a flow the reader
-can step through) or a call tree, plus callouts linked to diff lines.
+can step through) or a Before / after, plus callouts linked to diff lines.
 _Avoid_: Section, stop, step
 
 **Tour engine**:

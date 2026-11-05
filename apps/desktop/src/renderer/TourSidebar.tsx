@@ -123,9 +123,9 @@ export function RewriteTour(props: {
   )
 }
 
-export function StartReading(props: { onShowChapter: (index: number) => void }) {
+export function StartReading(props: { onStart: () => void }) {
   return (
-    <Button size="sm" onClick={() => props.onShowChapter(0)}>
+    <Button size="sm" onClick={props.onStart}>
       <BookOpen aria-hidden />
       Start reading
     </Button>
@@ -141,7 +141,7 @@ const finishedWriting = (before: TourState | null, after: TourState | null) =>
 export const useTourReadyToast = (
   latest: TourState | null,
   reading: TourReading | null,
-  onShowChapter: (index: number) => void,
+  onStartReading: () => void,
 ) => {
   const before = useRef(latest)
 
@@ -155,7 +155,7 @@ export const useTourReadyToast = (
         children: "Start reading",
         onClick: () => {
           toast.close(id)
-          onShowChapter(0)
+          onStartReading()
         },
       },
     })
@@ -171,7 +171,7 @@ export const useTourReadyToast = (
   }, [latest])
 }
 
-export function TourCard(props: { reading: TourReading; onShowChapter: (index: number) => void }) {
+export function TourCard(props: { reading: TourReading; onStartReading: () => void }) {
   const { reading } = props
 
   return (
@@ -193,7 +193,7 @@ export function TourCard(props: { reading: TourReading; onShowChapter: (index: n
         </p>
       </CardContent>
       <CardFooter className="flex-wrap gap-3">
-        <StartReading onShowChapter={props.onShowChapter} />
+        <StartReading onStart={props.onStartReading} />
         <span className="text-sm text-muted-foreground">
           {plural(reading.chapters.length, "Chapter")}
         </span>
@@ -207,6 +207,7 @@ export function TourSidebar(props: {
   reading: TourReading | null
   viewedFiles: ViewedFilesStore
   onShowChapter: (index: number) => void
+  onStartReading: () => void
 }) {
   const { tour } = props
   const { latest, subscriptionProblem, pending, commandFailure } = tour
@@ -246,7 +247,7 @@ export function TourSidebar(props: {
         <div className="space-y-4 px-1 py-3">
           <p className="leading-relaxed text-muted-foreground">
             A Tour orders this PR's files into Chapters and explains what each group does and why,
-            using the description and diff.
+            using the description, the diff, and the code around it.
           </p>
           <Button onClick={tour.write} disabled={pending}>
             <Sparkles data-icon="inline-start" aria-hidden />
@@ -318,7 +319,7 @@ export function TourSidebar(props: {
       {reading !== null && (
         <section aria-label="Saved Tour" className="space-y-4 py-3">
           <div className="px-1">
-            <StartReading onShowChapter={props.onShowChapter} />
+            <StartReading onStart={props.onStartReading} />
           </div>
           <p className="px-1 leading-relaxed break-words text-muted-foreground">
             <TourText text={reading.intent} />

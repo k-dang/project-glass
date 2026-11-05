@@ -31,7 +31,7 @@ const deadline = 60_000
 
 const fixture = Effect.fnUntraced(function* (settings: ScriptedSettings = { reply: { answer } }) {
   const runners = yield* scriptedAgentRunners(settings)
-  const github = yield* startFakeGitHub()
+  const github = yield* startFakeGitHub({ git: true })
   const home = yield* isolatedHome
   const { watched, deadlineSet } = yield* watchDeadlines(deadline)
 
@@ -57,11 +57,12 @@ const fixture = Effect.fnUntraced(function* (settings: ScriptedSettings = { repl
   })
 
   const ref = new PullRequestRef({ owner: pr.owner, repo: pr.repo, number: pr.number })
-  const revision = new Revision({ base: "b0", head: "h1" })
+  const revision = new Revision({ base: pr.base.sha, head: pr.head.sha })
 
   const env = {
     GH_TOKEN: VIEWER.token,
     GLASS_GITHUB_API_URL: github.url,
+    GLASS_GIT_REMOTE: github.gitUrl,
     GLASS_TOUR_TIMEOUT_MS: String(deadline),
   }
 
@@ -109,7 +110,7 @@ const fixture = Effect.fnUntraced(function* (settings: ScriptedSettings = { repl
 
 const completed = (state: TourState) => state.job.status !== "writing"
 
-it.live("writes a saved Tour from the requested Revision's PR material, without file access", () =>
+it.live("writes a saved Tour from the requested Revision's PR material and checkout", () =>
   Effect.gen(function* () {
     const f = yield* fixture()
     assert.deepStrictEqual(yield* f.state(() => true), { tour: null, job: { status: "idle" } })
@@ -123,7 +124,7 @@ it.live("writes a saved Tour from the requested Revision's PR material, without 
     assert.equal(state.job.status, "idle")
     const [run] = f.runners.runs
     assert.strictEqual(run?.task.instructions, tourInstructions)
-    assert.strictEqual(run?.task.files, "none")
+    assert.includeMembers([...run!.files], ["greet.ts", "README.md"])
     assert.include(run?.task.prompt, "Greet people")
     assert.include(run?.task.prompt, "Use the person's name.")
     assert.include(run?.task.prompt, "+hello name")
@@ -142,7 +143,7 @@ it.live(
               {
                 ...answer.chapters[0]!,
                 diagram: { nodes: [], edges: [] },
-                callTree: "not a tree",
+                beforeAfter: "not an outline",
                 callouts: null,
               },
             ],
@@ -158,19 +159,25 @@ it.live(
     }),
 )
 
-it.live("persists generated call trees and callouts across a restart", () =>
+it.live("persists generated Before / afters and callouts across a restart", () =>
   Effect.gen(function* () {
     const target = { path: "greet.ts", side: "new", startLine: 1, endLine: 1 } as const
 
+    const beforeAfter = {
+      title: "How a greeting is built",
+      lines: [
+        { depth: 0, text: "Greet", change: "unchanged", target: null },
+        { depth: 1, text: "Use the name", change: "added", target },
+      ],
+    } as const
+
     const rich: TourAnswer = {
       ...answer,
+      beforeAfter,
       chapters: [
         {
           ...answer.chapters[0]!,
-          callTree: [
-            { id: "greet", parent: null, label: "Greet", change: "unchanged", target },
-            { id: "name", parent: "greet", label: "Use the name", change: "added", target },
-          ],
+          beforeAfter,
           callouts: [{ label: "The supplied name reaches the greeting.", target }],
         },
       ],
@@ -180,7 +187,8 @@ it.live("persists generated call trees and callouts across a restart", () =>
 
     yield* f.write
     const saved = (yield* f.state(completed)).tour!
-    assert.deepStrictEqual(saved.chapters[0]?.callTree, rich.chapters[0]?.callTree)
+    assert.deepStrictEqual(saved.beforeAfter, beforeAfter)
+    assert.deepStrictEqual(saved.chapters[0]?.beforeAfter, beforeAfter)
     assert.deepStrictEqual(saved.chapters[0]?.callouts, rich.chapters[0]?.callouts)
 
     assert.deepStrictEqual((yield* f.restart).tour, saved)
@@ -311,9 +319,9 @@ for (const [name, settings, expected] of [
   ["an invalid answer", { reply: { answer: { chapters: "wrong" } } }, "unusable-output"],
   ["no surviving Chapters", { reply: { answer: { ...answer, chapters: [] } } }, "unusable-output"],
   ["a runner failure", { reply: { fail: "failed" } }, "runner"],
-  ["an authentication rejection", { reply: { fail: "authentication" } }, "authentication"],
+  ["an authentication rejection", { reply: { fail: "authentication" } }, "runner"],
   ["a runner that isn't ready", { reply: { answer }, ready: "not-ready" }, "not-ready"],
-  ["a runner that isn't installed", { reply: { answer }, ready: "not-installed" }, "not-installed"],
+  ["a runner that isn't installed", { reply: { answer }, ready: "not-installed" }, "not-ready"],
 ] as const satisfies ReadonlyArray<readonly [string, ScriptedSettings, string]>) {
   it.live(`reports ${name}`, () =>
     Effect.gen(function* () {
@@ -327,31 +335,26 @@ for (const [name, settings, expected] of [
   )
 }
 
-for (const [name, settings, started] of [
-  ["slow generation", { reply: "hold" }, "ran"],
-  ["a slow readiness check", { reply: { answer }, ready: "hang" }, "selected"],
-] as const) {
-  it.effect(`times out ${name}`, () =>
-    Effect.gen(function* () {
-      const f = yield* fixture(settings)
-      yield* f.write
-      yield* f.runners[started](1)
-      yield* f.deadlineSet
-      yield* TestClock.adjust(deadline)
+it.effect("times out slow generation", () =>
+  Effect.gen(function* () {
+    const f = yield* fixture({ reply: "hold" })
+    yield* f.write
+    yield* f.runners.ran(1)
+    yield* f.deadlineSet
+    yield* TestClock.adjust(deadline)
 
-      const state = yield* f.state(completed)
-      assert.equal(state.job.status === "failed" && state.job.reason.reason, "timeout")
-      assert.isNull(state.tour)
-    }),
-  )
-}
+    const state = yield* f.state(completed)
+    assert.equal(state.job.status === "failed" && state.job.reason.reason, "timeout")
+    assert.isNull(state.tour)
+  }),
+)
 
 it.live("retries a runner that wasn't installed once it is", () =>
   Effect.gen(function* () {
     const f = yield* fixture({ reply: { answer }, ready: "not-installed" })
     yield* f.write
     const missing = yield* f.state(completed)
-    assert.equal(missing.job.status === "failed" && missing.job.reason.reason, "not-installed")
+    assert.equal(missing.job.status === "failed" && missing.job.reason.reason, "not-ready")
 
     yield* f.runners.configure({ reply: { answer } })
     yield* f.write
@@ -399,7 +402,10 @@ it.live(
         number: second.number,
       })
 
-      yield* f.client.WriteTour({ pullRequest: other, revision: f.revision })
+      yield* f.client.WriteTour({
+        pullRequest: other,
+        revision: new Revision({ base: second.base.sha, head: second.head.sha }),
+      })
       yield* f.runners.ran(2)
       yield* f.runners.configure({ reply: { answer: { ...answer, intent: "Replacement wins." } } })
       yield* f.write
@@ -488,7 +494,7 @@ it.live(
         Effect.forkChild,
       )
 
-      const requested = new Revision({ base: "b0", head: "h2" })
+      const requested = new Revision({ base: f.pr.base.sha, head: f.pr.head.sha })
       yield* f.client.WriteTour({ pullRequest: f.ref, revision: requested })
       yield* f.runners.ran(2)
       f.pr.push({ head: { sha: "h3", files: { "greet.ts": "later" } } })

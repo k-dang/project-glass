@@ -114,7 +114,7 @@ it("keeps the old Tour readable through a rewrite until its replacement arrives"
     job: {
       status: "failed",
       reason: new TourFailure({
-        reason: "authentication",
+        reason: "runner",
         runner,
         message: "pi couldn't sign in to openai. Sign in again, then try again.",
       }),

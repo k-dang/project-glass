@@ -78,7 +78,7 @@ it.live("answers from a read-only checkout, starting from the asked line", () =>
     assert.include(run?.task.prompt, "+hello name")
     assert.include(run?.task.prompt, '"text":"hello name"')
     assert.include(run?.task.prompt, "Who calls this?")
-    assert.isFalse(existsSync(run!.directory!))
+    assert.isFalse(existsSync(run!.task.checkout))
   }),
 )
 
@@ -133,7 +133,7 @@ it.live("interrupting a question stops the agent and removes its checkout", () =
 
     const asking = yield* Effect.forkChild(f.ask(helloName))
     yield* f.runners.ran(1)
-    const checkout = f.runners.runs[0]!.directory!
+    const checkout = f.runners.runs[0]!.task.checkout
     assert.isTrue(existsSync(checkout))
 
     yield* Fiber.interrupt(asking)

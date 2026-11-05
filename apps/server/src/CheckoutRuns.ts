@@ -2,6 +2,7 @@ import {
   type AgentRunnerIdentity,
   type CheckoutRunReason,
   type ConnectionError,
+  type EngineFeature,
   type NoCredentials,
   type PullRequestRef,
   type Revision,
@@ -155,7 +156,9 @@ const checkoutError =
 export class CheckoutRuns extends Context.Service<
   CheckoutRuns,
   {
-    readonly select: () => Effect.Effect<CheckoutRunner, CheckoutRunFailure, Scope.Scope>
+    readonly select: (
+      feature: EngineFeature,
+    ) => Effect.Effect<CheckoutRunner, CheckoutRunFailure, Scope.Scope>
     readonly copy: <I>(copy: CheckoutCopy<I>) => Effect.Effect<I, CheckoutRunFailure>
   }
 >()("@glass/server/CheckoutRuns") {
@@ -180,9 +183,9 @@ export class CheckoutRuns extends Context.Service<
         return input
       })
 
-      const select = Effect.fnUntraced(function* () {
+      const select = Effect.fnUntraced(function* (feature: EngineFeature) {
         const engineSettings = yield* settings.read().pipe(
-          Effect.map((current) => engineSettingsOf(current, "agentReviews")),
+          Effect.map((current) => engineSettingsOf(current, feature)),
           Effect.mapError((error) => checkoutRunFailure("not-ready", error.message)),
         )
 
@@ -214,7 +217,7 @@ export class CheckoutRuns extends Context.Service<
             concurrency: 2,
           })
 
-          return yield* selected.run({ ...prepared, subject, files: { readOnly: checkout } }).pipe(
+          return yield* selected.run({ ...prepared, subject, checkout }).pipe(
             Effect.map((answer) => ({ input, answer })),
             Effect.mapError(fromAgentFailure),
             Effect.timeoutOrElse({

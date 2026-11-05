@@ -1,6 +1,6 @@
 {
   "scenario": "pi-unlisted-model",
-  "program": "1.4.0",
+  "program": "1.5.0",
   "models": {
     "claude-code": "unused",
     "pi": {

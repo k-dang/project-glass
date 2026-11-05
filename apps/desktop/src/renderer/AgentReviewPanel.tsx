@@ -23,6 +23,7 @@ import { LineLocation, pathLineName } from "./Discussions"
 import { Elapsed } from "./Elapsed"
 import { type ComposerSuggestion, MessageBox } from "./MessageBox"
 import { ProblemAlert } from "./ProblemAlert"
+import { fileName } from "./fileName"
 import { streamProblem } from "./problems"
 import type { AgentReviewControls } from "./useAgentReview"
 import { type DraftStore, useDraftsLocked, useLineDraftPlaces } from "./useDrafts"
@@ -48,8 +49,6 @@ const followUpSuggestions: ReadonlyArray<ComposerSuggestion> = [
       "Draft PR comments without using jargon and speak coherently. State it more simply and concisely, like one human talking to another.",
   },
 ]
-
-const fileName = (path: string) => path.split("/").at(-1) ?? path
 
 const focusOnMount = (element: HTMLTextAreaElement | null) => element?.focus()
 

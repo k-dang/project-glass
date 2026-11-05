@@ -20,21 +20,30 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { ChangedFilesView, type ChangedFilesViewProps, type ViewHandle } from "./ChangedFilesView"
 import { annotationSides, type ParsedFile } from "./changesView"
+import { LineCounts } from "./LineCounts"
 import { plural } from "./plural"
 import { allViewed, twoDigits } from "./tourProgress"
 import type { TourChapter, TourReading } from "./tourReading"
 import { TourText } from "./TourText"
 import { TourDiagram } from "./TourDiagram"
-import { TourCallTree } from "./TourCallTree"
+import { TourBeforeAfter } from "./TourBeforeAfter"
+import { StartReading } from "./TourSidebar"
 import { useViewedFiles, type ViewedFilesStore } from "./useViewedFiles"
 
 type ScrollBehavior = "smooth" | "instant"
+
+const tourProse =
+  "max-w-[80ch] text-[13px] leading-[1.8] text-muted-foreground wrap-anywhere [&_code]:bg-transparent [&_code]:p-0 [&_code]:text-xs [&_code]:text-inherit"
+
+const chapterGrid =
+  "grid grid-cols-[340px_minmax(0,1fr)] overflow-clip rounded-[10px] border bg-[color-mix(in_oklch,var(--muted)_35%,var(--background))] @max-[850px]/tour:grid-cols-[280px_minmax(0,1fr)] @max-[700px]/tour:grid-cols-1"
 
 export interface TourViewHandle {
   showFile: (path: string, behavior?: ScrollBehavior) => void
   returnTo: (path: string) => void
   showLine: (path: string, side: DiffSide, line: number) => void
   showChapter: (index: number, behavior: ScrollBehavior) => void
+  showOverview: () => void
   currentChapter: () => number
   viewOf: (path: string) => ViewHandle | null
 }
@@ -150,11 +159,11 @@ export function TourView(props: TourViewProps) {
   const currentChapter = useCallback(() => {
     const root = container.current
 
-    if (root === null) return 0
+    if (root === null) return -1
 
     const top = root.getBoundingClientRect().top
     const atEnd = root.scrollTop > 0 && root.scrollTop + root.clientHeight >= root.scrollHeight - 1
-    let index = 0
+    let index = -1
 
     for (const [candidate, { element }] of sections.current) {
       if (atEnd || element.getBoundingClientRect().top <= top + 24)
@@ -286,16 +295,34 @@ export function TourView(props: TourViewProps) {
     [chapterOf, selectFile, onOpenChange],
   )
 
+  const showChapter = useCallback(
+    (index: number, behavior: ScrollBehavior) => {
+      revealChapter(index, behavior)
+      const path = groups[index]?.files[0]?.file.path
+
+      if (path !== undefined) selectFile(index, path)
+    },
+    [groups, revealChapter, selectFile],
+  )
+
+  const showTargetInChapter = useCallback(
+    (target: TourCodeTarget) => {
+      const index = chapterOf(target.path)
+      open(index)
+      revealChapter(index, "instant")
+      showTarget(target)
+    },
+    [chapterOf, open, revealChapter, showTarget],
+  )
+
   useImperativeHandle(
     ref,
     () => ({
       currentChapter,
       viewOf: (path) => sections.current.get(chapterOf(path))?.view.current ?? null,
-      showChapter: (index, behavior) => {
-        revealChapter(index, behavior)
-        const path = groups[index]?.files[0]?.file.path
-
-        if (path !== undefined) selectFile(index, path)
+      showChapter,
+      showOverview: () => {
+        requestAnimationFrame(() => container.current?.scrollTo({ top: 0, behavior: "instant" }))
       },
       showFile: (path, behavior = "instant") => {
         const index = chapterOf(path)
@@ -308,23 +335,18 @@ export function TourView(props: TourViewProps) {
         if (collapsed(index)) revealChapter(index, "instant")
         else scrollToFile(index, path, "instant")
       },
-      showLine: (path, side, line) => {
-        const index = chapterOf(path)
-        open(index)
-        revealChapter(index, "instant")
-        showTarget({ path, side, startLine: line, endLine: line })
-      },
+      showLine: (path, side, line) =>
+        showTargetInChapter({ path, side, startLine: line, endLine: line }),
     }),
     [
-      groups,
       currentChapter,
+      showChapter,
+      showTargetInChapter,
       revealChapter,
-      selectFile,
       open,
       collapsed,
       scrollToFile,
       chapterOf,
-      showTarget,
     ],
   )
 
@@ -334,7 +356,7 @@ export function TourView(props: TourViewProps) {
       ref={container}
       aria-label="Tour Chapters"
       onScroll={() => {
-        const index = currentChapter()
+        const index = Math.max(currentChapter(), 0)
         inView.current = index
 
         if (!ready.current) return
@@ -344,6 +366,16 @@ export function TourView(props: TourViewProps) {
         if (path !== undefined) onCurrentPathChange(path)
       }}
     >
+      {reading.beforeAfter !== null && (
+        <TourOverview
+          intent={reading.intent}
+          beforeAfter={reading.beforeAfter}
+          chapterCount={reading.chapters.length}
+          fileCount={reading.files.length}
+          onStart={() => showChapter(0, "smooth")}
+          onShowTarget={showTargetInChapter}
+        />
+      )}
       {groups.map(({ chapter, files }, index) => (
         <ChapterCard
           key={`${DateTime.formatIso(reading.writtenAt)}:${index}`}
@@ -369,6 +401,39 @@ export function TourView(props: TourViewProps) {
         />
       ))}
     </div>
+  )
+}
+
+function TourOverview(props: {
+  intent: string
+  beforeAfter: NonNullable<TourReading["beforeAfter"]>
+  chapterCount: number
+  fileCount: number
+  onStart: () => void
+  onShowTarget: (target: TourCodeTarget) => void
+}) {
+  const heading = useId()
+
+  return (
+    <section className={cn(chapterGrid, "[&+section]:mt-5")} aria-labelledby={heading}>
+      <div className="min-w-0 px-6 py-5.5 @max-[850px]/tour:p-4.5">
+        <h2 id={heading} className="text-base leading-6 font-semibold">
+          Tour overview
+        </h2>
+        <p className="mt-2.5 mb-5 font-mono text-[11px] text-muted-foreground uppercase">
+          {plural(props.chapterCount, "Chapter")} · {plural(props.fileCount, "file")}
+        </p>
+        <p className={tourProse}>
+          <TourText text={props.intent} />
+        </p>
+        <div className="mt-4">
+          <StartReading onStart={props.onStart} />
+        </div>
+      </div>
+      <div className="min-w-0 border-l p-4.5 @max-[850px]/tour:p-3.5 @max-[700px]/tour:border-t @max-[700px]/tour:border-l-0">
+        <TourBeforeAfter beforeAfter={props.beforeAfter} onSelect={props.onShowTarget} />
+      </div>
+    </section>
   )
 }
 
@@ -412,13 +477,7 @@ function ChapterCard(props: {
 
   return (
     <section
-      className={
-        props.collapsed
-          ? "[&+section]:mt-5"
-          : cn(
-              "grid grid-cols-[340px_minmax(0,1fr)] overflow-clip rounded-[10px] border bg-[color-mix(in_oklch,var(--muted)_35%,var(--background))] @max-[850px]/tour:grid-cols-[280px_minmax(0,1fr)] @max-[700px]/tour:grid-cols-1 [&+section]:mt-5",
-            )
-      }
+      className={cn(!props.collapsed && chapterGrid, "[&+section]:mt-5")}
       aria-labelledby={heading}
       ref={(element) => props.register(element, view)}
     >
@@ -464,7 +523,7 @@ function ChapterCard(props: {
           <aside
             className={cn(
               "max-h-(--tour-card-height) min-w-0 overflow-y-auto px-6 py-5.5 [scrollbar-width:thin] @max-[850px]/tour:p-4.5",
-              chapter?.callTree == null
+              chapter?.beforeAfter == null
                 ? "@max-[700px]/tour:max-h-75"
                 : "@max-[700px]/tour:max-h-none",
             )}
@@ -497,7 +556,7 @@ function ChapterCard(props: {
               store={props.diff.viewedFiles}
               onChange={props.diff.onViewedChange}
             />
-            <div className="max-w-[80ch] text-[13px] leading-[1.8] text-muted-foreground wrap-anywhere [&_code]:bg-transparent [&_code]:p-0 [&_code]:text-xs [&_code]:text-inherit [&_p+p]:mt-3">
+            <div className={cn(tourProse, "[&_p+p]:mt-3")}>
               {paragraphs.map((paragraph, index) => (
                 <p key={index}>
                   <TourText text={paragraph} />
@@ -524,12 +583,10 @@ function ChapterCard(props: {
                 ))}
               </nav>
             )}
-            {chapter?.callTree != null && (
-              <TourCallTree
-                tree={chapter.callTree}
-                chapterTitle={title}
-                onSelect={props.onShowTarget}
-              />
+            {chapter?.beforeAfter != null && (
+              <div className="my-5">
+                <TourBeforeAfter beforeAfter={chapter.beforeAfter} onSelect={props.onShowTarget} />
+              </div>
             )}
             <ChapterFiles
               files={files}
@@ -573,15 +630,6 @@ function ChapterCard(props: {
         </>
       )}
     </section>
-  )
-}
-
-function LineCounts(props: { additions: number; deletions: number }) {
-  return (
-    <span className="flex shrink-0 gap-1 font-mono text-[10px]">
-      {props.deletions > 0 && <span className="text-deleted">−{props.deletions}</span>}
-      <span className="text-added">+{props.additions}</span>
-    </span>
   )
 }
 

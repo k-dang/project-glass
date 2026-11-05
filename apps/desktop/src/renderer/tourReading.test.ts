@@ -28,27 +28,32 @@ describe("readTour", () => {
       edges: [{ from: "a", to: "b", change: "added" }],
     } as const
 
-    const callTree = diagram.nodes.map((node, index) => ({
-      ...node,
-      parent: index === 0 ? null : "a",
-    }))
+    const beforeAfter = {
+      title: "A and B",
+      lines: diagram.nodes.map(({ label, change, target }) => ({
+        depth: 0,
+        text: label,
+        change,
+        target,
+      })),
+    }
 
     const callouts = [{ label: "Inspect B", target: diagram.nodes[1].target }]
 
     const tour = savedTour([
-      { ...tourChapter("One", ["a.ts", "b.ts"]), diagram, callTree, callouts },
+      { ...tourChapter("One", ["a.ts", "b.ts"]), diagram, beforeAfter, callouts },
     ])
 
     const current = readTour(files, tour, revision).chapters[0]!
     expect(current.diagram).toEqual(diagram)
-    expect(current.callTree).toEqual(callTree)
+    expect(current.beforeAfter).toEqual(beforeAfter)
     expect(current.callouts).toEqual(callouts)
 
     const outdated = readTour(files, tour, new Revision({ base: revision.base, head: "new-head" }))
       .chapters[0]!
 
     expect(outdated.diagram).toBeNull()
-    expect(outdated.callTree).toBeNull()
+    expect(outdated.beforeAfter).toBeNull()
     expect(outdated.callouts).toEqual([])
 
     const missing = readTour(
@@ -57,9 +62,37 @@ describe("readTour", () => {
       revision,
     ).chapters[0]!
 
-    expect(missing.callTree).toBeNull()
+    expect(missing.beforeAfter).toBeNull()
     expect(missing.callouts).toEqual([])
     expect(missing.diagram).toBeNull()
+  })
+
+  it("shows a Tour's Before / after only for its current Revision, with its files present", () => {
+    const beforeAfter = {
+      title: "A",
+      lines: [
+        {
+          depth: 0,
+          text: "Add A",
+          change: "added",
+          target: { path: "a.ts", side: "new", startLine: 1, endLine: 1 },
+        },
+      ],
+    } as const
+
+    const tour = { ...savedTour([tourChapter("One", ["b.ts"])]), beforeAfter }
+
+    expect(readTour(files, tour, revision).beforeAfter).toEqual(beforeAfter)
+    expect(
+      readTour(files, tour, new Revision({ base: revision.base, head: "new-head" })).beforeAfter,
+    ).toBeNull()
+    expect(
+      readTour(
+        files.filter(({ file }) => file.path !== "a.ts"),
+        tour,
+        revision,
+      ).beforeAfter,
+    ).toBeNull()
   })
 
   it("shows every changed file once: files gone from the PR drop out, repeats stay first", () => {

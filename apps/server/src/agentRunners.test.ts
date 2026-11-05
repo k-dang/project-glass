@@ -12,6 +12,7 @@ import {
   type RunnerScenario,
   runnerScenarios,
   runnersLayer,
+  scenarioTask,
   seedCheckout,
 } from "../test/runnerReplay"
 import { AgentRunners } from "./agentRunners"
@@ -39,7 +40,7 @@ const fixture = Effect.fnUntraced(function* (
       models: recording.models,
     })
 
-    return yield* runner.run(scenario.task(checkout))
+    return yield* runner.run(scenarioTask(scenario, checkout))
   }).pipe(
     Effect.scoped,
     Effect.provide(
@@ -174,27 +175,19 @@ for (const [name, base, from, to] of [
     }),
   )
 
-const withoutRestrictedTools = (base: string) =>
-  edited(base, (spawn) => spawn.args[0] === "--help", "--restricted", "--unrelated")
-
-it.live("refuses file access to a Claude Code that can't restrict its tools", () =>
+it.live("refuses a Claude Code that can't restrict its tools", () =>
   Effect.gen(function* () {
     const f = yield* fixture(scenarioNamed("claude-read-only"), {
-      recording: withoutRestrictedTools("claude-read-only"),
+      recording: edited(
+        "claude-read-only",
+        (spawn) => spawn.args[0] === "--help",
+        "--restricted",
+        "--unrelated",
+      ),
     })
 
     const failure = yield* Effect.flip(f.run)
     assert.strictEqual(failure.reason, "not-ready")
-  }),
-)
-
-it.live("runs a task without file access on a Claude Code that can't restrict its tools", () =>
-  Effect.gen(function* () {
-    const f = yield* fixture(scenarioNamed("claude-answer"), {
-      recording: withoutRestrictedTools("claude-answer"),
-    })
-
-    assert.deepStrictEqual(yield* f.run, { summary: "Fine." })
   }),
 )
 

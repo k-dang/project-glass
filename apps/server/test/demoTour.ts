@@ -19,6 +19,36 @@ const target = (path: string, marker: string, side: "old" | "new" = "new"): Tour
 export const demoTour: TourAnswer = {
   intent:
     "Give each API client a token bucket, returning 429 when its tokens run out. This is a curated synthetic Tour, written without a model.",
+  beforeAfter: {
+    title: "What happens to a request",
+    lines: [
+      { depth: 0, text: "request arrives", change: "unchanged", target: null },
+      {
+        depth: 1,
+        text: "log it and call the handler",
+        change: "removed",
+        target: target(middleware, "export const middleware", "old"),
+      },
+      {
+        depth: 1,
+        text: "log it, then find the client's bucket",
+        change: "added",
+        target: target(middleware, "buckets.get(key)"),
+      },
+      {
+        depth: 2,
+        text: "no token left: return 429 with retry-after",
+        change: "added",
+        target: target(middleware, "status: 429"),
+      },
+      {
+        depth: 2,
+        text: "token taken: call the handler",
+        change: "added",
+        target: target(middleware, "return next(request)"),
+      },
+    ],
+  },
   chapters: [
     {
       title: "Gate requests before the handler",
@@ -114,34 +144,34 @@ export const demoTour: TourAnswer = {
     {
       title: "Refill and consume tokens",
       explanation:
-        "Each bucket starts full. Taking a token first refills it for the elapsed time, capped at capacity, then consumes one only when at least one is available. The call tree follows the burst test into the implementation. The tests cover burst capacity and fractional refill intervals.",
+        "Each bucket starts full. Taking a token first refills it for the elapsed time, capped at capacity, then consumes one only when at least one is available. The Before / after follows the burst test into the implementation. The tests cover burst capacity and fractional refill intervals.",
       files: [
         { path: bucket, summary: "Tracks tokens, refills over time, and calculates retry delays." },
         { path: bucketTest, summary: "Covers burst capacity and time-based refill." },
       ],
-      callTree: [
-        {
-          id: "burst-test",
-          parent: null,
-          label: "Test a burst of three requests",
-          change: "added",
-          target: target(bucketTest, 'it("allows a burst'),
-        },
-        {
-          id: "create",
-          parent: "burst-test",
-          label: "createBucket: start with two tokens",
-          change: "added",
-          target: target(bucket, "export const createBucket"),
-        },
-        {
-          id: "consume",
-          parent: "burst-test",
-          label: "take: allow two requests, reject the third",
-          change: "added",
-          target: target(bucket, "export const take"),
-        },
-      ],
+      beforeAfter: {
+        title: "A burst of three requests",
+        lines: [
+          {
+            depth: 0,
+            text: "test a burst of three requests",
+            change: "added",
+            target: target(bucketTest, 'it("allows a burst'),
+          },
+          {
+            depth: 1,
+            text: "createBucket: start with two tokens",
+            change: "added",
+            target: target(bucket, "export const createBucket"),
+          },
+          {
+            depth: 1,
+            text: "take: allow two requests, reject the third",
+            change: "added",
+            target: target(bucket, "export const take"),
+          },
+        ],
+      },
       callouts: [
         {
           label: "Refill cannot exceed the bucket's capacity.",

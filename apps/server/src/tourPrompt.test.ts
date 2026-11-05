@@ -1,4 +1,4 @@
-import { Chapter, type TourDiagram } from "@glass/contracts"
+import { Chapter, Tour, type TourDiagram } from "@glass/contracts"
 import { Schema } from "effect"
 import { expect, it } from "vite-plus/test"
 import { TourAnswer } from "./tourPrompt"
@@ -27,7 +27,7 @@ const diagram: TourDiagram = {
 
 it.each([
   ["empty diagram", { diagram: { nodes: [], edges: [] } }],
-  ["malformed call tree", { callTree: "not a tree" }],
+  ["malformed Before / after", { beforeAfter: "not an outline" }],
 ] as const)("omits %s without discarding prose or valid sibling visuals", (_, invalid) => {
   const result = decode({ ...answer, chapters: [{ ...chapter, callouts, ...invalid }] })
   expect(result.chapters).toEqual([{ ...chapter, callouts }])
@@ -54,9 +54,14 @@ it("still rejects malformed required Chapter content", () => {
   ).toThrow(/explanation/)
 })
 
+it("omits a malformed Tour Before / after without discarding its Chapters", () => {
+  expect(decode({ ...answer, beforeAfter: { title: "Empty", lines: [] } })).toEqual(answer)
+})
+
 it("still asks the agent for the strict output schema", () => {
   const strict = Schema.Struct({
     intent: TourAnswer.fields.intent,
+    beforeAfter: Tour.fields.beforeAfter,
     chapters: Schema.Array(Chapter),
     unplacedFiles: TourAnswer.fields.unplacedFiles,
   })

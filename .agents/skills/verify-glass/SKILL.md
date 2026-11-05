@@ -19,8 +19,8 @@ Run from the repo root. First time in a checkout: `mise trust && mise install &&
 
 ```sh
 V=.agents/skills/verify-glass/scripts/glass-verify.ts
-node $V launch                                  # fake GitHub, local Pi provider; no model charges
-node $V launch --tour-provider real             # live model provider; may incur charges
+node $V launch                                  # fake GitHub, Claude Code and pi off; no model charges
+node $V launch --real-agents                    # your Claude Code and pi; may incur charges
 node $V launch --github fake --fake-mode 401    # fake GitHub: ok | 401 | 500 | down | busy-500
 node $V launch --no-credentials                 # no token env vars, gh hidden from PATH
 node $V launch --github fake --fail-backend-start  # the backend exits as it starts
@@ -34,7 +34,7 @@ Each run is isolated under `.verify/<id>/` (gitignored): its own Electron profil
 
 GitHub defaults to fake. Explicit `--github real` selects live GitHub. With fake GitHub, the backend's `GLASS_GITHUB_API_URL` points at the shared fake in `apps/server/test/fakeGitHub.ts`. It answers `GET /user` as `octocat` (`ok`), HTTP 401, HTTP 500, or a dropped connection (`down`), and `GH_TOKEN` is a dummy. In `ok` mode it also answers the PR list reads (the full read of open PRs, the catch-up search, and checks) with four Needs review PRs (Passing, Failing, Running, and Unavailable checks), two My PRs (one a draft), and one Reviewing PR per followed repository; a repository named `quiet` has none and one named `busy` supplies 134 Needs review PRs alongside My PRs and Reviewing. `busy-500` answers like `ok` except that every PR list read of the `busy` repository fails with HTTP 500. Listed PRs open into a PR workspace with a one-file diff; `octo-org/glass#101` is the exception, 150 generated files for scroll and memory runs. Drafts, Reviews, and Tours use the shared fake too. That env var is the backend's real GitHub boundary, so everything from the renderer to the HTTP call is production code. Change its answer mid-run with `node $V fake-github <mode>`.
 
-Tour verification defaults to `--tour-provider fake`. Choose **pi** as the Tour engine in Settings → Tours before **Write Tour**. Your installed `pi` calls a local provider that returns a clearly marked synthetic Chapter covering the PR's actual changed paths. Pi credentials and model settings live inside the run; Claude Code is disabled to prevent accidental paid calls. GitHub still uses the chosen `--github` mode. See [Tours](features/tours.md) for the recipe. Choose `--tour-provider real` explicitly to use your normal Pi configuration and Claude Code installation; this may incur model charges.
+Verify Tours and Agent reviews with `--backend fake`: they read a checkout, and only that backend's fake GitHub has a git remote. Otherwise Claude Code and pi are off, to prevent accidental paid calls. See [Tours](features/tours.md) for the recipe. Choose `--real-agents` explicitly to use your normal Pi configuration and Claude Code installation; this may incur model charges.
 
 ## Doctor
 
@@ -42,7 +42,7 @@ Tour verification defaults to `--tour-provider fake`. Choose **pi** as the Tour 
 node $V doctor
 ```
 
-Read-only. Checks an Electron process serves the run's CDP port, that port belongs to our Electron (prints its version), the window shows the built renderer, the backend answers `/health` with the run's secret, the helper-owned fake providers are up, and the build is newer than every source file. For `--backend fake`, it labels GitHub as backend-owned and Tours as synthetic runners; the fake Anthropic API supplies the pinned real Claude CLI. Exit code 1 on any `FAIL`. Run it first whenever anything looks off; a stale-build `FAIL` means relaunch without `--no-build`.
+Read-only. Checks an Electron process serves the run's CDP port, that port belongs to our Electron (prints its version), the window shows the built renderer, the backend answers `/health` with the run's secret, the helper-owned fake GitHub is up, and the build is newer than every source file. For `--backend fake`, it labels GitHub as backend-owned and Tours as synthetic runners; the fake Anthropic API supplies the pinned real Claude CLI. Exit code 1 on any `FAIL`. Run it first whenever anything looks off; a stale-build `FAIL` means relaunch without `--no-build`.
 
 ## Drive
 
@@ -99,7 +99,7 @@ Sampling is read-only, but it attaches a debugger to the window's target, which 
 
 ## Evidence
 
-Everything lands in `.verify/<id>/evidence/`: your snapshots and screenshots, plus on `stop`, `electron.log` (main-process and backend stdout), `backend.log`, `fake-github.log` (one line per GitHub request with the mode that answered it), and `fake-pi.log` (completion timestamps and file counts; no prompts or credentials).
+Everything lands in `.verify/<id>/evidence/`: your snapshots and screenshots, plus on `stop`, `electron.log` (main-process and backend stdout), `backend.log`, and `fake-github.log` (one line per GitHub request with the mode that answered it).
 
 Proof standards:
 
@@ -107,7 +107,7 @@ Proof standards:
 - Capture the action and the resulting state: a snapshot/screenshot before and after, not only the final screen.
 - Verify side effects alongside the UI: `fake-github.log` proves the click reached GitHub; `stop` prints whether the backend port closed.
 - Use fake GitHub for isolated verification. Explicit `--github real` selects live GitHub; isolated storage does not isolate GitHub writes.
-- A fake-provider Tour proves the app, SDK transport, saving, and rendering. Report it as synthetic; live authentication and model output quality require a real-provider run.
+- A synthetic Tour proves the app, the checkout, saving, and rendering. Report it as synthetic; live authentication and model output quality require a real-provider run.
 - Look at every screenshot with the Read tool; layout or copy that looks off is a finding.
 
 ## Cleanup
