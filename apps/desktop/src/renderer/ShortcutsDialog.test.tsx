@@ -2,6 +2,8 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, expect, it, vi } from "vite-plus/test"
+import { Button } from "@/components/ui/button"
+import { TooltipProvider } from "@/components/ui/tooltip"
 import { BackToPullRequests } from "./BackToPullRequests"
 import { ShortcutsDialog } from "./ShortcutsDialog"
 
@@ -33,6 +35,29 @@ it("opens with Shift+? and Escape returns focus without leaving the PR workspace
   expect(back).not.toHaveBeenCalled()
   await user.keyboard("{Escape}")
   expect(back).toHaveBeenCalledOnce()
+})
+
+it("shows an opener's tooltip when tabbing to it, but not when closing returns focus", async () => {
+  const user = userEvent.setup()
+  render(
+    <TooltipProvider>
+      <Button title="Read the diff">Read diff</Button>
+      <ShortcutsDialog />
+    </TooltipProvider>,
+  )
+  const opener = screen.getByRole("button", { name: "Read diff" })
+
+  await user.tab()
+  expect(document.activeElement).toBe(opener)
+  await screen.findByRole("tooltip", { name: "Read the diff" })
+
+  fireEvent.keyDown(opener, { key: "?", shiftKey: true })
+  await screen.findByRole("dialog", { name: "Keyboard shortcuts" })
+  await waitFor(() => expect(screen.queryByRole("tooltip")).toBeNull())
+
+  await user.keyboard("{Escape}")
+  await waitFor(() => expect(document.activeElement).toBe(opener))
+  expect(screen.queryByRole("tooltip")).toBeNull()
 })
 
 it("searches shortcuts, recovers from no results, and starts fresh when reopened", async () => {

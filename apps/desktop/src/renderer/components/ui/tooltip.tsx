@@ -1,6 +1,8 @@
 import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip"
 import { cn } from "cn"
-import { type ReactElement, type ReactNode, useId } from "react"
+import { type ReactElement, type ReactNode, useEffect, useId } from "react"
+
+let lastKey = ""
 
 function TooltipHint({
   children,
@@ -14,7 +16,11 @@ function TooltipHint({
   const descriptionId = useId()
 
   return (
-    <Tooltip>
+    <Tooltip
+      onOpenChange={(open, details) => {
+        if (open && details.reason === "trigger-focus" && lastKey !== "Tab") details.cancel()
+      }}
+    >
       <TooltipTrigger render={children} aria-describedby={descriptionId} />
       <TooltipContent id={descriptionId} side={side}>
         {content}
@@ -24,6 +30,16 @@ function TooltipHint({
 }
 
 function TooltipProvider({ delay = 300, ...props }: TooltipPrimitive.Provider.Props) {
+  useEffect(() => {
+    const recordKey = (event: KeyboardEvent) => {
+      lastKey = event.key
+    }
+
+    window.addEventListener("keydown", recordKey, true)
+
+    return () => window.removeEventListener("keydown", recordKey, true)
+  }, [])
+
   return <TooltipPrimitive.Provider data-slot="tooltip-provider" delay={delay} {...props} />
 }
 
