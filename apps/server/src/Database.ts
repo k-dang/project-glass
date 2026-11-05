@@ -17,12 +17,14 @@ const synchronousNormal = Layer.effectDiscard(
   }),
 )
 
+export const databaseFile = (dataDirectory: string) => join(dataDirectory, "glass.db")
+
 export const DatabaseLive = Layer.merge(synchronousNormal, migrations).pipe(
   Layer.provideMerge(
     Layer.unwrap(
       Effect.gen(function* () {
         const { dataDirectory } = yield* ServerConfig
-        const filename = join(dataDirectory, "glass.db")
+        const filename = databaseFile(dataDirectory)
         const fs = yield* FileSystem.FileSystem
 
         yield* fs.makeDirectory(dirname(filename), { recursive: true })

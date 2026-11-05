@@ -47,6 +47,10 @@ export const describeError = (error: BackendError): Problem =>
         title: "That isn't a GitHub repository",
         detail: "Enter owner/repo or a repository URL like https://github.com/owner/repo.",
       }),
+      StorageError: () => ({
+        title: "Couldn't measure storage",
+        detail: "Glass couldn't read its database sizes.",
+      }),
       SettingsError: ({ message }) => ({
         title: "Couldn't access settings",
         detail: message,

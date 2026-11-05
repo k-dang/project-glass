@@ -42,6 +42,8 @@ export * from "./rpc"
 
 export * from "./settings"
 
+export * from "./storage"
+
 export * from "./toDo"
 
 export * from "./toDoMention"

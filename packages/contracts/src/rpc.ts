@@ -54,6 +54,7 @@ import { ReviewDecision, SubmitReviewError } from "./review"
 import { Revision, RevisionSide, StaleRevision } from "./revision"
 import { ResumableDestination, SavedPlace, SavedPlaceError } from "./savedPlace"
 import { SettingsError } from "./settings"
+import { StorageError, StorageItem } from "./storage"
 import { ToDo, ToDoError, ToDoTitle } from "./toDo"
 import { TourFailure, TourState } from "./tour"
 
@@ -145,6 +146,7 @@ export class GlassRpcs extends RpcGroup.make(
     payload: { feature: EngineFeature, enabled: Schema.Boolean },
     error: SettingsError,
   }),
+  Rpc.make("GetStorageBreakdown", { success: Schema.Array(StorageItem), error: StorageError }),
   Rpc.make("ListFollowedRepositories", {
     success: Schema.Array(FollowedRepository),
     error: SettingsError,

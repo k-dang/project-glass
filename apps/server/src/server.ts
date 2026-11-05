@@ -29,6 +29,7 @@ import { PullRequestMirror } from "./PullRequestMirror"
 import { Queue } from "./Queue"
 import { SettingsStore } from "./SettingsStore"
 import { SavedPlaces } from "./SavedPlaces"
+import { Storage } from "./Storage"
 import { ToDos } from "./ToDos"
 import { AgentRunners } from "./agentRunners"
 import { Tours } from "./Tours"
@@ -79,7 +80,7 @@ const services = (agentRunners: AgentRunnersLayer) =>
     Layer.provide(Checkouts.layer),
     Layer.provide(Git.layer),
     Layer.provide(agentRunners),
-    Layer.provide(ActivityLog.layer),
+    Layer.provide(Layer.merge(ActivityLog.layer, Storage.layer)),
     Layer.provide(DatabaseLive),
     Layer.provide(FollowedRepositories.layer),
     Layer.provide(SettingsStore.layer),
