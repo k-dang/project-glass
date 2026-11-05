@@ -11,7 +11,6 @@ import { FileMaterial, fileMaterial } from "./tourPrompt"
 
 const CommentMaterial = Schema.Struct({ author: Schema.String, bodyHtml: Schema.String })
 
-/** A PR as the Agent programs read it: data, never instructions. */
 export const PullRequestMaterial = Schema.Struct({
   title: Schema.String,
   description: Schema.String,

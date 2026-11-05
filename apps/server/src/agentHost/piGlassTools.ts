@@ -6,7 +6,6 @@ const URL_VARIABLE = "GLASS_TOOLS_URL"
 
 const BEARER_VARIABLE = "GLASS_TOOLS_BEARER"
 
-/** pi's tool names for Glass's tools, which match Claude Code's. */
 export const PI_GLASS_TOOLS = `${GLASS_MCP_PREFIX}*`
 
 /** The variables pi's Glass tools read, empty unless `access` is given so none are inherited. */

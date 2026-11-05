@@ -31,7 +31,6 @@ import { PullRequestLists } from "../PullRequestLists"
 import { Queue } from "../Queue"
 import { ToDos } from "../ToDos"
 
-/** A Glass failure, worded for the model to explain to the user. */
 export class GlassToolFailure extends Schema.TaggedError<GlassToolFailure>()("GlassToolFailure", {
   message: Schema.String,
 }) {}
@@ -209,19 +208,18 @@ const activityOf = (turn: Turn) =>
 
 /** Leaves out the largest diffs first until the rest fit. */
 const withinBudget = (files: ReadonlyArray<FileMaterial>) => {
-  const sizes = files.map((file) => file.diff?.length ?? 0)
-  const leftOut = new Set<number>()
-  let total = sizes.reduce((sum, size) => sum + size, 0)
+  const leftOut = new Set<FileMaterial>()
+  let total = files.reduce((sum, file) => sum + (file.diff?.length ?? 0), 0)
 
-  for (const index of sizes.map((_, i) => i).toSorted((a, b) => sizes[b]! - sizes[a]!)) {
+  for (const file of files.toSorted((a, b) => (b.diff?.length ?? 0) - (a.diff?.length ?? 0))) {
     if (total <= MAX_DIFF_CHARS) break
-    leftOut.add(index)
-    total -= sizes[index]!
+    leftOut.add(file)
+    total -= file.diff?.length ?? 0
   }
 
   return {
-    files: files.map((file, index) => (leftOut.has(index) ? { ...file, diff: null } : file)),
-    diffsLeftOut: files.flatMap((file, index) => (leftOut.has(index) ? [file.path] : [])),
+    files: files.map((file) => (leftOut.has(file) ? { ...file, diff: null } : file)),
+    diffsLeftOut: files.flatMap((file) => (leftOut.has(file) ? [file.path] : [])),
   }
 }
 
