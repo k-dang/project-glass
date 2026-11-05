@@ -88,7 +88,6 @@ const services = (agentRunners: AgentRunnersLayer) =>
     Layer.provide(SettingsStore.layer),
     Layer.provide(GitHubClient.layer),
     Layer.provide(GitHubAuth.layer),
-    // Merged out too: the MCP routes authenticate with the credentials services issue.
     Layer.provideMerge(McpCredentials.layer),
   )
 

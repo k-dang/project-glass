@@ -22,7 +22,6 @@ const McpAccess = HttpRouter.middleware(
 
     return (httpEffect) =>
       Effect.gen(function* () {
-        // Effect's own bearer decoder, which keeps the value redacted.
         const bearer = yield* HttpApiBuilder.securityDecode(HttpApiSecurity.bearer)
         const credential = credentials.authenticate(bearer)
 
@@ -69,8 +68,7 @@ export const McpRoutes = (tools: Layer.Layer<never>) =>
       version: "1.0.0",
       path: MCP_PATH,
       protocols: [McpProtocol.v2025_11_25],
-      // Effect never expires sessions: a runtime ending cleanly frees its own. A revoked
-      // credential's sessions are unusable but stay in Effect's memory until the backend restarts.
+      // Effect never expires sessions, so a runtime ending cleanly frees its own.
       allowSessionTermination: true,
     }).pipe(Layer.provide(McpAccess.layer), Layer.orDie),
     tools,

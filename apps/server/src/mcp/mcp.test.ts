@@ -145,6 +145,7 @@ describe("MCP endpoint", () => {
       const second = yield* mcpCredentials.issue(GLOBAL)
 
       assert.notStrictEqual(Redacted.value(second), Redacted.value(first))
+
       const restarted = yield* connectMcp(baseUrl, second)
 
       assert.strictEqual((yield* restarted.request("tools/list", {}).response).status, 200)

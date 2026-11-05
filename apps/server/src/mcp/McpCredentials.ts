@@ -1,10 +1,7 @@
 import { Context, Deferred, Effect, Layer, Option, Redacted, type Scope } from "effect"
 import { createHash, randomBytes } from "node:crypto"
 
-/**
- * Who an MCP request comes from. It is resolved from the request's credential, never from tool
- * arguments, so a tool's target cannot change who is asking.
- */
+/** Who an MCP request comes from, resolved from its credential rather than tool arguments. */
 export interface McpCallerIdentity {
   readonly conversationId: string
 }
@@ -13,11 +10,8 @@ export interface McpCallerIdentity {
 export class McpCaller extends Context.Service<McpCaller, McpCallerIdentity>()(
   "@glass/server/McpCaller",
 ) {
-  /**
-   * The current request's caller. Tool handlers run inside an authenticated request, so a missing
-   * caller is a defect. Read from the fiber rather than required in the type, because tool
-   * handlers are built once while their caller differs per request.
-   */
+  // Read from the fiber rather than required in the type: tool handlers are built once, while
+  // their caller differs per request.
   static readonly current = Effect.serviceOption(McpCaller).pipe(
     Effect.flatMap(
       Option.match({
@@ -40,12 +34,7 @@ export interface McpCredential {
   readonly revoked: Effect.Effect<void>
 }
 
-/**
- * Bearer credentials for conversation runtimes calling the MCP endpoint. A credential is issued
- * when a runtime starts, is bound to that runtime's conversation, and is revoked when the runtime
- * ends; a restarted runtime gets a fresh one. Kept in memory only: they live no longer than the
- * backend that issued them.
- */
+/** Bearer credentials for conversation runtimes, issued per runtime and kept in memory only. */
 export class McpCredentials extends Context.Service<
   McpCredentials,
   {
