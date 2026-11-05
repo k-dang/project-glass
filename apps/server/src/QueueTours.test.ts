@@ -40,7 +40,7 @@ const fixture = Effect.fnUntraced(function* ({ queueTours = true } = {}) {
   const home = yield* isolatedHome
   const { watched, deadlineSet } = yield* watchDeadlines(deadline)
   const runners = yield* scriptedAgentRunners({ reply: "hold" })
-  const github = yield* startFakeGitHub()
+  const github = yield* startFakeGitHub({ git: true })
 
   const seed = (title: string, state: FakePullRequestState = "OPEN") =>
     github.seedPullRequest({
@@ -62,6 +62,7 @@ const fixture = Effect.fnUntraced(function* ({ queueTours = true } = {}) {
   const env = {
     GH_TOKEN: VIEWER.token,
     GLASS_GITHUB_API_URL: github.url,
+    GLASS_GIT_REMOTE: github.gitUrl,
     GLASS_TOUR_TIMEOUT_MS: String(deadline),
   }
 
@@ -234,7 +235,7 @@ it.live(
 
       written.push({ head: { sha: "h-pushed", files: { "greet.ts": "hello again" } } })
       yield* f.client.RefreshQueue()
-      assert.strictEqual((yield* f.client.ListSavedQueue())[0]?.revision?.head, "h-pushed")
+      assert.strictEqual((yield* f.client.ListSavedQueue())[0]?.revision?.head, written.head.sha)
 
       yield* f.runners.configure({ reply: "hold" })
       const interrupted = f.seed("Wave")

@@ -9,14 +9,12 @@ import {
 } from "@glass/contracts"
 import { Context, DateTime, Effect, Layer, Option, Schema, Stream, SubscriptionRef } from "effect"
 import { SqlClient } from "effect/sql"
+import { type CheckoutRunFailure, CheckoutRuns } from "./CheckoutRuns"
 import { GitHubClient } from "./github/GitHubClient"
 import { pullRequestJobs, type PullRequestJob } from "./pullRequestJobs"
 import { ServerConfig } from "./ServerConfig"
-import { engineSettingsOf, SettingsStore } from "./SettingsStore"
-import type { AgentFailure } from "./agentFailure"
-import { AgentRunners } from "./agentRunners"
 import { TourAnswer, tourInstructions, tourPrompt } from "./tourPrompt"
-import { repairChapterVisuals } from "./tourVisuals"
+import { repairChapterVisuals, validateTourBeforeAfter } from "./tourVisuals"
 
 const BACKGROUND_SLOTS = 2
 
@@ -24,6 +22,7 @@ type Job = PullRequestJob<TourState>
 
 const content = Schema.Struct({
   intent: Tour.fields.intent,
+  beforeAfter: Tour.fields.beforeAfter,
   chapters: Tour.fields.chapters,
   everythingElse: Tour.fields.everythingElse,
 })
@@ -51,12 +50,8 @@ const logStorageFailure = Effect.tapError((cause: unknown) =>
   Effect.logWarning("Couldn't load or save a Tour", cause),
 )
 
-const fromAgentFailure = ({ reason, message, runner }: AgentFailure) =>
-  new TourFailure({
-    reason: reason === "failed" ? "runner" : reason,
-    message,
-    runner,
-  })
+const fromCheckoutRunFailure = ({ reason, message, runner }: CheckoutRunFailure) =>
+  new TourFailure({ reason, message, runner })
 
 const repair = (answer: TourAnswer, changedFiles: ReadonlyArray<ChangedFile>) => {
   const remaining = new Set(changedFiles.map((file) => file.path))
@@ -73,7 +68,10 @@ const repair = (answer: TourAnswer, changedFiles: ReadonlyArray<ChangedFile>) =>
     ...new Set([...answer.unplacedFiles.filter((path) => remaining.has(path)), ...remaining]),
   ]
 
-  return { intent: answer.intent, chapters, everythingElse }
+  const beforeAfter =
+    answer.beforeAfter == null ? null : validateTourBeforeAfter(answer.beforeAfter, changedFiles)
+
+  return { intent: answer.intent, beforeAfter, chapters, everythingElse }
 }
 
 export class Tours extends Context.Service<
@@ -95,15 +93,7 @@ export class Tours extends Context.Service<
       const sql = yield* SqlClient.SqlClient
       const github = yield* GitHubClient
       const config = yield* ServerConfig
-      const settings = yield* SettingsStore
-      const runners = yield* AgentRunners
-
-      const engineSettings = settings.read().pipe(
-        Effect.map((current) => engineSettingsOf(current, "tours")),
-        Effect.mapError(
-          (error) => new TourFailure({ reason: "not-ready", message: error.message, runner: null }),
-        ),
-      )
+      const checkoutRuns = yield* CheckoutRuns
 
       const load = Effect.fnUntraced(function* (pr: PullRequestRef) {
         const rows =
@@ -145,39 +135,35 @@ export class Tours extends Context.Service<
 
       const work = (job: Job, pr: PullRequestRef, revision: Revision, startedAt: number) =>
         Effect.gen(function* () {
-          const selected = yield* runners
-            .select(yield* engineSettings)
-            .pipe(Effect.mapError(fromAgentFailure))
+          const selected = yield* checkoutRuns
+            .select("tours")
+            .pipe(Effect.mapError(fromCheckoutRunFailure))
 
           const runner = selected.identity
           yield* setJob(job, { status: "writing", startedAt, runner })
 
-          const input = yield* github.tourInput(pr, revision).pipe(
-            Effect.tapError((cause) =>
-              Effect.logWarning("Couldn't read the Revision for a Tour", cause),
-            ),
-            Effect.mapError(
-              () =>
-                new TourFailure({
-                  reason: "github",
-                  message:
-                    "Couldn't read the requested Revision from GitHub. Reload the PR and try again.",
-                  runner,
-                }),
-            ),
-          )
-
-          const answer = yield* selected
+          const { input, answer } = yield* selected
             .run({
+              pr,
+              revision,
               subject: "Tour",
-              instructions: tourInstructions,
-              prompt: tourPrompt(input),
-              answer: TourAnswer,
-              files: "none",
+              timeout: config.tourTimeoutMs,
+              read: github.tourInput,
+              task: (material) =>
+                Effect.succeed({
+                  instructions: tourInstructions,
+                  prompt: tourPrompt(material),
+                  answer: TourAnswer,
+                }),
             })
-            .pipe(Effect.mapError(fromAgentFailure))
+            .pipe(Effect.mapError(fromCheckoutRunFailure))
 
           const repaired = repair(answer, input.files)
+
+          if (answer.beforeAfter != null && repaired.beforeAfter === null)
+            yield* Effect.logWarning(
+              "Dropped a Tour's Before / after: it changed nothing or a changed line isn't in the diff",
+            )
 
           if (repaired.chapters.length === 0)
             return yield* new TourFailure({
@@ -200,19 +186,6 @@ export class Tours extends Context.Service<
           )
         }).pipe(
           Effect.scoped,
-          Effect.timeoutOrElse({
-            duration: config.tourTimeoutMs,
-            orElse: () =>
-              Effect.gen(function* () {
-                const { job: current } = yield* SubscriptionRef.get(job.state)
-
-                return yield* new TourFailure({
-                  reason: "timeout",
-                  message: "Writing the Tour took too long. Try again.",
-                  runner: current.status === "writing" ? current.runner : null,
-                })
-              }),
-          }),
           jobs.settle(job, ({ tour, job: current }, error: Option.Option<TourFailure>) => ({
             tour,
             job: {

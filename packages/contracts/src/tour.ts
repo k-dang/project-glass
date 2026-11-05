@@ -1,5 +1,6 @@
 import { Schema } from "effect"
 import { AgentRunnerIdentity } from "./engine"
+import { CheckoutRunReason } from "./checkoutRun"
 import { DiffSide } from "./discussion"
 import { Revision } from "./revision"
 
@@ -54,14 +55,19 @@ export const TourDiagram = Schema.Struct({
 
 export type TourDiagram = typeof TourDiagram.Type
 
-export const TourCallTree = Schema.Array(
-  Schema.Struct({
-    ...TourDiagramNode.fields,
-    parent: Schema.NullOr(Schema.NonEmptyString),
-  }),
-).check(Schema.isMinLength(2), Schema.isMaxLength(12))
+export const TourBeforeAfter = Schema.Struct({
+  title: Schema.NonEmptyString.check(Schema.isMaxLength(80)),
+  lines: Schema.Array(
+    Schema.Struct({
+      depth: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 6 })),
+      text: Schema.NonEmptyString.check(Schema.isMaxLength(120)),
+      change: DiagramChange,
+      target: Schema.NullOr(TourCodeTarget),
+    }),
+  ).check(Schema.isMinLength(2), Schema.isMaxLength(24)),
+})
 
-export type TourCallTree = typeof TourCallTree.Type
+export type TourBeforeAfter = typeof TourBeforeAfter.Type
 
 export const TourCallouts = Schema.Array(
   Schema.Struct({
@@ -77,7 +83,7 @@ export const Chapter = Schema.Struct({
   explanation: Schema.String,
   files: Schema.Array(Schema.Struct({ path: Schema.String, summary: Schema.String })),
   diagram: Schema.optionalKey(Schema.NullOr(TourDiagram)),
-  callTree: Schema.optionalKey(Schema.NullOr(TourCallTree)),
+  beforeAfter: Schema.optionalKey(Schema.NullOr(TourBeforeAfter)),
   callouts: Schema.optionalKey(TourCallouts),
 })
 
@@ -87,6 +93,7 @@ export const Tour = Schema.Struct({
   revision: Revision,
   writtenAt: Schema.DateTimeUtcFromString,
   intent: Schema.String,
+  beforeAfter: Schema.optionalKey(Schema.NullOr(TourBeforeAfter)),
   chapters: Schema.Array(Chapter),
   everythingElse: Schema.Array(Schema.String),
 })
@@ -94,16 +101,7 @@ export const Tour = Schema.Struct({
 export type Tour = typeof Tour.Type
 
 export class TourFailure extends Schema.TaggedError<TourFailure>()("TourFailure", {
-  reason: Schema.Literals([
-    "not-installed",
-    "not-ready",
-    "authentication",
-    "runner",
-    "timeout",
-    "unusable-output",
-    "github",
-    "storage",
-  ]),
+  reason: CheckoutRunReason,
   message: Schema.String,
   runner: Schema.NullOr(AgentRunnerIdentity),
 }) {}

@@ -4,42 +4,39 @@ import type {
   TourCodeTarget,
   TourDiagram,
   TourDiagramNode,
-  TourCallTree,
+  TourBeforeAfter,
   TourCallouts,
 } from "@glass/contracts"
 import { Predicate } from "effect"
 import { rangeInPatch } from "./github/patchLines"
 
-const validTarget = (
-  target: TourCodeTarget,
-  chapter: Chapter,
-  files: ReadonlyArray<ChangedFile>,
-) => {
+const validTarget = (target: TourCodeTarget, files: ReadonlyArray<ChangedFile>) => {
   const file = files.find((entry) => entry.path === target.path)
 
   return (
-    chapter.files.some((entry) => entry.path === target.path) &&
     file !== undefined &&
     Predicate.isTagged(file.patch, "TextPatch") &&
     rangeInPatch(file.patch.hunks, target.side, target.startLine, target.endLine)
   )
 }
 
-const validNode = (node: TourDiagramNode, chapter: Chapter, files: ReadonlyArray<ChangedFile>) =>
+const validNode = (
+  node: Pick<TourDiagramNode, "change" | "target">,
+  files: ReadonlyArray<ChangedFile>,
+) =>
   (node.change !== "added" || node.target.side === "new") &&
   (node.change !== "removed" || node.target.side === "old") &&
-  validTarget(node.target, chapter, files)
+  validTarget(node.target, files)
 
 export const validateTourDiagram = (
   diagram: TourDiagram,
-  chapter: Chapter,
   files: ReadonlyArray<ChangedFile>,
 ): TourDiagram | null => {
   const ids = new Set(diagram.nodes.map((node) => node.id))
 
   if (ids.size !== diagram.nodes.length) return null
 
-  if (!diagram.nodes.every((node) => validNode(node, chapter, files))) return null
+  if (!diagram.nodes.every((node) => validNode(node, files))) return null
 
   const connections = new Map(diagram.nodes.map((node) => [node.id, new Set<string>()]))
   const edges = new Set<string>()
@@ -86,48 +83,48 @@ export const validateTourDiagram = (
   return diagram
 }
 
-export const validateTourCallTree = (
-  tree: TourCallTree,
-  chapter: Chapter,
+export const validateTourBeforeAfter = (
+  beforeAfter: TourBeforeAfter,
   files: ReadonlyArray<ChangedFile>,
-): TourCallTree | null => {
-  const seen = new Set<string>()
+): TourBeforeAfter | null => {
+  const changed = beforeAfter.lines.filter((line) => line.change !== "unchanged")
 
-  for (const node of tree) {
-    if (seen.has(node.id) || !validNode(node, chapter, files)) return null
+  if (changed.length === 0) return null
 
-    if (seen.size === 0 ? node.parent !== null : node.parent === null || !seen.has(node.parent))
-      return null
-    seen.add(node.id)
+  if (
+    !changed.every(({ change, target }) => target !== null && validNode({ change, target }, files))
+  )
+    return null
+
+  return {
+    ...beforeAfter,
+    lines: beforeAfter.lines.map((line) =>
+      line.target === null || validTarget(line.target, files) ? line : { ...line, target: null },
+    ),
   }
-
-  return tree
 }
 
-export const validateTourCallouts = (
-  callouts: TourCallouts,
-  chapter: Chapter,
-  files: ReadonlyArray<ChangedFile>,
-) => callouts.filter((callout) => validTarget(callout.target, chapter, files))
+export const validateTourCallouts = (callouts: TourCallouts, files: ReadonlyArray<ChangedFile>) =>
+  callouts.filter((callout) => validTarget(callout.target, files))
 
 export const repairChapterVisuals = (
   chapter: Chapter,
   files: ReadonlyArray<ChangedFile>,
 ): Chapter => {
   const repaired = { ...chapter }
+  const inChapter = files.filter((file) => chapter.files.some(({ path }) => path === file.path))
 
-  if (chapter.diagram != null)
-    repaired.diagram = validateTourDiagram(chapter.diagram, chapter, files)
+  if (chapter.diagram != null) repaired.diagram = validateTourDiagram(chapter.diagram, inChapter)
 
-  if (chapter.callTree != null)
-    repaired.callTree = validateTourCallTree(chapter.callTree, chapter, files)
+  if (chapter.beforeAfter != null)
+    repaired.beforeAfter = validateTourBeforeAfter(chapter.beforeAfter, inChapter)
 
   if (chapter.callouts !== undefined)
-    repaired.callouts = validateTourCallouts(chapter.callouts, chapter, files)
+    repaired.callouts = validateTourCallouts(chapter.callouts, inChapter)
 
   // A Chapter shows one map. The diagram wins because it also carries branches and
-  // flow steps; a call tree survives only when no usable diagram does.
-  if (repaired.diagram != null && repaired.callTree != null) repaired.callTree = null
+  // flow steps; a Before / after survives only when no usable diagram does.
+  if (repaired.diagram != null && repaired.beforeAfter != null) repaired.beforeAfter = null
 
   return repaired
 }

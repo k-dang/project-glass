@@ -1,7 +1,8 @@
 # Tour runners reuse existing credentials through the Claude Code and pi CLIs
 
 > These runners are now strategies behind the seam Tours share with Agent reviews (ADR 0006), and
-> Agent reviews also read a checkout (ADR 0005).
+> Agent reviews also read a checkout (ADR 0005). Tours now read one too (ADR 0012), so the paragraph
+> below on running with no tools no longer holds.
 
 The reviewer chooses Claude Code or the pi CLI when writing a Tour. Both reuse the user's existing
 credentials through their installed CLI, so Glass adds no API-key store or authentication setup, and

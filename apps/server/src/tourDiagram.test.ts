@@ -3,14 +3,14 @@ import {
   ChangedFile,
   type Chapter,
   TextPatch,
+  type TourBeforeAfter,
   type TourDiagram,
-  type TourCallTree,
 } from "@glass/contracts"
 import { expect, it } from "vite-plus/test"
 import {
   repairChapterVisuals,
+  validateTourBeforeAfter,
   validateTourDiagram,
-  validateTourCallTree,
   validateTourCallouts,
 } from "./tourVisuals"
 
@@ -61,49 +61,78 @@ it("validates flow references and preserves a static diagram when its steps are 
     },
   ]
 
-  expect(validateTourDiagram({ ...diagram, steps }, chapter, [file])?.steps).toEqual(steps)
+  expect(validateTourDiagram({ ...diagram, steps }, [file])?.steps).toEqual(steps)
   expect(
-    validateTourDiagram(
-      { ...diagram, steps: [{ ...steps[0]!, nodes: ["invented"] }, steps[1]!] },
-      chapter,
-      [file],
-    ),
-  ).toEqual(diagram)
-  expect(
-    validateTourDiagram({ ...diagram, steps: [steps[0]!, { ...steps[1]!, edges: [9] }] }, chapter, [
+    validateTourDiagram({ ...diagram, steps: [{ ...steps[0]!, nodes: ["invented"] }, steps[1]!] }, [
       file,
     ]),
   ).toEqual(diagram)
+  expect(
+    validateTourDiagram({ ...diagram, steps: [steps[0]!, { ...steps[1]!, edges: [9] }] }, [file]),
+  ).toEqual(diagram)
 })
 
-it("accepts a rooted call tree and rejects unknown callers, cycles, and multiple roots", () => {
-  const tree: TourCallTree = [
-    { ...diagram.nodes[0]!, parent: null },
-    { ...diagram.nodes[1]!, parent: "receive" },
-  ]
+const beforeAfter: TourBeforeAfter = {
+  title: "How a request is stored",
+  lines: [
+    { depth: 0, text: "Receive request", change: "unchanged", target: null },
+    {
+      depth: 1,
+      text: "Write straight away",
+      change: "removed",
+      target: { path: file.path, side: "old", startLine: 2, endLine: 2 },
+    },
+    {
+      depth: 1,
+      text: "Validate, then write",
+      change: "added",
+      target: { path: file.path, side: "new", startLine: 2, endLine: 3 },
+    },
+  ],
+}
 
-  expect(validateTourCallTree(tree, chapter, [file])).toEqual(tree)
-
-  for (const parent of ["missing", "validate", null]) {
-    expect(validateTourCallTree([tree[0]!, { ...tree[1]!, parent }], chapter, [file])).toBeNull()
-  }
-
-  expect(validateTourCallTree([tree[1]!, tree[0]!], chapter, [file])).toBeNull()
+it("keeps a Before / after whose changed lines are anchored to the diff", () => {
+  expect(validateTourBeforeAfter(beforeAfter, [file])).toEqual(beforeAfter)
 })
 
-it("keeps one map per Chapter, preferring the diagram over a call tree", () => {
-  const callTree: TourCallTree = [
-    { ...diagram.nodes[0]!, parent: null },
-    { ...diagram.nodes[1]!, parent: "receive" },
-  ]
+it("drops the reference from an unchanged line outside the diff, keeping the line", () => {
+  const outside = { path: file.path, side: "new", startLine: 500, endLine: 500 } as const
+  const [first, ...rest] = beforeAfter.lines
 
-  expect(repairChapterVisuals({ ...chapter, callTree }, [file])).toMatchObject({
+  expect(
+    validateTourBeforeAfter({ ...beforeAfter, lines: [{ ...first!, target: outside }, ...rest] }, [
+      file,
+    ]),
+  ).toEqual(beforeAfter)
+})
+
+it.each([
+  ["no target", null],
+  ["a line outside the diff", { path: file.path, side: "new", startLine: 500, endLine: 500 }],
+  ["the wrong side", { path: file.path, side: "old", startLine: 2, endLine: 2 }],
+] as const)("omits a Before / after with an added line on %s", (_, target) => {
+  const lines = beforeAfter.lines.map((line) =>
+    line.change === "added" ? { ...line, target } : line,
+  )
+
+  expect(validateTourBeforeAfter({ ...beforeAfter, lines }, [file])).toBeNull()
+})
+
+it("omits a Before / after that changes nothing or targets another file", () => {
+  const lines = beforeAfter.lines.map((line) => ({ ...line, change: "unchanged" as const }))
+
+  expect(validateTourBeforeAfter({ ...beforeAfter, lines }, [file])).toBeNull()
+  expect(validateTourBeforeAfter(beforeAfter, [])).toBeNull()
+})
+
+it("keeps one map per Chapter, preferring the diagram over a Before / after", () => {
+  expect(repairChapterVisuals({ ...chapter, beforeAfter }, [file])).toMatchObject({
     diagram,
-    callTree: null,
+    beforeAfter: null,
   })
   expect(
-    repairChapterVisuals({ ...chapter, diagram: { ...diagram, edges: [] }, callTree }, [file]),
-  ).toMatchObject({ diagram: null, callTree })
+    repairChapterVisuals({ ...chapter, diagram: { ...diagram, edges: [] }, beforeAfter }, [file]),
+  ).toMatchObject({ diagram: null, beforeAfter })
 })
 
 it("keeps callouts anchored to the Chapter diff and drops invalid targets", () => {
@@ -111,14 +140,13 @@ it("keeps callouts anchored to the Chapter diff and drops invalid targets", () =
   expect(
     validateTourCallouts(
       [callout, { ...callout, target: { ...callout.target, startLine: 99, endLine: 99 } }],
-      chapter,
       [file],
     ),
   ).toEqual([callout])
 })
 
 it("accepts connected diagrams anchored to complete patch ranges on either side", () => {
-  expect(validateTourDiagram(diagram, chapter, [file])).toEqual(diagram)
+  expect(validateTourDiagram(diagram, [file])).toEqual(diagram)
 
   const removed: TourDiagram = {
     ...diagram,
@@ -132,7 +160,7 @@ it("accepts connected diagrams anchored to complete patch ranges on either side"
     ],
   }
 
-  expect(validateTourDiagram(removed, chapter, [file])).toEqual(removed)
+  expect(validateTourDiagram(removed, [file])).toEqual(removed)
 })
 
 it.each([
@@ -145,16 +173,15 @@ it.each([
   expect(
     validateTourDiagram(
       { ...diagram, nodes: [diagram.nodes[0]!, { ...diagram.nodes[1]!, target }] },
-      chapter,
       [file],
     ),
   ).toBeNull()
 })
 
 it("rejects targets outside the Chapter and files without a text patch", () => {
-  expect(validateTourDiagram(diagram, { ...chapter, files: [] }, [file])).toBeNull()
+  expect(repairChapterVisuals({ ...chapter, files: [] }, [file]).diagram).toBeNull()
   expect(
-    validateTourDiagram(diagram, chapter, [
+    validateTourDiagram(diagram, [
       new ChangedFile({
         path: file.path,
         previousPath: null,
@@ -172,19 +199,16 @@ it.each([
   ["self connection", [diagram.edges[0]!, { from: "receive", to: "receive", change: "added" }]],
   ["duplicate connection", [diagram.edges[0]!, diagram.edges[0]!]],
 ] as const)("rejects an invalid graph: %s", (_, edges) => {
-  expect(validateTourDiagram({ ...diagram, edges }, chapter, [file])).toBeNull()
+  expect(validateTourDiagram({ ...diagram, edges }, [file])).toBeNull()
 })
 
 it("rejects duplicate node ids and disconnected nodes", () => {
   expect(
-    validateTourDiagram({ ...diagram, nodes: [...diagram.nodes, diagram.nodes[0]!] }, chapter, [
-      file,
-    ]),
+    validateTourDiagram({ ...diagram, nodes: [...diagram.nodes, diagram.nodes[0]!] }, [file]),
   ).toBeNull()
   expect(
     validateTourDiagram(
       { ...diagram, nodes: [...diagram.nodes, { ...diagram.nodes[0]!, id: "unconnected" }] },
-      chapter,
       [file],
     ),
   ).toBeNull()

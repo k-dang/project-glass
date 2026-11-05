@@ -15,6 +15,7 @@ import {
   recordingSpawner,
   runnerScenarios,
   runnersLayer,
+  scenarioTask,
   seedCheckout,
 } from "./runnerReplay"
 
@@ -90,7 +91,7 @@ const record = async (scenario: RunnerScenario) => {
       Effect.gen(function* () {
         const runner = yield* (yield* AgentRunners).select({ engine: scenario.engine, models })
 
-        return yield* runner.run(scenario.task(checkout))
+        return yield* runner.run(scenarioTask(scenario, checkout))
       }).pipe(
         Effect.scoped,
         Effect.match({

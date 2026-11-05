@@ -1,4 +1,4 @@
-import type { Tour, TourDiagram, TourCallTree, TourCallouts, Revision } from "@glass/contracts"
+import type { Tour, TourBeforeAfter, TourDiagram, TourCallouts, Revision } from "@glass/contracts"
 import { Equal } from "effect"
 import type { ParsedFile } from "./changesView"
 
@@ -8,13 +8,14 @@ export interface TourChapter {
   readonly explanation: string
   readonly paths: ReadonlyArray<string>
   readonly diagram: TourDiagram | null
-  readonly callTree: TourCallTree | null
+  readonly beforeAfter: TourBeforeAfter | null
   readonly callouts: TourCallouts
 }
 
 export interface TourReading {
   readonly writtenAt: Tour["writtenAt"]
   readonly intent: string
+  readonly beforeAfter: TourBeforeAfter | null
   readonly chapters: ReadonlyArray<TourChapter>
   readonly files: ReadonlyArray<ParsedFile>
   readonly summaries: ReadonlyMap<string, string>
@@ -44,6 +45,16 @@ export const readTour = (
     return true
   }
 
+  const shownBeforeAfter = (
+    beforeAfter: TourBeforeAfter | null | undefined,
+    inScope: (path: string) => boolean,
+  ) =>
+    current &&
+    beforeAfter != null &&
+    beforeAfter.lines.every(({ target }) => target === null || inScope(target.path))
+      ? beforeAfter
+      : null
+
   const chapters = tour.chapters.map((chapter, index): TourChapter => {
     const paths = chapter.files.flatMap(({ path, summary }) => {
       if (!place(path)) return []
@@ -67,12 +78,7 @@ export const readTour = (
         diagram.nodes.every((node) => paths.includes(node.target.path))
           ? diagram
           : null,
-      callTree:
-        current &&
-        chapter.callTree != null &&
-        chapter.callTree.every((node) => paths.includes(node.target.path))
-          ? chapter.callTree
-          : null,
+      beforeAfter: shownBeforeAfter(chapter.beforeAfter, (path) => paths.includes(path)),
       callouts: current
         ? (chapter.callouts ?? []).filter((callout) => paths.includes(callout.target.path))
         : [],
@@ -85,6 +91,7 @@ export const readTour = (
   return {
     writtenAt: tour.writtenAt,
     intent: tour.intent,
+    beforeAfter: shownBeforeAfter(tour.beforeAfter, (path) => byPath.has(path)),
     chapters,
     files,
     summaries,

@@ -166,7 +166,7 @@ it.live(
       assert.include(run?.task.prompt, "+hello name")
       assert.include(run?.task.prompt, "Why a name?")
       assert.notInclude(run?.task.prompt, "My own note")
-      assert.isFalse(existsSync(run!.directory!))
+      assert.isFalse(existsSync(run!.task.checkout))
 
       assert.deepStrictEqual(review?.revision, f.revision)
       assert.strictEqual(review?.markdown, answer.markdown)
@@ -208,7 +208,7 @@ it.live("cancels a running review, removing its checkout, and replaces the last 
     yield* f.start
     yield* f.state((state) => state.job.status === "reviewing" && state.job.runner !== null)
     yield* f.runners.ran(2)
-    const checkout = f.runners.runs.at(-1)!.directory!
+    const checkout = f.runners.runs.at(-1)!.task.checkout
     assert.isTrue(existsSync(checkout))
 
     yield* f.client.CancelAgentReview({ pullRequest: f.ref })

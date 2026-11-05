@@ -21,7 +21,6 @@ import { formatAreas, formatSummary, type MemorySample, startSampler } from "./m
 import { githubMode } from "./launch-options.ts"
 import { FAKE_MODES, isFakeMode, serveFakeGitHub } from "./fake-github.ts"
 import { VIEWER } from "../../../../apps/server/test/fakePullRequest.ts"
-import { serveFakePi } from "./fake-pi.ts"
 
 const root = join(import.meta.dirname, "..", "..", "..", "..")
 const desktopDir = join(root, "apps", "desktop")
@@ -31,11 +30,12 @@ const RENDERER_URL = "glass://app/index.html"
 const USAGE = `Usage: node .agents/skills/verify-glass/scripts/glass-verify.ts <command> [options]
 
   launch [--github real|fake] [--fake-mode ok|401|500|down|busy-500] [--no-credentials]
-         [--tour-provider fake|real] [--fail-backend-start] [--backend real|fake]
+         [--real-agents] [--fail-backend-start] [--backend real|fake]
          [--no-build] [--run <id>]
                                          build, start an isolated Glass, wait until ready
                                          GitHub defaults to fake; --github real selects live GitHub
-                                         Tour provider defaults to fake; real may incur model charges
+                                         Claude Code and pi are off unless --real-agents, which may
+                                         incur model charges
                                          --backend fake runs pnpm dev:fake's backend and its demo
                                          Agents; it brings its own fake GitHub and providers, and
                                          runs Claude Code Agents on the pinned claude against a
@@ -76,7 +76,7 @@ interface RunState {
   readonly github: "real" | "fake"
   readonly backend: "real" | "fake"
   readonly fake?: { readonly pid: number; readonly port: number }
-  readonly fakePi?: { readonly pid: number; readonly port: number }
+  readonly realAgents: boolean
   backendUrl?: string
 }
 
@@ -365,7 +365,7 @@ const launch = async (options: {
   run?: string
   github: string | undefined
   fakeMode: string
-  tourProvider: string
+  realAgents: boolean
   noCredentials: boolean
   failBackendStart: boolean
   backend: string
@@ -373,8 +373,6 @@ const launch = async (options: {
 }) => {
   const github = githubMode(options.github, options.backend)
   if (!isFakeMode(options.fakeMode)) fail(`--fake-mode is one of ${FAKE_MODES.join(", ")}`)
-  if (options.tourProvider !== "real" && options.tourProvider !== "fake")
-    fail("--tour-provider is real or fake")
   if (options.backend !== "real" && options.backend !== "fake") fail("--backend is real or fake")
   const fakeBackend = options.backend === "fake"
   const id = options.run ?? `run-${new Date().toISOString().replace(/\D/g, "").slice(0, 14)}`
@@ -398,19 +396,12 @@ const launch = async (options: {
     console.log("Backend: fake, with demo PRs and Agents. Ask a demo pi Agent to work slowly to keep its Turn running.")
   }
 
-  let fakePi: RunState["fakePi"]
   let fake: RunState["fake"]
   try {
-    if (options.tourProvider === "fake" && !fakeBackend) {
-      fakePi = await startFake(
-        "__fake-pi",
-        [paths.home],
-        join(paths.state, "fake-pi-ready.json"),
-        join(paths.state, "fake-pi.log"),
-      )
-      env["PI_CODING_AGENT_DIR"] = join(paths.home, ".pi", "agent")
-      env["GLASS_CLAUDE_COMMAND"] = join(paths.state, "claude-disabled-in-fake-provider-mode")
-      console.log("Tour provider: fake. Choose pi as the Tour engine in Settings; Claude Code is disabled.")
+    if (!options.realAgents && !fakeBackend) {
+      env["GLASS_CLAUDE_COMMAND"] = join(paths.state, "claude-disabled")
+      env["GLASS_PI_COMMAND"] = join(paths.state, "pi-disabled")
+      console.log("Agents: off, so no model charges. Use --backend fake for synthetic runners.")
     }
 
     if (!fakeBackend && github === "fake") {
@@ -426,9 +417,7 @@ const launch = async (options: {
       delete env["GITHUB_TOKEN"]
     }
   } catch (error) {
-    for (const provider of [fakePi, fake]) {
-      if (provider !== undefined) killTree(provider.pid)
-    }
+    if (fake !== undefined) killTree(fake.pid)
     return fail(error instanceof Error ? error.message : String(error))
   }
   if (options.noCredentials) {
@@ -457,7 +446,7 @@ const launch = async (options: {
     github: fakeBackend ? "fake" : github,
     backend: options.backend,
     ...(fake === undefined ? {} : { fake }),
-    ...(fakePi === undefined ? {} : { fakePi }),
+    realAgents: options.realAgents,
   }
   saveRun(run)
 
@@ -499,7 +488,7 @@ const doctor = async (run: RunState) => {
     console.log(`${pass ? "OK  " : "FAIL"} ${label}${detail ? `: ${detail}` : ""}`)
   }
   console.log(`Run ${run.id} (backend: ${run.backend}, github: ${run.backend === "fake" ? "fake, backend-owned" : run.github})`)
-  console.log(`Tour provider: ${run.backend === "fake" ? "synthetic runners" : run.fakePi === undefined ? "real" : "fake (pi; Claude Code disabled)"}`)
+  console.log(`Agents: ${run.backend === "fake" ? "synthetic runners" : run.realAgents ? "real" : "off"}`)
   const pid = glassPid(run)
   check(pid !== undefined, "Electron process", `pid ${pid ?? "none"}`)
   const version = await cdpJson(
@@ -528,13 +517,6 @@ const doctor = async (run: RunState) => {
       isAlive(run.fake.pid),
       "Fake GitHub",
       `port ${run.fake.port}, mode ${readFileSync(runPaths(run.id).fakeModeFile, "utf8")}`,
-    )
-  }
-  if (run.fakePi !== undefined) {
-    check(
-      isAlive(run.fakePi.pid) && (await portIsOpen(run.fakePi.port)),
-      "Fake Pi provider",
-      `port ${run.fakePi.port}`,
     )
   }
   const newestSource = Math.max(
@@ -590,7 +572,6 @@ const stop = async (run: RunState) => {
     if (await glassRunning(run)) return fail(`Glass is still running (pid ${pid}); run state kept`)
   }
   if (run.fake !== undefined) killTree(run.fake.pid)
-  if (run.fakePi !== undefined) killTree(run.fakePi.pid)
   if (backendUrl) {
     const port = Number(new URL(backendUrl).port)
     for (let attempt = 0; attempt < 50 && (await portIsOpen(port)); attempt++) await sleep(100)
@@ -601,7 +582,6 @@ const stop = async (run: RunState) => {
     paths.electronLog,
     paths.backendLog,
     join(paths.state, "fake-github.log"),
-    join(paths.state, "fake-pi.log"),
   ]) {
     if (existsSync(log)) copyFileSync(log, join(paths.evidence, basename(log)))
   }
@@ -644,7 +624,7 @@ const main = async () => {
       run: { type: "string" },
       github: { type: "string" },
       "fake-mode": { type: "string", default: "ok" },
-      "tour-provider": { type: "string", default: "fake" },
+      "real-agents": { type: "boolean", default: false },
       "no-credentials": { type: "boolean", default: false },
       "fail-backend-start": { type: "boolean", default: false },
       "no-build": { type: "boolean", default: false },
@@ -674,13 +654,11 @@ const main = async () => {
         arg ?? fail("missing mode file"),
         positionals[2] ?? fail("missing ready file"),
       )
-    case "__fake-pi":
-      return serveFakePi(arg ?? fail("missing home"), positionals[2] ?? fail("missing ready file"))
     case "launch":
       return launch({
         github: values.github,
         fakeMode: values["fake-mode"],
-        tourProvider: values["tour-provider"],
+        realAgents: values["real-agents"],
         noCredentials: values["no-credentials"],
         failBackendStart: values["fail-backend-start"],
         backend: values.backend,

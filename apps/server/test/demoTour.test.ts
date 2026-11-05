@@ -1,7 +1,7 @@
 import { ChangedFile, Chapter, TextPatch } from "@glass/contracts"
 import { Schema } from "effect"
 import { expect, it } from "vite-plus/test"
-import { repairChapterVisuals } from "../src/tourVisuals"
+import { repairChapterVisuals, validateTourBeforeAfter } from "../src/tourVisuals"
 import { rateLimitFiles } from "./demoPullRequests"
 import { demoTour } from "./demoTour"
 
@@ -21,6 +21,7 @@ it("keeps every demo visual valid against the seeded PR's diff", () => {
   )
 
   expect(chapters.map((chapter) => repairChapterVisuals(chapter, files))).toEqual(demoTour.chapters)
+  expect(validateTourBeforeAfter(demoTour.beforeAfter!, files)).toEqual(demoTour.beforeAfter)
   expect(chapters.flatMap((chapter) => chapter.files.map(({ path }) => path)).toSorted()).toEqual(
     rateLimitFiles.map(({ path }) => path).toSorted(),
   )

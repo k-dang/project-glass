@@ -2,6 +2,7 @@ import type { TourDiagram as Diagram, TourDiagramNode } from "@glass/contracts"
 import { useId, useLayoutEffect, useRef, useState } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { fileName } from "./fileName"
 
 interface Box {
   readonly left: number
@@ -225,7 +226,7 @@ export function TourDiagram(props: {
           <ol className="relative flex gap-7" style={{ paddingBottom: gutter }}>
             {diagram.nodes.map((node) => {
               const { target } = node
-              const name = target.path.slice(target.path.lastIndexOf("/") + 1)
+              const name = fileName(target.path)
 
               const range =
                 target.startLine === target.endLine

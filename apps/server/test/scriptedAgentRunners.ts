@@ -19,7 +19,6 @@ export interface ScriptedSettings {
 interface ScriptedRun {
   readonly engine: AgentEngine
   readonly task: AgentTask<unknown>
-  readonly directory: string | null
   readonly files: ReadonlyArray<string>
 }
 
@@ -80,8 +79,7 @@ export const scriptedAgentRunners = Effect.fnUntraced(function* (initial: Script
                 runs.push({
                   engine: engineSettings.engine,
                   task,
-                  directory: task.files === "none" ? null : task.files.readOnly,
-                  files: task.files === "none" ? [] : filesIn(task.files.readOnly),
+                  files: filesIn(task.checkout),
                 })
                 started.add()
 

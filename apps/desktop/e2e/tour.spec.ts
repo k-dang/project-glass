@@ -3,6 +3,8 @@ import type { TourAnswer } from "../../server/src/tourPrompt"
 import type { FakeGitHub } from "../../server/test/fakeGitHub"
 import { expect, openPullRequest, startLineDraft, test } from "./glass"
 
+test.use({ git: true })
+
 const numbered = (count: number, word = "line") =>
   Array.from({ length: count }, (_, index) => `${word} ${index + 1}`)
 
@@ -201,22 +203,23 @@ test("reads linked visuals and steps through flows without changing viewed progr
         title: "Store valid input",
         explanation: "Saving now goes through a single insert.",
         files: [{ path: "store.ts", summary: "Inserts the input." }],
-        callTree: [
-          {
-            id: "save",
-            parent: null,
-            label: "save(input)",
-            change: "added",
-            target: { path: "store.ts", side: "new", startLine: 1, endLine: 3 },
-          },
-          {
-            id: "insert",
-            parent: "save",
-            label: "db.insert(input)",
-            change: "added",
-            target: { path: "store.ts", side: "new", startLine: 2, endLine: 2 },
-          },
-        ],
+        beforeAfter: {
+          title: "How input is saved",
+          lines: [
+            {
+              depth: 0,
+              text: "save(input)",
+              change: "added",
+              target: { path: "store.ts", side: "new", startLine: 1, endLine: 3 },
+            },
+            {
+              depth: 1,
+              text: "db.insert(input)",
+              change: "added",
+              target: { path: "store.ts", side: "new", startLine: 2, endLine: 2 },
+            },
+          ],
+        },
       },
     ],
     unplacedFiles: [],
@@ -297,16 +300,12 @@ test("reads linked visuals and steps through flows without changing viewed progr
   await expect(chapter).toContainText("1/2 viewed")
 
   const storing = window.getByRole("region", { name: "Store valid input", exact: true })
-  const tree = storing.getByRole("region", { name: "Call tree for Store valid input" })
-  await tree.getByRole("button", { name: /db\.insert\(input\)/ }).click()
+  const beforeAfter = storing.getByRole("region", { name: "Before / after: How input is saved" })
+  await beforeAfter.getByRole("button", { name: /db\.insert\(input\)/ }).click()
   await expect(
     storing.locator("[data-selected-line]").filter({ hasText: "return db.insert(input)" }),
   ).toBeVisible()
-  await tree.getByRole("button", { name: "Collapse calls from save(input)" }).click()
-  await expect(tree.getByRole("button", { name: /db\.insert\(input\)/ })).toHaveCount(0)
-  await tree.getByRole("button", { name: "Expand calls from save(input)" }).click()
-  await expect(tree.getByRole("button", { name: /db\.insert\(input\)/ })).toBeVisible()
-  await window.screenshot({ path: testInfo.outputPath("call-tree.png") })
+  await window.screenshot({ path: testInfo.outputPath("before-after.png") })
 
   await window.setViewportSize({ width: 800, height: 1000 })
   await expect(diagram).toBeVisible()
@@ -355,6 +354,54 @@ test("moves between Chapters from the keyboard and the sidebar in a tall window"
   await window.getByRole("tab", { name: "Overview" }).click()
   await window.getByRole("button", { name: /Document the greeting/ }).click()
   await expect(second).toBeInViewport()
+})
+
+test("opens on the Tour overview and returns to it from the keyboard", async ({
+  github,
+  claude,
+  window,
+}) => {
+  await claude.answer({
+    ...tour,
+    beforeAfter: {
+      title: "How the greeting spells numbers",
+      lines: [
+        { depth: 0, text: "build the greeting", change: "unchanged", target: null },
+        {
+          depth: 1,
+          text: "write twenty in digits",
+          change: "removed",
+          target: { path: "greet.ts", side: "old", startLine: 20, endLine: 20 },
+        },
+        {
+          depth: 1,
+          text: "write twenty in words",
+          change: "added",
+          target: { path: "greet.ts", side: "new", startLine: 20, endLine: 20 },
+        },
+      ],
+    },
+  })
+  await openPullRequest(window, seedTourPullRequest(github))
+  await writeTour(window)
+
+  const changes = window.getByRole("tabpanel", { name: "Changes" })
+  const overview = changes.getByRole("region", { name: "Tour overview" })
+  const heading = overview.getByRole("heading", { name: "Tour overview" })
+  const firstChapter = changes.getByRole("heading", { name: "Spell out the greeting" })
+  await expect(heading).toBeInViewport()
+
+  await window.keyboard.press("]")
+  await expect(firstChapter).toBeInViewport()
+  await expect(heading).not.toBeInViewport()
+
+  await window.keyboard.press("[")
+  await expect(heading).toBeInViewport()
+
+  await overview.getByRole("button", { name: /write twenty in words/ }).click()
+  await expect(
+    changes.locator("[data-selected-line]").filter({ hasText: "line twenty" }),
+  ).toBeInViewport()
 })
 
 test("moves on to the next Chapter once the one in view is viewed", async ({

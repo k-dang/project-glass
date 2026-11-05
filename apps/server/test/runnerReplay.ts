@@ -6,7 +6,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { AgentFailure } from "../src/agentFailure"
-import { AgentRunners, type AgentTask } from "../src/agentRunners"
+import { AgentRunners } from "../src/agentRunners"
 import { ServerConfig } from "../src/ServerConfig"
 import { counter } from "./counter"
 import {
@@ -25,17 +25,17 @@ const Summary = Schema.Struct({ summary: Schema.String })
 export interface RunnerScenario {
   readonly name: string
   readonly engine: "claude-code" | "pi"
-  readonly task: (checkout: string) => AgentTask<typeof Summary.Type>
+  readonly instructions: string
   readonly recordEnv?: Readonly<Record<string, string | undefined>>
   readonly piModelId?: string
 }
 
-const answerTask = (instructions: string, files: AgentTask<unknown>["files"] = "none") => ({
+export const scenarioTask = ({ instructions }: RunnerScenario, checkout: string) => ({
   subject: "Agent review",
   instructions,
   prompt: "PR material: none. This is a test of the answer format.",
   answer: Summary,
-  files,
+  checkout,
 })
 
 const signedOut = {
@@ -56,38 +56,42 @@ const readGreeting =
   'Read the file src/greet.ts, then reply with only JSON of the form {"summary":"<the file\'s contents>"}.'
 
 export const runnerScenarios: ReadonlyArray<RunnerScenario> = [
-  { name: "claude-answer", engine: "claude-code", task: () => answerTask(replyFine) },
+  {
+    name: "claude-answer",
+    engine: "claude-code",
+    instructions: replyFine,
+  },
   {
     name: "claude-read-only",
     engine: "claude-code",
-    task: (checkout) => answerTask(readGreeting, { readOnly: checkout }),
+    instructions: readGreeting,
   },
   {
     name: "claude-signed-out",
     engine: "claude-code",
-    task: () => answerTask(replyFine),
+    instructions: replyFine,
     recordEnv: signedOut,
   },
   {
     name: "claude-rejected-key",
     engine: "claude-code",
-    task: () => answerTask(replyFine),
+    instructions: replyFine,
     recordEnv: {
       ...signedOut,
       ANTHROPIC_API_KEY: "sk-ant-glass-recording-rejected",
       CLAUDE_CODE_MAX_RETRIES: "0",
     },
   },
-  { name: "pi-answer", engine: "pi", task: () => answerTask(replyFine) },
+  { name: "pi-answer", engine: "pi", instructions: replyFine },
   {
     name: "pi-read-only",
     engine: "pi",
-    task: (checkout) => answerTask(readGreeting, { readOnly: checkout }),
+    instructions: readGreeting,
   },
   {
     name: "pi-unlisted-model",
     engine: "pi",
-    task: () => answerTask(replyFine),
+    instructions: replyFine,
     piModelId: "glass-no-such-model",
   },
 ]

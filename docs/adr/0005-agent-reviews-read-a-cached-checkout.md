@@ -1,5 +1,7 @@
 # Agent reviews read a checkout of the PR through Glass's own cached clones
 
+> Tours read the same checkout now (ADR 0012).
+
 Unlike Tours (ADR 0004), an Agent review gets a checkout of the Revision's head and read-only
 file tools (read, search, list) with no shell or network, because a review that can only see the
 diff misses callers, surrounding code, and untouched tests. Glass keeps one blobless partial clone

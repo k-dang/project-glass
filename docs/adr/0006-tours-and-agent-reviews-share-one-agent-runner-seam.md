@@ -1,5 +1,8 @@
 # Tours and Agent reviews share one agent-runner seam
 
+> Tours now read a checkout (ADR 0012), so every task carries one and file access is no longer a
+> choice on the seam.
+
 Tours and Agent reviews ask an agent the same thing: follow these instructions over this PR
 material and return an answer matching this schema. So both go through one `AgentRunners` seam
 instead of a runner set each. A task carries the instructions, the prompt, the answer schema, and

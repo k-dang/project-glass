@@ -34,10 +34,12 @@ const revision = (pr: FakePullRequest) => new Revision({ base: pr.base.sha, head
 const fixture = Effect.fnUntraced(function* ({
   env = {},
   token = VIEWER.token,
+  resolveToken = Effect.succeed({ token: Redacted.make(token), source: "GH_TOKEN" }),
   home: sharedHome,
 }: {
   readonly env?: Record<string, string>
   readonly token?: string
+  readonly resolveToken?: GitHubAuth["Service"]["resolveToken"]
   readonly home?: string
 } = {}) {
   const github = yield* startFakeGitHub({ git: true })
@@ -47,14 +49,7 @@ const fixture = Effect.fnUntraced(function* ({
 
   const services = yield* Layer.build(
     Checkouts.layer.pipe(
-      Layer.provide(
-        Layer.succeed(
-          GitHubAuth,
-          GitHubAuth.of({
-            resolveToken: Effect.succeed({ token: Redacted.make(token), source: "GH_TOKEN" }),
-          }),
-        ),
-      ),
+      Layer.provide(Layer.succeed(GitHubAuth, GitHubAuth.of({ resolveToken }))),
       Layer.provide(Git.layer),
       Layer.provide(ServerConfig.layer),
       Layer.provide(NodeServices.layer),
@@ -287,6 +282,24 @@ it.live("fails as a failed fetch when GitHub errors", () =>
     const error = yield* failure(pr)
 
     assertFailure(error, "fetch-failed")
+  }),
+)
+
+it.effect("times out a token lookup that never answers", () =>
+  Effect.gen(function* () {
+    const deadline = 60_000
+    const asked = yield* Deferred.make<void>()
+
+    const { github, failure } = yield* fixture({
+      env: { GLASS_CHECKOUT_TIMEOUT_MS: String(deadline) },
+      resolveToken: Deferred.succeed(asked, undefined).pipe(Effect.andThen(Effect.never)),
+    })
+
+    const failing = yield* Effect.forkChild(failure(seed(github)))
+    yield* Deferred.await(asked)
+    yield* Effect.yieldNow
+    yield* TestClock.adjust(deadline)
+    assertFailure(yield* Fiber.join(failing), "timeout")
   }),
 )
 

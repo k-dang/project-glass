@@ -36,7 +36,7 @@ export class ServerConfig extends Context.Service<
       const tourTimeoutMs = yield* Config.schema(
         Schema.Int.check(Schema.isGreaterThan(0)),
         "GLASS_TOUR_TIMEOUT_MS",
-      ).pipe(Config.withDefault(300_000))
+      ).pipe(Config.withDefault(900_000))
 
       const agentReviewTimeoutMs = yield* Config.schema(
         Schema.Int.check(Schema.isGreaterThan(0)),
