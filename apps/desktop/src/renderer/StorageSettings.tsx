@@ -110,7 +110,7 @@ function StorageRow(props: { row: Row; total: number; index: number }) {
       className="enter-motion border-b"
       style={{ transitionDelay: `${props.index * 32}ms` }}
     >
-      <CollapsibleTrigger className="group flex w-full items-center gap-3 py-3 text-left text-sm tabular-nums transition-transform duration-150 ease-out active:scale-[0.995]">
+      <CollapsibleTrigger className="group flex w-full items-center gap-3 py-3 text-left text-sm tabular-nums">
         <ChevronRight
           className="size-3.5 shrink-0 text-muted-foreground transition-transform duration-200 ease-out group-data-panel-open:rotate-90"
           aria-hidden
