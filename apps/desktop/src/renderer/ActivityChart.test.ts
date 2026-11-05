@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { ActivityStamp } from "@glass/contracts"
 import { DateTime } from "effect"
 import { expect, it } from "vite-plus/test"

@@ -1,8 +1,10 @@
 import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip"
 import { cn } from "cn"
-import { type ReactElement, type ReactNode, useEffect, useId } from "react"
+import { type ReactElement, type ReactNode, useId } from "react"
 
 let lastKey = ""
+
+window.addEventListener("keydown", (event) => (lastKey = event.key), true)
 
 function TooltipHint({
   children,
@@ -30,16 +32,6 @@ function TooltipHint({
 }
 
 function TooltipProvider({ delay = 300, ...props }: TooltipPrimitive.Provider.Props) {
-  useEffect(() => {
-    const recordKey = (event: KeyboardEvent) => {
-      lastKey = event.key
-    }
-
-    window.addEventListener("keydown", recordKey, true)
-
-    return () => window.removeEventListener("keydown", recordKey, true)
-  }, [])
-
   return <TooltipPrimitive.Provider data-slot="tooltip-provider" delay={delay} {...props} />
 }
 
