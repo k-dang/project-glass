@@ -1,4 +1,3 @@
-/** Claude Code's own tool for asking the user Questions. */
 export const CLAUDE_QUESTION_TOOL = "AskUserQuestion"
 
 /** The tool Glass's extension gives pi for asking the user Questions, which pi has none of. */

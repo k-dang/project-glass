@@ -18,8 +18,6 @@ export const changeGlobalProgramAtom = backendRuntime.fn(
     ),
 )
 
-// The message's context is captured from the area the user is in once Glass gives the
-// conversation tools that read it.
 const sending = (sent: MessageInput) => ({ ...sent, context: null })
 
 export const globalConversation: Conversation = {
