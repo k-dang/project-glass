@@ -188,7 +188,6 @@ const ListAgentOptions = Tool.make("list_agent_options", {
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)
 
-/** Glass's actions change the user's work, so a cancelled call still finishes what it started. */
 const action = Context.make(Tool.Readonly, false).pipe(
   Context.add(Tool.Destructive, false),
   Context.add(Tool.Idempotent, false),
@@ -272,7 +271,7 @@ export const GlassTools = Toolkit.make(
   SendAgentMessage,
 )
 
-type Failure =
+type ServiceFailure =
   | ActivityLogError
   | AgentError
   | AgentReviewFailure
@@ -287,7 +286,7 @@ type Failure =
   | StaleRevision
   | ToDoError
 
-const explained = (error: Failure) =>
+const explained = (error: ServiceFailure) =>
   new GlassToolFailure({
     message: Match.value(error).pipe(
       Match.tagsExhaustive({
@@ -352,12 +351,16 @@ const withinBudget = (files: ReadonlyArray<FileMaterial>) => {
   }
 }
 
-interface ModelAt {
+interface ModelChoiceAt {
   readonly engine: AgentEngine
   readonly place: AgentPlace
   readonly model: string | null
   readonly effort: string | null
 }
+
+/** An action changes the user's work, so a cancelled call still finishes what it started. */
+const acted = <A, R>(effect: Effect.Effect<A, ServiceFailure, R>) =>
+  effect.pipe(Effect.mapError(explained), Effect.uninterruptible)
 
 const first = <A, E, R>(stream: Stream.Stream<A, E, R>) =>
   stream.pipe(Stream.runHead, Effect.map(Option.getOrThrow))
@@ -376,13 +379,13 @@ export const GlassToolHandlers = GlassTools.toLayer(
     const agentReviews = yield* AgentReviews
 
     /** The UI offers only the models and Efforts a place lists, so the conversation can't invent one. */
-    const offered = Effect.fnUntraced(function* ({ engine, place, model, effort }: ModelAt) {
+    const offered = Effect.fnUntraced(function* ({ engine, place, model, effort }: ModelChoiceAt) {
       const { defaultModel, models } = yield* agents.models(engine, place)
       const chosen = model === null ? defaultModel : models.find(({ id }) => id === model)
 
       if (chosen === undefined)
         yield* new AgentError({
-          message: `There's no model "${model}" there. list_agent_options lists the models a place offers.`,
+          message: `${model === null ? "That place has no default model" : `That place has no model "${model}"`}. list_agent_options lists the models a place offers.`,
         })
 
       if (effort !== null && !(chosen?.efforts.includes(effort) ?? false))
@@ -460,7 +463,7 @@ export const GlassToolHandlers = GlassTools.toLayer(
           yield* agentReviews.start(pullRequest, revision)
 
           return yield* first(agentReviews.watch(pullRequest))
-        }).pipe(Effect.mapError(explained), Effect.uninterruptible),
+        }).pipe(acted),
       list_agent_places: () =>
         Effect.all({
           thisMac: checkouts.list().pipe(
@@ -476,7 +479,8 @@ export const GlassToolHandlers = GlassTools.toLayer(
         Effect.gen(function* () {
           if (!agents.engines(place).includes(engine))
             return yield* new AgentError({
-              message: `That place doesn't run ${engine}. list_agent_places names the Agent programs each place runs.`,
+              message:
+                "That place doesn't run that Agent program. list_agent_places names the Agent programs each place runs.",
             })
 
           const { defaultBranch, branches } = yield* branchesAt(place, repository)
@@ -488,12 +492,11 @@ export const GlassToolHandlers = GlassTools.toLayer(
           yield* offered(input)
 
           return { agent: yield* agents.create({ ...input, permissionMode: null, images: [] }) }
-        }).pipe(Effect.mapError(explained), Effect.uninterruptible),
+        }).pipe(acted),
       send_agent_message: ({ agentId, message }) =>
         agents.send(agentId, { message, images: [] }).pipe(
           Effect.map((delivery) => ({ delivery })),
-          Effect.mapError(explained),
-          Effect.uninterruptible,
+          acted,
         ),
     })
   }),

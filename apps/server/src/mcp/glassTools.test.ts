@@ -4,7 +4,7 @@ import { Effect, Schema } from "effect"
 import { startFakeGitHub } from "../../test/fakeGitHub"
 import { VIEWER } from "../../test/fakePullRequest"
 import { isolatedHome, startBackend } from "../../test/harness"
-import { connectMcp, listedTools, toolResult } from "../../test/mcpClient"
+import { connectMcp, listedTools, toolText as textOf } from "../../test/mcpClient"
 
 const startGlass = Effect.gen(function* () {
   const github = yield* startFakeGitHub()
@@ -37,14 +37,8 @@ const startGlass = Effect.gen(function* () {
     yield* backend.mcpCredentials.issue({ conversationId: "global-conversation" }),
   )
 
-  const call = (name: string, args: Schema.JsonObject = {}) =>
-    mcp.request("tools/call", { name, arguments: args }).response.pipe(Effect.map(toolResult))
-
-  return { ...backend, github, pr, mcp, call }
+  return { ...backend, github, pr, mcp, call: mcp.call }
 })
-
-const textOf = (result: ReturnType<typeof toolResult>) =>
-  result.content.map((block) => ("text" in block ? block.text : "")).join("\n")
 
 describe("Glass tools over MCP", () => {
   it.live("lists Glass's tools, marking which only read", () =>

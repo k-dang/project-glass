@@ -8,33 +8,23 @@ import {
   thisMac,
   TurnDone,
 } from "@glass/contracts"
-import { type Redacted, Effect, Option, Schema, Stream } from "effect"
+import { Effect, Option, Schema, Stream } from "effect"
 import { agentsFixture, holding, repository, settled } from "../../test/agentsFixture"
 import { startFakeGitHub } from "../../test/fakeGitHub"
 import { VIEWER } from "../../test/fakePullRequest"
 import { isolatedHome, startBackend } from "../../test/harness"
-import { connectMcp, toolResult } from "../../test/mcpClient"
+import { connectMcp, toolText as textOf } from "../../test/mcpClient"
 import { scriptedAgentRunners } from "../../test/scriptedAgentRunners"
 
 const caller = { conversationId: "global-conversation" }
 
-const callerOf = Effect.fnUntraced(function* (baseUrl: string, bearer: Redacted.Redacted) {
-  const mcp = yield* connectMcp(baseUrl, bearer)
-
-  return (name: string, args: Schema.JsonObject = {}) =>
-    mcp.request("tools/call", { name, arguments: args }).response.pipe(Effect.map(toolResult))
-})
-
 const startGlass = Effect.gen(function* () {
   const f = yield* agentsFixture
 
-  const call = yield* callerOf(f.baseUrl, yield* f.mcpCredentials.issue(caller))
+  const { call } = yield* connectMcp(f.baseUrl, yield* f.mcpCredentials.issue(caller))
 
   return { ...f, call }
 })
-
-const textOf = (result: ReturnType<typeof toolResult>) =>
-  result.content.map((block) => ("text" in block ? block.text : "")).join("\n")
 
 const onThisMac = (message: string) => ({
   repository: { owner: repository.owner, repo: repository.repo },
@@ -203,7 +193,7 @@ const startReviewing = Effect.gen(function* () {
     runners.layer,
   )
 
-  const call = yield* callerOf(backend.baseUrl, yield* backend.mcpCredentials.issue(caller))
+  const { call } = yield* connectMcp(backend.baseUrl, yield* backend.mcpCredentials.issue(caller))
   const pullRequest = { owner: pr.owner, repo: pr.repo, number: pr.number }
 
   const review = (until: (state: AgentReviewState) => boolean) =>

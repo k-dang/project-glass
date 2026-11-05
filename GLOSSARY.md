@@ -195,7 +195,8 @@ _Avoid_: Session, thread, bot, box
 The one conversation the user has with Glass itself, opened beside any area without leaving it,
 with Claude Code or pi. It works in no repository and needs no Local checkout; it reads no files and
 runs no commands, but reads the user's work in Glass through Glass's tools, starts Agent reviews,
-creates Agents and messages them, and asks the user Questions. A message keeps the PR workspace and Revision, or the Agent, in view when it was sent.
+creates Agents and messages them, and asks the user Questions. A message keeps the PR workspace
+and Revision, or the Agent, in view when it was sent.
 _Avoid_: Assistant, chat, copilot, global Agent
 
 **Agent program**:
