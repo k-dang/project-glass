@@ -60,16 +60,12 @@ export const ReviewBrief = Schema.Struct({
 
 export type ReviewBrief = typeof ReviewBrief.Type
 
-/** An Agent working in its worktree or Sandbox, with the user's own tools and settings. */
 export const WorkRole = Schema.TaggedStruct("Work", {})
 
-/** An Agent review's Agent, reading its checkout and proposing Suggested drafts. */
 export const ReviewRole = Schema.TaggedStruct("Review", { brief: ReviewBrief })
 
-/** The Global conversation, which reaches Glass rather than a project and asks Questions. */
 export const GlobalRole = Schema.TaggedStruct("Global", {})
 
-/** What a conversation the host starts is for, which decides its tools and instructions. */
 export const ConversationRole = Schema.Union([WorkRole, ReviewRole, GlobalRole])
 
 export type ConversationRole = typeof ConversationRole.Type

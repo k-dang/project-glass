@@ -60,7 +60,6 @@ export const waitingAgentsAtom = backendRuntime
   )
   .pipe(Atom.keepAlive)
 
-/** A transcript kept up to date from its updates, applying at most one batch a frame. */
 export const transcriptOf = <E, R>(updates: Stream.Stream<TranscriptUpdate, E, R>) =>
   updates.pipe(
     Stream.groupedWithin(Number.POSITIVE_INFINITY, FRAME),

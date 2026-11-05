@@ -21,7 +21,7 @@ export const changeGlobalProgramAtom = backendRuntime.fn(
 const sending = (sent: MessageInput) => ({ ...sent, context: null })
 
 export const globalConversation: Conversation = {
-  key: "global-conversation",
+  composerKey: "global-conversation",
   transcript: backendRuntime
     .atom(
       transcriptOf(Stream.unwrap(Backend.useSync((backend) => backend.WatchGlobalTranscript()))),

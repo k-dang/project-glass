@@ -141,24 +141,20 @@ export type SentMessage = typeof SentMessage.Type
 
 export const sentOf = ({ message, images }: SentMessage): SentMessage => ({ message, images })
 
-/** The PR workspace and Revision the user was viewing when they sent a message. */
 export const PullRequestContext = Schema.TaggedStruct("PullRequest", {
   pullRequest: PullRequestRef,
   revision: Revision,
 })
 
-/** The Agent the user had open when they sent a message, named as it was then. */
 export const AgentContext = Schema.TaggedStruct("Agent", {
   agentId: Schema.String,
   name: Schema.String,
 })
 
-/** What a message to the Global conversation was sent from, fixed when it was sent. */
 export const CapturedContext = Schema.Union([PullRequestContext, AgentContext])
 
 export type CapturedContext = typeof CapturedContext.Type
 
-/** A message with the context it was sent from, which only the Global conversation captures. */
 export const MessageWithContext = Schema.Struct({
   ...SentMessage.fields,
   context: Schema.NullOr(CapturedContext),

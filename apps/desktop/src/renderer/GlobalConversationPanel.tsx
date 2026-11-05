@@ -41,7 +41,6 @@ function ProgramPicker(props: { program: GlobalConversationProgram }) {
   )
 }
 
-/** The Global conversation beside whichever area the user is in, leaving that area as it was. */
 export function GlobalConversationPanel() {
   const setOpen = useAtomSet(globalConversationOpenAtom)
   const transcript = useAtomValue(globalConversation.transcript)

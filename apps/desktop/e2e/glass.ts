@@ -42,7 +42,6 @@ interface Glass {
   }
   readonly app: ElectronApplication
   readonly window: Page
-  /** Quits Glass and starts it again on the same data, returning its new window. */
   readonly relaunch: () => Promise<Page>
 }
 

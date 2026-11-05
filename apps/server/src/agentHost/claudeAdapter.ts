@@ -98,12 +98,13 @@ const startFailure = (cause: unknown) =>
       : "Claude Code could not start. Check its installation.",
   })
 
+const withoutUserSetup = { settingSources: [], strictMcpConfig: true } satisfies Options
+
 const reviewOptions = (brief: ReviewBrief): Options => ({
   systemPrompt: { type: "preset", preset: "claude_code", append: brief.instructions },
   tools: claudeReadOnlyTools,
   allowedTools: [...claudeReadOnlyTools, `${GLASS_MCP_PREFIX}${SUGGEST_DRAFT_TOOL}`],
-  settingSources: [],
-  strictMcpConfig: true,
+  ...withoutUserSetup,
   mcpServers: {
     [GLASS_MCP_SERVER]: createSdkMcpServer({
       name: GLASS_MCP_SERVER,
@@ -128,7 +129,6 @@ const reviewOptions = (brief: ReviewBrief): Options => ({
   },
 })
 
-/** Leaves out the user's settings, plugins, and MCP servers, and every tool but Questions. */
 const globalOptions: Options = {
   systemPrompt: {
     type: "preset",
@@ -136,8 +136,7 @@ const globalOptions: Options = {
     append: globalInstructions(CLAUDE_QUESTION_TOOL),
   },
   tools: [CLAUDE_QUESTION_TOOL],
-  settingSources: [],
-  strictMcpConfig: true,
+  ...withoutUserSetup,
 }
 
 const roleOptions = (role: ConversationRole): Options =>

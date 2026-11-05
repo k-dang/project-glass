@@ -34,7 +34,6 @@ import { prompt } from "./prompt"
 import { ToDos } from "./ToDos"
 import { encodeImages, StoredMessage, Transcripts } from "./Transcripts"
 
-/** A conversation the backend delivers Turns to: an Agent or the Global conversation. */
 export interface Conversation {
   readonly id: string
   readonly engine: AgentEngine
@@ -45,8 +44,7 @@ export interface Conversation {
   readonly runningHost: Effect.Effect<Option.Option<HostClient>>
 }
 
-/** Finds the conversation a started Turn belongs to, or none when the caller doesn't own it. */
-export type FindConversation = (
+export type ClaimConversation = (
   conversationId: string,
 ) => Effect.Effect<Option.Option<Conversation>, AgentError>
 
@@ -55,19 +53,10 @@ const decodeUnsent = Schema.decodeUnknownEffect(Schema.Array(StoredMessage))
 const unsentFailure = () =>
   new AgentError({ message: "Couldn't read or save your unsent message. Try again." })
 
-/**
- * What every conversation does with its Turns, its Queued messages, and the user's Unsent
- * message, whatever it is for and wherever its host runs.
- */
 export class ConversationTurns extends Context.Service<
   ConversationTurns,
   {
-    /**
-     * Delivers each Turn that starts from now on in a conversation `find` claims, leaving the rest
-     * to their own owners.
-     */
-    readonly deliverTurnsOf: (find: FindConversation) => Effect.Effect<void>
-    /** Runs `effect` only while the conversation has no Turn running, so none starts meanwhile. */
+    readonly deliverTurnsOf: (claim: ClaimConversation) => Effect.Effect<void>
     readonly whileIdle: <A, E>(
       conversationId: string,
       effect: Effect.Effect<A, E>,
@@ -104,7 +93,7 @@ export class ConversationTurns extends Context.Service<
       const sql = yield* SqlClient.SqlClient
       const transcripts = yield* Transcripts
       const toDos = yield* ToDos
-      const lock = yield* Semaphore.make(1)
+      const turnLock = yield* Semaphore.make(1)
       const scope = yield* Scope.Scope
 
       const delivered = Effect.fnUntraced(function* (sent: MessageWithContext) {
@@ -140,7 +129,7 @@ export class ConversationTurns extends Context.Service<
             { concurrency: "unbounded" },
           )
 
-          yield* lock.withPermits(1)(
+          yield* turnLock.withPermits(1)(
             Effect.gen(function* () {
               if ((yield* transcripts.runningTurn(agentId)) !== turnId) return
 
@@ -149,7 +138,6 @@ export class ConversationTurns extends Context.Service<
           )
         }).pipe(Effect.catch((error) => failTurn(conversation.id, turnId, hostFailure(error))))
 
-      /** Ends a Turn Glass couldn't deliver, so it never shows as running with nothing behind it. */
       const failTurn = (conversationId: string, turnId: string, reason: string) =>
         Effect.gen(function* () {
           const ended = { at: yield* DateTime.now, ending: TurnFailed.make({ reason }) }
@@ -159,12 +147,12 @@ export class ConversationTurns extends Context.Service<
           Effect.catch((cause) => Effect.logWarning("Couldn't fail an undelivered Turn", cause)),
         )
 
-      const deliverTurnsOf = Effect.fnUntraced(function* (find: FindConversation) {
+      const deliverTurnsOf = Effect.fnUntraced(function* (claim: ClaimConversation) {
         const started = yield* transcripts.subscribeStarted.pipe(Scope.provide(scope))
 
         yield* started.pipe(
           Stream.runForEach(({ agentId, turnId, message, images, context }) =>
-            find(agentId).pipe(
+            claim(agentId).pipe(
               Effect.flatMap(
                 Option.match({
                   onNone: () => Effect.void,
@@ -209,7 +197,7 @@ export class ConversationTurns extends Context.Service<
       const stop = Effect.fn("ConversationTurns.stop")(function* (conversation: Conversation) {
         const agentId = conversation.id
 
-        yield* lock.withPermits(1)(
+        yield* turnLock.withPermits(1)(
           Effect.gen(function* () {
             if ((yield* transcripts.runningTurn(agentId)) === null) return
 
@@ -278,14 +266,13 @@ export class ConversationTurns extends Context.Service<
         )
       })
 
-      // Starting Turns under the lock keeps one from starting while `whileIdle` runs.
       const startOrQueue = (conversationId: string, sent: MessageWithContext) =>
-        lock.withPermits(1)(transcripts.startOrQueue(conversationId, sent))
+        turnLock.withPermits(1)(transcripts.startOrQueue(conversationId, sent))
 
       return ConversationTurns.of({
         deliverTurnsOf,
         whileIdle: (conversationId, effect) =>
-          lock.withPermits(1)(
+          turnLock.withPermits(1)(
             Effect.gen(function* () {
               if ((yield* transcripts.runningTurn(conversationId)) !== null)
                 return yield* new AgentBusy()
@@ -303,7 +290,7 @@ export class ConversationTurns extends Context.Service<
           if (!(yield* trySteer(conversation, sent))) yield* startOrQueue(conversation.id, sent)
         }),
         sendQueued: (conversationId, queuedId) =>
-          lock.withPermits(1)(transcripts.startQueued(conversationId, queuedId)),
+          turnLock.withPermits(1)(transcripts.startQueued(conversationId, queuedId)),
         stop,
         answer,
         unsent,

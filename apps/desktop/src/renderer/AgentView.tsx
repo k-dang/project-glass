@@ -742,7 +742,7 @@ export function AgentComposer(props: {
 
 function usePersistedComposer(conversation: Conversation) {
   const registry = useContext(RegistryContext)
-  const [written, setWritten] = useAtom(writtenAtom(conversation.key))
+  const [written, setWritten] = useAtom(writtenAtom(conversation.composerKey))
   const kept = Option.getOrNull(AsyncResult.value(useAtomValue(conversation.unsent)))
   const composed = written ?? kept ?? nothingUnsent
   const unsaved = useRef<SentMessage | null>(null)

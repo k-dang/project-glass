@@ -151,7 +151,6 @@ const refused = (what: "model" | "effort") => (error: string) =>
     Effect.andThen(Effect.fail(couldNotSwitch("pi", what))),
   )
 
-/** Starts pi with only `tools`, Glass's own extension, and its instructions, loading nothing else. */
 const lockedDownFlags = Effect.fnUntraced(function* (
   folder: string,
   tools: ReadonlyArray<string>,

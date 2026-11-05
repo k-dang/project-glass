@@ -1,6 +1,5 @@
 export const CLAUDE_QUESTION_TOOL = "AskUserQuestion"
 
-/** The tool Glass's extension gives pi for asking the user Questions, which pi has none of. */
 export const PI_QUESTION_TOOL = "ask_user"
 
 export const globalInstructions = (questionTool: string) =>
@@ -12,7 +11,6 @@ Answer in Markdown, directly and concisely.`
 const questionDescription =
   "Ask the user one question and wait for their answer. Give options when the answer is one of a few choices; leave them out for the user to answer in their own words."
 
-/** pi loads an extension in its own process, so the tool goes into a file pi reads. */
 export const piQuestionExtension = `
 export default function (pi) {
   pi.registerTool({

@@ -45,10 +45,6 @@ const firstProgram = new GlobalConversationProgram({
 const storageFailure = () =>
   new AgentError({ message: "Couldn't read or save the Global conversation. Try again." })
 
-/**
- * The one conversation the user has with Glass itself, from anywhere in it. It runs in the local
- * agent host, in a folder of Glass's own rather than a repository, with only Questions as tools.
- */
 export class GlobalConversation extends Context.Service<
   GlobalConversation,
   {
@@ -147,8 +143,6 @@ export class GlobalConversation extends Context.Service<
           Effect.as(next),
         )
 
-      // A new Agent program takes over only while no Turn runs, so none starts on the old one. The
-      // next message starts it, and it keeps only its own earlier Turns.
       const switchProgram = (next: GlobalConversationProgram) =>
         turns.whileIdle(
           id,

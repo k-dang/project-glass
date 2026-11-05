@@ -24,13 +24,8 @@ import {
 } from "./agentsArea"
 import type { BackendError } from "./backend"
 
-/**
- * Everything a transcript and its composer read and do, for an Agent or the Global conversation.
- * Its atoms come from families, so the same conversation always gets the same ones.
- */
 export interface Conversation {
-  /** Keys what the user is writing, kept apart for each conversation. */
-  readonly key: string
+  readonly composerKey: string
   readonly transcript: Atom.Atom<
     AsyncResult.AsyncResult<Transcript, BackendError | Cause.NoSuchElementError>
   >
@@ -47,7 +42,7 @@ export interface Conversation {
 }
 
 export const agentConversation = (agentId: string): Conversation => ({
-  key: agentId,
+  composerKey: agentId,
   transcript: transcriptAtom(agentId),
   send: sendMessageAtom(agentId),
   steer: steerAtom(agentId),
