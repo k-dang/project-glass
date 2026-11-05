@@ -47,15 +47,22 @@ it.live("lists a Followed repository's branches from GitHub, for a Sandbox", () 
       branches: ["main", "develop", ...features],
     })
 
+    assert.equal(yield* client.GetGitHubDefaultBranch({ repository }), "develop")
+
     const branches = yield* client.ListGitHubBranches({ repository })
-    assert.equal(branches.defaultBranch, "develop")
-    assert.sameMembers([...branches.branches], ["main", "develop", ...features])
+    assert.sameMembers([...branches], ["main", "develop", ...features])
 
     const missing = yield* client
       .ListGitHubBranches({ repository: { owner: "glass-demo", repo: "nowhere" } })
       .pipe(Effect.flip)
 
     assert.equal(missing._tag, "GitHubUnavailable")
+
+    const missingDefault = yield* client
+      .GetGitHubDefaultBranch({ repository: { owner: "glass-demo", repo: "nowhere" } })
+      .pipe(Effect.flip)
+
+    assert.equal(missingDefault._tag, "GitHubUnavailable")
   }),
 )
 

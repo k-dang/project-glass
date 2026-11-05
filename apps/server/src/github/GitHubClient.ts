@@ -1,6 +1,5 @@
 import {
   BinaryFile,
-  Branches,
   type ChangedFile,
   CommentNotFound,
   type ConnectionError,
@@ -137,7 +136,9 @@ import {
   ThreadResolutionResponse,
   ReactionMutationResponse,
   REPOSITORY_BRANCHES_QUERY,
+  REPOSITORY_DEFAULT_BRANCH_QUERY,
   RepositoryBranchesResponse,
+  RepositoryDefaultBranchResponse,
 } from "./queries"
 
 const GitHubUser = Schema.Struct({ login: Schema.String })
@@ -221,6 +222,11 @@ const allPages = <A, E>(
   return from(null)
 }
 
+const repositoryNotFound = (repository: FollowedRepository) =>
+  new GitHubUnavailable({
+    message: `GitHub couldn't find ${repository.owner}/${repository.repo}. Check you can open it on GitHub.`,
+  })
+
 export class GitHubClient extends Context.Service<
   GitHubClient,
   {
@@ -279,7 +285,10 @@ export class GitHubClient extends Context.Service<
     ) => Effect.Effect<RepositoryFiles, ConnectionError>
     readonly repositoryBranches: (
       repository: FollowedRepository,
-    ) => Effect.Effect<Branches, ConnectionError>
+    ) => Effect.Effect<ReadonlyArray<string>, ConnectionError>
+    readonly repositoryDefaultBranch: (
+      repository: FollowedRepository,
+    ) => Effect.Effect<string | null, ConnectionError>
     readonly setFileViewed: (
       pullRequestId: string,
       revision: Revision,
@@ -926,12 +935,26 @@ export class GitHubClient extends Context.Service<
         })
       })
 
-      const repositoryBranches = (repository: FollowedRepository) => {
-        const notFound = new GitHubUnavailable({
-          message: `GitHub couldn't find ${repository.owner}/${repository.repo}. Check you can open it on GitHub.`,
-        })
+      const repositoryDefaultBranch = (repository: FollowedRepository) => {
+        const notFound = repositoryNotFound(repository)
 
-        let defaultBranch: string | null = null
+        return Effect.gen(function* () {
+          const data = yield* graphql({
+            name: "RepositoryDefaultBranch",
+            query: REPOSITORY_DEFAULT_BRANCH_QUERY,
+            variables: { owner: repository.owner, name: repository.repo },
+            response: RepositoryDefaultBranchResponse,
+            domainError: ({ type }) => (type === "NOT_FOUND" ? notFound : undefined),
+          })
+
+          if (data.repository === null) return yield* notFound
+
+          return data.repository.defaultBranchRef?.name ?? null
+        }).pipe(Effect.withSpan("GitHubClient.repositoryDefaultBranch"))
+      }
+
+      const repositoryBranches = (repository: FollowedRepository) => {
+        const notFound = repositoryNotFound(repository)
 
         return allPages((after) =>
           Effect.gen(function* () {
@@ -945,14 +968,10 @@ export class GitHubClient extends Context.Service<
 
             if (data.repository === null) return yield* notFound
 
-            defaultBranch = data.repository.defaultBranchRef?.name ?? null
-
             return data.repository.refs
           }),
         ).pipe(
-          Effect.map(
-            (refs) => new Branches({ defaultBranch, branches: refs.map(({ name }) => name) }),
-          ),
+          Effect.map((refs) => refs.map(({ name }) => name)),
           Effect.withSpan("GitHubClient.repositoryBranches"),
         )
       }
@@ -1180,6 +1199,7 @@ export class GitHubClient extends Context.Service<
         fileContents,
         repositoryFiles,
         repositoryBranches,
+        repositoryDefaultBranch,
         setFileViewed,
         createDraft,
         updateDraft,

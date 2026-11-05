@@ -26,6 +26,7 @@ export function ChipSelect<Value extends string>(props: {
   value: Value | null
   items: ReadonlyArray<ChipItem<Value>>
   onValueChange: (value: Value) => void
+  onOpenChange?: (open: boolean) => void
   placeholder?: string
   disabled?: boolean
   className?: string
@@ -41,6 +42,7 @@ export function ChipSelect<Value extends string>(props: {
       value={props.value}
       items={props.items}
       disabled={props.disabled}
+      onOpenChange={props.onOpenChange}
       onValueChange={(chosen) => {
         if (chosen === ACTION_KEY) props.action?.onSelect()
         else if (chosen !== null) props.onValueChange(chosen)
