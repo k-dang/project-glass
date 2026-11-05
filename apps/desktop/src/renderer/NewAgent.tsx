@@ -4,7 +4,6 @@ import {
   AgentEngine,
   type AgentPlace,
   asksPermission,
-  Branches,
   defaultPermissionMode,
   type FollowedRepository,
   type LocalCheckout,
@@ -28,9 +27,12 @@ import {
   agentsAtom,
   agentModelsAtom,
   branchesAtom,
+  branchNamesAtom,
   writtenAtom,
   createAgentAtom,
+  defaultBranchAtom,
   gitHubBranchesAtom,
+  gitHubDefaultBranchAtom,
   linkCheckoutAtom,
   localCheckoutsAtom,
   newAgentCommandsAtom,
@@ -68,9 +70,12 @@ interface Choosable {
 
 interface PlaceOptions {
   readonly place: AgentPlace
+  readonly defaultBranch: (
+    repository: FollowedRepository,
+  ) => Atom.Atom<AsyncResult.AsyncResult<string | null, BackendError>>
   readonly branches: (
     repository: FollowedRepository,
-  ) => Atom.Atom<AsyncResult.AsyncResult<Branches, BackendError>>
+  ) => Atom.Atom<AsyncResult.AsyncResult<ReadonlyArray<string>, BackendError>>
   readonly describe: (key: string | undefined) => string
   readonly starting: (key: string, baseBranch: string) => string
   readonly choosesFolder: boolean
@@ -79,7 +84,8 @@ interface PlaceOptions {
 
 const onThisMac: PlaceOptions = {
   place: thisMac,
-  branches: branchesAtom,
+  defaultBranch: defaultBranchAtom,
+  branches: branchNamesAtom,
   describe: (key) =>
     key === undefined
       ? "Choose a folder you cloned a GitHub repository into."
@@ -91,6 +97,7 @@ const onThisMac: PlaceOptions = {
 
 const inSandboxOf = ({ id, name, engines }: SandboxProviderInfo): PlaceOptions => ({
   place: SandboxPlace.make({ providerId: id }),
+  defaultBranch: gitHubDefaultBranchAtom,
   branches: gitHubBranchesAtom,
   describe: (key) =>
     key === undefined
@@ -122,9 +129,12 @@ const unlisted = Atom.make(noCommands)
 
 const unlistedFiles = Atom.make(noFiles)
 
-const noBranches: Atom.Atom<AsyncResult.AsyncResult<Branches, BackendError>> = Atom.make(
-  AsyncResult.success(new Branches({ defaultBranch: null, branches: [] })),
+const noDefaultBranch: Atom.Atom<AsyncResult.AsyncResult<string | null, BackendError>> = Atom.make(
+  AsyncResult.success(null),
 )
+
+const unlistedBranches: Atom.Atom<AsyncResult.AsyncResult<ReadonlyArray<string>, BackendError>> =
+  Atom.make(AsyncResult.initial())
 
 export function NewAgent(props: { repository: string | undefined }) {
   const checkouts = useAtomValue(localCheckoutsAtom)
@@ -287,19 +297,28 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
     find(newest === undefined ? undefined : repositoryKey(newest.repository)) ??
     props.repositories[0]?.repository
 
-  const branches = useAtomValue(repository === undefined ? noBranches : where.branches(repository))
+  const key = repository === undefined ? undefined : repositoryKey(repository)
+  const branchContext = JSON.stringify([placeKey(where.place), key])
+  const [browsed, setBrowsed] = useState<string | null>(null)
+
+  const defaults = useAtomValue(
+    repository === undefined ? noDefaultBranch : where.defaultBranch(repository),
+  )
+
+  const chosenBase = props.bases[branchContext]
+  // A chosen base keeps the list read, so a branch deleted since falls back to the default.
+  const wantsList = chosenBase !== undefined || browsed === branchContext
+
+  const branches = useAtomValue(
+    repository === undefined || !wantsList ? unlistedBranches : where.branches(repository),
+  )
 
   const created = useAtomValue(createAgentAtom)
   const create = useAtomSet(createAgentAtom, { mode: "promiseExit" })
+  const defaultBranch = AsyncResult.value(defaults)
   const listed = Option.getOrNull(AsyncResult.value(branches))
-  const key = repository === undefined ? undefined : repositoryKey(repository)
-  const branchContext = JSON.stringify([placeKey(where.place), key])
-  const chosenBase = props.bases[branchContext]
 
-  const baseBranch =
-    (chosenBase !== undefined && listed?.branches.includes(chosenBase) ? chosenBase : null) ??
-    listed?.defaultBranch ??
-    null
+  const baseBranch = pickBase(chosenBase, listed, Option.getOrNull(defaultBranch))
 
   const offered = useAtomValue(agentModelsAtom(props.program.engine, placeKey(where.place)))
 
@@ -424,7 +443,12 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
         label="Message"
         placeholder="What should the Agent do?"
         blocked={created.waiting || baseBranch === null || awaitingModels}
-        problem={settledProblem(created) ?? settledProblem(branches) ?? folder.problem}
+        problem={
+          settledProblem(created) ??
+          settledProblem(defaults) ??
+          settledProblem(branches) ??
+          folder.problem
+        }
         send={send}
         steer={null}
         recall={null}
@@ -487,10 +511,14 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
             label="Base branch"
             icon={<GitBranch aria-hidden />}
             value={baseBranch}
-            items={(listed?.branches ?? []).map((branch) => ({ value: branch, label: branch }))}
+            items={(listed ?? (baseBranch === null ? [] : [baseBranch])).map((branch) => ({
+              value: branch,
+              label: branch,
+            }))}
+            onOpenChange={(open) => open && setBrowsed(branchContext)}
             onValueChange={(branch) => key !== undefined && props.setBase(branchContext, branch)}
             placeholder={key === undefined ? "No branches" : "Loading branches…"}
-            disabled={listed === null || key === undefined}
+            disabled={Option.isNone(defaultBranch) || key === undefined}
           />
           {asksPermission(where.place) && (
             <div className="ml-auto">
@@ -506,6 +534,18 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
       {starting === null && <div className="flex-1" />}
     </section>
   )
+}
+
+const pickBase = (
+  chosen: string | undefined,
+  listed: ReadonlyArray<string> | null,
+  defaultBranch: string | null,
+) => {
+  if (chosen === undefined) return defaultBranch
+
+  if (listed === null) return null
+
+  return listed.includes(chosen) ? chosen : defaultBranch
 }
 
 function PrefetchBranches(props: { checkout: LocalCheckout }) {

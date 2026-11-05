@@ -130,6 +130,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       LinkLocalCheckout: ({ path }) => checkouts.link(path),
       ListBranches: ({ repository }) => checkouts.branches(repository),
       ListGitHubBranches: ({ repository }) => github.repositoryBranches(repository),
+      GetGitHubDefaultBranch: ({ repository }) => github.repositoryDefaultBranch(repository),
       ListAgentModels: ({ engine, place }) => agents.models(engine, place),
       ListNewAgentCommands: ({ engine, place, repository }) =>
         agents.newAgentCommands(engine, place, repository),

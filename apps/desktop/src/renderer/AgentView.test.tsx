@@ -327,8 +327,7 @@ it("keeps local branch, program, model, effort, and unsent work when exploring a
           new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes", engines: ["claude-code"] }),
         ]),
       ListFollowedRepositories: () => Effect.succeed([agent.repository]),
-      ListGitHubBranches: () =>
-        Effect.succeed(new Branches({ defaultBranch: "trunk", branches: ["trunk"] })),
+      GetGitHubDefaultBranch: () => Effect.succeed("trunk"),
       ListAgentModels: ({ engine, place }) =>
         Predicate.isTagged(place, "sandbox")
           ? Effect.succeed(
@@ -422,8 +421,7 @@ it("restores each program's choices and keeps local Permission mode separate fro
           new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes", engines: ["claude-code"] }),
         ]),
       ListFollowedRepositories: () => Effect.succeed([agent.repository]),
-      ListGitHubBranches: () =>
-        Effect.succeed(new Branches({ defaultBranch: "main", branches: ["main"] })),
+      GetGitHubDefaultBranch: () => Effect.succeed("main"),
     },
     "/agents/new",
   )
@@ -601,8 +599,7 @@ it("keeps an unlinked Local place blocked and never inherits Sandbox bypass perm
           new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes", engines: ["claude-code"] }),
         ]),
       ListFollowedRepositories: () => Effect.succeed([agent.repository]),
-      ListGitHubBranches: () =>
-        Effect.succeed(new Branches({ defaultBranch: "main", branches: ["main"] })),
+      GetGitHubDefaultBranch: () => Effect.succeed("main"),
     },
     "/agents/new",
   )
@@ -632,9 +629,10 @@ it("keeps an unlinked Local place blocked and never inherits Sandbox bypass perm
   ).toBeTruthy()
 })
 
-it("starts an Agent in a Sandbox on a Followed repository, from its branches on GitHub", async () => {
+it("starts a Sandbox Agent on the default branch, listing other branches only when asked", async () => {
   const created: Array<NewAgent> = []
   const listedModels: Array<string | null> = []
+  let listedBranches = 0
   const followed = new FollowedRepository({ owner: "glass-demo", repo: "lamp" })
 
   const user = mount(
@@ -649,8 +647,13 @@ it("starts an Agent in a Sandbox on a Followed repository, from its branches on 
           }),
         ]),
       ListFollowedRepositories: () => Effect.succeed([followed]),
+      GetGitHubDefaultBranch: () => Effect.succeed("trunk"),
       ListGitHubBranches: () =>
-        Effect.succeed(new Branches({ defaultBranch: "trunk", branches: ["trunk"] })),
+        Effect.sync(() => {
+          listedBranches += 1
+
+          return ["trunk", "release"]
+        }),
       ListAgentModels: (payload) => {
         listedModels.push(placeKey(payload.place))
 
@@ -674,6 +677,11 @@ it("starts an Agent in a Sandbox on a Followed repository, from its branches on 
   expect(within(newAgentDraft()).getByText("The Agent works on a branch of its own.")).toBeTruthy()
   expect(within(newAgentDraft()).queryByRole("combobox", { name: "Permission mode" })).toBeNull()
   expect(listedModels).toContain("sandbox:fake")
+  expect(listedBranches).toBe(0)
+
+  await user.click(within(newAgentDraft()).getByRole("combobox", { name: "Base branch" }))
+  await user.click(await screen.findByRole("option", { name: "release" }))
+  expect(listedBranches).toBe(1)
 
   await user.type(
     within(newAgentDraft()).getByRole("textbox", { name: "Message" }),
@@ -683,7 +691,7 @@ it("starts an Agent in a Sandbox on a Followed repository, from its branches on 
   expect(created).toMatchObject([
     {
       repository: followed,
-      baseBranch: "trunk",
+      baseBranch: "release",
       place: SandboxPlace.make({ providerId: "fake" }),
       permissionMode: null,
     },
@@ -721,8 +729,7 @@ it("offers only the Agent programs a Sandbox provider runs", async () => {
         ]),
       ListFollowedRepositories: () =>
         Effect.succeed([new FollowedRepository({ owner: "glass-demo", repo: "lamp" })]),
-      ListGitHubBranches: () =>
-        Effect.succeed(new Branches({ defaultBranch: "trunk", branches: ["trunk"] })),
+      GetGitHubDefaultBranch: () => Effect.succeed("trunk"),
     },
     "/agents/new",
   )

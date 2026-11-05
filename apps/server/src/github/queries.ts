@@ -203,9 +203,24 @@ export const ReactionMutationResponse = GraphQLResponse(ReactionMutationPayload)
 
 export const MutationResponse = GraphQLResponse(Schema.Record(Schema.String, Schema.Unknown))
 
-export const REPOSITORY_BRANCHES_QUERY = `query RepositoryBranches($owner: String!, $name: String!, $after: String) {
+export const REPOSITORY_DEFAULT_BRANCH_QUERY = `query RepositoryDefaultBranch($owner: String!, $name: String!) {
   repository(owner: $owner, name: $name) {
     defaultBranchRef { name }
+  }
+}`
+
+export const RepositoryDefaultBranchResponse = GraphQLResponse(
+  Schema.Struct({
+    repository: Schema.NullOr(
+      Schema.Struct({
+        defaultBranchRef: Schema.NullOr(Schema.Struct({ name: Schema.String })),
+      }),
+    ),
+  }),
+)
+
+export const REPOSITORY_BRANCHES_QUERY = `query RepositoryBranches($owner: String!, $name: String!, $after: String) {
+  repository(owner: $owner, name: $name) {
     refs(refPrefix: "refs/heads/", first: 100, after: $after) {
       pageInfo { hasNextPage endCursor }
       nodes { name }
@@ -217,7 +232,6 @@ export const RepositoryBranchesResponse = GraphQLResponse(
   Schema.Struct({
     repository: Schema.NullOr(
       Schema.Struct({
-        defaultBranchRef: Schema.NullOr(Schema.Struct({ name: Schema.String })),
         refs: Schema.Struct({
           pageInfo: Schema.Struct({
             hasNextPage: Schema.Boolean,

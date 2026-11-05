@@ -81,6 +81,7 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         ListAgentFiles: () => Effect.succeed([]),
         ListSandboxProviders: () => Effect.succeed([]),
         ListGitHubBranches: unused,
+        GetGitHubDefaultBranch: unused,
         CreateAgent: unused,
         SendMessage: unused,
         GetAgentChanges: unused,

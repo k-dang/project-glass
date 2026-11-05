@@ -89,9 +89,25 @@ export const branchesAtom = Atom.family((repository: FollowedRepository) =>
   backendRuntime.atom(Backend.use((backend) => backend.ListBranches({ repository }))),
 )
 
+export const defaultBranchAtom = Atom.family((repository: FollowedRepository) =>
+  Atom.make((get) =>
+    AsyncResult.map(get(branchesAtom(repository)), ({ defaultBranch }) => defaultBranch),
+  ),
+)
+
+export const branchNamesAtom = Atom.family((repository: FollowedRepository) =>
+  Atom.make((get) => AsyncResult.map(get(branchesAtom(repository)), ({ branches }) => branches)),
+)
+
 export const gitHubBranchesAtom = Atom.family((repository: FollowedRepository) =>
   backendRuntime
     .atom(Backend.use((backend) => backend.ListGitHubBranches({ repository })))
+    .pipe(Atom.keepAlive),
+)
+
+export const gitHubDefaultBranchAtom = Atom.family((repository: FollowedRepository) =>
+  backendRuntime
+    .atom(Backend.use((backend) => backend.GetGitHubDefaultBranch({ repository })))
     .pipe(Atom.keepAlive),
 )
 

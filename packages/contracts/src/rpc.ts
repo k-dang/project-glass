@@ -309,7 +309,12 @@ export class GlassRpcs extends RpcGroup.make(
   }),
   Rpc.make("ListGitHubBranches", {
     payload: { repository: FollowedRepository },
-    success: Branches,
+    success: Schema.Array(Schema.String),
+    error: ConnectionError,
+  }),
+  Rpc.make("GetGitHubDefaultBranch", {
+    payload: { repository: FollowedRepository },
+    success: Schema.NullOr(Schema.String),
     error: ConnectionError,
   }),
   Rpc.make("ListAgentModels", {

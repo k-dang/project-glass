@@ -204,6 +204,10 @@ const GraphQLRequest = Schema.Union([
     }),
   }),
   Schema.Struct({
+    operationName: Schema.Literal("RepositoryDefaultBranch"),
+    variables: Schema.Struct({ owner: Schema.String, name: Schema.String }),
+  }),
+  Schema.Struct({
     operationName: Schema.Literal("RepositoryBranches"),
     variables: Schema.Struct({
       owner: Schema.String,
@@ -921,8 +925,8 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
       case "RemoveReaction":
         return setReaction(request.operationName, request.variables)
 
-      case "RepositoryBranches": {
-        const { owner, name, after } = request.variables
+      case "RepositoryDefaultBranch": {
+        const { owner, name } = request.variables
         const seeded = branches.get(branchesKey(owner, name))
 
         if (seeded === undefined) return unresolvedRepository(owner, name)
@@ -932,6 +936,20 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
             repository: {
               defaultBranchRef:
                 seeded.defaultBranch === null ? null : { name: seeded.defaultBranch },
+            },
+          },
+        }
+      }
+
+      case "RepositoryBranches": {
+        const { owner, name, after } = request.variables
+        const seeded = branches.get(branchesKey(owner, name))
+
+        if (seeded === undefined) return unresolvedRepository(owner, name)
+
+        return {
+          data: {
+            repository: {
               refs: connectionPage(
                 seeded.branches.map((branch) => ({ name: branch })),
                 after,
