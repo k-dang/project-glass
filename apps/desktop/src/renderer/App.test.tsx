@@ -20,6 +20,8 @@ import {
   ReplySent,
   PullRequestWorkspace,
   SettingsError,
+  StorageError,
+  StorageItem,
   Revision,
   noListings,
   ToDoDone,
@@ -103,6 +105,40 @@ const mount = (handlers: Parameters<typeof testLayer>[0]) => {
 afterEach(() => {
   cleanup()
   window.history.replaceState(null, "", "#/")
+})
+
+it("breaks storage down by table in Settings, and retries a failed measurement", async () => {
+  let measurements = 0
+
+  const user = mount({
+    GetStorageBreakdown: () => {
+      measurements += 1
+
+      return measurements === 1
+        ? Effect.fail(new StorageError())
+        : Effect.succeed([
+            new StorageItem({ name: "agent_turn", group: "agents", bytes: 2.5 * 1024 ** 2 }),
+            new StorageItem({ name: "tours", group: "reviews", bytes: 512 * 1024 }),
+            new StorageItem({ name: "Write-ahead log", group: "overhead", bytes: 508 * 1024 }),
+            new StorageItem({ name: "Free space", group: "overhead", bytes: 4096 }),
+          ])
+    },
+  })
+
+  await user.click(await screen.findByRole("link", { name: "Follow repositories" }))
+  const storage = within(await screen.findByRole("region", { name: "Storage" }))
+  await user.click(await storage.findByRole("button", { name: "Try again" }))
+
+  expect((await storage.findByText("3.5 MB on disk")).textContent).toContain("largest is Agents")
+  expect(storage.getByText("agent_turn")).toBeTruthy()
+  expect(storage.queryByText("tours")).toBeNull()
+
+  await user.click(storage.getByRole("button", { name: /Reviews/ }))
+  expect(await storage.findByText("tours")).toBeTruthy()
+
+  await user.click(storage.getByRole("button", { name: /SQLite overhead/ }))
+  expect(await storage.findByText("Write-ahead log")).toBeTruthy()
+  expect(storage.getByText("Free space")).toBeTruthy()
 })
 
 it("turns Tours for the Queue on from Settings, and back off if saving fails", async () => {

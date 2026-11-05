@@ -268,3 +268,15 @@ An Agent with a Permission request or Question waiting is marked in the Agents l
 **Connection**:
 The GitHub identity Glass acts as, and where its token came from.
 _Avoid_: Session, account, login
+
+### Storage
+
+**Storage**:
+The disk space Glass's database takes up on this device, shown in Settings.
+_Avoid_: Disk usage
+
+**Storage group**:
+One part of Storage: Agents, Reviews, Activity, To-dos, Glass internals, or SQLite overhead. Each
+holds the tables behind that part of Glass; SQLite overhead holds its write-ahead log and free
+space.
+_Avoid_: Area, which names a part of Glass the user visits

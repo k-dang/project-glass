@@ -23,13 +23,13 @@ export default defineConfig({
   pack: [
     {
       ...node,
-      entry: { bin: "src/bin.ts" },
+      entry: { bin: "src/bin.ts", sqlReadWorker: "src/sqlReadWorker.ts" },
       outDir: "dist",
     },
     agentHost("dist"),
     {
       ...node,
-      entry: { fakeBackend: "test/fakeBackend.ts" },
+      entry: { fakeBackend: "test/fakeBackend.ts", sqlReadWorker: "src/sqlReadWorker.ts" },
       outDir: "dist-fake",
       // It reads ../schema.json relative to its own module, which breaks once bundled.
       deps: { ...node.deps, neverBundle: ["@octokit/graphql-schema"] },

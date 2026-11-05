@@ -13,6 +13,7 @@ import { Queue } from "./Queue"
 import { engineSettingsOf, SettingsStore, withEngineSettings } from "./SettingsStore"
 import { Sandboxes } from "./Sandboxes"
 import { SavedPlaces } from "./SavedPlaces"
+import { Storage } from "./Storage"
 import { ToDos } from "./ToDos"
 import { Tours } from "./Tours"
 
@@ -32,6 +33,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
     const agents = yield* Agents
     const sandboxes = yield* Sandboxes
     const checkouts = yield* LocalCheckouts
+    const storage = yield* Storage
 
     return GlassRpcs.of({
       GetSavedPlaces: () => savedPlaces.list(),
@@ -59,6 +61,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
           .pipe(Effect.map((updated) => engineSettingsOf(updated, feature))),
       GetQueueWork: ({ feature }) => queue.enabled(feature),
       SetQueueWork: ({ feature, enabled }) => queue.setEnabled(feature, enabled),
+      GetStorageBreakdown: () => storage.breakdown,
       ListFollowedRepositories: () => repositories.list(),
       FollowRepository: ({ input }) => repositories.follow(input),
       UnfollowRepository: ({ repository }) => repositories.unfollow(repository),

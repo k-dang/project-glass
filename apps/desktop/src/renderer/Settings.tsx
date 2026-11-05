@@ -8,6 +8,7 @@ import { FollowedRepositoriesSettings } from "./FollowedRepositories"
 import { ProblemAlert } from "./ProblemAlert"
 import { describeSource, problemOf } from "./problems"
 import { SettingsSection } from "./SettingsSection"
+import { StorageSettings } from "./StorageSettings"
 import { useTheme } from "./theme"
 
 const themes = [
@@ -135,6 +136,7 @@ export function Settings() {
         </fieldset>
       </SettingsSection>
       <AgentSettings />
+      <StorageSettings />
     </div>
   )
 }
