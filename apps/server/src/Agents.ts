@@ -54,7 +54,14 @@ import {
 import { SqlClient } from "effect/sql"
 import { randomUUID } from "node:crypto"
 import { ActivityLog } from "./ActivityLog"
-import { asAgentError, hostFailure, type PlacedAgent, type Placement } from "./Placement"
+import {
+  asAgentError,
+  type HostCallError,
+  type HostClient,
+  hostFailure,
+  type PlacedAgent,
+  type Placement,
+} from "./Placement"
 import { Sandboxes } from "./Sandboxes"
 import { LocalPlacement } from "./LocalPlacement"
 import type { DeliveredMessage } from "./agentHost/deliveredMessage"
@@ -148,6 +155,14 @@ export class Agents extends Context.Service<
     readonly commands: (
       agentId: string,
     ) => Effect.Effect<ReadonlyArray<AgentCommand>, AgentNotFound | AgentError>
+    readonly newAgentFiles: (
+      place: AgentPlace,
+      repository: FollowedRepository,
+      baseBranch: string,
+    ) => Effect.Effect<ReadonlyArray<string>, InvalidLocalCheckout | AgentError>
+    readonly files: (
+      agentId: string,
+    ) => Effect.Effect<ReadonlyArray<string>, AgentNotFound | AgentError>
     readonly create: (input: NewAgent) => Effect.Effect<Agent, InvalidLocalCheckout | AgentError>
     readonly createForReview: (input: NewReviewAgent) => Effect.Effect<Agent, AgentError>
     readonly send: (
@@ -586,16 +601,30 @@ export class Agents extends Context.Service<
           .pipe(Effect.mapError(asAgentError))
       })
 
-      const commands = Effect.fn("Agents.commands")(function* (agentId: string) {
+      const listedByHost = Effect.fnUntraced(function* <A>(
+        agentId: string,
+        list: (
+          host: HostClient,
+          row: PlacedAgent,
+        ) => Effect.Effect<ReadonlyArray<A>, HostCallError>,
+      ) {
         const row = yield* find(agentId)
         const host = yield* placementOf(row).hostOnceMade(row)
 
         if (Option.isNone(host)) return []
 
-        return yield* host.value
-          .ListCommands({ engine: row.agent.engine, folder: row.folder })
-          .pipe(Effect.mapError(asAgentError))
+        return yield* list(host.value, row).pipe(Effect.mapError(asAgentError))
       })
+
+      const commands = (agentId: string) =>
+        listedByHost(agentId, (host, row) =>
+          host.ListCommands({ engine: row.agent.engine, folder: row.folder }),
+        ).pipe(Effect.withSpan("Agents.commands"))
+
+      const files = (agentId: string) =>
+        listedByHost(agentId, (host, row) => host.ListFiles({ folder: row.folder })).pipe(
+          Effect.withSpan("Agents.files"),
+        )
 
       const update = Effect.fn("Agents.update")(function* (
         agentId: string,
@@ -746,6 +775,9 @@ export class Agents extends Context.Service<
             : Effect.succeed([])
         },
         commands,
+        newAgentFiles: (place, repository, baseBranch) =>
+          placementFor(place).files(repository, baseBranch),
+        files,
         create,
         createForReview,
         send,

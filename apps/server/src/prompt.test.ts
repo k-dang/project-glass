@@ -1,5 +1,5 @@
 import { assert, it } from "@effect/vitest"
-import { ToDo, toDoMention } from "@glass/contracts"
+import { fileMention, ToDo, toDoMention } from "@glass/contracts"
 import { prompt } from "./prompt"
 
 const shipDocs = { id: 7, title: "Ship docs", done: false }
@@ -27,6 +27,13 @@ it("marks each Mention and follows the message with its To-dos", () => {
       "</to_do>",
       "</glass_to_dos>",
     ].join("\n"),
+  )
+})
+
+it("names a mentioned file by its path", () => {
+  assert.equal(
+    prompt(`Fix ${fileMention("src/app [old].ts")}`, []),
+    "Fix the file `src/app [old].ts`",
   )
 })
 

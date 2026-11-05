@@ -129,16 +129,19 @@ class NewAgentOf extends Data.Class<{
   readonly repository: FollowedRepository
 }> {}
 
-const COMMANDS_IDLE_TTL = "5 minutes"
+const COMPOSER_LISTING_IDLE_TTL = "5 minutes"
 
 export const noCommands: ReadonlyArray<AgentCommand> = []
 
-const commandsOf = (
-  listing: Atom.Atom<AsyncResult.AsyncResult<ReadonlyArray<AgentCommand>, unknown>>,
-) => Atom.map(listing, (listed) => Option.getOrElse(AsyncResult.value(listed), () => noCommands))
+export const noFiles: ReadonlyArray<string> = []
+
+const listedOr = <A>(
+  listing: Atom.Atom<AsyncResult.AsyncResult<ReadonlyArray<A>, unknown>>,
+  none: ReadonlyArray<A>,
+) => Atom.map(listing, (listed) => Option.getOrElse(AsyncResult.value(listed), () => none))
 
 const newAgentCommandsFamily = Atom.family((program: NewAgentOf) =>
-  commandsOf(
+  listedOr(
     backendRuntime
       .atom(
         Backend.use((backend) =>
@@ -149,7 +152,8 @@ const newAgentCommandsFamily = Atom.family((program: NewAgentOf) =>
           }),
         ),
       )
-      .pipe(Atom.setIdleTTL(COMMANDS_IDLE_TTL)),
+      .pipe(Atom.setIdleTTL(COMPOSER_LISTING_IDLE_TTL)),
+    noCommands,
   ),
 )
 
@@ -160,10 +164,49 @@ export const newAgentCommandsAtom = (
 ) => newAgentCommandsFamily(new NewAgentOf({ engine, place, repository }))
 
 export const agentCommandsAtom = Atom.family((agentId: string) =>
-  commandsOf(
+  listedOr(
     backendRuntime
       .atom(Backend.use((backend) => backend.ListAgentCommands({ agentId })))
-      .pipe(Atom.setIdleTTL(COMMANDS_IDLE_TTL)),
+      .pipe(Atom.setIdleTTL(COMPOSER_LISTING_IDLE_TTL)),
+    noCommands,
+  ),
+)
+
+class NewAgentBranch extends Data.Class<{
+  readonly place: string
+  readonly repository: FollowedRepository
+  readonly baseBranch: string
+}> {}
+
+const newAgentFilesFamily = Atom.family((branch: NewAgentBranch) =>
+  listedOr(
+    backendRuntime
+      .atom(
+        Backend.use((backend) =>
+          backend.ListNewAgentFiles({
+            place: placeOfKey(branch.place),
+            repository: branch.repository,
+            baseBranch: branch.baseBranch,
+          }),
+        ),
+      )
+      .pipe(Atom.setIdleTTL(COMPOSER_LISTING_IDLE_TTL)),
+    noFiles,
+  ),
+)
+
+export const newAgentFilesAtom = (
+  place: string,
+  repository: FollowedRepository,
+  baseBranch: string,
+) => newAgentFilesFamily(new NewAgentBranch({ place, repository, baseBranch }))
+
+export const agentFilesAtom = Atom.family((agentId: string) =>
+  listedOr(
+    backendRuntime
+      .atom(Backend.use((backend) => backend.ListAgentFiles({ agentId })))
+      .pipe(Atom.setIdleTTL(COMPOSER_LISTING_IDLE_TTL)),
+    noFiles,
   ),
 )
 

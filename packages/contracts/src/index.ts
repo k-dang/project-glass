@@ -46,6 +46,6 @@ export * from "./storage"
 
 export * from "./toDo"
 
-export * from "./toDoMention"
+export * from "./mention"
 
 export * from "./tour"

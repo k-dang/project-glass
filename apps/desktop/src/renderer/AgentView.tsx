@@ -89,6 +89,7 @@ import {
   agentsAtom,
   cancelQueuedAtom,
   agentCommandsAtom,
+  agentFilesAtom,
   changeModelAtom,
   changePermissionModeAtom,
   writtenAtom,
@@ -682,6 +683,7 @@ export function AgentComposer(props: {
   const waiting = turns.at(-1)?.parts.find(isWaiting)
   const [composed, setComposed] = usePersistedComposer(agentId)
   const commands = useAtomValue(agentCommandsAtom(agentId))
+  const files = useAtomValue(agentFilesAtom(agentId))
   const sent = useAtomValue(sendMessageAtom(agentId))
   const send = useAtomSet(sendMessageAtom(agentId), { mode: "promiseExit" })
   const steered = useAtomValue(steerAtom(agentId))
@@ -716,6 +718,7 @@ export function AgentComposer(props: {
         onStop={running ? () => stop() : null}
         notice={waiting !== undefined && <WaitingNotice waiting={waiting} />}
         commands={commands}
+        files={files}
         pickers={props.pickers}
         suggestions={props.suggestions ?? []}
       />

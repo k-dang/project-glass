@@ -34,7 +34,9 @@ import {
   linkCheckoutAtom,
   localCheckoutsAtom,
   newAgentCommandsAtom,
+  newAgentFilesAtom,
   noCommands,
+  noFiles,
   placeNames,
   sandboxProvidersAtom,
   placeIcons,
@@ -117,6 +119,8 @@ export const defaultPlace = (
 }
 
 const unlisted = Atom.make(noCommands)
+
+const unlistedFiles = Atom.make(noFiles)
 
 const noBranches: Atom.Atom<AsyncResult.AsyncResult<Branches, BackendError>> = Atom.make(
   AsyncResult.success(new Branches({ defaultBranch: null, branches: [] })),
@@ -305,6 +309,12 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
       : newAgentCommandsAtom(props.program.engine, placeKey(where.place), repository),
   )
 
+  const files = useAtomValue(
+    repository === undefined || baseBranch === null
+      ? unlistedFiles
+      : newAgentFilesAtom(placeKey(where.place), repository, baseBranch),
+  )
+
   const models = Option.getOrNull(AsyncResult.value(offered))
 
   const model =
@@ -420,6 +430,7 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
         recall={null}
         onStop={null}
         commands={commands}
+        files={files}
         pickers={
           <ModelPicker
             engine={program.engine}

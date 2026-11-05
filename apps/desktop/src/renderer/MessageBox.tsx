@@ -20,9 +20,9 @@ import { ArrowUp, Square, X } from "lucide-react"
 import { memo, type ReactNode, useLayoutEffect, useRef, useState } from "react"
 import { InputGroup, InputGroupAddon, InputGroupButton } from "@/components/ui/input-group"
 import { Suggestion, Suggestions } from "@/components/ui/suggestion"
-import { noCommands } from "./agentsArea"
+import { noCommands, noFiles } from "./agentsArea"
 import { CommandHighlight, useCommandPicker } from "./Commands"
-import { pastedSlice, toContent, ToDoMention, toMessage } from "./composerDocument"
+import { pastedSlice, toContent, Mention, toMessage } from "./composerDocument"
 import { MarkdownStyling } from "./markdownStyling"
 import { useMentionPicker } from "./Mentions"
 import { type Problem } from "./problems"
@@ -64,7 +64,7 @@ const extensions = [
   Document,
   Paragraph,
   Text,
-  ToDoMention,
+  Mention,
   MarkdownStyling,
   CommandHighlight,
   UndoRedo,
@@ -108,6 +108,7 @@ export function MessageBox(props: {
   recall: SentMessage | null
   onStop: (() => void) | null
   commands?: ReadonlyArray<AgentCommand>
+  files?: ReadonlyArray<string>
   pickers?: ReactNode
   suggestions?: ReadonlyArray<ComposerSuggestion>
   children?: ReactNode
@@ -127,7 +128,7 @@ export function MessageBox(props: {
     },
   })
 
-  const mentions = useMentionPicker(editor, !props.textOnly)
+  const mentions = useMentionPicker(editor, !props.textOnly, props.files ?? noFiles)
   const commands = useCommandPicker(editor, props.commands ?? noCommands)
   const picker = mentions.activeDescendant === null ? commands : mentions
 

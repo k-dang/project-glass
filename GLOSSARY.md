@@ -230,9 +230,11 @@ _Avoid_: Run, execution, exchange
 A message sent while a Turn runs, waiting to start the next Turn; the user can cancel it before then.
 
 **Mention**:
-A To-do the user points at from a message to an Agent, by typing `@` and picking it. The message
-shows it by its title; the Agent reads the To-do's title and notes as they are when the message
-reaches it.
+A To-do or file the user points at from a message to an Agent, by typing `@` and picking it. The
+message shows a To-do by its title and a file by its name. The Agent reads a To-do's title and notes
+as they are when the message reaches it, and a file's path. Files come from the Agent's folder, or,
+for a New Agent's first message, from the branch it starts from: the Local checkout's copy of it on
+this device, or GitHub's for a Sandbox.
 _Avoid_: Reference, attachment, tag, chip
 
 **Command**:

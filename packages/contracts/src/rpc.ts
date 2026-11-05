@@ -327,6 +327,16 @@ export class GlassRpcs extends RpcGroup.make(
     success: Schema.Array(AgentCommand),
     error: Schema.Union([AgentNotFound, AgentError]),
   }),
+  Rpc.make("ListNewAgentFiles", {
+    payload: { place: AgentPlace, repository: FollowedRepository, baseBranch: Schema.String },
+    success: Schema.Array(Schema.String),
+    error: Schema.Union([InvalidLocalCheckout, AgentError]),
+  }),
+  Rpc.make("ListAgentFiles", {
+    payload: { agentId: Schema.String },
+    success: Schema.Array(Schema.String),
+    error: Schema.Union([AgentNotFound, AgentError]),
+  }),
   Rpc.make("ListSandboxProviders", { success: Schema.Array(SandboxProviderInfo) }),
   Rpc.make("CreateAgent", {
     payload: NewAgent,
