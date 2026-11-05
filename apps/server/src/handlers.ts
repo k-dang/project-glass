@@ -1,10 +1,16 @@
-import { ActivityPullRequest, GlassRpcs, PullRequestOpened } from "@glass/contracts"
+import {
+  ActivityPullRequest,
+  GlassRpcs,
+  GlobalConversationProgram,
+  PullRequestOpened,
+} from "@glass/contracts"
 import { Effect } from "effect"
 import { ActivityLog } from "./ActivityLog"
 import { AgentReviews } from "./AgentReviews"
 import { Asks } from "./Asks"
 import { Agents } from "./Agents"
 import { GitHubClient } from "./github/GitHubClient"
+import { GlobalConversation } from "./GlobalConversation"
 import { BackgroundGitHubRequest } from "./github/GitHubRequestPolicy"
 import { FollowedRepositories } from "./FollowedRepositories"
 import { LocalCheckouts } from "./LocalCheckouts"
@@ -31,6 +37,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
     const settings = yield* SettingsStore
     const savedPlaces = yield* SavedPlaces
     const agents = yield* Agents
+    const globalConversation = yield* GlobalConversation
     const sandboxes = yield* Sandboxes
     const checkouts = yield* LocalCheckouts
     const storage = yield* Storage
@@ -160,6 +167,20 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       GetAgentChanges: ({ agentId }) => agents.changes(agentId),
       GetRemovalWarnings: ({ agentId }) => agents.removalWarnings(agentId),
       RemoveAgent: ({ agentId }) => agents.remove(agentId),
+      GetGlobalConversationProgram: () => globalConversation.program,
+      ChangeGlobalConversationProgram: (program) =>
+        globalConversation.changeProgram(new GlobalConversationProgram(program)),
+      WatchGlobalTranscript: () => globalConversation.transcript,
+      SendGlobalMessage: (input) => globalConversation.send(input),
+      SteerGlobal: (input) => globalConversation.steer(input),
+      CancelGlobalQueuedMessage: ({ queuedMessageId }) =>
+        globalConversation.cancelQueued(queuedMessageId),
+      SendGlobalQueuedMessage: ({ queuedMessageId }) =>
+        globalConversation.sendQueued(queuedMessageId),
+      StopGlobalTurn: () => globalConversation.stop,
+      AnswerGlobalRequest: ({ requestId, answer }) => globalConversation.answer(requestId, answer),
+      GetGlobalUnsentMessage: () => globalConversation.unsent,
+      SaveGlobalUnsentMessage: (unsent) => globalConversation.saveUnsent(unsent),
     })
   }),
 )

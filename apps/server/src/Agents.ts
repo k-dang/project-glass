@@ -13,7 +13,6 @@ import {
   FollowedRepository,
   type InvalidLocalCheckout,
   type MessageInput,
-  mentionedToDoIds,
   type ModelChoice,
   defaultPermissionMode,
   engineCapabilities,
@@ -23,18 +22,13 @@ import {
   type RequestAnswer,
   NoPermissionModes,
   type RequestNotWaiting,
-  RequestWaiting,
+  type RequestWaiting,
   type Revision,
   SandboxPlace,
   thisMac as thisMacPlace,
   type TranscriptUpdate,
   TurnCutOff,
-  TurnEnded,
-  TurnFailed,
   TurnInterrupted,
-  TurnStopped,
-  isNothingUnsent,
-  nothingUnsent,
   type SentMessage,
 } from "@glass/contracts"
 import {
@@ -54,21 +48,18 @@ import {
 import { SqlClient } from "effect/sql"
 import { randomUUID } from "node:crypto"
 import { ActivityLog } from "./ActivityLog"
+import { type Conversation, ConversationTurns } from "./ConversationTurns"
 import {
   asAgentError,
   type HostCallError,
   type HostClient,
-  hostFailure,
   type PlacedAgent,
   type Placement,
 } from "./Placement"
 import { Sandboxes } from "./Sandboxes"
 import { LocalPlacement } from "./LocalPlacement"
-import type { DeliveredMessage } from "./agentHost/deliveredMessage"
-import { ReviewBrief } from "./agentHost/protocol"
-import { encodeImages, StoredMessage, Transcripts } from "./Transcripts"
-import { prompt } from "./prompt"
-import { ToDos } from "./ToDos"
+import { ReviewBrief, ReviewRole, WorkRole } from "./agentHost/protocol"
+import { Transcripts } from "./Transcripts"
 
 const StoredAgent = Schema.Struct({
   id: Agent.fields.id,
@@ -90,13 +81,9 @@ const BriefJson = Schema.fromJsonString(ReviewBrief)
 
 const encodeBrief = Schema.encodeSync(BriefJson)
 
-const decodeBrief = Schema.decodeUnknownEffect(
-  Schema.Array(Schema.Struct({ brief: Schema.NullOr(BriefJson) })),
-)
+const decodeBrief = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ brief: BriefJson })))
 
 const decodeStored = Schema.decodeUnknownEffect(Schema.Array(StoredAgent))
-
-const decodeUnsent = Schema.decodeUnknownEffect(Schema.Array(StoredMessage))
 
 const toRow = ({
   owner,
@@ -218,7 +205,7 @@ export class Agents extends Context.Service<
       const localPlacement = yield* LocalPlacement
       const sandboxes = yield* Sandboxes
       const activityLog = yield* ActivityLog
-      const toDos = yield* ToDos
+      const turns = yield* ConversationTurns
       const fs = yield* FileSystem.FileSystem
       const lock = yield* Semaphore.make(1)
       const scope = yield* Scope.Scope
@@ -280,85 +267,48 @@ export class Agents extends Context.Service<
       const withSandbox = (agent: Agent) =>
         sandboxes.status(agent.id).pipe(Effect.map((sandbox) => agentWith(agent, { sandbox })))
 
-      const delivered = Effect.fnUntraced(function* ({ message, images }: MessageInput) {
-        const ids = mentionedToDoIds(message)
-
-        const listed =
-          ids.length === 0
-            ? []
-            : yield* toDos.list().pipe(
-                Effect.tapError((cause) =>
-                  Effect.logWarning("Couldn't read mentioned To-dos", cause),
-                ),
-                Effect.orElseSucceed(() => []),
-              )
-
-        const mentioned = ids.flatMap((id) => listed.find((toDo) => toDo.id === id) ?? [])
-
-        return { message, images, prompt: prompt(message, mentioned) } satisfies DeliveredMessage
-      })
-
       const reviewBrief = (row: PlacedAgent) =>
-        row.forReview
-          ? sql`SELECT review_brief AS brief FROM agent WHERE id = ${row.agent.id}`.pipe(
-              Effect.flatMap(decodeBrief),
-              Effect.map(([found]) => found?.brief ?? null),
-              Effect.tapError((cause) => Effect.logWarning("Couldn't read a review brief", cause)),
-              Effect.mapError(storageFailure),
-            )
-          : Effect.succeed(null)
-
-      const deliver = (row: PlacedAgent, turnId: string, input: MessageInput) =>
-        Effect.gen(function* () {
-          const client = yield* placementOf(row).host(row)
-          const { id: agentId, engine, model, effort, permissionMode } = row.agent
-
-          const [, message] = yield* Effect.all(
-            [
-              reviewBrief(row).pipe(
-                Effect.flatMap((review) =>
-                  client.StartAgent({ agentId, engine, folder: row.folder, review }),
-                ),
-              ),
-              delivered(input),
-            ],
-            { concurrency: "unbounded" },
-          )
-
-          yield* lock.withPermits(1)(
-            Effect.gen(function* () {
-              if ((yield* transcripts.runningTurn(agentId)) !== turnId) return
-
-              yield* client.StartTurn({
-                agentId,
-                turnId,
-                ...message,
-                model,
-                effort,
-                permissionMode,
-              })
-            }),
-          )
-        }).pipe(
-          Effect.catch((error) =>
-            Effect.gen(function* () {
-              const reason = hostFailure(error)
-              const ended = { at: yield* DateTime.now, ending: TurnFailed.make({ reason }) }
-
-              yield* transcripts.save(row.agent.id, [TurnEnded.make({ turnId, ended })])
-            }),
+        sql`SELECT review_brief AS brief FROM agent WHERE id = ${row.agent.id}`.pipe(
+          Effect.flatMap(decodeBrief),
+          Effect.flatMap(([found]) =>
+            found === undefined
+              ? Effect.fail("An Agent review's Agent is gone")
+              : Effect.succeed(found.brief),
           ),
+          Effect.tapError((cause) => Effect.logWarning("Couldn't read a review brief", cause)),
+          Effect.mapError(storageFailure),
         )
+
+      const conversationOf = (row: PlacedAgent): Conversation => {
+        const placement = placementOf(row)
+        const { id, engine, model, effort, permissionMode } = row.agent
+
+        return {
+          id,
+          engine,
+          folder: row.folder,
+          role: row.forReview
+            ? reviewBrief(row).pipe(Effect.map((brief) => ReviewRole.make({ brief })))
+            : Effect.succeed(WorkRole.make({})),
+          settings: { model, effort, permissionMode },
+          host: placement.host(row),
+          runningHost: placement.runningHost(row),
+        }
+      }
 
       const startedTurns = yield* transcripts.subscribeStarted
 
+      // Turns of conversations that aren't Agents, such as the Global conversation, are left to
+      // their own services.
       yield* startedTurns.pipe(
-        Stream.runForEach(({ agentId, turnId, message, images }) =>
+        Stream.runForEach(({ agentId, turnId, message, images, context }) =>
           find(agentId).pipe(
             Effect.flatMap((row) =>
-              deliver(row, turnId, { message, images }).pipe(Effect.forkIn(scope)),
+              turns
+                .deliver(conversationOf(row), turnId, { message, images, context })
+                .pipe(Effect.forkIn(scope)),
             ),
-            Effect.catch((cause) => Effect.logWarning("Couldn't deliver a Turn", cause)),
+            Effect.catchTag("AgentNotFound", () => Effect.void),
           ),
         ),
         Effect.forkIn(scope),
@@ -392,7 +342,7 @@ export class Agents extends Context.Service<
               })}`
 
               yield* SubscriptionRef.update(rows, (current) => [...current, row])
-              yield* transcripts.startOrQueue(agent.id, first)
+              yield* transcripts.startOrQueue(agent.id, { ...first, context: null })
             }).pipe(sql.withTransaction),
           )
           .pipe(
@@ -479,44 +429,17 @@ export class Agents extends Context.Service<
         return yield* withSandbox(agent)
       })
 
-      const trySteer = (row: PlacedAgent, input: MessageInput) =>
-        Effect.gen(function* () {
-          const agentId = row.agent.id
-
-          if ((yield* transcripts.runningTurn(agentId)) === null) return false
-
-          const running = yield* placementOf(row).runningHost(row)
-
-          if (Option.isNone(running)) return false
-
-          const message = yield* delivered(input)
-
-          return yield* running.value.Steer({ agentId, ...message }).pipe(
-            Effect.as(true),
-            Effect.tapError((cause) => Effect.logWarning("Couldn't Steer a Turn", cause)),
-            Effect.orElseSucceed(() => false),
-          )
-        })
-
-      const refuseWhileWaiting = (agentId: string) =>
-        transcripts
-          .isWaiting(agentId)
-          .pipe(Effect.flatMap((waiting) => (waiting ? new RequestWaiting() : Effect.void)))
-
       const findWritable = (agentId: string) =>
         find(agentId).pipe(Effect.tap(() => sandboxes.refuseIfGone(agentId)))
 
       const send = Effect.fn("Agents.send")(function* (agentId: string, input: MessageInput) {
         yield* findWritable(agentId)
-        yield* refuseWhileWaiting(agentId)
-        yield* transcripts.startOrQueue(agentId, input)
+        yield* turns.send(agentId, { ...input, context: null })
       })
 
       const steer = Effect.fn("Agents.steer")(function* (agentId: string, input: MessageInput) {
         const row = yield* findWritable(agentId)
-        yield* refuseWhileWaiting(agentId)
-
-        if (!(yield* trySteer(row, input))) yield* transcripts.startOrQueue(agentId, input)
+        yield* turns.steer(conversationOf(row), { ...input, context: null })
       })
 
       const sendQueued = Effect.fn("Agents.sendQueued")(function* (
@@ -528,62 +451,21 @@ export class Agents extends Context.Service<
       })
 
       const stop = Effect.fn("Agents.stop")(function* (agentId: string) {
-        const row = yield* find(agentId)
-
-        yield* lock.withPermits(1)(
-          Effect.gen(function* () {
-            if ((yield* transcripts.runningTurn(agentId)) === null) return
-
-            const running = yield* placementOf(row).runningHost(row)
-
-            const left = Option.isNone(running)
-              ? null
-              : yield* running.value.StopTurn({ agentId }).pipe(
-                  Effect.tapError((cause) => Effect.logWarning("Couldn't stop a Turn", cause)),
-                  Effect.orElseSucceed(() => null),
-                )
-
-            if (left === null) yield* transcripts.endRunning(TurnStopped.make({}), [agentId])
-            else if (left.length > 0) yield* transcripts.prependQueued(agentId, left)
-          }),
-        )
+        yield* turns.stop(conversationOf(yield* find(agentId)))
       })
 
       const unsent = Effect.fn("Agents.unsent")(function* (agentId: string) {
         yield* find(agentId)
 
-        const [saved] = yield* sql`
-          SELECT message, images FROM agent_unsent_message WHERE agent_id = ${agentId}
-        `.pipe(
-          Effect.flatMap(decodeUnsent),
-          Effect.tapError((cause) => Effect.logWarning("Couldn't read an unsent message", cause)),
-          Effect.mapError(storageFailure),
-        )
-
-        return saved ?? nothingUnsent
+        return yield* turns.unsent(agentId)
       })
 
       const saveUnsent = Effect.fn("Agents.saveUnsent")(function* (
         agentId: string,
-        { message, images }: SentMessage,
+        unsentMessage: SentMessage,
       ) {
         yield* find(agentId)
-
-        yield* (
-          isNothingUnsent({ message, images })
-            ? sql`DELETE FROM agent_unsent_message WHERE agent_id = ${agentId}`
-            : sql`
-                INSERT INTO agent_unsent_message ${sql.insert({
-                  agent_id: agentId,
-                  message,
-                  images: encodeImages(images),
-                })}
-                ON CONFLICT (agent_id) DO UPDATE SET message = excluded.message, images = excluded.images
-              `
-        ).pipe(
-          Effect.tapError((cause) => Effect.logWarning("Couldn't save an unsent message", cause)),
-          Effect.mapError(storageFailure),
-        )
+        yield* turns.saveUnsent(agentId, unsentMessage)
       })
 
       const changes = Effect.fn("Agents.changes")(function* (agentId: string) {
@@ -671,18 +553,7 @@ export class Agents extends Context.Service<
         requestId: string,
         given: RequestAnswer,
       ) {
-        const row = yield* find(agentId)
-
-        return yield* placementOf(row)
-          .host(row)
-          .pipe(
-            Effect.flatMap((client) => client.AnswerRequest({ agentId, requestId, answer: given })),
-            Effect.mapError((error) =>
-              Predicate.isTagged(error, "RequestNotWaiting")
-                ? error
-                : new AgentError({ message: hostFailure(error) }),
-            ),
-          )
+        return yield* turns.answer(conversationOf(yield* find(agentId)), requestId, given)
       })
 
       const removalWarnings = Effect.fn("Agents.removalWarnings")(function* (agentId: string) {
@@ -735,7 +606,7 @@ export class Agents extends Context.Service<
 
           yield* Effect.gen(function* () {
             yield* transcripts.remove(agentId)
-            yield* sql`DELETE FROM agent_unsent_message WHERE agent_id = ${agentId}`
+            yield* turns.removeUnsent(agentId)
             yield* sql`DELETE FROM agent WHERE id = ${agentId}`
           }).pipe(sql.withTransaction, Effect.mapError(storageFailure))
         }).pipe(

@@ -9,6 +9,8 @@ import {
   type Agent,
   emptyTranscript,
   asksPermission,
+  type CapturedContext,
+  contextLabel,
   type Image,
   isWaiting,
   nothingUnsent,
@@ -87,22 +89,18 @@ import {
 import {
   type AgentTab,
   agentsAtom,
-  cancelQueuedAtom,
-  agentCommandsAtom,
-  agentFilesAtom,
   changeModelAtom,
   changePermissionModeAtom,
   writtenAtom,
   placeKey,
-  saveUnsent,
-  sendMessageAtom,
-  sendQueuedAtom,
-  steerAtom,
-  stopTurnAtom,
   reachSandboxAtom,
-  transcriptAtom,
-  unsentMessageAtom,
 } from "./agentsArea"
+import {
+  agentConversation,
+  type Conversation,
+  ConversationContext,
+  useConversation,
+} from "./conversation"
 import { MessageText, readableText } from "./Mentions"
 import { Attachment, type ComposerSuggestion, MessageBox } from "./MessageBox"
 import { ModelPicker } from "./ModelPicker"
@@ -161,8 +159,9 @@ export function AgentView(props: { agentId: string } & AgentTabs) {
 
 function OpenAgent(props: { agent: Agent } & AgentTabs) {
   const { agent, tab, onTabChange } = props
-  const transcript = useAtomValue(transcriptAtom(agent.id))
-  const reconnect = useAtomRefresh(transcriptAtom(agent.id))
+  const conversation = agentConversation(agent.id)
+  const transcript = useAtomValue(conversation.transcript)
+  const reconnect = useAtomRefresh(conversation.transcript)
 
   const { turns, queued, status } = Option.getOrElse(
     AsyncResult.value(transcript),
@@ -183,74 +182,75 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
   }, [registry, agent.id])
 
   return (
-    <section aria-label={agent.name} className="flex min-h-0 flex-1 flex-col">
-      <AgentHeader
-        heading={
-          tab === "changes" ? (
-            <>
-              <button
-                type="button"
-                className="truncate text-muted-foreground hover:text-foreground"
-                onClick={() => onTabChange("chat")}
-              >
-                {agent.name}
-              </button>
-              <span className="text-muted-foreground/50">/</span>
-              <h1 className="font-medium">Changes</h1>
-            </>
+    <ConversationContext value={conversation}>
+      <section aria-label={agent.name} className="flex min-h-0 flex-1 flex-col">
+        <AgentHeader
+          heading={
+            tab === "changes" ? (
+              <>
+                <button
+                  type="button"
+                  className="truncate text-muted-foreground hover:text-foreground"
+                  onClick={() => onTabChange("chat")}
+                >
+                  {agent.name}
+                </button>
+                <span className="text-muted-foreground/50">/</span>
+                <h1 className="font-medium">Changes</h1>
+              </>
+            ) : (
+              <h1 className="truncate font-medium">{agent.name}</h1>
+            )
+          }
+          place={agent.place}
+          repository={repositoryKey(agent.repository)}
+          branch={agent.name}
+          baseBranch={agent.baseBranch}
+        >
+          {tab === "chat" ? (
+            <AgentHeaderAction onSelect={() => onTabChange("changes")}>
+              <FileDiff aria-hidden />
+              Changes
+            </AgentHeaderAction>
           ) : (
-            <h1 className="truncate font-medium">{agent.name}</h1>
-          )
-        }
-        place={agent.place}
-        repository={repositoryKey(agent.repository)}
-        branch={agent.name}
-        baseBranch={agent.baseBranch}
-      >
-        {tab === "chat" ? (
-          <AgentHeaderAction onSelect={() => onTabChange("changes")}>
-            <FileDiff aria-hidden />
-            Changes
-          </AgentHeaderAction>
-        ) : (
-          <AgentHeaderAction onSelect={() => onTabChange("chat")}>
-            <MessageCircle aria-hidden />
-            Back to Chat
-          </AgentHeaderAction>
+            <AgentHeaderAction onSelect={() => onTabChange("chat")}>
+              <MessageCircle aria-hidden />
+              Back to Chat
+            </AgentHeaderAction>
+          )}
+        </AgentHeader>
+        {AsyncResult.isFailure(transcript) && !transcript.waiting && (
+          <div className="px-6 pt-4">
+            <ProblemAlert
+              problem={streamProblem(transcript.cause)}
+              action={{ label: "Reconnect", run: reconnect }}
+            />
+          </div>
         )}
-      </AgentHeader>
-      {AsyncResult.isFailure(transcript) && !transcript.waiting && (
-        <div className="px-6 pt-4">
-          <ProblemAlert
-            problem={streamProblem(transcript.cause)}
-            action={{ label: "Reconnect", run: reconnect }}
-          />
+        <div hidden={tab !== "chat"} className="flex min-h-0 flex-1 flex-col">
+          <Transcript turns={turns} status={status} />
+          {reach === "unreachable" && <UnreachableNotice agentId={agent.id} />}
+          {gone === null ? (
+            <Composer agent={agent} turns={turns} queued={queued} />
+          ) : (
+            <output className="mx-auto block w-full max-w-3xl px-6 py-4 text-sm text-muted-foreground">
+              {goneExplanation(gone)}
+            </output>
+          )}
         </div>
-      )}
-      <div hidden={tab !== "chat"} className="flex min-h-0 flex-1 flex-col">
-        <Transcript agentId={agent.id} turns={turns} status={status} />
-        {reach === "unreachable" && <UnreachableNotice agentId={agent.id} />}
-        {gone === null ? (
-          <Composer agent={agent} turns={turns} queued={queued} />
-        ) : (
-          <output className="mx-auto block w-full max-w-3xl px-6 py-4 text-sm text-muted-foreground">
-            {goneExplanation(gone)}
-          </output>
-        )}
-      </div>
-      <section
-        aria-label="Changes"
-        hidden={tab !== "changes"}
-        className="flex min-h-0 min-w-0 flex-1 flex-col"
-      >
-        {changesOpened && <AgentChanges agent={agent} turns={turns} />}
+        <section
+          aria-label="Changes"
+          hidden={tab !== "changes"}
+          className="flex min-h-0 min-w-0 flex-1 flex-col"
+        >
+          {changesOpened && <AgentChanges agent={agent} turns={turns} />}
+        </section>
       </section>
-    </section>
+    </ConversationContext>
   )
 }
 
 export function Transcript(props: {
-  agentId: string
   turns: ReadonlyArray<Turn>
   status: string | null
   lead?: ReactNode
@@ -288,7 +288,6 @@ export function Transcript(props: {
               {props.turns.slice(hidden).map((turn) => (
                 <TurnView
                   key={turn.id}
-                  agentId={props.agentId}
                   turn={turn}
                   latest={turn === props.turns.at(-1)}
                   status={turn === props.turns.at(-1) ? props.status : null}
@@ -320,10 +319,13 @@ function AttachedImages(props: { images: ReadonlyArray<Image> }) {
   )
 }
 
+const sentFrom = (context: CapturedContext | null) =>
+  context === null ? undefined : `From ${contextLabel(context)}`
+
 export function UserMessage(props: {
   message: string
   images: ReadonlyArray<Image>
-  label?: string
+  label?: string | undefined
 }) {
   return (
     <Message align="end">
@@ -343,7 +345,6 @@ export function UserMessage(props: {
 }
 
 const TurnView = memo(function TurnView(props: {
-  agentId: string
   turn: Turn
   latest: boolean
   status: string | null
@@ -353,11 +354,11 @@ const TurnView = memo(function TurnView(props: {
   return (
     <MessageScrollerItem messageId={turn.id} scrollAnchor exactHeight={props.latest}>
       <MessageGroup className="gap-4">
-        <UserMessage message={turn.message} images={turn.images} />
+        <UserMessage message={turn.message} images={turn.images} label={sentFrom(turn.context)} />
         <Message>
           <MessageContent>
             {nestParts(turn.parts).map(({ part, index, nested }) => (
-              <PartView key={index} agentId={props.agentId} part={part} nested={nested} />
+              <PartView key={index} part={part} nested={nested} />
             ))}
             <Trace>
               {turn.ended === null ? (
@@ -487,7 +488,6 @@ const toolStatus = {
 } as const
 
 const PartView = memo(function PartView(props: {
-  agentId: string
   part: TurnPart
   nested: ReadonlyArray<NestedPart>
 }) {
@@ -496,8 +496,12 @@ const PartView = memo(function PartView(props: {
   return Match.value(props.part).pipe(
     Match.tagsExhaustive({
       Text: ({ text }) => <Streamdown className="text-sm">{text}</Streamdown>,
-      Steer: ({ message, images }) => (
-        <UserMessage label="Steered" message={message} images={images} />
+      Steer: ({ message, images, context }) => (
+        <UserMessage
+          label={["Steered", sentFrom(context)].filter(Predicate.isString).join(" · ")}
+          message={message}
+          images={images}
+        />
       ),
       Thinking: ({ text }) => (
         <Trace>
@@ -547,7 +551,7 @@ const PartView = memo(function PartView(props: {
                 {props.nested.length > 0 && (
                   <div className="flex flex-col gap-1 border-l pl-3">
                     {props.nested.map(({ part, index, nested }) => (
-                      <PartView key={index} agentId={props.agentId} part={part} nested={nested} />
+                      <PartView key={index} part={part} nested={nested} />
                     ))}
                   </div>
                 )}
@@ -566,8 +570,8 @@ const PartView = memo(function PartView(props: {
           </Trace>
         )
       },
-      PermissionRequest: (request) => <RequestCard agentId={props.agentId} part={request} />,
-      Question: (question) => <RequestCard agentId={props.agentId} part={question} />,
+      PermissionRequest: (request) => <RequestCard part={request} />,
+      Question: (question) => <RequestCard part={question} />,
     }),
   )
 })
@@ -641,7 +645,6 @@ function Composer(props: {
 
   return (
     <AgentComposer
-      agentId={agent.id}
       turns={props.turns}
       queued={props.queued}
       problem={settledProblem(changed) ?? settledProblem(modeChanged)}
@@ -668,7 +671,6 @@ function Composer(props: {
 }
 
 export function AgentComposer(props: {
-  agentId: string
   turns: ReadonlyArray<Turn>
   queued: ReadonlyArray<QueuedMessage>
   label?: string
@@ -678,24 +680,25 @@ export function AgentComposer(props: {
   pickers?: ReactNode
   suggestions?: ReadonlyArray<ComposerSuggestion>
 }) {
-  const { agentId, turns } = props
+  const { turns } = props
+  const conversation = useConversation()
   const running = turns.at(-1)?.ended === null
   const waiting = turns.at(-1)?.parts.find(isWaiting)
-  const [composed, setComposed] = usePersistedComposer(agentId)
-  const commands = useAtomValue(agentCommandsAtom(agentId))
-  const files = useAtomValue(agentFilesAtom(agentId))
-  const sent = useAtomValue(sendMessageAtom(agentId))
-  const send = useAtomSet(sendMessageAtom(agentId), { mode: "promiseExit" })
-  const steered = useAtomValue(steerAtom(agentId))
-  const steer = useAtomSet(steerAtom(agentId), { mode: "promiseExit" })
-  const stopped = useAtomValue(stopTurnAtom(agentId))
-  const stop = useAtomSet(stopTurnAtom(agentId))
+  const [composed, setComposed] = usePersistedComposer(conversation)
+  const commands = useAtomValue(conversation.commands)
+  const files = useAtomValue(conversation.files)
+  const sent = useAtomValue(conversation.send)
+  const send = useAtomSet(conversation.send, { mode: "promiseExit" })
+  const steered = useAtomValue(conversation.steer)
+  const steer = useAtomSet(conversation.steer, { mode: "promiseExit" })
+  const stopped = useAtomValue(conversation.stop)
+  const stop = useAtomSet(conversation.stop)
 
   return (
     <>
       {props.queued.length > 0 && (
         <div className="px-6">
-          <QueuedMessages agentId={agentId} queued={props.queued} running={running} />
+          <QueuedMessages queued={props.queued} running={running} />
         </div>
       )}
       <MessageBox
@@ -726,10 +729,10 @@ export function AgentComposer(props: {
   )
 }
 
-function usePersistedComposer(agentId: string) {
+function usePersistedComposer(conversation: Conversation) {
   const registry = useContext(RegistryContext)
-  const [written, setWritten] = useAtom(writtenAtom(agentId))
-  const kept = Option.getOrNull(AsyncResult.value(useAtomValue(unsentMessageAtom(agentId))))
+  const [written, setWritten] = useAtom(writtenAtom(conversation.key))
+  const kept = Option.getOrNull(AsyncResult.value(useAtomValue(conversation.unsent)))
   const composed = written ?? kept ?? nothingUnsent
   const unsaved = useRef<SentMessage | null>(null)
 
@@ -740,17 +743,17 @@ function usePersistedComposer(agentId: string) {
 
     const timer = setTimeout(() => {
       unsaved.current = null
-      saveUnsent(registry, agentId, written)
+      conversation.saveUnsent(registry, written)
     }, SAVE_DELAY_MS)
 
     return () => clearTimeout(timer)
-  }, [registry, agentId, written])
+  }, [registry, conversation, written])
 
   useEffect(
     () => () => {
-      if (unsaved.current !== null) saveUnsent(registry, agentId, unsaved.current)
+      if (unsaved.current !== null) conversation.saveUnsent(registry, unsaved.current)
     },
-    [registry, agentId],
+    [registry, conversation],
   )
 
   const setComposed = useCallback(
@@ -761,13 +764,10 @@ function usePersistedComposer(agentId: string) {
   return [composed, setComposed] as const
 }
 
-function QueuedMessages(props: {
-  agentId: string
-  queued: ReadonlyArray<QueuedMessage>
-  running: boolean
-}) {
-  const cancel = useAtomSet(cancelQueuedAtom(props.agentId))
-  const sendNow = useAtomSet(sendQueuedAtom(props.agentId))
+function QueuedMessages(props: { queued: ReadonlyArray<QueuedMessage>; running: boolean }) {
+  const conversation = useConversation()
+  const cancel = useAtomSet(conversation.cancelQueued)
+  const sendNow = useAtomSet(conversation.sendQueued)
 
   return (
     <section aria-label="Queued messages" className="mx-auto flex max-w-3xl flex-col gap-1 pt-2">
@@ -783,6 +783,11 @@ function QueuedMessages(props: {
               <QueueItemRow>
                 <QueueItemContent>
                   <MessageText text={queued.message} />
+                  {queued.context !== null && (
+                    <span className="block text-xs text-muted-foreground">
+                      {sentFrom(queued.context)}
+                    </span>
+                  )}
                 </QueueItemContent>
                 <QueueItemActions>
                   {!props.running && (

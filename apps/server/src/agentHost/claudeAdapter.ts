@@ -23,9 +23,19 @@ import {
   RequestNotWaiting,
   type RequestPart,
   SUGGEST_DRAFT_TOOL,
-  sentOf,
+  withContextOf,
 } from "@glass/contracts"
-import { Deferred, Effect, Option, Predicate, Queue, Schema, type Scope, Stream } from "effect"
+import {
+  Deferred,
+  Effect,
+  Match,
+  Option,
+  Predicate,
+  Queue,
+  Schema,
+  type Scope,
+  Stream,
+} from "effect"
 import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
 import * as z from "zod"
@@ -34,7 +44,14 @@ import { claudeReadOnlyTools } from "../readOnlyTools"
 import type { AgentAdapter } from "./adapter"
 import { GLASS_MCP_PREFIX, GLASS_MCP_SERVER, Input, isFailure, machine } from "./claudeTurn"
 import type { DeliveredMessage } from "./deliveredMessage"
-import { couldNotSwitch, HostAgentError, notRunning, type ReviewBrief } from "./protocol"
+import { CLAUDE_QUESTION_TOOL, globalInstructions } from "./globalRole"
+import {
+  type ConversationRole,
+  couldNotSwitch,
+  HostAgentError,
+  notRunning,
+  type ReviewBrief,
+} from "./protocol"
 import { settleWith } from "./requests"
 import {
   placeSuggestedDraft,
@@ -110,6 +127,27 @@ const reviewOptions = (brief: ReviewBrief): Options => ({
     }),
   },
 })
+
+/** Leaves out the user's settings, plugins, and MCP servers, and every tool but Questions. */
+const globalOptions: Options = {
+  systemPrompt: {
+    type: "preset",
+    preset: "claude_code",
+    append: globalInstructions(CLAUDE_QUESTION_TOOL),
+  },
+  tools: [CLAUDE_QUESTION_TOOL],
+  settingSources: [],
+  strictMcpConfig: true,
+}
+
+const roleOptions = (role: ConversationRole): Options =>
+  Match.value(role).pipe(
+    Match.tagsExhaustive({
+      Work: () => ({}),
+      Review: ({ brief }) => reviewOptions(brief),
+      Global: () => globalOptions,
+    }),
+  )
 
 const startClaude = (
   sdk: ClaudeSdk,
@@ -231,7 +269,7 @@ const decodeQuestions = Schema.decodeUnknownOption(AskedQuestions)
 const decodeToolInput = Schema.decodeUnknownOption(ToolInput)
 
 const requestOf = (requestId: string, toolName: string, input: ToolInput) => {
-  if (toolName === "AskUserQuestion") {
+  if (toolName === CLAUDE_QUESTION_TOOL) {
     const asked = decodeQuestions(input)
 
     if (Option.isSome(asked))
@@ -332,7 +370,7 @@ export const claudeAdapter = (command: string, sdk: ClaudeSdk = liveSdk): AgentA
       Effect.scoped,
     ),
 
-  start: Effect.fnUntraced(function* ({ folder, conversation, review, report }) {
+  start: Effect.fnUntraced(function* ({ folder, conversation, role, report }) {
     const prompts = yield* Queue.unbounded<SDKUserMessage>()
     const requests = yield* Queue.unbounded<Input>()
     const waiting = new Map<string, Asked>()
@@ -380,7 +418,7 @@ export const claudeAdapter = (command: string, sdk: ClaudeSdk = liveSdk): AgentA
           { signal },
         ),
       saved === undefined ? { sessionId: conversation } : { resume: conversation },
-      review === null ? {} : reviewOptions(review),
+      roleOptions(role),
     )
 
     const turns = yield* runTurns({
@@ -413,7 +451,7 @@ export const claudeAdapter = (command: string, sdk: ClaudeSdk = liveSdk): AgentA
           yield* control("Permission mode", () => session.setPermissionMode(permissionMode))
       }),
       startTurn: Effect.fnUntraced(function* (turnId: string, sent: DeliveredMessage) {
-        yield* turns.begin(turnId, sentOf(sent))
+        yield* turns.begin(turnId, withContextOf(sent))
 
         return yield* Queue.offer(prompts, { ...userMessage(sent), uuid: randomUUID() }).pipe(
           Effect.asVoid,
@@ -436,7 +474,7 @@ export const claudeAdapter = (command: string, sdk: ClaudeSdk = liveSdk): AgentA
 
         const cancelled = yield* interruptAll(session)
 
-        return steers.filter(({ id }) => cancelled.includes(id)).map(sentOf)
+        return steers.filter(({ id }) => cancelled.includes(id)).map(withContextOf)
       }),
       answer: Effect.fnUntraced(function* (requestId: string, answer: RequestAnswer) {
         const asked = waiting.get(requestId)

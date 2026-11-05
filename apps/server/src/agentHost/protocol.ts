@@ -5,10 +5,10 @@ import {
   AgentEvent,
   AgentModels,
   ChangedFile,
+  MessageWithContext,
   ModelChoice,
   RequestAnswer,
   RequestNotWaiting,
-  SentMessage,
 } from "@glass/contracts"
 import { Schema, SchemaTransformation } from "effect"
 import { randomBytes } from "node:crypto"
@@ -60,11 +60,25 @@ export const ReviewBrief = Schema.Struct({
 
 export type ReviewBrief = typeof ReviewBrief.Type
 
+/** An Agent working in its worktree or Sandbox, with the user's own tools and settings. */
+export const WorkRole = Schema.TaggedStruct("Work", {})
+
+/** An Agent review's Agent, reading its checkout and proposing Suggested drafts. */
+export const ReviewRole = Schema.TaggedStruct("Review", { brief: ReviewBrief })
+
+/** The Global conversation, which reaches Glass rather than a project and asks Questions. */
+export const GlobalRole = Schema.TaggedStruct("Global", {})
+
+/** What a conversation the host starts is for, which decides its tools and instructions. */
+export const ConversationRole = Schema.Union([WorkRole, ReviewRole, GlobalRole])
+
+export type ConversationRole = typeof ConversationRole.Type
+
 export class HostAgentError extends Schema.TaggedError<HostAgentError>()("HostAgentError", {
   message: Schema.String,
 }) {}
 
-export const SteersNotTakenIn = Schema.Array(SentMessage)
+export const SteersNotTakenIn = Schema.Array(MessageWithContext)
 
 export type SteersNotTakenIn = typeof SteersNotTakenIn.Type
 
@@ -84,7 +98,7 @@ export class AgentHostRpcs extends RpcGroup.make(
       agentId: Schema.String,
       engine: AgentEngine,
       folder: HostFolder,
-      review: Schema.NullOr(ReviewBrief),
+      role: ConversationRole,
     },
     error: HostAgentError,
   }),

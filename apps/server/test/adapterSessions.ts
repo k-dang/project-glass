@@ -18,7 +18,12 @@ import { vi } from "vite-plus/test"
 import type { AgentAdapter, AgentSession } from "../src/agentHost/adapter"
 import { claudeAdapter, type ClaudeSdk } from "../src/agentHost/claudeAdapter"
 import { piAdapter } from "../src/agentHost/piAdapter"
-import type { ReviewBrief, TurnSettings } from "../src/agentHost/protocol"
+import {
+  type ConversationRole,
+  type ReviewBrief,
+  type TurnSettings,
+  WorkRole,
+} from "../src/agentHost/protocol"
 import { bundledPi, bundledPiProgram } from "./demoAgent"
 import { type FakeModelSettings, fakeModelProvider } from "./fakeModelProvider"
 import { isolatedHome, stubHome } from "./harness"
@@ -60,8 +65,8 @@ const drive = Effect.fnUntraced(function* (
     Effect.map((current) => waiting(current)!),
   )
 
-  const open = (conversation: string, review: ReviewBrief | null = null) =>
-    adapter.start({ folder, conversation, review, report }).pipe(
+  const open = (conversation: string, role: ConversationRole = WorkRole.make({})) =>
+    adapter.start({ folder, conversation, role, report }).pipe(
       Effect.map((session: AgentSession) => ({
         session,
         configure: (settings: Partial<TurnSettings>) =>
@@ -76,13 +81,13 @@ const drive = Effect.fnUntraced(function* (
           Effect.gen(function* () {
             const turnId = `turn-${++nextTurn}`
             const sentAt = yield* DateTime.now
-            yield* report(TurnStarted.make({ turnId, message, images, sentAt }))
-            yield* session.startTurn(turnId, { message, images, prompt: message })
+            yield* report(TurnStarted.make({ turnId, message, images, context: null, sentAt }))
+            yield* session.startTurn(turnId, { message, images, context: null, prompt: message })
 
             return turnId
           }),
         steer: (message: string, images: ReadonlyArray<Image> = []) =>
-          session.steer({ message, images, prompt: message }),
+          session.steer({ message, images, context: null, prompt: message }),
         answer: (requestId: string, answer: RequestAnswer) => session.answer(requestId, answer),
       })),
     )

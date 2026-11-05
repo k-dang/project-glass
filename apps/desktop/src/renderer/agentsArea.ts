@@ -15,6 +15,7 @@ import {
   SandboxPlace,
   type SentMessage,
   type Transcript,
+  type TranscriptUpdate,
   repositoryKey,
   thisMac,
 } from "@glass/contracts"
@@ -43,7 +44,7 @@ export const placeNames: Record<PlaceTag, string> = { "this-mac": "Local", sandb
 
 export const placeIcons: Record<PlaceTag, LucideIcon> = { "this-mac": Laptop, sandbox: Cloud }
 
-const TRANSCRIPT_IDLE_TTL = "5 minutes"
+export const TRANSCRIPT_IDLE_TTL = "5 minutes"
 
 const FRAME = "16 millis"
 
@@ -59,19 +60,25 @@ export const waitingAgentsAtom = backendRuntime
   )
   .pipe(Atom.keepAlive)
 
+/** A transcript kept up to date from its updates, applying at most one batch a frame. */
+export const transcriptOf = <E, R>(updates: Stream.Stream<TranscriptUpdate, E, R>) =>
+  updates.pipe(
+    Stream.groupedWithin(Number.POSITIVE_INFINITY, FRAME),
+    Stream.mapAccum(
+      (): Transcript => emptyTranscript,
+      (transcript, batch) => {
+        const next = batch.reduce(applyTranscriptUpdate, transcript)
+
+        return [next, [next]] as const
+      },
+    ),
+  )
+
 export const transcriptAtom = Atom.family((agentId: string) =>
   backendRuntime
     .atom(
-      Stream.unwrap(Backend.useSync((backend) => backend.WatchTranscript({ agentId }))).pipe(
-        Stream.groupedWithin(Number.POSITIVE_INFINITY, FRAME),
-        Stream.mapAccum(
-          (): Transcript => emptyTranscript,
-          (transcript, updates) => {
-            const next = updates.reduce(applyTranscriptUpdate, transcript)
-
-            return [next, [next]] as const
-          },
-        ),
+      transcriptOf(
+        Stream.unwrap(Backend.useSync((backend) => backend.WatchTranscript({ agentId }))),
       ),
     )
     .pipe(Atom.setIdleTTL(TRANSCRIPT_IDLE_TTL)),
@@ -245,9 +252,16 @@ export const changePermissionModeAtom = Atom.family((agentId: string) =>
   ),
 )
 
-export const answerRequestAtom = Atom.family((requestId: string) =>
-  backendRuntime.fn((answered: { readonly agentId: string; readonly answer: RequestAnswer }) =>
-    Backend.use((backend) => backend.AnswerRequest({ requestId, ...answered })),
+export class AgentRequest extends Data.Class<{
+  readonly agentId: string
+  readonly requestId: string
+}> {}
+
+export const answerRequestAtom = Atom.family((request: AgentRequest) =>
+  backendRuntime.fn((answer: RequestAnswer) =>
+    Backend.use((backend) =>
+      backend.AnswerRequest({ agentId: request.agentId, requestId: request.requestId, answer }),
+    ),
   ),
 )
 

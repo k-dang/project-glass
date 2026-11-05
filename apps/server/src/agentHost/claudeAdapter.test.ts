@@ -1,6 +1,7 @@
 import { assert, it } from "@effect/vitest"
 import { Effect, Stream } from "effect"
 import { claudeAdapter, type ClaudeQuery } from "./claudeAdapter"
+import { WorkRole } from "./protocol"
 
 it.live("reports a failed SDK handshake as a host error and closes the query", () =>
   Effect.gen(function* () {
@@ -24,7 +25,12 @@ it.live("reports a failed SDK handshake as a host error and closes the query", (
       query: () => query,
       getSessionInfo: async () => undefined,
     })
-      .start({ folder: "checkout", conversation: "new", review: null, report: () => Effect.void })
+      .start({
+        folder: "checkout",
+        conversation: "new",
+        role: WorkRole.make({}),
+        report: () => Effect.void,
+      })
       .pipe(Effect.scoped, Effect.flip)
 
     assert.equal(failed._tag, "HostAgentError")

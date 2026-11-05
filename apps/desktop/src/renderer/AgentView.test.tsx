@@ -99,7 +99,7 @@ it("shows the Agent under Local and its Turn's parts as they stream", async () =
     WatchTranscript: () =>
       Stream.make(
         TranscriptSnapshot.make({ turns: [], queued: [], status: null }),
-        TurnStarted.make({ turnId, message: "Run echo", images: [], sentAt }),
+        TurnStarted.make({ turnId, message: "Run echo", images: [], context: null, sentAt }),
         PartSet.make({ turnId, index: 0, part: ThinkingPart.make({ text: "I should " }) }),
         PartAppended.make({ turnId, index: 0, text: "run echo." }),
         PartSet.make({
@@ -908,6 +908,7 @@ it("nests a subagent's tool calls under the tool call that started it", async ()
               id: turnId,
               message: "Delegate",
               images: [],
+              context: null,
               sentAt,
               ended: null,
               parts: [call("task-1", "Agent", null), call("bash-1", "Bash", "task-1")],
@@ -947,7 +948,7 @@ it("shows a Turn cut off when Glass lost the Agent", async () => {
     WatchTranscript: () =>
       Stream.make(
         TranscriptSnapshot.make({ turns: [], queued: [], status: null }),
-        TurnStarted.make({ turnId, message: "Run echo", images: [], sentAt }),
+        TurnStarted.make({ turnId, message: "Run echo", images: [], context: null, sentAt }),
         TurnEnded.make({
           turnId,
           ended: { at: DateTime.add(sentAt, { seconds: 4 }), ending: TurnCutOff.make({}) },
@@ -989,7 +990,17 @@ it("makes the open Agent the Saved place, which Activity leaves for Dashboard to
 const waitingTurn = (parts: ReadonlyArray<TurnPart>) =>
   Stream.make(
     TranscriptSnapshot.make({
-      turns: [{ id: "turn-1", message: "List files", images: [], sentAt, ended: null, parts }],
+      turns: [
+        {
+          id: "turn-1",
+          message: "List files",
+          images: [],
+          context: null,
+          sentAt,
+          ended: null,
+          parts,
+        },
+      ],
       queued: [],
       status: null,
     }),
@@ -1141,6 +1152,7 @@ const runningTurn = {
   id: "turn-1",
   message: "Build it",
   images: [],
+  context: null,
   sentAt,
   ended: null,
   parts: [],
@@ -1150,7 +1162,7 @@ const running = (queued: ReadonlyArray<{ id: string; message: string }> = []) =>
   Stream.make(
     TranscriptSnapshot.make({
       turns: [runningTurn],
-      queued: queued.map((message) => ({ ...message, images: [] })),
+      queued: queued.map((message) => ({ ...message, images: [], context: null })),
       status: null,
     }),
   )
@@ -1203,7 +1215,7 @@ it("lists Queued messages, cancels one, and sends one now once no Turn runs", as
       Stream.make(
         TranscriptSnapshot.make({
           turns: [stopped],
-          queued: queued.map((message) => ({ ...message, images: [] })),
+          queued: queued.map((message) => ({ ...message, images: [], context: null })),
           status: null,
         }),
       ),
@@ -1390,6 +1402,7 @@ it("mentions an open To-do picked after @, and shows the Mention as its title", 
           turnId: "turn-1",
           message: `Earlier: ${toDoMention(flaky)}`,
           images: [],
+          context: null,
           sentAt,
         }),
       ),

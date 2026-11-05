@@ -29,6 +29,7 @@ const groupOfItem = new Map<string, StorageGroup>([
   ["agent_queued_message", "agents"],
   ["agent_unsent_message", "agents"],
   ["local_checkout", "agents"],
+  ["global_conversation", "agents"],
   ["agent_reviews", "reviews"],
   ["queued_pull_request", "reviews"],
   ["tours", "reviews"],

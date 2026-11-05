@@ -15,9 +15,9 @@ import { beginTurn, Input, step, stoppedReason, type TurnState } from "./claudeT
 
 const now = DateTime.makeUnsafe("2026-10-26T12:00:00Z")
 
-const steer = { message: "Use tabs", images: [], prompt: "Use tabs", id: "steer-1" }
+const steer = { message: "Use tabs", images: [], context: null, prompt: "Use tabs", id: "steer-1" }
 
-const fresh = beginTurn("turn-1", { message: "Build it", images: [] }, now)
+const fresh = beginTurn("turn-1", { message: "Build it", images: [], context: null }, now)
 
 const holding: TurnState = { ...fresh, steers: [steer] }
 
@@ -90,7 +90,7 @@ it("goes on into the run a late Steer starts, showing the Steer where that run t
   const taken = run([runStart(["steer-1"])], first.state)
   assert.deepStrictEqual(taken.state?.turn.parts, [
     TextPart.make({ text: "Built." }),
-    SteerPart.make({ message: steer.message, images: [] }),
+    SteerPart.make({ message: steer.message, images: [], context: null }),
   ])
 })
 
@@ -115,7 +115,7 @@ it("ends with the run when Claude Code doesn't stamp its replies, showing the St
   const ended = step(shown.state, Input.Message({ message: result(false) }), now)
   assert.deepInclude(
     ended.events.flatMap((event) => (Predicate.isTagged(event, "PartSet") ? [event.part] : [])),
-    SteerPart.make({ message: steer.message, images: [] }),
+    SteerPart.make({ message: steer.message, images: [], context: null }),
   )
 })
 

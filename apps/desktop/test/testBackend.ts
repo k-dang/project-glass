@@ -1,4 +1,11 @@
-import { GlassRpcs, nothingUnsent, SavedPlace } from "@glass/contracts"
+import {
+  emptyTranscript,
+  GlassRpcs,
+  GlobalConversationProgram,
+  nothingUnsent,
+  SavedPlace,
+  TranscriptSnapshot,
+} from "@glass/contracts"
 import { DateTime, Effect, Layer, ManagedRuntime, Stream } from "effect"
 import { AtomRegistry } from "effect/reactivity"
 import { type Rpc, type RpcGroup, RpcTest } from "effect/rpc"
@@ -97,6 +104,20 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         AnswerRequest: unused,
         GetRemovalWarnings: unused,
         RemoveAgent: unused,
+        GetGlobalConversationProgram: () =>
+          Effect.succeed(
+            new GlobalConversationProgram({ engine: "claude-code", model: null, effort: null }),
+          ),
+        ChangeGlobalConversationProgram: unused,
+        WatchGlobalTranscript: () => Stream.make(TranscriptSnapshot.make(emptyTranscript)),
+        SendGlobalMessage: unused,
+        SteerGlobal: unused,
+        CancelGlobalQueuedMessage: unused,
+        SendGlobalQueuedMessage: unused,
+        StopGlobalTurn: unused,
+        AnswerGlobalRequest: unused,
+        GetGlobalUnsentMessage: () => Effect.succeed(nothingUnsent),
+        SaveGlobalUnsentMessage: () => Effect.void,
         ...handlers,
       }),
     ),

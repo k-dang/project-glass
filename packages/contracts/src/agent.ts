@@ -1,6 +1,8 @@
 import { agentEngines } from "@glass/plugin"
 import { Match, Predicate, Schema } from "effect"
 import { FollowedRepository } from "./followedRepository"
+import { PullRequestRef } from "./pullRequest"
+import { Revision } from "./revision"
 
 export const AgentEngine = Schema.Literals(agentEngines)
 
@@ -139,6 +141,46 @@ export type SentMessage = typeof SentMessage.Type
 
 export const sentOf = ({ message, images }: SentMessage): SentMessage => ({ message, images })
 
+/** The PR workspace and Revision the user was viewing when they sent a message. */
+export const PullRequestContext = Schema.TaggedStruct("PullRequest", {
+  pullRequest: PullRequestRef,
+  revision: Revision,
+})
+
+/** The Agent the user had open when they sent a message, named as it was then. */
+export const AgentContext = Schema.TaggedStruct("Agent", {
+  agentId: Schema.String,
+  name: Schema.String,
+})
+
+/** What a message to the Global conversation was sent from, fixed when it was sent. */
+export const CapturedContext = Schema.Union([PullRequestContext, AgentContext])
+
+export type CapturedContext = typeof CapturedContext.Type
+
+export const contextLabel = (context: CapturedContext) =>
+  Match.value(context).pipe(
+    Match.tagsExhaustive({
+      PullRequest: ({ pullRequest: { owner, repo, number }, revision }) =>
+        `${owner}/${repo}#${number} at ${revision.head.slice(0, 7)}`,
+      Agent: ({ name }) => name,
+    }),
+  )
+
+/** A message with the context it was sent from, which only the Global conversation captures. */
+export const MessageWithContext = Schema.Struct({
+  ...SentMessage.fields,
+  context: Schema.NullOr(CapturedContext),
+})
+
+export type MessageWithContext = typeof MessageWithContext.Type
+
+export const withContextOf = ({
+  message,
+  images,
+  context,
+}: MessageWithContext): MessageWithContext => ({ message, images, context })
+
 export const TextPart = Schema.TaggedStruct("Text", { text: Schema.String })
 
 export const ThinkingPart = Schema.TaggedStruct("Thinking", { text: Schema.String })
@@ -193,7 +235,7 @@ export const QuestionPart = Schema.TaggedStruct("Question", {
   answers: Schema.NullOr(Schema.Array(QuestionReply)),
 })
 
-export const SteerPart = Schema.TaggedStruct("Steer", SentMessage.fields)
+export const SteerPart = Schema.TaggedStruct("Steer", MessageWithContext.fields)
 
 export const TurnPart = Schema.Union([
   TextPart,
@@ -285,7 +327,7 @@ export type TurnEnd = typeof TurnEnd.Type
 
 export const Turn = Schema.Struct({
   id: Schema.String,
-  ...SentMessage.fields,
+  ...MessageWithContext.fields,
   sentAt: Schema.DateTimeUtcFromString,
   ended: Schema.NullOr(TurnEnd),
   parts: Schema.Array(TurnPart),
@@ -295,7 +337,7 @@ export type Turn = typeof Turn.Type
 
 export const TurnStarted = Schema.TaggedStruct("TurnStarted", {
   turnId: Schema.String,
-  ...SentMessage.fields,
+  ...MessageWithContext.fields,
   sentAt: Schema.DateTimeUtcFromString,
 })
 
@@ -317,7 +359,7 @@ export const AgentEvent = Schema.Union([TurnStarted, PartSet, PartAppended, Turn
 
 export type AgentEvent = typeof AgentEvent.Type
 
-export const QueuedMessage = Schema.Struct({ id: Schema.String, ...SentMessage.fields })
+export const QueuedMessage = Schema.Struct({ id: Schema.String, ...MessageWithContext.fields })
 
 export type QueuedMessage = typeof QueuedMessage.Type
 
@@ -383,9 +425,9 @@ export const applyAgentEvent = (
 ): ReadonlyArray<Turn> =>
   Match.value(event).pipe(
     Match.tagsExhaustive({
-      TurnStarted: ({ turnId, message, images, sentAt }) => [
+      TurnStarted: ({ turnId, message, images, context, sentAt }) => [
         ...turns,
-        { id: turnId, message, images, sentAt, ended: null, parts: [] },
+        { id: turnId, message, images, context, sentAt, ended: null, parts: [] },
       ],
       PartSet: ({ turnId, index, part }) =>
         changeTurn(turns, turnId, (turn) => {
@@ -423,6 +465,13 @@ export const MessageText = Schema.Trimmed.check(Schema.isNonEmpty())
 export const MessageInput = Schema.Struct({ ...SentMessage.fields, message: MessageText })
 
 export type MessageInput = typeof MessageInput.Type
+
+export const MessageInputWithContext = Schema.Struct({
+  ...MessageInput.fields,
+  context: MessageWithContext.fields.context,
+})
+
+export type MessageInputWithContext = typeof MessageInputWithContext.Type
 
 export const nothingUnsent: SentMessage = { message: "", images: [] }
 

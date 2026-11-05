@@ -11,12 +11,13 @@ import {
   RequestNotWaiting,
   type RequestPart,
   SUGGEST_DRAFT_TOOL,
-  sentOf,
+  withContextOf,
 } from "@glass/contracts"
 import {
   Duration,
   Effect,
   FileSystem,
+  Match,
   Option,
   Predicate,
   Queue,
@@ -48,7 +49,8 @@ import {
   machine,
   stoppedReason,
 } from "./piTurn"
-import { couldNotSwitch, HostAgentError, notRunning, type ReviewBrief } from "./protocol"
+import { globalInstructions, PI_QUESTION_TOOL, piQuestionExtension } from "./globalRole"
+import { type ConversationRole, couldNotSwitch, HostAgentError, notRunning } from "./protocol"
 import { settleWith } from "./requests"
 import { piLoadsNothing, piReadOnlyTools } from "../readOnlyTools"
 import { piSuggestDraftExtension } from "./suggestDraftTool"
@@ -149,7 +151,13 @@ const refused = (what: "model" | "effort") => (error: string) =>
     Effect.andThen(Effect.fail(couldNotSwitch("pi", what))),
   )
 
-const reviewFlags = Effect.fnUntraced(function* (folder: string, brief: ReviewBrief) {
+/** Starts pi with only `tools`, Glass's own extension, and its instructions, loading nothing else. */
+const lockedDownFlags = Effect.fnUntraced(function* (
+  folder: string,
+  tools: ReadonlyArray<string>,
+  extension: { readonly name: string; readonly source: string },
+  instructionsText: string,
+) {
   const fs = yield* FileSystem.FileSystem
   const directory = `${folder}.pi`
 
@@ -157,22 +165,43 @@ const reviewFlags = Effect.fnUntraced(function* (folder: string, brief: ReviewBr
     fs.remove(directory, { recursive: true, force: true }).pipe(Effect.ignore),
   )
 
-  const extension = join(directory, "suggest-draft.js")
+  const extensionFile = join(directory, extension.name)
   const instructions = join(directory, "instructions.md")
 
-  yield* fs.writeFileString(extension, piSuggestDraftExtension(brief))
-  yield* fs.writeFileString(instructions, brief.instructions)
+  yield* fs.writeFileString(extensionFile, extension.source)
+  yield* fs.writeFileString(instructions, instructionsText)
 
   return [
     "--tools",
-    [...piReadOnlyTools, SUGGEST_DRAFT_TOOL].join(","),
+    tools.join(","),
     ...piLoadsNothing,
     "--extension",
-    extension,
+    extensionFile,
     "--append-system-prompt",
     instructions,
   ]
 })
+
+const roleFlags = (folder: string, role: ConversationRole) =>
+  Match.value(role).pipe(
+    Match.tagsExhaustive({
+      Work: () => Effect.succeed([]),
+      Review: ({ brief }) =>
+        lockedDownFlags(
+          folder,
+          [...piReadOnlyTools, SUGGEST_DRAFT_TOOL],
+          { name: "suggest-draft.js", source: piSuggestDraftExtension(brief) },
+          brief.instructions,
+        ),
+      Global: () =>
+        lockedDownFlags(
+          folder,
+          [PI_QUESTION_TOOL],
+          { name: "ask-user.js", source: piQuestionExtension },
+          globalInstructions(PI_QUESTION_TOOL),
+        ),
+    }),
+  )
 
 export const piAdapter = (command: string) =>
   Effect.gen(function* () {
@@ -224,21 +253,16 @@ export const piAdapter = (command: string) =>
           }))
         }).pipe(Effect.scoped),
 
-      start: Effect.fnUntraced(function* ({ folder, conversation, review, report }) {
+      start: Effect.fnUntraced(function* ({ folder, conversation, role, report }) {
         const scope = yield* Scope.Scope
 
-        const flags =
-          review === null
-            ? []
-            : yield* reviewFlags(folder, review).pipe(
-                Effect.provideService(FileSystem.FileSystem, fs),
-                Effect.tapError((error) =>
-                  Effect.logWarning("Couldn't prepare pi's review tools", error),
-                ),
-                Effect.mapError(
-                  () => new HostAgentError({ message: "Couldn't prepare pi's tools. Try again." }),
-                ),
-              )
+        const flags = yield* roleFlags(folder, role).pipe(
+          Effect.provideService(FileSystem.FileSystem, fs),
+          Effect.tapError((error) => Effect.logWarning("Couldn't prepare pi's tools", error)),
+          Effect.mapError(
+            () => new HostAgentError({ message: "Couldn't prepare pi's tools. Try again." }),
+          ),
+        )
 
         const rpc = yield* startPi(folder, conversation, flags)
 
@@ -350,7 +374,7 @@ export const piAdapter = (command: string) =>
             return undefined
           }),
           startTurn: Effect.fnUntraced(function* (turnId: string, sent: DeliveredMessage) {
-            yield* turns.begin(turnId, sentOf(sent))
+            yield* turns.begin(turnId, withContextOf(sent))
 
             const answer = yield* rpc.request(piMessage("prompt", sent), PromptAccepted).pipe(
               Effect.map(({ disposition }) =>

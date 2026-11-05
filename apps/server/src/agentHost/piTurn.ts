@@ -15,8 +15,8 @@ import {
   TurnFailed,
   type TurnPart,
   TurnStopped,
-  type SentMessage,
-  sentOf,
+  type MessageWithContext,
+  withContextOf,
 } from "@glass/contracts"
 import { Data, type DateTime, Predicate } from "effect"
 import type { AssistantUpdate, ClearedQueue, PiEvent, ToolResult } from "./piRpc"
@@ -92,7 +92,11 @@ export const stoppedReason =
 
 const refusedReason = "pi didn't accept the message. Send it again."
 
-export const beginTurn = (turnId: string, sent: SentMessage, at: DateTime.Utc): TurnState => ({
+export const beginTurn = (
+  turnId: string,
+  sent: MessageWithContext,
+  at: DateTime.Utc,
+): TurnState => ({
   turn: { id: turnId, ...sent, sentAt: at, ended: null, parts: [] },
   partByBlock: new Map(),
   toolCalls: new Map(),
@@ -161,7 +165,7 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
 
   const showSteer = (turn: TurnState, steer: Steer) => {
     state = { ...turn, steers: turn.steers.filter((sent) => sent !== steer) }
-    setPart(state, turn.turn.parts.length, SteerPart.make(sentOf(steer)))
+    setPart(state, turn.turn.parts.length, SteerPart.make(withContextOf(steer)))
   }
 
   const takeIn = (turn: TurnState) => {
@@ -294,7 +298,7 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
 export const leftover = (
   steers: ReadonlyArray<Steer>,
   cleared: typeof ClearedQueue.Type,
-): ReadonlyArray<SentMessage> => {
+): ReadonlyArray<MessageWithContext> => {
   const ours = steers.slice(Math.max(0, steers.length - cleared.steering.length))
 
   const others = [
@@ -302,7 +306,10 @@ export const leftover = (
     ...cleared.followUp,
   ]
 
-  return [...ours.map(sentOf), ...others.map((message) => ({ message, images: [] }))]
+  return [
+    ...ours.map(withContextOf),
+    ...others.map((message) => ({ message, images: [], context: null })),
+  ]
 }
 
 export const machine: TurnMachine<TurnState, Input, Command> = {

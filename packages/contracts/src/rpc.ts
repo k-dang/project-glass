@@ -16,6 +16,7 @@ import {
   InvalidLocalCheckout,
   LocalCheckout,
   MessageInput,
+  MessageInputWithContext,
   ModelChoice,
   NewAgent,
   NoPermissionModes,
@@ -29,6 +30,7 @@ import {
   TranscriptUpdate,
 } from "./agent"
 import { ConnectionError, GitHubConnection } from "./connection"
+import { GlobalConversationProgram } from "./globalConversation"
 import {
   DiffSide,
   DiscussionResolutionError,
@@ -409,6 +411,39 @@ export class GlassRpcs extends RpcGroup.make(
     payload: { agentId: Schema.String },
     error: Schema.Union([AgentNotFound, AgentError]),
   }),
+  Rpc.make("GetGlobalConversationProgram", {
+    success: GlobalConversationProgram,
+    error: AgentError,
+  }),
+  Rpc.make("ChangeGlobalConversationProgram", {
+    payload: GlobalConversationProgram.fields,
+    success: GlobalConversationProgram,
+    error: Schema.Union([AgentBusy, AgentError]),
+  }),
+  Rpc.make("WatchGlobalTranscript", { success: TranscriptUpdate, error: AgentError, stream: true }),
+  Rpc.make("SendGlobalMessage", {
+    payload: MessageInputWithContext,
+    error: Schema.Union([RequestWaiting, AgentError]),
+  }),
+  Rpc.make("SteerGlobal", {
+    payload: MessageInputWithContext,
+    error: Schema.Union([RequestWaiting, AgentError]),
+  }),
+  Rpc.make("CancelGlobalQueuedMessage", {
+    payload: { queuedMessageId: Schema.String },
+    error: AgentError,
+  }),
+  Rpc.make("SendGlobalQueuedMessage", {
+    payload: { queuedMessageId: Schema.String },
+    error: Schema.Union([AgentBusy, AgentError]),
+  }),
+  Rpc.make("StopGlobalTurn", { error: AgentError }),
+  Rpc.make("AnswerGlobalRequest", {
+    payload: { requestId: Schema.String, answer: RequestAnswer },
+    error: Schema.Union([RequestNotWaiting, AgentError]),
+  }),
+  Rpc.make("GetGlobalUnsentMessage", { success: SentMessage, error: AgentError }),
+  Rpc.make("SaveGlobalUnsentMessage", { payload: SentMessage, error: AgentError }),
 ) {}
 
 export type GlassRpcError = Rpc.Error<RpcGroup.Rpcs<typeof GlassRpcs>>

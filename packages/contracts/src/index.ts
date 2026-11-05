@@ -20,6 +20,8 @@ export * from "./engine"
 
 export * from "./followedRepository"
 
+export * from "./globalConversation"
+
 export * from "./pullRequest"
 
 export * from "./pullRequestList"

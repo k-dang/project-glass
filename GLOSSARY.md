@@ -191,6 +191,13 @@ One named conversation, started from Glass, with Claude Code or pi working in on
 this device, a Sandbox, or, for an Agent review's Follow-ups, a checkout of the review's Revision.
 _Avoid_: Session, thread, bot, box
 
+**Global conversation**:
+The one conversation the user has with Glass itself, opened beside any area without leaving it,
+with Claude Code or pi. It works in no repository and needs no Local checkout; it reads no files and
+runs no commands, and asks the user Questions. A message can keep the PR workspace and Revision, or
+the Agent, it was sent from.
+_Avoid_: Assistant, chat, copilot, global Agent
+
 **Agent program**:
 Claude Code or pi, the program an Agent runs. It decides which models and efforts the user can pick,
 and leaving either to it runs its own default.
@@ -248,8 +255,8 @@ A message sent into the running Turn, for the Agent to take in before it finishe
 _Avoid_: Interrupt, inject
 
 **Unsent message**:
-What the user has written to an Agent and not sent yet, with any images, kept for each Agent on this
-device until they send or clear it.
+What the user has written to an Agent or the Global conversation and not sent yet, with any images,
+kept for each on this device until they send or clear it.
 _Avoid_: Draft (a Draft is a GitHub comment)
 
 **Permission mode**:

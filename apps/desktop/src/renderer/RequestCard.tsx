@@ -23,18 +23,19 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { answerRequestAtom } from "./agentsArea"
+import { useConversation } from "./conversation"
 import { settledProblem } from "./problems"
 
 export const requestElementId = (requestId: string) => `request-${requestId}`
 
-const useAnswer = (agentId: string, requestId: string) => {
-  const answered = useAtomValue(answerRequestAtom(requestId))
-  const answer = useAtomSet(answerRequestAtom(requestId))
+const useAnswer = (requestId: string) => {
+  const answering = useConversation().answer(requestId)
+  const answered = useAtomValue(answering)
+  const answer = useAtomSet(answering)
   const problem = settledProblem(answered)
 
   return {
-    answer: (given: RequestAnswer) => answer({ agentId, answer: given }),
+    answer: (given: RequestAnswer) => answer(given),
     sending: answered.waiting,
     problem:
       problem === null ? null : (
@@ -56,8 +57,8 @@ function Outcome(props: { icon: ReactNode; children: ReactNode }) {
   )
 }
 
-export function RequestCard(props: { agentId: string; part: RequestPart }) {
-  const { agentId, part } = props
+export function RequestCard(props: { part: RequestPart }) {
+  const { part } = props
 
   return (
     <div
@@ -69,20 +70,19 @@ export function RequestCard(props: { agentId: string; part: RequestPart }) {
       )}
     >
       {Predicate.isTagged(part, "Question") ? (
-        <Questions agentId={agentId} question={part} />
+        <Questions question={part} />
       ) : (
-        <Permission agentId={agentId} request={part} />
+        <Permission request={part} />
       )}
     </div>
   )
 }
 
 function Permission(props: {
-  agentId: string
   request: Extract<RequestPart, { readonly _tag: "PermissionRequest" }>
 }) {
   const { request } = props
-  const { answer, sending, problem } = useAnswer(props.agentId, request.requestId)
+  const { answer, sending, problem } = useAnswer(request.requestId)
   const [reason, setReason] = useState("")
   const titleId = useId()
   const reasonId = useId()
@@ -156,12 +156,9 @@ const option = (label: string, description: string | null, control: ReactNode) =
   </Label>
 )
 
-function Questions(props: {
-  agentId: string
-  question: Extract<RequestPart, { readonly _tag: "Question" }>
-}) {
+function Questions(props: { question: Extract<RequestPart, { readonly _tag: "Question" }> }) {
   const { question } = props
-  const { answer, sending, problem } = useAnswer(props.agentId, question.requestId)
+  const { answer, sending, problem } = useAnswer(question.requestId)
 
   const [chosen, setChosen] = useState<ReadonlyArray<ReadonlyArray<string>>>(() =>
     question.questions.map(() => []),

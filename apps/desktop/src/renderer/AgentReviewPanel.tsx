@@ -16,7 +16,7 @@ import { Streamdown } from "streamdown"
 import { Button } from "@/components/ui/button"
 import { Marker, MarkerContent } from "@/components/ui/marker"
 import { Textarea } from "@/components/ui/textarea"
-import { transcriptAtom } from "./agentsArea"
+import { agentConversation, ConversationContext } from "./conversation"
 import { AgentComposer, ToolCallView, Transcript, UserMessage } from "./AgentView"
 import type { ShowNote } from "./changesView"
 import { LineLocation, pathLineName } from "./Discussions"
@@ -217,8 +217,9 @@ function ReviewAgent(props: {
   show: ShowNote
 }) {
   const { agentId, drafts, show, outdated } = props
-  const transcript = useAtomValue(transcriptAtom(agentId))
-  const reconnect = useAtomRefresh(transcriptAtom(agentId))
+  const conversation = agentConversation(agentId)
+  const transcript = useAtomValue(conversation.transcript)
+  const reconnect = useAtomRefresh(conversation.transcript)
 
   const { turns, queued, status } = Option.getOrElse(
     AsyncResult.value(transcript),
@@ -237,40 +238,40 @@ function ReviewAgent(props: {
   )
 
   return (
-    <ToolCallView value={suggestedDraftView}>
-      {AsyncResult.isFailure(transcript) && !transcript.waiting && (
-        <div className="px-5 pt-4">
-          <ProblemAlert
-            problem={streamProblem(transcript.cause)}
-            action={{ label: "Reconnect", run: reconnect }}
-          />
-        </div>
-      )}
-      <Transcript
-        agentId={agentId}
-        turns={turns}
-        status={status}
-        lead={
-          <>
-            {props.lead}
-            <FollowUpsMarker />
-          </>
-        }
-      />
-      {outdated ? (
-        <OutdatedNote />
-      ) : (
-        <AgentComposer
-          agentId={agentId}
+    <ConversationContext value={conversation}>
+      <ToolCallView value={suggestedDraftView}>
+        {AsyncResult.isFailure(transcript) && !transcript.waiting && (
+          <div className="px-5 pt-4">
+            <ProblemAlert
+              problem={streamProblem(transcript.cause)}
+              action={{ label: "Reconnect", run: reconnect }}
+            />
+          </div>
+        )}
+        <Transcript
           turns={turns}
-          queued={queued}
-          label="Follow up"
-          idlePlaceholder="Ask about the review, or have it draft comments"
-          textOnly
-          suggestions={followUpSuggestions}
+          status={status}
+          lead={
+            <>
+              {props.lead}
+              <FollowUpsMarker />
+            </>
+          }
         />
-      )}
-    </ToolCallView>
+        {outdated ? (
+          <OutdatedNote />
+        ) : (
+          <AgentComposer
+            turns={turns}
+            queued={queued}
+            label="Follow up"
+            idlePlaceholder="Ask about the review, or have it draft comments"
+            textOnly
+            suggestions={followUpSuggestions}
+          />
+        )}
+      </ToolCallView>
+    </ConversationContext>
   )
 }
 

@@ -105,6 +105,7 @@ const followUps: ReadonlyArray<Turn> = [
     id: "turn-1",
     message: "Draft a comment for the letter change.",
     images: [],
+    context: null,
     sentAt,
     ended: { at: sentAt, ending: TurnDone.make({}) },
     parts: [

@@ -22,7 +22,7 @@ it.live(
             : Deferred.succeed(busy, undefined).pipe(Effect.andThen(Deferred.await(resume))),
       })
 
-      yield* turns.begin("turn-1", { message: "Build it", images: [] })
+      yield* turns.begin("turn-1", { message: "Build it", images: [], context: null })
       yield* turns.offer(
         Input.Event({
           event: { type: "tool_execution_start", toolCallId: "call-1", toolName: "bash", args: {} },

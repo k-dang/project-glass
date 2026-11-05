@@ -23,8 +23,12 @@ it.live(
   () =>
     Effect.gen(function* () {
       const transcripts = yield* Transcripts
-      yield* transcripts.startOrQueue("agent-1", { message: "Build it", images: [] })
-      yield* transcripts.startOrQueue("agent-1", { message: "Then docs", images: [] })
+      yield* transcripts.startOrQueue("agent-1", { message: "Build it", images: [], context: null })
+      yield* transcripts.startOrQueue("agent-1", {
+        message: "Then docs",
+        images: [],
+        context: null,
+      })
       const turnId = yield* transcripts.runningTurn("agent-1")
 
       yield* transcripts.endRunning(TurnStopped.make({}), ["agent-1"])
