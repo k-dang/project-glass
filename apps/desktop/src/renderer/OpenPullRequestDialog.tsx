@@ -9,7 +9,7 @@ import { shortcutLabel } from "./shortcutLabel"
 import { useShortcuts } from "./useShortcuts"
 
 export function OpenPullRequestDialog(props: {
-  current: PullRequestRef
+  current?: PullRequestRef
   onOpen: (pullRequest: PullRequestRef) => void
 }) {
   const [open, setOpen] = useState(false)
@@ -22,7 +22,8 @@ export function OpenPullRequestDialog(props: {
 
   const reference = parsePullRequestReference(address)
 
-  const isCurrent = reference !== null && sameRef(reference, props.current)
+  const isCurrent =
+    reference !== null && props.current !== undefined && sameRef(reference, props.current)
 
   const show = (next: boolean) => {
     if (next) setAddress("")
@@ -64,19 +65,21 @@ export function OpenPullRequestDialog(props: {
 
   return (
     <Dialog open={open} onOpenChange={show}>
-      <DialogTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Open another PR"
-            aria-keyshortcuts="Meta+L Control+L"
-            title={`Open another PR (${shortcutLabel("L")})`}
-          />
-        }
-      >
-        <GitPullRequestArrow aria-hidden />
-      </DialogTrigger>
+      {props.current !== undefined && (
+        <DialogTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Open another PR"
+              aria-keyshortcuts="Meta+L Control+L"
+              title={`Open another PR (${shortcutLabel("L")})`}
+            />
+          }
+        >
+          <GitPullRequestArrow aria-hidden />
+        </DialogTrigger>
+      )}
       <DialogContent
         instant
         showCloseButton={false}
