@@ -2,12 +2,24 @@ import {
   type ActivityLogError,
   ActivityPage,
   Agent,
-  type AgentError,
+  AgentEngine,
+  AgentError,
+  AgentModels,
+  type AgentReviewFailure,
+  AgentReviewState,
+  Branches,
   type AgentNotFound,
   type ConnectionError,
+  FollowedRepository,
+  type InvalidLocalCheckout,
+  LocalCheckout,
+  MessageDelivery,
+  MessageText,
   type PullRequestAccessDenied,
   type PullRequestNotFound,
   type QueueError,
+  type RequestWaiting,
+  SandboxProviderInfo,
   type SettingsError,
   type StaleRevision,
   type ToDoError,
@@ -18,15 +30,21 @@ import {
   ToDo,
   type Turn,
   TurnEnding,
+  AgentPlace,
+  localPlace,
 } from "@glass/contracts"
 import { Context, Effect, Match, Option, Schema, Stream } from "effect"
 import { Tool, Toolkit } from "effect/ai"
 import { ActivityLog } from "../ActivityLog"
+import { AgentReviews } from "../AgentReviews"
 import { agentReviewMaterial, PullRequestMaterial } from "../agentReviewPrompt"
 import type { FileMaterial } from "../tourPrompt"
 import { Agents } from "../Agents"
 import { GitHubClient } from "../github/GitHubClient"
 import { BackgroundGitHubRequest } from "../github/GitHubRequestPolicy"
+import { FollowedRepositories } from "../FollowedRepositories"
+import { LocalCheckouts } from "../LocalCheckouts"
+import { Sandboxes } from "../Sandboxes"
 import { PullRequestLists } from "../PullRequestLists"
 import { Queue } from "../Queue"
 import { ToDos } from "../ToDos"
@@ -141,6 +159,102 @@ const ReadPullRequest = Tool.make("read_pull_request", {
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)
 
+const ListAgentPlaces = Tool.make("list_agent_places", {
+  description:
+    "Lists where the user can start an Agent. An Agent on this device works in a copy of a Local checkout, so its repository must be one of localCheckouts. An Agent in a Sandbox works in any followed repository, in a Sandbox from one of sandboxProviders. Each place runs only the Agent programs listed with it.",
+  success: Schema.Struct({
+    local: Schema.Struct({
+      engines: Schema.Array(AgentEngine),
+      localCheckouts: Schema.Array(LocalCheckout),
+    }),
+    sandboxProviders: Schema.Array(SandboxProviderInfo),
+    followedRepositories: Schema.Array(FollowedRepository),
+  }),
+  failure: GlassToolFailure,
+}).annotateMerge(readOnly)
+
+const ListAgentOptions = Tool.make("list_agent_options", {
+  description:
+    "Lists the base branches and models an Agent can start with, for a repository, place, and Agent program from list_agent_places.",
+  parameters: Schema.Struct({
+    place: AgentPlace,
+    repository: FollowedRepository,
+    engine: AgentEngine,
+  }),
+  success: Schema.Struct({
+    ...Branches.fields,
+    models: AgentModels,
+  }),
+  failure: GlassToolFailure,
+}).annotateMerge(readOnly)
+
+const action = Context.make(Tool.Readonly, false).pipe(
+  Context.add(Tool.Destructive, false),
+  Context.add(Tool.Idempotent, false),
+  Context.add(Tool.OpenWorld, false),
+)
+
+const CreateAgent = Tool.make("create_agent", {
+  description:
+    "Creates an Agent: a named coding conversation working on a branch of its own, made from a base branch of a repository. It starts its first Turn with the message, and appears in the user's Agents. This returns once Glass created the Agent, not when it finishes its Turn: read_agent_transcript shows its progress. Choose the place, program, base branch, and model from list_agent_places and list_agent_options, never from guesses. If this call fails without saying why, or is cut off, call list_agents before trying again rather than creating a second Agent.",
+  parameters: Schema.Struct({
+    repository: FollowedRepository,
+    baseBranch: Schema.String.annotate({
+      description: "The branch the Agent's branch starts from.",
+    }),
+    place: AgentPlace.annotate({
+      description: "Where the Agent works: on this device, or in a Sandbox from a provider.",
+    }),
+    engine: AgentEngine.annotate({ description: "The Agent program that runs the Agent." }),
+    model: Schema.NullOr(Schema.String).annotate({
+      description: "A model id from list_agent_options, or null for the program's default.",
+    }),
+    effort: Schema.NullOr(Schema.String).annotate({
+      description: "One of the model's Efforts, or null for its default.",
+    }),
+    message: MessageText.annotate({ description: "The Agent's first message: its task." }),
+  }),
+  success: Schema.Struct({ agent: Agent }),
+  failure: GlassToolFailure,
+}).annotateMerge(action)
+
+const SendAgentMessage = Tool.make("send_agent_message", {
+  description:
+    "Sends a message to one of the user's Agents, as the user would from the Agent. An idle Agent starts a Turn with it; a busy Agent keeps it as a Queued message and starts on it after its running Turn. This returns once Glass accepted the message, not when the Agent answers: read_agent_transcript shows its progress. If this call fails without saying why, or is cut off, read the Agent's transcript before sending again rather than sending it twice.",
+  parameters: Schema.Struct({
+    agentId: Schema.String.annotate({ description: "The Agent's id, from list_agents." }),
+    message: MessageText,
+  }),
+  success: Schema.Struct({
+    delivery: MessageDelivery.annotate({
+      description:
+        "started: the Agent started a Turn with it. queued: it waits behind the running Turn.",
+    }),
+  }),
+  failure: GlassToolFailure,
+}).annotateMerge(action)
+
+const ReadAgentReview = Tool.make("read_agent_review", {
+  description:
+    "Reads a PR's Agent review: the latest one written, with the Revision it reviewed, and whether one is being written now or failed.",
+  parameters: Schema.Struct({ pullRequest: PullRequestRef }),
+  success: AgentReviewState,
+  failure: GlassToolFailure,
+}).annotateMerge(readOnly)
+
+const StartAgentReview = Tool.make("start_agent_review", {
+  description:
+    "Starts an Agent review of a PR at a Revision, as the user would from the PR. It appears beside the PR's diff once written. This returns once the review started, not when it is written, which takes minutes: read_agent_review shows its progress and result, or why it failed, such as the PR having changed since that Revision. Starting one replaces any review being written for the PR, so read_agent_review first and ask the user before replacing one.",
+  parameters: Schema.Struct({
+    pullRequest: PullRequestRef,
+    revision: Revision.annotate({
+      description: "The Revision to review, such as the one in a message's glass_context.",
+    }),
+  }),
+  success: AgentReviewState,
+  failure: GlassToolFailure,
+}).annotateMerge(action)
+
 export const GlassTools = Toolkit.make(
   ListPullRequests,
   ListQueue,
@@ -149,21 +263,30 @@ export const GlassTools = Toolkit.make(
   ListAgents,
   ReadAgentTranscript,
   ReadPullRequest,
+  ReadAgentReview,
+  StartAgentReview,
+  ListAgentPlaces,
+  ListAgentOptions,
+  CreateAgent,
+  SendAgentMessage,
 )
 
-type ReadFailure =
+type ServiceFailure =
   | ActivityLogError
   | AgentError
+  | AgentReviewFailure
   | AgentNotFound
   | ConnectionError
+  | InvalidLocalCheckout
   | PullRequestAccessDenied
   | PullRequestNotFound
   | QueueError
+  | RequestWaiting
   | SettingsError
   | StaleRevision
   | ToDoError
 
-const explained = (error: ReadFailure) =>
+const explained = (error: ServiceFailure) =>
   new GlassToolFailure({
     message: Match.value(error).pipe(
       Match.tagsExhaustive({
@@ -175,10 +298,15 @@ const explained = (error: ReadFailure) =>
         TokenRejected: () => "GitHub rejected Glass's GitHub login.",
         AgentNotFound: () =>
           "There's no Agent with that id. list_agents names the Agents there are.",
+        InvalidLocalCheckout: ({ message }) =>
+          `${message} The user links one from New Agent in Agents; an Agent in a Sandbox needs none.`,
         PullRequestAccessDenied: ({ message }) => message,
         GitHubUnavailable: ({ message }) => message,
         ActivityLogError: ({ message }) => message,
         AgentError: ({ message }) => message,
+        AgentReviewFailure: ({ message }) => message,
+        RequestWaiting: () =>
+          "The Agent is waiting for the user to answer its Question or Permission request, so it took no message. The user answers it in the Agent.",
         QueueError: ({ message }) => message,
         SettingsError: ({ message }) => message,
         ToDoError: ({ message }) => message,
@@ -234,6 +362,30 @@ export const GlassToolHandlers = GlassTools.toLayer(
     const activityLog = yield* ActivityLog
     const github = yield* GitHubClient
     const agents = yield* Agents
+    const followed = yield* FollowedRepositories
+    const checkouts = yield* LocalCheckouts
+    const sandboxes = yield* Sandboxes
+    const agentReviews = yield* AgentReviews
+
+    const refuseUnofferedModel = Effect.fnUntraced(function* ({
+      engine,
+      place,
+      model,
+      effort,
+    }: Tool.Parameters<typeof CreateAgent>) {
+      const { defaultModel, models } = yield* agents.models(engine, place)
+      const chosen = model === null ? defaultModel : models.find(({ id }) => id === model)
+
+      if (model !== null && chosen === undefined)
+        yield* new AgentError({
+          message: `That place has no model "${model}". list_agent_options lists the models a place offers.`,
+        })
+
+      if (effort !== null && !(chosen?.efforts.includes(effort) ?? false))
+        yield* new AgentError({
+          message: `That model has no Effort "${effort}". list_agent_options lists each model's Efforts.`,
+        })
+    })
 
     return GlassTools.of({
       list_pull_requests: () =>
@@ -284,6 +436,49 @@ export const GlassToolHandlers = GlassTools.toLayer(
 
           return { revision: read, ...material, ...withinBudget(material.files) }
         }).pipe(Effect.mapError(explained)),
+      read_agent_review: ({ pullRequest }) =>
+        first(agentReviews.watch(pullRequest)).pipe(Effect.mapError(explained)),
+      start_agent_review: ({ pullRequest, revision }) =>
+        agentReviews
+          .start(pullRequest, revision)
+          .pipe(
+            Effect.uninterruptible,
+            Effect.andThen(first(agentReviews.watch(pullRequest))),
+            Effect.mapError(explained),
+          ),
+      list_agent_places: () =>
+        Effect.gen(function* () {
+          return {
+            local: { engines: agents.engines(localPlace), localCheckouts: yield* checkouts.list() },
+            sandboxProviders: sandboxes.providers,
+            followedRepositories: yield* followed.list(),
+          }
+        }).pipe(Effect.mapError(explained)),
+      list_agent_options: ({ place, repository, engine }) =>
+        Effect.all(
+          {
+            defaultBranch: agents.newAgentDefaultBranch(place, repository),
+            branches: agents.newAgentBranches(place, repository),
+            models: agents.models(engine, place),
+          },
+          { concurrency: "unbounded" },
+        ).pipe(Effect.mapError(explained)),
+      create_agent: (input) =>
+        Effect.gen(function* () {
+          yield* refuseUnofferedModel(input)
+
+          const agent = yield* agents
+            .create({ ...input, permissionMode: null, images: [] })
+            .pipe(Effect.uninterruptible)
+
+          return { agent }
+        }).pipe(Effect.mapError(explained)),
+      send_agent_message: ({ agentId, message }) =>
+        agents.send(agentId, { message, images: [] }).pipe(
+          Effect.uninterruptible,
+          Effect.map((delivery) => ({ delivery })),
+          Effect.mapError(explained),
+        ),
     })
   }),
 )

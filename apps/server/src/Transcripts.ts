@@ -5,6 +5,7 @@ import {
   endTurnEvents,
   isRequestPart,
   Image,
+  type MessageDelivery,
   type MessageWithContext,
   PartAppended,
   AgentBusy,
@@ -154,7 +155,7 @@ export class Transcripts extends Context.Service<
     readonly startOrQueue: (
       agentId: string,
       input: MessageWithContext,
-    ) => Effect.Effect<void, AgentError>
+    ) => Effect.Effect<MessageDelivery, AgentError>
     readonly prependQueued: (
       agentId: string,
       inputs: ReadonlyArray<MessageWithContext>,
@@ -301,13 +302,13 @@ export class Transcripts extends Context.Service<
         return [yield* queuedChanged(agentId), turn]
       })
 
-      const change = <E, R>(
+      const changeWith = <A, E, R>(
         agentId: string,
-        effect: Effect.Effect<ReadonlyArray<TranscriptUpdate>, E, R>,
+        effect: Effect.Effect<readonly [A, ReadonlyArray<TranscriptUpdate>], E, R>,
       ) =>
         lockFor(agentId).withPermits(1)(
           Effect.gen(function* () {
-            const updates = yield* sql.withTransaction(effect)
+            const [decided, updates] = yield* sql.withTransaction(effect)
 
             if (updates.some(changesRequest))
               yield* markWaiting(agentId, yield* hasWaitingRequest(agentId))
@@ -316,7 +317,18 @@ export class Transcripts extends Context.Service<
               published,
               updates.map((update) => ({ agentId, update })),
             )
+
+            return decided
           }),
+        )
+
+      const change = <E, R>(
+        agentId: string,
+        effect: Effect.Effect<ReadonlyArray<TranscriptUpdate>, E, R>,
+      ) =>
+        changeWith(
+          agentId,
+          Effect.map(effect, (updates) => [undefined, updates] as const),
         )
 
       const startNext = Effect.fnUntraced(function* (agentId: string) {
@@ -452,15 +464,15 @@ export class Transcripts extends Context.Service<
         startOrQueue: (agentId, input) =>
           withStorageFailure(
             "send a message",
-            change(
+            changeWith(
               agentId,
               Effect.gen(function* () {
                 if ((yield* runningTurn(agentId)) === null)
-                  return [yield* startTurn(agentId, input)]
+                  return ["started", [yield* startTurn(agentId, input)]] as const
 
                 yield* insertQueued(agentId, (yield* queuedPositions(agentId)).last + 1, input)
 
-                return [yield* queuedChanged(agentId)]
+                return ["queued", [yield* queuedChanged(agentId)]] as const
               }),
             ),
           ),

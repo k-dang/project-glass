@@ -4,6 +4,7 @@ import {
   type AgentEngine,
   AgentError,
   AgentModels,
+  type ConnectionError,
   FollowedRepository,
   InvalidLocalCheckout,
 } from "@glass/contracts"
@@ -46,6 +47,12 @@ export interface Placement {
     engine: AgentEngine,
     repository: FollowedRepository,
   ) => Effect.Effect<ReadonlyArray<AgentCommand>, InvalidLocalCheckout | AgentError>
+  readonly defaultBranch: (
+    repository: FollowedRepository,
+  ) => Effect.Effect<string | null, InvalidLocalCheckout | ConnectionError | AgentError>
+  readonly branches: (
+    repository: FollowedRepository,
+  ) => Effect.Effect<ReadonlyArray<string>, InvalidLocalCheckout | ConnectionError | AgentError>
   readonly files: (
     repository: FollowedRepository,
     baseBranch: string,

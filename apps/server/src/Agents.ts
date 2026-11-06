@@ -5,6 +5,7 @@ import {
   AgentError,
   type AgentCommand,
   AgentModels,
+  type ConnectionError,
   AgentNotFound,
   type AgentPlace,
   asksPermission,
@@ -12,6 +13,7 @@ import {
   type ChangedFile,
   FollowedRepository,
   type InvalidLocalCheckout,
+  type MessageDelivery,
   type MessageInput,
   type ModelChoice,
   defaultPermissionMode,
@@ -134,6 +136,7 @@ export class Agents extends Context.Service<
     readonly transcript: (
       agentId: string,
     ) => Stream.Stream<TranscriptUpdate, AgentNotFound | AgentError>
+    readonly engines: (place: AgentPlace) => ReadonlyArray<AgentEngine>
     readonly models: (
       engine: AgentEngine,
       place: AgentPlace,
@@ -146,6 +149,14 @@ export class Agents extends Context.Service<
     readonly commands: (
       agentId: string,
     ) => Effect.Effect<ReadonlyArray<AgentCommand>, AgentNotFound | AgentError>
+    readonly newAgentDefaultBranch: (
+      place: AgentPlace,
+      repository: FollowedRepository,
+    ) => Effect.Effect<string | null, InvalidLocalCheckout | ConnectionError | AgentError>
+    readonly newAgentBranches: (
+      place: AgentPlace,
+      repository: FollowedRepository,
+    ) => Effect.Effect<ReadonlyArray<string>, InvalidLocalCheckout | ConnectionError | AgentError>
     readonly newAgentFiles: (
       place: AgentPlace,
       repository: FollowedRepository,
@@ -159,7 +170,7 @@ export class Agents extends Context.Service<
     readonly send: (
       agentId: string,
       input: MessageInput,
-    ) => Effect.Effect<void, AgentNotFound | RequestWaiting | AgentError>
+    ) => Effect.Effect<MessageDelivery, AgentNotFound | RequestWaiting | AgentError>
     readonly steer: (
       agentId: string,
       input: MessageInput,
@@ -235,6 +246,21 @@ export class Agents extends Context.Service<
         Predicate.isTagged(place, "sandbox")
           ? sandboxes.placement(place.providerId)
           : localPlacement
+
+      const placementRunning = (
+        place: AgentPlace,
+        engine: AgentEngine,
+      ): Effect.Effect<Placement, AgentError> => {
+        const placement = placementFor(place)
+
+        return placement.engines.includes(engine)
+          ? Effect.succeed(placement)
+          : Effect.fail(
+              new AgentError({
+                message: "This place doesn't run that Agent program. Pick another.",
+              }),
+            )
+      }
 
       const reviewPlacement: Placement = {
         ...localPlacement,
@@ -380,12 +406,7 @@ export class Agents extends Context.Service<
       const create = Effect.fn("Agents.create")(function* (input: NewAgent) {
         const { repository, baseBranch, engine, model, effort, place } = input
         const { message, images } = input
-        const placement = placementFor(place)
-
-        if (!placement.engines.includes(engine))
-          return yield* new AgentError({
-            message: "That kind of Sandbox doesn't run this Agent program. Pick another.",
-          })
+        const placement = yield* placementRunning(place, engine)
 
         const permissionMode =
           engineCapabilities[engine].permissionModes.length === 0
@@ -433,7 +454,8 @@ export class Agents extends Context.Service<
 
       const send = Effect.fn("Agents.send")(function* (agentId: string, input: MessageInput) {
         yield* findWritable(agentId)
-        yield* turns.send(agentId, { ...input, context: null })
+
+        return yield* turns.send(agentId, { ...input, context: null })
       })
 
       const steer = Effect.fn("Agents.steer")(function* (agentId: string, input: MessageInput) {
@@ -631,20 +653,17 @@ export class Agents extends Context.Service<
         transcript: (agentId) =>
           Stream.unwrap(find(agentId).pipe(Effect.as(transcripts.watch(agentId)))),
         readTranscript: (agentId) => find(agentId).pipe(Effect.andThen(transcripts.read(agentId))),
-        models: (engine, place) => {
-          const placement = placementFor(place)
-
-          return placement.engines.includes(engine)
-            ? placement.models(engine)
-            : Effect.succeed(new AgentModels({ defaultModel: null, models: [] }))
-        },
-        newAgentCommands: (engine, place, repository) => {
-          const placement = placementFor(place)
-
-          return placement.engines.includes(engine)
-            ? placement.commands(engine, repository)
-            : Effect.succeed([])
-        },
+        engines: (place) => placementFor(place).engines,
+        models: (engine, place) =>
+          placementRunning(place, engine).pipe(
+            Effect.flatMap((placement) => placement.models(engine)),
+          ),
+        newAgentCommands: (engine, place, repository) =>
+          placementRunning(place, engine).pipe(
+            Effect.flatMap((placement) => placement.commands(engine, repository)),
+          ),
+        newAgentDefaultBranch: (place, repository) => placementFor(place).defaultBranch(repository),
+        newAgentBranches: (place, repository) => placementFor(place).branches(repository),
         commands,
         newAgentFiles: (place, repository, baseBranch) =>
           placementFor(place).files(repository, baseBranch),

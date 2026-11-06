@@ -9,15 +9,17 @@ import {
   PullRequestRef,
   Revision,
   TextPart,
+  localPlace,
   type Transcript,
   type Turn,
   TurnDone,
   TurnInterrupted,
+  TurnStopped,
 } from "@glass/contracts"
 import { Effect, Option, Predicate, Stream } from "effect"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
-import { agentsFixture, holding, lastText, settled } from "../test/agentsFixture"
+import { agentsFixture, holding, lastText, repository, settled } from "../test/agentsFixture"
 import { childProcesses, startedHost } from "../test/agentHostProcesses"
 
 type Client = Effect.Success<typeof agentsFixture>["client"]
@@ -167,5 +169,42 @@ it.live("revokes its program's credential when the agent host stops", () =>
     const [, ended] = yield* globalTurns(f.client, settled(2))
 
     assert.deepStrictEqual(glassCalls(ended), [{ status: "failed", output: "Refused with 401" }])
+  }),
+)
+
+it.live("leaves an Agent it created running when its own Turn stops", () =>
+  Effect.gen(function* () {
+    const f = yield* agentsFixture
+    yield* f.client.LinkLocalCheckout({ path: f.clone.checkout })
+
+    const newAgent = {
+      repository: { owner: repository.owner, repo: repository.repo },
+      baseBranch: "main",
+      place: localPlace,
+      engine: "pi",
+      model: null,
+      effort: null,
+      message: "hold:agent",
+    }
+
+    yield* send(f.client, `call:create_agent ${JSON.stringify(newAgent)}\nhold:never`)
+    yield* globalTurns(f.client, holding)
+    const [created] = yield* f.agents
+    assert.isDefined(created)
+    yield* f.transcript(created.id, holding)
+
+    yield* f.client.StopGlobalTurn()
+    const [stopped] = yield* globalTurns(f.client, settled(1))
+
+    assert.deepStrictEqual(stopped?.ended?.ending, TurnStopped.make({}))
+    assert.deepStrictEqual(
+      glassCalls(stopped)?.map(({ status }) => status),
+      ["done"],
+    )
+
+    yield* f.release("agent")
+    const [worked] = yield* f.transcript(created.id, settled(1))
+
+    assert.deepStrictEqual(worked?.ended?.ending, TurnDone.make({}))
   }),
 )

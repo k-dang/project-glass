@@ -1,12 +1,12 @@
 import { assert, it } from "@effect/vitest"
-import { AgentStarted, TextPatch, localPlace } from "@glass/contracts"
+import { AgentStarted, SandboxPlace, TextPatch, localPlace } from "@glass/contracts"
 import { Effect, Option, Stream } from "effect"
 import { existsSync } from "node:fs"
 import { mkdir, rename, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { agentsFixture, holding, repository, settled } from "../test/agentsFixture"
 import { gitIn } from "../test/gitRepositories"
-import { isolatedHome, startSignedInBackend } from "../test/harness"
+import { isolatedHome } from "../test/harness"
 
 it.live("links a clone as the Local checkout of the GitHub repository it names, and keeps it", () =>
   Effect.gen(function* () {
@@ -32,35 +32,36 @@ it.live("links a clone as the Local checkout of the GitHub repository it names, 
     assert.deepStrictEqual(kept?.repository, repository)
     assert.equal(kept?.path, linked.path)
 
-    const branches = yield* restarted.ListBranches({ repository })
-    assert.equal(branches.defaultBranch, "main")
-    assert.sameMembers([...branches.branches], ["main", "develop"])
+    const onThisDevice = { place: localPlace, repository }
+    assert.equal(yield* restarted.GetNewAgentDefaultBranch(onThisDevice), "main")
+    assert.sameMembers(
+      [...(yield* restarted.ListNewAgentBranches(onThisDevice))],
+      ["main", "develop"],
+    )
   }),
 )
 
 it.live("lists a Followed repository's branches from GitHub, for a Sandbox", () =>
   Effect.gen(function* () {
-    const { github, client } = yield* startSignedInBackend
+    const { github, client } = yield* agentsFixture
+    const inSandbox = { place: SandboxPlace.make({ providerId: "fake" }), repository }
+    const nowhere = { ...inSandbox, repository: { owner: "glass-demo", repo: "nowhere" } }
     const features = Array.from({ length: 150 }, (_, index) => `feature/${index}`)
     github.seedBranches(repository, {
       defaultBranch: "develop",
       branches: ["main", "develop", ...features],
     })
 
-    assert.equal(yield* client.GetGitHubDefaultBranch({ repository }), "develop")
+    assert.equal(yield* client.GetNewAgentDefaultBranch(inSandbox), "develop")
 
-    const branches = yield* client.ListGitHubBranches({ repository })
+    const branches = yield* client.ListNewAgentBranches(inSandbox)
     assert.sameMembers([...branches], ["main", "develop", ...features])
 
-    const missing = yield* client
-      .ListGitHubBranches({ repository: { owner: "glass-demo", repo: "nowhere" } })
-      .pipe(Effect.flip)
+    const missing = yield* client.ListNewAgentBranches(nowhere).pipe(Effect.flip)
 
     assert.equal(missing._tag, "GitHubUnavailable")
 
-    const missingDefault = yield* client
-      .GetGitHubDefaultBranch({ repository: { owner: "glass-demo", repo: "nowhere" } })
-      .pipe(Effect.flip)
+    const missingDefault = yield* client.GetNewAgentDefaultBranch(nowhere).pipe(Effect.flip)
 
     assert.equal(missingDefault._tag, "GitHubUnavailable")
   }),

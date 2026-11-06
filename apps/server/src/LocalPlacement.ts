@@ -131,6 +131,10 @@ export class LocalPlacement extends Context.Service<
             Effect.mapError(asAgentError),
           )
         }),
+        defaultBranch: (repository) =>
+          checkouts.branches(repository).pipe(Effect.map(({ defaultBranch }) => defaultBranch)),
+        branches: (repository) =>
+          checkouts.branches(repository).pipe(Effect.map(({ branches }) => branches)),
         files: Effect.fnUntraced(function* (repository, baseBranch) {
           const { path, remote } = yield* checkouts.get(repository)
 

@@ -151,6 +151,8 @@ const notInstalled = (providerId: string): Placement => {
     engines: AgentEngine.literals,
     models: () => failure,
     commands: () => Effect.succeed([]),
+    defaultBranch: () => failure,
+    branches: () => failure,
     files: () => Effect.succeed([]),
     place: () => failure,
     host: () => failure,
@@ -477,6 +479,8 @@ export class Sandboxes extends Context.Service<
               ),
             ),
           commands: () => Effect.succeed([]),
+          defaultBranch: github.repositoryDefaultBranch,
+          branches: github.repositoryBranches,
           files: (repository, baseBranch) =>
             github.repositoryFiles(repository, baseBranch).pipe(
               Effect.tap(({ truncated }) =>

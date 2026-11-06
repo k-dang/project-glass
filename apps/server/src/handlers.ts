@@ -135,9 +135,9 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       WatchTranscript: ({ agentId }) => agents.transcript(agentId),
       ListLocalCheckouts: () => checkouts.list(),
       LinkLocalCheckout: ({ path }) => checkouts.link(path),
-      ListBranches: ({ repository }) => checkouts.branches(repository),
-      ListGitHubBranches: ({ repository }) => github.repositoryBranches(repository),
-      GetGitHubDefaultBranch: ({ repository }) => github.repositoryDefaultBranch(repository),
+      GetNewAgentDefaultBranch: ({ place, repository }) =>
+        agents.newAgentDefaultBranch(place, repository),
+      ListNewAgentBranches: ({ place, repository }) => agents.newAgentBranches(place, repository),
       ListAgentModels: ({ engine, place }) => agents.models(engine, place),
       ListNewAgentCommands: ({ engine, place, repository }) =>
         agents.newAgentCommands(engine, place, repository),
@@ -153,7 +153,8 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       ChangePermissionMode: ({ agentId, permissionMode }) =>
         agents.changePermissionMode(agentId, permissionMode),
       AnswerRequest: ({ agentId, requestId, answer }) => agents.answer(agentId, requestId, answer),
-      SendMessage: ({ agentId, message, images }) => agents.send(agentId, { message, images }),
+      SendMessage: ({ agentId, message, images }) =>
+        agents.send(agentId, { message, images }).pipe(Effect.asVoid),
       Steer: ({ agentId, message, images }) => agents.steer(agentId, { message, images }),
       CancelQueuedMessage: ({ agentId, queuedMessageId }) =>
         agents.cancelQueued(agentId, queuedMessageId),

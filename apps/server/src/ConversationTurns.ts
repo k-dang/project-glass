@@ -3,6 +3,7 @@ import {
   AgentError,
   isNothingUnsent,
   mentionedToDoIds,
+  type MessageDelivery,
   type MessageWithContext,
   nothingUnsent,
   type RequestAnswer,
@@ -62,7 +63,7 @@ export class ConversationTurns extends Context.Service<
     readonly send: (
       conversationId: string,
       message: MessageWithContext,
-    ) => Effect.Effect<void, RequestWaiting | AgentError>
+    ) => Effect.Effect<MessageDelivery, RequestWaiting | AgentError>
     readonly steer: (
       conversation: Conversation,
       message: MessageWithContext,
@@ -277,7 +278,8 @@ export class ConversationTurns extends Context.Service<
           ),
         send: Effect.fn("ConversationTurns.send")(function* (conversationId, sent) {
           yield* refuseWhileWaiting(conversationId)
-          yield* startOrQueue(conversationId, sent)
+
+          return yield* startOrQueue(conversationId, sent)
         }),
         steer: Effect.fn("ConversationTurns.steer")(function* (conversation, sent) {
           yield* refuseWhileWaiting(conversation.id)

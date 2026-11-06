@@ -12,7 +12,6 @@ import {
   AgentModels,
   AgentPlace,
   AgentNotFound,
-  Branches,
   InvalidLocalCheckout,
   LocalCheckout,
   MessageInput,
@@ -304,20 +303,15 @@ export class GlassRpcs extends RpcGroup.make(
     success: LocalCheckout,
     error: Schema.Union([InvalidLocalCheckout, AgentError]),
   }),
-  Rpc.make("ListBranches", {
-    payload: { repository: FollowedRepository },
-    success: Branches,
-    error: Schema.Union([InvalidLocalCheckout, AgentError]),
-  }),
-  Rpc.make("ListGitHubBranches", {
-    payload: { repository: FollowedRepository },
-    success: Schema.Array(Schema.String),
-    error: ConnectionError,
-  }),
-  Rpc.make("GetGitHubDefaultBranch", {
-    payload: { repository: FollowedRepository },
+  Rpc.make("GetNewAgentDefaultBranch", {
+    payload: { place: AgentPlace, repository: FollowedRepository },
     success: Schema.NullOr(Schema.String),
-    error: ConnectionError,
+    error: Schema.Union([InvalidLocalCheckout, ConnectionError, AgentError]),
+  }),
+  Rpc.make("ListNewAgentBranches", {
+    payload: { place: AgentPlace, repository: FollowedRepository },
+    success: Schema.Array(Schema.String),
+    error: Schema.Union([InvalidLocalCheckout, ConnectionError, AgentError]),
   }),
   Rpc.make("ListAgentModels", {
     payload: { engine: AgentEngine, place: AgentPlace },

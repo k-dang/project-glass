@@ -56,7 +56,7 @@ export const agentsFixture = Effect.gen(function* () {
   const serverScope = yield* Scope.make()
   yield* Effect.addFinalizer((exit) => Scope.close(serverScope, exit))
 
-  const { client } = yield* startBackend(env, home).pipe(
+  const { client, baseUrl, mcpCredentials } = yield* startBackend(env, home).pipe(
     Effect.provideService(Scope.Scope, serverScope),
   )
 
@@ -168,6 +168,9 @@ export const agentsFixture = Effect.gen(function* () {
 
   return {
     client,
+    github,
+    baseUrl,
+    mcpCredentials,
     agents: client.WatchAgents().pipe(Stream.runHead, Effect.map(Option.getOrThrow)),
     home,
     clone,

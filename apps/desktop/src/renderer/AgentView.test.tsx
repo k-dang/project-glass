@@ -11,7 +11,7 @@ import {
   type RequestAnswer,
   type TurnPart,
   AgentModels,
-  Branches,
+  type AgentPlace,
   FollowedRepository,
   GitHubConnection,
   LocalCheckout,
@@ -233,8 +233,7 @@ it("starts an Agent from its first message, on the repository's default branch",
       WatchAgents: () => Stream.make([]),
       ListLocalCheckouts: () =>
         Effect.succeed([new LocalCheckout({ repository: agent.repository, path: "/src/greeter" })]),
-      ListBranches: () =>
-        Effect.succeed(new Branches({ defaultBranch: "main", branches: ["develop", "main"] })),
+      ...branchesAt({ local: () => ["main", ["develop", "main"]] }),
       CreateAgent: (input) => Effect.sync(() => created.push(input)).pipe(Effect.as(agent)),
       WatchTranscript: () =>
         Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
@@ -275,8 +274,7 @@ it("shows the first message at once while the Agent starts", async () => {
       WatchAgents: () => Stream.make([]),
       ListLocalCheckouts: () =>
         Effect.succeed([new LocalCheckout({ repository: agent.repository, path: "/src/greeter" })]),
-      ListBranches: () =>
-        Effect.succeed(new Branches({ defaultBranch: "main", branches: ["main"] })),
+      ...branchesAt({}),
       CreateAgent: () => Deferred.await(started).pipe(Effect.as(agent)),
       WatchTranscript: () =>
         Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
@@ -299,6 +297,31 @@ it("shows the first message at once while the Agent starts", async () => {
   await waitFor(() => expect(window.location.hash).toBe(`#/agents/${agent.id}`))
 })
 
+const branchesAt = ({
+  local = () => ["main", ["main"]],
+  sandbox = { defaultBranch: "main" },
+}: {
+  readonly local?: (repository: FollowedRepository) => readonly [string, ReadonlyArray<string>]
+  readonly sandbox?: {
+    readonly defaultBranch: string
+    readonly branches?: Effect.Effect<ReadonlyArray<string>>
+  }
+}) => ({
+  GetNewAgentDefaultBranch: ({ place, repository }: PlaceRepository) =>
+    Effect.succeed(
+      Predicate.isTagged(place, "sandbox") ? sandbox.defaultBranch : local(repository)[0],
+    ),
+  ListNewAgentBranches: ({ place, repository }: PlaceRepository) =>
+    Predicate.isTagged(place, "sandbox")
+      ? (sandbox.branches ?? Effect.succeed([sandbox.defaultBranch]))
+      : Effect.succeed(local(repository)[1]),
+})
+
+interface PlaceRepository {
+  readonly place: AgentPlace
+  readonly repository: FollowedRepository
+}
+
 const choice = (picker: HTMLElement, group: string, item: string) =>
   within(within(picker).getByRole("group", { name: group })).getByRole("button", { name: item })
 
@@ -306,7 +329,7 @@ const newAgentHandlers = (created: Array<NewAgent>, agents: ReadonlyArray<Agent>
   WatchAgents: () => Stream.make(agents),
   ListLocalCheckouts: () =>
     Effect.succeed([new LocalCheckout({ repository: agent.repository, path: "/src/greeter" })]),
-  ListBranches: () => Effect.succeed(new Branches({ defaultBranch: "main", branches: ["main"] })),
+  ...branchesAt({}),
   CreateAgent: (input: NewAgent) => Effect.sync(() => created.push(input)).pipe(Effect.as(agent)),
   WatchTranscript: () =>
     Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
@@ -320,14 +343,15 @@ it("keeps local branch, program, model, effort, and unsent work when exploring a
   const user = mount(
     {
       ...newAgentHandlers(created, []),
-      ListBranches: () =>
-        Effect.succeed(new Branches({ defaultBranch: "main", branches: ["main", "develop"] })),
+      ...branchesAt({
+        local: () => ["main", ["main", "develop"]],
+        sandbox: { defaultBranch: "trunk" },
+      }),
       ListSandboxProviders: () =>
         Effect.succeed([
           new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes", engines: ["claude-code"] }),
         ]),
       ListFollowedRepositories: () => Effect.succeed([agent.repository]),
-      GetGitHubDefaultBranch: () => Effect.succeed("trunk"),
       ListAgentModels: ({ engine, place }) =>
         Predicate.isTagged(place, "sandbox")
           ? Effect.succeed(
@@ -421,7 +445,7 @@ it("restores each program's choices and keeps local Permission mode separate fro
           new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes", engines: ["claude-code"] }),
         ]),
       ListFollowedRepositories: () => Effect.succeed([agent.repository]),
-      GetGitHubDefaultBranch: () => Effect.succeed("main"),
+      ...branchesAt({ sandbox: { defaultBranch: "main" } }),
     },
     "/agents/new",
   )
@@ -484,13 +508,10 @@ it("keeps branches per repository and falls back when a remembered branch disapp
             (repository) => new LocalCheckout({ repository, path: `/src/${repository.repo}` }),
           ),
         ),
-      ListBranches: ({ repository }) =>
-        Effect.succeed(
-          new Branches({
-            defaultBranch: repository.repo === "lamp" ? "trunk" : "main",
-            branches: repository.repo === "lamp" ? ["trunk"] : localBranches,
-          }),
-        ),
+      ...branchesAt({
+        local: (repository) =>
+          repository.repo === "lamp" ? ["trunk", ["trunk"]] : ["main", localBranches],
+      }),
       ListSandboxProviders: () =>
         Effect.succeed([
           new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes", engines: ["claude-code"] }),
@@ -599,7 +620,7 @@ it("keeps an unlinked Local place blocked and never inherits Sandbox bypass perm
           new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes", engines: ["claude-code"] }),
         ]),
       ListFollowedRepositories: () => Effect.succeed([agent.repository]),
-      GetGitHubDefaultBranch: () => Effect.succeed("main"),
+      ...branchesAt({ sandbox: { defaultBranch: "main" } }),
     },
     "/agents/new",
   )
@@ -647,13 +668,16 @@ it("starts a Sandbox Agent on the default branch, listing other branches only wh
           }),
         ]),
       ListFollowedRepositories: () => Effect.succeed([followed]),
-      GetGitHubDefaultBranch: () => Effect.succeed("trunk"),
-      ListGitHubBranches: () =>
-        Effect.sync(() => {
-          listedBranches += 1
+      ...branchesAt({
+        sandbox: {
+          defaultBranch: "trunk",
+          branches: Effect.sync(() => {
+            listedBranches += 1
 
-          return ["trunk", "release"]
-        }),
+            return ["trunk", "release"]
+          }),
+        },
+      }),
       ListAgentModels: (payload) => {
         listedModels.push(placeKey(payload.place))
 
@@ -729,7 +753,7 @@ it("offers only the Agent programs a Sandbox provider runs", async () => {
         ]),
       ListFollowedRepositories: () =>
         Effect.succeed([new FollowedRepository({ owner: "glass-demo", repo: "lamp" })]),
-      GetGitHubDefaultBranch: () => Effect.succeed("trunk"),
+      ...branchesAt({ sandbox: { defaultBranch: "trunk" } }),
     },
     "/agents/new",
   )

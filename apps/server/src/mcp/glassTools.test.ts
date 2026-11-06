@@ -4,7 +4,7 @@ import { Effect, Schema } from "effect"
 import { startFakeGitHub } from "../../test/fakeGitHub"
 import { VIEWER } from "../../test/fakePullRequest"
 import { isolatedHome, startBackend } from "../../test/harness"
-import { connectMcp, listedTools, toolResult } from "../../test/mcpClient"
+import { connectMcp, listedTools, toolText } from "../../test/mcpClient"
 
 const startGlass = Effect.gen(function* () {
   const github = yield* startFakeGitHub()
@@ -37,35 +37,34 @@ const startGlass = Effect.gen(function* () {
     yield* backend.mcpCredentials.issue({ conversationId: "global-conversation" }),
   )
 
-  const call = (name: string, args: Schema.JsonObject = {}) =>
-    mcp.request("tools/call", { name, arguments: args }).response.pipe(Effect.map(toolResult))
-
-  return { ...backend, github, pr, mcp, call }
+  return { ...backend, github, pr, mcp, call: mcp.call }
 })
 
-const textOf = (result: ReturnType<typeof toolResult>) =>
-  result.content.map((block) => ("text" in block ? block.text : "")).join("\n")
-
 describe("Glass tools over MCP", () => {
-  it.live("lists the read-only tools", () =>
+  it.live("lists Glass's tools, marking which only read", () =>
     Effect.gen(function* () {
       const { mcp } = yield* startGlass
 
       const tools = listedTools(yield* mcp.request("tools/list", {}).response)
 
       assert.deepStrictEqual(
-        tools.map(({ name }) => name),
+        tools.map(({ name, annotations }) => [name, annotations?.readOnlyHint]),
         [
-          "list_pull_requests",
-          "list_queue",
-          "list_to_dos",
-          "list_recent_activity",
-          "list_agents",
-          "read_agent_transcript",
-          "read_pull_request",
+          ["list_pull_requests", true],
+          ["list_queue", true],
+          ["list_to_dos", true],
+          ["list_recent_activity", true],
+          ["list_agents", true],
+          ["read_agent_transcript", true],
+          ["read_pull_request", true],
+          ["read_agent_review", true],
+          ["start_agent_review", false],
+          ["list_agent_places", true],
+          ["list_agent_options", true],
+          ["create_agent", false],
+          ["send_agent_message", false],
         ],
       )
-      assert.isTrue(tools.every(({ annotations }) => annotations?.readOnlyHint === true))
     }),
   )
 
@@ -95,8 +94,8 @@ describe("Glass tools over MCP", () => {
       })
 
       assert.isFalse(result.isError)
-      assert.include(textOf(result), "Greet by name")
-      assert.include(textOf(result), "hello name")
+      assert.include(toolText(result), "Greet by name")
+      assert.include(toolText(result), "hello name")
       assert.deepStrictEqual(yield* client.ListActivity({ limit: 10 }), before)
 
       const [queued] = yield* client.ListSavedQueue()
@@ -132,7 +131,7 @@ describe("Glass tools over MCP", () => {
       })
 
       assert.isTrue(result.isError)
-      assert.include(textOf(result), "changed since that Revision")
+      assert.include(toolText(result), "changed since that Revision")
     }),
   )
 
@@ -143,7 +142,7 @@ describe("Glass tools over MCP", () => {
       const result = yield* call("read_agent_transcript", { agentId: "no-such-agent", turns: 3 })
 
       assert.isTrue(result.isError)
-      assert.include(textOf(result), "no Agent with that id")
+      assert.include(toolText(result), "no Agent with that id")
     }),
   )
 })

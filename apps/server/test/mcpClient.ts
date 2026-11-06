@@ -92,13 +92,17 @@ export const connectMcp = Effect.fnUntraced(function* (baseUrl: string, bearer: 
 
   yield* send({ jsonrpc: "2.0", method: "notifications/initialized" })
 
+  const request = (method: string, params: Schema.JsonObject, credential?: Redacted.Redacted) => {
+    const id = ++lastId
+
+    return { id, response: send({ jsonrpc: "2.0", id, method, params }, credential) }
+  }
+
   return {
     send,
-    request: (method: string, params: Schema.JsonObject, credential?: Redacted.Redacted) => {
-      const id = ++lastId
-
-      return { id, response: send({ jsonrpc: "2.0", id, method, params }, credential) }
-    },
+    request,
+    call: (name: string, args: Schema.JsonObject = {}) =>
+      request("tools/call", { name, arguments: args }).response.pipe(Effect.map(toolResult)),
   }
 })
 
@@ -119,3 +123,6 @@ const resultOrThrow = (response: McpResponse) => {
 export const listedTools = (response: McpResponse) => decodeTools(resultOrThrow(response)).tools
 
 export const toolResult = (response: McpResponse) => decodeToolResult(resultOrThrow(response))
+
+export const toolText = (result: typeof McpSchema.CallToolResult.Type) =>
+  result.content.map((block) => ("text" in block ? block.text : "")).join("\n")

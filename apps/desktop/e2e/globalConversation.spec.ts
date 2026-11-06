@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs"
 import { join } from "node:path"
+import { seedClone } from "../../server/test/gitRepositories"
 import { expect, openPullRequest, test } from "./glass"
 
 test("keeps one Global conversation beside every area, answered by Claude Code without a Local checkout", async ({
@@ -101,4 +102,42 @@ test("reads the PR in view through Glass's tools, keeping that PR after navigati
     conversation.getByText(/The fake model saw: .*"title":"Greet by name"/),
   ).toBeVisible()
   await expect(conversation).toContainText(/Done in/)
+})
+
+test("starts an Agent through Glass's tools, which appears in Agents and runs its first Turn", async ({
+  app,
+  home,
+  window,
+}) => {
+  const { checkout } = seedClone(home, "glass-demo", "greeter")
+
+  await app.evaluate(({ dialog }, folder) => {
+    dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [folder] })
+  }, checkout)
+
+  await window.getByRole("link", { name: "Agents" }).click()
+  await window.getByRole("combobox", { name: "Repository" }).click()
+  await window.getByRole("option", { name: "Choose folder…" }).click()
+  await expect(
+    window
+      .getByRole("region", { name: "New Agent" })
+      .getByRole("combobox", { name: "Base branch" }),
+  ).toContainText("main")
+
+  await window.getByRole("button", { name: "Global conversation" }).click()
+  const conversation = window.getByRole("complementary", { name: "Global conversation" })
+  const message = conversation.getByRole("textbox", { name: "Message" })
+  await message.fill("Start an Agent in glass-demo/greeter from main: Say hello")
+  await message.press("Enter")
+
+  await expect(conversation.getByText("create_agent")).toBeVisible()
+  await expect(conversation.getByText(/The fake model saw: .*"baseBranch":"main"/)).toBeVisible()
+  await expect(conversation).toContainText(/Done in/)
+
+  const created = window.getByRole("navigation", { name: "Agents list" }).getByRole("link")
+  await expect(created).toHaveCount(1)
+  await created.click()
+  await expect(
+    window.getByRole("region", { name: "Transcript" }).getByText("Fake reply to: Say hello"),
+  ).toBeVisible()
 })
