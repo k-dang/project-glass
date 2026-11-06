@@ -19,6 +19,7 @@ import { shortcutLabel } from "./shortcutLabel"
 import { submitOnShortcut } from "./submitShortcut"
 import {
   type DraftStore,
+  isPublishing,
   useDraftCount,
   useDraftsLocked,
   useReviewSummary,
@@ -59,7 +60,7 @@ export function FinishReview(props: {
   const [open, setOpen] = useState(false)
   const [decision, setDecision] = useState<ReviewDecision>("comment")
   const summaryRef = useRef<HTMLTextAreaElement>(null)
-  const sending = submission.type === "sending"
+  const sending = isPublishing(submission)
   const failure = submission.type === "failed" ? submission.problem : null
   const awaitingReload = failure?.fixedByReload === true
 

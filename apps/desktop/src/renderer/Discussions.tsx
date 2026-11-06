@@ -7,7 +7,6 @@ import {
   type PublishedComment,
   Review,
   type ReviewState,
-  type Viewer,
 } from "@glass/contracts"
 import { cn } from "cn"
 import { DateTime } from "effect"
@@ -252,23 +251,6 @@ export function DiscussionThread(props: {
         <ReplyComposer store={props.replies} discussionId={id} name={name} />
       </CollapsibleContent>
     </Collapsible>
-  )
-}
-
-export function PublishedDraftThread(props: { location: ReactNode; viewer: Viewer; body: string }) {
-  const { login, avatarUrl } = props.viewer
-
-  return (
-    <section className={threadCard}>
-      <header className={threadHeader}>
-        <ThreadTitle resolved={false} location={props.location} />
-      </header>
-      <div className={cn("border-t", threadComments)}>
-        <CommentLayout author={login} avatarUrl={avatarUrl} aside={<Published />}>
-          <p className="text-sm whitespace-pre-wrap">{props.body}</p>
-        </CommentLayout>
-      </div>
-    </section>
   )
 }
 

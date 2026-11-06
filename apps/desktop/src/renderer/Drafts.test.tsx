@@ -155,7 +155,7 @@ it("stops offering Ask once the Draft's first save is on its way to GitHub", asy
   expect(await screen.findByText("Saved privately")).toBeDefined()
 })
 
-it("offers Comment only while it's the only Draft, publishing it without the Review summary and showing its Discussion", async () => {
+it("offers Comment only while it's the only Draft, publishing it without the Review summary and holding the card until Reload", async () => {
   const submitted: Array<{ decision: string; summary: string }> = []
   let reloads = 0
 
@@ -190,10 +190,9 @@ it("offers Comment only while it's the only Draft, publishing it without the Rev
   await waitFor(() => expect(reloads).toBe(1))
   expect(submitted).toEqual([{ decision: "comment", summary: "" }])
   expect(store.summary()).toBe("Later")
-  screen.getByText("Unresolved thread on")
-  screen.getByText("octocat")
-  screen.getByText("Published")
-  expect(screen.queryByRole("textbox")).toBeNull()
+  expect(screen.getByRole("textbox")).toHaveProperty("readOnly", true)
+  expect(screen.getByRole("button", comment)).toHaveProperty("disabled", true)
+  expect(screen.queryByText("Saved privately")).toBeNull()
 })
 
 it("saves on Enter, adds a line on Option+Enter, and comments on Shift+Enter", async () => {

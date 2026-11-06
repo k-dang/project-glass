@@ -312,7 +312,9 @@ describe("DraftStore", () => {
     ;(await next(submits)).answer(Effect.void)
     await submitting
 
-    expect(store.view("D1")).toMatchObject({ body: "Hi", published: true })
+    expect(store.submission()).toEqual({ type: "submitted" })
+    expect(store.views()).toEqual([])
+    expect(store.view("D1")).toMatchObject({ body: "Hi" })
     expect(store.view(blank)).toBeUndefined()
     expect(store.linePlaces().map((place) => place.key)).toEqual(["D1"])
 

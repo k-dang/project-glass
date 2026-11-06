@@ -202,7 +202,6 @@ const view = (key: string, path: string, place: DraftView["place"]): DraftView =
   feedback: { type: "draft" },
   local: false,
   deleting: false,
-  published: false,
 })
 
 const summary = (sections: ReturnType<typeof toNoteSections>) =>

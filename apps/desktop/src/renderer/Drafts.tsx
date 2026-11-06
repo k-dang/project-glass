@@ -5,13 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Kbd } from "@/components/ui/kbd"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  DiffHunk,
-  LineLocation,
-  lineName,
-  originalLineName,
-  PublishedDraftThread,
-} from "./Discussions"
+import { DiffHunk, LineLocation, lineName, originalLineName } from "./Discussions"
 import { ConfirmationDialog } from "./ConfirmationDialog"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemText } from "./problems"
@@ -20,6 +14,7 @@ import {
   type DraftStore,
   type DraftView,
   type Feedback,
+  isPublishing,
   type Submission,
   useDraft,
   useDraftCount,
@@ -106,6 +101,7 @@ function DraftCard(props: {
   const { draft, store } = props
   const { feedback } = draft
   const locked = useDraftsLocked(store)
+  const publishing = isPublishing(useSubmission(store))
 
   return (
     <section className="overflow-hidden rounded-lg border border-dashed border-modified/70 bg-modified/5 font-sans">
@@ -113,20 +109,24 @@ function DraftCard(props: {
         <PenLine className="size-4 shrink-0 text-modified" aria-hidden />
         <span className="min-w-0 flex-1 truncate">Draft on {props.location}</span>
         {props.aside}
-        <DraftFeedback draft={draft} locked={locked} onRetry={() => store.save(draft.key)} />
+        {!publishing && (
+          <DraftFeedback draft={draft} locked={locked} onRetry={() => store.save(draft.key)} />
+        )}
         <Button
           variant="ghost"
           size="icon-xs"
           aria-label={`Delete Draft on ${draftName(draft)}`}
           title="Delete Draft"
-          disabled={locked || (feedback?.type === "sending" && feedback.action === "delete")}
+          disabled={
+            locked || publishing || (feedback?.type === "sending" && feedback.action === "delete")
+          }
           onClick={() => store.remove(draft.key)}
         >
           <Trash2 aria-hidden />
         </Button>
       </header>
       {props.children}
-      {feedback?.type === "failed" && (
+      {feedback?.type === "failed" && !publishing && (
         <p className="border-t border-dashed border-modified/40 px-3 py-2 text-sm text-destructive">
           {problemText(feedback.problem)}
         </p>
@@ -196,7 +196,7 @@ function DraftActions(props: {
             onClick={props.onComment}
             aria-label={`Comment with Draft on ${draftName(draft)}`}
           >
-            {submission.type === "sending" && (
+            {isPublishing(submission) && (
               <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden />
             )}
             Comment
@@ -225,6 +225,7 @@ export function LineDraft(props: {
   const locked = useDraftsLocked(store)
   const submission = useSubmission(store)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [commenting, setCommenting] = useState(false)
 
   const focusStarted = useCallback(
     (element: HTMLTextAreaElement | null) => {
@@ -235,23 +236,17 @@ export function LineDraft(props: {
 
   if (draft === undefined) return null
 
-  if (draft.published) {
-    return (
-      <PublishedDraftThread
-        location={<DraftLocation draft={draft} />}
-        viewer={store.workspace.viewer}
-        body={draft.body}
-      />
-    )
-  }
-
-  const readOnly = draft.deleting || locked
+  const readOnly = draft.deleting || locked || isPublishing(submission)
   const empty = draft.body.trim() === ""
-  const canComment = draftCount === 1
+  const canComment = draftCount === 1 || commenting
   const canAsk = draft.local
 
   const comment = async () => {
-    if ((await store.submit("comment", "")).type === "submitted") props.onReload()
+    setCommenting(true)
+    const outcome = await store.submit("comment", "")
+
+    if (outcome.type === "submitted") props.onReload()
+    else setCommenting(false)
   }
 
   return (
