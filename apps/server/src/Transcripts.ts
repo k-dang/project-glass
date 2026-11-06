@@ -1,4 +1,5 @@
 import {
+  Agent,
   AgentError,
   type AgentEvent,
   CapturedContext,
@@ -19,14 +20,17 @@ import {
   type TranscriptUpdate,
   Turn,
   TurnEnd,
+  type TurnEnded,
   type TurnEnding,
   TurnPart,
   TurnStarted,
 } from "@glass/contracts"
 import {
   Context,
+  Data,
   DateTime,
   Effect,
+  Exit,
   Layer,
   Match,
   Predicate,
@@ -39,6 +43,7 @@ import {
 } from "effect"
 import { SqlClient } from "effect/sql"
 import { randomUUID } from "node:crypto"
+import { recordUnit } from "./wideEvents"
 
 const encodePart = Schema.encodeSync(Schema.fromJsonString(TurnPart))
 
@@ -89,6 +94,20 @@ const decodeQueued = Schema.decodeUnknownEffect(
   ),
 )
 
+const decodeEndedTurn = Schema.decodeUnknownEffect(
+  Schema.Array(
+    Schema.Struct({
+      sentAt: Turn.fields.sentAt,
+      engine: Schema.NullOr(Agent.fields.engine),
+      model: Schema.NullOr(Agent.fields.model),
+      effort: Schema.NullOr(Agent.fields.effort),
+      sandboxProvider: Schema.NullOr(Schema.String),
+      toolCalls: Schema.Int,
+      failedToolCalls: Schema.Int,
+    }),
+  ),
+)
+
 const decodeTurnIds = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ id: Schema.String })))
 
 const decodePositions = Schema.decodeUnknownEffect(
@@ -133,6 +152,15 @@ const startsNext = (event: TranscriptUpdate) =>
   Predicate.isTagged(event, "TurnEnded") &&
   (Predicate.isTagged(event.ended.ending, "Done") ||
     Predicate.isTagged(event.ended.ending, "Failed"))
+
+class TurnFailure extends Data.TaggedError("TurnFailure")<{ readonly message: string }> {}
+
+const turnExit = (ending: TurnEnding): Exit.Exit<void, TurnFailure> =>
+  Predicate.isTagged(ending, "Done")
+    ? Exit.void
+    : Predicate.isTagged(ending, "Failed")
+      ? Exit.fail(new TurnFailure({ message: ending.reason }))
+      : Exit.interrupt()
 
 const storageFailure = () =>
   new AgentError({ message: "Couldn't read or save the Agent's transcript. Try again." })
@@ -339,12 +367,49 @@ export class Transcripts extends Context.Service<
         return head === undefined ? [] : yield* startFromQueue(agentId, head)
       })
 
+      const recordTurn = Effect.fnUntraced(function* (
+        agentId: string,
+        { turnId, ended: { at, ending } }: typeof TurnEnded.Type,
+      ) {
+        const [turn] = yield* sql`
+          SELECT
+            t.sent_at AS sentAt, a.engine, a.model, a.effort, a.sandbox_provider AS sandboxProvider,
+            COUNT(p.turn_id) AS toolCalls,
+            COUNT(CASE json_extract(p.part, '$.status') WHEN 'failed' THEN 1 END) AS failedToolCalls
+          FROM agent_turn t
+          LEFT JOIN agent a ON a.id = t.agent_id
+          LEFT JOIN agent_turn_part p
+            ON p.turn_id = t.id AND json_extract(p.part, '$._tag') = 'ToolCall'
+          WHERE t.id = ${turnId}
+          GROUP BY t.id
+        `.pipe(Effect.flatMap(decodeEndedTurn))
+
+        if (turn === undefined) return
+
+        yield* recordUnit("Turn", {
+          startedAt: turn.sentAt,
+          endedAt: at,
+          exit: turnExit(ending),
+          fields: {
+            agent_id: agentId,
+            turn_id: turnId,
+            ending: ending._tag,
+            engine: turn.engine,
+            model: turn.model,
+            effort: turn.effort,
+            sandbox_provider: turn.sandboxProvider,
+            tool_calls: turn.toolCalls,
+            failed_tool_calls: turn.failedToolCalls,
+          },
+        })
+      })
+
       const save = (
         agentId: string,
         events: ReadonlyArray<AgentEvent>,
         throughJournalEntry?: number,
       ) =>
-        change(
+        changeWith(
           agentId,
           Effect.gen(function* () {
             if (throughJournalEntry !== undefined)
@@ -354,11 +419,22 @@ export class Transcripts extends Context.Service<
               writeApplied(agentId, event),
             )
 
-            return written.some(startsNext) ? [...written, ...(yield* startNext(agentId))] : written
+            const ended = written.filter((event) => Predicate.isTagged(event, "TurnEnded"))
+
+            const updates = written.some(startsNext)
+              ? [...written, ...(yield* startNext(agentId))]
+              : written
+
+            return [ended, updates] as const
           }),
         ).pipe(
           Effect.tapError((cause) => Effect.logWarning("Couldn't save a transcript", cause)),
           Effect.mapError(storageFailure),
+          Effect.flatMap((ended) =>
+            Effect.forEach(ended, (event) => recordTurn(agentId, event), { discard: true }).pipe(
+              Effect.catch((cause) => Effect.logWarning("Couldn't describe an ended Turn", cause)),
+            ),
+          ),
         )
 
       const snapshot = Effect.fnUntraced(function* (agentId: string) {

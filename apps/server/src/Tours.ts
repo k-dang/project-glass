@@ -186,7 +186,7 @@ export class Tours extends Context.Service<
           )
         }).pipe(
           Effect.scoped,
-          jobs.settle(job, ({ tour, job: current }, error: Option.Option<TourFailure>) => ({
+          jobs.settle(job, "Tour", ({ tour, job: current }, error: Option.Option<TourFailure>) => ({
             tour,
             job: {
               status: "failed",

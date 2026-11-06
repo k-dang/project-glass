@@ -1,7 +1,8 @@
 import { assert, it } from "@effect/vitest"
 import { PullRequestRef } from "@glass/contracts"
-import { Cause, Deferred, Effect, Fiber, Logger, Option, Result, SubscriptionRef } from "effect"
+import { Deferred, Effect, Fiber, Option, Schema, SubscriptionRef } from "effect"
 import { pullRequestJobs } from "./pullRequestJobs"
+import { wideEvents } from "./wideEvents"
 
 const pr = new PullRequestRef({ owner: "octo-org", repo: "hello-world", number: 1 })
 
@@ -42,11 +43,18 @@ it.live("replaces work that waits to commit while the replacement holds the lock
   }).pipe(Effect.scoped),
 )
 
-it.live("logs the full unexpected defect before settling the job to a safe failure", () =>
+const JobUnit = Schema.Struct({
+  level: Schema.String,
+  event: Schema.String,
+  pr: Schema.String,
+  error: Schema.Struct({ tag: Schema.String, message: Schema.String }),
+})
+
+const decodeJobUnit = Schema.decodeUnknownSync(Schema.fromJsonString(JobUnit))
+
+it.live("records an unexpected defect on the job's unit and settles to a safe failure", () =>
   Effect.gen(function* () {
-    const logs: Array<Logger.Options<unknown>> = []
-    const logger = Logger.make((entry) => logs.push(entry))
-    const defect = new Error("Unexpected job failure")
+    const lines: Array<typeof JobUnit.Type> = []
 
     yield* Effect.gen(function* () {
       const jobs = yield* pullRequestJobs({
@@ -59,8 +67,8 @@ it.live("logs the full unexpected defect before settling the job to a safe failu
       const job = yield* jobs.jobFor(pr)
       yield* jobs.begin(job, (replace) =>
         replace(
-          Effect.die(defect).pipe(
-            jobs.settle(job, (_state, error) => {
+          Effect.die(new Error("Unexpected job failure")).pipe(
+            jobs.settle(job, "Tour", (_state, error) => {
               assert.isTrue(Option.isNone(error))
 
               return "failed"
@@ -70,10 +78,13 @@ it.live("logs the full unexpected defect before settling the job to a safe failu
       )
       yield* Fiber.join(job.running!.fiber)
       assert.strictEqual(yield* SubscriptionRef.get(job.state), "failed")
-    }).pipe(Effect.provideService(Logger.CurrentLoggers, new Set([logger])))
+    }).pipe(Effect.provide(wideEvents("backend", (line) => lines.push(decodeJobUnit(line)))))
 
-    assert.strictEqual(logs.length, 1)
-    assert.strictEqual(logs[0]!.logLevel, "Error")
-    assert.strictEqual(Result.getOrThrow(Cause.findDefect(logs[0]!.cause)), defect)
+    const [unit] = lines
+
+    assert.strictEqual(lines.length, 1)
+    assert.include(unit, { level: "ERROR", event: "Tour", pr: "octo-org/hello-world#1" })
+    assert.strictEqual(unit?.error.tag, "Defect")
+    assert.include(unit?.error.message, "Unexpected job failure")
   }).pipe(Effect.scoped),
 )

@@ -1,11 +1,12 @@
-import { NodeRuntime, NodeSocket } from "@effect/platform-node"
+import { NodeSocket } from "@effect/platform-node"
 import { Layer } from "effect"
 import { ServerLive } from "./server"
 import { ServerConfig } from "./ServerConfig"
+import { runMain, wideEventsToStdout } from "./wideEvents"
 
 Layer.launch(
   ServerLive.pipe(
     Layer.provide(ServerConfig.layer),
     Layer.provide(NodeSocket.layerWebSocketConstructor),
   ),
-).pipe(NodeRuntime.runMain)
+).pipe(runMain(wideEventsToStdout("backend")))
