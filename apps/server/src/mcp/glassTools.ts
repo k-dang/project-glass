@@ -351,9 +351,6 @@ const withinBudget = (files: ReadonlyArray<FileMaterial>) => {
   }
 }
 
-/** An action's service call finishes even when its tool call is cancelled, so a stopped Turn never leaves it half done. */
-const accepted: typeof Effect.uninterruptible = Effect.uninterruptible
-
 const first = <A, E, R>(stream: Stream.Stream<A, E, R>) =>
   stream.pipe(Stream.runHead, Effect.map(Option.getOrThrow))
 
@@ -369,6 +366,26 @@ export const GlassToolHandlers = GlassTools.toLayer(
     const checkouts = yield* LocalCheckouts
     const sandboxes = yield* Sandboxes
     const agentReviews = yield* AgentReviews
+
+    const refuseUnofferedModel = Effect.fnUntraced(function* ({
+      engine,
+      place,
+      model,
+      effort,
+    }: Tool.Parameters<typeof CreateAgent>) {
+      const { defaultModel, models } = yield* agents.models(engine, place)
+      const chosen = model === null ? defaultModel : models.find(({ id }) => id === model)
+
+      if (model !== null && chosen === undefined)
+        yield* new AgentError({
+          message: `That place has no model "${model}". list_agent_options lists the models a place offers.`,
+        })
+
+      if (effort !== null && !(chosen?.efforts.includes(effort) ?? false))
+        yield* new AgentError({
+          message: `That model has no Effort "${effort}". list_agent_options lists each model's Efforts.`,
+        })
+    })
 
     return GlassTools.of({
       list_pull_requests: () =>
@@ -425,7 +442,7 @@ export const GlassToolHandlers = GlassTools.toLayer(
         agentReviews
           .start(pullRequest, revision)
           .pipe(
-            accepted,
+            Effect.uninterruptible,
             Effect.andThen(first(agentReviews.watch(pullRequest))),
             Effect.mapError(explained),
           ),
@@ -448,31 +465,17 @@ export const GlassToolHandlers = GlassTools.toLayer(
         ).pipe(Effect.mapError(explained)),
       create_agent: (input) =>
         Effect.gen(function* () {
-          // The UI picks only from the models and Efforts a place lists. Checking here rather than in
-          // Agents.create spares every create from the UI a model listing, which can start a process.
-          const { engine, place, model, effort } = input
-          const { defaultModel, models } = yield* agents.models(engine, place)
-          const chosen = model === null ? defaultModel : models.find(({ id }) => id === model)
-
-          if (model !== null && chosen === undefined)
-            return yield* new AgentError({
-              message: `That place has no model "${model}". list_agent_options lists the models a place offers.`,
-            })
-
-          if (effort !== null && !(chosen?.efforts.includes(effort) ?? false))
-            return yield* new AgentError({
-              message: `That model has no Effort "${effort}". list_agent_options lists each model's Efforts.`,
-            })
+          yield* refuseUnofferedModel(input)
 
           const agent = yield* agents
             .create({ ...input, permissionMode: null, images: [] })
-            .pipe(accepted)
+            .pipe(Effect.uninterruptible)
 
           return { agent }
         }).pipe(Effect.mapError(explained)),
       send_agent_message: ({ agentId, message }) =>
         agents.send(agentId, { message, images: [] }).pipe(
-          accepted,
+          Effect.uninterruptible,
           Effect.map((delivery) => ({ delivery })),
           Effect.mapError(explained),
         ),

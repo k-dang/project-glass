@@ -96,12 +96,11 @@ class PlaceRepository extends Data.Class<{
   readonly repository: FollowedRepository
 }> {}
 
-/** A Sandbox's branches come from GitHub, so they're kept; a Local checkout's are reread. */
-const keptInSandbox = <A>(at: PlaceRepository, atom: Atom.Atom<A>) =>
+const keptWhenFromGitHub = <A>(at: PlaceRepository, atom: Atom.Atom<A>) =>
   Predicate.isTagged(placeOfKey(at.placeKey), "sandbox") ? atom.pipe(Atom.keepAlive) : atom
 
 const newAgentDefaultBranchFamily = Atom.family((at: PlaceRepository) =>
-  keptInSandbox(
+  keptWhenFromGitHub(
     at,
     backendRuntime.atom(
       Backend.use((backend) =>
@@ -115,7 +114,7 @@ const newAgentDefaultBranchFamily = Atom.family((at: PlaceRepository) =>
 )
 
 const newAgentBranchesFamily = Atom.family((at: PlaceRepository) =>
-  keptInSandbox(
+  keptWhenFromGitHub(
     at,
     backendRuntime.atom(
       Backend.use((backend) =>

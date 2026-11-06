@@ -53,6 +53,10 @@ const encodeAccess = Schema.encodeSync(AccessJson)
 
 const decodeAccess = Schema.decodeSync(AccessJson)
 
+const scriptedCall = /^call(-ended)?:(\S+)(?: (.+))?$/m
+
+const scriptedHold = /^hold:(\S+)/m
+
 const decodeArgs = Schema.decodeSync(Schema.fromJsonString(Schema.JsonObject))
 
 export const scriptedAdapter = (gates: string): AgentAdapter => {
@@ -106,11 +110,9 @@ export const scriptedAdapter = (gates: string): AgentAdapter => {
             yield* report(TurnEnded.make({ turnId, ended: { at: yield* DateTime.now, ending } }))
           })
 
-        // A scripted message is read line by line: `call:<tool> <json>` calls one of Glass's tools,
-        // then `hold:<gate>` holds the Turn until the test releases that gate.
         const run = (turnId: string, { message }: MessageWithContext) =>
           Effect.gen(function* () {
-            const called = /^call(-ended)?:(\S+)(?: (.+))?$/m.exec(message)
+            const called = scriptedCall.exec(message)
 
             if (called !== null && glass !== null) {
               const [, ended, name, args = "{}"] = called
@@ -131,7 +133,7 @@ export const scriptedAdapter = (gates: string): AgentAdapter => {
               )
             }
 
-            const hold = /^hold:(\S+)/m.exec(message)?.[1]
+            const hold = scriptedHold.exec(message)?.[1]
 
             if (hold !== undefined) {
               yield* part(turnId, TextPart.make({ text: "Holding." }))
