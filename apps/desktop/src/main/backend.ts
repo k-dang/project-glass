@@ -2,7 +2,7 @@ import { RPC_PATH } from "@glass/contracts"
 import type { BackendEndpoint } from "@glass/contracts/desktop"
 import { Deferred, Duration, Effect, Fiber, Schema } from "effect"
 import { utilityProcess } from "electron"
-import { randomBytes } from "node:crypto"
+import { randomBytes, randomUUID } from "node:crypto"
 import { createServer } from "node:net"
 import { BackendError, keepRunning, openBackendLog, waitForBackend } from "./backendIo"
 
@@ -44,11 +44,23 @@ export const startBackend = Effect.fn("startBackend")(function* (options: {
     process.stdout.write(chunk)
   }
 
-  const note = (message: string) =>
-    Effect.sync(() => writeOutput(Buffer.from(`[glass ${new Date().toISOString()}] ${message}\n`)))
+  const launch = {
+    source: "desktop",
+    launch_id: randomUUID(),
+    platform: `${process.platform}-${process.arch}`,
+  }
+
+  const note = (level: "INFO" | "ERROR", message: string) =>
+    Effect.sync(() =>
+      writeOutput(
+        Buffer.from(
+          `${JSON.stringify({ at: new Date().toISOString(), ...launch, level, message })}\n`,
+        ),
+      ),
+    )
 
   const run = Effect.gen(function* () {
-    yield* note("Starting backend")
+    yield* note("INFO", "Starting backend")
 
     const child = yield* Effect.acquireRelease(
       Effect.sync(() => {
@@ -89,9 +101,9 @@ export const startBackend = Effect.fn("startBackend")(function* (options: {
   }).pipe(Effect.scoped)
 
   const supervisor = yield* keepRunning(run, (error, delay) =>
-    note(`${error.message}; restarting in ${Duration.format(delay)}`),
+    note("ERROR", `${error.message}; restarting in ${Duration.format(delay)}`),
   ).pipe(
-    Effect.tapError((error) => note(`${error.message}; giving up`)),
+    Effect.tapError((error) => note("ERROR", `${error.message}; giving up`)),
     Effect.raceFirst(log.failed),
     Effect.forkScoped,
   )

@@ -63,6 +63,7 @@ import { Sandboxes } from "./Sandboxes"
 import { LocalPlacement } from "./LocalPlacement"
 import { type ConversationRole, ReviewBrief, ReviewRole, WorkRole } from "./agentHost/protocol"
 import { Transcripts } from "./Transcripts"
+import { annotateUnit } from "./wideEvents"
 
 const StoredAgent = Schema.Struct({
   id: Agent.fields.id,
@@ -110,6 +111,12 @@ const toRow = ({
 const agentWith = (agent: Agent, change: Partial<typeof Agent.Type>) =>
   // oxlint-disable-next-line typescript/no-misused-spread -- The fields go straight back into Agent.
   new Agent({ ...agent, ...change })
+
+const sandboxProviderOf = (place: AgentPlace) =>
+  Predicate.isTagged(place, "sandbox") ? place.providerId : null
+
+const annotateAgent = ({ id, engine, model, place }: Agent) =>
+  annotateUnit({ agent_id: id, engine, model, sandbox_provider: sandboxProviderOf(place) })
 
 const storageFailure = () =>
   new AgentError({ message: "Couldn't read or save your Agents. Try again." })
@@ -239,6 +246,8 @@ export class Agents extends Context.Service<
 
         if (found === undefined) return yield* new AgentNotFound({ agentId })
 
+        yield* annotateAgent(found.agent)
+
         return found
       })
 
@@ -350,10 +359,11 @@ export class Agents extends Context.Service<
         return lock
           .withPermits(1)(
             Effect.gen(function* () {
+              yield* annotateAgent(agent)
               yield* sql`INSERT INTO agent ${sql.insert({
                 id: agent.id,
                 name: agent.name,
-                sandbox_provider: Predicate.isTagged(place, "sandbox") ? place.providerId : null,
+                sandbox_provider: sandboxProviderOf(place),
                 owner: repository.owner,
                 repo: repository.repo,
                 base_branch: agent.baseBranch,

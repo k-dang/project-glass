@@ -235,6 +235,7 @@ export class AgentReviews extends Context.Service<
           Effect.flatMap((review) => save(job, pr, review)),
           jobs.settle(
             job,
+            "AgentReview",
             ({ review, job: current }, error: Option.Option<AgentReviewFailure>) => ({
               review,
               job: {
@@ -313,14 +314,18 @@ export class AgentReviews extends Context.Service<
               .pipe(Effect.onError(() => removeAgent(agent.id)))
           }),
         ).pipe(
-          jobs.settle(job, (state, error: Option.Option<AgentReviewFailure>) => ({
-            review: state.review,
-            job: {
-              status: "agent-start-failed",
-              message,
-              reason: Option.getOrElse(error, () => stoppedRunner(runner)),
-            },
-          })),
+          jobs.settle(
+            job,
+            "AgentReview.startAgent",
+            (state, error: Option.Option<AgentReviewFailure>) => ({
+              review: state.review,
+              job: {
+                status: "agent-start-failed",
+                message,
+                reason: Option.getOrElse(error, () => stoppedRunner(runner)),
+              },
+            }),
+          ),
         )
 
       const start = Effect.fn("AgentReviews.start")(function* (

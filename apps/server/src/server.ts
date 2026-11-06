@@ -1,7 +1,7 @@
 import { NodeHttpServer, NodeServices } from "@effect/platform-node"
-import { GlassRpcs, RPC_PATH } from "@glass/contracts"
+import { GlassRpcs, RPC_PATH, TOKEN_PARAM } from "@glass/contracts"
 import { Effect, type FileSystem, Layer } from "effect"
-import { HttpRouter, HttpServerResponse } from "effect/http"
+import { HttpRouter, HttpServerResponse, UrlParams } from "effect/http"
 import type { ChildProcessSpawner } from "effect/process"
 import { RpcSerialization, RpcServer } from "effect/rpc"
 import { createServer } from "node:http"
@@ -107,6 +107,7 @@ export const serve = (agentRunners: AgentRunnersLayer, mcpTools: McpToolsLayer) 
     Layer.provideMerge(services(agentRunners, mcpTools)),
     Layer.provide(RpcSerialization.layerJson),
     Layer.provide(NodeServices.layer),
+    Layer.provide(Layer.succeed(UrlParams.CurrentRedactedNames)([TOKEN_PARAM])),
   )
 
 export const ServerLive = serve(AgentRunners.layer, GlassMcpTools)

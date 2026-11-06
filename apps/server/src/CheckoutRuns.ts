@@ -22,6 +22,7 @@ import type { AgentFailure } from "./agentFailure"
 import { AgentRunners } from "./agentRunners"
 import { type CheckoutFailure, Checkouts } from "./Checkouts"
 import { engineSettingsOf, SettingsStore } from "./SettingsStore"
+import { annotateUnit, recordDuration } from "./wideEvents"
 
 export class CheckoutRunFailure extends Data.TaggedError("CheckoutRunFailure")<{
   readonly reason: CheckoutRunReason
@@ -170,6 +171,8 @@ export class CheckoutRuns extends Context.Service<
       const settings = yield* SettingsStore
 
       const copy = Effect.fnUntraced(function* <I>(options: CheckoutCopy<I>) {
+        yield* annotateUnit({ head: options.revision.head })
+
         const [input] = yield* Effect.all(
           [
             readMaterial(options, null),
@@ -211,13 +214,20 @@ export class CheckoutRuns extends Context.Service<
 
           const checkOut = checkouts
             .checkout(pr, revision)
-            .pipe(Effect.mapError(checkoutError(identity)))
+            .pipe(Effect.mapError(checkoutError(identity)), recordDuration("checkout_ms"))
+
+          yield* annotateUnit({
+            engine: identity.engine,
+            model: identity.model,
+            head: revision.head,
+          })
 
           const [{ input, prepared }, checkout] = yield* Effect.all([prepare, checkOut], {
             concurrency: 2,
           })
 
           return yield* selected.run({ ...prepared, subject, checkout }).pipe(
+            recordDuration("agent_ms"),
             Effect.map((answer) => ({ input, answer })),
             Effect.mapError(fromAgentFailure),
             Effect.timeoutOrElse({

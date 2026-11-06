@@ -4,16 +4,18 @@ import {
   PullRequestRef,
   Revision,
   type TourDiagram,
+  TOKEN_PARAM,
   type TourState,
 } from "@glass/contracts"
-import { Clock, Effect, Exit, Fiber, Option, Scope, Stream } from "effect"
+import { Array as Arr, Clock, Effect, Exit, Fiber, Option, Schema, Scope, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { startFakeGitHub } from "../test/fakeGitHub"
 import { VIEWER } from "../test/fakePullRequest"
 import { watchDeadlines } from "../test/deadlines"
-import { isolatedHome, startBackend } from "../test/harness"
+import { isolatedHome, LAUNCH_TOKEN, startBackend } from "../test/harness"
 import { type ScriptedSettings, scriptedAgentRunners } from "../test/scriptedAgentRunners"
 import { type TourAnswer, tourInstructions } from "./tourPrompt"
+import { wideEvents } from "./wideEvents"
 
 const answer = {
   intent: "Greet people by name.",
@@ -334,6 +336,46 @@ for (const [name, settings, expected] of [
     }),
   )
 }
+
+const TourUnit = Schema.Struct({
+  event: Schema.Literal("Tour"),
+  outcome: Schema.String,
+  error: Schema.Struct({ tag: Schema.String, message: Schema.String }),
+  pr: Schema.String,
+  head: Schema.String,
+  engine: Schema.String,
+  clone: Schema.String,
+  checkout_ms: Schema.Number,
+  agent_ms: Schema.Number,
+})
+
+const decodeTourUnit = Schema.decodeUnknownOption(Schema.fromJsonString(TourUnit))
+
+it.live("records a failed Tour as one unit of work, without the launch token", () =>
+  Effect.gen(function* () {
+    const lines: Array<string> = []
+
+    const revision = yield* Effect.gen(function* () {
+      const f = yield* fixture({ reply: { answer: { ...answer, chapters: [] } } })
+      yield* f.write
+      yield* f.state(completed)
+
+      return f.revision
+    }).pipe(Effect.scoped, Effect.provide(wideEvents("backend", (line) => lines.push(line))))
+
+    const tour = Option.getOrThrow(Arr.findFirst(lines, (line) => decodeTourUnit(line)))
+
+    assert.include(tour, {
+      outcome: "failure",
+      head: revision.head,
+      clone: "new",
+      engine: "claude-code",
+    })
+    assert.strictEqual(tour.error.tag, "TourFailure")
+    assert.isTrue(lines.some((line) => line.includes(`${TOKEN_PARAM}=REDACTED`)))
+    assert.isFalse(lines.some((line) => line.includes(LAUNCH_TOKEN)))
+  }),
+)
 
 it.effect("times out slow generation", () =>
   Effect.gen(function* () {

@@ -11,6 +11,7 @@ import {
 } from "effect"
 
 export interface PullRequestJob<S> {
+  readonly pr: string
   readonly state: SubscriptionRef.SubscriptionRef<S>
   readonly lock: Semaphore.Semaphore
   running: { readonly fiber: Fiber.Fiber<void>; readonly background: boolean } | null
@@ -36,6 +37,7 @@ export const pullRequestJobs = Effect.fnUntraced(function* <S, E>(options: {
     if (existing !== undefined) return existing
 
     const job: PullRequestJob<S> = {
+      pr: key,
       state: yield* SubscriptionRef.make(yield* options.load(pr)),
       lock: yield* Semaphore.make(1),
       running: null,
@@ -83,15 +85,13 @@ export const pullRequestJobs = Effect.fnUntraced(function* <S, E>(options: {
     )
 
   const settle =
-    <F>(job: PullRequestJob<S>, failed: (state: S, error: Option.Option<F>) => S) =>
+    <F>(job: PullRequestJob<S>, event: string, failed: (state: S, error: Option.Option<F>) => S) =>
     <A>(work: Effect.Effect<A, F>) =>
       work.pipe(
+        Effect.withSpan(event, { root: true, attributes: { pr: job.pr } }),
         Effect.asVoid,
         Effect.catchCause((cause) =>
           Effect.gen(function* () {
-            if (Cause.hasDies(cause))
-              yield* Effect.logError("Unexpected failure in a PR background job", cause)
-
             if (Cause.hasInterrupts(cause)) yield* Effect.interrupt
 
             yield* SubscriptionRef.update(job.state, (state) =>

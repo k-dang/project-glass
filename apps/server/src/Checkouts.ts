@@ -21,6 +21,7 @@ import { Git } from "./git"
 import { gitBasicAuthorization } from "./gitEnv"
 import { GitHubAuth } from "./github/GitHubAuth"
 import { ServerConfig } from "./ServerConfig"
+import { annotateUnit } from "./wideEvents"
 
 export class CheckoutFailure extends Data.TaggedError("CheckoutFailure")<{
   readonly reason: "unreachable" | "access-refused" | "fetch-failed" | "timeout" | "storage"
@@ -118,7 +119,10 @@ export class Checkouts extends Context.Service<
       ) {
         const url = `${config.gitRemote}/${repository}.git`
 
-        if (yield* fs.exists(clone)) {
+        const existing = yield* fs.exists(clone)
+        yield* annotateUnit({ clone: existing ? "existing" : "new" })
+
+        if (existing) {
           yield* removeStaleLockFiles(clone)
           yield* git(["--git-dir", clone, "remote", "set-url", "origin", url], env)
 

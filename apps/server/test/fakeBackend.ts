@@ -1,4 +1,4 @@
-import { NodeRuntime, NodeSocket } from "@effect/platform-node"
+import { NodeSocket } from "@effect/platform-node"
 import { ConfigProvider, Effect, Layer, Redacted } from "effect"
 import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { mkdtemp, rm } from "node:fs/promises"
@@ -7,6 +7,7 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { serve } from "../src/server"
 import { ServerConfig } from "../src/ServerConfig"
+import { runMain, wideEventsToStdout } from "../src/wideEvents"
 import { bundledPi, seedDemoAgent, startDemoClaude, startDemoPi } from "./demoAgent"
 import { DEMO_REPOSITORY, seedDemoPullRequests } from "./demoPullRequests"
 import { startFakeGitHub } from "./fakeGitHub"
@@ -89,4 +90,8 @@ const main = Effect.gen(function* () {
   return yield* Effect.never
 })
 
-main.pipe(Effect.provide(NodeSocket.layerWebSocketConstructor), Effect.scoped, NodeRuntime.runMain)
+main.pipe(
+  Effect.provide(NodeSocket.layerWebSocketConstructor),
+  Effect.scoped,
+  runMain(wideEventsToStdout("backend")),
+)
