@@ -297,7 +297,6 @@ it("shows the first message at once while the Agent starts", async () => {
   await waitFor(() => expect(window.location.hash).toBe(`#/agents/${agent.id}`))
 })
 
-/** Each place's branches for New Agent: a Local checkout's by repository, and a Sandbox's from GitHub. */
 const branchesAt = ({
   local = () => ["main", ["main"]],
   sandbox = { defaultBranch: "main" },

@@ -302,7 +302,6 @@ export class Transcripts extends Context.Service<
         return [yield* queuedChanged(agentId), turn]
       })
 
-      /** Saves a change and publishes its updates, returning what the change decided. */
       const changeWith = <A, E, R>(
         agentId: string,
         effect: Effect.Effect<readonly [A, ReadonlyArray<TranscriptUpdate>], E, R>,

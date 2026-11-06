@@ -465,7 +465,6 @@ export const nothingUnsent: SentMessage = { message: "", images: [] }
 export const isNothingUnsent = ({ message, images }: SentMessage) =>
   message === "" && images.length === 0
 
-/** Whether a sent message started a Turn or waits as a Queued message behind the running one. */
 export const MessageDelivery = Schema.Literals(["started", "queued"])
 
 export type MessageDelivery = typeof MessageDelivery.Type
