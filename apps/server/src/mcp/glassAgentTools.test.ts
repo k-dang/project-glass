@@ -1,8 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
 import {
   Agent,
-  type AgentReviewState,
-  AgentReviewState as AgentReviewStateSchema,
+  AgentReviewState,
   isWaiting,
   PullRequestRef,
   localPlace,
@@ -13,7 +12,7 @@ import { agentsFixture, holding, repository, settled } from "../../test/agentsFi
 import { startFakeGitHub } from "../../test/fakeGitHub"
 import { VIEWER } from "../../test/fakePullRequest"
 import { isolatedHome, startBackend } from "../../test/harness"
-import { connectMcp, toolText as textOf } from "../../test/mcpClient"
+import { connectMcp, toolText } from "../../test/mcpClient"
 import { scriptedAgentRunners } from "../../test/scriptedAgentRunners"
 
 const caller = { conversationId: "global-conversation" }
@@ -46,7 +45,7 @@ describe("Glass's Agent tools over MCP", () => {
 
       const result = yield* f.call("create_agent", onThisDevice("Investigate the greeting"))
 
-      assert.isFalse(result.isError, textOf(result))
+      assert.isFalse(result.isError, toolText(result))
       const { agent } = decodeCreated(result.structuredContent)
       assert.deepStrictEqual(
         (yield* f.agents).map(({ id }) => id),
@@ -67,7 +66,7 @@ describe("Glass's Agent tools over MCP", () => {
       const result = yield* f.call("create_agent", onThisDevice("Investigate"))
 
       assert.isTrue(result.isError)
-      assert.include(textOf(result), "Link a Local checkout of glass-demo/greeter first.")
+      assert.include(toolText(result), "Link a Local checkout of glass-demo/greeter first.")
       assert.deepStrictEqual(yield* f.agents, [])
     }),
   )
@@ -123,9 +122,9 @@ describe("Glass's Agent tools over MCP", () => {
       })
 
       assert.isTrue(model.isError)
-      assert.include(textOf(model), "list_agent_options")
+      assert.include(toolText(model), "list_agent_options")
       assert.isTrue(effort.isError)
-      assert.include(textOf(effort), "Effort")
+      assert.include(toolText(effort), "Effort")
       assert.deepStrictEqual(yield* f.agents, [])
     }),
   )
@@ -162,7 +161,7 @@ describe("Glass's Agent tools over MCP", () => {
       const result = yield* f.call("send_agent_message", { agentId: agent.id, message: "Next" })
 
       assert.isTrue(result.isError)
-      assert.include(textOf(result), "waiting for the user")
+      assert.include(toolText(result), "waiting for the user")
     }),
   )
 })
@@ -206,7 +205,7 @@ const startReviewing = Effect.gen(function* () {
   return { ...backend, pr, pullRequest, revision, call, review }
 })
 
-const decodeReview = Schema.decodeUnknownSync(AgentReviewStateSchema)
+const decodeReview = Schema.decodeUnknownSync(AgentReviewState)
 
 describe("Glass's Agent review tools over MCP", () => {
   it.live("starts an Agent review, then reads it once written", () =>
@@ -218,7 +217,7 @@ describe("Glass's Agent review tools over MCP", () => {
         revision: f.revision,
       })
 
-      assert.isFalse(started.isError, textOf(started))
+      assert.isFalse(started.isError, toolText(started))
       assert.equal(decodeReview(started.structuredContent).job.status, "reviewing")
       yield* f.review(({ review }) => review !== null)
 

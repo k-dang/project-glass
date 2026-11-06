@@ -4,7 +4,7 @@ import { Effect, Schema } from "effect"
 import { startFakeGitHub } from "../../test/fakeGitHub"
 import { VIEWER } from "../../test/fakePullRequest"
 import { isolatedHome, startBackend } from "../../test/harness"
-import { connectMcp, listedTools, toolText as textOf } from "../../test/mcpClient"
+import { connectMcp, listedTools, toolText } from "../../test/mcpClient"
 
 const startGlass = Effect.gen(function* () {
   const github = yield* startFakeGitHub()
@@ -94,8 +94,8 @@ describe("Glass tools over MCP", () => {
       })
 
       assert.isFalse(result.isError)
-      assert.include(textOf(result), "Greet by name")
-      assert.include(textOf(result), "hello name")
+      assert.include(toolText(result), "Greet by name")
+      assert.include(toolText(result), "hello name")
       assert.deepStrictEqual(yield* client.ListActivity({ limit: 10 }), before)
 
       const [queued] = yield* client.ListSavedQueue()
@@ -131,7 +131,7 @@ describe("Glass tools over MCP", () => {
       })
 
       assert.isTrue(result.isError)
-      assert.include(textOf(result), "changed since that Revision")
+      assert.include(toolText(result), "changed since that Revision")
     }),
   )
 
@@ -142,7 +142,7 @@ describe("Glass tools over MCP", () => {
       const result = yield* call("read_agent_transcript", { agentId: "no-such-agent", turns: 3 })
 
       assert.isTrue(result.isError)
-      assert.include(textOf(result), "no Agent with that id")
+      assert.include(toolText(result), "no Agent with that id")
     }),
   )
 })
