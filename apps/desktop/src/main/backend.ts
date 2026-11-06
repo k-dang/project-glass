@@ -1,10 +1,13 @@
 import { RPC_PATH } from "@glass/contracts"
 import type { BackendEndpoint } from "@glass/contracts/desktop"
 import { Deferred, Duration, Effect, Fiber, Schema } from "effect"
-import { utilityProcess } from "electron"
+import { type UtilityProcess, utilityProcess } from "electron"
 import { randomBytes, randomUUID } from "node:crypto"
 import { createServer } from "node:net"
 import { BackendError, keepRunning, openBackendLog, waitForBackend } from "./backendIo"
+
+// Longer than the backend's own wait for the Agent host to stop.
+const STOP_DEADLINE = Duration.seconds(10)
 
 const decodeTcpAddress = Schema.decodeUnknownEffect(Schema.Struct({ port: Schema.Number }))
 
@@ -28,6 +31,21 @@ const freePort = Effect.callback<number, BackendError>((resume) => {
     )
   })
 })
+
+// Asks the backend to stop and waits for it, since it stops the Agent host and the Agent programs
+// under it. `kill()` would end the backend two seconds later, before it had stopped them.
+const stopBackend = (backend: UtilityProcess, exitCode: Promise<number>) =>
+  Effect.sync(() => {
+    if (backend.pid !== undefined) process.kill(backend.pid, "SIGINT")
+  }).pipe(
+    Effect.andThen(Effect.promise(() => exitCode)),
+    Effect.timeoutOrElse({
+      duration: STOP_DEADLINE,
+      orElse: () =>
+        Effect.sync(() => backend.kill()).pipe(Effect.andThen(Effect.promise(() => exitCode))),
+    }),
+    Effect.asVoid,
+  )
 
 export const startBackend = Effect.fn("startBackend")(function* (options: {
   readonly entry: string
@@ -62,7 +80,7 @@ export const startBackend = Effect.fn("startBackend")(function* (options: {
   const run = Effect.gen(function* () {
     yield* note("INFO", "Starting backend")
 
-    const child = yield* Effect.acquireRelease(
+    const { exitCode } = yield* Effect.acquireRelease(
       Effect.sync(() => {
         const backend = utilityProcess.fork(options.entry, [], {
           serviceName: "Glass backend",
@@ -77,16 +95,13 @@ export const startBackend = Effect.fn("startBackend")(function* (options: {
 
         for (const output of [backend.stdout, backend.stderr]) output?.on("data", writeOutput)
 
-        return backend
+        return {
+          backend,
+          exitCode: new Promise<number>((resolve) => backend.once("exit", resolve)),
+        }
       }),
-      (backend) =>
-        Effect.sync(() => {
-          for (const output of [backend.stdout, backend.stderr]) output?.off("data", writeOutput)
-          backend.kill()
-        }),
+      (started) => stopBackend(started.backend, started.exitCode),
     )
-
-    const exitCode = new Promise<number>((resolve) => child.once("exit", resolve))
 
     const exited = Effect.promise(() => exitCode).pipe(
       Effect.flatMap((code) =>
