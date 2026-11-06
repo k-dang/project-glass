@@ -302,13 +302,14 @@ export class Transcripts extends Context.Service<
         return [yield* queuedChanged(agentId), turn]
       })
 
-      const change = <E, R>(
+      /** Saves a change and publishes its updates, returning what the change decided. */
+      const changeWith = <A, E, R>(
         agentId: string,
-        effect: Effect.Effect<ReadonlyArray<TranscriptUpdate>, E, R>,
+        effect: Effect.Effect<readonly [A, ReadonlyArray<TranscriptUpdate>], E, R>,
       ) =>
         lockFor(agentId).withPermits(1)(
           Effect.gen(function* () {
-            const updates = yield* sql.withTransaction(effect)
+            const [decided, updates] = yield* sql.withTransaction(effect)
 
             if (updates.some(changesRequest))
               yield* markWaiting(agentId, yield* hasWaitingRequest(agentId))
@@ -318,8 +319,17 @@ export class Transcripts extends Context.Service<
               updates.map((update) => ({ agentId, update })),
             )
 
-            return updates
+            return decided
           }),
+        )
+
+      const change = <E, R>(
+        agentId: string,
+        effect: Effect.Effect<ReadonlyArray<TranscriptUpdate>, E, R>,
+      ) =>
+        changeWith(
+          agentId,
+          Effect.map(effect, (updates) => [undefined, updates] as const),
         )
 
       const startNext = Effect.fnUntraced(function* (agentId: string) {
@@ -455,20 +465,16 @@ export class Transcripts extends Context.Service<
         startOrQueue: (agentId, input) =>
           withStorageFailure(
             "send a message",
-            change(
+            changeWith(
               agentId,
               Effect.gen(function* () {
                 if ((yield* runningTurn(agentId)) === null)
-                  return [yield* startTurn(agentId, input)]
+                  return ["started", [yield* startTurn(agentId, input)]] as const
 
                 yield* insertQueued(agentId, (yield* queuedPositions(agentId)).last + 1, input)
 
-                return [yield* queuedChanged(agentId)]
+                return ["queued", [yield* queuedChanged(agentId)]] as const
               }),
-            ),
-          ).pipe(
-            Effect.map(([update]): MessageDelivery =>
-              Predicate.isTagged(update, "TurnStarted") ? "started" : "queued",
             ),
           ),
         prependQueued: (agentId, inputs) =>

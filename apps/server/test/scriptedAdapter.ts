@@ -106,6 +106,8 @@ export const scriptedAdapter = (gates: string): AgentAdapter => {
             yield* report(TurnEnded.make({ turnId, ended: { at: yield* DateTime.now, ending } }))
           })
 
+        // A scripted message is read line by line: `call:<tool> <json>` calls one of Glass's tools,
+        // then `hold:<gate>` holds the Turn until the test releases that gate.
         const run = (turnId: string, { message }: MessageWithContext) =>
           Effect.gen(function* () {
             const called = /^call(-ended)?:(\S+)(?: (.+))?$/m.exec(message)

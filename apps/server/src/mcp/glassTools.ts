@@ -188,7 +188,6 @@ const ListAgentOptions = Tool.make("list_agent_options", {
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)
 
-/** An action changes the user's work, so its service call finishes even when the call is cancelled. */
 const action = Context.make(Tool.Readonly, false).pipe(
   Context.add(Tool.Destructive, false),
   Context.add(Tool.Idempotent, false),
@@ -352,6 +351,9 @@ const withinBudget = (files: ReadonlyArray<FileMaterial>) => {
   }
 }
 
+/** An action's service call finishes even when its tool call is cancelled, so a stopped Turn never leaves it half done. */
+const accepted: typeof Effect.uninterruptible = Effect.uninterruptible
+
 const first = <A, E, R>(stream: Stream.Stream<A, E, R>) =>
   stream.pipe(Stream.runHead, Effect.map(Option.getOrThrow))
 
@@ -434,7 +436,7 @@ export const GlassToolHandlers = GlassTools.toLayer(
         agentReviews
           .start(pullRequest, revision)
           .pipe(
-            Effect.uninterruptible,
+            accepted,
             Effect.andThen(first(agentReviews.watch(pullRequest))),
             Effect.mapError(explained),
           ),
@@ -463,14 +465,15 @@ export const GlassToolHandlers = GlassTools.toLayer(
         }).pipe(Effect.mapError(explained)),
       create_agent: (input) =>
         Effect.gen(function* () {
-          // The UI offers only the models and Efforts a place lists, so the conversation can't invent one.
+          // The UI picks only from the models and Efforts a place lists. Checking here rather than in
+          // Agents.create spares every create from the UI a model listing, which can start a process.
           const { engine, place, model, effort } = input
           const { defaultModel, models } = yield* agents.models(engine, place)
           const chosen = model === null ? defaultModel : models.find(({ id }) => id === model)
 
-          if (chosen === undefined)
+          if (model !== null && chosen === undefined)
             return yield* new AgentError({
-              message: `${model === null ? "That place has no default model" : `That place has no model "${model}"`}. list_agent_options lists the models a place offers.`,
+              message: `That place has no model "${model}". list_agent_options lists the models a place offers.`,
             })
 
           if (effort !== null && !(chosen?.efforts.includes(effort) ?? false))
@@ -480,13 +483,13 @@ export const GlassToolHandlers = GlassTools.toLayer(
 
           const agent = yield* agents
             .create({ ...input, permissionMode: null, images: [] })
-            .pipe(Effect.uninterruptible)
+            .pipe(accepted)
 
           return { agent }
         }).pipe(Effect.mapError(explained)),
       send_agent_message: ({ agentId, message }) =>
         agents.send(agentId, { message, images: [] }).pipe(
-          Effect.uninterruptible,
+          accepted,
           Effect.map((delivery) => ({ delivery })),
           Effect.mapError(explained),
         ),
