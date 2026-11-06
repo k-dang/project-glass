@@ -1,18 +1,11 @@
-import { existsSync, watch } from "node:fs"
-import { dirname } from "node:path"
+import { Effect } from "effect"
+import { existsSync } from "node:fs"
+import { eventually } from "./eventually.ts"
 
+// Checks again until the file exists, since fs.watch can miss a file made just after it starts
+// watching when the machine is busy, leaving the wait stuck.
 export const whenExists = (path: string, signal?: AbortSignal) =>
-  new Promise<void>((resolve) => {
-    const watcher = watch(dirname(path), () => {
-      if (!existsSync(path)) return
-      watcher.close()
-      resolve()
-    })
-
-    signal?.addEventListener("abort", () => watcher.close(), { once: true })
-
-    if (existsSync(path)) {
-      watcher.close()
-      resolve()
-    }
-  })
+  Effect.runPromise(
+    eventually(Effect.suspend(() => (existsSync(path) ? Effect.void : Effect.fail(path)))),
+    { signal },
+  )
