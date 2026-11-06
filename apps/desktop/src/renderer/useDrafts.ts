@@ -32,7 +32,6 @@ export interface DraftView {
   readonly body: string
   readonly feedback: Feedback
   readonly deleting: boolean
-  readonly published: boolean
   readonly local: boolean
 }
 
@@ -41,10 +40,12 @@ export type SubmitOutcome =
   | { readonly type: "failed"; readonly problem: Problem }
 
 export type Submission =
-  | { readonly type: "idle" | "sending" }
+  | { readonly type: "idle" | "sending" | "submitted" }
   | Extract<SubmitOutcome, { readonly type: "failed" }>
 
 const idle: Submission = { type: "idle" }
+
+export const isPublishing = ({ type }: Submission) => type === "sending" || type === "submitted"
 
 const unsavedProblem: Problem = {
   title: "Some Drafts haven't saved to GitHub",
@@ -86,7 +87,6 @@ interface Entry {
   readonly requested: boolean
   readonly deleting: boolean
   readonly failure: { readonly action: DraftAction; readonly problem: Problem } | null
-  readonly published: boolean
 }
 
 const pendingAction = (entry: Entry): DraftAction | null => {
@@ -120,7 +120,6 @@ const toView = (entry: Entry): DraftView => ({
   body: entry.body,
   feedback: feedbackOf(entry),
   deleting: entry.deleting,
-  published: entry.published,
   local: isLocal(entry),
 })
 
@@ -140,11 +139,13 @@ export class DraftStore {
     ),
   )
   readonly viewsAtom = Atom.make((get) =>
-    [...get(this.#entriesAtom).keys()].flatMap((key) => {
-      const view = get(this.viewAtom(key))
+    get(this.submissionAtom).type === "submitted"
+      ? []
+      : [...get(this.#entriesAtom).keys()].flatMap((key) => {
+          const view = get(this.viewAtom(key))
 
-      return view === undefined || view.published ? [] : [view]
-    }),
+          return view === undefined ? [] : [view]
+        }),
   )
   readonly linePlacesAtom = Atom.make((get) =>
     [...get(this.#entriesAtom).values()].flatMap(({ key, path, place }): Array<LineNotePlace> =>
@@ -194,6 +195,8 @@ export class DraftStore {
 
   readonly submission = () => this.registry.get(this.submissionAtom)
 
+  readonly #closed = () => this.locked() || this.submission().type === "submitted"
+
   setSummary(summary: string) {
     this.registry.set(this.summaryAtom, summary)
   }
@@ -211,7 +214,7 @@ export class DraftStore {
   }
 
   start(path: string, side: DiffSide, line: number) {
-    if (this.locked()) return
+    if (this.#closed()) return
 
     for (const entry of this.registry.get(this.#entriesAtom).values()) {
       const { place } = entry
@@ -234,7 +237,7 @@ export class DraftStore {
   }
 
   add(path: string, side: DiffSide, line: number, body: string) {
-    if (this.locked()) return
+    if (this.#closed()) return
 
     this.save(this.#addLine(path, side, line, body))
   }
@@ -250,7 +253,7 @@ export class DraftStore {
   edit(key: string, body: string) {
     const entry = this.registry.get(this.#entriesAtom).get(key)
 
-    if (entry === undefined || entry.deleting || entry.published || this.locked()) return
+    if (entry === undefined || entry.deleting || this.#closed()) return
 
     this.#put({ ...entry, body, failure: null })
   }
@@ -258,7 +261,7 @@ export class DraftStore {
   remove(key: string) {
     const entry = this.registry.get(this.#entriesAtom).get(key)
 
-    if (entry === undefined || entry.published || this.locked()) return
+    if (entry === undefined || this.#closed()) return
 
     this.#save({ ...entry, deleting: true })
   }
@@ -266,7 +269,7 @@ export class DraftStore {
   takeLocal(key: string) {
     const entry = this.registry.get(this.#entriesAtom).get(key)
 
-    if (entry === undefined || !isLocal(entry) || this.locked()) return undefined
+    if (entry === undefined || !isLocal(entry) || this.#closed()) return undefined
 
     const { path, place, body } = entry
 
@@ -280,7 +283,7 @@ export class DraftStore {
   save(key: string) {
     const entry = this.registry.get(this.#entriesAtom).get(key)
 
-    if (entry !== undefined && !this.locked() && mayNeedCall(entry)) {
+    if (entry !== undefined && !this.#closed() && mayNeedCall(entry)) {
       this.#request(entry)
     }
   }
@@ -335,10 +338,8 @@ export class DraftStore {
 
     if (Exit.isSuccess(exit)) {
       const drafts = [...this.registry.get(this.#entriesAtom).values()].flatMap(
-        ({ path, place, saved, published }) =>
-          saved === null || published
-            ? []
-            : [new Draft({ id: saved.id, path, place, body: saved.body })],
+        ({ path, place, saved }) =>
+          saved === null ? [] : [new Draft({ id: saved.id, path, place, body: saved.body })],
       )
 
       this.#record(
@@ -352,19 +353,14 @@ export class DraftStore {
 
       this.registry.update(
         this.#entriesAtom,
-        (entries) =>
-          new Map(
-            [...entries].flatMap(([key, entry]) =>
-              entry.saved === null ? [] : [[key, { ...entry, published: true }]],
-            ),
-          ),
+        (entries) => new Map([...entries].filter(([, entry]) => entry.saved !== null)),
       )
       outcome = { type: "submitted", published: drafts.length }
     } else {
       outcome = { type: "failed", problem: submitProblem(exit.cause) }
     }
 
-    this.#setSubmission(outcome.type === "failed" ? outcome : idle)
+    this.#setSubmission(outcome.type === "failed" ? outcome : { type: "submitted" })
     this.unlock()
 
     return outcome
@@ -410,7 +406,6 @@ export class DraftStore {
       requested: false,
       deleting: false,
       failure: null,
-      published: false,
     }
 
     this.#put(entry)
