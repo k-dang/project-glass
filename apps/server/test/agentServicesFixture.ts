@@ -13,7 +13,7 @@ import {
   type MessageWithContext,
   type Transcript,
   type RequestNotWaiting,
-  thisMac,
+  localPlace,
 } from "@glass/contracts"
 import {
   ConfigProvider,
@@ -288,7 +288,7 @@ export const agentServicesFixture = Effect.gen(function* () {
     create: (
       permissionMode: TurnSettings["permissionMode"] = null,
       engine: "claude-code" | "pi" = "claude-code",
-      place: AgentPlace = thisMac,
+      place: AgentPlace = localPlace,
     ) =>
       running.agents.create({
         repository: new FollowedRepository({ owner: "glass-test", repo: "greeter" }),

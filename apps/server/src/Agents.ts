@@ -27,7 +27,7 @@ import {
   type RequestWaiting,
   type Revision,
   SandboxPlace,
-  thisMac as thisMacPlace,
+  localPlace,
   type Transcript,
   type TranscriptUpdate,
   TurnCutOff,
@@ -99,7 +99,7 @@ const toRow = ({
   agent: new Agent({
     ...agent,
     place:
-      sandboxProvider === null ? thisMacPlace : SandboxPlace.make({ providerId: sandboxProvider }),
+      sandboxProvider === null ? localPlace : SandboxPlace.make({ providerId: sandboxProvider }),
     repository: new FollowedRepository({ owner, repo }),
     sandbox: null,
   }),
@@ -383,7 +383,7 @@ export class Agents extends Context.Service<
         const agent = new Agent({
           id: randomUUID(),
           name: input.name,
-          place: thisMacPlace,
+          place: localPlace,
           repository: input.repository,
           baseBranch: input.revision.base,
           engine: input.engine,

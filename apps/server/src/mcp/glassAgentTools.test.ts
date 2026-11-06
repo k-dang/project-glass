@@ -5,7 +5,7 @@ import {
   AgentReviewState as AgentReviewStateSchema,
   isWaiting,
   PullRequestRef,
-  thisMac,
+  localPlace,
   TurnDone,
 } from "@glass/contracts"
 import { Effect, Option, Schema, Stream } from "effect"
@@ -29,7 +29,7 @@ const startGlass = Effect.gen(function* () {
 const onThisDevice = (message: string) => ({
   repository: { owner: repository.owner, repo: repository.repo },
   baseBranch: "main",
-  place: thisMac,
+  place: localPlace,
   engine: "pi",
   model: null,
   effort: null,
@@ -80,7 +80,7 @@ describe("Glass's Agent tools over MCP", () => {
       const places = yield* f.call("list_agent_places")
 
       const options = yield* f.call("list_agent_options", {
-        place: thisMac,
+        place: localPlace,
         repository: { owner: repository.owner, repo: repository.repo },
         engine: "pi",
       })

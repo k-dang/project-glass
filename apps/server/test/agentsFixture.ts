@@ -10,7 +10,7 @@ import {
   type Transcript,
   SandboxPlace,
   type SandboxStatus,
-  thisMac,
+  localPlace,
   type Turn,
 } from "@glass/contracts"
 import { Effect, Exit, Option, Predicate, Scope, Stream } from "effect"
@@ -110,7 +110,7 @@ export const agentsFixture = Effect.gen(function* () {
           message,
           images,
           permissionMode: null,
-          place: thisMac,
+          place: localPlace,
           ...program,
         }),
       ),

@@ -9,7 +9,7 @@ import {
   PullRequestRef,
   Revision,
   TextPart,
-  thisMac,
+  localPlace,
   type Transcript,
   type Turn,
   TurnDone,
@@ -180,7 +180,7 @@ it.live("leaves an Agent it created running when its own Turn stops", () =>
     const newAgent = {
       repository: { owner: repository.owner, repo: repository.repo },
       baseBranch: "main",
-      place: thisMac,
+      place: localPlace,
       engine: "pi",
       model: null,
       effort: null,

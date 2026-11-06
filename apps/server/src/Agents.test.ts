@@ -1,5 +1,5 @@
 import { assert, it } from "@effect/vitest"
-import { AgentStarted, SandboxPlace, TextPatch, thisMac } from "@glass/contracts"
+import { AgentStarted, SandboxPlace, TextPatch, localPlace } from "@glass/contracts"
 import { Effect, Option, Stream } from "effect"
 import { existsSync } from "node:fs"
 import { mkdir, rename, writeFile } from "node:fs/promises"
@@ -32,9 +32,12 @@ it.live("links a clone as the Local checkout of the GitHub repository it names, 
     assert.deepStrictEqual(kept?.repository, repository)
     assert.equal(kept?.path, linked.path)
 
-    const onThisMac = { place: thisMac, repository }
-    assert.equal(yield* restarted.GetNewAgentDefaultBranch(onThisMac), "main")
-    assert.sameMembers([...(yield* restarted.ListNewAgentBranches(onThisMac))], ["main", "develop"])
+    const onThisDevice = { place: localPlace, repository }
+    assert.equal(yield* restarted.GetNewAgentDefaultBranch(onThisDevice), "main")
+    assert.sameMembers(
+      [...(yield* restarted.ListNewAgentBranches(onThisDevice))],
+      ["main", "develop"],
+    )
   }),
 )
 
@@ -82,7 +85,7 @@ it.live("starts an Agent in a worktree, on a new branch it names from its base",
 
     assert.deepStrictEqual(
       { id: listed?.id, place: listed?.place, repository: listed?.repository },
-      { id: agent.id, place: thisMac, repository },
+      { id: agent.id, place: localPlace, repository },
     )
 
     const { activities } = yield* f.client.ListActivity({ limit: 10 })
@@ -92,7 +95,7 @@ it.live("starts an Agent in a worktree, on a new branch it names from its base",
         agentId: agent.id,
         name: agent.name,
         repository,
-        machine: "this-mac",
+        machine: "local",
         engine: "pi",
         message: "Say hello",
       }),

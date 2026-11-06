@@ -1,4 +1,4 @@
-import { thisMac } from "@glass/contracts"
+import { localPlace } from "@glass/contracts"
 import { Effect, Predicate, Result, Schema } from "effect"
 import { randomUUID } from "node:crypto"
 import { createServer, type ServerResponse } from "node:http"
@@ -101,7 +101,7 @@ const replyTo = (request: FakeAnthropicRequest): Reply => {
       input: {
         repository: { owner, repo },
         baseBranch,
-        place: thisMac,
+        place: localPlace,
         engine: "claude-code",
         model: null,
         effort: null,

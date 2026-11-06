@@ -31,7 +31,7 @@ import {
   type Turn,
   TurnEnding,
   AgentPlace,
-  thisMac,
+  localPlace,
 } from "@glass/contracts"
 import { Context, Effect, Match, Option, Schema, Stream } from "effect"
 import { Tool, Toolkit } from "effect/ai"
@@ -449,7 +449,7 @@ export const GlassToolHandlers = GlassTools.toLayer(
       list_agent_places: () =>
         Effect.gen(function* () {
           return {
-            local: { engines: agents.engines(thisMac), localCheckouts: yield* checkouts.list() },
+            local: { engines: agents.engines(localPlace), localCheckouts: yield* checkouts.list() },
             sandboxProviders: sandboxes.providers,
             followedRepositories: yield* followed.list(),
           }

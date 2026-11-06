@@ -14,7 +14,7 @@ import {
   repositoryKey,
   SandboxPlace,
   type SandboxProviderInfo,
-  thisMac,
+  localPlace,
 } from "@glass/contracts"
 import { useNavigate } from "@tanstack/react-router"
 import { Exit, Option, Predicate } from "effect"
@@ -73,8 +73,8 @@ interface PlaceOptions {
   readonly engines: readonly [AgentEngine, ...Array<AgentEngine>]
 }
 
-const onThisMac: PlaceOptions = {
-  place: thisMac,
+const localOptions: PlaceOptions = {
+  place: localPlace,
   describe: (key) =>
     key === undefined
       ? "Choose a folder you cloned a GitHub repository into."
@@ -109,7 +109,9 @@ export const defaultPlace = (
 
   const first = providers[0]
 
-  return hasCheckouts || first === undefined ? thisMac : SandboxPlace.make({ providerId: first.id })
+  return hasCheckouts || first === undefined
+    ? localPlace
+    : SandboxPlace.make({ providerId: first.id })
 }
 
 const unlisted = Atom.make(noCommands)
@@ -202,7 +204,7 @@ function ChoosePlace(props: {
     ? providers.find(({ id }) => id === place.providerId)
     : undefined
 
-  const where = provider === undefined ? onThisMac : inSandboxOf(provider)
+  const where = provider === undefined ? localOptions : inSandboxOf(provider)
 
   const placeContext = placeKey(where.place)
   const preferredEngine = engines[placeContext] ?? newest?.engine ?? "claude-code"
@@ -464,7 +466,7 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
               icon={<PlaceIcon aria-hidden />}
               value={placeKey(where.place)}
               items={[
-                { value: placeKey(thisMac), label: placeNames["this-mac"] },
+                { value: placeKey(localPlace), label: placeNames["local"] },
                 ...props.providers.map((provider) => ({
                   value: placeKey(SandboxPlace.make({ providerId: provider.id })),
                   label: provider.name,
@@ -540,8 +542,8 @@ const pickBase = (
 }
 
 function PrefetchBranches(props: { checkout: LocalCheckout }) {
-  useAtomValue(newAgentDefaultBranchAtom(placeKey(thisMac), props.checkout.repository))
-  useAtomValue(newAgentBranchesAtom(placeKey(thisMac), props.checkout.repository))
+  useAtomValue(newAgentDefaultBranchAtom(placeKey(localPlace), props.checkout.repository))
+  useAtomValue(newAgentBranchesAtom(placeKey(localPlace), props.checkout.repository))
 
   return null
 }
