@@ -38,7 +38,8 @@ jobs:
       - run: pnpm install
       - name: Let Chromium's sandbox create the user namespaces Ubuntu's AppArmor blocks
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-      - run: xvfb-run -a pnpm test:e2e
+      - run: pnpm build
+      - run: xvfb-run -a pnpm --filter @glass/desktop exec playwright test e2e/agent.spec.ts e2e/ask.spec.ts --repeat-each=25 --reporter=line --timeout=40000 2>&1 | grep -E --line-buffered 'DIAG|✘|passed|failed|flaky|Error|Timeout' ; exit ${PIPESTATUS[0]}
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

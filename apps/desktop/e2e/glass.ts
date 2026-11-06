@@ -126,7 +126,22 @@ export const test = base.extend<Glass>({
     await app.close()
   },
   window: async ({ app }, use) => {
-    await use(await app.firstWindow())
+    const started = Date.now()
+    const page = await app.firstWindow()
+    const probe = async (label: string) => {
+      const windows = await app.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows().map((w) => ({ visible: w.isVisible(), minimized: w.isMinimized(), bounds: w.getBounds() })),
+      )
+      const frame = await Promise.race([
+        page.evaluate(() => new Promise<number>((r) => requestAnimationFrame(() => r(performance.now())))).then(() => "frame"),
+        new Promise((r) => setTimeout(() => r("no-frame-2s"), 2000)),
+      ])
+      const visibility = await page.evaluate(() => document.visibilityState)
+      console.log(`DIAG ${label} t=${Date.now() - started}ms windows=${JSON.stringify(windows)} raf=${frame} visibility=${visibility}`)
+    }
+    await probe("firstWindow")
+    await use(page)
+    await probe("teardown")
   },
   relaunch: async ({ app, github, claude, pi, home }, use) => {
     const relaunched: Array<ElectronApplication> = []
