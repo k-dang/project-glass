@@ -161,9 +161,9 @@ const ReadPullRequest = Tool.make("read_pull_request", {
 
 const ListAgentPlaces = Tool.make("list_agent_places", {
   description:
-    "Lists where the user can start an Agent. An Agent on this Mac works in a copy of a Local checkout, so its repository must be one of localCheckouts. An Agent in a Sandbox works in any followed repository, in a Sandbox from one of sandboxProviders. Each place runs only the Agent programs listed with it.",
+    "Lists where the user can start an Agent. An Agent on this device works in a copy of a Local checkout, so its repository must be one of localCheckouts. An Agent in a Sandbox works in any followed repository, in a Sandbox from one of sandboxProviders. Each place runs only the Agent programs listed with it.",
   success: Schema.Struct({
-    thisMac: Schema.Struct({
+    local: Schema.Struct({
       engines: Schema.Array(AgentEngine),
       localCheckouts: Schema.Array(LocalCheckout),
     }),
@@ -203,7 +203,7 @@ const CreateAgent = Tool.make("create_agent", {
       description: "The branch the Agent's branch starts from.",
     }),
     place: AgentPlace.annotate({
-      description: "Where the Agent works: on this Mac, or in a Sandbox from a provider.",
+      description: "Where the Agent works: on this device, or in a Sandbox from a provider.",
     }),
     engine: AgentEngine.annotate({ description: "The Agent program that runs the Agent." }),
     model: Schema.NullOr(Schema.String).annotate({
@@ -449,7 +449,7 @@ export const GlassToolHandlers = GlassTools.toLayer(
       list_agent_places: () =>
         Effect.gen(function* () {
           return {
-            thisMac: { engines: agents.engines(thisMac), localCheckouts: yield* checkouts.list() },
+            local: { engines: agents.engines(thisMac), localCheckouts: yield* checkouts.list() },
             sandboxProviders: sandboxes.providers,
             followedRepositories: yield* followed.list(),
           }

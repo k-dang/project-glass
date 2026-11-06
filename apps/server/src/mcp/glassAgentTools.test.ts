@@ -26,7 +26,7 @@ const startGlass = Effect.gen(function* () {
   return { ...f, call }
 })
 
-const onThisMac = (message: string) => ({
+const onThisDevice = (message: string) => ({
   repository: { owner: repository.owner, repo: repository.repo },
   baseBranch: "main",
   place: thisMac,
@@ -44,7 +44,7 @@ describe("Glass's Agent tools over MCP", () => {
       const f = yield* startGlass
       yield* f.client.LinkLocalCheckout({ path: f.clone.checkout })
 
-      const result = yield* f.call("create_agent", onThisMac("Investigate the greeting"))
+      const result = yield* f.call("create_agent", onThisDevice("Investigate the greeting"))
 
       assert.isFalse(result.isError, textOf(result))
       const { agent } = decodeCreated(result.structuredContent)
@@ -60,11 +60,11 @@ describe("Glass's Agent tools over MCP", () => {
     }),
   )
 
-  it.live("tells the conversation to link a Local checkout before an Agent on this Mac", () =>
+  it.live("tells the conversation to link a Local checkout before an Agent on this device", () =>
     Effect.gen(function* () {
       const f = yield* startGlass
 
-      const result = yield* f.call("create_agent", onThisMac("Investigate"))
+      const result = yield* f.call("create_agent", onThisDevice("Investigate"))
 
       assert.isTrue(result.isError)
       assert.include(textOf(result), "Link a Local checkout of glass-demo/greeter first.")
@@ -86,7 +86,7 @@ describe("Glass's Agent tools over MCP", () => {
       })
 
       assert.deepStrictEqual(places.structuredContent, {
-        thisMac: {
+        local: {
           engines: ["claude-code", "pi"],
           localCheckouts: [
             { repository: { owner: "glass-demo", repo: "greeter" }, path: f.clone.checkout },
@@ -112,12 +112,12 @@ describe("Glass's Agent tools over MCP", () => {
       yield* f.client.LinkLocalCheckout({ path: f.clone.checkout })
 
       const model = yield* f.call("create_agent", {
-        ...onThisMac("Investigate"),
+        ...onThisDevice("Investigate"),
         model: "imagined",
       })
 
       const effort = yield* f.call("create_agent", {
-        ...onThisMac("Investigate"),
+        ...onThisDevice("Investigate"),
         model: "scripted",
         effort: "high",
       })
