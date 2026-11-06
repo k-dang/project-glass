@@ -24,7 +24,7 @@ import {
   SandboxProviderInfo,
   type SandboxReach,
   SandboxStatus,
-  thisMac,
+  localPlace,
   SavedPlace,
   TextPart,
   ThinkingPart,
@@ -259,7 +259,7 @@ it("starts an Agent from its first message, on the repository's default branch",
       model: null,
       effort: null,
       permissionMode: null,
-      place: thisMac,
+      place: localPlace,
       message: "Fix the bug",
       images: [],
     },
@@ -399,7 +399,7 @@ it("keeps local branch, program, model, effort, and unsent work when exploring a
   await user.type(within(newAgentDraft()).getByRole("textbox", { name: "Message" }), "{Enter}")
   expect(created).toMatchObject([
     {
-      place: thisMac,
+      place: localPlace,
       baseBranch: "develop",
       engine: "pi",
       model: "glass-test/thinker",

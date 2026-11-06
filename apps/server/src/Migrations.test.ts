@@ -2,6 +2,7 @@ import { SqliteClient, SqliteMigrator } from "@effect/sql-sqlite-node"
 import { assert, it } from "@effect/vitest"
 import {
   Activity,
+  AgentStarted,
   applyTranscriptUpdate,
   emptyTranscript,
   ActivityPullRequest,
@@ -72,6 +73,7 @@ it.live("upgrades existing Activity history and uses its indexes after reopening
       [21, "agent_review_follow_ups_as_agent"],
       [22, "index_activity_by_kind"],
       [23, "create_global_conversation"],
+      [24, "name_local_place"],
     ] as const
 
     for (const expected of [upgrade, []] as const) {
@@ -318,5 +320,51 @@ it.live("keeps the saved place as its area's saved place", () =>
     assert.deepStrictEqual(rows, [
       { area: "agents", destination, saved_at: "2026-10-20T00:00:00.000Z" },
     ])
+  }),
+)
+
+// An AgentStarted payload as Glass saved it before migration 0024.
+const savedAgentStarted = (machine: string) =>
+  `{"_tag":"AgentStarted","agentId":"agent-${machine}","name":"agent/swift-otter",` +
+  `"repository":{"owner":"acme","repo":"api"},"machine":"${machine}","engine":"pi",` +
+  `"message":"Say hello"}`
+
+const decodeAgentStarted = Schema.decodeUnknownSync(Schema.fromJsonString(AgentStarted))
+
+it.live("keeps Agents started on this device in Activity history", () =>
+  Effect.gen(function* () {
+    const home = yield* isolatedHome
+    const filename = join(home, "glass.db")
+    const before = Object.fromEntries(Object.entries(migrations).filter(([id]) => id < "0024"))
+
+    const run = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) =>
+      effect.pipe(Effect.provide(SqliteClient.layer({ filename })), Effect.scoped)
+
+    yield* run(
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient
+        yield* SqliteMigrator.run({ loader: SqliteMigrator.fromRecord(before) })
+
+        for (const machine of ["this-mac", "sandbox"])
+          yield* sql`
+            INSERT INTO activity (kind, payload, occurred_at, login)
+            VALUES ('AgentStarted', ${savedAgentStarted(machine)}, '2026-10-20T00:00:00Z', 'octocat')
+          `
+      }),
+    )
+
+    const rows = yield* run(
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient
+        yield* SqliteMigrator.run({ loader: migrationLoader })
+
+        return yield* sql<{ payload: string }>`SELECT payload FROM activity ORDER BY id`
+      }),
+    )
+
+    assert.deepStrictEqual(
+      rows.map(({ payload }) => decodeAgentStarted(payload).machine),
+      ["local", "sandbox"],
+    )
   }),
 )

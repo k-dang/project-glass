@@ -17,7 +17,7 @@ import {
   type Transcript,
   type TranscriptUpdate,
   repositoryKey,
-  thisMac,
+  localPlace,
 } from "@glass/contracts"
 import { Data, Effect, Exit, Option, Predicate, Schema, Stream } from "effect"
 import { AsyncResult, Atom, type AtomRegistry } from "effect/reactivity"
@@ -38,11 +38,11 @@ export const placeKey = (place: AgentPlace) =>
 export const placeOfKey = (key: string): AgentPlace =>
   key.startsWith("sandbox:")
     ? SandboxPlace.make({ providerId: key.slice("sandbox:".length) })
-    : thisMac
+    : localPlace
 
-export const placeNames: Record<PlaceTag, string> = { "this-mac": "Local", sandbox: "Sandbox" }
+export const placeNames: Record<PlaceTag, string> = { local: "Local", sandbox: "Sandbox" }
 
-export const placeIcons: Record<PlaceTag, LucideIcon> = { "this-mac": Laptop, sandbox: Cloud }
+export const placeIcons: Record<PlaceTag, LucideIcon> = { local: Laptop, sandbox: Cloud }
 
 export const TRANSCRIPT_IDLE_TTL = "5 minutes"
 
@@ -334,7 +334,7 @@ export const removeAgent = async (registry: AtomRegistry.AtomRegistry, agent: Ag
     })
 }
 
-const groupOrder: ReadonlyArray<PlaceTag> = ["this-mac", "sandbox"]
+const groupOrder: ReadonlyArray<PlaceTag> = ["local", "sandbox"]
 
 export const groupAgents = (agents: ReadonlyArray<Agent>) =>
   groupOrder.flatMap((machine) => {

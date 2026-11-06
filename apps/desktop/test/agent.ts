@@ -1,10 +1,10 @@
-import { Agent, FollowedRepository, thisMac } from "@glass/contracts"
+import { Agent, FollowedRepository, localPlace } from "@glass/contracts"
 import { DateTime } from "effect"
 
 export const agentFields = {
   id: "agent-1",
   name: "agent/swift-otter",
-  place: thisMac,
+  place: localPlace,
   repository: new FollowedRepository({ owner: "glass-demo", repo: "greeter" }),
   baseBranch: "main",
   engine: "pi",

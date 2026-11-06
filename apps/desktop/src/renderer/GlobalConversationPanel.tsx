@@ -3,7 +3,7 @@ import {
   AgentEngine,
   emptyTranscript,
   type GlobalConversationProgram,
-  thisMac,
+  localPlace,
 } from "@glass/contracts"
 import { Option } from "effect"
 import { AsyncResult } from "effect/reactivity"
@@ -30,7 +30,7 @@ function ProgramPicker(props: { program: GlobalConversationProgram }) {
   return (
     <ModelPicker
       engine={program.engine}
-      placeKey={placeKey(thisMac)}
+      placeKey={placeKey(localPlace)}
       model={program.model}
       effort={program.effort}
       onChange={(choice) => change({ engine: program.engine, ...choice })}

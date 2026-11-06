@@ -8,24 +8,24 @@ export const AgentEngine = Schema.Literals(agentEngines)
 
 export type AgentEngine = typeof AgentEngine.Type
 
-export const ThisMacPlace = Schema.TaggedStruct("this-mac", {})
+export const LocalPlace = Schema.TaggedStruct("local", {})
 
 export const SandboxPlace = Schema.TaggedStruct("sandbox", { providerId: Schema.String })
 
 export const PlaceTag = Schema.Literals([
-  ThisMacPlace.fields._tag.schema.literal,
+  LocalPlace.fields._tag.schema.literal,
   SandboxPlace.fields._tag.schema.literal,
 ])
 
 export type PlaceTag = typeof PlaceTag.Type
 
-export const AgentPlace = Schema.Union([ThisMacPlace, SandboxPlace])
+export const AgentPlace = Schema.Union([LocalPlace, SandboxPlace])
 
 export type AgentPlace = typeof AgentPlace.Type
 
-export const thisMac: AgentPlace = ThisMacPlace.make({})
+export const localPlace: AgentPlace = LocalPlace.make({})
 
-export const asksPermission = (place: AgentPlace) => Predicate.isTagged(place, "this-mac")
+export const asksPermission = (place: AgentPlace) => Predicate.isTagged(place, "local")
 
 export class LocalCheckout extends Schema.Class<LocalCheckout>("LocalCheckout")({
   repository: FollowedRepository,

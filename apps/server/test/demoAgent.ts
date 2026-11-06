@@ -1,4 +1,4 @@
-import { GlassRpcs, RPC_PATH, thisMac, TOKEN_PARAM } from "@glass/contracts"
+import { GlassRpcs, RPC_PATH, localPlace, TOKEN_PARAM } from "@glass/contracts"
 import { Effect, Option, Schema, Stream } from "effect"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
@@ -114,7 +114,7 @@ export const seedDemoAgent = Effect.fnUntraced(function* (
     model: null,
     effort: null,
     permissionMode: null,
-    place: thisMac,
+    place: localPlace,
     message: "Show me around this repository.",
     images: [],
   })
