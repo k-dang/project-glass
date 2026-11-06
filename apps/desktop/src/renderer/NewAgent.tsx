@@ -26,16 +26,13 @@ import { Trace, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace"
 import {
   agentsAtom,
   agentModelsAtom,
-  branchesAtom,
-  branchNamesAtom,
   writtenAtom,
   createAgentAtom,
-  defaultBranchAtom,
-  gitHubBranchesAtom,
-  gitHubDefaultBranchAtom,
   linkCheckoutAtom,
   localCheckoutsAtom,
+  newAgentBranchesAtom,
   newAgentCommandsAtom,
+  newAgentDefaultBranchAtom,
   newAgentFilesAtom,
   noCommands,
   noFiles,
@@ -70,12 +67,6 @@ interface Choosable {
 
 interface PlaceOptions {
   readonly place: AgentPlace
-  readonly defaultBranch: (
-    repository: FollowedRepository,
-  ) => Atom.Atom<AsyncResult.AsyncResult<string | null, BackendError>>
-  readonly branches: (
-    repository: FollowedRepository,
-  ) => Atom.Atom<AsyncResult.AsyncResult<ReadonlyArray<string>, BackendError>>
   readonly describe: (key: string | undefined) => string
   readonly starting: (key: string, baseBranch: string) => string
   readonly choosesFolder: boolean
@@ -84,8 +75,6 @@ interface PlaceOptions {
 
 const onThisMac: PlaceOptions = {
   place: thisMac,
-  defaultBranch: defaultBranchAtom,
-  branches: branchNamesAtom,
   describe: (key) =>
     key === undefined
       ? "Choose a folder you cloned a GitHub repository into."
@@ -97,8 +86,6 @@ const onThisMac: PlaceOptions = {
 
 const inSandboxOf = ({ id, name, engines }: SandboxProviderInfo): PlaceOptions => ({
   place: SandboxPlace.make({ providerId: id }),
-  defaultBranch: gitHubDefaultBranchAtom,
-  branches: gitHubBranchesAtom,
   describe: (key) =>
     key === undefined
       ? "Follow a repository in Settings to get started."
@@ -302,7 +289,9 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
   const [browsed, setBrowsed] = useState<string | null>(null)
 
   const defaults = useAtomValue(
-    repository === undefined ? noDefaultBranch : where.defaultBranch(repository),
+    repository === undefined
+      ? noDefaultBranch
+      : newAgentDefaultBranchAtom(placeKey(where.place), repository),
   )
 
   const chosenBase = props.bases[branchContext]
@@ -310,7 +299,9 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
   const wantsList = chosenBase !== undefined || browsed === branchContext
 
   const branches = useAtomValue(
-    repository === undefined || !wantsList ? unlistedBranches : where.branches(repository),
+    repository === undefined || !wantsList
+      ? unlistedBranches
+      : newAgentBranchesAtom(placeKey(where.place), repository),
   )
 
   const created = useAtomValue(createAgentAtom)
@@ -549,7 +540,8 @@ const pickBase = (
 }
 
 function PrefetchBranches(props: { checkout: LocalCheckout }) {
-  useAtomValue(branchesAtom(props.checkout.repository))
+  useAtomValue(newAgentDefaultBranchAtom(placeKey(thisMac), props.checkout.repository))
+  useAtomValue(newAgentBranchesAtom(placeKey(thisMac), props.checkout.repository))
 
   return null
 }

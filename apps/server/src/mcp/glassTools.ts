@@ -33,7 +33,7 @@ import {
   AgentPlace,
   thisMac,
 } from "@glass/contracts"
-import { Context, Effect, Match, Option, Predicate, Schema, Stream } from "effect"
+import { Context, Effect, Match, Option, Schema, Stream } from "effect"
 import { Tool, Toolkit } from "effect/ai"
 import { ActivityLog } from "../ActivityLog"
 import { AgentReviews } from "../AgentReviews"
@@ -370,17 +370,6 @@ export const GlassToolHandlers = GlassTools.toLayer(
     const sandboxes = yield* Sandboxes
     const agentReviews = yield* AgentReviews
 
-    const branchesAt = (place: AgentPlace, repository: FollowedRepository) =>
-      Predicate.isTagged(place, "sandbox")
-        ? Effect.all(
-            {
-              defaultBranch: github.repositoryDefaultBranch(repository),
-              branches: github.repositoryBranches(repository),
-            },
-            { concurrency: "unbounded" },
-          )
-        : checkouts.branches(repository)
-
     return GlassTools.of({
       list_pull_requests: () =>
         lists
@@ -449,20 +438,14 @@ export const GlassToolHandlers = GlassTools.toLayer(
           }
         }).pipe(Effect.mapError(explained)),
       list_agent_options: ({ place, repository, engine }) =>
-        Effect.gen(function* () {
-          if (!agents.engines(place).includes(engine))
-            return yield* new AgentError({
-              message:
-                "That place doesn't run that Agent program. list_agent_places names the Agent programs each place runs.",
-            })
-
-          const [{ defaultBranch, branches }, models] = yield* Effect.all(
-            [branchesAt(place, repository), agents.models(engine, place)],
-            { concurrency: "unbounded" },
-          )
-
-          return { defaultBranch, branches, models }
-        }).pipe(Effect.mapError(explained)),
+        Effect.all(
+          {
+            defaultBranch: agents.newAgentDefaultBranch(place, repository),
+            branches: agents.newAgentBranches(place, repository),
+            models: agents.models(engine, place),
+          },
+          { concurrency: "unbounded" },
+        ).pipe(Effect.mapError(explained)),
       create_agent: (input) =>
         Effect.gen(function* () {
           // The UI picks only from the models and Efforts a place lists. Checking here rather than in

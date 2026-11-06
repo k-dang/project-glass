@@ -168,6 +168,7 @@ export const agentsFixture = Effect.gen(function* () {
 
   return {
     client,
+    github,
     baseUrl,
     mcpCredentials,
     agents: client.WatchAgents().pipe(Stream.runHead, Effect.map(Option.getOrThrow)),

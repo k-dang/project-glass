@@ -135,9 +135,9 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       WatchTranscript: ({ agentId }) => agents.transcript(agentId),
       ListLocalCheckouts: () => checkouts.list(),
       LinkLocalCheckout: ({ path }) => checkouts.link(path),
-      ListBranches: ({ repository }) => checkouts.branches(repository),
-      ListGitHubBranches: ({ repository }) => github.repositoryBranches(repository),
-      GetGitHubDefaultBranch: ({ repository }) => github.repositoryDefaultBranch(repository),
+      GetNewAgentDefaultBranch: ({ place, repository }) =>
+        agents.newAgentDefaultBranch(place, repository),
+      ListNewAgentBranches: ({ place, repository }) => agents.newAgentBranches(place, repository),
       ListAgentModels: ({ engine, place }) => agents.models(engine, place),
       ListNewAgentCommands: ({ engine, place, repository }) =>
         agents.newAgentCommands(engine, place, repository),

@@ -106,10 +106,7 @@ it.live("offers a Sandbox only the Agent programs its provider runs", () =>
       })
       .pipe(Effect.flip)
 
-    assert.equal(
-      refused.message,
-      "That kind of Sandbox doesn't run this Agent program. Pick another.",
-    )
+    assert.equal(refused.message, "This place doesn't run that Agent program. Pick another.")
   }),
 )
 

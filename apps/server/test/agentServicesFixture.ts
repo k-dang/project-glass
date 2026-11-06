@@ -165,6 +165,8 @@ export const agentServicesFixture = Effect.gen(function* () {
         models: () => models,
         commands: (engine) =>
           client.ListCommands({ engine, folder: "checkout" }).pipe(Effect.orDie),
+        defaultBranch: () => Effect.succeed(null),
+        branches: () => Effect.succeed([]),
         files: () => Effect.succeed([]),
         place: () =>
           Effect.sync(() => {

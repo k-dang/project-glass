@@ -91,31 +91,45 @@ export const localCheckoutsAtom = backendRuntime
   .atom(Backend.use((backend) => backend.ListLocalCheckouts()))
   .pipe(Atom.keepAlive)
 
-export const branchesAtom = Atom.family((repository: FollowedRepository) =>
-  backendRuntime.atom(Backend.use((backend) => backend.ListBranches({ repository }))),
-)
+class PlaceRepository extends Data.Class<{
+  readonly placeKey: string
+  readonly repository: FollowedRepository
+}> {}
 
-export const defaultBranchAtom = Atom.family((repository: FollowedRepository) =>
-  Atom.make((get) =>
-    AsyncResult.map(get(branchesAtom(repository)), ({ defaultBranch }) => defaultBranch),
+/** A Sandbox's branches come from GitHub, so they're kept; a Local checkout's are reread. */
+const keptInSandbox = <A>(at: PlaceRepository, atom: Atom.Atom<A>) =>
+  Predicate.isTagged(placeOfKey(at.placeKey), "sandbox") ? atom.pipe(Atom.keepAlive) : atom
+
+const newAgentDefaultBranchFamily = Atom.family((at: PlaceRepository) =>
+  keptInSandbox(
+    at,
+    backendRuntime.atom(
+      Backend.use((backend) =>
+        backend.GetNewAgentDefaultBranch({
+          place: placeOfKey(at.placeKey),
+          repository: at.repository,
+        }),
+      ),
+    ),
   ),
 )
 
-export const branchNamesAtom = Atom.family((repository: FollowedRepository) =>
-  Atom.make((get) => AsyncResult.map(get(branchesAtom(repository)), ({ branches }) => branches)),
+const newAgentBranchesFamily = Atom.family((at: PlaceRepository) =>
+  keptInSandbox(
+    at,
+    backendRuntime.atom(
+      Backend.use((backend) =>
+        backend.ListNewAgentBranches({ place: placeOfKey(at.placeKey), repository: at.repository }),
+      ),
+    ),
+  ),
 )
 
-export const gitHubBranchesAtom = Atom.family((repository: FollowedRepository) =>
-  backendRuntime
-    .atom(Backend.use((backend) => backend.ListGitHubBranches({ repository })))
-    .pipe(Atom.keepAlive),
-)
+export const newAgentDefaultBranchAtom = (key: string, repository: FollowedRepository) =>
+  newAgentDefaultBranchFamily(new PlaceRepository({ placeKey: key, repository }))
 
-export const gitHubDefaultBranchAtom = Atom.family((repository: FollowedRepository) =>
-  backendRuntime
-    .atom(Backend.use((backend) => backend.GetGitHubDefaultBranch({ repository })))
-    .pipe(Atom.keepAlive),
-)
+export const newAgentBranchesAtom = (key: string, repository: FollowedRepository) =>
+  newAgentBranchesFamily(new PlaceRepository({ placeKey: key, repository }))
 
 export const sandboxProvidersAtom = backendRuntime
   .atom(Backend.use((backend) => backend.ListSandboxProviders()))
