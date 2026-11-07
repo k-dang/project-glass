@@ -36,7 +36,7 @@ const tourProse =
   "max-w-[80ch] text-[13px] leading-[1.8] text-muted-foreground wrap-anywhere [&_code]:bg-transparent [&_code]:p-0 [&_code]:text-xs [&_code]:text-inherit"
 
 const chapterGrid =
-  "grid grid-cols-[340px_minmax(0,1fr)] overflow-clip rounded-[10px] border bg-[color-mix(in_oklch,var(--muted)_35%,var(--background))] @max-[850px]/tour:grid-cols-[280px_minmax(0,1fr)] @max-[700px]/tour:grid-cols-1"
+  "grid grid-cols-[clamp(300px,30%,400px)_minmax(0,1fr)] overflow-clip rounded-[10px] border bg-[color-mix(in_oklch,var(--muted)_35%,var(--background))] @max-[850px]/tour:grid-cols-[280px_minmax(0,1fr)] @max-[700px]/tour:grid-cols-1"
 
 export interface TourViewHandle {
   showFile: (path: string, behavior?: ScrollBehavior) => void
@@ -416,7 +416,7 @@ function TourOverview(props: {
 
   return (
     <section className={cn(chapterGrid, "[&+section]:mt-5")} aria-labelledby={heading}>
-      <div className="min-w-0 px-6 py-5.5 @max-[850px]/tour:p-4.5">
+      <div className="min-w-0 px-5 py-5.5 @max-[850px]/tour:p-4">
         <h2 id={heading} className="text-base leading-6 font-semibold">
           Tour overview
         </h2>
@@ -522,7 +522,7 @@ function ChapterCard(props: {
         <>
           <aside
             className={cn(
-              "max-h-(--tour-card-height) min-w-0 overflow-y-auto px-6 py-5.5 [scrollbar-width:thin] @max-[850px]/tour:p-4.5",
+              "max-h-(--tour-card-height) min-w-0 overflow-y-auto px-5 py-5.5 [scrollbar-width:thin] @max-[850px]/tour:p-4",
               chapter?.beforeAfter == null
                 ? "@max-[700px]/tour:max-h-75"
                 : "@max-[700px]/tour:max-h-none",
@@ -564,47 +564,36 @@ function ChapterCard(props: {
               ))}
             </div>
             {chapter !== null && chapter.callouts.length > 0 && (
-              <nav
-                className="mt-4 max-w-[80ch] space-y-2"
-                aria-label={`Code callouts for ${title}`}
-              >
-                {chapter.callouts.map((callout, index) => (
-                  <button
-                    key={index}
-                    type="button"
-                    className="block w-full cursor-pointer rounded-md border-l-2 border-(--viewed) px-3 py-2 text-left text-xs leading-5 wrap-anywhere hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                    onClick={() => props.onShowTarget(callout.target)}
-                  >
-                    <TourText text={callout.label} />
-                    <span className="ml-1 text-muted-foreground" aria-hidden>
-                      ↗
-                    </span>
-                  </button>
-                ))}
-              </nav>
+              <ChapterCallouts
+                callouts={chapter.callouts}
+                title={title}
+                onShowTarget={props.onShowTarget}
+              />
             )}
             {chapter?.beforeAfter != null && (
               <div className="my-5">
                 <TourBeforeAfter beforeAfter={chapter.beforeAfter} onSelect={props.onShowTarget} />
               </div>
             )}
-            <ChapterFiles
-              files={files}
-              path={props.path}
-              store={props.diff.viewedFiles}
-              onSelect={(path) => {
-                props.onSelect(path)
-                props.diff.onOpenChange(path, true)
-                view.current?.scrollTo({ type: "item", id: path, align: "start" })
-              }}
-              title={title}
-            />
           </aside>
           <div
             className={cn(
               "flex h-(--tour-card-height) min-h-0 min-w-0 flex-col border-l px-4.5 pt-4 pb-4.5 @max-[850px]/tour:p-3.5 @max-[700px]/tour:h-115 @max-[700px]/tour:border-t @max-[700px]/tour:border-l-0",
             )}
           >
+            {files.length > 0 && (
+              <ChapterFiles
+                files={files}
+                path={props.path}
+                store={props.diff.viewedFiles}
+                onSelect={(path) => {
+                  props.onSelect(path)
+                  props.diff.onOpenChange(path, true)
+                  view.current?.scrollTo({ type: "item", id: path, align: "start" })
+                }}
+                title={title}
+              />
+            )}
             {chapter?.diagram != null && (
               <TourDiagram
                 diagram={chapter.diagram}
@@ -688,38 +677,110 @@ function ChapterFiles(props: {
   title: string
 }) {
   const viewed = useViewedFiles(props.store)
+  const strip = useRef<HTMLElement>(null)
+  const names = useMemo(() => fileLabels(props.files), [props.files])
+
+  useLayoutEffect(() => {
+    const nav = strip.current
+
+    const tab =
+      props.path === undefined
+        ? null
+        : nav?.querySelector<HTMLElement>(`[data-path="${CSS.escape(props.path)}"]`)
+
+    if (!nav || !tab) return
+
+    if (tab.offsetLeft < nav.scrollLeft) nav.scrollLeft = tab.offsetLeft
+    else if (tab.offsetLeft + tab.offsetWidth > nav.scrollLeft + nav.clientWidth)
+      nav.scrollLeft = tab.offsetLeft + tab.offsetWidth - nav.clientWidth
+  }, [props.path])
 
   return (
-    <nav className="mt-5.5 flex flex-col gap-1.75" aria-label={`Files in ${props.title}`}>
-      {props.files.map(({ file }) => {
-        const slash = file.path.lastIndexOf("/")
+    <nav
+      ref={strip}
+      className="relative mb-3 flex shrink-0 gap-1 overflow-x-auto pb-1 [scrollbar-width:thin]"
+      aria-label={`Files in ${props.title}`}
+    >
+      {props.files.map(({ file }) => (
+        <button
+          type="button"
+          key={file.path}
+          className="flex shrink-0 cursor-pointer items-center gap-2 rounded-md border bg-background px-2.5 py-1.5 transition-transform duration-150 ease-out hover:bg-accent focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring active:scale-[0.98] aria-[current=location]:border-(--viewed) aria-[current=location]:bg-[color-mix(in_oklch,var(--viewed)_10%,var(--background))]"
+          aria-current={props.path === file.path ? "location" : undefined}
+          onClick={() => props.onSelect(file.path)}
+          title={file.path}
+          data-path={file.path}
+        >
+          {viewed.viewed.has(file.path) && (
+            <Check aria-label="Viewed" className="size-3 shrink-0 text-(--viewed)" />
+          )}
+          <span className="font-mono text-[11px] font-medium whitespace-nowrap">
+            {names.get(file.path)}
+          </span>
+          <LineCounts additions={file.additions} deletions={file.deletions} />
+        </button>
+      ))}
+    </nav>
+  )
+}
 
-        return (
-          <button
-            type="button"
-            key={file.path}
-            className="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-[7px] border bg-background px-2.5 py-2.25 text-left hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-ring aria-[current=location]:border-(--viewed) aria-[current=location]:bg-[color-mix(in_oklch,var(--viewed)_10%,var(--background))]"
-            aria-current={props.path === file.path ? "location" : undefined}
-            onClick={() => props.onSelect(file.path)}
-            title={file.path}
-          >
-            <span className="min-w-0 flex-1">
-              <span className="block break-all font-mono text-[11px] font-medium">
-                {file.path.slice(slash + 1)}
+const fileLabels = (files: ReadonlyArray<ParsedFile>) => {
+  const segments = files.map(({ file }) => file.path.split("/"))
+  const labels = new Map<string, string>()
+
+  for (const parts of segments) {
+    let depth = 1
+    const label = () => parts.slice(-depth).join("/")
+
+    while (
+      depth < parts.length &&
+      segments.some((other) => other !== parts && other.slice(-depth).join("/") === label())
+    )
+      depth++
+
+    labels.set(parts.join("/"), label())
+  }
+
+  return labels
+}
+
+function ChapterCallouts(props: {
+  callouts: TourChapter["callouts"]
+  title: string
+  onShowTarget: (target: TourCodeTarget) => void
+}) {
+  return (
+    <nav className="mt-5 max-w-[80ch]" aria-label={`Code callouts for ${props.title}`}>
+      <h3 className="mb-2 font-mono text-[10px] font-normal tracking-wider text-muted-foreground uppercase">
+        Callouts
+      </h3>
+      <ol className="divide-y border-y">
+        {props.callouts.map((callout, index) => (
+          <li key={index}>
+            <button
+              type="button"
+              className="group flex w-full cursor-pointer items-start gap-2.5 px-1 py-2 text-left text-[12.5px] leading-5 wrap-anywhere text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+              onClick={() => props.onShowTarget(callout.target)}
+            >
+              <span
+                aria-hidden
+                className="mt-px w-4 shrink-0 font-mono text-[11px] text-(--viewed) tabular-nums"
+              >
+                {index + 1}
               </span>
-              {slash >= 0 && (
-                <span className="block truncate font-mono text-[10px] text-muted-foreground">
-                  {file.path.slice(0, slash)}
-                </span>
-              )}
-            </span>
-            {viewed.viewed.has(file.path) && (
-              <Check aria-label="Viewed" className="size-3 shrink-0 text-(--viewed)" />
-            )}
-            <LineCounts additions={file.additions} deletions={file.deletions} />
-          </button>
-        )
-      })}
+              <span className="min-w-0 flex-1 [&_code]:text-[11.5px]">
+                <TourText text={callout.label} />
+              </span>
+              <span
+                aria-hidden
+                className="mt-px shrink-0 text-muted-foreground/60 transition-transform duration-150 ease-out group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-foreground"
+              >
+                ↗
+              </span>
+            </button>
+          </li>
+        ))}
+      </ol>
     </nav>
   )
 }
