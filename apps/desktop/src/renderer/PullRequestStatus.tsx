@@ -89,6 +89,9 @@ const checkOrder: ReadonlyArray<CheckState> = ["failed", "running", "passed", "s
 export const isOpen = (pullRequest: PullRequest) =>
   pullRequest.state === "open" || pullRequest.state === "draft"
 
+export const closedAs = (pullRequest: PullRequest) =>
+  pullRequest.state === "closed" || pullRequest.state === "merged" ? pullRequest.state : null
+
 export function StatusChips(props: { pullRequest: PullRequest }) {
   const { pullRequest } = props
 

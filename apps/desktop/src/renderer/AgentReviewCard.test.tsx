@@ -74,17 +74,20 @@ it("notes an outdated review and reviews again", async () => {
   expect(within(rerunFailed.card!).getByRole("note").textContent).toContain("older Revision")
 })
 
-it("offers to start a review, and only where one can start", async () => {
+it("offers to start a review, and says why one can't start on a merged PR", async () => {
   const f = mount({})
   await userEvent.click(within(f.card!).getByRole("button", { name: "Start Agent review" }))
   expect(f.controls.start).toHaveBeenCalledOnce()
   cleanup()
 
-  expect(mount({ start: null }).card).toBeNull()
+  const merged = within(mount({ start: null, closedAs: "merged" }).card!)
+  expect(merged.getByText("Agent reviews are for open PRs, and this one is merged.")).toBeDefined()
+  expect(merged.queryByRole("button")).toBeNull()
   cleanup()
 
   const closedAndFailed = mount({
     start: null,
+    closedAs: "closed",
     job: {
       status: "failed",
       reason: new AgentReviewFailure({

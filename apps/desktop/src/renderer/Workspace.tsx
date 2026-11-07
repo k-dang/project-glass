@@ -63,7 +63,7 @@ import type { Problem } from "./problems"
 import { RepositoryBrowser } from "./RepositoryBrowser"
 import { FinishReview } from "./FinishReview"
 import { OpenPullRequestDialog } from "./OpenPullRequestDialog"
-import { isOpen, StatusChips } from "./PullRequestStatus"
+import { closedAs, StatusChips } from "./PullRequestStatus"
 import { type ChangesOrder, type WorkspaceTab, workspaceViewAtom } from "./reviewsArea"
 import { ShortSha } from "./shortSha"
 import type { AskStore } from "./useAsks"
@@ -103,7 +103,7 @@ export function Workspace(props: {
 }) {
   const { pullRequest, revision, files, discussions } = props.workspace
   const tour = useTour(pullRequest.ref, revision)
-  const agentReview = useAgentReview(pullRequest.ref, revision, isOpen(pullRequest))
+  const agentReview = useAgentReview(pullRequest.ref, revision, closedAs(pullRequest))
   const registry = useContext(RegistryContext)
   const [workspaceView, setView] = useAtom(workspaceViewAtom)
   const { tab, file: currentPath, order: chosenOrder, repositoryFile } = workspaceView

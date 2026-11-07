@@ -17,7 +17,7 @@ export const agentReviewStates = Atom.family((pullRequest: PullRequestRef) =>
 export const useAgentReview = (
   pullRequest: PullRequestRef,
   revision: Revision,
-  startable: boolean,
+  closedAs: "closed" | "merged" | null,
 ) => {
   const stateAtom = agentReviewStates(pullRequest)
 
@@ -84,7 +84,8 @@ export const useAgentReview = (
     followUpPending: followUpResult.waiting,
     subscriptionProblem,
     reconnect,
-    start: startable ? start : null,
+    closedAs,
+    start: closedAs === null ? start : null,
     followUp,
     cancel,
   }
