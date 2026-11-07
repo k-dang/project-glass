@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Item, ItemActions, ItemContent, ItemDescription } from "@/components/ui/item"
-import { failureOf, ReviewAgain, ReviewingLine, WaitingLine } from "./AgentReview"
+import { closedReason, failureOf, ReviewAgain, ReviewingLine, WaitingLine } from "./AgentReview"
 import { AgentReviewMarkdown } from "./AgentReviewPanel"
 import { OutdatedNote } from "./OutdatedNote"
 import { ProblemAlert } from "./ProblemAlert"
@@ -11,10 +11,7 @@ import type { AgentReviewControls } from "./useAgentReview"
 
 export function AgentReviewCard(props: { controls: AgentReviewControls; onRead: () => void }) {
   const { controls, onRead } = props
-  const { job, review, start, subscriptionProblem } = controls
-  const idle = job === null || job.status === "idle"
-
-  if (review === null && start === null && idle && subscriptionProblem === null) return null
+  const { review } = controls
 
   return (
     <Card render={<section />} aria-label="Agent review">
@@ -50,7 +47,7 @@ export function AgentReviewCard(props: { controls: AgentReviewControls; onRead: 
 
 function AgentReviewStatus(props: { controls: AgentReviewControls }) {
   const { controls } = props
-  const { job, review, outdated, start, subscriptionProblem } = controls
+  const { job, review, outdated, closedAs, start, subscriptionProblem } = controls
 
   if (subscriptionProblem !== null)
     return (
@@ -97,7 +94,12 @@ function AgentReviewStatus(props: { controls: AgentReviewControls }) {
 
   if (outdatedReview !== null) return outdatedNote
 
-  if (review !== null || start === null) return null
+  if (review !== null) return null
+
+  if (closedAs !== null)
+    return <p className="text-sm text-muted-foreground">{closedReason(closedAs)}</p>
+
+  if (start === null) return null
 
   return (
     <Item variant="outline" size="sm">

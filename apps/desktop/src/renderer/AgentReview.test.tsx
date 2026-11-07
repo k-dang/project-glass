@@ -81,3 +81,15 @@ it("keeps a running review in view when another command fails", () => {
 
   expect(screen.getByRole("button", { name: "Cancel" })).toBeDefined()
 })
+
+it("keeps the toolbar button on a closed PR and says why it can't start", async () => {
+  const closed = controls({ start: null, closedAs: "closed" })
+  render(<AgentReviewButton controls={closed} onRead={vi.fn<() => void>()} />)
+
+  const button = screen.getByRole("button", { name: "Agent review" })
+  expect(button.getAttribute("aria-disabled")).toBe("true")
+  await userEvent.hover(button)
+  expect((await screen.findByRole("tooltip")).textContent).toBe(
+    "Agent reviews are for open PRs, and this one is closed.",
+  )
+})

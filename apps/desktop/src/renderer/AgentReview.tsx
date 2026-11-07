@@ -7,14 +7,32 @@ import { warningTone } from "./PullRequestRow"
 import { ShortSha } from "./shortSha"
 import type { AgentReviewControls } from "./useAgentReview"
 
+export const closedReason = (closedAs: "closed" | "merged") =>
+  `Agent reviews are for open PRs, and this one is ${closedAs}.`
+
 export function AgentReviewButton(props: { controls: AgentReviewControls; onRead: () => void }) {
-  const { job, review, outdated, start } = props.controls
+  const { job, review, outdated, closedAs, start } = props.controls
 
   if (review !== null && !outdated)
     return (
       <Button variant="ghost" size="sm" onClick={props.onRead}>
         <PanelLeft aria-hidden />
         Read Agent review
+      </Button>
+    )
+
+  if (closedAs !== null)
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        disabled
+        focusableWhenDisabled
+        title={closedReason(closedAs)}
+        className="cursor-default opacity-50 hover:bg-transparent dark:hover:bg-transparent"
+      >
+        <ScanSearch aria-hidden />
+        Agent review
       </Button>
     )
 

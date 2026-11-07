@@ -7,6 +7,7 @@ export const controls = (overrides: Partial<AgentReviewControls>): AgentReviewCo
   job: { status: "idle" },
   review: null,
   outdated: false,
+  closedAs: null,
   commandProblem: null,
   followUpProblem: null,
   followUpPending: false,
