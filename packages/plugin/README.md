@@ -15,5 +15,4 @@ connection.
 
 To write one, start from [`examples/fake-sandboxes`](../../examples/fake-sandboxes) or paste
 [`examples/sandbox-provider-prompt.md`](../../examples/sandbox-provider-prompt.md) into your coding
-agent. The diagram's source is [`docs/diagrams/agent-host.html`](../../docs/diagrams/agent-host.html);
-re-export it with its SVG button after changing it.
+agent.
