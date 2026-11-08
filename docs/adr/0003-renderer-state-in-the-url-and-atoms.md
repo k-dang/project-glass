@@ -15,7 +15,7 @@ the PR, and a router blocker in the app shell guards unsent work from wherever t
 that must survive an unmount, such as a Review GitHub may already have accepted, belongs in those
 stores, not in component state.
 
-## Considered Options
+## Considered options
 
 - **Extend the hand-rolled hash router**: least code now, but every route would rebuild search-param
   validation, typed links, defaults, and navigation blocking by hand.

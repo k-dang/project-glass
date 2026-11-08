@@ -6,7 +6,7 @@ behind typed contracts rather than in the renderer or the Electron main process.
 Electron `utilityProcess` serving RPC over WebSocket on `127.0.0.1`, guarded by a per-launch secret
 and an origin check: crash isolation from the windows without a full server lifecycle.
 
-## Considered Options
+## Considered options
 
 - **No backend** (renderer calls GitHub, main injects the token): least code, but agents need Node,
   and script injected into the renderer could act with the full token.
@@ -17,10 +17,6 @@ and an origin check: crash isolation from the windows without a full server life
 
 ## Consequences
 
-The windows outlive a backend crash: `main` restarts the backend on the same port and token, and
-the renderer's RPC socket reconnects on its own while the app shows "Reconnecting". Only a backend
-that keeps crashing gets "Glass's backend keeps stopping" with a Relaunch button. The backend's
-output lands in `~/.glass/logs/backend.log` instead of the terminal. `main` now supervises a second
-process, choosing a free port, minting the token, waiting for `/health`, and restarting it, and the
-renderer holds one RPC socket that can die under it, so every call runs through a runtime that
-retries.
+The windows outlive a backend crash, but `main` now supervises a second process and restarts it on
+the same port and token, and the renderer holds one RPC socket that can die under it, so every call
+runs through a runtime that retries. The backend's output goes to a log file, not the terminal.

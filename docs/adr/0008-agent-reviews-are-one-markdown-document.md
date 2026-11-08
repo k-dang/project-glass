@@ -1,14 +1,8 @@
 # Agent reviews are one Markdown document read beside the diff
 
-> The user can now follow up on an Agent review in a conversation with an Agent seeded with it, and
-> the agent can suggest Drafts on diff lines (ADR 0009). The review itself stays one Markdown document.
-
-An Agent review is the agent's own Markdown, opening with a paragraph whose bold first sentence
-names the PR's main risk. Glass places nothing on the diff. Overview shows that opening paragraph,
-and the whole review reads in an Agent review tab of the file panel, next to the code it talks
-about. The agent still answers through the shared runner seam (ADR 0006) as JSON, but the only field
-is the Markdown, as Ask's only field is its answer, so the answer's schema stays a few dozen
-characters.
+An Agent review is the agent's own Markdown, read beside the diff rather than placed on it. The
+agent still answers through the shared runner seam (ADR 0006) as JSON, but the only field is the
+Markdown, so the answer's schema stays a few dozen characters.
 
 Reviews used to return Findings: rated points, each placed on a diff line, a file, or the whole PR,
 shown inline in the diff. The placement was the costliest part to keep working. Its schema passed
@@ -24,5 +18,6 @@ format any model writes reliably.
   schema, but kept the validation, the inline rendering, and the failures a stray path causes.
 - **Plain text that Glass parses into Findings**: no schema at all, but Glass would own a parser
   that any heading in a body could break.
-- **The review as the start of an Agent conversation**: follow-up questions would help, but it needs
-  an Agent and its checkout for every review; Ask already answers questions about a line.
+- **The review as the start of an Agent conversation**: follow-up questions help, but it needs an
+  Agent and its checkout for every review. Instead, a review gets an Agent only when the user sends
+  a Follow-up (ADR 0009).

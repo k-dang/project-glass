@@ -9,7 +9,7 @@ A session recording names the pinned SDK or bundled pi version it came from, and
 once that pin moves, because Glass ships those versions. A runner recording only notes its version,
 since users run whichever `claude` and `pi` they have.
 
-## Considered Options
+## Considered options
 
 - **A hand-written fake `claude`**: free to run and needs no login, but Glass built this first and it
   encoded wrong beliefs about the CLI, such as its model list and asking before read-only commands,
