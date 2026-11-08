@@ -23,10 +23,10 @@ The backend gathers the chosen skills and sends them to the agent host when the 
 starts, so local and Sandbox Agents work the same way and Sandbox providers change nothing. Sent
 skills add to the repository's own skills and the Agent program's defaults; they replace nothing.
 
-For example, the user adds `https://github.com/k-dang/skills/tree/main/skills/kstack` as the pack
-`kstack`, then creates a Sandbox Agent with kstack and Local skills ticked. The Agent can run
-`/kstack:architect` in Claude Code and the user's own `/grilling`, and its details show
-"kstack @ ae5650f · Local skills".
+For example, the user adds `https://github.com/acme/skills/tree/main/skills/team` as the pack
+`team`, then creates a Sandbox Agent with team and Local skills ticked. The Agent can run
+`/team:architect` in Claude Code and the user's own `/grilling`, and its details show
+"team @ ae5650f · Local skills".
 
 ## User Stories
 
@@ -78,7 +78,7 @@ For example, the user adds `https://github.com/k-dang/skills/tree/main/skills/ks
   root). No other git hosts and no local-folder packs.
 - **What counts as a skill.** If the pack's folder contains `SKILL.md`, the pack is that one skill.
   Otherwise discover folders containing `SKILL.md` recursively, without descending into a folder
-  once it is a skill. Other files at the pack's top level (for example kstack's `UPSTREAM.md`) are
+  once it is a skill. Other files at the pack's top level (for example an `UPSTREAM.md`) are
   ignored. A skill whose `SKILL.md` doesn't parse or has no description is skipped and reported in
   the preview.
 - **Pinning.** A pack remembers the ref from its URL and the commit that ref resolved to. Update
@@ -87,7 +87,7 @@ For example, the user adds `https://github.com/k-dang/skills/tree/main/skills/ks
   update check.
 - **Names.** A pack's name defaults to its folder's (or repository's) name, must be unique, follows
   skill-name rules (lowercase letters, digits, hyphens), and is fixed once added. It is the
-  namespace Claude Code shows (`/kstack:architect`).
+  namespace Claude Code shows (`/team:architect`).
 - **Storage.** Pack metadata and the files of each pinned commit live in Glass's database, so an
   Agent's row and the pins it references stay the one record of that Agent (as ADR 0010 already
   treats Sandbox state). A pinned commit's files are kept while a pack or any Agent references them
@@ -121,7 +121,7 @@ For example, the user adds `https://github.com/k-dang/skills/tree/main/skills/ks
   in the picker's warning copy.
 - **Roles.** Only Work Agents get skills. Agent reviews, Follow-ups, Tours, and the Global
   conversation keep their current lockdown unchanged.
-- **Agent details.** Show the Agent's sources, such as "kstack @ ae5650f · Local skills". Pack skills
+- **Agent details.** Show the Agent's sources, such as "team @ ae5650f · Local skills". Pack skills
   appear in the existing Command list without new work.
 - **No size limit.** The preview shows what a pack contains; revisit only if a real pack hits a
   transport limit.
@@ -135,7 +135,7 @@ Proposed; not yet confirmed with Kevin.
   duplicate names, and an inaccessible repository. Test Update's change summary and that existing
   Agents keep their pins, and that removing a pack keeps files an Agent still references.
 - Test host delivery once per Agent program using the existing recording seams: an Agent started
-  with a pack lists the pack's skill as a Command (Claude Code `/kstack:<skill>`, pi
+  with a pack lists the pack's skill as a Command (Claude Code `/team:<skill>`, pi
   `/skill:<skill>`). Refresh real recordings under the existing recording policy rather than
   asserting launch arguments.
 - Extend the Sandbox Agent Electron acceptance test (`apps/desktop/e2e/sandboxAgent.spec.ts`) with
@@ -166,9 +166,8 @@ Research this design rests on:
 - The pinned Claude Agent SDK takes local plugins (`plugins: [{ type: "local", path }]`), which load
   skills, and a `skills` filter; pi takes `--skill <path>`, discovers skills recursively, and reads
   `~/.agents/skills` and `~/.pi/agent/skills`.
-- kstack shares four skill names with the user's Local skills (`bro`, `no-comments`,
-  `create-verification-skill`, `maintain-verification-skill`), so clashes are an expected case, not
-  an edge case.
+- Published packs often share skill names with the user's Local skills (the first pack tried shared
+  four), so clashes are an expected case, not an edge case.
 - The agent host is the same for both placements and already receives per-conversation payloads
   through `StartAgent`'s role (the Review brief), which is why skills need no change to the Sandbox
   provider contract.
