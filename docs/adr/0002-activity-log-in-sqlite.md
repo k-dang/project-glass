@@ -1,8 +1,8 @@
 # The Activity log is the backend's first store, in SQLite
 
 Agents and later features will search what the user did, so the backend keeps an Activity log in
-`~/.project-glass/glass.db`, a SQLite database through `effect/sql` and `@effect/sql-sqlite-node`,
-which uses Node's built-in `node:sqlite` and so needs no native module rebuilt for Electron.
+a SQLite database through `effect/sql` and `@effect/sql-sqlite-node`, which uses Node's built-in
+`node:sqlite` and so needs no native module rebuilt for Electron.
 Everything later features will search is kept here; the settings that only need loading, such as
 the followed repositories, stay in `settings.json` beside it. Each Activity is a typed Schema in
 `packages/contracts`, stored as its kind and a JSON payload, so a new kind needs no migration. Each
@@ -12,7 +12,7 @@ Activity shares the one log without fitting a PR-shaped envelope.
 The log is the source of truth and holds no search index. Full-text or vector search is a derived
 index built from it when a reader exists, and can be rebuilt or replaced without touching the log.
 
-## Considered Options
+## Considered options
 
 - **Append-only JSONL file**: simplest, but every future query becomes a full scan in our own code.
 - **Postgres with pgvector**: a server to install and run beside a desktop app.

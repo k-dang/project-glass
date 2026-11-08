@@ -228,6 +228,16 @@ Code the user installs in Glass's plugins folder to add to what Glass can do, su
 provider.
 _Avoid_: Extension, add-on
 
+**Skill pack**:
+A named set of skills from one GitHub folder, pinned to a commit, that the user adds in Settings
+and picks for an Agent when creating it. An Agent keeps the packs and commits it was created with.
+_Avoid_: Skill set, registry, bundle, plugin
+
+**Local skills**:
+The skills in the user's skill folders on this device that the Agent program reads. Local Agents
+always have them; a Sandbox Agent has them only if the user picks them when creating it.
+_Avoid_: My skills, user skills
+
 **Turn**:
 One message to an Agent and its whole response. It ends done, failed, stopped by the user, cut off
 when Glass loses the Agent, or interrupted when Glass quits; a Sandbox Agent's Turn carries on

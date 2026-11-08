@@ -188,7 +188,7 @@ export const wideEvents = (source: Source, stdout: Sink, stderr?: Sink) => {
 
   return Layer.mergeAll(
     // Replaces the logger set rather than merging: Effect's default text logger would otherwise
-    // add non-JSON lines to backend.log (ADR 0013).
+    // add non-JSON lines to backend.log (ADR 0012).
     Logger.layer([lineLogger(emit)]),
     Layer.succeed(Tracer.Tracer)(unitTracer(emit)),
   )
