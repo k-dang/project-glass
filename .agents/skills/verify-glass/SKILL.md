@@ -99,7 +99,7 @@ Sampling is read-only, but it attaches a debugger to the window's target, which 
 
 ## Evidence
 
-Everything lands in `.verify/<id>/evidence/`: your snapshots and screenshots, plus on `stop`, `electron.log` (main-process and backend stdout), `backend.log`, and `fake-github.log` (one line per GitHub request with the mode that answered it).
+Everything lands in `.verify/<id>/evidence/`: your snapshots and screenshots, plus on `stop`, `electron.log` (main-process stdout), `backend.log` (the backend's and Agent host's output), and `fake-github.log` (one line per GitHub request with the mode that answered it).
 
 Proof standards:
 

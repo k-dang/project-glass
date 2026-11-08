@@ -58,7 +58,12 @@ export const startBackend = Effect.fn("startBackend")(function* (options: {
 
   const writeOutput = (chunk: Buffer) => {
     log.stream.write(chunk)
-    process.stdout.write(chunk)
+  }
+
+  // Stderr is filed and echoed, so warnings, errors and crash text show up in the terminal.
+  const relayStderr = (chunk: Buffer) => {
+    writeOutput(chunk)
+    process.stderr.write(chunk)
   }
 
   const launch = {
@@ -92,7 +97,8 @@ export const startBackend = Effect.fn("startBackend")(function* (options: {
           },
         })
 
-        for (const output of [backend.stdout, backend.stderr]) output?.on("data", writeOutput)
+        backend.stdout?.on("data", writeOutput)
+        backend.stderr?.on("data", relayStderr)
 
         return {
           backend,

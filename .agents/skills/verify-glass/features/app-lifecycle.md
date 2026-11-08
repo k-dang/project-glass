@@ -31,7 +31,7 @@ Preconditions:
 - **Start error (`life-start-error`).** `node $V launch --github fake --fail-backend-start`. `node $V wait --text "didn't start"`, then `snapshot`/`screenshot`: `heading "Glass's backend didn't start"`, the log path, and `button "Relaunch Glass"`. `backend.log` shows four `Starting backend` notes, restarts after 500ms, 1s, and 2s, and `giving up`. A relaunch fails the same way in this mode.
 - **Restart (`life-restart`).** `node $V launch --github fake`, `wait --text "Needs review"`, then `node $V kill-backend` and at once `wait --text "Reconnecting"` and capture `reconnecting`. The banner clears within about 2s; `doctor` then shows the same Electron pid and "Backend health" OK on the same port. Add a to-do to prove calls work again, and `backend.log` shows `Backend exited with code 1; restarting in 500ms`.
 - **Crash and relaunch (`life-crash`, `life-relaunch`).** Run `kill-backend` four times, each once the Reconnecting banner has cleared. `wait --text "keeps stopping"` and capture `heading "Glass's backend keeps stopping"`. `click --role button --name "Relaunch Glass"`, `wait --text "Needs review"`, then `doctor`: "Electron process" shows a new pid and "Backend health" is OK on a new port. `backend.log` still holds the earlier launch's restarts and `giving up`, followed by the new port's `Listening on` line. `stop` then reports that new port closed.
-- **Proof.** `evidence/backend.log` and `evidence/electron.log` survive `stop`, with the `Listening on` line, alongside `opened.aria.txt`.
+- **Proof.** `evidence/backend.log` and `evidence/electron.log` survive `stop`, with the `Listening on` line in the backend log, alongside `opened.aria.txt`.
 
 ## Gotchas
 

@@ -156,32 +156,48 @@ const lineLogger = (emit: Emit) =>
 
 type Source = "backend" | "agent-host"
 
-const emitter = (source: Source, write: (line: string) => void): Emit => {
+type Sink = (line: string) => void
+
+const isLoud = (line: UnitLine | LogLine) => line.level === "WARN" || line.level === "ERROR"
+
+/**
+ * Both producers meet here: `lineLogger` for `Effect.log*` and `UnitSpan.end` for units, which a
+ * `Logger` never sees. Each line reaches one sink, so nothing is written twice.
+ */
+const emitter = (source: Source, stdout: Sink, stderr?: Sink): Emit => {
   const launch = {
     source,
     launch_id: randomUUID(),
     platform: `${process.platform}-${process.arch}`,
   }
 
-  return (at, line, extra) =>
-    write(Formatter.formatJson({ at, ...launch, ...Object.fromEntries(extra), ...line }))
+  return (at, line, extra) => {
+    const text = Formatter.formatJson({ at, ...launch, ...Object.fromEntries(extra), ...line })
+    const sink = stderr !== undefined && isLoud(line) ? stderr : stdout
+
+    sink(text)
+  }
 }
 
-const toStdout = (line: string) => process.stdout.write(`${line}\n`)
+const toStdout: Sink = (line) => process.stdout.write(`${line}\n`)
 
-export const wideEvents = (source: Source, write: (line: string) => void) => {
-  const emit = emitter(source, write)
+const toStderr: Sink = (line) => process.stderr.write(`${line}\n`)
+
+export const wideEvents = (source: Source, stdout: Sink, stderr?: Sink) => {
+  const emit = emitter(source, stdout, stderr)
 
   return Layer.mergeAll(
+    // Replaces the logger set rather than merging: Effect's default text logger would otherwise
+    // add non-JSON lines to backend.log (ADR 0012).
     Logger.layer([lineLogger(emit)]),
     Layer.succeed(Tracer.Tracer)(unitTracer(emit)),
   )
 }
 
-export const wideEventsToStdout = (source: Source) => wideEvents(source, toStdout)
+export const wideEventsToStdout = (source: Source) => wideEvents(source, toStdout, toStderr)
 
 export const jsonLogsToStdout = (source: Source) =>
-  Logger.layer([lineLogger(emitter(source, toStdout))])
+  Logger.layer([lineLogger(emitter(source, toStdout, toStderr))])
 
 /**
  * Runs a process's main effect with `output` providing its logger, so the failure that ends it is
