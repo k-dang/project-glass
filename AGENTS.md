@@ -3,13 +3,10 @@
 A desktop work hub for reviewing GitHub pull requests and working with coding Agents.
 
 - **Domain words** come from [`GLOSSARY.md`](GLOSSARY.md); use them in code, UI copy, and specs.
-- **Architecture decisions**: [`docs/adr/`](docs/adr/) records why current decisions were made, kept up to date as they change. ADRs are context, not constraints: if a requirement challenges one, weigh the alternatives and propose replacing it.
-- **Import boundaries and test waits**: `pnpm check` enforces the [executable policies](tools/oxlint/glass/README.md); consult their syntax and exceptions when changing imports or test synchronization.
 
 ## Effect 4
 
-The repo uses Effect 4, whose APIs differ from the Effect 3 most examples show (`effect/rpc`, `effect/http`, `effect/process` subpaths; `Context.Service`). Read the installed source and its
-`AGENTS.md` and `ai-docs/` under `node_modules/.pnpm/effect@*/node_modules/effect/` as the truth.
+The repo uses Effect 4, whose APIs differ from the Effect 3 most examples show (`effect/rpc`, `effect/http`, `effect/process` subpaths; `Context.Service`). Read the installed source and its `AGENTS.md` and `ai-docs/` under `node_modules/.pnpm/effect@*/node_modules/effect/` as the truth.
 
 - Expected failures are tagged errors in the error channel; services stay transport-agnostic and RPC handlers stay thin (`apps/server/src/handlers.ts`).
 
