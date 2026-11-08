@@ -16,7 +16,7 @@ The repo uses Effect 4, whose APIs differ from the Effect 3 most examples show (
 ## Gotchas
 
 - The per-launch secret travels in the `token` query parameter, so request logging stays off (`disableLogger` in `apps/server/src/server.ts`) and HTTP spans redact it (`UrlParams.CurrentRedactedNames` there).
-- `backend.log` is one JSON line per unit of work (ADR 0013). Record what a unit learns with `annotateUnit`, following the rule in `apps/server/src/wideEvents.ts` on what never goes in a field. Background work that outlives its RPC needs its own `root: true` span, as `settle` in `apps/server/src/pullRequestJobs.ts` gives each PR job.
+- `backend.log` is one JSON line per unit of work (ADR 0012). Record what a unit learns with `annotateUnit`, following the rule in `apps/server/src/wideEvents.ts` on what never goes in a field. Background work that outlives its RPC needs its own `root: true` span, as `settle` in `apps/server/src/pullRequestJobs.ts` gives each PR job.
 
 ## Tests
 
