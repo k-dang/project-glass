@@ -60,7 +60,7 @@ export const startBackend = Effect.fn("startBackend")(function* (options: {
     log.stream.write(chunk)
   }
 
-  // Filed and echoed: WARN/ERROR lines and raw crash text, which only the terminal shows.
+  // Stderr is filed and echoed, so warnings, errors and crash text show up in the terminal.
   const relayStderr = (chunk: Buffer) => {
     writeOutput(chunk)
     process.stderr.write(chunk)
@@ -105,15 +105,7 @@ export const startBackend = Effect.fn("startBackend")(function* (options: {
           exitCode: new Promise<number>((resolve) => backend.once("exit", resolve)),
         }
       }),
-      (started) =>
-        stopBackend(started.backend, started.exitCode).pipe(
-          Effect.andThen(
-            Effect.sync(() => {
-              started.backend.stdout?.off("data", writeOutput)
-              started.backend.stderr?.off("data", relayStderr)
-            }),
-          ),
-        ),
+      (started) => stopBackend(started.backend, started.exitCode),
     )
 
     const exited = Effect.promise(() => exitCode).pipe(
