@@ -6,7 +6,6 @@ import { randomBytes, randomUUID } from "node:crypto"
 import { createServer } from "node:net"
 import { BackendError, keepRunning, openBackendLog, waitForBackend } from "./backendIo"
 
-// Longer than the backend's own wait for the Agent host to stop.
 const STOP_DEADLINE = Duration.seconds(10)
 
 const decodeTcpAddress = Schema.decodeUnknownEffect(Schema.Struct({ port: Schema.Number }))
@@ -32,8 +31,8 @@ const freePort = Effect.callback<number, BackendError>((resume) => {
   })
 })
 
-// Asks the backend to stop and waits for it, since it stops the Agent host and the Agent programs
-// under it. `kill()` would end the backend two seconds later, before it had stopped them.
+// `kill()` SIGKILLs a backend still running two seconds after its SIGTERM (Chromium's
+// EnsureProcessTerminated), cutting off its shutdown of the Agent host.
 const stopBackend = (backend: UtilityProcess, exitCode: Promise<number>) =>
   Effect.sync(() => {
     if (backend.pid !== undefined) process.kill(backend.pid, "SIGINT")
