@@ -31,6 +31,7 @@ import { GlassMcpTools, McpRoutes } from "./mcp/server"
 import { FollowedRepositories } from "./FollowedRepositories"
 import { PullRequestLists } from "./PullRequestLists"
 import { PullRequestMirror } from "./PullRequestMirror"
+import { PullRequestWorkspaces } from "./PullRequestWorkspaces"
 import { Queue } from "./Queue"
 import { AgentCommands, SettingsStore } from "./SettingsStore"
 import { SavedPlaces } from "./SavedPlaces"
@@ -88,6 +89,7 @@ const services = (
       Layer.provide(ToDos.layer),
       Layer.provide(SavedPlaces.layer),
       Layer.provide(Queue.layer),
+      Layer.provide(PullRequestWorkspaces.layer),
       Layer.provide(Tours.layer),
       Layer.provide(AgentReviews.layer),
       Layer.provide(Asks.layer),

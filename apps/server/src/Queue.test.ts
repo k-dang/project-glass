@@ -1,7 +1,8 @@
 import { assert, it } from "@effect/vitest"
 import { PullRequestRef, PullRequestSummary, type Queue } from "@glass/contracts"
 import { DateTime, Effect } from "effect"
-import { startFakeGitHub } from "../test/fakeGitHub"
+import { eventually } from "../test/eventually"
+import { type FakeGitHub, startFakeGitHub } from "../test/fakeGitHub"
 import { type FakePullRequest, VIEWER } from "../test/fakePullRequest"
 import { isolatedHome, startBackend } from "../test/harness"
 
@@ -243,4 +244,37 @@ it.live(
       })
       assert.deepStrictEqual(titles(yield* client.ListSavedQueue()), ["Opened before queuing"])
     }),
+)
+
+const operations = (github: FakeGitHub) =>
+  github.graphQLRequests.map(({ operationName }) => operationName)
+
+it.live("opens a queued PR from the read Glass started when it was queued", () =>
+  Effect.gen(function* () {
+    const { github, start } = yield* startSignedIn
+    const pr = github.seedPullRequest({ title: "Read ahead", base, head })
+    const { client } = yield* start
+    yield* client.AddToQueue({ references: [ref(pr)] })
+    yield* eventually(Effect.sync(() => assert.include(operations(github), "PullRequest")))
+
+    const workspace = yield* client.OpenPullRequest({ pullRequest: ref(pr) })
+
+    assert.strictEqual(workspace.pullRequest.title, "Read ahead")
+    assert.strictEqual(operations(github).filter((name) => name === "PullRequest").length, 1)
+  }),
+)
+
+it.live("opens a queued PR fresh when it changed after Glass read it ahead", () =>
+  Effect.gen(function* () {
+    const { github, start } = yield* startSignedIn
+    const pr = github.seedPullRequest({ title: "Pushed to", base, head })
+    const { client } = yield* start
+    yield* client.AddToQueue({ references: [ref(pr)] })
+    yield* eventually(Effect.sync(() => assert.include(operations(github), "PullRequestRevision")))
+    pr.push({ head: { sha: "h2", files: {} } })
+
+    const workspace = yield* client.OpenPullRequest({ pullRequest: ref(pr) })
+
+    assert.strictEqual(workspace.revision.head, "h2")
+  }),
 )

@@ -10,6 +10,7 @@ import { BackgroundGitHubRequest } from "./github/GitHubRequestPolicy"
 import { FollowedRepositories } from "./FollowedRepositories"
 import { LocalCheckouts } from "./LocalCheckouts"
 import { PullRequestLists } from "./PullRequestLists"
+import { PullRequestWorkspaces } from "./PullRequestWorkspaces"
 import { Queue } from "./Queue"
 import { engineSettingsOf, SettingsStore, withEngineSettings } from "./SettingsStore"
 import { Sandboxes } from "./Sandboxes"
@@ -31,6 +32,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
     const agentReviews = yield* AgentReviews
     const asks = yield* Asks
     const queue = yield* Queue
+    const workspaces = yield* PullRequestWorkspaces
     const settings = yield* SettingsStore
     const savedPlaces = yield* SavedPlaces
     const agents = yield* Agents
@@ -89,7 +91,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       RestoreToQueue: ({ queued }) => queue.restore(queued),
       GetConnection: () => github.viewer,
       OpenPullRequest: ({ pullRequest: ref }) =>
-        github.pullRequest(ref).pipe(
+        workspaces.open(ref).pipe(
           Effect.tap(({ pullRequest, revision }) =>
             Effect.all([
               activityLog.record(
