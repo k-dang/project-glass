@@ -177,6 +177,7 @@ function AddSkillPack(props: { packs: ReadonlyArray<SkillPack>; change: Change }
         </fieldset>
       </form>
       {AsyncResult.builder(preview)
+        .onWaiting(() => null)
         .onFailure((cause) => <ProblemAlert problem={problemOf(cause)} />)
         .onSuccess((value) => (
           <PreviewCard
@@ -314,6 +315,7 @@ function PackList(props: { packs: ReadonlyArray<SkillPack>; change: Change }) {
             </div>
             {updating === pack.name &&
               AsyncResult.builder(update)
+                .onWaiting(() => null)
                 .onFailure((cause) => <ProblemAlert problem={problemOf(cause)} />)
                 .onSuccess((value) => (
                   <UpdateCard

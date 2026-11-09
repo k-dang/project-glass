@@ -4,19 +4,12 @@ import { parse } from "yaml"
 
 const SKILL_FILE = "SKILL.md"
 
-// GitHub tree URLs don't separate a ref from its path, and refs may contain slashes.
-export const skillPackSources = (input: string): ReadonlyArray<SkillPackSource> | null => {
+export const candidateSkillPackSources = (input: string): ReadonlyArray<SkillPackSource> | null => {
   const trimmed = input.trim()
 
-  let url: URL
+  const url = URL.parse(/^[a-z]+:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`)
 
-  try {
-    url = new URL(/^[a-z]+:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`)
-  } catch {
-    return null
-  }
-
-  if (!/^(?:www\.)?github\.com$/i.test(url.hostname)) return null
+  if (url === null || !/^(?:www\.)?github\.com$/i.test(url.hostname)) return null
 
   const [owner, repo, kind, ...rest] = url.pathname
     .split("/")

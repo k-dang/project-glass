@@ -6,6 +6,7 @@ import {
   SkillPackNameTaken,
   SkillPackPreview,
   SkillPackSource,
+  type SkillPackError,
   SkillPackUpdate,
   SkippedSkill,
 } from "@glass/contracts"
@@ -15,7 +16,7 @@ import { Effect } from "effect"
 import { afterEach, expect, it, vi } from "vite-plus/test"
 import { backendLayerAtom } from "./backend"
 import { SkillPacksSettings } from "./SkillPacks"
-import { type Handlers, testLayer } from "../../test/testBackend"
+import { type Handlers, type Held, hold, next, testLayer } from "../../test/testBackend"
 
 afterEach(cleanup)
 
@@ -160,4 +161,36 @@ it("shows what an update changes and moves the pin only when confirmed", async (
   expect(updated).toHaveBeenCalledWith({ name: "team", commit: second }, expect.anything())
   expect(await screen.findByText("b17c0de")).toBeDefined()
   expect(screen.queryByLabelText("Update team", { selector: "div" })).toBeNull()
+})
+
+it("hides one pack's update while another pack's update loads", async () => {
+  const checks: Array<Held<{ name: string }, SkillPackUpdate, SkillPackError>> = []
+
+  const user = mount({
+    ListSkillPacks: () =>
+      Effect.succeed([pack("alpha", first, [architect]), pack("beta", first, [architect])]),
+    PreviewSkillPackUpdate: hold(checks),
+  })
+
+  await user.click(await screen.findByRole("button", { name: "Update alpha" }))
+  ;(await next(checks)).answer(
+    Effect.succeed(
+      new SkillPackUpdate({
+        name: "alpha",
+        from: first,
+        to: second,
+        added: [],
+        removed: [],
+        changed: [],
+        skipped: [],
+      }),
+    ),
+  )
+  expect(await screen.findByLabelText("Update alpha", { selector: "div" })).toBeDefined()
+
+  await user.click(screen.getByRole("button", { name: "Update beta" }))
+  await next(checks)
+
+  expect(screen.queryByLabelText("Update alpha", { selector: "div" })).toBeNull()
+  expect(screen.queryByRole("button", { name: "Update to b17c0de" })).toBeNull()
 })

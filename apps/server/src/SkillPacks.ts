@@ -23,7 +23,7 @@ import {
   filesBySkill,
   readSkill,
   skillFilePath,
-  skillPackSources,
+  candidateSkillPackSources,
   suggestedName,
 } from "./skillPackContents"
 
@@ -159,13 +159,13 @@ export class SkillPacks extends Context.Service<
           if (commit !== null) return { source, commit }
         }
 
-        const [first] = candidates
+        const first = candidates[0]!
 
         return yield* new SkillPackNotReadable({
           message:
-            first!.ref === null
-              ? `${repositoryLabel(first!)} has no default branch.`
-              : `GitHub has no branch, tag, or commit in ${repositoryLabel(first!)} that this URL names.`,
+            first.ref === null
+              ? `${repositoryLabel(first)} has no default branch.`
+              : `GitHub has no branch, tag, or commit in ${repositoryLabel(first)} that this URL names.`,
         })
       })
 
@@ -398,7 +398,7 @@ export class SkillPacks extends Context.Service<
         list: Effect.fn("SkillPacks.list")(() => list),
 
         preview: Effect.fn("SkillPacks.preview")(function* (url) {
-          const candidates = skillPackSources(url)
+          const candidates = candidateSkillPackSources(url)
 
           if (candidates === null) return yield* new InvalidSkillPackUrl({ input: url })
 
