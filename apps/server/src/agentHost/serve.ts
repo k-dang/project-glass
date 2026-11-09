@@ -3,11 +3,9 @@ import { Config, Context, Deferred, Effect, Layer, Option, Schema } from "effect
 import { HttpServer } from "effect/http"
 import { closeSync, writeSync } from "node:fs"
 import { createServer } from "node:http"
-import type { AgentEngine } from "@glass/contracts"
 import { Changes } from "./Changes"
-import { HostAgents } from "./HostAgents"
+import { HostAgents, type Programs } from "./HostAgents"
 import { Journal } from "./Journal"
-import type { AgentAdapter } from "./adapter"
 import { Git } from "../git"
 import { HostReady } from "./protocol"
 import { hostServer } from "./server"
@@ -25,9 +23,7 @@ const reportReady = (address: Parameters<typeof HttpServer.formatAddress>[0]) =>
     closeSync(3)
   })
 
-export const serveAgentHost = <E, R>(
-  programs: Effect.Effect<Record<AgentEngine, AgentAdapter>, E, R>,
-) =>
+export const serveAgentHost = <E, R>(programs: Effect.Effect<Programs, E, R>) =>
   Effect.gen(function* () {
     const token = yield* Config.Redacted("GLASS_HOST_TOKEN")
 

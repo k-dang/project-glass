@@ -1,10 +1,5 @@
 import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
-import {
-  AgentEngine,
-  emptyTranscript,
-  type GlobalConversationProgram,
-  localPlace,
-} from "@glass/contracts"
+import { emptyTranscript, localPlace, type ModelChoice } from "@glass/contracts"
 import { Option } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import { X } from "lucide-react"
@@ -14,30 +9,25 @@ import { AgentComposer, contextLabel, Transcript } from "./AgentView"
 import { ConversationContext } from "./conversation"
 import {
   capturedContextAtom,
-  changeGlobalProgramAtom,
+  changeGlobalModelAtom,
   globalConversation,
   globalConversationOpenAtom,
-  globalProgramAtom,
+  globalModelAtom,
 } from "./globalConversation"
 import { ModelPicker } from "./ModelPicker"
 import { ProblemAlert } from "./ProblemAlert"
 import { settledProblem, streamProblem } from "./problems"
 
-function ProgramPicker(props: { program: GlobalConversationProgram }) {
-  const { program } = props
-  const change = useAtomSet(changeGlobalProgramAtom)
+function GlobalModelPicker(props: { choice: ModelChoice }) {
+  const change = useAtomSet(changeGlobalModelAtom)
 
   return (
     <ModelPicker
-      engine={program.engine}
+      engine="pi"
       placeKey={placeKey(localPlace)}
-      model={program.model}
-      effort={program.effort}
-      onChange={(choice) => change({ engine: program.engine, ...choice })}
-      programs={{
-        engines: AgentEngine.literals,
-        onChange: (engine) => change({ engine, model: null, effort: null }),
-      }}
+      model={props.choice.model}
+      effort={props.choice.effort}
+      onChange={change}
     />
   )
 }
@@ -46,8 +36,8 @@ export function GlobalConversationPanel() {
   const setOpen = useAtomSet(globalConversationOpenAtom)
   const transcript = useAtomValue(globalConversation.transcript)
   const reconnect = useAtomRefresh(globalConversation.transcript)
-  const program = Option.getOrNull(AsyncResult.value(useAtomValue(globalProgramAtom)))
-  const changed = useAtomValue(changeGlobalProgramAtom)
+  const choice = Option.getOrNull(AsyncResult.value(useAtomValue(globalModelAtom)))
+  const changed = useAtomValue(changeGlobalModelAtom)
   const context = useAtomValue(capturedContextAtom)
 
   const { turns, queued, status } = Option.getOrElse(
@@ -89,7 +79,7 @@ export function GlobalConversationPanel() {
           queued={queued}
           idlePlaceholder="Ask Glass about your work"
           problem={settledProblem(changed)}
-          pickers={program !== null && <ProgramPicker program={program} />}
+          pickers={choice !== null && <GlobalModelPicker choice={choice} />}
         />
       </aside>
     </ConversationContext>

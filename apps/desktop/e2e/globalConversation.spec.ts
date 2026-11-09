@@ -1,9 +1,12 @@
 import { existsSync } from "node:fs"
 import { join } from "node:path"
+import { globalConversationReply } from "../../server/test/fakeGlobalConversation"
 import { seedClone } from "../../server/test/gitRepositories"
 import { expect, openPullRequest, test } from "./glass"
 
-test("keeps one Global conversation beside every area, answered by Claude Code without a Local checkout", async ({
+test.use({ piModel: { reply: globalConversationReply } })
+
+test("keeps one Global conversation beside every area, answered by pi without a Local checkout", async ({
   github,
   home,
   window,
@@ -53,7 +56,9 @@ test("restores the Global conversation after Glass restarts, with its waiting Tu
   await message.fill("Please ask me something")
   await message.press("Enter")
 
-  await expect(conversation.getByText("Which files should I look at?")).toBeVisible()
+  await expect(
+    conversation.getByRole("group", { name: "Which files should I look at?" }),
+  ).toBeVisible()
 
   const restarted = await relaunch()
   await restarted.getByRole("button", { name: "Global conversation" }).click()

@@ -13,8 +13,7 @@ export const AgentHostHandlers = AgentHostRpcs.toLayer(
     return AgentHostRpcs.of({
       ListModels: ({ engine }) => agents.models(engine),
       ListCommands: ({ engine, folder }) => agents.commands(engine, folder),
-      StartAgent: ({ agentId, engine, folder, role }) =>
-        agents.start(agentId, engine, folder, role),
+      StartAgent: (start) => agents.start(start),
       StartTurn: ({ agentId, turnId, model, effort, permissionMode, ...message }) =>
         agents.startTurn(agentId, turnId, message, { model, effort, permissionMode }),
       Steer: ({ agentId, ...message }) => agents.steer(agentId, message),

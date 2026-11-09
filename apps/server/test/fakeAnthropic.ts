@@ -1,4 +1,3 @@
-import { localPlace } from "@glass/contracts"
 import { Effect, Predicate, Result, Schema } from "effect"
 import { randomUUID } from "node:crypto"
 import { createServer, type ServerResponse } from "node:http"
@@ -75,40 +74,6 @@ const replyTo = (request: FakeAnthropicRequest): Reply => {
 
   if (onlyCancelledToolResult)
     return { type: "text", text: `The fake model saw: ${textOf(result.content).slice(0, 200)}` }
-
-  const viewed = /viewing PR ([\w-]+)\/([\w.-]+)#(\d+) at Revision base (\w+), head (\w+)\./.exec(
-    words,
-  )
-
-  if (viewed !== null && /\bthis PR\b/i.test(words)) {
-    const [, owner = "", repo = "", number = "", base = "", head = ""] = viewed
-
-    return {
-      type: "tool_use",
-      name: "mcp__glass__read_pull_request",
-      input: { pullRequest: { owner, repo, number: Number(number) }, revision: { base, head } },
-    }
-  }
-
-  const delegated = /^Start an Agent in ([\w-]+)\/([\w.-]+) from (\S+): (.+)$/m.exec(words)
-
-  if (delegated !== null) {
-    const [, owner = "", repo = "", baseBranch = "", message = ""] = delegated
-
-    return {
-      type: "tool_use",
-      name: "mcp__glass__create_agent",
-      input: {
-        repository: { owner, repo },
-        baseBranch,
-        place: localPlace,
-        engine: "claude-code",
-        model: null,
-        effort: null,
-        message,
-      },
-    }
-  }
 
   const command = /`([^`]+)`/.exec(words)?.[1]
 

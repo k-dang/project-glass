@@ -68,8 +68,10 @@ export const lastTextOf = (turn: Turn | undefined) => {
 export const waiting = (turns: ReadonlyArray<Turn>) =>
   turns.at(-1)?.parts.findLast((part): part is RequestPart => isWaiting(part))
 
-const drive = Effect.fnUntraced(function* (
-  adapter: AgentAdapter,
+type Work = typeof WorkRole.Type
+
+const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
+  adapter: AgentAdapter<Role | Work>,
   tape: ReturnType<typeof sessionTape>,
   folder: string,
   defaults: Partial<TurnSettings> = {},
@@ -96,7 +98,7 @@ const drive = Effect.fnUntraced(function* (
     Effect.map((current) => waiting(current)!),
   )
 
-  const open = (conversation: string, role: ConversationRole = WorkRole.make({})) =>
+  const open = (conversation: string, role: Role | Work = WorkRole.make({})) =>
     adapter.start({ folder, conversation, role, report }).pipe(
       Effect.map((session: AgentSession) => ({
         session,

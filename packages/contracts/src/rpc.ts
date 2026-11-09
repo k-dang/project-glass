@@ -29,7 +29,6 @@ import {
   TranscriptUpdate,
 } from "./agent"
 import { ConnectionError, GitHubConnection } from "./connection"
-import { GlobalConversationProgram } from "./globalConversation"
 import {
   DiffSide,
   DiscussionResolutionError,
@@ -405,14 +404,13 @@ export class GlassRpcs extends RpcGroup.make(
     payload: { agentId: Schema.String },
     error: Schema.Union([AgentNotFound, AgentError]),
   }),
-  Rpc.make("GetGlobalConversationProgram", {
-    success: GlobalConversationProgram,
+  Rpc.make("GetGlobalConversationModel", {
+    success: ModelChoice,
     error: AgentError,
   }),
-  Rpc.make("ChangeGlobalConversationProgram", {
-    payload: GlobalConversationProgram.fields,
-    success: GlobalConversationProgram,
-    error: Schema.Union([AgentBusy, AgentError]),
+  Rpc.make("ChangeGlobalConversationModel", {
+    payload: ModelChoice.fields,
+    error: AgentError,
   }),
   Rpc.make("WatchGlobalTranscript", { success: TranscriptUpdate, error: AgentError, stream: true }),
   Rpc.make("SendGlobalMessage", {

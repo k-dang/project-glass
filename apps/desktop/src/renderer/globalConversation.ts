@@ -1,8 +1,8 @@
 import {
   AgentContext,
   type CapturedContext,
-  type GlobalConversationProgram,
   type MessageInput,
+  type ModelChoice,
   PullRequestContext,
   type PullRequestRef,
   type RequestAnswer,
@@ -16,15 +16,14 @@ import { openWorkspaceAtom, sameRef } from "./reviewsArea"
 
 export const globalConversationOpenAtom = Atom.make(false).pipe(Atom.keepAlive)
 
-export const globalProgramAtom = backendRuntime
-  .atom(Backend.use((backend) => backend.GetGlobalConversationProgram()))
+export const globalModelAtom = backendRuntime
+  .atom(Backend.use((backend) => backend.GetGlobalConversationModel()))
   .pipe(Atom.keepAlive)
 
-export const changeGlobalProgramAtom = backendRuntime.fn(
-  (program: typeof GlobalConversationProgram.Encoded, get) =>
-    Backend.use((backend) => backend.ChangeGlobalConversationProgram(program)).pipe(
-      Effect.tap(() => Effect.sync(() => get.refresh(globalProgramAtom))),
-    ),
+export const changeGlobalModelAtom = backendRuntime.fn((choice: ModelChoice, get) =>
+  Backend.use((backend) => backend.ChangeGlobalConversationModel(choice)).pipe(
+    Effect.tap(() => Effect.sync(() => get.refresh(globalModelAtom))),
+  ),
 )
 
 /** The PR workspace or Agent the current route shows, which the router keeps up to date. */
