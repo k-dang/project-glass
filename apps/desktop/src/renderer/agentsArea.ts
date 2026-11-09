@@ -23,7 +23,7 @@ import { Data, Effect, Exit, Option, Predicate, Schema, Stream } from "effect"
 import { AsyncResult, Atom, type AtomRegistry } from "effect/reactivity"
 import { Cloud, Laptop, type LucideIcon } from "lucide-react"
 import { toast } from "@/components/ui/toast"
-import { Backend, backendRuntime, backendRuntimeOf } from "./backend"
+import { Backend, type BackendError, backendRuntime, backendRuntimeOf } from "./backend"
 import { problemOf } from "./problems"
 
 export type AgentTab = "chat" | "changes"
@@ -202,10 +202,7 @@ export const newAgentCommandsAtom = (
   repository: FollowedRepository,
 ) => newAgentCommandsFamily(new NewAgentOf({ engine, place, repository }))
 
-/**
- * Whether the Agent's Sandbox is reachable. A Sandbox Agent's host lists nothing until its Sandbox
- * is made, so its listings read again once it can be reached.
- */
+/** Whether the Agent's Sandbox can be reached. Its host lists nothing until the Sandbox is made. */
 const sandboxReachableAtom = Atom.family((agentId: string) =>
   Atom.make((get) =>
     Option.match(AsyncResult.value(get(agentsAtom)), {
@@ -215,15 +212,27 @@ const sandboxReachableAtom = Atom.family((agentId: string) =>
   ),
 )
 
-export const agentCommandsAtom = Atom.family((agentId: string) =>
+/** One of the Agent's listings for the composer, read again once its Sandbox can be reached. */
+const agentListingAtom = <A>(
+  agentId: string,
+  list: Effect.Effect<ReadonlyArray<A>, BackendError, Backend>,
+  none: ReadonlyArray<A>,
+) =>
   listedOr(
     backendRuntime
       .atom((get) => {
         get(sandboxReachableAtom(agentId))
 
-        return Backend.use((backend) => backend.ListAgentCommands({ agentId }))
+        return list
       })
       .pipe(Atom.setIdleTTL(COMPOSER_LISTING_IDLE_TTL)),
+    none,
+  )
+
+export const agentCommandsAtom = Atom.family((agentId: string) =>
+  agentListingAtom(
+    agentId,
+    Backend.use((backend) => backend.ListAgentCommands({ agentId })),
     noCommands,
   ),
 )
@@ -258,14 +267,9 @@ export const newAgentFilesAtom = (
 ) => newAgentFilesFamily(new NewAgentBranch({ place, repository, baseBranch }))
 
 export const agentFilesAtom = Atom.family((agentId: string) =>
-  listedOr(
-    backendRuntime
-      .atom((get) => {
-        get(sandboxReachableAtom(agentId))
-
-        return Backend.use((backend) => backend.ListAgentFiles({ agentId }))
-      })
-      .pipe(Atom.setIdleTTL(COMPOSER_LISTING_IDLE_TTL)),
+  agentListingAtom(
+    agentId,
+    Backend.use((backend) => backend.ListAgentFiles({ agentId })),
     noFiles,
   ),
 )

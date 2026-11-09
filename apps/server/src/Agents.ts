@@ -354,16 +354,16 @@ export class Agents extends Context.Service<
           ),
         )
 
-      const skillsOf = ({ id, engine, localSkills: sendsLocal }: Agent) =>
+      const skillsOf = (agent: Agent) =>
         Effect.all(
           [
-            sendsLocal
+            agent.localSkills
               ? localSkills
-                  .source(engine)
+                  .source(agent.engine)
                   .pipe(Effect.map((local) => (local.skills.length === 0 ? [] : [local])))
               : Effect.succeed([]),
             skillPacks
-              .agentSkills(id)
+              .agentSkills(agent.id)
               .pipe(Effect.mapError(({ message }) => new AgentError({ message }))),
           ],
           { concurrency: "unbounded" },

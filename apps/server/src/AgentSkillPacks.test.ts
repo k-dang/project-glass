@@ -5,9 +5,7 @@ import { join } from "node:path"
 import { DatabaseSync } from "node:sqlite"
 import { agentsFixture, settled } from "../test/agentsFixture"
 import { ExecutableFile } from "../test/fakeRepositories"
-
-const skill = (name: string, description: string) =>
-  `---\nname: ${name}\ndescription: ${description}\n---\n\nUse ${name} well.\n`
+import { skillFile } from "../test/skillFiles"
 
 const acmeSkills = { owner: "acme", repo: "skills" }
 
@@ -35,9 +33,9 @@ it.live(
       const f = yield* agentsFixture
 
       const first = f.github.pushRepository(acmeSkills, "main", {
-        "skills/team/architect/SKILL.md": skill("architect", "Shape a design."),
+        "skills/team/architect/SKILL.md": skillFile("architect", "Shape a design."),
         "skills/team/architect/run.sh": new ExecutableFile("echo hi"),
-        "skills/team/review/deep/critic/SKILL.md": skill("critic", "Find the flaws."),
+        "skills/team/review/deep/critic/SKILL.md": skillFile("critic", "Find the flaws."),
       })
 
       const { source } = yield* f.client.PreviewSkillPack({ url: teamUrl })
@@ -70,7 +68,7 @@ it.live(
       }
 
       const second = f.github.pushRepository(acmeSkills, "main", {
-        "skills/team/planner/SKILL.md": skill("planner", "Plan the work."),
+        "skills/team/planner/SKILL.md": skillFile("planner", "Plan the work."),
       })
 
       yield* f.client.UpdateSkillPack({ name: "team", commit: second })

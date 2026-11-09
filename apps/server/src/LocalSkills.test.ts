@@ -3,10 +3,8 @@ import { type Agent } from "@glass/contracts"
 import { Effect } from "effect"
 import { mkdirSync, symlinkSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
-import { agentsFixture } from "../test/agentsFixture"
-
-const skill = (name: string, description: string) =>
-  `---\nname: ${name}\ndescription: ${description}\n---\n\nUse ${name} well.\n`
+import { agentsFixture, settled } from "../test/agentsFixture"
+import { skillFile } from "../test/skillFiles"
 
 const write = (path: string, contents: string) => {
   mkdirSync(dirname(path), { recursive: true })
@@ -22,14 +20,16 @@ it.live(
       const f = yield* agentsFixture
       const dotfiles = join(f.home, "dotfiles", "skills")
 
-      write(join(dotfiles, "grilling", "SKILL.md"), skill("grilling", "Ask hard questions."))
+      write(join(dotfiles, "grilling", "SKILL.md"), skillFile("grilling", "Ask hard questions."))
       mkdirSync(join(f.home, ".agents", "skills"), { recursive: true })
       symlinkSync(join(dotfiles, "grilling"), join(f.home, ".agents", "skills", "grilling"))
       write(
         join(f.home, ".pi", "agent", "skills", "notes", "deep", "SKILL.md"),
-        skill("notes", "Take notes."),
+        skillFile("notes", "Take notes."),
       )
-      write(join(f.home, ".claude", "skills", "tidy", "SKILL.md"), skill("tidy", "Tidy up."))
+      write(join(f.home, ".claude", "skills", "tidy", "SKILL.md"), skillFile("tidy", "Tidy up."))
+      symlinkSync(join(f.home, "dotfiles", "gone"), join(f.home, ".agents", "skills", "gone"))
+      symlinkSync(join(dotfiles, "gone.sh"), join(dotfiles, "grilling", "run.sh"))
 
       assert.deepStrictEqual(yield* f.client.ListLocalSkills({ engine: "pi" }), [
         "grilling",
@@ -50,11 +50,14 @@ it.live(
         [sandboxed, without, local].map(({ localSkills }) => localSkills),
         [true, false, false],
       )
+
+      for (const agent of [sandboxed, without, local]) yield* f.transcript(agent.id, settled(1))
+
       assert.deepStrictEqual(yield* commandsOf(sandboxed), ["local:deep", "local:grilling"])
       assert.deepStrictEqual(yield* commandsOf(without), [])
       assert.deepStrictEqual(yield* commandsOf(local), [])
 
-      write(join(dotfiles, "planner", "SKILL.md"), skill("planner", "Plan the work."))
+      write(join(dotfiles, "planner", "SKILL.md"), skillFile("planner", "Plan the work."))
       symlinkSync(join(dotfiles, "planner"), join(f.home, ".agents", "skills", "planner"))
 
       assert.deepStrictEqual(yield* commandsOf(sandboxed), [

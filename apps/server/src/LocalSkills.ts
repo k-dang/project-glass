@@ -1,11 +1,15 @@
 import { AgentError, type AgentEngine, LOCAL_SKILLS_NAMESPACE, Skill } from "@glass/contracts"
-import { Context, Effect, FileSystem, Layer, type PlatformError } from "effect"
+import { Context, Effect, FileSystem, Layer, Option, type PlatformError } from "effect"
 import { join } from "node:path"
-import type { SentSkill, SkillFile, SkillSource } from "./agentHost/protocol"
+import type { SentSkill, SkillSource } from "./agentHost/protocol"
 import { ServerConfig } from "./ServerConfig"
-import { readSkill, uniqueFolder } from "./skillPackContents"
-
-const SKILL_FILE = "SKILL.md"
+import {
+  filesBySkill,
+  lastSegment,
+  readSkill,
+  skillFilePath,
+  uniqueFolder,
+} from "./skillPackContents"
 
 /** The folders each Agent program reads Local skills from, in the order it reads them. */
 const foldersOf = (home: string): Record<AgentEngine, ReadonlyArray<string>> => ({
@@ -13,15 +17,32 @@ const foldersOf = (home: string): Record<AgentEngine, ReadonlyArray<string>> => 
   pi: [join(home, ".pi", "agent", "skills"), join(home, ".agents", "skills")],
 })
 
+interface FoundFile {
+  /** Relative to the folder the program reads, with `/` between segments. */
+  readonly path: string
+  readonly executable: boolean
+}
+
 interface FoundSkill {
   readonly folder: string
-  readonly name: string
-  readonly files: ReadonlyArray<SkillFile>
+  readonly directory: string
+  readonly files: ReadonlyArray<FoundFile>
 }
+
+const READS = { concurrency: 8 } as const
 
 const couldNotRead = new AgentError({
   message: "Glass couldn't read your Local skills. Try again.",
 })
+
+const reading = <A>(effect: Effect.Effect<A, PlatformError.PlatformError>) =>
+  effect.pipe(
+    Effect.catchTag("PlatformError", (cause) =>
+      Effect.logWarning("Couldn't read the Local skills", cause).pipe(
+        Effect.andThen(Effect.fail(couldNotRead)),
+      ),
+    ),
+  )
 
 export class LocalSkills extends Context.Service<
   LocalSkills,
@@ -38,75 +59,40 @@ export class LocalSkills extends Context.Service<
       const fs = yield* FileSystem.FileSystem
       const folders = foldersOf((yield* ServerConfig).homeDirectory)
 
+      /** Every file under `folder`, following each symlink once and skipping broken ones. */
       const filesUnder = (
         folder: string,
         relative: string,
         visited: Set<string>,
-      ): Effect.Effect<ReadonlyArray<SkillFile>, PlatformError.PlatformError> =>
+      ): Effect.Effect<ReadonlyArray<FoundFile>, PlatformError.PlatformError> =>
         Effect.gen(function* () {
-          const directory = join(folder, relative)
-          const real = yield* fs.realPath(directory)
+          const real = yield* fs.realPath(join(folder, relative))
 
           if (visited.has(real)) return []
           visited.add(real)
 
-          const entries = (yield* fs.readDirectory(directory)).toSorted()
+          const entries = yield* fs.readDirectory(join(folder, relative))
 
-          const nested = yield* Effect.forEach(entries, (entry) =>
-            Effect.gen(function* () {
-              const path = relative === "" ? entry : `${relative}/${entry}`
-              const info = yield* fs.stat(join(folder, path))
+          const nested = yield* Effect.forEach(
+            entries.toSorted(),
+            (entry) =>
+              Effect.gen(function* () {
+                const path = relative === "" ? entry : `${relative}/${entry}`
 
-              if (info.type === "Directory") return yield* filesUnder(folder, path, visited)
+                const info = yield* fs.stat(join(folder, path)).pipe(
+                  Effect.map(Option.some),
+                  Effect.catchReason("PlatformError", "NotFound", () => Effect.succeedNone),
+                )
 
-              if (info.type !== "File") return []
+                if (Option.isNone(info)) return []
 
-              return [
-                {
-                  path,
-                  executable: (info.mode & 0o111) !== 0,
-                  contents: yield* fs.readFile(join(folder, path)),
-                },
-              ]
-            }),
-          )
+                if (info.value.type === "Directory") return yield* filesUnder(folder, path, visited)
 
-          return nested.flat()
-        })
-
-      const skillsUnder = (
-        directory: string,
-        visited: Set<string>,
-      ): Effect.Effect<ReadonlyArray<FoundSkill>, PlatformError.PlatformError> =>
-        Effect.gen(function* () {
-          const real = yield* fs.realPath(directory)
-
-          if (visited.has(real)) return []
-          visited.add(real)
-
-          const entries = (yield* fs.readDirectory(directory)).toSorted()
-
-          const nested = yield* Effect.forEach(entries, (entry) =>
-            Effect.gen(function* () {
-              const folder = join(directory, entry)
-
-              if ((yield* fs.stat(folder)).type !== "Directory") return []
-
-              if (!(yield* fs.exists(join(folder, SKILL_FILE)))) {
-                return yield* skillsUnder(folder, visited)
-              }
-
-              const text = yield* fs.readFileString(join(folder, SKILL_FILE))
-              const read = readSkill(entry, text, entry)
-
-              return [
-                {
-                  folder: entry,
-                  name: read instanceof Skill ? read.name : entry,
-                  files: yield* filesUnder(folder, "", new Set()),
-                },
-              ]
-            }),
+                return info.value.type === "File"
+                  ? [{ path, executable: (info.value.mode & 0o111) !== 0 }]
+                  : []
+              }),
+            READS,
           )
 
           return nested.flat()
@@ -114,37 +100,64 @@ export class LocalSkills extends Context.Service<
 
       const found = (engine: AgentEngine) =>
         Effect.forEach(folders[engine], (folder) =>
-          skillsUnder(folder, new Set()).pipe(
+          filesUnder(folder, "", new Set()).pipe(
             Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed([])),
-          ),
-        ).pipe(
-          Effect.map((perFolder) => perFolder.flat()),
-          Effect.catchTag("PlatformError", (cause) =>
-            Effect.logWarning("Couldn't read the Local skills", cause).pipe(
-              Effect.andThen(Effect.fail(couldNotRead)),
+            Effect.map((files) =>
+              [...filesBySkill(files)].flatMap(([directory, owned]): ReadonlyArray<FoundSkill> =>
+                directory === "" ? [] : [{ folder, directory, files: owned }],
+              ),
             ),
           ),
-        )
+        ).pipe(Effect.map((perFolder) => perFolder.flat()))
 
       return LocalSkills.of({
         names: (engine) =>
           found(engine).pipe(
-            Effect.map((skills) => [...new Set(skills.map(({ name }) => name))].toSorted()),
+            Effect.flatMap((skills) =>
+              Effect.forEach(
+                skills,
+                ({ folder, directory }) =>
+                  fs.readFileString(join(folder, skillFilePath(directory))).pipe(
+                    Effect.map((text) => {
+                      const read = readSkill(directory, text, lastSegment(directory))
+
+                      return read instanceof Skill ? read.name : lastSegment(directory)
+                    }),
+                  ),
+                READS,
+              ),
+            ),
+            Effect.map((names) => [...new Set(names)].toSorted()),
+            reading,
             Effect.withSpan("LocalSkills.names"),
           ),
         source: (engine) =>
           found(engine).pipe(
-            Effect.map((skills) => {
+            Effect.flatMap((skills) => {
               const taken = new Set<string>()
 
-              return {
-                name: LOCAL_SKILLS_NAMESPACE,
-                skills: skills.map(({ folder, files }): SentSkill => ({
-                  name: uniqueFolder(taken, folder),
+              return Effect.forEach(skills, ({ folder, directory, files }) =>
+                Effect.forEach(
                   files,
-                })),
-              }
+                  ({ path, executable }) =>
+                    fs.readFile(join(folder, path)).pipe(
+                      Effect.map((contents) => ({
+                        path: path.slice(directory.length + 1),
+                        executable,
+                        contents,
+                      })),
+                    ),
+                  READS,
+                ).pipe(
+                  Effect.map((sent): SentSkill => ({
+                    name: uniqueFolder(taken, lastSegment(directory)),
+                    files: sent,
+                  })),
+                ),
+              )
             }),
+            Effect.map((skills) => ({ name: LOCAL_SKILLS_NAMESPACE, skills })),
+            reading,
             Effect.withSpan("LocalSkills.source"),
           ),
       })

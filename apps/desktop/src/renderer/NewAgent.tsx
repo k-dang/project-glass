@@ -56,7 +56,7 @@ import {
   LocalSkillsToggle,
   SharedSkillNames,
   SkillPackPicker,
-  useSkillPackChoice,
+  useSkillChoice,
 } from "./SkillPackPicker"
 
 const NEW_AGENT_TEXT = "new"
@@ -312,7 +312,7 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
       : newAgentBranchesAtom(placeKey(where.place), repository),
   )
 
-  const skillPacks = useSkillPackChoice(where.place, props.program.engine)
+  const skills = useSkillChoice(where.place, props.program.engine)
   const created = useAtomValue(createAgentAtom)
   const create = useAtomSet(createAgentAtom, { mode: "promiseExit" })
   const defaultBranch = AsyncResult.value(defaults)
@@ -394,8 +394,8 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
       repository,
       baseBranch,
       place: where.place,
-      skillPacks: skillPacks.chosen,
-      localSkills: skillPacks.localSkills,
+      skillPacks: skills.chosen,
+      localSkills: skills.localSkills,
       ...program,
       ...message,
     })
@@ -448,11 +448,11 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
           created.waiting ||
           baseBranch === null ||
           awaitingModels ||
-          !AsyncResult.isSuccess(skillPacks.listed)
+          !AsyncResult.isSuccess(skills.listed)
         }
         problem={
           settledProblem(created) ??
-          settledProblem(skillPacks.listed) ??
+          settledProblem(skills.listed) ??
           settledProblem(defaults) ??
           settledProblem(branches) ??
           folder.problem
@@ -529,14 +529,14 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
             disabled={Option.isNone(defaultBranch) || key === undefined}
           />
           <SkillPackPicker
-            names={skillPacks.names}
-            chosen={skillPacks.chosen}
-            onChange={skillPacks.setChosen}
+            names={skills.names}
+            chosen={skills.chosen}
+            onChange={skills.setChosen}
           />
-          {skillPacks.offersLocalSkills && (
+          {skills.offersLocalSkills && (
             <LocalSkillsToggle
-              checked={skillPacks.localSkills}
-              onCheckedChange={skillPacks.setLocalSkills}
+              checked={skills.localSkills}
+              onCheckedChange={skills.setLocalSkills}
             />
           )}
           {asksPermission(where.place) && (
@@ -548,7 +548,7 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
               />
             </div>
           )}
-          <SharedSkillNames shared={skillPacks.shared} />
+          <SharedSkillNames shared={skills.shared} />
         </div>
       </MessageBox>
       {starting === null && <div className="flex-1" />}

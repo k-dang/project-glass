@@ -20,7 +20,7 @@ const storageKey = "glass.newAgent.skillPacks"
 
 const localSkillsKey = "glass.newAgent.localSkills"
 
-const LOCAL_SKILLS_LABEL = "Local skills"
+export const LOCAL_SKILLS_LABEL = "Local skills"
 
 const decodeChosen = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Array(Schema.String)))
 
@@ -45,7 +45,7 @@ const localSkillNamesAtom = Atom.family((engine: AgentEngine) =>
   backendRuntime.atom(Backend.use((backend) => backend.ListLocalSkills({ engine }))),
 )
 
-const unread = Atom.make(AsyncResult.success<ReadonlyArray<string>>([]))
+const noLocalSkills = Atom.make(AsyncResult.success<ReadonlyArray<string>>([]))
 
 interface ChosenSource {
   readonly label: string
@@ -78,7 +78,7 @@ const sharedSkillNames = (engine: AgentEngine, sources: ReadonlyArray<ChosenSour
 }
 
 /** The new-Agent flow's choice of Skill packs and, for a Sandbox Agent, Local skills. */
-export const useSkillPackChoice = (place: AgentPlace, engine: AgentEngine) => {
+export const useSkillChoice = (place: AgentPlace, engine: AgentEngine) => {
   const listedPacks = useAtomValue(skillPacksAtom)
   const packs = Option.getOrElse(AsyncResult.value(listedPacks), () => [])
   const [lastChosen, setChosen] = useAtom(lastChosenAtom)
@@ -88,7 +88,7 @@ export const useSkillPackChoice = (place: AgentPlace, engine: AgentEngine) => {
   const chosenPacks = packs.filter(({ name }) => lastChosen.includes(name))
 
   const localNames = Option.getOrElse(
-    AsyncResult.value(useAtomValue(localSkills ? localSkillNamesAtom(engine) : unread)),
+    AsyncResult.value(useAtomValue(localSkills ? localSkillNamesAtom(engine) : noLocalSkills)),
     () => [],
   )
 
