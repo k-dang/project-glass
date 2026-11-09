@@ -67,6 +67,7 @@ import {
 import { Sandboxes } from "./Sandboxes"
 import { LocalPlacement } from "./LocalPlacement"
 import { type AgentRole, ReviewBrief, ReviewRole, WorkRole } from "./agentHost/protocol"
+import { LocalSkills } from "./LocalSkills"
 import { SkillPacks } from "./SkillPacks"
 import { Transcripts } from "./Transcripts"
 import { annotateUnit } from "./wideEvents"
@@ -92,6 +93,7 @@ const StoredAgent = Schema.Struct({
   model: Agent.fields.model,
   effort: Agent.fields.effort,
   permissionMode: Agent.fields.permissionMode,
+  localSkills: Schema.BooleanFromBit,
   folder: Schema.String,
   createdAt: Agent.fields.createdAt,
   forReview: Schema.BooleanFromBit,
@@ -264,13 +266,15 @@ export class Agents extends Context.Service<
       const turns = yield* ConversationTurns
       const notes = yield* FeedbackNotes
       const skillPacks = yield* SkillPacks
+      const localSkills = yield* LocalSkills
       const fs = yield* FileSystem.FileSystem
       const lock = yield* Semaphore.make(1)
       const scope = yield* Scope.Scope
 
       const stored = yield* sql`
         SELECT id, name, sandbox_provider AS sandboxProvider, owner, repo, base_branch AS baseBranch,
-          engine, model, effort, permission_mode AS permissionMode, folder, created_at AS createdAt,
+          engine, model, effort, permission_mode AS permissionMode, local_skills AS localSkills, folder,
+          created_at AS createdAt,
           review_brief IS NOT NULL AS forReview
         FROM agent ORDER BY created_at
       `.pipe(Effect.flatMap(decodeStored), Effect.orDie)
@@ -350,10 +354,25 @@ export class Agents extends Context.Service<
           ),
         )
 
-      const skillsOf = (agentId: string) =>
-        skillPacks
-          .agentSkills(agentId)
-          .pipe(Effect.mapError(({ message }) => new AgentError({ message })))
+      /**
+       * Local skills go first: pi keeps the first skill of a name, so a Sandbox Agent's Local skill
+       * wins over a pack's, as a local Agent's does.
+       */
+      const skillsOf = (agent: Agent) =>
+        Effect.all(
+          [
+            agent.localSkills
+              ? localSkills.source(agent.engine).pipe(
+                  Effect.map(Option.toArray),
+                  Effect.mapError(({ message }) => new AgentError({ message })),
+                )
+              : Effect.succeed([]),
+            skillPacks
+              .agentSkills(agent.id)
+              .pipe(Effect.mapError(({ message }) => new AgentError({ message }))),
+          ],
+          { concurrency: "unbounded" },
+        ).pipe(Effect.map(([local, packs]) => [...local, ...packs]))
 
       const conversationOf = (row: PlacedAgent): Conversation => {
         const placement = placementOf(row)
@@ -366,7 +385,7 @@ export class Agents extends Context.Service<
         return {
           id,
           start: (client) =>
-            Effect.all([role, skillsOf(id)], { concurrency: "unbounded" }).pipe(
+            Effect.all([role, skillsOf(row.agent)], { concurrency: "unbounded" }).pipe(
               Effect.flatMap(([started, skills]) =>
                 client.StartAgent({
                   agentId: id,
@@ -428,6 +447,7 @@ export class Agents extends Context.Service<
                 model: agent.model,
                 effort: agent.effort,
                 permission_mode: agent.permissionMode,
+                local_skills: agent.localSkills ? 1 : 0,
                 folder: placed.folder,
                 created_at: DateTime.formatIso(agent.createdAt),
                 review_brief: Purpose.$match(purpose, {
@@ -471,6 +491,7 @@ export class Agents extends Context.Service<
           effort: null,
           permissionMode: null,
           skillPacks: [],
+          localSkills: false,
           createdAt: yield* DateTime.now,
           sandbox: null,
         })
@@ -507,6 +528,7 @@ export class Agents extends Context.Service<
           effort,
           permissionMode,
           skillPacks: [],
+          localSkills: Predicate.isTagged(place, "sandbox") && input.localSkills,
           createdAt: yield* DateTime.now,
           sandbox: null,
         })
@@ -603,7 +625,7 @@ export class Agents extends Context.Service<
 
       const commands = (agentId: string) =>
         listedByHost(agentId, (host, row) =>
-          skillsOf(row.agent.id).pipe(
+          skillsOf(row.agent).pipe(
             Effect.flatMap((skills) =>
               host.ListCommands({ engine: row.agent.engine, folder: row.folder, skills }),
             ),

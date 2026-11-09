@@ -28,6 +28,7 @@ import {
   skillFilePath,
   candidateSkillPackSources,
   suggestedName,
+  claimFolder,
 } from "./skillPackContents"
 
 interface PackSkill {
@@ -98,16 +99,6 @@ const decodeSentFiles = Schema.decodeUnknownEffect(
     }),
   ),
 )
-
-const uniqueFolder = (taken: Set<string>, wanted: string) => {
-  let folder = wanted
-
-  for (let suffix = 2; taken.has(folder); suffix++) folder = `${wanted}-${suffix}`
-
-  taken.add(folder)
-
-  return folder
-}
 
 const repositoryLabel = ({ owner, repo }: SkillPackSource) => `${owner}/${repo}`
 
@@ -424,7 +415,7 @@ export class SkillPacks extends Context.Service<
             const inside = directory === "" ? 0 : directory.length + 1
 
             return {
-              name: uniqueFolder(taken, directory === "" ? name : lastSegment(directory)),
+              name: claimFolder(taken, directory === "" ? name : lastSegment(directory)),
               files: owned.map(({ path, executable, contents }) => ({
                 path: path.slice(inside),
                 executable,

@@ -30,6 +30,7 @@ const clientWith = Effect.fnUntraced(function* (
           agentHostBundle: "agentHost.mjs",
           gitRemote: "https://github.com",
           dataDirectory: "",
+          homeDirectory: "",
         }),
       ),
     ),

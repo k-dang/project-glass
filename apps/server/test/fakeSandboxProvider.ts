@@ -24,6 +24,7 @@ const FakeSandboxSettings = Schema.Struct({
   cloneFrom: Schema.String,
   piCommand: Schema.String,
   claudeCommand: Schema.String,
+  home: Schema.optional(Schema.String),
 })
 
 export type FakeSandboxSettings = typeof FakeSandboxSettings.Type
@@ -236,17 +237,24 @@ export const fakeSandboxProvider =
         const bundle = join(folder, "agentHost.mjs")
         copyFileSync(request.host.bundle, bundle)
 
+        const hostEnv: NodeJS.ProcessEnv = {
+          ...process.env,
+          ...request.host.environment,
+          ELECTRON_RUN_AS_NODE: "1",
+          GLASS_HOST_PORT: "0",
+          GLASS_HOST_ADDRESS: "127.0.0.1",
+          GLASS_PI_COMMAND: settings.piCommand,
+          GLASS_CLAUDE_COMMAND: settings.claudeCommand,
+        }
+
+        if (settings.home !== undefined) {
+          hostEnv["HOME"] = settings.home
+          hostEnv["USERPROFILE"] = settings.home
+        }
+
         const host = spawn(process.execPath, [bundle], {
           cwd: folder,
-          env: {
-            ...process.env,
-            ...request.host.environment,
-            ELECTRON_RUN_AS_NODE: "1",
-            GLASS_HOST_PORT: "0",
-            GLASS_HOST_ADDRESS: "127.0.0.1",
-            GLASS_PI_COMMAND: settings.piCommand,
-            GLASS_CLAUDE_COMMAND: settings.claudeCommand,
-          },
+          env: hostEnv,
           stdio: ["ignore", "inherit", "inherit", "pipe"],
           detached: process.platform !== "win32",
         })

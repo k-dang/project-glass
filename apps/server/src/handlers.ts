@@ -14,6 +14,7 @@ import { Queue } from "./Queue"
 import { engineSettingsOf, SettingsStore, withEngineSettings } from "./SettingsStore"
 import { Sandboxes } from "./Sandboxes"
 import { SavedPlaces } from "./SavedPlaces"
+import { LocalSkills } from "./LocalSkills"
 import { SkillPacks } from "./SkillPacks"
 import { Storage } from "./Storage"
 import { ToDos } from "./ToDos"
@@ -38,6 +39,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
     const checkouts = yield* LocalCheckouts
     const storage = yield* Storage
     const skillPacks = yield* SkillPacks
+    const localSkills = yield* LocalSkills
 
     return GlassRpcs.of({
       GetSavedPlaces: () => savedPlaces.list(),
@@ -75,6 +77,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       PreviewSkillPackUpdate: ({ name }) => skillPacks.previewUpdate(name),
       UpdateSkillPack: ({ name, commit }) => skillPacks.update(name, commit),
       RemoveSkillPack: ({ name }) => skillPacks.remove(name),
+      ListLocalSkills: ({ engine }) => localSkills.names(engine),
       ListPullRequests: () =>
         lists.list().pipe(Effect.provideService(BackgroundGitHubRequest, true)),
       ListSavedPullRequests: () => lists.saved(),

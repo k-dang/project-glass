@@ -6,10 +6,22 @@
 
 **Status:** ready-for-agent
 
-- [ ] The new-Agent picker shows a Local skills checkbox only for Sandbox placements (local Agents always have Local skills because the program reads them itself); it is part of the remembered last choice.
-- [ ] `NewAgent` carries whether a Sandbox Agent includes Local skills; the Agent keeps that choice for its whole life. The Global conversation's create-Agent tool passes no Local skills.
-- [ ] Each time a Sandbox Agent's program starts, the backend reads the folders that program reads on this device (`~/.claude/skills` for Claude Code; `~/.agents/skills` and `~/.pi/agent/skills` for pi), following symlinks, and sends them as one more source in the Work role.
-- [ ] Claude Code receives Local skills as one more generated plugin, named as settled in ticket 02's SDK findings; pi receives them as `--skill` paths.
-- [ ] The Agent's details show "· Local skills" when it has them, such as "team @ ae5650f · Local skills".
-- [ ] The picker warns, without blocking, when chosen packs and the chosen program's Local skills share a skill name, naming the skills; the copy states which one the Agent uses, based on ticket 02's findings. It does not look up the repository's own skills.
-- [ ] The Sandbox Agent Electron acceptance test gains one path: create a Sandbox Agent with a pack and Local skills, and see both in its Command list and details. It waits on observable events, with no sleeps or timing assertions.
+- [x] The new-Agent picker shows a Local skills checkbox only for Sandbox placements (local Agents always have Local skills because the program reads them itself); it is part of the remembered last choice.
+- [x] `NewAgent` carries whether a Sandbox Agent includes Local skills; the Agent keeps that choice for its whole life. The Global conversation's create-Agent tool passes no Local skills.
+- [x] Each time a Sandbox Agent's program starts, the backend reads the folders that program reads on this device (`~/.claude/skills` for Claude Code; `~/.agents/skills` and `~/.pi/agent/skills` for pi), following symlinks, and sends them as one more source in the Work role.
+- [x] Claude Code receives Local skills as one more generated plugin, named as settled in ticket 02's SDK findings; pi receives them as `--skill` paths.
+- [x] The Agent's details show "· Local skills" when it has them, such as "team @ ae5650f · Local skills".
+- [x] The picker warns, without blocking, when chosen packs and the chosen program's Local skills share a skill name, naming the skills; the copy states which one the Agent uses, based on ticket 02's findings. It does not look up the repository's own skills.
+- [x] The Sandbox Agent Electron acceptance test gains one path: create a Sandbox Agent with a pack and Local skills, and see both in its Command list and details. It waits on observable events, with no sleeps or timing assertions.
+
+## Comments
+
+**Naming (2026-11-09).** Claude Code can't load an un-namespaced plugin (ticket 02's findings), so a Sandbox Agent's Local skills are the plugin `local` (`/local:grilling`), and `local` is no longer a valid Skill pack name. Glass sends Local skills before the Agent's packs, so in pi a Local skill wins over a pack's skill of the same name, as it does for a local Agent; the picker's warning says so. In Claude Code the warning names each namespaced command instead.
+
+**Details.** `Agent.localSkills` records whether Glass sends the Local skills, so it is only ever true for Sandbox Agents, and only they show "· Local skills". A local Agent's program reads them itself.
+
+**Command list.** A Sandbox Agent's host lists nothing until its Sandbox is made, and the desktop never asked again, so a new Sandbox Agent's Command list stayed empty. Its commands and files now list again once its Sandbox is reachable.
+
+**What counts as a Local skill (2026-11-09).** Local skills follow the Skill packs' rules: a skill is a folder with a `SKILL.md` that parses and has a description, and others are neither listed nor sent. A broken symlink, or a file Glass isn't allowed to read (logged), is left out on its own rather than failing the Agent's start. Glass sends only the first Local skill of each name or `SKILL.md`, as pi loads a `SKILL.md` once however many paths reach it and keeps the first skill of a name, so a skill linked into both of pi's folders, or under two names, or one that takes its folder's name in both, is sent once. Symlinks are followed except round a loop, so skills that link the same scripts folder each get it.
+
+**Depth and local Agents (2026-11-09).** Claude Code reads only `~/.claude/skills/<name>/SKILL.md`, so a Sandbox Agent on Claude Code gets only those; pi's folders are still read recursively, as pi does. The shared-name warning also covers local Agents, whose program reads their Local skills itself: in Claude Code their skills are un-namespaced (`/grilling` beside `/team:grilling`), and in pi the Local skill wins, as it does for a Sandbox Agent. The picker reads the Local skills' names only once a Skill pack is chosen, since there is nothing to warn about before.

@@ -123,6 +123,7 @@ export class Agent extends Schema.Class<Agent>("Agent")({
   ...ModelChoice.fields,
   permissionMode: Schema.NullOr(PermissionMode),
   skillPacks: Schema.Array(AgentSkillPack),
+  localSkills: Schema.Boolean,
   createdAt: Schema.DateTimeUtcFromString,
   sandbox: Schema.NullOr(SandboxStatus),
 }) {}
@@ -482,6 +483,8 @@ export const NewAgent = Schema.Struct({
   permissionMode: Schema.NullOr(PermissionMode),
   place: AgentPlace,
   skillPacks: Schema.Array(Schema.String),
+  /** Whether a Sandbox Agent gets the user's Local skills; a local Agent's program reads them itself. */
+  localSkills: Schema.Boolean,
   ...MessageInput.fields,
 })
 

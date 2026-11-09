@@ -1,4 +1,4 @@
-import type { TokenSource } from "@glass/contracts"
+import { LOCAL_SKILLS_NAMESPACE, type TokenSource } from "@glass/contracts"
 import { Cause, Match, Option, Predicate } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import type { BackendError } from "./backend"
@@ -58,7 +58,7 @@ export const describeError = (error: BackendError): Problem =>
       }),
       InvalidSkillPackName: () => ({
         title: "That name can't be a Skill pack's",
-        detail: "Use lowercase letters, digits, and single hyphens, up to 64 characters.",
+        detail: `Use lowercase letters, digits, and single hyphens, up to 64 characters. ${LOCAL_SKILLS_NAMESPACE} is kept for your Local skills.`,
       }),
       SkillPackNameTaken: ({ name }) => ({
         title: "That name is taken",
@@ -69,6 +69,10 @@ export const describeError = (error: BackendError): Problem =>
         detail: `${name} was removed. Reload Settings to see your Skill packs now.`,
       }),
       SkillPackError: ({ message }) => ({ title: "Couldn't access Skill packs", detail: message }),
+      LocalSkillsError: ({ message }) => ({
+        title: "Couldn't read your Local skills",
+        detail: message,
+      }),
       StorageError: () => ({
         title: "Couldn't measure storage",
         detail: "Glass couldn't read its database sizes.",

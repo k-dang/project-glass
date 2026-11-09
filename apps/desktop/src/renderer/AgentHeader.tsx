@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { AgentsPanelToggle, NewAgentLink } from "./Agents"
 import { placeIcons, placeNames } from "./agentsArea"
+import { LOCAL_SKILLS_LABEL } from "./skillChoice"
 
 const fact =
   "flex h-7 w-full min-w-0 items-center gap-2 rounded-sm px-2 text-xs [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-muted-foreground"
@@ -17,9 +18,15 @@ export function AgentHeader(props: {
   branch?: string | undefined
   baseBranch: string | null
   skillPacks?: ReadonlyArray<AgentSkillPack> | undefined
+  localSkills?: boolean | undefined
   children?: ReactNode
 }) {
   const PlaceIcon = props.place === null ? null : placeIcons[props.place._tag]
+
+  const skillSources = [
+    ...(props.skillPacks ?? []).map(({ name, commit }) => `${name} @ ${shortSha(commit)}`),
+    ...(props.localSkills === true ? [LOCAL_SKILLS_LABEL] : []),
+  ]
 
   return (
     <header className="flex h-11 shrink-0 items-center gap-2 border-b px-4 text-sm">
@@ -52,14 +59,10 @@ export function AgentHeader(props: {
                 </div>
               </>
             )}
-            {props.skillPacks !== undefined && props.skillPacks.length > 0 && (
+            {skillSources.length > 0 && (
               <div className={fact}>
                 <Package aria-hidden />
-                <span className="truncate">
-                  {props.skillPacks
-                    .map(({ name, commit }) => `${name} @ ${shortSha(commit)}`)
-                    .join(" · ")}
-                </span>
+                <span className="truncate">{skillSources.join(" · ")}</span>
               </div>
             )}
             {props.children}

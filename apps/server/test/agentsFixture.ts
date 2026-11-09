@@ -99,7 +99,7 @@ export const agentsFixture = Effect.gen(function* () {
   const start = (
     message = "Say hello",
     program: Pick<NewAgent, "engine" | "model" | "effort"> &
-      Partial<Pick<NewAgent, "permissionMode" | "skillPacks">> = {
+      Partial<Pick<NewAgent, "permissionMode" | "skillPacks" | "localSkills">> = {
       engine: "pi",
       model: null,
       effort: null,
@@ -116,6 +116,7 @@ export const agentsFixture = Effect.gen(function* () {
           permissionMode: null,
           place: localPlace,
           skillPacks: [],
+          localSkills: false,
           ...program,
         }),
       ),
@@ -124,7 +125,11 @@ export const agentsFixture = Effect.gen(function* () {
   const startSandbox = (
     message = "Say hello",
     program: Pick<NewAgent, "engine" | "model" | "effort"> &
-      Partial<Pick<NewAgent, "skillPacks">> = { engine: "pi", model: null, effort: null },
+      Partial<Pick<NewAgent, "skillPacks" | "localSkills">> = {
+      engine: "pi",
+      model: null,
+      effort: null,
+    },
   ) =>
     client.CreateAgent({
       repository,
@@ -134,6 +139,7 @@ export const agentsFixture = Effect.gen(function* () {
       permissionMode: null,
       place: SandboxPlace.make({ providerId: "fake" }),
       skillPacks: [],
+      localSkills: false,
       ...program,
     })
 

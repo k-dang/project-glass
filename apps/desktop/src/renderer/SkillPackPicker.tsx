@@ -1,7 +1,5 @@
-import { useAtom, useAtomValue } from "@effect/atom-react"
-import { Option, Schema } from "effect"
-import { AsyncResult, Atom } from "effect/reactivity"
-import { Package } from "lucide-react"
+import { Package, TriangleAlert } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Select,
   SelectContent,
@@ -9,35 +7,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { cn } from "cn"
 import { chip } from "./chips"
-import { skillPacksAtom } from "./SkillPacks"
-
-const storageKey = "glass.newAgent.skillPacks"
-
-const decodeChosen = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Array(Schema.String)))
-
-const lastChosenAtom = Atom.writable(
-  (): ReadonlyArray<string> =>
-    Option.getOrElse(decodeChosen(localStorage.getItem(storageKey)), () => []),
-  (ctx, chosen: ReadonlyArray<string>) => {
-    localStorage.setItem(storageKey, JSON.stringify(chosen))
-    ctx.setSelf(chosen)
-  },
-).pipe(Atom.keepAlive)
-
-export const useSkillPackChoice = () => {
-  const listed = useAtomValue(skillPacksAtom)
-  const packs = Option.getOrElse(AsyncResult.value(listed), () => [])
-  const [lastChosen, setChosen] = useAtom(lastChosenAtom)
-  const names = packs.map(({ name }) => name)
-
-  return {
-    listed,
-    names,
-    chosen: names.filter((name) => lastChosen.includes(name)),
-    setChosen,
-  }
-}
+import { LOCAL_SKILLS_LABEL } from "./skillChoice"
 
 export function SkillPackPicker(props: {
   names: ReadonlyArray<string>
@@ -75,5 +47,35 @@ export function SkillPackPicker(props: {
         ))}
       </SelectContent>
     </Select>
+  )
+}
+
+export function LocalSkillsToggle(props: {
+  checked: boolean
+  onCheckedChange: (checked: boolean) => void
+}) {
+  return (
+    <label className={cn(chip, "flex cursor-pointer items-center rounded-md")}>
+      <Checkbox checked={props.checked} onCheckedChange={props.onCheckedChange} />
+      {LOCAL_SKILLS_LABEL}
+    </label>
+  )
+}
+
+export function SharedSkillNames(props: { shared: ReadonlyArray<string> }) {
+  if (props.shared.length === 0) return null
+
+  return (
+    <ul
+      aria-label="Shared skill names"
+      className="flex basis-full flex-col gap-0.5 px-2 text-xs text-muted-foreground"
+    >
+      {props.shared.map((line) => (
+        <li key={line} className="flex items-start gap-1.5">
+          <TriangleAlert aria-hidden className="mt-0.5 size-3 shrink-0 text-amber-500" />
+          {line}
+        </li>
+      ))}
+    </ul>
   )
 }

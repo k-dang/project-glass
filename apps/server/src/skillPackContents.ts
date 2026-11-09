@@ -34,6 +34,16 @@ export const candidateSkillPackSources = (input: string): ReadonlyArray<SkillPac
   )
 }
 
+export const claimFolder = (taken: Set<string>, wanted: string) => {
+  let folder = wanted
+
+  for (let suffix = 2; taken.has(folder); suffix++) folder = `${wanted}-${suffix}`
+
+  taken.add(folder)
+
+  return folder
+}
+
 export const lastSegment = (path: string) => path.slice(path.lastIndexOf("/") + 1)
 
 const folderName = ({ repo, path }: SkillPackSource) => lastSegment(path === "" ? repo : path)

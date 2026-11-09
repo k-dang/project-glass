@@ -1,6 +1,7 @@
 import { useAtom, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
 import {
   isSkillPackName,
+  LOCAL_SKILLS_NAMESPACE,
   shortSha,
   type Skill,
   type SkillPack,
@@ -209,7 +210,9 @@ function PreviewCard(props: {
     ? `You already have a pack named ${name}.`
     : valid
       ? `Agents run its skills as /${name}:skill. The name can't change later.`
-      : "Use lowercase letters, digits, and single hyphens."
+      : name === LOCAL_SKILLS_NAMESPACE
+        ? `${name} is kept for your Local skills.`
+        : "Use lowercase letters, digits, and single hyphens."
 
   return (
     <form

@@ -78,6 +78,7 @@ it.live("upgrades existing Activity history and uses its indexes after reopening
       [26, "create_skill_packs"],
       [27, "create_agent_feedback_notes"],
       [28, "agent_skill_packs"],
+      [29, "agent_local_skills"],
     ] as const
 
     for (const expected of [upgrade, []] as const) {

@@ -189,11 +189,16 @@ it("removes the open Agent from the sidebar after confirming its uncommitted cha
   expect(window.location.hash).toBe("#/agents/new")
 })
 
-it("shows the Skill packs and commits an Agent was created with in its details", async () => {
+it("shows the Skill packs and commits an Agent was created with, and its Local skills, in its details", async () => {
   const user = mount({
     WatchAgents: () =>
       Stream.make([
-        new Agent({ ...agentFields, skillPacks: [{ name: "team", commit: "ae5650fbbbb" }] }),
+        new Agent({
+          ...agentFields,
+          place: SandboxPlace.make({ providerId: "fake" }),
+          skillPacks: [{ name: "team", commit: "ae5650fbbbb" }],
+          localSkills: true,
+        }),
       ]),
     WatchTranscript: () =>
       Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
@@ -201,7 +206,39 @@ it("shows the Skill packs and commits an Agent was created with in its details",
 
   await user.click(await screen.findByRole("button", { name: "Details" }))
 
-  expect(await screen.findByText("team @ ae5650f")).toBeTruthy()
+  expect(await screen.findByText("team @ ae5650f · Local skills")).toBeTruthy()
+})
+
+it("lists a Sandbox Agent's commands again once its Sandbox can be reached", async () => {
+  const reached = Deferred.makeUnsafe<void>()
+  let made = false
+
+  const user = mount({
+    WatchAgents: () =>
+      Stream.concat(
+        Stream.make([inSandboxWith("connecting")]),
+        Stream.fromEffect(Deferred.await(reached)).pipe(Stream.as([inSandboxWith("reachable")])),
+      ),
+    ListAgentCommands: () =>
+      Effect.sync(() =>
+        made ? [{ name: "local:grilling", description: "Ask hard questions." }] : [],
+      ),
+    WatchTranscript: () =>
+      Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
+  })
+
+  const composer = await screen.findByRole("textbox", { name: "Message" })
+  await user.type(composer, "/")
+  expect(screen.queryByRole("listbox", { name: "Commands" })).toBeNull()
+
+  made = true
+  Deferred.doneUnsafe(reached, Exit.void)
+  await user.type(composer, "{Backspace}/gr")
+
+  expect(
+    within(await screen.findByRole("listbox", { name: "Commands" })).getByRole("option")
+      .textContent,
+  ).toBe("/local:grillingAsk hard questions.")
 })
 
 it("lists a Sandbox Agent under Sandboxes, and shows the step its Sandbox is at while it's made", async () => {

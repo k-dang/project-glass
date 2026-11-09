@@ -4,8 +4,13 @@ const SKILL_PACK_NAME_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
 export const SKILL_PACK_NAME_MAX_LENGTH = 64
 
+/** Claude Code won't load a plugin without a name, so a Sandbox Agent's Local skills need one. */
+export const LOCAL_SKILLS_NAMESPACE = "local"
+
 export const isSkillPackName = (name: string) =>
-  name.length <= SKILL_PACK_NAME_MAX_LENGTH && SKILL_PACK_NAME_PATTERN.test(name)
+  name.length <= SKILL_PACK_NAME_MAX_LENGTH &&
+  SKILL_PACK_NAME_PATTERN.test(name) &&
+  name !== LOCAL_SKILLS_NAMESPACE
 
 export class SkillPackSource extends Schema.Class<SkillPackSource>("SkillPackSource")({
   owner: Schema.String,
@@ -81,5 +86,9 @@ export class SkillPackNotFound extends Schema.TaggedError<SkillPackNotFound>()(
 ) {}
 
 export class SkillPackError extends Schema.TaggedError<SkillPackError>()("SkillPackError", {
+  message: Schema.String,
+}) {}
+
+export class LocalSkillsError extends Schema.TaggedError<LocalSkillsError>()("LocalSkillsError", {
   message: Schema.String,
 }) {}

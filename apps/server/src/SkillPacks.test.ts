@@ -15,9 +15,7 @@ import { startFakeGitHub } from "../test/fakeGitHub"
 import { VIEWER } from "../test/fakePullRequest"
 import { ExecutableFile } from "../test/fakeRepositories"
 import { isolatedHome, startBackend, startSignedInBackend } from "../test/harness"
-
-const skill = (name: string, description: string) =>
-  `---\nname: ${name}\ndescription: ${description}\n---\n\nUse ${name} well.\n`
+import { skillFile } from "../test/skillFiles"
 
 const acmeSkills = { owner: "acme", repo: "skills" }
 
@@ -48,9 +46,9 @@ describe("Skill packs", () => {
       const commit = github.pushRepository(acmeSkills, "main", {
         "README.md": "# Acme skills",
         "skills/team/UPSTREAM.md": "Copied from elsewhere.",
-        "skills/team/architect/SKILL.md": skill("architect", "Shape a design."),
-        "skills/team/architect/notes/SKILL.md": skill("nested", "Never its own skill."),
-        "skills/team/review/deep/critic/SKILL.md": skill("critic", "Find the flaws."),
+        "skills/team/architect/SKILL.md": skillFile("architect", "Shape a design."),
+        "skills/team/architect/notes/SKILL.md": skillFile("nested", "Never its own skill."),
+        "skills/team/review/deep/critic/SKILL.md": skillFile("critic", "Find the flaws."),
         "skills/team/review/deep/critic/run.sh": new ExecutableFile("echo hi"),
         "skills/team/silent/SKILL.md": "---\nname: silent\n---\n",
         "skills/team/broken/SKILL.md": "---\nname: [broken\n---\n",
@@ -85,14 +83,14 @@ describe("Skill packs", () => {
   it.live("reads a repository URL's default branch and a single-skill folder as one skill", () =>
     Effect.gen(function* () {
       const { client, github } = yield* startSignedInBackend
-      const grilling = { "SKILL.md": skill("grilling", "Ask hard questions.") }
+      const grilling = { "SKILL.md": skillFile("grilling", "Ask hard questions.") }
 
       const trunk = github.pushRepository({ owner: "Acme", repo: "Grill" }, "trunk", grilling)
       github.pushRepository(acmeSkills, "main", { "README.md": "# Acme skills" })
 
       const release = github.pushRepository(acmeSkills, "release/v2", {
-        "skills/architect/SKILL.md": skill("architect", "Shape a design."),
-        "skills/architect/notes/SKILL.md": skill("nested", "Never its own skill."),
+        "skills/architect/SKILL.md": skillFile("architect", "Shape a design."),
+        "skills/architect/notes/SKILL.md": skillFile("nested", "Never its own skill."),
       })
 
       const repository = yield* client.PreviewSkillPack({
@@ -174,7 +172,7 @@ describe("Skill packs", () => {
 
       const commit = github.pushRepository(acmeSkills, "main", {
         "skills/team/UPSTREAM.md": "Copied from elsewhere.",
-        "skills/team/architect/SKILL.md": skill("architect", "Shape a design."),
+        "skills/team/architect/SKILL.md": skillFile("architect", "Shape a design."),
         "skills/team/architect/run.sh": new ExecutableFile("echo hi"),
         "skills/team/silent/SKILL.md": "---\nname: silent\n---\n",
       })
@@ -202,7 +200,7 @@ describe("Skill packs", () => {
             team,
           ])
 
-          for (const name of ["Team", "team_skills", "-team", "a".repeat(65)]) {
+          for (const name of ["Team", "team_skills", "-team", "a".repeat(65), "local"]) {
             assert.instanceOf(
               yield* Effect.flip(client.AddSkillPack({ source, commit, name })),
               InvalidSkillPackName,
@@ -224,7 +222,7 @@ describe("Skill packs", () => {
           pin: commit,
           path: "architect/SKILL.md",
           executable: 0,
-          text: skill("architect", "Shape a design."),
+          text: skillFile("architect", "Shape a design."),
         },
         { pin: commit, path: "architect/run.sh", executable: 1, text: "echo hi" },
       ])
@@ -242,11 +240,11 @@ describe("Skill packs", () => {
       )
 
       const first = github.pushRepository(acmeSkills, "main", {
-        "skills/team/architect/SKILL.md": skill("architect", "Shape a design."),
-        "skills/team/critic/SKILL.md": skill("critic", "Find the flaws."),
+        "skills/team/architect/SKILL.md": skillFile("architect", "Shape a design."),
+        "skills/team/critic/SKILL.md": skillFile("critic", "Find the flaws."),
         "skills/team/critic/run.sh": "echo critic",
-        "skills/team/scribe/SKILL.md": skill("scribe", "Write it down."),
-        "skills/team/tidy/SKILL.md": skill("tidy", "Clean up."),
+        "skills/team/scribe/SKILL.md": skillFile("scribe", "Write it down."),
+        "skills/team/tidy/SKILL.md": skillFile("tidy", "Clean up."),
       })
 
       const { source } = yield* client.PreviewSkillPack({ url: teamUrl })
@@ -262,11 +260,11 @@ describe("Skill packs", () => {
       })
 
       const second = github.pushRepository(acmeSkills, "main", {
-        "skills/team/architect/SKILL.md": skill("architect", "Shape a design."),
-        "skills/team/critic/SKILL.md": skill("critic", "Find the flaws."),
+        "skills/team/architect/SKILL.md": skillFile("architect", "Shape a design."),
+        "skills/team/critic/SKILL.md": skillFile("critic", "Find the flaws."),
         "skills/team/critic/run.sh": new ExecutableFile("echo critic"),
-        "skills/team/scribe/SKILL.md": skill("scribe", "Write it all down."),
-        "skills/team/planner/SKILL.md": skill("planner", "Plan the work."),
+        "skills/team/scribe/SKILL.md": skillFile("scribe", "Write it all down."),
+        "skills/team/planner/SKILL.md": skillFile("planner", "Plan the work."),
         "skills/team/broken/SKILL.md": "No frontmatter.",
       })
 
@@ -336,7 +334,7 @@ describe("Skill packs", () => {
       )
 
       const commit = github.pushRepository(acmeSkills, "main", {
-        "skills/team/architect/SKILL.md": skill("architect", "Shape a design."),
+        "skills/team/architect/SKILL.md": skillFile("architect", "Shape a design."),
       })
 
       const { source } = yield* client.PreviewSkillPack({ url: teamUrl })

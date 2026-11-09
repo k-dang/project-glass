@@ -23,7 +23,7 @@ import { Data, Effect, Exit, Option, Predicate, Schema, Stream } from "effect"
 import { AsyncResult, Atom, type AtomRegistry } from "effect/reactivity"
 import { Cloud, Laptop, type LucideIcon } from "lucide-react"
 import { toast } from "@/components/ui/toast"
-import { Backend, backendRuntime, backendRuntimeOf } from "./backend"
+import { Backend, type BackendError, backendRuntime, backendRuntimeOf } from "./backend"
 import { problemOf } from "./problems"
 
 export type AgentTab = "chat" | "changes"
@@ -202,11 +202,35 @@ export const newAgentCommandsAtom = (
   repository: FollowedRepository,
 ) => newAgentCommandsFamily(new NewAgentOf({ engine, place, repository }))
 
-export const agentCommandsAtom = Atom.family((agentId: string) =>
+const sandboxReachableAtom = Atom.family((agentId: string) =>
+  Atom.make((get) =>
+    Option.match(AsyncResult.value(get(agentsAtom)), {
+      onNone: () => false,
+      onSome: (agents) => agents.find(({ id }) => id === agentId)?.sandbox?.reach === "reachable",
+    }),
+  ),
+)
+
+const relistedOnReachAtom = <A>(
+  agentId: string,
+  list: Effect.Effect<ReadonlyArray<A>, BackendError, Backend>,
+  none: ReadonlyArray<A>,
+) =>
   listedOr(
     backendRuntime
-      .atom(Backend.use((backend) => backend.ListAgentCommands({ agentId })))
+      .atom((get) => {
+        get(sandboxReachableAtom(agentId))
+
+        return list
+      })
       .pipe(Atom.setIdleTTL(COMPOSER_LISTING_IDLE_TTL)),
+    none,
+  )
+
+export const agentCommandsAtom = Atom.family((agentId: string) =>
+  relistedOnReachAtom(
+    agentId,
+    Backend.use((backend) => backend.ListAgentCommands({ agentId })),
     noCommands,
   ),
 )
@@ -241,10 +265,9 @@ export const newAgentFilesAtom = (
 ) => newAgentFilesFamily(new NewAgentBranch({ place, repository, baseBranch }))
 
 export const agentFilesAtom = Atom.family((agentId: string) =>
-  listedOr(
-    backendRuntime
-      .atom(Backend.use((backend) => backend.ListAgentFiles({ agentId })))
-      .pipe(Atom.setIdleTTL(COMPOSER_LISTING_IDLE_TTL)),
+  relistedOnReachAtom(
+    agentId,
+    Backend.use((backend) => backend.ListAgentFiles({ agentId })),
     noFiles,
   ),
 )

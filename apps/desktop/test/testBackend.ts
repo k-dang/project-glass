@@ -47,6 +47,7 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         FollowRepository: unused,
         UnfollowRepository: unused,
         ListSkillPacks: () => Effect.succeed([]),
+        ListLocalSkills: () => Effect.succeed([]),
         PreviewSkillPack: unused,
         AddSkillPack: unused,
         PreviewSkillPackUpdate: unused,

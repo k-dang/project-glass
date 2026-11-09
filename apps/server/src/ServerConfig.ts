@@ -27,6 +27,7 @@ export class ServerConfig extends Context.Service<
     readonly agentHostBundle: string
     readonly gitRemote: string
     readonly dataDirectory: string
+    readonly homeDirectory: string
   }
 >()("@glass/server/ServerConfig") {
   static readonly layer = Layer.effect(
@@ -47,7 +48,8 @@ export class ServerConfig extends Context.Service<
         Config.withDefault("https://api.github.com"),
       )
 
-      const home = yield* Config.String("GLASS_HOME").pipe(Config.withDefault(""))
+      const homeDirectory =
+        (yield* Config.String("GLASS_HOME").pipe(Config.withDefault(""))) || homedir()
 
       const agentHostBundle = yield* Config.String("GLASS_AGENT_HOST_BUNDLE").pipe(
         Config.withDefault(bundledEntry("agentHost", import.meta.url)),
@@ -65,7 +67,8 @@ export class ServerConfig extends Context.Service<
         githubApiUrl,
         agentHostBundle,
         gitRemote,
-        dataDirectory: join(home || homedir(), ".project-glass"),
+        dataDirectory: join(homeDirectory, ".project-glass"),
+        homeDirectory,
       })
     }),
   )
