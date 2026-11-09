@@ -13,7 +13,7 @@ type FakeFile = string | ExecutableFile
 export type FakeFiles = Readonly<Record<string, FakeFile>>
 
 interface FakeRepository {
-  readonly defaultBranch: string
+  defaultBranch: string | null
   readonly refs: Map<string, string>
   readonly commits: Map<string, FakeFiles>
 }
@@ -38,6 +38,11 @@ export const blobSha = (contents: string | Buffer) => {
 const within = (folder: string, path: string) =>
   folder === "" ? path : path.startsWith(`${folder}/`) ? path.slice(folder.length + 1) : null
 
+interface Repository {
+  readonly owner: string
+  readonly repo: string
+}
+
 const keyOf = (owner: string, repo: string) => `${owner}/${repo}`.toLowerCase()
 
 export const fakeRepositories = () => {
@@ -54,7 +59,9 @@ export const fakeRepositories = () => {
   }
 
   const resolve = (repository: FakeRepository, revision: string) => {
-    const branch = repository.refs.get(revision)
+    const branch = repository.refs.get(
+      revision === "HEAD" ? (repository.defaultBranch ?? "") : revision,
+    )
 
     if (branch !== undefined) return branch
 
@@ -63,32 +70,57 @@ export const fakeRepositories = () => {
     return [...repository.commits.keys()].find((sha) => sha.startsWith(revision)) ?? null
   }
 
+  const repositoryAt = (key: string, defaultBranch: string | null) => {
+    const repository = repositories.get(key) ?? {
+      defaultBranch,
+      refs: new Map(),
+      commits: new Map(),
+    }
+
+    repositories.set(key, repository)
+
+    return repository
+  }
+
+  const commitTo = (repository: FakeRepository, key: string, ref: string, files: FakeFiles) => {
+    const commit = sha1("commit", key, ref, String(++pushes))
+
+    repository.commits.set(commit, files)
+    repository.refs.set(ref, commit)
+
+    return commit
+  }
+
   return {
-    push: (
-      { owner, repo }: { readonly owner: string; readonly repo: string },
-      ref: string,
-      files: FakeFiles,
+    seedBranches: (
+      { owner, repo }: Repository,
+      seed: { readonly defaultBranch: string | null; readonly branches: ReadonlyArray<string> },
     ) => {
       const key = keyOf(owner, repo)
+      const repository = repositoryAt(key, seed.defaultBranch)
 
-      const repository = repositories.get(key) ?? {
-        defaultBranch: ref,
-        refs: new Map(),
-        commits: new Map(),
-      }
+      repository.defaultBranch = seed.defaultBranch
+      repository.refs.clear()
 
-      const commit = sha1("commit", key, ref, String(++pushes))
+      for (const branch of seed.branches) commitTo(repository, key, branch, {})
+    },
+
+    push: ({ owner, repo }: Repository, ref: string, files: FakeFiles) => {
+      const key = keyOf(owner, repo)
+      const repository = repositoryAt(key, ref)
 
       for (const file of Object.values(files)) {
         const bytes = contentsOf(file)
         blobs.set(blobSha(bytes), bytes)
       }
 
-      repository.commits.set(commit, files)
-      repository.refs.set(ref, commit)
-      repositories.set(key, repository)
+      return commitTo(repository, key, ref, files)
+    },
 
-      return commit
+    branches: (owner: string, repo: string) => {
+      const repository = repositories.get(keyOf(owner, repo))
+
+      return repository === undefined ? undefined : [...repository.refs.keys()]
     },
 
     defaultBranch: (owner: string, repo: string) =>

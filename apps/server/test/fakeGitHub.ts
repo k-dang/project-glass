@@ -463,8 +463,6 @@ interface FakeGitHubOptions {
   ) => FakeFailure | undefined
 }
 
-const branchesKey = (owner: string, repo: string) => `${owner}/${repo}`.toLowerCase()
-
 export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubOptions = {}) {
   const failures: Array<FakeFailure> = []
   const graphQLFailures: Array<FakeGraphQLError> = []
@@ -473,11 +471,6 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
   const unavailableRepositories = new Set<string>()
   const timingOutRepositories = new Set<string>()
   const gitRefusedRepositories = new Set<string>()
-
-  const branches = new Map<
-    string,
-    { readonly defaultBranch: string | null; readonly branches: ReadonlyArray<string> }
-  >()
 
   const repositories = fakeRepositories()
 
@@ -951,22 +944,14 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
 
       case "RepositoryDefaultBranch": {
         const { owner, name } = request.variables
-        const seeded = branches.get(branchesKey(owner, name))
-        const pushed = repositories.defaultBranch(owner, name)
+        const defaultBranch = repositories.defaultBranch(owner, name)
 
-        if (seeded === undefined && pushed !== undefined) {
-          return {
-            data: { repository: { defaultBranchRef: { name: pushed } } },
-          }
-        }
-
-        if (seeded === undefined) return unresolvedRepository(owner, name)
+        if (defaultBranch === undefined) return unresolvedRepository(owner, name)
 
         return {
           data: {
             repository: {
-              defaultBranchRef:
-                seeded.defaultBranch === null ? null : { name: seeded.defaultBranch },
+              defaultBranchRef: defaultBranch === null ? null : { name: defaultBranch },
             },
           },
         }
@@ -1007,7 +992,7 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
 
       case "RepositoryBranches": {
         const { owner, name, after } = request.variables
-        const seeded = branches.get(branchesKey(owner, name))
+        const seeded = repositories.branches(owner, name)
 
         if (seeded === undefined) return unresolvedRepository(owner, name)
 
@@ -1015,7 +1000,7 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
           data: {
             repository: {
               refs: connectionPage(
-                seeded.branches.map((branch) => ({ name: branch })),
+                seeded.map((branch) => ({ name: branch })),
                 after,
               ),
             },
@@ -1184,9 +1169,7 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
 
       return pr
     },
-    seedBranches: ({ owner, repo }, seed) => {
-      branches.set(branchesKey(owner, repo), seed)
-    },
+    seedBranches: repositories.seedBranches,
     pushRepository: repositories.push,
     failNext: (failure) => {
       failures.push(failure)

@@ -185,7 +185,7 @@ export interface TreeBlob {
 
 type RepositoryName = Pick<FollowedRepository, "owner" | "repo">
 
-class RepositoryMissing extends Data.TaggedError("RepositoryMissing") {}
+export class RepositoryMissing extends Data.TaggedError("RepositoryMissing") {}
 
 const missingRepository = ({ type }: GraphQLError) =>
   type === "NOT_FOUND" || type === "FORBIDDEN" ? new RepositoryMissing() : undefined
@@ -995,25 +995,17 @@ export class GitHubClient extends Context.Service<
         return new RepositoryFiles({ paths: blobs.map(({ path }) => path), truncated })
       })
 
-      const defaultBranchQuery = <E>(
-        { owner, repo }: RepositoryName,
-        domainError: (error: GraphQLError) => E | undefined,
-      ) =>
-        graphql({
-          name: "RepositoryDefaultBranch",
-          query: REPOSITORY_DEFAULT_BRANCH_QUERY,
-          variables: { owner, name: repo },
-          response: RepositoryDefaultBranchResponse,
-          domainError,
-        })
-
       const repositoryDefaultBranch = (repository: FollowedRepository) => {
         const notFound = repositoryNotFound(repository)
 
         return Effect.gen(function* () {
-          const data = yield* defaultBranchQuery(repository, ({ type }) =>
-            type === "NOT_FOUND" ? notFound : undefined,
-          )
+          const data = yield* graphql({
+            name: "RepositoryDefaultBranch",
+            query: REPOSITORY_DEFAULT_BRANCH_QUERY,
+            variables: { owner: repository.owner, name: repository.repo },
+            response: RepositoryDefaultBranchResponse,
+            domainError: ({ type }) => (type === "NOT_FOUND" ? notFound : undefined),
+          })
 
           if (data.repository === null) return yield* notFound
 
@@ -1048,18 +1040,10 @@ export class GitHubClient extends Context.Service<
         { owner, repo }: RepositoryName,
         revision: string | null,
       ) {
-        const resolved =
-          revision ??
-          (yield* defaultBranchQuery({ owner, repo }, missingRepository).pipe(
-            Effect.flatMap(foundRepository),
-          )).defaultBranchRef?.name
-
-        if (resolved === undefined) return null
-
         const object = (yield* graphql({
           name: "CommitAtRevision",
           query: COMMIT_AT_REVISION_QUERY,
-          variables: { owner, name: repo, revision: resolved },
+          variables: { owner, name: repo, revision: revision ?? "HEAD" },
           response: CommitAtRevisionResponse,
           domainError: missingRepository,
         }).pipe(Effect.flatMap(foundRepository))).object

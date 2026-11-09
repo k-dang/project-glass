@@ -23,8 +23,15 @@ import { problemOf, settledProblem } from "./problems"
 import { SettingsSection } from "./SettingsSection"
 import { ShortSha } from "./shortSha"
 
+type ChangeTarget =
+  | { readonly kind: "add" }
+  | { readonly kind: "remove" | "update"; readonly name: string }
+
+const sameTarget = (a: ChangeTarget | null, b: ChangeTarget) =>
+  a !== null && a.kind === b.kind && (a.kind === "add" || (b.kind !== "add" && a.name === b.name))
+
 interface PackChange {
-  readonly target: string
+  readonly target: ChangeTarget
   readonly save: Effect.Effect<ReadonlyArray<SkillPack>, BackendError, Backend>
 }
 
@@ -34,7 +41,7 @@ const savedSkillPacksAtom = backendRuntime
 
 const changeAtom = backendRuntime.fn((change: PackChange) => change.save).pipe(Atom.keepAlive)
 
-export const skillPacksAtom = Atom.make((get) =>
+const skillPacksAtom = Atom.make((get) =>
   Option.match(AsyncResult.value(get(changeAtom)), {
     onSome: (saved) => AsyncResult.success(saved),
     onNone: () => get(savedSkillPacksAtom),
@@ -88,7 +95,7 @@ function DetailList(props: { label: string; items: ReadonlyArray<Detail> }) {
 
 function useChange() {
   const change = useAtomValue(changeAtom)
-  const [target, setTarget] = useState<string | null>(null)
+  const [target, setTarget] = useState<ChangeTarget | null>(null)
   const save = useAtomSet(changeAtom)
 
   return {
@@ -195,7 +202,7 @@ function PreviewCard(props: {
   const [name, setName] = useState(preview.suggestedName)
   const taken = props.packs.some((pack) => pack.name === name)
   const valid = isSkillPackName(name)
-  const adding = change.pending === "add"
+  const adding = sameTarget(change.pending, { kind: "add" })
 
   const hint = taken
     ? `You already have a pack named ${name}.`
@@ -211,7 +218,7 @@ function PreviewCard(props: {
         event.preventDefault()
 
         change.run({
-          target: "add",
+          target: { kind: "add" },
           save: Backend.use((backend) =>
             backend.AddSkillPack({ source: preview.source, commit: preview.commit, name }),
           ).pipe(Effect.tap(() => Effect.sync(props.onDone))),
@@ -299,7 +306,9 @@ function PackList(props: { packs: ReadonlyArray<SkillPack>; change: Change }) {
                   disabled={props.change.pending !== null}
                   onClick={() => setRemoving(pack.name)}
                 >
-                  {props.change.pending === `remove:${pack.name}` ? "Removing…" : "Remove"}
+                  {sameTarget(props.change.pending, { kind: "remove", name: pack.name })
+                    ? "Removing…"
+                    : "Remove"}
                 </Button>
               </div>
             </div>
@@ -331,7 +340,7 @@ function PackList(props: { packs: ReadonlyArray<SkillPack>; change: Change }) {
 
           setRemoving(null)
           props.change.run({
-            target: `remove:${name}`,
+            target: { kind: "remove", name },
             save: Backend.use((backend) => backend.RemoveSkillPack({ name })),
           })
         }}
@@ -342,7 +351,7 @@ function PackList(props: { packs: ReadonlyArray<SkillPack>; change: Change }) {
 
 function UpdateCard(props: { update: SkillPackUpdate; change: Change; onDone: () => void }) {
   const { update, change } = props
-  const saving = change.pending === `update:${update.name}`
+  const saving = sameTarget(change.pending, { kind: "update", name: update.name })
 
   if (update.from === update.to) {
     return (
@@ -374,7 +383,7 @@ function UpdateCard(props: { update: SkillPackUpdate; change: Change; onDone: ()
           disabled={change.pending !== null}
           onClick={() => {
             change.run({
-              target: `update:${update.name}`,
+              target: { kind: "update", name: update.name },
               save: Backend.use((backend) =>
                 backend.UpdateSkillPack({ name: update.name, commit: update.to }),
               ).pipe(Effect.tap(() => Effect.sync(props.onDone))),

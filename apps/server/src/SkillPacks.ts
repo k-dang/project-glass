@@ -279,7 +279,19 @@ export class SkillPacks extends Context.Service<
       const preparePin = Effect.fnUntraced(function* (source: SkillPackSource, commit: string) {
         const existing = yield* existingPin(source, commit).pipe(Effect.catch(storageFailure))
 
-        if (existing !== undefined) return Effect.succeed(existing)
+        if (existing !== undefined) {
+          return existingPin(source, commit).pipe(
+            Effect.flatMap((stillThere) =>
+              stillThere === undefined
+                ? Effect.fail(
+                    new SkillPackError({
+                      message: "Another change replaced this Skill pack's files. Try again.",
+                    }),
+                  )
+                : Effect.succeed(stillThere),
+            ),
+          )
+        }
 
         const { skills, downloaded } = yield* read(source, commit)
 
@@ -405,22 +417,31 @@ export class SkillPacks extends Context.Service<
         add: Effect.fn("SkillPacks.add")(function* (source, commit, name) {
           if (!isSkillPackName(name)) return yield* new InvalidSkillPackName({ name })
 
-          const taken = yield* sql`SELECT 1 FROM skill_pack WHERE name = ${name}`.pipe(
+          const taken = sql`SELECT 1 FROM skill_pack WHERE name = ${name}`.pipe(
             Effect.map((rows) => rows.length > 0),
-            Effect.catch(storageFailure),
           )
 
-          if (taken) return yield* new SkillPackNameTaken({ name })
+          if (yield* taken.pipe(Effect.catch(storageFailure))) {
+            return yield* new SkillPackNameTaken({ name })
+          }
 
           const storePin = yield* preparePin(source, commit)
 
           yield* Effect.gen(function* () {
+            if (yield* taken) return yield* new SkillPackNameTaken({ name })
+
             const pinId = yield* storePin
 
-            yield* sql`
+            return yield* sql`
               INSERT INTO skill_pack ${sql.insert({ name, ref: source.ref, pin_id: pinId })}
             `
-          }).pipe(sql.withTransaction, Effect.catch(storageFailure))
+          }).pipe(
+            sql.withTransaction,
+            Effect.catchIf(
+              (error) => !(error instanceof SkillPackNameTaken || error instanceof SkillPackError),
+              storageFailure,
+            ),
+          )
 
           return yield* list
         }),
@@ -474,7 +495,10 @@ export class SkillPacks extends Context.Service<
 
             yield* sql`UPDATE skill_pack SET pin_id = ${pinId} WHERE name = ${name}`
             yield* releaseUnusedPins
-          }).pipe(sql.withTransaction, Effect.catch(storageFailure))
+          }).pipe(
+            sql.withTransaction,
+            Effect.catchIf((error) => !(error instanceof SkillPackError), storageFailure),
+          )
 
           return yield* list
         }),
