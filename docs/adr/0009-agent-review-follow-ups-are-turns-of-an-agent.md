@@ -6,10 +6,10 @@ review gets one Agent (ADR 0007), started on the first Follow-up, and each Follo
 it. The agent keeps what it read in earlier Turns instead of rereading the checkout from a replayed
 transcript, and Follow-ups gain streamed answers, Steer, and Stop.
 
-The Agent works in a checkout of the review's Revision from Glass's cached clone (ADR 0005), with
-a shell to explore the change (ADR 0014), not a Local checkout worktree, since it never commits. It is seeded with the PR
-material and the review as data, never as instructions, because both come from the PR's author or
-an earlier agent.
+The Agent works in a checkout of the review's Revision from Glass's cached clone, with a shell like
+the review's own (ADR 0005), not a Local checkout worktree, since it never commits. It is seeded with
+the PR material and the review as data, never as instructions, because both come from the PR's
+author or an earlier agent.
 
 The agent proposes a Suggested draft by calling a Glass tool with a path, side, line, and body.
 Glass checks the line against the diff and rejects a call that misses it, so the agent can place it

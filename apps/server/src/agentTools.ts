@@ -1,5 +1,5 @@
 // Read-only tasks (Tours, Ask) read the checkout and nothing else. Shell tasks (Agent reviews and
-// their Follow-ups) also run commands, git above all, to find the change themselves (ADR 0014).
+// their Follow-ups) also run commands, git above all, to find the change themselves (ADR 0005).
 export type AgentTools = "read-only" | "shell"
 
 const claudeReadTools = ["Read", "Grep", "Glob"]
