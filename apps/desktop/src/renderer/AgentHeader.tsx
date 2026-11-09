@@ -1,7 +1,7 @@
-import type { AgentPlace } from "@glass/contracts"
+import { type AgentPlace, type AgentSkillPack, shortSha } from "@glass/contracts"
 import { cn } from "cn"
-import { FolderGit2, GitBranch, PanelTop } from "lucide-react"
-import type { ReactNode } from "react"
+import { FolderGit2, GitBranch, Package, PanelTop } from "lucide-react"
+import { Fragment, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { AgentsPanelToggle, NewAgentLink } from "./Agents"
@@ -16,6 +16,7 @@ export function AgentHeader(props: {
   repository?: string | undefined
   branch?: string | undefined
   baseBranch: string | null
+  skillPacks?: ReadonlyArray<AgentSkillPack> | undefined
   children?: ReactNode
 }) {
   const PlaceIcon = props.place === null ? null : placeIcons[props.place._tag]
@@ -50,6 +51,19 @@ export function AgentHeader(props: {
                   </span>
                 </div>
               </>
+            )}
+            {props.skillPacks !== undefined && props.skillPacks.length > 0 && (
+              <div className={fact}>
+                <Package aria-hidden />
+                <span className="truncate">
+                  {props.skillPacks.map(({ name, commit }, index) => (
+                    <Fragment key={name}>
+                      {index > 0 && " · "}
+                      <span>{`${name} @ ${shortSha(commit)}`}</span>
+                    </Fragment>
+                  ))}
+                </span>
+              </div>
             )}
             {props.children}
           </PopoverContent>

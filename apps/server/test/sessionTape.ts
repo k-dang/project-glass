@@ -326,9 +326,13 @@ export const sessionTape = (
 
   const nextRecorded = (args: ReadonlyArray<string>, cwd: string | undefined) => {
     const process = recorded.processes[nextProcess++]
-    const started = show({ args: args.map(normalizeText), cwd: normalizeText(cwd ?? "") })
+    const actual = { args: args.map(normalizeText), cwd: normalizeText(cwd ?? "") }
+    const started = show(actual)
 
-    if (process === undefined || show({ args: [...process.args], cwd: process.cwd }) !== started) {
+    if (
+      process === undefined ||
+      !tryMatch({ args: [...process.args], cwd: process.cwd }, actual, ids)
+    ) {
       problem(`Glass started a program the recording doesn't have: ${started}`)
 
       return undefined

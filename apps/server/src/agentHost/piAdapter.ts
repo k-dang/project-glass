@@ -19,6 +19,7 @@ import {
   FileSystem,
   Match,
   Option,
+  type PlatformError,
   Predicate,
   Queue,
   Schema,
@@ -57,8 +58,10 @@ import {
   type GlassToolsAccess,
   HostAgentError,
   notRunning,
+  type SkillSource,
 } from "./protocol"
 import { settleWith } from "./requests"
+import { writeSentSkills } from "./sentSkills"
 import { piLoadsNothing, piReadOnlyTools } from "../readOnlyTools"
 import { piSuggestDraftExtension } from "./suggestDraftTool"
 import { runTurns } from "./turnLoop"
@@ -191,17 +194,31 @@ const lockedDownFlags = Effect.fnUntraced(function* (
   ]
 })
 
+const skillFlags = (folder: string, skills: ReadonlyArray<SkillSource>) =>
+  writeSentSkills(folder, skills).pipe(
+    Effect.map((written) =>
+      written.flatMap((plugin) => plugin.skills.flatMap((skill) => ["--skill", skill])),
+    ),
+  )
+
+const couldNotPrepare = (error: PlatformError.PlatformError) =>
+  Effect.logWarning("Couldn't prepare pi's tools", error).pipe(
+    Effect.andThen(
+      Effect.fail(new HostAgentError({ message: "Couldn't prepare pi's tools. Try again." })),
+    ),
+  )
+
 const roleFlags = (folder: string, role: ConversationRole) =>
   Match.value(role).pipe(
     Match.tagsExhaustive({
-      Work: () => Effect.succeed([]),
+      Work: ({ skills }) => skillFlags(folder, skills),
       Review: ({ brief }) =>
         lockedDownFlags(
           folder,
           [...piReadOnlyTools, SUGGEST_DRAFT_TOOL],
           [{ name: "suggest-draft.js", source: piSuggestDraftExtension(brief) }],
           brief.instructions,
-        ),
+        ).pipe(Effect.catch(couldNotPrepare)),
       Global: () =>
         lockedDownFlags(
           folder,
@@ -211,7 +228,7 @@ const roleFlags = (folder: string, role: ConversationRole) =>
             { name: "glass-tools.js", source: piGlassToolsExtension },
           ],
           globalInstructions,
-        ),
+        ).pipe(Effect.catch(couldNotPrepare)),
     }),
   )
 
@@ -253,9 +270,13 @@ export const piAdapter = (command: string) =>
         })
       }).pipe(Effect.scoped),
 
-      commands: (folder: string) =>
+      commands: (folder: string, skills: ReadonlyArray<SkillSource>) =>
         Effect.gen(function* () {
-          const rpc = yield* startPi(folder)
+          const flags = yield* skillFlags(folder, skills).pipe(
+            Effect.provideService(FileSystem.FileSystem, fs),
+          )
+
+          const rpc = yield* startPi(folder, undefined, flags)
 
           const { commands } = yield* rpc.request({ type: "get_commands" }, AvailableCommands).pipe(
             Effect.tapError((error) => Effect.logWarning("pi didn't list its commands", error)),
@@ -275,10 +296,6 @@ export const piAdapter = (command: string) =>
 
         const flags = yield* roleFlags(folder, role).pipe(
           Effect.provideService(FileSystem.FileSystem, fs),
-          Effect.tapError((error) => Effect.logWarning("Couldn't prepare pi's tools", error)),
-          Effect.mapError(
-            () => new HostAgentError({ message: "Couldn't prepare pi's tools. Try again." }),
-          ),
         )
 
         const rpc = yield* startPi(

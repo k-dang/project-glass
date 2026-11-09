@@ -26,6 +26,8 @@ import {
   SandboxStatus,
   localPlace,
   SavedPlace,
+  SkillPack,
+  SkillPackSource,
   TextPart,
   ThinkingPart,
   ToDo,
@@ -89,6 +91,7 @@ const mount = (handlers: Parameters<typeof testLayer>[0], path = `/agents/${agen
 
 afterEach(() => {
   cleanup()
+  localStorage.clear()
   window.history.replaceState(null, "", "#/")
 })
 
@@ -275,11 +278,73 @@ it("starts an Agent from its first message, on the repository's default branch",
       effort: null,
       permissionMode: null,
       place: localPlace,
+      skillPacks: [],
       message: "Fix the bug",
       images: [],
     },
   ])
   await waitFor(() => expect(window.location.hash).toBe(`#/agents/${agent.id}`))
+})
+
+const pack = (name: string, commit: string) =>
+  new SkillPack({
+    name,
+    source: new SkillPackSource({ owner: "acme", repo: "skills", ref: "main", path: name }),
+    commit,
+    updatable: true,
+    skills: [],
+  })
+
+it("starts an Agent with the Skill packs picked, and picks the same ones next time", async () => {
+  const created: Array<NewAgent> = []
+
+  const handlers = {
+    ...newAgentHandlers(created, []),
+    ListSkillPacks: () =>
+      Effect.succeed([pack("docs", "1111111aaaa"), pack("team", "ae5650fbbbb")]),
+  }
+
+  const user = mount(handlers, "/agents/new")
+
+  const packs = await within(await screen.findByRole("region", { name: "New Agent" })).findByRole(
+    "combobox",
+    { name: "Skill packs" },
+  )
+
+  expect(within(packs).getByText("No Skill packs")).toBeTruthy()
+  await user.click(packs)
+  await user.click(await screen.findByRole("option", { name: "team" }))
+  await user.keyboard("{Escape}")
+  expect(within(packs).getByText("team")).toBeTruthy()
+  await user.type(within(newAgentDraft()).getByRole("textbox", { name: "Message" }), "One{Enter}")
+  await waitFor(() => expect(window.location.hash).toBe(`#/agents/${agent.id}`))
+
+  cleanup()
+  const again = mount(handlers, "/agents/new")
+
+  const remembered = await within(
+    await screen.findByRole("region", { name: "New Agent" }),
+  ).findByRole("combobox", { name: "Skill packs" })
+
+  expect(within(remembered).getByText("team")).toBeTruthy()
+  await again.type(within(newAgentDraft()).getByRole("textbox", { name: "Message" }), "Two{Enter}")
+
+  expect(created.map(({ skillPacks }) => skillPacks)).toEqual([["team"], ["team"]])
+})
+
+it("shows the Skill packs and commits an Agent was created with in its details", async () => {
+  const user = mount({
+    WatchAgents: () =>
+      Stream.make([
+        new Agent({ ...agentFields, skillPacks: [{ name: "team", commit: "ae5650fbbbb" }] }),
+      ]),
+    WatchTranscript: () =>
+      Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
+  })
+
+  await user.click(await screen.findByRole("button", { name: "Details" }))
+
+  expect(await screen.findByText("team @ ae5650f")).toBeTruthy()
 })
 
 it("shows the first message at once while the Agent starts", async () => {

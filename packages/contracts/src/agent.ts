@@ -109,6 +109,10 @@ export class SandboxStatus extends Schema.Class<SandboxStatus>("SandboxStatus")(
   reach: SandboxReach,
 }) {}
 
+export const AgentSkillPack = Schema.Struct({ name: Schema.String, commit: Schema.String })
+
+export type AgentSkillPack = typeof AgentSkillPack.Type
+
 export class Agent extends Schema.Class<Agent>("Agent")({
   id: Schema.String,
   name: Schema.String,
@@ -118,6 +122,7 @@ export class Agent extends Schema.Class<Agent>("Agent")({
   engine: AgentEngine,
   ...ModelChoice.fields,
   permissionMode: Schema.NullOr(PermissionMode),
+  skillPacks: Schema.Array(AgentSkillPack),
   createdAt: Schema.DateTimeUtcFromString,
   sandbox: Schema.NullOr(SandboxStatus),
 }) {}
@@ -476,6 +481,7 @@ export const NewAgent = Schema.Struct({
   ...ModelChoice.fields,
   permissionMode: Schema.NullOr(PermissionMode),
   place: AgentPlace,
+  skillPacks: Schema.Array(Schema.String),
   ...MessageInput.fields,
 })
 

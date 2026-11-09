@@ -127,7 +127,7 @@ export class LocalPlacement extends Context.Service<
           const { path } = yield* checkouts.get(repository)
 
           return yield* host.client.pipe(
-            Effect.flatMap((client) => client.ListCommands({ engine, folder: path })),
+            Effect.flatMap((client) => client.ListCommands({ engine, folder: path, skills: [] })),
             Effect.mapError(asAgentError),
           )
         }),

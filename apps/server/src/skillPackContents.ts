@@ -34,7 +34,7 @@ export const candidateSkillPackSources = (input: string): ReadonlyArray<SkillPac
   )
 }
 
-const lastSegment = (path: string) => path.slice(path.lastIndexOf("/") + 1)
+export const lastSegment = (path: string) => path.slice(path.lastIndexOf("/") + 1)
 
 const folderName = ({ repo, path }: SkillPackSource) => lastSegment(path === "" ? repo : path)
 

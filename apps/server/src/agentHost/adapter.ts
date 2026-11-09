@@ -7,7 +7,13 @@ import type {
 } from "@glass/contracts"
 import type { Effect, Scope } from "effect"
 import type { DeliveredMessage } from "./deliveredMessage"
-import type { ConversationRole, HostAgentError, SteersNotTakenIn, TurnSettings } from "./protocol"
+import type {
+  ConversationRole,
+  HostAgentError,
+  SkillSource,
+  SteersNotTakenIn,
+  TurnSettings,
+} from "./protocol"
 
 export interface AgentSession {
   readonly configure: (settings: TurnSettings) => Effect.Effect<void, HostAgentError>
@@ -27,7 +33,10 @@ export interface AgentSession {
 
 export interface AgentAdapter<Role extends ConversationRole = ConversationRole> {
   readonly models: Effect.Effect<AgentModels, HostAgentError>
-  readonly commands: (folder: string) => Effect.Effect<ReadonlyArray<AgentCommand>, HostAgentError>
+  readonly commands: (
+    folder: string,
+    skills: ReadonlyArray<SkillSource>,
+  ) => Effect.Effect<ReadonlyArray<AgentCommand>, HostAgentError>
   readonly start: (options: {
     readonly folder: string
     readonly conversation: string

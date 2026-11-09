@@ -36,6 +36,7 @@ import {
   type ConversationRole,
   GlobalRole,
   type ReviewBrief,
+  type SkillSource,
   type TurnSettings,
   WorkRole,
 } from "../src/agentHost/protocol"
@@ -98,7 +99,7 @@ const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
     Effect.map((current) => waiting(current)!),
   )
 
-  const open = (conversation: string, role: Role | Work = WorkRole.make({})) =>
+  const open = (conversation: string, role: Role | Work = WorkRole.make({ skills: [] })) =>
     adapter.start({ folder, conversation, role, report }).pipe(
       Effect.map((session: AgentSession) => ({
         session,
@@ -141,6 +142,19 @@ export const writeGreetSkill = (skills: string) =>
       "---\nname: greet\ndescription: Greets the user by name.\n---\n\nSay hello.\n",
     )
   })
+
+export const greetPack: SkillSource = {
+  name: "team",
+  files: [
+    {
+      path: "greet/SKILL.md",
+      executable: false,
+      contents: new TextEncoder().encode(
+        "---\nname: greet\ndescription: Greets the team by name.\n---\n\nSay hello to the team.\n",
+      ),
+    },
+  ],
+}
 
 export const writeGreeter = (folder: string) =>
   Effect.sync(() => writeFileSync(join(folder, "greet.ts"), "hi\nhello name\nbye\n"))
@@ -240,7 +254,9 @@ export const claudeSession = Effect.fnUntraced(function* (
       tape.sessionInfo(id, options?.dir, () => getSessionInfo(id, options)),
   }
 
-  return yield* drive(claudeAdapter(pinnedClaude(), sdk), tape, folder, { model: "haiku" })
+  const adapter = yield* claudeAdapter(pinnedClaude(), sdk).pipe(Effect.provide(NodeServices.layer))
+
+  return yield* drive(adapter, tape, folder, { model: "haiku" })
 })
 
 const PROVIDER_CREDENTIAL = /^(AWS|GOOGLE|GCLOUD|AZURE|ANTHROPIC)_|_(API_KEY|TOKEN)$/

@@ -13,7 +13,7 @@ const programs = Effect.gen(function* () {
   )
 
   return {
-    "claude-code": claudeAdapter(claudeCommand),
+    "claude-code": yield* claudeAdapter(claudeCommand),
     pi: yield* piAdapter(piCommand),
   }
 })

@@ -11,6 +11,7 @@ export const agentFields = {
   model: null,
   effort: null,
   permissionMode: null,
+  skillPacks: [],
   createdAt: DateTime.makeUnsafe("2026-10-26T12:00:00Z"),
   sandbox: null,
 } as const

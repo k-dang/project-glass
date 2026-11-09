@@ -13,6 +13,7 @@ import {
 import { Effect, Predicate, Schema } from "effect"
 import { join } from "node:path"
 import {
+  greetPack,
   piSession,
   reviewBrief,
   run,
@@ -262,11 +263,29 @@ it.live("lists the user's skills among what pi runs as `/name`, named as pi take
     const f = yield* piSession("pi-commands")
     yield* writeGreetSkill(join(f.home, ".pi", "agent", "skills"))
 
-    const commands = yield* f.adapter.commands(f.folder)
+    const commands = yield* f.adapter.commands(f.folder, [])
 
     assert.deepStrictEqual(
       commands.find(({ name }) => name === "skill:greet"),
       { name: "skill:greet", description: "Greets the user by name." },
+    )
+  }).pipe(Effect.scoped),
+)
+
+it.live("lists a sent Skill pack's skills, keeping the user's own skill of the same name", () =>
+  Effect.gen(function* () {
+    const f = yield* piSession("pi-skill-pack")
+
+    const sentOnly = yield* f.adapter.commands(f.folder, [greetPack])
+    yield* writeGreetSkill(join(f.home, ".pi", "agent", "skills"))
+    const clashing = yield* f.adapter.commands(f.folder, [greetPack])
+
+    assert.deepStrictEqual(
+      [sentOnly, clashing].map((commands) => commands.find(({ name }) => name === "skill:greet")),
+      [
+        { name: "skill:greet", description: "Greets the team by name." },
+        { name: "skill:greet", description: "Greets the user by name." },
+      ],
     )
   }).pipe(Effect.scoped),
 )

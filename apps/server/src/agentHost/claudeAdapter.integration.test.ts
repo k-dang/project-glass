@@ -16,6 +16,7 @@ import { Effect, Predicate } from "effect"
 import { join } from "node:path"
 import {
   claudeSession,
+  greetPack,
   reviewBrief,
   run,
   writeGreeter,
@@ -64,6 +65,19 @@ it.live("answers Claude Code's Permission requests and Questions through Glass",
     assert.include(
       Predicate.isTagged(lastText(answered[1]), "Text") ? lastText(answered[1])!.text : "",
       "Only the README",
+    )
+  }).pipe(Effect.scoped),
+)
+
+it.live("lists a sent Skill pack's skills as `/pack:skill`", () =>
+  Effect.gen(function* () {
+    const f = yield* claudeSession("claude-skill-pack")
+
+    const commands = yield* f.adapter.commands(f.folder, [greetPack])
+
+    assert.deepStrictEqual(
+      commands.find(({ name }) => name === "team:greet"),
+      { name: "team:greet", description: "(team) Greets the team by name." },
     )
   }).pipe(Effect.scoped),
 )
@@ -125,7 +139,7 @@ it.live("lists the folder's skills among what Claude Code runs as `/name`", () =
     const f = yield* claudeSession("claude-commands")
     yield* writeGreetSkill(join(f.folder, ".claude", "skills"))
 
-    const commands = yield* f.adapter.commands(f.folder)
+    const commands = yield* f.adapter.commands(f.folder, [])
 
     assert.deepStrictEqual(
       commands.find(({ name }) => name === "greet"),

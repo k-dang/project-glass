@@ -60,7 +60,19 @@ export const ReviewBrief = Schema.Struct({
 
 export type ReviewBrief = typeof ReviewBrief.Type
 
-export const WorkRole = Schema.TaggedStruct("Work", {})
+export const SkillFile = Schema.Struct({
+  path: Schema.String,
+  executable: Schema.Boolean,
+  contents: Schema.Uint8Array,
+})
+
+export type SkillFile = typeof SkillFile.Type
+
+export const SkillSource = Schema.Struct({ name: Schema.String, files: Schema.Array(SkillFile) })
+
+export type SkillSource = typeof SkillSource.Type
+
+export const WorkRole = Schema.TaggedStruct("Work", { skills: Schema.Array(SkillSource) })
 
 export const ReviewRole = Schema.TaggedStruct("Review", { brief: ReviewBrief })
 
@@ -113,7 +125,7 @@ export class AgentHostRpcs extends RpcGroup.make(
     error: HostAgentError,
   }),
   Rpc.make("ListCommands", {
-    payload: { engine: AgentEngine, folder: HostFolder },
+    payload: { engine: AgentEngine, folder: HostFolder, skills: Schema.Array(SkillSource) },
     success: Schema.Array(AgentCommand),
     error: HostAgentError,
   }),

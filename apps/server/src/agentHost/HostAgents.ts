@@ -14,6 +14,7 @@ import {
   type AgentRole,
   type ConversationStart,
   HostAgentError,
+  type SkillSource,
   type SteersNotTakenIn,
   type TurnSettings,
 } from "./protocol"
@@ -39,6 +40,7 @@ export class HostAgents extends Context.Service<
     readonly commands: (
       engine: AgentEngine,
       folder: string,
+      skills: ReadonlyArray<SkillSource>,
     ) => Effect.Effect<ReadonlyArray<AgentCommand>, HostAgentError>
     readonly start: (start: ConversationStart) => Effect.Effect<boolean, HostAgentError>
     readonly startTurn: (
@@ -130,7 +132,7 @@ export class HostAgents extends Context.Service<
 
         return HostAgents.of({
           models: (engine) => adapters[engine].models,
-          commands: (engine, folder) => adapters[engine].commands(folder),
+          commands: (engine, folder, skills) => adapters[engine].commands(folder, skills),
           start,
           startTurn: Effect.fnUntraced(function* (agentId, turnId, message, settings) {
             const agent = yield* find(agentId)
