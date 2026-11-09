@@ -37,7 +37,6 @@ export function FeedbackNoteCard(props: {
   onShow: (() => void) | null
   onEdit: (() => void) | null
   onRemove: () => Promise<Problem | null>
-  foldedCode?: boolean
 }) {
   const { note, older } = props
   const [removing, setRemoving] = useState(false)
@@ -73,7 +72,6 @@ export function FeedbackNoteCard(props: {
       </div>
       {older && <Snippet code={note.code} />}
       <p className="whitespace-pre-wrap wrap-anywhere">{note.text}</p>
-      {props.foldedCode === true && !older && <OriginalCode code={note.code} />}
       {problem !== null && (
         <ProblemAlert problem={problem} action={{ label: "Retry", run: () => void remove() }} />
       )}
@@ -93,17 +91,6 @@ export function FeedbackNoteCard(props: {
         </Button>
       </div>
     </article>
-  )
-}
-
-function OriginalCode(props: { code: string }) {
-  return (
-    <details className="text-xs">
-      <summary className="cursor-pointer text-muted-foreground">Original code</summary>
-      <div className="pt-1">
-        <Snippet code={props.code} />
-      </div>
-    </details>
   )
 }
 
@@ -162,7 +149,6 @@ export function StagedFeedback(props: {
                   editing === null ? () => setEditing({ id: note.id, draft: note.text }) : null
                 }
                 onRemove={() => props.onRemove(note.id)}
-                foldedCode
               />
             )}
           </li>
