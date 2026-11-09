@@ -74,6 +74,7 @@ it.live("upgrades existing Activity history and uses its indexes after reopening
       [22, "index_activity_by_kind"],
       [23, "create_global_conversation"],
       [24, "name_local_place"],
+      [25, "global_conversation_on_pi"],
     ] as const
 
     for (const expected of [upgrade, []] as const) {
@@ -366,5 +367,33 @@ it.live("keeps Agents started on this device in Activity history", () =>
       rows.map(({ payload }) => decodeAgentStarted(payload).machine),
       ["local", "sandbox"],
     )
+  }),
+)
+
+it.live("moves a Global conversation from Claude Code to pi with pi's default model", () =>
+  Effect.gen(function* () {
+    const home = yield* isolatedHome
+    yield* Effect.promise(() => mkdir(join(home, ".project-glass"), { recursive: true }))
+
+    const before = Object.fromEntries(Object.entries(migrations).filter(([id]) => id < "0025"))
+
+    yield* Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient
+      yield* SqliteMigrator.run({ loader: SqliteMigrator.fromRecord(before) })
+      yield* sql`
+        INSERT INTO global_conversation (id, engine, model, effort)
+        VALUES ('global-1', 'claude-code', 'opus', 'high')
+      `
+    }).pipe(
+      Effect.provide(SqliteClient.layer({ filename: join(home, ".project-glass", "glass.db") })),
+      Effect.scoped,
+    )
+
+    const { client } = yield* startBackend({}, home)
+
+    assert.deepStrictEqual(yield* client.GetGlobalConversationModel(), {
+      model: null,
+      effort: null,
+    })
   }),
 )

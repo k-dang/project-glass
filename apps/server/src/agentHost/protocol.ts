@@ -74,9 +74,29 @@ export type GlassToolsAccess = typeof GlassToolsAccess.Type
 
 export const GlobalRole = Schema.TaggedStruct("Global", { tools: GlassToolsAccess })
 
-export const ConversationRole = Schema.Union([WorkRole, ReviewRole, GlobalRole])
+export const AgentRole = Schema.Union([WorkRole, ReviewRole])
 
-export type ConversationRole = typeof ConversationRole.Type
+export type AgentRole = typeof AgentRole.Type
+
+export type ConversationRole = AgentRole | typeof GlobalRole.Type
+
+/** An Agent runs in either Agent program; the Global conversation runs only in pi. */
+export const ConversationStart = Schema.Union([
+  Schema.Struct({
+    agentId: Schema.String,
+    engine: AgentEngine,
+    folder: HostFolder,
+    role: AgentRole,
+  }),
+  Schema.Struct({
+    agentId: Schema.String,
+    engine: Schema.Literal("pi"),
+    folder: HostFolder,
+    role: GlobalRole,
+  }),
+])
+
+export type ConversationStart = typeof ConversationStart.Type
 
 export class HostAgentError extends Schema.TaggedError<HostAgentError>()("HostAgentError", {
   message: Schema.String,
@@ -98,12 +118,7 @@ export class AgentHostRpcs extends RpcGroup.make(
     error: HostAgentError,
   }),
   Rpc.make("StartAgent", {
-    payload: {
-      agentId: Schema.String,
-      engine: AgentEngine,
-      folder: HostFolder,
-      role: ConversationRole,
-    },
+    payload: ConversationStart,
     /** Whether it started the program, rather than finding it already running. */
     success: Schema.Boolean,
     error: HostAgentError,

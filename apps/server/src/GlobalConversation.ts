@@ -1,8 +1,8 @@
 import {
-  AgentBusy,
+  type AgentBusy,
   AgentError,
-  GlobalConversationProgram,
   type MessageInputWithContext,
+  ModelChoice,
   type RequestAnswer,
   type RequestNotWaiting,
   type RequestWaiting,
@@ -31,19 +31,13 @@ import { GlobalRole } from "./agentHost/protocol"
 import { type Conversation, ConversationTurns } from "./ConversationTurns"
 import { LocalAgentHost } from "./LocalAgentHost"
 import { McpCredentials } from "./mcp/McpCredentials"
-import { asAgentError, type HostClient } from "./Placement"
+import type { HostClient } from "./Placement"
 import { ServerConfig } from "./ServerConfig"
 import { Transcripts } from "./Transcripts"
 
-const StoredConversation = Schema.Struct({ id: Schema.String, ...GlobalConversationProgram.fields })
+const StoredConversation = Schema.Struct({ id: Schema.String, ...ModelChoice.fields })
 
 const decodeStored = Schema.decodeUnknownEffect(Schema.Array(StoredConversation))
-
-const firstProgram = new GlobalConversationProgram({
-  engine: "claude-code",
-  model: null,
-  effort: null,
-})
 
 const hostGone = new AgentError({ message: "Glass lost the process that runs Agents. Try again." })
 
@@ -53,10 +47,8 @@ const storageFailure = () =>
 export class GlobalConversation extends Context.Service<
   GlobalConversation,
   {
-    readonly program: Effect.Effect<GlobalConversationProgram>
-    readonly changeProgram: (
-      program: GlobalConversationProgram,
-    ) => Effect.Effect<GlobalConversationProgram, AgentBusy | AgentError>
+    readonly model: Effect.Effect<ModelChoice>
+    readonly changeModel: (choice: ModelChoice) => Effect.Effect<void, AgentError>
     readonly transcript: Stream.Stream<TranscriptUpdate, AgentError>
     readonly send: (
       input: MessageInputWithContext,
@@ -89,7 +81,7 @@ export class GlobalConversation extends Context.Service<
       const folder = join(config.dataDirectory, "global-conversation")
 
       const [stored] = yield* sql`
-        SELECT id, engine, model, effort FROM global_conversation LIMIT 1
+        SELECT id, model, effort FROM global_conversation LIMIT 1
       `.pipe(Effect.flatMap(decodeStored), Effect.orDie)
 
       const id = stored?.id ?? randomUUID()
@@ -97,23 +89,23 @@ export class GlobalConversation extends Context.Service<
       if (stored === undefined)
         yield* sql`INSERT INTO global_conversation ${sql.insert({
           id,
-          engine: firstProgram.engine,
-          model: firstProgram.model,
-          effort: firstProgram.effort,
+          model: null,
+          effort: null,
         })}`.pipe(Effect.orDie)
 
-      const program = yield* SubscriptionRef.make(
-        stored === undefined ? firstProgram : new GlobalConversationProgram(stored),
-      )
+      const model = yield* SubscriptionRef.make<ModelChoice>({
+        model: stored?.model ?? null,
+        effort: stored?.effort ?? null,
+      })
 
       yield* fs.makeDirectory(folder, { recursive: true }).pipe(Effect.orDie)
 
-      // Each start of the program gets a fresh credential, revoked when it is replaced or the
-      // program is switched, and with the host's lifetime when the host stops.
+      // Each start of pi gets a fresh credential, revoked when it is replaced, and with the host's
+      // lifetime when the host stops.
       const starting = yield* Semaphore.make(1)
       let runningCredential: Scope.Closeable | null = null
 
-      const replaceRunning = (next: Scope.Closeable | null) =>
+      const replaceRunning = (next: Scope.Closeable) =>
         Effect.suspend(() => {
           const ending = runningCredential
           runningCredential = next
@@ -121,9 +113,7 @@ export class GlobalConversation extends Context.Service<
           return ending === null ? Effect.void : Scope.close(ending, Exit.void)
         })
 
-      const revokeRunning = starting.withPermits(1)(replaceRunning(null))
-
-      const start = (engine: GlobalConversationProgram["engine"]) => (client: HostClient) =>
+      const start = (client: HostClient) =>
         starting.withPermits(1)(
           Effect.gen(function* () {
             const lifetime = yield* host.lifetimeOf(client).pipe(
@@ -144,7 +134,7 @@ export class GlobalConversation extends Context.Service<
             })
 
             const started = yield* client
-              .StartAgent({ agentId: id, engine, folder, role })
+              .StartAgent({ agentId: id, engine: "pi", folder, role })
               .pipe(Effect.onError(() => revoke))
 
             yield* started ? replaceRunning(credential) : revoke
@@ -160,11 +150,11 @@ export class GlobalConversation extends Context.Service<
         Effect.forkIn(scope),
       )
 
-      const conversation = SubscriptionRef.get(program).pipe(
-        Effect.map(({ engine, model, effort }): Conversation => ({
+      const conversation = SubscriptionRef.get(model).pipe(
+        Effect.map((choice): Conversation => ({
           id,
-          start: start(engine),
-          settings: { model, effort, permissionMode: null },
+          start,
+          settings: { ...choice, permissionMode: null },
           host: host.client,
           runningHost: host.running,
         })),
@@ -176,47 +166,25 @@ export class GlobalConversation extends Context.Service<
 
       yield* transcripts.endRunning(TurnInterrupted.make({}), [id]).pipe(Effect.orDie)
 
-      const saveProgram = (next: GlobalConversationProgram) =>
-        sql`
+      const changeModel = Effect.fn("GlobalConversation.changeModel")(function* (
+        choice: ModelChoice,
+      ) {
+        yield* sql`
           UPDATE global_conversation
-          SET engine = ${next.engine}, model = ${next.model}, effort = ${next.effort}
+          SET model = ${choice.model}, effort = ${choice.effort}
           WHERE id = ${id}
         `.pipe(
           Effect.tapError((cause) =>
-            Effect.logWarning("Couldn't save the Global conversation's program", cause),
+            Effect.logWarning("Couldn't save the Global conversation's model", cause),
           ),
           Effect.mapError(storageFailure),
-          Effect.andThen(SubscriptionRef.set(program, next)),
-          Effect.as(next),
         )
-
-      const switchProgram = (next: GlobalConversationProgram) =>
-        turns.whileIdle(
-          id,
-          host.running.pipe(
-            Effect.flatMap(
-              Option.match({
-                onNone: () => Effect.void,
-                onSome: (running) =>
-                  running.StopAgent({ agentId: id }).pipe(Effect.mapError(asAgentError)),
-              }),
-            ),
-            Effect.andThen(revokeRunning),
-            Effect.andThen(saveProgram(next)),
-          ),
-        )
-
-      const changeProgram = Effect.fn("GlobalConversation.changeProgram")(function* (
-        next: GlobalConversationProgram,
-      ) {
-        const current = yield* SubscriptionRef.get(program)
-
-        return yield* next.engine === current.engine ? saveProgram(next) : switchProgram(next)
+        yield* SubscriptionRef.set(model, choice)
       })
 
       return GlobalConversation.of({
-        program: SubscriptionRef.get(program),
-        changeProgram,
+        model: SubscriptionRef.get(model),
+        changeModel,
         transcript: transcripts.watch(id),
         send: (input) => turns.send(id, input).pipe(Effect.asVoid),
         steer: (input) =>

@@ -1,6 +1,7 @@
 import {
   type AgentCommand,
   type AgentEngine,
+  type AgentEvent,
   type AgentModels,
   type RequestAnswer,
   RequestNotWaiting,
@@ -10,11 +11,17 @@ import type { AgentAdapter, AgentSession } from "./adapter"
 import type { DeliveredMessage } from "./deliveredMessage"
 import { Journal } from "./Journal"
 import {
-  type ConversationRole,
+  type AgentRole,
+  type ConversationStart,
   HostAgentError,
   type SteersNotTakenIn,
   type TurnSettings,
 } from "./protocol"
+
+export interface Programs {
+  readonly "claude-code": AgentAdapter<AgentRole>
+  readonly pi: AgentAdapter
+}
 
 interface Running {
   readonly scope: Scope.Closeable
@@ -33,12 +40,7 @@ export class HostAgents extends Context.Service<
       engine: AgentEngine,
       folder: string,
     ) => Effect.Effect<ReadonlyArray<AgentCommand>, HostAgentError>
-    readonly start: (
-      agentId: string,
-      engine: AgentEngine,
-      folder: string,
-      role: ConversationRole,
-    ) => Effect.Effect<boolean, HostAgentError>
+    readonly start: (start: ConversationStart) => Effect.Effect<boolean, HostAgentError>
     readonly startTurn: (
       agentId: string,
       turnId: string,
@@ -58,7 +60,7 @@ export class HostAgents extends Context.Service<
     readonly stop: (agentId: string) => Effect.Effect<void>
   }
 >()("@glass/server/agentHost/HostAgents") {
-  static readonly make = (adapters: Record<AgentEngine, AgentAdapter>) =>
+  static readonly make = (adapters: Programs) =>
     Layer.effect(
       HostAgents,
       Effect.gen(function* () {
@@ -68,24 +70,29 @@ export class HostAgents extends Context.Service<
         const lock = yield* Semaphore.make(1)
 
         const start = Effect.fn("HostAgents.start")(
-          function* (agentId: string, engine: AgentEngine, folder: string, role: ConversationRole) {
+          function* (starting: ConversationStart) {
+            const { agentId, folder } = starting
             const current = running.get(agentId)
 
             if (current !== undefined && !(yield* current.session.stopped)) return false
 
             const scope = yield* Scope.fork(hostScope)
+            const report = (event: AgentEvent) => journal.append(agentId, event)
 
-            const session = yield* adapters[engine]
-              .start({
-                folder,
-                conversation: agentId,
-                role,
-                report: (event) => journal.append(agentId, event),
-              })
-              .pipe(
-                Scope.provide(scope),
-                Effect.onError(() => Scope.close(scope, Exit.void)),
-              )
+            const started =
+              starting.engine === "pi"
+                ? adapters.pi.start({ folder, conversation: agentId, role: starting.role, report })
+                : adapters["claude-code"].start({
+                    folder,
+                    conversation: agentId,
+                    role: starting.role,
+                    report,
+                  })
+
+            const session = yield* started.pipe(
+              Scope.provide(scope),
+              Effect.onError(() => Scope.close(scope, Exit.void)),
+            )
 
             const agent: Running = {
               scope,

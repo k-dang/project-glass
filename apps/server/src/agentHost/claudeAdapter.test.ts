@@ -19,7 +19,6 @@ it.live("reports a failed SDK handshake as a host error and closes the query", (
       setPermissionMode: async () => {},
       applyFlagSettings: async () => {},
       interrupt: async () => undefined,
-      setMcpServers: async () => ({ added: [], removed: [], errors: {} }),
     }
 
     const failed = yield* claudeAdapter("claude-test", {

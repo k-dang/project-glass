@@ -1,7 +1,6 @@
 import {
   emptyTranscript,
   GlassRpcs,
-  GlobalConversationProgram,
   nothingUnsent,
   SavedPlace,
   TranscriptSnapshot,
@@ -103,11 +102,8 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         AnswerRequest: unused,
         GetRemovalWarnings: unused,
         RemoveAgent: unused,
-        GetGlobalConversationProgram: () =>
-          Effect.succeed(
-            new GlobalConversationProgram({ engine: "claude-code", model: null, effort: null }),
-          ),
-        ChangeGlobalConversationProgram: unused,
+        GetGlobalConversationModel: () => Effect.succeed({ model: null, effort: null }),
+        ChangeGlobalConversationModel: unused,
         WatchGlobalTranscript: () => Stream.make(TranscriptSnapshot.make(emptyTranscript)),
         SendGlobalMessage: unused,
         SteerGlobal: unused,

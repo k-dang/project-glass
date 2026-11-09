@@ -210,7 +210,7 @@ const roleFlags = (folder: string, role: ConversationRole) =>
             { name: "ask-user.js", source: piQuestionExtension },
             { name: "glass-tools.js", source: piGlassToolsExtension },
           ],
-          globalInstructions(PI_QUESTION_TOOL),
+          globalInstructions,
         ),
     }),
   )

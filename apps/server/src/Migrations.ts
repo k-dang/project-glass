@@ -23,6 +23,7 @@ import agentReviewFollowUpsAsAgent from "./migrations/0021_agent_review_follow_u
 import indexActivityByKind from "./migrations/0022_index_activity_by_kind"
 import createGlobalConversation from "./migrations/0023_create_global_conversation"
 import nameLocalPlace from "./migrations/0024_name_local_place"
+import globalConversationOnPi from "./migrations/0025_global_conversation_on_pi"
 
 export const migrations = {
   "0001_create_activity": createActivity,
@@ -49,6 +50,7 @@ export const migrations = {
   "0022_index_activity_by_kind": indexActivityByKind,
   "0023_create_global_conversation": createGlobalConversation,
   "0024_name_local_place": nameLocalPlace,
+  "0025_global_conversation_on_pi": globalConversationOnPi,
 }
 
 export const migrationLoader = SqliteMigrator.fromRecord(migrations)

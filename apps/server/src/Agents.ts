@@ -61,7 +61,7 @@ import {
 } from "./Placement"
 import { Sandboxes } from "./Sandboxes"
 import { LocalPlacement } from "./LocalPlacement"
-import { type ConversationRole, ReviewBrief, ReviewRole, WorkRole } from "./agentHost/protocol"
+import { type AgentRole, ReviewBrief, ReviewRole, WorkRole } from "./agentHost/protocol"
 import { Transcripts } from "./Transcripts"
 import { annotateUnit } from "./wideEvents"
 
@@ -314,7 +314,7 @@ export class Agents extends Context.Service<
         const placement = placementOf(row)
         const { id, engine, model, effort, permissionMode } = row.agent
 
-        const role: Effect.Effect<ConversationRole, AgentError> = row.forReview
+        const role: Effect.Effect<AgentRole, AgentError> = row.forReview
           ? reviewBrief(row).pipe(Effect.map((brief) => ReviewRole.make({ brief })))
           : Effect.succeed(WorkRole.make({}))
 

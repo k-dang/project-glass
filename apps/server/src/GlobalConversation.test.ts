@@ -4,7 +4,6 @@ import {
   applyTranscriptUpdate,
   type CapturedContext,
   emptyTranscript,
-  GlobalConversationProgram,
   PullRequestContext,
   PullRequestRef,
   Revision,
@@ -69,12 +68,6 @@ it.live("keeps each message's captured context with its Turn, including once it 
 
     assert.deepStrictEqual(queued[0]?.context, onAgent)
 
-    const refused = yield* f.client
-      .ChangeGlobalConversationProgram({ engine: "pi", model: null, effort: null })
-      .pipe(Effect.flip)
-
-    assert.equal(refused._tag, "AgentBusy")
-
     yield* f.release("first")
     const turns = yield* globalTurns(f.client, settled(2))
 
@@ -86,24 +79,21 @@ it.live("keeps each message's captured context with its Turn, including once it 
 )
 
 it.live(
-  "restores the transcript, Unsent message, and program after a relaunch, with the running Turn interrupted",
+  "restores the transcript, Unsent message, and model after a relaunch, with the running Turn interrupted",
   () =>
     Effect.gen(function* () {
       const f = yield* agentsFixture
-      const program = { engine: "pi", model: "scripted", effort: null } as const
+      const model = { model: "scripted", effort: null }
       const unsent = { message: "Still writing", images: [] }
 
-      yield* f.client.ChangeGlobalConversationProgram(program)
+      yield* f.client.ChangeGlobalConversationModel(model)
       yield* send(f.client, "hold:never", onPullRequest)
       yield* globalTurns(f.client, holding)
       yield* f.client.SaveGlobalUnsentMessage(unsent)
 
       const restarted = yield* f.restart
 
-      assert.deepStrictEqual(
-        yield* restarted.GetGlobalConversationProgram(),
-        new GlobalConversationProgram(program),
-      )
+      assert.deepStrictEqual(yield* restarted.GetGlobalConversationModel(), model)
       assert.deepStrictEqual(yield* restarted.GetGlobalUnsentMessage(), unsent)
 
       yield* send(restarted, "After")
@@ -124,22 +114,21 @@ const glassCalls = (turn: Turn | undefined) =>
   )
 
 it.live(
-  "gives each start of its program a fresh credential for Glass's tools, revoking the last",
+  "gives each start of pi a fresh credential, revoking the last when the agent host stops",
   () =>
     Effect.gen(function* () {
       const f = yield* agentsFixture
+      const earlierHosts = childProcesses(process.pid, "scriptedAgentHost.mjs")
       yield* f.client.AddToDo({ title: "Reply to Sam" })
 
-      yield* send(f.client, "call:list_to_dos")
-      const [read] = yield* globalTurns(f.client, settled(1))
+      yield* send(f.client, "hold:never")
+      yield* globalTurns(f.client, holding)
 
-      assert.deepStrictEqual(
-        glassCalls(read)?.map(({ status }) => status),
-        ["done"],
-      )
-      assert.include(glassCalls(read)?.[0]?.output, "Reply to Sam")
+      const host = startedHost(earlierHosts)
+      assert.isDefined(host, "the backend has no agent host running")
+      process.kill(host, "SIGKILL")
+      yield* globalTurns(f.client, settled(1))
 
-      yield* f.client.ChangeGlobalConversationProgram({ engine: "pi", model: null, effort: null })
       yield* send(f.client, "call-ended:list_to_dos")
       yield* send(f.client, "call:list_to_dos")
       const [, ended, restarted] = yield* globalTurns(f.client, settled(3))
@@ -149,27 +138,8 @@ it.live(
         glassCalls(restarted)?.map(({ status }) => status),
         ["done"],
       )
+      assert.include(glassCalls(restarted)?.[0]?.output, "Reply to Sam")
     }),
-)
-
-it.live("revokes its program's credential when the agent host stops", () =>
-  Effect.gen(function* () {
-    const f = yield* agentsFixture
-    const earlierHosts = childProcesses(process.pid, "scriptedAgentHost.mjs")
-
-    yield* send(f.client, "hold:never")
-    yield* globalTurns(f.client, holding)
-
-    const host = startedHost(earlierHosts)
-    assert.isDefined(host, "the backend has no agent host running")
-    process.kill(host, "SIGKILL")
-    yield* globalTurns(f.client, settled(1))
-
-    yield* send(f.client, "call-ended:list_to_dos")
-    const [, ended] = yield* globalTurns(f.client, settled(2))
-
-    assert.deepStrictEqual(glassCalls(ended), [{ status: "failed", output: "Refused with 401" }])
-  }),
 )
 
 it.live("leaves an Agent it created running when its own Turn stops", () =>

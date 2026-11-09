@@ -25,13 +25,13 @@ export interface AgentSession {
   readonly stopped: Effect.Effect<boolean>
 }
 
-export interface AgentAdapter {
+export interface AgentAdapter<Role extends ConversationRole = ConversationRole> {
   readonly models: Effect.Effect<AgentModels, HostAgentError>
   readonly commands: (folder: string) => Effect.Effect<ReadonlyArray<AgentCommand>, HostAgentError>
   readonly start: (options: {
     readonly folder: string
     readonly conversation: string
-    readonly role: ConversationRole
+    readonly role: Role
     readonly report: (event: AgentEvent) => Effect.Effect<void>
   }) => Effect.Effect<AgentSession, HostAgentError, Scope.Scope>
 }

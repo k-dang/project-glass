@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url"
 import { connectRpcClient } from "../src/rpcSocket"
 import { DEMO_REPOSITORY } from "./demoPullRequests"
 import { startFakeAnthropic } from "./fakeAnthropic"
+import { globalConversationReply, isGlobalConversation } from "./fakeGlobalConversation"
 import {
   type FakeModelDelta,
   type FakeModelRequest,
@@ -43,6 +44,8 @@ const slowReply = `Working through it one step at a time. ${Array.from(
 ).join(" ")} All done.`
 
 const demoReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
+  if (isGlobalConversation(input)) return globalConversationReply(input)
+
   const changes = {
     "Write a note": "printf 'hello from the Agent\\n' > notes.txt",
     "Write another": "printf 'a second note\\n' > more.txt",

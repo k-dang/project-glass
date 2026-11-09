@@ -3,7 +3,7 @@ import { AgentStarted, SandboxPlace, TextPatch, localPlace } from "@glass/contra
 import { Effect, Option, Stream } from "effect"
 import { existsSync } from "node:fs"
 import { mkdir, rename, writeFile } from "node:fs/promises"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
 import { agentsFixture, holding, repository, settled } from "../test/agentsFixture"
 import { gitIn } from "../test/gitRepositories"
 import { isolatedHome } from "../test/harness"
@@ -25,7 +25,7 @@ it.live("links a clone as the Local checkout of the GitHub repository it names, 
     const linked = yield* f.client.LinkLocalCheckout({ path: join(f.clone.checkout, "src") })
 
     assert.deepStrictEqual(linked.repository, repository)
-    assert.equal(linked.path, gitIn(f.clone.checkout, "rev-parse", "--show-toplevel"))
+    assert.equal(linked.path, resolve(gitIn(f.clone.checkout, "rev-parse", "--show-toplevel")))
 
     const restarted = yield* f.restart
     const [kept] = yield* restarted.ListLocalCheckouts()

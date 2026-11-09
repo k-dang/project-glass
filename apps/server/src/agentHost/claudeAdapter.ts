@@ -32,7 +32,6 @@ import {
   Option,
   Predicate,
   Queue,
-  Redacted,
   Schema,
   type Scope,
   Stream,
@@ -45,11 +44,9 @@ import { claudeReadOnlyTools } from "../readOnlyTools"
 import type { AgentAdapter } from "./adapter"
 import { Input, isFailure, machine } from "./claudeTurn"
 import type { DeliveredMessage } from "./deliveredMessage"
-import { CLAUDE_QUESTION_TOOL, globalInstructions } from "./globalRole"
 import {
-  type ConversationRole,
+  type AgentRole,
   couldNotSwitch,
-  type GlassToolsAccess,
   HostAgentError,
   notRunning,
   type ReviewBrief,
@@ -62,6 +59,8 @@ import {
 } from "./suggestDraftTool"
 import { GLASS_MCP_PREFIX, GLASS_MCP_SERVER, permissionRequest, ToolInput } from "./toolCalls"
 import { runTurns } from "./turnLoop"
+
+const QUESTION_TOOL = "AskUserQuestion"
 
 const START_TIMEOUT = "60 seconds"
 
@@ -84,7 +83,6 @@ export interface ClaudeQuery extends AsyncIterable<SDKMessage> {
   readonly setPermissionMode: Query["setPermissionMode"]
   readonly applyFlagSettings: Query["applyFlagSettings"]
   readonly interrupt: Query["interrupt"]
-  readonly setMcpServers: Query["setMcpServers"]
 }
 
 export interface ClaudeSdk {
@@ -101,13 +99,12 @@ const startFailure = (cause: unknown) =>
       : "Claude Code could not start. Check its installation.",
   })
 
-const withoutUserSetup = { settingSources: [], strictMcpConfig: true } satisfies Options
-
 const reviewOptions = (brief: ReviewBrief): Options => ({
   systemPrompt: { type: "preset", preset: "claude_code", append: brief.instructions },
   tools: claudeReadOnlyTools,
   allowedTools: [...claudeReadOnlyTools, `${GLASS_MCP_PREFIX}${SUGGEST_DRAFT_TOOL}`],
-  ...withoutUserSetup,
+  settingSources: [],
+  strictMcpConfig: true,
   mcpServers: {
     [GLASS_MCP_SERVER]: createSdkMcpServer({
       name: GLASS_MCP_SERVER,
@@ -132,52 +129,11 @@ const reviewOptions = (brief: ReviewBrief): Options => ({
   },
 })
 
-// Glass's tools are registered once Claude Code runs, which keeps their credential out of its
-// launch arguments.
-const globalOptions: Options = {
-  systemPrompt: {
-    type: "preset",
-    preset: "claude_code",
-    append: globalInstructions(CLAUDE_QUESTION_TOOL),
-  },
-  tools: [CLAUDE_QUESTION_TOOL],
-  allowedTools: [`mcp__${GLASS_MCP_SERVER}`],
-  ...withoutUserSetup,
-}
-
-const roleOptions = (role: ConversationRole): Options =>
+const roleOptions = (role: AgentRole): Options =>
   Match.value(role).pipe(
     Match.tagsExhaustive({
       Work: () => ({}),
       Review: ({ brief }) => reviewOptions(brief),
-      Global: () => globalOptions,
-    }),
-  )
-
-const unreachableTools = new HostAgentError({
-  message: "Claude Code couldn't reach Glass's tools. Try again.",
-})
-
-const connectGlassTools = (session: ClaudeQuery, { url, bearer }: GlassToolsAccess) =>
-  Effect.tryPromise(() =>
-    session.setMcpServers({
-      [GLASS_MCP_SERVER]: {
-        type: "http",
-        url,
-        headers: { authorization: `Bearer ${Redacted.value(bearer)}` },
-      },
-    }),
-  ).pipe(
-    Effect.tapError((cause) => Effect.logWarning("Claude Code refused Glass's tools", cause)),
-    Effect.mapError(() => unreachableTools),
-    Effect.flatMap(({ errors }) => {
-      const error = errors[GLASS_MCP_SERVER]
-
-      return error === undefined
-        ? Effect.void
-        : Effect.logWarning("Claude Code couldn't connect to Glass's tools", error).pipe(
-            Effect.andThen(Effect.fail(unreachableTools)),
-          )
     }),
   )
 
@@ -301,7 +257,7 @@ const decodeQuestions = Schema.decodeUnknownOption(AskedQuestions)
 const decodeToolInput = Schema.decodeUnknownOption(ToolInput)
 
 const requestOf = (requestId: string, toolName: string, input: ToolInput) => {
-  if (toolName === CLAUDE_QUESTION_TOOL) {
+  if (toolName === QUESTION_TOOL) {
     const asked = decodeQuestions(input)
 
     if (Option.isSome(asked))
@@ -370,7 +326,10 @@ const handshake = (sdk: ClaudeSdk, command: string, folder: string) =>
     Promise.resolve({ behavior: "deny", message: "Glass is only asking what it offers." }),
   ).pipe(Effect.map(({ initialized }) => initialized))
 
-export const claudeAdapter = (command: string, sdk: ClaudeSdk = liveSdk): AgentAdapter => ({
+export const claudeAdapter = (
+  command: string,
+  sdk: ClaudeSdk = liveSdk,
+): AgentAdapter<AgentRole> => ({
   models: Effect.gen(function* () {
     const initialized = yield* handshake(sdk, command, homedir())
 
@@ -452,8 +411,6 @@ export const claudeAdapter = (command: string, sdk: ClaudeSdk = liveSdk): AgentA
       saved === undefined ? { sessionId: conversation } : { resume: conversation },
       roleOptions(role),
     )
-
-    if (Predicate.isTagged(role, "Global")) yield* connectGlassTools(session, role.tools)
 
     const turns = yield* runTurns({
       program: "Claude Code",
