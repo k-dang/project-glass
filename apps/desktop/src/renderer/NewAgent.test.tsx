@@ -146,6 +146,33 @@ it("starts an Agent with the Skill packs picked, and picks the same ones next ti
   expect(created.map(({ skillPacks }) => skillPacks)).toEqual([["team"], ["team"]])
 })
 
+it("waits for the Skill packs to load before starting an Agent with the remembered ones", async () => {
+  const created: Array<NewAgent> = []
+  const listed = Deferred.makeUnsafe<void>()
+  localStorage.setItem("glass.newAgent.skillPacks", JSON.stringify(["team"]))
+
+  const user = mount(
+    {
+      ...newAgentHandlers(created, []),
+      ListSkillPacks: () => Deferred.await(listed).pipe(Effect.as([pack("team", "ae5650fbbbb")])),
+    },
+    "/agents/new",
+  )
+
+  const message = await within(await screen.findByRole("region", { name: "New Agent" })).findByRole(
+    "textbox",
+    { name: "Message" },
+  )
+
+  await user.type(message, "Go{Enter}")
+  Deferred.doneUnsafe(listed, Exit.void)
+  await within(newAgentDraft()).findByRole("combobox", { name: "Skill packs" })
+  await user.type(message, "{Enter}")
+
+  await waitFor(() => expect(window.location.hash).toBe(`#/agents/${agent.id}`))
+  expect(created.map(({ skillPacks }) => skillPacks)).toEqual([["team"]])
+})
+
 it("shows the first message at once while the Agent starts", async () => {
   const started = Deferred.makeUnsafe<void>()
 

@@ -438,9 +438,15 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
         setComposed={(update) => setWritten(update(composed))}
         label="Message"
         placeholder="What should the Agent do?"
-        blocked={created.waiting || baseBranch === null || awaitingModels}
+        blocked={
+          created.waiting ||
+          baseBranch === null ||
+          awaitingModels ||
+          !AsyncResult.isSuccess(skillPacks.listed)
+        }
         problem={
           settledProblem(created) ??
+          settledProblem(skillPacks.listed) ??
           settledProblem(defaults) ??
           settledProblem(branches) ??
           folder.problem

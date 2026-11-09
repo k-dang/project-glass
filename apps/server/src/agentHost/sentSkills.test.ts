@@ -28,16 +28,18 @@ it.live("writes each source's skills where the program reads them, and removes t
       },
     ]).pipe(Scope.provide(scope), Effect.provide(NodeFileSystem.layer))
 
-    assert.deepStrictEqual(team?.skills, [join(team!.plugin, "skills", "architect")])
-    assert.isTrue(existsSync(join(team!.plugin, ".claude-plugin", "plugin.json")))
+    assert.isDefined(team)
+    const architect = join(team.plugin, "skills", "architect")
+    assert.deepStrictEqual(team.skills, [architect])
+    assert.isTrue(existsSync(join(team.plugin, ".claude-plugin", "plugin.json")))
 
     if (process.platform !== "win32") {
-      assert.strictEqual(statSync(join(team!.skills[0]!, "bin", "run.sh")).mode & 0o111, 0o111)
-      assert.strictEqual(statSync(join(team!.skills[0]!, "SKILL.md")).mode & 0o111, 0)
+      assert.strictEqual(statSync(join(architect, "bin", "run.sh")).mode & 0o111, 0o111)
+      assert.strictEqual(statSync(join(architect, "SKILL.md")).mode & 0o111, 0)
     }
 
     yield* Scope.close(scope, Exit.void)
-    assert.isFalse(existsSync(team!.plugin))
+    assert.isFalse(existsSync(team.plugin))
   }),
 )
 

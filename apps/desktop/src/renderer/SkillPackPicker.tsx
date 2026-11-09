@@ -26,11 +26,13 @@ const lastChosenAtom = Atom.writable(
 ).pipe(Atom.keepAlive)
 
 export const useSkillPackChoice = () => {
-  const packs = Option.getOrElse(AsyncResult.value(useAtomValue(skillPacksAtom)), () => [])
+  const listed = useAtomValue(skillPacksAtom)
+  const packs = Option.getOrElse(AsyncResult.value(listed), () => [])
   const [lastChosen, setChosen] = useAtom(lastChosenAtom)
   const names = packs.map(({ name }) => name)
 
   return {
+    listed,
     names,
     chosen: names.filter((name) => lastChosen.includes(name)),
     setChosen,
