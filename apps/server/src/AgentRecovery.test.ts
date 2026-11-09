@@ -156,7 +156,7 @@ it.live("marks a running Turn interrupted after a relaunch, and runs the next me
     yield* f.transcript(agent.id, holding)
 
     const restarted = yield* f.restart
-    yield* restarted.SendMessage({ agentId: agent.id, message: "Third", images: [] })
+    yield* restarted.SendMessage({ agentId: agent.id, message: "Third", images: [], feedback: [] })
     const turns = yield* f.transcript(agent.id, settled(3), restarted)
 
     assert.deepStrictEqual(

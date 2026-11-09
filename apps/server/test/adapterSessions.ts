@@ -116,7 +116,9 @@ const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
           Effect.gen(function* () {
             const turnId = `turn-${++nextTurn}`
             const sentAt = yield* DateTime.now
-            yield* report(TurnStarted.make({ turnId, message, images, context: null, sentAt }))
+            yield* report(
+              TurnStarted.make({ turnId, message, images, context: null, feedback: [], sentAt }),
+            )
             yield* session.startTurn(turnId, { message, images, context: null, prompt: message })
 
             return turnId

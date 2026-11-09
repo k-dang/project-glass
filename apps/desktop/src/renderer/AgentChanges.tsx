@@ -26,20 +26,23 @@ import { type FeedbackAnnotation, isOlder } from "./feedbackLines"
 import { FilePanelTabsList, FilePanelTabTrigger } from "./FilePanelTabs"
 import { plural } from "./plural"
 import { ProblemAlert } from "./ProblemAlert"
-import { problemOf } from "./problems"
+import { type Problem, problemOf } from "./problems"
 import { useFeedbackComposer } from "./useFeedbackComposer"
 import { type FeedbackNotesStore, useFeedbackNotes } from "./useFeedbackNotes"
 
-export function AgentChanges(props: { agent: Agent; turns: ReadonlyArray<Turn> }) {
+export function AgentChanges(props: {
+  agent: Agent
+  turns: ReadonlyArray<Turn>
+  onReviewFeedback: () => void
+}) {
   const { agent } = props
   const changes = useAtomValue(agentChangesAtom(agent.id))
   const refresh = useAtomRefresh(agentChangesAtom(agent.id))
   const notes = useAtomValue(feedbackNotesAtom(agent.id))
-  const refreshNotes = useAtomRefresh(feedbackNotesAtom(agent.id))
   const turnsEnded = props.turns.filter((turn) => turn.ended !== null).length
   const [turnsEndedAtSnapshot, setTurnsEndedAtSnapshot] = useState(turnsEnded)
   const shown = Option.getOrNull(AsyncResult.value(changes))
-  const store = useFeedbackNotes(agent.id, AsyncResult.isSuccess(notes) ? notes.value : null)
+  const store = useFeedbackNotes(agent.id)
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("files")
 
   const showLatest = () => {
@@ -68,7 +71,7 @@ export function AgentChanges(props: { agent: Agent; turns: ReadonlyArray<Turn> }
         </div>
       )}
       <LoadProblem result={changes} retry={refresh} />
-      <LoadProblem result={notes} retry={refreshNotes} />
+      <LoadProblem result={notes} retry={store.refresh} />
       {(shown !== null || (AsyncResult.isFailure(changes) && store.ready)) && (
         <ChangesWithFeedback
           key={shown?.id ?? "unavailable"}
@@ -76,6 +79,7 @@ export function AgentChanges(props: { agent: Agent; turns: ReadonlyArray<Turn> }
           store={store}
           sidebarTab={sidebarTab}
           setSidebarTab={setSidebarTab}
+          onReviewFeedback={props.onReviewFeedback}
         />
       )}
     </div>
@@ -89,6 +93,7 @@ function ChangesWithFeedback(props: {
   store: FeedbackNotesStore
   sidebarTab: SidebarTab
   setSidebarTab: (tab: SidebarTab) => void
+  onReviewFeedback: () => void
 }) {
   const { changes, store, sidebarTab, setSidebarTab } = props
   const changesId = changes?.id ?? null
@@ -205,6 +210,13 @@ function ChangesWithFeedback(props: {
           agentReview={null}
           outdatedTour={null}
         />
+        {store.notes.length > 0 && (
+          <ReviewFeedback
+            store={store}
+            editing={feedback.editing}
+            onStaged={props.onReviewFeedback}
+          />
+        )}
         {older > 0 && (
           <OlderNotes
             count={older}
@@ -249,6 +261,44 @@ function LoadProblem(props: {
       />
     </div>
   ) : null
+}
+
+function ReviewFeedback(props: {
+  store: FeedbackNotesStore
+  editing: boolean
+  onStaged: () => void
+}) {
+  const { store } = props
+  const [staging, setStaging] = useState(false)
+  const [problem, setProblem] = useState<Problem | null>(null)
+
+  const stage = async () => {
+    setStaging(true)
+    const failed = await store.stage()
+    setStaging(false)
+    setProblem(failed)
+
+    if (failed === null) props.onStaged()
+  }
+
+  return (
+    <div className="flex flex-col gap-2 border-t px-4 py-2">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
+        <span className="min-w-0 flex-1 basis-48">
+          {props.editing
+            ? "Save or cancel the open note before you review your feedback."
+            : `${plural(store.notes.length, "Feedback note")} to send to the Agent.`}
+        </span>
+        <Button size="sm" disabled={props.editing || staging} onClick={() => void stage()}>
+          <MessageSquareText data-icon="inline-start" aria-hidden />
+          Review feedback
+        </Button>
+      </div>
+      {problem !== null && (
+        <ProblemAlert problem={problem} action={{ label: "Retry", run: () => void stage() }} />
+      )}
+    </div>
+  )
 }
 
 function OlderNotes(props: { count: number; onView: () => void }) {

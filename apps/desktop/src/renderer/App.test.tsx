@@ -468,6 +468,7 @@ it("opens the Global conversation beside the current area, labelling each messag
                 pullRequest: workspace.pullRequest.ref,
                 revision: workspace.revision,
               }),
+              feedback: [],
               sentAt,
               ended: { at: sentAt, ending: TurnDone.make({}) },
               parts: [TextPart.make({ text: "Nearly." })],

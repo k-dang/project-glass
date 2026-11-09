@@ -297,5 +297,5 @@ export function useFeedbackComposer(props: {
     />
   )
 
-  return { diffProps, overview }
+  return { diffProps, overview, editing: editing !== null }
 }

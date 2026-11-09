@@ -1,6 +1,13 @@
 import { assert, it } from "@effect/vitest"
-import { AgentStarted, FeedbackNote, SandboxPlace, TextPatch, localPlace } from "@glass/contracts"
-import { Effect, Option, Stream } from "effect"
+import {
+  AgentStarted,
+  FeedbackNote,
+  SandboxPlace,
+  TextPatch,
+  UnsentFeedback,
+  localPlace,
+} from "@glass/contracts"
+import { Effect, Option, Predicate, Stream } from "effect"
 import { existsSync } from "node:fs"
 import { mkdir, rename, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
@@ -249,10 +256,80 @@ it.live(
       assert.notEqual((yield* f.client.GetAgentChanges({ agentId: agent.id })).id, read.id)
 
       const restarted = yield* f.restart
-      assert.deepStrictEqual(yield* restarted.ListFeedbackNotes({ agentId: agent.id }), [edited])
+      assert.deepStrictEqual((yield* restarted.ListFeedbackNotes({ agentId: agent.id })).notes, [
+        edited,
+      ])
 
       yield* restarted.RemoveAgent({ agentId: agent.id })
       const gone = yield* restarted.ListFeedbackNotes({ agentId: agent.id }).pipe(Effect.flip)
       assert.equal(gone._tag, "AgentNotFound")
+    }),
+)
+
+it.live(
+  "queues staged Feedback notes for the working Agent as one message, taking only those notes",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* agentsFixture
+      const agent = yield* f.start("hold:first")
+      const agentId = agent.id
+      yield* f.transcript(agentId, holding)
+
+      const fields = {
+        path: "src/retry.ts",
+        side: "new",
+        start: 2,
+        end: 3,
+        code: "attempts++\nreturn send()",
+        changesId: "changes-1",
+      } as const
+
+      const capAttempts = new FeedbackNote({ ...fields, id: "note-1", text: "Cap the attempts" })
+      const keepError = new FeedbackNote({ ...fields, id: "note-2", text: "Keep the last error" })
+      const later = new FeedbackNote({ ...fields, id: "note-3", text: "Not staged yet" })
+
+      for (const note of [capAttempts, keepError, later])
+        yield* f.client.SaveFeedbackNote({ agentId, note })
+
+      const staged = [capAttempts.id, keepError.id]
+      yield* f.client.StageFeedbackNotes({ agentId, noteIds: staged })
+      assert.deepStrictEqual((yield* f.client.ListFeedbackNotes({ agentId })).staged, staged)
+
+      const sent = { agentId, message: "", images: [], feedback: staged }
+      yield* f.client.SendMessage(sent)
+
+      const { queued } = yield* f.watch(agentId, (transcript) => transcript.queued.length === 1)
+      assert.deepStrictEqual(queued[0]?.feedback, [capAttempts, keepError])
+      assert.deepStrictEqual(
+        yield* f.client.ListFeedbackNotes({ agentId }),
+        new UnsentFeedback({ notes: [later], staged: [] }),
+      )
+
+      const again = yield* f.client.SendMessage(sent).pipe(Effect.flip)
+      assert.equal(again._tag, "AgentError")
+      assert.lengthOf((yield* f.client.ListFeedbackNotes({ agentId })).notes, 1)
+
+      yield* f.release("first")
+      yield* f.transcript(agentId, settled(2))
+
+      const restarted = yield* f.restart
+
+      const { turns, queued: left } = yield* f.watch(
+        agentId,
+        (transcript) => settled(2)(transcript.turns),
+        restarted,
+      )
+
+      assert.lengthOf(left, 0)
+      assert.deepStrictEqual(turns[1]?.feedback, [capAttempts, keepError])
+
+      const received = turns[1]?.parts.flatMap((part) =>
+        Predicate.isTagged(part, "Text") && part.text.includes("<glass_feedback>")
+          ? [part.text]
+          : [],
+      )
+
+      assert.include(received?.[0], "Keep the last error")
+      assert.include(received?.[0], "attempts++\nreturn send()")
     }),
 )

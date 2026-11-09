@@ -20,6 +20,7 @@ import { randomUUID } from "node:crypto"
 import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs"
 import { basename, dirname, join, relative } from "node:path"
 import type { AgentAdapter, AgentSession } from "../src/agentHost/adapter"
+import type { DeliveredMessage } from "../src/agentHost/deliveredMessage"
 import { GlassToolsAccess, notRunning } from "../src/agentHost/protocol"
 import type { WrittenSkills } from "../src/agentHost/sentSkills"
 import { MCP_PATH } from "../src/mcp/server"
@@ -122,7 +123,7 @@ export const scriptedAdapter = (gates: string): AgentAdapter => {
             yield* report(TurnEnded.make({ turnId, ended: { at: yield* DateTime.now, ending } }))
           })
 
-        const run = (turnId: string, { message }: MessageWithContext) =>
+        const run = (turnId: string, { message, prompt }: DeliveredMessage) =>
           Effect.gen(function* () {
             const called = scriptedCall.exec(message)
 
@@ -212,6 +213,9 @@ export const scriptedAdapter = (gates: string): AgentAdapter => {
               turn!.waiting = { part: request, index, answered }
               yield* Deferred.await(answered)
             }
+
+            if (prompt.includes("<glass_feedback>"))
+              yield* part(turnId, TextPart.make({ text: prompt }))
 
             yield* part(turnId, TextPart.make({ text: `Reply to: ${message}` }))
             yield* end(turnId, TurnDone.make({}))

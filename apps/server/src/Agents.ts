@@ -36,6 +36,7 @@ import {
   TurnCutOff,
   TurnInterrupted,
   type SentMessage,
+  type UnsentFeedback,
 } from "@glass/contracts"
 import {
   Context,
@@ -203,7 +204,8 @@ export class Agents extends Context.Service<
     readonly createForReview: (input: NewReviewAgent) => Effect.Effect<Agent, AgentError>
     readonly send: (
       agentId: string,
-      input: MessageInput,
+      input: SentMessage,
+      feedback?: ReadonlyArray<string>,
     ) => Effect.Effect<MessageDelivery, AgentNotFound | RequestWaiting | AgentError>
     readonly steer: (
       agentId: string,
@@ -220,7 +222,11 @@ export class Agents extends Context.Service<
     readonly changes: (agentId: string) => Effect.Effect<AgentChanges, AgentNotFound | AgentError>
     readonly feedbackNotes: (
       agentId: string,
-    ) => Effect.Effect<ReadonlyArray<FeedbackNote>, AgentNotFound | AgentError>
+    ) => Effect.Effect<UnsentFeedback, AgentNotFound | AgentError>
+    readonly stageFeedbackNotes: (
+      agentId: string,
+      noteIds: ReadonlyArray<string>,
+    ) => Effect.Effect<void, AgentNotFound | AgentError>
     readonly saveFeedbackNote: (
       agentId: string,
       note: FeedbackNote,
@@ -556,10 +562,18 @@ export class Agents extends Context.Service<
       const findWritable = (agentId: string) =>
         find(agentId).pipe(Effect.tap(() => sandboxes.refuseIfGone(agentId)))
 
-      const send = Effect.fn("Agents.send")(function* (agentId: string, input: MessageInput) {
+      const send = Effect.fn("Agents.send")(function* (
+        agentId: string,
+        { message, images }: SentMessage,
+        feedback: ReadonlyArray<string> = [],
+      ) {
         yield* findWritable(agentId)
 
-        return yield* turns.send(agentId, { ...input, context: null })
+        return yield* turns.send(
+          agentId,
+          { message, images, context: null },
+          notes.take(agentId, feedback),
+        )
       })
 
       const steer = Effect.fn("Agents.steer")(function* (agentId: string, input: MessageInput) {
@@ -783,6 +797,8 @@ export class Agents extends Context.Service<
         send,
         changes,
         feedbackNotes: (agentId) => find(agentId).pipe(Effect.andThen(notes.list(agentId))),
+        stageFeedbackNotes: (agentId, noteIds) =>
+          find(agentId).pipe(Effect.andThen(notes.stage(agentId, noteIds))),
         saveFeedbackNote: (agentId, note) =>
           find(agentId).pipe(Effect.andThen(notes.save(agentId, note))),
         removeFeedbackNote: (agentId, noteId) =>

@@ -16,7 +16,7 @@ import { type EditorView } from "@tiptap/pm/view"
 import { EditorContent, useEditor } from "@tiptap/react"
 import { Predicate, Schema } from "effect"
 import { Base64 } from "effect/encoding"
-import { ArrowUp, Square, X } from "lucide-react"
+import { ArrowUp, LoaderCircle, Square, X } from "lucide-react"
 import { memo, type ReactNode, useLayoutEffect, useRef, useState } from "react"
 import { InputGroup, InputGroupAddon, InputGroupButton } from "@/components/ui/input-group"
 import { Suggestion, Suggestions } from "@/components/ui/suggestion"
@@ -100,6 +100,7 @@ export function MessageBox(props: {
   placeholder: string
   textOnly?: boolean
   holdUntilAccepted?: boolean
+  attachment?: ReactNode
   blocked: boolean
   problem: Problem | null
   notice?: ReactNode
@@ -145,6 +146,8 @@ export function MessageBox(props: {
       .run()
   }, [editor, composed.message])
 
+  const hasAttachment = props.attachment !== undefined && props.attachment !== null
+
   const written = (): SentMessage => ({ ...composed, message: toMessage(editor.state.doc.content) })
 
   const suggest = async (prompt: string) => {
@@ -165,9 +168,9 @@ export function MessageBox(props: {
     const sent = written()
     const message = sent.message.trim()
 
-    if (props.blocked || sending.current || message === "") return
+    if (props.blocked || sending.current || (message === "" && !hasAttachment)) return
 
-    if (!props.holdUntilAccepted) {
+    if (!props.holdUntilAccepted && !hasAttachment) {
       setComposed(() => nothingUnsent)
 
       if (!(await deliver({ message, images: sent.images })))
@@ -282,94 +285,108 @@ export function MessageBox(props: {
   }, [editor, label, placeholder, awaiting, activeDescendant, listbox])
 
   return (
-    <form
-      className="px-6 pt-2 pb-4"
-      onSubmit={(event) => {
-        event.preventDefault()
-        void submit(props.send)
-      }}
-    >
-      <div className="mx-auto flex max-w-3xl flex-col gap-2">
-        {props.problem !== null && <ProblemAlert problem={props.problem} />}
-        {props.notice}
-        {props.suggestions !== undefined && props.suggestions.length > 0 && (
-          <Suggestions>
-            {props.suggestions.map((suggestion) => (
-              <Suggestion
-                key={suggestion.label}
-                disabled={props.blocked || awaiting}
-                onClick={() => void suggest(suggestion.prompt)}
-              >
-                {suggestion.label}
-              </Suggestion>
-            ))}
-          </Suggestions>
-        )}
-        <div className="relative">
-          {picker.choices !== null && (
-            <div className="absolute inset-x-0 bottom-full z-50 mb-2">{picker.choices}</div>
-          )}
-          <InputGroup>
-            {composed.images.length > 0 && (
-              <InputGroupAddon align="block-start" className="flex-wrap gap-2">
-                {composed.images.map((image, index) => (
-                  <span key={index} className="relative">
-                    <Attachment
-                      image={image}
-                      index={index}
-                      className="size-14 rounded-md border object-cover"
-                    />
-                    <InputGroupButton
-                      size="icon-xs"
-                      variant="secondary"
-                      className="absolute -top-1.5 -right-1.5 rounded-full"
-                      aria-label={`Remove attachment ${index + 1}`}
-                      onClick={() =>
-                        setComposed((current) => ({
-                          ...current,
-                          images: current.images.filter((_, at) => at !== index),
-                        }))
-                      }
-                    >
-                      <X />
-                    </InputGroupButton>
-                  </span>
-                ))}
-              </InputGroupAddon>
-            )}
-            <EditorContent editor={editor} className="w-full min-w-0" />
-            <InputGroupAddon align="block-end" className="min-w-0 items-end gap-1">
-              <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1 [&>button]:min-w-0">
-                {props.pickers}
-              </div>
-              <div className="ml-auto flex shrink-0 gap-1">
-                {props.onStop !== null && (
-                  <InputGroupButton
-                    size="icon-sm"
-                    variant="secondary"
-                    className="rounded-full"
-                    aria-label="Stop"
-                    onClick={props.onStop}
-                  >
-                    <Square className="fill-current" />
-                  </InputGroupButton>
-                )}
-                <InputGroupButton
-                  type="submit"
-                  size="icon-sm"
-                  variant="default"
-                  className="rounded-full"
-                  disabled={props.blocked || awaiting || composed.message.trim() === ""}
-                  aria-label="Send"
-                >
-                  <ArrowUp />
-                </InputGroupButton>
-              </div>
-            </InputGroupAddon>
-          </InputGroup>
+    <>
+      {hasAttachment && (
+        <div className="px-6 pt-2">
+          <div className="mx-auto max-w-3xl rounded-lg border bg-muted/30 px-3 py-2">
+            {props.attachment}
+          </div>
         </div>
-        {props.children}
-      </div>
-    </form>
+      )}
+      <form
+        className="px-6 pt-2 pb-4"
+        onSubmit={(event) => {
+          event.preventDefault()
+          void submit(props.send)
+        }}
+      >
+        <div className="mx-auto flex max-w-3xl flex-col gap-2">
+          {props.problem !== null && <ProblemAlert problem={props.problem} />}
+          {props.notice}
+          {props.suggestions !== undefined && props.suggestions.length > 0 && (
+            <Suggestions>
+              {props.suggestions.map((suggestion) => (
+                <Suggestion
+                  key={suggestion.label}
+                  disabled={props.blocked || awaiting}
+                  onClick={() => void suggest(suggestion.prompt)}
+                >
+                  {suggestion.label}
+                </Suggestion>
+              ))}
+            </Suggestions>
+          )}
+          <div className="relative">
+            {picker.choices !== null && (
+              <div className="absolute inset-x-0 bottom-full z-50 mb-2">{picker.choices}</div>
+            )}
+            <InputGroup>
+              {composed.images.length > 0 && (
+                <InputGroupAddon align="block-start" className="flex-wrap gap-2">
+                  {composed.images.map((image, index) => (
+                    <span key={index} className="relative">
+                      <Attachment
+                        image={image}
+                        index={index}
+                        className="size-14 rounded-md border object-cover"
+                      />
+                      <InputGroupButton
+                        size="icon-xs"
+                        variant="secondary"
+                        className="absolute -top-1.5 -right-1.5 rounded-full"
+                        aria-label={`Remove attachment ${index + 1}`}
+                        onClick={() =>
+                          setComposed((current) => ({
+                            ...current,
+                            images: current.images.filter((_, at) => at !== index),
+                          }))
+                        }
+                      >
+                        <X />
+                      </InputGroupButton>
+                    </span>
+                  ))}
+                </InputGroupAddon>
+              )}
+              <EditorContent editor={editor} className="w-full min-w-0" />
+              <InputGroupAddon align="block-end" className="min-w-0 items-end gap-1">
+                <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1 [&>button]:min-w-0">
+                  {props.pickers}
+                </div>
+                <div className="ml-auto flex shrink-0 gap-1">
+                  {props.onStop !== null && (
+                    <InputGroupButton
+                      size="icon-sm"
+                      variant="secondary"
+                      className="rounded-full"
+                      aria-label="Stop"
+                      onClick={props.onStop}
+                    >
+                      <Square className="fill-current" />
+                    </InputGroupButton>
+                  )}
+                  <InputGroupButton
+                    type="submit"
+                    size="icon-sm"
+                    variant="default"
+                    className="rounded-full"
+                    disabled={
+                      props.blocked ||
+                      awaiting ||
+                      (composed.message.trim() === "" && !hasAttachment)
+                    }
+                    aria-label="Send"
+                    aria-busy={awaiting}
+                  >
+                    {awaiting ? <LoaderCircle className="animate-spin" /> : <ArrowUp />}
+                  </InputGroupButton>
+                </div>
+              </InputGroupAddon>
+            </InputGroup>
+          </div>
+          {props.children}
+        </div>
+      </form>
+    </>
   )
 }

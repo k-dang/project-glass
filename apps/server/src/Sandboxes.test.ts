@@ -371,6 +371,6 @@ it.effect(
         refused.message,
         "This Agent's Sandbox expired, so it can't take messages. Its transcript stays until you remove the Agent.",
       )
-      assert.deepStrictEqual(yield* f.agents.feedbackNotes(agent.id), [note])
+      assert.deepStrictEqual((yield* f.agents.feedbackNotes(agent.id)).notes, [note])
     }),
 )

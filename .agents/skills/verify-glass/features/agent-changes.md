@@ -1,11 +1,12 @@
 # Agent changes
 
-A local Agent's Changes view shows its worktree diff. The view keeps its Revision until Show latest, even when another Turn changes files. The user can leave Feedback notes on lines of it, kept beside their code across restarts and labelled as an older version after Show latest.
+A local Agent's Changes view shows its worktree diff. The view keeps its Revision until Show latest, even when another Turn changes files. The user can leave Feedback notes on lines of it, kept beside their code across restarts and labelled as an older version after Show latest. Review feedback adds the notes to the Agent's message, which sends them with their code as one message, or queues it while a Turn runs.
 
 ## Sub-features
 
 - Read an Agent's changes, return to Chat, and explicitly move to its latest changes.
 - Select lines by keyboard, add a Feedback note, edit it in place, find it in the Feedback tab after a relaunch, see it marked Older version with its code after Show latest, and remove it.
+- Review feedback, send it to the idle Agent, and queue more while a Turn runs.
 
 ## How to get to it (user POV)
 
@@ -25,6 +26,11 @@ Feedback notes, from step 3's Changes:
 2. Click `Edit`, type new text, click `Save changes`, `wait` for it.
 3. Run `kill-backend` four times, each once `doctor` shows Backend health OK again, then `wait --text "keeps stopping"` and click `Relaunch Glass`. Reopen the Agent's Changes and the `Feedback 1` tab: the edited note is there, without an Older version label.
 4. Run step 4 above, then `Show latest` and `wait --text "older version"`. The note shows `Older version` with `hello from the Agent` as its code, and the diff shows `View feedback`. Click `Remove`, `wait --text "No feedback yet"`.
+
+Sending feedback, from a note added in Changes:
+
+1. Click `Review feedback`. Chat opens; `wait --text "attached to this message"`. Type an instruction in Message, screenshot, and click `Send`. `wait --text "1 Feedback note"`: the demo Agent's reply quotes the `<glass_feedback>` block it received, with the note's code, and the note is gone from Changes.
+2. Send `Please work slowly` (about 9s of reply), then at once add another note in Changes, click `Review feedback` and `Send`. `wait --text "Starts when the Agent finishes"` and screenshot the Queued message. `wait --text "All done"`, then the queued feedback starts its own Turn.
 
 ## Gotchas
 

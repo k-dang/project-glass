@@ -1,9 +1,11 @@
 import {
+  type AcceptedMessage,
   Agent,
   AgentError,
   type AgentEvent,
   CapturedContext,
   endTurnEvents,
+  FeedbackNote,
   isRequestPart,
   Image,
   type MessageDelivery,
@@ -57,6 +59,10 @@ const ContextJson = Schema.NullOr(Schema.fromJsonString(CapturedContext))
 
 const encodeContext = Schema.encodeSync(ContextJson)
 
+const FeedbackJson = Schema.fromJsonString(Schema.Array(FeedbackNote))
+
+const encodeFeedback = Schema.encodeSync(FeedbackJson)
+
 const decodeTurns = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({
@@ -64,6 +70,7 @@ const decodeTurns = Schema.decodeUnknownEffect(
       message: Turn.fields.message,
       images: ImagesJson,
       context: ContextJson,
+      feedback: FeedbackJson,
       sentAt: Turn.fields.sentAt,
       ended: Schema.NullOr(Schema.fromJsonString(TurnEnd)),
     }),
@@ -90,7 +97,12 @@ export const StoredMessage = Schema.Struct({ ...SentMessage.fields, images: Imag
 
 const decodeQueued = Schema.decodeUnknownEffect(
   Schema.Array(
-    Schema.Struct({ ...QueuedMessage.fields, ...StoredMessage.fields, context: ContextJson }),
+    Schema.Struct({
+      ...QueuedMessage.fields,
+      ...StoredMessage.fields,
+      context: ContextJson,
+      feedback: FeedbackJson,
+    }),
   ),
 )
 
@@ -162,6 +174,9 @@ const turnExit = (ending: TurnEnding): Exit.Exit<void, TurnFailure> =>
       ? Exit.fail(new TurnFailure({ message: ending.reason }))
       : Exit.interrupt()
 
+const isExpected = (cause: unknown) =>
+  Predicate.isTagged(cause, "AgentBusy") || Predicate.isTagged(cause, "AgentError")
+
 const storageFailure = () =>
   new AgentError({ message: "Couldn't read or save the Agent's transcript. Try again." })
 
@@ -183,6 +198,7 @@ export class Transcripts extends Context.Service<
     readonly startOrQueue: (
       agentId: string,
       input: MessageWithContext,
+      feedback?: Effect.Effect<ReadonlyArray<FeedbackNote>, AgentError>,
     ) => Effect.Effect<MessageDelivery, AgentError>
     readonly prependQueued: (
       agentId: string,
@@ -243,13 +259,14 @@ export class Transcripts extends Context.Service<
       const writeApplied = (agentId: string, event: AgentEvent) =>
         Match.value(event).pipe(
           Match.tagsExhaustive({
-            TurnStarted: ({ turnId, message, images, context, sentAt }) =>
+            TurnStarted: ({ turnId, message, images, context, feedback, sentAt }) =>
               sql`INSERT INTO agent_turn ${sql.insert({
                 id: turnId,
                 agent_id: agentId,
                 message,
                 images: encodeImages(images),
                 context: encodeContext(context),
+                feedback: encodeFeedback(feedback),
                 sent_at: DateTime.formatIso(sentAt),
               })}`.pipe(Effect.as(true)),
             PartSet: ({ turnId, index, part }) =>
@@ -281,7 +298,7 @@ export class Transcripts extends Context.Service<
 
       const queued = (agentId: string) =>
         sql`
-          SELECT id, message, images, context FROM agent_queued_message
+          SELECT id, message, images, context, feedback FROM agent_queued_message
           WHERE agent_id = ${agentId} ORDER BY position
         `.pipe(Effect.flatMap(decodeQueued))
 
@@ -290,7 +307,7 @@ export class Transcripts extends Context.Service<
           Effect.map((current) => QueuedMessagesChanged.make({ queued: current })),
         )
 
-      const insertQueued = (agentId: string, position: number, input: MessageWithContext) =>
+      const insertQueued = (agentId: string, position: number, input: AcceptedMessage) =>
         sql`INSERT INTO agent_queued_message ${sql.insert({
           id: randomUUID(),
           agent_id: agentId,
@@ -298,6 +315,7 @@ export class Transcripts extends Context.Service<
           message: input.message,
           images: encodeImages(input.images),
           context: encodeContext(input.context),
+          feedback: encodeFeedback(input.feedback),
         })}`
 
       const queuedPositions = (agentId: string) =>
@@ -309,12 +327,13 @@ export class Transcripts extends Context.Service<
           Effect.map(([found]) => ({ first: found?.first ?? 0, last: found?.last ?? 0 })),
         )
 
-      const startTurn = Effect.fnUntraced(function* (agentId: string, input: MessageWithContext) {
+      const startTurn = Effect.fnUntraced(function* (agentId: string, input: AcceptedMessage) {
         const event = TurnStarted.make({
           turnId: randomUUID(),
           message: input.message,
           images: input.images,
           context: input.context,
+          feedback: input.feedback,
           sentAt: yield* DateTime.now,
         })
 
@@ -440,7 +459,7 @@ export class Transcripts extends Context.Service<
       const snapshot = Effect.fnUntraced(function* (agentId: string) {
         const turns = yield* decodeTurns(
           yield* sql`
-            SELECT id, message, images, context, sent_at AS sentAt, ended
+            SELECT id, message, images, context, feedback, sent_at AS sentAt, ended
             FROM agent_turn WHERE agent_id = ${agentId} ORDER BY rowid
           `,
         )
@@ -498,13 +517,9 @@ export class Transcripts extends Context.Service<
       const withStorageFailure = <A, E, R>(name: string, effect: Effect.Effect<A, E, R>) =>
         effect.pipe(
           Effect.tapError((cause) =>
-            Predicate.isTagged(cause, "AgentBusy")
-              ? Effect.void
-              : Effect.logWarning(`Couldn't ${name}`, cause),
+            isExpected(cause) ? Effect.void : Effect.logWarning(`Couldn't ${name}`, cause),
           ),
-          Effect.mapError((cause) =>
-            Predicate.isTagged(cause, "AgentBusy") ? cause : storageFailure(),
-          ),
+          Effect.mapError((cause) => (isExpected(cause) ? cause : storageFailure())),
         )
 
       return Transcripts.of({
@@ -537,12 +552,14 @@ export class Transcripts extends Context.Service<
             lockFor(agentId).withPermits(1)(snapshot(agentId)),
           ),
         runningTurn: (agentId) => withStorageFailure("read a running Turn", runningTurn(agentId)),
-        startOrQueue: (agentId, input) =>
+        startOrQueue: (agentId, sent, feedback = Effect.succeed([])) =>
           withStorageFailure(
             "send a message",
             changeWith(
               agentId,
               Effect.gen(function* () {
+                const input = { ...sent, feedback: yield* feedback }
+
                 if ((yield* runningTurn(agentId)) === null)
                   return ["started", [yield* startTurn(agentId, input)]] as const
 
@@ -562,7 +579,8 @@ export class Transcripts extends Context.Service<
 
                 yield* Effect.forEach(
                   inputs,
-                  (input, index) => insertQueued(agentId, start + index, input),
+                  (input, index) =>
+                    insertQueued(agentId, start + index, { ...input, feedback: [] }),
                   { discard: true },
                 )
 

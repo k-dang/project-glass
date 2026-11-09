@@ -1,4 +1,5 @@
-import type { FeedbackNote } from "@glass/contracts"
+import { FeedbackNote } from "@glass/contracts"
+import { cn } from "cn"
 import { History, MessageSquarePlus, PenLine, Trash2, X } from "lucide-react"
 import { type ReactNode, useState } from "react"
 import { Badge } from "@/components/ui/badge"
@@ -6,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Kbd } from "@/components/ui/kbd"
 import { Textarea } from "@/components/ui/textarea"
 import { type FeedbackTarget, isOlder, rangeLabel } from "./feedbackLines"
+import { plural } from "./plural"
 import { ProblemAlert } from "./ProblemAlert"
 import type { Problem } from "./problems"
 import { shortcutLabel } from "./shortcutLabel"
@@ -35,6 +37,7 @@ export function FeedbackNoteCard(props: {
   onShow: (() => void) | null
   onEdit: (() => void) | null
   onRemove: () => Promise<Problem | null>
+  foldedCode?: boolean
 }) {
   const { note, older } = props
   const [removing, setRemoving] = useState(false)
@@ -70,6 +73,7 @@ export function FeedbackNoteCard(props: {
       </div>
       {older && <Snippet code={note.code} />}
       <p className="whitespace-pre-wrap wrap-anywhere">{note.text}</p>
+      {props.foldedCode === true && !older && <OriginalCode code={note.code} />}
       {problem !== null && (
         <ProblemAlert problem={problem} action={{ label: "Retry", run: () => void remove() }} />
       )}
@@ -89,6 +93,94 @@ export function FeedbackNoteCard(props: {
         </Button>
       </div>
     </article>
+  )
+}
+
+function OriginalCode(props: { code: string }) {
+  return (
+    <details className="text-xs">
+      <summary className="cursor-pointer text-muted-foreground">Original code</summary>
+      <div className="pt-1">
+        <Snippet code={props.code} />
+      </div>
+    </details>
+  )
+}
+
+const noteLocation = (note: FeedbackNote) =>
+  `${note.path} ${rangeLabel(note.side, note.start, note.end)}`
+
+export function StagedFeedback(props: {
+  notes: ReadonlyArray<FeedbackNote>
+  onSave: (note: FeedbackNote) => Promise<Problem | null>
+  onRemove: (noteId: string) => Promise<Problem | null>
+}) {
+  const [editing, setEditing] = useState<{ id: string; draft: string } | null>(null)
+
+  return (
+    <section
+      aria-label="Feedback attached to this message"
+      className="flex max-h-72 flex-col gap-2 overflow-y-auto py-1 text-left"
+    >
+      <p className="text-xs text-muted-foreground">
+        {plural(props.notes.length, "Feedback note")} attached to this message
+      </p>
+      <ul className="flex flex-col gap-2">
+        {props.notes.map((note) => (
+          <li key={note.id}>
+            {editing?.id === note.id ? (
+              <FeedbackEditor
+                target={note}
+                older={false}
+                saved
+                draft={editing.draft}
+                onDraftChange={(draft) => setEditing({ id: note.id, draft })}
+                onSave={async (text) => {
+                  // oxlint-disable-next-line typescript/no-misused-spread -- The fields go straight back into FeedbackNote.
+                  const problem = await props.onSave(new FeedbackNote({ ...note, text }))
+
+                  if (problem === null) setEditing(null)
+
+                  return problem
+                }}
+                onCancel={() => setEditing(null)}
+              />
+            ) : (
+              <FeedbackNoteCard
+                note={note}
+                older={false}
+                location={noteLocation(note)}
+                onShow={null}
+                onEdit={
+                  editing === null ? () => setEditing({ id: note.id, draft: note.text }) : null
+                }
+                onRemove={() => props.onRemove(note.id)}
+                foldedCode
+              />
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+export function SentFeedback(props: { feedback: ReadonlyArray<FeedbackNote>; className?: string }) {
+  return (
+    <details className={cn("rounded-lg border bg-background px-3 py-2 text-sm", props.className)}>
+      <summary className="cursor-pointer text-xs text-muted-foreground">
+        {plural(props.feedback.length, "Feedback note")}
+      </summary>
+      <ul className="flex flex-col gap-3 pt-2">
+        {props.feedback.map((note) => (
+          <li key={note.id} className="flex flex-col gap-1">
+            <span className="text-xs text-muted-foreground">{noteLocation(note)}</span>
+            <Snippet code={note.code} />
+            <p className="whitespace-pre-wrap wrap-anywhere">{note.text}</p>
+          </li>
+        ))}
+      </ul>
+    </details>
   )
 }
 

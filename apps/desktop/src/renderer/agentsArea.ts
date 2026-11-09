@@ -2,6 +2,7 @@ import {
   type Agent,
   type AgentCommand,
   type AgentEngine,
+  type AgentMessageInput,
   type AgentPlace,
   applyTranscriptUpdate,
   emptyTranscript,
@@ -16,6 +17,7 @@ import {
   type SentMessage,
   type Transcript,
   type TranscriptUpdate,
+  type UnsentFeedback,
   repositoryKey,
   localPlace,
 } from "@glass/contracts"
@@ -89,6 +91,10 @@ export const agentChangesAtom = Atom.family((agentId: string) =>
 
 export const feedbackNotesAtom = Atom.family((agentId: string) =>
   backendRuntime.atom(Backend.use((backend) => backend.ListFeedbackNotes({ agentId }))),
+)
+
+export const writtenFeedbackAtom = Atom.family((_agentId: string) =>
+  Atom.make<UnsentFeedback | null>(null).pipe(Atom.keepAlive),
 )
 
 export const localCheckoutsAtom = backendRuntime
@@ -309,7 +315,7 @@ export const createAgentAtom = backendRuntime.fn((input: NewAgent) =>
 )
 
 export const sendMessageAtom = Atom.family((agentId: string) =>
-  backendRuntime.fn((sent: MessageInput) =>
+  backendRuntime.fn((sent: AgentMessageInput) =>
     Backend.use((backend) => backend.SendMessage({ agentId, ...sent })),
   ),
 )
