@@ -3,7 +3,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
 import type { ActivityKind, ActivityStamp } from "@glass/contracts"
 import { DateTime, Effect, Schema } from "effect"
-import { AsyncResult } from "effect/reactivity"
+import { AsyncResult, Atom } from "effect/reactivity"
 import { useId, useState } from "react"
 import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from "recharts"
 import { Backend, backendRuntime } from "./backend"
@@ -70,20 +70,22 @@ export const activityByDay = (
   return rows
 }
 
-const activityChartAtom = backendRuntime.atom(
-  Effect.gen(function* () {
-    const now = DateTime.toDate(yield* DateTime.now)
+const activityChartAtom = backendRuntime
+  .atom(
+    Effect.gen(function* () {
+      const now = DateTime.toDate(yield* DateTime.now)
 
-    const stamps = yield* Backend.use((backend) =>
-      backend.ListActivityStamps({
-        since: DateTime.fromDateUnsafe(daysAgo(longestRange - 1, now)),
-        kinds: doneKinds,
-      }),
-    )
+      const stamps = yield* Backend.use((backend) =>
+        backend.ListActivityStamps({
+          since: DateTime.fromDateUnsafe(daysAgo(longestRange - 1, now)),
+          kinds: doneKinds,
+        }),
+      )
 
-    return { stamps, now }
-  }),
-)
+      return { stamps, now }
+    }),
+  )
+  .pipe(Atom.keepAlive, Atom.swr({ staleTime: 0 }))
 
 export function ActivityChart() {
   const id = useId()
