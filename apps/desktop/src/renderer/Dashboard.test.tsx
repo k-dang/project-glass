@@ -138,6 +138,7 @@ it("keeps the Activity chart visible while refreshing on a return to the Dashboa
       ActivityLogError
     >
   > = []
+
   const now = new Date()
   const user = userEvent.setup()
 
