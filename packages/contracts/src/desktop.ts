@@ -40,18 +40,16 @@ export interface DesktopBridge {
 }
 
 export interface DogfoodReportsBridge {
-  /** Saves a screenshot of the window as it is now, with the logs and settings. */
   readonly record: () => Promise<DogfoodReportRecorded>
-  /** Adds the note and what the screen was about, and returns the report's final folder. */
   readonly finish: (details: DogfoodReportDetails) => Promise<string>
+  readonly discard: (id: string) => Promise<void>
 }
 
 /** Main passes this to development builds' renderers, whose preload then offers Dogfood reports. */
 export const DOGFOOD_REPORTS_ARGUMENT = "--glass-dogfood-reports"
 
-/** The screenshot and diagnostics are on disk; the note and what the screen showed come next. */
 export interface DogfoodReportRecorded {
-  readonly folder: string
+  readonly id: string
   readonly screenshot: string
 }
 
@@ -63,7 +61,7 @@ export interface DogfoodReportSubject {
 }
 
 export interface DogfoodReportDetails {
-  readonly folder: string
+  readonly id: string
   readonly note: string
   readonly subject: DogfoodReportSubject
 }
@@ -83,3 +81,5 @@ export const CHOOSE_FOLDER_CHANNEL = "glass:choose-folder"
 export const RECORD_DOGFOOD_REPORT_CHANNEL = "glass:record-dogfood-report"
 
 export const FINISH_DOGFOOD_REPORT_CHANNEL = "glass:finish-dogfood-report"
+
+export const DISCARD_DOGFOOD_REPORT_CHANNEL = "glass:discard-dogfood-report"

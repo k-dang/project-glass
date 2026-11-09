@@ -1,5 +1,6 @@
 import type { DogfoodReportDetails, DogfoodReportSubject } from "@glass/contracts/desktop"
-import { copyFile, mkdir, rename, writeFile } from "node:fs/promises"
+import { randomUUID } from "node:crypto"
+import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 interface Capture {
@@ -21,9 +22,11 @@ const stampOf = (date: Date) =>
   `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}-` +
   `${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`
 
-const copyIfPresent = (from: string, to: string) =>
-  copyFile(from, to).catch((error: NodeJS.ErrnoException) => {
+const readIfPresent = (path: string) =>
+  readFile(path).catch((error: NodeJS.ErrnoException) => {
     if (error.code !== "ENOENT") throw error
+
+    return null
   })
 
 const SLUG_LENGTH = 48
@@ -69,40 +72,53 @@ const subjectFileOf = (recorded: Recorded, subject: DogfoodReportSubject): Subje
 const json = (value: SubjectFile | NonNullable<DogfoodReportSubject["tour"]>) =>
   `${JSON.stringify(value, null, 2)}\n`
 
-/** Writes Dogfood reports into `reports`, one folder each. */
+interface Held {
+  readonly id: string
+  readonly stamp: string
+  readonly recorded: Recorded
+  readonly files: ReadonlyArray<readonly [string, Buffer | null]>
+}
+
 export const dogfoodReportWriter = (reports: string) => {
-  // Also limits `finish` to folders this writer recorded.
-  const unfinished = new Map<string, Recorded>()
+  let held: Held | null = null
 
   return {
     record: async (capture: Capture): Promise<string> => {
-      const folder = join(reports, stampOf(capture.now))
-      const recorded = { recordedAt: capture.now.toISOString(), glassCommit: capture.glassCommit }
-
-      await mkdir(reports, { recursive: true })
-      // Not recursive, so a second report in the same second fails instead of overwriting.
-      await mkdir(folder)
-      await Promise.all([
-        writeFile(join(folder, "screenshot.png"), capture.screenshot),
-        copyIfPresent(capture.backendLogPath, join(folder, "backend.log")),
-        copyIfPresent(capture.settingsPath, join(folder, "settings.json")),
-        writeFile(join(folder, "subject.json"), json(recorded)),
+      const [backendLog, settings] = await Promise.all([
+        readIfPresent(capture.backendLogPath),
+        readIfPresent(capture.settingsPath),
       ])
-      unfinished.set(folder, recorded)
 
-      return folder
+      const id = randomUUID()
+
+      held = {
+        id,
+        stamp: stampOf(capture.now),
+        recorded: { recordedAt: capture.now.toISOString(), glassCommit: capture.glassCommit },
+        files: [
+          ["screenshot.png", capture.screenshot],
+          ["backend.log", backendLog],
+          ["settings.json", settings],
+        ],
+      }
+
+      return id
     },
 
-    finish: async ({ folder, note, subject }: DogfoodReportDetails): Promise<string> => {
-      const recorded = unfinished.get(folder)
+    finish: async ({ id, note, subject }: DogfoodReportDetails): Promise<string> => {
+      if (held?.id !== id) throw new Error(`No unfinished Dogfood report ${id}`)
 
-      if (recorded === undefined) throw new Error(`No unfinished Dogfood report at ${folder}`)
-
-      unfinished.delete(folder)
+      const { stamp, recorded, files } = held
+      held = null
 
       const text = note.trim()
+      const slug = slugOf(text)
+      const folder = join(reports, slug === "" ? stamp : `${stamp}-${slug}`)
 
+      await mkdir(reports, { recursive: true })
+      await mkdir(folder)
       await Promise.all([
+        ...files.map(([name, data]) => data !== null && writeFile(join(folder, name), data)),
         writeFile(join(folder, "subject.json"), json(subjectFileOf(recorded, subject))),
         text !== "" && writeFile(join(folder, "note.md"), `${text}\n`),
         subject.tour !== null && writeFile(join(folder, "tour.json"), json(subject.tour)),
@@ -110,14 +126,11 @@ export const dogfoodReportWriter = (reports: string) => {
           writeFile(join(folder, "agent-review.md"), subject.agentReview.markdown),
       ])
 
-      const slug = slugOf(text)
+      return folder
+    },
 
-      if (slug === "") return folder
-
-      const named = `${folder}-${slug}`
-      await rename(folder, named)
-
-      return named
+    discard: (id: string) => {
+      if (held?.id === id) held = null
     },
   }
 }
