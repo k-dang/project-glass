@@ -83,7 +83,7 @@ function DetailList(props: { label: string; items: ReadonlyArray<Detail> }) {
       <h4 className="text-xs font-medium text-muted-foreground">{props.label}</h4>
       <ul aria-label={props.label} className="flex flex-col gap-1 text-sm">
         {props.items.map(({ key, title, detail }) => (
-          <li key={key}>
+          <li key={key} className="line-clamp-2">
             <span className="font-medium">{title}</span>
             <span className="text-muted-foreground"> · {detail}</span>
           </li>
