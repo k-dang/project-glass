@@ -1,9 +1,12 @@
+import { NodeServices } from "@effect/platform-node"
 import { assert, describe, it } from "@effect/vitest"
 import { defaultReviewPrompt } from "@glass/contracts"
-import { Effect } from "effect"
+import { ConfigProvider, Effect, Layer } from "effect"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { isolatedHome, startBackend } from "../test/harness"
+import { isolatedHome, LAUNCH_TOKEN, startBackend } from "../test/harness"
+import { ServerConfig } from "./ServerConfig"
+import { AgentCommands, SettingsStore } from "./SettingsStore"
 
 const defaultModels = {
   "claude-code": "claude-sonnet-5-5",
@@ -29,7 +32,43 @@ describe("settings file", () => {
         agentReviewEngine: "pi",
         queueAgentReviews: false,
         reviewPrompt: defaultReviewPrompt,
+        claudeCommand: "claude",
+        piCommand: "pi",
       })
+    }),
+  )
+
+  it.live("gives Agents the commands saved in the settings file", () =>
+    Effect.gen(function* () {
+      const home = yield* isolatedHome
+      yield* Effect.promise(() => mkdir(join(home, ".project-glass")))
+      yield* Effect.promise(() =>
+        writeFile(
+          join(home, ".project-glass", "settings.json"),
+          JSON.stringify({ claudeCommand: "/opt/claude/bin/claude" }),
+        ),
+      )
+
+      const commands = yield* AgentCommands.pipe(
+        Effect.provide(
+          AgentCommands.layer.pipe(
+            Layer.provide(SettingsStore.layer),
+            Layer.provide(ServerConfig.layer),
+            Layer.provide(
+              ConfigProvider.layer(
+                ConfigProvider.fromEnvRecord({
+                  GLASS_PORT: "0",
+                  GLASS_TOKEN: LAUNCH_TOKEN,
+                  GLASS_HOME: home,
+                }),
+              ),
+            ),
+            Layer.provide(NodeServices.layer),
+          ),
+        ),
+      )
+
+      assert.deepStrictEqual(commands, { claudeCommand: "/opt/claude/bin/claude", piCommand: "pi" })
     }),
   )
 
@@ -61,6 +100,8 @@ describe("settings file", () => {
         agentReviewEngine: "pi",
         queueAgentReviews: false,
         reviewPrompt: defaultReviewPrompt,
+        claudeCommand: "claude",
+        piCommand: "pi",
       })
     }),
   )

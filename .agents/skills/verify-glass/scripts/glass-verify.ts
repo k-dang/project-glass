@@ -20,6 +20,7 @@ import { Cdp, cdpJson } from "./cdp.ts"
 import { formatAreas, formatSummary, type MemorySample, startSampler } from "./memory.ts"
 import { githubMode } from "./launch-options.ts"
 import { FAKE_MODES, isFakeMode, serveFakeGitHub } from "./fake-github.ts"
+import { writeAgentCommands } from "../../../../apps/server/test/agentCommands.ts"
 import { VIEWER } from "../../../../apps/server/test/fakePullRequest.ts"
 
 const root = join(import.meta.dirname, "..", "..", "..", "..")
@@ -398,9 +399,17 @@ const launch = async (options: {
 
   let fake: RunState["fake"]
   try {
-    if (!options.realAgents && !fakeBackend) {
-      env["GLASS_CLAUDE_COMMAND"] = join(paths.state, "claude-disabled")
-      env["GLASS_PI_COMMAND"] = join(paths.state, "pi-disabled")
+    const agentsOff = !options.realAgents && !fakeBackend
+    writeAgentCommands(
+      join(paths.home, ".project-glass"),
+      agentsOff
+        ? {
+            claudeCommand: join(paths.state, "claude-disabled"),
+            piCommand: join(paths.state, "pi-disabled"),
+          }
+        : undefined,
+    )
+    if (agentsOff) {
       console.log("Agents: off, so no model charges. Use --backend fake for synthetic runners.")
     }
 

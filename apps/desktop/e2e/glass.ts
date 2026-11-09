@@ -12,12 +12,13 @@ import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { TourAnswer } from "../../server/src/tourPrompt"
+import { writeAgentCommands } from "../../server/test/agentCommands"
 import { bundledPi } from "../../server/test/demoAgent"
 import { startFakeAnthropic } from "../../server/test/fakeAnthropic"
 import { type FakeModelSettings, fakeModelProvider } from "../../server/test/fakeModelProvider"
 import { type FakeGitHub, startFakeGitHub } from "../../server/test/fakeGitHub"
 import { type FakePullRequest, VIEWER } from "../../server/test/fakePullRequest"
-import { fakeAnthropicEnvironment } from "../../server/test/pinnedClaude"
+import { fakeAnthropicEnvironment, pinnedClaude } from "../../server/test/pinnedClaude"
 
 const desktopDir = join(import.meta.dirname, "..")
 
@@ -27,6 +28,7 @@ const UNINHERITED = new Set(["VITE_DEV_SERVER_URL", "ELECTRON_RUN_AS_NODE", "GLA
 
 interface Claude {
   readonly answer: (tour: TourAnswer) => Promise<void>
+  readonly command: string
   readonly environment: Readonly<Record<string, string>>
 }
 
@@ -47,6 +49,10 @@ interface Glass {
 
 const launch = (glass: Pick<Glass, "github" | "claude" | "pi" | "home">) => {
   const { github, claude, pi, home } = glass
+  writeAgentCommands(join(home, ".project-glass"), {
+    claudeCommand: claude.command,
+    piCommand: pi.command,
+  })
 
   const inherited = Object.entries(process.env).flatMap(([key, value]) =>
     value === undefined || UNINHERITED.has(key) ? [] : [[key, value]],
@@ -68,7 +74,6 @@ const launch = (glass: Pick<Glass, "github" | "claude" | "pi" | "home">) => {
       GH_TOKEN: VIEWER.token,
       GLASS_GITHUB_API_URL: github.url,
       ...claude.environment,
-      GLASS_PI_COMMAND: pi.command,
       // Keeps pi from refreshing its model catalog over the network.
       PI_OFFLINE: "1",
       GLASS_GIT_REMOTE: github.gitUrl,
@@ -102,6 +107,7 @@ export const test = base.extend<Glass>({
                 Effect.runPromise(
                   anthropic.respond(() => ({ type: "text", text: JSON.stringify(tour) })),
                 ),
+              command: pinnedClaude(),
               environment: fakeAnthropicEnvironment(home, anthropic.url),
             }),
           ),

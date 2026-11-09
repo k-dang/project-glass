@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url"
 import { serve } from "../src/server"
 import { ServerConfig } from "../src/ServerConfig"
 import { runMain, wideEventsToStdout } from "../src/wideEvents"
+import { writeAgentCommands } from "./agentCommands"
 import { bundledPi, seedDemoAgent, startDemoClaude, startDemoPi } from "./demoAgent"
 import { DEMO_REPOSITORY, seedDemoPullRequests } from "./demoPullRequests"
 import { startFakeGitHub } from "./fakeGitHub"
@@ -17,8 +18,7 @@ import { fakeAgentRunners } from "./fakeAgentRunners"
 import { FAKE_PI_MODEL } from "./fakeModelProvider"
 import { installFakeSandboxProvider } from "./fakeSandboxProvider"
 
-const seedDemoSettings = Effect.gen(function* () {
-  const { dataDirectory } = yield* ServerConfig
+const seedDemoSettings = (dataDirectory: string) => {
   const settings = join(dataDirectory, "settings.json")
 
   if (existsSync(settings)) return
@@ -31,7 +31,7 @@ const seedDemoSettings = Effect.gen(function* () {
       agentReviewModels: { pi: FAKE_PI_MODEL },
     }),
   )
-})
+}
 
 const main = Effect.gen(function* () {
   const github = yield* startFakeGitHub({ git: true })
@@ -50,8 +50,6 @@ const main = Effect.gen(function* () {
       GH_TOKEN: VIEWER.token,
       GLASS_GITHUB_API_URL: github.url,
       GLASS_GIT_REMOTE: github.gitUrl,
-      GLASS_PI_COMMAND: bundledPi,
-      GLASS_CLAUDE_COMMAND: claudeCommand,
     }),
   )
 
@@ -76,9 +74,11 @@ const main = Effect.gen(function* () {
     fileURLToPath(new URL("../test/fakeSandboxProvider.ts", import.meta.url)),
   )
 
+  seedDemoSettings(config.dataDirectory)
+  writeAgentCommands(config.dataDirectory, { claudeCommand, piCommand: bundledPi })
+
   yield* Layer.build(
     serve(fakeAgentRunners, Layer.empty).pipe(
-      Layer.provide(Layer.effectDiscard(seedDemoSettings)),
       Layer.provide(ServerConfig.layer),
       Layer.provide(configured),
     ),

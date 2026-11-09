@@ -27,8 +27,6 @@ const clientWith = Effect.fnUntraced(function* (
           token: Redacted.make("test-launch-token"),
           allowedOrigins: new Set<string>(),
           githubApiUrl: "http://127.0.0.1",
-          claudeCommand: "claude",
-          piCommand: "pi",
           agentHostBundle: "agentHost.mjs",
           gitRemote: "https://github.com",
           dataDirectory: "",

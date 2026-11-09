@@ -38,7 +38,6 @@ const isolatedEnvironment = (home: string) => ({
 
 export const fakeAnthropicEnvironment = (home: string, url: string) => ({
   ...isolatedEnvironment(home),
-  GLASS_CLAUDE_COMMAND: pinnedClaude(),
   ANTHROPIC_BASE_URL: url,
   ANTHROPIC_API_KEY: "sk-ant-glass-test-fake",
 })

@@ -45,11 +45,7 @@ const fixture = Effect.fnUntraced(function* (
     Effect.scoped,
     Effect.provide(
       runnersLayer(
-        {
-          GLASS_HOME: home,
-          GLASS_CLAUDE_COMMAND: join(home, "claude"),
-          GLASS_PI_COMMAND: join(home, "pi"),
-        },
+        { claudeCommand: join(home, "claude"), piCommand: join(home, "pi") },
         replay.layer,
       ),
     ),
@@ -193,8 +189,6 @@ it.live("refuses a Claude Code that can't restrict its tools", () =>
 
 it.live("reports a runner whose executable is missing as not installed", () =>
   Effect.gen(function* () {
-    const home = yield* isolatedHome
-
     const failures = yield* Effect.forEach(["claude-code", "pi"] as const, (engine) =>
       Effect.gen(function* () {
         const runner = yield* (yield* AgentRunners).select({
@@ -210,11 +204,7 @@ it.live("reports a runner whose executable is missing as not installed", () =>
         Effect.scoped,
         Effect.flip,
         Effect.provide(
-          runnersLayer({
-            GLASS_HOME: home,
-            GLASS_CLAUDE_COMMAND: "glass-missing-claude",
-            GLASS_PI_COMMAND: "glass-missing-pi",
-          }),
+          runnersLayer({ claudeCommand: "glass-missing-claude", piCommand: "glass-missing-pi" }),
         ),
       ),
     )
