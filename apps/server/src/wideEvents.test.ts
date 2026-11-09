@@ -1,5 +1,5 @@
 import { assert, it } from "@effect/vitest"
-import { Data, Effect, Schema } from "effect"
+import { Data, Effect, Layer, Option, Schema, Tracer } from "effect"
 import { annotateUnit, recordDuration, wideEvents } from "./wideEvents"
 
 class ReviewFailed extends Data.TaggedError("ReviewFailed")<{
@@ -129,5 +129,47 @@ it.effect("records a defect with its full cause", () =>
     assert.include(unit, { level: "ERROR", outcome: "failure" })
     assert.strictEqual(unit?.error?.tag, "Defect")
     assert.include(unit?.error?.message, "boom")
+  }),
+)
+
+it.effect("makes units from the tracer it is given, so they export like any other span", () =>
+  Effect.gen(function* () {
+    const lines: Array<typeof Line.Type> = []
+    const spans: Array<Tracer.NativeSpan> = []
+
+    const recording = Tracer.make({
+      span: (options) => {
+        const span = new Tracer.NativeSpan(options)
+
+        spans.push(span)
+
+        return span
+      },
+    })
+
+    yield* Effect.void.pipe(
+      Effect.withSpan("PullRequestMirror.read"),
+      Effect.withSpan("PullRequestJob.tour", { root: true }),
+      Effect.provide(
+        wideEvents("backend", (line) => lines.push(decodeLine(line))).pipe(
+          Layer.provide(Layer.succeed(Tracer.Tracer)(recording)),
+        ),
+      ),
+    )
+
+    const [tour, read] = spans
+
+    assert.deepStrictEqual(
+      spans.map((span) => [span.name, span.status._tag]),
+      [
+        ["PullRequestJob.tour", "Ended"],
+        ["PullRequestMirror.read", "Ended"],
+      ],
+    )
+    assert.strictEqual(Option.getOrUndefined(read!.parent), tour)
+    assert.deepStrictEqual(
+      lines.map(({ event, trace_id }) => ({ event, trace_id })),
+      [{ event: "PullRequestJob.tour", trace_id: tour!.traceId }],
+    )
   }),
 )

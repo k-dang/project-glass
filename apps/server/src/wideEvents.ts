@@ -13,6 +13,7 @@ import {
   Predicate,
   Tracer,
 } from "effect"
+import { OtlpLogger, OtlpSerialization, OtlpTracer } from "effect/observability"
 import { randomUUID } from "node:crypto"
 
 /**
@@ -91,50 +92,57 @@ type Emit = (
   extra: Iterable<readonly [string, unknown]>,
 ) => void
 
-type SpanInit = ConstructorParameters<typeof Tracer.NativeSpan>[0]
+const units = new WeakSet<Tracer.Span>()
 
-class UnitSpan extends Tracer.NativeSpan {
-  readonly #emit: Emit
+/** Effect's spans have no end hook, so this patches `end` on the inner tracer's own span. */
+const asUnit = (span: Tracer.Span, emit: Emit) => {
+  const end = span.end.bind(span)
 
-  constructor(options: SpanInit, emit: Emit) {
-    super(options)
-    this.#emit = emit
-  }
+  span.end = (endTime, exit) => {
+    end(endTime, exit)
 
-  override end(endTime: bigint, exit: Exit.Exit<unknown, unknown>) {
-    super.end(endTime, exit)
-
-    this.#emit(
+    emit(
       new Date(Number(endTime / 1_000_000n)).toISOString(),
       {
         ...endingOf(exit),
-        event: this.name,
-        duration_ms: Math.round(Number(endTime - this.startTime) / 1_000_000),
-        trace_id: this.traceId,
+        event: span.name,
+        duration_ms: Math.round(Number(endTime - span.status.startTime) / 1_000_000),
+        trace_id: span.traceId,
       },
-      this.attributes,
+      span.attributes,
     )
   }
+
+  units.add(span)
+
+  return span
 }
 
-const unitOf = (span: Tracer.AnySpan | undefined): UnitSpan | undefined => {
+const unitOf = (span: Tracer.AnySpan | undefined) => {
   let current = span
 
-  while (current !== undefined && !(current instanceof UnitSpan))
-    current = Predicate.isTagged(current, "Span")
-      ? Option.getOrUndefined(current.parent)
-      : undefined
+  while (current !== undefined && Predicate.isTagged(current, "Span")) {
+    if (units.has(current)) return current
 
-  return current
+    current = Option.getOrUndefined(current.parent)
+  }
+
+  return undefined
 }
 
 const unitTracer = (emit: Emit) =>
-  Tracer.make({
-    span: (options) =>
-      options.kind === "server" || options.root
-        ? new UnitSpan(options, emit)
-        : new Tracer.NativeSpan(options),
-  })
+  Layer.effect(Tracer.Tracer)(
+    Effect.map(Effect.tracer, (inner) =>
+      Tracer.make({
+        span: (options) => {
+          const span = inner.span(options)
+
+          return options.kind === "server" || options.root ? asUnit(span, emit) : span
+        },
+        context: inner.context,
+      }),
+    ),
+  )
 
 const lineLogger = (emit: Emit) =>
   Logger.make((options) => {
@@ -154,6 +162,8 @@ const lineLogger = (emit: Emit) =>
     )
   })
 
+const launchId = randomUUID()
+
 type Source = "backend" | "agent-host"
 
 type Sink = (line: string) => void
@@ -161,13 +171,13 @@ type Sink = (line: string) => void
 const isLoud = (line: UnitLine | LogLine) => line.level === "WARN" || line.level === "ERROR"
 
 /**
- * Both producers meet here: `lineLogger` for `Effect.log*` and `UnitSpan.end` for units, which a
+ * Both producers meet here: `lineLogger` for `Effect.log*` and `asUnit` for units, which a
  * `Logger` never sees. Each line reaches one sink, so nothing is written twice.
  */
 const emitter = (source: Source, stdout: Sink, stderr?: Sink): Emit => {
   const launch = {
     source,
-    launch_id: randomUUID(),
+    launch_id: launchId,
     platform: `${process.platform}-${process.arch}`,
   }
 
@@ -190,11 +200,26 @@ export const wideEvents = (source: Source, stdout: Sink, stderr?: Sink) => {
     // Replaces the logger set rather than merging: Effect's default text logger would otherwise
     // add non-JSON lines to backend.log (ADR 0012).
     Logger.layer([lineLogger(emit)]),
-    Layer.succeed(Tracer.Tracer)(unitTracer(emit)),
+    unitTracer(emit),
   )
 }
 
-export const wideEventsToStdout = (source: Source) => wideEvents(source, toStdout, toStderr)
+/**
+ * Also sends every span and log line to an OTLP collector when the standard `OTEL_*` variables ask
+ * for it, for profiling during development (ADR 0012).
+ */
+export const wideEventsToStdout = (source: Source) => {
+  const resource = {
+    serviceName: `glass-${source}`,
+    attributes: { "service.instance.id": launchId },
+  }
+
+  return OtlpLogger.layerFromConfig({ resource, mergeWithExisting: true }).pipe(
+    Layer.provideMerge(wideEvents(source, toStdout, toStderr)),
+    Layer.provide(OtlpTracer.layerFromConfig({ resource })),
+    Layer.provide(OtlpSerialization.layerJson),
+  )
+}
 
 export const jsonLogsToStdout = (source: Source) =>
   Logger.layer([lineLogger(emitter(source, toStdout, toStderr))])
