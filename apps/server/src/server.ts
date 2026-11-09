@@ -34,6 +34,7 @@ import { PullRequestMirror } from "./PullRequestMirror"
 import { Queue } from "./Queue"
 import { AgentCommands, SettingsStore } from "./SettingsStore"
 import { SavedPlaces } from "./SavedPlaces"
+import { SkillPacks } from "./SkillPacks"
 import { Storage } from "./Storage"
 import { ToDos } from "./ToDos"
 import { AgentRunners } from "./agentRunners"
@@ -85,6 +86,7 @@ const services = (
       Layer.provide(PullRequestMirror.layer),
       Layer.provide(ToDos.layer),
       Layer.provide(SavedPlaces.layer),
+      Layer.provide(SkillPacks.layer),
       Layer.provide(Queue.layer),
       Layer.provide(Tours.layer),
       Layer.provide(AgentReviews.layer),

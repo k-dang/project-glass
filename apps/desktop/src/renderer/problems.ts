@@ -47,6 +47,28 @@ export const describeError = (error: BackendError): Problem =>
         title: "That isn't a GitHub repository",
         detail: "Enter owner/repo or a repository URL like https://github.com/owner/repo.",
       }),
+      InvalidSkillPackUrl: () => ({
+        title: "That isn't a GitHub folder or repository URL",
+        detail:
+          "Paste a URL like https://github.com/owner/repo or https://github.com/owner/repo/tree/main/skills.",
+      }),
+      SkillPackNotReadable: ({ message }) => ({
+        title: "Couldn't read that Skill pack",
+        detail: message,
+      }),
+      InvalidSkillPackName: () => ({
+        title: "That name can't be a Skill pack's",
+        detail: "Use lowercase letters, digits, and single hyphens, up to 64 characters.",
+      }),
+      SkillPackNameTaken: ({ name }) => ({
+        title: "That name is taken",
+        detail: `You already have a Skill pack named ${name}. Choose another name.`,
+      }),
+      SkillPackNotFound: ({ name }) => ({
+        title: "This Skill pack is gone",
+        detail: `${name} was removed. Reload Settings to see your Skill packs now.`,
+      }),
+      SkillPackError: ({ message }) => ({ title: "Couldn't access Skill packs", detail: message }),
       StorageError: () => ({
         title: "Couldn't measure storage",
         detail: "Glass couldn't read its database sizes.",

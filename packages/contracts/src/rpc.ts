@@ -51,6 +51,18 @@ import { ReviewDecision, SubmitReviewError } from "./review"
 import { Revision, RevisionSide, StaleRevision } from "./revision"
 import { ResumableDestination, SavedPlace, SavedPlaceError } from "./savedPlace"
 import { SettingsError } from "./settings"
+import {
+  InvalidSkillPackName,
+  InvalidSkillPackUrl,
+  SkillPack,
+  SkillPackError,
+  SkillPackNameTaken,
+  SkillPackNotFound,
+  SkillPackNotReadable,
+  SkillPackPreview,
+  SkillPackSource,
+  SkillPackUpdate,
+} from "./skillPack"
 import { StorageError, StorageItem } from "./storage"
 import { ToDo, ToDoError, ToDoTitle } from "./toDo"
 import { TourFailure, TourState } from "./tour"
@@ -71,6 +83,10 @@ export const NewDraft = Schema.Struct({
 export type NewDraft = typeof NewDraft.Type
 
 const toDoList = { success: Schema.Array(ToDo), error: ToDoError }
+
+const skillPackList = { success: Schema.Array(SkillPack), error: SkillPackError }
+
+const SkillPackReadError = Schema.Union([SkillPackNotReadable, SkillPackError, ConnectionError])
 
 export class GlassRpcs extends RpcGroup.make(
   Rpc.make("GetSavedPlaces", { success: Schema.Array(SavedPlace), error: SavedPlaceError }),
@@ -158,6 +174,28 @@ export class GlassRpcs extends RpcGroup.make(
     success: Schema.Array(FollowedRepository),
     error: SettingsError,
   }),
+  Rpc.make("ListSkillPacks", skillPackList),
+  Rpc.make("PreviewSkillPack", {
+    payload: { url: Schema.String },
+    success: SkillPackPreview,
+    error: Schema.Union([InvalidSkillPackUrl, SkillPackReadError]),
+  }),
+  Rpc.make("AddSkillPack", {
+    payload: { source: SkillPackSource, commit: Schema.String, name: Schema.String },
+    success: Schema.Array(SkillPack),
+    error: Schema.Union([InvalidSkillPackName, SkillPackNameTaken, SkillPackReadError]),
+  }),
+  Rpc.make("PreviewSkillPackUpdate", {
+    payload: { name: Schema.String },
+    success: SkillPackUpdate,
+    error: Schema.Union([SkillPackNotFound, SkillPackReadError]),
+  }),
+  Rpc.make("UpdateSkillPack", {
+    payload: { name: Schema.String, commit: Schema.String },
+    success: Schema.Array(SkillPack),
+    error: Schema.Union([SkillPackNotFound, SkillPackReadError]),
+  }),
+  Rpc.make("RemoveSkillPack", { payload: { name: Schema.String }, ...skillPackList }),
   Rpc.make("ListPullRequests", {
     success: PullRequestListings,
     error: Schema.Union([SettingsError, ConnectionError]),

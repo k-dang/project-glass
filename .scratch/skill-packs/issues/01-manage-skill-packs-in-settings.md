@@ -6,12 +6,12 @@
 
 **Status:** ready-for-agent
 
-- [ ] Accepts tree URLs (`github.com/<owner>/<repo>/tree/<ref>/<path>`) and repository URLs (default branch, repository root), read through the user's existing GitHub Connection, private repositories included. Other hosts are rejected with a clear message.
-- [ ] A folder that contains `SKILL.md` is a pack of that one skill; otherwise skills are discovered recursively, without descending into a folder once it is a skill. Other top-level files are ignored.
-- [ ] The preview lists each skill's name and description and the resolved commit; skills whose `SKILL.md` doesn't parse or has no description are listed as skipped with the reason, and the rest can still be added.
-- [ ] An empty folder, a wrong path, and an inaccessible repository each produce a clear error in the preview.
-- [ ] The pack's name defaults to its folder's (or repository's) name, must be unique among the user's packs, follows skill-name rules (lowercase letters, digits, hyphens), and is fixed once added.
-- [ ] Pack metadata (URL ref and pinned commit) and the files of the pinned commit are stored in Glass's database, with no new Storage group.
-- [ ] Update re-resolves the ref, shows skills added, removed, and changed against the current pin, and moves the pin only on confirmation. A pack whose ref is already a commit offers nothing to update. There is no automatic update check.
-- [ ] Remove takes the pack off the list; a pinned commit's files are deleted once no pack references them (ticket 02 extends this to Agent references).
-- [ ] Backend-boundary tests against recorded or fixture GitHub responses cover: tree and repository URLs, a single-skill folder, recursive discovery, skipped skills with reasons, duplicate names, an inaccessible repository, and Update's change summary.
+- [x] Accepts tree URLs (`github.com/<owner>/<repo>/tree/<ref>/<path>`) and repository URLs (default branch, repository root), read through the user's existing GitHub Connection, private repositories included. Other hosts are rejected with a clear message.
+- [x] A folder that contains `SKILL.md` is a pack of that one skill; otherwise skills are discovered recursively, without descending into a folder once it is a skill. Other top-level files are ignored.
+- [x] The preview lists each skill's name and description and the resolved commit; skills whose `SKILL.md` doesn't parse or has no description are listed as skipped with the reason, and the rest can still be added.
+- [x] An empty folder, a wrong path, and an inaccessible repository each produce a clear error in the preview.
+- [x] The pack's name defaults to its folder's (or repository's) name, must be unique among the user's packs, follows skill-name rules (lowercase letters, digits, hyphens), and is fixed once added.
+- [x] Pack metadata (URL ref and pinned commit) and the files of the pinned commit are stored in Glass's database, with no new Storage group.
+- [x] Update re-resolves the ref, shows skills added, removed, and changed against the current pin, and moves the pin only on confirmation. A pack whose ref is already a commit offers nothing to update. There is no automatic update check.
+- [x] Remove takes the pack off the list; a pinned commit's files are deleted once no pack references them (ticket 02 extends this to Agent references).
+- [x] Backend-boundary tests against recorded or fixture GitHub responses cover: tree and repository URLs, a single-skill folder, recursive discovery, skipped skills with reasons, duplicate names, an inaccessible repository, and Update's change summary.

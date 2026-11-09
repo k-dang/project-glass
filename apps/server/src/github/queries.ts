@@ -243,3 +243,65 @@ export const RepositoryBranchesResponse = GraphQLResponse(
     ),
   }),
 )
+
+export const COMMIT_AT_REVISION_QUERY = `query CommitAtRevision($owner: String!, $name: String!, $revision: String!) {
+  repository(owner: $owner, name: $name) {
+    object(expression: $revision) {
+      __typename
+      ... on Commit { oid }
+      ... on Tag { target { __typename ... on Commit { oid } } }
+    }
+  }
+}`
+
+const CommitOid = Schema.Struct({ __typename: Schema.Literal("Commit"), oid: Schema.String })
+
+const OtherObject = Schema.Struct({ __typename: Schema.String })
+
+export const CommitAtRevisionResponse = GraphQLResponse(
+  Schema.Struct({
+    repository: Schema.NullOr(
+      Schema.Struct({
+        object: Schema.NullOr(
+          Schema.Union([
+            CommitOid,
+            Schema.Struct({
+              __typename: Schema.Literal("Tag"),
+              target: Schema.Union([CommitOid, OtherObject]),
+            }),
+            OtherObject,
+          ]),
+        ),
+      }),
+    ),
+  }),
+)
+
+export const TREE_AT_EXPRESSION_QUERY = `query TreeAtExpression($owner: String!, $name: String!, $expression: String!) {
+  repository(owner: $owner, name: $name) {
+    object(expression: $expression) {
+      __typename
+      ... on Tree { oid }
+      ... on Commit { tree { oid } }
+    }
+  }
+}`
+
+export const TreeAtExpressionResponse = GraphQLResponse(
+  Schema.Struct({
+    repository: Schema.NullOr(
+      Schema.Struct({
+        object: Schema.NullOr(
+          Schema.Union([
+            Schema.Struct({ __typename: Schema.Literal("Tree"), oid: Schema.String }),
+            Schema.Struct({
+              __typename: Schema.Literal("Commit"),
+              tree: Schema.Struct({ oid: Schema.String }),
+            }),
+            OtherObject,
+          ]),
+        ),
+      }),
+    ),
+  }),
+)
