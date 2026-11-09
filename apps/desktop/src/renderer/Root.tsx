@@ -2,7 +2,9 @@ import type { BackendFailure } from "@glass/contracts"
 import { LoaderCircle, ServerCrash } from "lucide-react"
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
+import { Toaster } from "@/components/ui/toast"
 import { App } from "./App"
+import { DogfoodReports } from "./DogfoodReports"
 
 export function Root() {
   const [failure, setFailure] = useState<BackendFailure | null>(null)
@@ -11,7 +13,21 @@ export function Root() {
     void window.glass.backendFailure().then(setFailure)
   }, [])
 
-  return failure === null ? <App /> : <BackendFailed failure={failure} />
+  // Dogfood reports stay mounted across a backend failure, when its log matters most.
+  return (
+    <>
+      {failure === null ? (
+        <App />
+      ) : (
+        <Toaster>
+          <BackendFailed failure={failure} />
+        </Toaster>
+      )}
+      {window.glass.dogfoodReports !== undefined && (
+        <DogfoodReports bridge={window.glass.dogfoodReports} />
+      )}
+    </>
+  )
 }
 
 function BackendFailed(props: { failure: BackendFailure }) {

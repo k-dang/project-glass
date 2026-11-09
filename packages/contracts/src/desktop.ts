@@ -1,3 +1,7 @@
+import type { CapturedContext } from "./agent"
+import type { AgentReview } from "./agentReview"
+import type { Tour } from "./tour"
+
 export interface BackendEndpoint {
   readonly url: string
   readonly token: string
@@ -31,6 +35,37 @@ export interface DesktopBridge {
   readonly setTheme: (theme: Theme) => Promise<ColorScheme>
   readonly resourceUsage: () => Promise<ResourceUsage>
   readonly chooseFolder: () => Promise<string | null>
+  /** Present in development builds only, which record Dogfood reports. */
+  readonly dogfoodReports?: DogfoodReportsBridge
+}
+
+export interface DogfoodReportsBridge {
+  /** Saves a screenshot of the window as it is now, with the logs and settings. */
+  readonly record: () => Promise<DogfoodReportRecorded>
+  /** Adds the note and what the screen was about, and returns the report's final folder. */
+  readonly finish: (details: DogfoodReportDetails) => Promise<string>
+}
+
+/** Main passes this to development builds' renderers, whose preload then offers Dogfood reports. */
+export const DOGFOOD_REPORTS_ARGUMENT = "--glass-dogfood-reports"
+
+/** The screenshot and diagnostics are on disk; the note and what the screen showed come next. */
+export interface DogfoodReportRecorded {
+  readonly folder: string
+  readonly screenshot: string
+}
+
+export interface DogfoodReportSubject {
+  readonly route: string
+  readonly context: typeof CapturedContext.Encoded | null
+  readonly tour: typeof Tour.Encoded | null
+  readonly agentReview: typeof AgentReview.Encoded | null
+}
+
+export interface DogfoodReportDetails {
+  readonly folder: string
+  readonly note: string
+  readonly subject: DogfoodReportSubject
 }
 
 export const BACKEND_ENDPOINT_CHANNEL = "glass:backend-endpoint"
@@ -44,3 +79,7 @@ export const SET_THEME_CHANNEL = "glass:set-theme"
 export const RESOURCE_USAGE_CHANNEL = "glass:resource-usage"
 
 export const CHOOSE_FOLDER_CHANNEL = "glass:choose-folder"
+
+export const RECORD_DOGFOOD_REPORT_CHANNEL = "glass:record-dogfood-report"
+
+export const FINISH_DOGFOOD_REPORT_CHANNEL = "glass:finish-dogfood-report"
