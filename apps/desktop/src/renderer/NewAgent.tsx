@@ -52,6 +52,7 @@ import { ModelPicker } from "./ModelPicker"
 import { PermissionModePicker } from "./PermissionModePicker"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf, settledProblem } from "./problems"
+import { SkillPackPicker, useSkillPackChoice } from "./SkillPackPicker"
 
 const NEW_AGENT_TEXT = "new"
 
@@ -306,6 +307,7 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
       : newAgentBranchesAtom(placeKey(where.place), repository),
   )
 
+  const skillPacks = useSkillPackChoice()
   const created = useAtomValue(createAgentAtom)
   const create = useAtomSet(createAgentAtom, { mode: "promiseExit" })
   const defaultBranch = AsyncResult.value(defaults)
@@ -387,6 +389,7 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
       repository,
       baseBranch,
       place: where.place,
+      skillPacks: skillPacks.chosen,
       ...program,
       ...message,
     })
@@ -435,9 +438,15 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
         setComposed={(update) => setWritten(update(composed))}
         label="Message"
         placeholder="What should the Agent do?"
-        blocked={created.waiting || baseBranch === null || awaitingModels}
+        blocked={
+          created.waiting ||
+          baseBranch === null ||
+          awaitingModels ||
+          !AsyncResult.isSuccess(skillPacks.listed)
+        }
         problem={
           settledProblem(created) ??
+          settledProblem(skillPacks.listed) ??
           settledProblem(defaults) ??
           settledProblem(branches) ??
           folder.problem
@@ -512,6 +521,11 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
             onValueChange={(branch) => key !== undefined && props.setBase(branchContext, branch)}
             placeholder={key === undefined ? "No branches" : "Loading branches…"}
             disabled={Option.isNone(defaultBranch) || key === undefined}
+          />
+          <SkillPackPicker
+            names={skillPacks.names}
+            chosen={skillPacks.chosen}
+            onChange={skillPacks.setChosen}
           />
           {asksPermission(where.place) && (
             <div className="ml-auto">

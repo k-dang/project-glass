@@ -1,6 +1,7 @@
 import {
   Agent,
   AgentBusy,
+  type AgentSkillPack,
   type AgentEngine,
   AgentError,
   type AgentCommand,
@@ -38,6 +39,7 @@ import {
 } from "@glass/contracts"
 import {
   Context,
+  Data,
   DateTime,
   Effect,
   FileSystem,
@@ -50,7 +52,7 @@ import {
   Stream,
   SubscriptionRef,
 } from "effect"
-import { SqlClient } from "effect/sql"
+import { SqlClient, type SqlError } from "effect/sql"
 import { createHash, randomUUID } from "node:crypto"
 import { ActivityLog } from "./ActivityLog"
 import { type Conversation, ConversationTurns } from "./ConversationTurns"
@@ -65,6 +67,7 @@ import {
 import { Sandboxes } from "./Sandboxes"
 import { LocalPlacement } from "./LocalPlacement"
 import { type AgentRole, ReviewBrief, ReviewRole, WorkRole } from "./agentHost/protocol"
+import { SkillPacks } from "./SkillPacks"
 import { Transcripts } from "./Transcripts"
 import { annotateUnit } from "./wideEvents"
 
@@ -102,16 +105,13 @@ const decodeBrief = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ brie
 
 const decodeStored = Schema.decodeUnknownEffect(Schema.Array(StoredAgent))
 
-const toRow = ({
-  owner,
-  repo,
-  folder,
-  sandboxProvider,
-  forReview,
-  ...agent
-}: typeof StoredAgent.Type): PlacedAgent => ({
+const toRow = (
+  { owner, repo, folder, sandboxProvider, forReview, ...agent }: typeof StoredAgent.Type,
+  skillPacks: ReadonlyArray<AgentSkillPack>,
+): PlacedAgent => ({
   agent: new Agent({
     ...agent,
+    skillPacks,
     place:
       sandboxProvider === null ? localPlace : SandboxPlace.make({ providerId: sandboxProvider }),
     repository: new FollowedRepository({ owner, repo }),
@@ -133,6 +133,18 @@ const annotateAgent = ({ id, engine, model, place }: Agent) =>
 
 const storageFailure = () =>
   new AgentError({ message: "Couldn't read or save your Agents. Try again." })
+
+const couldNotSave = (cause: SqlError.SqlError) =>
+  Effect.logWarning("Couldn't save an Agent", cause).pipe(
+    Effect.andThen(Effect.fail(storageFailure())),
+  )
+
+type Purpose = Data.TaggedEnum<{
+  Work: { readonly packs: ReadonlyArray<string> }
+  Review: { readonly brief: ReviewBrief }
+}>
+
+const Purpose = Data.taggedEnum<Purpose>()
 
 export interface NewReviewAgent {
   readonly name: string
@@ -251,6 +263,7 @@ export class Agents extends Context.Service<
       const activityLog = yield* ActivityLog
       const turns = yield* ConversationTurns
       const notes = yield* FeedbackNotes
+      const skillPacks = yield* SkillPacks
       const fs = yield* FileSystem.FileSystem
       const lock = yield* Semaphore.make(1)
       const scope = yield* Scope.Scope
@@ -262,7 +275,11 @@ export class Agents extends Context.Service<
         FROM agent ORDER BY created_at
       `.pipe(Effect.flatMap(decodeStored), Effect.orDie)
 
-      const rows = yield* SubscriptionRef.make<ReadonlyArray<PlacedAgent>>(stored.map(toRow))
+      const packsOfAgents = yield* skillPacks.agentPacks.pipe(Effect.orDie)
+
+      const rows = yield* SubscriptionRef.make<ReadonlyArray<PlacedAgent>>(
+        stored.map((agent) => toRow(agent, packsOfAgents.get(agent.id) ?? [])),
+      )
 
       const find = Effect.fnUntraced(function* (agentId: string) {
         const found = (yield* SubscriptionRef.get(rows)).find(({ agent }) => agent.id === agentId)
@@ -333,6 +350,11 @@ export class Agents extends Context.Service<
           ),
         )
 
+      const skillsOf = (agentId: string) =>
+        skillPacks
+          .agentSkills(agentId)
+          .pipe(Effect.mapError(({ message }) => new AgentError({ message })))
+
       const conversationOf = (row: PlacedAgent): Conversation => {
         const placement = placementOf(row)
         const { id, engine, model, effort, permissionMode } = row.agent
@@ -344,9 +366,15 @@ export class Agents extends Context.Service<
         return {
           id,
           start: (client) =>
-            role.pipe(
-              Effect.flatMap((started) =>
-                client.StartAgent({ agentId: id, engine, folder: row.folder, role: started }),
+            Effect.all([role, skillsOf(id)], { concurrency: "unbounded" }).pipe(
+              Effect.flatMap(([started, skills]) =>
+                client.StartAgent({
+                  agentId: id,
+                  engine,
+                  folder: row.folder,
+                  role: started,
+                  skills,
+                }),
               ),
               Effect.asVoid,
             ),
@@ -371,20 +399,26 @@ export class Agents extends Context.Service<
         )
         .pipe(Effect.orDie)
 
-      const insert = (row: PlacedAgent, first: MessageInput, review: ReviewBrief | null) => {
-        const { agent, folder } = row
-        const { place, repository } = agent
+      const insert = (placed: PlacedAgent, first: MessageInput, purpose: Purpose) => {
+        const { id, place, repository } = placed.agent
 
         const forget = SubscriptionRef.update(rows, (current) =>
-          current.filter((kept) => kept !== row),
+          current.filter((kept) => kept.agent.id !== id),
         )
 
         return lock
           .withPermits(1)(
             Effect.gen(function* () {
+              const agent = agentWith(placed.agent, {
+                skillPacks: yield* skillPacks.pinForAgent(
+                  id,
+                  Purpose.$match(purpose, { Work: ({ packs }) => packs, Review: () => [] }),
+                ),
+              })
+
               yield* annotateAgent(agent)
               yield* sql`INSERT INTO agent ${sql.insert({
-                id: agent.id,
+                id,
                 name: agent.name,
                 sandbox_provider: sandboxProviderOf(place),
                 owner: repository.owner,
@@ -394,18 +428,31 @@ export class Agents extends Context.Service<
                 model: agent.model,
                 effort: agent.effort,
                 permission_mode: agent.permissionMode,
-                folder,
+                folder: placed.folder,
                 created_at: DateTime.formatIso(agent.createdAt),
-                review_brief: review === null ? null : encodeBrief(review),
+                review_brief: Purpose.$match(purpose, {
+                  Work: () => null,
+                  Review: ({ brief }) => encodeBrief(brief),
+                }),
               })}`
 
-              yield* SubscriptionRef.update(rows, (current) => [...current, row])
-              yield* transcripts.startOrQueue(agent.id, { ...first, context: null })
+              yield* SubscriptionRef.update(rows, (current) => [...current, { ...placed, agent }])
+              yield* transcripts.startOrQueue(id, { ...first, context: null })
+
+              return agent
             }).pipe(sql.withTransaction),
           )
           .pipe(
-            Effect.tapError((cause) => Effect.logWarning("Couldn't save an Agent", cause)),
-            Effect.mapError(storageFailure),
+            Effect.catchTags({
+              SkillPackNotFound: ({ name }) =>
+                Effect.fail(
+                  new AgentError({
+                    message: `The Skill pack ${name} was removed. Choose the Agent's Skill packs again.`,
+                  }),
+                ),
+              SkillPackError: ({ message }) => Effect.fail(new AgentError({ message })),
+              SqlError: couldNotSave,
+            }),
             Effect.onError(() => forget),
           )
       }
@@ -423,17 +470,16 @@ export class Agents extends Context.Service<
           model: input.model,
           effort: null,
           permissionMode: null,
+          skillPacks: [],
           createdAt: yield* DateTime.now,
           sandbox: null,
         })
 
-        yield* insert(
+        return yield* insert(
           { agent, folder: input.checkout, forReview: true },
           { message: input.message, images: [] },
-          input.review,
+          Purpose.Review({ brief: input.review }),
         )
-
-        return agent
       })
 
       const create = Effect.fn("Agents.create")(function* (input: NewAgent) {
@@ -460,13 +506,16 @@ export class Agents extends Context.Service<
           model,
           effort,
           permissionMode,
+          skillPacks: [],
           createdAt: yield* DateTime.now,
           sandbox: null,
         })
 
-        yield* insert({ agent, folder, forReview: false }, { message, images }, null).pipe(
-          Effect.onError(() => discard),
-        )
+        const created = yield* insert(
+          { agent, folder, forReview: false },
+          { message, images },
+          Purpose.Work({ packs: input.skillPacks }),
+        ).pipe(Effect.onError(() => discard))
 
         yield* activityLog.record(
           AgentStarted.make({
@@ -479,7 +528,7 @@ export class Agents extends Context.Service<
           }),
         )
 
-        return yield* withSandbox(agent)
+        return yield* withSandbox(created)
       })
 
       const findWritable = (agentId: string) =>
@@ -554,7 +603,11 @@ export class Agents extends Context.Service<
 
       const commands = (agentId: string) =>
         listedByHost(agentId, (host, row) =>
-          host.ListCommands({ engine: row.agent.engine, folder: row.folder }),
+          skillsOf(row.agent.id).pipe(
+            Effect.flatMap((skills) =>
+              host.ListCommands({ engine: row.agent.engine, folder: row.folder, skills }),
+            ),
+          ),
         ).pipe(Effect.withSpan("Agents.commands"))
 
       const files = (agentId: string) =>
@@ -662,6 +715,7 @@ export class Agents extends Context.Service<
             yield* transcripts.remove(agentId)
             yield* turns.removeUnsent(agentId)
             yield* notes.removeAll(agentId)
+            yield* skillPacks.releaseAgent(agentId)
             yield* sql`DELETE FROM agent WHERE id = ${agentId}`
           }).pipe(sql.withTransaction, Effect.mapError(storageFailure))
         }).pipe(

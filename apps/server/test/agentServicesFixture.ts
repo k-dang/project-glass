@@ -43,6 +43,7 @@ import { followJournal } from "../src/hostJournal"
 import { migrationLoader } from "../src/Migrations"
 import { Plugins } from "../src/Plugins"
 import { Sandboxes } from "../src/Sandboxes"
+import { SkillPacks } from "../src/SkillPacks"
 import { ServerConfig } from "../src/ServerConfig"
 import { GitHubClient } from "../src/github/GitHubClient"
 import { LocalPlacement } from "../src/LocalPlacement"
@@ -142,6 +143,7 @@ export const agentServicesFixture = Effect.gen(function* () {
     Layer.mergeAll(
       HostAgents.make({ "claude-code": adapter, pi: adapter }).pipe(
         Layer.provideMerge(Journal.layer),
+        Layer.provide(NodeFileSystem.layer),
       ),
       Layer.succeed(Changes, changes),
     )
@@ -165,7 +167,7 @@ export const agentServicesFixture = Effect.gen(function* () {
         engines: AgentEngine.literals,
         models: () => models,
         commands: (engine) =>
-          client.ListCommands({ engine, folder: "checkout" }).pipe(Effect.orDie),
+          client.ListCommands({ engine, folder: "checkout", skills: [] }).pipe(Effect.orDie),
         defaultBranch: () => Effect.succeed(null),
         branches: () => Effect.succeed([]),
         files: () => Effect.succeed([]),
@@ -206,6 +208,7 @@ export const agentServicesFixture = Effect.gen(function* () {
               ),
             ),
           ),
+          Layer.provide(SkillPacks.layer.pipe(Layer.provide(Layer.mock(GitHubClient)({})))),
           Layer.provide(ConversationTurns.layer),
           Layer.provide(FeedbackNotes.layer),
           Layer.provideMerge(Transcripts.layer),
@@ -297,6 +300,7 @@ export const agentServicesFixture = Effect.gen(function* () {
         baseBranch: "main",
         message: "Start",
         images: [],
+        skillPacks: [],
         engine,
         model: null,
         effort: null,

@@ -18,9 +18,10 @@ import {
 import { DateTime, Deferred, Effect, Fiber, Predicate, Schema, Scope } from "effect"
 import { randomUUID } from "node:crypto"
 import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
+import { basename, dirname, join, relative } from "node:path"
 import type { AgentAdapter, AgentSession } from "../src/agentHost/adapter"
 import { GlassToolsAccess, notRunning } from "../src/agentHost/protocol"
+import type { WrittenSkills } from "../src/agentHost/sentSkills"
 import { MCP_PATH } from "../src/mcp/server"
 import { connectMcp, initialize, mcpPost } from "./mcpClient"
 import { settleWith } from "../src/agentHost/requests"
@@ -59,6 +60,17 @@ const scriptedHold = /^hold:(\S+)/m
 
 const decodeArgs = Schema.decodeSync(Schema.fromJsonString(Schema.JsonObject))
 
+const skillCommands = (written: ReadonlyArray<WrittenSkills>) =>
+  written.flatMap(({ plugin, skills }) =>
+    skills.map((skill) => ({ name: `${basename(plugin)}:${basename(skill)}`, description: "" })),
+  )
+
+const filesUnder = (folder: string): ReadonlyArray<string> =>
+  readdirSync(folder, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => relative(folder, join(entry.parentPath, entry.name)).replaceAll("\\", "/"))
+    .toSorted()
+
 export const scriptedAdapter = (gates: string): AgentAdapter => {
   // The Global conversation's starts are kept beside the gates, so they outlive this host.
   const currentStart = join(gates, "global-start.json")
@@ -77,8 +89,8 @@ export const scriptedAdapter = (gates: string): AgentAdapter => {
         models: [{ id: "scripted", name: "Scripted", efforts: [] }],
       }),
     ),
-    commands: () => Effect.succeed([]),
-    start: ({ folder, role, report }) =>
+    commands: (_folder, skills) => Effect.succeed(skillCommands(skills)),
+    start: ({ folder, role, skills, report }) =>
       Effect.gen(function* () {
         const review = Predicate.isTagged(role, "Review") ? role.brief : null
         const glass = Predicate.isTagged(role, "Global") ? role.tools : null
@@ -171,6 +183,13 @@ export const scriptedAdapter = (gates: string): AgentAdapter => {
                   parentToolCallId: null,
                 }),
               )
+            }
+
+            if (message === "show the skills") {
+              const [first] = skills
+              const written = first === undefined ? [] : filesUnder(dirname(first.plugin))
+
+              yield* part(turnId, TextPart.make({ text: written.join(",") }))
             }
 
             if (message === "show the review" && review !== null) {

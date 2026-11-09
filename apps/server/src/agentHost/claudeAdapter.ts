@@ -52,6 +52,7 @@ import {
   type ReviewBrief,
 } from "./protocol"
 import { settleWith } from "./requests"
+import type { WrittenSkills } from "./sentSkills"
 import {
   placeSuggestedDraft,
   suggestDraftDescription,
@@ -137,13 +138,23 @@ const roleOptions = (role: AgentRole): Options =>
     }),
   )
 
+const pluginOptions = (skills: ReadonlyArray<WrittenSkills>): Options =>
+  skills.length === 0
+    ? {}
+    : {
+        plugins: skills.map(({ plugin }) => ({
+          type: "local",
+          path: plugin,
+          skipMcpDiscovery: true,
+        })),
+      }
+
 const startClaude = (
   sdk: ClaudeSdk,
   command: string,
   folder: string,
   prompt: AsyncIterable<SDKUserMessage>,
   canUseTool: CanUseTool,
-  sessionOption?: { readonly resume: string } | { readonly sessionId: string },
   extra: Options = {},
 ): Effect.Effect<
   {
@@ -164,7 +175,6 @@ const startClaude = (
             // The SDK's own default system prompt is empty, unlike the terminal `claude`'s.
             systemPrompt: { type: "preset", preset: "claude_code" },
             includePartialMessages: true,
-            ...sessionOption,
             ...extra,
             canUseTool,
             // The user may pick bypassPermissions between Turns.
@@ -321,9 +331,14 @@ interface Asked {
  * Starts Claude Code in `folder` only for its handshake, which sends the model nothing. It still
  * starts what the folder's settings start, such as MCP servers, plugins, and SessionStart hooks.
  */
-const handshake = (sdk: ClaudeSdk, command: string, folder: string) =>
-  startClaude(sdk, command, folder, Stream.toAsyncIterable(Stream.never), () =>
-    Promise.resolve({ behavior: "deny", message: "Glass is only asking what it offers." }),
+const handshake = (sdk: ClaudeSdk, command: string, folder: string, extra: Options = {}) =>
+  startClaude(
+    sdk,
+    command,
+    folder,
+    Stream.toAsyncIterable(Stream.never),
+    () => Promise.resolve({ behavior: "deny", message: "Glass is only asking what it offers." }),
+    extra,
   ).pipe(Effect.map(({ initialized }) => initialized))
 
 export const claudeAdapter = (
@@ -353,15 +368,15 @@ export const claudeAdapter = (
     })
   }).pipe(Effect.scoped),
 
-  commands: (folder) =>
-    handshake(sdk, command, folder).pipe(
+  commands: (folder, skills) =>
+    handshake(sdk, command, folder, pluginOptions(skills)).pipe(
       Effect.map(({ commands }) =>
         commands.map(({ name, description }): AgentCommand => ({ name, description })),
       ),
       Effect.scoped,
     ),
 
-  start: Effect.fnUntraced(function* ({ folder, conversation, role, report }) {
+  start: Effect.fnUntraced(function* ({ folder, conversation, role, skills, report }) {
     const prompts = yield* Queue.unbounded<SDKUserMessage>()
     const requests = yield* Queue.unbounded<Input>()
     const waiting = new Map<string, Asked>()
@@ -408,8 +423,11 @@ export const claudeAdapter = (
           ),
           { signal },
         ),
-      saved === undefined ? { sessionId: conversation } : { resume: conversation },
-      roleOptions(role),
+      {
+        ...(saved === undefined ? { sessionId: conversation } : { resume: conversation }),
+        ...roleOptions(role),
+        ...pluginOptions(skills),
+      },
     )
 
     const turns = yield* runTurns({

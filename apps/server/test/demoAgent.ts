@@ -120,5 +120,6 @@ export const seedDemoAgent = Effect.fnUntraced(function* (
     place: localPlace,
     message: "Show me around this repository.",
     images: [],
+    skillPacks: [],
   })
 })

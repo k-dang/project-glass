@@ -468,7 +468,7 @@ export const GlassToolHandlers = GlassTools.toLayer(
           yield* refuseUnofferedModel(input)
 
           const agent = yield* agents
-            .create({ ...input, permissionMode: null, images: [] })
+            .create({ ...input, permissionMode: null, skillPacks: [], images: [] })
             .pipe(Effect.uninterruptible)
 
           return { agent }

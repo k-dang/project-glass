@@ -1,0 +1,133 @@
+{
+  "scenario": "pi-skill-pack",
+  "program": "@earendil-works/pi-coding-agent 1.3.0",
+  "processes": [
+    {
+      "args": [
+        "--mode",
+        "rpc",
+        "--skill",
+        "<folder>.skills-19e320d2-f532-459e-a6f3-a2ab948b75e9/team/skills/greet"
+      ],
+      "cwd": "<folder>",
+      "frames": [
+        {
+          "out": {
+            "type": "get_commands",
+            "id": "glass-1"
+          }
+        },
+        {
+          "in": {
+            "id": "glass-1",
+            "type": "response",
+            "command": "get_commands",
+            "success": true,
+            "data": {
+              "commands": [
+                {
+                  "name": "llama",
+                  "description": "Manage llama.cpp router models",
+                  "source": "extension",
+                  "sourceInfo": {
+                    "path": "builtin:llama.cpp",
+                    "source": "builtin",
+                    "scope": "temporary",
+                    "origin": "top-level"
+                  }
+                },
+                {
+                  "name": "mcp",
+                  "description": "Manage MCP servers: sign in, reconnect, enable or disable, and change exposure",
+                  "source": "extension",
+                  "sourceInfo": {
+                    "path": "builtin:mcp",
+                    "source": "builtin",
+                    "scope": "temporary",
+                    "origin": "top-level"
+                  }
+                },
+                {
+                  "name": "skill:greet",
+                  "description": "Greets the team by name.",
+                  "source": "skill",
+                  "sourceInfo": {
+                    "path": "<folder>.skills-19e320d2-f532-459e-a6f3-a2ab948b75e9/team/skills/greet/SKILL.md",
+                    "source": "local",
+                    "scope": "temporary",
+                    "origin": "top-level",
+                    "baseDir": "<folder>.skills-19e320d2-f532-459e-a6f3-a2ab948b75e9/team/skills/greet"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "args": [
+        "--mode",
+        "rpc",
+        "--skill",
+        "<folder>.skills-403de8c1-a7c2-4e09-a92d-4b8c73bc52f3/team/skills/greet"
+      ],
+      "cwd": "<folder>",
+      "frames": [
+        {
+          "out": {
+            "type": "get_commands",
+            "id": "glass-1"
+          }
+        },
+        {
+          "in": {
+            "id": "glass-1",
+            "type": "response",
+            "command": "get_commands",
+            "success": true,
+            "data": {
+              "commands": [
+                {
+                  "name": "llama",
+                  "description": "Manage llama.cpp router models",
+                  "source": "extension",
+                  "sourceInfo": {
+                    "path": "builtin:llama.cpp",
+                    "source": "builtin",
+                    "scope": "temporary",
+                    "origin": "top-level"
+                  }
+                },
+                {
+                  "name": "mcp",
+                  "description": "Manage MCP servers: sign in, reconnect, enable or disable, and change exposure",
+                  "source": "extension",
+                  "sourceInfo": {
+                    "path": "builtin:mcp",
+                    "source": "builtin",
+                    "scope": "temporary",
+                    "origin": "top-level"
+                  }
+                },
+                {
+                  "name": "skill:greet",
+                  "description": "Greets the user by name.",
+                  "source": "skill",
+                  "sourceInfo": {
+                    "path": "<pi-home>/.pi/agent/skills/greet/SKILL.md",
+                    "source": "auto",
+                    "scope": "user",
+                    "origin": "top-level",
+                    "baseDir": "<pi-home>/.pi/agent"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "calls": []
+}

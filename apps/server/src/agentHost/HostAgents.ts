@@ -6,14 +6,16 @@ import {
   type RequestAnswer,
   RequestNotWaiting,
 } from "@glass/contracts"
-import { Context, Effect, Exit, Layer, Scope, Semaphore } from "effect"
+import { Context, Effect, Exit, FileSystem, Layer, Scope, Semaphore } from "effect"
 import type { AgentAdapter, AgentSession } from "./adapter"
 import type { DeliveredMessage } from "./deliveredMessage"
 import { Journal } from "./Journal"
+import { writeSentSkills } from "./sentSkills"
 import {
   type AgentRole,
   type ConversationStart,
   HostAgentError,
+  type SkillSource,
   type SteersNotTakenIn,
   type TurnSettings,
 } from "./protocol"
@@ -39,6 +41,7 @@ export class HostAgents extends Context.Service<
     readonly commands: (
       engine: AgentEngine,
       folder: string,
+      skills: ReadonlyArray<SkillSource>,
     ) => Effect.Effect<ReadonlyArray<AgentCommand>, HostAgentError>
     readonly start: (start: ConversationStart) => Effect.Effect<boolean, HostAgentError>
     readonly startTurn: (
@@ -65,6 +68,11 @@ export class HostAgents extends Context.Service<
       HostAgents,
       Effect.gen(function* () {
         const journal = yield* Journal
+        const fs = yield* FileSystem.FileSystem
+
+        const written = (folder: string, skills: ReadonlyArray<SkillSource>) =>
+          writeSentSkills(folder, skills).pipe(Effect.provideService(FileSystem.FileSystem, fs))
+
         const hostScope = yield* Scope.Scope
         const running = new Map<string, Running>()
         const lock = yield* Semaphore.make(1)
@@ -79,15 +87,25 @@ export class HostAgents extends Context.Service<
             const scope = yield* Scope.fork(hostScope)
             const report = (event: AgentEvent) => journal.append(agentId, event)
 
-            const started =
-              starting.engine === "pi"
-                ? adapters.pi.start({ folder, conversation: agentId, role: starting.role, report })
+            const started = Effect.gen(function* () {
+              const skills = yield* written(folder, starting.skills)
+
+              return yield* starting.engine === "pi"
+                ? adapters.pi.start({
+                    folder,
+                    conversation: agentId,
+                    role: starting.role,
+                    skills,
+                    report,
+                  })
                 : adapters["claude-code"].start({
                     folder,
                     conversation: agentId,
                     role: starting.role,
+                    skills,
                     report,
                   })
+            })
 
             const session = yield* started.pipe(
               Scope.provide(scope),
@@ -130,7 +148,11 @@ export class HostAgents extends Context.Service<
 
         return HostAgents.of({
           models: (engine) => adapters[engine].models,
-          commands: (engine, folder) => adapters[engine].commands(folder),
+          commands: (engine, folder, skills) =>
+            written(folder, skills).pipe(
+              Effect.flatMap((paths) => adapters[engine].commands(folder, paths)),
+              Effect.scoped,
+            ),
           start,
           startTurn: Effect.fnUntraced(function* (agentId, turnId, message, settings) {
             const agent = yield* find(agentId)

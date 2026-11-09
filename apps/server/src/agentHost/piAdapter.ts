@@ -59,6 +59,8 @@ import {
   notRunning,
 } from "./protocol"
 import { settleWith } from "./requests"
+import { scopedFolder } from "./scopedFolder"
+import type { WrittenSkills } from "./sentSkills"
 import { piLoadsNothing, piReadOnlyTools } from "../readOnlyTools"
 import { piSuggestDraftExtension } from "./suggestDraftTool"
 import { runTurns } from "./turnLoop"
@@ -165,11 +167,7 @@ const lockedDownFlags = Effect.fnUntraced(function* (
   instructionsText: string,
 ) {
   const fs = yield* FileSystem.FileSystem
-  const directory = `${folder}.pi`
-
-  yield* Effect.acquireRelease(fs.makeDirectory(directory, { recursive: true }), () =>
-    fs.remove(directory, { recursive: true, force: true }).pipe(Effect.ignore),
-  )
+  const directory = yield* scopedFolder(`${folder}.pi`)
 
   const instructions = join(directory, "instructions.md")
 
@@ -191,10 +189,13 @@ const lockedDownFlags = Effect.fnUntraced(function* (
   ]
 })
 
-const roleFlags = (folder: string, role: ConversationRole) =>
+const skillFlags = (skills: ReadonlyArray<WrittenSkills>) =>
+  skills.flatMap((plugin) => plugin.skills.flatMap((skill) => ["--skill", skill]))
+
+const roleFlags = (folder: string, role: ConversationRole, skills: ReadonlyArray<WrittenSkills>) =>
   Match.value(role).pipe(
     Match.tagsExhaustive({
-      Work: () => Effect.succeed([]),
+      Work: () => Effect.succeed(skillFlags(skills)),
       Review: ({ brief }) =>
         lockedDownFlags(
           folder,
@@ -253,9 +254,9 @@ export const piAdapter = (command: string) =>
         })
       }).pipe(Effect.scoped),
 
-      commands: (folder: string) =>
+      commands: (folder: string, skills: ReadonlyArray<WrittenSkills>) =>
         Effect.gen(function* () {
-          const rpc = yield* startPi(folder)
+          const rpc = yield* startPi(folder, undefined, skillFlags(skills))
 
           const { commands } = yield* rpc.request({ type: "get_commands" }, AvailableCommands).pipe(
             Effect.tapError((error) => Effect.logWarning("pi didn't list its commands", error)),
@@ -270,10 +271,10 @@ export const piAdapter = (command: string) =>
           }))
         }).pipe(Effect.scoped),
 
-      start: Effect.fnUntraced(function* ({ folder, conversation, role, report }) {
+      start: Effect.fnUntraced(function* ({ folder, conversation, role, skills, report }) {
         const scope = yield* Scope.Scope
 
-        const flags = yield* roleFlags(folder, role).pipe(
+        const flags = yield* roleFlags(folder, role, skills).pipe(
           Effect.provideService(FileSystem.FileSystem, fs),
           Effect.tapError((error) => Effect.logWarning("Couldn't prepare pi's tools", error)),
           Effect.mapError(

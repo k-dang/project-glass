@@ -36,6 +36,7 @@ import {
   type ConversationRole,
   GlobalRole,
   type ReviewBrief,
+  type SkillSource,
   type TurnSettings,
   WorkRole,
 } from "../src/agentHost/protocol"
@@ -46,6 +47,7 @@ import { VIEWER } from "./fakePullRequest"
 import { isolatedHome, startBackend, stubHome } from "./harness"
 import { PI_MODEL, PI_PROVIDER, type PiSettings, writePiLogin, writePiSettings } from "./piLogin"
 import { claudeLoginEnvironment, pinnedClaude, pinnedClaudeProgram } from "./pinnedClaude"
+import { writeSentSkills } from "../src/agentHost/sentSkills"
 import { recordingSessions, sessionTape } from "./sessionTape"
 
 export const run = (tool: string, command: string, reply: string) =>
@@ -99,7 +101,7 @@ const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
   )
 
   const open = (conversation: string, role: Role | Work = WorkRole.make({})) =>
-    adapter.start({ folder, conversation, role, report }).pipe(
+    adapter.start({ folder, conversation, role, skills: [], report }).pipe(
       Effect.map((session: AgentSession) => ({
         session,
         configure: (settings: Partial<TurnSettings>) =>
@@ -141,6 +143,27 @@ export const writeGreetSkill = (skills: string) =>
       "---\nname: greet\ndescription: Greets the user by name.\n---\n\nSay hello.\n",
     )
   })
+
+export const writeGreetPack = (folder: string) =>
+  writeSentSkills(folder, [greetPack]).pipe(Effect.provide(NodeServices.layer))
+
+const greetPack: SkillSource = {
+  name: "team",
+  skills: [
+    {
+      name: "greet",
+      files: [
+        {
+          path: "SKILL.md",
+          executable: false,
+          contents: new TextEncoder().encode(
+            "---\nname: greet\ndescription: Greets the team by name.\n---\n\nSay hello to the team.\n",
+          ),
+        },
+      ],
+    },
+  ],
+}
 
 export const writeGreeter = (folder: string) =>
   Effect.sync(() => writeFileSync(join(folder, "greet.ts"), "hi\nhello name\nbye\n"))

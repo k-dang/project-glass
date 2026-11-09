@@ -60,6 +60,22 @@ export const ReviewBrief = Schema.Struct({
 
 export type ReviewBrief = typeof ReviewBrief.Type
 
+export const SkillFile = Schema.Struct({
+  path: Schema.String,
+  executable: Schema.Boolean,
+  contents: Schema.Uint8Array,
+})
+
+export type SkillFile = typeof SkillFile.Type
+
+export const SentSkill = Schema.Struct({ name: Schema.String, files: Schema.Array(SkillFile) })
+
+export type SentSkill = typeof SentSkill.Type
+
+export const SkillSource = Schema.Struct({ name: Schema.String, skills: Schema.Array(SentSkill) })
+
+export type SkillSource = typeof SkillSource.Type
+
 export const WorkRole = Schema.TaggedStruct("Work", {})
 
 export const ReviewRole = Schema.TaggedStruct("Review", { brief: ReviewBrief })
@@ -87,12 +103,14 @@ export const ConversationStart = Schema.Union([
     engine: AgentEngine,
     folder: HostFolder,
     role: AgentRole,
+    skills: Schema.Array(SkillSource),
   }),
   Schema.Struct({
     agentId: Schema.String,
     engine: Schema.Literal("pi"),
     folder: HostFolder,
     role: GlobalRole,
+    skills: Schema.Array(SkillSource),
   }),
 ])
 
@@ -113,7 +131,7 @@ export class AgentHostRpcs extends RpcGroup.make(
     error: HostAgentError,
   }),
   Rpc.make("ListCommands", {
-    payload: { engine: AgentEngine, folder: HostFolder },
+    payload: { engine: AgentEngine, folder: HostFolder, skills: Schema.Array(SkillSource) },
     success: Schema.Array(AgentCommand),
     error: HostAgentError,
   }),

@@ -26,6 +26,7 @@ import nameLocalPlace from "./migrations/0024_name_local_place"
 import globalConversationOnPi from "./migrations/0025_global_conversation_on_pi"
 import createSkillPacks from "./migrations/0026_create_skill_packs"
 import createAgentFeedbackNotes from "./migrations/0027_create_agent_feedback_notes"
+import agentSkillPacks from "./migrations/0028_agent_skill_packs"
 
 export const migrations = {
   "0001_create_activity": createActivity,
@@ -55,6 +56,7 @@ export const migrations = {
   "0025_global_conversation_on_pi": globalConversationOnPi,
   "0026_create_skill_packs": createSkillPacks,
   "0027_create_agent_feedback_notes": createAgentFeedbackNotes,
+  "0028_agent_skill_packs": agentSkillPacks,
 }
 
 export const migrationLoader = SqliteMigrator.fromRecord(migrations)

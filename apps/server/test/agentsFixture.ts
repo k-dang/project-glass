@@ -99,7 +99,11 @@ export const agentsFixture = Effect.gen(function* () {
   const start = (
     message = "Say hello",
     program: Pick<NewAgent, "engine" | "model" | "effort"> &
-      Partial<Pick<NewAgent, "permissionMode">> = { engine: "pi", model: null, effort: null },
+      Partial<Pick<NewAgent, "permissionMode" | "skillPacks">> = {
+      engine: "pi",
+      model: null,
+      effort: null,
+    },
     images: ReadonlyArray<Image> = [],
   ) =>
     client.LinkLocalCheckout({ path: clone.checkout }).pipe(
@@ -111,6 +115,7 @@ export const agentsFixture = Effect.gen(function* () {
           images,
           permissionMode: null,
           place: localPlace,
+          skillPacks: [],
           ...program,
         }),
       ),
@@ -118,11 +123,8 @@ export const agentsFixture = Effect.gen(function* () {
 
   const startSandbox = (
     message = "Say hello",
-    program: Pick<NewAgent, "engine" | "model" | "effort"> = {
-      engine: "pi",
-      model: null,
-      effort: null,
-    },
+    program: Pick<NewAgent, "engine" | "model" | "effort"> &
+      Partial<Pick<NewAgent, "skillPacks">> = { engine: "pi", model: null, effort: null },
   ) =>
     client.CreateAgent({
       repository,
@@ -131,6 +133,7 @@ export const agentsFixture = Effect.gen(function* () {
       images: [],
       permissionMode: null,
       place: SandboxPlace.make({ providerId: "fake" }),
+      skillPacks: [],
       ...program,
     })
 

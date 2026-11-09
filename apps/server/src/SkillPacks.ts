@@ -1,4 +1,5 @@
 import {
+  type AgentSkillPack,
   type ConnectionError,
   InvalidSkillPackName,
   InvalidSkillPackUrl,
@@ -17,10 +18,12 @@ import {
 } from "@glass/contracts"
 import { Context, Effect, Layer, Schema } from "effect"
 import { SqlClient } from "effect/sql"
+import type { SkillSource } from "./agentHost/protocol"
 import { GitHubClient, type TreeBlob } from "./github/GitHubClient"
 import {
   fallbackSkillName,
   filesBySkill,
+  lastSegment,
   readSkill,
   skillFilePath,
   candidateSkillPackSources,
@@ -75,6 +78,36 @@ const decodeFiles = Schema.decodeUnknownEffect(
 )
 
 const decodeId = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ id: Schema.Int })))
+
+const decodeAgentPins = Schema.decodeUnknownEffect(
+  Schema.Array(Schema.Struct({ name: Schema.String, pin_id: Schema.Int })),
+)
+
+const decodeAgentPacks = Schema.decodeUnknownEffect(
+  Schema.Array(
+    Schema.Struct({ agent_id: Schema.String, name: Schema.String, commit_sha: Schema.String }),
+  ),
+)
+
+const decodeSentFiles = Schema.decodeUnknownEffect(
+  Schema.Array(
+    Schema.Struct({
+      path: Schema.String,
+      executable: Schema.BooleanFromBit,
+      contents: Schema.Uint8Array,
+    }),
+  ),
+)
+
+const uniqueFolder = (taken: Set<string>, wanted: string) => {
+  let folder = wanted
+
+  for (let suffix = 2; taken.has(folder); suffix++) folder = `${wanted}-${suffix}`
+
+  taken.add(folder)
+
+  return folder
+}
 
 const repositoryLabel = ({ owner, repo }: SkillPackSource) => `${owner}/${repo}`
 
@@ -140,6 +173,18 @@ export class SkillPacks extends Context.Service<
       commit: string,
     ) => Reading<ReadonlyArray<SkillPack>, SkillPackNotFound>
     readonly remove: (name: string) => SkillPackList
+    readonly pinForAgent: (
+      agentId: string,
+      names: ReadonlyArray<string>,
+    ) => Effect.Effect<ReadonlyArray<AgentSkillPack>, SkillPackNotFound | SkillPackError>
+    readonly releaseAgent: (agentId: string) => Effect.Effect<void, SkillPackError>
+    readonly agentPacks: Effect.Effect<
+      ReadonlyMap<string, ReadonlyArray<AgentSkillPack>>,
+      SkillPackError
+    >
+    readonly agentSkills: (
+      agentId: string,
+    ) => Effect.Effect<ReadonlyArray<SkillSource>, SkillPackError>
   }
 >()("@glass/server/SkillPacks") {
   static readonly layer = Layer.effect(
@@ -359,9 +404,35 @@ export class SkillPacks extends Context.Service<
       })
 
       const releaseUnusedPins = Effect.gen(function* () {
-        yield* sql`DELETE FROM skill_pack_skill WHERE pin_id NOT IN (SELECT pin_id FROM skill_pack)`
-        yield* sql`DELETE FROM skill_pack_file WHERE pin_id NOT IN (SELECT pin_id FROM skill_pack)`
-        yield* sql`DELETE FROM skill_pack_pin WHERE id NOT IN (SELECT pin_id FROM skill_pack)`
+        const used = sql`SELECT pin_id FROM skill_pack UNION SELECT pin_id FROM agent_skill_pack`
+
+        yield* sql`DELETE FROM skill_pack_skill WHERE pin_id NOT IN (${used})`
+        yield* sql`DELETE FROM skill_pack_file WHERE pin_id NOT IN (${used})`
+        yield* sql`DELETE FROM skill_pack_pin WHERE id NOT IN (${used})`
+      })
+
+      const sentSkills = Effect.fnUntraced(function* (name: string, pinId: number) {
+        const files = yield* decodeSentFiles(
+          yield* sql`SELECT path, executable, contents FROM skill_pack_file WHERE pin_id = ${pinId}`,
+        )
+
+        const taken = new Set<string>()
+
+        return {
+          name,
+          skills: [...filesBySkill(files)].map(([directory, owned]) => {
+            const inside = directory === "" ? 0 : directory.length + 1
+
+            return {
+              name: uniqueFolder(taken, directory === "" ? name : lastSegment(directory)),
+              files: owned.map(({ path, executable, contents }) => ({
+                path: path.slice(inside),
+                executable,
+                contents,
+              })),
+            }
+          }),
+        } satisfies SkillSource
       })
 
       const packNamed = (name: string) =>
@@ -501,6 +572,64 @@ export class SkillPacks extends Context.Service<
           )
 
           return yield* list
+        }),
+
+        pinForAgent: Effect.fn("SkillPacks.pinForAgent")(function* (agentId, names) {
+          if (names.length === 0) return []
+
+          const rows = yield* packRows
+          const chosen = rows.filter(({ pack }) => names.includes(pack.name))
+          const missing = names.find((name) => !chosen.some(({ pack }) => pack.name === name))
+
+          if (missing !== undefined) return yield* new SkillPackNotFound({ name: missing })
+
+          yield* sql`
+            INSERT INTO agent_skill_pack ${sql.insert(
+              chosen.map(({ pack, pinId }) => ({
+                agent_id: agentId,
+                name: pack.name,
+                pin_id: pinId,
+              })),
+            )}
+          `.pipe(Effect.catch(storageFailure))
+
+          return chosen.map(({ pack }) => ({ name: pack.name, commit: pack.commit }))
+        }),
+
+        releaseAgent: (agentId) =>
+          Effect.gen(function* () {
+            yield* sql`DELETE FROM agent_skill_pack WHERE agent_id = ${agentId}`
+            yield* releaseUnusedPins
+          }).pipe(Effect.catch(storageFailure)),
+
+        agentPacks: sql`
+            SELECT assigned.agent_id, assigned.name, pin.commit_sha
+            FROM agent_skill_pack AS assigned JOIN skill_pack_pin AS pin ON pin.id = assigned.pin_id
+            ORDER BY assigned.name
+          `.pipe(
+          Effect.flatMap(decodeAgentPacks),
+          Effect.map(
+            (rows) =>
+              new Map(
+                [...Map.groupBy(rows, ({ agent_id }) => agent_id)].map(([agentId, packs]) => [
+                  agentId,
+                  packs.map(({ name, commit_sha }) => ({ name, commit: commit_sha })),
+                ]),
+              ),
+          ),
+          Effect.catch(storageFailure),
+        ),
+
+        agentSkills: Effect.fn("SkillPacks.agentSkills")(function* (agentId) {
+          return yield* sql`
+            SELECT name, pin_id FROM agent_skill_pack WHERE agent_id = ${agentId} ORDER BY name
+          `.pipe(
+            Effect.flatMap(decodeAgentPins),
+            Effect.flatMap((pins) =>
+              Effect.forEach(pins, ({ name, pin_id }) => sentSkills(name, pin_id)),
+            ),
+            Effect.catch(storageFailure),
+          )
         }),
 
         remove: Effect.fn("SkillPacks.remove")(function* (name) {

@@ -35,6 +35,7 @@ const groupOfItem = new Map<string, StorageGroup>([
   ["skill_pack_pin", "agents"],
   ["skill_pack_skill", "agents"],
   ["skill_pack_file", "agents"],
+  ["agent_skill_pack", "agents"],
   ["agent_reviews", "reviews"],
   ["queued_pull_request", "reviews"],
   ["tours", "reviews"],

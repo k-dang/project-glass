@@ -41,7 +41,7 @@ const savedSkillPacksAtom = backendRuntime
 
 const changeAtom = backendRuntime.fn((change: PackChange) => change.save).pipe(Atom.keepAlive)
 
-const skillPacksAtom = Atom.make((get) =>
+export const skillPacksAtom = Atom.make((get) =>
   Option.match(AsyncResult.value(get(changeAtom)), {
     onSome: (saved) => AsyncResult.success(saved),
     onNone: () => get(savedSkillPacksAtom),

@@ -134,7 +134,7 @@ export class GlobalConversation extends Context.Service<
             })
 
             const started = yield* client
-              .StartAgent({ agentId: id, engine: "pi", folder, role })
+              .StartAgent({ agentId: id, engine: "pi", folder, role, skills: [] })
               .pipe(Effect.onError(() => revoke))
 
             yield* started ? replaceRunning(credential) : revoke
