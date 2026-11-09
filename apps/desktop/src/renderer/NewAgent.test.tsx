@@ -232,9 +232,34 @@ it("gives a Sandbox Agent the Local skills when picked, warning which skill name
   ).toBe("true")
 })
 
+it("warns a local Agent which skill names its Skill packs share with the Local skills", async () => {
+  localStorage.setItem("glass.newAgent.skillPacks", JSON.stringify(["team"]))
+
+  mount(
+    {
+      ...newAgentHandlers([], []),
+      ListSkillPacks: () =>
+        Effect.succeed([pack("team", "ae5650fbbbb", ["architect", "grilling"])]),
+      ListLocalSkills: () => Effect.succeed(["grilling", "notes"]),
+    },
+    "/agents/new",
+  )
+
+  const shared = await within(await screen.findByRole("region", { name: "New Agent" })).findByRole(
+    "list",
+    { name: "Shared skill names" },
+  )
+
+  expect(within(newAgentDraft()).queryByRole("checkbox", { name: "Local skills" })).toBeNull()
+  expect(within(shared).getByRole("listitem").textContent).toBe(
+    "grilling is in Local skills and team. The Agent has each, as /grilling and /team:grilling.",
+  )
+})
+
 it("shows when the Local skills can't be read, and still starts the Sandbox Agent", async () => {
   const created: Array<NewAgent> = []
   localStorage.setItem("glass.newAgent.localSkills", "true")
+  localStorage.setItem("glass.newAgent.skillPacks", JSON.stringify(["team"]))
 
   const user = mount(
     {
@@ -244,6 +269,7 @@ it("shows when the Local skills can't be read, and still starts the Sandbox Agen
           new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes", engines: ["claude-code"] }),
         ]),
       ListFollowedRepositories: () => Effect.succeed([agent.repository]),
+      ListSkillPacks: () => Effect.succeed([pack("team", "ae5650fbbbb", ["architect"])]),
       ListLocalSkills: () =>
         Effect.fail(new LocalSkillsError({ message: "Glass couldn't read your Local skills." })),
     },
@@ -260,7 +286,7 @@ it("shows when the Local skills can't be read, and still starts the Sandbox Agen
     "Fix the bug{Enter}",
   )
   await waitFor(() => expect(window.location.hash).toBe(`#/agents/${agent.id}`))
-  expect(created).toMatchObject([{ localSkills: true }])
+  expect(created).toMatchObject([{ skillPacks: ["team"], localSkills: true }])
 })
 
 it("shows the first message at once while the Agent starts", async () => {

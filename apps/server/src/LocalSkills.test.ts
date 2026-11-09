@@ -28,6 +28,10 @@ it.live(
         skillFile("notes", "Take notes."),
       )
       write(join(f.home, ".claude", "skills", "tidy", "SKILL.md"), skillFile("tidy", "Tidy up."))
+      write(
+        join(f.home, ".claude", "skills", "archive", "old", "SKILL.md"),
+        skillFile("old", "Claude Code doesn't look this deep."),
+      )
       symlinkSync(join(f.home, "dotfiles", "gone"), join(f.home, ".agents", "skills", "gone"))
       symlinkSync(join(dotfiles, "gone.sh"), join(dotfiles, "grilling", "run.sh"))
       write(join(dotfiles, "grilling", "secret.txt"), "Only for me.")

@@ -11,10 +11,19 @@ import {
   uniqueFolder,
 } from "./skillPackContents"
 
-/** The folders each Agent program reads Local skills from, in the order it reads them. */
-const foldersOf = (home: string): Record<AgentEngine, ReadonlyArray<string>> => ({
-  "claude-code": [join(home, ".claude", "skills")],
-  pi: [join(home, ".pi", "agent", "skills"), join(home, ".agents", "skills")],
+interface SkillFolders {
+  /** The folders the program reads Local skills from, in the order it reads them. */
+  readonly folders: ReadonlyArray<string>
+  /** Whether the program finds skills below a folder's top level, as pi does and Claude Code doesn't. */
+  readonly nested: boolean
+}
+
+const foldersOf = (home: string): Record<AgentEngine, SkillFolders> => ({
+  "claude-code": { folders: [join(home, ".claude", "skills")], nested: false },
+  pi: {
+    folders: [join(home, ".pi", "agent", "skills"), join(home, ".agents", "skills")],
+    nested: true,
+  },
 })
 
 interface FoundFile {
@@ -81,7 +90,7 @@ export class LocalSkills extends Context.Service<
     LocalSkills,
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
-      const folders = foldersOf((yield* ServerConfig).homeDirectory)
+      const skillFolders = foldersOf((yield* ServerConfig).homeDirectory)
 
       /** Every file under `folder` Glass can read, following each symlink once. */
       const filesUnder = (
@@ -121,12 +130,17 @@ export class LocalSkills extends Context.Service<
         })
 
       /** The skills that load, as the programs load them: skipping any whose SKILL.md doesn't. */
-      const found = (engine: AgentEngine) =>
-        Effect.forEach(folders[engine], (folder) =>
+      const found = (engine: AgentEngine) => {
+        const { folders, nested } = skillFolders[engine]
+
+        const loads = (directory: string) =>
+          directory !== "" && (nested || !directory.includes("/"))
+
+        return Effect.forEach(folders, (folder) =>
           filesUnder(folder, "", new Set()).pipe(
             Effect.flatMap((files) =>
               Effect.forEach(
-                [...filesBySkill(files)].filter(([directory]) => directory !== ""),
+                [...filesBySkill(files)].filter(([directory]) => loads(directory)),
                 ([directory, owned]) =>
                   orSkipped(fs.readFileString(join(folder, skillFilePath(directory)))).pipe(
                     Effect.map(
@@ -144,6 +158,7 @@ export class LocalSkills extends Context.Service<
             ),
           ),
         ).pipe(Effect.map((perFolder) => perFolder.flat().flatMap(Option.toArray)))
+      }
 
       const sent = (taken: Set<string>, { folder, directory, files }: FoundSkill) =>
         Effect.forEach(

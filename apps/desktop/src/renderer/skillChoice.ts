@@ -38,7 +38,8 @@ const noLocalSkills = Atom.make(AsyncResult.success<ReadonlyArray<string>>([]))
 
 interface ChosenSource {
   readonly label: string
-  readonly namespace: string
+  /** What Claude Code puts before the source's skill names in its commands, such as `team:`. */
+  readonly prefix: string
   readonly skills: ReadonlyArray<string>
 }
 
@@ -46,8 +47,9 @@ const listed = new Intl.ListFormat("en", { type: "conjunction" })
 
 /**
  * One line per skill name that more than one chosen source has, saying which the Agent uses.
- * Sources come in the order Glass sends them (`skillsOf` in the server's Agents.ts), Local skills
- * first, because pi keeps the first skill of a name.
+ * Local skills come first because pi keeps the first skill of a name: a local Agent's pi finds
+ * them before any sent skill, and Glass sends a Sandbox Agent's first (`skillsOf` in the server's
+ * Agents.ts).
  */
 const sharedSkillNames = (engine: AgentEngine, sources: ReadonlyArray<ChosenSource>) => {
   const names = [...new Set(sources.flatMap(({ skills }) => skills))].toSorted()
@@ -62,12 +64,15 @@ const sharedSkillNames = (engine: AgentEngine, sources: ReadonlyArray<ChosenSour
     return engine === "pi"
       ? [`${where} The Agent uses the one in ${having[0]!.label}.`]
       : [
-          `${where} The Agent has each, as ${listed.format(having.map(({ namespace }) => `/${namespace}:${name}`))}.`,
+          `${where} The Agent has each, as ${listed.format(having.map(({ prefix }) => `/${prefix}${name}`))}.`,
         ]
   })
 }
 
-/** The new-Agent flow's choice of Skill packs and, for a Sandbox Agent, Local skills. */
+/**
+ * The new-Agent flow's choice of Skill packs and, for a Sandbox Agent, Local skills. A local Agent
+ * always has its Local skills, so they count towards the shared-name warning there too.
+ */
 export const useSkillChoice = (place: AgentPlace, engine: AgentEngine) => {
   const listedPacks = useAtomValue(skillPacksAtom)
   const packs = Option.getOrElse(AsyncResult.value(listedPacks), () => [])
@@ -75,9 +80,13 @@ export const useSkillChoice = (place: AgentPlace, engine: AgentEngine) => {
   const [lastLocalSkills, setLocalSkills] = useAtom(lastLocalSkillsAtom)
   const offersLocalSkills = Predicate.isTagged(place, "sandbox")
   const localSkills = offersLocalSkills && lastLocalSkills
+  const hasLocalSkills = !offersLocalSkills || lastLocalSkills
   const chosenPacks = packs.filter(({ name }) => lastChosen.includes(name))
 
-  const localNamesListed = useAtomValue(localSkills ? localSkillNamesAtom(engine) : noLocalSkills)
+  const localNamesListed = useAtomValue(
+    hasLocalSkills && chosenPacks.length > 0 ? localSkillNamesAtom(engine) : noLocalSkills,
+  )
+
   const localNames = Option.getOrElse(AsyncResult.value(localNamesListed), () => [])
 
   return {
@@ -90,12 +99,18 @@ export const useSkillChoice = (place: AgentPlace, engine: AgentEngine) => {
     localSkills,
     setLocalSkills,
     shared: sharedSkillNames(engine, [
-      ...(localSkills
-        ? [{ label: LOCAL_SKILLS_LABEL, namespace: LOCAL_SKILLS_NAMESPACE, skills: localNames }]
+      ...(hasLocalSkills
+        ? [
+            {
+              label: LOCAL_SKILLS_LABEL,
+              prefix: localSkills ? `${LOCAL_SKILLS_NAMESPACE}:` : "",
+              skills: localNames,
+            },
+          ]
         : []),
       ...chosenPacks.map(({ name, skills }) => ({
         label: name,
-        namespace: name,
+        prefix: `${name}:`,
         skills: skills.map((skill) => skill.name),
       })),
     ]),
