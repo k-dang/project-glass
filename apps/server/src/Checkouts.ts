@@ -142,23 +142,36 @@ export class Checkouts extends Context.Service<
         )
       })
 
+      // `files` becomes a repository of its own: HEAD is the Revision's head, its objects come
+      // from the shared clone, and the clone already holds every blob `git diff base...HEAD`
+      // reads, so an agent can explore the change with git without a token or the network.
       const fill = Effect.fnUntraced(function* (
         pr: PullRequestRef,
         revision: Revision,
         files: string,
-        index: string,
       ) {
         const repository = `${pr.owner.toLowerCase()}/${pr.repo.toLowerCase()}`
         const clone = join(config.dataDirectory, "repos", repository)
         const ref = `refs/pull/${pr.number}/head`
+        const gitDirectory = join(files, ".git")
 
         yield* Effect.gen(function* () {
           const { token } = yield* auth.resolveToken
           const env = authenticatedEnv(token)
 
           yield* ensureClone(repository, clone, env)
+          // The base ref keeps the base commit reachable, so maintenance never prunes it.
           yield* git(
-            ["--git-dir", clone, "fetch", "--quiet", "--no-tags", "origin", `+${ref}:${ref}`],
+            [
+              "--git-dir",
+              clone,
+              "fetch",
+              "--quiet",
+              "--no-tags",
+              "origin",
+              `+${ref}:${ref}`,
+              `+${revision.base}:refs/pull/${pr.number}/base`,
+            ],
             env,
           )
 
@@ -170,10 +183,26 @@ export class Checkouts extends Context.Service<
           if (head !== revision.head) return yield* new StaleRevision()
 
           yield* fs.makeDirectory(files)
+          yield* git(["init", "--quiet", "--template=", files], env)
+          yield* fs.writeFileString(
+            join(gitDirectory, "objects", "info", "alternates"),
+            `${join(clone, "objects")}\n`,
+          )
+
+          // Run in the clone, whose remote fetches the blobs a blobless clone lacks.
+          yield* git(
+            ["--git-dir", clone, "--work-tree", files, "read-tree", "--reset", "-u", head],
+            {
+              ...env,
+              GIT_INDEX_FILE: join(gitDirectory, "index"),
+            },
+          )
+          // Only for its side effect: fetches the base blobs the diff reads, in one batch.
+          yield* git(["--git-dir", clone, "diff", "--numstat", `${revision.base}...${head}`], env)
 
           return yield* git(
-            ["--git-dir", clone, "--work-tree", files, "read-tree", "--reset", "-u", head],
-            { ...env, GIT_INDEX_FILE: index },
+            ["--git-dir", gitDirectory, "update-ref", "--no-deref", "HEAD", head],
+            env,
           ).pipe(Effect.asVoid)
         }).pipe(
           Effect.timeoutOrElse({
@@ -191,7 +220,7 @@ export class Checkouts extends Context.Service<
         const directory = yield* fs.makeTempDirectoryScoped({ prefix: "glass-checkout-" })
         const files = join(directory, pr.repo)
 
-        yield* fill(pr, revision, files, join(directory, "index"))
+        yield* fill(pr, revision, files)
 
         return files
       }, storageFailure)
@@ -201,14 +230,11 @@ export class Checkouts extends Context.Service<
         revision: Revision,
         folder: string,
       ) {
-        const index = `${folder}.index`
-
         yield* fs.makeDirectory(dirname(folder), { recursive: true })
-        yield* fill(pr, revision, folder, index).pipe(
+        yield* fill(pr, revision, folder).pipe(
           Effect.onError(() =>
             fs.remove(folder, { recursive: true, force: true }).pipe(Effect.ignore),
           ),
-          Effect.ensuring(fs.remove(index, { force: true }).pipe(Effect.ignore)),
         )
       }, storageFailure)
 

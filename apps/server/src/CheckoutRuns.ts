@@ -19,6 +19,7 @@ import {
   type Scope,
 } from "effect"
 import type { AgentFailure } from "./agentFailure"
+import type { AgentTools } from "./agentTools"
 import { AgentRunners } from "./agentRunners"
 import { type CheckoutFailure, Checkouts } from "./Checkouts"
 import { engineSettingsOf, SettingsStore } from "./SettingsStore"
@@ -79,6 +80,7 @@ export interface CheckoutTask<A> {
   readonly instructions: string
   readonly prompt: string
   readonly answer: Schema.Decoder<A>
+  readonly tools: AgentTools
 }
 
 export interface CheckoutRun<I, A> {

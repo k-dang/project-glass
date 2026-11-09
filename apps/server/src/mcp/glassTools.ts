@@ -37,7 +37,7 @@ import { Context, Effect, Match, Option, Schema, Stream } from "effect"
 import { Tool, Toolkit } from "effect/ai"
 import { ActivityLog } from "../ActivityLog"
 import { AgentReviews } from "../AgentReviews"
-import { agentReviewMaterial, PullRequestMaterial } from "../agentReviewPrompt"
+import { PullRequestMaterial, pullRequestMaterial } from "../agentReviewPrompt"
 import type { FileMaterial } from "../tourPrompt"
 import { Agents } from "../Agents"
 import { GitHubClient } from "../github/GitHubClient"
@@ -432,7 +432,7 @@ export const GlassToolHandlers = GlassTools.toLayer(
         Effect.gen(function* () {
           const read = revision ?? (yield* github.pullRequest(pullRequest)).revision
 
-          const material = agentReviewMaterial(yield* github.reviewInput(pullRequest, read))
+          const material = pullRequestMaterial(yield* github.reviewInput(pullRequest, read))
 
           return { revision: read, ...material, ...withinBudget(material.files) }
         }).pipe(Effect.mapError(explained)),

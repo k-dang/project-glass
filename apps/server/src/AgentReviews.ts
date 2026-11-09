@@ -219,8 +219,9 @@ export class AgentReviews extends Context.Service<
               task: (material) =>
                 Effect.succeed({
                   instructions: agentReviewInstructions(prompt),
-                  prompt: agentReviewPrompt(material),
+                  prompt: agentReviewPrompt(material, revision),
                   answer: AgentReviewAnswer,
+                  tools: "shell",
                 }),
             })
             .pipe(Effect.mapError(fromCheckoutRunFailure))
