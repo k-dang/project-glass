@@ -170,7 +170,7 @@ export function MessageBox(props: {
 
     if (props.blocked || sending.current || (message === "" && !hasAttachment)) return
 
-    if (!props.holdUntilAccepted && !hasAttachment) {
+    if (!props.holdUntilAccepted) {
       setComposed(() => nothingUnsent)
 
       if (!(await deliver({ message, images: sent.images })))

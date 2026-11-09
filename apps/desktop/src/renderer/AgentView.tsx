@@ -760,6 +760,7 @@ export function AgentComposer(props: {
         setComposed={setComposed}
         label={props.label ?? "Message"}
         textOnly={props.textOnly ?? false}
+        holdUntilAccepted={staged.length > 0}
         placeholder={composerPlaceholder(running, waiting, props.idlePlaceholder)}
         blocked={sent.waiting || steered.waiting || waiting !== undefined}
         problem={
@@ -843,14 +844,17 @@ function QueuedMessages(props: { queued: ReadonlyArray<QueuedMessage>; running: 
       </p>
       <QueueList>
         {props.queued.map((queued) => {
-          const readable =
-            queued.message === "" ? "Feedback on the Agent's changes" : readableText(queued.message)
+          const feedbackOnly = queued.message === ""
+
+          const readable = feedbackOnly
+            ? "Feedback on the Agent's changes"
+            : readableText(queued.message)
 
           return (
             <QueueItem key={queued.id} aria-label={readable}>
               <QueueItemRow>
                 <QueueItemContent>
-                  {queued.message === "" ? readable : <MessageText text={queued.message} />}
+                  {feedbackOnly ? readable : <MessageText text={queued.message} />}
                   {queued.context !== null && (
                     <span className="block text-xs text-muted-foreground">
                       {sentFrom(queued.context)}

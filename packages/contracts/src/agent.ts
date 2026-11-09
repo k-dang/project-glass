@@ -485,14 +485,12 @@ const agentMessageFields = {
   feedback: Schema.Array(Schema.String),
 }
 
-export const AgentMessageInput = Schema.Struct(agentMessageFields).check(hasContent)
-
-export type AgentMessageInput = typeof AgentMessageInput.Type
-
 export const SendAgentMessage = Schema.Struct({
   agentId: Schema.String,
   ...agentMessageFields,
 }).check(hasContent)
+
+export type AgentMessageInput = Omit<typeof SendAgentMessage.Type, "agentId">
 
 export const nothingUnsent: SentMessage = { message: "", images: [] }
 

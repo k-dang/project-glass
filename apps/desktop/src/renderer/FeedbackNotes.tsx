@@ -53,7 +53,7 @@ export function FeedbackNoteCard(props: {
 
   return (
     <article
-      aria-label={`Feedback on ${note.path} ${rangeLabel(note.side, note.start, note.end)}`}
+      aria-label={`Feedback on ${noteLocation(note)}`}
       className="flex flex-col gap-2 rounded-lg border bg-background p-3 font-sans text-sm"
     >
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -320,7 +320,7 @@ export function FeedbackOverview(props: {
               <FeedbackNoteCard
                 note={note}
                 older={older}
-                location={`${note.path} ${rangeLabel(note.side, note.start, note.end)}`}
+                location={noteLocation(note)}
                 onShow={older ? null : () => props.onShow(note)}
                 onEdit={onEdit === null ? null : () => onEdit(note)}
                 onRemove={() => props.onRemove(note)}

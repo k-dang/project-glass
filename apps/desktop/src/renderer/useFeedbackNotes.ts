@@ -18,7 +18,7 @@ export interface FeedbackNotesStore {
   readonly refresh: () => void
 }
 
-const nothingUnsent = new UnsentFeedback({ notes: [], staged: [] })
+const noFeedback = new UnsentFeedback({ notes: [], staged: [] })
 
 const withSaved = (notes: ReadonlyArray<FeedbackNote>, saved: FeedbackNote) =>
   notes.some(({ id }) => id === saved.id)
@@ -37,7 +37,7 @@ export function useFeedbackNotes(agentId: string): FeedbackNotesStore {
   const refetch = useAtomRefresh(feedbackNotesAtom(agentId))
   const [written, setWritten] = useAtom(writtenFeedbackAtom(agentId))
   const saved = AsyncResult.isSuccess(listed) ? listed.value : null
-  const unsent = written ?? saved ?? nothingUnsent
+  const unsent = written ?? saved ?? noFeedback
 
   return useMemo(() => {
     const write = async (
@@ -49,7 +49,7 @@ export function useFeedbackNotes(agentId: string): FeedbackNotesStore {
 
       if (Exit.isFailure(exit)) return { ...problemOf(exit.cause), title }
 
-      setWritten((current) => apply(current ?? saved ?? nothingUnsent))
+      setWritten((current) => apply(current ?? saved ?? noFeedback))
 
       return null
     }
@@ -80,8 +80,7 @@ export function useFeedbackNotes(agentId: string): FeedbackNotesStore {
           (current) => new UnsentFeedback({ notes: current.notes, staged: noteIds }),
         )
       },
-      sent: (noteIds) =>
-        setWritten((current) => without(current ?? saved ?? nothingUnsent, noteIds)),
+      sent: (noteIds) => setWritten((current) => without(current ?? saved ?? noFeedback, noteIds)),
       refresh: () => {
         setWritten(null)
         refetch()

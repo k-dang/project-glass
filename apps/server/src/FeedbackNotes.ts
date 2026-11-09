@@ -4,8 +4,8 @@ import { SqlClient } from "effect/sql"
 
 const decodeNotes = Schema.decodeUnknownEffect(Schema.Array(FeedbackNote))
 
-const decodeListed = Schema.decodeUnknownEffect(
-  Schema.Array(Schema.Struct({ ...FeedbackNote.fields, staged: Schema.BooleanFromBit })),
+const decodeStaged = Schema.decodeUnknownEffect(
+  Schema.Array(Schema.Struct({ id: Schema.String, staged: Schema.BooleanFromBit })),
 )
 
 const guarded =
@@ -40,32 +40,25 @@ export class FeedbackNotes extends Context.Service<
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
 
-      const notesWhere = (agentId: string, only: ReadonlyArray<string>) => sql`
-        SELECT id, path, side, start_line AS start, end_line AS end, code,
-          changes_id AS changesId, text
-        FROM agent_feedback_note
-        WHERE agent_id = ${agentId} AND ${sql.in("id", only)}
-        ORDER BY rowid
+      const columns = sql`
+        id, path, side, start_line AS start, end_line AS end, code, changes_id AS changesId, text
       `
 
       return FeedbackNotes.of({
         list: Effect.fn("FeedbackNotes.list")((agentId) =>
           sql`
-            SELECT id, path, side, start_line AS start, end_line AS end, code,
-              changes_id AS changesId, text, staged
-            FROM agent_feedback_note WHERE agent_id = ${agentId} ORDER BY rowid
+            SELECT ${columns}, staged FROM agent_feedback_note
+            WHERE agent_id = ${agentId} ORDER BY rowid
           `.pipe(
-            Effect.flatMap(decodeListed),
-            Effect.map(
-              (rows) =>
-                new UnsentFeedback({
-                  notes: rows.map(
-                    ({ id, path, side, start, end, code, changesId, text }) =>
-                      new FeedbackNote({ id, path, side, start, end, code, changesId, text }),
-                  ),
-                  staged: rows.flatMap(({ id, staged }) => (staged ? [id] : [])),
-                }),
+            Effect.flatMap((rows) =>
+              Effect.all({
+                notes: decodeNotes(rows),
+                staged: decodeStaged(rows).pipe(
+                  Effect.map((flags) => flags.flatMap(({ id, staged }) => (staged ? [id] : []))),
+                ),
+              }),
             ),
+            Effect.map((unsent) => new UnsentFeedback(unsent)),
             guarded("read"),
           ),
         ),
@@ -100,17 +93,18 @@ export class FeedbackNotes extends Context.Service<
         take: Effect.fn("FeedbackNotes.take")(function* (agentId, noteIds) {
           if (noteIds.length === 0) return []
 
-          const taken = yield* Effect.gen(function* () {
-            const found = yield* notesWhere(agentId, noteIds).pipe(Effect.flatMap(decodeNotes))
+          const ids = Array.from(new Set(noteIds))
 
-            yield* sql`
-              DELETE FROM agent_feedback_note WHERE agent_id = ${agentId} AND ${sql.in("id", noteIds)}
-            `
+          const taken = yield* sql`
+            DELETE FROM agent_feedback_note WHERE agent_id = ${agentId} AND ${sql.in("id", noteIds)}
+            RETURNING ${columns}
+          `.pipe(
+            Effect.flatMap(decodeNotes),
+            Effect.map((found) => ids.flatMap((id) => found.find((note) => note.id === id) ?? [])),
+            guarded("send"),
+          )
 
-            return found
-          }).pipe(guarded("send"))
-
-          if (taken.length !== new Set(noteIds).size)
+          if (taken.length !== ids.length)
             return yield* new AgentError({
               message:
                 "Some of these Feedback notes were already sent or removed. Review your feedback again.",

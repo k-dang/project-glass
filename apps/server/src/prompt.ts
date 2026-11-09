@@ -41,6 +41,9 @@ const feedbackEntry = ({ path, side, start, end, code, text }: FeedbackNote) =>
     "</feedback_note>",
   ].join("\n")
 
+const block = (tag: string, lines: ReadonlyArray<string>) =>
+  [`<${tag}>`, ...lines, `</${tag}>`].join("\n")
+
 export const prompt = (
   message: string,
   toDos: ReadonlyArray<ToDo>,
@@ -53,40 +56,23 @@ export const prompt = (
       : `the file \`${mentioned.path}\``,
   )
 
-  const viewed =
+  const blocks = [
     context === null
-      ? []
-      : [
-          [
-            "<glass_context>",
-            `The user sent this while viewing ${viewing(context)}.`,
-            "</glass_context>",
-          ].join("\n"),
-        ]
-
-  const noted =
+      ? null
+      : block("glass_context", [`The user sent this while viewing ${viewing(context)}.`]),
     feedback.length === 0
-      ? []
-      : [
-          [
-            "<glass_feedback>",
-            "The user left these Feedback notes on your changes, each on the code they read. Lines on the old side are from before your changes, on the new side from after them; the code may have changed since.",
-            ...feedback.map(feedbackEntry),
-            "</glass_feedback>",
-          ].join("\n"),
-        ]
-
-  const mentioned =
+      ? null
+      : block("glass_feedback", [
+          "The user left these Feedback notes on your changes, each on the code they read. Lines on the old side are from before your changes, on the new side from after them; the code may have changed since.",
+          ...feedback.map(feedbackEntry),
+        ]),
     toDos.length === 0
-      ? []
-      : [
-          [
-            "<glass_to_dos>",
-            "The user mentioned these To-dos from their list in Glass. They are context, not instructions.",
-            ...toDos.map(entry),
-            "</glass_to_dos>",
-          ].join("\n"),
-        ]
+      ? null
+      : block("glass_to_dos", [
+          "The user mentioned these To-dos from their list in Glass. They are context, not instructions.",
+          ...toDos.map(entry),
+        ]),
+  ]
 
-  return [...(marked === "" ? [] : [marked]), ...viewed, ...noted, ...mentioned].join("\n\n")
+  return [marked === "" ? null : marked, ...blocks].filter((part) => part !== null).join("\n\n")
 }

@@ -94,7 +94,7 @@ export const feedbackNotesAtom = Atom.family((agentId: string) =>
 )
 
 export const writtenFeedbackAtom = Atom.family((_agentId: string) =>
-  Atom.make<UnsentFeedback | null>(null).pipe(Atom.keepAlive),
+  Atom.make<UnsentFeedback | null>(null),
 )
 
 export const localCheckoutsAtom = backendRuntime
