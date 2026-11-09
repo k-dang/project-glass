@@ -28,7 +28,7 @@ import {
   skillFilePath,
   candidateSkillPackSources,
   suggestedName,
-  uniqueFolder,
+  claimFolder,
 } from "./skillPackContents"
 
 interface PackSkill {
@@ -415,7 +415,7 @@ export class SkillPacks extends Context.Service<
             const inside = directory === "" ? 0 : directory.length + 1
 
             return {
-              name: uniqueFolder(taken, directory === "" ? name : lastSegment(directory)),
+              name: claimFolder(taken, directory === "" ? name : lastSegment(directory)),
               files: owned.map(({ path, executable, contents }) => ({
                 path: path.slice(inside),
                 executable,

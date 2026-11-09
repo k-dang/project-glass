@@ -24,7 +24,6 @@ const FakeSandboxSettings = Schema.Struct({
   cloneFrom: Schema.String,
   piCommand: Schema.String,
   claudeCommand: Schema.String,
-  /** A home folder of the Sandbox's own, so its programs can't find the user's Local skills. */
   home: Schema.optional(Schema.String),
 })
 

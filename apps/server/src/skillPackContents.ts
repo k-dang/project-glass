@@ -34,8 +34,7 @@ export const candidateSkillPackSources = (input: string): ReadonlyArray<SkillPac
   )
 }
 
-/** Claims `wanted` in `taken`, or the first `wanted-2`, `wanted-3`, … that's free. */
-export const uniqueFolder = (taken: Set<string>, wanted: string) => {
+export const claimFolder = (taken: Set<string>, wanted: string) => {
   let folder = wanted
 
   for (let suffix = 2; taken.has(folder); suffix++) folder = `${wanted}-${suffix}`

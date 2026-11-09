@@ -202,7 +202,6 @@ export const newAgentCommandsAtom = (
   repository: FollowedRepository,
 ) => newAgentCommandsFamily(new NewAgentOf({ engine, place, repository }))
 
-/** Whether the Agent's Sandbox can be reached. Its host lists nothing until the Sandbox is made. */
 const sandboxReachableAtom = Atom.family((agentId: string) =>
   Atom.make((get) =>
     Option.match(AsyncResult.value(get(agentsAtom)), {
@@ -212,8 +211,7 @@ const sandboxReachableAtom = Atom.family((agentId: string) =>
   ),
 )
 
-/** One of the Agent's listings for the composer, read again once its Sandbox can be reached. */
-const agentListingAtom = <A>(
+const relistedOnReachAtom = <A>(
   agentId: string,
   list: Effect.Effect<ReadonlyArray<A>, BackendError, Backend>,
   none: ReadonlyArray<A>,
@@ -230,7 +228,7 @@ const agentListingAtom = <A>(
   )
 
 export const agentCommandsAtom = Atom.family((agentId: string) =>
-  agentListingAtom(
+  relistedOnReachAtom(
     agentId,
     Backend.use((backend) => backend.ListAgentCommands({ agentId })),
     noCommands,
@@ -267,7 +265,7 @@ export const newAgentFilesAtom = (
 ) => newAgentFilesFamily(new NewAgentBranch({ place, repository, baseBranch }))
 
 export const agentFilesAtom = Atom.family((agentId: string) =>
-  agentListingAtom(
+  relistedOnReachAtom(
     agentId,
     Backend.use((backend) => backend.ListAgentFiles({ agentId })),
     noFiles,

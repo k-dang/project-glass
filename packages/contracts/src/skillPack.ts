@@ -4,7 +4,7 @@ const SKILL_PACK_NAME_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
 export const SKILL_PACK_NAME_MAX_LENGTH = 64
 
-/** The namespace a Sandbox Agent's Local skills take in Claude Code, so no Skill pack can have it. */
+/** Claude Code won't load a plugin without a name, so a Sandbox Agent's Local skills need one. */
 export const LOCAL_SKILLS_NAMESPACE = "local"
 
 export const isSkillPackName = (name: string) =>

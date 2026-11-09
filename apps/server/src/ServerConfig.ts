@@ -27,7 +27,6 @@ export class ServerConfig extends Context.Service<
     readonly agentHostBundle: string
     readonly gitRemote: string
     readonly dataDirectory: string
-    /** The user's home folder, where the Agent programs read their Local skills. */
     readonly homeDirectory: string
   }
 >()("@glass/server/ServerConfig") {

@@ -123,7 +123,6 @@ export class Agent extends Schema.Class<Agent>("Agent")({
   ...ModelChoice.fields,
   permissionMode: Schema.NullOr(PermissionMode),
   skillPacks: Schema.Array(AgentSkillPack),
-  /** Whether Glass sends the user's Local skills, which only a Sandbox Agent can be given. */
   localSkills: Schema.Boolean,
   createdAt: Schema.DateTimeUtcFromString,
   sandbox: Schema.NullOr(SandboxStatus),

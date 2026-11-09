@@ -391,7 +391,7 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
       baseBranch,
       place: where.place,
       skillPacks: skills.chosen,
-      localSkills: skills.localSkills,
+      localSkills: skills.sendsLocalSkills,
       ...program,
       ...message,
     })
@@ -532,7 +532,7 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
           />
           {skills.offersLocalSkills && (
             <LocalSkillsToggle
-              checked={skills.localSkills}
+              checked={skills.sendsLocalSkills}
               onCheckedChange={skills.setLocalSkills}
             />
           )}

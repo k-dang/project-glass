@@ -8,26 +8,23 @@ import {
   lastSegment,
   readSkill,
   skillFilePath,
-  uniqueFolder,
+  claimFolder,
 } from "./skillPackContents"
 
 interface SkillFolders {
-  /** The folders the program reads Local skills from, in the order it reads them. */
   readonly folders: ReadonlyArray<string>
-  /** Whether the program finds skills below a folder's top level, as pi does and Claude Code doesn't. */
-  readonly nested: boolean
+  readonly readsNestedSkills: boolean
 }
 
 const foldersOf = (home: string): Record<AgentEngine, SkillFolders> => ({
-  "claude-code": { folders: [join(home, ".claude", "skills")], nested: false },
+  "claude-code": { folders: [join(home, ".claude", "skills")], readsNestedSkills: false },
   pi: {
     folders: [join(home, ".pi", "agent", "skills"), join(home, ".agents", "skills")],
-    nested: true,
+    readsNestedSkills: true,
   },
 })
 
 interface FoundFile {
-  /** Relative to the folder the program reads, with `/` between segments. */
   readonly path: string
   readonly executable: boolean
 }
@@ -35,7 +32,6 @@ interface FoundFile {
 interface FoundSkill {
   readonly folder: string
   readonly directory: string
-  /** Where its SKILL.md really is, after symlinks. */
   readonly realSkillFile: string
   readonly skill: Skill
   readonly files: ReadonlyArray<FoundFile>
@@ -47,10 +43,6 @@ const couldNotRead = new LocalSkillsError({
   message: "Glass couldn't read your Local skills. Try again.",
 })
 
-/**
- * What a program does with a file or folder it can't read: goes without it. A broken symlink is
- * common in dotfiles and goes quietly; one Glass isn't allowed to read is worth a log line.
- */
 const orSkipped = <A>(
   effect: Effect.Effect<A, PlatformError.PlatformError>,
 ): Effect.Effect<Option.Option<A>, PlatformError.PlatformError> =>
@@ -95,15 +87,10 @@ const reading = <A>(effect: Effect.Effect<A, PlatformError.PlatformError>) =>
 export class LocalSkills extends Context.Service<
   LocalSkills,
   {
-    /** The names of the Local skills the program reads, for the new-Agent picker. */
     readonly names: (engine: AgentEngine) => Effect.Effect<ReadonlyArray<string>, LocalSkillsError>
-    /**
-     * The Local skills the program reads, as they are now, to send a Sandbox Agent: one source, or
-     * none when there are no skills.
-     */
-    readonly sources: (
+    readonly source: (
       engine: AgentEngine,
-    ) => Effect.Effect<ReadonlyArray<SkillSource>, LocalSkillsError>
+    ) => Effect.Effect<Option.Option<SkillSource>, LocalSkillsError>
   }
 >()("@glass/server/LocalSkills") {
   static readonly layer = Layer.effect(
@@ -112,7 +99,6 @@ export class LocalSkills extends Context.Service<
       const fs = yield* FileSystem.FileSystem
       const skillFolders = foldersOf((yield* ServerConfig).homeDirectory)
 
-      /** Every file under `folder` Glass can read, following symlinks but not round a loop. */
       const filesUnder = (
         folder: string,
         relative: string,
@@ -149,15 +135,11 @@ export class LocalSkills extends Context.Service<
           return nested.flat()
         })
 
-      /**
-       * The skills that load, as the programs load them: skipping any whose SKILL.md doesn't, and
-       * keeping only the first skill of a name or SKILL.md.
-       */
       const found = (engine: AgentEngine) => {
-        const { folders, nested } = skillFolders[engine]
+        const { folders, readsNestedSkills } = skillFolders[engine]
 
         const loads = (directory: string) =>
-          directory !== "" && (nested || !directory.includes("/"))
+          directory !== "" && (readsNestedSkills || !directory.includes("/"))
 
         return Effect.forEach(folders, (folder) =>
           filesUnder(folder, "", new Set()).pipe(
@@ -204,7 +186,7 @@ export class LocalSkills extends Context.Service<
           READS,
         ).pipe(
           Effect.map((read): SentSkill => ({
-            name: uniqueFolder(taken, lastSegment(directory)),
+            name: claimFolder(taken, lastSegment(directory)),
             files: read.flatMap(Option.toArray),
           })),
         )
@@ -216,7 +198,7 @@ export class LocalSkills extends Context.Service<
             reading,
             Effect.withSpan("LocalSkills.names"),
           ),
-        sources: (engine) =>
+        source: (engine) =>
           found(engine).pipe(
             Effect.flatMap((skills) => {
               const taken = new Set<string>()
@@ -224,10 +206,12 @@ export class LocalSkills extends Context.Service<
               return Effect.forEach(skills, (skill) => sent(taken, skill))
             }),
             Effect.map((skills) =>
-              skills.length === 0 ? [] : [{ name: LOCAL_SKILLS_NAMESPACE, skills }],
+              skills.length === 0
+                ? Option.none()
+                : Option.some({ name: LOCAL_SKILLS_NAMESPACE, skills }),
             ),
             reading,
-            Effect.withSpan("LocalSkills.sources"),
+            Effect.withSpan("LocalSkills.source"),
           ),
       })
     }),
