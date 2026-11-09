@@ -4,7 +4,7 @@ Opening Glass shows one "Glass" window while its backend starts; the backend's o
 
 ## Sub-features
 
-- `life-open` opens a 1280×820 window titled "Glass" showing an app icon rail ending in the connection avatar, and a Reviews top bar with the pull request URL field.
+- `life-open` opens a 1280×820 window titled "Glass" showing an app icon rail ending in the connection avatar, and Dashboard.
 - `life-backend` starts the backend on a fresh localhost port behind a per-launch secret while the window loads; the window reaches it once it is up.
 - `life-logs` appends backend output and Glass's `[glass <time>]` start, restart, and give-up notes to `~/.glass/logs/backend.log` across launches, moving it to `backend.previous.log` at launch once it passes 5 MB.
 - `life-quit` closing the last window quits Glass and frees the backend's port.
@@ -25,12 +25,12 @@ Preconditions:
 
 - No live run with the same ID (`node $V list`).
 
-- **Open (`life-open`, `life-backend`).** `node $V launch`, then `node $V doctor`. Every line is `OK`, including "Window shows the built renderer" and "Backend health". `node $V snapshot opened` shows `navigation "App areas"`, links for Reviews, Agents, and Settings, `textbox "Pull request URL"`, and `heading "Open a pull request"`.
+- **Open (`life-open`, `life-backend`).** `node $V launch`, then `node $V doctor`. Every line is `OK`, including "Window shows the built renderer" and "Backend health". `node $V snapshot opened` shows `navigation "App areas"`, links for Reviews, Agents, and Settings, `main "Dashboard"`, and `heading "Dashboard"`.
 - **Logs (`life-logs`).** The run's `GLASS_HOME` is `.verify/<id>/state/home`, so the log is `.verify/<id>/state/home/.glass/logs/backend.log` and contains `[glass <time>] Starting backend` followed by `Listening on http://127.0.0.1:<port>` matching the backend URL `launch` printed. Rotation to `backend.previous.log` needs 5 MB of output; the main-process test covers it.
 - **Quit (`life-quit`).** `node $V stop`. It requests app shutdown and prints `Backend port <port>: closed`. "Electron did not quit; killing its process tree" means the app did not quit by itself, which is a failure.
 - **Start error (`life-start-error`).** `node $V launch --github fake --fail-backend-start`. `node $V wait --text "didn't start"`, then `snapshot`/`screenshot`: `heading "Glass's backend didn't start"`, the log path, and `button "Relaunch Glass"`. `backend.log` shows four `Starting backend` notes, restarts after 500ms, 1s, and 2s, and `giving up`. A relaunch fails the same way in this mode.
-- **Restart (`life-restart`).** `node $V launch --github fake`, `wait --text "Needs review"`, then `node $V kill-backend` and at once `wait --text "Reconnecting"` and capture `reconnecting`. The banner clears within about 2s; `doctor` then shows the same Electron pid and "Backend health" OK on the same port. Add a to-do to prove calls work again, and `backend.log` shows `Backend exited with code 1; restarting in 500ms`.
-- **Crash and relaunch (`life-crash`, `life-relaunch`).** Run `kill-backend` four times, each once the Reconnecting banner has cleared. `wait --text "keeps stopping"` and capture `heading "Glass's backend keeps stopping"`. `click --role button --name "Relaunch Glass"`, `wait --text "Needs review"`, then `doctor`: "Electron process" shows a new pid and "Backend health" is OK on a new port. `backend.log` still holds the earlier launch's restarts and `giving up`, followed by the new port's `Listening on` line. `stop` then reports that new port closed.
+- **Restart (`life-restart`).** `node $V launch --github fake`, `wait --text "Dashboard"`, then `node $V kill-backend` and at once `wait --text "Reconnecting"` and capture `reconnecting`. The banner clears within about 2s; `doctor` then shows the same Electron pid and "Backend health" OK on the same port. Add a to-do to prove calls work again, and `backend.log` shows `Backend exited with code 1; restarting in 500ms`.
+- **Crash and relaunch (`life-crash`, `life-relaunch`).** Run `kill-backend` four times, each once the Reconnecting banner has cleared. `wait --text "keeps stopping"` and capture `heading "Glass's backend keeps stopping"`. `click --role button --name "Relaunch Glass"`, `wait --text "Dashboard"`, then `doctor`: "Electron process" shows a new pid and "Backend health" is OK on a new port. `backend.log` still holds the earlier launch's restarts and `giving up`, followed by the new port's `Listening on` line. `stop` then reports that new port closed.
 - **Proof.** `evidence/backend.log` and `evidence/electron.log` survive `stop`, with the `Listening on` line in the backend log, alongside `opened.aria.txt`.
 
 ## Gotchas

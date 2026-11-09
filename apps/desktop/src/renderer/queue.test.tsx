@@ -20,7 +20,7 @@ import {
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { DateTime, Effect, Stream, SubscriptionRef } from "effect"
-import { afterEach, expect, it } from "vite-plus/test"
+import { afterEach, beforeEach, expect, it } from "vite-plus/test"
 import { App } from "./App"
 import { backendLayerAtom } from "./backend"
 import { openReview } from "../../test/finishReview"
@@ -150,6 +150,10 @@ const mount = (
 
   return userEvent.setup()
 }
+
+beforeEach(() => {
+  window.history.replaceState(null, "", "#/reviews")
+})
 
 afterEach(() => {
   cleanup()

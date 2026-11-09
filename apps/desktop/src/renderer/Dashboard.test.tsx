@@ -40,7 +40,7 @@ const stamp = (kind: ActivityStamp["kind"], occurredAt: Date) =>
   new ActivityStamp({ kind, occurredAt: DateTime.fromDateUnsafe(occurredAt) })
 
 const mount = (handlers: Partial<Handlers>) => {
-  window.history.replaceState(null, "", "#/dashboard")
+  window.history.replaceState(null, "", "#/")
 
   render(
     <RegistryProvider initialValues={[[backendLayerAtom, testLayer(handlers)]]}>

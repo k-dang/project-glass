@@ -152,6 +152,7 @@ export const test = base.extend<Glass>({
 export { expect }
 
 export const openPullRequest = async (window: Page, pr: FakePullRequest) => {
+  await window.getByRole("link", { name: "Reviews", exact: true }).click()
   await window.getByRole("textbox", { name: "Open a PR" }).fill(pr.url)
   await window.getByRole("button", { name: "Open", exact: true }).click()
   await expect(window.getByRole("heading", { name: `${pr.title} #${pr.number}` })).toBeVisible()
