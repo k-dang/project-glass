@@ -53,7 +53,7 @@ Read-only. Checks an Electron process serves the run's CDP port, that port belon
 | `screenshot <name>`                              | saves `evidence/<name>.png`                                                                 |
 | `click --role <role> --name <name>`              | finds the element in the accessibility tree and dispatches a real mouse click at its center |
 | `type --role <role> --name <name> --text <text>` | clicks the element, then replaces its contents with `<text>` as a paste would               |
-| `press --key <key> [--meta]`                     | presses a key such as `Enter` or `ArrowUp` in the focused element, holding ⌘ with `--meta`  |
+| `press --key <key> [--meta] [--shift]`           | presses a key such as `Enter` or `ArrowUp` in the focused element, holding ⌘ with `--meta` and Shift with `--shift` |
 | `wait --text <text> [--timeout ms]`              | polls body text and accessible StaticText, including shadow-root diffs (default 15s); exit 1 on timeout                                      |
 | `scroll --by <pixels> [--x n] [--y n]`           | turns the wheel over the window, for views that load as you scroll                          |
 | `memory [--samples n] [--interval ms] [--gc] [--out n]` | samples renderer, worker, and process memory into `evidence/<out>.jsonl`, then prints deltas |

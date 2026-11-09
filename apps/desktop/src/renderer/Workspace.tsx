@@ -38,6 +38,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { FilePanelTabsList, FilePanelTabTrigger } from "./FilePanelTabs"
 import type { ActivityRecorder } from "./activity"
 import { AgentReviewBanner, AgentReviewButton } from "./AgentReview"
 import { AgentReviewCard } from "./AgentReviewCard"
@@ -407,10 +408,7 @@ export function Workspace(props: {
           )}
         >
           <Tabs value={shownPanelTab} onValueChange={setPanelTab} className="min-h-0 flex-1 gap-0">
-            <TabsList
-              aria-label="File panel"
-              className="w-full justify-start gap-1 rounded-none border-b bg-transparent px-2 py-1 group-data-horizontal/tabs:h-9"
-            >
+            <FilePanelTabsList>
               <FilePanelTabTrigger value="tree" icon={FolderTree}>
                 Tree
               </FilePanelTabTrigger>
@@ -428,7 +426,7 @@ export function Workspace(props: {
                   Agent review
                 </FilePanelTabTrigger>
               )}
-            </TabsList>
+            </FilePanelTabsList>
             <TabsContent value="tree" keepMounted className="flex min-h-0 flex-col">
               {files.length === 0 ? (
                 <p className="px-4 py-6 text-sm text-muted-foreground">No files changed.</p>
@@ -600,22 +598,6 @@ export function Workspace(props: {
         </TabsContent>
       </div>
     </Tabs>
-  )
-}
-
-function FilePanelTabTrigger(props: {
-  value: FilePanelTab
-  icon: LucideIcon
-  children: ReactNode
-}) {
-  return (
-    <TabsTrigger
-      value={props.value}
-      className="h-6 flex-none rounded-md px-2 text-xs font-normal transition-none data-active:bg-muted dark:data-active:border-transparent dark:data-active:bg-muted group-data-[variant=default]/tabs-list:data-active:shadow-none"
-    >
-      <props.icon aria-hidden className="size-3" />
-      {props.children}
-    </TabsTrigger>
   )
 }
 

@@ -2,6 +2,7 @@
 import {
   ActivityPage,
   Agent,
+  AgentChanges,
   AnswerQuestion,
   DenyRequest,
   PermissionRequestPart,
@@ -110,7 +111,7 @@ it("switches between Chat and Changes with Mod+D, even from the composer", async
   const user = mount({
     WatchTranscript: () =>
       Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
-    GetAgentChanges: () => Effect.succeed([]),
+    GetAgentChanges: () => Effect.succeed(new AgentChanges({ id: "read", files: [] })),
   })
 
   await user.click(await screen.findByRole("textbox", { name: "Message" }))

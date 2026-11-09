@@ -1,5 +1,6 @@
 import type { ChangedFile, DiffSide, LineDiscussion } from "@glass/contracts"
 import {
+  type AnnotationSide,
   type CodeViewDiffItem,
   type DiffLineAnnotation,
   type FileDiffMetadata,
@@ -78,21 +79,35 @@ const parse = (file: ChangedFile): ParsedFile => {
 export interface ChangesLayout {
   readonly tree: FileTreePreparedInput
   readonly files: ReadonlyArray<ParsedFile>
+  readonly diffOf: (path: string) => FileDiffMetadata | null
 }
 
-export const layOut = (files: ReadonlyArray<ChangedFile>): ChangesLayout => {
-  const tree = prepareFileTreeInput(files.map((file) => file.path))
-  const byPath = new Map(files.map((file) => [file.path, file]))
+export const layOut = (changed: ReadonlyArray<ChangedFile>): ChangesLayout => {
+  const tree = prepareFileTreeInput(changed.map((file) => file.path))
+  const byPath = new Map(changed.map((file) => [file.path, file]))
+  const files = tree.paths.map((path) => parse(byPath.get(path)!))
 
-  return { tree, files: tree.paths.map((path) => parse(byPath.get(path)!)) }
+  const shown = new Map(
+    files.flatMap((entry) =>
+      entry.placeholder === null ? [[entry.file.path, entry.fileDiff] as const] : [],
+    ),
+  )
+
+  return { tree, files, diffOf: (path) => shown.get(path) ?? null }
 }
+
+export const shownRanges = (fileDiff: FileDiffMetadata, side: DiffSide) =>
+  fileDiff.hunks.map((hunk) =>
+    side === "new"
+      ? { first: hunk.additionStart, count: hunk.additionCount, index: hunk.additionLineIndex }
+      : { first: hunk.deletionStart, count: hunk.deletionCount, index: hunk.deletionLineIndex },
+  )
+
+export const hunkHolding = (fileDiff: FileDiffMetadata, side: DiffSide, line: number) =>
+  shownRanges(fileDiff, side).findIndex(({ first, count }) => line >= first && line < first + count)
 
 export const inHunk = (fileDiff: FileDiffMetadata, side: DiffSide, line: number) =>
-  fileDiff.hunks.some((hunk) =>
-    side === "new"
-      ? line >= hunk.additionStart && line < hunk.additionStart + hunk.additionCount
-      : line >= hunk.deletionStart && line < hunk.deletionStart + hunk.deletionCount,
-  )
+  hunkHolding(fileDiff, side, line) !== -1
 
 export interface CollapseChoices {
   readonly opened: ReadonlyMap<string, boolean>
@@ -110,12 +125,15 @@ const isCollapsed = (entry: ParsedFile, choices: CollapseChoices) => {
   return choices.all === "collapsed"
 }
 
-export const annotationSides: Record<DiffSide, DiffLineAnnotation<LineNote>["side"]> = {
+export const annotationSides: Record<DiffSide, AnnotationSide> = {
   old: "deletions",
   new: "additions",
 }
 
-const groupByPath = <A>(values: ReadonlyArray<A>, pathOf: (value: A) => string) => {
+export const sideOf = (side: AnnotationSide | undefined): DiffSide =>
+  side === "deletions" ? "old" : "new"
+
+export const groupByPath = <A>(values: ReadonlyArray<A>, pathOf: (value: A) => string) => {
   const byPath = new Map<string, Array<A>>()
 
   for (const value of values) {
@@ -170,6 +188,11 @@ const notesOn = (notes: LineNotes) => {
   })
 }
 
+export interface FileAnnotations<M> {
+  readonly annotations: Array<DiffLineAnnotation<M>>
+  readonly drawn: unknown
+}
+
 const annotationsOf = (notes: LineNotes): Array<DiffLineAnnotation<LineNote>> => [
   ...notes.discussions.map((discussion): DiffLineAnnotation<LineNote> => ({
     side: annotationSides[discussion.side],
@@ -188,18 +211,26 @@ const annotationsOf = (notes: LineNotes): Array<DiffLineAnnotation<LineNote>> =>
   })),
 ]
 
-const drawnKey = (notes: LineNotes, collapsed: boolean, lead: number | undefined) =>
-  JSON.stringify([
-    collapsed,
-    lead,
-    notes.discussions.map(({ id, resolved, comments }) => [
-      id,
-      resolved,
-      comments.map((comment) => [comment.id, comment.bodyHtml]),
-    ]),
-    notes.drafts.map((draft) => draft.key),
-    notes.asks.map((ask) => ask.key),
-  ])
+export const lineNoteAnnotations = (notes: LineNotes) => {
+  const notesFor = notesOn(notes)
+
+  return (path: string): FileAnnotations<LineNote> => {
+    const fileNotes = notesFor(path)
+
+    return {
+      annotations: annotationsOf(fileNotes),
+      drawn: [
+        fileNotes.discussions.map(({ id, resolved, comments }) => [
+          id,
+          resolved,
+          comments.map((comment) => [comment.id, comment.bodyHtml]),
+        ]),
+        fileNotes.drafts.map((draft) => draft.key),
+        fileNotes.asks.map((ask) => ask.key),
+      ],
+    }
+  }
+}
 
 const hash = (text: string) => {
   let value = 0x811c9dc5
@@ -212,34 +243,31 @@ const hash = (text: string) => {
 }
 
 /** Diffs accepts controlled item-data updates only when the item's version changes. */
-export const toItems = (
+export const toItems = <M>(
   files: ReadonlyArray<ParsedFile>,
-  notes: LineNotes,
+  annotationsFor: (path: string) => FileAnnotations<M>,
   choices: CollapseChoices,
   leads: ReadonlyMap<string, number> = new Map(),
-) => {
-  const notesFor = notesOn(notes)
-
-  return files.map((entry): CodeViewDiffItem<LineNote> => {
+) =>
+  files.map((entry): CodeViewDiffItem<M> => {
     const { path } = entry.file
-    const fileNotes = notesFor(path)
+    const { annotations, drawn } = annotationsFor(path)
     const collapsed = isCollapsed(entry, choices)
     const lead = leads.get(path)
 
-    const item: CodeViewDiffItem<LineNote> = {
+    const item: CodeViewDiffItem<M> = {
       type: "diff",
       id: path,
       fileDiff: entry.fileDiff,
-      annotations: annotationsOf(fileNotes),
+      annotations,
       collapsed,
-      version: hash(drawnKey(fileNotes, collapsed, lead)),
+      version: hash(JSON.stringify([collapsed, lead, drawn])),
     }
 
     if (lead !== undefined) item.lead = lead
 
     return item
   })
-}
 
 export type ListedNote =
   | { readonly type: "discussion"; readonly discussion: LineDiscussion }

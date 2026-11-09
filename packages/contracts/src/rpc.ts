@@ -6,6 +6,7 @@ import { AskAnswer, AskFailure, AskPlace, AskQuestion } from "./ask"
 import {
   Agent,
   AgentBusy,
+  AgentChanges,
   AgentCommand,
   AgentEngine,
   AgentError,
@@ -40,13 +41,9 @@ import {
 } from "./discussion"
 import { CreateDraftError, Draft, UpdateDraftError } from "./draft"
 import { EngineFeature, EngineSettings } from "./engine"
+import { FeedbackNote } from "./feedbackNote"
 import { FollowedRepository, InvalidRepositoryInput } from "./followedRepository"
-import {
-  ChangedFile,
-  OpenPullRequestError,
-  PullRequestRef,
-  PullRequestWorkspace,
-} from "./pullRequest"
+import { OpenPullRequestError, PullRequestRef, PullRequestWorkspace } from "./pullRequest"
 import { PullRequestListings } from "./pullRequestList"
 import { Queue, QueueAddition, QueueError, QueuedPullRequest } from "./queue"
 import { FileContents, GetFileContentsError, RepositoryFiles } from "./repository"
@@ -435,7 +432,20 @@ export class GlassRpcs extends RpcGroup.make(
   }),
   Rpc.make("GetAgentChanges", {
     payload: { agentId: Schema.String },
-    success: Schema.Array(ChangedFile),
+    success: AgentChanges,
+    error: Schema.Union([AgentNotFound, AgentError]),
+  }),
+  Rpc.make("ListFeedbackNotes", {
+    payload: { agentId: Schema.String },
+    success: Schema.Array(FeedbackNote),
+    error: Schema.Union([AgentNotFound, AgentError]),
+  }),
+  Rpc.make("SaveFeedbackNote", {
+    payload: { agentId: Schema.String, note: FeedbackNote },
+    error: Schema.Union([AgentNotFound, AgentError]),
+  }),
+  Rpc.make("RemoveFeedbackNote", {
+    payload: { agentId: Schema.String, noteId: Schema.String },
     error: Schema.Union([AgentNotFound, AgentError]),
   }),
   Rpc.make("RemoveAgent", {

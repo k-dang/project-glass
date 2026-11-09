@@ -87,6 +87,10 @@ export const agentChangesAtom = Atom.family((agentId: string) =>
   backendRuntime.atom(Backend.use((backend) => backend.GetAgentChanges({ agentId }))),
 )
 
+export const feedbackNotesAtom = Atom.family((agentId: string) =>
+  backendRuntime.atom(Backend.use((backend) => backend.ListFeedbackNotes({ agentId }))),
+)
+
 export const localCheckoutsAtom = backendRuntime
   .atom(Backend.use((backend) => backend.ListLocalCheckouts()))
   .pipe(Atom.keepAlive)
