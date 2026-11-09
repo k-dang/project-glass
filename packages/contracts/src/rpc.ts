@@ -448,15 +448,18 @@ export class GlassRpcs extends RpcGroup.make(
     error: Schema.Union([AgentNotFound, AgentError]),
   }),
   Rpc.make("StageFeedbackNotes", {
-    payload: { agentId: Schema.String, noteIds: Schema.Array(Schema.String) },
+    payload: { agentId: Schema.String },
+    success: UnsentFeedback,
     error: Schema.Union([AgentNotFound, AgentError]),
   }),
   Rpc.make("SaveFeedbackNote", {
     payload: { agentId: Schema.String, note: FeedbackNote },
+    success: UnsentFeedback,
     error: Schema.Union([AgentNotFound, AgentError]),
   }),
   Rpc.make("RemoveFeedbackNote", {
     payload: { agentId: Schema.String, noteId: Schema.String },
+    success: UnsentFeedback,
     error: Schema.Union([AgentNotFound, AgentError]),
   }),
   Rpc.make("RemoveAgent", {

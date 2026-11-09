@@ -110,12 +110,19 @@ function OriginalCode(props: { code: string }) {
 const noteLocation = (note: FeedbackNote) =>
   `${note.path} ${rangeLabel(note.side, note.start, note.end)}`
 
+export interface StagedEdit {
+  readonly id: string
+  readonly draft: string
+}
+
 export function StagedFeedback(props: {
   notes: ReadonlyArray<FeedbackNote>
+  editing: StagedEdit | null
+  onEditingChange: (editing: StagedEdit | null) => void
   onSave: (note: FeedbackNote) => Promise<Problem | null>
   onRemove: (noteId: string) => Promise<Problem | null>
 }) {
-  const [editing, setEditing] = useState<{ id: string; draft: string } | null>(null)
+  const { editing, onEditingChange: setEditing } = props
 
   return (
     <section

@@ -288,12 +288,15 @@ it.live(
       const keepError = new FeedbackNote({ ...fields, id: "note-2", text: "Keep the last error" })
       const later = new FeedbackNote({ ...fields, id: "note-3", text: "Not staged yet" })
 
-      for (const note of [capAttempts, keepError, later])
+      for (const note of [capAttempts, keepError])
         yield* f.client.SaveFeedbackNote({ agentId, note })
 
       const staged = [capAttempts.id, keepError.id]
-      yield* f.client.StageFeedbackNotes({ agentId, noteIds: staged })
-      assert.deepStrictEqual((yield* f.client.ListFeedbackNotes({ agentId })).staged, staged)
+      assert.deepStrictEqual((yield* f.client.StageFeedbackNotes({ agentId })).staged, staged)
+      yield* f.client.SaveFeedbackNote({ agentId, note: later })
+
+      const unstaged = { agentId, message: "", images: [], feedback: [later.id] }
+      assert.equal((yield* f.client.SendMessage(unstaged).pipe(Effect.flip))._tag, "AgentError")
 
       const sent = { agentId, message: "", images: [], feedback: staged }
       yield* f.client.SendMessage(sent)

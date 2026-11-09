@@ -175,7 +175,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
         agents.saveUnsent(agentId, { message, images }),
       GetAgentChanges: ({ agentId }) => agents.changes(agentId),
       ListFeedbackNotes: ({ agentId }) => agents.feedbackNotes(agentId),
-      StageFeedbackNotes: ({ agentId, noteIds }) => agents.stageFeedbackNotes(agentId, noteIds),
+      StageFeedbackNotes: ({ agentId }) => agents.stageFeedbackNotes(agentId),
       SaveFeedbackNote: ({ agentId, note }) => agents.saveFeedbackNote(agentId, note),
       RemoveFeedbackNote: ({ agentId, noteId }) => agents.removeFeedbackNote(agentId, noteId),
       GetRemovalWarnings: ({ agentId }) => agents.removalWarnings(agentId),

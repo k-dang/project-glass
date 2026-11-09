@@ -225,16 +225,15 @@ export class Agents extends Context.Service<
     ) => Effect.Effect<UnsentFeedback, AgentNotFound | AgentError>
     readonly stageFeedbackNotes: (
       agentId: string,
-      noteIds: ReadonlyArray<string>,
-    ) => Effect.Effect<void, AgentNotFound | AgentError>
+    ) => Effect.Effect<UnsentFeedback, AgentNotFound | AgentError>
     readonly saveFeedbackNote: (
       agentId: string,
       note: FeedbackNote,
-    ) => Effect.Effect<void, AgentNotFound | AgentError>
+    ) => Effect.Effect<UnsentFeedback, AgentNotFound | AgentError>
     readonly removeFeedbackNote: (
       agentId: string,
       noteId: string,
-    ) => Effect.Effect<void, AgentNotFound | AgentError>
+    ) => Effect.Effect<UnsentFeedback, AgentNotFound | AgentError>
     readonly stop: (agentId: string) => Effect.Effect<void, AgentNotFound | AgentError>
     readonly reachSandbox: (agentId: string) => Effect.Effect<void, AgentNotFound | AgentError>
     readonly unsent: (agentId: string) => Effect.Effect<SentMessage, AgentNotFound | AgentError>
@@ -797,8 +796,7 @@ export class Agents extends Context.Service<
         send,
         changes,
         feedbackNotes: (agentId) => find(agentId).pipe(Effect.andThen(notes.list(agentId))),
-        stageFeedbackNotes: (agentId, noteIds) =>
-          find(agentId).pipe(Effect.andThen(notes.stage(agentId, noteIds))),
+        stageFeedbackNotes: (agentId) => find(agentId).pipe(Effect.andThen(notes.stage(agentId))),
         saveFeedbackNote: (agentId, note) =>
           find(agentId).pipe(Effect.andThen(notes.save(agentId, note))),
         removeFeedbackNote: (agentId, noteId) =>

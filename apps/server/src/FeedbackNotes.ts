@@ -22,12 +22,12 @@ export class FeedbackNotes extends Context.Service<
   FeedbackNotes,
   {
     readonly list: (agentId: string) => Effect.Effect<UnsentFeedback, AgentError>
-    readonly save: (agentId: string, note: FeedbackNote) => Effect.Effect<void, AgentError>
-    readonly remove: (agentId: string, noteId: string) => Effect.Effect<void, AgentError>
-    readonly stage: (
+    readonly save: (
       agentId: string,
-      noteIds: ReadonlyArray<string>,
-    ) => Effect.Effect<void, AgentError>
+      note: FeedbackNote,
+    ) => Effect.Effect<UnsentFeedback, AgentError>
+    readonly remove: (agentId: string, noteId: string) => Effect.Effect<UnsentFeedback, AgentError>
+    readonly stage: (agentId: string) => Effect.Effect<UnsentFeedback, AgentError>
     readonly take: (
       agentId: string,
       noteIds: ReadonlyArray<string>,
@@ -44,24 +44,26 @@ export class FeedbackNotes extends Context.Service<
         id, path, side, start_line AS start, end_line AS end, code, changes_id AS changesId, text
       `
 
-      return FeedbackNotes.of({
-        list: Effect.fn("FeedbackNotes.list")((agentId) =>
-          sql`
+      const list = Effect.fn("FeedbackNotes.list")((agentId: string) =>
+        sql`
             SELECT ${columns}, staged FROM agent_feedback_note
             WHERE agent_id = ${agentId} ORDER BY rowid
           `.pipe(
-            Effect.flatMap((rows) =>
-              Effect.all({
-                notes: decodeNotes(rows),
-                staged: decodeStaged(rows).pipe(
-                  Effect.map((flags) => flags.flatMap(({ id, staged }) => (staged ? [id] : []))),
-                ),
-              }),
-            ),
-            Effect.map((unsent) => new UnsentFeedback(unsent)),
-            guarded("read"),
+          Effect.flatMap((rows) =>
+            Effect.all({
+              notes: decodeNotes(rows),
+              staged: decodeStaged(rows).pipe(
+                Effect.map((flags) => flags.flatMap(({ id, staged }) => (staged ? [id] : []))),
+              ),
+            }),
           ),
+          Effect.map((unsent) => new UnsentFeedback(unsent)),
+          guarded("read"),
         ),
+      )
+
+      return FeedbackNotes.of({
+        list,
         save: Effect.fn("FeedbackNotes.save")((agentId, note) =>
           sql`
             INSERT INTO agent_feedback_note ${sql.insert({
@@ -76,19 +78,18 @@ export class FeedbackNotes extends Context.Service<
               text: note.text,
             })}
             ON CONFLICT (agent_id, id) DO UPDATE SET text = excluded.text
-          `.pipe(Effect.asVoid, guarded("save")),
+          `.pipe(guarded("save"), Effect.andThen(list(agentId))),
         ),
         remove: Effect.fn("FeedbackNotes.remove")((agentId, noteId) =>
           sql`
             DELETE FROM agent_feedback_note WHERE id = ${noteId} AND agent_id = ${agentId}
-          `.pipe(Effect.asVoid, guarded("remove")),
+          `.pipe(guarded("remove"), Effect.andThen(list(agentId))),
         ),
-        stage: Effect.fn("FeedbackNotes.stage")((agentId, noteIds) =>
-          sql`
-            UPDATE agent_feedback_note
-            SET staged = ${noteIds.length === 0 ? sql`0` : sql`${sql.in("id", noteIds)}`}
-            WHERE agent_id = ${agentId}
-          `.pipe(Effect.asVoid, guarded("stage")),
+        stage: Effect.fn("FeedbackNotes.stage")((agentId) =>
+          sql`UPDATE agent_feedback_note SET staged = 1 WHERE agent_id = ${agentId}`.pipe(
+            guarded("stage"),
+            Effect.andThen(list(agentId)),
+          ),
         ),
         take: Effect.fn("FeedbackNotes.take")(function* (agentId, noteIds) {
           if (noteIds.length === 0) return []
@@ -96,7 +97,7 @@ export class FeedbackNotes extends Context.Service<
           const ids = Array.from(new Set(noteIds))
 
           const taken = yield* sql`
-            DELETE FROM agent_feedback_note WHERE agent_id = ${agentId} AND ${sql.in("id", noteIds)}
+            DELETE FROM agent_feedback_note WHERE agent_id = ${agentId} AND staged = 1 AND ${sql.in("id", noteIds)}
             RETURNING ${columns}
           `.pipe(
             Effect.flatMap(decodeNotes),

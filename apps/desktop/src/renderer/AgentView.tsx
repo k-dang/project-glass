@@ -107,7 +107,7 @@ import {
 } from "./conversation"
 import { MessageText, readableText } from "./Mentions"
 import { Attachment, type ComposerSuggestion, MessageBox } from "./MessageBox"
-import { SentFeedback, StagedFeedback } from "./FeedbackNotes"
+import { SentFeedback } from "./FeedbackNotes"
 import { ModelPicker } from "./ModelPicker"
 import { PermissionModePicker } from "./PermissionModePicker"
 import { RequestCard, requestElementId } from "./RequestCard"
@@ -116,6 +116,7 @@ import { type Problem, problemText, settledProblem, streamProblem } from "./prob
 import { referenceText } from "./queue"
 import { rememberPlace } from "./savedPlace"
 import { shortcutLabel } from "./shortcutLabel"
+import { useStagedFeedback } from "./useStagedFeedback"
 import { type FeedbackNotesStore, useFeedbackNotes } from "./useFeedbackNotes"
 import { useShortcuts } from "./useShortcuts"
 
@@ -733,8 +734,7 @@ export function AgentComposer(props: {
   suggestions?: ReadonlyArray<ComposerSuggestion>
   feedback?: FeedbackNotesStore
 }) {
-  const { turns, feedback } = props
-  const staged = feedback?.staged ?? []
+  const { turns } = props
   const conversation = useConversation()
   const running = turns.at(-1)?.ended === null
   const waiting = turns.at(-1)?.parts.find(isWaiting)
@@ -748,6 +748,12 @@ export function AgentComposer(props: {
   const stopped = useAtomValue(conversation.stop)
   const stop = useAtomSet(conversation.stop)
 
+  const { editing, ...staged } = useStagedFeedback(
+    props.feedback,
+    async (message) => Exit.isSuccess(await send(message)),
+    async (message) => Exit.isSuccess(await steer(message)),
+  )
+
   return (
     <>
       {props.queued.length > 0 && (
@@ -760,9 +766,8 @@ export function AgentComposer(props: {
         setComposed={setComposed}
         label={props.label ?? "Message"}
         textOnly={props.textOnly ?? false}
-        holdUntilAccepted={staged.length > 0}
         placeholder={composerPlaceholder(running, waiting, props.idlePlaceholder)}
-        blocked={sent.waiting || steered.waiting || waiting !== undefined}
+        blocked={sent.waiting || steered.waiting || waiting !== undefined || editing}
         problem={
           settledProblem(sent) ??
           settledProblem(steered) ??
@@ -770,21 +775,7 @@ export function AgentComposer(props: {
           props.problem ??
           null
         }
-        send={async (message) => {
-          const included = staged.map(({ id }) => id)
-          const exit = await send({ ...message, feedback: included })
-
-          if (Exit.isSuccess(exit)) feedback?.sent(included)
-          else if (included.length > 0) feedback?.refresh()
-
-          return Exit.isSuccess(exit)
-        }}
-        steer={staged.length > 0 ? null : async (message) => Exit.isSuccess(await steer(message))}
-        attachment={
-          feedback !== undefined && staged.length > 0 ? (
-            <StagedFeedback notes={staged} onSave={feedback.save} onRemove={feedback.remove} />
-          ) : null
-        }
+        {...staged}
         recall={lastSent(turns, props.queued)}
         onStop={running ? () => stop() : null}
         notice={waiting !== undefined && <WaitingNotice waiting={waiting} />}

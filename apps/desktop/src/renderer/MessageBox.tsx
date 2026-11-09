@@ -100,6 +100,7 @@ export function MessageBox(props: {
   placeholder: string
   textOnly?: boolean
   holdUntilAccepted?: boolean
+  allowEmpty?: boolean
   attachment?: ReactNode
   blocked: boolean
   problem: Problem | null
@@ -146,8 +147,6 @@ export function MessageBox(props: {
       .run()
   }, [editor, composed.message])
 
-  const hasAttachment = props.attachment !== undefined && props.attachment !== null
-
   const written = (): SentMessage => ({ ...composed, message: toMessage(editor.state.doc.content) })
 
   const suggest = async (prompt: string) => {
@@ -168,7 +167,7 @@ export function MessageBox(props: {
     const sent = written()
     const message = sent.message.trim()
 
-    if (props.blocked || sending.current || (message === "" && !hasAttachment)) return
+    if (props.blocked || sending.current || (message === "" && !props.allowEmpty)) return
 
     if (!props.holdUntilAccepted) {
       setComposed(() => nothingUnsent)
@@ -286,7 +285,7 @@ export function MessageBox(props: {
 
   return (
     <>
-      {hasAttachment && (
+      {props.attachment !== undefined && (
         <div className="px-6 pt-2">
           <div className="mx-auto max-w-3xl rounded-lg border bg-muted/30 px-3 py-2">
             {props.attachment}
@@ -373,7 +372,7 @@ export function MessageBox(props: {
                     disabled={
                       props.blocked ||
                       awaiting ||
-                      (composed.message.trim() === "" && !hasAttachment)
+                      (composed.message.trim() === "" && !props.allowEmpty)
                     }
                     aria-label="Send"
                     aria-busy={awaiting}

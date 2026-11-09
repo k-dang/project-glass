@@ -20,11 +20,6 @@ export interface FeedbackNotesStore {
 
 const noFeedback = new UnsentFeedback({ notes: [], staged: [] })
 
-const withSaved = (notes: ReadonlyArray<FeedbackNote>, saved: FeedbackNote) =>
-  notes.some(({ id }) => id === saved.id)
-    ? notes.map((note) => (note.id === saved.id ? saved : note))
-    : [...notes, saved]
-
 const without = (unsent: UnsentFeedback, noteIds: ReadonlyArray<string>) =>
   new UnsentFeedback({
     notes: unsent.notes.filter(({ id }) => !noteIds.includes(id)),
@@ -42,14 +37,13 @@ export function useFeedbackNotes(agentId: string): FeedbackNotesStore {
   return useMemo(() => {
     const write = async (
       title: string,
-      call: Effect.Effect<void, BackendError, Backend>,
-      apply: (unsent: UnsentFeedback) => UnsentFeedback,
+      call: Effect.Effect<UnsentFeedback, BackendError, Backend>,
     ) => {
       const exit = await runtime.runPromiseExit(call)
 
       if (Exit.isFailure(exit)) return { ...problemOf(exit.cause), title }
 
-      setWritten((current) => apply(current ?? saved ?? noFeedback))
+      setWritten(exit.value)
 
       return null
     }
@@ -62,24 +56,17 @@ export function useFeedbackNotes(agentId: string): FeedbackNotesStore {
         write(
           "Couldn't save your Feedback note",
           Backend.use((backend) => backend.SaveFeedbackNote({ agentId, note })),
-          (current) =>
-            new UnsentFeedback({ notes: withSaved(current.notes, note), staged: current.staged }),
         ),
       remove: (noteId) =>
         write(
           "Couldn't remove your Feedback note",
           Backend.use((backend) => backend.RemoveFeedbackNote({ agentId, noteId })),
-          (current) => without(current, [noteId]),
         ),
-      stage: () => {
-        const noteIds = unsent.notes.map(({ id }) => id)
-
-        return write(
+      stage: () =>
+        write(
           "Couldn't add your feedback to the message",
-          Backend.use((backend) => backend.StageFeedbackNotes({ agentId, noteIds })),
-          (current) => new UnsentFeedback({ notes: current.notes, staged: noteIds }),
-        )
-      },
+          Backend.use((backend) => backend.StageFeedbackNotes({ agentId })),
+        ),
       sent: (noteIds) => setWritten((current) => without(current ?? saved ?? noFeedback, noteIds)),
       refresh: () => {
         setWritten(null)
