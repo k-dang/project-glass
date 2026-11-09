@@ -24,7 +24,7 @@ import { ChildProcessSpawner } from "effect/process"
 import { join } from "node:path"
 import { type AgentFailure, agentFailure, runnerFailureReason } from "./agentFailure"
 import { launchCommand } from "./processes"
-import { claudeReadOnlyTools, piLoadsNothing, piReadOnlyTools } from "./readOnlyTools"
+import { type AgentTools, claudeTools, piLoadsNothing, piTools } from "./agentTools"
 import { AgentCommands } from "./SettingsStore"
 
 export interface AgentTask<A> {
@@ -32,6 +32,7 @@ export interface AgentTask<A> {
   readonly instructions: string
   readonly prompt: string
   readonly answer: Schema.Decoder<A>
+  readonly tools: AgentTools
   readonly checkout: string
 }
 
@@ -77,8 +78,28 @@ const startFailure = (name: string) => (error: { readonly reason: unknown }) => 
 const claudeFlags = ["--strict-mcp-config", "--no-session-persistence", "--disable-slash-commands"]
 
 // `--restricted` confines the file tools to the working directory and skips the user's settings
-// files, so their hooks never see the PR's files.
-const claudeReadOnlyFlags = ["--restricted", "--tools", claudeReadOnlyTools.join(",")]
+// files, so their hooks never see the PR's files. A shell task can't be restricted, so it skips
+// the settings files by name and allows its tools, since `-p` refuses any tool not allowed.
+const claudeToolFlags: Record<AgentTools, ReadonlyArray<string>> = {
+  "read-only": ["--restricted", "--tools", claudeTools["read-only"].join(",")],
+  shell: [
+    "--setting-sources",
+    "",
+    "--tools",
+    claudeTools.shell.join(","),
+    "--allowedTools",
+    claudeTools.shell.join(","),
+  ],
+}
+
+// The thinking level is left to pi's settings: a level a model lacks fails the request.
+const piCliFlags = (tools: AgentTools) => [
+  "--offline",
+  "--no-session",
+  ...piLoadsNothing,
+  "--tools",
+  piTools[tools].join(","),
+]
 
 const runnerStrategies = Effect.gen(function* () {
   const commands = yield* AgentCommands
@@ -142,7 +163,15 @@ const runnerStrategies = Effect.gen(function* () {
 
       const result = yield* execute(
         commands.claudeCommand,
-        ["-p", ...claudeReadOnlyFlags, ...claudeFlags, "--model", model, "--output-format", "json"],
+        [
+          "-p",
+          ...claudeToolFlags[task.tools],
+          ...claudeFlags,
+          "--model",
+          model,
+          "--output-format",
+          "json",
+        ],
         task.checkout,
         `${task.instructions}\n\n${promptWithSchema(task)}`,
       ).pipe(
@@ -204,7 +233,7 @@ const runnerStrategies = Effect.gen(function* () {
     if (
       Result.isFailure(help) ||
       help.success.code !== 0 ||
-      [...claudeFlags, "--restricted", "--tools"].some(
+      [...claudeFlags, "--restricted", "--setting-sources", "--tools", "--allowedTools"].some(
         (flag) => !help.success.stdout.includes(flag),
       )
     )
@@ -217,15 +246,6 @@ const runnerStrategies = Effect.gen(function* () {
 
     return { identity, run: runClaudeCode(model, identity) } satisfies AgentRunner
   })
-
-  // The thinking level is left to pi's settings: a level a model lacks fails the request.
-  const piCliFlags = [
-    "--offline",
-    "--no-session",
-    ...piLoadsNothing,
-    "--tools",
-    piReadOnlyTools.join(","),
-  ]
 
   // `--mode json` ends with an `agent_end` event carrying the conversation; its last message is
   // the model's answer after any tool calls.
@@ -280,7 +300,7 @@ const runnerStrategies = Effect.gen(function* () {
           "-p",
           "--mode",
           "json",
-          ...piCliFlags,
+          ...piCliFlags(task.tools),
           "--provider",
           selection.provider,
           "--model",

@@ -1,5 +1,8 @@
 # Agent tasks read a checkout of the PR through Glass's own cached clones
 
+Agent reviews and their Follow-ups now run with a shell in a git repository of the PR (ADR 0014);
+what follows holds for Tours and Ask.
+
 Every agent task (Tours, Agent reviews, Ask) gets a checkout of the Revision's head and read-only
 file tools (read, search, list) with no shell or network. A task that sees only the diff misses
 callers, surrounding code, and untouched tests: a review can't check what a change breaks, and a

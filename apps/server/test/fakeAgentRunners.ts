@@ -12,7 +12,7 @@ const chapterSize = 2
 const material = Schema.fromJsonString(
   Schema.Struct({
     title: Schema.String,
-    files: Schema.Array(Schema.Struct({ path: Schema.String })),
+    files: Schema.optional(Schema.Array(Schema.Struct({ path: Schema.String }))),
   }),
 )
 
@@ -20,7 +20,7 @@ const decodeMaterial = (prompt: string) =>
   Schema.decodeUnknownSync(material)(prompt.slice(prompt.indexOf("{")).split("\n")[0])
 
 const syntheticTour = (prompt: string): TourAnswer => {
-  const { title, files } = decodeMaterial(prompt)
+  const { title, files = [] } = decodeMaterial(prompt)
 
   if (title === RATE_LIMIT_TITLE) return demoTour
 
@@ -50,18 +50,13 @@ const syntheticTour = (prompt: string): TourAnswer => {
 }
 
 const syntheticReview = (prompt: string): AgentReviewAnswer => {
-  const { title, files } = decodeMaterial(prompt)
+  const { title } = decodeMaterial(prompt)
 
   return {
     markdown: [
       `**Synthetic Agent review of "${title}", written without a model.**`,
       "A fake runner wrote this review without reading the code.",
-      ...files
-        .slice(0, 2)
-        .map(
-          ({ path }) =>
-            `## Synthetic point on ${basename(path)}\n\nA fake runner raised this about \`${path}\`.`,
-        ),
+      "## Synthetic point\n\nA fake runner raised this point.",
     ].join("\n\n"),
   }
 }

@@ -9,7 +9,7 @@
         "--session-id",
         "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
         "--tools",
-        "read,grep,find,ls,suggest_draft",
+        "read,grep,find,ls,bash,suggest_draft",
         "--no-extensions",
         "--no-mcp",
         "--no-skills",
@@ -59,7 +59,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-03T23-38-57-413Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-09T16-23-15-241Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -103,7 +103,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1793749137560,
+              "timestamp": 1794241395321,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -206,6 +206,28 @@
                         "description": "Maximum number of entries to return (default: 500)"
                       }
                     }
+                  }
+                },
+                {
+                  "name": "bash",
+                  "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+                  "parameters": {
+                    "type": "object",
+                    "required": ["command"],
+                    "properties": {
+                      "command": {
+                        "type": "string",
+                        "description": "Shell command to execute"
+                      },
+                      "timeout": {
+                        "type": "number",
+                        "description": "Timeout in seconds (optional, no default timeout)"
+                      }
+                    }
+                  },
+                  "constrainedSampling": {
+                    "type": "json_schema",
+                    "strict": "prefer"
                   }
                 },
                 {
@@ -248,7 +270,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1793749137560,
+              "timestamp": 1794241395321,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -354,6 +376,28 @@
                   }
                 },
                 {
+                  "name": "bash",
+                  "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+                  "parameters": {
+                    "type": "object",
+                    "required": ["command"],
+                    "properties": {
+                      "command": {
+                        "type": "string",
+                        "description": "Shell command to execute"
+                      },
+                      "timeout": {
+                        "type": "number",
+                        "description": "Timeout in seconds (optional, no default timeout)"
+                      }
+                    }
+                  },
+                  "constrainedSampling": {
+                    "type": "json_schema",
+                    "strict": "prefer"
+                  }
+                },
+                {
                   "name": "suggest_draft",
                   "description": "Propose a comment for the PR's author on one line of the diff, for the reviewer to edit and add as a Draft. Glass refuses a line outside the diff's hunks.",
                   "parameters": {
@@ -397,7 +441,7 @@
                   "text": "Draft comments on greet.ts."
                 }
               ],
-              "timestamp": 1793749137558
+              "timestamp": 1794241395321
             }
           }
         },
@@ -412,7 +456,7 @@
                   "text": "Draft comments on greet.ts."
                 }
               ],
-              "timestamp": 1793749137558
+              "timestamp": 1794241395321
             }
           }
         },
@@ -440,7 +484,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1793749137582
+              "timestamp": 1794241395332
             }
           }
         },
@@ -464,8 +508,8 @@
             "assistantMessageEvent": {
               "type": "toolcall_start",
               "contentIndex": 0,
-              "id": "read-greet",
-              "toolName": "read"
+              "id": "cat-greet",
+              "toolName": "bash"
             }
           }
         },
@@ -489,7 +533,7 @@
             "assistantMessageEvent": {
               "type": "toolcall_delta",
               "contentIndex": 0,
-              "delta": "{\"path\":\"greet.ts\"}"
+              "delta": "{\"command\":\"cat greet.ts\"}"
             }
           }
         },
@@ -515,10 +559,10 @@
               "contentIndex": 0,
               "toolCall": {
                 "type": "toolCall",
-                "id": "read-greet",
-                "name": "read",
+                "id": "cat-greet",
+                "name": "bash",
                 "arguments": {
-                  "path": "greet.ts"
+                  "command": "cat greet.ts"
                 }
               }
             }
@@ -532,10 +576,10 @@
               "content": [
                 {
                   "type": "toolCall",
-                  "id": "read-greet",
-                  "name": "read",
+                  "id": "cat-greet",
+                  "name": "bash",
                   "arguments": {
-                    "path": "greet.ts"
+                    "command": "cat greet.ts"
                   }
                 }
               ],
@@ -557,10 +601,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1793749137582,
+              "timestamp": 1794241395332,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 23,
+              "durationMs": 17,
               "thinkingLevel": "off"
             }
           }
@@ -568,18 +612,50 @@
         {
           "in": {
             "type": "tool_execution_start",
-            "toolCallId": "read-greet",
-            "toolName": "read",
+            "toolCallId": "cat-greet",
+            "toolName": "bash",
             "args": {
-              "path": "greet.ts"
+              "command": "cat greet.ts"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "tool_execution_update",
+            "toolCallId": "cat-greet",
+            "toolName": "bash",
+            "args": {
+              "command": "cat greet.ts"
+            },
+            "partialResult": {
+              "content": []
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "tool_execution_update",
+            "toolCallId": "cat-greet",
+            "toolName": "bash",
+            "args": {
+              "command": "cat greet.ts"
+            },
+            "partialResult": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "hi\nhello name\nbye\n"
+                }
+              ],
+              "details": {}
             }
           }
         },
         {
           "in": {
             "type": "tool_execution_end",
-            "toolCallId": "read-greet",
-            "toolName": "read",
+            "toolCallId": "cat-greet",
+            "toolName": "bash",
             "result": {
               "content": [
                 {
@@ -587,10 +663,15 @@
                   "text": "hi\nhello name\nbye\n"
                 }
               ],
-              "structuredContent": "hi\nhello name\nbye\n"
+              "structuredContent": {
+                "output": "hi\nhello name\nbye\n",
+                "truncated": false,
+                "exit_code": 0,
+                "wall_time_seconds": 0
+              }
             },
             "isError": false,
-            "durationMs": 1
+            "durationMs": 15
           }
         },
         {
@@ -598,8 +679,8 @@
             "type": "message_start",
             "message": {
               "role": "toolResult",
-              "toolCallId": "read-greet",
-              "toolName": "read",
+              "toolCallId": "cat-greet",
+              "toolName": "bash",
               "content": [
                 {
                   "type": "text",
@@ -607,8 +688,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 1,
-              "timestamp": 1793749137608
+              "durationMs": 15,
+              "timestamp": 1794241395366
             }
           }
         },
@@ -617,8 +698,8 @@
             "type": "message_end",
             "message": {
               "role": "toolResult",
-              "toolCallId": "read-greet",
-              "toolName": "read",
+              "toolCallId": "cat-greet",
+              "toolName": "bash",
               "content": [
                 {
                   "type": "text",
@@ -626,8 +707,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 1,
-              "timestamp": 1793749137608
+              "durationMs": 15,
+              "timestamp": 1794241395366
             }
           }
         },
@@ -639,10 +720,10 @@
               "content": [
                 {
                   "type": "toolCall",
-                  "id": "read-greet",
-                  "name": "read",
+                  "id": "cat-greet",
+                  "name": "bash",
                   "arguments": {
-                    "path": "greet.ts"
+                    "command": "cat greet.ts"
                   }
                 }
               ],
@@ -664,17 +745,17 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1793749137582,
+              "timestamp": 1794241395332,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 23,
+              "durationMs": 17,
               "thinkingLevel": "off"
             },
             "toolResults": [
               {
                 "role": "toolResult",
-                "toolCallId": "read-greet",
-                "toolName": "read",
+                "toolCallId": "cat-greet",
+                "toolName": "bash",
                 "content": [
                   {
                     "type": "text",
@@ -682,8 +763,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 1,
-                "timestamp": 1793749137608
+                "durationMs": 15,
+                "timestamp": 1794241395366
               }
             ]
           }
@@ -698,21 +779,7 @@
             "type": "message_start",
             "message": {
               "role": "assistant",
-              "content": [
-                {
-                  "type": "toolCall",
-                  "id": "suggest-2",
-                  "name": "suggest_draft",
-                  "arguments": {
-                    "path": "greet.ts",
-                    "side": "new",
-                    "line": 2,
-                    "body": "Keep the name."
-                  },
-                  "partialArgs": "{\"path\":\"greet.ts\",\"side\":\"new\",\"line\":2,\"body\":\"Keep the name.\"}",
-                  "streamIndex": 0
-                }
-              ],
+              "content": [],
               "api": "openai-completions",
               "provider": "glass-test",
               "model": "gpt-test",
@@ -731,7 +798,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1793749137611
+              "timestamp": 1794241395367
             }
           }
         },
@@ -854,10 +921,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1793749137611,
+              "timestamp": 1794241395367,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 5,
+              "durationMs": 2,
               "thinkingLevel": "off"
             }
           }
@@ -907,7 +974,7 @@
               ],
               "isError": false,
               "durationMs": 0,
-              "timestamp": 1793749137617
+              "timestamp": 1794241395370
             }
           }
         },
@@ -926,7 +993,7 @@
               ],
               "isError": false,
               "durationMs": 0,
-              "timestamp": 1793749137617
+              "timestamp": 1794241395370
             }
           }
         },
@@ -966,10 +1033,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1793749137611,
+              "timestamp": 1794241395367,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 5,
+              "durationMs": 2,
               "thinkingLevel": "off"
             },
             "toolResults": [
@@ -985,7 +1052,7 @@
                 ],
                 "isError": false,
                 "durationMs": 0,
-                "timestamp": 1793749137617
+                "timestamp": 1794241395370
               }
             ]
           }
@@ -1019,7 +1086,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1793749137619
+              "timestamp": 1794241395371
             }
           }
         },
@@ -1142,7 +1209,7 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1793749137619,
+              "timestamp": 1794241395371,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
               "durationMs": 2,
@@ -1197,7 +1264,7 @@
               "details": {},
               "isError": true,
               "durationMs": 0,
-              "timestamp": 1793749137622
+              "timestamp": 1794241395373
             }
           }
         },
@@ -1217,7 +1284,7 @@
               "details": {},
               "isError": true,
               "durationMs": 0,
-              "timestamp": 1793749137622
+              "timestamp": 1794241395373
             }
           }
         },
@@ -1257,7 +1324,7 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1793749137619,
+              "timestamp": 1794241395371,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
               "durationMs": 2,
@@ -1277,7 +1344,7 @@
                 "details": {},
                 "isError": true,
                 "durationMs": 0,
-                "timestamp": 1793749137622
+                "timestamp": 1794241395373
               }
             ]
           }
@@ -1311,7 +1378,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1793749137623
+              "timestamp": 1794241395373
             }
           }
         },
@@ -1415,7 +1482,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1793749137623,
+              "timestamp": 1794241395373,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -1452,7 +1519,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1793749137623,
+              "timestamp": 1794241395373,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -1469,7 +1536,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1793749137560,
+                "timestamp": 1794241395321,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -1575,6 +1642,28 @@
                     }
                   },
                   {
+                    "name": "bash",
+                    "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+                    "parameters": {
+                      "type": "object",
+                      "required": ["command"],
+                      "properties": {
+                        "command": {
+                          "type": "string",
+                          "description": "Shell command to execute"
+                        },
+                        "timeout": {
+                          "type": "number",
+                          "description": "Timeout in seconds (optional, no default timeout)"
+                        }
+                      }
+                    },
+                    "constrainedSampling": {
+                      "type": "json_schema",
+                      "strict": "prefer"
+                    }
+                  },
+                  {
                     "name": "suggest_draft",
                     "description": "Propose a comment for the PR's author on one line of the diff, for the reviewer to edit and add as a Draft. Glass refuses a line outside the diff's hunks.",
                     "parameters": {
@@ -1613,17 +1702,17 @@
                     "text": "Draft comments on greet.ts."
                   }
                 ],
-                "timestamp": 1793749137558
+                "timestamp": 1794241395321
               },
               {
                 "role": "assistant",
                 "content": [
                   {
                     "type": "toolCall",
-                    "id": "read-greet",
-                    "name": "read",
+                    "id": "cat-greet",
+                    "name": "bash",
                     "arguments": {
-                      "path": "greet.ts"
+                      "command": "cat greet.ts"
                     }
                   }
                 ],
@@ -1645,16 +1734,16 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1793749137582,
+                "timestamp": 1794241395332,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
-                "durationMs": 23,
+                "durationMs": 17,
                 "thinkingLevel": "off"
               },
               {
                 "role": "toolResult",
-                "toolCallId": "read-greet",
-                "toolName": "read",
+                "toolCallId": "cat-greet",
+                "toolName": "bash",
                 "content": [
                   {
                     "type": "text",
@@ -1662,8 +1751,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 1,
-                "timestamp": 1793749137608
+                "durationMs": 15,
+                "timestamp": 1794241395366
               },
               {
                 "role": "assistant",
@@ -1698,10 +1787,10 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1793749137611,
+                "timestamp": 1794241395367,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
-                "durationMs": 5,
+                "durationMs": 2,
                 "thinkingLevel": "off"
               },
               {
@@ -1716,7 +1805,7 @@
                 ],
                 "isError": false,
                 "durationMs": 0,
-                "timestamp": 1793749137617
+                "timestamp": 1794241395370
               },
               {
                 "role": "assistant",
@@ -1751,7 +1840,7 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1793749137619,
+                "timestamp": 1794241395371,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
                 "durationMs": 2,
@@ -1770,7 +1859,7 @@
                 "details": {},
                 "isError": true,
                 "durationMs": 0,
-                "timestamp": 1793749137622
+                "timestamp": 1794241395373
               },
               {
                 "role": "assistant",
@@ -1798,7 +1887,7 @@
                   }
                 },
                 "stopReason": "stop",
-                "timestamp": 1793749137623,
+                "timestamp": 1794241395373,
                 "responseId": "test-completion",
                 "rawStopReason": "stop",
                 "durationMs": 2,
@@ -1849,7 +1938,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-03T23-38-57-413Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-09T16-23-15-241Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 9,

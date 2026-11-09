@@ -40,7 +40,7 @@ import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
 import * as z from "zod"
 import { sdkExecutable } from "../processes"
-import { claudeReadOnlyTools } from "../readOnlyTools"
+import { claudeTools } from "../agentTools"
 import type { AgentAdapter } from "./adapter"
 import { Input, isFailure, machine } from "./claudeTurn"
 import type { DeliveredMessage } from "./deliveredMessage"
@@ -102,8 +102,8 @@ const startFailure = (cause: unknown) =>
 
 const reviewOptions = (brief: ReviewBrief): Options => ({
   systemPrompt: { type: "preset", preset: "claude_code", append: brief.instructions },
-  tools: claudeReadOnlyTools,
-  allowedTools: [...claudeReadOnlyTools, `${GLASS_MCP_PREFIX}${SUGGEST_DRAFT_TOOL}`],
+  tools: [...claudeTools.shell],
+  allowedTools: [...claudeTools.shell, `${GLASS_MCP_PREFIX}${SUGGEST_DRAFT_TOOL}`],
   settingSources: [],
   strictMcpConfig: true,
   mcpServers: {

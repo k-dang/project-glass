@@ -7,6 +7,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { AgentFailure } from "../src/agentFailure"
 import { AgentRunners } from "../src/agentRunners"
+import type { AgentTools } from "../src/agentTools"
 import { AgentCommands } from "../src/SettingsStore"
 import { counter } from "./counter"
 import {
@@ -26,15 +27,20 @@ export interface RunnerScenario {
   readonly name: string
   readonly engine: "claude-code" | "pi"
   readonly instructions: string
+  readonly tools?: AgentTools
   readonly recordEnv?: Readonly<Record<string, string | undefined>>
   readonly piModelId?: string
 }
 
-export const scenarioTask = ({ instructions }: RunnerScenario, checkout: string) => ({
+export const scenarioTask = (
+  { instructions, tools = "read-only" }: RunnerScenario,
+  checkout: string,
+) => ({
   subject: "Agent review",
   instructions,
   prompt: "PR material: none. This is a test of the answer format.",
   answer: Summary,
+  tools,
   checkout,
 })
 
@@ -51,6 +57,9 @@ export const seedCheckout = (checkout: string) => {
   mkdirSync(join(checkout, "src"), { recursive: true })
   writeFileSync(join(checkout, "src", "greet.ts"), "hello")
 }
+
+const runGreeting =
+  'Run the shell command `cat src/greet.ts`, then reply with only JSON of the form {"summary":"<what it printed>"}.'
 
 const readGreeting =
   'Read the file src/greet.ts, then reply with only JSON of the form {"summary":"<the file\'s contents>"}.'
@@ -82,11 +91,23 @@ export const runnerScenarios: ReadonlyArray<RunnerScenario> = [
       CLAUDE_CODE_MAX_RETRIES: "0",
     },
   },
+  {
+    name: "claude-shell",
+    engine: "claude-code",
+    instructions: runGreeting,
+    tools: "shell",
+  },
   { name: "pi-answer", engine: "pi", instructions: replyFine },
   {
     name: "pi-read-only",
     engine: "pi",
     instructions: readGreeting,
+  },
+  {
+    name: "pi-shell",
+    engine: "pi",
+    instructions: runGreeting,
+    tools: "shell",
   },
   {
     name: "pi-unlisted-model",

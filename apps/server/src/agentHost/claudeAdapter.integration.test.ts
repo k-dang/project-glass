@@ -293,36 +293,40 @@ it.live("runs the next Turn in a newly chosen Permission mode", () =>
   }).pipe(Effect.scoped),
 )
 
-it.live("reads its checkout and proposes Suggested drafts as an Agent review's Agent", () =>
-  Effect.gen(function* () {
-    const f = yield* claudeSession("claude-review")
-    yield* writeGreeter(f.folder)
-    const agent = yield* f.open(conversation, ReviewRole.make({ brief: reviewBrief }))
+it.live(
+  "runs commands in its checkout and proposes Suggested drafts as an Agent review's Agent",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* claudeSession("claude-review")
+      yield* writeGreeter(f.folder)
+      const agent = yield* f.open(conversation, ReviewRole.make({ brief: reviewBrief }))
 
-    yield* agent.send(
-      'Read greet.ts with the Read tool. Then call the suggest_draft tool exactly twice, one call after the other: first with path greet.ts, side new, line 2, and body "Keep the name."; then with path greet.ts, side new, line 40, and body "Off the diff.". Then reply with exactly: DONE',
-    )
-    const [turn] = yield* f.until(settled(1))
-    assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
-    assert.isFalse(turn!.parts.some(isRequestPart))
+      yield* agent.send(
+        'Run `cat greet.ts` with the Bash tool. Then call the suggest_draft tool exactly twice, one call after the other: first with path greet.ts, side new, line 2, and body "Keep the name."; then with path greet.ts, side new, line 40, and body "Off the diff.". Then reply with exactly: DONE',
+      )
+      const [turn] = yield* f.until(settled(1))
+      assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
+      assert.isFalse(turn!.parts.some(isRequestPart))
 
-    const calls = turn!.parts.filter((part) => Predicate.isTagged(part, "ToolCall"))
-    assert.includeMembers(
-      ["Read", "Grep", "Glob", "suggest_draft"],
-      [...new Set(calls.map(({ name }) => name))],
-    )
+      const calls = turn!.parts.filter((part) => Predicate.isTagged(part, "ToolCall"))
+      assert.includeMembers(
+        ["Read", "Grep", "Glob", "Bash", "suggest_draft"],
+        [...new Set(calls.map(({ name }) => name))],
+      )
 
-    const suggestions = calls.filter(({ name }) => name === "suggest_draft")
-    assert.deepStrictEqual(
-      suggestions.map(({ status }) => status),
-      ["done", "failed"],
-    )
-    assert.deepStrictEqual(acceptedSuggestedDraftOf(suggestions[0]!), {
-      path: "greet.ts",
-      side: "new",
-      line: 2,
-      body: "Keep the name.",
-    })
-    assert.include(suggestions[1]?.output, "not a line of the diff")
-  }).pipe(Effect.scoped),
+      assert.include(calls.find(({ name }) => name === "Bash")?.output, "hello name")
+
+      const suggestions = calls.filter(({ name }) => name === "suggest_draft")
+      assert.deepStrictEqual(
+        suggestions.map(({ status }) => status),
+        ["done", "failed"],
+      )
+      assert.deepStrictEqual(acceptedSuggestedDraftOf(suggestions[0]!), {
+        path: "greet.ts",
+        side: "new",
+        line: 2,
+        body: "Keep the name.",
+      })
+      assert.include(suggestions[1]?.output, "not a line of the diff")
+    }).pipe(Effect.scoped),
 )

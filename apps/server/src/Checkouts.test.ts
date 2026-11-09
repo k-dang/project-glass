@@ -18,6 +18,7 @@ import { mkdir, readdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { vi } from "vite-plus/test"
 import { eventually } from "../test/eventually"
+import { gitIn } from "../test/gitRepositories"
 import { type FakeGitHub, startFakeGitHub } from "../test/fakeGitHub"
 import { type FakePullRequest, type FakePullRequestSeed, VIEWER } from "../test/fakePullRequest"
 import { isolatedHome, LAUNCH_TOKEN } from "../test/harness"
@@ -87,14 +88,12 @@ const files = async (directory: string) =>
     await Promise.all(
       (await readdir(directory, { recursive: true, withFileTypes: true }))
         .filter((entry) => entry.isFile())
-        .map(async (entry) => {
-          const path = join(entry.parentPath, entry.name)
-
-          return [
-            path.slice(directory.length + 1).replaceAll("\\", "/"),
-            await readFile(path, "utf8"),
-          ]
-        }),
+        .map((entry) => join(entry.parentPath, entry.name))
+        .filter((path) => !path.slice(directory.length + 1).startsWith(".git/"))
+        .map(async (path) => [
+          path.slice(directory.length + 1).replaceAll("\\", "/"),
+          await readFile(path, "utf8"),
+        ]),
     ),
   )
 
@@ -125,6 +124,19 @@ it.live("checks out the Revision's head into a directory removed when its scope 
     yield* Scope.close(scope, Exit.void)
     assert.isFalse(existsSync(directory))
   }),
+)
+
+it.live("checks out a git repository whose HEAD is the head and that diffs against the base", () =>
+  Effect.gen(function* () {
+    const { github, checkout } = yield* fixture()
+    const pr = seed(github)
+
+    const directory = yield* checkout(pr)
+
+    assert.strictEqual(gitIn(directory, "rev-parse", "HEAD"), pr.head.sha)
+    assert.strictEqual(gitIn(directory, "status", "--porcelain"), "")
+    assert.include(gitIn(directory, "diff", `${pr.base.sha}...HEAD`), "+hello name")
+  }).pipe(Effect.scoped),
 )
 
 it.live("removes the checkout when its job is interrupted", () =>

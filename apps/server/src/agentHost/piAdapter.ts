@@ -61,7 +61,7 @@ import {
 import { settleWith } from "./requests"
 import { scopedFolder } from "./scopedFolder"
 import type { WrittenSkills } from "./sentSkills"
-import { piLoadsNothing, piReadOnlyTools } from "../readOnlyTools"
+import { piLoadsNothing, piTools } from "../agentTools"
 import { piSuggestDraftExtension } from "./suggestDraftTool"
 import { runTurns } from "./turnLoop"
 
@@ -199,7 +199,7 @@ const roleFlags = (folder: string, role: ConversationRole, skills: ReadonlyArray
       Review: ({ brief }) =>
         lockedDownFlags(
           folder,
-          [...piReadOnlyTools, SUGGEST_DRAFT_TOOL],
+          [...piTools.shell, SUGGEST_DRAFT_TOOL],
           [{ name: "suggest-draft.js", source: piSuggestDraftExtension(brief) }],
           brief.instructions,
         ),

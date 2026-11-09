@@ -154,6 +154,7 @@ export class Tours extends Context.Service<
                   instructions: tourInstructions,
                   prompt: tourPrompt(material),
                   answer: TourAnswer,
+                  tools: "read-only",
                 }),
             })
             .pipe(Effect.mapError(fromCheckoutRunFailure))

@@ -26,6 +26,7 @@ const filesIn = (directory: string) =>
   readdirSync(directory, { recursive: true, withFileTypes: true })
     .filter((entry) => entry.isFile())
     .map((entry) => relative(directory, join(entry.parentPath, entry.name)).replaceAll("\\", "/"))
+    .filter((path) => !path.startsWith(".git/"))
     .toSorted()
 
 export const scriptedAgentRunners = Effect.fnUntraced(function* (initial: ScriptedSettings) {

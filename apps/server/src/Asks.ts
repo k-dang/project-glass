@@ -56,6 +56,7 @@ export class Asks extends Context.Service<
                 instructions: askInstructions,
                 prompt: askPrompt(input, found.file, place, found.text, question),
                 answer: AskAgentAnswer,
+                tools: "read-only",
               })
             },
           })
