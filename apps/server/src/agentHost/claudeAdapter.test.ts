@@ -1,4 +1,3 @@
-import { NodeFileSystem } from "@effect/platform-node"
 import { assert, it } from "@effect/vitest"
 import { Effect, Stream } from "effect"
 import { claudeAdapter, type ClaudeQuery } from "./claudeAdapter"
@@ -22,16 +21,15 @@ it.live("reports a failed SDK handshake as a host error and closes the query", (
       interrupt: async () => undefined,
     }
 
-    const adapter = yield* claudeAdapter("claude-test", {
+    const failed = yield* claudeAdapter("claude-test", {
       query: () => query,
       getSessionInfo: async () => undefined,
-    }).pipe(Effect.provide(NodeFileSystem.layer))
-
-    const failed = yield* adapter
+    })
       .start({
         folder: "checkout",
         conversation: "new",
         role: WorkRole.make({ skills: [] }),
+        skills: [],
         report: () => Effect.void,
       })
       .pipe(Effect.scoped, Effect.flip)

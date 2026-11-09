@@ -28,7 +28,6 @@ import {
 import {
   Deferred,
   Effect,
-  FileSystem,
   Match,
   Option,
   Predicate,
@@ -51,10 +50,9 @@ import {
   HostAgentError,
   notRunning,
   type ReviewBrief,
-  type SkillSource,
 } from "./protocol"
 import { settleWith } from "./requests"
-import { type WrittenSkills, writeSentSkills } from "./sentSkills"
+import type { WrittenSkills } from "./sentSkills"
 import {
   placeSuggestedDraft,
   suggestDraftDescription,
@@ -132,11 +130,19 @@ const reviewOptions = (brief: ReviewBrief): Options => ({
   },
 })
 
-const pluginOptions = (written: ReadonlyArray<WrittenSkills>): Options =>
-  written.length === 0
+const roleOptions = (role: AgentRole): Options =>
+  Match.value(role).pipe(
+    Match.tagsExhaustive({
+      Work: () => ({}),
+      Review: ({ brief }) => reviewOptions(brief),
+    }),
+  )
+
+const pluginOptions = (skills: ReadonlyArray<WrittenSkills>): Options =>
+  skills.length === 0
     ? {}
     : {
-        plugins: written.map(({ plugin }) => ({
+        plugins: skills.map(({ plugin }) => ({
           type: "local",
           path: plugin,
           skipMcpDiscovery: true,
@@ -149,7 +155,6 @@ const startClaude = (
   folder: string,
   prompt: AsyncIterable<SDKUserMessage>,
   canUseTool: CanUseTool,
-  sessionOption?: { readonly resume: string } | { readonly sessionId: string },
   extra: Options = {},
 ): Effect.Effect<
   {
@@ -170,7 +175,6 @@ const startClaude = (
             // The SDK's own default system prompt is empty, unlike the terminal `claude`'s.
             systemPrompt: { type: "preset", preset: "claude_code" },
             includePartialMessages: true,
-            ...sessionOption,
             ...extra,
             canUseTool,
             // The user may pick bypassPermissions between Turns.
@@ -327,186 +331,172 @@ interface Asked {
  * Starts Claude Code in `folder` only for its handshake, which sends the model nothing. It still
  * starts what the folder's settings start, such as MCP servers, plugins, and SessionStart hooks.
  */
-const handshake = (sdk: ClaudeSdk, command: string, folder: string, options: Options = {}) =>
+const handshake = (sdk: ClaudeSdk, command: string, folder: string, extra: Options = {}) =>
   startClaude(
     sdk,
     command,
     folder,
     Stream.toAsyncIterable(Stream.never),
     () => Promise.resolve({ behavior: "deny", message: "Glass is only asking what it offers." }),
-    undefined,
-    options,
+    extra,
   ).pipe(Effect.map(({ initialized }) => initialized))
 
-export const claudeAdapter = (command: string, sdk: ClaudeSdk = liveSdk) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem
+export const claudeAdapter = (
+  command: string,
+  sdk: ClaudeSdk = liveSdk,
+): AgentAdapter<AgentRole> => ({
+  models: Effect.gen(function* () {
+    const initialized = yield* handshake(sdk, command, homedir())
 
-    const skillOptions = (folder: string, skills: ReadonlyArray<SkillSource>) =>
-      writeSentSkills(folder, skills).pipe(
-        Effect.map(pluginOptions),
-        Effect.provideService(FileSystem.FileSystem, fs),
+    const { models } = initialized
+    // Claude Code lists its default as a model called `default`, which a `null` model runs; it is
+    // named after the model it resolves to.
+    const fallback = models.find((model) => model.value === "default")
+    const others = models.filter((model) => model !== fallback)
+
+    const resolved = others.find(
+      (model) =>
+        fallback?.resolvedModel !== undefined && model.resolvedModel === fallback.resolvedModel,
+    )
+
+    return new AgentModels({
+      defaultModel:
+        fallback === undefined
+          ? null
+          : { ...toModel(fallback), name: resolved?.displayName ?? fallback.displayName },
+      models: others.map(toModel),
+    })
+  }).pipe(Effect.scoped),
+
+  commands: (folder, skills) =>
+    handshake(sdk, command, folder, pluginOptions(skills)).pipe(
+      Effect.map(({ commands }) =>
+        commands.map(({ name, description }): AgentCommand => ({ name, description })),
+      ),
+      Effect.scoped,
+    ),
+
+  start: Effect.fnUntraced(function* ({ folder, conversation, role, skills, report }) {
+    const prompts = yield* Queue.unbounded<SDKUserMessage>()
+    const requests = yield* Queue.unbounded<Input>()
+    const waiting = new Map<string, Asked>()
+
+    const ask = (toolName: string, input: ToolInput, requestId: string) =>
+      Effect.gen(function* () {
+        const part = requestOf(requestId, toolName, input)
+        const answered = yield* Deferred.make<PermissionResult>()
+        waiting.set(requestId, { part, input, answered })
+        yield* Queue.offer(requests, Input.Asked({ part }))
+
+        return yield* Deferred.await(answered)
+      }).pipe(
+        Effect.onInterrupt(() => Queue.offer(requests, Input.Expired({ requestId }))),
+        Effect.ensuring(Effect.sync(() => waiting.delete(requestId))),
       )
 
-    return {
-      models: Effect.gen(function* () {
-        const initialized = yield* handshake(sdk, command, homedir())
+    // Claude Code refuses to resume a conversation it hasn't saved, and to start one it has.
+    const saved = yield* Effect.tryPromise(() =>
+      sdk.getSessionInfo(conversation, { dir: folder }),
+    ).pipe(
+      Effect.tapError((cause) =>
+        Effect.logWarning("Couldn't look up a Claude Code conversation", cause),
+      ),
+      Effect.mapError(
+        () =>
+          new HostAgentError({
+            message: "Glass couldn't look up this Agent's Claude Code conversation. Try again.",
+          }),
+      ),
+    )
 
-        const { models } = initialized
-        // Claude Code lists its default as a model called `default`, which a `null` model runs; it is
-        // named after the model it resolves to.
-        const fallback = models.find((model) => model.value === "default")
-        const others = models.filter((model) => model !== fallback)
-
-        const resolved = others.find(
-          (model) =>
-            fallback?.resolvedModel !== undefined && model.resolvedModel === fallback.resolvedModel,
-        )
-
-        return new AgentModels({
-          defaultModel:
-            fallback === undefined
-              ? null
-              : { ...toModel(fallback), name: resolved?.displayName ?? fallback.displayName },
-          models: others.map(toModel),
-        })
-      }).pipe(Effect.scoped),
-
-      commands: (folder, skills) =>
-        skillOptions(folder, skills).pipe(
-          Effect.flatMap((options) => handshake(sdk, command, folder, options)),
-          Effect.map(({ commands }) =>
-            commands.map(({ name, description }): AgentCommand => ({ name, description })),
+    const { session } = yield* startClaude(
+      sdk,
+      command,
+      folder,
+      Stream.toAsyncIterable(Stream.fromQueue(prompts)),
+      (toolName, input, { toolUseID, signal }) =>
+        Effect.runPromise(
+          ask(
+            toolName,
+            Option.getOrElse(decodeToolInput(input), () => ({})),
+            toolUseID,
           ),
-          Effect.scoped,
+          { signal },
         ),
+      {
+        ...(saved === undefined ? { sessionId: conversation } : { resume: conversation }),
+        ...roleOptions(role),
+        ...pluginOptions(skills),
+      },
+    )
 
-      start: Effect.fnUntraced(function* ({ folder, conversation, role, report }) {
-        const prompts = yield* Queue.unbounded<SDKUserMessage>()
-        const requests = yield* Queue.unbounded<Input>()
-        const waiting = new Map<string, Asked>()
+    const turns = yield* runTurns({
+      program: "Claude Code",
+      machine,
+      events: Stream.fromAsyncIterable(session, (cause) => cause).pipe(
+        Stream.tap((message) =>
+          isFailure(message)
+            ? Effect.logWarning("Claude Code ended a Turn with an error", message)
+            : Effect.void,
+        ),
+        Stream.map((message) => Input.Message({ message })),
+        Stream.merge(Stream.fromQueue(requests), { haltStrategy: "left" }),
+      ),
+      report,
+    })
 
-        const ask = (toolName: string, input: ToolInput, requestId: string) =>
-          Effect.gen(function* () {
-            const part = requestOf(requestId, toolName, input)
-            const answered = yield* Deferred.make<PermissionResult>()
-            waiting.set(requestId, { part, input, answered })
-            yield* Queue.offer(requests, Input.Asked({ part }))
-
-            return yield* Deferred.await(answered)
-          }).pipe(
-            Effect.onInterrupt(() => Queue.offer(requests, Input.Expired({ requestId }))),
-            Effect.ensuring(Effect.sync(() => waiting.delete(requestId))),
-          )
-
-        // Claude Code refuses to resume a conversation it hasn't saved, and to start one it has.
-        const saved = yield* Effect.tryPromise(() =>
-          sdk.getSessionInfo(conversation, { dir: folder }),
-        ).pipe(
-          Effect.tapError((cause) =>
-            Effect.logWarning("Couldn't look up a Claude Code conversation", cause),
-          ),
-          Effect.mapError(
-            () =>
-              new HostAgentError({
-                message: "Glass couldn't look up this Agent's Claude Code conversation. Try again.",
-              }),
-          ),
+    return {
+      closed: turns.closed,
+      stopped: turns.stopped,
+      configure: Effect.fnUntraced(function* ({ model, effort, permissionMode }) {
+        const effortLevel = yield* Schema.decodeUnknownEffect(EffortLevel)(effort).pipe(
+          Effect.mapError(() => couldNotSwitch("Claude Code", "effort")),
         )
 
-        const { session } = yield* startClaude(
-          sdk,
-          command,
-          folder,
-          Stream.toAsyncIterable(Stream.fromQueue(prompts)),
-          (toolName, input, { toolUseID, signal }) =>
-            Effect.runPromise(
-              ask(
-                toolName,
-                Option.getOrElse(decodeToolInput(input), () => ({})),
-                toolUseID,
-              ),
-              { signal },
-            ),
-          saved === undefined ? { sessionId: conversation } : { resume: conversation },
-          yield* Match.value(role).pipe(
-            Match.tagsExhaustive({
-              Work: ({ skills }) => skillOptions(folder, skills),
-              Review: ({ brief }) => Effect.succeed(reviewOptions(brief)),
-            }),
-          ),
-        )
+        yield* control("model", () => session.setModel(model ?? undefined))
+        yield* control("effort", () => session.applyFlagSettings({ effortLevel }))
 
-        const turns = yield* runTurns({
-          program: "Claude Code",
-          machine,
-          events: Stream.fromAsyncIterable(session, (cause) => cause).pipe(
-            Stream.tap((message) =>
-              isFailure(message)
-                ? Effect.logWarning("Claude Code ended a Turn with an error", message)
-                : Effect.void,
-            ),
-            Stream.map((message) => Input.Message({ message })),
-            Stream.merge(Stream.fromQueue(requests), { haltStrategy: "left" }),
-          ),
-          report,
-        })
-
-        return {
-          closed: turns.closed,
-          stopped: turns.stopped,
-          configure: Effect.fnUntraced(function* ({ model, effort, permissionMode }) {
-            const effortLevel = yield* Schema.decodeUnknownEffect(EffortLevel)(effort).pipe(
-              Effect.mapError(() => couldNotSwitch("Claude Code", "effort")),
-            )
-
-            yield* control("model", () => session.setModel(model ?? undefined))
-            yield* control("effort", () => session.applyFlagSettings({ effortLevel }))
-
-            if (permissionMode !== null)
-              yield* control("Permission mode", () => session.setPermissionMode(permissionMode))
-          }),
-          startTurn: Effect.fnUntraced(function* (turnId: string, sent: DeliveredMessage) {
-            yield* turns.begin(turnId, withContextOf(sent))
-
-            return yield* Queue.offer(prompts, { ...userMessage(sent), uuid: randomUUID() }).pipe(
-              Effect.asVoid,
-            )
-          }),
-          // Claude Code folds a message with priority `next` into the running Turn between tool rounds.
-          steer: Effect.fnUntraced(function* (sent: DeliveredMessage) {
-            const uuid = randomUUID()
-
-            if (!(yield* turns.steer({ ...sent, id: uuid }))) return yield* notRunning
-
-            return yield* Queue.offer(prompts, {
-              ...userMessage(sent),
-              uuid,
-              priority: "next",
-            }).pipe(Effect.asVoid)
-          }),
-          stopTurn: Effect.gen(function* () {
-            const steers = yield* turns.stop
-
-            if (steers === null) return null
-
-            const cancelled = yield* interruptAll(session)
-
-            return steers.filter(({ id }) => cancelled.includes(id)).map(withContextOf)
-          }),
-          answer: Effect.fnUntraced(function* (requestId: string, answer: RequestAnswer) {
-            const asked = waiting.get(requestId)
-
-            if (asked === undefined) return yield* new RequestNotWaiting()
-
-            const settled = yield* settleWith(asked.part, answer)
-            waiting.delete(requestId)
-            yield* Queue.offer(requests, Input.Answered({ requestId, answer }))
-            yield* Deferred.succeed(asked.answered, permissionResult(settled, asked.input))
-
-            return undefined
-          }),
-        }
+        if (permissionMode !== null)
+          yield* control("Permission mode", () => session.setPermissionMode(permissionMode))
       }),
-    } satisfies AgentAdapter<AgentRole>
-  })
+      startTurn: Effect.fnUntraced(function* (turnId: string, sent: DeliveredMessage) {
+        yield* turns.begin(turnId, withContextOf(sent))
+
+        return yield* Queue.offer(prompts, { ...userMessage(sent), uuid: randomUUID() }).pipe(
+          Effect.asVoid,
+        )
+      }),
+      // Claude Code folds a message with priority `next` into the running Turn between tool rounds.
+      steer: Effect.fnUntraced(function* (sent: DeliveredMessage) {
+        const uuid = randomUUID()
+
+        if (!(yield* turns.steer({ ...sent, id: uuid }))) return yield* notRunning
+
+        return yield* Queue.offer(prompts, { ...userMessage(sent), uuid, priority: "next" }).pipe(
+          Effect.asVoid,
+        )
+      }),
+      stopTurn: Effect.gen(function* () {
+        const steers = yield* turns.stop
+
+        if (steers === null) return null
+
+        const cancelled = yield* interruptAll(session)
+
+        return steers.filter(({ id }) => cancelled.includes(id)).map(withContextOf)
+      }),
+      answer: Effect.fnUntraced(function* (requestId: string, answer: RequestAnswer) {
+        const asked = waiting.get(requestId)
+
+        if (asked === undefined) return yield* new RequestNotWaiting()
+
+        const settled = yield* settleWith(asked.part, answer)
+        waiting.delete(requestId)
+        yield* Queue.offer(requests, Input.Answered({ requestId, answer }))
+        yield* Deferred.succeed(asked.answered, permissionResult(settled, asked.input))
+
+        return undefined
+      }),
+    }
+  }),
+})

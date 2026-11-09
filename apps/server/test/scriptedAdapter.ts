@@ -15,14 +15,13 @@ import {
   TurnStopped,
   withContextOf,
 } from "@glass/contracts"
-import { NodeFileSystem } from "@effect/platform-node"
 import { DateTime, Deferred, Effect, Fiber, Predicate, Schema, Scope } from "effect"
 import { randomUUID } from "node:crypto"
 import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs"
-import { dirname, join, relative } from "node:path"
+import { basename, dirname, join, relative } from "node:path"
 import type { AgentAdapter, AgentSession } from "../src/agentHost/adapter"
-import { GlassToolsAccess, notRunning, type SkillSource } from "../src/agentHost/protocol"
-import { writeSentSkills } from "../src/agentHost/sentSkills"
+import { GlassToolsAccess, notRunning } from "../src/agentHost/protocol"
+import type { WrittenSkills } from "../src/agentHost/sentSkills"
 import { MCP_PATH } from "../src/mcp/server"
 import { connectMcp, initialize, mcpPost } from "./mcpClient"
 import { settleWith } from "../src/agentHost/requests"
@@ -61,12 +60,9 @@ const scriptedHold = /^hold:(\S+)/m
 
 const decodeArgs = Schema.decodeSync(Schema.fromJsonString(Schema.JsonObject))
 
-const skillCommands = (skills: ReadonlyArray<SkillSource>) =>
-  skills.flatMap(({ name, files }) =>
-    [...new Set(files.map(({ path }) => path.split("/")[0]))].map((skill) => ({
-      name: `${name}:${skill}`,
-      description: "",
-    })),
+const skillCommands = (written: ReadonlyArray<WrittenSkills>) =>
+  written.flatMap(({ plugin, skills }) =>
+    skills.map((skill) => ({ name: `${basename(plugin)}:${basename(skill)}`, description: "" })),
   )
 
 const filesUnder = (folder: string): ReadonlyArray<string> =>
@@ -94,15 +90,11 @@ export const scriptedAdapter = (gates: string): AgentAdapter => {
       }),
     ),
     commands: (_folder, skills) => Effect.succeed(skillCommands(skills)),
-    start: ({ folder, role, report }) =>
+    start: ({ folder, role, skills, report }) =>
       Effect.gen(function* () {
         const review = Predicate.isTagged(role, "Review") ? role.brief : null
         const glass = Predicate.isTagged(role, "Global") ? role.tools : null
         const scope = yield* Scope.Scope
-
-        const sent = Predicate.isTagged(role, "Work")
-          ? yield* writeSentSkills(folder, role.skills).pipe(Effect.provide(NodeFileSystem.layer))
-          : []
 
         if (glass !== null) {
           if (existsSync(currentStart)) renameSync(currentStart, previousStart)
@@ -194,7 +186,7 @@ export const scriptedAdapter = (gates: string): AgentAdapter => {
             }
 
             if (message === "show the skills") {
-              const [first] = sent
+              const [first] = skills
               const written = first === undefined ? [] : filesUnder(dirname(first.plugin))
 
               yield* part(turnId, TextPart.make({ text: written.join(",") }))

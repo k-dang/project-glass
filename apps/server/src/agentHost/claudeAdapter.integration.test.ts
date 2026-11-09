@@ -16,7 +16,7 @@ import { Effect, Predicate } from "effect"
 import { join } from "node:path"
 import {
   claudeSession,
-  greetPack,
+  writeGreetPack,
   reviewBrief,
   run,
   writeGreeter,
@@ -73,7 +73,7 @@ it.live("lists a sent Skill pack's skills as `/pack:skill`", () =>
   Effect.gen(function* () {
     const f = yield* claudeSession("claude-skill-pack")
 
-    const commands = yield* f.adapter.commands(f.folder, [greetPack])
+    const commands = yield* f.adapter.commands(f.folder, yield* writeGreetPack(f.folder))
 
     assert.deepStrictEqual(
       commands.find(({ name }) => name === "team:greet"),

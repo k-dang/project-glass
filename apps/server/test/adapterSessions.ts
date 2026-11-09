@@ -47,6 +47,7 @@ import { VIEWER } from "./fakePullRequest"
 import { isolatedHome, startBackend, stubHome } from "./harness"
 import { PI_MODEL, PI_PROVIDER, type PiSettings, writePiLogin, writePiSettings } from "./piLogin"
 import { claudeLoginEnvironment, pinnedClaude, pinnedClaudeProgram } from "./pinnedClaude"
+import { writeSentSkills } from "../src/agentHost/sentSkills"
 import { recordingSessions, sessionTape } from "./sessionTape"
 
 export const run = (tool: string, command: string, reply: string) =>
@@ -100,7 +101,7 @@ const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
   )
 
   const open = (conversation: string, role: Role | Work = WorkRole.make({ skills: [] })) =>
-    adapter.start({ folder, conversation, role, report }).pipe(
+    adapter.start({ folder, conversation, role, skills: [], report }).pipe(
       Effect.map((session: AgentSession) => ({
         session,
         configure: (settings: Partial<TurnSettings>) =>
@@ -143,7 +144,10 @@ export const writeGreetSkill = (skills: string) =>
     )
   })
 
-export const greetPack: SkillSource = {
+export const writeGreetPack = (folder: string) =>
+  writeSentSkills(folder, [greetPack]).pipe(Effect.provide(NodeServices.layer))
+
+const greetPack: SkillSource = {
   name: "team",
   files: [
     {
@@ -254,9 +258,7 @@ export const claudeSession = Effect.fnUntraced(function* (
       tape.sessionInfo(id, options?.dir, () => getSessionInfo(id, options)),
   }
 
-  const adapter = yield* claudeAdapter(pinnedClaude(), sdk).pipe(Effect.provide(NodeServices.layer))
-
-  return yield* drive(adapter, tape, folder, { model: "haiku" })
+  return yield* drive(claudeAdapter(pinnedClaude(), sdk), tape, folder, { model: "haiku" })
 })
 
 const PROVIDER_CREDENTIAL = /^(AWS|GOOGLE|GCLOUD|AZURE|ANTHROPIC)_|_(API_KEY|TOKEN)$/

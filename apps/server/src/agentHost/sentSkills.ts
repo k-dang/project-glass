@@ -18,6 +18,17 @@ const isInside = (folder: string, target: string) => {
   return path !== "" && !path.startsWith("..") && !isAbsolute(path)
 }
 
+export const scopedFolder = (folder: string) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem
+
+    yield* Effect.acquireRelease(fs.makeDirectory(folder, { recursive: true }), () =>
+      fs.remove(folder, { recursive: true, force: true }).pipe(Effect.ignore),
+    )
+
+    return folder
+  })
+
 export const writeSentSkills = (
   folder: string,
   sources: ReadonlyArray<SkillSource>,
@@ -30,11 +41,7 @@ export const writeSentSkills = (
     if (sources.length === 0) return []
 
     const fs = yield* FileSystem.FileSystem
-    const directory = `${folder}.skills-${randomUUID()}`
-
-    yield* Effect.acquireRelease(fs.makeDirectory(directory, { recursive: true }), () =>
-      fs.remove(directory, { recursive: true, force: true }).pipe(Effect.ignore),
-    )
+    const directory = yield* scopedFolder(`${folder}.skills-${randomUUID()}`)
 
     return yield* Effect.forEach(sources, ({ name, files }) =>
       Effect.gen(function* () {

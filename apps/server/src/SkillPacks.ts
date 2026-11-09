@@ -17,7 +17,7 @@ import {
   SkippedSkill,
 } from "@glass/contracts"
 import { Context, Effect, Layer, Schema } from "effect"
-import { SqlClient, type SqlError } from "effect/sql"
+import { SqlClient } from "effect/sql"
 import type { SkillSource } from "./agentHost/protocol"
 import { GitHubClient, type TreeBlob } from "./github/GitHubClient"
 import {
@@ -78,12 +78,6 @@ const decodeFiles = Schema.decodeUnknownEffect(
 )
 
 const decodeId = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ id: Schema.Int })))
-
-const decodePins = Schema.decodeUnknownEffect(
-  Schema.Array(
-    Schema.Struct({ name: Schema.String, pin_id: Schema.Int, commit_sha: Schema.String }),
-  ),
-)
 
 const decodeAgentPins = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ name: Schema.String, pin_id: Schema.Int })),
@@ -182,11 +176,8 @@ export class SkillPacks extends Context.Service<
     readonly pinForAgent: (
       agentId: string,
       names: ReadonlyArray<string>,
-    ) => Effect.Effect<
-      ReadonlyArray<AgentSkillPack>,
-      SkillPackNotFound | SqlError.SqlError | Schema.SchemaError
-    >
-    readonly releaseAgent: (agentId: string) => Effect.Effect<void, SqlError.SqlError>
+    ) => Effect.Effect<ReadonlyArray<AgentSkillPack>, SkillPackNotFound | SkillPackError>
+    readonly releaseAgent: (agentId: string) => Effect.Effect<void, SkillPackError>
     readonly agentPacks: () => Effect.Effect<
       ReadonlyMap<string, ReadonlyArray<AgentSkillPack>>,
       SkillPackError
@@ -584,35 +575,30 @@ export class SkillPacks extends Context.Service<
         pinForAgent: Effect.fn("SkillPacks.pinForAgent")(function* (agentId, names) {
           if (names.length === 0) return []
 
-          const chosen = [...new Set(names)]
-
-          const pins = yield* decodePins(
-            yield* sql`
-              SELECT pack.name, pack.pin_id, pin.commit_sha
-              FROM skill_pack AS pack JOIN skill_pack_pin AS pin ON pin.id = pack.pin_id
-              WHERE ${sql.in("pack.name", chosen)}
-              ORDER BY pack.name
-            `,
-          )
-
-          const missing = chosen.find((name) => !pins.some((pin) => pin.name === name))
+          const rows = yield* packRows
+          const chosen = rows.filter(({ pack }) => names.includes(pack.name))
+          const missing = names.find((name) => !chosen.some(({ pack }) => pack.name === name))
 
           if (missing !== undefined) return yield* new SkillPackNotFound({ name: missing })
 
           yield* sql`
             INSERT INTO agent_skill_pack ${sql.insert(
-              pins.map(({ name, pin_id }) => ({ agent_id: agentId, name, pin_id })),
+              chosen.map(({ pack, pinId }) => ({
+                agent_id: agentId,
+                name: pack.name,
+                pin_id: pinId,
+              })),
             )}
-          `
+          `.pipe(Effect.catch(storageFailure))
 
-          return pins.map(({ name, commit_sha }) => ({ name, commit: commit_sha }))
+          return chosen.map(({ pack }) => ({ name: pack.name, commit: pack.commit }))
         }),
 
         releaseAgent: (agentId) =>
           Effect.gen(function* () {
             yield* sql`DELETE FROM agent_skill_pack WHERE agent_id = ${agentId}`
             yield* releaseUnusedPins
-          }),
+          }).pipe(Effect.catch(storageFailure)),
 
         agentPacks: () =>
           sql`

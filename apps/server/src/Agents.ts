@@ -120,6 +120,11 @@ const annotateAgent = ({ id, engine, model, place }: Agent) =>
 const storageFailure = () =>
   new AgentError({ message: "Couldn't read or save your Agents. Try again." })
 
+const couldNotSave = (cause: unknown) =>
+  Effect.logWarning("Couldn't save an Agent", cause).pipe(
+    Effect.andThen(Effect.fail(storageFailure())),
+  )
+
 export interface NewReviewAgent {
   readonly name: string
   readonly repository: FollowedRepository
@@ -364,61 +369,60 @@ export class Agents extends Context.Service<
         packs: ReadonlyArray<string>,
       ) => {
         const { folder } = placed
-        const { place, repository } = placed.agent
-        let row = placed
+        const { id, place, repository } = placed.agent
 
         const forget = SubscriptionRef.update(rows, (current) =>
-          current.filter((kept) => kept !== row),
+          current.filter((kept) => kept.agent.id !== id),
         )
+
+        const pinned = skillPacks.pinForAgent(id, packs).pipe(
+          Effect.catchTag("SkillPackNotFound", ({ name }) =>
+            Effect.fail(
+              new AgentError({
+                message: `The Skill pack ${name} was removed. Choose the Agent's Skill packs again.`,
+              }),
+            ),
+          ),
+          Effect.mapError(({ message }) => new AgentError({ message })),
+        )
+
+        const save = (agent: Agent) =>
+          Effect.gen(function* () {
+            const row = { ...placed, agent }
+            yield* annotateAgent(agent)
+            yield* sql`INSERT INTO agent ${sql.insert({
+              id: agent.id,
+              name: agent.name,
+              sandbox_provider: sandboxProviderOf(place),
+              owner: repository.owner,
+              repo: repository.repo,
+              base_branch: agent.baseBranch,
+              engine: agent.engine,
+              model: agent.model,
+              effort: agent.effort,
+              permission_mode: agent.permissionMode,
+              folder,
+              created_at: DateTime.formatIso(agent.createdAt),
+              review_brief: review === null ? null : encodeBrief(review),
+            })}`
+
+            yield* SubscriptionRef.update(rows, (current) => [...current, row])
+            yield* transcripts.startOrQueue(agent.id, { ...first, context: null })
+
+            return agent
+          }).pipe(Effect.catch(couldNotSave))
 
         return lock
           .withPermits(1)(
-            Effect.gen(function* () {
-              const agent = agentWith(placed.agent, {
-                skillPacks: yield* skillPacks.pinForAgent(placed.agent.id, packs),
-              })
-
-              row = { ...placed, agent }
-              yield* annotateAgent(agent)
-              yield* sql`INSERT INTO agent ${sql.insert({
-                id: agent.id,
-                name: agent.name,
-                sandbox_provider: sandboxProviderOf(place),
-                owner: repository.owner,
-                repo: repository.repo,
-                base_branch: agent.baseBranch,
-                engine: agent.engine,
-                model: agent.model,
-                effort: agent.effort,
-                permission_mode: agent.permissionMode,
-                folder,
-                created_at: DateTime.formatIso(agent.createdAt),
-                review_brief: review === null ? null : encodeBrief(review),
-              })}`
-
-              yield* SubscriptionRef.update(rows, (current) => [...current, row])
-              yield* transcripts.startOrQueue(agent.id, { ...first, context: null })
-
-              return agent
-            }).pipe(sql.withTransaction),
-          )
-          .pipe(
-            Effect.catchTag("SkillPackNotFound", ({ name }) =>
-              Effect.fail(
-                new AgentError({
-                  message: `The Skill pack ${name} was removed. Choose the Agent's Skill packs again.`,
-                }),
+            pinned.pipe(
+              Effect.flatMap((packsPinned) =>
+                save(agentWith(placed.agent, { skillPacks: packsPinned })),
               ),
+              sql.withTransaction,
+              Effect.catchTag("SqlError", couldNotSave),
             ),
-            Effect.catchIf(
-              (error) => !(error instanceof AgentError),
-              (cause) =>
-                Effect.logWarning("Couldn't save an Agent", cause).pipe(
-                  Effect.andThen(Effect.fail(storageFailure())),
-                ),
-            ),
-            Effect.onError(() => forget),
           )
+          .pipe(Effect.onError(() => forget))
       }
 
       const createForReview = Effect.fn("Agents.createForReview")(function* (
@@ -569,7 +573,7 @@ export class Agents extends Context.Service<
 
       const commands = (agentId: string) =>
         listedByHost(agentId, (host, row) =>
-          (row.forReview ? Effect.succeed([]) : skillsOf(row.agent.id)).pipe(
+          skillsOf(row.agent.id).pipe(
             Effect.flatMap((skills) =>
               host.ListCommands({ engine: row.agent.engine, folder: row.folder, skills }),
             ),

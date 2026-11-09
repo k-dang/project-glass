@@ -13,7 +13,7 @@ import {
 import { Effect, Predicate, Schema } from "effect"
 import { join } from "node:path"
 import {
-  greetPack,
+  writeGreetPack,
   piSession,
   reviewBrief,
   run,
@@ -276,9 +276,9 @@ it.live("lists a sent Skill pack's skills, keeping the user's own skill of the s
   Effect.gen(function* () {
     const f = yield* piSession("pi-skill-pack")
 
-    const sentOnly = yield* f.adapter.commands(f.folder, [greetPack])
+    const sentOnly = yield* f.adapter.commands(f.folder, yield* writeGreetPack(f.folder))
     yield* writeGreetSkill(join(f.home, ".pi", "agent", "skills"))
-    const clashing = yield* f.adapter.commands(f.folder, [greetPack])
+    const clashing = yield* f.adapter.commands(f.folder, yield* writeGreetPack(f.folder))
 
     assert.deepStrictEqual(
       [sentOnly, clashing].map((commands) => commands.find(({ name }) => name === "skill:greet")),
