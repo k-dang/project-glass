@@ -21,3 +21,5 @@
 **Details.** `Agent.localSkills` records whether Glass sends the Local skills, so it is only ever true for Sandbox Agents, and only they show "· Local skills". A local Agent's program reads them itself.
 
 **Command list.** A Sandbox Agent's host lists nothing until its Sandbox is made, and the desktop never asked again, so a new Sandbox Agent's Command list stayed empty. Its commands and files now list again once its Sandbox is reachable.
+
+**What counts as a Local skill (2026-11-09).** Local skills follow the Skill packs' rules: a skill is a folder with a `SKILL.md` that parses and has a description, and others are neither listed nor sent. A broken symlink, or a file Glass isn't allowed to read (logged), is left out on its own rather than failing the Agent's start. Each of pi's two folders is read on its own, so a skill linked into both is sent twice, and pi keeps the first, as a local pi finding both would.

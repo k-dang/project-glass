@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { AgentsPanelToggle, NewAgentLink } from "./Agents"
 import { placeIcons, placeNames } from "./agentsArea"
-import { LOCAL_SKILLS_LABEL } from "./SkillPackPicker"
+import { LOCAL_SKILLS_LABEL } from "./skillChoice"
 
 const fact =
   "flex h-7 w-full min-w-0 items-center gap-2 rounded-sm px-2 text-xs [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-muted-foreground"

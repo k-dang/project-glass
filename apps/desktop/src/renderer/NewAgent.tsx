@@ -52,12 +52,8 @@ import { ModelPicker } from "./ModelPicker"
 import { PermissionModePicker } from "./PermissionModePicker"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf, settledProblem } from "./problems"
-import {
-  LocalSkillsToggle,
-  SharedSkillNames,
-  SkillPackPicker,
-  useSkillChoice,
-} from "./SkillPackPicker"
+import { useSkillChoice } from "./skillChoice"
+import { LocalSkillsToggle, SharedSkillNames, SkillPackPicker } from "./SkillPackPicker"
 
 const NEW_AGENT_TEXT = "new"
 
@@ -453,6 +449,7 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
         problem={
           settledProblem(created) ??
           settledProblem(skills.listed) ??
+          settledProblem(skills.localNamesListed) ??
           settledProblem(defaults) ??
           settledProblem(branches) ??
           folder.problem

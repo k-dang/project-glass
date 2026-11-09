@@ -1,7 +1,7 @@
 import { assert, it } from "@effect/vitest"
 import { type Agent } from "@glass/contracts"
 import { Effect } from "effect"
-import { mkdirSync, symlinkSync, writeFileSync } from "node:fs"
+import { chmodSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { agentsFixture, settled } from "../test/agentsFixture"
 import { skillFile } from "../test/skillFiles"
@@ -30,6 +30,9 @@ it.live(
       write(join(f.home, ".claude", "skills", "tidy", "SKILL.md"), skillFile("tidy", "Tidy up."))
       symlinkSync(join(f.home, "dotfiles", "gone"), join(f.home, ".agents", "skills", "gone"))
       symlinkSync(join(dotfiles, "gone.sh"), join(dotfiles, "grilling", "run.sh"))
+      write(join(dotfiles, "grilling", "secret.txt"), "Only for me.")
+      chmodSync(join(dotfiles, "grilling", "secret.txt"), 0o000)
+      write(join(f.home, ".agents", "skills", "draft", "SKILL.md"), "No frontmatter yet.\n")
 
       assert.deepStrictEqual(yield* f.client.ListLocalSkills({ engine: "pi" }), [
         "grilling",

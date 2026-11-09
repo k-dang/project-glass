@@ -354,13 +354,17 @@ export class Agents extends Context.Service<
           ),
         )
 
+      /**
+       * Local skills go first: pi keeps the first skill of a name, so a Sandbox Agent's Local skill
+       * wins over a pack's, as a local Agent's does. The new-Agent picker's warning says so.
+       */
       const skillsOf = (agent: Agent) =>
         Effect.all(
           [
             agent.localSkills
               ? localSkills
-                  .source(agent.engine)
-                  .pipe(Effect.map((local) => (local.skills.length === 0 ? [] : [local])))
+                  .sources(agent.engine)
+                  .pipe(Effect.mapError(({ message }) => new AgentError({ message })))
               : Effect.succeed([]),
             skillPacks
               .agentSkills(agent.id)

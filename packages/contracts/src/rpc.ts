@@ -54,6 +54,7 @@ import { SettingsError } from "./settings"
 import {
   InvalidSkillPackName,
   InvalidSkillPackUrl,
+  LocalSkillsError,
   SkillPack,
   SkillPackError,
   SkillPackNameTaken,
@@ -199,7 +200,7 @@ export class GlassRpcs extends RpcGroup.make(
   Rpc.make("ListLocalSkills", {
     payload: { engine: AgentEngine },
     success: Schema.Array(Schema.String),
-    error: AgentError,
+    error: LocalSkillsError,
   }),
   Rpc.make("ListPullRequests", {
     success: PullRequestListings,

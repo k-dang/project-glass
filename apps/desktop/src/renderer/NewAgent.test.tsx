@@ -6,6 +6,7 @@ import {
   type AgentPlace,
   FollowedRepository,
   LocalCheckout,
+  LocalSkillsError,
   type NewAgent,
   SandboxPlace,
   SandboxProviderInfo,
@@ -229,6 +230,37 @@ it("gives a Sandbox Agent the Local skills when picked, warning which skill name
       "aria-checked",
     ),
   ).toBe("true")
+})
+
+it("shows when the Local skills can't be read, and still starts the Sandbox Agent", async () => {
+  const created: Array<NewAgent> = []
+  localStorage.setItem("glass.newAgent.localSkills", "true")
+
+  const user = mount(
+    {
+      ...newAgentHandlers(created, []),
+      ListSandboxProviders: () =>
+        Effect.succeed([
+          new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes", engines: ["claude-code"] }),
+        ]),
+      ListFollowedRepositories: () => Effect.succeed([agent.repository]),
+      ListLocalSkills: () =>
+        Effect.fail(new LocalSkillsError({ message: "Glass couldn't read your Local skills." })),
+    },
+    "/agents/new",
+  )
+
+  const draft = await screen.findByRole("region", { name: "New Agent" })
+  await user.click(await within(draft).findByRole("combobox", { name: "Where the Agent runs" }))
+  await user.click(await screen.findByRole("option", { name: "Fake Sandboxes" }))
+  expect(await within(newAgentDraft()).findByText("Couldn't read your Local skills")).toBeTruthy()
+
+  await user.type(
+    within(newAgentDraft()).getByRole("textbox", { name: "Message" }),
+    "Fix the bug{Enter}",
+  )
+  await waitFor(() => expect(window.location.hash).toBe(`#/agents/${agent.id}`))
+  expect(created).toMatchObject([{ localSkills: true }])
 })
 
 it("shows the first message at once while the Agent starts", async () => {

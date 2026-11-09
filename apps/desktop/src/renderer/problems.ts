@@ -69,6 +69,10 @@ export const describeError = (error: BackendError): Problem =>
         detail: `${name} was removed. Reload Settings to see your Skill packs now.`,
       }),
       SkillPackError: ({ message }) => ({ title: "Couldn't access Skill packs", detail: message }),
+      LocalSkillsError: ({ message }) => ({
+        title: "Couldn't read your Local skills",
+        detail: message,
+      }),
       StorageError: () => ({
         title: "Couldn't measure storage",
         detail: "Glass couldn't read its database sizes.",

@@ -88,3 +88,7 @@ export class SkillPackNotFound extends Schema.TaggedError<SkillPackNotFound>()(
 export class SkillPackError extends Schema.TaggedError<SkillPackError>()("SkillPackError", {
   message: Schema.String,
 }) {}
+
+export class LocalSkillsError extends Schema.TaggedError<LocalSkillsError>()("LocalSkillsError", {
+  message: Schema.String,
+}) {}
