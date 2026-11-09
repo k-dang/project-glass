@@ -1,9 +1,11 @@
-import type { DiffSide, LineDiscussion } from "@glass/contracts"
+import type { LineDiscussion } from "@glass/contracts"
 import type {
   CodeViewItem,
+  CodeViewLineSelection,
   DiffIndicators,
   DiffLineAnnotation,
   FileDiffContentsLoader,
+  SelectedLineRange,
 } from "@pierre/diffs"
 import { CodeView, type CodeViewHandle, type CodeViewReactOptions } from "@pierre/diffs/react"
 import { ChevronDown, ChevronRight, Plus } from "lucide-react"
@@ -27,10 +29,13 @@ import { LineAsk } from "./Asks"
 import { LineDraft } from "./Drafts"
 import {
   type CollapseChoices,
+  type FileAnnotations,
   inHunk,
   type LineNote,
   type LineNotes,
+  lineNoteAnnotations,
   type ParsedFile,
+  sideOf,
   toItems,
 } from "./changesView"
 import { TourText } from "./TourText"
@@ -63,9 +68,9 @@ interface HoveredLine {
   readonly side?: DiffLineAnnotation<LineNote>["side"]
 }
 
-export type ViewHandle = CodeViewHandle<LineNote, undefined>
+export type ViewHandle<M = LineNote> = CodeViewHandle<M, undefined>
 
-export function useOpenedFiles(viewOf: (path: string) => ViewHandle | null) {
+export function useOpenedFiles<M>(viewOf: (path: string) => ViewHandle<M> | null) {
   const [opened, setOpened] = useState<ReadonlyMap<string, boolean>>(new Map())
 
   const setFilesOpen = useCallback(
@@ -99,10 +104,10 @@ export function useOpenedFiles(viewOf: (path: string) => ViewHandle | null) {
 
 const hideHeaderCounts = "[data-additions-count], [data-deletions-count] { display: none; }"
 
-interface DiffViewProps {
+export interface DiffViewProps<M> {
   initialPath: string | null
   files: ReadonlyArray<ParsedFile>
-  notes: LineNotes
+  annotationsFor: (path: string) => FileAnnotations<M>
   display: Display
   loadDiffFiles?: FileDiffContentsLoader
   opened: CollapseChoices["opened"]
@@ -110,39 +115,21 @@ interface DiffViewProps {
   onOpenChange: (path: string, open: boolean) => void
   onCurrentPathChange: (path: string) => void
   summaries: ReadonlyMap<string, string> | null
-  searchGroup?: CodeViewReactOptions<LineNote, undefined>["searchGroup"]
-  renderAnnotation: (annotation: DiffLineAnnotation<LineNote>) => ReactNode
+  searchGroup?: CodeViewReactOptions<M, undefined>["searchGroup"]
+  renderAnnotation: (annotation: DiffLineAnnotation<M>) => ReactNode
   renderGutterUtility:
-    | ((getHoveredLine: () => HoveredLine | undefined, item: CodeViewItem<LineNote>) => ReactNode)
+    | ((getHoveredLine: () => HoveredLine | undefined, item: CodeViewItem<M>) => ReactNode)
     | null
+  onGutterUtilityClick?: (path: string, range: SelectedLineRange) => void
+  selectedLines?: CodeViewLineSelection | null
+  onSelectedLinesChange?: (selection: CodeViewLineSelection | null) => void
   renderFileActions?: (path: string) => ReactNode
-  ref: RefObject<ViewHandle | null>
+  ref: RefObject<ViewHandle<M> | null>
 }
 
-const noNotes: LineNotes = { discussions: [], drafts: [], asks: [] }
-
-const renderNothing = () => null
-
-export function ReadOnlyDiffView(
-  props: Omit<
-    DiffViewProps,
-    "notes" | "summaries" | "renderAnnotation" | "renderGutterUtility" | "searchGroup"
-  >,
-) {
-  return (
-    <DiffView
-      {...props}
-      notes={noNotes}
-      summaries={null}
-      renderAnnotation={renderNothing}
-      renderGutterUtility={null}
-    />
-  )
-}
-
-function DiffView(props: DiffViewProps) {
+export function DiffView<M>(props: DiffViewProps<M>) {
   const { files, opened, onOpenChange, summaries, onCurrentPathChange, ref, display } = props
-  const { renderFileActions, notes } = props
+  const { renderFileActions, annotationsFor, onGutterUtilityClick } = props
   const parsed = useMemo(() => new Map(files.map((entry) => [entry.file.path, entry])), [files])
   const [initialPath] = useState(props.initialPath)
   const ready = useRef(false)
@@ -166,14 +153,14 @@ function DiffView(props: DiffViewProps) {
   )
 
   const items = useMemo(
-    () => toItems(files, notes, { opened, all: props.all }, leads),
-    [files, notes, opened, props.all, leads],
+    () => toItems(files, annotationsFor, { opened, all: props.all }, leads),
+    [files, annotationsFor, opened, props.all, leads],
   )
 
-  const options = useMemo((): CodeViewReactOptions<LineNote, undefined> => {
+  const options = useMemo((): CodeViewReactOptions<M, undefined> => {
     const lines = lineOptions(display.wrap)
 
-    const codeOptions: CodeViewReactOptions<LineNote, undefined> = {
+    const codeOptions: CodeViewReactOptions<M, undefined> = {
       ...lines,
       unsafeCSS: `${lines.unsafeCSS ?? ""} ${hideHeaderCounts}`,
       diffStyle: display.diffStyle,
@@ -184,7 +171,7 @@ function DiffView(props: DiffViewProps) {
       layout: { paddingTop: 0, paddingBottom: 0, gap: inTour ? 12 : 1 },
       hunkSeparators: "line-info-basic",
       stickyHeaders: true,
-      enableGutterUtility: props.renderGutterUtility !== null,
+      enableGutterUtility: props.renderGutterUtility !== null || onGutterUtilityClick !== undefined,
       enableLineSelection: true,
       onPostRender: (_node, _instance, _phase, context) => {
         const viewer = ref.current?.getInstance()
@@ -211,19 +198,24 @@ function DiffView(props: DiffViewProps) {
 
     if (props.searchGroup !== undefined) codeOptions.searchGroup = props.searchGroup
 
+    if (onGutterUtilityClick !== undefined)
+      codeOptions.onGutterUtilityClick = (range, context) =>
+        onGutterUtilityClick(context.item.id, range)
+
     return codeOptions
   }, [
     display,
     props.loadDiffFiles,
     props.searchGroup,
     props.renderGutterUtility,
+    onGutterUtilityClick,
     files,
     ref,
     inTour,
   ])
 
   const renderHeaderPrefix = useCallback(
-    (item: CodeViewItem<LineNote>) => {
+    (item: CodeViewItem<M>) => {
       const entry = parsed.get(item.id)
 
       if (entry === undefined) return null
@@ -250,7 +242,7 @@ function DiffView(props: DiffViewProps) {
   )
 
   const renderHeaderMetadata = useCallback(
-    (item: CodeViewItem<LineNote>) => {
+    (item: CodeViewItem<M>) => {
       const entry = parsed.get(item.id)
 
       if (entry === undefined) return null
@@ -276,7 +268,7 @@ function DiffView(props: DiffViewProps) {
   )
 
   const renderItemLead = useCallback(
-    (item: CodeViewItem<LineNote>) => {
+    (item: CodeViewItem<M>) => {
       const summary = summaries?.get(item.id)
 
       return summary === undefined ? null : (
@@ -320,7 +312,13 @@ function DiffView(props: DiffViewProps) {
       renderHeaderMetadata={renderHeaderMetadata}
       renderItemLead={renderItemLead}
       renderAnnotation={props.renderAnnotation}
-      renderGutterUtility={props.renderGutterUtility ?? renderNothing}
+      {...(props.renderGutterUtility === null
+        ? {}
+        : { renderGutterUtility: props.renderGutterUtility })}
+      {...(props.selectedLines === undefined ? {} : { selectedLines: props.selectedLines })}
+      {...(props.onSelectedLinesChange === undefined
+        ? {}
+        : { onSelectedLinesChange: props.onSelectedLinesChange })}
       onScroll={onScroll}
       onRevealSearchMatch={(item) => onOpenChange(item.id, true)}
       className={cn(
@@ -334,8 +332,15 @@ function DiffView(props: DiffViewProps) {
 }
 
 export interface ChangedFilesViewProps extends Omit<
-  DiffViewProps,
-  "notes" | "loadDiffFiles" | "renderAnnotation" | "renderGutterUtility" | "renderFileActions"
+  DiffViewProps<LineNote>,
+  | "annotationsFor"
+  | "loadDiffFiles"
+  | "renderAnnotation"
+  | "renderGutterUtility"
+  | "onGutterUtilityClick"
+  | "selectedLines"
+  | "onSelectedLinesChange"
+  | "renderFileActions"
 > {
   discussions: ReadonlyArray<LineDiscussion>
   drafts: DraftStore
@@ -355,8 +360,13 @@ export function ChangedFilesView(props: ChangedFilesViewProps) {
   const draftPlaces = useLineDraftPlaces(drafts)
   const askPlaces = useLineAskPlaces(asks)
 
-  const notes = useMemo(
-    (): LineNotes => ({ discussions, drafts: draftPlaces, asks: askPlaces }),
+  const annotationsFor = useMemo(
+    () =>
+      lineNoteAnnotations({
+        discussions,
+        drafts: draftPlaces,
+        asks: askPlaces,
+      } satisfies LineNotes),
     [discussions, draftPlaces, askPlaces],
   )
 
@@ -371,7 +381,7 @@ export function ChangedFilesView(props: ChangedFilesViewProps) {
 
           if (hovered === undefined || item.type !== "diff") return
 
-          const side: DiffSide = hovered.side === "deletions" ? "old" : "new"
+          const side = sideOf(hovered.side)
 
           if (inHunk(item.fileDiff, side, hovered.lineNumber)) {
             drafts.start(item.id, side, hovered.lineNumber)
@@ -421,7 +431,7 @@ export function ChangedFilesView(props: ChangedFilesViewProps) {
   return (
     <DiffView
       {...diff}
-      notes={notes}
+      annotationsFor={annotationsFor}
       renderAnnotation={renderAnnotation}
       renderGutterUtility={renderGutterUtility}
       renderFileActions={renderFileActions}

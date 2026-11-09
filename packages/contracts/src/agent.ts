@@ -1,7 +1,7 @@
 import { agentEngines } from "@glass/plugin"
 import { Match, Predicate, Schema } from "effect"
 import { FollowedRepository } from "./followedRepository"
-import { PullRequestRef } from "./pullRequest"
+import { ChangedFile, PullRequestRef } from "./pullRequest"
 import { Revision } from "./revision"
 
 export const AgentEngine = Schema.Literals(agentEngines)
@@ -485,6 +485,11 @@ export class SandboxProviderInfo extends Schema.Class<SandboxProviderInfo>("Sand
   id: Schema.String,
   name: Schema.String,
   engines: Schema.NonEmptyArray(AgentEngine),
+}) {}
+
+export class AgentChanges extends Schema.Class<AgentChanges>("AgentChanges")({
+  id: Schema.String,
+  files: Schema.Array(ChangedFile),
 }) {}
 
 export class RemovalWarnings extends Schema.Class<RemovalWarnings>("RemovalWarnings")({

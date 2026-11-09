@@ -1,5 +1,5 @@
 import { assert, it } from "@effect/vitest"
-import { AgentStarted, SandboxPlace, TextPatch, localPlace } from "@glass/contracts"
+import { AgentStarted, FeedbackNote, SandboxPlace, TextPatch, localPlace } from "@glass/contracts"
 import { Effect, Option, Stream } from "effect"
 import { existsSync } from "node:fs"
 import { mkdir, rename, writeFile } from "node:fs/promises"
@@ -178,7 +178,7 @@ it.live(
       })
 
       const before = git()
-      const files = yield* f.client.GetAgentChanges({ agentId: agent.id })
+      const { files } = yield* f.client.GetAgentChanges({ agentId: agent.id })
       assert.deepStrictEqual(git(), before)
       assert.equal(before.branch, agent.name)
       assert.notEqual(before.head, f.clone.main)
@@ -201,5 +201,58 @@ it.live(
         files.find(({ path }) => path === "staged.txt")?.patch,
         TextPatch.make({ hunks: "@@ -0,0 +1 @@\n+staged " }),
       )
+    }),
+)
+
+it.live(
+  "keeps an Agent's Feedback notes with the code they were left on until the Agent is removed",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* agentsFixture
+      const agent = yield* f.start("Make changes")
+      const worktree = f.worktree(agent.name)
+      yield* f.transcript(agent.id, settled(1))
+      yield* Effect.promise(() => writeFile(join(worktree, "notes.txt"), "one\ntwo\n"))
+
+      const read = yield* f.client.GetAgentChanges({ agentId: agent.id })
+      assert.equal((yield* f.client.GetAgentChanges({ agentId: agent.id })).id, read.id)
+
+      const fields = {
+        id: "note-1",
+        path: "notes.txt",
+        side: "new",
+        start: 1,
+        end: 2,
+        code: "one\ntwo",
+        changesId: read.id,
+        text: "Say three too",
+      } as const
+
+      const note = new FeedbackNote(fields)
+
+      const other = new FeedbackNote({
+        ...fields,
+        id: "note-2",
+        start: 2,
+        code: "two",
+        text: "Drop",
+      })
+
+      const edited = new FeedbackNote({ ...fields, text: "Say three and four" })
+
+      yield* f.client.SaveFeedbackNote({ agentId: agent.id, note })
+      yield* f.client.SaveFeedbackNote({ agentId: agent.id, note: other })
+      yield* f.client.SaveFeedbackNote({ agentId: agent.id, note: edited })
+      yield* f.client.RemoveFeedbackNote({ agentId: agent.id, noteId: other.id })
+
+      yield* Effect.promise(() => writeFile(join(worktree, "notes.txt"), "one\nthree\n"))
+      assert.notEqual((yield* f.client.GetAgentChanges({ agentId: agent.id })).id, read.id)
+
+      const restarted = yield* f.restart
+      assert.deepStrictEqual(yield* restarted.ListFeedbackNotes({ agentId: agent.id }), [edited])
+
+      yield* restarted.RemoveAgent({ agentId: agent.id })
+      const gone = yield* restarted.ListFeedbackNotes({ agentId: agent.id }).pipe(Effect.flip)
+      assert.equal(gone._tag, "AgentNotFound")
     }),
 )
