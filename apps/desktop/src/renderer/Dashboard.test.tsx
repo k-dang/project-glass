@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { RegistryProvider } from "@effect/atom-react"
 import {
+  type ActivityLogError,
   ActivityStamp,
   PullRequestRef,
   PullRequestSummary,
@@ -8,13 +9,13 @@ import {
   Revision,
   ToDo,
 } from "@glass/contracts"
-import { cleanup, render, screen, within } from "@testing-library/react"
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { DateTime, Effect } from "effect"
 import { afterEach, expect, it } from "vite-plus/test"
 import { App } from "./App"
 import { backendLayerAtom } from "./backend"
-import { type Handlers, testLayer } from "../../test/testBackend"
+import { type Handlers, type Held, hold, next, testLayer } from "../../test/testBackend"
 
 const queued = (number: number, title: string) =>
   new QueuedPullRequest({
@@ -127,4 +128,43 @@ it("totals what the user got done over the chosen days", async () => {
       .getAllByRole("listitem")
       .map((item) => item.textContent),
   ).toEqual(["Reviews 0", "Replies 1", "Agents started 0", "To-dos done 1"])
+})
+
+it("keeps the Activity chart visible while refreshing on a return to the Dashboard", async () => {
+  const reads: Array<
+    Held<
+      Parameters<Handlers["ListActivityStamps"]>[0],
+      ReadonlyArray<ActivityStamp>,
+      ActivityLogError
+    >
+  > = []
+
+  const now = new Date()
+  const user = userEvent.setup()
+
+  mount({ ListActivityStamps: hold(reads) })
+  const first = await next(reads)
+  expect(screen.getByText("Loading your Activity…")).toBeTruthy()
+  first.answer(Effect.succeed([stamp("AgentStarted", now)]))
+  await screen.findByText("Agents started", { exact: false })
+  expect(screen.getByRole("list", { name: "Activity totals" }).textContent).toContain(
+    "Agents started 1",
+  )
+
+  await user.click(screen.getByRole("link", { name: "Go to Activity" }))
+  await screen.findByRole("main", { name: "Activity" })
+  await user.click(screen.getByRole("link", { name: "Dashboard" }))
+  const refresh = await next(reads)
+
+  expect(screen.queryByText("Loading your Activity…")).toBeNull()
+  expect(screen.getByRole("list", { name: "Activity totals" }).textContent).toContain(
+    "Agents started 1",
+  )
+
+  refresh.answer(Effect.succeed([stamp("AgentStarted", now), stamp("AgentStarted", now)]))
+  await waitFor(() =>
+    expect(screen.getByRole("list", { name: "Activity totals" }).textContent).toContain(
+      "Agents started 2",
+    ),
+  )
 })
