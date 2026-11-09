@@ -217,7 +217,7 @@ export const wideEventsToStdout = (source: Source) => {
   return OtlpLogger.layerFromConfig({ resource, mergeWithExisting: true }).pipe(
     Layer.provideMerge(wideEvents(source, toStdout, toStderr)),
     Layer.provide(OtlpTracer.layerFromConfig({ resource })),
-    Layer.provide(OtlpSerialization.layerJson),
+    Layer.provide(OtlpSerialization.layerProtobuf),
   )
 }
 

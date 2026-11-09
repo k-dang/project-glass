@@ -42,12 +42,13 @@ pnpm fix          # apply format and lint fixes
 The backend runs on its own: `GLASS_PORT=4000 GLASS_TOKEN=secret node apps/server/dist/bin.mjs`.
 
 To profile the backend, set the standard `OTEL_*` variables before `pnpm dev` and it also sends
-every span and log line over OTLP/HTTP, e.g. to Jaeger:
+every span and log line over OTLP/HTTP, e.g. to the Aspire dashboard:
 
 ```sh
-docker run --rm -p 16686:16686 -p 4318:4318 jaegertracing/jaeger:2.5.0
+docker run --rm -p 18888:18888 -p 4318:18890 -e DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS=true \
+  mcr.microsoft.com/dotnet/aspire-dashboard:9.5
 export OTEL_TRACES_EXPORTER=otlp OTEL_LOGS_EXPORTER=otlp OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
-pnpm dev   # traces at http://localhost:16686
+pnpm dev   # traces and logs at http://localhost:18888
 ```
 
 ## Storage
