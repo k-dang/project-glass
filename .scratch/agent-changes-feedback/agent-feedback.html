@@ -1,252 +1,1154 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Glass · Feedback on Agent Changes</title>
-<style>
-:root {
-  color-scheme: light dark;
-  --background: light-dark(#ffffff, #111111);
-  --foreground: light-dark(#252525, #cecece);
-  --card: light-dark(#fafafa, #1b1b1b);
-  --muted: light-dark(#f4f4f4, #222222);
-  --muted-foreground: light-dark(#666666, #a3a3a3);
-  --border: light-dark(#dedede, #303030);
-  --primary: light-dark(#252525, #e4e4e4);
-  --primary-foreground: light-dark(#fafafa, #181818);
-  --accent: light-dark(#eeeaff, #292738);
-  --ring: light-dark(#6255c4, #a6a8ff);
-  --success: light-dark(#18732d, #63cd7b);
-  --warning: light-dark(#845006, #e5b57a);
-  --destructive: light-dark(#b32538, #ef8586);
-  --add-surface: light-dark(#eef8f0, #14271b);
-  --delete-surface: light-dark(#fff0f0, #301c22);
-  --syntax: light-dark(#743b95, #d995ca);
-  --string: light-dark(#79601c, #e8c778);
-  --radius: 8px;
-  --font-sans: 'Geist Variable', 'Segoe UI', system-ui, sans-serif;
-  --font-mono: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
-  font-family: var(--font-sans); color: var(--foreground); font-size: 13px;
-}
-* { box-sizing: border-box; }
-html, body { margin: 0; }
-button, input, textarea, select { font: inherit; }
-button, select, summary, label[for="image-input"] { cursor: pointer; }
-button { color: var(--foreground); background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 6px 9px; line-height: 1.35; }
-button:hover:not(:disabled), summary:hover { background: var(--muted); }
-button:disabled { opacity: .48; cursor: not-allowed; }
-:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
-button.primary { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); font-weight: 550; }
-button.primary:hover:not(:disabled) { opacity: .9; background: var(--primary); }
-button.outline { border-color: var(--border); background: var(--background); }
-button.danger { color: var(--destructive); }
-button.small { font-size: 12px; padding: 4px 7px; }
-button.icon { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
-svg.icon { width: 15px; height: 15px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-.muted { color: var(--muted-foreground); }
-.mono, code, pre { font-family: var(--font-mono); }
-.badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; line-height: 1.4; padding: 2px 6px; border: 1px solid var(--border); border-radius: 5px; white-space: nowrap; }
-.dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; flex: none; }
-.working { color: var(--warning); }
-.ready { color: var(--success); }
-.count { min-width: 17px; border-radius: 4px; background: var(--muted); padding: 1px 4px; text-align: center; font-size: 11px; font-variant-numeric: tabular-nums; }
-.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-[hidden] { display: none !important; }
-.app { display: grid; grid-template-columns: 165px minmax(0, 1fr); min-height: 700px; }
-.agent-panel { background: var(--card); border-right: 1px solid var(--border); padding: 18px 10px; }
-.panel-title { padding: 0 7px 20px; display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
-.agent-group { margin: 0 7px 9px; font-size: 10px; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: .08em; }
-.agent-entry { border-radius: 6px; background: var(--muted); padding: 9px; }
-.agent-repo { font-size: 11px; color: var(--muted-foreground); margin-bottom: 4px; }
-.agent-name { font-weight: 550; }
-.agent-status { display: flex; align-items: center; gap: 6px; margin-top: 7px; font-size: 11px; }
-.scope-note { margin: 22px 7px 0; font-size: 11px; color: var(--muted-foreground); line-height: 1.6; }
-.workspace { min-width: 0; background: var(--background); display: flex; flex-direction: column; }
-.agent-header { min-height: 45px; border-bottom: 1px solid var(--border); padding: 5px 18px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.heading { font-size: 13px; font-weight: 550; margin: 0; }
-.header-spacer { flex: 1; }
-.nav { display: flex; gap: 2px; }
-.nav button[aria-current="page"] { background: var(--muted); color: var(--foreground); }
-.nav button { color: var(--muted-foreground); font-size: 12px; }
-.branch { font-size: 11px; color: var(--muted-foreground); display: flex; align-items: center; gap: 6px; }
-.changes-heading { padding: 12px 18px 10px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid var(--border); font-size: 12px; }
-.changes-heading .primary { margin-left: auto; }
-.update { margin: 12px 18px 0; padding: 10px 12px; background: var(--muted); border-radius: 6px; display: flex; align-items: center; gap: 12px; font-size: 12px; }
-.update span { flex: 1; }
-.changes-grid { display: grid; grid-template-columns: 185px minmax(0, 1fr); flex: 1; min-height: 560px; }
-.file-panel { border-right: 1px solid var(--border); background: var(--background); min-width: 0; display: flex; flex-direction: column; }
-.panel-tabs { display: flex; gap: 3px; padding: 10px 8px; border-bottom: 1px solid var(--border); }
-.panel-tabs button { display: flex; align-items: center; gap: 6px; font-size: 12px; }
-.panel-tabs button[aria-selected="true"] { background: var(--muted); }
-.file-list { padding: 12px 7px; }
-.folder { font-size: 11px; color: var(--muted-foreground); padding: 0 8px 8px; overflow-wrap: anywhere; }
-.file-button { display: flex; align-items: center; width: 100%; text-align: left; gap: 5px; padding: 8px; font-size: 12px; }
-.file-button[aria-current="true"] { background: var(--muted); }
-.file-button .filename { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.file-button .added { color: var(--success); font-size: 10px; }
-.panel-note-list { padding: 3px 10px 12px; }
-.panel-empty { padding: 20px 12px; font-size: 12px; line-height: 1.65; color: var(--muted-foreground); }
-.summary-note { border-bottom: 1px solid var(--border); padding: 12px 0; }
-.summary-note > button { padding: 0; width: 100%; text-align: left; }
-.summary-note > button:hover { background: transparent; text-decoration: underline; text-underline-offset: 3px; }
-.summary-note p { line-height: 1.55; margin: 7px 0; overflow-wrap: anywhere; font-size: 12px; }
-.location { font-size: 11px; color: var(--muted-foreground); overflow-wrap: anywhere; }
-.note-actions { display: flex; gap: 4px; flex-wrap: wrap; }
-.note-actions button { font-size: 11px; padding: 3px 5px; }
-.old-label { color: var(--warning); font-size: 10px; display: inline-flex; align-items: center; gap: 4px; }
-.diff-pane { min-width: 0; padding: 0 16px 20px; }
-.diff-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 0; font-size: 11px; min-height: 39px; }
-.diff-toolbar > span { flex: 1; }
-.file-header { min-height: 40px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px 12px; background: var(--card); border: 1px solid var(--border); border-radius: 6px 6px 0 0; }
-.file-header .path { font-size: 11px; overflow-wrap: anywhere; flex: 1; }
-.file-header .totals { font-size: 11px; color: var(--success); white-space: nowrap; }
-.diff-scroll { overflow-x: auto; border: 1px solid var(--border); border-top: 0; border-radius: 0 0 6px 6px; }
-.hunk { padding: 7px 12px; font: 11px var(--font-mono); color: var(--muted-foreground); background: var(--muted); white-space: nowrap; }
-.diff-row { display: grid; grid-template-columns: 25px 34px 34px 18px minmax(max-content, 1fr); min-height: 25px; font: 11px/25px var(--font-mono); position: relative; }
-.diff-row.add { background: var(--add-surface); }
-.diff-row.del { background: var(--delete-surface); }
-.line-number { padding: 0 4px; font: inherit; text-align: right; border-radius: 0; color: var(--muted-foreground); min-height: 25px; border: 0; user-select: none; touch-action: none; }
-.line-number:hover:not(:disabled) { background: var(--accent); color: var(--foreground); }
-.line-number[aria-pressed="true"] { color: var(--ring); background: var(--accent); font-weight: 650; }
-.empty-line-number { color: transparent; }
-.sign { text-align: center; color: var(--muted-foreground); }
-.code { padding-right: 18px; white-space: pre; }
-.kw { color: var(--syntax); }
-.str { color: var(--string); }
-.code-comment { color: var(--muted-foreground); }
-.diff-row.selected { box-shadow: inset 3px 0 var(--ring); background: var(--accent); }
-.diff-row.annotated:not(.selected) { box-shadow: inset 2px 0 var(--ring); }
-.line-number.has-note { color: var(--ring); font-weight: 650; }
-.gutter-add { padding: 0; border: 0; border-radius: 3px; font: 16px/25px var(--font-sans); color: var(--ring); opacity: 0; min-width: 25px; }
-.diff-row:hover .gutter-add,.gutter-add:focus-visible,.diff-row.selected .gutter-add { opacity: 1; background: var(--accent); }
-.inline-note { position: sticky; left: 0; width: 100%; background: var(--background); padding: 12px 15px 13px 26px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); border-left: 3px solid var(--ring); }
-.inline-note .note-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 11px; }
-.inline-note p { margin: 9px 0 7px; font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
-.note-index { width: 19px; height: 19px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; background: var(--accent); color: var(--ring); font-weight: 600; flex: none; }
-.inline-note .note-actions { gap: 9px; }
-.inline-note .note-actions button { color: var(--muted-foreground); }
-.annotation-editor { position: sticky; left: 0; width: 100%; padding: 13px 15px 14px 26px; border-left: 3px solid var(--ring); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--card); }
-.annotation-editor h2 { font-size: 12px; margin: 0; font-weight: 550; display: flex; gap: 8px; align-items: center; }
-.annotation-editor textarea { margin-top: 10px; min-height: 80px; }
-.annotation-editor .editor-footer { align-items: center; }
-.shortcut { margin-right: auto; color: var(--muted-foreground); font-size: 10px; }
-.context-actions { position: sticky; left: 0; width: 100%; padding: 7px 13px 7px 26px; border-left: 3px solid var(--ring); background: var(--card); border-block: 1px solid var(--border); display: flex; align-items: center; gap: 8px; font: 11px var(--font-sans); }
-.context-actions .location { flex: 1; }
-.older-feedback { margin-top: 18px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
-.older-feedback h2 { margin: 0; padding: 10px 13px; font-size: 12px; font-weight: 550; color: var(--warning); background: var(--card); }
-.older-feedback .inline-note { border-left-color: var(--warning); }
-.older-feedback .annotation-editor { border-left-color: var(--warning); }
-.help-line { font-size: 11px; color: var(--muted-foreground); line-height: 1.6; padding: 11px 0 0; }
-pre.snippet { font-size: 11px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; border-radius: 5px; padding: 9px 11px; margin: 9px 0; background: var(--muted); color: var(--foreground); max-height: 190px; overflow-y: auto; }
-textarea { width: 100%; resize: vertical; border: 1px solid var(--border); border-radius: 5px; padding: 9px 10px; background: var(--background); color: var(--foreground); line-height: 1.6; }
-textarea::placeholder { color: var(--muted-foreground); opacity: 1; }
-.editor-footer { display: flex; justify-content: flex-end; gap: 6px; padding-top: 9px; }
-.form-error { color: var(--destructive); font-size: 12px; line-height: 1.5; margin-top: 7px; }
-.chat { padding: 22px 24px 18px; max-width: 830px; width: 100%; margin: 0 auto; }
-.transcript { min-height: 220px; }
-.turn { margin-bottom: 22px; }
-.turn .speaker { font-size: 11px; color: var(--muted-foreground); margin-bottom: 7px; display: flex; gap: 7px; align-items: center; }
-.turn .turn-body { line-height: 1.7; overflow-wrap: anywhere; font-size: 13px; white-space: pre-wrap; }
-.turn.user { margin-left: 35px; }
-.turn.user .turn-body { display: inline-block; background: var(--muted); padding: 10px 14px; border-radius: 9px; }
-.transcript-notes { margin-top: 9px; }
-.transcript-notes summary { padding: 6px 0; font-size: 12px; }
-.message-note { padding: 8px 0 10px 12px; border-left: 2px solid var(--border); margin: 8px 0; }
-.message-note p { margin: 5px 0; line-height: 1.6; font-size: 12px; overflow-wrap: anywhere; }
-.tool-line { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted-foreground); padding: 10px 0; }
-.spinner { width: 11px; height: 11px; border: 1.5px solid var(--border); border-top-color: var(--muted-foreground); border-radius: 50%; animation: spin 1s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-.queue-section { margin: 18px 0 12px; }
-.queue-heading { font-size: 11px; color: var(--muted-foreground); margin-bottom: 7px; }
-.queue-message { border: 1px solid var(--border); border-radius: 7px; padding: 10px 12px; margin-bottom: 7px; background: var(--card); }
-.queue-top { display: flex; align-items: start; gap: 10px; }
-.queue-top > div { flex: 1; min-width: 0; }
-.queue-top p { margin: 0 0 5px; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; }
-.queue-message details { margin-top: 7px; font-size: 11px; }
-.queue-message summary { padding: 4px 0; }
-.pending-reminder { display: flex; align-items: center; gap: 8px; margin: 12px 0; font-size: 12px; }
-.pending-reminder > span { flex: 1; }
-.composer { border: 1px solid var(--border); border-radius: 10px; padding: 5px; background: var(--background); }
-.composer textarea { border: 0; min-height: 95px; background: transparent; resize: vertical; padding: 10px; font-size: 13px; }
-.composer textarea:focus-visible { outline-offset: -2px; }
-.feedback-attachment { margin: 6px; padding: 10px 12px; background: var(--card); border: 1px solid var(--border); border-radius: 7px; }
-.feedback-attachment > summary { font-size: 12px; padding: 2px 0; }
-.attachment-item { padding: 11px 0; border-bottom: 1px solid var(--border); }
-.attachment-item:last-child { border: 0; padding-bottom: 0; }
-.attachment-item p { font-size: 12px; line-height: 1.6; margin: 7px 0; overflow-wrap: anywhere; }
-.attachment-item .actions-row { display: flex; align-items: center; gap: 7px; }
-.attachment-item .actions-row > span { flex: 1; }
-.attachment-item button { font-size: 11px; }
-.composer-footer { display: flex; align-items: center; gap: 8px; padding: 5px; }
-.composer-footer .model { font-size: 11px; color: var(--muted-foreground); flex: 1; }
-.composer-help { color: var(--muted-foreground); font-size: 11px; line-height: 1.6; margin: 9px 1px; }
-.image-strip { display: flex; gap: 8px; padding: 5px 10px; flex-wrap: wrap; }
-.image-chip { display: flex; align-items: center; gap: 5px; max-width: 100%; }
-.image-chip img { width: 35px; height: 35px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border); }
-.image-chip span { font-size: 11px; overflow-wrap: anywhere; }
-.notice { padding: 11px 12px; background: var(--muted); border-radius: 6px; margin: 12px 0; font-size: 12px; line-height: 1.6; }
-.error-notice { border-left: 2px solid var(--destructive); color: var(--destructive); }
-.status-line { min-height: 34px; border-top: 1px solid var(--border); padding: 8px 17px; display: flex; align-items: start; gap: 7px; font-size: 11px; line-height: 1.5; background: var(--background); }
-.status-line span:last-child { margin-left: auto; white-space: nowrap; color: var(--muted-foreground); }
-.simulation { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 16px; }
-.simulation > summary { font-size: 12px; color: var(--muted-foreground); padding: 5px 0; }
-.simulation-content { padding-top: 12px; display: flex; flex-direction: column; gap: 12px; }
-.simulation-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-.simulation label { font-size: 12px; display: flex; align-items: center; gap: 7px; }
-.simulation select { border: 1px solid var(--border); border-radius: 5px; background: var(--background); color: var(--foreground); padding: 6px 8px; max-width: 100%; }
-.simulation p { color: var(--muted-foreground); font-size: 11px; line-height: 1.6; margin: 0; }
-.simulation input[type="checkbox"] { accent-color: var(--ring); }
-.removed { padding: 70px 24px; min-height: 640px; text-align: center; background: var(--background); }
-.removed h1 { font-size: 17px; font-weight: 550; }
-.removed p { color: var(--muted-foreground); line-height: 1.7; }
-dialog { width: min(440px, calc(100% - 32px)); padding: 24px; border: 1px solid var(--border); border-radius: 10px; color: var(--foreground); background: var(--background); }
-dialog::backdrop { background: #0008; }
-dialog h2 { font-size: 16px; font-weight: 550; margin: 0 0 12px; }
-dialog p { color: var(--muted-foreground); font-size: 13px; line-height: 1.7; margin: 0 0 20px; }
-.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
-.dialog-actions .danger { border-color: var(--destructive); }
-@media(max-width: 1000px) { .app { grid-template-columns: minmax(0, 1fr); } .agent-panel { display: none; } }
-@media(max-width: 570px) {
-  :root { font-size: 13px; }
-  .app { min-height: 680px; }
-  .agent-header { padding: 8px 10px; gap: 5px 8px; }
-  .branch { display: none; }
-  .nav { margin-left: auto; }
-  .agent-header .header-spacer { display: none; }
-  .changes-heading { padding: 10px; }
-  .changes-heading > span { width: 100%; }
-  .changes-heading .primary { margin-left: 0; }
-  .changes-grid { display: flex; flex-direction: column; min-height: 0; }
-  .file-panel { border-right: 0; border-bottom: 1px solid var(--border); }
-  .panel-tabs { padding: 6px 8px; }
-  .file-list { display: flex; gap: 5px; padding: 5px 8px; flex-wrap: wrap; }
-  .folder { display: none; }
-  .file-button { width: auto; min-height: 40px; font-size: 11px; }
-  .panel-note-list { max-height: 260px; overflow-y: auto; }
-  .panel-empty { padding: 10px 12px; }
-  .diff-pane { padding: 0 10px 14px; }
-  .diff-toolbar { padding: 8px 0; }
-  .diff-toolbar > span { width: 100%; flex-basis: 100%; }
-  .diff-row { grid-template-columns: 32px 40px 40px 16px minmax(max-content, 1fr); font-size: 11px; line-height: 40px; }
-  .gutter-add { opacity: .75; min-height: 40px; }
-  .line-number { min-height: 40px; }
-  .update { margin: 10px 10px 0; flex-wrap: wrap; }
-  .update span { flex-basis: 180px; }
-  .chat { padding: 18px 12px 10px; }
-  .turn.user { margin-left: 12px; }
-  .status-line { padding: 8px 10px; flex-wrap: wrap; }
-  .status-line span:last-child { margin-left: 0; }
-  .simulation select { font-size: 16px; }
-  textarea { font-size: 16px !important; }
-  .simulation-row { gap: 8px; }
-}
-@media(pointer: coarse) { button { min-height: 44px; } .line-number { min-height: 44px; } .gutter-add { opacity: .75; min-height: 44px; } .diff-row { grid-template-columns: 44px 44px 44px 16px minmax(max-content, 1fr); line-height: 44px; } }
-@media(prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; scroll-behavior: auto !important; } }
-</style>
-</head>
-<body>
-<!--
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Glass · Feedback on Agent Changes</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --background: light-dark(#ffffff, #111111);
+        --foreground: light-dark(#252525, #cecece);
+        --card: light-dark(#fafafa, #1b1b1b);
+        --muted: light-dark(#f4f4f4, #222222);
+        --muted-foreground: light-dark(#666666, #a3a3a3);
+        --border: light-dark(#dedede, #303030);
+        --primary: light-dark(#252525, #e4e4e4);
+        --primary-foreground: light-dark(#fafafa, #181818);
+        --accent: light-dark(#eeeaff, #292738);
+        --ring: light-dark(#6255c4, #a6a8ff);
+        --success: light-dark(#18732d, #63cd7b);
+        --warning: light-dark(#845006, #e5b57a);
+        --destructive: light-dark(#b32538, #ef8586);
+        --add-surface: light-dark(#eef8f0, #14271b);
+        --delete-surface: light-dark(#fff0f0, #301c22);
+        --syntax: light-dark(#743b95, #d995ca);
+        --string: light-dark(#79601c, #e8c778);
+        --radius: 8px;
+        --font-sans: "Geist Variable", "Segoe UI", system-ui, sans-serif;
+        --font-mono: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+        font-family: var(--font-sans);
+        color: var(--foreground);
+        font-size: 13px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+      }
+      button,
+      input,
+      textarea,
+      select {
+        font: inherit;
+      }
+      button,
+      select,
+      summary,
+      label[for="image-input"] {
+        cursor: pointer;
+      }
+      button {
+        color: var(--foreground);
+        background: transparent;
+        border: 1px solid transparent;
+        border-radius: 6px;
+        padding: 6px 9px;
+        line-height: 1.35;
+      }
+      button:hover:not(:disabled),
+      summary:hover {
+        background: var(--muted);
+      }
+      button:disabled {
+        opacity: 0.48;
+        cursor: not-allowed;
+      }
+      :focus-visible {
+        outline: 2px solid var(--ring);
+        outline-offset: 3px;
+      }
+      button.primary {
+        background: var(--primary);
+        color: var(--primary-foreground);
+        border-color: var(--primary);
+        font-weight: 550;
+      }
+      button.primary:hover:not(:disabled) {
+        opacity: 0.9;
+        background: var(--primary);
+      }
+      button.outline {
+        border-color: var(--border);
+        background: var(--background);
+      }
+      button.danger {
+        color: var(--destructive);
+      }
+      button.small {
+        font-size: 12px;
+        padding: 4px 7px;
+      }
+      button.icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+      svg.icon {
+        width: 15px;
+        height: 15px;
+        flex: none;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.6;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .muted {
+        color: var(--muted-foreground);
+      }
+      .mono,
+      code,
+      pre {
+        font-family: var(--font-mono);
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 11px;
+        line-height: 1.4;
+        padding: 2px 6px;
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        white-space: nowrap;
+      }
+      .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: currentColor;
+        display: inline-block;
+        flex: none;
+      }
+      .working {
+        color: var(--warning);
+      }
+      .ready {
+        color: var(--success);
+      }
+      .count {
+        min-width: 17px;
+        border-radius: 4px;
+        background: var(--muted);
+        padding: 1px 4px;
+        text-align: center;
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+      }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      .app {
+        display: grid;
+        grid-template-columns: 165px minmax(0, 1fr);
+        min-height: 700px;
+      }
+      .agent-panel {
+        background: var(--card);
+        border-right: 1px solid var(--border);
+        padding: 18px 10px;
+      }
+      .panel-title {
+        padding: 0 7px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-weight: 600;
+      }
+      .agent-group {
+        margin: 0 7px 9px;
+        font-size: 10px;
+        color: var(--muted-foreground);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .agent-entry {
+        border-radius: 6px;
+        background: var(--muted);
+        padding: 9px;
+      }
+      .agent-repo {
+        font-size: 11px;
+        color: var(--muted-foreground);
+        margin-bottom: 4px;
+      }
+      .agent-name {
+        font-weight: 550;
+      }
+      .agent-status {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 7px;
+        font-size: 11px;
+      }
+      .scope-note {
+        margin: 22px 7px 0;
+        font-size: 11px;
+        color: var(--muted-foreground);
+        line-height: 1.6;
+      }
+      .workspace {
+        min-width: 0;
+        background: var(--background);
+        display: flex;
+        flex-direction: column;
+      }
+      .agent-header {
+        min-height: 45px;
+        border-bottom: 1px solid var(--border);
+        padding: 5px 18px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .heading {
+        font-size: 13px;
+        font-weight: 550;
+        margin: 0;
+      }
+      .header-spacer {
+        flex: 1;
+      }
+      .nav {
+        display: flex;
+        gap: 2px;
+      }
+      .nav button[aria-current="page"] {
+        background: var(--muted);
+        color: var(--foreground);
+      }
+      .nav button {
+        color: var(--muted-foreground);
+        font-size: 12px;
+      }
+      .branch {
+        font-size: 11px;
+        color: var(--muted-foreground);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .changes-heading {
+        padding: 12px 18px 10px;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+        border-bottom: 1px solid var(--border);
+        font-size: 12px;
+      }
+      .changes-heading .primary {
+        margin-left: auto;
+      }
+      .update {
+        margin: 12px 18px 0;
+        padding: 10px 12px;
+        background: var(--muted);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 12px;
+      }
+      .update span {
+        flex: 1;
+      }
+      .changes-grid {
+        display: grid;
+        grid-template-columns: 185px minmax(0, 1fr);
+        flex: 1;
+        min-height: 560px;
+      }
+      .file-panel {
+        border-right: 1px solid var(--border);
+        background: var(--background);
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .panel-tabs {
+        display: flex;
+        gap: 3px;
+        padding: 10px 8px;
+        border-bottom: 1px solid var(--border);
+      }
+      .panel-tabs button {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+      }
+      .panel-tabs button[aria-selected="true"] {
+        background: var(--muted);
+      }
+      .file-list {
+        padding: 12px 7px;
+      }
+      .folder {
+        font-size: 11px;
+        color: var(--muted-foreground);
+        padding: 0 8px 8px;
+        overflow-wrap: anywhere;
+      }
+      .file-button {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        text-align: left;
+        gap: 5px;
+        padding: 8px;
+        font-size: 12px;
+      }
+      .file-button[aria-current="true"] {
+        background: var(--muted);
+      }
+      .file-button .filename {
+        flex: 1;
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+      .file-button .added {
+        color: var(--success);
+        font-size: 10px;
+      }
+      .panel-note-list {
+        padding: 3px 10px 12px;
+      }
+      .panel-empty {
+        padding: 20px 12px;
+        font-size: 12px;
+        line-height: 1.65;
+        color: var(--muted-foreground);
+      }
+      .summary-note {
+        border-bottom: 1px solid var(--border);
+        padding: 12px 0;
+      }
+      .summary-note > button {
+        padding: 0;
+        width: 100%;
+        text-align: left;
+      }
+      .summary-note > button:hover {
+        background: transparent;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+      .summary-note p {
+        line-height: 1.55;
+        margin: 7px 0;
+        overflow-wrap: anywhere;
+        font-size: 12px;
+      }
+      .location {
+        font-size: 11px;
+        color: var(--muted-foreground);
+        overflow-wrap: anywhere;
+      }
+      .note-actions {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+      }
+      .note-actions button {
+        font-size: 11px;
+        padding: 3px 5px;
+      }
+      .old-label {
+        color: var(--warning);
+        font-size: 10px;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .diff-pane {
+        min-width: 0;
+        padding: 0 16px 20px;
+      }
+      .diff-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        padding: 10px 0;
+        font-size: 11px;
+        min-height: 39px;
+      }
+      .diff-toolbar > span {
+        flex: 1;
+      }
+      .file-header {
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 10px 12px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 6px 6px 0 0;
+      }
+      .file-header .path {
+        font-size: 11px;
+        overflow-wrap: anywhere;
+        flex: 1;
+      }
+      .file-header .totals {
+        font-size: 11px;
+        color: var(--success);
+        white-space: nowrap;
+      }
+      .diff-scroll {
+        overflow-x: auto;
+        border: 1px solid var(--border);
+        border-top: 0;
+        border-radius: 0 0 6px 6px;
+      }
+      .hunk {
+        padding: 7px 12px;
+        font: 11px var(--font-mono);
+        color: var(--muted-foreground);
+        background: var(--muted);
+        white-space: nowrap;
+      }
+      .diff-row {
+        display: grid;
+        grid-template-columns: 25px 34px 34px 18px minmax(max-content, 1fr);
+        min-height: 25px;
+        font: 11px/25px var(--font-mono);
+        position: relative;
+      }
+      .diff-row.add {
+        background: var(--add-surface);
+      }
+      .diff-row.del {
+        background: var(--delete-surface);
+      }
+      .line-number {
+        padding: 0 4px;
+        font: inherit;
+        text-align: right;
+        border-radius: 0;
+        color: var(--muted-foreground);
+        min-height: 25px;
+        border: 0;
+        user-select: none;
+        touch-action: none;
+      }
+      .line-number:hover:not(:disabled) {
+        background: var(--accent);
+        color: var(--foreground);
+      }
+      .line-number[aria-pressed="true"] {
+        color: var(--ring);
+        background: var(--accent);
+        font-weight: 650;
+      }
+      .empty-line-number {
+        color: transparent;
+      }
+      .sign {
+        text-align: center;
+        color: var(--muted-foreground);
+      }
+      .code {
+        padding-right: 18px;
+        white-space: pre;
+      }
+      .kw {
+        color: var(--syntax);
+      }
+      .str {
+        color: var(--string);
+      }
+      .code-comment {
+        color: var(--muted-foreground);
+      }
+      .diff-row.selected {
+        box-shadow: inset 3px 0 var(--ring);
+        background: var(--accent);
+      }
+      .diff-row.annotated:not(.selected) {
+        box-shadow: inset 2px 0 var(--ring);
+      }
+      .line-number.has-note {
+        color: var(--ring);
+        font-weight: 650;
+      }
+      .gutter-add {
+        padding: 0;
+        border: 0;
+        border-radius: 3px;
+        font: 16px/25px var(--font-sans);
+        color: var(--ring);
+        opacity: 0;
+        min-width: 25px;
+      }
+      .diff-row:hover .gutter-add,
+      .gutter-add:focus-visible,
+      .diff-row.selected .gutter-add {
+        opacity: 1;
+        background: var(--accent);
+      }
+      .inline-note {
+        position: sticky;
+        left: 0;
+        width: 100%;
+        background: var(--background);
+        padding: 12px 15px 13px 26px;
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+        border-left: 3px solid var(--ring);
+      }
+      .inline-note .note-top {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        font-size: 11px;
+      }
+      .inline-note p {
+        margin: 9px 0 7px;
+        font-size: 13px;
+        line-height: 1.65;
+        overflow-wrap: anywhere;
+      }
+      .note-index {
+        width: 19px;
+        height: 19px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        background: var(--accent);
+        color: var(--ring);
+        font-weight: 600;
+        flex: none;
+      }
+      .inline-note .note-actions {
+        gap: 9px;
+      }
+      .inline-note .note-actions button {
+        color: var(--muted-foreground);
+      }
+      .annotation-editor {
+        position: sticky;
+        left: 0;
+        width: 100%;
+        padding: 13px 15px 14px 26px;
+        border-left: 3px solid var(--ring);
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+        background: var(--card);
+      }
+      .annotation-editor h2 {
+        font-size: 12px;
+        margin: 0;
+        font-weight: 550;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .annotation-editor textarea {
+        margin-top: 10px;
+        min-height: 80px;
+      }
+      .annotation-editor .editor-footer {
+        align-items: center;
+      }
+      .shortcut {
+        margin-right: auto;
+        color: var(--muted-foreground);
+        font-size: 10px;
+      }
+      .context-actions {
+        position: sticky;
+        left: 0;
+        width: 100%;
+        padding: 7px 13px 7px 26px;
+        border-left: 3px solid var(--ring);
+        background: var(--card);
+        border-block: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font: 11px var(--font-sans);
+      }
+      .context-actions .location {
+        flex: 1;
+      }
+      .older-feedback {
+        margin-top: 18px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        overflow: hidden;
+      }
+      .older-feedback h2 {
+        margin: 0;
+        padding: 10px 13px;
+        font-size: 12px;
+        font-weight: 550;
+        color: var(--warning);
+        background: var(--card);
+      }
+      .older-feedback .inline-note {
+        border-left-color: var(--warning);
+      }
+      .older-feedback .annotation-editor {
+        border-left-color: var(--warning);
+      }
+      .help-line {
+        font-size: 11px;
+        color: var(--muted-foreground);
+        line-height: 1.6;
+        padding: 11px 0 0;
+      }
+      pre.snippet {
+        font-size: 11px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        border-radius: 5px;
+        padding: 9px 11px;
+        margin: 9px 0;
+        background: var(--muted);
+        color: var(--foreground);
+        max-height: 190px;
+        overflow-y: auto;
+      }
+      textarea {
+        width: 100%;
+        resize: vertical;
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        padding: 9px 10px;
+        background: var(--background);
+        color: var(--foreground);
+        line-height: 1.6;
+      }
+      textarea::placeholder {
+        color: var(--muted-foreground);
+        opacity: 1;
+      }
+      .editor-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 6px;
+        padding-top: 9px;
+      }
+      .form-error {
+        color: var(--destructive);
+        font-size: 12px;
+        line-height: 1.5;
+        margin-top: 7px;
+      }
+      .chat {
+        padding: 22px 24px 18px;
+        max-width: 830px;
+        width: 100%;
+        margin: 0 auto;
+      }
+      .transcript {
+        min-height: 220px;
+      }
+      .turn {
+        margin-bottom: 22px;
+      }
+      .turn .speaker {
+        font-size: 11px;
+        color: var(--muted-foreground);
+        margin-bottom: 7px;
+        display: flex;
+        gap: 7px;
+        align-items: center;
+      }
+      .turn .turn-body {
+        line-height: 1.7;
+        overflow-wrap: anywhere;
+        font-size: 13px;
+        white-space: pre-wrap;
+      }
+      .turn.user {
+        margin-left: 35px;
+      }
+      .turn.user .turn-body {
+        display: inline-block;
+        background: var(--muted);
+        padding: 10px 14px;
+        border-radius: 9px;
+      }
+      .transcript-notes {
+        margin-top: 9px;
+      }
+      .transcript-notes summary {
+        padding: 6px 0;
+        font-size: 12px;
+      }
+      .message-note {
+        padding: 8px 0 10px 12px;
+        border-left: 2px solid var(--border);
+        margin: 8px 0;
+      }
+      .message-note p {
+        margin: 5px 0;
+        line-height: 1.6;
+        font-size: 12px;
+        overflow-wrap: anywhere;
+      }
+      .tool-line {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 11px;
+        color: var(--muted-foreground);
+        padding: 10px 0;
+      }
+      .spinner {
+        width: 11px;
+        height: 11px;
+        border: 1.5px solid var(--border);
+        border-top-color: var(--muted-foreground);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .queue-section {
+        margin: 18px 0 12px;
+      }
+      .queue-heading {
+        font-size: 11px;
+        color: var(--muted-foreground);
+        margin-bottom: 7px;
+      }
+      .queue-message {
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        padding: 10px 12px;
+        margin-bottom: 7px;
+        background: var(--card);
+      }
+      .queue-top {
+        display: flex;
+        align-items: start;
+        gap: 10px;
+      }
+      .queue-top > div {
+        flex: 1;
+        min-width: 0;
+      }
+      .queue-top p {
+        margin: 0 0 5px;
+        font-size: 12px;
+        line-height: 1.5;
+        overflow-wrap: anywhere;
+        white-space: pre-wrap;
+      }
+      .queue-message details {
+        margin-top: 7px;
+        font-size: 11px;
+      }
+      .queue-message summary {
+        padding: 4px 0;
+      }
+      .pending-reminder {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 12px 0;
+        font-size: 12px;
+      }
+      .pending-reminder > span {
+        flex: 1;
+      }
+      .composer {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 5px;
+        background: var(--background);
+      }
+      .composer textarea {
+        border: 0;
+        min-height: 95px;
+        background: transparent;
+        resize: vertical;
+        padding: 10px;
+        font-size: 13px;
+      }
+      .composer textarea:focus-visible {
+        outline-offset: -2px;
+      }
+      .feedback-attachment {
+        margin: 6px;
+        padding: 10px 12px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 7px;
+      }
+      .feedback-attachment > summary {
+        font-size: 12px;
+        padding: 2px 0;
+      }
+      .attachment-item {
+        padding: 11px 0;
+        border-bottom: 1px solid var(--border);
+      }
+      .attachment-item:last-child {
+        border: 0;
+        padding-bottom: 0;
+      }
+      .attachment-item p {
+        font-size: 12px;
+        line-height: 1.6;
+        margin: 7px 0;
+        overflow-wrap: anywhere;
+      }
+      .attachment-item .actions-row {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .attachment-item .actions-row > span {
+        flex: 1;
+      }
+      .attachment-item button {
+        font-size: 11px;
+      }
+      .composer-footer {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px;
+      }
+      .composer-footer .model {
+        font-size: 11px;
+        color: var(--muted-foreground);
+        flex: 1;
+      }
+      .composer-help {
+        color: var(--muted-foreground);
+        font-size: 11px;
+        line-height: 1.6;
+        margin: 9px 1px;
+      }
+      .image-strip {
+        display: flex;
+        gap: 8px;
+        padding: 5px 10px;
+        flex-wrap: wrap;
+      }
+      .image-chip {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        max-width: 100%;
+      }
+      .image-chip img {
+        width: 35px;
+        height: 35px;
+        object-fit: cover;
+        border-radius: 4px;
+        border: 1px solid var(--border);
+      }
+      .image-chip span {
+        font-size: 11px;
+        overflow-wrap: anywhere;
+      }
+      .notice {
+        padding: 11px 12px;
+        background: var(--muted);
+        border-radius: 6px;
+        margin: 12px 0;
+        font-size: 12px;
+        line-height: 1.6;
+      }
+      .error-notice {
+        border-left: 2px solid var(--destructive);
+        color: var(--destructive);
+      }
+      .status-line {
+        min-height: 34px;
+        border-top: 1px solid var(--border);
+        padding: 8px 17px;
+        display: flex;
+        align-items: start;
+        gap: 7px;
+        font-size: 11px;
+        line-height: 1.5;
+        background: var(--background);
+      }
+      .status-line span:last-child {
+        margin-left: auto;
+        white-space: nowrap;
+        color: var(--muted-foreground);
+      }
+      .simulation {
+        border-top: 1px solid var(--border);
+        padding-top: 12px;
+        margin-top: 16px;
+      }
+      .simulation > summary {
+        font-size: 12px;
+        color: var(--muted-foreground);
+        padding: 5px 0;
+      }
+      .simulation-content {
+        padding-top: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .simulation-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+      }
+      .simulation label {
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .simulation select {
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        background: var(--background);
+        color: var(--foreground);
+        padding: 6px 8px;
+        max-width: 100%;
+      }
+      .simulation p {
+        color: var(--muted-foreground);
+        font-size: 11px;
+        line-height: 1.6;
+        margin: 0;
+      }
+      .simulation input[type="checkbox"] {
+        accent-color: var(--ring);
+      }
+      .removed {
+        padding: 70px 24px;
+        min-height: 640px;
+        text-align: center;
+        background: var(--background);
+      }
+      .removed h1 {
+        font-size: 17px;
+        font-weight: 550;
+      }
+      .removed p {
+        color: var(--muted-foreground);
+        line-height: 1.7;
+      }
+      dialog {
+        width: min(440px, calc(100% - 32px));
+        padding: 24px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        color: var(--foreground);
+        background: var(--background);
+      }
+      dialog::backdrop {
+        background: #0008;
+      }
+      dialog h2 {
+        font-size: 16px;
+        font-weight: 550;
+        margin: 0 0 12px;
+      }
+      dialog p {
+        color: var(--muted-foreground);
+        font-size: 13px;
+        line-height: 1.7;
+        margin: 0 0 20px;
+      }
+      .dialog-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+      .dialog-actions .danger {
+        border-color: var(--destructive);
+      }
+      @media (max-width: 1000px) {
+        .app {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .agent-panel {
+          display: none;
+        }
+      }
+      @media (max-width: 570px) {
+        :root {
+          font-size: 13px;
+        }
+        .app {
+          min-height: 680px;
+        }
+        .agent-header {
+          padding: 8px 10px;
+          gap: 5px 8px;
+        }
+        .branch {
+          display: none;
+        }
+        .nav {
+          margin-left: auto;
+        }
+        .agent-header .header-spacer {
+          display: none;
+        }
+        .changes-heading {
+          padding: 10px;
+        }
+        .changes-heading > span {
+          width: 100%;
+        }
+        .changes-heading .primary {
+          margin-left: 0;
+        }
+        .changes-grid {
+          display: flex;
+          flex-direction: column;
+          min-height: 0;
+        }
+        .file-panel {
+          border-right: 0;
+          border-bottom: 1px solid var(--border);
+        }
+        .panel-tabs {
+          padding: 6px 8px;
+        }
+        .file-list {
+          display: flex;
+          gap: 5px;
+          padding: 5px 8px;
+          flex-wrap: wrap;
+        }
+        .folder {
+          display: none;
+        }
+        .file-button {
+          width: auto;
+          min-height: 40px;
+          font-size: 11px;
+        }
+        .panel-note-list {
+          max-height: 260px;
+          overflow-y: auto;
+        }
+        .panel-empty {
+          padding: 10px 12px;
+        }
+        .diff-pane {
+          padding: 0 10px 14px;
+        }
+        .diff-toolbar {
+          padding: 8px 0;
+        }
+        .diff-toolbar > span {
+          width: 100%;
+          flex-basis: 100%;
+        }
+        .diff-row {
+          grid-template-columns: 32px 40px 40px 16px minmax(max-content, 1fr);
+          font-size: 11px;
+          line-height: 40px;
+        }
+        .gutter-add {
+          opacity: 0.75;
+          min-height: 40px;
+        }
+        .line-number {
+          min-height: 40px;
+        }
+        .update {
+          margin: 10px 10px 0;
+          flex-wrap: wrap;
+        }
+        .update span {
+          flex-basis: 180px;
+        }
+        .chat {
+          padding: 18px 12px 10px;
+        }
+        .turn.user {
+          margin-left: 12px;
+        }
+        .status-line {
+          padding: 8px 10px;
+          flex-wrap: wrap;
+        }
+        .status-line span:last-child {
+          margin-left: 0;
+        }
+        .simulation select {
+          font-size: 16px;
+        }
+        textarea {
+          font-size: 16px !important;
+        }
+        .simulation-row {
+          gap: 8px;
+        }
+      }
+      @media (pointer: coarse) {
+        button {
+          min-height: 44px;
+        }
+        .line-number {
+          min-height: 44px;
+        }
+        .gutter-add {
+          opacity: 0.75;
+          min-height: 44px;
+        }
+        .diff-row {
+          grid-template-columns: 44px 44px 44px 16px minmax(max-content, 1fr);
+          line-height: 44px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation: none !important;
+          scroll-behavior: auto !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!--
 Prototype: review retry-delivery changes, collect original-code Feedback notes, stage into the
 same Agent's composer, then send or queue. Glass source supplies neutrals, restrained header,
 file tree, unified diff, transcript, and composer. No build, live GitHub, Agent, or host calls.
@@ -258,374 +1160,1009 @@ rejected acceptance, queued/canceled/cancel-too-late, running/done/failed Turn, 
 expired Sandbox, removed Agent, persistence recovery, desktop/mobile/reduced motion.
 Local browser storage is best-effort and scoped to this standalone prototype.
 -->
-<div id="prototype">
-  <div id="app"></div>
-  <div class="status-line"><span id="status" role="status" aria-live="polite">Select code or use the gutter + to add feedback.</span><span id="storage-status">Local prototype</span></div>
-  <details class="simulation" id="simulation" open>
-    <summary>Prototype controls</summary>
-    <div class="simulation-content">
-      <div class="simulation-row">
-        <label>Agent <select id="agent-state"><option value="working">Working</option><option value="idle">Idle</option><option value="waiting">Waiting for your answer</option><option value="gone">Sandbox expired</option></select></label>
-        <label>Next send <select id="send-result"><option value="accept">Accept message</option><option value="reject">Reject once</option><option value="turn-fails">Accept, then fail Turn</option></select></label>
+    <div id="prototype">
+      <div id="app"></div>
+      <div class="status-line">
+        <span id="status" role="status" aria-live="polite"
+          >Select code or use the gutter + to add feedback.</span
+        ><span id="storage-status">Local prototype</span>
       </div>
-      <div class="simulation-row">
-        <button class="outline small" id="new-code">Make newer changes</button>
-        <button class="outline small" id="finish-turn">Finish current Turn</button>
-        <button class="outline small" id="reopen">Reopen saved Agent</button>
-        <button class="outline small" id="remove-agent">Remove Agent</button>
-        <button class="small" id="reset">Reset prototype</button>
-      </div>
-      <label><input type="checkbox" id="cancel-race"> Start the queued message just before cancellation</label>
-      <p>Sample code, annotation, and Agent replies. All actions stay in this file; no Agent, repository, or Sandbox is changed. Select code or drag line numbers to annotate. For keyboard ranges, focus a line number and use Shift + ↑/↓, then Enter.</p>
+      <details class="simulation" id="simulation" open>
+        <summary>Prototype controls</summary>
+        <div class="simulation-content">
+          <div class="simulation-row">
+            <label
+              >Agent
+              <select id="agent-state">
+                <option value="working">Working</option>
+                <option value="idle">Idle</option>
+                <option value="waiting">Waiting for your answer</option>
+                <option value="gone">Sandbox expired</option>
+              </select></label
+            >
+            <label
+              >Next send
+              <select id="send-result">
+                <option value="accept">Accept message</option>
+                <option value="reject">Reject once</option>
+                <option value="turn-fails">Accept, then fail Turn</option>
+              </select></label
+            >
+          </div>
+          <div class="simulation-row">
+            <button class="outline small" id="new-code">Make newer changes</button>
+            <button class="outline small" id="finish-turn">Finish current Turn</button>
+            <button class="outline small" id="reopen">Reopen saved Agent</button>
+            <button class="outline small" id="remove-agent">Remove Agent</button>
+            <button class="small" id="reset">Reset prototype</button>
+          </div>
+          <label
+            ><input type="checkbox" id="cancel-race" /> Start the queued message just before
+            cancellation</label
+          >
+          <p>
+            Sample code, annotation, and Agent replies. All actions stay in this file; no Agent,
+            repository, or Sandbox is changed. Select code or drag line numbers to annotate. For
+            keyboard ranges, focus a line number and use Shift + ↑/↓, then Enter.
+          </p>
+        </div>
+      </details>
     </div>
-  </details>
-</div>
-<dialog id="confirm-dialog" aria-labelledby="confirm-title" aria-describedby="confirm-description">
-  <h2 id="confirm-title"></h2><p id="confirm-description"></p>
-  <div class="dialog-actions"><button class="outline" id="confirm-cancel">Keep exploring</button><button class="danger outline" id="confirm-accept">Reset prototype</button></div>
-</dialog>
-<input id="image-input" type="file" accept="image/*" hidden>
-<script>
-(() => {
-  'use strict';
-  const KEY = 'glass.agent-feedback.prototype.v1';
-  const $ = id => document.getElementById(id);
-  const escape = value => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-  const clone = value => JSON.parse(JSON.stringify(value));
-  const uid = () => globalThis.crypto?.randomUUID?.() ?? `n${Date.now()}${Math.random().toString(16).slice(2)}`;
-  const icons = {
-    branch: '<path d="M6 3v10a3 3 0 0 0 3 3h3M12 5v3a4 4 0 0 1-4 4"/><circle cx="6" cy="3" r="2"/><circle cx="12" cy="3" r="2"/><circle cx="14" cy="16" r="2"/>',
-    note: '<path d="M3 3h14v11H8l-5 3z"/><path d="M6 7h8M6 10h5"/>',
-    changes: '<path d="M5 2h8l4 4v12H5zM12 2v5h5M8 11h6M11 8v6"/>',
-    chat: '<path d="M3 3h14v11H8l-5 3z"/>',
-    arrow: '<path d="M10 17V3M4 9l6-6 6 6"/>',
-    attach: '<path d="m7 10 5-5a3 3 0 0 1 4 4l-7 7a4 4 0 0 1-6-6l7-7M6 12l6-6"/>',
-    check: '<path d="m4 10 4 4 8-9"/>',
-    close: '<path d="m5 5 10 10M15 5 5 15"/>',
-    folder: '<path d="M2 5h6l2 2h8v10H2z"/>',
-  };
-  const icon = name => `<svg class="icon" viewBox="0 0 20 20" aria-hidden="true">${icons[name] || icons.note}</svg>`;
-  const files = [
-    {id: 'retry', name: 'retryDelivery.ts', path: 'apps/server/src/agentHost/retryDelivery.ts'},
-    {id: 'test', name: 'retryDelivery.test.ts', path: 'apps/server/src/agentHost/retryDelivery.test.ts'},
-  ];
-  const row = (old, next, text, kind = 'context') => ({old, new: next, text, kind});
-  function rowsFor(file, version) {
-    if (file === 'test') return [
-      row(1,1,'import { expect, it } from "vitest"'), row(2,2,'import { deliverWithRetry } from "./retryDelivery"'), row(3,3,''),
-      row(null,4,'it("delivers a message", async () => {','add'), row(null,5,'  let delivered = false','add'),
-      row(null,6,'  await deliverWithRetry(async () => {','add'), row(null,7,'    delivered = true','add'), row(null,8,'  })','add'),
-      row(null,9,'  expect(delivered).toBe(true)','add'), row(null,10,'})','add'),
-      ...(version === 2 ? [row(null,11,'','add'), row(null,12,'// Add a failing-delivery test next.','add')] : []),
-    ];
-    return [
-      row(1,1,'export async function deliverWithRetry('), row(2,2,'  send: () => Promise<void>,'), row(3,3,') {'),
-      row(4,null,'  return send()','del'), row(null,4,'  let attempts = 0','add'),
-      row(null,5,version === 1 ? '  while (true) {' : '  while (attempts < 3) {','add'),
-      row(null,6,'    try {','add'), row(null,7,'      await send()','add'), row(null,8,'      return','add'),
-      row(null,9,'    } catch (error) {','add'), row(null,10,'      attempts += 1','add'),
-      ...(version === 2 ? [row(null,11,'      if (attempts === 3) throw error','add'),row(null,12,'      await delay(500)','add'),row(null,13,'    }','add'),row(null,14,'  }','add'),row(5,15,'}')] :
-        [row(null,11,'      await delay(500)','add'),row(null,12,'    }','add'),row(null,13,'  }','add'),row(5,14,'}')]),
-    ];
-  }
-  const initial = () => ({version: 1, latest: 1, tab: 'changes', panel: 'files', file: 'retry', notes: [{id:'example-retry-limit',file:'retry',side:'new',start:5,end:11,version:1,snippet:rowsFor('retry',1).filter(r=>r.new>=5&&r.new<=11).map(r=>r.text).join('\n'),text:'Cap retries at three attempts, then rethrow the original error.'}], staged: [],
-    message: 'Please keep the change focused on delivery retries.', images: [], queue: [], messages: [],
-    agent: 'working', initialFinished: false, removed: false});
-  let memory = null, storageAvailable = false;
-  try { localStorage.setItem(KEY + '.check', '1'); localStorage.removeItem(KEY + '.check'); storageAvailable = true; } catch {}
-  let state;
-  try { state = storageAvailable && localStorage.getItem(KEY) ? JSON.parse(localStorage.getItem(KEY)) : initial(); } catch { state = initial(); }
-  if (!state || !Array.isArray(state.notes) || !Array.isArray(state.messages) || !Array.isArray(state.staged) || !Array.isArray(state.queue)) state = initial();
-  let selection = null, anchor = null, editor = null, busy = false, error = '', editorError = '', dialogTrigger = null, dragging = false, dragOrigin = null, dragMoved = false, suppressLineClick = false;
-  function save() {
-    memory = clone(state);
-    if (storageAvailable) try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { storageAvailable = false; }
-    $('storage-status').textContent = storageAvailable ? 'Saved in this browser' : 'Kept for this prototype session';
-  }
-  function announce(message) { $('status').textContent = message; }
-  function focus(id) { $(id)?.focus(); }
-  const currentFile = () => files.find(file => file.id === state.file);
-  const pendingStaged = () => state.notes.filter(note => state.staged.includes(note.id));
-  const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
-  const totals = file => { const rows=rowsFor(file.id,state.version);return {added:rows.filter(row=>row.kind==='add').length,deleted:rows.filter(row=>row.kind==='del').length}; };
-  const location = note => `${files.find(file => file.id === note.file).name} · ${note.side === 'new' ? 'new' : 'old'} ${note.start === note.end ? 'line ' + note.start : 'lines ' + note.start + '–' + note.end}`;
-  const older = note => note.version !== state.version;
-  function oldBadge(note) { return older(note) ? '<span class="old-label">◷ Older version</span>' : ''; }
-  function syntax(text) {
-    return text.split(/("[^"]*"|\b(?:export|async|function|return|let|while|true|try|await|catch|if|throw|import|from|const)\b)/g).map(part =>
-      /^"/.test(part) ? `<span class="str">${escape(part)}</span>` : /^(export|async|function|return|let|while|true|try|await|catch|if|throw|import|from|const)$/.test(part) ? `<span class="kw">${part}</span>` : escape(part)).join('');
-  }
-  function noteActions(note, prefix = '') {
-    return `<div class="note-actions"><button data-action="edit" data-id="${note.id}" aria-label="Edit feedback: ${escape(note.text)}">Edit</button><button data-action="delete" data-id="${note.id}" aria-label="Remove feedback: ${escape(note.text)}">Remove</button>${prefix === 'panel' ? `<button data-action="copy-note" data-id="${note.id}">Copy</button>` : ''}</div>`;
-  }
-  function noteSummary(note) {
-    return `<article class="summary-note"><button data-action="open-note" data-id="${note.id}" class="location">${escape(location(note))}</button><p>${escape(note.text)}</p>${oldBadge(note)}${noteActions(note,'panel')}</article>`;
-  }
-  function renderSidebar() {
-    if (state.panel === 'files') return `<div class="file-list"><div class="folder">apps/server/src/agentHost</div>${files.map(file => `<button class="file-button" data-action="file" data-file="${file.id}" aria-current="${state.file === file.id}">${icon('changes')}<span class="filename">${file.name}</span><span class="added">+${totals(file).added}</span>${state.notes.some(n => n.file === file.id) ? '<span class="dot" style="color:var(--ring)"></span>' : ''}</button>`).join('')}</div>`;
-    return state.notes.length ? `<div class="panel-note-list">${state.notes.map(noteSummary).join('')}</div>` : '<div class="panel-empty">No feedback yet.<br>Select a line or range in the diff, then add a note.</div>';
-  }
-  function selected(rowData, side) { const value = rowData[side]; return selection && selection.side === side && value !== null && value >= selection.start && value <= selection.end; }
-  function numberButton(data, side) {
-    if (data[side] === null) return '<span class="empty-line-number"></span>';
-    const pressed = !!selected(data,side);
-    const annotated = state.notes.some(note=>note.file===state.file&&note.version===state.version&&note.side===side&&data[side]>=note.start&&data[side]<=note.end);
-    return `<button class="line-number ${annotated?'has-note':''}" data-action="line" data-side="${side}" data-line="${data[side]}" aria-label="Select ${side} line ${data[side]}" aria-pressed="${pressed}">${data[side]}</button>`;
-  }
-  function editorHtml() {
-    if (!editor) return '';
-    return `<form id="note-form" class="annotation-editor" aria-label="${editor.id ? 'Edit' : 'Add'} Feedback note"><h2>${icon('note')}${editor.id?'Edit feedback':'Add feedback'} <span class="location">${escape(editor.side==='new'?'New':'Old')} ${editor.start===editor.end?'line '+editor.start:'lines '+editor.start+'–'+editor.end}</span>${oldBadge(editor)}</h2>${older(editor)?`<pre class="snippet">${escape(editor.snippet)}</pre>`:''}<label for="note-text" class="sr-only">Feedback on selected code</label><textarea id="note-text" rows="3" placeholder="What should the Agent change here?" aria-invalid="${!!editorError}" aria-describedby="note-error">${escape(editor.text)}</textarea><div id="note-error" class="form-error" role="alert">${escape(editorError)}</div><div class="editor-footer"><span class="shortcut">Ctrl / ⌘ + Enter to save</span><button type="button" data-action="cancel-editor">Cancel</button><button type="submit" class="primary">${editor.id?'Save changes':'Add note'}</button></div></form>`;
-  }
-  function inlineNote(note, detached=false) {
-    if(editor?.id===note.id)return editorHtml();
-    return `<article class="inline-note" tabindex="-1" data-note-id="${note.id}" aria-label="Feedback on ${escape(location(note))}"><div class="note-top"><span class="note-index">${state.notes.indexOf(note)+1}</span><strong>You</strong><span class="location">${escape(note.side==='new'?'New':'Old')} ${note.start===note.end?'line '+note.start:'lines '+note.start+'–'+note.end}</span><span class="muted">· Unsent</span>${oldBadge(note)}</div>${detached?`<pre class="snippet">${escape(note.snippet)}</pre>`:''}<p>${escape(note.text)}</p>${noteActions(note)}</article>`;
-  }
-  function renderDiff() {
-    const file = currentFile(), rows = rowsFor(file.id,state.version);
-    const selectedLabel = selection ? `${selection.side === 'new' ? 'New' : 'Old'} ${selection.start === selection.end ? 'line ' + selection.start : 'lines ' + selection.start + '–' + selection.end}` : 'Select code or use + in the gutter to annotate.';
-    const notes=state.notes.filter(note=>note.file===file.id&&note.version===state.version);
-    const stale=state.notes.filter(note=>note.file===file.id&&note.version!==state.version);
-    const lineHtml=rows.map(data=>{
-      const inline=notes.filter(note=>data[note.side]===note.end);
-      const annotated=notes.some(note=>data[note.side]!==null&&data[note.side]>=note.start&&data[note.side]<=note.end);
-      const side=data.new===null?'old':'new',line=data[side];
-      const target=selection&&data[selection.side]===selection.end;
-      const composeHere=editor&&editor.file===file.id&&editor.version===state.version&&!editor.id&&data[editor.side]===editor.end;
-      return `<div class="diff-row ${data.kind} ${annotated?'annotated':''} ${selected(data,'old')||selected(data,'new')?'selected':''}" data-old="${data.old??''}" data-new="${data.new??''}"><button class="gutter-add" data-action="gutter-note" data-side="${side}" data-line="${line}" aria-label="Add feedback on ${side} line ${line}">+</button>${numberButton(data,'old')}${numberButton(data,'new')}<span class="sign">${data.kind==='add'?'+':data.kind==='del'?'−':''}</span><code class="code">${syntax(data.text)}</code></div>${inline.map(note=>inlineNote(note)).join('')}${composeHere?editorHtml():target&&!editor?`<div class="context-actions"><span class="location">${selectedLabel}</span><button class="outline small icon" id="add-note" data-action="add-note">${icon('note')}Add feedback</button><button class="small" data-action="clear-selection" aria-label="Clear selected lines">×</button></div>`:''}`;
-    }).join('');
-    const staleEditor=editor&&editor.file===file.id&&editor.version!==state.version&&!editor.id?editorHtml():'';
-    return `<div class="diff-toolbar"><span class="muted" id="selection-label">${selectedLabel}</span></div><section aria-label="${file.name} diff"><div class="file-header"><span class="path mono">${file.path}</span><span class="totals">+${totals(file).added} <span style="color:var(--destructive)">−${totals(file).deleted}</span></span></div><div class="diff-scroll"><div class="hunk">@@ −1,${file.id==='retry'?'5':'3'} +1,${rows.filter(row=>row.new!==null).length} @@</div>${lineHtml}</div></section>${stale.length||staleEditor?`<section class="older-feedback" aria-label="Feedback on an older version"><h2>Earlier feedback · original code preserved</h2>${stale.map(note=>inlineNote(note,true)).join('')}${staleEditor}</section>`:''}<div class="help-line">Feedback stays beside its code until you send it to the Agent.</div>`;
-  }
-  function renderChanges() {
-    return `<div class="changes-heading"><span class="muted">Changes since <span class="mono">main</span>, including uncommitted work</span><button id="stage-feedback" class="primary icon" data-action="stage" ${!state.notes.length || busy ? 'disabled' : ''}>${icon('note')}Review feedback${state.notes.length ? ` (${state.notes.length})` : ''}</button></div>${state.latest > state.version ? `<div class="update"><span>The Agent has worked since you opened these changes.</span><button class="outline small" id="show-latest" data-action="latest" ${busy ? 'disabled' : ''}>Show latest</button></div>` : ''}${state.agent === 'gone' ? '<div class="update"><span>Sandbox expired. Previously displayed code and saved notes remain available.</span></div>' : ''}<div class="changes-grid"><aside class="file-panel" aria-label="Files and feedback"><div class="panel-tabs" role="tablist" aria-label="Changes panel"><button role="tab" id="files-tab" aria-selected="${state.panel === 'files'}" aria-controls="panel-content" data-action="panel" data-panel="files">Files <span class="count">2</span></button><button role="tab" id="feedback-tab" aria-selected="${state.panel === 'feedback'}" aria-controls="panel-content" data-action="panel" data-panel="feedback">Feedback <span class="count">${state.notes.length}</span></button></div><div id="panel-content" role="tabpanel" aria-labelledby="${state.panel === 'files' ? 'files-tab' : 'feedback-tab'}">${renderSidebar()}</div></aside><div class="diff-pane" id="diff-pane">${renderDiff()}</div></div>`;
-  }
-  function frozenNotes(notes) {
-    return notes.map(note => `<div class="message-note"><div class="location">${escape(location(note))} · version ${note.version}</div><p>${escape(note.text)}</p><pre class="snippet">${escape(note.snippet)}</pre></div>`).join('');
-  }
-  function attachmentHtml() {
-    const notes = pendingStaged();
-    if (!notes.length) return '';
-    return `<details class="feedback-attachment" id="feedback-attachment" open><summary>${plural(notes.length,'Feedback note')} <span class="muted">· attached to this message</span></summary>${notes.map(note => `<article class="attachment-item"><div class="actions-row"><span class="location">${escape(location(note))}</span>${oldBadge(note)}</div><p>${escape(note.text)}</p><details><summary class="location">Original code</summary><pre class="snippet">${escape(note.snippet)}</pre></details>${noteActions(note)}</article>`).join('')}</details>`;
-  }
-  function imagesHtml(images, editable = false) {
-    if (!images.length) return '';
-    return `<div class="image-strip">${images.map((image,index) => `<div class="image-chip"><img src="${escape(image.data)}" alt="${escape(image.name)}"><span>${escape(image.name)}</span>${editable ? `<button data-action="remove-image" data-index="${index}" aria-label="Remove image ${escape(image.name)}">×</button>` : ''}</div>`).join('')}</div>`;
-  }
-  function renderChat() {
-    const staged = pendingStaged(), remaining = state.notes.filter(n => !state.staged.includes(n.id));
-    const blocked = state.agent === 'waiting' || state.agent === 'gone';
-    const empty = !staged.length && !state.message.trim() && !state.images.length;
-    return `<div class="chat"><section class="transcript" aria-label="Conversation"><div class="turn user"><div class="speaker">You</div><div class="turn-body">Make delivery retry transient failures without losing the queued message.</div></div><div class="turn"><div class="speaker">${icon('chat')}Claude Code</div><div class="turn-body">I’ve added delivery retries and a test for successful delivery. You can review the changes while I finish.</div>${!state.initialFinished && state.agent === 'working' ? '<div class="tool-line"><span class="spinner"></span>Reading retryDelivery.test.ts</div>' : ''}</div>${state.messages.map(message => `<article class="turn user"><div class="speaker">You${message.notes.length ? ' · Feedback' : ''}</div><div class="turn-body">${escape(message.text || 'Feedback on your changes')}</div>${imagesHtml(message.images)}${message.notes.length ? `<details class="transcript-notes"><summary>${plural(message.notes.length,'Feedback note')}</summary>${frozenNotes(message.notes)}</details>` : ''}</article><article class="turn"><div class="speaker">${icon('chat')}Claude Code</div>${message.outcome === 'working' ? '<div class="tool-line"><span class="spinner"></span>Working through your feedback…</div>' : message.outcome === 'failed' ? `<div class="notice error-notice">The Turn failed. Your feedback is kept above.</div><button class="outline small" data-action="retry-message" data-id="${message.id}">Use message again</button>` : '<div class="turn-body">I’ve capped retries at three attempts and kept the final error. I’ll cover the failure path in the test too.</div>'}</article>`).join('')}</section>${state.queue.length ? `<section class="queue-section" aria-label="Queued messages"><div class="queue-heading">Starts when the Agent finishes</div>${state.queue.map(message => `<article class="queue-message"><div class="queue-top"><div><p>${escape(message.text || 'Feedback on your changes')}</p><span class="location">${plural(message.notes.length,'Feedback note')} · Queued</span></div><button class="small" data-action="cancel-queued" data-id="${message.id}" aria-label="Cancel queued feedback">Cancel</button></div>${message.notes.length ? `<details><summary>View feedback</summary>${frozenNotes(message.notes)}</details>` : ''}${imagesHtml(message.images)}</article>`).join('')}</section>` : ''}${remaining.length ? `<div class="pending-reminder"><span>${plural(remaining.length,'unsent Feedback note')} in Changes</span><button class="outline small" data-action="stage">Review feedback</button></div>` : ''}${state.agent === 'waiting' ? '<div class="notice">The Agent is waiting for your answer. Answer its Question before sending another message.</div>' : ''}${state.agent === 'gone' ? '<div class="notice">This Agent’s Sandbox expired. Your conversation and feedback are kept here. You can read or copy the notes in Changes.</div>' : ''}${error ? `<div class="notice error-notice" id="send-error" role="alert">${escape(error)}</div>` : ''}<section class="composer" aria-label="Message composer">${attachmentHtml()}${imagesHtml(state.images,true)}<label for="message-text" class="sr-only">Message to Agent</label><textarea id="message-text" rows="3" placeholder="Message this Agent…" ${busy || state.agent === 'gone' ? 'disabled' : ''}>${escape(state.message)}</textarea><div class="composer-footer"><button class="icon" data-action="attach" aria-label="Attach an image" ${busy || state.agent === 'gone' ? 'disabled' : ''}>${icon('attach')}</button><span class="model">Claude Code <span class="muted">· Sonnet</span></span><button id="send-message" class="primary icon" data-action="send" ${busy || blocked || empty ? 'disabled' : ''}>${busy ? '<span class="spinner"></span>Sending…' : `${icon('arrow')}${state.agent === 'working' ? 'Queue message' : 'Send'}`}</button></div></section><div class="composer-help">${state.agent === 'working' ? 'Your message waits for the next Turn. The Agent can keep working while you write.' : state.agent === 'waiting' ? 'Sending is unavailable while a Question is waiting.' : state.agent === 'gone' ? 'Sending is unavailable because this Sandbox expired.' : 'Feedback is sent with its original code and locations.'}</div></div>`;
-  }
-  function render() {
-    if (state.removed) {
-      $('app').innerHTML = '<section class="removed"><h1>Agent removed</h1><p>Its conversation and unsent feedback have been removed from this prototype.</p><button class="outline" data-action="reset">Start again</button></section>';
-    } else {
-      const status = state.agent === 'working' ? 'Working' : state.agent === 'idle' ? 'Ready' : state.agent === 'waiting' ? 'Waiting on you' : 'Sandbox expired';
-      $('app').innerHTML = `<div class="app"><aside class="agent-panel" aria-label="Agents"><div class="panel-title">Agents ${icon('chat')}</div><div class="agent-group">Local</div><div class="agent-entry"><div class="agent-repo">k-dang/project-glass</div><div class="agent-name">cedar</div><div class="agent-status ${state.agent === 'idle' ? 'ready' : 'working'}"><span class="dot"></span>${status}</div></div><p class="scope-note">Review the Agent’s work, then send your notes back to the same conversation.</p></aside><main class="workspace"><header class="agent-header"><h1 class="heading">cedar</h1><span class="muted">/</span><span class="heading">${state.tab === 'changes' ? 'Changes' : 'Chat'}</span><span class="header-spacer"></span><span class="branch">${icon('branch')}cedar <span class="muted">from main</span></span><nav class="nav" aria-label="Agent views"><button data-action="tab" data-tab="chat" aria-current="${state.tab === 'chat' ? 'page' : 'false'}" class="icon">${icon('chat')}Chat</button><button data-action="tab" data-tab="changes" aria-current="${state.tab === 'changes' ? 'page' : 'false'}" class="icon">${icon('changes')}Changes${state.notes.length ? `<span class="count">${state.notes.length}</span>` : ''}</button></nav></header>${state.tab === 'changes' ? renderChanges() : renderChat()}</main></div>`;
-    }
-    $('agent-state').value = state.agent;
-    $('finish-turn').disabled = state.removed || state.agent !== 'working' || busy;
-    $('new-code').disabled = state.removed || state.latest === 2 || state.agent === 'gone' || busy;
-    $('remove-agent').disabled = state.removed || busy;
-    $('reset').disabled = busy;
-    $('reopen').disabled = busy;
-    $('agent-state').disabled = state.removed || busy;
-    $('send-result').disabled = state.removed || busy;
-    $('cancel-race').disabled = state.removed || busy;
-    save();
-  }
-  function selectLine(side, line, extend) {
-    if (busy) return false;
-    if(editor&&(editor.id||editor.text.trim())){announce('Save or cancel the current note before selecting another range.');return false;}
-    if (!extend || !anchor || anchor.side !== side) anchor = {side,line};
-    selection = {side,start:Math.min(anchor.line,line),end:Math.max(anchor.line,line)};
-    editor = null; editorError = '';
-    const pane = $('diff-pane'), oldScroll = pane.querySelector('.diff-scroll')?.scrollLeft || 0;
-    pane.innerHTML = renderDiff();
-    pane.querySelector('.diff-scroll').scrollLeft = oldScroll;
-    const button = pane.querySelector(`.line-number[data-side="${side}"][data-line="${line}"]`);
-    if (!dragging) button?.focus({preventScroll:true});
-    return true;
-  }
-  function addNote() {
-    if (!selection) return;
-    const data = rowsFor(state.file,state.version).filter(r => r[selection.side] !== null && r[selection.side] >= selection.start && r[selection.side] <= selection.end);
-    editor = {...selection,file:state.file,version:state.version,snippet:data.map(r => r.text).join('\n'),text:''};
-    editorError = ''; render(); $('note-form')?.scrollIntoView({block:'nearest',inline:'nearest'}); focus('note-text');
-  }
-  function stage() {
-    if (!state.notes.length || busy) return;
-    if(editor?.text.trim()){announce('Save or cancel the open note before reviewing your feedback.');focus('note-text');return;}
-    state.staged = state.notes.map(n => n.id); state.tab = 'chat'; editor = null; error = ''; render();
-    announce(`${plural(state.staged.length,'Feedback note')} added to your message. Existing text and images are kept.`); focus('message-text');
-  }
-  function editNote(id) {
-    const note = state.notes.find(n => n.id === id); if (!note || busy) return;
-    editor = clone(note); editorError = ''; state.tab = 'changes'; state.file = note.file;
-    selection = note.version === state.version ? {side:note.side,start:note.start,end:note.end} : null;
-    render(); $('note-form')?.scrollIntoView({block:'nearest',inline:'nearest'}); focus('note-text');
-  }
-  async function send() {
-    if (busy || state.agent === 'waiting' || state.agent === 'gone' || state.removed) return;
-    const notes = clone(pendingStaged()); if (!notes.length && !state.message.trim() && !state.images.length) return;
-    const result = $('send-result').value;
-    const message = {id:uid(),text:state.message.trim(),images:clone(state.images),notes,fail:result === 'turn-fails',outcome:'working'};
-    busy = true; error = ''; render(); announce('Sending feedback…');
-    await new Promise(resolve => setTimeout(resolve, 500));
-    busy = false; $('send-result').value = 'accept';
-    if (result === 'reject') { error = 'Couldn’t send the message. Your text, images, and Feedback notes are still here. Try again.'; render(); announce('Send failed. All unsent feedback is kept.'); focus('send-message'); return; }
-    const sentIds = new Set(notes.map(n => n.id));
-    state.notes = state.notes.filter(n => !sentIds.has(n.id)); state.staged = state.staged.filter(id => !sentIds.has(id)); state.message = ''; state.images = [];
-    if (state.agent === 'working') { state.queue.push(message); announce('Feedback queued for the next Turn. Cancel returns the notes to Changes.'); }
-    else { state.messages.push(message); state.agent = 'working'; state.initialFinished = true; announce('Feedback accepted. The Agent has started a Turn.'); }
-    render(); focus('message-text');
-  }
-  function startNext() {
-    const message = state.queue.shift();
-    if (message) { message.outcome = 'working'; state.messages.push(message); state.agent = 'working'; state.initialFinished = true; }
-    return message;
-  }
-  function finishTurn() {
-    if (state.agent !== 'working' || busy) return;
-    const running = state.messages.find(m => m.outcome === 'working');
-    if (running) running.outcome = running.fail ? 'failed' : 'done';
-    state.initialFinished = true; state.agent = 'idle'; state.latest = 2;
-    const next = startNext(); render();
-    announce(next ? 'The previous Turn finished. Queued feedback has started.' : running?.fail ? 'The Turn failed. Sent feedback stays in the conversation.' : 'The Turn finished. You can show the latest changes.');
-  }
-  function cancelQueued(id) {
-    if (busy) return;
-    const index = state.queue.findIndex(m => m.id === id); if (index < 0) { announce('That message has already started. Its feedback stays in the conversation.'); return; }
-    if ($('cancel-race').checked) {
-      const previous = state.messages.find(m => m.outcome === 'working'); if (previous) previous.outcome = previous.fail ? 'failed' : 'done';
-      state.initialFinished = true; const message = state.queue.splice(index,1)[0]; state.messages.push(message); state.agent = 'working';
-      $('cancel-race').checked = false; render(); announce('Too late to cancel: the message has already started. Its notes stay in the conversation.'); focus('message-text'); return;
-    }
-    const message = state.queue.splice(index,1)[0];
-    const pendingIds = new Set(state.notes.map(n => n.id));
-    state.notes.push(...message.notes.filter(note => !pendingIds.has(note.id)));
-    render(); announce(`Queued message canceled. ${plural(message.notes.length,'Feedback note')} returned to Changes. Your newer message is kept.`); focus('message-text');
-  }
-  function noteText(note) { return `${files.find(f=>f.id===note.file).path} (${note.side} ${note.start}–${note.end}, version ${note.version})\n${note.snippet}\n\n${note.text}`; }
-  async function copyNote(id) {
-    const note = state.notes.find(n => n.id === id); if (!note) return;
-    try { await navigator.clipboard.writeText(noteText(note)); announce('Feedback and original code copied.'); }
-    catch {
-      const area = document.createElement('textarea'); area.value = noteText(note); area.style.position = 'fixed'; area.style.left = '-10000px'; document.body.append(area); area.select();
-      let copied = false; try { copied = document.execCommand('copy'); } catch {}
-      area.remove(); announce(copied ? 'Feedback and original code copied.' : 'Copy is unavailable here. Open the note and select its text to copy.');
-    }
-  }
-  function confirmReset(trigger) {
-    dialogTrigger = trigger;
-    $('confirm-title').textContent = 'Reset this prototype?';
-    $('confirm-description').textContent = 'This clears the sample messages, images, and feedback stored by this prototype. It does not affect Glass.';
-    $('confirm-dialog').showModal(); $('confirm-cancel').focus();
-  }
-  function remove() { state.notes = []; state.queue = []; state.messages = []; state.staged = []; state.message = ''; state.images = []; state.removed = true; editor = null; render(); announce('Agent and its local feedback removed from the prototype.'); document.querySelector('[data-action="reset"]')?.focus(); }
-  function reset() { state = initial(); selection = anchor = editor = null; error = editorError = ''; busy = false; $('send-result').value = 'accept'; $('cancel-race').checked = false; render(); announce('Prototype reset. Select a line number to start.'); focus('files-tab'); }
-  $('confirm-cancel').addEventListener('click', () => $('confirm-dialog').close());
-  $('confirm-accept').addEventListener('click', () => { dialogTrigger=null; $('confirm-dialog').close(); reset(); });
-  $('confirm-dialog').addEventListener('close', () => { dialogTrigger?.isConnected && dialogTrigger.focus(); });
-  $('confirm-dialog').addEventListener('keydown', event => {
-    if(event.key!=='Tab')return;
-    const first=$('confirm-cancel'),last=$('confirm-accept');
-    if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
-    else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
-  });
-  $('app').addEventListener('click', event => {
-    const button = event.target.closest('button[data-action]'); if (!button || button.disabled) return;
-    const {action,id} = button.dataset;
-    if (busy && action !== 'line') return;
-    if (action === 'line') { if(suppressLineClick){suppressLineClick=false;return;}if(selectLine(button.dataset.side,Number(button.dataset.line),event.shiftKey))addNote(); }
-    if (action === 'gutter-note') { if(selectLine(button.dataset.side,Number(button.dataset.line),event.shiftKey))addNote(); }
-    if (action === 'file') { state.file = button.dataset.file; selection = anchor = null; render();document.querySelector('.line-number')?.focus({preventScroll:true}); }
-    if (action === 'panel') { state.panel = button.dataset.panel; render(); focus(state.panel === 'files' ? 'files-tab' : 'feedback-tab'); }
-    if (action === 'tab') { state.tab = button.dataset.tab; render(); if(state.tab==='chat')focus('message-text');else document.querySelector('.line-number')?.focus({preventScroll:true}); }
-    if (action === 'clear-selection') { selection = anchor = null; render(); }
-    if (action === 'add-note') addNote();
-    if (action === 'cancel-editor') { editor = null; editorError = ''; render(); focus('add-note'); }
-    if (action === 'edit') editNote(id);
-    if (action === 'delete') { state.notes = state.notes.filter(n=>n.id!==id); state.staged=state.staged.filter(n=>n!==id); if(editor?.id===id)editor=null; render(); announce('Feedback note removed.');const target=document.querySelector('[data-action="edit"]')||$('message-text')||$('feedback-tab');target?.focus(); }
-    if (action === 'open-note') { const note=state.notes.find(n=>n.id===id); if(note){state.file=note.file;selection=note.version===state.version?{side:note.side,start:note.start,end:note.end}:null;render();const card=document.querySelector('[data-note-id="'+id+'"]');card?.scrollIntoView({block:'nearest'});card?.focus({preventScroll:true});announce(older(note)?'This note refers to an older version. Its original code is kept.':location(note));} }
-    if (action === 'copy-note') copyNote(id);
-    if (action === 'stage') stage();
-    if (action === 'send') send();
-    if (action === 'cancel-queued') cancelQueued(id);
-    if (action === 'latest') { busy=true;render();announce('Loading the latest changes…');setTimeout(()=>{state.version=state.latest;selection=anchor=null;busy=false;render();announce('Latest changes shown. Earlier feedback keeps its original code.');},350); }
-    if (action === 'attach') $('image-input').click();
-    if (action === 'remove-image') { state.images.splice(Number(button.dataset.index),1);render(); }
-    if (action === 'retry-message') { const message=state.messages.find(m=>m.id===id);if(message){const ids=new Set(state.notes.map(n=>n.id));state.notes.push(...message.notes.filter(n=>!ids.has(n.id)));state.staged=state.notes.map(n=>n.id);if(!state.message.trim())state.message=message.text;state.tab='chat';render();announce('Feedback added to your unsent message. Existing text is kept.');focus('message-text');} }
-    if (action === 'reset') reset();
-  });
-  $('app').addEventListener('submit', event => {
-    if(event.target.id!=='note-form') return;event.preventDefault();
-    if (!editor || busy) return;
-    editor.text = $('note-text').value.trim();
-    if(!editor.text){editorError='Write feedback before saving this note.';render();focus('note-text');return;}
-    const note={...editor,id:editor.id||uid()};
-    const index=state.notes.findIndex(n=>n.id===note.id);if(index<0)state.notes.push(note);else state.notes[index]=note;
-    editor=null;editorError='';selection=anchor=null;render();announce('Feedback note saved beside its code.');const card=document.querySelector('[data-note-id="'+note.id+'"]');card?.focus({preventScroll:true});
-  });
-  $('app').addEventListener('input', event => {
-    if(event.target.id==='message-text'){state.message=event.target.value;save();const sendButton=$('send-message');if(sendButton)sendButton.disabled=busy||['waiting','gone'].includes(state.agent)||(!state.message.trim()&&!pendingStaged().length&&!state.images.length);}
-    if(event.target.id==='note-text'&&editor)editor.text=event.target.value;
-  });
-  $('app').addEventListener('keydown', event => {
-    if((event.ctrlKey||event.metaKey)&&event.key==='Enter'&&event.target.id==='note-text'){event.preventDefault();$('note-form').requestSubmit();return;}
-    if((event.ctrlKey||event.metaKey)&&event.key==='Enter'&&event.target.id==='message-text'){event.preventDefault();send();return;}
-    if(event.key==='Escape'&&editor){event.preventDefault();editor=null;editorError='';render();focus('add-note');return;}
-    const button=event.target.closest('[data-action="line"]');
-    if(button&&(event.key==='Enter'||event.key===' ')){
-      event.preventDefault();const side=button.dataset.side,line=Number(button.dataset.line);
-      if(selection&&selection.side===side&&line>=selection.start&&line<=selection.end)addNote();
-      else if(selectLine(side,line,false))addNote();
-      return;
-    }
-    if(button&&['ArrowUp','ArrowDown'].includes(event.key)){
-      event.preventDefault();const side=button.dataset.side;const values=rowsFor(state.file,state.version).map(r=>r[side]).filter(n=>n!==null);const index=values.indexOf(Number(button.dataset.line));const next=values[index+(event.key==='ArrowUp'?-1:1)];
-      if(next!==undefined){if(event.shiftKey){const current=Number(button.dataset.line);if(!anchor||anchor.side!==side||!selection||current<selection.start||current>selection.end)anchor={side,line:current};selectLine(side,next,true);}else $('diff-pane').querySelector(`.line-number[data-side="${side}"][data-line="${next}"]`)?.focus();}
-    }
-    if(event.key==='ArrowLeft'||event.key==='ArrowRight'){
-      const tab=event.target.closest('[role="tab"]');if(tab){event.preventDefault();state.panel=tab.id==='files-tab'?'feedback':'files';render();focus(state.panel==='files'?'files-tab':'feedback-tab');}
-    }
-  });
-  document.addEventListener('pointerup',()=>{const completed=dragMoved;dragging=false;if(completed){suppressLineClick=true;setTimeout(()=>{suppressLineClick=false;},0);if(!editor&&selection)addNote();}dragMoved=false;});
-  document.addEventListener('pointercancel',()=>{dragging=false;dragMoved=false;dragOrigin=null;});
-  $('app').addEventListener('pointerdown',event=>{const button=event.target.closest('[data-action="line"]');if(button&&event.button===0){dragging=true;dragMoved=false;dragOrigin={side:button.dataset.side,line:Number(button.dataset.line)};}});
-  $('app').addEventListener('pointermove',event=>{if(!dragging||!(event.buttons&1)||!dragOrigin)return;const button=document.elementFromPoint(event.clientX,event.clientY)?.closest('[data-action="line"]');if(button&&button.dataset.side===dragOrigin.side&&Number(button.dataset.line)!==dragOrigin.line){if(!dragMoved)anchor={...dragOrigin};dragMoved=true;selectLine(button.dataset.side,Number(button.dataset.line),true);}});
-  $('app').addEventListener('mouseup',event=>{
-    if(busy||event.target.closest('textarea,input,button'))return;
-    const native=window.getSelection();if(!native||native.isCollapsed||!native.toString().trim())return;
-    const selectionElement=node=>node?.nodeType===Node.ELEMENT_NODE?node:node?.parentElement;
-    const startCode=selectionElement(native.anchorNode)?.closest('.code'),endCode=selectionElement(native.focusNode)?.closest('.code');
-    if(!startCode||!endCode)return;
-    const first=startCode.closest('.diff-row'),last=endCode.closest('.diff-row');
-    const side=first.classList.contains('del')?'old':'new';
-    if(!first.dataset[side]||!last.dataset[side]){announce('Choose code on one side of the diff.');return;}
-    anchor={side,line:Number(first.dataset[side])};
-    if(selectLine(side,Number(last.dataset[side]),true))addNote();
-  });
-  $('image-input').addEventListener('change',async event=>{
-    const file=event.target.files[0];if(!file)return;
-    if(!file.type.startsWith('image/')){announce('Choose an image file.');return;}
-    if(file.size>2*1024*1024){announce('For this prototype, choose an image smaller than 2 MB.');return;}
-    const reader=new FileReader();reader.onload=()=>{state.images.push({name:file.name,data:reader.result});render();announce('Image added to the unsent message.');};reader.onerror=()=>announce('Couldn’t read that image. Try another file.');reader.readAsDataURL(file);event.target.value='';
-  });
-  $('agent-state').addEventListener('change',event=>{
-    if(busy||state.removed)return;
-    const next=event.target.value;
-    if(next==='idle'){const running=state.messages.find(m=>m.outcome==='working');if(running)running.outcome=running.fail?'failed':'done';state.initialFinished=true;}
-    state.agent=next;render();announce(next==='gone'?'Sandbox expired. Saved notes are still readable and copyable.':`Agent is ${next}.`);
-  });
-  $('new-code').addEventListener('click',()=>{state.latest=2;render();announce('Newer code is available. Your open diff and notes have not changed.');});
-  $('finish-turn').addEventListener('click',finishTurn);
-  $('reopen').addEventListener('click',()=>{if(busy)return;try{state=storageAvailable?JSON.parse(localStorage.getItem(KEY)):clone(memory);}catch{}editor=selection=anchor=null;error='';render();announce('Agent reopened with its saved feedback, message, and attachments.');});
-  $('remove-agent').addEventListener('click',remove);
-  $('reset').addEventListener('click',event=>confirmReset(event.currentTarget));
-  render();
-})();
-</script>
-</body>
+    <dialog
+      id="confirm-dialog"
+      aria-labelledby="confirm-title"
+      aria-describedby="confirm-description"
+    >
+      <h2 id="confirm-title"></h2>
+      <p id="confirm-description"></p>
+      <div class="dialog-actions">
+        <button class="outline" id="confirm-cancel">Keep exploring</button
+        ><button class="danger outline" id="confirm-accept">Reset prototype</button>
+      </div>
+    </dialog>
+    <input id="image-input" type="file" accept="image/*" hidden />
+    <script>
+      ;(() => {
+        "use strict"
+        const KEY = "glass.agent-feedback.prototype.v1"
+        const $ = (id) => document.getElementById(id)
+        const escape = (value) =>
+          String(value).replace(
+            /[&<>"']/g,
+            (char) =>
+              ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char],
+          )
+        const clone = (value) => JSON.parse(JSON.stringify(value))
+        const uid = () =>
+          globalThis.crypto?.randomUUID?.() ??
+          `n${Date.now()}${Math.random().toString(16).slice(2)}`
+        const icons = {
+          branch:
+            '<path d="M6 3v10a3 3 0 0 0 3 3h3M12 5v3a4 4 0 0 1-4 4"/><circle cx="6" cy="3" r="2"/><circle cx="12" cy="3" r="2"/><circle cx="14" cy="16" r="2"/>',
+          note: '<path d="M3 3h14v11H8l-5 3z"/><path d="M6 7h8M6 10h5"/>',
+          changes: '<path d="M5 2h8l4 4v12H5zM12 2v5h5M8 11h6M11 8v6"/>',
+          chat: '<path d="M3 3h14v11H8l-5 3z"/>',
+          arrow: '<path d="M10 17V3M4 9l6-6 6 6"/>',
+          attach: '<path d="m7 10 5-5a3 3 0 0 1 4 4l-7 7a4 4 0 0 1-6-6l7-7M6 12l6-6"/>',
+          check: '<path d="m4 10 4 4 8-9"/>',
+          close: '<path d="m5 5 10 10M15 5 5 15"/>',
+          folder: '<path d="M2 5h6l2 2h8v10H2z"/>',
+        }
+        const icon = (name) =>
+          `<svg class="icon" viewBox="0 0 20 20" aria-hidden="true">${icons[name] || icons.note}</svg>`
+        const files = [
+          {
+            id: "retry",
+            name: "retryDelivery.ts",
+            path: "apps/server/src/agentHost/retryDelivery.ts",
+          },
+          {
+            id: "test",
+            name: "retryDelivery.test.ts",
+            path: "apps/server/src/agentHost/retryDelivery.test.ts",
+          },
+        ]
+        const row = (old, next, text, kind = "context") => ({ old, new: next, text, kind })
+        function rowsFor(file, version) {
+          if (file === "test")
+            return [
+              row(1, 1, 'import { expect, it } from "vitest"'),
+              row(2, 2, 'import { deliverWithRetry } from "./retryDelivery"'),
+              row(3, 3, ""),
+              row(null, 4, 'it("delivers a message", async () => {', "add"),
+              row(null, 5, "  let delivered = false", "add"),
+              row(null, 6, "  await deliverWithRetry(async () => {", "add"),
+              row(null, 7, "    delivered = true", "add"),
+              row(null, 8, "  })", "add"),
+              row(null, 9, "  expect(delivered).toBe(true)", "add"),
+              row(null, 10, "})", "add"),
+              ...(version === 2
+                ? [
+                    row(null, 11, "", "add"),
+                    row(null, 12, "// Add a failing-delivery test next.", "add"),
+                  ]
+                : []),
+            ]
+          return [
+            row(1, 1, "export async function deliverWithRetry("),
+            row(2, 2, "  send: () => Promise<void>,"),
+            row(3, 3, ") {"),
+            row(4, null, "  return send()", "del"),
+            row(null, 4, "  let attempts = 0", "add"),
+            row(null, 5, version === 1 ? "  while (true) {" : "  while (attempts < 3) {", "add"),
+            row(null, 6, "    try {", "add"),
+            row(null, 7, "      await send()", "add"),
+            row(null, 8, "      return", "add"),
+            row(null, 9, "    } catch (error) {", "add"),
+            row(null, 10, "      attempts += 1", "add"),
+            ...(version === 2
+              ? [
+                  row(null, 11, "      if (attempts === 3) throw error", "add"),
+                  row(null, 12, "      await delay(500)", "add"),
+                  row(null, 13, "    }", "add"),
+                  row(null, 14, "  }", "add"),
+                  row(5, 15, "}"),
+                ]
+              : [
+                  row(null, 11, "      await delay(500)", "add"),
+                  row(null, 12, "    }", "add"),
+                  row(null, 13, "  }", "add"),
+                  row(5, 14, "}"),
+                ]),
+          ]
+        }
+        const initial = () => ({
+          version: 1,
+          latest: 1,
+          tab: "changes",
+          panel: "files",
+          file: "retry",
+          notes: [
+            {
+              id: "example-retry-limit",
+              file: "retry",
+              side: "new",
+              start: 5,
+              end: 11,
+              version: 1,
+              snippet: rowsFor("retry", 1)
+                .filter((r) => r.new >= 5 && r.new <= 11)
+                .map((r) => r.text)
+                .join("\n"),
+              text: "Cap retries at three attempts, then rethrow the original error.",
+            },
+          ],
+          staged: [],
+          message: "Please keep the change focused on delivery retries.",
+          images: [],
+          queue: [],
+          messages: [],
+          agent: "working",
+          initialFinished: false,
+          removed: false,
+        })
+        let memory = null,
+          storageAvailable = false
+        try {
+          localStorage.setItem(KEY + ".check", "1")
+          localStorage.removeItem(KEY + ".check")
+          storageAvailable = true
+        } catch {}
+        let state
+        try {
+          state =
+            storageAvailable && localStorage.getItem(KEY)
+              ? JSON.parse(localStorage.getItem(KEY))
+              : initial()
+        } catch {
+          state = initial()
+        }
+        if (
+          !state ||
+          !Array.isArray(state.notes) ||
+          !Array.isArray(state.messages) ||
+          !Array.isArray(state.staged) ||
+          !Array.isArray(state.queue)
+        )
+          state = initial()
+        let selection = null,
+          anchor = null,
+          editor = null,
+          busy = false,
+          error = "",
+          editorError = "",
+          dialogTrigger = null,
+          dragging = false,
+          dragOrigin = null,
+          dragMoved = false,
+          suppressLineClick = false
+        function save() {
+          memory = clone(state)
+          if (storageAvailable)
+            try {
+              localStorage.setItem(KEY, JSON.stringify(state))
+            } catch {
+              storageAvailable = false
+            }
+          $("storage-status").textContent = storageAvailable
+            ? "Saved in this browser"
+            : "Kept for this prototype session"
+        }
+        function announce(message) {
+          $("status").textContent = message
+        }
+        function focus(id) {
+          $(id)?.focus()
+        }
+        const currentFile = () => files.find((file) => file.id === state.file)
+        const pendingStaged = () => state.notes.filter((note) => state.staged.includes(note.id))
+        const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`
+        const totals = (file) => {
+          const rows = rowsFor(file.id, state.version)
+          return {
+            added: rows.filter((row) => row.kind === "add").length,
+            deleted: rows.filter((row) => row.kind === "del").length,
+          }
+        }
+        const location = (note) =>
+          `${files.find((file) => file.id === note.file).name} · ${note.side === "new" ? "new" : "old"} ${note.start === note.end ? "line " + note.start : "lines " + note.start + "–" + note.end}`
+        const older = (note) => note.version !== state.version
+        function oldBadge(note) {
+          return older(note) ? '<span class="old-label">◷ Older version</span>' : ""
+        }
+        function syntax(text) {
+          return text
+            .split(
+              /("[^"]*"|\b(?:export|async|function|return|let|while|true|try|await|catch|if|throw|import|from|const)\b)/g,
+            )
+            .map((part) =>
+              /^"/.test(part)
+                ? `<span class="str">${escape(part)}</span>`
+                : /^(export|async|function|return|let|while|true|try|await|catch|if|throw|import|from|const)$/.test(
+                      part,
+                    )
+                  ? `<span class="kw">${part}</span>`
+                  : escape(part),
+            )
+            .join("")
+        }
+        function noteActions(note, prefix = "") {
+          return `<div class="note-actions"><button data-action="edit" data-id="${note.id}" aria-label="Edit feedback: ${escape(note.text)}">Edit</button><button data-action="delete" data-id="${note.id}" aria-label="Remove feedback: ${escape(note.text)}">Remove</button>${prefix === "panel" ? `<button data-action="copy-note" data-id="${note.id}">Copy</button>` : ""}</div>`
+        }
+        function noteSummary(note) {
+          return `<article class="summary-note"><button data-action="open-note" data-id="${note.id}" class="location">${escape(location(note))}</button><p>${escape(note.text)}</p>${oldBadge(note)}${noteActions(note, "panel")}</article>`
+        }
+        function renderSidebar() {
+          if (state.panel === "files")
+            return `<div class="file-list"><div class="folder">apps/server/src/agentHost</div>${files.map((file) => `<button class="file-button" data-action="file" data-file="${file.id}" aria-current="${state.file === file.id}">${icon("changes")}<span class="filename">${file.name}</span><span class="added">+${totals(file).added}</span>${state.notes.some((n) => n.file === file.id) ? '<span class="dot" style="color:var(--ring)"></span>' : ""}</button>`).join("")}</div>`
+          return state.notes.length
+            ? `<div class="panel-note-list">${state.notes.map(noteSummary).join("")}</div>`
+            : '<div class="panel-empty">No feedback yet.<br>Select a line or range in the diff, then add a note.</div>'
+        }
+        function selected(rowData, side) {
+          const value = rowData[side]
+          return (
+            selection &&
+            selection.side === side &&
+            value !== null &&
+            value >= selection.start &&
+            value <= selection.end
+          )
+        }
+        function numberButton(data, side) {
+          if (data[side] === null) return '<span class="empty-line-number"></span>'
+          const pressed = !!selected(data, side)
+          const annotated = state.notes.some(
+            (note) =>
+              note.file === state.file &&
+              note.version === state.version &&
+              note.side === side &&
+              data[side] >= note.start &&
+              data[side] <= note.end,
+          )
+          return `<button class="line-number ${annotated ? "has-note" : ""}" data-action="line" data-side="${side}" data-line="${data[side]}" aria-label="Select ${side} line ${data[side]}" aria-pressed="${pressed}">${data[side]}</button>`
+        }
+        function editorHtml() {
+          if (!editor) return ""
+          return `<form id="note-form" class="annotation-editor" aria-label="${editor.id ? "Edit" : "Add"} Feedback note"><h2>${icon("note")}${editor.id ? "Edit feedback" : "Add feedback"} <span class="location">${escape(editor.side === "new" ? "New" : "Old")} ${editor.start === editor.end ? "line " + editor.start : "lines " + editor.start + "–" + editor.end}</span>${oldBadge(editor)}</h2>${older(editor) ? `<pre class="snippet">${escape(editor.snippet)}</pre>` : ""}<label for="note-text" class="sr-only">Feedback on selected code</label><textarea id="note-text" rows="3" placeholder="What should the Agent change here?" aria-invalid="${!!editorError}" aria-describedby="note-error">${escape(editor.text)}</textarea><div id="note-error" class="form-error" role="alert">${escape(editorError)}</div><div class="editor-footer"><span class="shortcut">Ctrl / ⌘ + Enter to save</span><button type="button" data-action="cancel-editor">Cancel</button><button type="submit" class="primary">${editor.id ? "Save changes" : "Add note"}</button></div></form>`
+        }
+        function inlineNote(note, detached = false) {
+          if (editor?.id === note.id) return editorHtml()
+          return `<article class="inline-note" tabindex="-1" data-note-id="${note.id}" aria-label="Feedback on ${escape(location(note))}"><div class="note-top"><span class="note-index">${state.notes.indexOf(note) + 1}</span><strong>You</strong><span class="location">${escape(note.side === "new" ? "New" : "Old")} ${note.start === note.end ? "line " + note.start : "lines " + note.start + "–" + note.end}</span><span class="muted">· Unsent</span>${oldBadge(note)}</div>${detached ? `<pre class="snippet">${escape(note.snippet)}</pre>` : ""}<p>${escape(note.text)}</p>${noteActions(note)}</article>`
+        }
+        function renderDiff() {
+          const file = currentFile(),
+            rows = rowsFor(file.id, state.version)
+          const selectedLabel = selection
+            ? `${selection.side === "new" ? "New" : "Old"} ${selection.start === selection.end ? "line " + selection.start : "lines " + selection.start + "–" + selection.end}`
+            : "Select code or use + in the gutter to annotate."
+          const notes = state.notes.filter(
+            (note) => note.file === file.id && note.version === state.version,
+          )
+          const stale = state.notes.filter(
+            (note) => note.file === file.id && note.version !== state.version,
+          )
+          const lineHtml = rows
+            .map((data) => {
+              const inline = notes.filter((note) => data[note.side] === note.end)
+              const annotated = notes.some(
+                (note) =>
+                  data[note.side] !== null &&
+                  data[note.side] >= note.start &&
+                  data[note.side] <= note.end,
+              )
+              const side = data.new === null ? "old" : "new",
+                line = data[side]
+              const target = selection && data[selection.side] === selection.end
+              const composeHere =
+                editor &&
+                editor.file === file.id &&
+                editor.version === state.version &&
+                !editor.id &&
+                data[editor.side] === editor.end
+              return `<div class="diff-row ${data.kind} ${annotated ? "annotated" : ""} ${selected(data, "old") || selected(data, "new") ? "selected" : ""}" data-old="${data.old ?? ""}" data-new="${data.new ?? ""}"><button class="gutter-add" data-action="gutter-note" data-side="${side}" data-line="${line}" aria-label="Add feedback on ${side} line ${line}">+</button>${numberButton(data, "old")}${numberButton(data, "new")}<span class="sign">${data.kind === "add" ? "+" : data.kind === "del" ? "−" : ""}</span><code class="code">${syntax(data.text)}</code></div>${inline.map((note) => inlineNote(note)).join("")}${composeHere ? editorHtml() : target && !editor ? `<div class="context-actions"><span class="location">${selectedLabel}</span><button class="outline small icon" id="add-note" data-action="add-note">${icon("note")}Add feedback</button><button class="small" data-action="clear-selection" aria-label="Clear selected lines">×</button></div>` : ""}`
+            })
+            .join("")
+          const staleEditor =
+            editor && editor.file === file.id && editor.version !== state.version && !editor.id
+              ? editorHtml()
+              : ""
+          return `<div class="diff-toolbar"><span class="muted" id="selection-label">${selectedLabel}</span></div><section aria-label="${file.name} diff"><div class="file-header"><span class="path mono">${file.path}</span><span class="totals">+${totals(file).added} <span style="color:var(--destructive)">−${totals(file).deleted}</span></span></div><div class="diff-scroll"><div class="hunk">@@ −1,${file.id === "retry" ? "5" : "3"} +1,${rows.filter((row) => row.new !== null).length} @@</div>${lineHtml}</div></section>${stale.length || staleEditor ? `<section class="older-feedback" aria-label="Feedback on an older version"><h2>Earlier feedback · original code preserved</h2>${stale.map((note) => inlineNote(note, true)).join("")}${staleEditor}</section>` : ""}<div class="help-line">Feedback stays beside its code until you send it to the Agent.</div>`
+        }
+        function renderChanges() {
+          return `<div class="changes-heading"><span class="muted">Changes since <span class="mono">main</span>, including uncommitted work</span><button id="stage-feedback" class="primary icon" data-action="stage" ${!state.notes.length || busy ? "disabled" : ""}>${icon("note")}Review feedback${state.notes.length ? ` (${state.notes.length})` : ""}</button></div>${state.latest > state.version ? `<div class="update"><span>The Agent has worked since you opened these changes.</span><button class="outline small" id="show-latest" data-action="latest" ${busy ? "disabled" : ""}>Show latest</button></div>` : ""}${state.agent === "gone" ? '<div class="update"><span>Sandbox expired. Previously displayed code and saved notes remain available.</span></div>' : ""}<div class="changes-grid"><aside class="file-panel" aria-label="Files and feedback"><div class="panel-tabs" role="tablist" aria-label="Changes panel"><button role="tab" id="files-tab" aria-selected="${state.panel === "files"}" aria-controls="panel-content" data-action="panel" data-panel="files">Files <span class="count">2</span></button><button role="tab" id="feedback-tab" aria-selected="${state.panel === "feedback"}" aria-controls="panel-content" data-action="panel" data-panel="feedback">Feedback <span class="count">${state.notes.length}</span></button></div><div id="panel-content" role="tabpanel" aria-labelledby="${state.panel === "files" ? "files-tab" : "feedback-tab"}">${renderSidebar()}</div></aside><div class="diff-pane" id="diff-pane">${renderDiff()}</div></div>`
+        }
+        function frozenNotes(notes) {
+          return notes
+            .map(
+              (note) =>
+                `<div class="message-note"><div class="location">${escape(location(note))} · version ${note.version}</div><p>${escape(note.text)}</p><pre class="snippet">${escape(note.snippet)}</pre></div>`,
+            )
+            .join("")
+        }
+        function attachmentHtml() {
+          const notes = pendingStaged()
+          if (!notes.length) return ""
+          return `<details class="feedback-attachment" id="feedback-attachment" open><summary>${plural(notes.length, "Feedback note")} <span class="muted">· attached to this message</span></summary>${notes.map((note) => `<article class="attachment-item"><div class="actions-row"><span class="location">${escape(location(note))}</span>${oldBadge(note)}</div><p>${escape(note.text)}</p><details><summary class="location">Original code</summary><pre class="snippet">${escape(note.snippet)}</pre></details>${noteActions(note)}</article>`).join("")}</details>`
+        }
+        function imagesHtml(images, editable = false) {
+          if (!images.length) return ""
+          return `<div class="image-strip">${images.map((image, index) => `<div class="image-chip"><img src="${escape(image.data)}" alt="${escape(image.name)}"><span>${escape(image.name)}</span>${editable ? `<button data-action="remove-image" data-index="${index}" aria-label="Remove image ${escape(image.name)}">×</button>` : ""}</div>`).join("")}</div>`
+        }
+        function renderChat() {
+          const staged = pendingStaged(),
+            remaining = state.notes.filter((n) => !state.staged.includes(n.id))
+          const blocked = state.agent === "waiting" || state.agent === "gone"
+          const empty = !staged.length && !state.message.trim() && !state.images.length
+          return `<div class="chat"><section class="transcript" aria-label="Conversation"><div class="turn user"><div class="speaker">You</div><div class="turn-body">Make delivery retry transient failures without losing the queued message.</div></div><div class="turn"><div class="speaker">${icon("chat")}Claude Code</div><div class="turn-body">I’ve added delivery retries and a test for successful delivery. You can review the changes while I finish.</div>${!state.initialFinished && state.agent === "working" ? '<div class="tool-line"><span class="spinner"></span>Reading retryDelivery.test.ts</div>' : ""}</div>${state.messages.map((message) => `<article class="turn user"><div class="speaker">You${message.notes.length ? " · Feedback" : ""}</div><div class="turn-body">${escape(message.text || "Feedback on your changes")}</div>${imagesHtml(message.images)}${message.notes.length ? `<details class="transcript-notes"><summary>${plural(message.notes.length, "Feedback note")}</summary>${frozenNotes(message.notes)}</details>` : ""}</article><article class="turn"><div class="speaker">${icon("chat")}Claude Code</div>${message.outcome === "working" ? '<div class="tool-line"><span class="spinner"></span>Working through your feedback…</div>' : message.outcome === "failed" ? `<div class="notice error-notice">The Turn failed. Your feedback is kept above.</div><button class="outline small" data-action="retry-message" data-id="${message.id}">Use message again</button>` : '<div class="turn-body">I’ve capped retries at three attempts and kept the final error. I’ll cover the failure path in the test too.</div>'}</article>`).join("")}</section>${state.queue.length ? `<section class="queue-section" aria-label="Queued messages"><div class="queue-heading">Starts when the Agent finishes</div>${state.queue.map((message) => `<article class="queue-message"><div class="queue-top"><div><p>${escape(message.text || "Feedback on your changes")}</p><span class="location">${plural(message.notes.length, "Feedback note")} · Queued</span></div><button class="small" data-action="cancel-queued" data-id="${message.id}" aria-label="Cancel queued feedback">Cancel</button></div>${message.notes.length ? `<details><summary>View feedback</summary>${frozenNotes(message.notes)}</details>` : ""}${imagesHtml(message.images)}</article>`).join("")}</section>` : ""}${remaining.length ? `<div class="pending-reminder"><span>${plural(remaining.length, "unsent Feedback note")} in Changes</span><button class="outline small" data-action="stage">Review feedback</button></div>` : ""}${state.agent === "waiting" ? '<div class="notice">The Agent is waiting for your answer. Answer its Question before sending another message.</div>' : ""}${state.agent === "gone" ? '<div class="notice">This Agent’s Sandbox expired. Your conversation and feedback are kept here. You can read or copy the notes in Changes.</div>' : ""}${error ? `<div class="notice error-notice" id="send-error" role="alert">${escape(error)}</div>` : ""}<section class="composer" aria-label="Message composer">${attachmentHtml()}${imagesHtml(state.images, true)}<label for="message-text" class="sr-only">Message to Agent</label><textarea id="message-text" rows="3" placeholder="Message this Agent…" ${busy || state.agent === "gone" ? "disabled" : ""}>${escape(state.message)}</textarea><div class="composer-footer"><button class="icon" data-action="attach" aria-label="Attach an image" ${busy || state.agent === "gone" ? "disabled" : ""}>${icon("attach")}</button><span class="model">Claude Code <span class="muted">· Sonnet</span></span><button id="send-message" class="primary icon" data-action="send" ${busy || blocked || empty ? "disabled" : ""}>${busy ? '<span class="spinner"></span>Sending…' : `${icon("arrow")}${state.agent === "working" ? "Queue message" : "Send"}`}</button></div></section><div class="composer-help">${state.agent === "working" ? "Your message waits for the next Turn. The Agent can keep working while you write." : state.agent === "waiting" ? "Sending is unavailable while a Question is waiting." : state.agent === "gone" ? "Sending is unavailable because this Sandbox expired." : "Feedback is sent with its original code and locations."}</div></div>`
+        }
+        function render() {
+          if (state.removed) {
+            $("app").innerHTML =
+              '<section class="removed"><h1>Agent removed</h1><p>Its conversation and unsent feedback have been removed from this prototype.</p><button class="outline" data-action="reset">Start again</button></section>'
+          } else {
+            const status =
+              state.agent === "working"
+                ? "Working"
+                : state.agent === "idle"
+                  ? "Ready"
+                  : state.agent === "waiting"
+                    ? "Waiting on you"
+                    : "Sandbox expired"
+            $("app").innerHTML =
+              `<div class="app"><aside class="agent-panel" aria-label="Agents"><div class="panel-title">Agents ${icon("chat")}</div><div class="agent-group">Local</div><div class="agent-entry"><div class="agent-repo">k-dang/project-glass</div><div class="agent-name">cedar</div><div class="agent-status ${state.agent === "idle" ? "ready" : "working"}"><span class="dot"></span>${status}</div></div><p class="scope-note">Review the Agent’s work, then send your notes back to the same conversation.</p></aside><main class="workspace"><header class="agent-header"><h1 class="heading">cedar</h1><span class="muted">/</span><span class="heading">${state.tab === "changes" ? "Changes" : "Chat"}</span><span class="header-spacer"></span><span class="branch">${icon("branch")}cedar <span class="muted">from main</span></span><nav class="nav" aria-label="Agent views"><button data-action="tab" data-tab="chat" aria-current="${state.tab === "chat" ? "page" : "false"}" class="icon">${icon("chat")}Chat</button><button data-action="tab" data-tab="changes" aria-current="${state.tab === "changes" ? "page" : "false"}" class="icon">${icon("changes")}Changes${state.notes.length ? `<span class="count">${state.notes.length}</span>` : ""}</button></nav></header>${state.tab === "changes" ? renderChanges() : renderChat()}</main></div>`
+          }
+          $("agent-state").value = state.agent
+          $("finish-turn").disabled = state.removed || state.agent !== "working" || busy
+          $("new-code").disabled =
+            state.removed || state.latest === 2 || state.agent === "gone" || busy
+          $("remove-agent").disabled = state.removed || busy
+          $("reset").disabled = busy
+          $("reopen").disabled = busy
+          $("agent-state").disabled = state.removed || busy
+          $("send-result").disabled = state.removed || busy
+          $("cancel-race").disabled = state.removed || busy
+          save()
+        }
+        function selectLine(side, line, extend) {
+          if (busy) return false
+          if (editor && (editor.id || editor.text.trim())) {
+            announce("Save or cancel the current note before selecting another range.")
+            return false
+          }
+          if (!extend || !anchor || anchor.side !== side) anchor = { side, line }
+          selection = { side, start: Math.min(anchor.line, line), end: Math.max(anchor.line, line) }
+          editor = null
+          editorError = ""
+          const pane = $("diff-pane"),
+            oldScroll = pane.querySelector(".diff-scroll")?.scrollLeft || 0
+          pane.innerHTML = renderDiff()
+          pane.querySelector(".diff-scroll").scrollLeft = oldScroll
+          const button = pane.querySelector(
+            `.line-number[data-side="${side}"][data-line="${line}"]`,
+          )
+          if (!dragging) button?.focus({ preventScroll: true })
+          return true
+        }
+        function addNote() {
+          if (!selection) return
+          const data = rowsFor(state.file, state.version).filter(
+            (r) =>
+              r[selection.side] !== null &&
+              r[selection.side] >= selection.start &&
+              r[selection.side] <= selection.end,
+          )
+          editor = {
+            ...selection,
+            file: state.file,
+            version: state.version,
+            snippet: data.map((r) => r.text).join("\n"),
+            text: "",
+          }
+          editorError = ""
+          render()
+          $("note-form")?.scrollIntoView({ block: "nearest", inline: "nearest" })
+          focus("note-text")
+        }
+        function stage() {
+          if (!state.notes.length || busy) return
+          if (editor?.text.trim()) {
+            announce("Save or cancel the open note before reviewing your feedback.")
+            focus("note-text")
+            return
+          }
+          state.staged = state.notes.map((n) => n.id)
+          state.tab = "chat"
+          editor = null
+          error = ""
+          render()
+          announce(
+            `${plural(state.staged.length, "Feedback note")} added to your message. Existing text and images are kept.`,
+          )
+          focus("message-text")
+        }
+        function editNote(id) {
+          const note = state.notes.find((n) => n.id === id)
+          if (!note || busy) return
+          editor = clone(note)
+          editorError = ""
+          state.tab = "changes"
+          state.file = note.file
+          selection =
+            note.version === state.version
+              ? { side: note.side, start: note.start, end: note.end }
+              : null
+          render()
+          $("note-form")?.scrollIntoView({ block: "nearest", inline: "nearest" })
+          focus("note-text")
+        }
+        async function send() {
+          if (busy || state.agent === "waiting" || state.agent === "gone" || state.removed) return
+          const notes = clone(pendingStaged())
+          if (!notes.length && !state.message.trim() && !state.images.length) return
+          const result = $("send-result").value
+          const message = {
+            id: uid(),
+            text: state.message.trim(),
+            images: clone(state.images),
+            notes,
+            fail: result === "turn-fails",
+            outcome: "working",
+          }
+          busy = true
+          error = ""
+          render()
+          announce("Sending feedback…")
+          await new Promise((resolve) => setTimeout(resolve, 500))
+          busy = false
+          $("send-result").value = "accept"
+          if (result === "reject") {
+            error =
+              "Couldn’t send the message. Your text, images, and Feedback notes are still here. Try again."
+            render()
+            announce("Send failed. All unsent feedback is kept.")
+            focus("send-message")
+            return
+          }
+          const sentIds = new Set(notes.map((n) => n.id))
+          state.notes = state.notes.filter((n) => !sentIds.has(n.id))
+          state.staged = state.staged.filter((id) => !sentIds.has(id))
+          state.message = ""
+          state.images = []
+          if (state.agent === "working") {
+            state.queue.push(message)
+            announce("Feedback queued for the next Turn. Cancel returns the notes to Changes.")
+          } else {
+            state.messages.push(message)
+            state.agent = "working"
+            state.initialFinished = true
+            announce("Feedback accepted. The Agent has started a Turn.")
+          }
+          render()
+          focus("message-text")
+        }
+        function startNext() {
+          const message = state.queue.shift()
+          if (message) {
+            message.outcome = "working"
+            state.messages.push(message)
+            state.agent = "working"
+            state.initialFinished = true
+          }
+          return message
+        }
+        function finishTurn() {
+          if (state.agent !== "working" || busy) return
+          const running = state.messages.find((m) => m.outcome === "working")
+          if (running) running.outcome = running.fail ? "failed" : "done"
+          state.initialFinished = true
+          state.agent = "idle"
+          state.latest = 2
+          const next = startNext()
+          render()
+          announce(
+            next
+              ? "The previous Turn finished. Queued feedback has started."
+              : running?.fail
+                ? "The Turn failed. Sent feedback stays in the conversation."
+                : "The Turn finished. You can show the latest changes.",
+          )
+        }
+        function cancelQueued(id) {
+          if (busy) return
+          const index = state.queue.findIndex((m) => m.id === id)
+          if (index < 0) {
+            announce("That message has already started. Its feedback stays in the conversation.")
+            return
+          }
+          if ($("cancel-race").checked) {
+            const previous = state.messages.find((m) => m.outcome === "working")
+            if (previous) previous.outcome = previous.fail ? "failed" : "done"
+            state.initialFinished = true
+            const message = state.queue.splice(index, 1)[0]
+            state.messages.push(message)
+            state.agent = "working"
+            $("cancel-race").checked = false
+            render()
+            announce(
+              "Too late to cancel: the message has already started. Its notes stay in the conversation.",
+            )
+            focus("message-text")
+            return
+          }
+          const message = state.queue.splice(index, 1)[0]
+          const pendingIds = new Set(state.notes.map((n) => n.id))
+          state.notes.push(...message.notes.filter((note) => !pendingIds.has(note.id)))
+          render()
+          announce(
+            `Queued message canceled. ${plural(message.notes.length, "Feedback note")} returned to Changes. Your newer message is kept.`,
+          )
+          focus("message-text")
+        }
+        function noteText(note) {
+          return `${files.find((f) => f.id === note.file).path} (${note.side} ${note.start}–${note.end}, version ${note.version})\n${note.snippet}\n\n${note.text}`
+        }
+        async function copyNote(id) {
+          const note = state.notes.find((n) => n.id === id)
+          if (!note) return
+          try {
+            await navigator.clipboard.writeText(noteText(note))
+            announce("Feedback and original code copied.")
+          } catch {
+            const area = document.createElement("textarea")
+            area.value = noteText(note)
+            area.style.position = "fixed"
+            area.style.left = "-10000px"
+            document.body.append(area)
+            area.select()
+            let copied = false
+            try {
+              copied = document.execCommand("copy")
+            } catch {}
+            area.remove()
+            announce(
+              copied
+                ? "Feedback and original code copied."
+                : "Copy is unavailable here. Open the note and select its text to copy.",
+            )
+          }
+        }
+        function confirmReset(trigger) {
+          dialogTrigger = trigger
+          $("confirm-title").textContent = "Reset this prototype?"
+          $("confirm-description").textContent =
+            "This clears the sample messages, images, and feedback stored by this prototype. It does not affect Glass."
+          $("confirm-dialog").showModal()
+          $("confirm-cancel").focus()
+        }
+        function remove() {
+          state.notes = []
+          state.queue = []
+          state.messages = []
+          state.staged = []
+          state.message = ""
+          state.images = []
+          state.removed = true
+          editor = null
+          render()
+          announce("Agent and its local feedback removed from the prototype.")
+          document.querySelector('[data-action="reset"]')?.focus()
+        }
+        function reset() {
+          state = initial()
+          selection = anchor = editor = null
+          error = editorError = ""
+          busy = false
+          $("send-result").value = "accept"
+          $("cancel-race").checked = false
+          render()
+          announce("Prototype reset. Select a line number to start.")
+          focus("files-tab")
+        }
+        $("confirm-cancel").addEventListener("click", () => $("confirm-dialog").close())
+        $("confirm-accept").addEventListener("click", () => {
+          dialogTrigger = null
+          $("confirm-dialog").close()
+          reset()
+        })
+        $("confirm-dialog").addEventListener("close", () => {
+          dialogTrigger?.isConnected && dialogTrigger.focus()
+        })
+        $("confirm-dialog").addEventListener("keydown", (event) => {
+          if (event.key !== "Tab") return
+          const first = $("confirm-cancel"),
+            last = $("confirm-accept")
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault()
+            last.focus()
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault()
+            first.focus()
+          }
+        })
+        $("app").addEventListener("click", (event) => {
+          const button = event.target.closest("button[data-action]")
+          if (!button || button.disabled) return
+          const { action, id } = button.dataset
+          if (busy && action !== "line") return
+          if (action === "line") {
+            if (suppressLineClick) {
+              suppressLineClick = false
+              return
+            }
+            if (selectLine(button.dataset.side, Number(button.dataset.line), event.shiftKey))
+              addNote()
+          }
+          if (action === "gutter-note") {
+            if (selectLine(button.dataset.side, Number(button.dataset.line), event.shiftKey))
+              addNote()
+          }
+          if (action === "file") {
+            state.file = button.dataset.file
+            selection = anchor = null
+            render()
+            document.querySelector(".line-number")?.focus({ preventScroll: true })
+          }
+          if (action === "panel") {
+            state.panel = button.dataset.panel
+            render()
+            focus(state.panel === "files" ? "files-tab" : "feedback-tab")
+          }
+          if (action === "tab") {
+            state.tab = button.dataset.tab
+            render()
+            if (state.tab === "chat") focus("message-text")
+            else document.querySelector(".line-number")?.focus({ preventScroll: true })
+          }
+          if (action === "clear-selection") {
+            selection = anchor = null
+            render()
+          }
+          if (action === "add-note") addNote()
+          if (action === "cancel-editor") {
+            editor = null
+            editorError = ""
+            render()
+            focus("add-note")
+          }
+          if (action === "edit") editNote(id)
+          if (action === "delete") {
+            state.notes = state.notes.filter((n) => n.id !== id)
+            state.staged = state.staged.filter((n) => n !== id)
+            if (editor?.id === id) editor = null
+            render()
+            announce("Feedback note removed.")
+            const target =
+              document.querySelector('[data-action="edit"]') ||
+              $("message-text") ||
+              $("feedback-tab")
+            target?.focus()
+          }
+          if (action === "open-note") {
+            const note = state.notes.find((n) => n.id === id)
+            if (note) {
+              state.file = note.file
+              selection =
+                note.version === state.version
+                  ? { side: note.side, start: note.start, end: note.end }
+                  : null
+              render()
+              const card = document.querySelector('[data-note-id="' + id + '"]')
+              card?.scrollIntoView({ block: "nearest" })
+              card?.focus({ preventScroll: true })
+              announce(
+                older(note)
+                  ? "This note refers to an older version. Its original code is kept."
+                  : location(note),
+              )
+            }
+          }
+          if (action === "copy-note") copyNote(id)
+          if (action === "stage") stage()
+          if (action === "send") send()
+          if (action === "cancel-queued") cancelQueued(id)
+          if (action === "latest") {
+            busy = true
+            render()
+            announce("Loading the latest changes…")
+            setTimeout(() => {
+              state.version = state.latest
+              selection = anchor = null
+              busy = false
+              render()
+              announce("Latest changes shown. Earlier feedback keeps its original code.")
+            }, 350)
+          }
+          if (action === "attach") $("image-input").click()
+          if (action === "remove-image") {
+            state.images.splice(Number(button.dataset.index), 1)
+            render()
+          }
+          if (action === "retry-message") {
+            const message = state.messages.find((m) => m.id === id)
+            if (message) {
+              const ids = new Set(state.notes.map((n) => n.id))
+              state.notes.push(...message.notes.filter((n) => !ids.has(n.id)))
+              state.staged = state.notes.map((n) => n.id)
+              if (!state.message.trim()) state.message = message.text
+              state.tab = "chat"
+              render()
+              announce("Feedback added to your unsent message. Existing text is kept.")
+              focus("message-text")
+            }
+          }
+          if (action === "reset") reset()
+        })
+        $("app").addEventListener("submit", (event) => {
+          if (event.target.id !== "note-form") return
+          event.preventDefault()
+          if (!editor || busy) return
+          editor.text = $("note-text").value.trim()
+          if (!editor.text) {
+            editorError = "Write feedback before saving this note."
+            render()
+            focus("note-text")
+            return
+          }
+          const note = { ...editor, id: editor.id || uid() }
+          const index = state.notes.findIndex((n) => n.id === note.id)
+          if (index < 0) state.notes.push(note)
+          else state.notes[index] = note
+          editor = null
+          editorError = ""
+          selection = anchor = null
+          render()
+          announce("Feedback note saved beside its code.")
+          const card = document.querySelector('[data-note-id="' + note.id + '"]')
+          card?.focus({ preventScroll: true })
+        })
+        $("app").addEventListener("input", (event) => {
+          if (event.target.id === "message-text") {
+            state.message = event.target.value
+            save()
+            const sendButton = $("send-message")
+            if (sendButton)
+              sendButton.disabled =
+                busy ||
+                ["waiting", "gone"].includes(state.agent) ||
+                (!state.message.trim() && !pendingStaged().length && !state.images.length)
+          }
+          if (event.target.id === "note-text" && editor) editor.text = event.target.value
+        })
+        $("app").addEventListener("keydown", (event) => {
+          if (
+            (event.ctrlKey || event.metaKey) &&
+            event.key === "Enter" &&
+            event.target.id === "note-text"
+          ) {
+            event.preventDefault()
+            $("note-form").requestSubmit()
+            return
+          }
+          if (
+            (event.ctrlKey || event.metaKey) &&
+            event.key === "Enter" &&
+            event.target.id === "message-text"
+          ) {
+            event.preventDefault()
+            send()
+            return
+          }
+          if (event.key === "Escape" && editor) {
+            event.preventDefault()
+            editor = null
+            editorError = ""
+            render()
+            focus("add-note")
+            return
+          }
+          const button = event.target.closest('[data-action="line"]')
+          if (button && (event.key === "Enter" || event.key === " ")) {
+            event.preventDefault()
+            const side = button.dataset.side,
+              line = Number(button.dataset.line)
+            if (
+              selection &&
+              selection.side === side &&
+              line >= selection.start &&
+              line <= selection.end
+            )
+              addNote()
+            else if (selectLine(side, line, false)) addNote()
+            return
+          }
+          if (button && ["ArrowUp", "ArrowDown"].includes(event.key)) {
+            event.preventDefault()
+            const side = button.dataset.side
+            const values = rowsFor(state.file, state.version)
+              .map((r) => r[side])
+              .filter((n) => n !== null)
+            const index = values.indexOf(Number(button.dataset.line))
+            const next = values[index + (event.key === "ArrowUp" ? -1 : 1)]
+            if (next !== undefined) {
+              if (event.shiftKey) {
+                const current = Number(button.dataset.line)
+                if (
+                  !anchor ||
+                  anchor.side !== side ||
+                  !selection ||
+                  current < selection.start ||
+                  current > selection.end
+                )
+                  anchor = { side, line: current }
+                selectLine(side, next, true)
+              } else
+                $("diff-pane")
+                  .querySelector(`.line-number[data-side="${side}"][data-line="${next}"]`)
+                  ?.focus()
+            }
+          }
+          if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+            const tab = event.target.closest('[role="tab"]')
+            if (tab) {
+              event.preventDefault()
+              state.panel = tab.id === "files-tab" ? "feedback" : "files"
+              render()
+              focus(state.panel === "files" ? "files-tab" : "feedback-tab")
+            }
+          }
+        })
+        document.addEventListener("pointerup", () => {
+          const completed = dragMoved
+          dragging = false
+          if (completed) {
+            suppressLineClick = true
+            setTimeout(() => {
+              suppressLineClick = false
+            }, 0)
+            if (!editor && selection) addNote()
+          }
+          dragMoved = false
+        })
+        document.addEventListener("pointercancel", () => {
+          dragging = false
+          dragMoved = false
+          dragOrigin = null
+        })
+        $("app").addEventListener("pointerdown", (event) => {
+          const button = event.target.closest('[data-action="line"]')
+          if (button && event.button === 0) {
+            dragging = true
+            dragMoved = false
+            dragOrigin = { side: button.dataset.side, line: Number(button.dataset.line) }
+          }
+        })
+        $("app").addEventListener("pointermove", (event) => {
+          if (!dragging || !(event.buttons & 1) || !dragOrigin) return
+          const button = document
+            .elementFromPoint(event.clientX, event.clientY)
+            ?.closest('[data-action="line"]')
+          if (
+            button &&
+            button.dataset.side === dragOrigin.side &&
+            Number(button.dataset.line) !== dragOrigin.line
+          ) {
+            if (!dragMoved) anchor = { ...dragOrigin }
+            dragMoved = true
+            selectLine(button.dataset.side, Number(button.dataset.line), true)
+          }
+        })
+        $("app").addEventListener("mouseup", (event) => {
+          if (busy || event.target.closest("textarea,input,button")) return
+          const native = window.getSelection()
+          if (!native || native.isCollapsed || !native.toString().trim()) return
+          const selectionElement = (node) =>
+            node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement
+          const startCode = selectionElement(native.anchorNode)?.closest(".code"),
+            endCode = selectionElement(native.focusNode)?.closest(".code")
+          if (!startCode || !endCode) return
+          const first = startCode.closest(".diff-row"),
+            last = endCode.closest(".diff-row")
+          const side = first.classList.contains("del") ? "old" : "new"
+          if (!first.dataset[side] || !last.dataset[side]) {
+            announce("Choose code on one side of the diff.")
+            return
+          }
+          anchor = { side, line: Number(first.dataset[side]) }
+          if (selectLine(side, Number(last.dataset[side]), true)) addNote()
+        })
+        $("image-input").addEventListener("change", async (event) => {
+          const file = event.target.files[0]
+          if (!file) return
+          if (!file.type.startsWith("image/")) {
+            announce("Choose an image file.")
+            return
+          }
+          if (file.size > 2 * 1024 * 1024) {
+            announce("For this prototype, choose an image smaller than 2 MB.")
+            return
+          }
+          const reader = new FileReader()
+          reader.onload = () => {
+            state.images.push({ name: file.name, data: reader.result })
+            render()
+            announce("Image added to the unsent message.")
+          }
+          reader.onerror = () => announce("Couldn’t read that image. Try another file.")
+          reader.readAsDataURL(file)
+          event.target.value = ""
+        })
+        $("agent-state").addEventListener("change", (event) => {
+          if (busy || state.removed) return
+          const next = event.target.value
+          if (next === "idle") {
+            const running = state.messages.find((m) => m.outcome === "working")
+            if (running) running.outcome = running.fail ? "failed" : "done"
+            state.initialFinished = true
+          }
+          state.agent = next
+          render()
+          announce(
+            next === "gone"
+              ? "Sandbox expired. Saved notes are still readable and copyable."
+              : `Agent is ${next}.`,
+          )
+        })
+        $("new-code").addEventListener("click", () => {
+          state.latest = 2
+          render()
+          announce("Newer code is available. Your open diff and notes have not changed.")
+        })
+        $("finish-turn").addEventListener("click", finishTurn)
+        $("reopen").addEventListener("click", () => {
+          if (busy) return
+          try {
+            state = storageAvailable ? JSON.parse(localStorage.getItem(KEY)) : clone(memory)
+          } catch {}
+          editor = selection = anchor = null
+          error = ""
+          render()
+          announce("Agent reopened with its saved feedback, message, and attachments.")
+        })
+        $("remove-agent").addEventListener("click", remove)
+        $("reset").addEventListener("click", (event) => confirmReset(event.currentTarget))
+        render()
+      })()
+    </script>
+  </body>
 </html>
