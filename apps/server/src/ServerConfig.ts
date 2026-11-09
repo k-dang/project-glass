@@ -51,6 +51,10 @@ export class ServerConfig extends Context.Service<
       const homeDirectory =
         (yield* Config.String("GLASS_HOME").pipe(Config.withDefault(""))) || homedir()
 
+      const dataDirectory = yield* Config.String("GLASS_DATA_DIRECTORY").pipe(
+        Config.withDefault(join(homeDirectory, ".project-glass")),
+      )
+
       const agentHostBundle = yield* Config.String("GLASS_AGENT_HOST_BUNDLE").pipe(
         Config.withDefault(bundledEntry("agentHost", import.meta.url)),
       )
@@ -67,7 +71,7 @@ export class ServerConfig extends Context.Service<
         githubApiUrl,
         agentHostBundle,
         gitRemote,
-        dataDirectory: join(homeDirectory, ".project-glass"),
+        dataDirectory,
         homeDirectory,
       })
     }),

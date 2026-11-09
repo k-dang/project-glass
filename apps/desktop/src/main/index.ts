@@ -4,6 +4,11 @@ import {
   type BackendEndpoint,
   CHOOSE_FOLDER_CHANNEL,
   type BackendFailure,
+  DOGFOOD_REPORTS_ARGUMENT,
+  type DogfoodReportDetails,
+  type DogfoodReportRecorded,
+  FINISH_DOGFOOD_REPORT_CHANNEL,
+  RECORD_DOGFOOD_REPORT_CHANNEL,
   RELAUNCH_CHANNEL,
   RESOURCE_USAGE_CHANNEL,
   SET_THEME_CHANNEL,
@@ -11,10 +16,12 @@ import {
 } from "@glass/contracts/desktop"
 import { Cause, Effect, Fiber, Option } from "effect"
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, net, protocol, shell } from "electron"
+import { execFile } from "node:child_process"
 import { homedir } from "node:os"
 import { join, relative } from "node:path"
 import { pathToFileURL } from "node:url"
 import { startBackend } from "./backend"
+import { dogfoodReportWriter } from "./dogfoodReports"
 import { prependLoginShellPath } from "./loginShellPath"
 import { summarizeResourceUsage } from "./resourceUsage"
 
@@ -97,6 +104,40 @@ const updateWindowTheme = (window: BrowserWindow) => {
   if (process.platform !== "darwin") window.setTitleBarOverlay(colors)
 }
 
+const glassHome = process.env["GLASS_HOME"] || homedir()
+
+const logFile = join(glassHome, ".glass", "logs", "backend.log")
+
+// The backend keeps its data here; main passes it as GLASS_DATA_DIRECTORY.
+const dataDirectory = join(glassHome, ".project-glass")
+
+// Dogfood reports live beside Glass's data, never in a repository.
+const dogfoodReports = dogfoodReportWriter(join(dataDirectory, "dogfood-reports"))
+
+const glassCommit = () =>
+  new Promise<string>((resolve) =>
+    execFile("git", ["describe", "--always", "--dirty"], { cwd: app.getAppPath() }, (error, out) =>
+      resolve(error === null ? out.trim() : "unknown"),
+    ),
+  )
+
+const recordDogfoodReportOf = async (window: BrowserWindow): Promise<DogfoodReportRecorded> => {
+  const now = new Date()
+  const [image, commit] = await Promise.all([window.webContents.capturePage(), glassCommit()])
+
+  const folder = await dogfoodReports.record({
+    screenshot: image.toPNG(),
+    backendLogPath: logFile,
+    settingsPath: join(dataDirectory, "settings.json"),
+    glassCommit: commit,
+    now,
+  })
+
+  const thumbnail = image.resize({ width: 640 }).toJPEG(70).toString("base64")
+
+  return { folder, screenshot: `data:image/jpeg;base64,${thumbnail}` }
+}
+
 const createWindow = () => {
   const initialColors = windowColors()
 
@@ -117,6 +158,7 @@ const createWindow = () => {
       nodeIntegration: false,
       // Throttled timers in a hidden window can interrupt WebSocket pings.
       backgroundThrottling: false,
+      additionalArguments: app.isPackaged ? [] : [DOGFOOD_REPORTS_ARGUMENT],
     },
   })
 
@@ -141,8 +183,6 @@ const createWindow = () => {
   void window.loadURL(devServerUrl ?? `${APP_ORIGIN}/index.html`)
 }
 
-const logFile = join(process.env["GLASS_HOME"] || homedir(), ".glass", "logs", "backend.log")
-
 const backendReady = Promise.withResolvers<BackendEndpoint>()
 
 const backendFailed = Promise.withResolvers<BackendFailure>()
@@ -162,6 +202,7 @@ const program = Effect.gen(function* () {
     entry: resources.server,
     rendererOrigin,
     logFile,
+    dataDirectory,
   })
 
   backendReady.resolve(backend.endpoint)
@@ -206,6 +247,20 @@ void app.whenReady().then(() => {
 
     return chosen.canceled ? null : (chosen.filePaths[0] ?? null)
   })
+
+  if (!app.isPackaged) {
+    ipcMain.handle(RECORD_DOGFOOD_REPORT_CHANNEL, async (event) => {
+      const window = BrowserWindow.fromWebContents(event.sender)
+
+      if (window === null) throw new Error("No window to record")
+
+      return recordDogfoodReportOf(window)
+    })
+    ipcMain.handle(FINISH_DOGFOOD_REPORT_CHANNEL, (_event, details: DogfoodReportDetails) =>
+      dogfoodReports.finish(details),
+    )
+  }
+
   ipcMain.handle(RELAUNCH_CHANNEL, () => {
     app.relaunch()
     app.quit()

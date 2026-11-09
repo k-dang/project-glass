@@ -300,3 +300,12 @@ One part of Storage: Agents, Reviews, Activity, To-dos, Glass internals, or SQLi
 holds the tables behind that part of Glass; SQLite overhead holds its write-ahead log and free
 space.
 _Avoid_: Area, which names a part of Glass the user visits
+
+### Developing Glass
+
+**Dogfood report**:
+A note a Glass developer records the moment something in Glass is broken or could be better, kept
+with what Glass was showing and the data behind it, so an agent can bring that moment back,
+compare it with new code, and, for a Tour or Agent review, write it again. Only development builds
+record them, and they never leave the device.
+_Avoid_: Feedback, bug report, snag

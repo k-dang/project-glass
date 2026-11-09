@@ -3,8 +3,8 @@ import { Cause, Option } from "effect"
 import { Copy, KeyRound, LoaderCircle, RefreshCw, TriangleAlert, WifiOff } from "lucide-react"
 import type { ReactNode } from "react"
 import { Button } from "@/components/ui/button"
-import { toast } from "@/components/ui/toast"
 import type { BackendError } from "./backend"
+import { copyText } from "./clipboard"
 import { withCode } from "./ProblemAlert"
 import { problemOf } from "./problems"
 
@@ -20,14 +20,7 @@ function ProblemIcon(props: { error: BackendError | null }) {
   }
 }
 
-const copy = async (command: string) => {
-  try {
-    await navigator.clipboard.writeText(command)
-    toast.add({ type: "success", title: "Command copied", timeout: 2500 })
-  } catch {
-    toast.add({ type: "error", title: "Couldn't copy to the clipboard" })
-  }
-}
+const copy = (command: string) => copyText(command, "Command copied")
 
 function ConnectionCard(props: {
   alert?: boolean

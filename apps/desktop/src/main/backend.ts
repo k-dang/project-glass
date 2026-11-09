@@ -50,6 +50,7 @@ export const startBackend = Effect.fn("startBackend")(function* (options: {
   readonly entry: string
   readonly rendererOrigin: string
   readonly logFile: string
+  readonly dataDirectory: string
 }) {
   const port = yield* freePort
   const token = randomBytes(32).toString("base64url")
@@ -94,6 +95,7 @@ export const startBackend = Effect.fn("startBackend")(function* (options: {
             GLASS_PORT: String(port),
             GLASS_TOKEN: token,
             GLASS_ALLOWED_ORIGINS: options.rendererOrigin,
+            GLASS_DATA_DIRECTORY: options.dataDirectory,
           },
         })
 
