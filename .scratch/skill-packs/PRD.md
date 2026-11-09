@@ -128,8 +128,6 @@ For example, the user adds `https://github.com/acme/skills/tree/main/skills/team
 
 ## Testing Decisions
 
-Proposed; not yet confirmed with Kevin.
-
 - Test the pack-creation flow at the backend boundary against recorded or fixture GitHub responses:
   tree and repository URLs, a single-skill folder, recursive discovery, skipped skills with reasons,
   duplicate names, and an inaccessible repository. Test Update's change summary and that existing
