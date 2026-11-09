@@ -30,6 +30,7 @@ export interface UnitFields {
   readonly effort?: string | null
   readonly sandbox_provider?: string | null
   readonly clone?: "new" | "existing"
+  readonly prefetched?: boolean
   readonly checkout_ms?: number
   readonly agent_ms?: number
   readonly ending?: string
