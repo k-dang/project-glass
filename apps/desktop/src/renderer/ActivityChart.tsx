@@ -85,7 +85,7 @@ const activityChartAtom = backendRuntime
       return { stamps, now }
     }),
   )
-  .pipe(Atom.keepAlive, Atom.swr({ staleTime: 0 }))
+  .pipe(Atom.setIdleTTL("5 minutes"), Atom.swr({ staleTime: 0 }))
 
 export function ActivityChart() {
   const id = useId()
