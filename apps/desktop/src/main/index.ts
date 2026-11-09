@@ -4,6 +4,7 @@ import {
   type BackendEndpoint,
   CHOOSE_FOLDER_CHANNEL,
   type BackendFailure,
+  DISCARD_DOGFOOD_REPORT_CHANNEL,
   DOGFOOD_REPORTS_ARGUMENT,
   type DogfoodReportDetails,
   type DogfoodReportRecorded,
@@ -125,7 +126,7 @@ const recordDogfoodReportOf = async (window: BrowserWindow): Promise<DogfoodRepo
   const now = new Date()
   const [image, commit] = await Promise.all([window.webContents.capturePage(), glassCommit()])
 
-  const folder = await dogfoodReports.record({
+  const id = await dogfoodReports.record({
     screenshot: image.toPNG(),
     backendLogPath: logFile,
     settingsPath: join(dataDirectory, "settings.json"),
@@ -135,7 +136,7 @@ const recordDogfoodReportOf = async (window: BrowserWindow): Promise<DogfoodRepo
 
   const thumbnail = image.resize({ width: 640 }).toJPEG(70).toString("base64")
 
-  return { folder, screenshot: `data:image/jpeg;base64,${thumbnail}` }
+  return { id, screenshot: `data:image/jpeg;base64,${thumbnail}` }
 }
 
 const createWindow = () => {
@@ -258,6 +259,9 @@ void app.whenReady().then(() => {
     })
     ipcMain.handle(FINISH_DOGFOOD_REPORT_CHANNEL, (_event, details: DogfoodReportDetails) =>
       dogfoodReports.finish(details),
+    )
+    ipcMain.handle(DISCARD_DOGFOOD_REPORT_CHANNEL, (_event, id: string) =>
+      dogfoodReports.discard(id),
     )
   }
 

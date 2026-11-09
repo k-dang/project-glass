@@ -114,34 +114,48 @@ export function DogfoodReports(props: { bridge: DogfoodReportsBridge }) {
     return () => window.removeEventListener("keydown", onKeyDown, { capture: true })
   }, [])
 
-  const finish = async (withNote: string) => {
+  const takePending = () => {
     const report = current.current
 
-    if (report === null || report === "recording") return
+    if (report === null || report === "recording") return null
 
     current.current = null
     setPending(null)
 
+    return report
+  }
+
+  const finish = async (withNote: string) => {
+    const report = takePending()
+
+    if (report === null) return
+
     try {
-      const { folder, subject } = report
-      const named = await bridge.finish({ folder, note: withNote, subject })
+      const { id, subject } = report
+      const folder = await bridge.finish({ id, note: withNote, subject })
 
       toast.add({
         type: "success",
         title: "Dogfood report saved",
-        description: fileName(named),
+        description: fileName(folder),
         actionProps: {
           children: "Copy path",
-          onClick: () => void copyText(named, "Path copied"),
+          onClick: () => void copyText(folder, "Path copied"),
         },
       })
     } catch (error) {
       toast.add({
         type: "error",
-        title: "Couldn't finish the Dogfood report",
-        description: `${String(error)}. Its screenshot and logs are in ${report.folder}.`,
+        title: "Couldn't save the Dogfood report",
+        description: String(error),
       })
     }
+  }
+
+  const discard = () => {
+    const report = takePending()
+
+    if (report !== null) void bridge.discard(report.id)
   }
 
   const submit = (event: FormEvent) => {
@@ -150,13 +164,14 @@ export function DogfoodReports(props: { bridge: DogfoodReportsBridge }) {
   }
 
   return (
-    <Dialog open={pending !== null} onOpenChange={(open) => !open && void finish("")}>
+    <Dialog open={pending !== null} onOpenChange={(open) => !open && discard()}>
       <DialogContent initialFocus={noteRef} className="sm:max-w-lg">
         <form onSubmit={submit} className="flex flex-col gap-4">
           <DialogHeader>
             <DialogTitle>Dogfood report</DialogTitle>
             <DialogDescription>
-              The screenshot, logs and settings are saved. Say what's broken or what should change.
+              The screenshot, logs and settings are captured. Say what's broken or what should
+              change.
             </DialogDescription>
           </DialogHeader>
           {pending !== null && (
@@ -176,6 +191,9 @@ export function DogfoodReports(props: { bridge: DogfoodReportsBridge }) {
             className="min-h-24"
           />
           <DialogFooter>
+            <Button type="button" variant="ghost" className="sm:mr-auto" onClick={discard}>
+              Discard
+            </Button>
             <Button type="button" variant="ghost" onClick={() => void finish("")}>
               Save without a note
             </Button>

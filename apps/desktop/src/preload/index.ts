@@ -3,6 +3,7 @@ import {
   BACKEND_FAILURE_CHANNEL,
   CHOOSE_FOLDER_CHANNEL,
   type DesktopBridge,
+  DISCARD_DOGFOOD_REPORT_CHANNEL,
   DOGFOOD_REPORTS_ARGUMENT,
   FINISH_DOGFOOD_REPORT_CHANNEL,
   RECORD_DOGFOOD_REPORT_CHANNEL,
@@ -23,6 +24,7 @@ const bridge: DesktopBridge = {
     dogfoodReports: {
       record: () => ipcRenderer.invoke(RECORD_DOGFOOD_REPORT_CHANNEL),
       finish: (details) => ipcRenderer.invoke(FINISH_DOGFOOD_REPORT_CHANNEL, details),
+      discard: (id) => ipcRenderer.invoke(DISCARD_DOGFOOD_REPORT_CHANNEL, id),
     },
   }),
 }
