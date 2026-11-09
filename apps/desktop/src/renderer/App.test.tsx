@@ -296,7 +296,7 @@ it("opens the keyboard shortcuts from any area, not only a PR workspace", async 
   await user.click(await screen.findByRole("link", { name: "To-dos" }))
   await user.keyboard("?")
   const dialog = await screen.findByRole("dialog", { name: "Keyboard shortcuts" })
-  expect(within(dialog).getByText("Agents")).toBeTruthy()
+  expect(within(dialog).getByRole("heading", { name: "Agents" })).toBeTruthy()
 })
 
 it("preserves a pending follow and its failure when leaving and returning to Settings", async () => {

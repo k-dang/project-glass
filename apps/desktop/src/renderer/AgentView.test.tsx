@@ -159,6 +159,22 @@ it("sends a message with Enter and clears the composer", async () => {
   expect(composer).toHaveProperty("textContent", "")
 })
 
+it("switches between Chat and Changes with Mod+D, even from the composer", async () => {
+  const user = mount({
+    WatchTranscript: () =>
+      Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
+    GetAgentChanges: () => Effect.succeed([]),
+  })
+
+  await user.click(await screen.findByRole("textbox", { name: "Message" }))
+  await user.keyboard("{Control>}d{/Control}")
+  await screen.findByRole("region", { name: "Changes" })
+
+  await user.keyboard("{Meta>}d{/Meta}")
+  await screen.findByRole("textbox", { name: "Message" })
+  expect(screen.queryByRole("region", { name: "Changes" })).toBeNull()
+})
+
 it("sends Markdown and HTML exactly as written", async () => {
   const sent: Array<string> = []
 
