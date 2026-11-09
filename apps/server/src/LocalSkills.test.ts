@@ -1,6 +1,6 @@
 import { assert, it } from "@effect/vitest"
-import { type Agent } from "@glass/contracts"
-import { Effect } from "effect"
+import { type Agent, TextPart } from "@glass/contracts"
+import { Effect, Predicate } from "effect"
 import { chmodSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { agentsFixture, settled } from "../test/agentsFixture"
@@ -73,4 +73,36 @@ it.live(
         "local:planner",
       ])
     }),
+)
+
+it.live("sends each Local skill name once, with every file its symlinks share", () =>
+  Effect.gen(function* () {
+    const f = yield* agentsFixture
+    const shared = join(f.home, "dotfiles", "scripts")
+    const twin = "---\ndescription: Named by its folder.\n---\n"
+
+    write(join(shared, "run.sh"), "echo hi")
+
+    for (const name of ["plan", "review"]) {
+      write(join(f.home, ".agents", "skills", name, "SKILL.md"), skillFile(name, `Do ${name}.`))
+      symlinkSync(shared, join(f.home, ".agents", "skills", name, "scripts"))
+    }
+
+    write(join(f.home, ".pi", "agent", "skills", "twin", "SKILL.md"), twin)
+    write(join(f.home, ".agents", "skills", "twin", "SKILL.md"), twin)
+    symlinkSync(
+      join(f.home, ".pi", "agent", "skills", "twin"),
+      join(f.home, ".agents", "skills", "alias"),
+    )
+
+    const agent = yield* f.startSandbox("show the skills", { ...pi, localSkills: true })
+    const [turn] = yield* f.transcript(agent.id, settled(1))
+
+    assert.deepStrictEqual(
+      turn?.parts.find((part) => Predicate.isTagged(part, "Text")),
+      TextPart.make({
+        text: "local/.claude-plugin/plugin.json,local/skills/plan/SKILL.md,local/skills/plan/scripts/run.sh,local/skills/review/SKILL.md,local/skills/review/scripts/run.sh,local/skills/twin/SKILL.md",
+      }),
+    )
+  }),
 )

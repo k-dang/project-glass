@@ -35,6 +35,8 @@ interface FoundFile {
 interface FoundSkill {
   readonly folder: string
   readonly directory: string
+  /** Where its SKILL.md really is, after symlinks. */
+  readonly realSkillFile: string
   readonly skill: Skill
   readonly files: ReadonlyArray<FoundFile>
 }
@@ -62,6 +64,24 @@ const orSkipped = <A>(
         ),
     }),
   )
+
+/**
+ * pi loads a SKILL.md once however many paths reach it, and keeps the first skill of a name, so
+ * the later ones are never sent.
+ */
+const firstOfEach = (skills: ReadonlyArray<FoundSkill>) => {
+  const names = new Set<string>()
+  const files = new Set<string>()
+
+  return skills.filter(({ skill, realSkillFile }) => {
+    if (names.has(skill.name) || files.has(realSkillFile)) return false
+
+    names.add(skill.name)
+    files.add(realSkillFile)
+
+    return true
+  })
+}
 
 const reading = <A>(effect: Effect.Effect<A, PlatformError.PlatformError>) =>
   effect.pipe(
@@ -92,17 +112,16 @@ export class LocalSkills extends Context.Service<
       const fs = yield* FileSystem.FileSystem
       const skillFolders = foldersOf((yield* ServerConfig).homeDirectory)
 
-      /** Every file under `folder` Glass can read, following each symlink once. */
+      /** Every file under `folder` Glass can read, following symlinks but not round a loop. */
       const filesUnder = (
         folder: string,
         relative: string,
-        visited: Set<string>,
+        ancestors: ReadonlySet<string>,
       ): Effect.Effect<ReadonlyArray<FoundFile>, PlatformError.PlatformError> =>
         Effect.gen(function* () {
           const real = yield* orSkipped(fs.realPath(join(folder, relative)))
 
-          if (Option.isNone(real) || visited.has(real.value)) return []
-          visited.add(real.value)
+          if (Option.isNone(real) || ancestors.has(real.value)) return []
 
           const entries = yield* orSkipped(fs.readDirectory(join(folder, relative)))
 
@@ -117,7 +136,8 @@ export class LocalSkills extends Context.Service<
 
                 if (Option.isNone(info)) return []
 
-                if (info.value.type === "Directory") return yield* filesUnder(folder, path, visited)
+                if (info.value.type === "Directory")
+                  return yield* filesUnder(folder, path, new Set([...ancestors, real.value]))
 
                 return info.value.type === "File"
                   ? [{ path, executable: (info.value.mode & 0o111) !== 0 }]
@@ -129,7 +149,10 @@ export class LocalSkills extends Context.Service<
           return nested.flat()
         })
 
-      /** The skills that load, as the programs load them: skipping any whose SKILL.md doesn't. */
+      /**
+       * The skills that load, as the programs load them: skipping any whose SKILL.md doesn't, and
+       * keeping only the first skill of a name or SKILL.md.
+       */
       const found = (engine: AgentEngine) => {
         const { folders, nested } = skillFolders[engine]
 
@@ -142,22 +165,27 @@ export class LocalSkills extends Context.Service<
               Effect.forEach(
                 [...filesBySkill(files)].filter(([directory]) => loads(directory)),
                 ([directory, owned]) =>
-                  orSkipped(fs.readFileString(join(folder, skillFilePath(directory)))).pipe(
-                    Effect.map(
-                      Option.flatMap((text) => {
-                        const skill = readSkill(directory, text, lastSegment(directory))
+                  Effect.gen(function* () {
+                    const skillFile = join(folder, skillFilePath(directory))
 
-                        return skill instanceof Skill
-                          ? Option.some<FoundSkill>({ folder, directory, skill, files: owned })
-                          : Option.none()
-                      }),
-                    ),
-                  ),
+                    const read = yield* orSkipped(
+                      Effect.all([fs.readFileString(skillFile), fs.realPath(skillFile)]),
+                    )
+
+                    if (Option.isNone(read)) return []
+
+                    const [text, realSkillFile] = read.value
+                    const skill = readSkill(directory, text, lastSegment(directory))
+
+                    return skill instanceof Skill
+                      ? [{ folder, directory, realSkillFile, skill, files: owned }]
+                      : []
+                  }),
                 READS,
               ),
             ),
           ),
-        ).pipe(Effect.map((perFolder) => perFolder.flat().flatMap(Option.toArray)))
+        ).pipe(Effect.map((perFolder) => firstOfEach(perFolder.flat(2))))
       }
 
       const sent = (taken: Set<string>, { folder, directory, files }: FoundSkill) =>
@@ -184,7 +212,7 @@ export class LocalSkills extends Context.Service<
       return LocalSkills.of({
         names: (engine) =>
           found(engine).pipe(
-            Effect.map((skills) => [...new Set(skills.map(({ skill }) => skill.name))].toSorted()),
+            Effect.map((skills) => skills.map(({ skill }) => skill.name).toSorted()),
             reading,
             Effect.withSpan("LocalSkills.names"),
           ),
