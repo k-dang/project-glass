@@ -63,6 +63,13 @@ const main = Effect.gen(function* () {
 
   github.seedBranches(DEMO_REPOSITORY, { defaultBranch: "main", branches: ["main", "develop"] })
 
+  github.pushRepository({ owner: DEMO_REPOSITORY.owner, repo: "skills" }, "main", {
+    "team/architect/SKILL.md":
+      "---\nname: architect\ndescription: Shape a design before writing code.\n---\n\nSketch the modules first.\n",
+    "team/reviewer/SKILL.md":
+      "---\nname: reviewer\ndescription: Review a change for bugs and gaps.\n---\n\nRead the diff twice.\n",
+  })
+
   installFakeSandboxProvider(
     dirname(config.dataDirectory),
     {
