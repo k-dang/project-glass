@@ -221,6 +221,7 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
           branch={agent.name}
           baseBranch={agent.baseBranch}
           skillPacks={agent.skillPacks}
+          localSkills={agent.localSkills}
         >
           {tab === "chat" ? (
             <AgentHeaderAction onSelect={() => onTabChange("changes")}>

@@ -9,6 +9,7 @@ import {
   type NewAgent,
   SandboxPlace,
   SandboxProviderInfo,
+  Skill,
   localPlace,
   SkillPack,
   SkillPackSource,
@@ -21,13 +22,13 @@ import { placeKey } from "./agentsArea"
 import { agent, agentFields } from "../../test/agent"
 import { choice, listModels, mount, pixel } from "../../test/agentApp"
 
-const pack = (name: string, commit: string) =>
+const pack = (name: string, commit: string, skills: ReadonlyArray<string> = []) =>
   new SkillPack({
     name,
     source: new SkillPackSource({ owner: "acme", repo: "skills", ref: "main", path: name }),
     commit,
     updatable: true,
-    skills: [],
+    skills: skills.map((skill) => new Skill({ name: skill, description: `Use ${skill}.` })),
   })
 
 const branchesAt = ({
@@ -102,6 +103,7 @@ it("starts an Agent from its first message, on the repository's default branch",
       permissionMode: null,
       place: localPlace,
       skillPacks: [],
+      localSkills: false,
       message: "Fix the bug",
       images: [],
     },
@@ -171,6 +173,62 @@ it("waits for the Skill packs to load before starting an Agent with the remember
 
   await waitFor(() => expect(window.location.hash).toBe(`#/agents/${agent.id}`))
   expect(created.map(({ skillPacks }) => skillPacks)).toEqual([["team"]])
+})
+
+it("gives a Sandbox Agent the Local skills when picked, warning which skill names its sources share", async () => {
+  const created: Array<NewAgent> = []
+  localStorage.setItem("glass.newAgent.skillPacks", JSON.stringify(["team"]))
+
+  const handlers = {
+    ...newAgentHandlers(created, []),
+    ListSandboxProviders: () =>
+      Effect.succeed([
+        new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes", engines: ["claude-code"] }),
+      ]),
+    ListSkillPacks: () =>
+      Effect.succeed([pack("team", "ae5650fbbbb", ["architect", "grilling", "tdd"])]),
+    ListFollowedRepositories: () => Effect.succeed([agent.repository]),
+    ListLocalSkills: () => Effect.succeed(["grilling", "notes", "tdd"]),
+  }
+
+  const user = mount(handlers, "/agents/new")
+  const draft = await screen.findByRole("region", { name: "New Agent" })
+  await within(draft).findByRole("combobox", { name: "Skill packs" })
+  expect(within(draft).queryByRole("checkbox", { name: "Local skills" })).toBeNull()
+
+  await user.click(within(draft).getByRole("combobox", { name: "Where the Agent runs" }))
+  await user.click(await screen.findByRole("option", { name: "Fake Sandboxes" }))
+  const localSkills = await within(newAgentDraft()).findByRole("checkbox", { name: "Local skills" })
+  expect(within(newAgentDraft()).queryByRole("list", { name: "Shared skill names" })).toBeNull()
+
+  await user.click(localSkills)
+  const shared = await within(newAgentDraft()).findByRole("list", { name: "Shared skill names" })
+  expect(
+    within(shared)
+      .getAllByRole("listitem")
+      .map(({ textContent }) => textContent),
+  ).toEqual([
+    "grilling is in Local skills and team. The Agent has each, as /local:grilling and /team:grilling.",
+    "tdd is in Local skills and team. The Agent has each, as /local:tdd and /team:tdd.",
+  ])
+
+  await user.type(
+    within(newAgentDraft()).getByRole("textbox", { name: "Message" }),
+    "Fix the bug{Enter}",
+  )
+  await waitFor(() => expect(window.location.hash).toBe(`#/agents/${agent.id}`))
+  expect(created).toMatchObject([{ skillPacks: ["team"], localSkills: true }])
+
+  cleanup()
+  mount(handlers, "/agents/new")
+  const again = await screen.findByRole("region", { name: "New Agent" })
+  await user.click(await within(again).findByRole("combobox", { name: "Where the Agent runs" }))
+  await user.click(await screen.findByRole("option", { name: "Fake Sandboxes" }))
+  expect(
+    (await within(newAgentDraft()).findByRole("checkbox", { name: "Local skills" })).getAttribute(
+      "aria-checked",
+    ),
+  ).toBe("true")
 })
 
 it("shows the first message at once while the Agent starts", async () => {

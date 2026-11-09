@@ -202,10 +202,27 @@ export const newAgentCommandsAtom = (
   repository: FollowedRepository,
 ) => newAgentCommandsFamily(new NewAgentOf({ engine, place, repository }))
 
+/**
+ * Whether the Agent's Sandbox is reachable. A Sandbox Agent's host lists nothing until its Sandbox
+ * is made, so its listings read again once it can be reached.
+ */
+const sandboxReachableAtom = Atom.family((agentId: string) =>
+  Atom.make((get) =>
+    Option.match(AsyncResult.value(get(agentsAtom)), {
+      onNone: () => false,
+      onSome: (agents) => agents.find(({ id }) => id === agentId)?.sandbox?.reach === "reachable",
+    }),
+  ),
+)
+
 export const agentCommandsAtom = Atom.family((agentId: string) =>
   listedOr(
     backendRuntime
-      .atom(Backend.use((backend) => backend.ListAgentCommands({ agentId })))
+      .atom((get) => {
+        get(sandboxReachableAtom(agentId))
+
+        return Backend.use((backend) => backend.ListAgentCommands({ agentId }))
+      })
       .pipe(Atom.setIdleTTL(COMPOSER_LISTING_IDLE_TTL)),
     noCommands,
   ),
@@ -243,7 +260,11 @@ export const newAgentFilesAtom = (
 export const agentFilesAtom = Atom.family((agentId: string) =>
   listedOr(
     backendRuntime
-      .atom(Backend.use((backend) => backend.ListAgentFiles({ agentId })))
+      .atom((get) => {
+        get(sandboxReachableAtom(agentId))
+
+        return Backend.use((backend) => backend.ListAgentFiles({ agentId }))
+      })
       .pipe(Atom.setIdleTTL(COMPOSER_LISTING_IDLE_TTL)),
     noFiles,
   ),

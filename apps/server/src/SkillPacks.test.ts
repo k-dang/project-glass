@@ -202,7 +202,7 @@ describe("Skill packs", () => {
             team,
           ])
 
-          for (const name of ["Team", "team_skills", "-team", "a".repeat(65)]) {
+          for (const name of ["Team", "team_skills", "-team", "a".repeat(65), "local"]) {
             assert.instanceOf(
               yield* Effect.flip(client.AddSkillPack({ source, commit, name })),
               InvalidSkillPackName,

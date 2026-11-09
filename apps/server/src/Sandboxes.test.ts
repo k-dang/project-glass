@@ -105,6 +105,7 @@ it.live("offers a Sandbox only the Agent programs its provider runs", () =>
         permissionMode: null,
         place: sandbox,
         skillPacks: [],
+        localSkills: false,
       })
       .pipe(Effect.flip)
 

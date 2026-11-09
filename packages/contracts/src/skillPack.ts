@@ -4,8 +4,13 @@ const SKILL_PACK_NAME_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
 export const SKILL_PACK_NAME_MAX_LENGTH = 64
 
+/** The namespace a Sandbox Agent's Local skills take in Claude Code, so no Skill pack can have it. */
+export const LOCAL_SKILLS_NAMESPACE = "local"
+
 export const isSkillPackName = (name: string) =>
-  name.length <= SKILL_PACK_NAME_MAX_LENGTH && SKILL_PACK_NAME_PATTERN.test(name)
+  name.length <= SKILL_PACK_NAME_MAX_LENGTH &&
+  SKILL_PACK_NAME_PATTERN.test(name) &&
+  name !== LOCAL_SKILLS_NAMESPACE
 
 export class SkillPackSource extends Schema.Class<SkillPackSource>("SkillPackSource")({
   owner: Schema.String,

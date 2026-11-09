@@ -17,9 +17,15 @@ export function AgentHeader(props: {
   branch?: string | undefined
   baseBranch: string | null
   skillPacks?: ReadonlyArray<AgentSkillPack> | undefined
+  localSkills?: boolean | undefined
   children?: ReactNode
 }) {
   const PlaceIcon = props.place === null ? null : placeIcons[props.place._tag]
+
+  const skillSources = [
+    ...(props.skillPacks ?? []).map(({ name, commit }) => `${name} @ ${shortSha(commit)}`),
+    ...(props.localSkills === true ? ["Local skills"] : []),
+  ]
 
   return (
     <header className="flex h-11 shrink-0 items-center gap-2 border-b px-4 text-sm">
@@ -52,14 +58,10 @@ export function AgentHeader(props: {
                 </div>
               </>
             )}
-            {props.skillPacks !== undefined && props.skillPacks.length > 0 && (
+            {skillSources.length > 0 && (
               <div className={fact}>
                 <Package aria-hidden />
-                <span className="truncate">
-                  {props.skillPacks
-                    .map(({ name, commit }) => `${name} @ ${shortSha(commit)}`)
-                    .join(" · ")}
-                </span>
+                <span className="truncate">{skillSources.join(" · ")}</span>
               </div>
             )}
             {props.children}

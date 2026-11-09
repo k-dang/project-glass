@@ -34,6 +34,7 @@ import { PullRequestMirror } from "./PullRequestMirror"
 import { Queue } from "./Queue"
 import { AgentCommands, SettingsStore } from "./SettingsStore"
 import { SavedPlaces } from "./SavedPlaces"
+import { LocalSkills } from "./LocalSkills"
 import { SkillPacks } from "./SkillPacks"
 import { Storage } from "./Storage"
 import { ToDos } from "./ToDos"
@@ -92,6 +93,7 @@ const services = (
       Layer.provide(Asks.layer),
       Layer.provide(AgentsLive),
       Layer.provideMerge(SkillPacks.layer),
+      Layer.provideMerge(LocalSkills.layer),
       Layer.provide(Plugins.layer),
       Layer.provide(CheckoutRuns.layer),
       Layer.provide(Checkouts.layer),

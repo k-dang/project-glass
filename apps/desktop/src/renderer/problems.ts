@@ -58,7 +58,8 @@ export const describeError = (error: BackendError): Problem =>
       }),
       InvalidSkillPackName: () => ({
         title: "That name can't be a Skill pack's",
-        detail: "Use lowercase letters, digits, and single hyphens, up to 64 characters.",
+        detail:
+          "Use lowercase letters, digits, and single hyphens, up to 64 characters. local is kept for your Local skills.",
       }),
       SkillPackNameTaken: ({ name }) => ({
         title: "That name is taken",

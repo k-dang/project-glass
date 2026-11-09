@@ -52,7 +52,12 @@ import { ModelPicker } from "./ModelPicker"
 import { PermissionModePicker } from "./PermissionModePicker"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf, settledProblem } from "./problems"
-import { SkillPackPicker, useSkillPackChoice } from "./SkillPackPicker"
+import {
+  LocalSkillsToggle,
+  SharedSkillNames,
+  SkillPackPicker,
+  useSkillPackChoice,
+} from "./SkillPackPicker"
 
 const NEW_AGENT_TEXT = "new"
 
@@ -307,7 +312,7 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
       : newAgentBranchesAtom(placeKey(where.place), repository),
   )
 
-  const skillPacks = useSkillPackChoice()
+  const skillPacks = useSkillPackChoice(where.place, props.program.engine)
   const created = useAtomValue(createAgentAtom)
   const create = useAtomSet(createAgentAtom, { mode: "promiseExit" })
   const defaultBranch = AsyncResult.value(defaults)
@@ -390,6 +395,7 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
       baseBranch,
       place: where.place,
       skillPacks: skillPacks.chosen,
+      localSkills: skillPacks.localSkills,
       ...program,
       ...message,
     })
@@ -527,6 +533,12 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
             chosen={skillPacks.chosen}
             onChange={skillPacks.setChosen}
           />
+          {skillPacks.offersLocalSkills && (
+            <LocalSkillsToggle
+              checked={skillPacks.localSkills}
+              onCheckedChange={skillPacks.setLocalSkills}
+            />
+          )}
           {asksPermission(where.place) && (
             <div className="ml-auto">
               <PermissionModePicker
@@ -536,6 +548,7 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
               />
             </div>
           )}
+          <SharedSkillNames shared={skillPacks.shared} />
         </div>
       </MessageBox>
       {starting === null && <div className="flex-1" />}

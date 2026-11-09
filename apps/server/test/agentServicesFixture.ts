@@ -43,6 +43,7 @@ import { followJournal } from "../src/hostJournal"
 import { migrationLoader } from "../src/Migrations"
 import { Plugins } from "../src/Plugins"
 import { Sandboxes } from "../src/Sandboxes"
+import { LocalSkills } from "../src/LocalSkills"
 import { SkillPacks } from "../src/SkillPacks"
 import { ServerConfig } from "../src/ServerConfig"
 import { GitHubClient } from "../src/github/GitHubClient"
@@ -209,6 +210,7 @@ export const agentServicesFixture = Effect.gen(function* () {
             ),
           ),
           Layer.provide(SkillPacks.layer.pipe(Layer.provide(Layer.mock(GitHubClient)({})))),
+          Layer.provide(Layer.mock(LocalSkills)({})),
           Layer.provide(ConversationTurns.layer),
           Layer.provide(FeedbackNotes.layer),
           Layer.provideMerge(Transcripts.layer),
@@ -301,6 +303,7 @@ export const agentServicesFixture = Effect.gen(function* () {
         message: "Start",
         images: [],
         skillPacks: [],
+        localSkills: false,
         engine,
         model: null,
         effort: null,
