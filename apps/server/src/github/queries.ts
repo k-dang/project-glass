@@ -243,3 +243,65 @@ export const RepositoryBranchesResponse = GraphQLResponse(
     ),
   }),
 )
+
+export const SKILL_PACK_COMMIT_QUERY = `query SkillPackCommit($owner: String!, $name: String!, $revision: String!) {
+  repository(owner: $owner, name: $name) {
+    object(expression: $revision) {
+      __typename
+      ... on Commit { oid }
+      ... on Tag { target { __typename ... on Commit { oid } } }
+    }
+  }
+}`
+
+const CommitOid = Schema.Struct({ __typename: Schema.Literal("Commit"), oid: Schema.String })
+
+const OtherObject = Schema.Struct({ __typename: Schema.String })
+
+export const SkillPackCommitResponse = GraphQLResponse(
+  Schema.Struct({
+    repository: Schema.NullOr(
+      Schema.Struct({
+        object: Schema.NullOr(
+          Schema.Union([
+            CommitOid,
+            Schema.Struct({
+              __typename: Schema.Literal("Tag"),
+              target: Schema.Union([CommitOid, OtherObject]),
+            }),
+            OtherObject,
+          ]),
+        ),
+      }),
+    ),
+  }),
+)
+
+export const SKILL_PACK_FOLDER_QUERY = `query SkillPackFolder($owner: String!, $name: String!, $expression: String!) {
+  repository(owner: $owner, name: $name) {
+    object(expression: $expression) {
+      __typename
+      ... on Tree { oid }
+      ... on Commit { tree { oid } }
+    }
+  }
+}`
+
+export const SkillPackFolderResponse = GraphQLResponse(
+  Schema.Struct({
+    repository: Schema.NullOr(
+      Schema.Struct({
+        object: Schema.NullOr(
+          Schema.Union([
+            Schema.Struct({ __typename: Schema.Literal("Tree"), oid: Schema.String }),
+            Schema.Struct({
+              __typename: Schema.Literal("Commit"),
+              tree: Schema.Struct({ oid: Schema.String }),
+            }),
+            OtherObject,
+          ]),
+        ),
+      }),
+    ),
+  }),
+)

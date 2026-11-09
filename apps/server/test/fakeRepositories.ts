@@ -1,0 +1,166 @@
+import { createHash } from "node:crypto"
+
+export class ExecutableFile {
+  readonly contents: string
+
+  constructor(contents: string) {
+    this.contents = contents
+  }
+}
+
+export type FakeFile = string | ExecutableFile
+
+export type FakeFiles = Readonly<Record<string, FakeFile>>
+
+interface FakeRepository {
+  defaultBranch: string | null
+  readonly refs: Map<string, string>
+  readonly commits: Map<string, FakeFiles>
+}
+
+const sha1 = (...parts: ReadonlyArray<string | Buffer>) => {
+  const hash = createHash("sha1")
+
+  for (const part of parts) hash.update(part)
+
+  return hash.digest("hex")
+}
+
+const contentsOf = (file: FakeFile) =>
+  Buffer.from(file instanceof ExecutableFile ? file.contents : file)
+
+const blobShaOf = (bytes: Buffer) => sha1(`blob ${bytes.length}\0`, bytes)
+
+const within = (folder: string, path: string) =>
+  folder === "" ? path : path.startsWith(`${folder}/`) ? path.slice(folder.length + 1) : null
+
+const keyOf = (owner: string, repo: string) => `${owner}/${repo}`.toLowerCase()
+
+export const fakeRepositories = () => {
+  const repositories = new Map<string, FakeRepository>()
+  const trees = new Map<string, { readonly commit: string; readonly path: string }>()
+  const blobs = new Map<string, Buffer>()
+  let pushes = 0
+
+  const treeOid = (commit: string, path: string) => {
+    const oid = sha1("tree", commit, ":", path)
+    trees.set(oid, { commit, path })
+
+    return oid
+  }
+
+  const resolve = (repository: FakeRepository, revision: string) => {
+    const branch = repository.refs.get(revision)
+
+    if (branch !== undefined) return branch
+
+    if (!/^[0-9a-f]{7,40}$/.test(revision)) return null
+
+    return [...repository.commits.keys()].find((sha) => sha.startsWith(revision)) ?? null
+  }
+
+  return {
+    push: (
+      { owner, repo }: { readonly owner: string; readonly repo: string },
+      ref: string,
+      files: FakeFiles,
+    ) => {
+      const key = keyOf(owner, repo)
+
+      const repository = repositories.get(key) ?? {
+        defaultBranch: ref,
+        refs: new Map(),
+        commits: new Map(),
+      }
+
+      const commit = sha1("commit", key, ref, String(++pushes))
+
+      for (const file of Object.values(files)) {
+        const bytes = contentsOf(file)
+        blobs.set(blobShaOf(bytes), bytes)
+      }
+
+      repository.commits.set(commit, files)
+      repository.refs.set(ref, commit)
+      repositories.set(key, repository)
+
+      return commit
+    },
+
+    defaultBranch: (owner: string, repo: string) =>
+      repositories.get(keyOf(owner, repo))?.defaultBranch,
+
+    commit: (owner: string, repo: string, revision: string) => {
+      const repository = repositories.get(keyOf(owner, repo))
+
+      return repository === undefined ? undefined : resolve(repository, revision)
+    },
+
+    folder: (owner: string, repo: string, expression: string) => {
+      const repository = repositories.get(keyOf(owner, repo))
+
+      if (repository === undefined) return undefined
+
+      const separator = expression.indexOf(":")
+      const revision = separator === -1 ? expression : expression.slice(0, separator)
+      const path = separator === -1 ? "" : expression.slice(separator + 1).replace(/\/$/, "")
+      const commit = resolve(repository, revision)
+
+      if (commit === null) return null
+
+      const isFolder =
+        path === "" ||
+        Object.keys(repository.commits.get(commit)!).some((file) => within(path, file) !== null)
+
+      return isFolder
+        ? {
+            kind: separator === -1 ? ("commit" as const) : ("tree" as const),
+            oid: treeOid(commit, path),
+          }
+        : null
+    },
+
+    tree: (owner: string, repo: string, oid: string) => {
+      const tree = trees.get(oid)
+      const files = repositories.get(keyOf(owner, repo))?.commits.get(tree?.commit ?? "")
+
+      if (tree === undefined || files === undefined) return undefined
+
+      const directories = new Set<string>()
+
+      const blobsInTree = Object.entries(files).flatMap(([path, file]) => {
+        const relative = within(tree.path, path)
+
+        if (relative === null) return []
+
+        const segments = relative.split("/")
+
+        for (let depth = 1; depth < segments.length; depth++)
+          directories.add(segments.slice(0, depth).join("/"))
+
+        return [
+          {
+            path: relative,
+            mode: file instanceof ExecutableFile ? "100755" : "100644",
+            type: "blob",
+            sha: blobShaOf(contentsOf(file)),
+          },
+        ]
+      })
+
+      return [
+        ...[...directories].map((path) => ({
+          path,
+          mode: "040000",
+          type: "tree",
+          sha: treeOid(tree.commit, tree.path === "" ? path : `${tree.path}/${path}`),
+        })),
+        ...blobsInTree,
+      ].toSorted((a, b) => (a.path < b.path ? -1 : 1))
+    },
+
+    blob: (sha: string) => blobs.get(sha),
+  }
+}
+
+export type FakeRepositories = ReturnType<typeof fakeRepositories>

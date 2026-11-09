@@ -23,6 +23,7 @@ import { author, connectionPage, inRepo, PAGE_SIZE, reviewRequestNodes } from ".
 import { answerListing, ListingRequest } from "./fakePullRequestListing.ts"
 import { startFakeGitRemote, type TrafficMeter, trafficMeter } from "./fakeGitRemote.ts"
 import { gitBasicAuthorization } from "../src/gitEnv.ts"
+import { type FakeFiles, fakeRepositories } from "./fakeRepositories.ts"
 
 export interface FakeGraphQLError {
   readonly type: string
@@ -208,6 +209,22 @@ const GraphQLRequest = Schema.Union([
     variables: Schema.Struct({ owner: Schema.String, name: Schema.String }),
   }),
   Schema.Struct({
+    operationName: Schema.Literal("SkillPackCommit"),
+    variables: Schema.Struct({
+      owner: Schema.String,
+      name: Schema.String,
+      revision: Schema.String,
+    }),
+  }),
+  Schema.Struct({
+    operationName: Schema.Literal("SkillPackFolder"),
+    variables: Schema.Struct({
+      owner: Schema.String,
+      name: Schema.String,
+      expression: Schema.String,
+    }),
+  }),
+  Schema.Struct({
     operationName: Schema.Literal("RepositoryBranches"),
     variables: Schema.Struct({
       owner: Schema.String,
@@ -373,6 +390,8 @@ const TreeParams = Schema.Struct({
   recursive: Schema.Literal("1"),
 })
 
+const BlobParams = Schema.Struct({ owner: Schema.String, repo: Schema.String, sha: Schema.String })
+
 const BLOB_TEXT_LIMIT = 512_000
 
 const blob = (contents: string) => {
@@ -417,6 +436,11 @@ export interface FakeGitHub {
     repository: { readonly owner: string; readonly repo: string },
     seed: { readonly defaultBranch: string | null; readonly branches: ReadonlyArray<string> },
   ): void
+  pushRepository(
+    repository: { readonly owner: string; readonly repo: string },
+    ref: string,
+    files: FakeFiles,
+  ): string
   failNext(failure: FakeFailure): void
   failNextGraphQL(error: FakeGraphQLError): void
   beforeNext(path: string, action: () => void): void
@@ -456,6 +480,8 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
     string,
     { readonly defaultBranch: string | null; readonly branches: ReadonlyArray<string> }
   >()
+
+  const repositories = fakeRepositories()
 
   const gitRemote = options.git
     ? yield* startFakeGitRemote({
@@ -928,6 +954,13 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
       case "RepositoryDefaultBranch": {
         const { owner, name } = request.variables
         const seeded = branches.get(branchesKey(owner, name))
+        const pushed = repositories.defaultBranch(owner, name)
+
+        if (seeded === undefined && pushed !== undefined) {
+          return {
+            data: { repository: { defaultBranchRef: pushed === null ? null : { name: pushed } } },
+          }
+        }
 
         if (seeded === undefined) return unresolvedRepository(owner, name)
 
@@ -936,6 +969,39 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
             repository: {
               defaultBranchRef:
                 seeded.defaultBranch === null ? null : { name: seeded.defaultBranch },
+            },
+          },
+        }
+      }
+
+      case "SkillPackCommit": {
+        const { owner, name, revision } = request.variables
+        const commit = repositories.commit(owner, name, revision)
+
+        if (commit === undefined) return unresolvedRepository(owner, name)
+
+        return {
+          data: {
+            repository: { object: commit === null ? null : { __typename: "Commit", oid: commit } },
+          },
+        }
+      }
+
+      case "SkillPackFolder": {
+        const { owner, name, expression } = request.variables
+        const folder = repositories.folder(owner, name, expression)
+
+        if (folder === undefined) return unresolvedRepository(owner, name)
+
+        return {
+          data: {
+            repository: {
+              object:
+                folder === null
+                  ? null
+                  : folder.kind === "tree"
+                    ? { __typename: "Tree", oid: folder.oid }
+                    : { __typename: "Commit", tree: { oid: folder.oid } },
             },
           },
         }
@@ -1005,6 +1071,11 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
 
   const gitTree = Effect.gen(function* () {
     const params = yield* Effect.orDie(HttpRouter.schemaParams(TreeParams))
+    const pushed = repositories.tree(params.owner, params.repo, params.sha)
+
+    if (pushed !== undefined)
+      return HttpServerResponse.jsonUnsafe({ tree: pushed, truncated: false })
+
     const commit = commitIn(params.owner, params.repo, params.sha)
 
     if (commit === undefined) {
@@ -1017,6 +1088,22 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
     return HttpServerResponse.jsonUnsafe({
       tree: treeEntries(commit),
       truncated: false,
+    })
+  })
+
+  const gitBlob = Effect.gen(function* () {
+    const { sha } = yield* Effect.orDie(HttpRouter.schemaParams(BlobParams))
+    const contents = repositories.blob(sha)
+
+    if (contents === undefined) {
+      return HttpServerResponse.jsonUnsafe({ message: "Not Found" }, { status: 404 })
+    }
+
+    return HttpServerResponse.jsonUnsafe({
+      sha,
+      size: contents.length,
+      encoding: "base64",
+      content: contents.toString("base64").replace(/(.{60})/g, "$1\n"),
     })
   })
 
@@ -1072,6 +1159,7 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
     ),
     HttpRouter.add("GET", "/repos/:owner/:repo/pulls/:number/files", pullRequestFiles),
     HttpRouter.add("GET", "/repos/:owner/:repo/git/trees/:sha", gitTree),
+    HttpRouter.add("GET", "/repos/:owner/:repo/git/blobs/:sha", gitBlob),
     ...(gitRemote === undefined ? [] : [gitRemote.route]),
     FailuresAndAuth,
   )
@@ -1101,6 +1189,7 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
     seedBranches: ({ owner, repo }, seed) => {
       branches.set(branchesKey(owner, repo), seed)
     },
+    pushRepository: repositories.push,
     failNext: (failure) => {
       failures.push(failure)
     },

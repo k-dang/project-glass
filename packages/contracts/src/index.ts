@@ -42,6 +42,8 @@ export * from "./rpc"
 
 export * from "./settings"
 
+export * from "./skillPack"
+
 export * from "./storage"
 
 export * from "./toDo"

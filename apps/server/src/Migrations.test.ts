@@ -75,6 +75,7 @@ it.live("upgrades existing Activity history and uses its indexes after reopening
       [23, "create_global_conversation"],
       [24, "name_local_place"],
       [25, "global_conversation_on_pi"],
+      [26, "create_skill_packs"],
     ] as const
 
     for (const expected of [upgrade, []] as const) {
