@@ -1,5 +1,11 @@
 import { TooltipHint } from "@/components/ui/tooltip"
-import type { ChangedFile, FileContents, PullRequestRef, Revision } from "@glass/contracts"
+import {
+  type ChangedFile,
+  type FileContents,
+  type PullRequestRef,
+  type Revision,
+  shortSha,
+} from "@glass/contracts"
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
 import { CodeView } from "@pierre/diffs/react"
 import { FileTree, useFileTree } from "@pierre/trees/react"
@@ -11,7 +17,6 @@ import { Backend, backendRuntime } from "./backend"
 import { CodeCardHeader, codeCardClassName, codeCardOptions } from "./codeCard"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf } from "./problems"
-import { shortSha } from "./shortSha"
 
 const repositoryFilesAtom = Atom.family(
   (key: { readonly pullRequest: PullRequestRef; readonly revision: Revision }) =>

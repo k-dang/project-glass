@@ -24,6 +24,7 @@ import {
   type TurnPart,
   goneExplanation,
   isGone,
+  shortSha,
 } from "@glass/contracts"
 import { cn } from "cn"
 import { DateTime, Exit, Match, Option, Predicate } from "effect"
@@ -112,7 +113,6 @@ import { type Problem, problemText, settledProblem, streamProblem } from "./prob
 import { referenceText } from "./queue"
 import { rememberPlace } from "./savedPlace"
 import { shortcutLabel } from "./shortcutLabel"
-import { shortSha } from "./shortSha"
 import { useShortcuts } from "./useShortcuts"
 
 const TURNS_PER_PAGE = 20

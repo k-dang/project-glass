@@ -1,6 +1,5 @@
+import { shortSha } from "@glass/contracts"
 import { TooltipHint } from "@/components/ui/tooltip"
-
-export const shortSha = (sha: string) => sha.slice(0, 7)
 
 export function ShortSha(props: { sha: string }) {
   return (

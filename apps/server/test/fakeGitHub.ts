@@ -3,7 +3,6 @@ import { validate } from "@octokit/graphql-schema"
 import { absurd, Context, Effect, Layer, Schema } from "effect"
 import { getOperationAST, parse } from "graphql"
 import { HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from "effect/http"
-import { createHash } from "node:crypto"
 import { createServer } from "node:http"
 import { fromGitHubSide, GitHubDiffSide } from "../src/github/diffSide.ts"
 import { lineInPatch } from "../src/github/patchLines.ts"
@@ -23,6 +22,7 @@ import { author, connectionPage, inRepo, PAGE_SIZE, reviewRequestNodes } from ".
 import { answerListing, ListingRequest } from "./fakePullRequestListing.ts"
 import { startFakeGitRemote, type TrafficMeter, trafficMeter } from "./fakeGitRemote.ts"
 import { gitBasicAuthorization } from "../src/gitEnv.ts"
+import { blobSha, type FakeFiles, fakeRepositories } from "./fakeRepositories.ts"
 
 export interface FakeGraphQLError {
   readonly type: string
@@ -208,6 +208,22 @@ const GraphQLRequest = Schema.Union([
     variables: Schema.Struct({ owner: Schema.String, name: Schema.String }),
   }),
   Schema.Struct({
+    operationName: Schema.Literal("CommitAtRevision"),
+    variables: Schema.Struct({
+      owner: Schema.String,
+      name: Schema.String,
+      revision: Schema.String,
+    }),
+  }),
+  Schema.Struct({
+    operationName: Schema.Literal("TreeAtExpression"),
+    variables: Schema.Struct({
+      owner: Schema.String,
+      name: Schema.String,
+      expression: Schema.String,
+    }),
+  }),
+  Schema.Struct({
     operationName: Schema.Literal("RepositoryBranches"),
     variables: Schema.Struct({
       owner: Schema.String,
@@ -373,6 +389,8 @@ const TreeParams = Schema.Struct({
   recursive: Schema.Literal("1"),
 })
 
+const BlobParams = Schema.Struct({ owner: Schema.String, repo: Schema.String, sha: Schema.String })
+
 const BLOB_TEXT_LIMIT = 512_000
 
 const blob = (contents: string) => {
@@ -398,15 +416,14 @@ const treeEntries = (commit: FakeCommit) => {
   )
 
   return [
-    ...[...directories].map((path) => ({ path, type: "tree" })),
-    ...Object.keys(commit.files).map((path) => ({ path, type: "blob" })),
+    ...[...directories].map((path) => ({ path, mode: "040000", type: "tree", sha: path })),
+    ...Object.entries(commit.files).map(([path, contents]) => ({
+      path,
+      mode: "100644",
+      type: "blob",
+      sha: blobSha(contents),
+    })),
   ].toSorted((a, b) => (a.path < b.path ? -1 : 1))
-}
-
-const blobSha = (contents: string) => {
-  const bytes = Buffer.from(contents)
-
-  return createHash("sha1").update(`blob ${bytes.length}\0`).update(bytes).digest("hex")
 }
 
 export interface FakeGitHub {
@@ -417,6 +434,11 @@ export interface FakeGitHub {
     repository: { readonly owner: string; readonly repo: string },
     seed: { readonly defaultBranch: string | null; readonly branches: ReadonlyArray<string> },
   ): void
+  pushRepository(
+    repository: { readonly owner: string; readonly repo: string },
+    ref: string,
+    files: FakeFiles,
+  ): string
   failNext(failure: FakeFailure): void
   failNextGraphQL(error: FakeGraphQLError): void
   beforeNext(path: string, action: () => void): void
@@ -441,8 +463,6 @@ interface FakeGitHubOptions {
   ) => FakeFailure | undefined
 }
 
-const branchesKey = (owner: string, repo: string) => `${owner}/${repo}`.toLowerCase()
-
 export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubOptions = {}) {
   const failures: Array<FakeFailure> = []
   const graphQLFailures: Array<FakeGraphQLError> = []
@@ -452,10 +472,7 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
   const timingOutRepositories = new Set<string>()
   const gitRefusedRepositories = new Set<string>()
 
-  const branches = new Map<
-    string,
-    { readonly defaultBranch: string | null; readonly branches: ReadonlyArray<string> }
-  >()
+  const repositories = fakeRepositories()
 
   const gitRemote = options.git
     ? yield* startFakeGitRemote({
@@ -927,15 +944,47 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
 
       case "RepositoryDefaultBranch": {
         const { owner, name } = request.variables
-        const seeded = branches.get(branchesKey(owner, name))
+        const defaultBranch = repositories.defaultBranch(owner, name)
 
-        if (seeded === undefined) return unresolvedRepository(owner, name)
+        if (defaultBranch === undefined) return unresolvedRepository(owner, name)
 
         return {
           data: {
             repository: {
-              defaultBranchRef:
-                seeded.defaultBranch === null ? null : { name: seeded.defaultBranch },
+              defaultBranchRef: defaultBranch === null ? null : { name: defaultBranch },
+            },
+          },
+        }
+      }
+
+      case "CommitAtRevision": {
+        const { owner, name, revision } = request.variables
+        const commit = repositories.commit(owner, name, revision)
+
+        if (commit === undefined) return unresolvedRepository(owner, name)
+
+        return {
+          data: {
+            repository: { object: commit === null ? null : { __typename: "Commit", oid: commit } },
+          },
+        }
+      }
+
+      case "TreeAtExpression": {
+        const { owner, name, expression } = request.variables
+        const folder = repositories.folder(owner, name, expression)
+
+        if (folder === undefined) return unresolvedRepository(owner, name)
+
+        return {
+          data: {
+            repository: {
+              object:
+                folder === null
+                  ? null
+                  : folder.kind === "tree"
+                    ? { __typename: "Tree", oid: folder.oid }
+                    : { __typename: "Commit", tree: { oid: folder.oid } },
             },
           },
         }
@@ -943,7 +992,7 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
 
       case "RepositoryBranches": {
         const { owner, name, after } = request.variables
-        const seeded = branches.get(branchesKey(owner, name))
+        const seeded = repositories.branches(owner, name)
 
         if (seeded === undefined) return unresolvedRepository(owner, name)
 
@@ -951,7 +1000,7 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
           data: {
             repository: {
               refs: connectionPage(
-                seeded.branches.map((branch) => ({ name: branch })),
+                seeded.map((branch) => ({ name: branch })),
                 after,
               ),
             },
@@ -1005,6 +1054,11 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
 
   const gitTree = Effect.gen(function* () {
     const params = yield* Effect.orDie(HttpRouter.schemaParams(TreeParams))
+    const pushed = repositories.tree(params.owner, params.repo, params.sha)
+
+    if (pushed !== undefined)
+      return HttpServerResponse.jsonUnsafe({ tree: pushed, truncated: false })
+
     const commit = commitIn(params.owner, params.repo, params.sha)
 
     if (commit === undefined) {
@@ -1017,6 +1071,22 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
     return HttpServerResponse.jsonUnsafe({
       tree: treeEntries(commit),
       truncated: false,
+    })
+  })
+
+  const gitBlob = Effect.gen(function* () {
+    const { sha } = yield* Effect.orDie(HttpRouter.schemaParams(BlobParams))
+    const contents = repositories.blob(sha)
+
+    if (contents === undefined) {
+      return HttpServerResponse.jsonUnsafe({ message: "Not Found" }, { status: 404 })
+    }
+
+    return HttpServerResponse.jsonUnsafe({
+      sha,
+      size: contents.length,
+      encoding: "base64",
+      content: contents.toString("base64").replace(/(.{60})/g, "$1\n"),
     })
   })
 
@@ -1072,6 +1142,7 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
     ),
     HttpRouter.add("GET", "/repos/:owner/:repo/pulls/:number/files", pullRequestFiles),
     HttpRouter.add("GET", "/repos/:owner/:repo/git/trees/:sha", gitTree),
+    HttpRouter.add("GET", "/repos/:owner/:repo/git/blobs/:sha", gitBlob),
     ...(gitRemote === undefined ? [] : [gitRemote.route]),
     FailuresAndAuth,
   )
@@ -1098,9 +1169,8 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
 
       return pr
     },
-    seedBranches: ({ owner, repo }, seed) => {
-      branches.set(branchesKey(owner, repo), seed)
-    },
+    seedBranches: repositories.seedBranches,
+    pushRepository: repositories.push,
     failNext: (failure) => {
       failures.push(failure)
     },

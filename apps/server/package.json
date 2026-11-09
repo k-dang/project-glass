@@ -25,6 +25,7 @@
     "vite": "catalog:",
     "vite-plus": "catalog:",
     "vitest": "catalog:",
+    "yaml": "2.9.0",
     "zod": "4.6.7"
   }
 }
