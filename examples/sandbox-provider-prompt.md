@@ -2,7 +2,7 @@
 
 Copy the block below into the coding agent of your choice, run from an empty folder.
 
-````text
+```text
 Build a Glass Sandbox provider Plugin for my Sandbox platform.
 
 Glass is at https://github.com/k-dang/project-glass. Read these before writing code:
@@ -17,4 +17,4 @@ a machine, which Agent programs to offer, and which logins a Sandbox needs.
 
 When done, tell me how to install the Plugin and how to check it: start an Agent in the new kind of
 Sandbox, send it a message, then remove the Agent and confirm the machine is gone.
-````
+```
