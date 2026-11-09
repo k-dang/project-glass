@@ -1,7 +1,7 @@
 import { useAtom, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
 import {
   isSkillPackName,
-  shortCommit,
+  shortSha,
   type Skill,
   type SkillPack,
   type SkillPackPreview,
@@ -21,6 +21,7 @@ import { ConfirmationDialog } from "./ConfirmationDialog"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf, settledProblem } from "./problems"
 import { SettingsSection } from "./SettingsSection"
+import { ShortSha } from "./shortSha"
 
 interface PackChange {
   readonly target: string
@@ -51,35 +52,33 @@ const updatePreviewAtom = backendRuntime.fn((name: string) =>
 const sourceLabel = (source: SkillPackSource) =>
   [`${source.owner}/${source.repo}`, source.path].filter((part) => part !== "").join("/")
 
-function SkillList(props: { label: string; skills: ReadonlyArray<Skill> }) {
-  if (props.skills.length === 0) return null
+interface Detail {
+  readonly key: string
+  readonly title: string
+  readonly detail: string
+}
+
+const skillDetails = (skills: ReadonlyArray<Skill>): ReadonlyArray<Detail> =>
+  skills.map(({ name, description }) => ({ key: name, title: name, detail: description }))
+
+const skippedDetails = (skipped: ReadonlyArray<SkippedSkill>): ReadonlyArray<Detail> =>
+  skipped.map(({ directory, reason }) => ({
+    key: directory,
+    title: directory === "" ? "This folder" : directory,
+    detail: reason,
+  }))
+
+function DetailList(props: { label: string; items: ReadonlyArray<Detail> }) {
+  if (props.items.length === 0) return null
 
   return (
     <div className="flex flex-col gap-1">
       <h4 className="text-xs font-medium text-muted-foreground">{props.label}</h4>
       <ul aria-label={props.label} className="flex flex-col gap-1 text-sm">
-        {props.skills.map((skill) => (
-          <li key={skill.name}>
-            <span className="font-medium">{skill.name}</span>
-            <span className="text-muted-foreground"> · {skill.description}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
-
-function SkippedList(props: { skipped: ReadonlyArray<SkippedSkill> }) {
-  if (props.skipped.length === 0) return null
-
-  return (
-    <div className="flex flex-col gap-1">
-      <h4 className="text-xs font-medium text-muted-foreground">Skipped</h4>
-      <ul aria-label="Skipped skills" className="flex flex-col gap-1 text-sm">
-        {props.skipped.map(({ directory, reason }) => (
-          <li key={directory}>
-            <span className="font-medium">{directory === "" ? "This folder" : directory}</span>
-            <span className="text-muted-foreground"> · {reason}</span>
+        {props.items.map(({ key, title, detail }) => (
+          <li key={key}>
+            <span className="font-medium">{title}</span>
+            <span className="text-muted-foreground"> · {detail}</span>
           </li>
         ))}
       </ul>
@@ -221,10 +220,13 @@ function PreviewCard(props: {
     >
       <p className="text-sm">
         <span className="font-medium">{sourceLabel(preview.source)}</span>
-        <span className="text-muted-foreground"> @ {shortCommit(preview.commit)}</span>
+        <span className="text-muted-foreground">
+          {" @ "}
+          <ShortSha sha={preview.commit} />
+        </span>
       </p>
-      <SkillList label="Skills" skills={preview.skills} />
-      <SkippedList skipped={preview.skipped} />
+      <DetailList label="Skills" items={skillDetails(preview.skills)} />
+      <DetailList label="Skipped" items={skippedDetails(preview.skipped)} />
       <fieldset disabled={adding} className="flex flex-col gap-2">
         <Label htmlFor="skill-pack-name">Name</Label>
         <Input
@@ -269,7 +271,7 @@ function PackList(props: { packs: ReadonlyArray<SkillPack>; change: Change }) {
               <div className="min-w-0 text-sm">
                 <p className="font-medium">{pack.name}</p>
                 <p className="break-all text-muted-foreground">
-                  {skillPackUrl(pack.source)} @ {shortCommit(pack.commit)}
+                  {skillPackUrl(pack.source)} @ <ShortSha sha={pack.commit} />
                 </p>
                 <p className="text-muted-foreground">
                   {pack.skills.map((skill) => skill.name).join(", ")}
@@ -345,7 +347,7 @@ function UpdateCard(props: { update: SkillPackUpdate; change: Change; onDone: ()
   if (update.from === update.to) {
     return (
       <div className="flex items-center justify-between gap-3 rounded-md border p-3 text-sm">
-        <p>Already up to date at {shortCommit(update.to)}.</p>
+        <p>Already up to date at {shortSha(update.to)}.</p>
         <Button variant="outline" size="sm" onClick={props.onDone}>
           Close
         </Button>
@@ -359,13 +361,13 @@ function UpdateCard(props: { update: SkillPackUpdate; change: Change; onDone: ()
   return (
     <div aria-label={`Update ${update.name}`} className="flex flex-col gap-3 rounded-md border p-3">
       <p className="text-sm">
-        {shortCommit(update.from)} → {shortCommit(update.to)}
+        {shortSha(update.from)} → {shortSha(update.to)}
         {unchanged && <span className="text-muted-foreground"> · No skills changed.</span>}
       </p>
-      <SkillList label="Added" skills={update.added} />
-      <SkillList label="Changed" skills={update.changed} />
-      <SkillList label="Removed" skills={update.removed} />
-      <SkippedList skipped={update.skipped} />
+      <DetailList label="Added" items={skillDetails(update.added)} />
+      <DetailList label="Changed" items={skillDetails(update.changed)} />
+      <DetailList label="Removed" items={skillDetails(update.removed)} />
+      <DetailList label="Skipped" items={skippedDetails(update.skipped)} />
       <div className="flex gap-2">
         <Button
           size="sm"
@@ -379,7 +381,7 @@ function UpdateCard(props: { update: SkillPackUpdate; change: Change; onDone: ()
             })
           }}
         >
-          {saving ? "Updating…" : `Update to ${shortCommit(update.to)}`}
+          {saving ? "Updating…" : `Update to ${shortSha(update.to)}`}
         </Button>
         <Button variant="outline" size="sm" disabled={saving} onClick={props.onDone}>
           Cancel

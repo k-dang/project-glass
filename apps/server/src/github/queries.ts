@@ -244,7 +244,7 @@ export const RepositoryBranchesResponse = GraphQLResponse(
   }),
 )
 
-export const SKILL_PACK_COMMIT_QUERY = `query SkillPackCommit($owner: String!, $name: String!, $revision: String!) {
+export const COMMIT_AT_REVISION_QUERY = `query CommitAtRevision($owner: String!, $name: String!, $revision: String!) {
   repository(owner: $owner, name: $name) {
     object(expression: $revision) {
       __typename
@@ -258,7 +258,7 @@ const CommitOid = Schema.Struct({ __typename: Schema.Literal("Commit"), oid: Sch
 
 const OtherObject = Schema.Struct({ __typename: Schema.String })
 
-export const SkillPackCommitResponse = GraphQLResponse(
+export const CommitAtRevisionResponse = GraphQLResponse(
   Schema.Struct({
     repository: Schema.NullOr(
       Schema.Struct({
@@ -277,7 +277,7 @@ export const SkillPackCommitResponse = GraphQLResponse(
   }),
 )
 
-export const SKILL_PACK_FOLDER_QUERY = `query SkillPackFolder($owner: String!, $name: String!, $expression: String!) {
+export const TREE_AT_EXPRESSION_QUERY = `query TreeAtExpression($owner: String!, $name: String!, $expression: String!) {
   repository(owner: $owner, name: $name) {
     object(expression: $expression) {
       __typename
@@ -287,7 +287,7 @@ export const SKILL_PACK_FOLDER_QUERY = `query SkillPackFolder($owner: String!, $
   }
 }`
 
-export const SkillPackFolderResponse = GraphQLResponse(
+export const TreeAtExpressionResponse = GraphQLResponse(
   Schema.Struct({
     repository: Schema.NullOr(
       Schema.Struct({

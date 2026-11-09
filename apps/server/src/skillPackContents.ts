@@ -1,7 +1,6 @@
 import { SKILL_PACK_NAME_MAX_LENGTH, Skill, SkillPackSource, SkippedSkill } from "@glass/contracts"
 import { Option, Result, Schema } from "effect"
 import { parse } from "yaml"
-import type { TreeBlob } from "./github/GitHubClient"
 
 const SKILL_FILE = "SKILL.md"
 
@@ -44,33 +43,43 @@ export const skillPackSources = (input: string): ReadonlyArray<SkillPackSource> 
 
 const lastSegment = (path: string) => path.slice(path.lastIndexOf("/") + 1)
 
-export const suggestedName = ({ repo, path }: SkillPackSource) =>
-  lastSegment(path === "" ? repo : path)
+const folderName = ({ repo, path }: SkillPackSource) => lastSegment(path === "" ? repo : path)
+
+export const suggestedName = (source: SkillPackSource) =>
+  folderName(source)
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .slice(0, SKILL_PACK_NAME_MAX_LENGTH)
     .replace(/^-+|-+$/g, "")
 
-export const skillDirectories = (blobs: ReadonlyArray<TreeBlob>) => {
-  const directories = blobs
-    .flatMap(({ path }) =>
-      path === SKILL_FILE
-        ? [""]
-        : path.endsWith(`/${SKILL_FILE}`)
-          ? [path.slice(0, -SKILL_FILE.length - 1)]
-          : [],
-    )
-    .toSorted()
+const skillFolderOf = (path: string) =>
+  path === SKILL_FILE
+    ? ""
+    : path.endsWith(`/${SKILL_FILE}`)
+      ? path.slice(0, -SKILL_FILE.length - 1)
+      : undefined
 
-  if (directories.includes("")) return [""]
+const foldersAround = (path: string) => {
+  const segments = path.split("/")
 
-  return directories.filter(
-    (directory) => !directories.some((other) => directory.startsWith(`${other}/`)),
-  )
+  return ["", ...segments.slice(0, -1).map((_, index) => segments.slice(0, index + 1).join("/"))]
 }
 
-export const filesOf = (directory: string, blobs: ReadonlyArray<TreeBlob>) =>
-  blobs.filter(({ path }) => directory === "" || path.startsWith(`${directory}/`))
+export const filesBySkill = <A extends { readonly path: string }>(files: ReadonlyArray<A>) => {
+  const skillFolders = new Set(files.flatMap(({ path }) => skillFolderOf(path) ?? []))
+
+  const owned = files.flatMap((file) => {
+    const folder = foldersAround(file.path).find((candidate) => skillFolders.has(candidate))
+
+    return folder === undefined ? [] : [{ folder, file }]
+  })
+
+  return new Map(
+    [...Map.groupBy(owned, ({ folder }) => folder)]
+      .toSorted(([a], [b]) => (a < b ? -1 : 1))
+      .map(([folder, entries]) => [folder, entries.map(({ file }) => file)]),
+  )
+}
 
 export const skillFilePath = (directory: string) =>
   directory === "" ? SKILL_FILE : `${directory}/${SKILL_FILE}`
@@ -114,4 +123,4 @@ export const readSkill = (
 }
 
 export const fallbackSkillName = (source: SkillPackSource, directory: string) =>
-  lastSegment(directory === "" ? (source.path === "" ? source.repo : source.path) : directory)
+  directory === "" ? folderName(source) : lastSegment(directory)

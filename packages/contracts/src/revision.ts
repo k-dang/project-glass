@@ -12,3 +12,5 @@ export const RevisionSide = Schema.Literals(["base", "head"] as const satisfies 
 export type RevisionSide = typeof RevisionSide.Type
 
 export class StaleRevision extends Schema.TaggedError<StaleRevision>()("StaleRevision", {}) {}
+
+export const shortSha = (sha: string) => sha.slice(0, 7)

@@ -3,7 +3,6 @@ import { validate } from "@octokit/graphql-schema"
 import { absurd, Context, Effect, Layer, Schema } from "effect"
 import { getOperationAST, parse } from "graphql"
 import { HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from "effect/http"
-import { createHash } from "node:crypto"
 import { createServer } from "node:http"
 import { fromGitHubSide, GitHubDiffSide } from "../src/github/diffSide.ts"
 import { lineInPatch } from "../src/github/patchLines.ts"
@@ -23,7 +22,7 @@ import { author, connectionPage, inRepo, PAGE_SIZE, reviewRequestNodes } from ".
 import { answerListing, ListingRequest } from "./fakePullRequestListing.ts"
 import { startFakeGitRemote, type TrafficMeter, trafficMeter } from "./fakeGitRemote.ts"
 import { gitBasicAuthorization } from "../src/gitEnv.ts"
-import { type FakeFiles, fakeRepositories } from "./fakeRepositories.ts"
+import { blobSha, type FakeFiles, fakeRepositories } from "./fakeRepositories.ts"
 
 export interface FakeGraphQLError {
   readonly type: string
@@ -209,7 +208,7 @@ const GraphQLRequest = Schema.Union([
     variables: Schema.Struct({ owner: Schema.String, name: Schema.String }),
   }),
   Schema.Struct({
-    operationName: Schema.Literal("SkillPackCommit"),
+    operationName: Schema.Literal("CommitAtRevision"),
     variables: Schema.Struct({
       owner: Schema.String,
       name: Schema.String,
@@ -217,7 +216,7 @@ const GraphQLRequest = Schema.Union([
     }),
   }),
   Schema.Struct({
-    operationName: Schema.Literal("SkillPackFolder"),
+    operationName: Schema.Literal("TreeAtExpression"),
     variables: Schema.Struct({
       owner: Schema.String,
       name: Schema.String,
@@ -417,15 +416,14 @@ const treeEntries = (commit: FakeCommit) => {
   )
 
   return [
-    ...[...directories].map((path) => ({ path, type: "tree" })),
-    ...Object.keys(commit.files).map((path) => ({ path, type: "blob" })),
+    ...[...directories].map((path) => ({ path, mode: "040000", type: "tree", sha: path })),
+    ...Object.entries(commit.files).map(([path, contents]) => ({
+      path,
+      mode: "100644",
+      type: "blob",
+      sha: blobSha(contents),
+    })),
   ].toSorted((a, b) => (a.path < b.path ? -1 : 1))
-}
-
-const blobSha = (contents: string) => {
-  const bytes = Buffer.from(contents)
-
-  return createHash("sha1").update(`blob ${bytes.length}\0`).update(bytes).digest("hex")
 }
 
 export interface FakeGitHub {
@@ -958,7 +956,7 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
 
         if (seeded === undefined && pushed !== undefined) {
           return {
-            data: { repository: { defaultBranchRef: pushed === null ? null : { name: pushed } } },
+            data: { repository: { defaultBranchRef: { name: pushed } } },
           }
         }
 
@@ -974,7 +972,7 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
         }
       }
 
-      case "SkillPackCommit": {
+      case "CommitAtRevision": {
         const { owner, name, revision } = request.variables
         const commit = repositories.commit(owner, name, revision)
 
@@ -987,7 +985,7 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
         }
       }
 
-      case "SkillPackFolder": {
+      case "TreeAtExpression": {
         const { owner, name, expression } = request.variables
         const folder = repositories.folder(owner, name, expression)
 

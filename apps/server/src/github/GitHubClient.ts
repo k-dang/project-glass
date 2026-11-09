@@ -139,10 +139,10 @@ import {
   REPOSITORY_DEFAULT_BRANCH_QUERY,
   RepositoryBranchesResponse,
   RepositoryDefaultBranchResponse,
-  SKILL_PACK_COMMIT_QUERY,
-  SKILL_PACK_FOLDER_QUERY,
-  SkillPackCommitResponse,
-  SkillPackFolderResponse,
+  COMMIT_AT_REVISION_QUERY,
+  CommitAtRevisionResponse,
+  TREE_AT_EXPRESSION_QUERY,
+  TreeAtExpressionResponse,
 } from "./queries"
 
 const GitHubUser = Schema.Struct({ login: Schema.String })
@@ -164,11 +164,6 @@ export interface ReviewInput extends TourInput {
 }
 
 const GitTree = Schema.Struct({
-  tree: Schema.Array(Schema.Struct({ path: Schema.String, type: Schema.String })),
-  truncated: Schema.Boolean,
-})
-
-const GitTreeWithBlobs = Schema.Struct({
   tree: Schema.Array(
     Schema.Struct({
       path: Schema.String,
@@ -190,7 +185,7 @@ export interface TreeBlob {
 
 type RepositoryName = Pick<FollowedRepository, "owner" | "repo">
 
-export class RepositoryMissing extends Data.TaggedError("RepositoryMissing") {}
+class RepositoryMissing extends Data.TaggedError("RepositoryMissing") {}
 
 const missingRepository = ({ type }: GraphQLError) =>
   type === "NOT_FOUND" || type === "FORBIDDEN" ? new RepositoryMissing() : undefined
@@ -972,34 +967,53 @@ export class GitHubClient extends Context.Service<
         return TextFile.make({ text: object.text })
       })
 
-      const repositoryFiles = Effect.fn("GitHubClient.repositoryFiles")(function* (
-        { owner, repo }: Pick<FollowedRepository, "owner" | "repo">,
-        ref: string,
+      const treeBlobs = Effect.fn("GitHubClient.treeBlobs")(function* (
+        { owner, repo }: RepositoryName,
+        tree: string,
       ) {
         const { body } = yield* send(
           HttpClientRequest.get(
-            `/repos/${owner}/${repo}/git/trees/${encodeURIComponent(ref)}`,
+            `/repos/${owner}/${repo}/git/trees/${encodeURIComponent(tree)}`,
           ).pipe(HttpClientRequest.setUrlParams({ recursive: 1 })),
           GitTree,
         )
 
-        return new RepositoryFiles({
-          paths: body.tree.flatMap((entry) => (entry.type === "blob" ? [entry.path] : [])),
+        return {
+          blobs: body.tree.flatMap(({ path, mode, type, sha }) =>
+            type === "blob" ? [{ path, sha, executable: mode === "100755" }] : [],
+          ),
           truncated: body.truncated,
-        })
+        }
       })
+
+      const repositoryFiles = Effect.fn("GitHubClient.repositoryFiles")(function* (
+        repository: RepositoryName,
+        ref: string,
+      ) {
+        const { blobs, truncated } = yield* treeBlobs(repository, ref)
+
+        return new RepositoryFiles({ paths: blobs.map(({ path }) => path), truncated })
+      })
+
+      const defaultBranchQuery = <E>(
+        { owner, repo }: RepositoryName,
+        domainError: (error: GraphQLError) => E | undefined,
+      ) =>
+        graphql({
+          name: "RepositoryDefaultBranch",
+          query: REPOSITORY_DEFAULT_BRANCH_QUERY,
+          variables: { owner, name: repo },
+          response: RepositoryDefaultBranchResponse,
+          domainError,
+        })
 
       const repositoryDefaultBranch = (repository: FollowedRepository) => {
         const notFound = repositoryNotFound(repository)
 
         return Effect.gen(function* () {
-          const data = yield* graphql({
-            name: "RepositoryDefaultBranch",
-            query: REPOSITORY_DEFAULT_BRANCH_QUERY,
-            variables: { owner: repository.owner, name: repository.repo },
-            response: RepositoryDefaultBranchResponse,
-            domainError: ({ type }) => (type === "NOT_FOUND" ? notFound : undefined),
-          })
+          const data = yield* defaultBranchQuery(repository, ({ type }) =>
+            type === "NOT_FOUND" ? notFound : undefined,
+          )
 
           if (data.repository === null) return yield* notFound
 
@@ -1036,21 +1050,17 @@ export class GitHubClient extends Context.Service<
       ) {
         const resolved =
           revision ??
-          (yield* graphql({
-            name: "RepositoryDefaultBranch",
-            query: REPOSITORY_DEFAULT_BRANCH_QUERY,
-            variables: { owner, name: repo },
-            response: RepositoryDefaultBranchResponse,
-            domainError: missingRepository,
-          }).pipe(Effect.flatMap(foundRepository))).defaultBranchRef?.name
+          (yield* defaultBranchQuery({ owner, repo }, missingRepository).pipe(
+            Effect.flatMap(foundRepository),
+          )).defaultBranchRef?.name
 
         if (resolved === undefined) return null
 
         const object = (yield* graphql({
-          name: "SkillPackCommit",
-          query: SKILL_PACK_COMMIT_QUERY,
+          name: "CommitAtRevision",
+          query: COMMIT_AT_REVISION_QUERY,
           variables: { owner, name: repo, revision: resolved },
-          response: SkillPackCommitResponse,
+          response: CommitAtRevisionResponse,
           domainError: missingRepository,
         }).pipe(Effect.flatMap(foundRepository))).object
 
@@ -1067,10 +1077,10 @@ export class GitHubClient extends Context.Service<
         path: string,
       ) {
         const { object } = yield* graphql({
-          name: "SkillPackFolder",
-          query: SKILL_PACK_FOLDER_QUERY,
+          name: "TreeAtExpression",
+          query: TREE_AT_EXPRESSION_QUERY,
           variables: { owner, name: repo, expression: path === "" ? commit : `${commit}:${path}` },
-          response: SkillPackFolderResponse,
+          response: TreeAtExpressionResponse,
           domainError: missingRepository,
         }).pipe(Effect.flatMap(foundRepository))
 
@@ -1079,25 +1089,6 @@ export class GitHubClient extends Context.Service<
         if ("oid" in object) return object.oid
 
         return "tree" in object ? object.tree.oid : null
-      })
-
-      const treeBlobs = Effect.fn("GitHubClient.treeBlobs")(function* (
-        { owner, repo }: RepositoryName,
-        tree: string,
-      ) {
-        const { body } = yield* send(
-          HttpClientRequest.get(`/repos/${owner}/${repo}/git/trees/${tree}`).pipe(
-            HttpClientRequest.setUrlParams({ recursive: 1 }),
-          ),
-          GitTreeWithBlobs,
-        )
-
-        return {
-          blobs: body.tree.flatMap(({ path, mode, type, sha }) =>
-            type === "blob" ? [{ path, sha, executable: mode === "100755" }] : [],
-          ),
-          truncated: body.truncated,
-        }
       })
 
       const blob = Effect.fn("GitHubClient.blob")(function* (
@@ -1109,7 +1100,7 @@ export class GitHubClient extends Context.Service<
           GitBlob,
         )
 
-        return new Uint8Array(Buffer.from(body.content, "base64"))
+        return Buffer.from(body.content, "base64")
       })
 
       /** GitHub places new Drafts on the current head; this mutation has no commit precondition. */

@@ -3,7 +3,7 @@ import {
   InvalidSkillPackName,
   InvalidSkillPackUrl,
   isSkillPackName,
-  shortCommit,
+  shortSha,
   Skill,
   SkillPack,
   SkillPackError,
@@ -20,9 +20,8 @@ import { SqlClient } from "effect/sql"
 import { GitHubClient, type TreeBlob } from "./github/GitHubClient"
 import {
   fallbackSkillName,
-  filesOf,
+  filesBySkill,
   readSkill,
-  skillDirectories,
   skillFilePath,
   skillPackSources,
   suggestedName,
@@ -37,6 +36,7 @@ interface PackSkill {
 interface PackContents {
   readonly skills: ReadonlyArray<PackSkill>
   readonly skipped: ReadonlyArray<SkippedSkill>
+  readonly downloaded: ReadonlyMap<string, Uint8Array>
 }
 
 const decodePacks = Schema.decodeUnknownEffect(
@@ -79,7 +79,7 @@ const decodeId = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ id: Sch
 const repositoryLabel = ({ owner, repo }: SkillPackSource) => `${owner}/${repo}`
 
 const atCommit = (source: SkillPackSource, commit: string) =>
-  `${repositoryLabel(source)} at ${shortCommit(commit)}`
+  `${repositoryLabel(source)} at ${shortSha(commit)}`
 
 const folderLabel = (source: SkillPackSource, commit: string) =>
   source.path === "" ? atCommit(source, commit) : `${source.path} in ${atCommit(source, commit)}`
@@ -100,7 +100,6 @@ const isCommitRef = (ref: string, commit: string) =>
 const fileKey = ({ path, sha, executable }: TreeBlob) => `${path}\0${sha}\0${executable}`
 
 const sameFiles = (a: ReadonlyArray<TreeBlob>, b: ReadonlyArray<TreeBlob>) =>
-  a.length === b.length &&
   a.map(fileKey).toSorted().join("\n") === b.map(fileKey).toSorted().join("\n")
 
 const sameSkill = (a: PackSkill, b: PackSkill) =>
@@ -189,24 +188,24 @@ export class SkillPacks extends Context.Service<
           })
         }
 
-        const directories = skillDirectories(blobs)
+        const skillFiles = filesBySkill(blobs)
 
-        if (directories.length === 0) {
+        if (skillFiles.size === 0) {
           return yield* new SkillPackNotReadable({
             message: `No folder in ${folderLabel(source, commit)} has a SKILL.md.`,
           })
         }
 
         const loaded = yield* Effect.forEach(
-          directories,
-          (directory) => {
-            const files = filesOf(directory, blobs)
+          skillFiles,
+          ([directory, files]) => {
             const skillFile = files.find(({ path }) => path === skillFilePath(directory))!
 
             return github.blob(source, skillFile.sha).pipe(
               Effect.map((bytes) => ({
                 directory,
                 files,
+                skillFile: [skillFile.sha, bytes] as const,
                 result: readSkill(
                   directory,
                   new TextDecoder().decode(bytes),
@@ -223,6 +222,7 @@ export class SkillPacks extends Context.Service<
             result instanceof Skill ? [{ directory, files, skill: result }] : [],
           ),
           skipped: loaded.flatMap(({ result }) => (result instanceof SkippedSkill ? [result] : [])),
+          downloaded: new Map(loaded.map(({ skillFile }) => skillFile)),
         } satisfies PackContents
       })
 
@@ -243,6 +243,8 @@ export class SkillPacks extends Context.Service<
           `,
         )
 
+        const skillsByPin = Map.groupBy(skills, ({ pin_id }) => pin_id)
+
         return packs.map((pack) => ({
           pinId: pack.pin_id,
           pack: new SkillPack({
@@ -255,10 +257,8 @@ export class SkillPacks extends Context.Service<
             }),
             commit: pack.commit_sha,
             updatable: pack.ref === null || !isCommitRef(pack.ref, pack.commit_sha),
-            skills: skills.flatMap((skill) =>
-              skill.pin_id === pack.pin_id
-                ? [new Skill({ name: skill.name, description: skill.description })]
-                : [],
+            skills: (skillsByPin.get(pack.pin_id) ?? []).map(
+              ({ name, description }) => new Skill({ name, description }),
             ),
           }),
         }))
@@ -281,16 +281,24 @@ export class SkillPacks extends Context.Service<
 
         if (existing !== undefined) return Effect.succeed(existing)
 
-        const { skills } = yield* read(source, commit)
+        const { skills, downloaded } = yield* read(source, commit)
 
         if (skills.length === 0) return yield* nothingToAdd(source, commit)
 
-        const downloaded = yield* Effect.forEach(
-          skills.flatMap(({ files }) => files),
-          (file) =>
-            github.blob(source, file.sha).pipe(Effect.map((contents) => ({ ...file, contents }))),
-          { concurrency: 8 },
+        const files = skills.flatMap((skill) => skill.files)
+
+        const missing = [...new Set(files.map(({ sha }) => sha))].filter(
+          (sha) => !downloaded.has(sha),
         )
+
+        const contents = new Map([
+          ...downloaded,
+          ...(yield* Effect.forEach(
+            missing,
+            (sha) => github.blob(source, sha).pipe(Effect.map((bytes) => [sha, bytes] as const)),
+            { concurrency: 8 },
+          )),
+        ])
 
         return Effect.gen(function* () {
           const storedMeanwhile = yield* existingPin(source, commit)
@@ -324,12 +332,12 @@ export class SkillPacks extends Context.Service<
 
           yield* sql`
             INSERT INTO skill_pack_file ${sql.insert(
-              downloaded.map(({ path, sha, executable, contents }) => ({
+              files.map(({ path, sha, executable }) => ({
                 pin_id: pinId,
                 path,
                 blob_sha: sha,
                 executable: executable ? 1 : 0,
-                contents,
+                contents: contents.get(sha)!,
               })),
             )}
           `
@@ -365,10 +373,12 @@ export class SkillPacks extends Context.Service<
             yield* sql`SELECT path, blob_sha, executable FROM skill_pack_file WHERE pin_id = ${pinId}`,
           )).map(({ path, blob_sha, executable }) => ({ path, sha: blob_sha, executable }))
 
+          const bySkill = filesBySkill(files)
+
           return skills.map(({ directory, name, description }) => ({
             directory,
             skill: new Skill({ name, description }),
-            files: filesOf(directory, files),
+            files: bySkill.get(directory) ?? [],
           }))
         }).pipe(Effect.catch(storageFailure))
 
@@ -395,45 +405,47 @@ export class SkillPacks extends Context.Service<
         add: Effect.fn("SkillPacks.add")(function* (source, commit, name) {
           if (!isSkillPackName(name)) return yield* new InvalidSkillPackName({ name })
 
-          const taken = () =>
-            sql`SELECT 1 FROM skill_pack WHERE name = ${name}`.pipe(
-              Effect.map((rows) => rows.length > 0),
-            )
+          const taken = yield* sql`SELECT 1 FROM skill_pack WHERE name = ${name}`.pipe(
+            Effect.map((rows) => rows.length > 0),
+            Effect.catch(storageFailure),
+          )
 
-          if (yield* taken().pipe(Effect.catch(storageFailure))) {
-            return yield* new SkillPackNameTaken({ name })
-          }
+          if (taken) return yield* new SkillPackNameTaken({ name })
 
           const storePin = yield* preparePin(source, commit)
 
           yield* Effect.gen(function* () {
-            if (yield* taken()) return yield* new SkillPackNameTaken({ name })
-
             const pinId = yield* storePin
 
-            return yield* sql`
+            yield* sql`
               INSERT INTO skill_pack ${sql.insert({ name, ref: source.ref, pin_id: pinId })}
             `
-          }).pipe(
-            sql.withTransaction,
-            Effect.catchIf((error) => !(error instanceof SkillPackNameTaken), storageFailure),
-          )
+          }).pipe(sql.withTransaction, Effect.catch(storageFailure))
 
           return yield* list
         }),
 
         previewUpdate: Effect.fn("SkillPacks.previewUpdate")(function* (name) {
           const { pack, pinId } = yield* packNamed(name)
-          const { commit } = yield* resolve([pack.source])
-          const next = yield* read(pack.source, commit)
-          const current = yield* storedContents(pinId)
+
+          const readLatest = Effect.gen(function* () {
+            const latest = yield* resolve([pack.source])
+
+            return { commit: latest.commit, contents: yield* read(pack.source, latest.commit) }
+          })
+
+          const [latest, current] = yield* Effect.all([readLatest, storedContents(pinId)], {
+            concurrency: "unbounded",
+          })
+
+          const next = latest.contents
           const pinned = new Map(current.map((entry) => [entry.directory, entry]))
           const resolved = new Set(next.skills.map(({ directory }) => directory))
 
           return new SkillPackUpdate({
             name,
             from: pack.commit,
-            to: commit,
+            to: latest.commit,
             added: next.skills
               .flatMap(({ directory, skill }) => (pinned.has(directory) ? [] : [skill]))
               .toSorted(byName),

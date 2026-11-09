@@ -8,12 +8,12 @@ export class ExecutableFile {
   }
 }
 
-export type FakeFile = string | ExecutableFile
+type FakeFile = string | ExecutableFile
 
 export type FakeFiles = Readonly<Record<string, FakeFile>>
 
 interface FakeRepository {
-  defaultBranch: string | null
+  readonly defaultBranch: string
   readonly refs: Map<string, string>
   readonly commits: Map<string, FakeFiles>
 }
@@ -29,7 +29,11 @@ const sha1 = (...parts: ReadonlyArray<string | Buffer>) => {
 const contentsOf = (file: FakeFile) =>
   Buffer.from(file instanceof ExecutableFile ? file.contents : file)
 
-const blobShaOf = (bytes: Buffer) => sha1(`blob ${bytes.length}\0`, bytes)
+export const blobSha = (contents: string | Buffer) => {
+  const bytes = Buffer.from(contents)
+
+  return sha1(`blob ${bytes.length}\0`, bytes)
+}
 
 const within = (folder: string, path: string) =>
   folder === "" ? path : path.startsWith(`${folder}/`) ? path.slice(folder.length + 1) : null
@@ -77,7 +81,7 @@ export const fakeRepositories = () => {
 
       for (const file of Object.values(files)) {
         const bytes = contentsOf(file)
-        blobs.set(blobShaOf(bytes), bytes)
+        blobs.set(blobSha(bytes), bytes)
       }
 
       repository.commits.set(commit, files)
@@ -126,41 +130,24 @@ export const fakeRepositories = () => {
 
       if (tree === undefined || files === undefined) return undefined
 
-      const directories = new Set<string>()
+      return Object.entries(files)
+        .flatMap(([path, file]) => {
+          const relative = within(tree.path, path)
 
-      const blobsInTree = Object.entries(files).flatMap(([path, file]) => {
-        const relative = within(tree.path, path)
-
-        if (relative === null) return []
-
-        const segments = relative.split("/")
-
-        for (let depth = 1; depth < segments.length; depth++)
-          directories.add(segments.slice(0, depth).join("/"))
-
-        return [
-          {
-            path: relative,
-            mode: file instanceof ExecutableFile ? "100755" : "100644",
-            type: "blob",
-            sha: blobShaOf(contentsOf(file)),
-          },
-        ]
-      })
-
-      return [
-        ...[...directories].map((path) => ({
-          path,
-          mode: "040000",
-          type: "tree",
-          sha: treeOid(tree.commit, tree.path === "" ? path : `${tree.path}/${path}`),
-        })),
-        ...blobsInTree,
-      ].toSorted((a, b) => (a.path < b.path ? -1 : 1))
+          return relative === null
+            ? []
+            : [
+                {
+                  path: relative,
+                  mode: file instanceof ExecutableFile ? "100755" : "100644",
+                  type: "blob",
+                  sha: blobSha(contentsOf(file)),
+                },
+              ]
+        })
+        .toSorted((a, b) => (a.path < b.path ? -1 : 1))
     },
 
     blob: (sha: string) => blobs.get(sha),
   }
 }
-
-export type FakeRepositories = ReturnType<typeof fakeRepositories>

@@ -78,7 +78,7 @@ it("previews a pack, refuses a taken name, and adds it under the chosen name", a
   expect(preview.getByRole("list", { name: "Skills" }).textContent).toBe(
     "architect · Shape a design.",
   )
-  expect(preview.getByRole("list", { name: "Skipped skills" }).textContent).toBe(
+  expect(preview.getByRole("list", { name: "Skipped" }).textContent).toBe(
     "silent · SKILL.md has no description.",
   )
   expect(preview.getByText("You already have a pack named team.")).toBeDefined()
@@ -158,6 +158,6 @@ it("shows what an update changes and moves the pin only when confirmed", async (
   await user.click(update.getByRole("button", { name: "Update to b17c0de" }))
 
   expect(updated).toHaveBeenCalledWith({ name: "team", commit: second }, expect.anything())
-  expect(await screen.findByText(/@ b17c0de$/)).toBeDefined()
+  expect(await screen.findByText("b17c0de")).toBeDefined()
   expect(screen.queryByLabelText("Update team", { selector: "div" })).toBeNull()
 })

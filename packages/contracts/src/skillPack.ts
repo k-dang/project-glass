@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 
-export const SKILL_PACK_NAME_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+const SKILL_PACK_NAME_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
 export const SKILL_PACK_NAME_MAX_LENGTH = 64
 
@@ -18,8 +18,6 @@ export const skillPackUrl = ({ owner, repo, ref, path }: SkillPackSource) =>
   ref === null
     ? `https://github.com/${owner}/${repo}`
     : `https://github.com/${owner}/${repo}/tree/${ref}${path === "" ? "" : `/${path}`}`
-
-export const shortCommit = (commit: string) => commit.slice(0, 7)
 
 export class Skill extends Schema.Class<Skill>("Skill")({
   name: Schema.String,
