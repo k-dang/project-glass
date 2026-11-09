@@ -9,8 +9,10 @@ import {
   AgentNotFound,
   type AgentPlace,
   asksPermission,
+  AgentChanges,
   AgentStarted,
-  type ChangedFile,
+  ChangedFile,
+  type FeedbackNote,
   FollowedRepository,
   type InvalidLocalCheckout,
   type MessageDelivery,
@@ -49,9 +51,10 @@ import {
   SubscriptionRef,
 } from "effect"
 import { SqlClient } from "effect/sql"
-import { randomUUID } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import { ActivityLog } from "./ActivityLog"
 import { type Conversation, ConversationTurns } from "./ConversationTurns"
+import { FeedbackNotes } from "./FeedbackNotes"
 import {
   asAgentError,
   type HostCallError,
@@ -64,6 +67,16 @@ import { LocalPlacement } from "./LocalPlacement"
 import { type AgentRole, ReviewBrief, ReviewRole, WorkRole } from "./agentHost/protocol"
 import { Transcripts } from "./Transcripts"
 import { annotateUnit } from "./wideEvents"
+
+const encodeFiles = Schema.encodeSync(Schema.Array(ChangedFile))
+
+const changesOf = (files: ReadonlyArray<ChangedFile>) =>
+  new AgentChanges({
+    id: createHash("sha256")
+      .update(JSON.stringify(encodeFiles(files)))
+      .digest("hex"),
+    files,
+  })
 
 const StoredAgent = Schema.Struct({
   id: Agent.fields.id,
@@ -190,9 +203,18 @@ export class Agents extends Context.Service<
       agentId: string,
       queuedId: string,
     ) => Effect.Effect<void, AgentNotFound | AgentBusy | AgentError>
-    readonly changes: (
+    readonly changes: (agentId: string) => Effect.Effect<AgentChanges, AgentNotFound | AgentError>
+    readonly feedbackNotes: (
       agentId: string,
-    ) => Effect.Effect<ReadonlyArray<ChangedFile>, AgentNotFound | AgentError>
+    ) => Effect.Effect<ReadonlyArray<FeedbackNote>, AgentNotFound | AgentError>
+    readonly saveFeedbackNote: (
+      agentId: string,
+      note: FeedbackNote,
+    ) => Effect.Effect<void, AgentNotFound | AgentError>
+    readonly removeFeedbackNote: (
+      agentId: string,
+      noteId: string,
+    ) => Effect.Effect<void, AgentNotFound | AgentError>
     readonly stop: (agentId: string) => Effect.Effect<void, AgentNotFound | AgentError>
     readonly reachSandbox: (agentId: string) => Effect.Effect<void, AgentNotFound | AgentError>
     readonly unsent: (agentId: string) => Effect.Effect<SentMessage, AgentNotFound | AgentError>
@@ -228,6 +250,7 @@ export class Agents extends Context.Service<
       const sandboxes = yield* Sandboxes
       const activityLog = yield* ActivityLog
       const turns = yield* ConversationTurns
+      const notes = yield* FeedbackNotes
       const fs = yield* FileSystem.FileSystem
       const lock = yield* Semaphore.make(1)
       const scope = yield* Scope.Scope
@@ -505,13 +528,13 @@ export class Agents extends Context.Service<
 
         const host = yield* placement.hostOnceMade(row)
 
-        if (Option.isNone(host)) return []
+        if (Option.isNone(host)) return changesOf([])
 
         const baseRef = yield* placement.baseRef(row)
 
         return yield* host.value
           .GetChanges({ folder: row.folder, baseRef })
-          .pipe(Effect.mapError(asAgentError))
+          .pipe(Effect.mapError(asAgentError), Effect.map(changesOf))
       })
 
       const listedByHost = Effect.fnUntraced(function* <A>(
@@ -638,6 +661,7 @@ export class Agents extends Context.Service<
           yield* Effect.gen(function* () {
             yield* transcripts.remove(agentId)
             yield* turns.removeUnsent(agentId)
+            yield* notes.removeAll(agentId)
             yield* sql`DELETE FROM agent WHERE id = ${agentId}`
           }).pipe(sql.withTransaction, Effect.mapError(storageFailure))
         }).pipe(
@@ -682,6 +706,11 @@ export class Agents extends Context.Service<
         createForReview,
         send,
         changes,
+        feedbackNotes: (agentId) => find(agentId).pipe(Effect.andThen(notes.list(agentId))),
+        saveFeedbackNote: (agentId, note) =>
+          find(agentId).pipe(Effect.andThen(notes.save(agentId, note))),
+        removeFeedbackNote: (agentId, noteId) =>
+          find(agentId).pipe(Effect.andThen(notes.remove(agentId, noteId))),
         steer,
         cancelQueued: (agentId, queuedId) =>
           find(agentId).pipe(Effect.andThen(transcripts.cancelQueued(agentId, queuedId))),

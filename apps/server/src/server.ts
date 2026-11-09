@@ -13,6 +13,7 @@ import { CheckoutRuns } from "./CheckoutRuns"
 import { Checkouts } from "./Checkouts"
 import { Agents } from "./Agents"
 import { ConversationTurns } from "./ConversationTurns"
+import { FeedbackNotes } from "./FeedbackNotes"
 import { DatabaseLive } from "./Database"
 import { Git } from "./git"
 import { GitHubAuth } from "./github/GitHubAuth"
@@ -62,6 +63,7 @@ const AgentsLive = Layer.merge(Agents.layer, GlobalConversation.layer).pipe(
   Layer.provide(LocalPlacement.layer),
   Layer.provideMerge(Sandboxes.layer),
   Layer.provide(ConversationTurns.layer),
+  Layer.provide(FeedbackNotes.layer),
   Layer.provide(LocalAgentHost.layer),
   Layer.provide(Transcripts.layer),
   Layer.provide(ToDos.layer),

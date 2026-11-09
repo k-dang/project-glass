@@ -18,6 +18,8 @@ export * from "./draft"
 
 export * from "./engine"
 
+export * from "./feedbackNote"
+
 export * from "./followedRepository"
 
 export * from "./pullRequest"

@@ -14,6 +14,7 @@ import {
   layOut,
   type LineNotePlace,
   type LineNotes,
+  lineNoteAnnotations,
   toItems,
   toNoteSections,
 } from "./changesView"
@@ -54,6 +55,8 @@ const lineNotes = (some: Partial<LineNotes> = {}): LineNotes => ({
   ...some,
 })
 
+const notesOf = (some: Partial<LineNotes> = {}) => lineNoteAnnotations(lineNotes(some))
+
 const choose = (
   opened: ReadonlyMap<string, boolean> = none,
   all: CollapseChoices["all"] = "expanded",
@@ -69,7 +72,7 @@ describe("layOut", () => {
 
     expect(keys).toEqual([expect.stringMatching(/\S/), expect.stringMatching(/\S/)])
     expect(new Set(keys).size).toBe(2)
-    expect(toItems(files, lineNotes(), choose())[0]!.fileDiff.cacheKey).toBe(keys[0])
+    expect(toItems(files, notesOf(), choose())[0]!.fileDiff.cacheKey).toBe(keys[0])
 
     const reloaded = layOut([
       changedFile("a.ts", TextPatch.make({ hunks: hunks.replace("+B", "+C") })),
@@ -94,21 +97,21 @@ describe("layOut", () => {
 
 describe("toItems", () => {
   const { files } = layOut([changedFile("a.ts"), changedFile("b.ts"), changedFile("c.ts")])
-  const plain = toItems(files, lineNotes(), choose())
+  const plain = toItems(files, notesOf(), choose())
 
   it("redraws only the file whose Drafts changed", () => {
-    const started = toItems(files, lineNotes({ drafts: [draft("1", "b.ts")] }), choose())
+    const started = toItems(files, notesOf({ drafts: [draft("1", "b.ts")] }), choose())
 
     expect(redrawn(plain, started)).toEqual(["b.ts"])
     expect(redrawn(started, plain)).toEqual(["b.ts"])
   })
 
   it("redraws only the file whose Discussions changed", () => {
-    const one = toItems(files, lineNotes({ discussions: [discussion("a.ts", 2)] }), choose())
+    const one = toItems(files, notesOf({ discussions: [discussion("a.ts", 2)] }), choose())
 
     const two = toItems(
       files,
-      lineNotes({ discussions: [discussion("a.ts", 2), discussion("c.ts", 1)] }),
+      notesOf({ discussions: [discussion("a.ts", 2), discussion("c.ts", 1)] }),
       choose(),
     )
 
@@ -118,19 +121,19 @@ describe("toItems", () => {
   it("redraws a Discussion's file when it gains a Reply or is resolved", () => {
     const before = toItems(
       files,
-      lineNotes({ discussions: [discussion("a.ts", 2), discussion("c.ts", 1)] }),
+      notesOf({ discussions: [discussion("a.ts", 2), discussion("c.ts", 1)] }),
       choose(),
     )
 
     const replied = toItems(
       files,
-      lineNotes({ discussions: [discussion("a.ts", 2, false, 1), discussion("c.ts", 1)] }),
+      notesOf({ discussions: [discussion("a.ts", 2, false, 1), discussion("c.ts", 1)] }),
       choose(),
     )
 
     const resolved = toItems(
       files,
-      lineNotes({ discussions: [discussion("a.ts", 2, true), discussion("c.ts", 1)] }),
+      notesOf({ discussions: [discussion("a.ts", 2, true), discussion("c.ts", 1)] }),
       choose(),
     )
 
@@ -139,7 +142,7 @@ describe("toItems", () => {
   })
 
   it("redraws only the file that collapsed", () => {
-    const closed = toItems(files, lineNotes(), choose(new Map([["a.ts", false]])))
+    const closed = toItems(files, notesOf(), choose(new Map([["a.ts", false]])))
 
     expect(redrawn(plain, closed)).toEqual(["a.ts"])
     expect(closed.map((item) => item.collapsed)).toEqual([true, false, false])
@@ -148,7 +151,7 @@ describe("toItems", () => {
   it("places Discussions and Drafts under their lines", () => {
     const [a, b] = toItems(
       files,
-      lineNotes({ discussions: [discussion("a.ts", 3)], drafts: [draft("1", "a.ts")] }),
+      notesOf({ discussions: [discussion("a.ts", 3)], drafts: [draft("1", "a.ts")] }),
       choose(),
     )
 
@@ -168,7 +171,7 @@ describe("collapsed", () => {
   const { files } = layOut([changedFile("a.ts"), changedFile("b.png", BinaryFile.make({}))])
 
   const collapsed = (opened: ReadonlyMap<string, boolean>, all?: CollapseChoices["all"]) =>
-    toItems(files, lineNotes(), choose(opened, all)).map((item) => item.collapsed)
+    toItems(files, notesOf(), choose(opened, all)).map((item) => item.collapsed)
 
   it("applies global and per-file collapse choices while keeping placeholders collapsed", () => {
     expect(collapsed(none, "collapsed")).toEqual([true, true])

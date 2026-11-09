@@ -1,6 +1,7 @@
 import { assert, it } from "@effect/vitest"
 import {
   ChangedFile,
+  FeedbackNote,
   FollowedRepository,
   SandboxPlace,
   SandboxProviderInfo,
@@ -247,7 +248,7 @@ it.live("Steers and stops an Agent's Turns in its Sandbox, and shows its changes
     })
 
     yield* f.setChanges({ files: [notes], uncommitted: true })
-    assert.deepStrictEqual(yield* f.agents.changes(agent.id), [notes])
+    assert.deepStrictEqual((yield* f.agents.changes(agent.id)).files, [notes])
     assert.deepStrictEqual(f.changesAsked, [
       { folder: resolve("greeter"), baseRef: "refs/remotes/origin/main" },
     ])
@@ -322,6 +323,19 @@ it.effect(
       const agent = yield* createSandboxed(f)
       yield* end(yield* f.started)
 
+      const note = new FeedbackNote({
+        id: "note",
+        path: "notes.txt",
+        side: "new",
+        start: 1,
+        end: 1,
+        code: "hi",
+        changesId: "read",
+        text: "Say hello",
+      })
+
+      yield* f.agents.saveFeedbackNote(agent.id, note)
+
       for (const expiry of [1000, 1500, 2000, 2500, 3000]) {
         yield* sandboxOf(f.agents, agent.id).pipe(
           Stream.filter(
@@ -355,5 +369,6 @@ it.effect(
         refused.message,
         "This Agent's Sandbox expired, so it can't take messages. Its transcript stays until you remove the Agent.",
       )
+      assert.deepStrictEqual(yield* f.agents.feedbackNotes(agent.id), [note])
     }),
 )

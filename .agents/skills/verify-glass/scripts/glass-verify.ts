@@ -48,8 +48,8 @@ const USAGE = `Usage: node .agents/skills/verify-glass/scripts/glass-verify.ts <
   click --role <role> --name <name>      real mouse click on an accessible element
   type --role <role> --name <name> --text <text>
                                          click the element, then replace its text with <text>
-  press --key <key> [--meta]             press a key (e.g. Enter, ArrowUp) in the focused element,
-                                         holding ⌘ with --meta
+  press --key <key> [--meta] [--shift]   press a key (e.g. Enter, ArrowUp) in the focused element,
+                                         holding ⌘ with --meta and Shift with --shift
   scroll --by <pixels> [--x <n>] [--y <n>]
                                          turn the wheel over the window, for views that load as you
                                          scroll
@@ -291,9 +291,10 @@ const clickElement = async (page: Cdp, role: string, name: string) => {
         const box = element.getBoundingClientRect()
         return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
       }
-      const at = center(this)
-      const label = this.labels?.[0]
-      return label && !this.contains(document.elementFromPoint(at.x, at.y)) ? center(label) : at
+      const target = this.nodeType === Node.TEXT_NODE ? this.parentElement : this
+      const at = center(target)
+      const label = target.labels?.[0]
+      return label && !target.contains(document.elementFromPoint(at.x, at.y)) ? center(label) : at
     }`,
   })
   await page.send("Input.dispatchMouseEvent", EmptyResponse, { type: "mouseMoved", ...at })
@@ -640,6 +641,7 @@ const main = async () => {
       backend: { type: "string", default: "real" },
       key: { type: "string" },
       meta: { type: "boolean", default: false },
+      shift: { type: "boolean", default: false },
       role: { type: "string" },
       name: { type: "string" },
       text: { type: "string" },
@@ -824,12 +826,12 @@ const main = async () => {
         return console.log(`Typed into ${role} "${name}"`)
       }
       case "press": {
-        const { key, meta } = values
+        const { key, meta, shift } = values
         if (!key) fail("press needs --key")
-        const pressed = { key, code: key, modifiers: meta ? 4 : 0 }
+        const pressed = { key, code: key, modifiers: (meta ? 4 : 0) | (shift ? 8 : 0) }
         await page.send("Input.dispatchKeyEvent", EmptyResponse, { type: "rawKeyDown", ...pressed })
         await page.send("Input.dispatchKeyEvent", EmptyResponse, { type: "keyUp", ...pressed })
-        return console.log(`Pressed ${meta ? "⌘" : ""}${key}`)
+        return console.log(`Pressed ${meta ? "⌘" : ""}${shift ? "⇧" : ""}${key}`)
       }
       default:
         return fail(`unknown command ${command}\n\n${USAGE}`)

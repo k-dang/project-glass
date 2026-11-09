@@ -38,6 +38,7 @@ import { AgentHostRpcs, type HostAgentError, type TurnSettings } from "../src/ag
 import { ActivityLog } from "../src/ActivityLog"
 import { Agents } from "../src/Agents"
 import { ConversationTurns } from "../src/ConversationTurns"
+import { FeedbackNotes } from "../src/FeedbackNotes"
 import { followJournal } from "../src/hostJournal"
 import { migrationLoader } from "../src/Migrations"
 import { Plugins } from "../src/Plugins"
@@ -206,6 +207,7 @@ export const agentServicesFixture = Effect.gen(function* () {
             ),
           ),
           Layer.provide(ConversationTurns.layer),
+          Layer.provide(FeedbackNotes.layer),
           Layer.provideMerge(Transcripts.layer),
           Layer.provide(Layer.succeed(LocalPlacement, placement)),
           Layer.provide(ToDos.layer),
