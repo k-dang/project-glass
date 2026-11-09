@@ -24,7 +24,7 @@ import { isolatedHome, LAUNCH_TOKEN } from "../test/harness"
 import { CheckoutFailure, Checkouts } from "./Checkouts"
 import { Git } from "./git"
 import { GitHubAuth } from "./github/GitHubAuth"
-import { ServerConfig } from "./ServerConfig"
+import { Deadlines, ServerConfig } from "./ServerConfig"
 
 const reference = (pr: FakePullRequest) =>
   new PullRequestRef({ owner: pr.owner, repo: pr.repo, number: pr.number })
@@ -32,12 +32,10 @@ const reference = (pr: FakePullRequest) =>
 const revision = (pr: FakePullRequest) => new Revision({ base: pr.base.sha, head: pr.head.sha })
 
 const fixture = Effect.fnUntraced(function* ({
-  env = {},
   token = VIEWER.token,
   resolveToken = Effect.succeed({ token: Redacted.make(token), source: "GH_TOKEN" }),
   home: sharedHome,
 }: {
-  readonly env?: Record<string, string>
   readonly token?: string
   readonly resolveToken?: GitHubAuth["Service"]["resolveToken"]
   readonly home?: string
@@ -60,7 +58,6 @@ const fixture = Effect.fnUntraced(function* ({
             GLASS_TOKEN: LAUNCH_TOKEN,
             GLASS_HOME: home,
             GLASS_GIT_REMOTE: github.gitUrl,
-            ...env,
           }),
         ),
       ),
@@ -287,29 +284,25 @@ it.live("fails as a failed fetch when GitHub errors", () =>
 
 it.effect("times out a token lookup that never answers", () =>
   Effect.gen(function* () {
-    const deadline = 60_000
+    const { checkoutMs } = yield* Deadlines
     const asked = yield* Deferred.make<void>()
 
     const { github, failure } = yield* fixture({
-      env: { GLASS_CHECKOUT_TIMEOUT_MS: String(deadline) },
       resolveToken: Deferred.succeed(asked, undefined).pipe(Effect.andThen(Effect.never)),
     })
 
     const failing = yield* Effect.forkChild(failure(seed(github)))
     yield* Deferred.await(asked)
     yield* Effect.yieldNow
-    yield* TestClock.adjust(deadline)
+    yield* TestClock.adjust(checkoutMs)
     assertFailure(yield* Fiber.join(failing), "timeout")
   }),
 )
 
 it.effect("times out a slow fetch and checks out once it recovers", () =>
   Effect.gen(function* () {
-    const deadline = 60_000
-
-    const { github, checkout, failure } = yield* fixture({
-      env: { GLASS_CHECKOUT_TIMEOUT_MS: String(deadline) },
-    })
+    const { checkoutMs } = yield* Deadlines
+    const { github, checkout, failure } = yield* fixture()
 
     const pr = seed(github)
 
@@ -317,7 +310,7 @@ it.effect("times out a slow fetch and checks out once it recovers", () =>
     github.timingOutRepositories.add(`${pr.owner}/${pr.repo}`)
     const failing = yield* Effect.forkChild(failure(pr))
     yield* eventually(Effect.sync(() => assert.isAtLeast(github.gitTraffic.inFlight, 1)))
-    yield* TestClock.adjust(deadline)
+    yield* TestClock.adjust(checkoutMs)
     assertFailure(yield* Fiber.join(failing), "timeout")
 
     github.timingOutRepositories.clear()

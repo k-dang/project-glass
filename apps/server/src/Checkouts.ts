@@ -20,7 +20,7 @@ import { dirname, join } from "node:path"
 import { Git } from "./git"
 import { gitBasicAuthorization } from "./gitEnv"
 import { GitHubAuth } from "./github/GitHubAuth"
-import { ServerConfig } from "./ServerConfig"
+import { Deadlines, ServerConfig } from "./ServerConfig"
 import { annotateUnit } from "./wideEvents"
 
 export class CheckoutFailure extends Data.TaggedError("CheckoutFailure")<{
@@ -73,6 +73,7 @@ export class Checkouts extends Context.Service<
     Checkouts,
     Effect.gen(function* () {
       const config = yield* ServerConfig
+      const deadlines = yield* Deadlines
       const auth = yield* GitHubAuth
       const fs = yield* FileSystem.FileSystem
       const gitService = yield* Git
@@ -176,7 +177,7 @@ export class Checkouts extends Context.Service<
           ).pipe(Effect.asVoid)
         }).pipe(
           Effect.timeoutOrElse({
-            duration: config.checkoutTimeoutMs,
+            duration: deadlines.checkoutMs,
             orElse: () => Effect.fail(new CheckoutFailure({ reason: "timeout" })),
           }),
           Semaphore.withPermit(lock(repository)),

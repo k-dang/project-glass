@@ -10,7 +10,7 @@ import { AskAgentAnswer, askInstructions, askPrompt } from "./askPrompt"
 import { checkoutRunFailure, CheckoutRuns } from "./CheckoutRuns"
 import { GitHubClient } from "./github/GitHubClient"
 import { lineInFiles } from "./github/patchLines"
-import { ServerConfig } from "./ServerConfig"
+import { Deadlines } from "./ServerConfig"
 
 export class Asks extends Context.Service<
   Asks,
@@ -28,7 +28,7 @@ export class Asks extends Context.Service<
     Effect.gen(function* () {
       const checkoutRuns = yield* CheckoutRuns
       const github = yield* GitHubClient
-      const config = yield* ServerConfig
+      const deadlines = yield* Deadlines
 
       const ask = Effect.fn("Asks.ask")(
         function* (pr: PullRequestRef, revision: Revision, place: AskPlace, question: string) {
@@ -38,7 +38,7 @@ export class Asks extends Context.Service<
             pr,
             revision,
             subject: "answer",
-            timeout: config.askTimeoutMs,
+            timeout: deadlines.askMs,
             read: github.tourInput,
             task: (input) => {
               const found = lineInFiles(input.files, place.path, place.side, place.line)

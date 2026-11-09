@@ -35,7 +35,7 @@ import { followUpInstructions } from "./followUpInstructions"
 import { GitHubClient } from "./github/GitHubClient"
 import { patchLineNumbers } from "./github/patchLines"
 import { pullRequestJobs, type PullRequestJob } from "./pullRequestJobs"
-import { ServerConfig } from "./ServerConfig"
+import { Deadlines, ServerConfig } from "./ServerConfig"
 import { engineSettingsOf, SettingsStore } from "./SettingsStore"
 
 const BACKGROUND_SLOTS = 1
@@ -115,6 +115,7 @@ export class AgentReviews extends Context.Service<
       const checkoutRuns = yield* CheckoutRuns
       const github = yield* GitHubClient
       const config = yield* ServerConfig
+      const deadlines = yield* Deadlines
       const settings = yield* SettingsStore
       const agents = yield* Agents
       const fs = yield* FileSystem.FileSystem
@@ -213,7 +214,7 @@ export class AgentReviews extends Context.Service<
               pr,
               revision,
               subject: "Agent review",
-              timeout: config.agentReviewTimeoutMs,
+              timeout: deadlines.agentReviewMs,
               read: github.reviewInput,
               task: (material) =>
                 Effect.succeed({

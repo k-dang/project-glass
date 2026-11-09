@@ -9,6 +9,7 @@ import { VIEWER } from "../test/fakePullRequest"
 import { watchDeadlines } from "../test/deadlines"
 import { isolatedHome, startBackend } from "../test/harness"
 import { type ScriptedSettings, scriptedAgentRunners } from "../test/scriptedAgentRunners"
+import { Deadlines } from "./ServerConfig"
 
 const deadline = 60_000
 
@@ -46,11 +47,14 @@ const fixture = Effect.fnUntraced(function* (
       GH_TOKEN: VIEWER.token,
       GLASS_GITHUB_API_URL: github.url,
       GLASS_GIT_REMOTE: github.gitUrl,
-      GLASS_ASK_TIMEOUT_MS: String(deadline),
     },
     home,
     runners.layer,
-  ).pipe(Effect.provideService(Scope.Scope, scope), Effect.provideService(Clock.Clock, watched))
+  ).pipe(
+    Effect.provideService(Scope.Scope, scope),
+    Effect.provideService(Clock.Clock, watched),
+    Effect.updateService(Deadlines, (deadlines) => ({ ...deadlines, askMs: deadline })),
+  )
 
   const ref = new PullRequestRef({ owner: pr.owner, repo: pr.repo, number: pr.number })
   const revision = new Revision({ base: pr.base.sha, head: pr.head.sha })
