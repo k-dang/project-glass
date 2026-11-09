@@ -199,7 +199,8 @@ export const startPiRpc = Effect.fnUntraced(function* (
       Effect.mapError((error) =>
         Predicate.isTagged(error.reason, "NotFound")
           ? new HostAgentError({
-              message: "pi isn't installed. Install it, or point GLASS_PI_COMMAND at it.",
+              message:
+                "pi isn't installed. Install it, or set piCommand in Glass's settings.json to its path and restart Glass.",
             })
           : new HostAgentError({ message: "pi could not start. Check its installation." }),
       ),

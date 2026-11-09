@@ -31,7 +31,7 @@ import { FollowedRepositories } from "./FollowedRepositories"
 import { PullRequestLists } from "./PullRequestLists"
 import { PullRequestMirror } from "./PullRequestMirror"
 import { Queue } from "./Queue"
-import { SettingsStore } from "./SettingsStore"
+import { AgentCommands, SettingsStore } from "./SettingsStore"
 import { SavedPlaces } from "./SavedPlaces"
 import { Storage } from "./Storage"
 import { ToDos } from "./ToDos"
@@ -55,7 +55,7 @@ const NodeServerLive = Layer.unwrap(
 type AgentRunnersLayer = Layer.Layer<
   AgentRunners,
   never,
-  ServerConfig | SettingsStore | ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem
+  SettingsStore | AgentCommands | ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem
 >
 
 const AgentsLive = Layer.merge(Agents.layer, GlobalConversation.layer).pipe(
@@ -70,7 +70,13 @@ const AgentsLive = Layer.merge(Agents.layer, GlobalConversation.layer).pipe(
 
 type McpToolsLayer = Layer.Layer<never, never, Layer.Services<typeof GlassMcpTools>>
 
-const services = (agentRunners: AgentRunnersLayer, mcpTools: McpToolsLayer) =>
+type AgentCommandsLayer = Layer.Layer<AgentCommands, never, SettingsStore>
+
+const services = (
+  agentRunners: AgentRunnersLayer,
+  mcpTools: McpToolsLayer,
+  agentCommands: AgentCommandsLayer,
+) =>
   Layer.merge(GlassRpcHandlers, mcpTools)
     .pipe(
       Layer.provide(PullRequestLists.layer),
@@ -89,6 +95,7 @@ const services = (agentRunners: AgentRunnersLayer, mcpTools: McpToolsLayer) =>
     )
     .pipe(
       Layer.provide(agentRunners),
+      Layer.provide(agentCommands),
       Layer.provide(Layer.merge(ActivityLog.layer, Storage.layer)),
       Layer.provide(DatabaseLive),
       Layer.provide(FollowedRepositories.layer),
@@ -98,13 +105,17 @@ const services = (agentRunners: AgentRunnersLayer, mcpTools: McpToolsLayer) =>
       Layer.provideMerge(McpCredentials.layer),
     )
 
-export const serve = (agentRunners: AgentRunnersLayer, mcpTools: McpToolsLayer) =>
+export const serve = (
+  agentRunners: AgentRunnersLayer,
+  mcpTools: McpToolsLayer,
+  agentCommands: AgentCommandsLayer = AgentCommands.layer,
+) =>
   HttpRouter.serve(Layer.merge(RendererRoutes, McpRoutes), {
     disableLogger: true,
   }).pipe(
     // Provided first so it listens last: Effect's Node server leaves connections hanging until it serves.
     Layer.provideMerge(NodeServerLive),
-    Layer.provideMerge(services(agentRunners, mcpTools)),
+    Layer.provideMerge(services(agentRunners, mcpTools, agentCommands)),
     Layer.provide(RpcSerialization.layerJson),
     Layer.provide(NodeServices.layer),
     Layer.provide(Layer.succeed(UrlParams.CurrentRedactedNames)([TOKEN_PARAM])),

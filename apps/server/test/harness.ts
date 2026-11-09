@@ -13,6 +13,7 @@ import { McpCredentials } from "../src/mcp/McpCredentials"
 import { GlassMcpTools } from "../src/mcp/server"
 import { serve } from "../src/server"
 import { ServerConfig } from "../src/ServerConfig"
+import { AgentCommands } from "../src/SettingsStore"
 import { startFakeGitHub } from "./fakeGitHub"
 import { VIEWER } from "./fakePullRequest"
 
@@ -61,7 +62,14 @@ export const startBackend = Effect.fnUntraced(function* (
       : { GH_TOKEN: VIEWER.token, GLASS_GITHUB_API_URL: (yield* startFakeGitHub()).url }
 
   const services = yield* Layer.build(
-    serve(agentRunners, mcpTools).pipe(
+    serve(
+      agentRunners,
+      mcpTools,
+      Layer.succeed(AgentCommands, {
+        claudeCommand: "glass-missing-claude",
+        piCommand: "glass-missing-pi",
+      }),
+    ).pipe(
       Layer.provide(ServerConfig.layer),
       Layer.provide(
         ConfigProvider.layer(
@@ -71,8 +79,6 @@ export const startBackend = Effect.fnUntraced(function* (
             GLASS_ALLOWED_ORIGINS: RENDERER_ORIGIN,
             GLASS_HOME: home,
             GLASS_GIT_REMOTE: join(home, "no-git-remote"),
-            GLASS_CLAUDE_COMMAND: "glass-missing-claude",
-            GLASS_PI_COMMAND: "glass-missing-pi",
             ...github,
             ...env,
           }),

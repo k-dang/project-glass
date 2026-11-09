@@ -23,6 +23,7 @@ import type { HostClient } from "./Placement"
 import { launchCommand } from "./processes"
 import { connectRpcClient } from "./rpcSocket"
 import { ServerConfig } from "./ServerConfig"
+import { AgentCommands } from "./SettingsStore"
 import { Transcripts } from "./Transcripts"
 
 const FORCE_KILL_AFTER = "2 seconds"
@@ -50,6 +51,7 @@ export class LocalAgentHost extends Context.Service<
     LocalAgentHost,
     Effect.gen(function* () {
       const config = yield* ServerConfig
+      const commands = yield* AgentCommands
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
       const transcripts = yield* Transcripts
       const webSocketConstructor = yield* Socket.WebSocketConstructor
@@ -67,8 +69,8 @@ export class LocalAgentHost extends Context.Service<
             launchCommand(config.agentHostBundle, [], {
               env: {
                 GLASS_HOST_TOKEN: token,
-                GLASS_PI_COMMAND: config.piCommand,
-                GLASS_CLAUDE_COMMAND: config.claudeCommand,
+                GLASS_PI_COMMAND: commands.piCommand,
+                GLASS_CLAUDE_COMMAND: commands.claudeCommand,
               },
               extendEnv: true,
               stdout: "inherit",

@@ -24,8 +24,6 @@ export class ServerConfig extends Context.Service<
     readonly token: Redacted.Redacted
     readonly allowedOrigins: ReadonlySet<string>
     readonly githubApiUrl: string
-    readonly claudeCommand: string
-    readonly piCommand: string
     readonly agentHostBundle: string
     readonly gitRemote: string
     readonly dataDirectory: string
@@ -36,12 +34,6 @@ export class ServerConfig extends Context.Service<
     Effect.gen(function* () {
       const port = yield* Config.Int("GLASS_PORT")
       const token = yield* Config.Redacted("GLASS_TOKEN")
-
-      const claudeCommand = yield* Config.String("GLASS_CLAUDE_COMMAND").pipe(
-        Config.withDefault("claude"),
-      )
-
-      const piCommand = yield* Config.String("GLASS_PI_COMMAND").pipe(Config.withDefault("pi"))
 
       const gitRemote = yield* Config.String("GLASS_GIT_REMOTE").pipe(
         Config.withDefault("https://github.com"),
@@ -71,8 +63,6 @@ export class ServerConfig extends Context.Service<
             .filter((origin) => origin.length > 0),
         ),
         githubApiUrl,
-        claudeCommand,
-        piCommand,
         agentHostBundle,
         gitRemote,
         dataDirectory: join(home || homedir(), ".project-glass"),

@@ -95,7 +95,7 @@ const liveSdk: ClaudeSdk = { query, getSessionInfo }
 const startFailure = (cause: unknown) =>
   new HostAgentError({
     message: /ENOENT|not found/i.test(String(cause))
-      ? "Claude Code isn't installed. Install it, or point GLASS_CLAUDE_COMMAND at it."
+      ? "Claude Code isn't installed. Install it, or set claudeCommand in Glass's settings.json to its path and restart Glass."
       : "Claude Code could not start. Check its installation.",
   })
 

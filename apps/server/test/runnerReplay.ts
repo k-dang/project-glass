@@ -1,13 +1,13 @@
 import { NodeServices } from "@effect/platform-node"
 import { EngineModels } from "@glass/contracts"
-import { ConfigProvider, Effect, Layer, Option, Predicate, Schema, Stream } from "effect"
+import { Effect, Layer, Option, Predicate, Schema, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { AgentFailure } from "../src/agentFailure"
 import { AgentRunners } from "../src/agentRunners"
-import { ServerConfig } from "../src/ServerConfig"
+import { AgentCommands } from "../src/SettingsStore"
 import { counter } from "./counter"
 import {
   decodeJson,
@@ -130,7 +130,7 @@ export const readRecording = (scenario: string) =>
   )
 
 export const runnersLayer = (
-  env: Readonly<Record<string, string>>,
+  commands: AgentCommands["Service"],
   spawner: Layer.Layer<
     ChildProcessSpawner.ChildProcessSpawner,
     never,
@@ -142,12 +142,7 @@ export const runnersLayer = (
 ) =>
   AgentRunners.layer.pipe(
     Layer.provide(spawner),
-    Layer.provide(ServerConfig.layer),
-    Layer.provide(
-      ConfigProvider.layer(
-        ConfigProvider.fromEnvRecord({ GLASS_PORT: "0", GLASS_TOKEN: "unused", ...env }),
-      ),
-    ),
+    Layer.provide(Layer.succeed(AgentCommands, commands)),
     Layer.provide(NodeServices.layer),
     Layer.orDie,
   )

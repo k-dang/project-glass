@@ -101,9 +101,8 @@ const record = async (scenario: RunnerScenario) => {
         Effect.provide(
           runnersLayer(
             {
-              GLASS_HOME: checkout,
-              GLASS_CLAUDE_COMMAND: sdkExecutable(commands["claude-code"]),
-              GLASS_PI_COMMAND: sdkExecutable(commands.pi),
+              claudeCommand: sdkExecutable(commands["claude-code"]),
+              piCommand: sdkExecutable(commands.pi),
             },
             recorder.layer,
           ),

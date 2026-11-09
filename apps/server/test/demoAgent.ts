@@ -15,7 +15,7 @@ import {
   runCommands,
 } from "./fakeModelProvider"
 import { seedClone } from "./gitRepositories"
-import { fakeAnthropicEnvironment } from "./pinnedClaude"
+import { fakeAnthropicEnvironment, pinnedClaude } from "./pinnedClaude"
 import { installedProgram } from "./replay"
 
 const bundledPiPackage = new URL(
@@ -78,7 +78,7 @@ export const startDemoClaude = Effect.fnUntraced(function* (directory: string) {
   const environment = fakeAnthropicEnvironment(directory, url)
   Object.assign(process.env, environment)
 
-  return environment.GLASS_CLAUDE_COMMAND
+  return pinnedClaude()
 })
 
 export const startDemoPi = Effect.fnUntraced(function* (directory: string) {

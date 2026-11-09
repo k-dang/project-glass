@@ -13,6 +13,8 @@ import { join } from "node:path"
 import { writeDataFile } from "./dataFiles"
 import { ServerConfig } from "./ServerConfig"
 
+const defaultAgentCommands = { claudeCommand: "claude", piCommand: "pi" }
+
 const defaultPiModel = Effect.succeed({ provider: "anthropic", modelId: "claude-sonnet-5-5" })
 
 const SavedModels = Schema.Struct({
@@ -34,6 +36,12 @@ const Settings = Schema.Struct({
   queueAgentReviews: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
   reviewPrompt: ReviewPrompt.pipe(
     Schema.withDecodingDefaultKey(Effect.succeed(defaultReviewPrompt)),
+  ),
+  claudeCommand: Schema.String.pipe(
+    Schema.withDecodingDefaultKey(Effect.succeed(defaultAgentCommands.claudeCommand)),
+  ),
+  piCommand: Schema.String.pipe(
+    Schema.withDecodingDefaultKey(Effect.succeed(defaultAgentCommands.piCommand)),
   ),
 })
 
@@ -143,6 +151,24 @@ export class SettingsStore extends Context.Service<
           lock.withPermits(1),
         ),
       })
+    }),
+  )
+}
+
+export class AgentCommands extends Context.Service<
+  AgentCommands,
+  { readonly claudeCommand: string; readonly piCommand: string }
+>()("@glass/server/AgentCommands") {
+  static readonly layer = Layer.effect(
+    AgentCommands,
+    Effect.gen(function* () {
+      const settings = yield* SettingsStore
+
+      const { claudeCommand, piCommand } = yield* settings
+        .read()
+        .pipe(Effect.orElseSucceed(() => defaultAgentCommands))
+
+      return AgentCommands.of({ claudeCommand, piCommand })
     }),
   )
 }

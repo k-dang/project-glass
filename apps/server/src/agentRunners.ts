@@ -25,7 +25,7 @@ import { join } from "node:path"
 import { type AgentFailure, agentFailure, runnerFailureReason } from "./agentFailure"
 import { launchCommand } from "./processes"
 import { claudeReadOnlyTools, piLoadsNothing, piReadOnlyTools } from "./readOnlyTools"
-import { ServerConfig } from "./ServerConfig"
+import { AgentCommands } from "./SettingsStore"
 
 export interface AgentTask<A> {
   readonly subject: string
@@ -81,7 +81,7 @@ const claudeFlags = ["--strict-mcp-config", "--no-session-persistence", "--disab
 const claudeReadOnlyFlags = ["--restricted", "--tools", claudeReadOnlyTools.join(",")]
 
 const runnerStrategies = Effect.gen(function* () {
-  const config = yield* ServerConfig
+  const commands = yield* AgentCommands
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
   const fs = yield* FileSystem.FileSystem
 
@@ -141,7 +141,7 @@ const runnerStrategies = Effect.gen(function* () {
       const unusable = unusableFailure("Claude Code", task.subject, identity)
 
       const result = yield* execute(
-        config.claudeCommand,
+        commands.claudeCommand,
         ["-p", ...claudeReadOnlyFlags, ...claudeFlags, "--model", model, "--output-format", "json"],
         task.checkout,
         `${task.instructions}\n\n${promptWithSchema(task)}`,
@@ -182,8 +182,8 @@ const runnerStrategies = Effect.gen(function* () {
 
     const [status, help] = yield* Effect.all(
       [
-        execute(config.claudeCommand, ["auth", "status", "--json"], cwd).pipe(Effect.result),
-        execute(config.claudeCommand, ["--help"], cwd).pipe(Effect.result),
+        execute(commands.claudeCommand, ["auth", "status", "--json"], cwd).pipe(Effect.result),
+        execute(commands.claudeCommand, ["--help"], cwd).pipe(Effect.result),
       ],
       { concurrency: "unbounded" },
     )
@@ -275,7 +275,7 @@ const runnerStrategies = Effect.gen(function* () {
         )
 
       const result = yield* execute(
-        config.piCommand,
+        commands.piCommand,
         [
           "-p",
           "--mode",
@@ -340,7 +340,7 @@ const runnerStrategies = Effect.gen(function* () {
     const { model } = identity
 
     const listed = yield* execute(
-      config.piCommand,
+      commands.piCommand,
       ["--offline", "--list-models", selection.modelId],
       cwd,
     ).pipe(Effect.mapError(startFailure("pi")))
