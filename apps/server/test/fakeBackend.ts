@@ -1,5 +1,6 @@
 import { NodeSocket } from "@effect/platform-node"
 import { ConfigProvider, Effect, Layer, Redacted } from "effect"
+import { FetchHttpClient } from "effect/http"
 import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -93,5 +94,5 @@ const main = Effect.gen(function* () {
 main.pipe(
   Effect.provide(NodeSocket.layerWebSocketConstructor),
   Effect.scoped,
-  runMain(wideEventsToStdout("backend")),
+  runMain(wideEventsToStdout("backend").pipe(Layer.provide(FetchHttpClient.layer))),
 )

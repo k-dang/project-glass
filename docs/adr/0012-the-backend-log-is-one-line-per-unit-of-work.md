@@ -9,8 +9,8 @@ Tour, a Turn) writes one wide event when it ends with everything known about it:
 error, the IDs it touched, and the runner and model. Log lines carry their unit's trace ID, so `jq`
 can answer "failed Turns on pi this week, by error" from the one file a user attaches to a bug
 report. The events are Effect spans written by a small tracer, so existing `Effect.fn` spans write
-nothing. The agent host writes logs but no units: its calls are already part of the backend's, and
-a unit per journal acknowledgement would bury them.
+nothing to the file. The agent host writes logs but no units: its calls are already part of the
+backend's, and a unit per journal acknowledgement would bury them.
 
 Because users attach this file to bug reports, fields hold IDs, counts, choices and durations, never
 message text, prompts, diffs or transcripts, and errors keep only their tag and message, since a
@@ -20,8 +20,10 @@ tagged error's other fields can hold what the user typed.
 
 - **Structured logging without units**: JSON lines with IDs annotated, but still one line per log
   call, so a single failure is still spread across lines that have to be joined.
-- **Export spans over OpenTelemetry**: needs a collector the user doesn't run. The question being
-  answered is about one person's machine, and one file is enough.
+- **Export spans over OpenTelemetry instead**: needs a collector the user doesn't run. The question
+  being answered is about one person's machine, and one file is enough. Developers profiling the
+  backend do run one, so when the standard `OTEL_*` variables ask for it every span and log line
+  also goes there over OTLP, alongside the file.
 - **Sample the events**: a desktop app writes few enough to keep them all.
 
 ## Consequences
