@@ -1,6 +1,7 @@
 import {
   AppWindow,
   ArrowUpRight,
+  Bot,
   Copy,
   GitPullRequestArrow,
   Keyboard,
@@ -53,6 +54,12 @@ const groups: ReadonlyArray<ShortcutGroup> = [
     icon: GitPullRequestArrow,
     note: "On the Reviews list.",
     shortcuts: [{ label: "Open a PR", keys: ["Mod", "L"] }],
+  },
+  {
+    title: "Agents",
+    icon: Bot,
+    note: "In an open Agent.",
+    shortcuts: [{ label: "Switch between Chat and Changes", keys: ["Mod", "D"] }],
   },
   {
     title: "Workspace",

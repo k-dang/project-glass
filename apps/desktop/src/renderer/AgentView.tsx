@@ -55,6 +55,7 @@ import {
 } from "react"
 import { Streamdown } from "streamdown"
 import { Button } from "@/components/ui/button"
+import { Kbd } from "@/components/ui/kbd"
 import { Bubble, BubbleContent } from "@/components/ui/bubble"
 import { CodeBlock, CodeBlockContent } from "@/components/ui/code-block"
 import { Message, MessageContent, MessageGroup } from "@/components/ui/message"
@@ -110,7 +111,9 @@ import { ProblemAlert } from "./ProblemAlert"
 import { type Problem, problemText, settledProblem, streamProblem } from "./problems"
 import { referenceText } from "./queue"
 import { rememberPlace } from "./savedPlace"
+import { shortcutLabel } from "./shortcutLabel"
 import { shortSha } from "./shortSha"
+import { useShortcuts } from "./useShortcuts"
 
 const TURNS_PER_PAGE = 20
 
@@ -176,6 +179,15 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
 
   const registry = useContext(RegistryContext)
 
+  useShortcuts([
+    {
+      key: "d",
+      mod: true,
+      allowInEditable: true,
+      run: () => onTabChange(tab === "chat" ? "changes" : "chat"),
+    },
+  ])
+
   const reach = agent.sandbox?.reach
   const gone = isGone(reach) ? reach : null
 
@@ -213,11 +225,13 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
             <AgentHeaderAction onSelect={() => onTabChange("changes")}>
               <FileDiff aria-hidden />
               Changes
+              <Kbd className="ml-auto">{shortcutLabel("D")}</Kbd>
             </AgentHeaderAction>
           ) : (
             <AgentHeaderAction onSelect={() => onTabChange("chat")}>
               <MessageCircle aria-hidden />
               Back to Chat
+              <Kbd className="ml-auto">{shortcutLabel("D")}</Kbd>
             </AgentHeaderAction>
           )}
         </AgentHeader>
