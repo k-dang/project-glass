@@ -100,7 +100,7 @@ const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
     Effect.map((current) => waiting(current)!),
   )
 
-  const open = (conversation: string, role: Role | Work = WorkRole.make({ skills: [] })) =>
+  const open = (conversation: string, role: Role | Work = WorkRole.make({})) =>
     adapter.start({ folder, conversation, role, skills: [], report }).pipe(
       Effect.map((session: AgentSession) => ({
         session,
@@ -149,13 +149,18 @@ export const writeGreetPack = (folder: string) =>
 
 const greetPack: SkillSource = {
   name: "team",
-  files: [
+  skills: [
     {
-      path: "greet/SKILL.md",
-      executable: false,
-      contents: new TextEncoder().encode(
-        "---\nname: greet\ndescription: Greets the team by name.\n---\n\nSay hello to the team.\n",
-      ),
+      name: "greet",
+      files: [
+        {
+          path: "SKILL.md",
+          executable: false,
+          contents: new TextEncoder().encode(
+            "---\nname: greet\ndescription: Greets the team by name.\n---\n\nSay hello to the team.\n",
+          ),
+        },
+      ],
     },
   ],
 }

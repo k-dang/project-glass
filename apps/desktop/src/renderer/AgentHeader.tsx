@@ -1,7 +1,7 @@
 import { type AgentPlace, type AgentSkillPack, shortSha } from "@glass/contracts"
 import { cn } from "cn"
 import { FolderGit2, GitBranch, Package, PanelTop } from "lucide-react"
-import { Fragment, type ReactNode } from "react"
+import type { ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { AgentsPanelToggle, NewAgentLink } from "./Agents"
@@ -56,12 +56,9 @@ export function AgentHeader(props: {
               <div className={fact}>
                 <Package aria-hidden />
                 <span className="truncate">
-                  {props.skillPacks.map(({ name, commit }, index) => (
-                    <Fragment key={name}>
-                      {index > 0 && " · "}
-                      <span>{`${name} @ ${shortSha(commit)}`}</span>
-                    </Fragment>
-                  ))}
+                  {props.skillPacks
+                    .map(({ name, commit }) => `${name} @ ${shortSha(commit)}`)
+                    .join(" · ")}
                 </span>
               </div>
             )}

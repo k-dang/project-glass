@@ -2,6 +2,7 @@ import { Effect, FileSystem, type Scope } from "effect"
 import { randomUUID } from "node:crypto"
 import { dirname, isAbsolute, join, relative } from "node:path"
 import { HostAgentError, type SkillSource } from "./protocol"
+import { scopedFolder } from "./scopedFolder"
 
 export interface WrittenSkills {
   readonly plugin: string
@@ -12,22 +13,14 @@ const couldNotWrite = new HostAgentError({
   message: "Glass couldn't write the Agent's skills. Try again.",
 })
 
-const isInside = (folder: string, target: string) => {
-  const path = relative(folder, target)
+const inside = (folder: string, path: string) => {
+  const target = join(folder, path)
+  const relation = relative(folder, target)
 
-  return path !== "" && !path.startsWith("..") && !isAbsolute(path)
+  return relation === "" || relation.startsWith("..") || isAbsolute(relation)
+    ? Effect.fail(couldNotWrite)
+    : Effect.succeed(target)
 }
-
-export const scopedFolder = (folder: string) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem
-
-    yield* Effect.acquireRelease(fs.makeDirectory(folder, { recursive: true }), () =>
-      fs.remove(folder, { recursive: true, force: true }).pipe(Effect.ignore),
-    )
-
-    return folder
-  })
 
 export const writeSentSkills = (
   folder: string,
@@ -43,12 +36,9 @@ export const writeSentSkills = (
     const fs = yield* FileSystem.FileSystem
     const directory = yield* scopedFolder(`${folder}.skills-${randomUUID()}`)
 
-    return yield* Effect.forEach(sources, ({ name, files }) =>
+    return yield* Effect.forEach(sources, ({ name, skills }) =>
       Effect.gen(function* () {
-        const plugin = join(directory, name)
-        const skillsFolder = join(plugin, "skills")
-
-        if (!isInside(directory, plugin)) return yield* couldNotWrite
+        const plugin = yield* inside(directory, name)
 
         yield* fs.makeDirectory(join(plugin, ".claude-plugin"), { recursive: true })
         yield* fs.writeFileString(
@@ -56,22 +46,24 @@ export const writeSentSkills = (
           JSON.stringify({ name }),
         )
 
-        const skills = new Set<string>()
+        const written = yield* Effect.forEach(skills, (skill) =>
+          Effect.gen(function* () {
+            const skillFolder = yield* inside(join(plugin, "skills"), skill.name)
 
-        for (const { path, executable, contents } of files) {
-          const target = join(skillsFolder, path)
+            for (const { path, executable, contents } of skill.files) {
+              const target = yield* inside(skillFolder, path)
 
-          if (!isInside(skillsFolder, target) || dirname(target) === skillsFolder)
-            return yield* couldNotWrite
+              yield* fs.makeDirectory(dirname(target), { recursive: true })
+              yield* fs.writeFile(target, contents)
 
-          skills.add(join(skillsFolder, path.split("/")[0]!))
-          yield* fs.makeDirectory(dirname(target), { recursive: true })
-          yield* fs.writeFile(target, contents)
+              if (executable) yield* fs.chmod(target, 0o755)
+            }
 
-          if (executable) yield* fs.chmod(target, 0o755)
-        }
+            return skillFolder
+          }),
+        )
 
-        return { plugin, skills: [...skills] }
+        return { plugin, skills: written }
       }),
     )
   }).pipe(

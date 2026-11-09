@@ -16,9 +16,14 @@ it.live("writes each source's skills where the program reads them, and removes t
     const [team] = yield* writeSentSkills(folder, [
       {
         name: "team",
-        files: [
-          { path: "architect/SKILL.md", executable: false, contents: text("---\n---\n") },
-          { path: "architect/bin/run.sh", executable: true, contents: text("echo hi") },
+        skills: [
+          {
+            name: "architect",
+            files: [
+              { path: "SKILL.md", executable: false, contents: text("---\n---\n") },
+              { path: "bin/run.sh", executable: true, contents: text("echo hi") },
+            ],
+          },
         ],
       },
     ]).pipe(Scope.provide(scope), Effect.provide(NodeFileSystem.layer))
@@ -43,7 +48,12 @@ it.live("refuses a file that would land outside its skill's folder", () =>
     const refused = yield* writeSentSkills(folder, [
       {
         name: "team",
-        files: [{ path: "../../escape.sh", executable: false, contents: text("") }],
+        skills: [
+          {
+            name: "architect",
+            files: [{ path: "../../escape.sh", executable: false, contents: text("") }],
+          },
+        ],
       },
     ]).pipe(Effect.scoped, Effect.provide(NodeFileSystem.layer), Effect.flip)
 

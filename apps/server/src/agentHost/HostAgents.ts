@@ -6,7 +6,7 @@ import {
   type RequestAnswer,
   RequestNotWaiting,
 } from "@glass/contracts"
-import { Context, Effect, Exit, FileSystem, Layer, Predicate, Scope, Semaphore } from "effect"
+import { Context, Effect, Exit, FileSystem, Layer, Scope, Semaphore } from "effect"
 import type { AgentAdapter, AgentSession } from "./adapter"
 import type { DeliveredMessage } from "./deliveredMessage"
 import { Journal } from "./Journal"
@@ -88,10 +88,7 @@ export class HostAgents extends Context.Service<
             const report = (event: AgentEvent) => journal.append(agentId, event)
 
             const started = Effect.gen(function* () {
-              const skills = yield* written(
-                folder,
-                Predicate.isTagged(starting.role, "Work") ? starting.role.skills : [],
-              )
+              const skills = yield* written(folder, starting.skills)
 
               return yield* starting.engine === "pi"
                 ? adapters.pi.start({

@@ -59,7 +59,8 @@ import {
   notRunning,
 } from "./protocol"
 import { settleWith } from "./requests"
-import { scopedFolder, type WrittenSkills } from "./sentSkills"
+import { scopedFolder } from "./scopedFolder"
+import type { WrittenSkills } from "./sentSkills"
 import { piLoadsNothing, piReadOnlyTools } from "../readOnlyTools"
 import { piSuggestDraftExtension } from "./suggestDraftTool"
 import { runTurns } from "./turnLoop"

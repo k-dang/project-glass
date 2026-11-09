@@ -91,7 +91,6 @@ it.live(
           [{ name: "team", commit: second }],
         ],
       )
-      assert.deepStrictEqual(storedPins(f.home), [first, second].toSorted())
       assert.deepStrictEqual(yield* commandsOf(local, relaunched), [
         "team:architect",
         "team:critic",

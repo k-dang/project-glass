@@ -178,7 +178,7 @@ export class SkillPacks extends Context.Service<
       names: ReadonlyArray<string>,
     ) => Effect.Effect<ReadonlyArray<AgentSkillPack>, SkillPackNotFound | SkillPackError>
     readonly releaseAgent: (agentId: string) => Effect.Effect<void, SkillPackError>
-    readonly agentPacks: () => Effect.Effect<
+    readonly agentPacks: Effect.Effect<
       ReadonlyMap<string, ReadonlyArray<AgentSkillPack>>,
       SkillPackError
     >
@@ -420,15 +420,17 @@ export class SkillPacks extends Context.Service<
 
         return {
           name,
-          files: [...filesBySkill(files)].flatMap(([directory, owned]) => {
-            const folder = uniqueFolder(taken, directory === "" ? name : lastSegment(directory))
+          skills: [...filesBySkill(files)].map(([directory, owned]) => {
             const inside = directory === "" ? 0 : directory.length + 1
 
-            return owned.map(({ path, executable, contents }) => ({
-              path: `${folder}/${path.slice(inside)}`,
-              executable,
-              contents,
-            }))
+            return {
+              name: uniqueFolder(taken, directory === "" ? name : lastSegment(directory)),
+              files: owned.map(({ path, executable, contents }) => ({
+                path: path.slice(inside),
+                executable,
+                contents,
+              })),
+            }
           }),
         } satisfies SkillSource
       })
@@ -600,24 +602,23 @@ export class SkillPacks extends Context.Service<
             yield* releaseUnusedPins
           }).pipe(Effect.catch(storageFailure)),
 
-        agentPacks: () =>
-          sql`
+        agentPacks: sql`
             SELECT assigned.agent_id, assigned.name, pin.commit_sha
             FROM agent_skill_pack AS assigned JOIN skill_pack_pin AS pin ON pin.id = assigned.pin_id
             ORDER BY assigned.name
           `.pipe(
-            Effect.flatMap(decodeAgentPacks),
-            Effect.map(
-              (rows) =>
-                new Map(
-                  [...Map.groupBy(rows, ({ agent_id }) => agent_id)].map(([agentId, packs]) => [
-                    agentId,
-                    packs.map(({ name, commit_sha }) => ({ name, commit: commit_sha })),
-                  ]),
-                ),
-            ),
-            Effect.catch(storageFailure),
+          Effect.flatMap(decodeAgentPacks),
+          Effect.map(
+            (rows) =>
+              new Map(
+                [...Map.groupBy(rows, ({ agent_id }) => agent_id)].map(([agentId, packs]) => [
+                  agentId,
+                  packs.map(({ name, commit_sha }) => ({ name, commit: commit_sha })),
+                ]),
+              ),
           ),
+          Effect.catch(storageFailure),
+        ),
 
         agentSkills: Effect.fn("SkillPacks.agentSkills")(function* (agentId) {
           return yield* sql`

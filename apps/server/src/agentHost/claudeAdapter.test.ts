@@ -28,7 +28,7 @@ it.live("reports a failed SDK handshake as a host error and closes the query", (
       .start({
         folder: "checkout",
         conversation: "new",
-        role: WorkRole.make({ skills: [] }),
+        role: WorkRole.make({}),
         skills: [],
         report: () => Effect.void,
       })
