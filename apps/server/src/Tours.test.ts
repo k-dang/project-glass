@@ -14,6 +14,7 @@ import { VIEWER } from "../test/fakePullRequest"
 import { watchDeadlines } from "../test/deadlines"
 import { isolatedHome, LAUNCH_TOKEN, startBackend } from "../test/harness"
 import { type ScriptedSettings, scriptedAgentRunners } from "../test/scriptedAgentRunners"
+import { Deadlines } from "./ServerConfig"
 import { type TourAnswer, tourInstructions } from "./tourPrompt"
 import { wideEvents } from "./wideEvents"
 
@@ -65,7 +66,6 @@ const fixture = Effect.fnUntraced(function* (settings: ScriptedSettings = { repl
     GH_TOKEN: VIEWER.token,
     GLASS_GITHUB_API_URL: github.url,
     GLASS_GIT_REMOTE: github.gitUrl,
-    GLASS_TOUR_TIMEOUT_MS: String(deadline),
   }
 
   const serverScope = yield* Scope.make()
@@ -74,6 +74,7 @@ const fixture = Effect.fnUntraced(function* (settings: ScriptedSettings = { repl
   const { client } = yield* startBackend(env, home, runners.layer).pipe(
     Effect.provideService(Scope.Scope, serverScope),
     Effect.provideService(Clock.Clock, watched),
+    Effect.updateService(Deadlines, (deadlines) => ({ ...deadlines, tourMs: deadline })),
   )
 
   const state = (predicate: (state: TourState) => boolean) =>

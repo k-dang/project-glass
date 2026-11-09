@@ -37,8 +37,6 @@ const fixture = Effect.fnUntraced(function* () {
       GH_TOKEN: VIEWER.token,
       GLASS_GITHUB_API_URL: github.url,
       GLASS_GIT_REMOTE: github.gitUrl,
-      GLASS_AGENT_REVIEW_TIMEOUT_MS: "60000",
-      GLASS_TOUR_TIMEOUT_MS: "60000",
     },
     home,
     runners.layer,

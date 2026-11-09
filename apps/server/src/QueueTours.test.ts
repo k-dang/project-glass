@@ -7,6 +7,7 @@ import { type FakePullRequest, type FakePullRequestState, VIEWER } from "../test
 import { watchDeadlines } from "../test/deadlines"
 import { isolatedHome, startBackend } from "../test/harness"
 import { scriptedAgentRunners } from "../test/scriptedAgentRunners"
+import { Deadlines } from "./ServerConfig"
 
 const answer = {
   intent: "Greet people by name.",
@@ -63,7 +64,6 @@ const fixture = Effect.fnUntraced(function* ({ queueTours = true } = {}) {
     GH_TOKEN: VIEWER.token,
     GLASS_GITHUB_API_URL: github.url,
     GLASS_GIT_REMOTE: github.gitUrl,
-    GLASS_TOUR_TIMEOUT_MS: String(deadline),
   }
 
   let serverScope = yield* Scope.make()
@@ -72,6 +72,7 @@ const fixture = Effect.fnUntraced(function* ({ queueTours = true } = {}) {
   const { client } = yield* startBackend(env, home, runners.layer).pipe(
     Effect.provideService(Scope.Scope, serverScope),
     Effect.provideService(Clock.Clock, watched),
+    Effect.updateService(Deadlines, (deadlines) => ({ ...deadlines, tourMs: deadline })),
   )
 
   if (queueTours) yield* client.SetQueueWork({ feature: "tours", enabled: true })

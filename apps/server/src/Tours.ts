@@ -12,7 +12,7 @@ import { SqlClient } from "effect/sql"
 import { type CheckoutRunFailure, CheckoutRuns } from "./CheckoutRuns"
 import { GitHubClient } from "./github/GitHubClient"
 import { pullRequestJobs, type PullRequestJob } from "./pullRequestJobs"
-import { ServerConfig } from "./ServerConfig"
+import { Deadlines } from "./ServerConfig"
 import { TourAnswer, tourInstructions, tourPrompt } from "./tourPrompt"
 import { repairChapterVisuals, validateTourBeforeAfter } from "./tourVisuals"
 
@@ -92,7 +92,7 @@ export class Tours extends Context.Service<
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
       const github = yield* GitHubClient
-      const config = yield* ServerConfig
+      const deadlines = yield* Deadlines
       const checkoutRuns = yield* CheckoutRuns
 
       const load = Effect.fnUntraced(function* (pr: PullRequestRef) {
@@ -147,7 +147,7 @@ export class Tours extends Context.Service<
               pr,
               revision,
               subject: "Tour",
-              timeout: config.tourTimeoutMs,
+              timeout: deadlines.tourMs,
               read: github.tourInput,
               task: (material) =>
                 Effect.succeed({

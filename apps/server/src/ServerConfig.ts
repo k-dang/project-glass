@@ -1,7 +1,21 @@
-import { Config, Context, Effect, Layer, type Redacted, Schema } from "effect"
+import { Config, Context, Effect, Layer, type Redacted } from "effect"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { bundledEntry } from "./processes"
+
+export const Deadlines = Context.Reference<{
+  readonly tourMs: number
+  readonly agentReviewMs: number
+  readonly askMs: number
+  readonly checkoutMs: number
+}>("@glass/server/Deadlines", {
+  defaultValue: () => ({
+    tourMs: 900_000,
+    agentReviewMs: 900_000,
+    askMs: 300_000,
+    checkoutMs: 300_000,
+  }),
+})
 
 export class ServerConfig extends Context.Service<
   ServerConfig,
@@ -13,11 +27,7 @@ export class ServerConfig extends Context.Service<
     readonly claudeCommand: string
     readonly piCommand: string
     readonly agentHostBundle: string
-    readonly tourTimeoutMs: number
-    readonly agentReviewTimeoutMs: number
-    readonly askTimeoutMs: number
     readonly gitRemote: string
-    readonly checkoutTimeoutMs: number
     readonly dataDirectory: string
   }
 >()("@glass/server/ServerConfig") {
@@ -33,29 +43,9 @@ export class ServerConfig extends Context.Service<
 
       const piCommand = yield* Config.String("GLASS_PI_COMMAND").pipe(Config.withDefault("pi"))
 
-      const tourTimeoutMs = yield* Config.schema(
-        Schema.Int.check(Schema.isGreaterThan(0)),
-        "GLASS_TOUR_TIMEOUT_MS",
-      ).pipe(Config.withDefault(900_000))
-
-      const agentReviewTimeoutMs = yield* Config.schema(
-        Schema.Int.check(Schema.isGreaterThan(0)),
-        "GLASS_AGENT_REVIEW_TIMEOUT_MS",
-      ).pipe(Config.withDefault(900_000))
-
-      const askTimeoutMs = yield* Config.schema(
-        Schema.Int.check(Schema.isGreaterThan(0)),
-        "GLASS_ASK_TIMEOUT_MS",
-      ).pipe(Config.withDefault(300_000))
-
       const gitRemote = yield* Config.String("GLASS_GIT_REMOTE").pipe(
         Config.withDefault("https://github.com"),
       )
-
-      const checkoutTimeoutMs = yield* Config.schema(
-        Schema.Int.check(Schema.isGreaterThan(0)),
-        "GLASS_CHECKOUT_TIMEOUT_MS",
-      ).pipe(Config.withDefault(300_000))
 
       const allowedOrigins = yield* Config.String("GLASS_ALLOWED_ORIGINS").pipe(
         Config.withDefault(""),
@@ -84,11 +74,7 @@ export class ServerConfig extends Context.Service<
         claudeCommand,
         piCommand,
         agentHostBundle,
-        tourTimeoutMs,
-        agentReviewTimeoutMs,
-        askTimeoutMs,
         gitRemote,
-        checkoutTimeoutMs,
         dataDirectory: join(home || homedir(), ".project-glass"),
       })
     }),
