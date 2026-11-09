@@ -3,8 +3,8 @@
 **What to build:** In Agent Changes, the user selects code or a gutter range, writes feedback at
 that location, and keeps the resulting Feedback note beside the code. Notes can be edited or
 removed, survive navigation and restart, and preserve exactly what the user read while the Agent
-continues working. Follow the agreed Feedback on Agent Changes design and approved inline
-annotation prototype.
+continues working. Follow the agreed [Feedback on Agent Changes design](../agent-changes-feedback.md)
+and approved [inline annotation prototype](../agent-feedback.html).
 
 **Blocked by:** None (can start immediately).
 

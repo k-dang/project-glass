@@ -246,12 +246,6 @@ _Avoid_: Run, execution, exchange
 
 **Queued message**:
 A message sent while a Turn runs, waiting to start the next Turn; the user can cancel it before then.
-Canceling a Queued message containing Feedback notes returns those notes to unsent feedback.
-
-**Feedback note**:
-An instruction the user leaves on a line or range on either side of an Agent's changes, tied to the
-code they read. The user collects Feedback notes and sends them together to that Agent in one message.
-_Avoid_: Draft, review comment
 
 **Mention**:
 A To-do or file the user points at from a message to an Agent, by typing `@` and picking it. The
@@ -272,9 +266,8 @@ A message sent into the running Turn, for the Agent to take in before it finishe
 _Avoid_: Interrupt, inject
 
 **Unsent message**:
-What the user has written to an Agent or the Global conversation and not sent yet, kept for each
-on this device until they send or clear it. It includes any images and, for an Agent, collected
-Feedback notes.
+What the user has written to an Agent or the Global conversation and not sent yet, with any images,
+kept for each on this device until they send or clear it.
 _Avoid_: Draft (a Draft is a GitHub comment)
 
 **Permission mode**:

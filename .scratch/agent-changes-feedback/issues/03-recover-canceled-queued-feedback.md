@@ -4,6 +4,8 @@
 unsent feedback so the user can edit or resend them. Cancellation preserves newer work and tells
 the user when the message has already started instead of pretending it was withdrawn.
 
+**Design:** [Feedback on Agent Changes](../agent-changes-feedback.md).
+
 **Blocked by:** 02: Stage and send feedback to the same Agent.
 
 **Status:** ready-for-agent

@@ -1,9 +1,11 @@
 # Feedback on Agent Changes
 
 Design and inline interaction approved. Implementation is split into three local tickets:
-collect durable inline Feedback notes, stage/send them, and recover canceled queued feedback.
+collect [durable inline Feedback notes](issues/01-collect-durable-inline-feedback-notes.md),
+[stage/send them](issues/02-stage-and-send-feedback-to-the-same-agent.md), and
+[recover canceled queued feedback](issues/03-recover-canceled-queued-feedback.md).
 
-Review the UI behavior first in the [standalone interactive prototype](../prototypes/agent-feedback.html).
+Review the UI behavior first in the [standalone interactive prototype](agent-feedback.html).
 It simulates code, message acceptance, queueing, failure, and Sandbox expiry locally.
 
 The UI follows an inline annotation flow: selecting code or using the gutter opens the editor at
@@ -11,6 +13,20 @@ that range, saving places the Feedback note directly under its code, and editing
 Keep the Files sidebar in place after saving; the Feedback tab is an optional overview. Collected
 notes still move together into the Agent's composer for sending. This adapts the selection and
 inline-comment interaction from [Plannotator](https://github.com/backnotprop/plannotator/tree/main).
+
+## Proposed terminology
+
+**Feedback note**: An instruction the user leaves on a line or range on either side of an Agent's
+changes, tied to the code they read. The user collects Feedback notes and sends them together to
+that Agent in one message. Avoid Draft and review comment.
+
+**Unsent message**: What the user has written to an Agent or the Global conversation and not sent
+yet, kept for each on this device until they send or clear it. It includes any images and, for an
+Agent, collected Feedback notes.
+
+**Queued message**: A message sent while a Turn runs, waiting to start the next Turn; the user can
+cancel it before then. Canceling a Queued message containing Feedback notes returns those notes
+to unsent feedback.
 
 ## Agreed workflow
 

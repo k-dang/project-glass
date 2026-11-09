@@ -5,6 +5,8 @@ Agent composer, adds an overall instruction if useful, and sends one message to 
 An idle Agent starts a Turn; a busy Agent receives a Queued message for its next Turn. The
 conversation keeps the sent feedback and the Agent's response.
 
+**Design:** [Feedback on Agent Changes](../agent-changes-feedback.md).
+
 **Blocked by:** 01: Collect durable inline Feedback notes.
 
 **Status:** ready-for-agent
