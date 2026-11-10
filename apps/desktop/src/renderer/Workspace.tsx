@@ -21,7 +21,6 @@ import {
   PanelLeft,
   RotateCw,
   Route,
-  ScanSearch,
 } from "lucide-react"
 import {
   type ReactNode,
@@ -42,7 +41,7 @@ import { FilePanelTabsList, FilePanelTabTrigger } from "./FilePanelTabs"
 import type { ActivityRecorder } from "./activity"
 import { AgentReviewBanner, AgentReviewButton } from "./AgentReview"
 import { AgentReviewCard } from "./AgentReviewCard"
-import { AgentReviewPanel } from "./AgentReviewPanel"
+import { AgentReviewPanel, AgentReviewSidePanel } from "./AgentReviewPanel"
 import { BackToPullRequests } from "./BackToPullRequests"
 import { annotationSides, type CollapseChoices, layOut, type ShowNote } from "./changesView"
 import { ChangedFilesTree } from "./ChangedFilesTree"
@@ -85,7 +84,7 @@ import { OutdatedTourFlag, TourCard, TourSidebar, useTourReadyToast } from "./To
 
 const wideWorkspaceQuery = "(min-width: 1024px)"
 
-type FilePanelTab = "tree" | "notes" | "tour" | "agent-review"
+type FilePanelTab = "tree" | "notes" | "tour"
 
 export function Workspace(props: {
   workspace: PullRequestWorkspace
@@ -129,6 +128,7 @@ export function Workspace(props: {
   const view = useRef<ViewHandle>(null)
   const tourView = useRef<TourViewHandle>(null)
   const [panelTab, setPanelTab] = useState<FilePanelTab>("tree")
+  const [reviewOpen, setReviewOpen] = useState(false)
   const fullFiles = useFullFiles(pullRequest.ref, revision)
   const { activity, drafts, asks, replies, resolutions, reactions } = props
   const draftCount = useDraftCount(drafts)
@@ -322,16 +322,12 @@ export function Workspace(props: {
 
   const readAgentReview = () => {
     flushSync(() => {
-      setPanelTab("agent-review")
-      setFilePanelOpen(true)
+      setReviewOpen(true)
       setView((previous) => ({ ...previous, tab: "changes", order: "path" }))
     })
 
     returnToCurrent(false)
   }
-
-  const shownPanelTab =
-    panelTab === "agent-review" && agentReview.review === null ? "tree" : panelTab
 
   const additions = files.reduce((sum, file) => sum + file.additions, 0)
   const deletions = files.reduce((sum, file) => sum + file.deletions, 0)
@@ -398,16 +394,11 @@ export function Workspace(props: {
         <aside
           id={filePanelId}
           className={cn(
-            "flex shrink-0 flex-col border-r",
-            shownPanelTab === "agent-review"
-              ? "w-[30rem]"
-              : agentReview.review !== null
-                ? "w-[26rem]"
-                : "w-80",
+            "flex w-80 shrink-0 flex-col border-r",
             (!filePanelOpen || tab === "files" || tourInChanges) && "hidden",
           )}
         >
-          <Tabs value={shownPanelTab} onValueChange={setPanelTab} className="min-h-0 flex-1 gap-0">
+          <Tabs value={panelTab} onValueChange={setPanelTab} className="min-h-0 flex-1 gap-0">
             <FilePanelTabsList>
               <FilePanelTabTrigger value="tree" icon={FolderTree}>
                 Tree
@@ -421,11 +412,6 @@ export function Workspace(props: {
               <FilePanelTabTrigger value="tour" icon={Route}>
                 Tour
               </FilePanelTabTrigger>
-              {agentReview.review !== null && (
-                <FilePanelTabTrigger value="agent-review" icon={ScanSearch}>
-                  Agent review
-                </FilePanelTabTrigger>
-              )}
             </FilePanelTabsList>
             <TabsContent value="tree" keepMounted className="flex min-h-0 flex-col">
               {files.length === 0 ? (
@@ -446,9 +432,6 @@ export function Workspace(props: {
                 drafts={drafts}
                 show={show}
               />
-            </TabsContent>
-            <TabsContent value="agent-review" className="flex min-h-0 flex-col">
-              <AgentReviewPanel controls={agentReview} drafts={drafts} show={show} />
             </TabsContent>
             <TabsContent value="tour" className="flex min-h-0 flex-col">
               <TourSidebar
@@ -584,6 +567,16 @@ export function Workspace(props: {
             )
           )}
         </TabsContent>
+        {tab === "changes" && reviewOpen && agentReview.review !== null && (
+          <AgentReviewSidePanel onClose={() => setReviewOpen(false)}>
+            <AgentReviewPanel
+              review={agentReview.review}
+              controls={agentReview}
+              drafts={drafts}
+              show={show}
+            />
+          </AgentReviewSidePanel>
+        )}
         <TabsContent value="files" keepMounted className="flex min-w-0">
           {browsed && (
             <RepositoryBrowser

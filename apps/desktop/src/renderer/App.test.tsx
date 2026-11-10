@@ -455,7 +455,7 @@ it("lists to-do Activity", async () => {
   )
 })
 
-it("opens the Global conversation beside the current area, labelling each message with where it was sent from", async () => {
+it("opens the Global conversation over the current area, labelling each message with where it was sent from", async () => {
   const sentAt = DateTime.makeUnsafe("2026-11-05T12:00:00Z")
 
   const user = mount({
@@ -487,18 +487,22 @@ it("opens the Global conversation beside the current area, labelling each messag
   await user.click(await screen.findByRole("link", { name: "To-dos" }))
   await user.keyboard("{Meta>}j{/Meta}")
 
-  const conversation = await screen.findByRole("complementary", { name: "Global conversation" })
+  const conversation = await screen.findByRole("dialog", { name: "Global conversation" })
   await within(conversation).findByText("Nearly.")
   expect(within(conversation).getByText("From octo-org/glass#42 at head001")).toBeTruthy()
-  expect(screen.getByRole("link", { name: "To-dos" }).getAttribute("aria-current")).toBe("page")
+  expect(
+    screen.getByRole("link", { name: "To-dos", hidden: true }).getAttribute("aria-current"),
+  ).toBe("page")
 
   await user.click(
     within(conversation).getByRole("button", { name: "Close the Global conversation" }),
   )
-  expect(screen.queryByRole("complementary", { name: "Global conversation" })).toBeNull()
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog", { name: "Global conversation" })).toBeNull(),
+  )
 
   await user.click(screen.getByRole("button", { name: "Global conversation" }))
-  await within(
-    await screen.findByRole("complementary", { name: "Global conversation" }),
-  ).findByText("Nearly.")
+  await within(await screen.findByRole("dialog", { name: "Global conversation" })).findByText(
+    "Nearly.",
+  )
 })

@@ -17,7 +17,7 @@ import { TooltipHint } from "@/components/ui/tooltip"
 import { backendReachableAtom } from "./backend"
 import { ConfirmationDialog } from "./ConfirmationDialog"
 import { globalConversationOpenAtom } from "./globalConversation"
-import { GlobalConversationPanel } from "./GlobalConversationPanel"
+import { GlobalConversationDialog } from "./GlobalConversationDialog"
 import { confirmLeave, discardPromptAtom, leavesPullRequest, reviewsLinkAtom } from "./reviewsArea"
 import { ConnectionAvatar } from "./Settings"
 import { ResourceUsage } from "./ResourceUsage"
@@ -78,7 +78,13 @@ export function AppShell() {
       allowInEditable: true,
       run: () => void navigate(link),
     })),
-    { key: "j", mod: true, allowInEditable: true, run: () => setConversing((open) => !open) },
+    {
+      key: "j",
+      mod: true,
+      allowInEditable: true,
+      allowInDialog: true,
+      run: () => setConversing((open) => !open),
+    },
   ])
 
   useBlocker({
@@ -131,17 +137,15 @@ export function AppShell() {
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="title-strip shrink-0 border-b" aria-hidden />
         <Reconnecting />
-        <div className="flex min-h-0 flex-1">
-          <div className="flex min-w-0 flex-1 flex-col">
-            <Outlet />
-          </div>
-          {conversing && <GlobalConversationPanel />}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <Outlet />
         </div>
         <footer className="flex h-7 shrink-0 items-center justify-end gap-1 border-t bg-muted/20 px-3">
           <ShortcutsDialog />
           <ResourceUsage />
         </footer>
       </div>
+      <GlobalConversationDialog />
       <DiscardDialog />
     </div>
   )

@@ -20,9 +20,9 @@ afterEach(resetTourWorkspace)
 
 const files = [changedFile("greet.ts")]
 
-const agentReviewTab = () => screen.getByRole("tab", { name: "Agent review" })
+const sidePanel = () => screen.queryByRole("complementary", { name: "Agent review" })
 
-it("reads the whole Agent review in the file panel beside the diff", async () => {
+it("reads the whole Agent review in a panel right of the diff, until it is closed", async () => {
   const f = mountTourWorkspace({
     files,
     agentReview: { review: reviewOf(revision), job: { status: "idle" } },
@@ -32,12 +32,14 @@ it("reads the whole Agent review in the file panel beside the diff", async () =>
   await f.user.click(within(card).getByRole("button", { name: "Read beside the diff" }))
 
   expect(screen.getByRole("tab", { name: "Changes" }).getAttribute("aria-selected")).toBe("true")
-  expect(agentReviewTab().getAttribute("aria-selected")).toBe("true")
-  const panel = await screen.findByRole("region", { name: "Agent review" })
+  const panel = await screen.findByRole("complementary", { name: "Agent review" })
   expect(within(panel).getByText("Callers expect the old letter")).toBeDefined()
+
+  await f.user.click(within(panel).getByRole("button", { name: "Close the Agent review" }))
+  expect(sidePanel()).toBeNull()
 })
 
-it("leaves the Tour order, which hides the file panel, to read the Agent review", async () => {
+it("leaves the Tour order to read the Agent review", async () => {
   const f = mountTourWorkspace({
     files,
     initial: {
@@ -59,7 +61,7 @@ it("leaves the Tour order, which hides the file panel, to read the Agent review"
 
   await f.user.click(within(changes()).getByRole("button", { name: "Read Agent review" }))
   expect(tourOrder.getAttribute("aria-pressed")).toBe("false")
-  expect(agentReviewTab().getAttribute("aria-selected")).toBe("true")
+  expect(sidePanel()).not.toBeNull()
 })
 
 it("marks an outdated Agent review on Changes and still reads it", async () => {
@@ -79,7 +81,7 @@ it("marks an outdated Agent review on Changes and still reads it", async () => {
 
   expect(banner.textContent).toContain("Outdated: written for an older Revision (head 0123456)")
   await f.user.click(within(banner).getByRole("button", { name: "Read beside the diff" }))
-  expect(agentReviewTab().getAttribute("aria-selected")).toBe("true")
+  expect(sidePanel()).not.toBeNull()
 })
 
 const followedUp = (reviewRevision: Revision) => ({
