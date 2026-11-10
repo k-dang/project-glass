@@ -3,6 +3,7 @@ import {
   ArrowUpRight,
   Bot,
   Copy,
+  FileDiff,
   GitPullRequestArrow,
   Keyboard,
   type LucideIcon,
@@ -85,14 +86,21 @@ const groups: ReadonlyArray<ShortcutGroup> = [
     ],
   },
   {
+    title: "Changes",
+    icon: FileDiff,
+    note: "In Changes, in Path or Tour order.",
+    shortcuts: [
+      { label: "Toggle full screen", keys: ["F"] },
+      { label: "Exit full screen", keys: ["Escape"] },
+    ],
+  },
+  {
     title: "Tour",
     icon: Route,
     note: "In Changes, when it shows Tour order.",
     shortcuts: [
       { label: "Next Chapter", keys: ["]"] },
       { label: "Previous Chapter", keys: ["["] },
-      { label: "Toggle full screen", keys: ["F"] },
-      { label: "Exit full screen", keys: ["Escape"] },
     ],
   },
 ]

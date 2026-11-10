@@ -156,14 +156,15 @@ export function Workspace(props: {
   const tourShown = chosenOrder === "tour" ? reading : null
   const shown = tourShown?.files ?? layout.files
 
-  const tourInChanges = tab === "changes" && tourShown !== null
+  const inChanges = tab === "changes"
+  const tourInChanges = inChanges && tourShown !== null
 
   const [fullScreenChosen, setFullScreen] = useState(false)
-  const fullScreen = fullScreenChosen && tourInChanges
+  const fullScreen = fullScreenChosen && inChanges
 
   const current = shown.find((entry) => entry.file.path === currentPath)?.file ?? shown[0]?.file
 
-  const viewingPath = tab === "changes" ? (current?.path ?? null) : null
+  const viewingPath = inChanges ? (current?.path ?? null) : null
 
   useEffect(
     () => (viewingPath === null ? undefined : activity.view(viewingPath)),
@@ -239,11 +240,11 @@ export function Workspace(props: {
     if (reading?.beforeAfter != null) tourView.current?.showOverview()
   }
 
-  useShortcuts(
-    tourInChanges
+  useShortcuts([
+    ...(inChanges ? [{ key: "f", run: () => setFullScreen(!fullScreen) }] : []),
+    ...(fullScreen ? [{ key: "Escape", run: () => setFullScreen(false) }] : []),
+    ...(tourInChanges
       ? [
-          { key: "f", run: () => setFullScreen(!fullScreen) },
-          ...(fullScreen ? [{ key: "Escape", run: () => setFullScreen(false) }] : []),
           {
             key: "]",
             run: () => openChapter((tourView.current?.currentChapter() ?? 0) + 1, "instant"),
@@ -258,8 +259,8 @@ export function Workspace(props: {
             },
           },
         ]
-      : [],
-  )
+      : []),
+  ])
 
   useTourReadyToast(tour.latest, reading, startReading)
 
@@ -510,7 +511,7 @@ export function Workspace(props: {
             all={all}
             onAllChange={showAll}
             tourOrder={reading === null ? null : { current: chosenOrder, onChange: showOrder }}
-            fullScreen={tourInChanges ? { on: fullScreen, onChange: setFullScreen } : null}
+            fullScreen={{ on: fullScreen, onChange: setFullScreen }}
             agentReview={<AgentReviewButton controls={agentReview} onRead={readAgentReview} />}
             outdatedTour={
               tourInChanges &&
@@ -567,7 +568,7 @@ export function Workspace(props: {
             )
           )}
         </TabsContent>
-        {tab === "changes" && reviewOpen && agentReview.review !== null && (
+        {inChanges && reviewOpen && agentReview.review !== null && (
           <AgentReviewSidePanel onClose={() => setReviewOpen(false)}>
             <AgentReviewPanel
               review={agentReview.review}
