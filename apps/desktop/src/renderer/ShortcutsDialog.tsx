@@ -71,6 +71,7 @@ const groups: ReadonlyArray<ShortcutGroup> = [
       { label: "Back to PRs", keys: ["Escape"] },
       { label: "Open another PR", keys: ["Mod", "L"] },
       { label: "Open Copy menu", keys: ["C"] },
+      { label: "Open or close the Agent review", keys: ["Mod", "D"] },
       { label: "Remove from Queue & advance", keys: ["Mod", "]"] },
       { label: "Next queued PR", keys: ["Mod", "Shift", "]"] },
     ],
