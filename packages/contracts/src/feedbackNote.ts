@@ -13,3 +13,8 @@ export class FeedbackNote extends Schema.Class<FeedbackNote>("FeedbackNote")({
   changesId: Schema.String,
   text: Schema.Trimmed.check(Schema.isNonEmpty()),
 }) {}
+
+export class UnsentFeedback extends Schema.Class<UnsentFeedback>("UnsentFeedback")({
+  notes: Schema.Array(FeedbackNote),
+  staged: Schema.Array(Schema.String),
+}) {}

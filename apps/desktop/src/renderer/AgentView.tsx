@@ -10,7 +10,9 @@ import {
   emptyTranscript,
   asksPermission,
   type CapturedContext,
+  type FeedbackNote,
   type Image,
+  isNothingUnsent,
   isWaiting,
   nothingUnsent,
   type QueuedMessage,
@@ -105,6 +107,7 @@ import {
 } from "./conversation"
 import { MessageText, readableText } from "./Mentions"
 import { Attachment, type ComposerSuggestion, MessageBox } from "./MessageBox"
+import { SentFeedback } from "./FeedbackNotes"
 import { ModelPicker } from "./ModelPicker"
 import { PermissionModePicker } from "./PermissionModePicker"
 import { RequestCard, requestElementId } from "./RequestCard"
@@ -113,6 +116,8 @@ import { type Problem, problemText, settledProblem, streamProblem } from "./prob
 import { referenceText } from "./queue"
 import { rememberPlace } from "./savedPlace"
 import { shortcutLabel } from "./shortcutLabel"
+import { useStagedFeedback } from "./useStagedFeedback"
+import { type FeedbackNotesStore, useFeedbackNotes } from "./useFeedbackNotes"
 import { useShortcuts } from "./useShortcuts"
 
 const TURNS_PER_PAGE = 20
@@ -136,7 +141,7 @@ const lastSent = (
   const steers = turn?.parts.flatMap((part) => (Predicate.isTagged(part, "Steer") ? [part] : []))
   const last = queued.at(-1) ?? steers?.at(-1) ?? turn
 
-  return last === undefined ? null : sentOf(last)
+  return last === undefined || isNothingUnsent(last) ? null : sentOf(last)
 }
 
 export function AgentView(props: { agentId: string } & AgentTabs) {
@@ -261,7 +266,13 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
           hidden={tab !== "changes"}
           className="flex min-h-0 min-w-0 flex-1 flex-col"
         >
-          {changesOpened && <AgentChanges agent={agent} turns={turns} />}
+          {changesOpened && (
+            <AgentChanges
+              agent={agent}
+              turns={turns}
+              onReviewFeedback={() => onTabChange("chat")}
+            />
+          )}
         </section>
       </section>
     </ConversationContext>
@@ -352,8 +363,11 @@ const sentFrom = (context: CapturedContext | null) =>
 export function UserMessage(props: {
   message: string
   images: ReadonlyArray<Image>
+  feedback?: ReadonlyArray<FeedbackNote>
   label?: string | undefined
 }) {
+  const feedback = props.feedback ?? []
+
   return (
     <Message align="end">
       <MessageContent>
@@ -361,11 +375,16 @@ export function UserMessage(props: {
           <span className="self-end text-xs text-muted-foreground">{props.label}</span>
         )}
         <AttachedImages images={props.images} />
-        <Bubble align="end" variant="muted">
-          <BubbleContent className="whitespace-pre-wrap">
-            <MessageText text={props.message} />
-          </BubbleContent>
-        </Bubble>
+        {props.message !== "" && (
+          <Bubble align="end" variant="muted">
+            <BubbleContent className="whitespace-pre-wrap">
+              <MessageText text={props.message} />
+            </BubbleContent>
+          </Bubble>
+        )}
+        {feedback.length > 0 && (
+          <SentFeedback feedback={feedback} className="w-full max-w-xl self-end" />
+        )}
       </MessageContent>
     </Message>
   )
@@ -381,7 +400,12 @@ const TurnView = memo(function TurnView(props: {
   return (
     <MessageScrollerItem messageId={turn.id} scrollAnchor exactHeight={props.latest}>
       <MessageGroup className="gap-4">
-        <UserMessage message={turn.message} images={turn.images} label={sentFrom(turn.context)} />
+        <UserMessage
+          message={turn.message}
+          images={turn.images}
+          feedback={turn.feedback}
+          label={sentFrom(turn.context)}
+        />
         <Message>
           <MessageContent>
             {nestParts(turn.parts).map(({ part, index, nested }) => (
@@ -669,11 +693,13 @@ function Composer(props: {
   const changeModel = useAtomSet(changeModelAtom(agent.id))
   const modeChanged = useAtomValue(changePermissionModeAtom(agent.id))
   const changePermissionMode = useAtomSet(changePermissionModeAtom(agent.id))
+  const feedback = useFeedbackNotes(agent.id)
 
   return (
     <AgentComposer
       turns={props.turns}
       queued={props.queued}
+      feedback={feedback}
       problem={settledProblem(changed) ?? settledProblem(modeChanged)}
       pickers={
         <>
@@ -706,6 +732,7 @@ export function AgentComposer(props: {
   problem?: Problem | null
   pickers?: ReactNode
   suggestions?: ReadonlyArray<ComposerSuggestion>
+  feedback?: FeedbackNotesStore
 }) {
   const { turns } = props
   const conversation = useConversation()
@@ -721,6 +748,12 @@ export function AgentComposer(props: {
   const stopped = useAtomValue(conversation.stop)
   const stop = useAtomSet(conversation.stop)
 
+  const { editing, ...staged } = useStagedFeedback(
+    props.feedback,
+    async (message) => Exit.isSuccess(await send(message)),
+    async (message) => Exit.isSuccess(await steer(message)),
+  )
+
   return (
     <>
       {props.queued.length > 0 && (
@@ -734,7 +767,7 @@ export function AgentComposer(props: {
         label={props.label ?? "Message"}
         textOnly={props.textOnly ?? false}
         placeholder={composerPlaceholder(running, waiting, props.idlePlaceholder)}
-        blocked={sent.waiting || steered.waiting || waiting !== undefined}
+        blocked={sent.waiting || steered.waiting || waiting !== undefined || editing}
         problem={
           settledProblem(sent) ??
           settledProblem(steered) ??
@@ -742,8 +775,7 @@ export function AgentComposer(props: {
           props.problem ??
           null
         }
-        send={async (message) => Exit.isSuccess(await send(message))}
-        steer={async (message) => Exit.isSuccess(await steer(message))}
+        {...staged}
         recall={lastSent(turns, props.queued)}
         onStop={running ? () => stop() : null}
         notice={waiting !== undefined && <WaitingNotice waiting={waiting} />}
@@ -803,13 +835,17 @@ function QueuedMessages(props: { queued: ReadonlyArray<QueuedMessage>; running: 
       </p>
       <QueueList>
         {props.queued.map((queued) => {
-          const readable = readableText(queued.message)
+          const feedbackOnly = queued.message === ""
+
+          const readable = feedbackOnly
+            ? "Feedback on the Agent's changes"
+            : readableText(queued.message)
 
           return (
             <QueueItem key={queued.id} aria-label={readable}>
               <QueueItemRow>
                 <QueueItemContent>
-                  <MessageText text={queued.message} />
+                  {feedbackOnly ? readable : <MessageText text={queued.message} />}
                   {queued.context !== null && (
                     <span className="block text-xs text-muted-foreground">
                       {sentFrom(queued.context)}
@@ -833,6 +869,7 @@ function QueuedMessages(props: { queued: ReadonlyArray<QueuedMessage>; running: 
                   </QueueItemAction>
                 </QueueItemActions>
               </QueueItemRow>
+              {queued.feedback.length > 0 && <SentFeedback feedback={queued.feedback} />}
               {queued.images.length > 0 && (
                 <QueueItemAttachment>
                   {queued.images.map((image, index) => (

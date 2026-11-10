@@ -1,5 +1,6 @@
 import { agentEngines } from "@glass/plugin"
 import { Match, Predicate, Schema } from "effect"
+import { FeedbackNote } from "./feedbackNote"
 import { FollowedRepository } from "./followedRepository"
 import { ChangedFile, PullRequestRef } from "./pullRequest"
 import { Revision } from "./revision"
@@ -174,6 +175,13 @@ export const withContextOf = ({
   context,
 }: MessageWithContext): MessageWithContext => ({ message, images, context })
 
+export const AcceptedMessage = Schema.Struct({
+  ...MessageWithContext.fields,
+  feedback: Schema.Array(FeedbackNote),
+})
+
+export type AcceptedMessage = typeof AcceptedMessage.Type
+
 export const TextPart = Schema.TaggedStruct("Text", { text: Schema.String })
 
 export const ThinkingPart = Schema.TaggedStruct("Thinking", { text: Schema.String })
@@ -320,7 +328,7 @@ export type TurnEnd = typeof TurnEnd.Type
 
 export const Turn = Schema.Struct({
   id: Schema.String,
-  ...MessageWithContext.fields,
+  ...AcceptedMessage.fields,
   sentAt: Schema.DateTimeUtcFromString,
   ended: Schema.NullOr(TurnEnd),
   parts: Schema.Array(TurnPart),
@@ -330,7 +338,7 @@ export type Turn = typeof Turn.Type
 
 export const TurnStarted = Schema.TaggedStruct("TurnStarted", {
   turnId: Schema.String,
-  ...MessageWithContext.fields,
+  ...AcceptedMessage.fields,
   sentAt: Schema.DateTimeUtcFromString,
 })
 
@@ -352,7 +360,7 @@ export const AgentEvent = Schema.Union([TurnStarted, PartSet, PartAppended, Turn
 
 export type AgentEvent = typeof AgentEvent.Type
 
-export const QueuedMessage = Schema.Struct({ id: Schema.String, ...MessageWithContext.fields })
+export const QueuedMessage = Schema.Struct({ id: Schema.String, ...AcceptedMessage.fields })
 
 export type QueuedMessage = typeof QueuedMessage.Type
 
@@ -418,9 +426,9 @@ export const applyAgentEvent = (
 ): ReadonlyArray<Turn> =>
   Match.value(event).pipe(
     Match.tagsExhaustive({
-      TurnStarted: ({ turnId, message, images, context, sentAt }) => [
+      TurnStarted: ({ turnId, message, images, context, feedback, sentAt }) => [
         ...turns,
-        { id: turnId, message, images, context, sentAt, ended: null, parts: [] },
+        { id: turnId, message, images, context, feedback, sentAt, ended: null, parts: [] },
       ],
       PartSet: ({ turnId, index, part }) =>
         changeTurn(turns, turnId, (turn) => {
@@ -465,6 +473,24 @@ export const MessageInputWithContext = Schema.Struct({
 })
 
 export type MessageInputWithContext = typeof MessageInputWithContext.Type
+
+const hasContent = Schema.makeFilter(
+  ({ message, feedback }: { readonly message: string; readonly feedback: ReadonlyArray<string> }) =>
+    message !== "" || feedback.length > 0 || "Write a message or attach Feedback notes",
+)
+
+const agentMessageFields = {
+  message: Schema.Trimmed,
+  images: SentMessage.fields.images,
+  feedback: Schema.Array(Schema.String),
+}
+
+export const SendAgentMessage = Schema.Struct({
+  agentId: Schema.String,
+  ...agentMessageFields,
+}).check(hasContent)
+
+export type AgentMessageInput = Omit<typeof SendAgentMessage.Type, "agentId">
 
 export const nothingUnsent: SentMessage = { message: "", images: [] }
 

@@ -1,5 +1,6 @@
 import type {
   AgentCommand,
+  AgentMessageInput,
   MessageInput,
   RequestAnswer,
   SentMessage,
@@ -29,7 +30,7 @@ export interface Conversation {
   readonly transcript: Atom.Atom<
     AsyncResult.AsyncResult<Transcript, BackendError | Cause.NoSuchElementError>
   >
-  readonly send: Atom.AtomResultFn<MessageInput, void, BackendError>
+  readonly send: Atom.AtomResultFn<AgentMessageInput, void, BackendError>
   readonly steer: Atom.AtomResultFn<MessageInput, void, BackendError>
   readonly stop: Atom.AtomResultFn<void, void, BackendError>
   readonly cancelQueued: Atom.AtomResultFn<string, void, BackendError>

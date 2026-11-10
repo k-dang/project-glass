@@ -9,6 +9,7 @@ import {
   TranscriptSnapshot,
   TurnDone,
   TurnEnded,
+  UnsentFeedback,
 } from "@glass/contracts"
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
@@ -35,6 +36,34 @@ const note = (id: string, changesId: string, text: string) =>
     changesId,
     text,
   })
+
+const unsent = (...notes: ReadonlyArray<FeedbackNote>) => new UnsentFeedback({ notes, staged: [] })
+
+const savedNotes = (...initial: ReadonlyArray<FeedbackNote>) => {
+  let current = unsent(...initial)
+
+  const write = (kept: ReadonlyArray<FeedbackNote>, staged = current.staged) =>
+    Effect.sync(() => (current = new UnsentFeedback({ notes: kept, staged })))
+
+  return {
+    current: () => current,
+    handlers: {
+      ListFeedbackNotes: () => Effect.sync(() => current),
+      SaveFeedbackNote: ({ note: written }) =>
+        write(
+          current.notes.some(({ id }) => id === written.id)
+            ? current.notes.map((kept) => (kept.id === written.id ? written : kept))
+            : [...current.notes, written],
+        ),
+      RemoveFeedbackNote: ({ noteId }) => write(current.notes.filter(({ id }) => id !== noteId)),
+      StageFeedbackNotes: () =>
+        write(
+          current.notes,
+          current.notes.map(({ id }) => id),
+        ),
+    } satisfies Parameters<typeof testLayer>[0],
+  }
+}
 
 const changes = (id: string) => new AgentChanges({ id, files: [changedFile("greet.ts")] })
 
@@ -71,16 +100,12 @@ afterEach(() => {
 })
 
 it("edits and removes Feedback notes, keeping older ones with their original code", async () => {
-  const saved: Array<FeedbackNote> = []
-  const removed: Array<string> = []
+  const store = savedNotes(note("current", "read-2", "Rename B"), note("older", "read-1", "Drop B"))
 
   const { user, region, overview } = await openChanges({
     WatchTranscript: idle,
     GetAgentChanges: () => Effect.succeed(changes("read-2")),
-    ListFeedbackNotes: () =>
-      Effect.succeed([note("current", "read-2", "Rename B"), note("older", "read-1", "Drop B")]),
-    SaveFeedbackNote: (payload) => Effect.sync(() => void saved.push(payload.note)),
-    RemoveFeedbackNote: ({ noteId }) => Effect.sync(() => void removed.push(noteId)),
+    ...store.handlers,
   })
 
   const [current, older] = await within(overview).findAllByRole("article", {
@@ -99,22 +124,24 @@ it("edits and removes Feedback notes, keeping older ones with their original cod
   await user.click(within(region).getByRole("button", { name: "Save changes" }))
 
   expect(await within(overview).findByText("Keep B after all")).toBeTruthy()
-  expect(saved).toEqual([note("older", "read-1", "Keep B after all")])
 
   await user.click(within(current!).getByRole("button", { name: "Remove" }))
   await waitFor(() => expect(within(region).queryByText("Rename B")).toBeNull())
-  expect(removed).toEqual(["current"])
+  expect(store.current().notes).toEqual([note("older", "read-1", "Keep B after all")])
 })
 
 it("keeps what the user wrote when a Feedback note can't be saved, until a retry saves it", async () => {
   let attempts = 0
+  const { handlers } = savedNotes(note("current", "read-1", "Rename B"))
 
   const { user, region, overview } = await openChanges({
     WatchTranscript: idle,
     GetAgentChanges: () => Effect.succeed(changes("read-1")),
-    ListFeedbackNotes: () => Effect.succeed([note("current", "read-1", "Rename B")]),
-    SaveFeedbackNote: () =>
-      ++attempts === 1 ? Effect.fail(new AgentError({ message: "Disk is full." })) : Effect.void,
+    ...handlers,
+    SaveFeedbackNote: (payload) =>
+      ++attempts === 1
+        ? Effect.fail(new AgentError({ message: "Disk is full." }))
+        : handlers.SaveFeedbackNote(payload),
   })
 
   await user.click(await within(overview).findByRole("button", { name: "Edit" }))
@@ -150,6 +177,7 @@ it("keeps the displayed Changes when Show latest fails, then marks notes older o
                 message: "Work",
                 images: [],
                 context: null,
+                feedback: [],
                 sentAt,
                 ended: null,
                 parts: [],
@@ -166,7 +194,7 @@ it("keeps the displayed Changes when Show latest fails, then marks notes older o
         ),
       ),
     GetAgentChanges: () => reads.shift()!,
-    ListFeedbackNotes: () => Effect.succeed([note("current", "read-1", "Rename B")]),
+    ListFeedbackNotes: () => Effect.succeed(unsent(note("current", "read-1", "Rename B"))),
   })
 
   const listed = await within(overview).findByRole("article", {
@@ -191,9 +219,9 @@ it("keeps the displayed Changes when Show latest fails, then marks notes older o
 })
 
 it("shows the Changes while Feedback notes can't load, then the notes once a retry reads them", async () => {
-  const lists: Array<Effect.Effect<ReadonlyArray<FeedbackNote>, AgentError>> = [
+  const lists: Array<Effect.Effect<UnsentFeedback, AgentError>> = [
     Effect.fail(new AgentError({ message: "Couldn't read your Feedback notes. Try again." })),
-    Effect.succeed([note("current", "read-1", "Rename B")]),
+    Effect.succeed(unsent(note("current", "read-1", "Rename B"))),
   ]
 
   const { user, region } = await openChanges({
@@ -218,7 +246,9 @@ it("keeps the note being edited from the Feedback tab until it's saved or cancel
     WatchTranscript: idle,
     GetAgentChanges: () => Effect.succeed(changes("read-1")),
     ListFeedbackNotes: () =>
-      Effect.succeed([note("first", "read-1", "Rename B"), note("second", "read-1", "Test B")]),
+      Effect.succeed(
+        unsent(note("first", "read-1", "Rename B"), note("second", "read-1", "Test B")),
+      ),
   })
 
   const [first, second] = await within(overview).findAllByRole("article", {
@@ -239,7 +269,7 @@ it("keeps Feedback notes readable when the Changes can't be read", async () => {
   const { region, overview } = await openChanges({
     WatchTranscript: idle,
     GetAgentChanges: () => Effect.fail(new AgentError({ message: "The Sandbox expired." })),
-    ListFeedbackNotes: () => Effect.succeed([note("current", "read-1", "Rename B")]),
+    ListFeedbackNotes: () => Effect.succeed(unsent(note("current", "read-1", "Rename B"))),
   })
 
   expect(within(region).getByText("The Sandbox expired.")).toBeTruthy()
@@ -256,7 +286,7 @@ it("keeps an unsaved edit while the Files tab is shown", async () => {
   const { user, region, overview } = await openChanges({
     WatchTranscript: idle,
     GetAgentChanges: () => Effect.succeed(changes("read-1")),
-    ListFeedbackNotes: () => Effect.succeed([note("current", "read-1", "Rename B")]),
+    ListFeedbackNotes: () => Effect.succeed(unsent(note("current", "read-1", "Rename B"))),
   })
 
   await user.click(await within(overview).findByRole("button", { name: "Edit" }))
@@ -268,4 +298,84 @@ it("keeps an unsaved edit while the Files tab is shown", async () => {
   expect(
     within(reopened).getByRole("textbox", { name: "Feedback on selected code" }),
   ).toHaveProperty("value", "Rename B!")
+})
+
+it("stages Feedback notes beside the unsent text and sends them as one message once accepted", async () => {
+  const store = savedNotes(note("first", "read-1", "Rename B"), note("second", "read-1", "Test B"))
+  const sent: Array<{ message: string; feedback: ReadonlyArray<string> }> = []
+  let attempts = 0
+
+  const { user, region } = await openChanges({
+    WatchTranscript: idle,
+    GetAgentChanges: () => Effect.succeed(changes("read-1")),
+    GetUnsentMessage: () => Effect.succeed({ message: "Also add docs", images: [] }),
+    ...store.handlers,
+    SendMessage: ({ message, feedback }) =>
+      ++attempts === 1
+        ? Effect.fail(new AgentError({ message: "Couldn't read or save the transcript." }))
+        : Effect.sync(() => void sent.push({ message, feedback })),
+  })
+
+  await user.click(within(region).getByRole("button", { name: "Review feedback" }))
+  const attached = await screen.findByRole("region", { name: "Feedback attached to this message" })
+  expect(store.current().staged).toEqual(["first", "second"])
+  expect(within(attached).getAllByRole("article")).toHaveLength(2)
+  expect(screen.getByRole("textbox", { name: "Message" }).textContent).toBe("Also add docs")
+
+  const [first] = within(attached).getAllByRole("article")
+  await user.click(within(first!).getByRole("button", { name: "Edit" }))
+  await user.type(within(attached).getByRole("textbox", { name: "Feedback on selected code" }), "!")
+  expect(screen.getByRole("button", { name: "Send" })).toHaveProperty("disabled", true)
+  await user.click(within(attached).getByRole("button", { name: "Save changes" }))
+  expect(await within(attached).findByText("Rename B!")).toBeTruthy()
+  expect(store.current().notes[0]).toEqual(note("first", "read-1", "Rename B!"))
+
+  await user.click(screen.getByRole("button", { name: "Send" }))
+  expect(await screen.findByText("Couldn't read or save the transcript.")).toBeTruthy()
+  expect(within(attached).getAllByRole("article")).toHaveLength(2)
+  expect(screen.getByRole("textbox", { name: "Message" }).textContent).toBe("Also add docs")
+
+  await user.click(screen.getByRole("button", { name: "Send" }))
+  await waitFor(() =>
+    expect(screen.queryByRole("region", { name: "Feedback attached to this message" })).toBeNull(),
+  )
+  expect(sent).toEqual([{ message: "Also add docs", feedback: ["first", "second"] }])
+  expect(screen.getByRole("textbox", { name: "Message" }).textContent).toBe("")
+  expect(within(region).queryByRole("button", { name: "Review feedback" })).toBeNull()
+})
+
+it("shows sent and Queued Feedback notes with the code they were left on", async () => {
+  const feedback = [note("first", "read-1", "Rename B")]
+
+  const { user } = await openChanges({
+    WatchTranscript: () =>
+      Stream.make(
+        TranscriptSnapshot.make({
+          turns: [
+            {
+              id: "turn-1",
+              message: "",
+              images: [],
+              context: null,
+              feedback,
+              sentAt,
+              ended: null,
+              parts: [],
+            },
+          ],
+          queued: [{ id: "queued-1", message: "", images: [], context: null, feedback }],
+          status: null,
+        }),
+      ),
+    GetAgentChanges: () => Effect.succeed(changes("read-1")),
+  })
+
+  await user.keyboard("{Control>}d{/Control}")
+  const queue = await screen.findByRole("region", { name: "Queued messages" })
+  expect(within(queue).getByText("Feedback on the Agent's changes")).toBeTruthy()
+  expect(within(queue).getByText("1 Feedback note")).toBeTruthy()
+
+  const transcript = screen.getByRole("region", { name: "Transcript" })
+  expect(within(transcript).getByText("1 Feedback note")).toBeTruthy()
+  expect(within(transcript).getByText("Rename B", { exact: true })).toBeTruthy()
 })

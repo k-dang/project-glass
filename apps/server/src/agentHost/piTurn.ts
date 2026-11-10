@@ -97,7 +97,7 @@ export const beginTurn = (
   sent: MessageWithContext,
   at: DateTime.Utc,
 ): TurnState => ({
-  turn: { id: turnId, ...sent, sentAt: at, ended: null, parts: [] },
+  turn: { id: turnId, ...sent, feedback: [], sentAt: at, ended: null, parts: [] },
   partByBlock: new Map(),
   toolCalls: new Map(),
   providerError: null,

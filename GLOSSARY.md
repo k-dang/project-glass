@@ -266,9 +266,17 @@ A message sent into the running Turn, for the Agent to take in before it finishe
 _Avoid_: Interrupt, inject
 
 **Unsent message**:
-What the user has written to an Agent or the Global conversation and not sent yet, with any images,
-kept for each on this device until they send or clear it.
+What the user has written to an Agent or the Global conversation and not sent yet, with any images
+and, for an Agent, the Feedback notes added to it, kept for each on this device until they send or
+clear it.
 _Avoid_: Draft (a Draft is a GitHub comment)
+
+**Feedback note**:
+An instruction the user leaves on a line or range on either side of an Agent's Changes, kept with
+the code they read there. The user adds the notes to the Agent's Unsent message and sends them
+together as one message to that Agent, which then keeps them in its conversation; Glass never
+publishes them.
+_Avoid_: Draft, review comment
 
 **Permission mode**:
 How much a local Claude Code Agent may do without asking: default, accept edits, auto, or bypass.

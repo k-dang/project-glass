@@ -161,8 +161,8 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       ChangePermissionMode: ({ agentId, permissionMode }) =>
         agents.changePermissionMode(agentId, permissionMode),
       AnswerRequest: ({ agentId, requestId, answer }) => agents.answer(agentId, requestId, answer),
-      SendMessage: ({ agentId, message, images }) =>
-        agents.send(agentId, { message, images }).pipe(Effect.asVoid),
+      SendMessage: ({ agentId, message, images, feedback }) =>
+        agents.send(agentId, { message, images }, feedback).pipe(Effect.asVoid),
       Steer: ({ agentId, message, images }) => agents.steer(agentId, { message, images }),
       CancelQueuedMessage: ({ agentId, queuedMessageId }) =>
         agents.cancelQueued(agentId, queuedMessageId),
@@ -175,6 +175,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
         agents.saveUnsent(agentId, { message, images }),
       GetAgentChanges: ({ agentId }) => agents.changes(agentId),
       ListFeedbackNotes: ({ agentId }) => agents.feedbackNotes(agentId),
+      StageFeedbackNotes: ({ agentId }) => agents.stageFeedbackNotes(agentId),
       SaveFeedbackNote: ({ agentId, note }) => agents.saveFeedbackNote(agentId, note),
       RemoveFeedbackNote: ({ agentId, noteId }) => agents.removeFeedbackNote(agentId, noteId),
       GetRemovalWarnings: ({ agentId }) => agents.removalWarnings(agentId),

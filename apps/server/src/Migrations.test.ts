@@ -79,6 +79,7 @@ it.live("upgrades existing Activity history and uses its indexes after reopening
       [27, "create_agent_feedback_notes"],
       [28, "agent_skill_packs"],
       [29, "agent_local_skills"],
+      [30, "send_feedback_notes"],
     ] as const
 
     for (const expected of [upgrade, []] as const) {
@@ -211,8 +212,20 @@ it.live("keeps an Agent's Turns, with no images, when Queued and unsent messages
 
     assert.deepStrictEqual(transcript.queued, [])
     assert.deepStrictEqual(
-      transcript.turns.map(({ message, images, parts }) => ({ message, images, parts })),
-      [{ message: "Say hello", images: [], parts: [TextPart.make({ text: "Hello!" })] }],
+      transcript.turns.map(({ message, images, feedback, parts }) => ({
+        message,
+        images,
+        feedback,
+        parts,
+      })),
+      [
+        {
+          message: "Say hello",
+          images: [],
+          feedback: [],
+          parts: [TextPart.make({ text: "Hello!" })],
+        },
+      ],
     )
   }),
 )

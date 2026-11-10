@@ -4,6 +4,7 @@ import {
   nothingUnsent,
   SavedPlace,
   TranscriptSnapshot,
+  UnsentFeedback,
 } from "@glass/contracts"
 import { DateTime, Effect, Layer, ManagedRuntime, Stream } from "effect"
 import { AtomRegistry } from "effect/reactivity"
@@ -97,7 +98,8 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         CreateAgent: unused,
         SendMessage: unused,
         GetAgentChanges: unused,
-        ListFeedbackNotes: () => Effect.succeed([]),
+        ListFeedbackNotes: () => Effect.succeed(new UnsentFeedback({ notes: [], staged: [] })),
+        StageFeedbackNotes: unused,
         SaveFeedbackNote: unused,
         RemoveFeedbackNote: unused,
         CancelQueuedMessage: unused,

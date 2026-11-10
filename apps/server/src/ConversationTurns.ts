@@ -1,6 +1,8 @@
 import {
+  type AcceptedMessage,
   AgentBusy,
   AgentError,
+  type FeedbackNote,
   isNothingUnsent,
   mentionedToDoIds,
   type MessageDelivery,
@@ -63,6 +65,7 @@ export class ConversationTurns extends Context.Service<
     readonly send: (
       conversationId: string,
       message: MessageWithContext,
+      feedback?: Effect.Effect<ReadonlyArray<FeedbackNote>, AgentError>,
     ) => Effect.Effect<MessageDelivery, RequestWaiting | AgentError>
     readonly steer: (
       conversation: Conversation,
@@ -95,7 +98,10 @@ export class ConversationTurns extends Context.Service<
       const turnLock = yield* Semaphore.make(1)
       const scope = yield* Scope.Scope
 
-      const delivered = Effect.fnUntraced(function* (sent: MessageWithContext) {
+      const delivered = Effect.fnUntraced(function* (
+        sent: MessageWithContext,
+        feedback: ReadonlyArray<FeedbackNote> = [],
+      ) {
         const ids = mentionedToDoIds(sent.message)
 
         const listed =
@@ -111,19 +117,22 @@ export class ConversationTurns extends Context.Service<
         const mentioned = ids.flatMap((id) => listed.find((toDo) => toDo.id === id) ?? [])
 
         return {
-          ...sent,
-          prompt: prompt(sent.message, mentioned, sent.context),
+          message: sent.message,
+          images: sent.images,
+          context: sent.context,
+          prompt: prompt(sent.message, mentioned, sent.context, feedback),
         } satisfies DeliveredMessage
       })
 
-      const deliver = (conversation: Conversation, turnId: string, sent: MessageWithContext) =>
+      const deliver = (conversation: Conversation, turnId: string, sent: AcceptedMessage) =>
         Effect.gen(function* () {
           const client = yield* conversation.host
           const agentId = conversation.id
 
-          const [, message] = yield* Effect.all([conversation.start(client), delivered(sent)], {
-            concurrency: "unbounded",
-          })
+          const [, message] = yield* Effect.all(
+            [conversation.start(client), delivered(sent, sent.feedback)],
+            { concurrency: "unbounded" },
+          )
 
           yield* turnLock.withPermits(1)(
             Effect.gen(function* () {
@@ -147,13 +156,13 @@ export class ConversationTurns extends Context.Service<
         const started = yield* transcripts.subscribeStarted.pipe(Scope.provide(scope))
 
         yield* started.pipe(
-          Stream.runForEach(({ agentId, turnId, message, images, context }) =>
+          Stream.runForEach(({ agentId, turnId, message, images, context, feedback }) =>
             claim(agentId).pipe(
               Effect.flatMap(
                 Option.match({
                   onNone: () => Effect.void,
                   onSome: (conversation) =>
-                    deliver(conversation, turnId, { message, images, context }).pipe(
+                    deliver(conversation, turnId, { message, images, context, feedback }).pipe(
                       Effect.forkIn(scope),
                       Effect.asVoid,
                     ),
@@ -262,8 +271,11 @@ export class ConversationTurns extends Context.Service<
         )
       })
 
-      const startOrQueue = (conversationId: string, sent: MessageWithContext) =>
-        turnLock.withPermits(1)(transcripts.startOrQueue(conversationId, sent))
+      const startOrQueue = (
+        conversationId: string,
+        sent: MessageWithContext,
+        feedback?: Effect.Effect<ReadonlyArray<FeedbackNote>, AgentError>,
+      ) => turnLock.withPermits(1)(transcripts.startOrQueue(conversationId, sent, feedback))
 
       return ConversationTurns.of({
         deliverTurnsOf,
@@ -276,10 +288,10 @@ export class ConversationTurns extends Context.Service<
               return yield* effect
             }),
           ),
-        send: Effect.fn("ConversationTurns.send")(function* (conversationId, sent) {
+        send: Effect.fn("ConversationTurns.send")(function* (conversationId, sent, feedback) {
           yield* refuseWhileWaiting(conversationId)
 
-          return yield* startOrQueue(conversationId, sent)
+          return yield* startOrQueue(conversationId, sent, feedback)
         }),
         steer: Effect.fn("ConversationTurns.steer")(function* (conversation, sent) {
           yield* refuseWhileWaiting(conversation.id)

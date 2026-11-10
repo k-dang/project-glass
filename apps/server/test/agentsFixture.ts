@@ -91,7 +91,7 @@ export const agentsFixture = Effect.gen(function* () {
     )
 
   const send = (agentId: string, message: string, images: ReadonlyArray<Image> = []) =>
-    client.SendMessage({ agentId, message, images })
+    client.SendMessage({ agentId, message, images, feedback: [] })
 
   const steer = (agentId: string, message: string, images: ReadonlyArray<Image> = []) =>
     client.Steer({ agentId, message, images })

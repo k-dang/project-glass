@@ -1,5 +1,6 @@
 import {
   AgentContext,
+  type AgentMessageInput,
   type CapturedContext,
   type MessageInput,
   type ModelChoice,
@@ -63,8 +64,9 @@ export const capturedContextAtom = Atom.make((get): CapturedContext | null => {
   })
 })
 
-const sending = (sent: MessageInput, get: Atom.FnContext) => ({
-  ...sent,
+const sending = ({ message, images }: MessageInput, get: Atom.FnContext) => ({
+  message,
+  images,
   context: get(capturedContextAtom),
 })
 
@@ -75,7 +77,7 @@ export const globalConversation: Conversation = {
       transcriptOf(Stream.unwrap(Backend.useSync((backend) => backend.WatchGlobalTranscript()))),
     )
     .pipe(Atom.setIdleTTL(TRANSCRIPT_IDLE_TTL)),
-  send: backendRuntime.fn((sent: MessageInput, get) =>
+  send: backendRuntime.fn((sent: AgentMessageInput, get) =>
     Backend.use((backend) => backend.SendGlobalMessage(sending(sent, get))),
   ),
   steer: backendRuntime.fn((sent: MessageInput, get) =>

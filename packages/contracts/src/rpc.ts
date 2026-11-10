@@ -26,6 +26,7 @@ import {
   RequestNotWaiting,
   RequestWaiting,
   SandboxProviderInfo,
+  SendAgentMessage,
   SentMessage,
   TranscriptUpdate,
 } from "./agent"
@@ -41,7 +42,7 @@ import {
 } from "./discussion"
 import { CreateDraftError, Draft, UpdateDraftError } from "./draft"
 import { EngineFeature, EngineSettings } from "./engine"
-import { FeedbackNote } from "./feedbackNote"
+import { FeedbackNote, UnsentFeedback } from "./feedbackNote"
 import { FollowedRepository, InvalidRepositoryInput } from "./followedRepository"
 import { OpenPullRequestError, PullRequestRef, PullRequestWorkspace } from "./pullRequest"
 import { PullRequestListings } from "./pullRequestList"
@@ -385,7 +386,7 @@ export class GlassRpcs extends RpcGroup.make(
     error: Schema.Union([InvalidLocalCheckout, AgentError]),
   }),
   Rpc.make("SendMessage", {
-    payload: { agentId: Schema.String, ...MessageInput.fields },
+    payload: SendAgentMessage,
     error: Schema.Union([AgentNotFound, RequestWaiting, AgentError]),
   }),
   Rpc.make("Steer", {
@@ -443,15 +444,22 @@ export class GlassRpcs extends RpcGroup.make(
   }),
   Rpc.make("ListFeedbackNotes", {
     payload: { agentId: Schema.String },
-    success: Schema.Array(FeedbackNote),
+    success: UnsentFeedback,
+    error: Schema.Union([AgentNotFound, AgentError]),
+  }),
+  Rpc.make("StageFeedbackNotes", {
+    payload: { agentId: Schema.String },
+    success: UnsentFeedback,
     error: Schema.Union([AgentNotFound, AgentError]),
   }),
   Rpc.make("SaveFeedbackNote", {
     payload: { agentId: Schema.String, note: FeedbackNote },
+    success: UnsentFeedback,
     error: Schema.Union([AgentNotFound, AgentError]),
   }),
   Rpc.make("RemoveFeedbackNote", {
     payload: { agentId: Schema.String, noteId: Schema.String },
+    success: UnsentFeedback,
     error: Schema.Union([AgentNotFound, AgentError]),
   }),
   Rpc.make("RemoveAgent", {
