@@ -1,5 +1,5 @@
 import { type AgentEngine, LOCAL_SKILLS_NAMESPACE, LocalSkillsError, Skill } from "@glass/contracts"
-import { Context, Effect, FileSystem, Layer, Option, type PlatformError } from "effect"
+import { Context, Effect, FileSystem, Layer, Option, type PlatformError, Predicate } from "effect"
 import { join } from "node:path"
 import type { SentSkill, SkillSource } from "./agentHost/protocol"
 import { ServerConfig } from "./ServerConfig"
@@ -50,6 +50,10 @@ const orSkipped = <A>(
     Effect.map(Option.some),
     Effect.catchReasons("PlatformError", {
       NotFound: () => Effect.succeedNone,
+      BadResource: (reason, error) =>
+        Predicate.hasProperty(reason.cause, "code") && reason.cause.code === "ELOOP"
+          ? Effect.succeedNone
+          : Effect.fail(error),
       PermissionDenied: (reason) =>
         Effect.logWarning("Skipped a Local skills file Glass can't read", reason).pipe(
           Effect.as(Option.none()),
@@ -157,7 +161,7 @@ export class LocalSkills extends Context.Service<
                     if (Option.isNone(read)) return []
 
                     const [text, realSkillFile] = read.value
-                    const skill = readSkill(directory, text, lastSegment(directory))
+                    const skill = readSkill(directory, text)
 
                     return skill instanceof Skill
                       ? [{ folder, directory, realSkillFile, skill, files: owned }]

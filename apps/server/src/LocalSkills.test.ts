@@ -34,9 +34,18 @@ it.live(
       )
       symlinkSync(join(f.home, "dotfiles", "gone"), join(f.home, ".agents", "skills", "gone"))
       symlinkSync(join(dotfiles, "gone.sh"), join(dotfiles, "grilling", "run.sh"))
+      symlinkSync("cycle", join(f.home, ".agents", "skills", "cycle"))
+      symlinkSync("cycle.sh", join(dotfiles, "grilling", "cycle.sh"))
       write(join(dotfiles, "grilling", "secret.txt"), "Only for me.")
       chmodSync(join(dotfiles, "grilling", "secret.txt"), 0o000)
       write(join(f.home, ".agents", "skills", "draft", "SKILL.md"), "No frontmatter yet.\n")
+
+      for (const folder of [".agents", ".claude"]) {
+        write(
+          join(f.home, folder, "skills", "unnamed", "SKILL.md"),
+          "---\ndescription: No name.\n---\n",
+        )
+      }
 
       assert.deepStrictEqual(yield* f.client.ListLocalSkills({ engine: "pi" }), [
         "grilling",
@@ -81,7 +90,7 @@ it.live(
     Effect.gen(function* () {
       const f = yield* agentsFixture
       const shared = join(f.home, "dotfiles", "scripts")
-      const twin = "---\ndescription: Named by its folder.\n---\n"
+      const twin = skillFile("twin", "A shared skill.")
 
       write(join(shared, "run.sh"), "echo hi")
 

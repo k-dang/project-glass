@@ -4,6 +4,7 @@ import {
   Skill,
   SkillPack,
   SkillPackNameTaken,
+  SkillPackNotReadable,
   SkillPackSource,
   SkillPackUpdate,
   SkippedSkill,
@@ -53,6 +54,9 @@ describe("Skill packs", () => {
         "skills/team/silent/SKILL.md": "---\nname: silent\n---\n",
         "skills/team/broken/SKILL.md": "---\nname: [broken\n---\n",
         "skills/team/bare/SKILL.md": "Just text.",
+        "skills/team/unnamed/SKILL.md": "---\ndescription: No name.\n---\n",
+        "skills/team/blank/SKILL.md": '---\nname: "  "\ndescription: Blank name.\n---\n',
+        "skills/team/numeric/SKILL.md": "---\nname: 123\ndescription: Numeric name.\n---\n",
       })
 
       const preview = yield* client.PreviewSkillPack({
@@ -71,12 +75,41 @@ describe("Skill packs", () => {
       ])
       assert.deepStrictEqual(preview.skipped, [
         new SkippedSkill({ directory: "bare", reason: "SKILL.md has no frontmatter." }),
+        new SkippedSkill({ directory: "blank", reason: "SKILL.md has no name." }),
         new SkippedSkill({
           directory: "broken",
           reason: "SKILL.md's frontmatter isn't valid YAML.",
         }),
+        new SkippedSkill({ directory: "numeric", reason: "SKILL.md has no name." }),
         new SkippedSkill({ directory: "silent", reason: "SKILL.md has no description." }),
+        new SkippedSkill({ directory: "unnamed", reason: "SKILL.md has no name." }),
       ])
+    }),
+  )
+
+  it.live("doesn't add a single skill without a frontmatter name", () =>
+    Effect.gen(function* () {
+      const { client, github } = yield* startSignedInBackend
+
+      github.pushRepository(acmeSkills, "main", {
+        "grilling/SKILL.md": "---\ndescription: Ask hard questions.\n---\n",
+      })
+
+      const preview = yield* client.PreviewSkillPack({
+        url: "https://github.com/acme/skills/tree/main/grilling",
+      })
+
+      assert.deepStrictEqual(preview.skills, [])
+      assert.deepStrictEqual(preview.skipped, [
+        new SkippedSkill({ directory: "", reason: "SKILL.md has no name." }),
+      ])
+      assert.instanceOf(
+        yield* Effect.flip(
+          client.AddSkillPack({ source: preview.source, commit: preview.commit, name: "team" }),
+        ),
+        SkillPackNotReadable,
+      )
+      assert.deepStrictEqual(yield* client.ListSkillPacks(), [])
     }),
   )
 
@@ -148,12 +181,16 @@ describe("Skill packs", () => {
         [
           yield* problem("https://gitlab.com/acme/skills"),
           yield* problem("https://github.com/acme/skills/blob/main/docs/README.md"),
+          yield* problem("https://github.com/acme/skills/tree/main/%ZZ"),
+          yield* problem("https://github.com/acme/skills/tree/main/%E0%A4"),
           yield* problem("https://github.com/acme/private-skills"),
           yield* problem("https://github.com/acme/skills/tree/nightly/skills"),
           yield* problem("https://github.com/acme/skills/tree/main/skills"),
           yield* problem("https://github.com/acme/skills/tree/main/docs"),
         ],
         [
+          "InvalidSkillPackUrl",
+          "InvalidSkillPackUrl",
           "InvalidSkillPackUrl",
           "InvalidSkillPackUrl",
           "GitHub couldn't find acme/private-skills, or your GitHub connection can't see it.",
