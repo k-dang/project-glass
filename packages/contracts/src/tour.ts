@@ -84,7 +84,7 @@ export const Chapter = Schema.Struct({
   files: Schema.Array(Schema.Struct({ path: Schema.String, summary: Schema.String })),
   diagram: Schema.optionalKey(Schema.NullOr(TourDiagram)),
   beforeAfter: Schema.optionalKey(Schema.NullOr(TourBeforeAfter)),
-  callouts: Schema.optionalKey(TourCallouts),
+  callouts: Schema.optionalKey(Schema.NullOr(TourCallouts)),
 })
 
 export type Chapter = typeof Chapter.Type

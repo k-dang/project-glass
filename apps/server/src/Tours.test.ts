@@ -147,7 +147,7 @@ it.live(
                 ...answer.chapters[0]!,
                 diagram: { nodes: [], edges: [] },
                 beforeAfter: "not an outline",
-                callouts: null,
+                callouts: "not a list",
               },
             ],
           },
