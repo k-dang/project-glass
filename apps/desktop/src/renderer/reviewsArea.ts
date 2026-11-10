@@ -89,6 +89,7 @@ const confirmDiscarding = (
           },
         }
 
+        registry.get(discardPromptAtom)?.answer(false)
         registry.set(discardPromptAtom, prompt)
 
         return Effect.sync(() => {

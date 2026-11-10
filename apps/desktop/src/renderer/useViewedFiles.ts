@@ -30,6 +30,7 @@ export class ViewedFilesStore {
   readonly #calls = new Set<Promise<void>>()
   readonly dispose: () => void
   readonly stateAtom: Atom.Writable<ViewedFilesState>
+  #holds = 0
 
   constructor(
     workspace: ViewedFilesSource,
@@ -133,6 +134,7 @@ export class ViewedFilesStore {
   }
 
   async lock() {
+    this.#holds += 1
     this.registry.set(this.stateAtom, { ...this.snapshot(), locked: true })
     await Promise.all(this.#calls)
   }
@@ -142,7 +144,8 @@ export class ViewedFilesStore {
   }
 
   unlock() {
-    this.registry.set(this.stateAtom, { ...this.snapshot(), locked: false })
+    this.#holds -= 1
+    this.registry.set(this.stateAtom, { ...this.snapshot(), locked: this.#holds > 0 })
   }
 }
 

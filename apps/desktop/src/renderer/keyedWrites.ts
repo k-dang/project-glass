@@ -23,7 +23,8 @@ export const createKeyedWrites = <Input, Value, E extends BackendError>(
 ) => {
   const empty: WriteView<Input, Value> = { confirmed: undefined, feedback: null }
   const viewsAtom = Atom.make<ReadonlyMap<string, WriteView<Input, Value>>>(new Map())
-  const lockedAtom = Atom.make(false)
+  const holdsAtom = Atom.make(0)
+  const lockedAtom = Atom.make((get) => get(holdsAtom) > 0)
 
   const dispose = registry.mount(
     Atom.make((get) => {
@@ -76,7 +77,7 @@ export const createKeyedWrites = <Input, Value, E extends BackendError>(
       ).finally(release)
     },
     async lock() {
-      registry.set(lockedAtom, true)
+      registry.update(holdsAtom, (holds) => holds + 1)
       await Effect.runPromise(
         AtomRegistry.toStream(registry, viewsAtom).pipe(
           Stream.filter(
@@ -86,6 +87,6 @@ export const createKeyedWrites = <Input, Value, E extends BackendError>(
         ),
       )
     },
-    unlock: () => registry.set(lockedAtom, false),
+    unlock: () => registry.update(holdsAtom, (holds) => holds - 1),
   }
 }

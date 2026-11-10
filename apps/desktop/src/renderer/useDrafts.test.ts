@@ -234,7 +234,7 @@ describe("DraftStore", () => {
 
     store.edit("D1", "Hi!")
 
-    const locked = store.lockAndSave()
+    const locked = store.lock()
 
     const update = await next(updates)
 
@@ -263,7 +263,7 @@ describe("DraftStore", () => {
     save(store, "D1", "Hi!")
     const first = await next(updates)
     store.edit("D1", "Hi?")
-    const locked = store.lockAndSave()
+    const locked = store.lock()
     first.answer(Effect.void)
 
     const second = await next(updates)
