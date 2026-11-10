@@ -330,6 +330,21 @@ export function Workspace(props: {
     returnToCurrent(false)
   }
 
+  const reviewShown = inChanges && reviewOpen
+
+  useShortcuts(
+    agentReview.review === null
+      ? []
+      : [
+          {
+            key: "d",
+            mod: true,
+            allowInEditable: true,
+            run: () => (reviewShown ? setReviewOpen(false) : readAgentReview()),
+          },
+        ],
+  )
+
   const additions = files.reduce((sum, file) => sum + file.additions, 0)
   const deletions = files.reduce((sum, file) => sum + file.deletions, 0)
   const filePanelLabel = filePanelOpen ? "Hide file panel" : "Show file panel"
@@ -568,7 +583,7 @@ export function Workspace(props: {
             )
           )}
         </TabsContent>
-        {inChanges && reviewOpen && agentReview.review !== null && (
+        {reviewShown && agentReview.review !== null && (
           <AgentReviewSidePanel onClose={() => setReviewOpen(false)}>
             <AgentReviewPanel
               review={agentReview.review}

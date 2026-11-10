@@ -39,6 +39,22 @@ it("reads the whole Agent review in a panel right of the diff, until it is close
   expect(sidePanel()).toBeNull()
 })
 
+it("opens and closes the Agent review with Mod+D, even from its composer", async () => {
+  const f = mountTourWorkspace({
+    files,
+    agentReview: { review: reviewOf(revision), job: { status: "idle" } },
+  })
+
+  await screen.findByRole("region", { name: "Agent review" })
+  await f.user.keyboard("{Control>}d{/Control}")
+  expect(screen.getByRole("tab", { name: "Changes" }).getAttribute("aria-selected")).toBe("true")
+  expect(sidePanel()).not.toBeNull()
+
+  await f.user.click(screen.getByRole("textbox", { name: "Follow up" }))
+  await f.user.keyboard("{Meta>}d{/Meta}")
+  expect(sidePanel()).toBeNull()
+})
+
 it("leaves the Tour order to read the Agent review", async () => {
   const f = mountTourWorkspace({
     files,
