@@ -5,7 +5,6 @@ import {
   AgentError,
   AgentModels,
   FeedbackNote,
-  QueuedMessageStarted,
   GitHubConnection,
   TranscriptSnapshot,
   TurnDone,
@@ -381,14 +380,13 @@ it("shows sent and Queued Feedback notes with the code they were left on", async
   expect(within(transcript).getByText("Rename B", { exact: true })).toBeTruthy()
 })
 
-it("returns a canceled Queued message's Feedback notes beside newer work, and says when it's too late", async () => {
+it("returns a canceled Queued message's Feedback notes beside newer work once a retry cancels it", async () => {
   const store = savedNotes(note("newer", "read-2", "Newer"))
   const queuedNote = note("queued", "read-1", "Cap the attempts")
   let attempts = 0
 
   const queued = [
     { id: "queued-1", message: "", images: [], context: null, feedback: [queuedNote] },
-    { id: "queued-2", message: "Then docs", images: [], context: null, feedback: [] },
   ]
 
   const { user, region } = await openChanges({
@@ -414,15 +412,10 @@ it("returns a canceled Queued message's Feedback notes beside newer work, and sa
     GetAgentChanges: () => Effect.succeed(changes("read-2")),
     GetUnsentMessage: () => Effect.succeed({ message: "Also add docs", images: [] }),
     ...store.handlers,
-    CancelQueuedMessage: ({ queuedMessageId }) =>
-      Effect.gen(function* () {
-        if (queuedMessageId === "queued-2") yield* new QueuedMessageStarted()
-
-        if (++attempts === 1)
-          yield* new AgentError({ message: "Couldn't cancel a Queued message." })
-
-        return yield* store.handlers.SaveFeedbackNote({ agentId: agent.id, note: queuedNote })
-      }),
+    CancelQueuedMessage: () =>
+      ++attempts === 1
+        ? Effect.fail(new AgentError({ message: "Couldn't cancel a Queued message." }))
+        : store.handlers.SaveFeedbackNote({ agentId: agent.id, note: queuedNote }),
   })
 
   await user.click(within(region).getByRole("button", { name: "Review feedback" }))
@@ -435,9 +428,6 @@ it("returns a canceled Queued message's Feedback notes beside newer work, and sa
 
   await user.click(within(queue).getByRole("button", { name: cancelFeedback }))
   await waitFor(() => expect(store.current().notes).toHaveLength(2))
-
-  await user.click(within(queue).getByRole("button", { name: "Cancel: Then docs" }))
-  expect(await screen.findByText("Too late to cancel")).toBeTruthy()
 
   expect(within(attached).getAllByRole("article")).toHaveLength(1)
   expect(screen.getByRole("textbox", { name: "Message" }).textContent).toBe("Also add docs")

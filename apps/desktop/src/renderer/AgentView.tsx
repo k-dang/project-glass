@@ -748,6 +748,7 @@ export function AgentComposer(props: {
   const stopped = useAtomValue(conversation.stop)
   const stop = useAtomSet(conversation.stop)
   const canceled = useAtomValue(conversation.cancelQueued)
+  const sentNow = useAtomValue(conversation.sendQueued)
 
   const { editing, ...staged } = useStagedFeedback(
     props.feedback,
@@ -774,6 +775,7 @@ export function AgentComposer(props: {
           settledProblem(steered) ??
           settledProblem(stopped) ??
           settledProblem(canceled) ??
+          settledProblem(sentNow) ??
           props.problem ??
           null
         }

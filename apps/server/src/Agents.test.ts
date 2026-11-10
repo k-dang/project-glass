@@ -362,11 +362,13 @@ const queuedFeedback = Effect.gen(function* () {
   yield* f.client.SendMessage({ agentId, message: "", images: [], feedback: ["note-1", "note-2"] })
 
   const { queued } = yield* f.watch(agentId, (transcript) => transcript.queued.length === 1)
+  const queuedId = queued[0]!.id
+
   const newer = new FeedbackNote({ ...fields, id: "note-3", text: "Newer" })
   yield* f.client.SaveFeedbackNote({ agentId, note: newer })
   yield* f.client.StageFeedbackNotes({ agentId })
 
-  return { f, agentId, sent, newer, queuedId: queued[0]?.id ?? "" }
+  return { f, agentId, sent, newer, queuedId }
 })
 
 it.live(

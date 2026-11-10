@@ -44,7 +44,7 @@ import {
   Stream,
   SubscriptionRef,
 } from "effect"
-import { SqlClient } from "effect/sql"
+import { SqlClient, type SqlError } from "effect/sql"
 import { randomUUID } from "node:crypto"
 import { recordUnit } from "./wideEvents"
 
@@ -179,10 +179,10 @@ const turnExit = (ending: TurnEnding): Exit.Exit<void, TurnFailure> =>
       ? Exit.fail(new TurnFailure({ message: ending.reason }))
       : Exit.interrupt()
 
-const isExpected = (cause: unknown) =>
-  Predicate.isTagged(cause, "AgentBusy") ||
-  Predicate.isTagged(cause, "QueuedMessageStarted") ||
-  Predicate.isTagged(cause, "AgentError")
+type StorageError = SqlError.SqlError | Schema.SchemaError
+
+const isStorageError = <E>(cause: E): cause is Extract<E, StorageError> =>
+  Predicate.isTagged(cause, "SqlError") || Predicate.isTagged(cause, "SchemaError")
 
 const storageFailure = () =>
   new AgentError({ message: "Couldn't read or save the Agent's transcript. Try again." })
@@ -341,7 +341,7 @@ export class Transcripts extends Context.Service<
       const startTurn = Effect.fnUntraced(function* (
         agentId: string,
         input: AcceptedMessage,
-        turnId: string = randomUUID(),
+        turnId: string,
       ) {
         const event = TurnStarted.make({
           turnId,
@@ -530,11 +530,8 @@ export class Transcripts extends Context.Service<
       })
 
       const withStorageFailure = <A, E, R>(name: string, effect: Effect.Effect<A, E, R>) =>
-        effect.pipe(
-          Effect.tapError((cause) =>
-            isExpected(cause) ? Effect.void : Effect.logWarning(`Couldn't ${name}`, cause),
-          ),
-          Effect.mapError((cause) => (isExpected(cause) ? cause : storageFailure())),
+        Effect.catchIf(effect, isStorageError, (cause) =>
+          Effect.logWarning(`Couldn't ${name}`, cause).pipe(Effect.andThen(storageFailure())),
         )
 
       return Transcripts.of({
@@ -576,7 +573,7 @@ export class Transcripts extends Context.Service<
                 const input = { ...sent, feedback: yield* feedback }
 
                 if ((yield* runningTurn(agentId)) === null)
-                  return ["started", [yield* startTurn(agentId, input)]] as const
+                  return ["started", [yield* startTurn(agentId, input, randomUUID())]] as const
 
                 yield* insertQueued(agentId, (yield* queuedPositions(agentId)).last + 1, input)
 
