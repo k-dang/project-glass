@@ -192,7 +192,7 @@ this device, a Sandbox, or, for an Agent review's Follow-ups, a checkout of the 
 _Avoid_: Session, thread, bot, box
 
 **Global conversation**:
-The one conversation the user has with Glass itself, opened beside any area without leaving it,
+The one conversation the user has with Glass itself, opened over any area without leaving it,
 run by pi. It works in no repository and needs no Local checkout; it reads no files and
 runs no commands, but reads the user's work in Glass through Glass's tools, starts Agent reviews,
 creates Agents and messages them, and asks the user Questions. A message keeps the PR workspace

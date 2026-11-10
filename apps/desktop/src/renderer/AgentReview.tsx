@@ -1,5 +1,5 @@
 import { cn } from "cn"
-import { Clock, LoaderCircle, PanelLeft, ScanSearch, TriangleAlert } from "lucide-react"
+import { Clock, LoaderCircle, PanelRight, ScanSearch, TriangleAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Elapsed } from "./Elapsed"
 import { ProblemAlert, withCode } from "./ProblemAlert"
@@ -16,7 +16,7 @@ export function AgentReviewButton(props: { controls: AgentReviewControls; onRead
   if (review !== null && !outdated)
     return (
       <Button variant="ghost" size="sm" onClick={props.onRead}>
-        <PanelLeft aria-hidden />
+        <PanelRight aria-hidden />
         Read Agent review
       </Button>
     )
