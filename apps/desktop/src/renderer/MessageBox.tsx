@@ -16,7 +16,7 @@ import { type EditorView } from "@tiptap/pm/view"
 import { EditorContent, useEditor } from "@tiptap/react"
 import { Predicate, Schema } from "effect"
 import { Base64 } from "effect/encoding"
-import { ArrowUp, LoaderCircle, Square, X } from "lucide-react"
+import { ArrowUp, LoaderCircle, Paperclip, Square, X } from "lucide-react"
 import { memo, type ReactNode, useLayoutEffect, useRef, useState } from "react"
 import { InputGroup, InputGroupAddon, InputGroupButton } from "@/components/ui/input-group"
 import { Suggestion, Suggestions } from "@/components/ui/suggestion"
@@ -117,6 +117,7 @@ export function MessageBox(props: {
 }) {
   const { composed, setComposed } = props
   const sending = useRef(false)
+  const fileInput = useRef<HTMLInputElement>(null)
   const [awaiting, setAwaiting] = useState(false)
 
   const [content] = useState(() => toContent(composed.message))
@@ -349,6 +350,32 @@ export function MessageBox(props: {
               )}
               <EditorContent editor={editor} className="w-full min-w-0" />
               <InputGroupAddon align="block-end" className="min-w-0 items-end gap-1">
+                {!props.textOnly && (
+                  <>
+                    <input
+                      ref={fileInput}
+                      type="file"
+                      accept={ImageMediaType.literals.join(",")}
+                      multiple
+                      hidden
+                      onChange={(event) => {
+                        addImages(event.currentTarget.files ?? [])
+                        event.currentTarget.value = ""
+                        editor.commands.focus()
+                      }}
+                    />
+                    <InputGroupButton
+                      size="icon-sm"
+                      className="text-muted-foreground"
+                      aria-label="Attach images"
+                      title="Attach images"
+                      disabled={awaiting}
+                      onClick={() => fileInput.current?.click()}
+                    >
+                      <Paperclip />
+                    </InputGroupButton>
+                  </>
+                )}
                 <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1 [&>button]:min-w-0">
                   {props.pickers}
                 </div>
