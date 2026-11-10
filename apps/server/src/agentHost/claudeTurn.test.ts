@@ -242,3 +242,12 @@ it("fails a Turn Claude Code couldn't sign in for, leaving out Claude Code's own
   assert.include(reason, "sign in")
   assert.notInclude(reason, "sk-ant-secret")
 })
+
+it("fails a Turn with Claude Code's own words for what went wrong", () => {
+  const { ending } = run([result(true)], fresh)
+
+  assert.deepStrictEqual(
+    ending,
+    TurnFailed.make({ reason: "Claude Code stopped with an error: overloaded" }),
+  )
+})

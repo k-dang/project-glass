@@ -61,6 +61,22 @@ it("forgets a provider error once a retry answers", () => {
   assert.deepInclude(retried.events.at(-1), { ended: { at: now, ending: TurnDone.make({}) } })
 })
 
+it("fails a Turn with the provider's own words for what went wrong", () => {
+  const failed = run([
+    { type: "agent_start" },
+    assistantEnd("error", "overloaded"),
+    { type: "agent_settled" },
+    Input.Idle({ idle: true, generation: 1 }),
+  ])
+
+  assert.deepInclude(failed.events.at(-1), {
+    ended: {
+      at: now,
+      ending: TurnFailed.make({ reason: "pi's model provider returned an error: overloaded" }),
+    },
+  })
+})
+
 it("streams text into one part and fails a tool call left running when pi exits", () => {
   const { events, state } = run([
     { type: "agent_start" },
