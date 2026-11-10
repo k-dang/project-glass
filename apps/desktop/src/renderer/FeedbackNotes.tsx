@@ -67,7 +67,6 @@ export function FeedbackNoteCard(props: {
             {props.location}
           </button>
         )}
-        <span>· Unsent</span>
         {older && <OlderVersion />}
       </div>
       {older && <Snippet code={note.code} />}
