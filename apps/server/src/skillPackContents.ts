@@ -11,10 +11,16 @@ export const candidateSkillPackSources = (input: string): ReadonlyArray<SkillPac
 
   if (url === null || !/^(?:www\.)?github\.com$/i.test(url.hostname)) return null
 
-  const [owner, repo, kind, ...rest] = url.pathname
-    .split("/")
-    .filter((segment) => segment !== "")
-    .map(decodeURIComponent)
+  const segments = Result.try(() =>
+    url.pathname
+      .split("/")
+      .filter((segment) => segment !== "")
+      .map(decodeURIComponent),
+  )
+
+  if (Result.isFailure(segments)) return null
+
+  const [owner, repo, kind, ...rest] = segments.success
 
   if (owner === undefined || repo === undefined) return null
 
@@ -98,11 +104,7 @@ const decodeName = Schema.decodeUnknownOption(Schema.Struct({ name: SkillText })
 
 const parseYaml = (text: string) => Result.try(() => parse(text))
 
-export const readSkill = (
-  directory: string,
-  text: string,
-  fallbackName: string,
-): Skill | SkippedSkill => {
+export const readSkill = (directory: string, text: string): Skill | SkippedSkill => {
   const skipped = (reason: string) => new SkippedSkill({ directory, reason })
   const frontmatter = frontmatterOf(text)
 
@@ -112,18 +114,12 @@ export const readSkill = (
 
   if (Result.isFailure(fields)) return skipped("SKILL.md's frontmatter isn't valid YAML.")
 
+  const name = decodeName(fields.success)
+
+  if (Option.isNone(name)) return skipped("SKILL.md has no name.")
+
   return Option.match(decodeDescription(fields.success), {
     onNone: () => skipped("SKILL.md has no description."),
-    onSome: ({ description }) =>
-      new Skill({
-        name: Option.match(decodeName(fields.success), {
-          onNone: () => fallbackName,
-          onSome: ({ name }) => name,
-        }),
-        description,
-      }),
+    onSome: ({ description }) => new Skill({ name: name.value.name, description }),
   })
 }
-
-export const fallbackSkillName = (source: SkillPackSource, directory: string) =>
-  directory === "" ? folderName(source) : lastSegment(directory)

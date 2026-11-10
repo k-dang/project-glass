@@ -21,7 +21,6 @@ import { SqlClient } from "effect/sql"
 import type { SkillSource } from "./agentHost/protocol"
 import { GitHubClient, type TreeBlob } from "./github/GitHubClient"
 import {
-  fallbackSkillName,
   filesBySkill,
   lastSegment,
   readSkill,
@@ -242,11 +241,7 @@ export class SkillPacks extends Context.Service<
                 directory,
                 files,
                 skillFile: [skillFile.sha, bytes] as const,
-                result: readSkill(
-                  directory,
-                  new TextDecoder().decode(bytes),
-                  fallbackSkillName(source, directory),
-                ),
+                result: readSkill(directory, new TextDecoder().decode(bytes)),
               })),
             )
           },
