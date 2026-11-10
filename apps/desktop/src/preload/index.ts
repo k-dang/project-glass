@@ -4,7 +4,6 @@ import {
   CHOOSE_FOLDER_CHANNEL,
   type DesktopBridge,
   DISCARD_DOGFOOD_REPORT_CHANNEL,
-  DOGFOOD_REPORTS_ARGUMENT,
   FINISH_DOGFOOD_REPORT_CHANNEL,
   RECORD_DOGFOOD_REPORT_CHANNEL,
   RELAUNCH_CHANNEL,
@@ -20,13 +19,11 @@ const bridge: DesktopBridge = {
   setTheme: (theme) => ipcRenderer.invoke(SET_THEME_CHANNEL, theme),
   resourceUsage: () => ipcRenderer.invoke(RESOURCE_USAGE_CHANNEL),
   chooseFolder: () => ipcRenderer.invoke(CHOOSE_FOLDER_CHANNEL),
-  ...(process.argv.includes(DOGFOOD_REPORTS_ARGUMENT) && {
-    dogfoodReports: {
-      record: () => ipcRenderer.invoke(RECORD_DOGFOOD_REPORT_CHANNEL),
-      finish: (details) => ipcRenderer.invoke(FINISH_DOGFOOD_REPORT_CHANNEL, details),
-      discard: (id) => ipcRenderer.invoke(DISCARD_DOGFOOD_REPORT_CHANNEL, id),
-    },
-  }),
+  dogfoodReports: {
+    record: () => ipcRenderer.invoke(RECORD_DOGFOOD_REPORT_CHANNEL),
+    finish: (details) => ipcRenderer.invoke(FINISH_DOGFOOD_REPORT_CHANNEL, details),
+    discard: (id) => ipcRenderer.invoke(DISCARD_DOGFOOD_REPORT_CHANNEL, id),
+  },
 }
 
 contextBridge.exposeInMainWorld("glass", bridge)

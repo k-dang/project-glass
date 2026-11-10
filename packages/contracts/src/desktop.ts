@@ -35,8 +35,7 @@ export interface DesktopBridge {
   readonly setTheme: (theme: Theme) => Promise<ColorScheme>
   readonly resourceUsage: () => Promise<ResourceUsage>
   readonly chooseFolder: () => Promise<string | null>
-  /** Present in development builds only, which record Dogfood reports. */
-  readonly dogfoodReports?: DogfoodReportsBridge
+  readonly dogfoodReports: DogfoodReportsBridge
 }
 
 export interface DogfoodReportsBridge {
@@ -44,9 +43,6 @@ export interface DogfoodReportsBridge {
   readonly finish: (details: DogfoodReportDetails) => Promise<string>
   readonly discard: (id: string) => Promise<void>
 }
-
-/** Main passes this to development builds' renderers, whose preload then offers Dogfood reports. */
-export const DOGFOOD_REPORTS_ARGUMENT = "--glass-dogfood-reports"
 
 export interface DogfoodReportRecorded {
   readonly id: string
