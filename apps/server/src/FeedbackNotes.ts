@@ -8,8 +8,20 @@ const decodeStaged = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ id: Schema.String, staged: Schema.BooleanFromBit })),
 )
 
+const row = (agentId: string, note: FeedbackNote) => ({
+  id: note.id,
+  agent_id: agentId,
+  path: note.path,
+  side: note.side,
+  start_line: note.start,
+  end_line: note.end,
+  code: note.code,
+  changes_id: note.changesId,
+  text: note.text,
+})
+
 const guarded =
-  (doing: "read" | "save" | "remove" | "stage" | "send") =>
+  (doing: "read" | "save" | "remove" | "stage" | "send" | "restore") =>
   <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
       Effect.tapError((cause) => Effect.logWarning(`Couldn't ${doing} Feedback notes`, cause)),
@@ -32,6 +44,10 @@ export class FeedbackNotes extends Context.Service<
       agentId: string,
       noteIds: ReadonlyArray<string>,
     ) => Effect.Effect<ReadonlyArray<FeedbackNote>, AgentError>
+    readonly restore: (
+      agentId: string,
+      notes: ReadonlyArray<FeedbackNote>,
+    ) => Effect.Effect<void, AgentError>
     readonly removeAll: (agentId: string) => Effect.Effect<void, AgentError>
   }
 >()("@glass/server/FeedbackNotes") {
@@ -66,17 +82,7 @@ export class FeedbackNotes extends Context.Service<
         list,
         save: Effect.fn("FeedbackNotes.save")((agentId, note) =>
           sql`
-            INSERT INTO agent_feedback_note ${sql.insert({
-              id: note.id,
-              agent_id: agentId,
-              path: note.path,
-              side: note.side,
-              start_line: note.start,
-              end_line: note.end,
-              code: note.code,
-              changes_id: note.changesId,
-              text: note.text,
-            })}
+            INSERT INTO agent_feedback_note ${sql.insert(row(agentId, note))}
             ON CONFLICT (agent_id, id) DO UPDATE SET text = excluded.text
           `.pipe(guarded("save"), Effect.andThen(list(agentId))),
         ),
@@ -113,6 +119,14 @@ export class FeedbackNotes extends Context.Service<
 
           return taken
         }),
+        restore: Effect.fn("FeedbackNotes.restore")((agentId, notes) =>
+          notes.length === 0
+            ? Effect.void
+            : sql`
+                INSERT INTO agent_feedback_note ${sql.insert(notes.map((note) => row(agentId, note)))}
+                ON CONFLICT (agent_id, id) DO NOTHING
+              `.pipe(Effect.asVoid, guarded("restore")),
+        ),
         removeAll: Effect.fn("FeedbackNotes.removeAll")((agentId) =>
           sql`DELETE FROM agent_feedback_note WHERE agent_id = ${agentId}`.pipe(
             Effect.asVoid,

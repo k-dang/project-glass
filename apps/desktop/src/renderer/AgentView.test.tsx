@@ -30,6 +30,8 @@ import {
   TurnEnded,
   TurnStarted,
   TurnStopped,
+  QueuedMessageStarted,
+  UnsentFeedback,
 } from "@glass/contracts"
 import { cleanup, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
@@ -641,7 +643,11 @@ it("lists Queued messages, cancels one, and sends one now once no Turn runs", as
 
   const handlers = {
     CancelQueuedMessage: ({ queuedMessageId }: { queuedMessageId: string }) =>
-      Effect.sync(() => void cancelled.push(queuedMessageId)),
+      Effect.sync(() => {
+        cancelled.push(queuedMessageId)
+
+        return new UnsentFeedback({ notes: [], staged: [] })
+      }),
     SendQueuedMessage: ({ queuedMessageId }: { queuedMessageId: string }) =>
       Effect.sync(() => void sentNow.push(queuedMessageId)),
   }
@@ -676,6 +682,18 @@ it("lists Queued messages, cancels one, and sends one now once no Turn runs", as
 
   await again.click(await screen.findByRole("button", { name: "Send now: Then add docs" }))
   expect(sentNow).toEqual(["queued-1"])
+})
+
+it("says it's too late to cancel a Queued message that already started its Turn", async () => {
+  const user = mount({
+    WatchTranscript: () => running([{ id: "queued-1", message: "Then add docs" }]),
+    CancelQueuedMessage: () => Effect.fail(new QueuedMessageStarted()),
+  })
+
+  const list = await screen.findByRole("region", { name: "Queued messages" })
+  await user.click(within(list).getByRole("button", { name: "Cancel: Then add docs" }))
+
+  expect(await screen.findByText("Too late to cancel")).toBeTruthy()
 })
 
 it("stops the running Turn, which then shows it was stopped", async () => {

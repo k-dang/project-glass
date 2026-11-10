@@ -21,6 +21,7 @@ import {
   NewAgent,
   NoPermissionModes,
   PermissionMode,
+  QueuedMessageStarted,
   RemovalWarnings,
   RequestAnswer,
   RequestNotWaiting,
@@ -395,7 +396,8 @@ export class GlassRpcs extends RpcGroup.make(
   }),
   Rpc.make("CancelQueuedMessage", {
     payload: { agentId: Schema.String, queuedMessageId: Schema.String },
-    error: Schema.Union([AgentNotFound, AgentError]),
+    success: UnsentFeedback,
+    error: Schema.Union([AgentNotFound, QueuedMessageStarted, AgentError]),
   }),
   Rpc.make("SendQueuedMessage", {
     payload: { agentId: Schema.String, queuedMessageId: Schema.String },
@@ -485,7 +487,7 @@ export class GlassRpcs extends RpcGroup.make(
   }),
   Rpc.make("CancelGlobalQueuedMessage", {
     payload: { queuedMessageId: Schema.String },
-    error: AgentError,
+    error: Schema.Union([QueuedMessageStarted, AgentError]),
   }),
   Rpc.make("SendGlobalQueuedMessage", {
     payload: { queuedMessageId: Schema.String },

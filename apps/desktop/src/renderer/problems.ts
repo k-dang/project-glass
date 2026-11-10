@@ -155,6 +155,10 @@ export const describeError = (error: BackendError): Problem =>
         title: "The Agent is waiting on you",
         detail: "Answer its Permission request or Question, then send your message.",
       }),
+      QueuedMessageStarted: () => ({
+        title: "Too late to cancel",
+        detail: "That message already started a Turn, so it stays in the conversation.",
+      }),
       RequestNotWaiting: () => ({
         title: "Already settled",
         detail: "That request was answered already, or its Turn ended.",

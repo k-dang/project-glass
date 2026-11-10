@@ -336,3 +336,74 @@ it.live(
       assert.include(received?.[0], "attempts++\nreturn send()")
     }),
 )
+
+const queuedFeedback = Effect.gen(function* () {
+  const f = yield* agentsFixture
+  const agent = yield* f.start("hold:first")
+  const agentId = agent.id
+  yield* f.transcript(agentId, holding)
+
+  const fields = {
+    path: "src/retry.ts",
+    side: "old",
+    start: 4,
+    end: 5,
+    code: "attempts++\nreturn send()",
+    changesId: "changes-1",
+  } as const
+
+  const sent = [
+    new FeedbackNote({ ...fields, id: "note-1", text: "Cap the attempts" }),
+    new FeedbackNote({ ...fields, id: "note-2", changesId: "changes-0", text: "Keep the error" }),
+  ]
+
+  for (const note of sent) yield* f.client.SaveFeedbackNote({ agentId, note })
+  yield* f.client.StageFeedbackNotes({ agentId })
+  yield* f.client.SendMessage({ agentId, message: "", images: [], feedback: ["note-1", "note-2"] })
+
+  const { queued } = yield* f.watch(agentId, (transcript) => transcript.queued.length === 1)
+  const queuedId = queued[0]!.id
+
+  const newer = new FeedbackNote({ ...fields, id: "note-3", text: "Newer" })
+  yield* f.client.SaveFeedbackNote({ agentId, note: newer })
+  yield* f.client.StageFeedbackNotes({ agentId })
+
+  return { f, agentId, sent, newer, queuedId }
+})
+
+it.live(
+  "returns a canceled Queued message's Feedback notes beside newer ones, once and durably",
+  () =>
+    Effect.gen(function* () {
+      const { f, agentId, sent, newer, queuedId } = yield* queuedFeedback
+      const cancel = { agentId, queuedMessageId: queuedId }
+      const restored = new UnsentFeedback({ notes: [newer, ...sent], staged: [newer.id] })
+
+      assert.deepStrictEqual(yield* f.client.CancelQueuedMessage(cancel), restored)
+      yield* f.watch(agentId, (transcript) => transcript.queued.length === 0)
+      assert.deepStrictEqual(yield* f.client.CancelQueuedMessage(cancel), restored)
+
+      const restarted = yield* f.restart
+      assert.deepStrictEqual(yield* restarted.ListFeedbackNotes({ agentId }), restored)
+    }),
+)
+
+it.live("refuses to cancel a Queued message whose Turn started, leaving its feedback sent", () =>
+  Effect.gen(function* () {
+    const { f, agentId, sent, newer, queuedId } = yield* queuedFeedback
+
+    yield* f.release("first")
+    yield* f.transcript(agentId, settled(2))
+
+    const late = yield* f.client
+      .CancelQueuedMessage({ agentId, queuedMessageId: queuedId })
+      .pipe(Effect.flip)
+
+    assert.equal(late._tag, "QueuedMessageStarted")
+    assert.deepStrictEqual(
+      yield* f.client.ListFeedbackNotes({ agentId }),
+      new UnsentFeedback({ notes: [newer], staged: [newer.id] }),
+    )
+    assert.deepStrictEqual((yield* f.transcript(agentId, settled(2)))[1]?.feedback, sent)
+  }),
+)

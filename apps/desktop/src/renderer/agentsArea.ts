@@ -335,8 +335,11 @@ export const reachSandboxAtom = Atom.family((agentId: string) =>
 )
 
 export const cancelQueuedAtom = Atom.family((agentId: string) =>
-  backendRuntime.fn((queuedMessageId: string) =>
-    Backend.use((backend) => backend.CancelQueuedMessage({ agentId, queuedMessageId })),
+  backendRuntime.fn((queuedMessageId: string, get) =>
+    Backend.use((backend) => backend.CancelQueuedMessage({ agentId, queuedMessageId })).pipe(
+      Effect.tap((unsent) => Effect.sync(() => get.set(writtenFeedbackAtom(agentId), unsent))),
+      Effect.asVoid,
+    ),
   ),
 )
 
