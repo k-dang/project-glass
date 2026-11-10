@@ -83,11 +83,20 @@ const endingOf = (result: SDKResultMessage): TurnEnding => {
       ? [result.result, result.api_error_status]
       : [result.errors.join("\n"), null]
 
+  if (status === 401 || status === 403 || saysSignInFailed(said))
+    return TurnFailed.make({
+      reason:
+        "Claude Code couldn't sign in. Run claude in a terminal to sign in, then send your message again.",
+    })
+
+  // A Sandbox's agent host logs where the user can't read, so the Turn carries Claude Code's words.
+  const words = said.trim()
+
   return TurnFailed.make({
     reason:
-      status === 401 || status === 403 || saysSignInFailed(said)
-        ? "Claude Code couldn't sign in. Run claude in a terminal to sign in, then send your message again."
-        : "Claude Code stopped with an error. Glass's backend log has the details; send your message again to retry.",
+      words === ""
+        ? "Claude Code stopped with an error. Send your message again to retry."
+        : `Claude Code stopped with an error: ${words}`,
   })
 }
 

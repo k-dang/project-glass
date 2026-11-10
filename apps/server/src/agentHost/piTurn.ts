@@ -115,7 +115,8 @@ const outputText = (result: ToolResult) =>
 const failureReason = (providerError: string) =>
   saysSignInFailed(providerError)
     ? "pi couldn't sign in to its model provider. Run pi in a terminal to sign in, then send your message again."
-    : "pi's model provider returned an error. Check pi's model and its provider, then send your message again."
+    : // A Sandbox's agent host logs where the user can't read, so the Turn carries pi's words.
+      `pi's model provider returned an error: ${providerError}`
 
 const emptyBlock = (type: string): TurnPart =>
   type.startsWith("text") ? TextPart.make({ text: "" }) : ThinkingPart.make({ text: "" })
@@ -215,7 +216,7 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
             ...turn,
             providerError:
               event.message.stopReason === "error"
-                ? (event.message.errorMessage ?? "unknown error")
+                ? event.message.errorMessage?.trim() || "unknown error"
                 : null,
           }
         break
