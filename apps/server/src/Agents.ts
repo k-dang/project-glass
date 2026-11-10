@@ -24,6 +24,7 @@ import {
   type NewAgent,
   type PermissionMode,
   RemovalWarnings,
+  type QueuedMessageStarted,
   type RequestAnswer,
   NoPermissionModes,
   type RequestNotWaiting,
@@ -214,7 +215,7 @@ export class Agents extends Context.Service<
     readonly cancelQueued: (
       agentId: string,
       queuedId: string,
-    ) => Effect.Effect<void, AgentNotFound | AgentError>
+    ) => Effect.Effect<void, AgentNotFound | QueuedMessageStarted | AgentError>
     readonly sendQueued: (
       agentId: string,
       queuedId: string,
@@ -803,7 +804,13 @@ export class Agents extends Context.Service<
           find(agentId).pipe(Effect.andThen(notes.remove(agentId, noteId))),
         steer,
         cancelQueued: (agentId, queuedId) =>
-          find(agentId).pipe(Effect.andThen(transcripts.cancelQueued(agentId, queuedId))),
+          find(agentId).pipe(
+            Effect.andThen(
+              transcripts.cancelQueued(agentId, queuedId, (feedback) =>
+                notes.restore(agentId, feedback),
+              ),
+            ),
+          ),
         sendQueued,
         stop,
         reachSandbox: (agentId) =>

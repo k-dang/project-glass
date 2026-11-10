@@ -1,12 +1,13 @@
 # Agent changes
 
-A local Agent's Changes view shows its worktree diff. The view keeps its Revision until Show latest, even when another Turn changes files. The user can leave Feedback notes on lines of it, kept beside their code across restarts and labelled as an older version after Show latest. Review feedback adds the notes to the Agent's message, which sends them with their code as one message, or queues it while a Turn runs.
+A local Agent's Changes view shows its worktree diff. The view keeps its Revision until Show latest, even when another Turn changes files. The user can leave Feedback notes on lines of it, kept beside their code across restarts and labelled as an older version after Show latest. Review feedback adds the notes to the Agent's message, which sends them with their code as one message, or queues it while a Turn runs. Canceling queued feedback returns its notes to Changes.
 
 ## Sub-features
 
 - Read an Agent's changes, return to Chat, and explicitly move to its latest changes.
 - Select lines by keyboard, add a Feedback note, edit it in place, find it in the Feedback tab after a relaunch, see it marked Older version with its code after Show latest, and remove it.
 - Review feedback, send it to the idle Agent, and queue more while a Turn runs.
+- Cancel queued feedback, find its note back in Changes, edit it, and send it again.
 
 ## How to get to it (user POV)
 
@@ -31,6 +32,7 @@ Sending feedback, from a note added in Changes:
 
 1. Click `Review feedback`. Chat opens; `wait --text "attached to this message"`. Type an instruction in Message, screenshot, and click `Send`. `wait --text "1 Feedback note"`: the demo Agent's reply quotes the `<glass_feedback>` block it received, with the note's code, and the note is gone from Changes.
 2. Send `Please work slowly` (about 9s of reply), then at once add another note in Changes, click `Review feedback` and `Send`. `wait --text "Starts when the Agent finishes"` and screenshot the Queued message. `wait --text "All done"`, then the queued feedback starts its own Turn.
+3. To cancel it in time, queue it behind two slow messages: send `Please work slowly`, then `Please work slowly again`, then add a note, click `Review feedback` and `Send`. Type something in Message and click `Cancel: Feedback on the Agent's changes`: the typed text stays. In Changes the note is back under its line; `Edit` it, `Review feedback`, and `Send`. The reply quotes the edited note.
 
 ## Gotchas
 

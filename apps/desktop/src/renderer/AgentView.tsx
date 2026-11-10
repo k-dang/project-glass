@@ -747,6 +747,7 @@ export function AgentComposer(props: {
   const steer = useAtomSet(conversation.steer, { mode: "promiseExit" })
   const stopped = useAtomValue(conversation.stop)
   const stop = useAtomSet(conversation.stop)
+  const canceled = useAtomValue(conversation.cancelQueued)
 
   const { editing, ...staged } = useStagedFeedback(
     props.feedback,
@@ -758,7 +759,7 @@ export function AgentComposer(props: {
     <>
       {props.queued.length > 0 && (
         <div className="px-6">
-          <QueuedMessages queued={props.queued} running={running} />
+          <QueuedMessages queued={props.queued} running={running} feedback={props.feedback} />
         </div>
       )}
       <MessageBox
@@ -772,6 +773,7 @@ export function AgentComposer(props: {
           settledProblem(sent) ??
           settledProblem(steered) ??
           settledProblem(stopped) ??
+          settledProblem(canceled) ??
           props.problem ??
           null
         }
@@ -823,10 +825,20 @@ function usePersistedComposer(conversation: Conversation) {
   return [composed, setComposed] as const
 }
 
-function QueuedMessages(props: { queued: ReadonlyArray<QueuedMessage>; running: boolean }) {
+function QueuedMessages(props: {
+  queued: ReadonlyArray<QueuedMessage>
+  running: boolean
+  feedback: FeedbackNotesStore | undefined
+}) {
   const conversation = useConversation()
-  const cancel = useAtomSet(conversation.cancelQueued)
+  const cancel = useAtomSet(conversation.cancelQueued, { mode: "promiseExit" })
   const sendNow = useAtomSet(conversation.sendQueued)
+
+  const cancelReturningFeedback = async (queued: QueuedMessage) => {
+    const exit = await cancel(queued.id)
+
+    if (Exit.isSuccess(exit) && queued.feedback.length > 0) props.feedback?.refresh()
+  }
 
   return (
     <section aria-label="Queued messages" className="mx-auto flex max-w-3xl flex-col gap-1 pt-2">
@@ -863,7 +875,7 @@ function QueuedMessages(props: { queued: ReadonlyArray<QueuedMessage>; running: 
                   )}
                   <QueueItemAction
                     aria-label={`Cancel: ${readable}`}
-                    onClick={() => cancel(queued.id)}
+                    onClick={() => void cancelReturningFeedback(queued)}
                   >
                     <X />
                   </QueueItemAction>

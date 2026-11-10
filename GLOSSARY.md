@@ -246,6 +246,7 @@ _Avoid_: Run, execution, exchange
 
 **Queued message**:
 A message sent while a Turn runs, waiting to start the next Turn; the user can cancel it before then.
+Canceling one returns its Feedback notes to the Agent's unsent feedback.
 
 **Mention**:
 A To-do or file the user points at from a message to an Agent, by typing `@` and picking it. The

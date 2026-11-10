@@ -5,6 +5,7 @@ import {
   AgentError,
   AgentModels,
   FeedbackNote,
+  QueuedMessageStarted,
   GitHubConnection,
   TranscriptSnapshot,
   TurnDone,
@@ -378,4 +379,74 @@ it("shows sent and Queued Feedback notes with the code they were left on", async
   const transcript = screen.getByRole("region", { name: "Transcript" })
   expect(within(transcript).getByText("1 Feedback note")).toBeTruthy()
   expect(within(transcript).getByText("Rename B", { exact: true })).toBeTruthy()
+})
+
+it("returns a canceled Queued message's Feedback notes beside newer work, and says when it's too late", async () => {
+  const store = savedNotes(note("newer", "read-2", "Newer"))
+  const queuedNote = note("queued", "read-1", "Cap the attempts")
+  let attempts = 0
+
+  const queued = [
+    { id: "queued-1", message: "", images: [], context: null, feedback: [queuedNote] },
+    { id: "queued-2", message: "Then docs", images: [], context: null, feedback: [] },
+  ]
+
+  const { user, region } = await openChanges({
+    WatchTranscript: () =>
+      Stream.make(
+        TranscriptSnapshot.make({
+          turns: [
+            {
+              id: "turn-1",
+              message: "Build it",
+              images: [],
+              context: null,
+              feedback: [],
+              sentAt,
+              ended: null,
+              parts: [],
+            },
+          ],
+          queued,
+          status: null,
+        }),
+      ),
+    GetAgentChanges: () => Effect.succeed(changes("read-2")),
+    GetUnsentMessage: () => Effect.succeed({ message: "Also add docs", images: [] }),
+    ...store.handlers,
+    CancelQueuedMessage: ({ queuedMessageId }) =>
+      Effect.gen(function* () {
+        if (queuedMessageId === "queued-2") yield* new QueuedMessageStarted()
+
+        if (++attempts === 1)
+          yield* new AgentError({ message: "Couldn't cancel a Queued message." })
+        yield* store.handlers.SaveFeedbackNote({ agentId: agent.id, note: queuedNote })
+      }),
+  })
+
+  await user.click(within(region).getByRole("button", { name: "Review feedback" }))
+  const attached = await screen.findByRole("region", { name: "Feedback attached to this message" })
+
+  const queue = await screen.findByRole("region", { name: "Queued messages" })
+  const cancelFeedback = "Cancel: Feedback on the Agent's changes"
+  await user.click(within(queue).getByRole("button", { name: cancelFeedback }))
+  expect(await screen.findByText("Couldn't cancel a Queued message.")).toBeTruthy()
+
+  await user.click(within(queue).getByRole("button", { name: cancelFeedback }))
+  await waitFor(() => expect(store.current().notes).toHaveLength(2))
+
+  await user.click(within(queue).getByRole("button", { name: "Cancel: Then docs" }))
+  expect(await screen.findByText("Too late to cancel")).toBeTruthy()
+
+  expect(within(attached).getAllByRole("article")).toHaveLength(1)
+  expect(screen.getByRole("textbox", { name: "Message" }).textContent).toBe("Also add docs")
+
+  await user.click(screen.getByRole("textbox", { name: "Message" }))
+  await user.keyboard("{Control>}d{/Control}")
+  await user.click(await screen.findByRole("tab", { name: /Feedback/ }))
+  const overview = await screen.findByRole("tabpanel", { name: /Feedback/ })
+  const [newer, restored] = await within(overview).findAllByRole("article")
+  expect(within(newer!).getByText("Newer")).toBeTruthy()
+  expect(within(restored!).getByText("Cap the attempts")).toBeTruthy()
+  expect(within(restored!).getByText("Older version")).toBeTruthy()
 })

@@ -14,6 +14,7 @@ import {
   AgentBusy,
   QueuedMessagesChanged,
   QueuedMessage,
+  QueuedMessageStarted,
   requestPartTags,
   SentMessage,
   StatusChanged,
@@ -122,6 +123,10 @@ const decodeEndedTurn = Schema.decodeUnknownEffect(
 
 const decodeTurnIds = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ id: Schema.String })))
 
+const decodeFeedback = Schema.decodeUnknownEffect(
+  Schema.Array(Schema.Struct({ feedback: FeedbackJson })),
+)
+
 const decodePositions = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({ first: Schema.NullOr(Schema.Int), last: Schema.NullOr(Schema.Int) }),
@@ -175,7 +180,9 @@ const turnExit = (ending: TurnEnding): Exit.Exit<void, TurnFailure> =>
       : Exit.interrupt()
 
 const isExpected = (cause: unknown) =>
-  Predicate.isTagged(cause, "AgentBusy") || Predicate.isTagged(cause, "AgentError")
+  Predicate.isTagged(cause, "AgentBusy") ||
+  Predicate.isTagged(cause, "QueuedMessageStarted") ||
+  Predicate.isTagged(cause, "AgentError")
 
 const storageFailure = () =>
   new AgentError({ message: "Couldn't read or save the Agent's transcript. Try again." })
@@ -204,7 +211,11 @@ export class Transcripts extends Context.Service<
       agentId: string,
       inputs: ReadonlyArray<MessageWithContext>,
     ) => Effect.Effect<void, AgentError>
-    readonly cancelQueued: (agentId: string, queuedId: string) => Effect.Effect<void, AgentError>
+    readonly cancelQueued: (
+      agentId: string,
+      queuedId: string,
+      restore?: (feedback: ReadonlyArray<FeedbackNote>) => Effect.Effect<void, AgentError>,
+    ) => Effect.Effect<void, QueuedMessageStarted | AgentError>
     readonly startQueued: (
       agentId: string,
       queuedId: string,
@@ -327,9 +338,13 @@ export class Transcripts extends Context.Service<
           Effect.map(([found]) => ({ first: found?.first ?? 0, last: found?.last ?? 0 })),
         )
 
-      const startTurn = Effect.fnUntraced(function* (agentId: string, input: AcceptedMessage) {
+      const startTurn = Effect.fnUntraced(function* (
+        agentId: string,
+        input: AcceptedMessage,
+        turnId: string = randomUUID(),
+      ) {
         const event = TurnStarted.make({
-          turnId: randomUUID(),
+          turnId,
           message: input.message,
           images: input.images,
           context: input.context,
@@ -344,7 +359,7 @@ export class Transcripts extends Context.Service<
 
       const startFromQueue = Effect.fnUntraced(function* (agentId: string, chosen: QueuedMessage) {
         yield* sql`DELETE FROM agent_queued_message WHERE id = ${chosen.id}`
-        const turn = yield* startTurn(agentId, chosen)
+        const turn = yield* startTurn(agentId, chosen, chosen.id)
 
         return [yield* queuedChanged(agentId), turn]
       })
@@ -588,17 +603,28 @@ export class Transcripts extends Context.Service<
               }),
             ),
           ),
-        cancelQueued: (agentId, queuedId) =>
+        cancelQueued: (agentId, queuedId, restore = () => Effect.void) =>
           withStorageFailure(
             "cancel a Queued message",
             change(
               agentId,
               Effect.gen(function* () {
-                yield* sql`
+                const [canceled] = yield* sql`
                   DELETE FROM agent_queued_message WHERE id = ${queuedId} AND agent_id = ${agentId}
+                  RETURNING feedback
+                `.pipe(Effect.flatMap(decodeFeedback))
+
+                if (canceled !== undefined) {
+                  yield* restore(canceled.feedback)
+
+                  return [yield* queuedChanged(agentId)]
+                }
+
+                const [started] = yield* sql`
+                  SELECT id FROM agent_turn WHERE id = ${queuedId} AND agent_id = ${agentId}
                 `
 
-                return [yield* queuedChanged(agentId)]
+                return started === undefined ? [] : yield* new QueuedMessageStarted()
               }),
             ),
           ),

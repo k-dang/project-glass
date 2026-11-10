@@ -1,5 +1,6 @@
 import {
   type AgentBusy,
+  type QueuedMessageStarted,
   AgentError,
   type MessageInputWithContext,
   ModelChoice,
@@ -56,7 +57,9 @@ export class GlobalConversation extends Context.Service<
     readonly steer: (
       input: MessageInputWithContext,
     ) => Effect.Effect<void, RequestWaiting | AgentError>
-    readonly cancelQueued: (queuedId: string) => Effect.Effect<void, AgentError>
+    readonly cancelQueued: (
+      queuedId: string,
+    ) => Effect.Effect<void, QueuedMessageStarted | AgentError>
     readonly sendQueued: (queuedId: string) => Effect.Effect<void, AgentBusy | AgentError>
     readonly stop: Effect.Effect<void, AgentError>
     readonly answer: (

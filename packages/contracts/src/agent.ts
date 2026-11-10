@@ -542,6 +542,11 @@ export class AgentNotFound extends Schema.TaggedError<AgentNotFound>()("AgentNot
 
 export class AgentBusy extends Schema.TaggedError<AgentBusy>()("AgentBusy", {}) {}
 
+export class QueuedMessageStarted extends Schema.TaggedError<QueuedMessageStarted>()(
+  "QueuedMessageStarted",
+  {},
+) {}
+
 export class RequestWaiting extends Schema.TaggedError<RequestWaiting>()("RequestWaiting", {}) {}
 
 export class RequestNotWaiting extends Schema.TaggedError<RequestNotWaiting>()(
