@@ -1,5 +1,5 @@
 import { Chapter, Tour, type TourDiagram } from "@glass/contracts"
-import { Schema } from "effect"
+import { Effect, Logger, Schema } from "effect"
 import { expect, it } from "vite-plus/test"
 import { TourAnswer } from "./tourPrompt"
 
@@ -34,10 +34,22 @@ it.each([
   expect(Schema.is(Chapter)(result.chapters[0])).toBe(true)
 })
 
-it("omits null callouts without weakening the saved Chapter contract", () => {
-  const invalid = { ...chapter, diagram, callouts: null }
-  expect(decode({ ...answer, chapters: [invalid] }).chapters).toEqual([{ ...chapter, diagram }])
-  expect(Schema.is(Chapter)(invalid)).toBe(false)
+it("accepts null callouts quietly and warns readably about malformed ones", () => {
+  const logged: Array<unknown> = []
+  const logger = Logger.make(({ message }) => logged.push(message))
+
+  const chapters = [
+    { ...chapter, callouts: null },
+    { ...chapter, callouts: "not a list" },
+  ]
+
+  const result = Schema.decodeUnknownEffect(TourAnswer)({ ...answer, chapters }).pipe(
+    Effect.provide(Logger.layer([logger])),
+    Effect.runSync,
+  )
+
+  expect(result.chapters).toEqual([{ ...chapter, callouts: null }, chapter])
+  expect(logged).toEqual([["Dropped a malformed Tour visual", "Expected array | null"]])
 })
 
 it.each([null, [], [{ caption: "Receive", nodes: null }]])(

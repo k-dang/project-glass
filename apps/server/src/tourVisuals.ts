@@ -119,7 +119,7 @@ export const repairChapterVisuals = (
   if (chapter.beforeAfter != null)
     repaired.beforeAfter = validateTourBeforeAfter(chapter.beforeAfter, inChapter)
 
-  if (chapter.callouts !== undefined)
+  if (chapter.callouts != null)
     repaired.callouts = validateTourCallouts(chapter.callouts, inChapter)
 
   // A Chapter shows one map. The diagram wins because it also carries branches and
