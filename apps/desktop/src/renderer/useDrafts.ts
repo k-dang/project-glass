@@ -217,7 +217,7 @@ export class DraftStore {
     this.#transition(key, { type: "save" })
   }
 
-  async lockAndSave() {
+  async lock() {
     this.registry.update(this.#holdsAtom, (holds) => holds + 1)
 
     for (const entry of this.registry.get(this.#entriesAtom).values()) {
@@ -239,7 +239,7 @@ export class DraftStore {
     }
 
     this.#setSubmission({ type: "sending" })
-    await this.lockAndSave()
+    await this.lock()
 
     if (this.hasUnsaved()) {
       this.#setSubmission({ type: "failed", problem: unsavedProblem })

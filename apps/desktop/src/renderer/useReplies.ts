@@ -93,17 +93,19 @@ export class ReplyStore {
     this.#calls.add(done)
   }
 
-  async lock(): Promise<ReadonlyMap<string, string>> {
-    this.#holds += 1
-    this.registry.set(this.lockedAtom, this.#holds > 0)
-
-    while (this.#calls.size > 0) await Promise.all(this.#calls)
-
+  unsent(): ReadonlyMap<string, string> {
     return new Map(
       [...this.registry.get(this.viewsAtom)].flatMap(([id, { body }]) =>
         body.trim() === "" ? [] : [[id, body]],
       ),
     )
+  }
+
+  async lock() {
+    this.#holds += 1
+    this.registry.set(this.lockedAtom, this.#holds > 0)
+
+    while (this.#calls.size > 0) await Promise.all(this.#calls)
   }
 
   discardUnsaved() {

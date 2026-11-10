@@ -992,6 +992,45 @@ it("dismisses Reload's discard prompt when the target changes, preserving the ol
   }
 })
 
+it("declines Reload's discard prompt when leaving asks instead, so staying keeps the workspace editable", async () => {
+  const registry = testRegistry({
+    GetConnection: () =>
+      Effect.succeed(new GitHubConnection({ login: "kevin", tokenSource: "gh" })),
+    OpenPullRequest: () => Effect.succeed(withDiscussion("head001")),
+    CreateDraft: () => Effect.fail(new GitHubUnavailable({ message: "Offline" })),
+  })
+
+  try {
+    openPullRequest(registry, greet.ref)
+
+    const first = await Effect.runPromise(
+      AtomRegistry.getResult(registry, openWorkspaceAtom, { suspendOnWaiting: true }),
+    )
+
+    first.feedback.drafts.start("greet.ts", "new", 2)
+    const draft = first.feedback.drafts.views()[0]!
+
+    first.feedback.drafts.edit(draft.key, "Unsent Draft")
+    const reloading = reloadPullRequest(registry)
+
+    await waitFor(() => expect(registry.get(discardPromptAtom)).not.toBeNull())
+    const reloadPrompt = registry.get(discardPromptAtom)
+    const leaving = confirmLeave(registry)
+
+    await reloading
+    await waitFor(() => expect(registry.get(discardPromptAtom)).not.toBe(reloadPrompt))
+    const leavePrompt = registry.get(discardPromptAtom)!
+
+    expect(leavePrompt.description).toBe("Drafts that couldn't save to GitHub will be discarded.")
+    leavePrompt.answer(false)
+    expect(await leaving).toBe(false)
+    first.feedback.drafts.edit(draft.key, "Editable Draft")
+    expect(first.feedback.drafts.view(draft.key)?.body).toBe("Editable Draft")
+  } finally {
+    registry.dispose()
+  }
+})
+
 it("leaves a PR while a resolution is in flight and shows its result when returning", async () => {
   const resolves: Array<
     Held<{ discussionId: string; resolved: boolean }, boolean, ConnectionError>

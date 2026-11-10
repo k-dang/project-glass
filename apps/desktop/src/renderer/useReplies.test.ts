@@ -121,7 +121,8 @@ describe("ReplyStore", () => {
 
     reply.answer(Effect.succeed(confirmed))
 
-    expect(await locked).toEqual(new Map([["T1", "Draft reply"]]))
+    await locked
+    expect(store.unsent()).toEqual(new Map([["T1", "Draft reply"]]))
     expect(store.view("T2")).toEqual({ body: "", feedback: null, published: [confirmed] })
 
     store.edit("T1", "Changed after publishing")

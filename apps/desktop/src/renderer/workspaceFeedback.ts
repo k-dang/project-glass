@@ -16,7 +16,10 @@ export interface ReloadFeedback {
   readonly summary: string
 }
 
-const unsavedDrafts = "Drafts that couldn't save to GitHub"
+interface Hold {
+  lock(): Promise<void>
+  unlock(): void
+}
 
 export class WorkspaceFeedback {
   readonly drafts: DraftStore
@@ -57,79 +60,70 @@ export class WorkspaceFeedback {
     return Effect.suspend(() => {
       if (this.#disposed || this.drafts.locked()) return Effect.void
 
-      return Effect.acquireUseRelease(
-        Effect.sync(() =>
-          Promise.all([
-            this.drafts.lockAndSave(),
-            this.replies.lock(),
-            this.viewedFiles.lock(),
-            this.resolutions.lock(),
-            this.reactions.lock(),
-          ]),
+      const drafts = this.drafts
+
+      return this.#handOff(
+        [drafts, this.replies, this.viewedFiles, this.resolutions, this.reactions],
+        () => this.#lostDrafts(),
+        confirm,
+        Effect.suspend(() =>
+          replace({
+            replies: this.replies.unsent(),
+            get summary() {
+              return drafts.summary()
+            },
+          }),
         ),
-        (pending) =>
-          Effect.gen({ self: this }, function* () {
-            const [, replies] = yield* Effect.promise(() => pending)
-
-            if (!(yield* confirm(this.drafts.hasUnsaved() ? [unsavedDrafts] : []))) return
-
-            const drafts = this.drafts
-
-            yield* replace({
-              replies,
-              get summary() {
-                return drafts.summary()
-              },
-            })
-          }),
-        () =>
-          Effect.sync(() => {
-            if (this.#disposed) return
-
-            this.drafts.unlock()
-            this.replies.unlock()
-            this.viewedFiles.unlock()
-            this.resolutions.unlock()
-            this.reactions.unlock()
-          }),
       )
     })
   }
 
   prepareLeave(confirm: ConfirmDiscard): Effect.Effect<boolean> {
+    return this.#handOff(
+      [this.drafts, this.replies],
+      () => [
+        ...this.#lostDrafts(),
+        ...(this.replies.unsent().size > 0 ? ["Replies you haven't published"] : []),
+        ...(this.drafts.summary().trim() !== "" ? ["your Review summary"] : []),
+      ],
+      confirm,
+      Effect.sync(() => {
+        this.drafts.discardUnsaved()
+        this.replies.discardUnsaved()
+        this.viewedFiles.discardUnsaved()
+      }),
+    )
+  }
+
+  #handOff<E, R>(
+    holds: ReadonlyArray<Hold>,
+    lost: () => ReadonlyArray<string>,
+    confirm: ConfirmDiscard,
+    proceed: Effect.Effect<void, E, R>,
+  ): Effect.Effect<boolean, E, R> {
     return Effect.acquireUseRelease(
-      Effect.sync(() => Promise.all([this.drafts.lockAndSave(), this.replies.lock()])),
-      (pending) =>
+      Effect.sync(() => Promise.all(holds.map((hold) => hold.lock()))),
+      (drained) =>
         Effect.gen({ self: this }, function* () {
-          const [, replies] = yield* Effect.promise(() => pending)
-          const lost: Array<string> = []
+          yield* Effect.promise(() => drained)
 
-          if (this.drafts.hasUnsaved()) lost.push(unsavedDrafts)
+          const proceeding = yield* confirm(lost())
 
-          if (replies.size > 0) lost.push("Replies you haven't published")
+          if (proceeding) yield* proceed
 
-          if (this.drafts.summary().trim() !== "") lost.push("your Review summary")
-
-          const leaving = yield* confirm(lost)
-
-          if (leaving) this.#discardUnsaved()
-
-          return leaving
+          return proceeding
         }),
       () =>
         Effect.sync(() => {
           if (this.#disposed) return
 
-          this.drafts.unlock()
-          this.replies.unlock()
+          for (const hold of holds) hold.unlock()
         }),
     )
   }
 
-  #discardUnsaved() {
-    this.drafts.discardUnsaved()
-    this.replies.discardUnsaved()
-    this.viewedFiles.discardUnsaved()
+  #lostDrafts() {
+    return this.drafts.hasUnsaved() ? ["Drafts that couldn't save to GitHub"] : []
   }
 
   dispose() {
