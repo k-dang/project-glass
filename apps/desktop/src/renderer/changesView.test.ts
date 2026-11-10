@@ -18,7 +18,7 @@ import {
   toItems,
   toNoteSections,
 } from "./changesView"
-import type { DraftView } from "./useDrafts"
+import type { DraftView } from "./draftSync"
 import { changedFile, hunks } from "../../test/workspace"
 
 const comment = (id: string) =>

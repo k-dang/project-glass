@@ -8,7 +8,7 @@ import {
 } from "@pierre/diffs"
 import { type FileTreePreparedInput, prepareFileTreeInput } from "@pierre/trees"
 import { Match, Predicate } from "effect"
-import type { DraftView } from "./useDrafts"
+import type { DraftView } from "./draftSync"
 
 export type LineNote =
   | { readonly type: "discussion"; readonly discussion: LineDiscussion }
