@@ -353,7 +353,12 @@ export const originalLineName = (originalLine: OriginalLine) =>
 
 export function LineLocation(props: { side: DiffSide; line: number }) {
   return (
-    <span className={props.side === "new" ? "text-added" : "text-deleted"}>
+    <span
+      className={cn(
+        "shrink-0 whitespace-nowrap",
+        props.side === "new" ? "text-added" : "text-deleted",
+      )}
+    >
       {lineName(props.side, props.line)}
     </span>
   )
