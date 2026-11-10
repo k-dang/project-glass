@@ -266,7 +266,7 @@ function AreaPage(props: { label: string; children: ReactNode }) {
   return (
     <main
       aria-label={props.label}
-      className="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]"
+      className="relative min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]"
     >
       {props.children}
     </main>
