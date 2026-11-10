@@ -31,7 +31,7 @@ import { act, cleanup, render, screen, waitFor, within } from "@testing-library/
 import userEvent from "@testing-library/user-event"
 import { DateTime, Effect } from "effect"
 import { AtomRegistry } from "effect/reactivity"
-import { afterEach, expect, it, vi } from "vite-plus/test"
+import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test"
 import { App } from "./App"
 import { backendLayerAtom } from "./backend"
 import {
@@ -159,6 +159,10 @@ const mount = (handlers: Parameters<typeof testLayer>[0]) => {
 
   return userEvent.setup()
 }
+
+beforeEach(() => {
+  window.history.replaceState(null, "", "#/reviews")
+})
 
 afterEach(() => {
   cleanup()

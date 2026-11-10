@@ -37,7 +37,7 @@ import { RegistryProvider } from "@effect/atom-react"
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { DateTime, Effect, Stream } from "effect"
-import { afterEach, expect, it } from "vite-plus/test"
+import { afterEach, beforeEach, expect, it } from "vite-plus/test"
 import { ACTIVITY_PAGE_SIZE } from "./ActivityLogPage"
 import { App } from "./App"
 import { backendLayerAtom } from "./backend"
@@ -106,6 +106,10 @@ const mount = (handlers: Parameters<typeof testLayer>[0]) => {
 
   return userEvent.setup()
 }
+
+beforeEach(() => {
+  window.history.replaceState(null, "", "#/reviews")
+})
 
 afterEach(() => {
   cleanup()

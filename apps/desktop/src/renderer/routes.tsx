@@ -53,7 +53,7 @@ const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
   beforeLoad: () => {
-    throw redirect({ to: "/reviews", search: defaultListSearch, replace: true })
+    throw redirect({ to: "/dashboard", replace: true })
   },
 })
 
