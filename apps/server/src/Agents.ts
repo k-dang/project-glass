@@ -215,7 +215,7 @@ export class Agents extends Context.Service<
     readonly cancelQueued: (
       agentId: string,
       queuedId: string,
-    ) => Effect.Effect<void, AgentNotFound | QueuedMessageStarted | AgentError>
+    ) => Effect.Effect<UnsentFeedback, AgentNotFound | QueuedMessageStarted | AgentError>
     readonly sendQueued: (
       agentId: string,
       queuedId: string,
@@ -810,6 +810,7 @@ export class Agents extends Context.Service<
                 notes.restore(agentId, feedback),
               ),
             ),
+            Effect.andThen(notes.list(agentId)),
           ),
         sendQueued,
         stop,

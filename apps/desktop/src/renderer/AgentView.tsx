@@ -759,7 +759,7 @@ export function AgentComposer(props: {
     <>
       {props.queued.length > 0 && (
         <div className="px-6">
-          <QueuedMessages queued={props.queued} running={running} feedback={props.feedback} />
+          <QueuedMessages queued={props.queued} running={running} />
         </div>
       )}
       <MessageBox
@@ -825,20 +825,10 @@ function usePersistedComposer(conversation: Conversation) {
   return [composed, setComposed] as const
 }
 
-function QueuedMessages(props: {
-  queued: ReadonlyArray<QueuedMessage>
-  running: boolean
-  feedback: FeedbackNotesStore | undefined
-}) {
+function QueuedMessages(props: { queued: ReadonlyArray<QueuedMessage>; running: boolean }) {
   const conversation = useConversation()
-  const cancel = useAtomSet(conversation.cancelQueued, { mode: "promiseExit" })
+  const cancel = useAtomSet(conversation.cancelQueued)
   const sendNow = useAtomSet(conversation.sendQueued)
-
-  const cancelReturningFeedback = async (queued: QueuedMessage) => {
-    const exit = await cancel(queued.id)
-
-    if (Exit.isSuccess(exit) && queued.feedback.length > 0) props.feedback?.refresh()
-  }
 
   return (
     <section aria-label="Queued messages" className="mx-auto flex max-w-3xl flex-col gap-1 pt-2">
@@ -875,7 +865,7 @@ function QueuedMessages(props: {
                   )}
                   <QueueItemAction
                     aria-label={`Cancel: ${readable}`}
-                    onClick={() => void cancelReturningFeedback(queued)}
+                    onClick={() => cancel(queued.id)}
                   >
                     <X />
                   </QueueItemAction>

@@ -420,7 +420,8 @@ it("returns a canceled Queued message's Feedback notes beside newer work, and sa
 
         if (++attempts === 1)
           yield* new AgentError({ message: "Couldn't cancel a Queued message." })
-        yield* store.handlers.SaveFeedbackNote({ agentId: agent.id, note: queuedNote })
+
+        return yield* store.handlers.SaveFeedbackNote({ agentId: agent.id, note: queuedNote })
       }),
   })
 

@@ -396,6 +396,7 @@ export class GlassRpcs extends RpcGroup.make(
   }),
   Rpc.make("CancelQueuedMessage", {
     payload: { agentId: Schema.String, queuedMessageId: Schema.String },
+    success: UnsentFeedback,
     error: Schema.Union([AgentNotFound, QueuedMessageStarted, AgentError]),
   }),
   Rpc.make("SendQueuedMessage", {

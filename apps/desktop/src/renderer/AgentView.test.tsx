@@ -30,6 +30,7 @@ import {
   TurnEnded,
   TurnStarted,
   TurnStopped,
+  UnsentFeedback,
 } from "@glass/contracts"
 import { cleanup, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
@@ -641,7 +642,11 @@ it("lists Queued messages, cancels one, and sends one now once no Turn runs", as
 
   const handlers = {
     CancelQueuedMessage: ({ queuedMessageId }: { queuedMessageId: string }) =>
-      Effect.sync(() => void cancelled.push(queuedMessageId)),
+      Effect.sync(() => {
+        cancelled.push(queuedMessageId)
+
+        return new UnsentFeedback({ notes: [], staged: [] })
+      }),
     SendQueuedMessage: ({ queuedMessageId }: { queuedMessageId: string }) =>
       Effect.sync(() => void sentNow.push(queuedMessageId)),
   }

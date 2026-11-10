@@ -377,12 +377,9 @@ it.live(
       const cancel = { agentId, queuedMessageId: queuedId }
       const restored = new UnsentFeedback({ notes: [newer, ...sent], staged: [newer.id] })
 
-      yield* f.client.CancelQueuedMessage(cancel)
+      assert.deepStrictEqual(yield* f.client.CancelQueuedMessage(cancel), restored)
       yield* f.watch(agentId, (transcript) => transcript.queued.length === 0)
-      assert.deepStrictEqual(yield* f.client.ListFeedbackNotes({ agentId }), restored)
-
-      yield* f.client.CancelQueuedMessage(cancel)
-      assert.deepStrictEqual(yield* f.client.ListFeedbackNotes({ agentId }), restored)
+      assert.deepStrictEqual(yield* f.client.CancelQueuedMessage(cancel), restored)
 
       const restarted = yield* f.restart
       assert.deepStrictEqual(yield* restarted.ListFeedbackNotes({ agentId }), restored)

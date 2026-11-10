@@ -622,7 +622,7 @@ export class Transcripts extends Context.Service<
 
                 const [started] = yield* sql`
                   SELECT id FROM agent_turn WHERE id = ${queuedId} AND agent_id = ${agentId}
-                `
+                `.pipe(Effect.flatMap(decodeTurnIds))
 
                 return started === undefined ? [] : yield* new QueuedMessageStarted()
               }),
