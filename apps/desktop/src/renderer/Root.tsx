@@ -23,9 +23,7 @@ export function Root() {
           <BackendFailed failure={failure} />
         </Toaster>
       )}
-      {window.glass.dogfoodReports !== undefined && (
-        <DogfoodReports bridge={window.glass.dogfoodReports} />
-      )}
+      <DogfoodReports bridge={window.glass.dogfoodReports} />
     </>
   )
 }

@@ -69,7 +69,7 @@ const isDogfoodShortcut = (event: KeyboardEvent) =>
   !event.altKey &&
   !event.repeat
 
-/** Records a Dogfood report on Mod+Shift+., then asks for its note. Development builds only. */
+/** Records a Dogfood report on Mod+Shift+., then asks for its note. */
 export function DogfoodReports(props: { bridge: DogfoodReportsBridge }) {
   const { bridge } = props
   const registry = useContext(RegistryContext)

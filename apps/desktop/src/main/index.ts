@@ -5,7 +5,6 @@ import {
   CHOOSE_FOLDER_CHANNEL,
   type BackendFailure,
   DISCARD_DOGFOOD_REPORT_CHANNEL,
-  DOGFOOD_REPORTS_ARGUMENT,
   type DogfoodReportDetails,
   type DogfoodReportRecorded,
   FINISH_DOGFOOD_REPORT_CHANNEL,
@@ -159,7 +158,6 @@ const createWindow = () => {
       nodeIntegration: false,
       // Throttled timers in a hidden window can interrupt WebSocket pings.
       backgroundThrottling: false,
-      additionalArguments: app.isPackaged ? [] : [DOGFOOD_REPORTS_ARGUMENT],
     },
   })
 
@@ -249,21 +247,17 @@ void app.whenReady().then(() => {
     return chosen.canceled ? null : (chosen.filePaths[0] ?? null)
   })
 
-  if (!app.isPackaged) {
-    ipcMain.handle(RECORD_DOGFOOD_REPORT_CHANNEL, async (event) => {
-      const window = BrowserWindow.fromWebContents(event.sender)
+  ipcMain.handle(RECORD_DOGFOOD_REPORT_CHANNEL, async (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
 
-      if (window === null) throw new Error("No window to record")
+    if (window === null) throw new Error("No window to record")
 
-      return recordDogfoodReportOf(window)
-    })
-    ipcMain.handle(FINISH_DOGFOOD_REPORT_CHANNEL, (_event, details: DogfoodReportDetails) =>
-      dogfoodReports.finish(details),
-    )
-    ipcMain.handle(DISCARD_DOGFOOD_REPORT_CHANNEL, (_event, id: string) =>
-      dogfoodReports.discard(id),
-    )
-  }
+    return recordDogfoodReportOf(window)
+  })
+  ipcMain.handle(FINISH_DOGFOOD_REPORT_CHANNEL, (_event, details: DogfoodReportDetails) =>
+    dogfoodReports.finish(details),
+  )
+  ipcMain.handle(DISCARD_DOGFOOD_REPORT_CHANNEL, (_event, id: string) => dogfoodReports.discard(id))
 
   ipcMain.handle(RELAUNCH_CHANNEL, () => {
     app.relaunch()
