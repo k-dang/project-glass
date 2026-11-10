@@ -10,10 +10,9 @@ import { ConfirmationDialog } from "./ConfirmationDialog"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemText } from "./problems"
 import { optionLabel, shortcutLabel } from "./shortcutLabel"
+import type { DraftView, Feedback } from "./draftSync"
 import {
   type DraftStore,
-  type DraftView,
-  type Feedback,
   isPublishing,
   type Submission,
   useDraft,

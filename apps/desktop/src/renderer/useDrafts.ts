@@ -3,37 +3,28 @@ import {
   type Activity,
   type DiffSide,
   Draft,
-  type DraftPlace,
   LinePlace,
   type PullRequestWorkspace,
   type ReviewDecision,
   ReviewSubmitted,
 } from "@glass/contracts"
-import { Cause, Effect, Exit, Option, Predicate } from "effect"
+import { Cause, Effect, Exit, Match, Option, Predicate } from "effect"
 import { Atom, type AtomRegistry } from "effect/reactivity"
 import { activityPullRequest } from "./activity"
 import { Backend, backendRuntimeOf, type BackendError, type BackendRuntime } from "./backend"
 import { type LineNotePlace, sameLineNotePlaces } from "./changesView"
+import {
+  type DraftEntry,
+  type DraftEvent,
+  type DraftView,
+  type DraftWrite,
+  draftView,
+  isLocalDraft,
+  pendingDraftWrite,
+  type SavedDraft,
+  stepDraft,
+} from "./draftSync"
 import { type Problem, problemOf } from "./problems"
-
-type DraftAction = "save" | "delete"
-
-export type Feedback =
-  | { readonly type: "draft" }
-  | { readonly type: "unsaved" }
-  | { readonly type: "sending"; readonly action: DraftAction }
-  | { readonly type: "failed"; readonly action: DraftAction; readonly problem: Problem }
-  | null
-
-export interface DraftView {
-  readonly key: string
-  readonly path: string
-  readonly place: DraftPlace
-  readonly body: string
-  readonly feedback: Feedback
-  readonly deleting: boolean
-  readonly local: boolean
-}
 
 export type SubmitOutcome =
   | { readonly type: "submitted"; readonly published: number }
@@ -67,75 +58,19 @@ const submitProblem = (cause: Cause.Cause<BackendError>) =>
     onNone: () => mayHaveSubmittedProblem,
   })
 
-interface Saved {
-  readonly id: string
-  readonly body: string
-}
-
-interface Call {
-  readonly action: DraftAction
-  readonly run: Effect.Effect<Saved | null, BackendError, Backend>
-}
-
-interface Entry {
-  readonly key: string
-  readonly path: string
-  readonly place: DraftPlace
-  readonly body: string
-  readonly saved: Saved | null
-  readonly sending: DraftAction | null
-  readonly requested: boolean
-  readonly deleting: boolean
-  readonly failure: { readonly action: DraftAction; readonly problem: Problem } | null
-}
-
-const pendingAction = (entry: Entry): DraftAction | null => {
-  const { saved, body } = entry
-
-  if (entry.deleting || body.trim() === "") return saved === null ? null : "delete"
-
-  if (saved !== null) return body === saved.body ? null : "save"
-
-  return Predicate.isTagged(entry.place, "LinePlace") ? "save" : null
-}
-
-const mayNeedCall = (entry: Entry) => entry.sending !== null || pendingAction(entry) !== null
-
-const feedbackOf = (entry: Entry): Feedback => {
-  if (entry.failure !== null) return { type: "failed", ...entry.failure }
-
-  if (entry.sending !== null) return { type: "sending", action: entry.sending }
-
-  if (pendingAction(entry) !== null) return { type: "unsaved" }
-
-  return entry.saved === null ? null : { type: "draft" }
-}
-
-const isLocal = (entry: Entry) => entry.saved === null && entry.sending === null
-
-const toView = (entry: Entry): DraftView => ({
-  key: entry.key,
-  path: entry.path,
-  place: entry.place,
-  body: entry.body,
-  feedback: feedbackOf(entry),
-  deleting: entry.deleting,
-  local: isLocal(entry),
-})
-
 const isDraftNotFound = (cause: Cause.Cause<unknown>) =>
   Option.exists(Cause.findErrorOption(cause), Predicate.isTagged("DraftNotFound"))
 
 export class DraftStore {
   readonly #runtime: BackendRuntime
   readonly #record: (activity: Activity) => void
-  readonly #entriesAtom = Atom.make<ReadonlyMap<string, Entry>>(new Map())
+  readonly #entriesAtom = Atom.make<ReadonlyMap<string, DraftEntry>>(new Map())
   readonly #calls = new Set<Promise<void>>()
   readonly #holdsAtom = Atom.make(0)
   readonly viewAtom = Atom.family((key: string) =>
     Atom.map(
       Atom.make((get) => get(this.#entriesAtom).get(key)),
-      (entry) => (entry === undefined ? undefined : toView(entry)),
+      (entry) => (entry === undefined ? undefined : draftView(entry)),
     ),
   )
   readonly viewsAtom = Atom.make((get) =>
@@ -251,48 +186,42 @@ export class DraftStore {
   }
 
   edit(key: string, body: string) {
-    const entry = this.registry.get(this.#entriesAtom).get(key)
+    if (this.#closed()) return
 
-    if (entry === undefined || entry.deleting || this.#closed()) return
-
-    this.#put({ ...entry, body, failure: null })
+    this.#transition(key, { type: "edit", body })
   }
 
   remove(key: string) {
-    const entry = this.registry.get(this.#entriesAtom).get(key)
+    if (this.#closed()) return
 
-    if (entry === undefined || this.#closed()) return
-
-    this.#save({ ...entry, deleting: true })
+    this.#transition(key, { type: "remove" })
   }
 
   takeLocal(key: string) {
     const entry = this.registry.get(this.#entriesAtom).get(key)
 
-    if (entry === undefined || !isLocal(entry) || this.#closed()) return undefined
+    if (entry === undefined || !isLocalDraft(entry) || this.#closed()) return undefined
 
     const { path, place, body } = entry
 
     if (!Predicate.isTagged(place, "LinePlace")) return undefined
 
-    this.#save({ ...entry, deleting: true })
+    this.#transition(key, { type: "remove" })
 
     return { place: { path, side: place.side, line: place.line }, body }
   }
 
   save(key: string) {
-    const entry = this.registry.get(this.#entriesAtom).get(key)
+    if (this.#closed()) return
 
-    if (entry !== undefined && !this.#closed() && mayNeedCall(entry)) {
-      this.#request(entry)
-    }
+    this.#transition(key, { type: "save" })
   }
 
   async lockAndSave() {
     this.registry.update(this.#holdsAtom, (holds) => holds + 1)
 
     for (const entry of this.registry.get(this.#entriesAtom).values()) {
-      if (entry.failure === null && mayNeedCall(entry)) this.#request(entry)
+      if (entry.sync.type !== "failed") this.#transition(entry.key, { type: "save" })
     }
 
     while (this.#calls.size > 0) await Promise.all(this.#calls)
@@ -368,12 +297,12 @@ export class DraftStore {
 
   discardUnsaved() {
     this.registry.update(this.#entriesAtom, (entries) => {
-      const saved = new Map<string, Entry>()
+      const saved = new Map<string, DraftEntry>()
 
       for (const [key, entry] of entries) {
-        if (entry.saved !== null) {
-          saved.set(key, { ...entry, body: entry.saved.body, deleting: false, failure: null })
-        }
+        const restored = stepDraft(entry, { type: "discard" }).entry
+
+        if (restored !== null) saved.set(key, restored)
       }
 
       return saved
@@ -386,7 +315,7 @@ export class DraftStore {
 
   hasUnsaved() {
     for (const entry of this.registry.get(this.#entriesAtom).values()) {
-      if (pendingAction(entry) !== null) return true
+      if (pendingDraftWrite(entry) !== null) return true
     }
 
     return false
@@ -399,108 +328,73 @@ export class DraftStore {
     return key
   }
 
-  #add(fields: Pick<Entry, "key" | "path" | "place" | "body" | "saved">) {
-    const entry = {
+  #add(fields: Pick<DraftEntry, "key" | "path" | "place" | "body" | "saved">) {
+    const entry: DraftEntry = {
       ...fields,
-      sending: null,
-      requested: false,
-      deleting: false,
-      failure: null,
+      intent: "edit",
+      sync: { type: "idle" },
     }
 
-    this.#put(entry)
+    this.registry.update(this.#entriesAtom, (entries) => new Map(entries).set(entry.key, entry))
   }
 
-  #nextCall(entry: Entry): Call | null {
-    const { saved, body, place } = entry
-    const action = pendingAction(entry)
-
-    if (action === null) return null
-
-    if (action === "delete" && saved !== null) {
-      const run = Backend.use((backend) => backend.DeleteDraft({ id: saved.id }))
-
-      return { action, run: Effect.as(run, null) }
-    }
-
-    if (saved !== null) {
-      const run = Backend.use((backend) => backend.UpdateDraft({ id: saved.id, body }))
-
-      return { action, run: Effect.as(run, { id: saved.id, body }) }
-    }
-
-    if (!Predicate.isTagged(place, "LinePlace")) return null
-
+  #run(write: DraftWrite): Effect.Effect<SavedDraft | null, BackendError, Backend> {
     const { pullRequest, revision } = this.workspace
 
-    const run = Backend.use((backend) =>
-      backend.CreateDraft({
-        pullRequestId: pullRequest.id,
-        revision,
-        path: entry.path,
-        side: place.side,
-        line: place.line,
-        body,
+    return Match.value(write).pipe(
+      Match.discriminatorsExhaustive("type")({
+        create: ({ path, side, line, body }) =>
+          Backend.use((backend) =>
+            backend.CreateDraft({
+              pullRequestId: pullRequest.id,
+              revision,
+              path,
+              side,
+              line,
+              body,
+            }),
+          ).pipe(Effect.map(({ id }) => ({ id, body }))),
+        update: ({ id, body }) =>
+          Backend.use((backend) => backend.UpdateDraft({ id, body })).pipe(Effect.as({ id, body })),
+        delete: ({ id }) =>
+          Backend.use((backend) => backend.DeleteDraft({ id })).pipe(Effect.as(null)),
       }),
     )
-
-    return { action: "save", run: Effect.map(run, ({ id }) => ({ id, body })) }
   }
 
-  #request(entry: Entry) {
-    this.#save({ ...entry, requested: true })
-  }
+  #transition(key: string, event: DraftEvent) {
+    const current = this.registry.get(this.#entriesAtom).get(key)
 
-  #save(entry: Entry) {
-    if (entry.sending !== null) return this.#put(entry)
+    if (current === undefined) return
 
-    if (entry.deleting && entry.saved === null) {
-      this.registry.update(this.#entriesAtom, (entries) => {
-        const next = new Map(entries)
-        next.delete(entry.key)
+    const { entry, write } = stepDraft(current, event)
 
-        return next
-      })
+    if (entry === current && write === null) return
 
-      return
-    }
+    this.registry.update(this.#entriesAtom, (entries) => {
+      const next = new Map(entries)
 
-    const ready = { ...entry, requested: false }
-    const call = this.#nextCall(ready)
+      if (entry === null) next.delete(key)
+      else next.set(key, entry)
 
-    if (call === null) return this.#put(ready)
+      return next
+    })
 
-    this.#send(ready, call)
-  }
+    if (write === null) return
 
-  #send(entry: Entry, { action, run }: Call) {
-    this.#put({ ...entry, sending: action, failure: null })
-
-    const done = this.#runtime.runPromiseExit(run).then((exit) => {
+    const done = this.#runtime.runPromiseExit(this.#run(write)).then((exit) => {
       this.#calls.delete(done)
-      const current = this.registry.get(this.#entriesAtom).get(entry.key)
-
-      if (current === undefined) return
-
-      let settled: Entry = { ...current, sending: null }
-
-      if (Exit.isSuccess(exit)) {
-        settled = { ...settled, saved: exit.value }
-      } else if (isDraftNotFound(exit.cause)) {
-        settled = { ...settled, saved: null, requested: true }
-      } else if (!(current.deleting && action === "save")) {
-        settled = { ...settled, failure: { action, problem: problemOf(exit.cause) } }
-      }
-
-      if ((settled.requested || settled.deleting) && settled.failure === null) this.#save(settled)
-      else this.#put(settled)
+      this.#transition(
+        key,
+        Exit.isSuccess(exit)
+          ? { type: "saved", saved: exit.value }
+          : isDraftNotFound(exit.cause)
+            ? { type: "missing" }
+            : { type: "failed", problem: problemOf(exit.cause) },
+      )
     })
 
     this.#calls.add(done)
-  }
-
-  #put(entry: Entry) {
-    this.registry.update(this.#entriesAtom, (entries) => new Map(entries).set(entry.key, entry))
   }
 
   #setSubmission(submission: Submission) {
