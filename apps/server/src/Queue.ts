@@ -5,6 +5,7 @@ import {
   type PullRequestRef,
   PullRequestState,
   PullRequestSummary,
+  canRunQueueWork,
   QueueAddition,
   QueuedPullRequest,
   QueueError,
@@ -74,7 +75,6 @@ export class Queue extends Context.Service<
   Queue,
   {
     readonly saved: () => Effect.Effect<ReadonlyArray<QueuedPullRequest>, QueueError>
-    /** The Queue as saved, again after every write to it. */
     readonly watch: () => Stream.Stream<ReadonlyArray<QueuedPullRequest>, QueueError>
     readonly refresh: () => Effect.Effect<void, QueueError | ConnectionError>
     readonly add: (
@@ -163,9 +163,9 @@ export class Queue extends Context.Service<
           const saved = yield* settings.read()
           const turnedOn = EngineFeature.literals.filter((feature) => queueWorkOf(saved, feature))
 
-          for (const { pullRequest, state, revision, problem } of candidates) {
-            if (problem !== null || revision === null || state === "merged" || state === "closed")
-              continue
+          for (const candidate of candidates) {
+            if (!canRunQueueWork(candidate)) continue
+            const { pullRequest, revision } = candidate
 
             yield* Effect.forEach(
               turnedOn,

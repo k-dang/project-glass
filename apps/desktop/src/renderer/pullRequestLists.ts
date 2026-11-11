@@ -123,5 +123,4 @@ const listingsAtom = backendRuntime
   })
   .pipe(Atom.setIdleTTL(CACHE_IDLE_TTL))
 
-/** The PR lists, kept fresh while the window is visible. The Reviews area and Needs you share this one poll. */
 export const watchedListingsAtom = watched(listingsAtom)

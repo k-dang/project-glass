@@ -14,7 +14,7 @@ import { GitPullRequest, Sparkles } from "lucide-react"
 import { useMemo } from "react"
 import { agentConversation, ConversationContext } from "./conversation"
 import { Count } from "./Lists"
-import { needsYouAtom, needsYouCountAtom, needsYouKey, needsYouStreamAtom } from "./needsYou"
+import { needsYouCountAtom, needsYouKey, needsYouStreamAtom, watchedNeedsYouAtom } from "./needsYou"
 import { ProblemAlert } from "./ProblemAlert"
 import { streamProblem } from "./problems"
 import { ago } from "./PullRequestRow"
@@ -57,7 +57,7 @@ function Waited(props: { since: DateTime.Utc; now: Date }) {
 }
 
 export function NeedsYouSection() {
-  const result = useAtomValue(needsYouAtom)
+  const result = useAtomValue(watchedNeedsYouAtom)
   const count = useAtomValue(needsYouCountAtom)
   const retry = useAtomRefresh(needsYouStreamAtom)
 

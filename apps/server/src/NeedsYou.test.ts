@@ -31,7 +31,6 @@ const longAgo = "2024-06-01T10:00:00.000Z"
 const needsYou = (client: Client, until: (items: NeedsYou) => boolean) =>
   client.WatchNeedsYou().pipe(Stream.filter(until), Stream.runHead, Effect.map(Option.getOrThrow))
 
-/** A fresh subscription's first list, which reflects every source as it is now. */
 const current = (client: Client) => needsYou(client, () => true)
 
 const agentItems = (items: NeedsYou) =>

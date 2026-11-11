@@ -9,19 +9,14 @@ export const needsYouStreamAtom = backendRuntime
   .atom(Stream.unwrap(Backend.useSync((backend) => backend.WatchNeedsYou())))
   .pipe(Atom.keepAlive)
 
-/**
- * Needs you, with the existing PR-list and Queue polls kept running while it is shown. Their
- * results are ignored. Listing PRs refreshes the server's Review requests and refreshing the Queue
- * rereads its finished Agent reviews.
- */
-export const needsYouAtom = Atom.make((get) => {
+export const watchedNeedsYouAtom = Atom.make((get) => {
   get(watchedListingsAtom)
   get(queueRefreshAtom)
 
   return get(needsYouStreamAtom)
 })
 
-export const needsYouCountAtom: Atom.Atom<number> = Atom.map(needsYouAtom, (result) =>
+export const needsYouCountAtom: Atom.Atom<number> = Atom.map(watchedNeedsYouAtom, (result) =>
   Option.getOrElse(
     Option.map(AsyncResult.value(result), (items) => items.length),
     () => 0,

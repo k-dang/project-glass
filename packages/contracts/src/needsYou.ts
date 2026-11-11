@@ -7,7 +7,6 @@ export const WaitingRequests = Schema.TaggedStruct("WaitingRequests", {
   requests: Schema.NonEmptyArray(Schema.Union([PermissionRequestPart, QuestionPart])),
 })
 
-/** Why an Agent needs the user. A new kind of Agent reason is a new member here. */
 export const AgentReason = Schema.Union([WaitingRequests])
 
 export type AgentReason = typeof AgentReason.Type
@@ -18,7 +17,6 @@ export const ReviewRequested = Schema.TaggedStruct("ReviewRequested", {})
 /** The PR is in the Queue and its Agent review is finished. */
 export const AgentReviewFinished = Schema.TaggedStruct("AgentReviewFinished", {})
 
-/** Why a PR needs the user. A new kind of PR reason is a new member here. */
 export const PullRequestReason = Schema.Union([ReviewRequested, AgentReviewFinished])
 
 export type PullRequestReason = typeof PullRequestReason.Type

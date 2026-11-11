@@ -2,6 +2,7 @@ import {
   AgentNeedsYou,
   AgentReviewFinished,
   finishedReview,
+  canRunQueueWork,
   type NeedsYouItem,
   PullRequestNeedsYou,
   type PullRequestReason,
@@ -19,7 +20,6 @@ import { Queue } from "./Queue"
 
 interface FinishedAgentReview {
   readonly pullRequest: PullRequestSummary
-  /** When Glass wrote the Agent review. */
   readonly since: DateTime.Utc
 }
 
@@ -29,7 +29,6 @@ interface PullRequestWait {
   readonly since: DateTime.Utc
 }
 
-/** Agents come first because each one is stopped mid-Turn until the user answers. */
 const rank: Record<NeedsYouItem["_tag"], number> = { Agent: 0, PullRequest: 1 }
 
 const order: Order.Order<NeedsYouItem> = Order.combine(
@@ -65,7 +64,6 @@ const pullRequestItem = (waits: Arr.NonEmptyReadonlyArray<PullRequestWait>) =>
     ),
   })
 
-/** One item per Agent and one per PR, with a PR's reasons merged, in Needs you order. */
 const needsYouOf = (
   waiting: ReadonlyArray<WaitingAgent>,
   requested: ReadonlyArray<RequestedReview>,
@@ -95,13 +93,8 @@ const needsYouOf = (
   )
 }
 
-/** Queued PRs that can have an Agent review: open or draft, with a revision, and still on GitHub. */
 const reviewable = (queued: ReadonlyArray<QueuedPullRequest>) =>
-  queued.flatMap(({ pullRequest, state, revision, problem }) =>
-    (state === "open" || state === "draft") && revision !== null && problem === null
-      ? [pullRequest]
-      : [],
-  )
+  queued.flatMap((row) => (canRunQueueWork(row) ? [row.pullRequest] : []))
 
 const samePullRequests = (
   before: ReadonlyArray<PullRequestSummary>,
@@ -121,7 +114,6 @@ const samePullRequests = (
 export class NeedsYou extends Context.Service<
   NeedsYou,
   {
-    /** Everything waiting on the user now, again after every change to any source. Never calls GitHub. */
     readonly watch: () => Stream.Stream<ReadonlyArray<NeedsYouItem>>
   }
 >()("@glass/server/NeedsYou") {
@@ -149,7 +141,6 @@ export class NeedsYou extends Context.Service<
           ),
         )
 
-      /** Queued PRs whose Agent review is finished, followed live per PR. */
       const finishedAgentReviews: Stream.Stream<ReadonlyArray<FinishedAgentReview>> = queue
         .watch()
         .pipe(

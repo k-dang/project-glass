@@ -159,7 +159,6 @@ export interface NewReviewAgent {
   readonly message: string
 }
 
-/** An Agent with Permission requests or Questions waiting on the user. Follow-up Agents count too. */
 export interface WaitingAgent {
   readonly agent: Agent
   readonly requests: Arr.NonEmptyReadonlyArray<WaitingRequest>

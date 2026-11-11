@@ -16,6 +16,17 @@ export class QueuedPullRequest extends Schema.Class<QueuedPullRequest>("QueuedPu
 
 export const Queue = Schema.Array(QueuedPullRequest)
 
+export const canRunQueueWork = <
+  Row extends {
+    readonly state: typeof PullRequestState.Type
+    readonly revision: Revision | null
+    readonly problem: GitHubUnavailable | null
+  },
+>(
+  row: Row,
+): row is Row & { readonly revision: Revision; readonly problem: null } =>
+  row.problem === null && row.revision !== null && row.state !== "closed" && row.state !== "merged"
+
 export type Queue = typeof Queue.Type
 
 export class QueueAddition extends Schema.Class<QueueAddition>("QueueAddition")({

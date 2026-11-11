@@ -144,13 +144,11 @@ interface Published {
   readonly update: TranscriptUpdate
 }
 
-/** A Permission request or Question waiting on the user, since Glass first saw it waiting. One already waiting at launch counts from launch. */
 export interface WaitingRequest {
   readonly part: RequestPart
   readonly since: DateTime.Utc
 }
 
-/** Each Agent's waiting requests in transcript order. An Agent with none is absent. */
 export type WaitingByAgent = ReadonlyMap<string, Arr.NonEmptyReadonlyArray<WaitingRequest>>
 
 export type StartedTurn = typeof TurnStarted.Type & { readonly agentId: string }

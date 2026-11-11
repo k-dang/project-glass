@@ -42,7 +42,6 @@ const viewerOf = (mirror: Mirror, login: string, touched: ReadonlySet<string>): 
   touched,
 })
 
-/** The outstanding Review requests on a PR that ask the user or one of their teams. */
 const viewerRequests = (pr: MirroredPullRequest, viewer: Viewer) => [
   ...pr.requestedUsers.filter((user) => user === viewer.login.toLowerCase()),
   ...pr.requestedTeams.filter((team) => viewer.teams.has(team)),
@@ -98,7 +97,6 @@ const summaryOf = (pr: MirroredPullRequest) =>
     updatedAt: pr.updatedAt,
   })
 
-/** A PR in Needs review, since the earliest of its Review requests to the user or their teams. */
 export interface RequestedReview {
   readonly pullRequest: PullRequestSummary
   readonly since: DateTime.Utc
@@ -112,7 +110,6 @@ const requestedReviewsOf = (
     pullRequests.flatMap((pr) => {
       const requests = viewerRequests(pr, viewer)
 
-      // A mirror saved before requestedSince existed has no times, so its requests count from the PR's last update.
       return Arr.isReadonlyArrayNonEmpty(requests)
         ? [
             {
@@ -166,7 +163,6 @@ export class PullRequestLists extends Context.Service<
   {
     readonly list: () => Effect.Effect<PullRequestListings, SettingsError | ConnectionError>
     readonly saved: () => Effect.Effect<PullRequestListings | null, SettingsError>
-    /** The Needs review rows as of the latest `list()`, again after each one. Starts from the saved mirror. */
     readonly watchNeedsReview: () => Stream.Stream<ReadonlyArray<RequestedReview>>
   }
 >()("@glass/server/PullRequestLists") {
