@@ -166,7 +166,6 @@ export class PullRequestMirror extends Context.Service<
 
         const known = before?.pullRequests.find((pr) => pr.id === fields.id)
 
-        // GitHub bumps updatedAt when it records a Review request, so one made while Glass was closed keeps its own time.
         const firstSeen = DateTime.min(now, fields.updatedAt)
 
         return {
