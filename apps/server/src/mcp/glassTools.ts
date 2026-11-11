@@ -410,7 +410,10 @@ export const GlassToolHandlers = GlassTools.toLayer(
       list_agents: () =>
         Effect.all([first(agents.watch()), first(agents.watchWaiting())]).pipe(
           Effect.map(([listed, waiting]) => ({
-            agents: listed.map((agent) => ({ agent, waiting: waiting.includes(agent.id) })),
+            agents: listed.map((agent) => ({
+              agent,
+              waiting: waiting.some((found) => found.agent.id === agent.id),
+            })),
           })),
           Effect.mapError(explained),
         ),

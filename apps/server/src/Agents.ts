@@ -38,6 +38,7 @@ import {
   type UnsentFeedback,
 } from "@glass/contracts"
 import {
+  Array as Arr,
   Context,
   Data,
   DateTime,
@@ -68,7 +69,7 @@ import { LocalPlacement } from "./LocalPlacement"
 import { type AgentRole, ReviewBrief, ReviewRole, WorkRole } from "./agentHost/protocol"
 import { LocalSkills } from "./LocalSkills"
 import { SkillPacks } from "./SkillPacks"
-import { Transcripts } from "./Transcripts"
+import { Transcripts, type WaitingRequest } from "./Transcripts"
 import { annotateUnit } from "./wideEvents"
 
 const encodeFiles = Schema.encodeSync(Schema.Array(ChangedFile))
@@ -158,11 +159,17 @@ export interface NewReviewAgent {
   readonly message: string
 }
 
+/** An Agent with Permission requests or Questions waiting on the user. Follow-up Agents count too. */
+export interface WaitingAgent {
+  readonly agent: Agent
+  readonly requests: Arr.NonEmptyReadonlyArray<WaitingRequest>
+}
+
 export class Agents extends Context.Service<
   Agents,
   {
     readonly watch: () => Stream.Stream<ReadonlyArray<Agent>, AgentError>
-    readonly watchWaiting: () => Stream.Stream<ReadonlyArray<string>>
+    readonly watchWaiting: () => Stream.Stream<ReadonlyArray<WaitingAgent>>
     readonly readTranscript: (
       agentId: string,
     ) => Effect.Effect<Transcript, AgentNotFound | AgentError>
@@ -751,13 +758,20 @@ export class Agents extends Context.Service<
         )
       })
 
+      const placed = Stream.zipLatest(SubscriptionRef.changes(rows), sandboxes.statuses).pipe(
+        Stream.map(([current, statuses]) =>
+          current.map((row) => ({
+            ...row,
+            agent: agentWith(row.agent, { sandbox: statuses.get(row.agent.id) ?? null }),
+          })),
+        ),
+      )
+
       return Agents.of({
         watch: () =>
-          Stream.zipLatest(SubscriptionRef.changes(rows), sandboxes.statuses).pipe(
-            Stream.map(([current, statuses]) =>
-              current.flatMap(({ agent, forReview }) =>
-                forReview ? [] : [agentWith(agent, { sandbox: statuses.get(agent.id) ?? null })],
-              ),
+          placed.pipe(
+            Stream.map((current) =>
+              current.flatMap(({ agent, forReview }) => (forReview ? [] : [agent])),
             ),
           ),
         transcript: (agentId) =>
@@ -808,7 +822,15 @@ export class Agents extends Context.Service<
         unsent,
         saveUnsent,
         watchWaiting: () =>
-          transcripts.waiting.pipe(Stream.map((waiting) => Array.from(waiting).toSorted())),
+          Stream.zipLatest(placed, transcripts.waiting).pipe(
+            Stream.map(([current, waiting]) =>
+              current.flatMap(({ agent }) => {
+                const requests = waiting.get(agent.id)
+
+                return requests === undefined ? [] : [{ agent, requests }]
+              }),
+            ),
+          ),
         changeModel: update,
         changePermissionMode,
         answer,

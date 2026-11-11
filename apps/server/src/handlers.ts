@@ -1,5 +1,5 @@
 import { ActivityPullRequest, GlassRpcs, PullRequestOpened } from "@glass/contracts"
-import { Effect } from "effect"
+import { Effect, Stream } from "effect"
 import { ActivityLog } from "./ActivityLog"
 import { AgentReviews } from "./AgentReviews"
 import { Asks } from "./Asks"
@@ -155,7 +155,8 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       ListAgentFiles: ({ agentId }) => agents.files(agentId),
       ListSandboxProviders: () => Effect.succeed(sandboxes.providers),
       CreateAgent: (input) => agents.create(input),
-      WatchWaitingAgents: () => agents.watchWaiting(),
+      WatchWaitingAgents: () =>
+        agents.watchWaiting().pipe(Stream.map((waiting) => waiting.map(({ agent }) => agent.id))),
       ChangeAgentModel: ({ agentId, model, effort }) =>
         agents.changeModel(agentId, { model, effort }),
       ChangePermissionMode: ({ agentId, permissionMode }) =>
