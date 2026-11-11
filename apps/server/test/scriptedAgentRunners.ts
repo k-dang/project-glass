@@ -1,10 +1,9 @@
 import { type AgentEngine, runnerIdentity } from "@glass/contracts"
 import { Deferred, Effect, Layer, Schema } from "effect"
-import { readdirSync } from "node:fs"
-import { join, relative } from "node:path"
 import { agentFailure, type AgentFailure } from "../src/agentFailure"
 import { type AgentTask, AgentRunners } from "../src/agentRunners"
 import { counter } from "./counter"
+import { filesIn } from "./filesIn"
 
 export type ScriptedReply =
   | { readonly answer: unknown }
@@ -21,13 +20,6 @@ interface ScriptedRun {
   readonly task: AgentTask<unknown>
   readonly files: ReadonlyArray<string>
 }
-
-const filesIn = (directory: string) =>
-  readdirSync(directory, { recursive: true, withFileTypes: true })
-    .filter((entry) => entry.isFile())
-    .map((entry) => relative(directory, join(entry.parentPath, entry.name)).replaceAll("\\", "/"))
-    .filter((path) => !path.startsWith(".git/"))
-    .toSorted()
 
 export const scriptedAgentRunners = Effect.fnUntraced(function* (initial: ScriptedSettings) {
   let settings = initial

@@ -13,11 +13,12 @@ import {
   Scope,
 } from "effect"
 import { TestClock } from "effect/testing"
-import { existsSync } from "node:fs"
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises"
+import { existsSync, readFileSync } from "node:fs"
+import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { vi } from "vite-plus/test"
 import { eventually } from "../test/eventually"
+import { filesIn } from "../test/filesIn"
 import { gitIn } from "../test/gitRepositories"
 import { type FakeGitHub, startFakeGitHub } from "../test/fakeGitHub"
 import { type FakePullRequest, type FakePullRequestSeed, VIEWER } from "../test/fakePullRequest"
@@ -83,18 +84,9 @@ const seed = (github: FakeGitHub, overrides: Partial<FakePullRequestSeed> = {}) 
     ...overrides,
   })
 
-const files = async (directory: string) =>
+const files = (directory: string) =>
   Object.fromEntries(
-    await Promise.all(
-      (await readdir(directory, { recursive: true, withFileTypes: true }))
-        .filter((entry) => entry.isFile())
-        .map((entry) => join(entry.parentPath, entry.name))
-        .filter((path) => !path.slice(directory.length + 1).startsWith(".git/"))
-        .map(async (path) => [
-          path.slice(directory.length + 1).replaceAll("\\", "/"),
-          await readFile(path, "utf8"),
-        ]),
-    ),
+    filesIn(directory).map((path) => [path, readFileSync(join(directory, path), "utf8")]),
   )
 
 const assertFailure = (
@@ -116,7 +108,7 @@ it.live("checks out the Revision's head into a directory removed when its scope 
 
     const directory = yield* checkout(pr).pipe(Scope.provide(scope))
 
-    assert.deepStrictEqual(yield* Effect.promise(() => files(directory)), {
+    assert.deepStrictEqual(files(directory), {
       "greet.ts": "hello name",
       "docs/README.md": "greeting",
     })
@@ -171,7 +163,7 @@ it.live("clones a repository once and only fetches for later checkouts", () =>
 
     const directory = yield* checkout(second)
 
-    assert.deepStrictEqual(yield* Effect.promise(() => files(directory)), { "farewell.ts": "bye" })
+    assert.deepStrictEqual(files(directory), { "farewell.ts": "bye" })
     assert.isTrue(existsSync(marker))
   }).pipe(Effect.scoped),
 )

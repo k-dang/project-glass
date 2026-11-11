@@ -12,8 +12,10 @@ import {
   type RequestNotWaiting,
   RequestWaiting,
   type SentMessage,
+  TurnCutOff,
   TurnEnded,
   TurnFailed,
+  TurnInterrupted,
   TurnStopped,
 } from "@glass/contracts"
 import {
@@ -35,6 +37,7 @@ import { type HostCallError, type HostClient, hostFailure } from "./Placement"
 import { prompt } from "./prompt"
 import { ToDos } from "./ToDos"
 import { encodeImages, StoredMessage, Transcripts } from "./Transcripts"
+import { annotateUnit } from "./wideEvents"
 
 export interface Conversation {
   readonly id: string
@@ -49,6 +52,19 @@ export type ClaimConversation = (
   conversationId: string,
 ) => Effect.Effect<Option.Option<Conversation>, AgentError>
 
+export interface Served {
+  readonly claim: ClaimConversation
+  readonly lost: Stream.Stream<ReadonlyArray<string>>
+  readonly interrupted: Effect.Effect<ReadonlyArray<string>>
+}
+
+export type Delivery = "dispatched" | "superseded" | "failed"
+
+interface Prepared {
+  readonly client: HostClient
+  readonly message: DeliveredMessage
+}
+
 const decodeUnsent = Schema.decodeUnknownEffect(Schema.Array(StoredMessage))
 
 const unsentFailure = () =>
@@ -57,7 +73,7 @@ const unsentFailure = () =>
 export class ConversationTurns extends Context.Service<
   ConversationTurns,
   {
-    readonly deliverTurnsOf: (claim: ClaimConversation) => Effect.Effect<void>
+    readonly serve: (conversations: Served) => Effect.Effect<void>
     readonly whileIdle: <A, E>(
       conversationId: string,
       effect: Effect.Effect<A, E>,
@@ -124,24 +140,35 @@ export class ConversationTurns extends Context.Service<
         } satisfies DeliveredMessage
       })
 
-      const deliver = (conversation: Conversation, turnId: string, sent: AcceptedMessage) =>
+      const prepare = (conversation: Conversation, sent: AcceptedMessage) =>
         Effect.gen(function* () {
           const client = yield* conversation.host
-          const agentId = conversation.id
 
           const [, message] = yield* Effect.all(
             [conversation.start(client), delivered(sent, sent.feedback)],
             { concurrency: "unbounded" },
           )
 
-          yield* turnLock.withPermits(1)(
-            Effect.gen(function* () {
-              if ((yield* transcripts.runningTurn(agentId)) !== turnId) return
+          return { client, message } satisfies Prepared
+        })
 
-              yield* client.StartTurn({ agentId, turnId, ...message, ...conversation.settings })
-            }),
-          )
-        }).pipe(Effect.catch((error) => failTurn(conversation.id, turnId, hostFailure(error))))
+      const dispatch = (
+        conversation: Conversation,
+        turnId: string,
+        { client, message }: Prepared,
+      ) =>
+        turnLock.withPermits(1)(
+          Effect.gen(function* () {
+            const agentId = conversation.id
+
+            if ((yield* transcripts.runningTurn(agentId)) !== turnId)
+              return "superseded" as const satisfies Delivery
+
+            yield* client.StartTurn({ agentId, turnId, ...message, ...conversation.settings })
+
+            return "dispatched" as const satisfies Delivery
+          }),
+        )
 
       const failTurn = (conversationId: string, turnId: string, reason: string) =>
         Effect.gen(function* () {
@@ -150,9 +177,29 @@ export class ConversationTurns extends Context.Service<
           yield* transcripts.save(conversationId, [TurnEnded.make({ turnId, ended })])
         }).pipe(
           Effect.catch((cause) => Effect.logWarning("Couldn't fail an undelivered Turn", cause)),
+          Effect.as("failed" as const satisfies Delivery),
         )
 
-      const deliverTurnsOf = Effect.fnUntraced(function* (claim: ClaimConversation) {
+      const deliver = (conversation: Conversation, turnId: string, sent: AcceptedMessage) =>
+        prepare(conversation, sent).pipe(
+          Effect.flatMap((prepared) => dispatch(conversation, turnId, prepared)),
+          Effect.catch((error) => failTurn(conversation.id, turnId, hostFailure(error))),
+          Effect.tap((delivery) =>
+            annotateUnit({ agent_id: conversation.id, turn_id: turnId, delivery }),
+          ),
+          Effect.withSpan("ConversationTurns.deliver", { root: true }),
+        )
+
+      const serve = Effect.fnUntraced(function* ({ claim, lost, interrupted }: Served) {
+        yield* lost.pipe(
+          Stream.runForEach((conversationIds) =>
+            transcripts
+              .endRunning(TurnCutOff.make({}), conversationIds)
+              .pipe(Effect.catch((cause) => Effect.logWarning("Couldn't cut off Turns", cause))),
+          ),
+          Effect.forkIn(scope),
+        )
+
         const started = yield* transcripts.subscribeStarted.pipe(Scope.provide(scope))
 
         yield* started.pipe(
@@ -173,6 +220,10 @@ export class ConversationTurns extends Context.Service<
           ),
           Effect.forkIn(scope),
         )
+
+        yield* transcripts
+          .endRunning(TurnInterrupted.make({}), yield* interrupted)
+          .pipe(Effect.orDie)
       })
 
       const refuseWhileWaiting = (conversationId: string) =>
@@ -278,7 +329,7 @@ export class ConversationTurns extends Context.Service<
       ) => turnLock.withPermits(1)(transcripts.startOrQueue(conversationId, sent, feedback))
 
       return ConversationTurns.of({
-        deliverTurnsOf,
+        serve,
         whileIdle: (conversationId, effect) =>
           turnLock.withPermits(1)(
             Effect.gen(function* () {
