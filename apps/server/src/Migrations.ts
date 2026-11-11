@@ -29,6 +29,7 @@ import createAgentFeedbackNotes from "./migrations/0027_create_agent_feedback_no
 import agentSkillPacks from "./migrations/0028_agent_skill_packs"
 import agentLocalSkills from "./migrations/0029_agent_local_skills"
 import sendFeedbackNotes from "./migrations/0030_send_feedback_notes"
+import sandboxRecordTags from "./migrations/0031_sandbox_record_tags"
 
 export const migrations = {
   "0001_create_activity": createActivity,
@@ -61,6 +62,7 @@ export const migrations = {
   "0028_agent_skill_packs": agentSkillPacks,
   "0029_agent_local_skills": agentLocalSkills,
   "0030_send_feedback_notes": sendFeedbackNotes,
+  "0031_sandbox_record_tags": sandboxRecordTags,
 }
 
 export const migrationLoader = SqliteMigrator.fromRecord(migrations)

@@ -80,6 +80,7 @@ it.live("upgrades existing Activity history and uses its indexes after reopening
       [28, "agent_skill_packs"],
       [29, "agent_local_skills"],
       [30, "send_feedback_notes"],
+      [31, "sandbox_record_tags"],
     ] as const
 
     for (const expected of [upgrade, []] as const) {
@@ -383,6 +384,61 @@ it.live("keeps Agents started on this device in Activity history", () =>
     assert.deepStrictEqual(
       rows.map(({ payload }) => decodeAgentStarted(payload).machine),
       ["local", "sandbox"],
+    )
+  }),
+)
+
+it.live("tags each saved Sandbox as being built, ready, or gone", () =>
+  Effect.gen(function* () {
+    const home = yield* isolatedHome
+    const filename = join(home, "glass.db")
+    const before = Object.fromEntries(Object.entries(migrations).filter(([id]) => id < "0031"))
+
+    const saved = {
+      building: { state: { id: "a" }, token: "t", ready: false },
+      ready: { state: { id: "b" }, token: "t", ready: true, expiresAt: "2026-10-21T00:00:00.000Z" },
+      gone: { state: { id: "c" }, token: "t", ready: true, gone: "expired" },
+    }
+
+    const run = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) =>
+      effect.pipe(Effect.provide(SqliteClient.layer({ filename })), Effect.scoped)
+
+    yield* run(
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient
+        yield* SqliteMigrator.run({ loader: SqliteMigrator.fromRecord(before) })
+
+        for (const [id, record] of Object.entries(saved))
+          yield* sql`
+            INSERT INTO agent (id, name, owner, repo, base_branch, engine, folder, created_at, sandbox)
+            VALUES (${id}, ${id}, 'acme', 'api', 'main', 'pi', 'api', '2026-10-20T00:00:00Z', ${JSON.stringify(record)})
+          `
+      }),
+    )
+
+    const rows = yield* run(
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient
+        yield* SqliteMigrator.run({ loader: migrationLoader })
+
+        return yield* sql<{
+          id: string
+          sandbox: string
+        }>`SELECT id, sandbox FROM agent ORDER BY id`
+      }),
+    )
+
+    assert.deepStrictEqual(
+      rows.map(({ id, sandbox }) => {
+        const record: { readonly _tag: string } = JSON.parse(sandbox)
+
+        return [id, record._tag, Object.keys(record).toSorted()]
+      }),
+      [
+        ["building", "Building", ["_tag", "state", "token"]],
+        ["gone", "Gone", ["_tag", "reason", "state", "token"]],
+        ["ready", "Ready", ["_tag", "expiresAt", "state", "token"]],
+      ],
     )
   }),
 )
