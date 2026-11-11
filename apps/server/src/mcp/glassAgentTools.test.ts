@@ -3,11 +3,12 @@ import {
   Agent,
   AgentReviewState,
   isWaiting,
+  NeedsYou,
   PullRequestRef,
   localPlace,
   TurnDone,
 } from "@glass/contracts"
-import { Effect, Option, Schema, Stream } from "effect"
+import { Effect, Option, Predicate, Schema, Stream } from "effect"
 import { agentsFixture, holding, repository, settled } from "../../test/agentsFixture"
 import { startFakeGitHub } from "../../test/fakeGitHub"
 import { VIEWER } from "../../test/fakePullRequest"
@@ -36,6 +37,8 @@ const onThisDevice = (message: string) => ({
 })
 
 const decodeCreated = Schema.decodeUnknownSync(Schema.Struct({ agent: Agent }))
+
+const decodeNeedsYou = Schema.decodeUnknownSync(Schema.Struct({ items: NeedsYou }))
 
 describe("Glass's Agent tools over MCP", () => {
   it.live("creates an Agent that appears in Agents and runs its first Turn", () =>
@@ -162,6 +165,29 @@ describe("Glass's Agent tools over MCP", () => {
 
       assert.isTrue(result.isError)
       assert.include(toolText(result), "waiting for the user")
+    }),
+  )
+
+  it.live("lists what needs the user, as Needs you shows it", () =>
+    Effect.gen(function* () {
+      const f = yield* startGlass
+      const agent = yield* f.start("Please ask permission")
+
+      const shown = yield* f.client.WatchNeedsYou().pipe(
+        Stream.filter((items) => items.some((item) => Predicate.isTagged(item, "Agent"))),
+        Stream.runHead,
+        Effect.map(Option.getOrThrow),
+      )
+
+      const result = yield* f.call("list_needs_you")
+
+      assert.isFalse(result.isError, toolText(result))
+      const { items } = decodeNeedsYou(result.structuredContent)
+      assert.deepStrictEqual(items, shown)
+      assert.deepStrictEqual(
+        items.map((item) => Predicate.isTagged(item, "Agent") && item.agent.id),
+        [agent.id],
+      )
     }),
   )
 })

@@ -15,6 +15,7 @@ import {
   LocalCheckout,
   MessageDelivery,
   MessageText,
+  NeedsYouItem,
   type PullRequestAccessDenied,
   type PullRequestNotFound,
   type QueueError,
@@ -44,6 +45,7 @@ import { GitHubClient } from "../github/GitHubClient"
 import { BackgroundGitHubRequest } from "../github/GitHubRequestPolicy"
 import { FollowedRepositories } from "../FollowedRepositories"
 import { LocalCheckouts } from "../LocalCheckouts"
+import { NeedsYou } from "../NeedsYou"
 import { Sandboxes } from "../Sandboxes"
 import { PullRequestLists } from "../PullRequestLists"
 import { Queue } from "../Queue"
@@ -111,6 +113,13 @@ const ListAgents = Tool.make("list_agents", {
   description:
     "Lists the user's Agents: the named coding conversations working in a repository, with each one's repository, base branch, program, and whether it waits for the user's answer.",
   success: Schema.Struct({ agents: Schema.Array(ListedAgent) }),
+  failure: GlassToolFailure,
+}).annotateMerge(readOnly)
+
+const ListNeedsYou = Tool.make("list_needs_you", {
+  description:
+    "Lists what waits on the user in Glass now: Agents with a Permission request or Question waiting, PRs that request their Review, and queued PRs whose Agent review is finished. Agents come first, then the longest waiting.",
+  success: Schema.Struct({ items: Schema.Array(NeedsYouItem) }),
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)
 
@@ -261,6 +270,7 @@ export const GlassTools = Toolkit.make(
   ListToDos,
   ListRecentActivity,
   ListAgents,
+  ListNeedsYou,
   ReadAgentTranscript,
   ReadPullRequest,
   ReadAgentReview,
@@ -366,6 +376,7 @@ export const GlassToolHandlers = GlassTools.toLayer(
     const checkouts = yield* LocalCheckouts
     const sandboxes = yield* Sandboxes
     const agentReviews = yield* AgentReviews
+    const needsYou = yield* NeedsYou
 
     const refuseUnofferedModel = Effect.fnUntraced(function* ({
       engine,
@@ -417,6 +428,7 @@ export const GlassToolHandlers = GlassTools.toLayer(
           })),
           Effect.mapError(explained),
         ),
+      list_needs_you: () => first(needsYou.watch()).pipe(Effect.map((items) => ({ items }))),
       read_agent_transcript: ({ agentId, turns }) =>
         agents.readTranscript(agentId).pipe(
           Effect.map((transcript) => ({
