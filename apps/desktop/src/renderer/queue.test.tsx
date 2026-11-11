@@ -20,7 +20,7 @@ import {
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { DateTime, Effect, Predicate, Stream, SubscriptionRef } from "effect"
-import { afterEach, beforeEach, expect, it } from "vite-plus/test"
+import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test"
 import { App } from "./App"
 import { backendLayerAtom } from "./backend"
 import { openReview } from "../../test/finishReview"
@@ -155,6 +155,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   cleanup()
   window.history.replaceState(null, "", "#/")
 })
@@ -418,7 +419,7 @@ it.each(["Control", "Meta"])(
   },
 )
 
-it("loads the next queued PR while the user reviews one, and records it opened only once shown", async () => {
+it("loads the next queued PR while the user reviews one, keeps it however long that takes, and records it opened only once shown", async () => {
   window.history.replaceState(null, "", "#/reviews?list=queue")
   const loaded: Array<string> = []
   const opened: Array<string> = []
@@ -443,10 +444,15 @@ it("loads the next queued PR while the user reviews one, and records it opened o
   await waitFor(() => expect(loaded).toEqual(["Greet the world", "Wave at the world"]))
   expect(opened).toEqual(["Greet the world"])
 
+  vi.useFakeTimers({ toFake: ["Date"] })
+  vi.setSystemTime(Date.now() + 60 * 60_000)
+
   await user.click(within(bar()).getByRole("button", { name: "Next PR" }))
   await showing("Wave at the world")
   await waitFor(() => expect(opened).toEqual(["Greet the world", "Wave at the world"]))
-  expect(loaded).toEqual(["Greet the world", "Wave at the world"])
+  await waitFor(() =>
+    expect(loaded).toEqual(["Greet the world", "Wave at the world", "Greet the world"]),
+  )
 })
 
 it("keeps the bar while a reviewed PR stays open, offering the next one, until the user leaves it", async () => {

@@ -232,10 +232,7 @@ export class GlassRpcs extends RpcGroup.make(
     success: GitHubConnection,
     error: ConnectionError,
   }),
-  /**
-   * Only reads. The renderer records PullRequestOpened when it shows the PR, which also marks it
-   * opened in the Queue, so it can load a PR ahead of showing it.
-   */
+  /** Only reads; recording PullRequestOpened is what marks a PR opened. */
   Rpc.make("LoadPullRequest", {
     payload: { pullRequest: PullRequestRef },
     success: PullRequestWorkspace,
@@ -312,6 +309,7 @@ export class GlassRpcs extends RpcGroup.make(
     success: Schema.Array(ReactionGroup),
     error: ReactionError,
   }),
+  /** PullRequestOpened also marks the PR opened in the Queue. */
   Rpc.make("RecordActivity", { payload: Activity }),
   Rpc.make("ListActivity", {
     payload: { limit: Schema.Int.check(Schema.isGreaterThan(0)) },

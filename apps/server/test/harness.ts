@@ -123,7 +123,6 @@ export const startSignedInBackend = Effect.gen(function* () {
 
 type Client = Effect.Success<ReturnType<typeof startBackend>>["client"]
 
-/** Opens a PR as the renderer does: loads it, then records that the user opened it. */
 export const openPullRequest = Effect.fnUntraced(function* (client: Client, ref: PullRequestRef) {
   const workspace = yield* client.LoadPullRequest({ pullRequest: ref })
   const { pullRequest, revision } = workspace

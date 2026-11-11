@@ -130,30 +130,33 @@ const LOADED_TTL = 5 * 60_000
 
 interface Loaded {
   readonly open: OpenWorkspace
-  /** Null while it waits as the next PR to open, so it doesn't age before the user gets to it. */
-  readonly at: number | null
+  readonly agingSince: number | null
 }
 
 const loadedAtom = Atom.make<ReadonlyMap<string, Loaded>>(new Map()).pipe(Atom.keepAlive)
 
-const isFresh = ({ at }: Loaded) => at === null || Date.now() - at < LOADED_TTL
+const isFresh = ({ agingSince }: Loaded) =>
+  agingSince === null || Date.now() - agingSince < LOADED_TTL
 
 const remember = (registry: AtomRegistry.AtomRegistry, ref: PullRequestRef, open: OpenWorkspace) =>
   registry.update(loadedAtom, (loaded) => {
     const target = registry.get(targetAtom)
     const shown = target === null ? null : urlOf(target)
+
+    const kept = (url: string, entry: Loaded) =>
+      url !== urlOf(ref) && (url === shown || isFresh(entry))
+
     const next = new Map(loaded)
 
     for (const [url, entry] of loaded) {
-      // A preload can land while the user is still on a PR whose loaded copy has gone stale.
-      if (url !== urlOf(ref) && (isFresh(entry) || url === shown)) continue
+      if (kept(url, entry)) continue
 
       entry.open.feedback.dispose()
 
       next.delete(url)
     }
 
-    next.set(urlOf(ref), { open, at: Date.now() })
+    next.set(urlOf(ref), { open, agingSince: Date.now() })
 
     return next
   })
@@ -233,27 +236,27 @@ const load = (request: OpenRequest, registry: AtomRegistry.AtomRegistry) =>
     }),
   )
 
-const stamp = (registry: AtomRegistry.AtomRegistry, ref: PullRequestRef, at: number | null) =>
+const setAgingSince = (
+  registry: AtomRegistry.AtomRegistry,
+  ref: PullRequestRef,
+  agingSince: number | null,
+) =>
   registry.update(loadedAtom, (loaded) => {
     const entry = loaded.get(urlOf(ref))
 
-    return entry === undefined ? loaded : new Map(loaded).set(urlOf(ref), { ...entry, at })
+    return entry === undefined ? loaded : new Map(loaded).set(urlOf(ref), { ...entry, agingSince })
   })
 
-/**
- * Loads a PR the user is likely to open next, so opening it shows it at once. The copy is kept
- * while mounted and starts aging once unmounted; the Reload button flags changes since.
- */
 export const preloadAtom = Atom.family((ref: PullRequestRef) =>
   backendRuntime.atom((get) => {
-    get.addFinalizer(() => stamp(get.registry, ref, Date.now()))
+    get.addFinalizer(() => setAgingSince(get.registry, ref, Date.now()))
 
     const loaded =
       recall(get.registry, ref) === undefined
         ? load({ ref }, get.registry).pipe(Effect.asVoid)
         : Effect.void
 
-    return loaded.pipe(Effect.andThen(Effect.sync(() => stamp(get.registry, ref, null))))
+    return loaded.pipe(Effect.andThen(Effect.sync(() => setAgingSince(get.registry, ref, null))))
   }),
 )
 
