@@ -12,7 +12,16 @@ import {
   Revision,
   type SettingsError,
 } from "@glass/contracts"
-import { Context, DateTime, Effect, Layer, Schema, Semaphore } from "effect"
+import {
+  Context,
+  DateTime,
+  Effect,
+  Layer,
+  Schema,
+  Semaphore,
+  Stream,
+  SubscriptionRef,
+} from "effect"
 import { SqlClient } from "effect/sql"
 import { AgentReviews } from "./AgentReviews"
 import { GitHubClient } from "./github/GitHubClient"
@@ -65,6 +74,8 @@ export class Queue extends Context.Service<
   Queue,
   {
     readonly saved: () => Effect.Effect<ReadonlyArray<QueuedPullRequest>, QueueError>
+    /** The Queue as saved, again after every write to it. */
+    readonly watch: () => Stream.Stream<ReadonlyArray<QueuedPullRequest>, QueueError>
     readonly refresh: () => Effect.Effect<void, QueueError | ConnectionError>
     readonly add: (
       references: ReadonlyArray<PullRequestRef>,
@@ -93,6 +104,9 @@ export class Queue extends Context.Service<
       const settings = yield* SettingsStore
       const workToggleLock = yield* Semaphore.make(1)
       const now = DateTime.now.pipe(Effect.map(DateTime.formatIso))
+      const writes = yield* SubscriptionRef.make(0)
+
+      const announce = Effect.ensuring(SubscriptionRef.update(writes, (count) => count + 1))
 
       const read = Effect.gen(function* () {
         const rows = yield* sql`
@@ -292,7 +306,7 @@ export class Queue extends Context.Service<
           alreadyQueued,
           notFound,
         })
-      })
+      }, announce)
 
       const refresh = Effect.fn("Queue.refresh")(function* () {
         const before = yield* read
@@ -310,7 +324,7 @@ export class Queue extends Context.Service<
             }),
           )
           .pipe(logSaveFailure, Effect.mapError(saveFailed))
-      })
+      }, announce)
 
       const remove = Effect.fn("Queue.remove")(function* (reference: PullRequestRef) {
         const key = referenceKey(reference)
@@ -324,7 +338,7 @@ export class Queue extends Context.Service<
         if (removed !== null) yield* cancelWork(removed.pullRequest.ref)
 
         return removed
-      })
+      }, announce)
 
       const restore = Effect.fn("Queue.restore")(function* (queued: QueuedPullRequest) {
         const openedAt = queued.openedSinceQueued ? yield* now : null
@@ -342,7 +356,7 @@ export class Queue extends Context.Service<
 
         yield* workspaces.prefetch([queued.pullRequest.ref])
         yield* startWork([queued])
-      })
+      }, announce)
 
       const opened = Effect.fn("Queue.opened")(
         function* (reference: PullRequestRef) {
@@ -354,6 +368,7 @@ export class Queue extends Context.Service<
           `
         },
         Effect.catch((cause) => Effect.logWarning("Couldn't mark a queued PR opened", cause)),
+        announce,
       )
 
       const reviewed = Effect.fn("Queue.reviewed")(
@@ -372,6 +387,7 @@ export class Queue extends Context.Service<
         Effect.catch((cause) =>
           Effect.logWarning("Couldn't take a reviewed PR out of the Queue", cause),
         ),
+        announce,
       )
 
       const setEnabled = Effect.fn("Queue.setEnabled")(function* (
@@ -385,6 +401,7 @@ export class Queue extends Context.Service<
 
       return Queue.of({
         saved: () => read,
+        watch: () => SubscriptionRef.changes(writes).pipe(Stream.mapEffect(() => read)),
         refresh,
         add,
         remove,
