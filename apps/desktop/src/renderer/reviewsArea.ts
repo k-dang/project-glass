@@ -130,26 +130,33 @@ const LOADED_TTL = 5 * 60_000
 
 interface Loaded {
   readonly open: OpenWorkspace
-  readonly at: number
+  readonly agingSince: number | null
 }
 
 const loadedAtom = Atom.make<ReadonlyMap<string, Loaded>>(new Map()).pipe(Atom.keepAlive)
 
-const isFresh = (loaded: Loaded) => Date.now() - loaded.at < LOADED_TTL
+const isFresh = ({ agingSince }: Loaded) =>
+  agingSince === null || Date.now() - agingSince < LOADED_TTL
 
 const remember = (registry: AtomRegistry.AtomRegistry, ref: PullRequestRef, open: OpenWorkspace) =>
   registry.update(loadedAtom, (loaded) => {
+    const target = registry.get(targetAtom)
+    const shown = target === null ? null : urlOf(target)
+
+    const kept = (url: string, entry: Loaded) =>
+      url !== urlOf(ref) && (url === shown || isFresh(entry))
+
     const next = new Map(loaded)
 
     for (const [url, entry] of loaded) {
-      if (url !== urlOf(ref) && isFresh(entry)) continue
+      if (kept(url, entry)) continue
 
       entry.open.feedback.dispose()
 
       next.delete(url)
     }
 
-    next.set(urlOf(ref), { open, at: Date.now() })
+    next.set(urlOf(ref), { open, agingSince: Date.now() })
 
     return next
   })
@@ -177,6 +184,10 @@ export const openWorkspaceAtom = backendRuntime
             Stream.runHead,
             Effect.andThen(load(request, get.registry)),
           ))
+
+      void open.activity
+        .opened()
+        .finally(() => get.registry.update(reviewingRevisionAtom, (revision) => revision + 1))
 
       if (destination !== undefined && request.previous === undefined) {
         const restored = restoreReviewPosition(open.workspace, destination)
@@ -215,17 +226,39 @@ export const changedOnGitHubAtom = watched(
 )
 
 const load = (request: OpenRequest, registry: AtomRegistry.AtomRegistry) =>
-  Backend.use((backend) => backend.OpenPullRequest({ pullRequest: request.ref })).pipe(
+  Backend.use((backend) => backend.LoadPullRequest({ pullRequest: request.ref })).pipe(
     Effect.map((workspace) => {
       const open = build(workspace, request.previous, registry)
 
       remember(registry, request.ref, open)
 
-      registry.update(reviewingRevisionAtom, (revision) => revision + 1)
-
       return open
     }),
   )
+
+const setAgingSince = (
+  registry: AtomRegistry.AtomRegistry,
+  ref: PullRequestRef,
+  agingSince: number | null,
+) =>
+  registry.update(loadedAtom, (loaded) => {
+    const entry = loaded.get(urlOf(ref))
+
+    return entry === undefined ? loaded : new Map(loaded).set(urlOf(ref), { ...entry, agingSince })
+  })
+
+export const preloadAtom = Atom.family((ref: PullRequestRef) =>
+  backendRuntime.atom((get) => {
+    get.addFinalizer(() => setAgingSince(get.registry, ref, Date.now()))
+
+    const loaded =
+      recall(get.registry, ref) === undefined
+        ? load({ ref }, get.registry).pipe(Effect.asVoid)
+        : Effect.void
+
+    return loaded.pipe(Effect.andThen(Effect.sync(() => setAgingSince(get.registry, ref, null))))
+  }),
+)
 
 export const openPullRequest = (registry: AtomRegistry.AtomRegistry, ref: PullRequestRef) => {
   const target = registry.get(targetAtom)

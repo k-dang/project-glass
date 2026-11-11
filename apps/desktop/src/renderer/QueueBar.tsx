@@ -1,5 +1,5 @@
 import { TooltipHint } from "@/components/ui/tooltip"
-import { RegistryContext, useAtomValue } from "@effect/atom-react"
+import { RegistryContext, useAtomMount, useAtomValue } from "@effect/atom-react"
 import { type PullRequestRef, referenceKey } from "@glass/contracts"
 import { Link, useNavigate } from "@tanstack/react-router"
 import { cn } from "cn"
@@ -11,7 +11,9 @@ import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { removeFromQueue, reviewedOutAtom, savedQueueAtom } from "./queue"
 import { QueueField } from "./QueueTab"
-import { listSearchAtom, sameRef, targetAtom } from "./reviewsArea"
+import { listSearchAtom, openWorkspaceAtom, preloadAtom, sameRef, targetAtom } from "./reviewsArea"
+import { agentReviewStates } from "./useAgentReview"
+import { tourStates } from "./useTour"
 
 export function QueueBar(props: {
   current: PullRequestRef
@@ -25,6 +27,16 @@ export function QueueBar(props: {
   const position = entries.findIndex((queued) => referenceKey(queued.pullRequest.ref) === key)
   const queued = position !== -1
   const next = queued && entries.length > 1 ? entries[(position + 1) % entries.length]! : null
+  const reviewedOutHere = reviewedOut !== null && referenceKey(reviewedOut.ref) === key
+
+  const after =
+    reviewedOutHere && entries.length > 0 ? entries[reviewedOut.position % entries.length]! : null
+
+  const upcoming = queued ? next : after
+
+  const preload = AsyncResult.isSuccess(useAtomValue(openWorkspaceAtom)) && upcoming !== null && (
+    <Preload pullRequest={upcoming.pullRequest.ref} />
+  )
 
   const removeThenNext = async () => {
     const current = props.current
@@ -98,6 +110,7 @@ export function QueueBar(props: {
         <span className="shrink-0 text-muted-foreground tabular-nums">
           {position + 1} of {entries.length}
         </span>
+        {preload}
         <div className="ml-auto flex items-center gap-2">
           <AddToQueue />
           <Button
@@ -125,13 +138,12 @@ export function QueueBar(props: {
     )
   }
 
-  if (reviewedOut === null || referenceKey(reviewedOut.ref) !== key) return null
-
-  const after = entries.length === 0 ? null : entries[reviewedOut.position % entries.length]!
+  if (!reviewedOutHere) return null
 
   return (
     <Strip>
       <span className="text-muted-foreground">Reviewed · out of the Queue</span>
+      {preload}
       {after !== null && (
         <Button
           variant="outline"
@@ -144,6 +156,14 @@ export function QueueBar(props: {
       )}
     </Strip>
   )
+}
+
+function Preload(props: { pullRequest: PullRequestRef }) {
+  useAtomMount(preloadAtom(props.pullRequest))
+  useAtomMount(tourStates(props.pullRequest))
+  useAtomMount(agentReviewStates(props.pullRequest))
+
+  return null
 }
 
 function AddToQueue() {

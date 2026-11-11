@@ -128,7 +128,7 @@ it.live("turning Tours off cancels the Queue's Tours but not one the user starte
     yield* f.client.AddToQueue({ references: queued.map(ref) })
     yield* f.client.WriteTour({
       pullRequest: ref(opened),
-      revision: (yield* f.client.OpenPullRequest({ pullRequest: ref(opened) })).revision,
+      revision: (yield* f.client.LoadPullRequest({ pullRequest: ref(opened) })).revision,
     })
     yield* f.runners.ran(3)
 
@@ -210,7 +210,7 @@ it.live("cancels the Tour of a PR leaving the Queue and starts the next one wait
     yield* f.runners.interrupted(1)
     yield* f.runners.ran(3)
 
-    const opened = yield* f.client.OpenPullRequest({ pullRequest: ref(reviewed!) })
+    const opened = yield* f.client.LoadPullRequest({ pullRequest: ref(reviewed!) })
     yield* f.client.SubmitReview({
       pullRequestId: opened.pullRequest.id,
       revision: opened.revision,

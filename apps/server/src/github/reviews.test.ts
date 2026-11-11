@@ -35,7 +35,7 @@ describe("Submitting a Review", () => {
       const { github, client } = yield* startSignedInBackend
       const pr = github.seedPullRequest(withDrafts)
 
-      const { pullRequest, revision } = yield* client.OpenPullRequest({
+      const { pullRequest, revision } = yield* client.LoadPullRequest({
         pullRequest: new PullRequestRef(pr),
       })
 
@@ -68,7 +68,7 @@ describe("Submitting a Review", () => {
       ] as const) {
         const pr = github.seedPullRequest(withDrafts)
 
-        const { pullRequest, revision } = yield* client.OpenPullRequest({
+        const { pullRequest, revision } = yield* client.LoadPullRequest({
           pullRequest: new PullRequestRef(pr),
         })
 
@@ -100,7 +100,7 @@ describe("Submitting a Review", () => {
       ] as const) {
         const pr = github.seedPullRequest({ base, head, changedFiles })
 
-        const { pullRequest, revision } = yield* client.OpenPullRequest({
+        const { pullRequest, revision } = yield* client.LoadPullRequest({
           pullRequest: new PullRequestRef(pr),
         })
 
@@ -126,7 +126,7 @@ describe("Submitting a Review", () => {
         outdatedDrafts: [changed!.id],
       })
 
-      const { pullRequest, revision } = yield* client.OpenPullRequest({
+      const { pullRequest, revision } = yield* client.LoadPullRequest({
         pullRequest: new PullRequestRef(pr),
       })
 
@@ -158,7 +158,7 @@ describe("Submitting a Review", () => {
         const pr = github.seedPullRequest(withDrafts)
         const drafts = pr.pendingReview!.drafts.slice()
 
-        const { pullRequest, revision } = yield* client.OpenPullRequest({
+        const { pullRequest, revision } = yield* client.LoadPullRequest({
           pullRequest: new PullRequestRef(pr),
         })
 
@@ -189,7 +189,7 @@ describe("Submitting a Review", () => {
       const pr = github.seedPullRequest({ ...withDrafts, author: VIEWER.login })
       const drafts = pr.pendingReview!.drafts.slice()
 
-      const { pullRequest, revision } = yield* client.OpenPullRequest({
+      const { pullRequest, revision } = yield* client.LoadPullRequest({
         pullRequest: new PullRequestRef(pr),
       })
 

@@ -126,10 +126,10 @@ export class PullRequestAccessDenied extends Schema.TaggedError<PullRequestAcces
   { ref: PullRequestRef, message: Schema.String },
 ) {}
 
-export const OpenPullRequestError = Schema.Union([
+export const LoadPullRequestError = Schema.Union([
   PullRequestNotFound,
   PullRequestAccessDenied,
   ConnectionError,
 ])
 
-export type OpenPullRequestError = typeof OpenPullRequestError.Type
+export type LoadPullRequestError = typeof LoadPullRequestError.Type
