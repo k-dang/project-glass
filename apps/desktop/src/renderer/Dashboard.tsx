@@ -8,6 +8,7 @@ import { ActivityChart } from "./ActivityChart"
 import { AgentContinueCard } from "./AgentContinueCard"
 import type { BackendError } from "./backend"
 import { Count, SectionLink } from "./Lists"
+import { NeedsYouSection } from "./NeedsYou"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf } from "./problems"
 import { repositoryLabeller } from "./PullRequestRow"
@@ -24,6 +25,7 @@ export function Dashboard() {
   return (
     <div className="page-content @container flex flex-col gap-8 py-6">
       <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+      <NeedsYouSection />
       <Continue />
       <ActivityChart />
       <div className="grid gap-8 @3xl:grid-cols-2">

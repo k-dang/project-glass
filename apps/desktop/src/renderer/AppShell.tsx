@@ -12,12 +12,13 @@ import {
   Settings,
   Sparkles,
 } from "lucide-react"
-import { useContext } from "react"
+import { useContext, useId } from "react"
 import { TooltipHint } from "@/components/ui/tooltip"
 import { backendReachableAtom } from "./backend"
 import { ConfirmationDialog } from "./ConfirmationDialog"
 import { globalConversationOpenAtom } from "./globalConversation"
 import { GlobalConversationDialog } from "./GlobalConversationDialog"
+import { NeedsYouBadge } from "./NeedsYou"
 import { confirmLeave, discardPromptAtom, leavesPullRequest, reviewsLinkAtom } from "./reviewsArea"
 import { ConnectionAvatar } from "./Settings"
 import { ResourceUsage } from "./ResourceUsage"
@@ -70,6 +71,7 @@ export function AppShell() {
   const areas = useAreas()
   const navigate = useNavigate()
   const [conversing, setConversing] = useAtom(globalConversationOpenAtom)
+  const needsYouBadgeId = useId()
 
   useShortcuts([
     ...areas.map(({ link }, index) => ({
@@ -111,10 +113,12 @@ export function AppShell() {
                   {...link}
                   activeOptions={{ includeSearch: false }}
                   aria-label={label}
+                  aria-describedby={label === "Dashboard" ? needsYouBadgeId : undefined}
                   aria-keyshortcuts={`Meta+${index + 1} Control+${index + 1}`}
                   className={cn(railLink, label === "Settings" && "mt-auto")}
                 >
                   <Icon className="size-4" aria-hidden />
+                  {label === "Dashboard" && <NeedsYouBadge id={needsYouBadgeId} />}
                 </Link>
               </TooltipHint>
             ))}

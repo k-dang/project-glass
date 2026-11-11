@@ -1,18 +1,16 @@
 import {
   type FollowedRepository,
   type PullRequestList,
-  type PullRequestListings,
   type PullRequestRef,
   type PullRequestSummary,
   parsePullRequestReference,
-  type RepositoryListing,
   repositoryKey,
 } from "@glass/contracts"
 import { Link } from "@tanstack/react-router"
 import { cn } from "cn"
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
-import { Data, DateTime, Effect, Match, Option, Record } from "effect"
-import { AsyncResult, Atom } from "effect/reactivity"
+import { DateTime } from "effect"
+import { AsyncResult } from "effect/reactivity"
 import { ArrowRight, RefreshCw, RotateCw, TriangleAlert } from "lucide-react"
 import { type FormEvent, useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -27,13 +25,11 @@ import {
 } from "@/components/ui/item"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { Backend, type BackendError, backendRuntime } from "./backend"
-import { followedRepositoriesRevisionAtom } from "./FollowedRepositories"
 import { Empty } from "./Lists"
 import { OpenPullRequestDialog } from "./OpenPullRequestDialog"
 import { plural } from "./plural"
 import { ProblemAlert } from "./ProblemAlert"
-import { describeError, type Problem, problemOf, problemText } from "./problems"
+import { type Problem, problemOf, problemText } from "./problems"
 import {
   columns,
   columnsWithRepository,
@@ -43,12 +39,11 @@ import {
   subgridRow,
   warningTone,
 } from "./PullRequestRow"
+import { type Group, Health, watchedListingsAtom } from "./pullRequestLists"
 import { queueRefreshAtom } from "./queue"
 import { QueueTab, QueueTabTrigger } from "./QueueTab"
 import { recency, recencyOf } from "./recency"
 import type { ListSearch, ListView } from "./reviewsArea"
-import { watched } from "./watched"
-import { reviewingRevisionAtom } from "./workspaceEvents"
 
 const tabs: ReadonlyArray<{
   readonly list: PullRequestList
@@ -77,118 +72,6 @@ const tabs: ReadonlyArray<{
       `Open a PR in ${repositories} to find it here later. PRs with your Drafts or submitted Reviews also appear here.`,
   },
 ]
-
-type Health = Data.TaggedEnum<{
-  Current: {}
-  NotRefreshed: { readonly problem: Problem }
-  Unavailable: { readonly problem: Problem }
-}>
-
-const Health = Data.taggedEnum<Health>()
-
-interface Group {
-  readonly repository: FollowedRepository
-  readonly pullRequests: ReadonlyArray<PullRequestSummary>
-  readonly health: Health
-}
-
-interface Listing {
-  readonly groups: ReadonlyArray<Group>
-  readonly problem: Problem | undefined
-  readonly notRefreshed: Problem | undefined
-}
-
-type Listings = Readonly<Record<PullRequestList, Listing>>
-
-const groupOf = (listing: RepositoryListing): Group =>
-  Match.valueTags(listing, {
-    RepositoryPullRequests: ({ repository, pullRequests }): Group => ({
-      repository,
-      pullRequests,
-      health: Health.Current(),
-    }),
-    RepositoryUnavailable: ({ repository, error, pullRequests }): Group => ({
-      repository,
-      pullRequests,
-      health:
-        pullRequests.length > 0
-          ? Health.NotRefreshed({ problem: describeError(error) })
-          : Health.Unavailable({ problem: describeError(error) }),
-    }),
-  })
-
-const markNotRefreshed =
-  (problem: Problem) =>
-  (group: Group): Group =>
-    Health.$is("Current")(group.health) && group.pullRequests.length > 0
-      ? { ...group, health: Health.NotRefreshed({ problem }) }
-      : group
-
-const listed = (repositories: ReadonlyArray<RepositoryListing>): Listing => ({
-  groups: repositories.map(groupOf),
-  problem: undefined,
-  notRefreshed: undefined,
-})
-
-const listingsOf = (listings: PullRequestListings): Listings => ({
-  "needs-review": listed(listings["needs-review"]),
-  "my-prs": listed(listings["my-prs"]),
-  reviewing: {
-    groups: listings.reviewing.map(groupOf),
-    problem:
-      listings.reviewingProblem === null ? undefined : describeError(listings.reviewingProblem),
-    notRefreshed: undefined,
-  },
-})
-
-const CACHE_IDLE_TTL = "5 minutes"
-
-const listingsAtom = backendRuntime
-  .atom((get) => {
-    get(followedRepositoriesRevisionAtom)
-    get(reviewingRevisionAtom)
-
-    const load = (known: Option.Option<Listings>) =>
-      Backend.use((backend) => backend.ListPullRequests()).pipe(
-        Effect.map(listingsOf),
-        Effect.catchCause((cause) =>
-          Option.match(known, {
-            onNone: () => Effect.failCause(cause),
-            onSome: (lists): Effect.Effect<Listings> => {
-              const problem = problemOf(cause)
-
-              return Effect.succeed(
-                Record.map(lists, (listing) => ({
-                  ...listing,
-                  groups: listing.groups.map(markNotRefreshed(problem)),
-                  notRefreshed: problem,
-                })),
-              )
-            },
-          }),
-        ),
-      )
-
-    const known = get
-      .self<AsyncResult.AsyncResult<Listings, BackendError>>()
-      .pipe(Option.flatMap(AsyncResult.value))
-
-    if (Option.isSome(known)) return load(known)
-
-    return Effect.gen(function* () {
-      const saved = yield* Backend.use((backend) => backend.ListSavedPullRequests()).pipe(
-        Effect.map((listings) => Option.map(Option.fromNullOr(listings), listingsOf)),
-        Effect.orElseSucceed(() => Option.none<Listings>()),
-      )
-
-      if (Option.isSome(saved)) get.setSelf(AsyncResult.success(saved.value, { waiting: true }))
-
-      return yield* load(saved)
-    })
-  })
-  .pipe(Atom.setIdleTTL(CACHE_IDLE_TTL))
-
-const watchedListingsAtom = watched(listingsAtom)
 
 export function PullRequestListPage(props: {
   search: ListSearch

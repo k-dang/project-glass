@@ -1,6 +1,7 @@
 import {
   emptyTranscript,
   GlassRpcs,
+  noListings,
   nothingUnsent,
   SavedPlace,
   TranscriptSnapshot,
@@ -54,7 +55,7 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         PreviewSkillPackUpdate: unused,
         UpdateSkillPack: unused,
         RemoveSkillPack: unused,
-        ListPullRequests: unused,
+        ListPullRequests: () => Effect.succeed(noListings),
         ListSavedPullRequests: () => Effect.succeed(null),
         ListSavedQueue: () => Effect.succeed([]),
         RefreshQueue: () => Effect.void,
