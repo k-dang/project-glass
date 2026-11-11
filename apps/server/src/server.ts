@@ -28,6 +28,7 @@ import { ServerConfig } from "./ServerConfig"
 import { LocalPlacement } from "./LocalPlacement"
 import { McpCredentials } from "./mcp/McpCredentials"
 import { GlassMcpTools, McpRoutes } from "./mcp/server"
+import { NeedsYou } from "./NeedsYou"
 import { FollowedRepositories } from "./FollowedRepositories"
 import { PullRequestLists } from "./PullRequestLists"
 import { PullRequestMirror } from "./PullRequestMirror"
@@ -84,6 +85,7 @@ const services = (
 ) =>
   Layer.merge(GlassRpcHandlers, mcpTools)
     .pipe(
+      Layer.provide(NeedsYou.layer),
       Layer.provide(PullRequestLists.layer),
       Layer.provide(PullRequestMirror.layer),
       Layer.provide(ToDos.layer),
