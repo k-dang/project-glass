@@ -15,6 +15,7 @@ import {
 } from "effect"
 import { OtlpLogger, OtlpSerialization, OtlpTracer } from "effect/observability"
 import { randomUUID } from "node:crypto"
+import type { Delivery } from "./ConversationTurns"
 
 /**
  * Fields hold IDs, counts, choices and durations. Never put message text, prompts, diffs,
@@ -34,6 +35,7 @@ export interface UnitFields {
   readonly checkout_ms?: number
   readonly agent_ms?: number
   readonly ending?: string
+  readonly delivery?: Delivery
   readonly tool_calls?: number
   readonly failed_tool_calls?: number
 }

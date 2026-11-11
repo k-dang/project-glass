@@ -9,8 +9,6 @@ import {
   type RequestWaiting,
   type SentMessage,
   type TranscriptUpdate,
-  TurnCutOff,
-  TurnInterrupted,
 } from "@glass/contracts"
 import {
   Context,
@@ -80,7 +78,6 @@ export class GlobalConversation extends Context.Service<
       const turns = yield* ConversationTurns
       const host = yield* LocalAgentHost
       const credentials = yield* McpCredentials
-      const scope = yield* Scope.Scope
       const folder = join(config.dataDirectory, "global-conversation")
 
       const [stored] = yield* sql`
@@ -144,15 +141,6 @@ export class GlobalConversation extends Context.Service<
           }),
         )
 
-      yield* (yield* host.subscribeStopped).pipe(
-        Stream.runForEach(() =>
-          transcripts
-            .endRunning(TurnCutOff.make({}), [id])
-            .pipe(Effect.catch((cause) => Effect.logWarning("Couldn't cut off a Turn", cause))),
-        ),
-        Effect.forkIn(scope),
-      )
-
       const conversation = SubscriptionRef.get(model).pipe(
         Effect.map((choice): Conversation => ({
           id,
@@ -163,11 +151,12 @@ export class GlobalConversation extends Context.Service<
         })),
       )
 
-      yield* turns.deliverTurnsOf((conversationId) =>
-        conversationId === id ? conversation.pipe(Effect.map(Option.some)) : Effect.succeedNone,
-      )
-
-      yield* transcripts.endRunning(TurnInterrupted.make({}), [id]).pipe(Effect.orDie)
+      yield* turns.serve({
+        claim: (conversationId) =>
+          conversationId === id ? conversation.pipe(Effect.map(Option.some)) : Effect.succeedNone,
+        lost: (yield* host.subscribeStopped).pipe(Stream.map(() => [id])),
+        interrupted: Effect.succeed([id]),
+      })
 
       const changeModel = Effect.fn("GlobalConversation.changeModel")(function* (
         choice: ModelChoice,

@@ -18,12 +18,13 @@ import {
 import { DateTime, Deferred, Effect, Fiber, Predicate, Schema, Scope } from "effect"
 import { randomUUID } from "node:crypto"
 import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs"
-import { basename, dirname, join, relative } from "node:path"
+import { basename, dirname, join } from "node:path"
 import type { AgentAdapter, AgentSession } from "../src/agentHost/adapter"
 import type { DeliveredMessage } from "../src/agentHost/deliveredMessage"
 import { GlassToolsAccess, notRunning } from "../src/agentHost/protocol"
 import type { WrittenSkills } from "../src/agentHost/sentSkills"
 import { MCP_PATH } from "../src/mcp/server"
+import { filesIn } from "./filesIn"
 import { connectMcp, initialize, mcpPost } from "./mcpClient"
 import { settleWith } from "../src/agentHost/requests"
 import { placeSuggestedDraft } from "../src/agentHost/suggestDraftTool"
@@ -65,12 +66,6 @@ const skillCommands = (written: ReadonlyArray<WrittenSkills>) =>
   written.flatMap(({ plugin, skills }) =>
     skills.map((skill) => ({ name: `${basename(plugin)}:${basename(skill)}`, description: "" })),
   )
-
-const filesUnder = (folder: string): ReadonlyArray<string> =>
-  readdirSync(folder, { recursive: true, withFileTypes: true })
-    .filter((entry) => entry.isFile())
-    .map((entry) => relative(folder, join(entry.parentPath, entry.name)).replaceAll("\\", "/"))
-    .toSorted()
 
 export const scriptedAdapter = (gates: string): AgentAdapter => {
   // The Global conversation's starts are kept beside the gates, so they outlive this host.
@@ -188,7 +183,7 @@ export const scriptedAdapter = (gates: string): AgentAdapter => {
 
             if (message === "show the skills") {
               const [first] = skills
-              const written = first === undefined ? [] : filesUnder(dirname(first.plugin))
+              const written = first === undefined ? [] : filesIn(dirname(first.plugin))
 
               yield* part(turnId, TextPart.make({ text: written.join(",") }))
             }

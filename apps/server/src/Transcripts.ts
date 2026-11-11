@@ -1,5 +1,4 @@
 import {
-  type AcceptedMessage,
   Agent,
   AgentError,
   type AgentEvent,
@@ -46,6 +45,12 @@ import {
 } from "effect"
 import { SqlClient, type SqlError } from "effect/sql"
 import { randomUUID } from "node:crypto"
+import {
+  type ConversationEvent,
+  type ConversationState,
+  type ConversationWrite,
+  stepConversation,
+} from "./conversationState"
 import { recordUnit } from "./wideEvents"
 
 const encodePart = Schema.encodeSync(Schema.fromJsonString(TurnPart))
@@ -123,10 +128,6 @@ const decodeEndedTurn = Schema.decodeUnknownEffect(
 
 const decodeTurnIds = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ id: Schema.String })))
 
-const decodeFeedback = Schema.decodeUnknownEffect(
-  Schema.Array(Schema.Struct({ feedback: FeedbackJson })),
-)
-
 const decodePositions = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({ first: Schema.NullOr(Schema.Int), last: Schema.NullOr(Schema.Int) }),
@@ -164,11 +165,6 @@ const joinConsecutiveAppends = (events: ReadonlyArray<AgentEvent>) => {
 
 const changesRequest = (update: TranscriptUpdate) =>
   Predicate.isTagged(update, "PartSet") && isRequestPart(update.part)
-
-const startsNext = (event: TranscriptUpdate) =>
-  Predicate.isTagged(event, "TurnEnded") &&
-  (Predicate.isTagged(event.ended.ending, "Done") ||
-    Predicate.isTagged(event.ended.ending, "Failed"))
 
 class TurnFailure extends Data.TaggedError("TurnFailure")<{ readonly message: string }> {}
 
@@ -318,9 +314,9 @@ export class Transcripts extends Context.Service<
           Effect.map((current) => QueuedMessagesChanged.make({ queued: current })),
         )
 
-      const insertQueued = (agentId: string, position: number, input: AcceptedMessage) =>
+      const insertQueued = (agentId: string, position: number, input: QueuedMessage) =>
         sql`INSERT INTO agent_queued_message ${sql.insert({
-          id: randomUUID(),
+          id: input.id,
           agent_id: agentId,
           position,
           message: input.message,
@@ -338,30 +334,68 @@ export class Transcripts extends Context.Service<
           Effect.map(([found]) => ({ first: found?.first ?? 0, last: found?.last ?? 0 })),
         )
 
-      const startTurn = Effect.fnUntraced(function* (
+      const execute = Effect.fnUntraced(function* (
         agentId: string,
-        input: AcceptedMessage,
-        turnId: string,
+        writes: ReadonlyArray<ConversationWrite>,
       ) {
-        const event = TurnStarted.make({
-          turnId,
-          message: input.message,
-          images: input.images,
-          context: input.context,
-          feedback: input.feedback,
-          sentAt: yield* DateTime.now,
-        })
+        const started: Array<TranscriptUpdate> = []
 
-        yield* writeApplied(agentId, event)
+        for (const write of writes)
+          switch (write.type) {
+            case "startTurn": {
+              const event = TurnStarted.make({
+                turnId: write.message.id,
+                message: write.message.message,
+                images: write.message.images,
+                context: write.message.context,
+                feedback: write.message.feedback,
+                sentAt: yield* DateTime.now,
+              })
 
-        return event
+              yield* writeApplied(agentId, event)
+              started.push(event)
+              break
+            }
+
+            case "enqueue":
+              yield* insertQueued(
+                agentId,
+                (yield* queuedPositions(agentId)).last + 1,
+                write.message,
+              )
+              break
+            case "prepend": {
+              const start = (yield* queuedPositions(agentId)).first - write.messages.length
+
+              yield* Effect.forEach(
+                write.messages,
+                (message, index) => insertQueued(agentId, start + index, message),
+                { discard: true },
+              )
+              break
+            }
+
+            case "dequeue":
+              yield* sql`DELETE FROM agent_queued_message WHERE id = ${write.queuedId}`
+              break
+          }
+
+        return writes.some(({ type }) => type !== "startTurn")
+          ? [yield* queuedChanged(agentId), ...started]
+          : started
       })
 
-      const startFromQueue = Effect.fnUntraced(function* (agentId: string, chosen: QueuedMessage) {
-        yield* sql`DELETE FROM agent_queued_message WHERE id = ${chosen.id}`
-        const turn = yield* startTurn(agentId, chosen, chosen.id)
+      const conversation = Effect.fnUntraced(function* (agentId: string) {
+        return {
+          running: yield* runningTurn(agentId),
+          queued: yield* queued(agentId),
+        } satisfies ConversationState
+      })
 
-        return [yield* queuedChanged(agentId), turn]
+      const step = Effect.fnUntraced(function* (agentId: string, event: ConversationEvent) {
+        const { outcome, writes } = stepConversation(yield* conversation(agentId), event)
+
+        return { outcome, updates: yield* execute(agentId, writes) }
       })
 
       const changeWith = <A, E, R>(
@@ -392,14 +426,6 @@ export class Transcripts extends Context.Service<
           agentId,
           Effect.map(effect, (updates) => [undefined, updates] as const),
         )
-
-      const startNext = Effect.fnUntraced(function* (agentId: string) {
-        if ((yield* runningTurn(agentId)) !== null) return []
-
-        const [head] = yield* queued(agentId)
-
-        return head === undefined ? [] : yield* startFromQueue(agentId, head)
-      })
 
       const recordTurn = Effect.fnUntraced(function* (
         agentId: string,
@@ -455,11 +481,11 @@ export class Transcripts extends Context.Service<
 
             const ended = written.filter((event) => Predicate.isTagged(event, "TurnEnded"))
 
-            const updates = written.some(startsNext)
-              ? [...written, ...(yield* startNext(agentId))]
-              : written
+            const next = yield* Effect.forEach(ended, ({ ended: { ending } }) =>
+              step(agentId, { type: "turnEnded", ending }),
+            )
 
-            return [ended, updates] as const
+            return [ended, [...written, ...next.flatMap(({ updates }) => updates)]] as const
           }),
         ).pipe(
           Effect.tapError((cause) => Effect.logWarning("Couldn't save a transcript", cause)),
@@ -570,14 +596,10 @@ export class Transcripts extends Context.Service<
             changeWith(
               agentId,
               Effect.gen(function* () {
-                const input = { ...sent, feedback: yield* feedback }
+                const message = { ...sent, feedback: yield* feedback, id: randomUUID() }
+                const { outcome, updates } = yield* step(agentId, { type: "send", message })
 
-                if ((yield* runningTurn(agentId)) === null)
-                  return ["started", [yield* startTurn(agentId, input, randomUUID())]] as const
-
-                yield* insertQueued(agentId, (yield* queuedPositions(agentId)).last + 1, input)
-
-                return ["queued", [yield* queuedChanged(agentId)]] as const
+                return [outcome.type === "started" ? "started" : "queued", updates] as const
               }),
             ),
           ),
@@ -586,18 +608,12 @@ export class Transcripts extends Context.Service<
             "put messages back in front of the Queued ones",
             change(
               agentId,
-              Effect.gen(function* () {
-                const start = (yield* queuedPositions(agentId)).first - inputs.length
-
-                yield* Effect.forEach(
-                  inputs,
-                  (input, index) =>
-                    insertQueued(agentId, start + index, { ...input, feedback: [] }),
-                  { discard: true },
-                )
-
-                return [yield* queuedChanged(agentId)]
-              }),
+              execute(agentId, [
+                {
+                  type: "prepend",
+                  messages: inputs.map((input) => ({ ...input, feedback: [], id: randomUUID() })),
+                },
+              ]),
             ),
           ),
         cancelQueued: (agentId, queuedId, restore = () => Effect.void) =>
@@ -606,15 +622,15 @@ export class Transcripts extends Context.Service<
             change(
               agentId,
               Effect.gen(function* () {
-                const [canceled] = yield* sql`
-                  DELETE FROM agent_queued_message WHERE id = ${queuedId} AND agent_id = ${agentId}
-                  RETURNING feedback
-                `.pipe(Effect.flatMap(decodeFeedback))
+                const { outcome, updates } = yield* step(agentId, {
+                  type: "cancelQueued",
+                  queuedId,
+                })
 
-                if (canceled !== undefined) {
-                  yield* restore(canceled.feedback)
+                if (outcome.type === "canceled") {
+                  yield* restore(outcome.feedback)
 
-                  return [yield* queuedChanged(agentId)]
+                  return updates
                 }
 
                 const [started] = yield* sql`
@@ -630,13 +646,11 @@ export class Transcripts extends Context.Service<
             "start a Queued message",
             change(
               agentId,
-              Effect.gen(function* () {
-                if ((yield* runningTurn(agentId)) !== null) return yield* new AgentBusy()
-
-                const chosen = (yield* queued(agentId)).find(({ id }) => id === queuedId)
-
-                return chosen === undefined ? [] : yield* startFromQueue(agentId, chosen)
-              }),
+              Effect.flatMap(
+                step(agentId, { type: "sendQueued", queuedId }),
+                ({ outcome, updates }) =>
+                  outcome.type === "busy" ? Effect.fail(new AgentBusy()) : Effect.succeed(updates),
+              ),
             ),
           ),
         subscribeStarted: PubSub.subscribe(published).pipe(

@@ -34,8 +34,6 @@ import {
   localPlace,
   type Transcript,
   type TranscriptUpdate,
-  TurnCutOff,
-  TurnInterrupted,
   type SentMessage,
   type UnsentFeedback,
 } from "@glass/contracts"
@@ -49,7 +47,6 @@ import {
   Option,
   Predicate,
   Schema,
-  Scope,
   Semaphore,
   Stream,
   SubscriptionRef,
@@ -275,7 +272,6 @@ export class Agents extends Context.Service<
       const localSkills = yield* LocalSkills
       const fs = yield* FileSystem.FileSystem
       const lock = yield* Semaphore.make(1)
-      const scope = yield* Scope.Scope
 
       const stored = yield* sql`
         SELECT id, name, sandbox_provider AS sandboxProvider, owner, repo, base_branch AS baseBranch,
@@ -335,15 +331,6 @@ export class Agents extends Context.Service<
 
       const placementOf = (row: PlacedAgent) =>
         row.forReview ? reviewPlacement : placementFor(row.agent.place)
-
-      yield* Stream.merge(yield* localPlacement.subscribeLost, yield* sandboxes.subscribeLost).pipe(
-        Stream.runForEach((agentIds) =>
-          transcripts
-            .endRunning(TurnCutOff.make({}), agentIds)
-            .pipe(Effect.catch((cause) => Effect.logWarning("Couldn't cut off Turns", cause))),
-        ),
-        Effect.forkIn(scope),
-      )
 
       const withSandbox = (agent: Agent) =>
         sandboxes.status(agent.id).pipe(Effect.map((sandbox) => agentWith(agent, { sandbox })))
@@ -409,20 +396,19 @@ export class Agents extends Context.Service<
         }
       }
 
-      yield* turns.deliverTurnsOf((agentId) =>
-        find(agentId).pipe(
-          Effect.map((row) => Option.some(conversationOf(row))),
-          Effect.catchTag("AgentNotFound", () => Effect.succeedNone),
+      yield* turns.serve({
+        claim: (agentId) =>
+          find(agentId).pipe(
+            Effect.map((row) => Option.some(conversationOf(row))),
+            Effect.catchTag("AgentNotFound", () => Effect.succeedNone),
+          ),
+        lost: Stream.merge(yield* localPlacement.subscribeLost, yield* sandboxes.subscribeLost),
+        interrupted: sandboxes.resume.pipe(
+          Effect.map((outlivedGlass) =>
+            stored.flatMap(({ id }) => (outlivedGlass.has(id) ? [] : [id])),
+          ),
         ),
-      )
-
-      const outlivedGlass = yield* sandboxes.resume
-      yield* transcripts
-        .endRunning(
-          TurnInterrupted.make({}),
-          stored.flatMap(({ id }) => (outlivedGlass.has(id) ? [] : [id])),
-        )
-        .pipe(Effect.orDie)
+      })
 
       const insert = (placed: PlacedAgent, first: MessageInput, purpose: Purpose) => {
         const { id, place, repository } = placed.agent
