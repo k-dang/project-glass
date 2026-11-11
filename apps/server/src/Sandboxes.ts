@@ -4,7 +4,6 @@ import {
   AgentModels,
   GoneReach,
   goneExplanation,
-  isGone,
   isOutOfReach,
   SandboxProviderInfo,
   type SandboxReach,
@@ -54,13 +53,17 @@ import { Transcripts } from "./Transcripts"
 
 const hostPort = 7310
 
-const SandboxRecord = Schema.Struct({
-  state: Schema.Json,
-  token: Schema.String,
-  ready: Schema.Boolean,
-  expiresAt: Schema.optional(Schema.DateTimeUtcFromString),
-  gone: Schema.optional(GoneReach),
-})
+const sandboxFields = { state: Schema.Json, token: Schema.String }
+
+const leaseFields = { ...sandboxFields, expiresAt: Schema.optional(Schema.DateTimeUtcFromString) }
+
+const Building = Schema.TaggedStruct("Building", sandboxFields)
+
+const Ready = Schema.TaggedStruct("Ready", leaseFields)
+
+const Gone = Schema.TaggedStruct("Gone", { ...leaseFields, reason: GoneReach })
+
+const SandboxRecord = Schema.Union([Building, Ready, Gone])
 
 type SandboxRecord = typeof SandboxRecord.Type
 
@@ -91,19 +94,33 @@ const storageFailure = () =>
 
 interface KnownSandbox {
   readonly record: SandboxRecord | null
-  readonly reach: SandboxReach
+  readonly reach: Exclude<SandboxReach, GoneReach>
 }
 
 const unknown: KnownSandbox = { record: null, reach: "connecting" }
 
-const statusOf = ({ record, reach }: KnownSandbox) =>
-  new SandboxStatus({ expiresAt: record?.expiresAt ?? null, reach })
+const reachOf = ({ record, reach }: KnownSandbox): SandboxReach =>
+  Predicate.isTagged(record, "Gone") ? record.reason : reach
 
-const expiredBy = (record: SandboxRecord | null, now: DateTime.Utc) =>
-  record?.expiresAt !== undefined && DateTime.isLessThanOrEqualTo(record.expiresAt, now)
+const expiresAtOf = (record: SandboxRecord | null) =>
+  record === null || Predicate.isTagged(record, "Building") ? undefined : record.expiresAt
 
-const goneReason = (record: SandboxRecord | null, now: DateTime.Utc): GoneReach =>
-  expiredBy(record, now) ? "expired" : "deleted"
+const statusOf = (found: KnownSandbox) =>
+  new SandboxStatus({ expiresAt: expiresAtOf(found.record) ?? null, reach: reachOf(found) })
+
+const expiredBy = (record: SandboxRecord, now: DateTime.Utc) => {
+  const expiresAt = expiresAtOf(record)
+
+  return expiresAt !== undefined && DateTime.isLessThanOrEqualTo(expiresAt, now)
+}
+
+const goneRecord = (record: typeof Building.Type | typeof Ready.Type, now: DateTime.Utc) =>
+  Gone.make({
+    state: record.state,
+    token: record.token,
+    expiresAt: expiresAtOf(record),
+    reason: expiredBy(record, now) ? "expired" : "deleted",
+  })
 
 interface HostLink {
   connection: HostClient | null
@@ -198,16 +215,8 @@ export class Sandboxes extends Context.Service<
         FROM agent WHERE sandbox IS NOT NULL
       `.pipe(Effect.flatMap(decodeStored), Effect.orDie)
 
-      const launchedAt = yield* DateTime.now
-
       const known = yield* SubscriptionRef.make<ReadonlyMap<string, KnownSandbox>>(
-        new Map(
-          stored.map(({ id, sandbox }) => {
-            const gone = sandbox.gone ?? (expiredBy(sandbox, launchedAt) ? "expired" : undefined)
-
-            return [id, { record: sandbox, reach: gone ?? "connecting" }]
-          }),
-        ),
+        new Map(stored.map(({ id, sandbox }) => [id, { record: sandbox, reach: "connecting" }])),
       )
 
       const links = new Map(stored.map(({ id, journalSaved }) => [id, newLink(journalSaved)]))
@@ -235,46 +244,52 @@ export class Sandboxes extends Context.Service<
             [before, after] as const,
             after === before ? Option.none() : Option.some(new Map(all).set(agentId, after)),
           ]
-        })
-
-      const setReach = (agentId: string, reach: SandboxReach) =>
-        change(agentId, (before) =>
-          isGone(before.reach) || before.reach === reach ? before : { ...before, reach },
-        ).pipe(
+        }).pipe(
           Effect.flatMap(([before, after]) =>
-            before.reach !== after.reach && isOutOfReach(after.reach)
+            reachOf(before) !== reachOf(after) && isOutOfReach(reachOf(after))
               ? PubSub.publish(lost, [agentId])
               : Effect.void,
           ),
         )
 
-      const save = (agentId: string, record: SandboxRecord | null) =>
+      const setReach = (agentId: string, reach: KnownSandbox["reach"]) =>
+        change(agentId, (before) => (before.reach === reach ? before : { ...before, reach }))
+
+      const setRecord = (agentId: string, record: SandboxRecord | null) =>
+        change(agentId, (before) => ({ ...before, record }))
+
+      const persist = (agentId: string, record: SandboxRecord | null) =>
         sql`
           UPDATE agent SET sandbox = ${record === null ? null : encodeRecord(record)}
           WHERE id = ${agentId}
         `.pipe(
-          Effect.andThen(change(agentId, (before) => ({ ...before, record }))),
           Effect.asVoid,
           Effect.tapError((cause) => Effect.logWarning("Couldn't save a Sandbox", cause)),
           Effect.mapError(storageFailure),
         )
 
+      const save = (agentId: string, record: SandboxRecord | null) =>
+        persist(agentId, record).pipe(Effect.andThen(setRecord(agentId, record)))
+
       const becomeGone = (agentId: string) =>
         Effect.gen(function* () {
           const { record } = yield* knownOf(agentId)
-          const gone = goneReason(record, yield* DateTime.now)
 
-          yield* Effect.logWarning(`An Agent's Sandbox was ${gone}`, agentId)
+          if (record === null || Predicate.isTagged(record, "Gone")) return
 
-          if (record !== null) yield* save(agentId, { ...record, gone }).pipe(Effect.ignore)
+          const gone = goneRecord(record, yield* DateTime.now)
 
-          yield* setReach(agentId, gone)
+          yield* Effect.logWarning(`An Agent's Sandbox was ${gone.reason}`, agentId)
+          yield* persist(agentId, gone).pipe(Effect.ignore)
+          yield* setRecord(agentId, gone)
         })
 
       const refuseIfGone = (agentId: string) =>
         knownOf(agentId).pipe(
-          Effect.flatMap(({ reach }) =>
-            isGone(reach) ? Effect.fail(goneFailure(reach)) : Effect.void,
+          Effect.flatMap(({ record }) =>
+            Predicate.isTagged(record, "Gone")
+              ? Effect.fail(goneFailure(record.reason))
+              : Effect.void,
           ),
         )
 
@@ -319,7 +334,7 @@ export class Sandboxes extends Context.Service<
                   progress: (step) => reports.offer(transcripts.setStatus(agent.id, step)),
                   record: (state) => {
                     recorded = state
-                    reports.offer(save(agent.id, { state, token, ready: false }))
+                    reports.offer(save(agent.id, Building.make({ state, token })))
                   },
                   signal,
                 }),
@@ -338,7 +353,7 @@ export class Sandboxes extends Context.Service<
 
               yield* waitForHost(provider, recorded)
 
-              return yield* save(agent.id, { state: recorded, token, ready: true })
+              return yield* save(agent.id, Ready.make({ state: recorded, token }))
             }).pipe(
               Effect.onError(() =>
                 recorded === undefined
@@ -351,12 +366,12 @@ export class Sandboxes extends Context.Service<
 
         const extendAhead = (agentId: string, extend: (state: SandboxState) => Promise<Date>) =>
           Effect.gen(function* () {
-            let last = (yield* knownOf(agentId)).record?.expiresAt
+            let last = expiresAtOf((yield* knownOf(agentId)).record)
 
             for (;;) {
-              const { record, reach } = yield* knownOf(agentId)
+              const { record } = yield* knownOf(agentId)
 
-              if (record === null || isGone(reach)) return
+              if (!Predicate.isTagged(record, "Ready")) return
 
               const expiresAt = yield* extendSandbox(provider, extend, record.state)
 
@@ -364,7 +379,8 @@ export class Sandboxes extends Context.Service<
 
               const { record: current } = yield* knownOf(agentId)
 
-              if (current !== null) yield* save(agentId, { ...current, expiresAt })
+              if (Predicate.isTagged(current, "Ready"))
+                yield* save(agentId, { ...current, expiresAt })
 
               last = expiresAt
 
@@ -388,12 +404,12 @@ export class Sandboxes extends Context.Service<
           opened: Deferred.Deferred<HostClient, AgentError | SandboxGone>,
         ) =>
           Effect.gen(function* () {
-            if ((yield* knownOf(agentId)).record?.ready !== true && placed !== null)
+            if (!Predicate.isTagged((yield* knownOf(agentId)).record, "Ready") && placed !== null)
               yield* provision(placed)
 
             const { record } = yield* knownOf(agentId)
 
-            if (record?.ready !== true) return yield* unreachable()
+            if (!Predicate.isTagged(record, "Ready")) return yield* unreachable()
 
             const link = linkOf(agentId)
 
@@ -450,7 +466,8 @@ export class Sandboxes extends Context.Service<
             Effect.gen(function* () {
               if (link.connection !== null) return link.connection
 
-              if (isGone((yield* knownOf(agentId)).reach)) return yield* new SandboxGone()
+              if (Predicate.isTagged((yield* knownOf(agentId)).record, "Gone"))
+                return yield* new SandboxGone()
 
               const opened = yield* Deferred.make<HostClient, AgentError | SandboxGone>()
               yield* FiberMap.run(sandboxFibers, agentId, follow(agentId, placed, opened))
@@ -505,11 +522,7 @@ export class Sandboxes extends Context.Service<
           host: (placed) =>
             connect(placed.agent.id, placed).pipe(
               Effect.catchTag("SandboxGone", () =>
-                knownOf(placed.agent.id).pipe(
-                  Effect.flatMap(({ reach }) =>
-                    Effect.fail(isGone(reach) ? goneFailure(reach) : unreachable()),
-                  ),
-                ),
+                refuseIfGone(placed.agent.id).pipe(Effect.andThen(Effect.fail(unreachable()))),
               ),
             ),
           runningHost: ({ agent }) =>
@@ -517,7 +530,7 @@ export class Sandboxes extends Context.Service<
           hostOnceMade: ({ agent }) =>
             knownOf(agent.id).pipe(
               Effect.flatMap(({ record }) =>
-                record?.ready === true
+                Predicate.isTagged(record, "Ready")
                   ? connect(agent.id, null).pipe(
                       Effect.map(Option.some),
                       Effect.catchTag("SandboxGone", () => Effect.succeedNone),
@@ -530,10 +543,11 @@ export class Sandboxes extends Context.Service<
             Effect.gen(function* () {
               yield* FiberMap.remove(sandboxFibers, agent.id)
 
-              const { record, reach } = yield* knownOf(agent.id)
+              const { record } = yield* knownOf(agent.id)
 
               if (record !== null) {
-                if (!isGone(reach)) yield* deleteSandbox(provider, record, "delete the Sandbox")
+                if (!Predicate.isTagged(record, "Gone"))
+                  yield* deleteSandbox(provider, record, "delete the Sandbox")
 
                 yield* save(agent.id, null)
               }
@@ -555,11 +569,16 @@ export class Sandboxes extends Context.Service<
         Array.from(sandboxProviders, ([id, provider]) => [id, makePlacement(provider)]),
       )
 
+      const launchedAt = yield* DateTime.now
+
       for (const { id, provider: providerId, sandbox } of stored) {
         const provider = sandboxProviders.get(providerId)
 
-        if (!sandbox.ready && provider !== undefined)
+        if (Predicate.isTagged(sandbox, "Building") && provider !== undefined)
           yield* discard(provider, id, sandbox).pipe(Effect.forkIn(scope))
+
+        if (Predicate.isTagged(sandbox, "Ready") && expiredBy(sandbox, launchedAt))
+          yield* becomeGone(id)
       }
 
       const resume = Effect.gen(function* () {
@@ -567,9 +586,9 @@ export class Sandboxes extends Context.Service<
 
         for (const { id, provider } of stored) {
           const found = placed.get(provider)
-          const { record, reach } = yield* knownOf(id)
+          const { record } = yield* knownOf(id)
 
-          if (found === undefined || record?.ready !== true || isGone(reach)) continue
+          if (found === undefined || !Predicate.isTagged(record, "Ready")) continue
 
           resumed.add(id)
           yield* found.resume(id).pipe(Effect.ignore, Effect.forkIn(scope))

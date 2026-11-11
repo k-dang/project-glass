@@ -234,6 +234,10 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
     },
     stopHost: stop,
     reclaim,
+    setGone: (agentId: string, isGone: boolean) => {
+      if (isGone) gone.add(agentId)
+      else gone.delete(agentId)
+    },
     closeAll: Effect.suspend(() => {
       return Effect.forEach(expiries.values(), Fiber.interrupt, { discard: true }).pipe(
         Effect.andThen(Effect.forEach([...hosts.keys()], stop, { discard: true })),
