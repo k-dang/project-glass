@@ -73,3 +73,17 @@ export const AgentReviewState = Schema.Struct({
 })
 
 export type AgentReviewState = typeof AgentReviewState.Type
+
+/** Whether a written Agent review counts as finished while its job is in each status. A Follow-up starting on it leaves it finished. */
+const finishedWhile: Record<AgentReviewState["job"]["status"], boolean> = {
+  idle: true,
+  "starting-agent": true,
+  "agent-start-failed": true,
+  waiting: false,
+  reviewing: false,
+  failed: false,
+}
+
+/** The PR's finished Agent review, or null when none is written or a newer one is waiting, running, or failed. */
+export const finishedReview = (state: AgentReviewState): AgentReview | null =>
+  state.review !== null && finishedWhile[state.job.status] ? state.review : null
