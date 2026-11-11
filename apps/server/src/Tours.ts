@@ -1,4 +1,5 @@
 import {
+  type AgentRunnerIdentity,
   Chapter,
   type ChangedFile,
   type PullRequestRef,
@@ -7,18 +8,32 @@ import {
   TourFailure,
   type TourState,
 } from "@glass/contracts"
-import { Context, DateTime, Effect, Layer, Option, Schema, Stream, SubscriptionRef } from "effect"
+import { Clock, Context, DateTime, Effect, Layer, Option, Schema, Stream } from "effect"
 import { SqlClient } from "effect/sql"
 import { type CheckoutRunFailure, CheckoutRuns } from "./CheckoutRuns"
 import { GitHubClient } from "./github/GitHubClient"
-import { pullRequestJobs, type PullRequestJob } from "./pullRequestJobs"
+import { type JobState, pullRequestJobs, type PullRequestJob } from "./pullRequestJobs"
 import { Deadlines } from "./ServerConfig"
 import { TourAnswer, tourInstructions, tourPrompt } from "./tourPrompt"
 import { repairChapterVisuals, validateTourBeforeAfter } from "./tourVisuals"
 
 const BACKGROUND_SLOTS = 2
 
-type Job = PullRequestJob<TourState>
+interface Progress {
+  readonly startedAt: number
+  readonly runner: AgentRunnerIdentity | null
+}
+
+type Job = PullRequestJob<Tour, Progress, TourFailure>
+
+const toState = ({ output, run }: JobState<Tour, Progress, TourFailure>): TourState => {
+  if (run.status === "running") return { tour: output, job: { status: "writing", ...run.progress } }
+
+  if (run.status === "failed")
+    return { tour: output, job: { status: "failed", reason: run.failure } }
+
+  return { tour: output, job: { status: run.status } }
+}
 
 const content = Schema.Struct({
   intent: Tour.fields.intent,
@@ -35,9 +50,6 @@ const stored = Schema.Array(
     content: Schema.fromJsonString(content),
   }),
 )
-
-const setJob = (job: Job, status: TourState["job"]) =>
-  SubscriptionRef.update(job.state, ({ tour }) => ({ tour, job: status }))
 
 const storageFailure = () =>
   new TourFailure({
@@ -114,33 +126,23 @@ export class Tours extends Context.Service<
                 ...row.content,
               })
 
-        return { tour, job: { status: "idle" } } satisfies TourState
+        return tour
       })
 
-      const jobs = yield* pullRequestJobs<TourState, TourFailure>({
-        load,
-        inProgress: ({ job }) => job.status === "writing" || job.status === "waiting",
-        idle: ({ tour }) => ({ tour, job: { status: "idle" } }),
-        backgroundSlots: BACKGROUND_SLOTS,
-        needsBackground: ({ tour, job }) => tour === null && job.status === "idle",
-        waiting: ({ tour }) => ({ tour, job: { status: "waiting" } }),
-      })
+      const jobs = yield* pullRequestJobs({ load, toState, backgroundSlots: BACKGROUND_SLOTS })
 
-      const markWriting = Effect.fnUntraced(function* (job: Job) {
-        const startedAt = DateTime.toEpochMillis(yield* DateTime.now)
-        yield* setJob(job, { status: "writing", startedAt, runner: null })
+      const started = Clock.currentTimeMillis.pipe(
+        Effect.map((startedAt): Progress => ({ startedAt, runner: null })),
+      )
 
-        return startedAt
-      })
-
-      const work = (job: Job, pr: PullRequestRef, revision: Revision, startedAt: number) =>
+      const work = (job: Job, pr: PullRequestRef, revision: Revision) =>
         Effect.gen(function* () {
           const selected = yield* checkoutRuns
             .select("tours")
             .pipe(Effect.mapError(fromCheckoutRunFailure))
 
           const runner = selected.identity
-          yield* setJob(job, { status: "writing", startedAt, runner })
+          yield* jobs.progress(job, (progress) => ({ ...progress, runner }))
 
           const { input, answer } = yield* selected
             .run({
@@ -183,36 +185,29 @@ export class Tours extends Context.Service<
               logStorageFailure,
               Effect.mapError(storageFailure),
             ),
-            { tour, job: { status: "idle" } },
+            tour,
           )
         }).pipe(
           Effect.scoped,
-          jobs.settle(job, "Tour", ({ tour, job: current }, error: Option.Option<TourFailure>) => ({
-            tour,
-            job: {
-              status: "failed",
-              reason: Option.getOrElse(
-                error,
-                () =>
-                  new TourFailure({
-                    reason: "runner",
-                    message:
-                      "The agent runner stopped unexpectedly. Check its installation and try again.",
-                    runner: current.status === "writing" ? current.runner : null,
-                  }),
-              ),
-            },
-          })),
+          jobs.settle(job, "Tour", (error: Option.Option<TourFailure>, { runner }) =>
+            Option.getOrElse(
+              error,
+              () =>
+                new TourFailure({
+                  reason: "runner",
+                  message:
+                    "The agent runner stopped unexpectedly. Check its installation and try again.",
+                  runner,
+                }),
+            ),
+          ),
         )
 
       const write = Effect.fn("Tours.write")(function* (pr: PullRequestRef, revision: Revision) {
         const job = yield* jobs.jobFor(pr)
 
         yield* jobs.begin(job, (replace) =>
-          Effect.gen(function* () {
-            const startedAt = yield* markWriting(job)
-            yield* replace(work(job, pr, revision, startedAt))
-          }),
+          Effect.flatMap(started, (progress) => replace(progress, work(job, pr, revision))),
         )
       })
 
@@ -220,9 +215,7 @@ export class Tours extends Context.Service<
         pr: PullRequestRef,
         revision: Revision,
       ) {
-        yield* jobs.startInBackground(pr, (job) =>
-          markWriting(job).pipe(Effect.flatMap((startedAt) => work(job, pr, revision, startedAt))),
-        )
+        yield* jobs.startInBackground(pr, started, (job) => work(job, pr, revision))
       })
 
       return Tours.of({

@@ -829,7 +829,11 @@ const main = async () => {
         const { key, meta, shift } = values
         if (!key) fail("press needs --key")
         const pressed = { key, code: key, modifiers: (meta ? 4 : 0) | (shift ? 8 : 0) }
-        await page.send("Input.dispatchKeyEvent", EmptyResponse, { type: "rawKeyDown", ...pressed })
+        const down =
+          key === "Enter"
+            ? { type: "keyDown", ...pressed, windowsVirtualKeyCode: 13, text: "\r" }
+            : { type: "rawKeyDown", ...pressed }
+        await page.send("Input.dispatchKeyEvent", EmptyResponse, down)
         await page.send("Input.dispatchKeyEvent", EmptyResponse, { type: "keyUp", ...pressed })
         return console.log(`Pressed ${meta ? "⌘" : ""}${shift ? "⇧" : ""}${key}`)
       }
