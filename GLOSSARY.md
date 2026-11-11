@@ -12,6 +12,10 @@ The last piece of work the user was doing in an area of Glass, with their place 
 device for them to continue. Each area keeps its own: the last PR in Reviews, the last Agent in
 Agents. Visiting Settings or Activity leaves every Saved place unchanged.
 
+**Needs you**:
+The Agents, Review requests, and queued PRs waiting on the user now, at the top of the Dashboard,
+with their count on the rail in every area.
+
 ### Reviewing
 
 **PR list**:
@@ -290,7 +294,8 @@ _Avoid_: Approval, prompt
 **Question**:
 An Agent asking the user to choose between options or answer in their own words, waiting in its
 transcript until they answer.
-An Agent with a Permission request or Question waiting is marked in the Agents list.
+An Agent with a Permission request or Question waiting is marked in the Agents list and listed in
+Needs you.
 
 ### Identity
 
