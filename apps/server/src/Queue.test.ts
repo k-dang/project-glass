@@ -4,7 +4,7 @@ import { DateTime, Effect } from "effect"
 import { eventually } from "../test/eventually"
 import { type FakeGitHub, startFakeGitHub } from "../test/fakeGitHub"
 import { type FakePullRequest, VIEWER } from "../test/fakePullRequest"
-import { isolatedHome, startBackend } from "../test/harness"
+import { isolatedHome, openPullRequest, startBackend } from "../test/harness"
 
 const base = { sha: "b0", files: {} }
 
@@ -214,16 +214,17 @@ it.live(
 )
 
 it.live(
-  "marks PRs opened since they were queued, and takes a PR out once a Review is submitted",
+  "marks PRs opened since they were queued, not just loaded, and takes a PR out once a Review is submitted",
   () =>
     Effect.gen(function* () {
       const { github, start } = yield* startSignedIn
       const earlier = github.seedPullRequest({ title: "Opened before queuing", base, head })
       const later = github.seedPullRequest({ title: "Opened after queuing", base, head })
       const { client } = yield* start
-      yield* client.OpenPullRequest({ pullRequest: ref(earlier) })
+      yield* openPullRequest(client, ref(earlier))
       yield* client.AddToQueue({ references: [ref(earlier), ref(later)] })
-      const opened = yield* client.OpenPullRequest({ pullRequest: ref(later) })
+      yield* client.LoadPullRequest({ pullRequest: ref(earlier) })
+      const opened = yield* openPullRequest(client, ref(later))
 
       assert.deepStrictEqual(
         (yield* client.ListSavedQueue()).map(({ pullRequest, openedSinceQueued }) => [
@@ -257,7 +258,7 @@ it.live("opens a queued PR from the read Glass started when it was queued", () =
     yield* client.AddToQueue({ references: [ref(pr)] })
     yield* eventually(Effect.sync(() => assert.include(operations(github), "PullRequest")))
 
-    const workspace = yield* client.OpenPullRequest({ pullRequest: ref(pr) })
+    const workspace = yield* client.LoadPullRequest({ pullRequest: ref(pr) })
 
     assert.strictEqual(workspace.pullRequest.title, "Read ahead")
     assert.strictEqual(operations(github).filter((name) => name === "PullRequest").length, 1)
@@ -273,7 +274,7 @@ it.live("opens a queued PR fresh when it changed after Glass read it ahead", () 
     yield* eventually(Effect.sync(() => assert.include(operations(github), "PullRequestRevision")))
     pr.push({ head: { sha: "h2", files: {} } })
 
-    const workspace = yield* client.OpenPullRequest({ pullRequest: ref(pr) })
+    const workspace = yield* client.LoadPullRequest({ pullRequest: ref(pr) })
 
     assert.strictEqual(workspace.revision.head, "h2")
   }),

@@ -328,7 +328,7 @@ it("keeps the active PR workspace, Revision, and unpublished feedback when its r
   const user = mount({
     ListFollowedRepositories: () => Effect.succeed([repository]),
     UnfollowRepository: () => Effect.succeed([]),
-    OpenPullRequest: () => Effect.succeed(workspace),
+    LoadPullRequest: () => Effect.succeed(workspace),
   })
 
   await user.type(
@@ -351,7 +351,7 @@ it("keeps the active PR workspace, Revision, and unpublished feedback when its r
 
 it("uses the supplied backend for repository file listing and reading", async () => {
   const user = mount({
-    OpenPullRequest: () => Effect.succeed(workspace),
+    LoadPullRequest: () => Effect.succeed(workspace),
     ListRepositoryFiles: () =>
       Effect.succeed(new RepositoryFiles({ paths: ["README.md"], truncated: false })),
     GetFileContents: () => Effect.succeed(FileTooLarge.make({})),

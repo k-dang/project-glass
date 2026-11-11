@@ -92,7 +92,7 @@ describe("Replies", () => {
         }),
       )
 
-      const { discussions } = yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(pr) })
+      const { discussions } = yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })
 
       assert.deepStrictEqual(
         discussions.onLines[0]?.comments.map((comment) => comment.bodyHtml),
@@ -146,7 +146,7 @@ describe("Replies", () => {
 
         const discussion = pr.addReviewThread(thread)
 
-        const { pullRequest, revision } = yield* client.OpenPullRequest({
+        const { pullRequest, revision } = yield* client.LoadPullRequest({
           pullRequest: new PullRequestRef(pr),
         })
 
@@ -218,7 +218,7 @@ describe("Replies", () => {
 
       const discussion = pr.addReviewThread(thread)
 
-      const { pullRequest, revision } = yield* client.OpenPullRequest({
+      const { pullRequest, revision } = yield* client.LoadPullRequest({
         pullRequest: new PullRequestRef(pr),
       })
 

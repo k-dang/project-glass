@@ -76,7 +76,7 @@ export const mountTourWorkspace = (
   const backend = testLayer({
     GetConnection: () =>
       Effect.succeed(new GitHubConnection({ login: "kevin", tokenSource: "gh" })),
-    OpenPullRequest: () =>
+    LoadPullRequest: () =>
       Effect.succeed(
         workspace([], { files: options.files ?? [], viewedPaths: options.viewedPaths ?? [] }),
       ),

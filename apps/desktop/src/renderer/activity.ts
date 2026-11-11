@@ -2,6 +2,7 @@ import {
   type Activity,
   ActivityPullRequest,
   FileViewed,
+  PullRequestOpened,
   type PullRequestWorkspace,
 } from "@glass/contracts"
 import { Backend, type BackendRuntime } from "./backend"
@@ -21,8 +22,14 @@ export class ActivityRecorder {
     this.#runtime = runtime
   }
 
-  readonly record = (activity: Activity) => {
-    void this.#runtime.runPromiseExit(Backend.use((backend) => backend.RecordActivity(activity)))
+  readonly record = (activity: Activity) => void this.#send(activity)
+
+  opened() {
+    return this.#send(PullRequestOpened.make({ pullRequest: this.#pullRequest }))
+  }
+
+  #send(activity: Activity) {
+    return this.#runtime.runPromiseExit(Backend.use((backend) => backend.RecordActivity(activity)))
   }
 
   view(path: string) {

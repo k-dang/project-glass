@@ -35,7 +35,7 @@ describe("changed files", () => {
         ],
       })
 
-      const { files } = yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(pr) })
+      const { files } = yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })
 
       assert.deepStrictEqual(files, [
         new ChangedFile({
@@ -91,7 +91,7 @@ describe("changed files", () => {
         ],
       })
 
-      const { files } = yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(pr) })
+      const { files } = yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })
 
       assert.deepStrictEqual(
         files.map(({ path, patch }) => [path, patch._tag]),
@@ -115,7 +115,7 @@ describe("changed files", () => {
         changedFiles: paths.map((path) => ({ path, status: "added", additions: 1, patch: "@@" })),
       })
 
-      const { files } = yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(pr) })
+      const { files } = yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })
 
       assert.deepStrictEqual(
         files.map((file) => file.path),
@@ -148,7 +148,7 @@ describe("pinning", () => {
         }),
       )
 
-      const workspace = yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(pr) })
+      const workspace = yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })
 
       assert.deepStrictEqual(workspace.revision, new Revision({ base: "b0", head: "h2" }))
       assert.deepStrictEqual(

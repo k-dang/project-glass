@@ -2,8 +2,8 @@ import { GlassRpcs, PullRequestRef } from "@glass/contracts"
 import { Option, Schema } from "effect"
 import { expect, it } from "vite-plus/test"
 
-it("validates structured PR references at the OpenPullRequest RPC", () => {
-  const rpc = GlassRpcs.requests.get("OpenPullRequest")!
+it("validates structured PR references at the LoadPullRequest RPC", () => {
+  const rpc = GlassRpcs.requests.get("LoadPullRequest")!
 
   const decode = Schema.decodeUnknownOption(rpc.payloadSchema)
   const reference = { owner: "octo-org", repo: "Hello.World_repo", number: 2147483647 }

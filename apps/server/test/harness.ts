@@ -1,5 +1,12 @@
 import { NodeSocket } from "@effect/platform-node"
-import { GlassRpcs, RPC_PATH, TOKEN_PARAM } from "@glass/contracts"
+import {
+  ActivityPullRequest,
+  GlassRpcs,
+  PullRequestOpened,
+  type PullRequestRef,
+  RPC_PATH,
+  TOKEN_PARAM,
+} from "@glass/contracts"
 import { Clock, ConfigProvider, Context, Effect, Layer, Option } from "effect"
 import { HttpServer } from "effect/http"
 import { Socket } from "effect/socket"
@@ -112,4 +119,24 @@ export const startSignedInBackend = Effect.gen(function* () {
   })
 
   return { github, client }
+})
+
+type Client = Effect.Success<ReturnType<typeof startBackend>>["client"]
+
+/** Opens a PR as the renderer does: loads it, then records that the user opened it. */
+export const openPullRequest = Effect.fnUntraced(function* (client: Client, ref: PullRequestRef) {
+  const workspace = yield* client.LoadPullRequest({ pullRequest: ref })
+  const { pullRequest, revision } = workspace
+
+  yield* client.RecordActivity(
+    PullRequestOpened.make({
+      pullRequest: new ActivityPullRequest({
+        ref: pullRequest.ref,
+        title: pullRequest.title,
+        revision,
+      }),
+    }),
+  )
+
+  return workspace
 })

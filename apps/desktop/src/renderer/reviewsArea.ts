@@ -139,10 +139,13 @@ const isFresh = (loaded: Loaded) => Date.now() - loaded.at < LOADED_TTL
 
 const remember = (registry: AtomRegistry.AtomRegistry, ref: PullRequestRef, open: OpenWorkspace) =>
   registry.update(loadedAtom, (loaded) => {
+    const target = registry.get(targetAtom)
+    const shown = target === null ? null : urlOf(target)
     const next = new Map(loaded)
 
     for (const [url, entry] of loaded) {
-      if (url !== urlOf(ref) && isFresh(entry)) continue
+      // A preload can land while the user is still on a PR whose loaded copy has gone stale.
+      if (url !== urlOf(ref) && (isFresh(entry) || url === shown)) continue
 
       entry.open.feedback.dispose()
 
@@ -177,6 +180,10 @@ export const openWorkspaceAtom = backendRuntime
             Stream.runHead,
             Effect.andThen(load(request, get.registry)),
           ))
+
+      void open.activity
+        .opened()
+        .finally(() => get.registry.update(reviewingRevisionAtom, (revision) => revision + 1))
 
       if (destination !== undefined && request.previous === undefined) {
         const restored = restoreReviewPosition(open.workspace, destination)
@@ -215,17 +222,52 @@ export const changedOnGitHubAtom = watched(
 )
 
 const load = (request: OpenRequest, registry: AtomRegistry.AtomRegistry) =>
-  Backend.use((backend) => backend.OpenPullRequest({ pullRequest: request.ref })).pipe(
+  Backend.use((backend) => backend.LoadPullRequest({ pullRequest: request.ref })).pipe(
     Effect.map((workspace) => {
       const open = build(workspace, request.previous, registry)
 
       remember(registry, request.ref, open)
 
-      registry.update(reviewingRevisionAtom, (revision) => revision + 1)
-
       return open
     }),
   )
+
+const keepFresh = (registry: AtomRegistry.AtomRegistry, ref: PullRequestRef) =>
+  registry.update(loadedAtom, (loaded) => {
+    const entry = loaded.get(urlOf(ref))
+
+    return entry === undefined
+      ? loaded
+      : new Map(loaded).set(urlOf(ref), { ...entry, at: Date.now() })
+  })
+
+/**
+ * Loads a PR the user is likely to open next, so opening it shows it at once. Mounted, it keeps the
+ * loaded copy fresh, loading it again only once GitHub has changed it.
+ */
+export const preloadAtom = Atom.family((ref: PullRequestRef) =>
+  watched(
+    backendRuntime.atom((get) => {
+      const loaded = get.registry.get(loadedAtom).get(urlOf(ref))
+
+      if (loaded === undefined) return load({ ref }, get.registry).pipe(Effect.asVoid)
+
+      if (isFresh(loaded)) return Effect.void
+
+      const { pullRequest, revision, updatedAt } = loaded.open.workspace
+
+      return Backend.use((backend) =>
+        backend.HasPullRequestChanged({ pullRequestId: pullRequest.id, revision, updatedAt }),
+      ).pipe(
+        Effect.andThen((changed) =>
+          changed
+            ? load({ ref }, get.registry).pipe(Effect.asVoid)
+            : Effect.sync(() => keepFresh(get.registry, ref)),
+        ),
+      )
+    }),
+  ),
+)
 
 export const openPullRequest = (registry: AtomRegistry.AtomRegistry, ref: PullRequestRef) => {
   const target = registry.get(targetAtom)

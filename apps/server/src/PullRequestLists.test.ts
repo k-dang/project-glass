@@ -17,7 +17,7 @@ import { vi } from "vite-plus/test"
 import { type FakeGitHub, startFakeGitHub } from "../test/fakeGitHub"
 import type { FakePullRequest } from "../test/fakePullRequest"
 import { VIEWER } from "../test/fakePullRequest"
-import { isolatedHome, startBackend, startSignedInBackend } from "../test/harness"
+import { isolatedHome, openPullRequest, startBackend, startSignedInBackend } from "../test/harness"
 
 const base = { sha: "b0", files: {} }
 
@@ -394,7 +394,7 @@ describe("PR list membership", () => {
       prs.mine.addComment({ author: VIEWER.login, bodyHtml: "<p>Ready</p>" })
 
       for (const pr of [prs.openedOnly, prs.openedWhileRequested]) {
-        yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(pr) })
+        yield* openPullRequest(client, new PullRequestRef(pr))
       }
 
       assert.deepStrictEqual(yield* membership(client, prs), {

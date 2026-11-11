@@ -45,7 +45,7 @@ import { CreateDraftError, Draft, UpdateDraftError } from "./draft"
 import { EngineFeature, EngineSettings } from "./engine"
 import { FeedbackNote, UnsentFeedback } from "./feedbackNote"
 import { FollowedRepository, InvalidRepositoryInput } from "./followedRepository"
-import { OpenPullRequestError, PullRequestRef, PullRequestWorkspace } from "./pullRequest"
+import { LoadPullRequestError, PullRequestRef, PullRequestWorkspace } from "./pullRequest"
 import { PullRequestListings } from "./pullRequestList"
 import { Queue, QueueAddition, QueueError, QueuedPullRequest } from "./queue"
 import { FileContents, GetFileContentsError, RepositoryFiles } from "./repository"
@@ -232,10 +232,14 @@ export class GlassRpcs extends RpcGroup.make(
     success: GitHubConnection,
     error: ConnectionError,
   }),
-  Rpc.make("OpenPullRequest", {
+  /**
+   * Only reads. The renderer records PullRequestOpened when it shows the PR, which also marks it
+   * opened in the Queue, so it can load a PR ahead of showing it.
+   */
+  Rpc.make("LoadPullRequest", {
     payload: { pullRequest: PullRequestRef },
     success: PullRequestWorkspace,
-    error: OpenPullRequestError,
+    error: LoadPullRequestError,
   }),
   /** Misses changes GitHub makes without touching the PR's updatedAt, like a removed Review request. */
   Rpc.make("HasPullRequestChanged", {
