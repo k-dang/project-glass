@@ -44,6 +44,10 @@ const MirroredPullRequest = Schema.Struct({
   viewerHasSubmittedReview: Schema.Boolean,
   requestedUsers: Schema.Array(Schema.String),
   requestedTeams: Schema.Array(Schema.String),
+  /** When Glass first saw each outstanding Review request, keyed by the entries of requestedUsers and requestedTeams. Team keys hold a slash, so they never collide with logins. */
+  requestedSince: Schema.Record(Schema.String, Schema.DateTimeUtcFromString).pipe(
+    Schema.withDecodingDefaultKey(Effect.succeed({})),
+  ),
 })
 
 export type MirroredPullRequest = typeof MirroredPullRequest.Type
@@ -147,6 +151,7 @@ export class PullRequestMirror extends Context.Service<
       const mirrored = Effect.fnUntraced(function* (
         { isOpen: _isOpen, reviewRequests, ...fields }: Candidate,
         before: RepositoryMirror | undefined,
+        now: DateTime.Utc,
       ) {
         const requestedUsers = [...reviewRequests.users]
         const requestedTeams = [...reviewRequests.teams]
@@ -161,11 +166,20 @@ export class PullRequestMirror extends Context.Service<
 
         const known = before?.pullRequests.find((pr) => pr.id === fields.id)
 
+        // GitHub bumps updatedAt when it records a Review request, so one made while Glass was closed keeps its own time.
+        const firstSeen = DateTime.min(now, fields.updatedAt)
+
         return {
           ...fields,
           checks: known?.head === fields.head ? known.checks : "unavailable",
           requestedUsers,
           requestedTeams,
+          requestedSince: Object.fromEntries(
+            [...requestedUsers, ...requestedTeams].map((key) => [
+              key,
+              known?.requestedSince[key] ?? firstSeen,
+            ]),
+          ),
         } satisfies MirroredPullRequest
       })
 
@@ -184,7 +198,7 @@ export class PullRequestMirror extends Context.Service<
           fullyReadAt: now,
           syncedAt: now,
           pullRequests: yield* Effect.forEach(candidates, (candidate) =>
-            mirrored(candidate, before),
+            mirrored(candidate, before, now),
           ),
         } satisfies RepositoryMirror
       })
@@ -204,7 +218,7 @@ export class PullRequestMirror extends Context.Service<
 
         const updated = yield* Effect.forEach(
           changed.filter((candidate) => candidate.isOpen),
-          (candidate) => mirrored(candidate, before),
+          (candidate) => mirrored(candidate, before, now),
         )
 
         return {
