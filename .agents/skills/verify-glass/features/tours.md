@@ -19,7 +19,7 @@ Open a PR, select the Tour tab, then Write Tour. When the Tour is saved, choose 
 3. `node $V click --role button --name "Write Tour"`, then `node $V wait --text "curated synthetic Tour"`. Capture a snapshot and screenshot of the saved Tour.
 4. `node $V click --role button --name "Start reading"`, then `node $V wait --text "What happens to a request"`. Capture the Tour overview: the intent beside the Before / after, above the first Chapter.
 5. Click a changed line, such as `node $V click --role button --name "no token left: return 429 with retry-after, added. Show middleware.ts:28"`. Capture its Chapter with the target line selected.
-6. For `tour-queue`, open Settings and `node $V click --role switch --name "Tours for the Queue"`. Go back to Reviews, select the Queue tab, and `node $V type --role textbox --name "Add to the Queue" --text "<another PR URL>"`. Then `node $V wait --text "Tour ready"` and capture the row.
+6. For `tour-queue`, open Settings and `node $V click --role switch --name "Tours for the Queue"`. Go back to Reviews, select the Queue tab, and `node $V type --role textbox --name "Add to the Queue" --text "<another PR URL>"` and `node $V press --key Enter`. Then `node $V wait --text "Tour ready"` and capture the row.
 7. Stop the run. The backend port closes.
 
 ## Gotchas

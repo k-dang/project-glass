@@ -1,32 +1,55 @@
 import { type PullRequestRef, referenceKey } from "@glass/contracts"
 import {
   Cause,
+  Deferred,
   Effect,
   Fiber,
-  type Option,
+  Option,
   Scope,
   Semaphore,
   Stream,
   SubscriptionRef,
 } from "effect"
 
-export interface PullRequestJob<S> {
-  readonly pr: string
-  readonly state: SubscriptionRef.SubscriptionRef<S>
-  readonly lock: Semaphore.Semaphore
-  running: { readonly fiber: Fiber.Fiber<void>; readonly background: boolean } | null
+type Run<P, F> =
+  | { readonly status: "idle" }
+  | { readonly status: "waiting"; readonly fiber: Fiber.Fiber<void> }
+  | {
+      readonly status: "running"
+      readonly fiber: Fiber.Fiber<void>
+      readonly background: boolean
+      readonly progress: P
+    }
+  | { readonly status: "failed"; readonly failure: F }
+
+type Waiting<P, F> = Extract<Run<P, F>, { status: "waiting" }>
+
+type Running<P, F> = Extract<Run<P, F>, { status: "running" }>
+
+const isWaiting = <P, F>(run: Run<P, F>): run is Waiting<P, F> => run.status === "waiting"
+
+const isRunning = <P, F>(run: Run<P, F>): run is Running<P, F> => run.status === "running"
+
+const active = <P, F>(run: Run<P, F>) => isWaiting(run) || isRunning(run)
+
+export interface JobState<O, P, F> {
+  readonly output: O | null
+  readonly run: Run<P, F>
 }
 
-export const pullRequestJobs = Effect.fnUntraced(function* <S, E>(options: {
-  readonly load: (pr: PullRequestRef) => Effect.Effect<S, E>
-  readonly inProgress: (state: S) => boolean
-  readonly idle: (state: S) => S
+export interface PullRequestJob<O, P, F> {
+  readonly pr: string
+  readonly state: SubscriptionRef.SubscriptionRef<JobState<O, P, F>>
+  readonly lock: Semaphore.Semaphore
+}
+
+export const pullRequestJobs = Effect.fnUntraced(function* <O, P, F, S, E>(options: {
+  readonly load: (pr: PullRequestRef) => Effect.Effect<O | null, E>
+  readonly toState: (state: JobState<O, P, F>) => S
   readonly backgroundSlots: number
-  readonly needsBackground: (state: S) => boolean
-  readonly waiting: (state: S) => S
 }) {
   const scope = yield* Scope.Scope
-  const jobs = new Map<string, PullRequestJob<S>>()
+  const jobs = new Map<string, PullRequestJob<O, P, F>>()
   const jobsLock = yield* Semaphore.make(1)
   const backgroundSlots = yield* Semaphore.make(options.backgroundSlots)
 
@@ -36,11 +59,13 @@ export const pullRequestJobs = Effect.fnUntraced(function* <S, E>(options: {
 
     if (existing !== undefined) return existing
 
-    const job: PullRequestJob<S> = {
+    const job: PullRequestJob<O, P, F> = {
       pr: key,
-      state: yield* SubscriptionRef.make(yield* options.load(pr)),
+      state: yield* SubscriptionRef.make<JobState<O, P, F>>({
+        output: yield* options.load(pr),
+        run: { status: "idle" },
+      }),
       lock: yield* Semaphore.make(1),
-      running: null,
     }
 
     jobs.set(key, job)
@@ -48,45 +73,74 @@ export const pullRequestJobs = Effect.fnUntraced(function* <S, E>(options: {
     return job
   }, jobsLock.withPermits(1))
 
-  const locked = <A, E2, R>(job: PullRequestJob<S>, change: Effect.Effect<A, E2, R>) =>
+  const locked = <A, E2, R>(job: PullRequestJob<O, P, F>, change: Effect.Effect<A, E2, R>) =>
     change.pipe(job.lock.withPermits(1), Effect.uninterruptible)
 
-  const replace = Effect.fnUntraced(function* (
-    job: PullRequestJob<S>,
-    work: Effect.Effect<void>,
-    background = false,
-  ) {
-    if (job.running !== null) yield* Fiber.interrupt(job.running.fiber)
+  const setRun = (job: PullRequestJob<O, P, F>, run: Run<P, F>) =>
+    SubscriptionRef.update(job.state, ({ output }) => ({ output, run }))
 
-    job.running = {
-      fiber: yield* work.pipe(Effect.forkIn(scope, { uninterruptible: false })),
-      background,
-    }
+  const updateRun = <R extends Run<P, F>>(
+    job: PullRequestJob<O, P, F>,
+    is: (run: Run<P, F>) => run is R,
+    change: (run: R) => Run<P, F>,
+  ) =>
+    SubscriptionRef.updateSome(job.state, ({ output, run }) =>
+      is(run) ? Option.some({ output, run: change(run) }) : Option.none(),
+    )
+
+  const launch = Effect.fnUntraced(function* (
+    job: PullRequestJob<O, P, F>,
+    work: Effect.Effect<void>,
+    started: (fiber: Fiber.Fiber<void>) => Run<P, F>,
+  ) {
+    const { run } = yield* SubscriptionRef.get(job.state)
+
+    if (active(run)) yield* Fiber.interrupt(run.fiber)
+
+    const ready = yield* Deferred.make<void>()
+
+    const fiber = yield* Deferred.await(ready).pipe(
+      Effect.andThen(work),
+      Effect.forkIn(scope, { uninterruptible: false }),
+    )
+
+    yield* setRun(job, started(fiber))
+    yield* Deferred.succeed(ready, undefined)
   })
 
-  const stopJob = (job: PullRequestJob<S>, onlyBackground: boolean) =>
+  const replace = (job: PullRequestJob<O, P, F>, progress: P, work: Effect.Effect<void>) =>
+    launch(job, work, (fiber) => ({ status: "running", fiber, background: false, progress }))
+
+  const stopJob = (job: PullRequestJob<O, P, F>, onlyBackground: boolean) =>
     locked(
       job,
       Effect.gen(function* () {
-        if (job.running === null || (onlyBackground && !job.running.background)) return
-        yield* Fiber.interrupt(job.running.fiber)
-        job.running = null
+        const { run } = yield* SubscriptionRef.get(job.state)
 
-        if (options.inProgress(yield* SubscriptionRef.get(job.state)))
-          yield* SubscriptionRef.update(job.state, options.idle)
+        if (!active(run) || (onlyBackground && run.status === "running" && !run.background)) return
+
+        yield* Fiber.interrupt(run.fiber)
+        yield* setRun(job, { status: "idle" })
       }),
     )
 
-  const commit = <E2>(job: PullRequestJob<S>, save: Effect.Effect<void, E2>, next: S) =>
+  const commit = <E2>(job: PullRequestJob<O, P, F>, save: Effect.Effect<void, E2>, output: O) =>
     save.pipe(
-      Effect.andThen(SubscriptionRef.set(job.state, next)),
+      Effect.andThen(SubscriptionRef.set(job.state, { output, run: { status: "idle" } })),
       Effect.uninterruptible,
       job.lock.withPermits(1),
     )
 
+  const progress = (job: PullRequestJob<O, P, F>, change: (progress: P) => P) =>
+    updateRun(job, isRunning, (run) => ({ ...run, progress: change(run.progress) }))
+
   const settle =
-    <F>(job: PullRequestJob<S>, event: string, failed: (state: S, error: Option.Option<F>) => S) =>
-    <A>(work: Effect.Effect<A, F>) =>
+    <E2>(
+      job: PullRequestJob<O, P, F>,
+      event: string,
+      failed: (error: Option.Option<E2>, progress: P) => F,
+    ) =>
+    <A>(work: Effect.Effect<A, E2>) =>
       work.pipe(
         Effect.withSpan(event, { root: true, attributes: { pr: job.pr } }),
         Effect.asVoid,
@@ -94,26 +148,45 @@ export const pullRequestJobs = Effect.fnUntraced(function* <S, E>(options: {
           Effect.gen(function* () {
             if (Cause.hasInterrupts(cause)) yield* Effect.interrupt
 
-            yield* SubscriptionRef.update(job.state, (state) =>
-              options.inProgress(state) ? failed(state, Cause.findErrorOption(cause)) : state,
-            )
+            yield* updateRun(job, isRunning, (run) => ({
+              status: "failed",
+              failure: failed(Cause.findErrorOption(cause), run.progress),
+            }))
           }),
         ),
       )
 
   const startInBackground = Effect.fnUntraced(function* (
     pr: PullRequestRef,
-    run: (job: PullRequestJob<S>) => Effect.Effect<void>,
+    start: Effect.Effect<P>,
+    run: (job: PullRequestJob<O, P, F>) => Effect.Effect<void>,
   ) {
     const job = yield* jobFor(pr)
 
     yield* locked(
       job,
       Effect.gen(function* () {
-        if (!options.needsBackground(yield* SubscriptionRef.get(job.state))) return
+        const { output, run: current } = yield* SubscriptionRef.get(job.state)
 
-        yield* SubscriptionRef.update(job.state, options.waiting)
-        yield* replace(job, backgroundSlots.withPermits(1)(run(job)), true)
+        if (output !== null || current.status !== "idle") return
+
+        yield* launch(
+          job,
+          backgroundSlots.withPermits(1)(
+            Effect.gen(function* () {
+              const initial = yield* start
+
+              yield* updateRun(job, isWaiting, (waiting) => ({
+                ...waiting,
+                status: "running",
+                background: true,
+                progress: initial,
+              }))
+              yield* run(job)
+            }),
+          ),
+          (fiber) => ({ status: "waiting", fiber }),
+        )
       }),
     )
   })
@@ -125,20 +198,23 @@ export const pullRequestJobs = Effect.fnUntraced(function* <S, E>(options: {
   }
 
   const watch = (pr: PullRequestRef) =>
-    Stream.unwrap(jobFor(pr).pipe(Effect.map((job) => SubscriptionRef.changes(job.state))))
+    Stream.unwrap(
+      jobFor(pr).pipe(
+        Effect.map((job) => SubscriptionRef.changes(job.state).pipe(Stream.map(options.toState))),
+      ),
+    )
 
   return {
     jobFor,
-    locked,
     begin: <A, E2, R>(
-      job: PullRequestJob<S>,
+      job: PullRequestJob<O, P, F>,
       next: (
-        replace: (work: Effect.Effect<void>, background?: boolean) => Effect.Effect<void>,
+        replace: (progress: P, work: Effect.Effect<void>) => Effect.Effect<void>,
       ) => Effect.Effect<A, E2, R>,
     ) =>
       locked(
         job,
-        Effect.suspend(() => next((work, background) => replace(job, work, background))),
+        Effect.suspend(() => next((initial, work) => replace(job, initial, work))),
       ),
     startInBackground,
     stop,
@@ -148,6 +224,7 @@ export const pullRequestJobs = Effect.fnUntraced(function* <S, E>(options: {
         discard: true,
       }),
     commit,
+    progress,
     settle,
     watch,
   }
