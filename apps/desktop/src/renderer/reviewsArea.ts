@@ -130,12 +130,13 @@ const LOADED_TTL = 5 * 60_000
 
 interface Loaded {
   readonly open: OpenWorkspace
-  readonly at: number
+  /** Null while it waits as the next PR to open, so it doesn't age before the user gets to it. */
+  readonly at: number | null
 }
 
 const loadedAtom = Atom.make<ReadonlyMap<string, Loaded>>(new Map()).pipe(Atom.keepAlive)
 
-const isFresh = (loaded: Loaded) => Date.now() - loaded.at < LOADED_TTL
+const isFresh = ({ at }: Loaded) => at === null || Date.now() - at < LOADED_TTL
 
 const remember = (registry: AtomRegistry.AtomRegistry, ref: PullRequestRef, open: OpenWorkspace) =>
   registry.update(loadedAtom, (loaded) => {
@@ -232,41 +233,28 @@ const load = (request: OpenRequest, registry: AtomRegistry.AtomRegistry) =>
     }),
   )
 
-const keepFresh = (registry: AtomRegistry.AtomRegistry, ref: PullRequestRef) =>
+const stamp = (registry: AtomRegistry.AtomRegistry, ref: PullRequestRef, at: number | null) =>
   registry.update(loadedAtom, (loaded) => {
     const entry = loaded.get(urlOf(ref))
 
-    return entry === undefined
-      ? loaded
-      : new Map(loaded).set(urlOf(ref), { ...entry, at: Date.now() })
+    return entry === undefined ? loaded : new Map(loaded).set(urlOf(ref), { ...entry, at })
   })
 
 /**
- * Loads a PR the user is likely to open next, so opening it shows it at once. Mounted, it keeps the
- * loaded copy fresh, loading it again only once GitHub has changed it.
+ * Loads a PR the user is likely to open next, so opening it shows it at once. The copy is kept
+ * while mounted and starts aging once unmounted; the Reload button flags changes since.
  */
 export const preloadAtom = Atom.family((ref: PullRequestRef) =>
-  watched(
-    backendRuntime.atom((get) => {
-      const loaded = get.registry.get(loadedAtom).get(urlOf(ref))
+  backendRuntime.atom((get) => {
+    get.addFinalizer(() => stamp(get.registry, ref, Date.now()))
 
-      if (loaded === undefined) return load({ ref }, get.registry).pipe(Effect.asVoid)
+    const loaded =
+      recall(get.registry, ref) === undefined
+        ? load({ ref }, get.registry).pipe(Effect.asVoid)
+        : Effect.void
 
-      if (isFresh(loaded)) return Effect.void
-
-      const { pullRequest, revision, updatedAt } = loaded.open.workspace
-
-      return Backend.use((backend) =>
-        backend.HasPullRequestChanged({ pullRequestId: pullRequest.id, revision, updatedAt }),
-      ).pipe(
-        Effect.andThen((changed) =>
-          changed
-            ? load({ ref }, get.registry).pipe(Effect.asVoid)
-            : Effect.sync(() => keepFresh(get.registry, ref)),
-        ),
-      )
-    }),
-  ),
+    return loaded.pipe(Effect.andThen(Effect.sync(() => stamp(get.registry, ref, null))))
+  }),
 )
 
 export const openPullRequest = (registry: AtomRegistry.AtomRegistry, ref: PullRequestRef) => {
