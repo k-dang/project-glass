@@ -13,7 +13,7 @@ import {
 import { Link, useNavigate } from "@tanstack/react-router"
 import { cn } from "cn"
 import { DateTime, Match, Option, Predicate } from "effect"
-import { Atom } from "effect/reactivity"
+import { AsyncResult, Atom } from "effect/reactivity"
 import { CircleHelp, GitPullRequest, Sparkles } from "lucide-react"
 import { useEffect, useId, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -27,11 +27,10 @@ import { agentConversation, ConversationContext } from "./conversation"
 import {
   needsYouCount,
   needsYouKey,
-  NeedsYouStatus,
+  type NeedsYouResult,
   needsYouStreamAtom,
   watchedNeedsYouAtom,
 } from "./needsYou"
-import { watchedListingsAtom } from "./pullRequestLists"
 import { ProblemAlert } from "./ProblemAlert"
 import { settledProblem, streamProblem } from "./problems"
 import { ago } from "./PullRequestRow"
@@ -40,13 +39,15 @@ import { readAgentReviewOnOpenAtom } from "./reviewsArea"
 import { RequestCard } from "./RequestCard"
 import { useShortcuts } from "./useShortcuts"
 
-const sections = [
-  { id: "stopped", title: "Stopped on you" },
-  { id: "holding", title: "Holding up work" },
-  { id: "waiting", title: "Waiting on you" },
-] as const
+const inStopped = (item: NeedsYouItem) =>
+  Predicate.isTagged(item, "Agent") || Predicate.isTagged(item, "OutsideQuestion")
 
-type SectionId = (typeof sections)[number]["id"]
+const inWaiting = (item: NeedsYouItem) => Predicate.isTagged(item, "PullRequest")
+
+const sections = [
+  { id: "stopped", title: "Stopped on you", include: inStopped },
+  { id: "waiting", title: "Waiting on you", include: inWaiting },
+] as const
 
 const requestLabel = (part: RequestPart) =>
   Match.valueTags(part, {
@@ -55,23 +56,11 @@ const requestLabel = (part: RequestPart) =>
   })
 
 const pullRequestReasonLabels = {
-  ReviewRequested: "Review requested",
   AgentReviewFinished: "Agent review finished",
 } as const satisfies Record<PullRequestNeedsYou["reasons"][number]["_tag"], string>
 
 const askedBy = (question: OutsideQuestion) =>
   question.label === null ? question.session : `${question.label} · ${question.session}`
-
-const sectionOf = (item: NeedsYouItem): SectionId =>
-  Match.valueTags(item, {
-    Agent: (): SectionId => "stopped",
-    // The caller is blocked until this is answered, the same way an Agent's question blocks its Turn.
-    OutsideQuestion: (): SectionId => "stopped",
-    PullRequest: (pullRequest): SectionId =>
-      pullRequest.reasons.some((reason) => Predicate.isTagged(reason, "ReviewRequested"))
-        ? "holding"
-        : "waiting",
-  })
 
 const reasonText = (item: NeedsYouItem) =>
   Match.valueTags(item, {
@@ -111,9 +100,6 @@ const firstPermission = (item: NeedsYouItem) =>
     OutsideQuestion: () => null,
     PullRequest: () => null,
   })
-
-const finishedReview = (item: PullRequestNeedsYou) =>
-  item.reasons.some((reason) => Predicate.isTagged(reason, "AgentReviewFinished"))
 
 const nextRemaining = (
   previous: readonly string[],
@@ -174,7 +160,7 @@ function Waited(props: { since: DateTime.Utc; now: Date }) {
   )
 }
 
-function InboxCount(props: { status: NeedsYouStatus }) {
+function InboxCount(props: { status: NeedsYouResult }) {
   const count = needsYouCount(props.status)
 
   if (Option.isNone(count)) return null
@@ -183,19 +169,19 @@ function InboxCount(props: { status: NeedsYouStatus }) {
 }
 
 function InboxRows(props: {
-  status: NeedsYouStatus
+  status: NeedsYouResult
   selectedKey: string | null
   now: Date
   onRetry: () => void
   onPick: (key: string) => void
 }) {
-  return NeedsYouStatus.$match(props.status, {
-    Loading: () => (
+  return AsyncResult.match(props.status, {
+    onInitial: () => (
       <output className="block px-4 py-3 text-sm text-muted-foreground">
         Loading what needs you…
       </output>
     ),
-    Failed: ({ cause }) => (
+    onFailure: ({ cause }) => (
       <div className="px-4 py-3">
         <ProblemAlert
           problem={streamProblem(cause)}
@@ -203,7 +189,7 @@ function InboxRows(props: {
         />
       </div>
     ),
-    Ready: ({ items }) =>
+    onSuccess: ({ value: items }) =>
       items.length === 0 ? (
         <p className="px-4 py-3 text-sm text-muted-foreground">Nothing needs you right now.</p>
       ) : (
@@ -224,7 +210,7 @@ function InboxSections(props: {
   onPick: (key: string) => void
 }) {
   return sections.map((section) => {
-    const rows = props.items.filter((item) => sectionOf(item) === section.id)
+    const rows = props.items.filter(section.include)
 
     if (rows.length === 0) return null
 
@@ -266,15 +252,15 @@ function InboxSections(props: {
 }
 
 function InboxPane(props: {
-  status: NeedsYouStatus
+  status: NeedsYouResult
   selected: NeedsYouItem | null
   now: Date
   onReadReview: (pullRequest: string) => void
 }) {
-  return NeedsYouStatus.$match(props.status, {
-    Loading: () => null,
-    Failed: () => null,
-    Ready: ({ items }) =>
+  return AsyncResult.match(props.status, {
+    onInitial: () => null,
+    onFailure: () => null,
+    onSuccess: ({ value: items }) =>
       props.selected === null ? (
         <p className="text-sm text-muted-foreground">
           {items.length === 0 ? "Nothing needs you right now." : "Select something that needs you."}
@@ -288,24 +274,14 @@ function InboxPane(props: {
 export function Inbox() {
   const status = useAtomValue(watchedNeedsYouAtom)
   const now = useMinuteClock()
-  const refreshNeedsYou = useAtomRefresh(needsYouStreamAtom)
-  const refreshListings = useAtomRefresh(watchedListingsAtom)
-
-  const retry = () => {
-    refreshNeedsYou()
-    refreshListings()
-  }
+  const retry = useAtomRefresh(needsYouStreamAtom)
 
   const navigate = useNavigate()
   const markReview = useAtomSet(readAgentReviewOnOpenAtom)
 
-  const items = NeedsYouStatus.$match(status, {
-    Loading: (): ReadonlyArray<NeedsYouItem> => [],
-    Failed: (): ReadonlyArray<NeedsYouItem> => [],
-    Ready: ({ items: ready }) => ready,
-  })
+  const items = AsyncResult.isSuccess(status) ? status.value : []
 
-  const flat = sections.flatMap((section) => items.filter((item) => sectionOf(item) === section.id))
+  const flat = sections.flatMap((section) => items.filter(section.include))
   const keys = flat.map(needsYouKey)
   const order = keys.join("\n")
   const [picked, setPicked] = useState<string | null>(null)
@@ -598,16 +574,14 @@ function PullRequestDetail(props: {
         >
           Open pull request
         </Link>
-        {finishedReview(props.item) && (
-          <Link
-            to="/reviews/$owner/$repo/$number"
-            params={pullRequest.ref}
-            className={cn(actionLink, "border")}
-            onClick={() => props.onReadReview(referenceKey(pullRequest.ref))}
-          >
-            Read Agent review
-          </Link>
-        )}
+        <Link
+          to="/reviews/$owner/$repo/$number"
+          params={pullRequest.ref}
+          className={cn(actionLink, "border")}
+          onClick={() => props.onReadReview(referenceKey(pullRequest.ref))}
+        >
+          Read Agent review
+        </Link>
       </div>
     </article>
   )

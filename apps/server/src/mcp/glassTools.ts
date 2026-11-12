@@ -127,7 +127,7 @@ const ListAgents = Tool.make("list_agents", {
 
 const ListNeedsYou = Tool.make("list_needs_you", {
   description:
-    "Lists what waits on the user in Glass now: Agents with a Permission request or Question waiting, questions from an agent outside Glass, PRs that request their Review, and queued PRs whose Agent review is finished. Agents and outside questions come first, then the longest waiting.",
+    "Lists what waits on the user in Glass now: Agents with a Permission request or Question waiting, questions from an agent outside Glass, and queued PRs whose Agent review is finished. Agents and outside questions come first, then the longest waiting.",
   success: Schema.Struct({ items: Schema.Array(NeedsYouItem) }),
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)

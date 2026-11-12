@@ -13,9 +13,8 @@ device for them to continue. Each area keeps its own: the last PR in Reviews, th
 Agents. Visiting Settings or Activity leaves every Saved place unchanged.
 
 **Needs you**:
-The Agents, questions from an agent outside Glass, Review requests, and queued PRs waiting on the
-user now. They live in the Inbox, grouped by why they are waiting, with their count on the Inbox
-rail link in every area.
+The Agents, questions from an agent outside Glass, and queued PRs waiting on the user now. They live
+in the Inbox, grouped by why they are waiting, with their count on the Inbox rail link in every area.
 The Dashboard shows that count once Needs you has loaded, and links to the Inbox.
 While it is loading or the stream has failed, the count stays off the Dashboard, the Inbox header, and the rail.
 

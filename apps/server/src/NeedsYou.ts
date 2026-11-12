@@ -6,28 +6,19 @@ import {
   type NeedsYouItem,
   type OutsideQuestion,
   PullRequestNeedsYou,
-  type PullRequestReason,
   type PullRequestSummary,
   type QueuedPullRequest,
   referenceKey,
-  ReviewRequested,
   WaitingRequests,
 } from "@glass/contracts"
 import { Array as Arr, Context, DateTime, Effect, Layer, Order, Predicate, Stream } from "effect"
 import { AgentReviews } from "./AgentReviews"
 import { Agents, type WaitingAgent } from "./Agents"
 import { OutsideQuestions } from "./OutsideQuestions"
-import { PullRequestLists, type RequestedReview } from "./PullRequestLists"
 import { Queue } from "./Queue"
 
 interface FinishedAgentReview {
   readonly pullRequest: PullRequestSummary
-  readonly since: DateTime.Utc
-}
-
-interface PullRequestWait {
-  readonly pullRequest: PullRequestSummary
-  readonly reason: PullRequestReason
   readonly since: DateTime.Utc
 }
 
@@ -42,11 +33,6 @@ const order: Order.Order<NeedsYouItem> = Order.combine(
   Order.mapInput(DateTime.Order, (item: NeedsYouItem) => item.since),
 )
 
-const byUpdatedAt = Order.mapInput(
-  DateTime.Order,
-  (summary: PullRequestSummary) => summary.updatedAt,
-)
-
 const agentItem = ({ agent, requests }: WaitingAgent) =>
   AgentNeedsYou.make({
     agent,
@@ -57,49 +43,19 @@ const agentItem = ({ agent, requests }: WaitingAgent) =>
     ),
   })
 
-const pullRequestItem = (waits: Arr.NonEmptyReadonlyArray<PullRequestWait>) =>
+const pullRequestItem = ({ pullRequest, since }: FinishedAgentReview) =>
   PullRequestNeedsYou.make({
-    pullRequest: Arr.max(
-      Arr.map(waits, ({ pullRequest }) => pullRequest),
-      byUpdatedAt,
-    ),
-    reasons: Arr.map(waits, ({ reason }) => reason),
-    since: Arr.min(
-      Arr.map(waits, ({ since }) => since),
-      DateTime.Order,
-    ),
+    pullRequest,
+    reasons: [AgentReviewFinished.make({})],
+    since,
   })
 
 const needsYouOf = (
   waiting: ReadonlyArray<WaitingAgent>,
-  requested: ReadonlyArray<RequestedReview>,
   finished: ReadonlyArray<FinishedAgentReview>,
   outside: ReadonlyArray<OutsideQuestion>,
-): ReadonlyArray<NeedsYouItem> => {
-  const waits: ReadonlyArray<PullRequestWait> = [
-    ...requested.map(({ pullRequest, since }) => ({
-      pullRequest,
-      since,
-      reason: ReviewRequested.make({}),
-    })),
-    ...finished.map(({ pullRequest, since }) => ({
-      pullRequest,
-      since,
-      reason: AgentReviewFinished.make({}),
-    })),
-  ]
-
-  return Arr.sort(
-    [
-      ...waiting.map(agentItem),
-      ...outside,
-      ...Object.values(Arr.groupBy(waits, ({ pullRequest }) => referenceKey(pullRequest.ref))).map(
-        pullRequestItem,
-      ),
-    ],
-    order,
-  )
-}
+): ReadonlyArray<NeedsYouItem> =>
+  Arr.sort([...waiting.map(agentItem), ...outside, ...finished.map(pullRequestItem)], order)
 
 const reviewable = (queued: ReadonlyArray<QueuedPullRequest>) =>
   queued.flatMap((row) => (canRunQueueWork(row) ? [row.pullRequest] : []))
@@ -129,10 +85,9 @@ export class NeedsYou extends Context.Service<
     NeedsYou,
     Effect.gen(function* () {
       const agents = yield* Agents
-      const lists = yield* PullRequestLists
       const queue = yield* Queue
       const agentReviews = yield* AgentReviews
-      const outside = yield* OutsideQuestions
+      const questions = yield* OutsideQuestions
 
       const finishedReviewOf = (pullRequest: PullRequestSummary) =>
         agentReviews.watch(pullRequest.ref).pipe(
@@ -173,15 +128,8 @@ export class NeedsYou extends Context.Service<
 
       return NeedsYou.of({
         watch: () =>
-          Stream.zipLatestAll(
-            agents.watchWaiting(),
-            lists.watchNeedsReview(),
-            finishedAgentReviews,
-            outside.watch(),
-          ).pipe(
-            Stream.map(([waiting, requested, finished, questions]) =>
-              needsYouOf(waiting, requested, finished, questions),
-            ),
+          Stream.zipLatestAll(agents.watchWaiting(), finishedAgentReviews, questions.watch()).pipe(
+            Stream.map(([waiting, finished, asked]) => needsYouOf(waiting, finished, asked)),
           ),
       })
     }),
