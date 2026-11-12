@@ -83,6 +83,5 @@ const finishedWhile: Record<AgentReviewState["job"]["status"], boolean> = {
   failed: false,
 }
 
-/** The PR's finished Agent review, or null when none is written or a newer one is waiting, running, or failed. */
 export const finishedReview = (state: AgentReviewState): AgentReview | null =>
   state.review !== null && finishedWhile[state.job.status] ? state.review : null

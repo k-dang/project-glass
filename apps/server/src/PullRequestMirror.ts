@@ -44,7 +44,6 @@ const MirroredPullRequest = Schema.Struct({
   viewerHasSubmittedReview: Schema.Boolean,
   requestedUsers: Schema.Array(Schema.String),
   requestedTeams: Schema.Array(Schema.String),
-  /** Keyed by requestedUsers and requestedTeams. Team keys contain a slash, and GitHub logins do not. */
   requestedSince: Schema.Record(Schema.String, Schema.DateTimeUtcFromString).pipe(
     Schema.withDecodingDefaultKey(Effect.succeed({})),
   ),
@@ -167,7 +166,6 @@ export class PullRequestMirror extends Context.Service<
         const known = before?.pullRequests.find((pr) => pr.id === fields.id)
 
         // GitHub bumps updatedAt when it records a Review request, so one made while Glass was closed is not newer than that update.
-        // cli/cli#14373, vercel/next.js#101010, kubernetes/kubernetes#144032, cli/cli#13400
         const latestPossibleAt = DateTime.min(now, fields.updatedAt)
 
         return {
