@@ -56,6 +56,21 @@ function Waited(props: { since: DateTime.Utc; now: Date }) {
   )
 }
 
+export function NeedsYouSummary() {
+  const count = useAtomValue(needsYouCountAtom)
+  const label = count === 0 ? "Nothing needs you" : `Needs you ${count}`
+
+  return (
+    <Link
+      to="/inbox"
+      className="flex h-10 items-center justify-between rounded-md border px-3 text-sm outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <span className="font-medium">{label}</span>
+      <span className="text-muted-foreground">Inbox →</span>
+    </Link>
+  )
+}
+
 export function NeedsYouSection() {
   const result = useAtomValue(watchedNeedsYouAtom)
   const count = useAtomValue(needsYouCountAtom)

@@ -19,6 +19,7 @@ import { AgentSearch } from "./agentsArea"
 import { AgentView } from "./AgentView"
 import { AppShell } from "./AppShell"
 import { Dashboard } from "./Dashboard"
+import { Inbox } from "./Inbox"
 import { Connecting, ConnectionProblem } from "./ConnectionProblem"
 import { useConnection } from "./connection"
 import { Viewed, viewedAtom } from "./globalConversation"
@@ -100,6 +101,16 @@ const activityRoute = createRoute({
   component: ActivityArea,
 })
 
+const inboxRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "inbox",
+  component: () => (
+    <main aria-label="Inbox" className="flex min-h-0 flex-1 overflow-hidden">
+      <Inbox />
+    </main>
+  ),
+})
+
 const dashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "dashboard",
@@ -151,6 +162,7 @@ const routeTree = rootRoute.addChildren([
   reviewsRoute.addChildren([listRoute, pullRequestRoute]),
   toDosRoute,
   activityRoute,
+  inboxRoute,
   dashboardRoute,
   agentsRoute.addChildren([noAgentRoute, newAgentRoute, agentRoute]),
   settingsRoute,
