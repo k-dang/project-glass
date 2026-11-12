@@ -11,7 +11,7 @@ it.live("creates the schema once and reads Activity through its indexes after re
     const home = yield* isolatedHome
     const filename = join(home, "glass.db")
 
-    for (const expected of [[[1, "baseline"]], []] as const) {
+    for (const expected of [[[1, "baseline"], [2, "outside_agent"]], []] as const) {
       yield* Effect.gen(function* () {
         const sql = yield* SqlClient.SqlClient
         assert.deepStrictEqual(yield* SqliteMigrator.run({ loader: migrationLoader }), expected)

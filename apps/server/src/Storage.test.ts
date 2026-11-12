@@ -12,7 +12,7 @@ it.live("measures the database by table, counting each index toward its table", 
 
       assert.sameMembers(
         items.filter(({ group }) => group === "internals").map(({ name }) => name),
-        ["effect_sql_migrations", "saved_place", "sqlite_schema"],
+        ["effect_sql_migrations", "outside_agent", "saved_place", "sqlite_schema"],
       )
 
       const bytesOf = (item: string) => items.find(({ name }) => name === item)?.bytes ?? 0
