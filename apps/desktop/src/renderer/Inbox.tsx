@@ -12,6 +12,7 @@ import { DateTime, Match, Option, Predicate } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import { GitPullRequest, Sparkles } from "lucide-react"
 import { useMemo, useState } from "react"
+import { Kbd } from "@/components/ui/kbd"
 import { AgentRequest, answerRequestAtom } from "./agentsArea"
 import { agentConversation, ConversationContext } from "./conversation"
 import { needsYouKey, needsYouStreamAtom, watchedNeedsYouAtom } from "./needsYou"
@@ -207,11 +208,27 @@ export function Inbox() {
   return (
     <div className="flex min-h-0 flex-1">
       <div className="flex w-96 shrink-0 flex-col border-r">
-        <header className="flex items-baseline justify-between gap-3 border-b px-4 py-3">
+        <header className="flex items-center justify-between gap-3 border-b px-4 py-3">
           <h1 className="text-base font-semibold">
             Inbox <span className="font-normal text-muted-foreground">{items.length}</span>
           </h1>
-          <p className="text-xs text-muted-foreground">j/k move · enter open · a allow</p>
+          <p className="flex flex-wrap items-center justify-end gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1">
+              <Kbd>J</Kbd>
+              <Kbd>K</Kbd>
+              move
+            </span>
+            <span aria-hidden>·</span>
+            <span className="inline-flex items-center gap-1">
+              <Kbd>Enter</Kbd>
+              open
+            </span>
+            <span aria-hidden>·</span>
+            <span className="inline-flex items-center gap-1">
+              <Kbd>A</Kbd>
+              allow
+            </span>
+          </p>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto">
           {AsyncResult.builder(result)
