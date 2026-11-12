@@ -38,6 +38,7 @@ import {
   sideOf,
   toItems,
 } from "./changesView"
+import { LowAttentionMark } from "./Hotspots"
 import { TourText } from "./TourText"
 import { cn } from "cn"
 import { type AskStore, useLineAskPlaces } from "./useAsks"
@@ -112,6 +113,7 @@ export interface DiffViewProps<M> {
   loadDiffFiles?: FileDiffContentsLoader
   opened: CollapseChoices["opened"]
   all: CollapseChoices["all"]
+  collapsedAtFirst: CollapseChoices["collapsedAtFirst"]
   onOpenChange: (path: string, open: boolean) => void
   onCurrentPathChange: (path: string) => void
   summaries: ReadonlyMap<string, string> | null
@@ -153,8 +155,14 @@ export function DiffView<M>(props: DiffViewProps<M>) {
   )
 
   const items = useMemo(
-    () => toItems(files, annotationsFor, { opened, all: props.all }, leads),
-    [files, annotationsFor, opened, props.all, leads],
+    () =>
+      toItems(
+        files,
+        annotationsFor,
+        { opened, all: props.all, collapsedAtFirst: props.collapsedAtFirst },
+        leads,
+      ),
+    [files, annotationsFor, opened, props.all, props.collapsedAtFirst, leads],
   )
 
   const options = useMemo((): CodeViewReactOptions<M, undefined> => {
@@ -341,6 +349,7 @@ export interface ChangedFilesViewProps extends Omit<
   | "selectedLines"
   | "onSelectedLinesChange"
   | "renderFileActions"
+  | "collapsedAtFirst"
 > {
   discussions: ReadonlyArray<LineDiscussion>
   drafts: DraftStore
@@ -352,11 +361,12 @@ export interface ChangedFilesViewProps extends Omit<
   viewedFiles: ViewedFilesStore
   onViewedChange: (paths: ReadonlyArray<string>, viewed: boolean) => void
   loadDiffFiles: FileDiffContentsLoader
+  lowAttention: ReadonlySet<string>
 }
 
 export function ChangedFilesView(props: ChangedFilesViewProps) {
   const { discussions, drafts, asks, replies, resolutions, reactions, ...rest } = props
-  const { onReload, viewedFiles, onViewedChange, ...diff } = rest
+  const { onReload, viewedFiles, onViewedChange, lowAttention, ...diff } = rest
   const draftPlaces = useLineDraftPlaces(drafts)
   const askPlaces = useLineAskPlaces(asks)
 
@@ -411,8 +421,13 @@ export function ChangedFilesView(props: ChangedFilesViewProps) {
   )
 
   const renderFileActions = useCallback(
-    (path: string) => <ViewedCheckbox path={path} store={viewedFiles} onChange={viewFile} />,
-    [viewedFiles, viewFile],
+    (path: string) => (
+      <>
+        {lowAttention.has(path) && <LowAttentionMark />}
+        <ViewedCheckbox path={path} store={viewedFiles} onChange={viewFile} />
+      </>
+    ),
+    [viewedFiles, viewFile, lowAttention],
   )
 
   const renderAnnotation = useCallback(
@@ -435,6 +450,7 @@ export function ChangedFilesView(props: ChangedFilesViewProps) {
       renderAnnotation={renderAnnotation}
       renderGutterUtility={renderGutterUtility}
       renderFileActions={renderFileActions}
+      collapsedAtFirst={lowAttention}
     />
   )
 }

@@ -14,10 +14,10 @@ author or an earlier agent.
 The agent proposes a Suggested draft by calling a Glass tool with a path, side, line, and body.
 Glass checks the line against the diff and rejects a call that misses it, so the agent can place it
 again or put the text in its answer: a stray placement costs one call rather than the whole answer,
-which is the failure ADR 0008 removed placement to avoid. For the line to be one the user is
-reading, Follow-ups run only while the review is current; an outdated review keeps its transcript
-to read and takes no new Turns. Nothing reaches GitHub until the user adds a Suggested draft as a
-Draft.
+which is the failure ADR 0008 guards against by making each Hotspot's place optional. For the
+line to be one the user is reading, Follow-ups run only while the review is current; an outdated
+review keeps its transcript to read and takes no new Turns. Nothing reaches GitHub until the user
+adds a Suggested draft as a Draft.
 
 ## Considered options
 
@@ -29,5 +29,5 @@ Draft.
   without its streaming, Steer, or Stop.
 - **One drafting pass with no conversation**: smaller, but it can't question the review's points,
   which is half of following up.
-- **A Draft button on each point of the review**: needs the review's points, their severities, and
-  their places back as structure, which ADR 0008 removed.
+- **A Draft button on each point of the review**: needs every point placed on a line, while ADR
+  0008 places only the Hotspots, and those only when their lines are in the diff.

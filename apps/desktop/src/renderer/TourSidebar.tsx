@@ -29,6 +29,7 @@ import { engineNames, runnerLabel } from "./engines"
 import { TourText } from "./TourText"
 import type { ViewedFilesStore } from "./useViewedFiles"
 import type { useTour } from "./useTour"
+import { AttentionMark } from "./Hotspots"
 
 function ChapterRow(props: {
   chapter: TourChapter
@@ -57,6 +58,7 @@ function ChapterRow(props: {
           >
             {chapter.title}
           </ItemTitle>
+          <AttentionMark chapter={chapter} />
         </ItemContent>
         {progress.done ? (
           <Check

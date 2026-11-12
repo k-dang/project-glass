@@ -1,6 +1,26 @@
-import type { Tour, TourBeforeAfter, TourDiagram, TourCallouts, Revision } from "@glass/contracts"
+import type {
+  AgentReview,
+  Hotspot,
+  Revision,
+  Tour,
+  TourBeforeAfter,
+  TourCallouts,
+  TourCodeTarget,
+  TourDiagram,
+} from "@glass/contracts"
 import { Equal } from "effect"
 import type { ParsedFile } from "./changesView"
+import { rankHotspots } from "./rankedHotspots"
+
+export type TourHotspot =
+  | { readonly rank: number; readonly hotspot: Hotspot; readonly chapter: null }
+  | {
+      readonly rank: number
+      readonly hotspot: Hotspot & { readonly place: TourCodeTarget }
+      readonly chapter: number
+    }
+
+export type ChapterHotspot = Extract<TourHotspot, { readonly chapter: number }>
 
 export interface TourChapter {
   readonly index: number
@@ -10,12 +30,15 @@ export interface TourChapter {
   readonly diagram: TourDiagram | null
   readonly beforeAfter: TourBeforeAfter | null
   readonly callouts: TourCallouts
+  readonly hotspots: ReadonlyArray<ChapterHotspot>
+  readonly lowAttention: boolean
 }
 
 export interface TourReading {
   readonly writtenAt: Tour["writtenAt"]
   readonly intent: string
   readonly beforeAfter: TourBeforeAfter | null
+  readonly hotspots: ReadonlyArray<TourHotspot> | null
   readonly chapters: ReadonlyArray<TourChapter>
   readonly files: ReadonlyArray<ParsedFile>
   readonly summaries: ReadonlyMap<string, string>
@@ -26,8 +49,11 @@ export const readTour = (
   changed: ReadonlyArray<ParsedFile>,
   tour: Tour,
   revision: Revision,
+  currentReview: AgentReview | null,
 ): TourReading => {
   const current = Equal.equals(tour.revision, revision)
+  const review = current ? currentReview : null
+  const lowAttention = new Set(review?.lowAttention.map(({ path }) => path))
   const byPath = new Map(changed.map((entry) => [entry.file.path, entry]))
   const files: Array<ParsedFile> = []
   const placed = new Set<string>()
@@ -55,7 +81,7 @@ export const readTour = (
       ? beforeAfter
       : null
 
-  const chapters = tour.chapters.map((chapter, index): TourChapter => {
+  const placedChapters = tour.chapters.map((chapter, index) => {
     const paths = chapter.files.flatMap(({ path, summary }) => {
       if (!place(path)) return []
 
@@ -82,8 +108,28 @@ export const readTour = (
       callouts: current
         ? (chapter.callouts ?? []).filter((callout) => paths.includes(callout.target.path))
         : [],
+      lowAttention: paths.length > 0 && paths.every((path) => lowAttention.has(path)),
     }
   })
+
+  const hotspots =
+    review === null
+      ? null
+      : rankHotspots(review.hotspots).map(({ rank, hotspot }): TourHotspot => {
+          const lines = hotspot.place
+          const chapter = lines === null ? undefined : chapterOf.get(lines.path)
+
+          return lines === null || chapter === undefined
+            ? { rank, hotspot, chapter: null }
+            : { rank, hotspot: { ...hotspot, place: lines }, chapter }
+        })
+
+  const chapters = placedChapters.map((chapter): TourChapter => ({
+    ...chapter,
+    hotspots: (hotspots ?? []).filter(
+      (entry): entry is ChapterHotspot => entry.chapter === chapter.index,
+    ),
+  }))
 
   for (const path of [...tour.everythingElse, ...changed.map((entry) => entry.file.path)])
     place(path)
@@ -92,9 +138,13 @@ export const readTour = (
     writtenAt: tour.writtenAt,
     intent: tour.intent,
     beforeAfter: shownBeforeAfter(tour.beforeAfter, (path) => byPath.has(path)),
+    hotspots,
     chapters,
     files,
     summaries,
     chapterOf,
   }
 }
+
+export const hasOverview = (reading: TourReading) =>
+  reading.beforeAfter !== null || reading.hotspots !== null

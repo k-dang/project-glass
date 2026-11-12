@@ -6,6 +6,7 @@ import type { AgentReviewControls } from "../src/renderer/useAgentReview"
 export const controls = (overrides: Partial<AgentReviewControls>): AgentReviewControls => ({
   job: { status: "idle" },
   review: null,
+  current: null,
   outdated: false,
   closedAs: null,
   commandProblem: null,
@@ -24,5 +25,7 @@ export const reviewOf = (revision: Revision): AgentReview => ({
   writtenAt: DateTime.makeUnsafe(0),
   markdown:
     "**The greeting changes a letter callers match on.** One line changes.\n\n## Callers expect the old letter\n\n`main.ts` matches on `b`.",
+  hotspots: [],
+  lowAttention: [],
   agentId: null,
 })

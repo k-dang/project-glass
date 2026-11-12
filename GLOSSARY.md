@@ -110,11 +110,23 @@ own model for each engine. It starts as pi.
 _Avoid_: Default engine, runner (in UI copy), reviewer
 
 **Agent review**:
-An agent-written critique of one Revision of a PR, kept on this device for the user alone: one
-Markdown document that opens with the PR's main risk, read beside the diff. Glass keeps the latest
-one for each PR and leaves it outdated after new commits. Unlike a Review, it is never published
-and never suggests a Review decision.
+An agent-written critique of one Revision of a PR, kept on this device for the user alone:
+Markdown that opens with the PR's main risk, its Hotspots, and its Low-attention files, read beside
+the diff. Glass keeps the latest one for each PR and leaves it outdated after new commits. Unlike a
+Review, it is never published and never suggests a Review decision.
 _Avoid_: AI review, code review, critique
+
+**Hotspot**:
+One of the few places in a PR an Agent review ranks for the closest read, at most five: a risk
+kind, why it matters in this PR, the code it rests on, and what to check, usually with the diff
+lines it is about. A Tour of the same Revision shows them where to look first and in their Chapters.
+An Agent review with nothing that stands out has none.
+_Avoid_: Finding, issue, risk area
+
+**Low-attention file**:
+A changed file an Agent review says needs little attention, such as generated code, wiring, or a
+version bump. The diff collapses it at first and keeps it one click away.
+_Avoid_: Plumbing, noise, skippable file
 
 **Follow-up**:
 A message the user sends about an Agent review, read beside it, and the agent's answer, which may

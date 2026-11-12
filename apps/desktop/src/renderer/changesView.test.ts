@@ -60,7 +60,8 @@ const notesOf = (some: Partial<LineNotes> = {}) => lineNoteAnnotations(lineNotes
 const choose = (
   opened: ReadonlyMap<string, boolean> = none,
   all: CollapseChoices["all"] = "expanded",
-): CollapseChoices => ({ opened, all })
+  collapsedAtFirst: ReadonlySet<string> = new Set(),
+): CollapseChoices => ({ opened, all, collapsedAtFirst })
 
 const redrawn = (before: ReturnType<typeof toItems>, after: ReturnType<typeof toItems>) =>
   after.filter((item, index) => item.version !== before[index]!.version).map((item) => item.id)
@@ -167,6 +168,13 @@ describe("toItems", () => {
   })
 })
 
+const suggested = (opened: ReadonlyMap<string, boolean>, all: CollapseChoices["all"]) =>
+  toItems(
+    layOut([changedFile("a.ts"), changedFile("b.ts")]).files,
+    notesOf(),
+    choose(opened, all, new Set(["b.ts"])),
+  ).map((item) => item.collapsed)
+
 describe("collapsed", () => {
   const { files } = layOut([changedFile("a.ts"), changedFile("b.png", BinaryFile.make({}))])
 
@@ -178,6 +186,12 @@ describe("collapsed", () => {
     expect(collapsed(none, "expanded")).toEqual([false, true])
     expect(collapsed(new Map([["a.ts", true]]), "collapsed")).toEqual([false, true])
     expect(collapsed(new Map([["b.png", true]]))).toEqual([false, true])
+  })
+
+  it("starts the suggested files collapsed until the user collapses or expands every file", () => {
+    expect(suggested(none, "suggested")).toEqual([false, true])
+    expect(suggested(new Map([["b.ts", true]]), "suggested")).toEqual([false, false])
+    expect(suggested(none, "expanded")).toEqual([false, false])
   })
 })
 

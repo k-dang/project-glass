@@ -1,17 +1,12 @@
 import { ChangeType, Chapter, Tour, TourDiagram, type ChangedFile } from "@glass/contracts"
-import { Effect, Option, Predicate, Schema, SchemaIssue } from "effect"
+import { Option, Predicate, Schema } from "effect"
 import type { TourInput } from "./github/GitHubClient"
-
-const formatIssue = SchemaIssue.makeFormatterDefault()
+import { dropMalformed } from "./lenientDecoding"
 
 const optionalVisual = <S extends Schema.Constraint>(
   schema: S,
 ): Schema.middlewareDecoding<S, S["DecodingServices"]> =>
-  Schema.catchDecoding<S>((issue) =>
-    Effect.logWarning("Dropped a malformed Tour visual", formatIssue(issue)).pipe(
-      Effect.as(Option.none()),
-    ),
-  )(schema)
+  Schema.catchDecoding<S>(dropMalformed("Tour visual", Option.none()))(schema)
 
 const diagramAnswer = Schema.Struct({
   ...TourDiagram.fields,
