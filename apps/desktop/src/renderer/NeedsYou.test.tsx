@@ -5,22 +5,27 @@ import {
   AgentNeedsYou,
   AgentReviewFinished,
   AllowRequest,
+  Discussions,
   GitHubConnection,
   type NeedsYou,
   PermissionRequestPart,
+  PullRequest,
   PullRequestNeedsYou,
   PullRequestRef,
   PullRequestSummary,
+  PullRequestWorkspace,
   type RequestAnswer,
   ReviewRequested,
   WaitingRequests,
 } from "@glass/contracts"
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { DateTime, Effect, SubscriptionRef } from "effect"
+import { Cause, DateTime, Effect, Stream, SubscriptionRef } from "effect"
 import { afterEach, expect, it } from "vite-plus/test"
 import { App } from "./App"
+import { reviewOf } from "../../test/agentReview"
 import { agent, agentFields } from "../../test/agent"
+import { pullRequestFields, revision, viewer } from "../../test/workspace"
 import { backendLayerAtom } from "./backend"
 import { type Handlers, type Held, hold, next, testLayer } from "../../test/testBackend"
 
@@ -149,7 +154,44 @@ it("says nothing needs you in the Inbox, and the Dashboard only links to that co
   await user.click(link)
 
   expect(await screen.findByRole("main", { name: "Inbox" })).toBeTruthy()
+  expect(screen.getByRole("heading", { name: "Inbox 0" })).toBeTruthy()
   expect(screen.getAllByText("Nothing needs you right now.").length).toBeGreaterThan(0)
+})
+
+it("keeps a loading or failed Needs you off the empty Inbox", async () => {
+  const user = mount(needsYouRef([]), { WatchNeedsYou: () => Stream.never }, "/")
+
+  const dashboard = await screen.findByRole("main", { name: "Dashboard" })
+  expect(within(dashboard).getByRole("link", { name: "Needs you" })).toBeTruthy()
+  expect(within(dashboard).queryByRole("link", { name: "Needs you 0" })).toBeNull()
+  expect(screen.queryByRole("link", { name: "Inbox", description: /need you/ })).toBeNull()
+
+  await user.click(screen.getByRole("link", { name: "Inbox" }))
+
+  expect(await screen.findByText("Loading what needs you…")).toBeTruthy()
+  expect(screen.queryByText("Nothing needs you right now.")).toBeNull()
+  expect(screen.getByRole("heading", { name: "Inbox" }).textContent).not.toContain("0")
+  expect(screen.queryByRole("heading", { name: "Inbox 0" })).toBeNull()
+})
+
+it("shows a failed Needs you as a failure, not an empty Inbox", async () => {
+  const user = mount(
+    needsYouRef([]),
+    { WatchNeedsYou: () => Stream.failCause(Cause.die("Needs you dropped")) },
+    "/",
+  )
+
+  const dashboard = await screen.findByRole("main", { name: "Dashboard" })
+  expect(within(dashboard).queryByRole("link", { name: "Needs you 0" })).toBeNull()
+  expect(within(dashboard).getByRole("link", { name: "Needs you" })).toBeTruthy()
+
+  await user.click(screen.getByRole("link", { name: "Inbox" }))
+
+  expect(await screen.findByRole("alert")).toBeTruthy()
+  expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy()
+  expect(screen.queryByText("Nothing needs you right now.")).toBeNull()
+  expect(screen.queryByRole("heading", { name: "Inbox 0" })).toBeNull()
+  expect(screen.queryByRole("link", { name: "Needs you 0" })).toBeNull()
 })
 
 it("groups Agents, review requests, and finished reviews, and labels a draft", async () => {
@@ -255,4 +297,97 @@ it("counts what needs you on the Inbox link from another area", async () => {
     expect(screen.queryByRole("link", { name: "Inbox", description: /need you/ })).toBeNull(),
   )
   expect(screen.getByRole("link", { name: "Inbox" }).textContent).toBe("")
+})
+
+const loadedWorkspace = () =>
+  Effect.succeed(
+    new PullRequestWorkspace({
+      viewer,
+      pullRequest: new PullRequest({
+        ...pullRequestFields,
+        ref,
+        url: `https://github.com/${ref.owner}/${ref.repo}/pull/${ref.number}`,
+      }),
+      revision,
+      updatedAt: DateTime.makeUnsafe("2026-10-01T00:00:00Z"),
+      files: [],
+      viewedPaths: [],
+      discussions: new Discussions({ onLines: [], outdated: [], timeline: [] }),
+      drafts: [],
+    }),
+  )
+
+const reviewHandlers: Partial<Handlers> = {
+  HasPullRequestChanged: () => Effect.succeed(false),
+  WatchAgentReview: () => Stream.make({ review: reviewOf(revision), job: { status: "idle" } }),
+}
+
+it("opens Changes and the Agent review when the pull request is still loading", async () => {
+  const opened: Array<Held<{ readonly pullRequest: PullRequestRef }, PullRequestWorkspace, never>> =
+    []
+
+  const user = mount(needsYouRef([reviewRequested]), {
+    LoadPullRequest: hold(opened),
+    ...reviewHandlers,
+  })
+
+  await user.click(await screen.findByRole("link", { name: "Read Agent review" }))
+  expect(await screen.findByRole("status", { name: "Loading pull request" })).toBeTruthy()
+  expect(screen.queryByRole("complementary", { name: "Agent review" })).toBeNull()
+  expect(screen.queryByRole("tab", { name: "Changes" })).toBeNull()
+
+  ;(await next(opened)).answer(loadedWorkspace())
+
+  await waitFor(() =>
+    expect(screen.getByRole("tab", { name: "Changes" }).getAttribute("aria-selected")).toBe("true"),
+  )
+  expect(screen.getByRole("complementary", { name: "Agent review" })).toBeTruthy()
+})
+
+it("leaves Enter on a focused button or link to that control", async () => {
+  const answers: Array<{ agentId: string; requestId: string; answer: RequestAnswer }> = []
+
+  const user = mount(needsYouRef([waitingAgent, reviewRequested]), {
+    AnswerRequest: (payload) => Effect.sync(() => void answers.push(payload)),
+    LoadPullRequest: () => loadedWorkspace(),
+    ...reviewHandlers,
+  })
+
+  const allow = await screen.findByRole("button", { name: "Allow" })
+  allow.focus()
+  await user.keyboard("j")
+  expect(
+    screen.getByRole("button", { name: /Retry flaky upload/ }).getAttribute("aria-current"),
+  ).toBe("true")
+  await user.keyboard("k")
+  expect(
+    screen.getByRole("button", { name: /agent\/swift-otter/ }).getAttribute("aria-current"),
+  ).toBe("true")
+
+  screen.getByRole("button", { name: "Allow" }).focus()
+  await user.keyboard("{Enter}")
+  expect(answers).toEqual([
+    { agentId: agent.id, requestId: "bash-1", answer: AllowRequest.make({}) },
+  ])
+  expect(window.location.hash).toBe("#/inbox")
+
+  screen.getByRole("link", { name: "Settings" }).focus()
+  await user.keyboard("{Enter}")
+  expect(window.location.hash).toBe("#/settings")
+})
+
+it("lets Enter on Read Agent review open the review", async () => {
+  const user = mount(needsYouRef([reviewRequested]), {
+    LoadPullRequest: () => loadedWorkspace(),
+    ...reviewHandlers,
+  })
+
+  const link = await screen.findByRole("link", { name: "Read Agent review" })
+  link.focus()
+  await user.keyboard("{Enter}")
+
+  await waitFor(() =>
+    expect(screen.getByRole("tab", { name: "Changes" }).getAttribute("aria-selected")).toBe("true"),
+  )
+  expect(screen.getByRole("complementary", { name: "Agent review" })).toBeTruthy()
 })

@@ -9,13 +9,19 @@ import {
 import { Link, useNavigate } from "@tanstack/react-router"
 import { cn } from "cn"
 import { DateTime, Match, Option, Predicate } from "effect"
-import { AsyncResult } from "effect/reactivity"
 import { GitPullRequest, Sparkles } from "lucide-react"
 import { useMemo, useState } from "react"
 import { Kbd } from "@/components/ui/kbd"
 import { AgentRequest, answerRequestAtom } from "./agentsArea"
 import { agentConversation, ConversationContext } from "./conversation"
-import { needsYouKey, needsYouStreamAtom, watchedNeedsYouAtom } from "./needsYou"
+import {
+  needsYouCount,
+  needsYouKey,
+  needsYouStatus,
+  NeedsYouStatus,
+  needsYouStreamAtom,
+  watchedNeedsYouAtom,
+} from "./needsYou"
 import { ProblemAlert } from "./ProblemAlert"
 import { streamProblem } from "./problems"
 import { ago } from "./PullRequestRow"
@@ -135,12 +141,128 @@ function Waited(props: { since: DateTime.Utc; now: Date }) {
   )
 }
 
+function InboxCount(props: { status: NeedsYouStatus }) {
+  const count = needsYouCount(props.status)
+
+  if (Option.isNone(count)) return null
+
+  return <span className="font-normal text-muted-foreground">{count.value}</span>
+}
+
+function InboxRows(props: {
+  status: NeedsYouStatus
+  selectedKey: string | null
+  now: Date
+  onRetry: () => void
+  onPick: (key: string) => void
+}) {
+  return NeedsYouStatus.$match(props.status, {
+    Loading: () => (
+      <output className="block px-4 py-3 text-sm text-muted-foreground">
+        Loading what needs you…
+      </output>
+    ),
+    Failed: ({ cause }) => (
+      <div className="px-4 py-3">
+        <ProblemAlert
+          problem={streamProblem(cause)}
+          action={{ label: "Retry", run: props.onRetry }}
+        />
+      </div>
+    ),
+    Ready: ({ items }) =>
+      items.length === 0 ? (
+        <p className="px-4 py-3 text-sm text-muted-foreground">Nothing needs you right now.</p>
+      ) : (
+        <InboxSections
+          items={items}
+          selectedKey={props.selectedKey}
+          now={props.now}
+          onPick={props.onPick}
+        />
+      ),
+  })
+}
+
+function InboxSections(props: {
+  items: ReadonlyArray<NeedsYouItem>
+  selectedKey: string | null
+  now: Date
+  onPick: (key: string) => void
+}) {
+  return sections.map((section) => {
+    const rows = props.items.filter((item) => sectionOf(item) === section.id)
+
+    if (rows.length === 0) return null
+
+    return (
+      <section key={section.id} aria-label={section.title} className="py-2">
+        <h2 className="px-4 py-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+          {section.title}
+        </h2>
+        <ul>
+          {rows.map((item) => {
+            const key = needsYouKey(item)
+
+            return (
+              <li key={key}>
+                <button
+                  type="button"
+                  aria-current={key === props.selectedKey ? "true" : undefined}
+                  className="flex w-full flex-col gap-0.5 px-4 py-2 text-left text-sm outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring aria-[current=true]:bg-accent"
+                  onClick={() => props.onPick(key)}
+                >
+                  <span className="flex items-baseline gap-2">
+                    <span className="min-w-0 flex-1 font-medium" title={titleOf(item)}>
+                      {titleOf(item)}
+                    </span>
+                    <Waited since={item.since} now={props.now} />
+                  </span>
+                  <span className="text-pretty text-xs text-muted-foreground" title={lineOf(item)}>
+                    {lineOf(item)}
+                  </span>
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      </section>
+    )
+  })
+}
+
+function InboxPane(props: {
+  status: NeedsYouStatus
+  selected: NeedsYouItem | null
+  now: Date
+  onReadReview: (pullRequest: string) => void
+}) {
+  return NeedsYouStatus.$match(props.status, {
+    Loading: () => null,
+    Failed: () => null,
+    Ready: ({ items }) =>
+      props.selected === null ? (
+        <p className="text-sm text-muted-foreground">
+          {items.length === 0 ? "Nothing needs you right now." : "Select something that needs you."}
+        </p>
+      ) : (
+        <InboxDetail item={props.selected} now={props.now} onReadReview={props.onReadReview} />
+      ),
+  })
+}
+
 export function Inbox() {
-  const result = useAtomValue(watchedNeedsYouAtom)
+  const status = needsYouStatus(useAtomValue(watchedNeedsYouAtom))
   const retry = useAtomRefresh(needsYouStreamAtom)
   const navigate = useNavigate()
   const markReview = useAtomSet(readAgentReviewOnOpenAtom)
-  const items = Option.getOrElse(AsyncResult.value(result), (): ReadonlyArray<NeedsYouItem> => [])
+
+  const items = NeedsYouStatus.$match(status, {
+    Loading: (): ReadonlyArray<NeedsYouItem> => [],
+    Failed: (): ReadonlyArray<NeedsYouItem> => [],
+    Ready: ({ items: ready }) => ready,
+  })
+
   const flat = sections.flatMap((section) => items.filter((item) => sectionOf(item) === section.id))
   const keys = flat.map(needsYouKey)
   const order = keys.join("\n")
@@ -196,7 +318,7 @@ export function Inbox() {
   useShortcuts([
     { key: "j", run: () => move(1) },
     { key: "k", run: () => move(-1) },
-    { key: "Enter", run: openSelected },
+    { key: "Enter", skipOnControl: true, run: openSelected },
     {
       key: "a",
       run: () => {
@@ -210,7 +332,7 @@ export function Inbox() {
       <div className="flex w-96 shrink-0 flex-col border-r">
         <header className="flex items-center justify-between gap-3 border-b px-4 py-3">
           <h1 className="text-base font-semibold">
-            Inbox <span className="font-normal text-muted-foreground">{items.length}</span>
+            Inbox <InboxCount status={status} />
           </h1>
           <p className="flex flex-wrap items-center justify-end gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1">
@@ -231,86 +353,17 @@ export function Inbox() {
           </p>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {AsyncResult.builder(result)
-            .onSuccess((rows) =>
-              rows.length === 0 ? (
-                <p className="px-4 py-3 text-sm text-muted-foreground">
-                  Nothing needs you right now.
-                </p>
-              ) : (
-                sections.map((section) => {
-                  const sectionRows = rows.filter((item) => sectionOf(item) === section.id)
-
-                  if (sectionRows.length === 0) return null
-
-                  return (
-                    <section key={section.id} aria-label={section.title} className="py-2">
-                      <h2 className="px-4 py-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                        {section.title}
-                      </h2>
-                      <ul>
-                        {sectionRows.map((item) => {
-                          const key = needsYouKey(item)
-                          const current = key === selectedKey
-
-                          return (
-                            <li key={key}>
-                              <button
-                                type="button"
-                                aria-current={current ? "true" : undefined}
-                                className="flex w-full flex-col gap-0.5 px-4 py-2 text-left text-sm outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring aria-[current=true]:bg-accent"
-                                onClick={() => setPicked(key)}
-                              >
-                                <span className="flex items-baseline gap-2">
-                                  <span
-                                    className="min-w-0 flex-1 font-medium"
-                                    title={titleOf(item)}
-                                  >
-                                    {titleOf(item)}
-                                  </span>
-                                  <Waited since={item.since} now={now} />
-                                </span>
-                                <span
-                                  className="text-pretty text-xs text-muted-foreground"
-                                  title={lineOf(item)}
-                                >
-                                  {lineOf(item)}
-                                </span>
-                              </button>
-                            </li>
-                          )
-                        })}
-                      </ul>
-                    </section>
-                  )
-                })
-              ),
-            )
-            .onFailure((cause) => (
-              <div className="px-4 py-3">
-                <ProblemAlert
-                  problem={streamProblem(cause)}
-                  action={{ label: "Retry", run: retry }}
-                />
-              </div>
-            ))
-            .orElse(() => (
-              <output className="block px-4 py-3 text-sm text-muted-foreground">
-                Loading what needs you…
-              </output>
-            ))}
+          <InboxRows
+            status={status}
+            selectedKey={selectedKey}
+            now={now}
+            onRetry={retry}
+            onPick={setPicked}
+          />
         </div>
       </div>
       <div className="min-w-0 flex-1 overflow-y-auto p-6">
-        {selected === null ? (
-          <p className="text-sm text-muted-foreground">
-            {items.length === 0
-              ? "Nothing needs you right now."
-              : "Select something that needs you."}
-          </p>
-        ) : (
-          <InboxDetail item={selected} now={now} onReadReview={markReview} />
-        )}
+        <InboxPane status={status} selected={selected} now={now} onReadReview={markReview} />
       </div>
     </div>
   )

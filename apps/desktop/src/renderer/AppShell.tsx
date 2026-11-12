@@ -1,4 +1,5 @@
 import { RegistryContext, useAtom, useAtomValue } from "@effect/atom-react"
+import { Option } from "effect"
 import { Link, type LinkOptions, Outlet, useBlocker, useNavigate } from "@tanstack/react-router"
 import { cn } from "cn"
 import {
@@ -20,7 +21,7 @@ import { ConfirmationDialog } from "./ConfirmationDialog"
 import { globalConversationOpenAtom } from "./globalConversation"
 import { GlobalConversationDialog } from "./GlobalConversationDialog"
 import { NeedsYouBadge } from "./NeedsYou"
-import { needsYouCountAtom } from "./needsYou"
+import { needsYouCount as countOf, needsYouStatus, watchedNeedsYouAtom } from "./needsYou"
 import { confirmLeave, discardPromptAtom, leavesPullRequest, reviewsLinkAtom } from "./reviewsArea"
 import { ConnectionAvatar } from "./Settings"
 import { ResourceUsage } from "./ResourceUsage"
@@ -75,7 +76,7 @@ export function AppShell() {
   const navigate = useNavigate()
   const [conversing, setConversing] = useAtom(globalConversationOpenAtom)
   const needsYouBadgeId = useId()
-  const needsYouCount = useAtomValue(needsYouCountAtom)
+  const needsYouCount = countOf(needsYouStatus(useAtomValue(watchedNeedsYouAtom)))
 
   useShortcuts([
     ...areas.map(({ link }, index) => ({
@@ -118,7 +119,9 @@ export function AppShell() {
                   activeOptions={{ includeSearch: false }}
                   aria-label={label}
                   aria-describedby={
-                    label === "Inbox" && needsYouCount > 0 ? needsYouBadgeId : undefined
+                    label === "Inbox" && Option.isSome(needsYouCount) && needsYouCount.value > 0
+                      ? needsYouBadgeId
+                      : undefined
                   }
                   aria-keyshortcuts={`Meta+${index + 1} Control+${index + 1}`}
                   className={cn(railLink, label === "Settings" && "mt-auto")}
