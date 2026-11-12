@@ -5,6 +5,7 @@ import { AgentReviewAnswer } from "../src/agentReviewPrompt"
 import { AskAgentAnswer } from "../src/askPrompt"
 import type { TourAnswer } from "../src/tourPrompt"
 import { RATE_LIMIT_TITLE } from "./demoPullRequests"
+import { demoAgentReview } from "./demoAgentReview"
 import { demoTour } from "./demoTour"
 
 const chapterSize = 2
@@ -52,12 +53,16 @@ const syntheticTour = (prompt: string): TourAnswer => {
 const syntheticReview = (prompt: string): AgentReviewAnswer => {
   const { title } = decodeMaterial(prompt)
 
+  if (title === RATE_LIMIT_TITLE) return demoAgentReview
+
   return {
     markdown: [
       `**Synthetic Agent review of "${title}", written without a model.**`,
       "A fake runner wrote this review without reading the code.",
       "## Synthetic point\n\nA fake runner raised this point.",
     ].join("\n\n"),
+    hotspots: [],
+    lowAttention: [],
   }
 }
 

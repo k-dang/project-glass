@@ -6,6 +6,7 @@ import type {
   PullRequestState,
   PullRequestWorkspace,
   Revision,
+  TourCodeTarget,
 } from "@glass/contracts"
 import { referenceKey } from "@glass/contracts"
 import { cn } from "cn"
@@ -72,6 +73,7 @@ import {
   workspaceViewAtom,
 } from "./reviewsArea"
 import { ShortSha } from "./shortSha"
+import type { HotspotFocus } from "./Hotspots"
 import type { AskStore } from "./useAsks"
 import { type DraftStore, useDraftCount, useDraftsLocked } from "./useDrafts"
 import { useFullFiles } from "./useFullFiles"
@@ -81,7 +83,7 @@ import type { Resolutions } from "./useResolutions"
 import { type ViewedFilesStore, useViewedFiles } from "./useViewedFiles"
 import { useShortcuts } from "./useShortcuts"
 import { TourView, type TourViewHandle } from "./TourView"
-import { readTour } from "./tourReading"
+import { hasOverview, readTour } from "./tourReading"
 import { useTour } from "./useTour"
 import { useAgentReview } from "./useAgentReview"
 import { positionOf } from "./reviewPosition"
@@ -110,6 +112,13 @@ export function Workspace(props: {
   const { pullRequest, revision, files, discussions } = props.workspace
   const tour = useTour(pullRequest.ref, revision)
   const agentReview = useAgentReview(pullRequest.ref, revision, closedAs(pullRequest))
+  const currentReview = agentReview.current
+
+  const lowAttention = useMemo(
+    () => new Set(currentReview?.lowAttention.map(({ path }) => path)),
+    [currentReview],
+  )
+
   const registry = useContext(RegistryContext)
   const [workspaceView, setView] = useAtom(workspaceViewAtom)
   const { tab, file: currentPath, order: chosenOrder, repositoryFile } = workspaceView
@@ -130,7 +139,8 @@ export function Workspace(props: {
 
   const filePanelId = useId()
   const [display, setDisplay] = useState<Display>(defaultDisplay)
-  const [all, setAll] = useState<CollapseChoices["all"]>("expanded")
+  const [all, setAll] = useState<CollapseChoices["all"]>("suggested")
+  const [hotspotFocus, setHotspotFocus] = useState<HotspotFocus | null>(null)
   const view = useRef<ViewHandle>(null)
   const tourView = useRef<TourViewHandle>(null)
   const [panelTab, setPanelTab] = useState<FilePanelTab>("tree")
@@ -170,8 +180,8 @@ export function Workspace(props: {
   const { saved } = tour
 
   const reading = useMemo(
-    () => (saved === null ? null : readTour(layout.files, saved, revision)),
-    [layout, saved, revision],
+    () => (saved === null ? null : readTour(layout.files, saved, revision, currentReview)),
+    [layout, saved, revision, currentReview],
   )
 
   const tourShown = chosenOrder === "tour" ? reading : null
@@ -258,7 +268,7 @@ export function Workspace(props: {
   const startReading = () => {
     openChapter(0)
 
-    if (reading?.beforeAfter != null) tourView.current?.showOverview()
+    if (reading !== null && hasOverview(reading)) tourView.current?.showOverview()
   }
 
   useShortcuts([
@@ -275,7 +285,8 @@ export function Workspace(props: {
             run: () => {
               const inView = tourView.current?.currentChapter() ?? 0
 
-              if (inView === 0 && reading?.beforeAfter != null) tourView.current?.showOverview()
+              if (inView === 0 && reading !== null && hasOverview(reading))
+                tourView.current?.showOverview()
               else openChapter(inView - 1, "instant")
             },
           },
@@ -285,9 +296,9 @@ export function Workspace(props: {
 
   useTourReadyToast(tour.latest, reading, startReading)
 
-  const openInChanges = (path: string) =>
+  const openInChanges = (path: string, order: ChangesOrder = chosenOrder) =>
     flushSync(() => {
-      setView((previous) => ({ ...previous, tab: "changes", file: path }))
+      setView((previous) => ({ ...previous, tab: "changes", order, file: path }))
       setOpened((paths) => (paths.get(path) === true ? paths : new Map(paths).set(path, true)))
     })
 
@@ -298,30 +309,40 @@ export function Workspace(props: {
     else view.current?.scrollTo({ type: "item", id: path, align: "start", behavior })
   }
 
-  const showLine = (path: string, side: DiffSide, line: number) => {
-    openInChanges(path)
+  const showPlace = (place: TourCodeTarget, order: ChangesOrder = chosenOrder) => {
+    openInChanges(place.path, order)
 
-    if (tourShown !== null) {
-      tourView.current?.showLine(path, side, line)
+    if (order === "tour" && reading !== null) {
+      tourView.current?.showRange(place)
 
       return
     }
 
+    const side = annotationSides[place.side]
+
     view.current?.setSelectedLines({
-      id: path,
-      range: { start: line, end: line, side: annotationSides[side] },
+      id: place.path,
+      range: { start: place.startLine, end: place.endLine, side },
     })
     view.current?.scrollTo({
       type: "line",
-      id: path,
-      lineNumber: line,
-      side: annotationSides[side],
+      id: place.path,
+      lineNumber: place.startLine,
+      side,
       align: "center",
       behavior: "smooth-auto",
     })
   }
 
+  const showLine = (path: string, side: DiffSide, line: number) =>
+    showPlace({ path, side, startLine: line, endLine: line })
+
   const show: ShowNote = { file: showFile, line: showLine }
+
+  const showInReview = (rank: number) => {
+    setHotspotFocus({ rank })
+    readAgentReview()
+  }
 
   const showAll = (next: CollapseChoices["all"]) => {
     flushSync(() => {
@@ -539,7 +560,11 @@ export function Workspace(props: {
           <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]">
             <div className="flex flex-col gap-8 px-6 py-8">
               {reading !== null && <TourCard reading={reading} onStartReading={startReading} />}
-              <AgentReviewCard controls={agentReview} onRead={readAgentReview} />
+              <AgentReviewCard
+                controls={agentReview}
+                onRead={readAgentReview}
+                onReadHotspot={showInReview}
+              />
               <Description html={pullRequest.descriptionHtml} />
               <DraftList store={drafts} onShow={(draft) => showDraft(show, draft)} />
               <Timeline items={discussions.timeline} reactions={reactions} />
@@ -571,6 +596,8 @@ export function Workspace(props: {
               initialPath={currentPath}
               ref={tourView}
               reading={tourShown}
+              onShowInReview={showInReview}
+              lowAttention={lowAttention}
               discussions={discussions.onLines}
               drafts={drafts}
               asks={asks}
@@ -610,6 +637,7 @@ export function Workspace(props: {
                 onOpenChange={setFileOpen}
                 onCurrentPathChange={setCurrentPath}
                 summaries={null}
+                lowAttention={lowAttention}
               />
             )
           )}
@@ -621,6 +649,13 @@ export function Workspace(props: {
               controls={agentReview}
               drafts={drafts}
               show={show}
+              hotspotLinks={{
+                onShowPlace: (place) => showPlace(place),
+                chapterOf: (rank) =>
+                  reading?.hotspots?.find((entry) => entry.rank === rank)?.chapter ?? null,
+                onShowInTour: (place) => showPlace(place, "tour"),
+                focus: hotspotFocus,
+              }}
             />
           </AgentReviewSidePanel>
         )}

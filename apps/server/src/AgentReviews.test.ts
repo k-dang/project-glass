@@ -151,6 +151,77 @@ const fixture = Effect.fnUntraced(function* (
 
 const reviewed = (state: AgentReviewState) => state.review !== null && state.job.status === "idle"
 
+const hotspot = (title: string) => ({
+  title,
+  kind: "public-contract",
+  place: null,
+  why: `Why ${title}`,
+  evidence: `Evidence ${title}`,
+  check: `Check ${title}`,
+})
+
+it.live("keeps the first five well-formed hotspots, linking only the ones placed in the diff", () =>
+  Effect.gen(function* () {
+    const f = yield* fixture({
+      reply: {
+        answer: {
+          ...answer,
+          hotspots: [
+            {
+              ...hotspot("In the diff"),
+              place: { path: "greet.ts", side: "new", startLine: 1, endLine: 2 },
+            },
+            {
+              ...hotspot("Unchanged file"),
+              place: { path: "main.ts", side: "new", startLine: 1, endLine: 1 },
+            },
+            { ...hotspot("Unknown kind"), kind: "style" },
+            {
+              ...hotspot("Malformed place"),
+              place: { path: "greet.ts", side: "new", startLine: "two" },
+            },
+            {
+              ...hotspot("Past the hunk"),
+              place: { path: "greet.ts", side: "new", startLine: 3, endLine: 9 },
+            },
+            {
+              title: "No place",
+              kind: "migration",
+              why: "Why No place",
+              evidence: "Evidence No place",
+              check: "Check No place",
+            },
+            hotspot("Sixth"),
+          ],
+          lowAttention: [
+            { path: "src/name.ts", reason: "Rename" },
+            { path: "greet.ts", reason: "A hotspot is here" },
+            { path: "nowhere.ts", reason: "Not changed" },
+          ],
+        },
+      },
+    })
+
+    yield* f.start
+    const { review } = yield* f.state(reviewed)
+
+    assert.deepStrictEqual(
+      review?.hotspots.map(({ title, place }) => [title, place]),
+      [
+        ["In the diff", { path: "greet.ts", side: "new", startLine: 1, endLine: 2 }],
+        ["Unchanged file", null],
+        ["Malformed place", null],
+        ["Past the hunk", null],
+        ["No place", null],
+      ],
+    )
+    assert.deepStrictEqual(review?.lowAttention, [{ path: "src/name.ts", reason: "Rename" }])
+
+    const restored = yield* f.restart
+    assert.deepStrictEqual(restored.review, review)
+  }),
+)
+
 it.live(
   "reviews a checkout of the Revision with the PR material and keeps it across restarts",
   () =>
@@ -174,6 +245,7 @@ it.live(
 
       assert.deepStrictEqual(review?.revision, f.revision)
       assert.strictEqual(review?.markdown, answer.markdown)
+      assert.deepStrictEqual([review?.hotspots, review?.lowAttention], [[], []])
 
       const activity = yield* f.client.ListActivity({ limit: 10 })
       assert.isEmpty(activity.activities)

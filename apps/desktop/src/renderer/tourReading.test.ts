@@ -44,13 +44,17 @@ describe("readTour", () => {
       { ...tourChapter("One", ["a.ts", "b.ts"]), diagram, beforeAfter, callouts },
     ])
 
-    const current = readTour(files, tour, revision).chapters[0]!
+    const current = readTour(files, tour, revision, null).chapters[0]!
     expect(current.diagram).toEqual(diagram)
     expect(current.beforeAfter).toEqual(beforeAfter)
     expect(current.callouts).toEqual(callouts)
 
-    const outdated = readTour(files, tour, new Revision({ base: revision.base, head: "new-head" }))
-      .chapters[0]!
+    const outdated = readTour(
+      files,
+      tour,
+      new Revision({ base: revision.base, head: "new-head" }),
+      null,
+    ).chapters[0]!
 
     expect(outdated.diagram).toBeNull()
     expect(outdated.beforeAfter).toBeNull()
@@ -60,6 +64,7 @@ describe("readTour", () => {
       files.filter(({ file }) => file.path !== "b.ts"),
       tour,
       revision,
+      null,
     ).chapters[0]!
 
     expect(missing.beforeAfter).toBeNull()
@@ -82,15 +87,17 @@ describe("readTour", () => {
 
     const tour = { ...savedTour([tourChapter("One", ["b.ts"])]), beforeAfter }
 
-    expect(readTour(files, tour, revision).beforeAfter).toEqual(beforeAfter)
+    expect(readTour(files, tour, revision, null).beforeAfter).toEqual(beforeAfter)
     expect(
-      readTour(files, tour, new Revision({ base: revision.base, head: "new-head" })).beforeAfter,
+      readTour(files, tour, new Revision({ base: revision.base, head: "new-head" }), null)
+        .beforeAfter,
     ).toBeNull()
     expect(
       readTour(
         files.filter(({ file }) => file.path !== "a.ts"),
         tour,
         revision,
+        null,
       ).beforeAfter,
     ).toBeNull()
   })
@@ -103,6 +110,7 @@ describe("readTour", () => {
         tourChapter("Two", ["a.ts", "b.ts"]),
       ]),
       revision,
+      null,
     )
 
     expect(reading.chapters.map((each) => each.paths)).toEqual([["c.ts", "a.ts"], ["b.ts"]])
@@ -116,6 +124,7 @@ describe("readTour", () => {
       files,
       savedTour([tourChapter("One", ["b.ts"])], ["d.ts", "gone.ts"]),
       revision,
+      null,
     )
 
     expect(paths(reading)).toEqual(["b.ts", "d.ts", "a.ts", "c.ts"])
@@ -131,6 +140,7 @@ describe("readTour", () => {
         tourChapter("Two", ["b.ts", "c.ts", "d.ts"]),
       ]),
       revision,
+      null,
     )
 
     expect(

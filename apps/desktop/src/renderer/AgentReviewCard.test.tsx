@@ -14,7 +14,13 @@ const older = new Revision({ base: "b0", head: "0123456789abcdef" })
 const mount = (overrides: Parameters<typeof controls>[0]) => {
   const given = controls(overrides)
   const onRead = vi.fn<() => void>()
-  render(<AgentReviewCard controls={given} onRead={onRead} />)
+  render(
+    <AgentReviewCard
+      controls={given}
+      onRead={onRead}
+      onReadHotspot={vi.fn<(rank: number) => void>()}
+    />,
+  )
 
   return {
     controls: given,

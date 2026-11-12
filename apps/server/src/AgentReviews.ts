@@ -6,6 +6,8 @@ import {
   type ChangedFile,
   type DiffSide,
   FollowedRepository,
+  Hotspot,
+  LowAttentionFile,
   type PullRequestRef,
   Revision,
   type AgentRunnerIdentity,
@@ -30,11 +32,16 @@ import { SqlClient } from "effect/sql"
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 import { Agents } from "./Agents"
-import { AgentReviewAnswer, agentReviewInstructions, agentReviewPrompt } from "./agentReviewPrompt"
+import {
+  AgentReviewAnswer,
+  agentReviewInstructions,
+  agentReviewPrompt,
+  MAX_HOTSPOTS,
+} from "./agentReviewPrompt"
 import { type CheckoutRunFailure, CheckoutRuns } from "./CheckoutRuns"
 import { followUpInstructions } from "./followUpInstructions"
 import { GitHubClient } from "./github/GitHubClient"
-import { patchLineNumbers } from "./github/patchLines"
+import { patchLineNumbers, rangeInFiles } from "./github/patchLines"
 import { type JobState, pullRequestJobs, type PullRequestJob } from "./pullRequestJobs"
 import { Deadlines, ServerConfig } from "./ServerConfig"
 import { engineSettingsOf, SettingsStore } from "./SettingsStore"
@@ -57,15 +64,44 @@ const toState = ({ output, run }: JobState<AgentReview, Progress, Failed>): Agen
   return { review: output, job: { status: run.status } }
 }
 
+const HotspotsJson = Schema.fromJsonString(Schema.Array(Hotspot))
+
+const LowAttentionJson = Schema.fromJsonString(Schema.Array(LowAttentionFile))
+
 const stored = Schema.Array(
   Schema.Struct({
     base: Schema.String,
     head: Schema.String,
     written_at: Schema.DateTimeUtcFromString,
     markdown: Schema.String,
+    hotspots: HotspotsJson,
+    low_attention: LowAttentionJson,
     agent_id: Schema.NullOr(Schema.String),
   }),
 )
+
+const encodeHotspots = Schema.encodeSync(HotspotsJson)
+
+const encodeLowAttention = Schema.encodeSync(LowAttentionJson)
+
+const fitToDiff = (answer: AgentReviewAnswer, files: ReadonlyArray<ChangedFile>) => {
+  const hotspots = answer.hotspots.slice(0, MAX_HOTSPOTS).map((hotspot) => ({
+    ...hotspot,
+    place: hotspot.place !== null && rangeInFiles(files, hotspot.place) ? hotspot.place : null,
+  }))
+
+  const hotspotPaths = new Set(
+    hotspots.flatMap(({ place }) => (place === null ? [] : [place.path])),
+  )
+
+  const changed = new Set(files.map(({ path }) => path))
+
+  const lowAttention = answer.lowAttention.filter(
+    (file) => changed.has(file.path) && !hotspotPaths.has(file.path),
+  )
+
+  return { hotspots, lowAttention }
+}
 
 const diffLinesOn = (files: ReadonlyArray<ChangedFile>, side: DiffSide) =>
   Object.fromEntries(
@@ -137,7 +173,7 @@ export class AgentReviews extends Context.Service<
       const load = Effect.fnUntraced(
         function* (pr: PullRequestRef) {
           const rows =
-            yield* sql`SELECT base, head, written_at, markdown, agent_id FROM agent_reviews WHERE ${where(pr)}`.pipe(
+            yield* sql`SELECT base, head, written_at, markdown, hotspots, low_attention, agent_id FROM agent_reviews WHERE ${where(pr)}`.pipe(
               Effect.flatMap(Schema.decodeUnknownEffect(stored)),
             )
 
@@ -150,6 +186,8 @@ export class AgentReviews extends Context.Service<
                   revision: new Revision({ base: row.base, head: row.head }),
                   writtenAt: row.written_at,
                   markdown: row.markdown,
+                  hotspots: row.hotspots,
+                  lowAttention: row.low_attention,
                   agentId: row.agent_id,
                 })
 
@@ -177,9 +215,9 @@ export class AgentReviews extends Context.Service<
 
           yield* jobs.commit(
             job,
-            sql`INSERT INTO agent_reviews (owner, repo, number, base, head, written_at, markdown, agent_id)
-              VALUES (${pr.owner}, ${pr.repo}, ${pr.number}, ${review.revision.base}, ${review.revision.head}, ${DateTime.formatIso(review.writtenAt)}, ${review.markdown}, NULL)
-              ON CONFLICT (owner, repo, number) DO UPDATE SET base = excluded.base, head = excluded.head, written_at = excluded.written_at, markdown = excluded.markdown, agent_id = NULL`.pipe(
+            sql`INSERT INTO agent_reviews (owner, repo, number, base, head, written_at, markdown, hotspots, low_attention, agent_id)
+              VALUES (${pr.owner}, ${pr.repo}, ${pr.number}, ${review.revision.base}, ${review.revision.head}, ${DateTime.formatIso(review.writtenAt)}, ${review.markdown}, ${encodeHotspots(review.hotspots)}, ${encodeLowAttention(review.lowAttention)}, NULL)
+              ON CONFLICT (owner, repo, number) DO UPDATE SET base = excluded.base, head = excluded.head, written_at = excluded.written_at, markdown = excluded.markdown, hotspots = excluded.hotspots, low_attention = excluded.low_attention, agent_id = NULL`.pipe(
               logStorageFailure,
               Effect.mapError(storageFailure),
             ),
@@ -208,7 +246,7 @@ export class AgentReviews extends Context.Service<
 
           yield* jobs.progress(job, (progress) => ({ ...progress, runner: runner.identity }))
 
-          const { answer } = yield* runner
+          const { input, answer } = yield* runner
             .run({
               pr,
               revision,
@@ -229,6 +267,7 @@ export class AgentReviews extends Context.Service<
             revision,
             writtenAt: yield* DateTime.now,
             markdown: answer.markdown,
+            ...fitToDiff(answer, input.files),
             agentId: null,
           })
         }).pipe(

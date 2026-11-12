@@ -3,10 +3,12 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Item, ItemActions, ItemContent, ItemDescription } from "@/components/ui/item"
-import { AgentReviewMarkdown } from "./AgentReviewPanel"
+import { AgentReviewMarkdown, splitLead } from "./AgentReviewPanel"
 import { Elapsed } from "./Elapsed"
+import { HotspotSummary } from "./Hotspots"
 import { OutdatedNote } from "./OutdatedNote"
 import { ProblemAlert } from "./ProblemAlert"
+import { rankHotspots } from "./rankedHotspots"
 import type { AgentReviewControls } from "./useAgentReview"
 
 export const closedReason = (closedAs: "closed" | "merged") =>
@@ -68,7 +70,11 @@ function ReviewAgain(props: { controls: AgentReviewControls }) {
   )
 }
 
-export function AgentReviewCard(props: { controls: AgentReviewControls; onRead: () => void }) {
+export function AgentReviewCard(props: {
+  controls: AgentReviewControls
+  onRead: () => void
+  onReadHotspot: (rank: number) => void
+}) {
   const { controls, onRead } = props
   const { review } = controls
 
@@ -90,7 +96,15 @@ export function AgentReviewCard(props: { controls: AgentReviewControls; onRead: 
       </CardHeader>
       <CardContent className="space-y-4">
         <AgentReviewStatus controls={controls} />
-        {review !== null && <AgentReviewMarkdown markdown={leadOf(review.markdown)} />}
+        {review !== null && (
+          <>
+            <AgentReviewMarkdown markdown={splitLead(review.markdown).lead} />
+            <HotspotSummary
+              hotspots={rankHotspots(review.hotspots)}
+              onSelect={props.onReadHotspot}
+            />
+          </>
+        )}
       </CardContent>
       {review !== null && (
         <CardFooter>
@@ -175,5 +189,3 @@ function AgentReviewStatus(props: { controls: AgentReviewControls }) {
     </Item>
   )
 }
-
-const leadOf = (markdown: string) => markdown.split(/\n\s*\n/, 1)[0] ?? ""
