@@ -124,11 +124,37 @@ export const pullRequestJobs = Effect.fnUntraced(function* <O, P, F, S, E>(optio
       }),
     )
 
-  const commit = <E2>(job: PullRequestJob<O, P, F>, save: Effect.Effect<void, E2>, output: O) =>
+  /** Saves and settles the job, deriving the new output from the current one so a change made meanwhile survives. */
+  const commit = <E2>(
+    job: PullRequestJob<O, P, F>,
+    save: Effect.Effect<void, E2>,
+    change: (output: O | null) => O,
+  ) =>
     save.pipe(
-      Effect.andThen(SubscriptionRef.set(job.state, { output, run: { status: "idle" } })),
+      Effect.andThen(
+        SubscriptionRef.update(job.state, ({ output }): JobState<O, P, F> => ({
+          output: change(output),
+          run: { status: "idle" },
+        })),
+      ),
       Effect.uninterruptible,
       job.lock.withPermits(1),
+    )
+
+  /** Changes the saved output without touching the run, so a job in progress keeps going. */
+  const amend = <E2>(
+    job: PullRequestJob<O, P, F>,
+    change: (output: O | null) => Effect.Effect<O | null, E2>,
+  ) =>
+    locked(
+      job,
+      Effect.gen(function* () {
+        const { output } = yield* SubscriptionRef.get(job.state)
+        const next = yield* change(output)
+
+        if (next !== output)
+          yield* SubscriptionRef.update(job.state, ({ run }) => ({ output: next, run }))
+      }),
     )
 
   const progress = (job: PullRequestJob<O, P, F>, change: (progress: P) => P) =>
@@ -224,6 +250,7 @@ export const pullRequestJobs = Effect.fnUntraced(function* <O, P, F, S, E>(optio
         discard: true,
       }),
     commit,
+    amend,
     progress,
     settle,
     watch,

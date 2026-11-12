@@ -28,4 +28,5 @@ export const reviewOf = (revision: Revision): AgentReview => ({
   hotspots: [],
   lowAttention: [],
   agentId: null,
+  done: false,
 })

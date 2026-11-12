@@ -27,6 +27,7 @@ export type AgentNeedsYou = typeof AgentNeedsYou.Type
 export const PullRequestNeedsYou = Schema.TaggedStruct("PullRequest", {
   pullRequest: PullRequestSummary,
   reasons: Schema.NonEmptyArray(PullRequestReason),
+  /** The finished Agent review's writtenAt, which also names that review when marking it done. */
   since: Schema.DateTimeUtcFromString,
 })
 
