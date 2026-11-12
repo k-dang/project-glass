@@ -167,6 +167,10 @@ export const describeError = (error: BackendError): Problem =>
         title: "Already settled",
         detail: "That question was answered already, or the wait ended.",
       }),
+      OutsideAgentNotFound: () => ({
+        title: "That agent is already disconnected",
+        detail: "It is no longer in the list of connected outside agents.",
+      }),
       NoPermissionModes: () => ({
         title: "No Permission modes",
         detail: "This Agent's program doesn't take a Permission mode.",

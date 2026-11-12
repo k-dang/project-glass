@@ -25,6 +25,7 @@ const transportOwners = new Set([
   "LocalAgentHost.ts",
   "sandboxCalls.ts",
   "mcp/server.ts",
+  "mcp/oauthHttp.ts",
 ])
 
 const entryPoints = new Set([

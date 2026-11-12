@@ -1,9 +1,33 @@
-import { Context, Deferred, Effect, Layer, Option, Redacted, type Scope } from "effect"
+import {
+  Context,
+  Deferred,
+  Effect,
+  Layer,
+  Match,
+  Option,
+  Redacted,
+  Schema,
+  type Scope,
+} from "effect"
 import { createHash, randomBytes } from "node:crypto"
 
-export interface McpCallerIdentity {
-  readonly conversationId: string
-}
+export class ConversationCaller extends Schema.TaggedClass<ConversationCaller>()("Conversation", {
+  conversationId: Schema.String,
+}) {}
+
+export class OutsideAgentCaller extends Schema.TaggedClass<OutsideAgentCaller>()("OutsideAgent", {
+  sessionId: Schema.String,
+  name: Schema.String,
+}) {}
+
+export type McpCallerIdentity = ConversationCaller | OutsideAgentCaller
+
+export const sessionOf = (caller: McpCallerIdentity) =>
+  Match.value(caller).pipe(
+    Match.tag("Conversation", ({ conversationId }) => conversationId),
+    Match.tag("OutsideAgent", ({ sessionId }) => sessionId),
+    Match.exhaustive,
+  )
 
 export class McpCaller extends Context.Service<McpCaller, McpCallerIdentity>()(
   "@glass/server/McpCaller",
@@ -32,9 +56,9 @@ export class McpCredentials extends Context.Service<
   McpCredentials,
   {
     /** Issues a credential for `caller`, revoked when the scope closes. */
-    readonly issue: (
-      caller: McpCallerIdentity,
-    ) => Effect.Effect<Redacted.Redacted, never, Scope.Scope>
+    readonly issue: (caller: {
+      readonly conversationId: string
+    }) => Effect.Effect<Redacted.Redacted, never, Scope.Scope>
     readonly authenticate: (bearer: Redacted.Redacted) => Option.Option<McpCredential>
     /** The endpoint's URL, once the backend listens. */
     readonly endpoint: Effect.Effect<string>
@@ -56,7 +80,7 @@ export class McpCredentials extends Context.Service<
               const revoked = yield* Deferred.make<void>()
 
               credentialsByDigest.set(key, {
-                caller,
+                caller: new ConversationCaller({ conversationId: caller.conversationId }),
                 ownedSessions: new Set(),
                 revoked: Deferred.await(revoked),
               })

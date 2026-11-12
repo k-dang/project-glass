@@ -47,7 +47,7 @@ import { BackgroundGitHubRequest } from "../github/GitHubRequestPolicy"
 import { FollowedRepositories } from "../FollowedRepositories"
 import { LocalCheckouts } from "../LocalCheckouts"
 import { AskProgress } from "./AskProgress"
-import { McpCaller } from "./McpCredentials"
+import { McpCaller, sessionOf } from "./McpCredentials"
 import { NeedsYou } from "../NeedsYou"
 import {
   ASK_PROGRESS_SECONDS,
@@ -566,13 +566,19 @@ export const GlassToolHandlers = GlassTools.toLayer(
           Effect.gen(function* () {
             const caller = yield* McpCaller.current
 
+            const label = Match.value(caller).pipe(
+              Match.tag("Conversation", () => from ?? null),
+              Match.tag("OutsideAgent", (agent) => from ?? agent.name),
+              Match.exhaustive,
+            )
+
             yield* Effect.forkScoped(waitingProgress)
 
             return yield* outsideQuestions.ask({
               question,
               choices: choices ?? [],
-              session: caller.conversationId,
-              label: from ?? null,
+              session: sessionOf(caller),
+              label,
               timeout: Duration.seconds(timeoutSeconds ?? ASK_TIMEOUT_DEFAULT_SECONDS),
             })
           }),

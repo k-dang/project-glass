@@ -26,6 +26,8 @@ export * from "./followedRepository"
 
 export * from "./needsYou"
 
+export * from "./outsideAgent"
+
 export * from "./pullRequest"
 
 export * from "./pullRequestList"

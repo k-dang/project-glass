@@ -10,7 +10,9 @@ import { BackgroundGitHubRequest } from "./github/GitHubRequestPolicy"
 import { FollowedRepositories } from "./FollowedRepositories"
 import { LocalCheckouts } from "./LocalCheckouts"
 import { NeedsYou } from "./NeedsYou"
+import { OutsideAgents } from "./OutsideAgents"
 import { OutsideQuestions } from "./OutsideQuestions"
+import { McpCredentials } from "./mcp/McpCredentials"
 import { PullRequestLists } from "./PullRequestLists"
 import { PullRequestWorkspaces } from "./PullRequestWorkspaces"
 import { Queue } from "./Queue"
@@ -46,6 +48,8 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
     const localSkills = yield* LocalSkills
     const needsYou = yield* NeedsYou
     const outsideQuestions = yield* OutsideQuestions
+    const outsideAgents = yield* OutsideAgents
+    const mcpCredentials = yield* McpCredentials
 
     return GlassRpcs.of({
       GetSavedPlaces: () => savedPlaces.list(),
@@ -156,6 +160,10 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
         agents.watchWaiting().pipe(Stream.map((waiting) => waiting.map(({ agent }) => agent.id))),
       WatchNeedsYou: () => needsYou.watch(),
       AnswerOutsideQuestion: ({ id, answer }) => outsideQuestions.answer(id, answer),
+      GetMcpEndpoint: () => mcpCredentials.endpoint.pipe(Effect.map((url) => ({ url }))),
+      ListOutsideAgents: () => outsideAgents.list(),
+      RevokeOutsideAgent: ({ id }) =>
+        outsideAgents.revoke(id).pipe(Effect.andThen(outsideAgents.list())),
       ChangeAgentModel: ({ agentId, model, effort }) =>
         agents.changeModel(agentId, { model, effort }),
       ChangePermissionMode: ({ agentId, permissionMode }) =>

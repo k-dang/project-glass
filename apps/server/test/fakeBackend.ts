@@ -7,6 +7,7 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { ASK_TIMEOUT_MAX_SECONDS, OutsideQuestions } from "../src/OutsideQuestions"
+import { GlassMcpTools } from "../src/mcp/server"
 import { serve } from "../src/server"
 import { ServerConfig } from "../src/ServerConfig"
 import { runMain, wideEventsToStdout } from "../src/wideEvents"
@@ -86,7 +87,7 @@ const main = Effect.gen(function* () {
   writeAgentCommands(config.dataDirectory, { claudeCommand, piCommand: bundledPi })
 
   const running = yield* Layer.build(
-    serve(fakeAgentRunners, Layer.empty).pipe(
+    serve(fakeAgentRunners, GlassMcpTools).pipe(
       Layer.provide(ServerConfig.layer),
       Layer.provide(configured),
     ),

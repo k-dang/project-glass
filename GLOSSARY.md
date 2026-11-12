@@ -299,8 +299,13 @@ An Agent asking the user to choose between options or answer in their own words,
 transcript until they answer.
 An Agent with a Permission request or Question waiting is marked in the Agents list and listed in
 Needs you.
-An agent outside Glass can ask through Glass's MCP endpoint. That question waits in the Inbox,
-under Stopped on you, until the user answers or the wait ends.
+An agent outside Glass can ask through Glass's MCP endpoint after the user approves it. That
+question waits in the Inbox, under Stopped on you, until the user answers or the wait ends.
+
+**Outside agent**:
+An agent Glass did not launch. The user approves it once, and it can then use Glass's MCP tools
+on this computer, including asking a question. It is not a conversation Glass started.
+_Avoid_: Session, client, login
 
 ### Identity
 
