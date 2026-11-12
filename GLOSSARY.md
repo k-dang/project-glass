@@ -15,6 +15,8 @@ Agents. Visiting Settings or Activity leaves every Saved place unchanged.
 **Needs you**:
 The Agents and queued PRs waiting on the user now. They live in the Inbox,
 grouped by why they are waiting, with their count on the Inbox rail link in every area.
+A queued PR waits once its Agent review is finished, until the user marks that Agent review done;
+writing it again puts the PR back.
 The Dashboard shows that count once Needs you has loaded, and links to the Inbox.
 While it is loading or the stream has failed, the count stays off the Dashboard, the Inbox header, and the rail.
 

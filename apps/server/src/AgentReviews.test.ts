@@ -11,7 +11,7 @@ import {
   acceptedSuggestedDraftOf,
   type Turn,
 } from "@glass/contracts"
-import { Clock, Effect, Exit, Option, Predicate, Scope, Stream } from "effect"
+import { Clock, DateTime, Effect, Exit, Option, Predicate, Scope, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { existsSync, mkdirSync, readdirSync } from "node:fs"
 import { join } from "node:path"
@@ -301,6 +301,25 @@ it.live("cancels a running review, removing its checkout, and replaces the last 
 
     const replaced = yield* f.state((state) => reviewed(state) && state.review !== first)
     assert.strictEqual(replaced.review?.markdown, replacement.markdown)
+  }),
+)
+
+it.live("marks only the Agent review it names done, keeping that across restarts", () =>
+  Effect.gen(function* () {
+    const f = yield* fixture()
+    yield* f.start
+    const { writtenAt } = (yield* f.state(reviewed)).review!
+
+    yield* f.client.MarkAgentReviewDone({
+      pullRequest: f.ref,
+      writtenAt: DateTime.subtract(writtenAt, { minutes: 1 }),
+    })
+    assert.isFalse((yield* f.state(() => true)).review?.done)
+
+    yield* f.client.MarkAgentReviewDone({ pullRequest: f.ref, writtenAt })
+    const done = (yield* f.state((state) => state.review?.done === true)).review!
+
+    assert.deepStrictEqual((yield* f.restart).review, done)
   }),
 )
 

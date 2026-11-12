@@ -77,6 +77,7 @@ const stored = Schema.Array(
     hotspots: HotspotsJson,
     low_attention: LowAttentionJson,
     agent_id: Schema.NullOr(Schema.String),
+    done: Schema.BooleanFromBit,
   }),
 )
 
@@ -150,6 +151,10 @@ export class AgentReviews extends Context.Service<
       message: string,
     ) => Effect.Effect<void, AgentReviewFailure>
     readonly cancel: (pr: PullRequestRef) => Effect.Effect<void>
+    readonly markDone: (
+      pr: PullRequestRef,
+      writtenAt: DateTime.Utc,
+    ) => Effect.Effect<void, AgentReviewFailure>
     readonly cancelBackground: () => Effect.Effect<void>
     readonly watch: (pr: PullRequestRef) => Stream.Stream<AgentReviewState, AgentReviewFailure>
   }
@@ -173,7 +178,7 @@ export class AgentReviews extends Context.Service<
       const load = Effect.fnUntraced(
         function* (pr: PullRequestRef) {
           const rows =
-            yield* sql`SELECT base, head, written_at, markdown, hotspots, low_attention, agent_id FROM agent_reviews WHERE ${where(pr)}`.pipe(
+            yield* sql`SELECT base, head, written_at, markdown, hotspots, low_attention, agent_id, done FROM agent_reviews WHERE ${where(pr)}`.pipe(
               Effect.flatMap(Schema.decodeUnknownEffect(stored)),
             )
 
@@ -189,6 +194,7 @@ export class AgentReviews extends Context.Service<
                   hotspots: row.hotspots,
                   lowAttention: row.low_attention,
                   agentId: row.agent_id,
+                  done: row.done,
                 })
 
           return review
@@ -215,13 +221,13 @@ export class AgentReviews extends Context.Service<
 
           yield* jobs.commit(
             job,
-            sql`INSERT INTO agent_reviews (owner, repo, number, base, head, written_at, markdown, hotspots, low_attention, agent_id)
-              VALUES (${pr.owner}, ${pr.repo}, ${pr.number}, ${review.revision.base}, ${review.revision.head}, ${DateTime.formatIso(review.writtenAt)}, ${review.markdown}, ${encodeHotspots(review.hotspots)}, ${encodeLowAttention(review.lowAttention)}, NULL)
-              ON CONFLICT (owner, repo, number) DO UPDATE SET base = excluded.base, head = excluded.head, written_at = excluded.written_at, markdown = excluded.markdown, hotspots = excluded.hotspots, low_attention = excluded.low_attention, agent_id = NULL`.pipe(
+            sql`INSERT INTO agent_reviews (owner, repo, number, base, head, written_at, markdown, hotspots, low_attention, agent_id, done)
+              VALUES (${pr.owner}, ${pr.repo}, ${pr.number}, ${review.revision.base}, ${review.revision.head}, ${DateTime.formatIso(review.writtenAt)}, ${review.markdown}, ${encodeHotspots(review.hotspots)}, ${encodeLowAttention(review.lowAttention)}, NULL, 0)
+              ON CONFLICT (owner, repo, number) DO UPDATE SET base = excluded.base, head = excluded.head, written_at = excluded.written_at, markdown = excluded.markdown, hotspots = excluded.hotspots, low_attention = excluded.low_attention, agent_id = NULL, done = 0`.pipe(
               logStorageFailure,
               Effect.mapError(storageFailure),
             ),
-            review,
+            () => review,
           )
 
           yield* removeAgent(replaced).pipe(Effect.forkIn(scope))
@@ -269,6 +275,7 @@ export class AgentReviews extends Context.Service<
             markdown: answer.markdown,
             ...fitToDiff(answer, input.files),
             agentId: null,
+            done: false,
           })
         }).pipe(
           Effect.scoped,
@@ -346,7 +353,7 @@ export class AgentReviews extends Context.Service<
                   logStorageFailure,
                   Effect.mapError(storageFailure),
                 ),
-                { ...review, agentId: agent.id },
+                (current) => ({ ...(current ?? review), agentId: agent.id }),
               )
               .pipe(Effect.onError(() => removeAgent(agent.id)))
           }),
@@ -444,11 +451,37 @@ export class AgentReviews extends Context.Service<
           )
       })
 
+      const markDone = Effect.fn("AgentReviews.markDone")(function* (
+        pr: PullRequestRef,
+        writtenAt: DateTime.Utc,
+      ) {
+        const job = yield* jobs.jobFor(pr)
+
+        yield* jobs.amend(job, (review) =>
+          Effect.gen(function* () {
+            if (
+              review === null ||
+              review.done ||
+              !DateTime.Equivalence(review.writtenAt, writtenAt)
+            )
+              return review
+
+            yield* sql`UPDATE agent_reviews SET done = 1 WHERE ${where(pr)}`.pipe(
+              logStorageFailure,
+              Effect.mapError(storageFailure),
+            )
+
+            return { ...review, done: true }
+          }),
+        )
+      })
+
       return AgentReviews.of({
         start,
         startInBackground,
         followUp,
         cancel: jobs.stop,
+        markDone,
         cancelBackground: jobs.stopBackground,
         watch: jobs.watch,
       })
