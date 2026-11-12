@@ -384,6 +384,6 @@ it.live("lists an Agent review's Follow-up Agent while its request waits", () =>
 
     assert.strictEqual(requestsOf(listed, agentId)[0]?._tag, "PermissionRequest")
     const agents = yield* f.client.WatchAgents().pipe(Stream.runHead, Effect.map(Option.getOrThrow))
-    assert.isFalse(agents.some(({ id }) => id === agentId))
+    assert.isTrue(agents.some(({ id, forReview }) => id === agentId && forReview))
   }),
 )

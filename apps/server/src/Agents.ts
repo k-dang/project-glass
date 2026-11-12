@@ -113,6 +113,7 @@ const toRow = (
 ): PlacedAgent => ({
   agent: new Agent({
     ...agent,
+    forReview,
     skillPacks,
     place:
       sandboxProvider === null ? localPlace : SandboxPlace.make({ providerId: sandboxProvider }),
@@ -492,6 +493,7 @@ export class Agents extends Context.Service<
           localSkills: false,
           createdAt: yield* DateTime.now,
           sandbox: null,
+          forReview: true,
         })
 
         return yield* insert(
@@ -767,12 +769,7 @@ export class Agents extends Context.Service<
       )
 
       return Agents.of({
-        watch: () =>
-          placed.pipe(
-            Stream.map((current) =>
-              current.flatMap(({ agent, forReview }) => (forReview ? [] : [agent])),
-            ),
-          ),
+        watch: () => placed.pipe(Stream.map((current) => current.map(({ agent }) => agent))),
         transcript: (agentId) =>
           Stream.unwrap(find(agentId).pipe(Effect.as(transcripts.watch(agentId)))),
         readTranscript: (agentId) => find(agentId).pipe(Effect.andThen(transcripts.read(agentId))),

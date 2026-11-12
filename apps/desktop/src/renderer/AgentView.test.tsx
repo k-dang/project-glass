@@ -147,6 +147,31 @@ it("sends Markdown and HTML exactly as written", async () => {
   expect(sent).toEqual(["Rename `foo_bar` in **<App>** *now*"])
 })
 
+it("opens a Follow-up Agent and keeps it out of the Agents list", async () => {
+  const reviewAgent = new Agent({
+    ...agentFields,
+    id: "review-agent",
+    name: "agent/review-hare",
+    forReview: true,
+  })
+
+  mount(
+    {
+      WatchAgents: () => Stream.make([agent, reviewAgent]),
+      WatchTranscript: () =>
+        Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
+    },
+    "/agents/review-agent",
+  )
+
+  expect(await screen.findByRole("heading", { name: reviewAgent.name })).toBeTruthy()
+  expect(
+    screen.queryByText("This Agent is gone. Pick another Agent or start a new one."),
+  ).toBeNull()
+  expect(screen.queryByRole("link", { name: reviewAgent.name })).toBeNull()
+  expect(screen.getByRole("link", { name: agent.name })).toBeTruthy()
+})
+
 it("keeps the hidden panel recoverable across Agent navigation", async () => {
   const user = mount(
     {

@@ -365,7 +365,10 @@ it.live("starts the review's Agent in a checkout of its Revision, sending it eve
     assert.deepStrictEqual(texts(turns[1]), ["Reply to: And the rename?"])
 
     const listed = yield* f.client.WatchAgents().pipe(Stream.runHead)
-    assert.deepStrictEqual(Option.getOrThrow(listed), [])
+    const agents = Option.getOrThrow(listed)
+    assert.strictEqual(agents.length, 1)
+    assert.strictEqual(agents[0]?.id, agentId)
+    assert.strictEqual(agents[0]?.forReview, true)
     assert.deepStrictEqual(yield* f.restart, started)
   }),
 )
