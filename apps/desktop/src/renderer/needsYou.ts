@@ -9,13 +9,6 @@ export const needsYouStreamAtom = backendRuntime
   .atom(Stream.unwrap(Backend.useSync((backend) => backend.WatchNeedsYou())))
   .pipe(Atom.keepAlive)
 
-export const watchedNeedsYouAtom = Atom.make((get) => {
-  get(watchedListingsAtom)
-  get(queueRefreshAtom)
-
-  return get(needsYouStreamAtom)
-})
-
 type NeedsYouFailure = BackendError | Cause.NoSuchElementError
 
 export type NeedsYouStatus = Data.TaggedEnum<{
@@ -26,15 +19,32 @@ export type NeedsYouStatus = Data.TaggedEnum<{
 
 export const NeedsYouStatus = Data.taggedEnum<NeedsYouStatus>()
 
-export const needsYouStatus = (
-  result: AsyncResult.AsyncResult<ReadonlyArray<NeedsYouItem>, NeedsYouFailure>,
-): NeedsYouStatus => {
-  if (AsyncResult.isSuccess(result)) return NeedsYouStatus.Ready({ items: result.value })
+const listingsSettled = (listings: AsyncResult.AsyncResult<unknown, BackendError>) =>
+  AsyncResult.isSuccess(listings) ||
+  (AsyncResult.isFailure(listings) && Option.isSome(listings.previousSuccess))
 
-  if (AsyncResult.isFailure(result)) return NeedsYouStatus.Failed({ cause: result.cause })
+export const needsYouStatus = (
+  needsYou: AsyncResult.AsyncResult<ReadonlyArray<NeedsYouItem>, NeedsYouFailure>,
+  listings: AsyncResult.AsyncResult<unknown, BackendError>,
+): NeedsYouStatus => {
+  if (AsyncResult.isFailure(needsYou)) return NeedsYouStatus.Failed({ cause: needsYou.cause })
+
+  if (AsyncResult.isFailure(listings) && Option.isNone(listings.previousSuccess)) {
+    return NeedsYouStatus.Failed({ cause: listings.cause })
+  }
+
+  if (AsyncResult.isSuccess(needsYou) && listingsSettled(listings)) {
+    return NeedsYouStatus.Ready({ items: needsYou.value })
+  }
 
   return NeedsYouStatus.Loading()
 }
+
+export const watchedNeedsYouAtom = Atom.make((get): NeedsYouStatus => {
+  get(queueRefreshAtom)
+
+  return needsYouStatus(get(needsYouStreamAtom), get(watchedListingsAtom))
+})
 
 export const needsYouCount = (status: NeedsYouStatus): Option.Option<number> =>
   NeedsYouStatus.$match(status, {

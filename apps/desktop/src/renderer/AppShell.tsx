@@ -21,7 +21,7 @@ import { ConfirmationDialog } from "./ConfirmationDialog"
 import { globalConversationOpenAtom } from "./globalConversation"
 import { GlobalConversationDialog } from "./GlobalConversationDialog"
 import { NeedsYouBadge } from "./NeedsYou"
-import { needsYouCount as countOf, needsYouStatus, watchedNeedsYouAtom } from "./needsYou"
+import { needsYouCount as countOf, watchedNeedsYouAtom } from "./needsYou"
 import { confirmLeave, discardPromptAtom, leavesPullRequest, reviewsLinkAtom } from "./reviewsArea"
 import { ConnectionAvatar } from "./Settings"
 import { ResourceUsage } from "./ResourceUsage"
@@ -76,7 +76,7 @@ export function AppShell() {
   const navigate = useNavigate()
   const [conversing, setConversing] = useAtom(globalConversationOpenAtom)
   const needsYouBadgeId = useId()
-  const needsYouCount = countOf(needsYouStatus(useAtomValue(watchedNeedsYouAtom)))
+  const needsYouCount = countOf(useAtomValue(watchedNeedsYouAtom))
 
   useShortcuts([
     ...areas.map(({ link }, index) => ({

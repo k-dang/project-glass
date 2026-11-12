@@ -5,23 +5,27 @@ import {
   AgentNeedsYou,
   AgentReviewFinished,
   AllowRequest,
+  ConnectionError,
   Discussions,
   GitHubConnection,
   type NeedsYou,
+  noListings,
   PermissionRequestPart,
   PullRequest,
+  type PullRequestListings,
   PullRequestNeedsYou,
   PullRequestRef,
   PullRequestSummary,
   PullRequestWorkspace,
   type RequestAnswer,
   ReviewRequested,
+  SettingsError,
   WaitingRequests,
 } from "@glass/contracts"
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react"
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { Cause, DateTime, Effect, Stream, SubscriptionRef } from "effect"
-import { afterEach, expect, it } from "vite-plus/test"
+import { afterEach, expect, it, vi } from "vite-plus/test"
 import { App } from "./App"
 import { reviewOf } from "../../test/agentReview"
 import { agent, agentFields } from "../../test/agent"
@@ -131,6 +135,10 @@ const mount = (
   return userEvent.setup()
 }
 
+type ListCall = Held<void, PullRequestListings, ConnectionError | SettingsError>
+
+const waitLabels = () => screen.getAllByRole("time").map((time) => time.textContent ?? "")
+
 const articleOf = (name: string) => {
   const article = screen.getByRole("heading", { name }).closest("article")
 
@@ -141,6 +149,7 @@ const articleOf = (name: string) => {
 
 afterEach(() => {
   cleanup()
+  vi.useRealTimers()
   window.history.replaceState(null, "", "#/")
 })
 
@@ -192,6 +201,80 @@ it("shows a failed Needs you as a failure, not an empty Inbox", async () => {
   expect(screen.queryByText("Nothing needs you right now.")).toBeNull()
   expect(screen.queryByRole("heading", { name: "Inbox 0" })).toBeNull()
   expect(screen.queryByRole("link", { name: "Needs you 0" })).toBeNull()
+})
+
+it("waits for the first pull request load before calling Needs you empty", async () => {
+  const loads: Array<ListCall> = []
+  const user = mount(needsYouRef([]), { ListPullRequests: hold(loads) }, "/")
+
+  const dashboard = await screen.findByRole("main", { name: "Dashboard" })
+  expect(within(dashboard).getByRole("link", { name: "Needs you" })).toBeTruthy()
+  expect(within(dashboard).queryByRole("link", { name: "Needs you 0" })).toBeNull()
+
+  await user.click(screen.getByRole("link", { name: "Inbox" }))
+
+  expect(await screen.findByText("Loading what needs you…")).toBeTruthy()
+  expect(screen.queryByText("Nothing needs you right now.")).toBeNull()
+  expect(screen.queryByRole("heading", { name: "Inbox 0" })).toBeNull()
+
+  ;(await next(loads)).answer(Effect.succeed(noListings))
+
+  expect(await screen.findByRole("heading", { name: "Inbox 0" })).toBeTruthy()
+  expect(screen.getAllByText("Nothing needs you right now.").length).toBeGreaterThan(0)
+
+  await user.click(screen.getByRole("link", { name: "Dashboard" }))
+
+  expect(
+    within(await screen.findByRole("main", { name: "Dashboard" })).getByRole("link", {
+      name: "Needs you 0",
+    }),
+  ).toBeTruthy()
+})
+
+it("shows a failed pull request load as a failed Needs you", async () => {
+  const user = mount(
+    needsYouRef([]),
+    {
+      ListPullRequests: () =>
+        Effect.fail(new SettingsError({ message: "Couldn't read pull requests" })),
+    },
+    "/",
+  )
+
+  const dashboard = await screen.findByRole("main", { name: "Dashboard" })
+  expect(within(dashboard).queryByRole("link", { name: "Needs you 0" })).toBeNull()
+  expect(within(dashboard).getByRole("link", { name: "Needs you" })).toBeTruthy()
+
+  await user.click(screen.getByRole("link", { name: "Inbox" }))
+
+  expect(await screen.findByRole("alert")).toBeTruthy()
+  expect(screen.getByText("Couldn't read pull requests")).toBeTruthy()
+  expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy()
+  expect(screen.queryByText("Nothing needs you right now.")).toBeNull()
+  expect(screen.queryByRole("heading", { name: "Inbox 0" })).toBeNull()
+})
+
+it("advances the wait while the Inbox stays open", async () => {
+  vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] })
+  const openedAt = DateTime.nowUnsafe()
+
+  const fresh = PullRequestNeedsYou.make({
+    pullRequest: summary(ref, "Retry flaky upload", false, openedAt),
+    reasons: [ReviewRequested.make({})],
+    since: openedAt,
+  })
+
+  mount(needsYouRef([fresh]))
+
+  expect(await screen.findByText(/Updated now/)).toBeTruthy()
+  expect(waitLabels().some((text) => text.includes("now"))).toBe(true)
+
+  await act(() => vi.advanceTimersByTimeAsync(60_000))
+
+  expect(screen.getByText(/Updated 1m/)).toBeTruthy()
+  expect(screen.queryByText(/Updated now/)).toBeNull()
+  expect(waitLabels().every((text) => text.includes("1m"))).toBe(true)
+  expect(waitLabels().some((text) => text.includes("now"))).toBe(false)
 })
 
 it("groups Agents, review requests, and finished reviews, and labels a draft", async () => {

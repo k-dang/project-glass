@@ -10,18 +10,18 @@ import { Link, useNavigate } from "@tanstack/react-router"
 import { cn } from "cn"
 import { DateTime, Match, Option, Predicate } from "effect"
 import { GitPullRequest, Sparkles } from "lucide-react"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Kbd } from "@/components/ui/kbd"
 import { AgentRequest, answerRequestAtom } from "./agentsArea"
 import { agentConversation, ConversationContext } from "./conversation"
 import {
   needsYouCount,
   needsYouKey,
-  needsYouStatus,
   NeedsYouStatus,
   needsYouStreamAtom,
   watchedNeedsYouAtom,
 } from "./needsYou"
+import { watchedListingsAtom } from "./pullRequestLists"
 import { ProblemAlert } from "./ProblemAlert"
 import { streamProblem } from "./problems"
 import { ago } from "./PullRequestRow"
@@ -126,6 +126,20 @@ const titleOf = (item: NeedsYouItem) =>
     Agent: ({ agent }) => agent.name,
     PullRequest: ({ pullRequest }) => pullRequest.title,
   })
+
+const minute = 60_000
+
+function useMinuteClock() {
+  const [now, setNow] = useState(() => new Date())
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), minute)
+
+    return () => window.clearInterval(timer)
+  }, [])
+
+  return now
+}
 
 function Waited(props: { since: DateTime.Utc; now: Date }) {
   const since = DateTime.toDateUtc(props.since)
@@ -252,8 +266,16 @@ function InboxPane(props: {
 }
 
 export function Inbox() {
-  const status = needsYouStatus(useAtomValue(watchedNeedsYouAtom))
-  const retry = useAtomRefresh(needsYouStreamAtom)
+  const status = useAtomValue(watchedNeedsYouAtom)
+  const now = useMinuteClock()
+  const refreshNeedsYou = useAtomRefresh(needsYouStreamAtom)
+  const refreshListings = useAtomRefresh(watchedListingsAtom)
+
+  const retry = () => {
+    refreshNeedsYou()
+    refreshListings()
+  }
+
   const navigate = useNavigate()
   const markReview = useAtomSet(readAgentReviewOnOpenAtom)
 
@@ -272,8 +294,6 @@ export function Inbox() {
     order,
     keys,
   })
-
-  const [now] = useState(() => new Date())
 
   if (seen.order !== order) {
     const resolved = nextRemaining(seen.keys, picked, keys)

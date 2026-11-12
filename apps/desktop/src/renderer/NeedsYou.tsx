@@ -1,10 +1,10 @@
 import { useAtomValue } from "@effect/atom-react"
 import { Link } from "@tanstack/react-router"
 import { Option } from "effect"
-import { needsYouCount, needsYouStatus, watchedNeedsYouAtom } from "./needsYou"
+import { needsYouCount, watchedNeedsYouAtom } from "./needsYou"
 
 export function NeedsYouSummary() {
-  const count = needsYouCount(needsYouStatus(useAtomValue(watchedNeedsYouAtom)))
+  const count = needsYouCount(useAtomValue(watchedNeedsYouAtom))
 
   const label = Option.match(count, {
     onNone: () => "Needs you",
@@ -25,7 +25,7 @@ export function NeedsYouSummary() {
 }
 
 export function NeedsYouBadge(props: { id: string }) {
-  const count = needsYouCount(needsYouStatus(useAtomValue(watchedNeedsYouAtom)))
+  const count = needsYouCount(useAtomValue(watchedNeedsYouAtom))
 
   if (Option.isNone(count) || count.value === 0) return null
 
