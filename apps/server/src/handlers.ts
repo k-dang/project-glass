@@ -61,6 +61,8 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       FollowUpAgentReview: ({ pullRequest, revision, message }) =>
         agentReviews.followUp(pullRequest, revision, message),
       CancelAgentReview: ({ pullRequest }) => agentReviews.cancel(pullRequest),
+      MarkAgentReviewDone: ({ pullRequest, writtenAt }) =>
+        agentReviews.markDone(pullRequest, writtenAt),
       Ask: ({ pullRequest, revision, place, question }) =>
         asks.ask(pullRequest, revision, place, question),
       WatchAgentReview: ({ pullRequest }) => agentReviews.watch(pullRequest),

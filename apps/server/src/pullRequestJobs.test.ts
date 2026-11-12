@@ -52,7 +52,7 @@ it.live("replaces work that waits to commit while the replacement holds the lock
       replace(
         progress,
         Deferred.await(replacing).pipe(
-          Effect.andThen(jobs.commit(job, Effect.void, "first")),
+          Effect.andThen(jobs.commit(job, Effect.void, () => "first")),
           Effect.onInterrupt(() => Deferred.succeed(first, undefined)),
         ),
       ),
@@ -62,7 +62,10 @@ it.live("replaces work that waits to commit while the replacement holds the lock
       Effect.gen(function* () {
         yield* Deferred.succeed(replacing, undefined)
         yield* Effect.yieldNow
-        yield* replace(progress, jobs.commit(job, Effect.void, "second"))
+        yield* replace(
+          progress,
+          jobs.commit(job, Effect.void, () => "second"),
+        )
       }),
     )
 

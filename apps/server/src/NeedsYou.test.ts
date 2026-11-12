@@ -245,6 +245,27 @@ it.live("drops a queued PR once it leaves the Queue or the user submits a Review
   }),
 )
 
+it.live("drops a PR the user marks done until its Agent review is written again", () =>
+  Effect.gen(function* () {
+    const f = yield* reviewsFixture()
+    const pr = f.seed("Greet")
+    yield* f.client.AddToQueue({ references: [ref(pr)] })
+    const first = (yield* f.review(pr)).review!
+    yield* needsYou(f.client, (items) => titles(items).length === 1)
+
+    yield* f.client.MarkAgentReviewDone({ pullRequest: ref(pr), writtenAt: first.writtenAt })
+    yield* needsYou(f.client, (items) => titles(items).length === 0)
+
+    yield* f.client.StartAgentReview({ pullRequest: ref(pr), revision: revisionOf(pr) })
+    yield* f.reviewState(
+      pr,
+      (state) => reviewed(state) && !DateTime.Equivalence(state.review!.writtenAt, first.writtenAt),
+    )
+
+    assert.deepStrictEqual(titles(yield* current(f.client)), ["Greet"])
+  }),
+)
+
 it.live("lists a queued draft with a finished Agent review, but not a closed or merged PR", () =>
   Effect.gen(function* () {
     const f = yield* reviewsFixture()

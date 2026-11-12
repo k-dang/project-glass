@@ -185,7 +185,7 @@ export class Tours extends Context.Service<
               logStorageFailure,
               Effect.mapError(storageFailure),
             ),
-            tour,
+            () => tour,
           )
         }).pipe(
           Effect.scoped,

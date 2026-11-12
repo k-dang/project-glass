@@ -94,7 +94,7 @@ export class NeedsYou extends Context.Service<
           Stream.map((state): FinishedAgentReview | null => {
             const review = finishedReview(state)
 
-            return review === null ? null : { pullRequest, since: review.writtenAt }
+            return review === null || review.done ? null : { pullRequest, since: review.writtenAt }
           }),
           Stream.catch((cause) =>
             Stream.fromEffect(

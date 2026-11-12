@@ -265,7 +265,7 @@ const outsideQuestion = OutsideQuestion.make({
   since: ago({ minutes: 1 }),
 })
 
-it("answers an outside question in Stopped on you and still moves with j and k", async () => {
+it("answers an outside question in Stopped on you", async () => {
   const answers: Array<{ id: string; answer: OutsideQuestionAnswer }> = []
   const needsYou = needsYouRef([outsideQuestion, finishedReview])
 
@@ -280,13 +280,6 @@ it("answers an outside question in Stopped on you and still moves with j and k",
 
   await user.keyboard("{Enter}")
   expect(window.location.hash).toBe("#/inbox")
-
-  await user.keyboard("j")
-  expect(
-    screen.getByRole("button", { name: /Retry flaky upload/ }).getAttribute("aria-current"),
-  ).toBe("true")
-  await user.keyboard("k")
-  expect(row.getAttribute("aria-current")).toBe("true")
 
   const pane = within(articleOf("Ship the retry change?"))
   await user.click(pane.getByRole("radio", { name: "Ship it" }))
@@ -317,7 +310,7 @@ it("sends a typed answer when an outside question has no choices", async () => {
   expect(answers).toEqual([{ id: "ask-2", answer: OutsideText.make({ text: "Not yet" }) }])
 })
 
-it("moves with j and k, opens a pull request with Enter, and allows with a", async () => {
+it("allows with a, and opens the clicked pull request with Enter", async () => {
   const answers: Array<{ agentId: string; requestId: string; answer: RequestAnswer }> = []
   const opened: Array<Held<{ readonly pullRequest: PullRequestRef }, never, never>> = []
 
@@ -329,43 +322,37 @@ it("moves with j and k, opens a pull request with Enter, and allows with a", asy
   const agentRow = await screen.findByRole("button", { name: /agent\/swift-otter/ })
   expect(agentRow.getAttribute("aria-current")).toBe("true")
 
-  await user.keyboard("j")
-  const pullRequest = screen.getByRole("button", { name: /Retry flaky upload/ })
-  expect(pullRequest.getAttribute("aria-current")).toBe("true")
-  expect(agentRow.getAttribute("aria-current")).toBeNull()
-
-  await user.keyboard("k")
-  expect(agentRow.getAttribute("aria-current")).toBe("true")
-
   await user.keyboard("a")
   expect(answers).toEqual([
     { agentId: agent.id, requestId: "bash-1", answer: AllowRequest.make({}) },
   ])
 
-  await user.keyboard("j")
+  await user.click(screen.getByRole("button", { name: /Retry flaky upload/ }))
   await user.keyboard("{Enter}")
 
   expect((await next(opened)).payload.pullRequest).toEqual(ref)
   expect(window.location.hash).toBe("#/reviews/octo-org/glass/42")
 })
 
-it("opens the row j moved to after a click", async () => {
-  const opened: Array<Held<{ readonly pullRequest: PullRequestRef }, never, never>> = []
+it("marks a finished Agent review done with Done or e, naming the review it saw", async () => {
+  const done: Array<{ readonly pullRequest: PullRequestRef; readonly writtenAt: DateTime.Utc }> = []
 
-  const user = mount(needsYouRef([waitingAgent, finishedReview]), {
-    LoadPullRequest: hold(opened),
+  const user = mount(needsYouRef([finishedReview, finishedDraft]), {
+    MarkAgentReviewDone: (payload) => Effect.sync(() => void done.push(payload)),
   })
 
-  await user.click(await screen.findByRole("button", { name: /agent\/swift-otter/ }))
-  await user.keyboard("j")
-  expect(
-    screen.getByRole("button", { name: /Retry flaky upload/ }).getAttribute("aria-current"),
-  ).toBe("true")
+  await user.click(await screen.findByRole("button", { name: /Retry flaky upload/ }))
+  await user.click(within(articleOf("Retry flaky upload")).getByRole("button", { name: "Done" }))
 
-  await user.keyboard("{Enter}")
+  await user.click(screen.getByRole("button", { name: /Sketch the empty state/ }))
+  await user.keyboard("e")
 
-  expect(window.location.hash).toBe("#/reviews/octo-org/glass/42")
-  expect((await next(opened)).payload.pullRequest).toEqual(ref)
+  await waitFor(() =>
+    expect(done).toEqual([
+      { pullRequest: ref, writtenAt: finishedReview.since },
+      { pullRequest: draftRef, writtenAt: finishedDraft.since },
+    ]),
+  )
 })
 
 it("opens the pull request and offers its finished Agent review", async () => {
@@ -459,18 +446,7 @@ it("leaves Enter on a focused button or link to that control", async () => {
     ...reviewHandlers,
   })
 
-  const allow = await screen.findByRole("button", { name: "Allow" })
-  allow.focus()
-  await user.keyboard("j")
-  expect(
-    screen.getByRole("button", { name: /Retry flaky upload/ }).getAttribute("aria-current"),
-  ).toBe("true")
-  await user.keyboard("k")
-  expect(
-    screen.getByRole("button", { name: /agent\/swift-otter/ }).getAttribute("aria-current"),
-  ).toBe("true")
-
-  screen.getByRole("button", { name: "Allow" }).focus()
+  ;(await screen.findByRole("button", { name: "Allow" })).focus()
   await user.keyboard("{Enter}")
   expect(answers).toEqual([
     { agentId: agent.id, requestId: "bash-1", answer: AllowRequest.make({}) },

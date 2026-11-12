@@ -36,6 +36,7 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         StartAgentReview: unused,
         FollowUpAgentReview: unused,
         CancelAgentReview: unused,
+        MarkAgentReviewDone: unused,
         WatchAgentReview: () => Stream.make({ review: null, job: { status: "idle" } }),
         Ask: unused,
         GetReviewPrompt: unused,

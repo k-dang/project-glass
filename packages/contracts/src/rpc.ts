@@ -123,6 +123,11 @@ export class GlassRpcs extends RpcGroup.make(
     payload: { pullRequest: PullRequestRef },
     error: AgentReviewFailure,
   }),
+  /** Marks the Agent review written at writtenAt done; a newer one is left as it is. */
+  Rpc.make("MarkAgentReviewDone", {
+    payload: { pullRequest: PullRequestRef, writtenAt: Schema.DateTimeUtcFromString },
+    error: AgentReviewFailure,
+  }),
   Rpc.make("WatchAgentReview", {
     payload: { pullRequest: PullRequestRef },
     success: AgentReviewState,
