@@ -7,6 +7,7 @@ import type {
   PullRequestWorkspace,
   Revision,
 } from "@glass/contracts"
+import { referenceKey } from "@glass/contracts"
 import { cn } from "cn"
 import {
   ChevronRight,
@@ -64,7 +65,12 @@ import { RepositoryBrowser } from "./RepositoryBrowser"
 import { FinishReview } from "./FinishReview"
 import { OpenPullRequestDialog } from "./OpenPullRequestDialog"
 import { closedAs, StatusChips } from "./PullRequestStatus"
-import { type ChangesOrder, type WorkspaceTab, workspaceViewAtom } from "./reviewsArea"
+import {
+  type ChangesOrder,
+  readAgentReviewOnOpenAtom,
+  type WorkspaceTab,
+  workspaceViewAtom,
+} from "./reviewsArea"
 import { ShortSha } from "./shortSha"
 import type { AskStore } from "./useAsks"
 import { type DraftStore, useDraftCount, useDraftsLocked } from "./useDrafts"
@@ -128,7 +134,22 @@ export function Workspace(props: {
   const view = useRef<ViewHandle>(null)
   const tourView = useRef<TourViewHandle>(null)
   const [panelTab, setPanelTab] = useState<FilePanelTab>("tree")
-  const [reviewOpen, setReviewOpen] = useState(false)
+  const [pendingReview, setPendingReview] = useAtom(readAgentReviewOnOpenAtom)
+  const opensReview = pendingReview === referenceKey(pullRequest.ref)
+  const [reviewOpen, setReviewOpen] = useState(opensReview)
+
+  if (opensReview) {
+    setPendingReview(null)
+
+    if (!reviewOpen) setReviewOpen(true)
+
+    setView((previous) =>
+      previous.tab === "changes" && previous.order === "path"
+        ? previous
+        : { ...previous, tab: "changes", order: "path" },
+    )
+  }
+
   const fullFiles = useFullFiles(pullRequest.ref, revision)
   const { activity, drafts, asks, replies, resolutions, reactions } = props
   const draftCount = useDraftCount(drafts)

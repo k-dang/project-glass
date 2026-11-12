@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   GitPullRequest,
   History,
+  Inbox,
   ListTodo,
   LoaderCircle,
   type LucideIcon,
@@ -41,6 +42,7 @@ function useAreas(): ReadonlyArray<Area> {
 
   return [
     { label: "Dashboard", icon: LayoutDashboard, link: { to: "/dashboard" } },
+    { label: "Inbox", icon: Inbox, link: { to: "/inbox" } },
     { label: "Reviews", icon: GitPullRequest, link: reviewsLink },
     { label: "To-dos", icon: ListTodo, link: { to: "/to-dos" } },
     { label: "Agents", icon: Sparkles, link: { to: "/agents" } },
@@ -116,13 +118,13 @@ export function AppShell() {
                   activeOptions={{ includeSearch: false }}
                   aria-label={label}
                   aria-describedby={
-                    label === "Dashboard" && needsYouCount > 0 ? needsYouBadgeId : undefined
+                    label === "Inbox" && needsYouCount > 0 ? needsYouBadgeId : undefined
                   }
                   aria-keyshortcuts={`Meta+${index + 1} Control+${index + 1}`}
                   className={cn(railLink, label === "Settings" && "mt-auto")}
                 >
                   <Icon className="size-4" aria-hidden />
-                  {label === "Dashboard" && <NeedsYouBadge id={needsYouBadgeId} />}
+                  {label === "Inbox" && <NeedsYouBadge id={needsYouBadgeId} />}
                 </Link>
               </TooltipHint>
             ))}

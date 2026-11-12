@@ -13,8 +13,9 @@ device for them to continue. Each area keeps its own: the last PR in Reviews, th
 Agents. Visiting Settings or Activity leaves every Saved place unchanged.
 
 **Needs you**:
-The Agents, Review requests, and queued PRs waiting on the user now, at the top of the Dashboard,
-with their count on the rail in every area.
+The Agents, Review requests, and queued PRs waiting on the user now. They live in the Inbox,
+grouped by why they are waiting, with their count on the Inbox rail link in every area.
+The Dashboard shows that count and links to the Inbox.
 
 ### Reviewing
 
