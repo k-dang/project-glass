@@ -26,10 +26,11 @@ test("runs an Agent review, reads it beside the diff, and shows its opening on O
 
   await openPullRequest(window, pr)
   await window.getByRole("tab", { name: "Changes" }).click()
-  const changes = window.getByRole("tabpanel", { name: "Changes" })
-  await changes.getByRole("button", { name: "Agent review" }).click()
+  await window.getByRole("button", { name: "Agent work" }).click()
+  const row = window.getByRole("listitem", { name: "Agent review" })
+  await row.getByRole("button", { name: "Start" }).click()
 
-  await changes.getByRole("button", { name: "Read Agent review" }).click()
+  await row.getByRole("button", { name: "Read" }).click()
 
   const panel = window.getByRole("complementary", { name: "Agent review" })
   await expect(panel.getByRole("heading", { name: "Callers expect the old word" })).toBeVisible()

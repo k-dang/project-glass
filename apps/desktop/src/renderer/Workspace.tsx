@@ -41,7 +41,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FilePanelTabsList, FilePanelTabTrigger } from "./FilePanelTabs"
 import type { ActivityRecorder } from "./activity"
-import { AgentReviewBanner, AgentReviewButton } from "./AgentReview"
+import { AgentWork } from "./AgentWork"
 import { AgentReviewCard } from "./AgentReviewCard"
 import { AgentReviewPanel, AgentReviewSidePanel } from "./AgentReviewPanel"
 import { BackToPullRequests } from "./BackToPullRequests"
@@ -88,7 +88,7 @@ import { useTour } from "./useTour"
 import { useAgentReview } from "./useAgentReview"
 import { positionOf } from "./reviewPosition"
 import { rememberPlace } from "./savedPlace"
-import { OutdatedTourFlag, TourCard, TourSidebar, useTourReadyToast } from "./TourSidebar"
+import { TourCard, TourSidebar, useTourReadyToast } from "./TourSidebar"
 
 const wideWorkspaceQuery = "(min-width: 1024px)"
 
@@ -374,6 +374,16 @@ export function Workspace(props: {
 
   const reviewShown = inChanges && reviewOpen
 
+  const agentWork = (
+    <AgentWork
+      tour={tour}
+      reading={reading}
+      review={agentReview}
+      onReadTour={startReading}
+      onReadReview={readAgentReview}
+    />
+  )
+
   useShortcuts(
     agentReview.review === null
       ? []
@@ -424,7 +434,12 @@ export function Workspace(props: {
           busy={draftsLocked}
           onReload={props.onReload}
           onBack={props.onBack}
-          open={<OpenPullRequestDialog current={pullRequest.ref} onOpen={props.onOpen} />}
+          open={
+            <>
+              {agentWork}
+              <OpenPullRequestDialog current={pullRequest.ref} onOpen={props.onOpen} />
+            </>
+          }
           review={
             <FinishReview
               key={pullRequest.id}
@@ -573,13 +588,8 @@ export function Workspace(props: {
             onAllChange={showAll}
             tourOrder={reading === null ? null : { current: chosenOrder, onChange: showOrder }}
             fullScreen={{ on: fullScreen, onChange: setFullScreen }}
-            agentReview={<AgentReviewButton controls={agentReview} onRead={readAgentReview} />}
-            outdatedTour={
-              tourInChanges &&
-              tour.outdated !== null && <OutdatedTourFlag revision={tour.outdated} tour={tour} />
-            }
+            agentWork={fullScreen && agentWork}
           />
-          <AgentReviewBanner controls={agentReview} onRead={readAgentReview} />
           {tourShown !== null ? (
             <TourView
               key={revisionKey}
