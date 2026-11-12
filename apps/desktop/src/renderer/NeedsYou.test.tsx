@@ -345,6 +345,25 @@ it("moves with j and k, opens a pull request with Enter, and allows with a", asy
   expect(window.location.hash).toBe("#/reviews/octo-org/glass/42")
 })
 
+it("opens the row j moved to after a click", async () => {
+  const opened: Array<Held<{ readonly pullRequest: PullRequestRef }, never, never>> = []
+
+  const user = mount(needsYouRef([waitingAgent, reviewRequested]), {
+    LoadPullRequest: hold(opened),
+  })
+
+  await user.click(await screen.findByRole("button", { name: /agent\/swift-otter/ }))
+  await user.keyboard("j")
+  expect(
+    screen.getByRole("button", { name: /Retry flaky upload/ }).getAttribute("aria-current"),
+  ).toBe("true")
+
+  await user.keyboard("{Enter}")
+
+  expect(window.location.hash).toBe("#/reviews/octo-org/glass/42")
+  expect((await next(opened)).payload.pullRequest).toEqual(ref)
+})
+
 it("opens the pull request and offers the Agent review when one is finished", async () => {
   const opened: Array<Held<{ readonly pullRequest: PullRequestRef }, never, never>> = []
 
