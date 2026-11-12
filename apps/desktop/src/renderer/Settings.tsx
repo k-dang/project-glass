@@ -1,8 +1,8 @@
-import type { Theme } from "@glass/contracts"
 import { AsyncResult } from "effect/reactivity"
 import { Avatar, AvatarBadge, AvatarFallback } from "@/components/ui/avatar"
 import { TooltipHint } from "@/components/ui/tooltip"
 import { AgentSettings } from "./AgentSettings"
+import { AppearanceSettings } from "./AppearanceSettings"
 import { useConnection } from "./connection"
 import { FollowedRepositoriesSettings } from "./FollowedRepositories"
 import { ProblemAlert } from "./ProblemAlert"
@@ -10,19 +10,6 @@ import { describeSource, problemOf } from "./problems"
 import { SettingsSection } from "./SettingsSection"
 import { SkillPacksSettings } from "./SkillPacks"
 import { StorageSettings } from "./StorageSettings"
-import { useTheme } from "./theme"
-
-const themes = [
-  { value: "system", label: "System", description: "Follow your device." },
-  { value: "light", label: "Light", description: "Bright and familiar." },
-  { value: "dark", label: "Dark", description: "The existing dark theme." },
-  { value: "charcoal", label: "Charcoal", description: "Softer surfaces. Colorful code." },
-  {
-    value: "catppuccin-mocha",
-    label: "Catppuccin Mocha",
-    description: "Soothing pastels on deep blue.",
-  },
-] satisfies ReadonlyArray<{ value: Theme; label: string; description: string }>
 
 export function ConnectionAvatar() {
   const { result } = useConnection()
@@ -77,8 +64,6 @@ function ConnectionDetails() {
 }
 
 export function Settings() {
-  const { theme, setTheme } = useTheme()
-
   return (
     <div className="page-content flex flex-col gap-8 py-6">
       <div>
@@ -91,51 +76,7 @@ export function Settings() {
         <ConnectionDetails />
       </SettingsSection>
       <FollowedRepositoriesSettings />
-      <SettingsSection
-        title="Appearance"
-        description="Choose how Glass looks, including code and diffs."
-      >
-        <fieldset className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <legend className="mb-3 text-sm font-medium">Theme</legend>
-          {themes.map(({ value, label, description }) => (
-            <label
-              key={value}
-              className="flex cursor-pointer flex-col gap-3 rounded-lg border bg-card p-3 has-checked:border-ring has-checked:ring-1 has-checked:ring-ring has-focus-visible:outline-2 has-focus-visible:outline-offset-4 has-focus-visible:outline-ring"
-            >
-              <span className="theme-preview" data-preview={value} aria-hidden>
-                <span className="theme-preview-rail" />
-                <span className="theme-preview-files">
-                  <i />
-                  <i />
-                  <i />
-                </span>
-                <span className="theme-preview-code">
-                  <i />
-                  <i />
-                  <i />
-                  <i />
-                </span>
-              </span>
-              <span className="flex items-center gap-2 text-sm font-medium">
-                <input
-                  type="radio"
-                  name="theme"
-                  value={value}
-                  checked={theme === value}
-                  onChange={() => setTheme(value)}
-                  aria-label={label}
-                  aria-describedby={`theme-${value}-description`}
-                  className="size-3.5 accent-(--ring)"
-                />
-                {label}
-              </span>
-              <span id={`theme-${value}-description`} className="text-xs text-muted-foreground">
-                {description}
-              </span>
-            </label>
-          ))}
-        </fieldset>
-      </SettingsSection>
+      <AppearanceSettings />
       <AgentSettings />
       <SkillPacksSettings />
       <StorageSettings />

@@ -2,6 +2,8 @@ export * from "./activity"
 
 export * from "./agentReview"
 
+export * from "./appearance"
+
 export * from "./ask"
 
 export * from "./checkoutRun"
