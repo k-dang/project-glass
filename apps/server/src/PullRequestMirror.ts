@@ -44,9 +44,6 @@ const MirroredPullRequest = Schema.Struct({
   viewerHasSubmittedReview: Schema.Boolean,
   requestedUsers: Schema.Array(Schema.String),
   requestedTeams: Schema.Array(Schema.String),
-  requestedSince: Schema.Record(Schema.String, Schema.DateTimeUtcFromString).pipe(
-    Schema.withDecodingDefaultKey(Effect.succeed({})),
-  ),
 })
 
 export type MirroredPullRequest = typeof MirroredPullRequest.Type
@@ -150,7 +147,6 @@ export class PullRequestMirror extends Context.Service<
       const mirrored = Effect.fnUntraced(function* (
         { isOpen: _isOpen, reviewRequests, ...fields }: Candidate,
         before: RepositoryMirror | undefined,
-        now: DateTime.Utc,
       ) {
         const requestedUsers = [...reviewRequests.users]
         const requestedTeams = [...reviewRequests.teams]
@@ -165,20 +161,11 @@ export class PullRequestMirror extends Context.Service<
 
         const known = before?.pullRequests.find((pr) => pr.id === fields.id)
 
-        // GitHub bumps updatedAt when it records a Review request, so one made while Glass was closed is not newer than that update.
-        const latestPossibleAt = DateTime.min(now, fields.updatedAt)
-
         return {
           ...fields,
           checks: known?.head === fields.head ? known.checks : "unavailable",
           requestedUsers,
           requestedTeams,
-          requestedSince: Object.fromEntries(
-            [...requestedUsers, ...requestedTeams].map((key) => [
-              key,
-              known?.requestedSince[key] ?? latestPossibleAt,
-            ]),
-          ),
         } satisfies MirroredPullRequest
       })
 
@@ -197,7 +184,7 @@ export class PullRequestMirror extends Context.Service<
           fullyReadAt: now,
           syncedAt: now,
           pullRequests: yield* Effect.forEach(candidates, (candidate) =>
-            mirrored(candidate, before, now),
+            mirrored(candidate, before),
           ),
         } satisfies RepositoryMirror
       })
@@ -217,7 +204,7 @@ export class PullRequestMirror extends Context.Service<
 
         const updated = yield* Effect.forEach(
           changed.filter((candidate) => candidate.isOpen),
-          (candidate) => mirrored(candidate, before, now),
+          (candidate) => mirrored(candidate, before),
         )
 
         return {

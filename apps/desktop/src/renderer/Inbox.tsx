@@ -9,6 +9,7 @@ import {
 import { Link, useNavigate } from "@tanstack/react-router"
 import { cn } from "cn"
 import { DateTime, Match, Option, Predicate } from "effect"
+import { AsyncResult } from "effect/reactivity"
 import { GitPullRequest, Sparkles } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import { Kbd } from "@/components/ui/kbd"
@@ -17,11 +18,10 @@ import { agentConversation, ConversationContext } from "./conversation"
 import {
   needsYouCount,
   needsYouKey,
-  NeedsYouStatus,
+  type NeedsYouResult,
   needsYouStreamAtom,
   watchedNeedsYouAtom,
 } from "./needsYou"
-import { watchedListingsAtom } from "./pullRequestLists"
 import { ProblemAlert } from "./ProblemAlert"
 import { streamProblem } from "./problems"
 import { ago } from "./PullRequestRow"
@@ -31,12 +31,9 @@ import { RequestCard } from "./RequestCard"
 import { useShortcuts } from "./useShortcuts"
 
 const sections = [
-  { id: "stopped", title: "Stopped on you" },
-  { id: "holding", title: "Holding up work" },
-  { id: "waiting", title: "Waiting on you" },
-] as const
-
-type SectionId = (typeof sections)[number]["id"]
+  { tag: "Agent", title: "Stopped on you" },
+  { tag: "PullRequest", title: "Waiting on you" },
+] as const satisfies ReadonlyArray<{ tag: NeedsYouItem["_tag"]; title: string }>
 
 const requestLabel = (part: RequestPart) =>
   Match.valueTags(part, {
@@ -45,18 +42,8 @@ const requestLabel = (part: RequestPart) =>
   })
 
 const pullRequestReasonLabels = {
-  ReviewRequested: "Review requested",
   AgentReviewFinished: "Agent review finished",
 } as const satisfies Record<PullRequestNeedsYou["reasons"][number]["_tag"], string>
-
-const sectionOf = (item: NeedsYouItem): SectionId =>
-  Match.valueTags(item, {
-    Agent: (): SectionId => "stopped",
-    PullRequest: (pullRequest): SectionId =>
-      pullRequest.reasons.some((reason) => Predicate.isTagged(reason, "ReviewRequested"))
-        ? "holding"
-        : "waiting",
-  })
 
 const reasonText = (item: NeedsYouItem) =>
   Match.valueTags(item, {
@@ -93,9 +80,6 @@ const firstPermission = (item: NeedsYouItem) =>
     },
     PullRequest: () => null,
   })
-
-const finishedReview = (item: PullRequestNeedsYou) =>
-  item.reasons.some((reason) => Predicate.isTagged(reason, "AgentReviewFinished"))
 
 const nextRemaining = (
   previous: readonly string[],
@@ -155,7 +139,7 @@ function Waited(props: { since: DateTime.Utc; now: Date }) {
   )
 }
 
-function InboxCount(props: { status: NeedsYouStatus }) {
+function InboxCount(props: { status: NeedsYouResult }) {
   const count = needsYouCount(props.status)
 
   if (Option.isNone(count)) return null
@@ -164,19 +148,19 @@ function InboxCount(props: { status: NeedsYouStatus }) {
 }
 
 function InboxRows(props: {
-  status: NeedsYouStatus
+  status: NeedsYouResult
   selectedKey: string | null
   now: Date
   onRetry: () => void
   onPick: (key: string) => void
 }) {
-  return NeedsYouStatus.$match(props.status, {
-    Loading: () => (
+  return AsyncResult.match(props.status, {
+    onInitial: () => (
       <output className="block px-4 py-3 text-sm text-muted-foreground">
         Loading what needs you…
       </output>
     ),
-    Failed: ({ cause }) => (
+    onFailure: ({ cause }) => (
       <div className="px-4 py-3">
         <ProblemAlert
           problem={streamProblem(cause)}
@@ -184,7 +168,7 @@ function InboxRows(props: {
         />
       </div>
     ),
-    Ready: ({ items }) =>
+    onSuccess: ({ value: items }) =>
       items.length === 0 ? (
         <p className="px-4 py-3 text-sm text-muted-foreground">Nothing needs you right now.</p>
       ) : (
@@ -205,12 +189,12 @@ function InboxSections(props: {
   onPick: (key: string) => void
 }) {
   return sections.map((section) => {
-    const rows = props.items.filter((item) => sectionOf(item) === section.id)
+    const rows = props.items.filter((item) => item._tag === section.tag)
 
     if (rows.length === 0) return null
 
     return (
-      <section key={section.id} aria-label={section.title} className="py-2">
+      <section key={section.tag} aria-label={section.title} className="py-2">
         <h2 className="px-4 py-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
           {section.title}
         </h2>
@@ -247,15 +231,15 @@ function InboxSections(props: {
 }
 
 function InboxPane(props: {
-  status: NeedsYouStatus
+  status: NeedsYouResult
   selected: NeedsYouItem | null
   now: Date
   onReadReview: (pullRequest: string) => void
 }) {
-  return NeedsYouStatus.$match(props.status, {
-    Loading: () => null,
-    Failed: () => null,
-    Ready: ({ items }) =>
+  return AsyncResult.match(props.status, {
+    onInitial: () => null,
+    onFailure: () => null,
+    onSuccess: ({ value: items }) =>
       props.selected === null ? (
         <p className="text-sm text-muted-foreground">
           {items.length === 0 ? "Nothing needs you right now." : "Select something that needs you."}
@@ -269,24 +253,14 @@ function InboxPane(props: {
 export function Inbox() {
   const status = useAtomValue(watchedNeedsYouAtom)
   const now = useMinuteClock()
-  const refreshNeedsYou = useAtomRefresh(needsYouStreamAtom)
-  const refreshListings = useAtomRefresh(watchedListingsAtom)
-
-  const retry = () => {
-    refreshNeedsYou()
-    refreshListings()
-  }
+  const retry = useAtomRefresh(needsYouStreamAtom)
 
   const navigate = useNavigate()
   const markReview = useAtomSet(readAgentReviewOnOpenAtom)
 
-  const items = NeedsYouStatus.$match(status, {
-    Loading: (): ReadonlyArray<NeedsYouItem> => [],
-    Failed: (): ReadonlyArray<NeedsYouItem> => [],
-    Ready: ({ items: ready }) => ready,
-  })
+  const items = AsyncResult.isSuccess(status) ? status.value : []
 
-  const flat = sections.flatMap((section) => items.filter((item) => sectionOf(item) === section.id))
+  const flat = sections.flatMap((section) => items.filter((item) => item._tag === section.tag))
   const keys = flat.map(needsYouKey)
   const order = keys.join("\n")
   const [picked, setPicked] = useState<string | null>(null)
@@ -490,16 +464,14 @@ function PullRequestDetail(props: {
         >
           Open pull request
         </Link>
-        {finishedReview(props.item) && (
-          <Link
-            to="/reviews/$owner/$repo/$number"
-            params={pullRequest.ref}
-            className={cn(actionLink, "border")}
-            onClick={() => props.onReadReview(referenceKey(pullRequest.ref))}
-          >
-            Read Agent review
-          </Link>
-        )}
+        <Link
+          to="/reviews/$owner/$repo/$number"
+          params={pullRequest.ref}
+          className={cn(actionLink, "border")}
+          onClick={() => props.onReadReview(referenceKey(pullRequest.ref))}
+        >
+          Read Agent review
+        </Link>
       </div>
     </article>
   )

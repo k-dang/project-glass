@@ -10,11 +10,9 @@ export const AgentReason = Schema.Union([WaitingRequests])
 
 export type AgentReason = typeof AgentReason.Type
 
-export const ReviewRequested = Schema.TaggedStruct("ReviewRequested", {})
-
 export const AgentReviewFinished = Schema.TaggedStruct("AgentReviewFinished", {})
 
-export const PullRequestReason = Schema.Union([ReviewRequested, AgentReviewFinished])
+export const PullRequestReason = Schema.Union([AgentReviewFinished])
 
 export type PullRequestReason = typeof PullRequestReason.Type
 
