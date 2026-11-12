@@ -56,5 +56,6 @@ export const needsYouCount = (status: NeedsYouStatus): Option.Option<number> =>
 export const needsYouKey = (item: NeedsYouItem): string =>
   Match.valueTags(item, {
     Agent: ({ agent }) => `agent:${agent.id}`,
+    OutsideQuestion: ({ id }) => `ask:${id}`,
     PullRequest: ({ pullRequest }) => `pr:${referenceKey(pullRequest.ref)}`,
   })

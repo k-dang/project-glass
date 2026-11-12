@@ -1,5 +1,5 @@
-import { Effect, Layer, Option } from "effect"
-import { McpProtocol, McpServer } from "effect/ai"
+import { Effect, Layer, Option, Schema } from "effect"
+import { McpProtocol, McpSchema, McpServer } from "effect/ai"
 import {
   HttpEffect,
   HttpRouter,
@@ -8,12 +8,36 @@ import {
   HttpServerResponse,
 } from "effect/http"
 import { HttpApiBuilder, HttpApiSecurity } from "effect/http-api"
+import { AskProgress } from "./AskProgress"
 import { GlassToolHandlers, GlassTools } from "./glassTools"
 import { McpCaller, McpCredentials } from "./McpCredentials"
 
 export const MCP_PATH = "/mcp"
 
 const SESSION_HEADER = "mcp-session-id"
+
+const progressTokenOf = (metadata: Schema.JsonObject | undefined) =>
+  Schema.decodeUnknownOption(McpSchema.ProgressToken)(metadata?.["progressToken"])
+
+const askProgress = AskProgress.of({
+  notify: (progress) =>
+    Effect.gen(function* () {
+      const server = yield* Effect.serviceOption(McpServer.McpServer)
+      const client = yield* Effect.serviceOption(McpSchema.McpServerClient)
+
+      const token = Option.isSome(client)
+        ? progressTokenOf(client.value.requestMetadata)
+        : Option.none()
+
+      if (Option.isNone(server) || Option.isNone(token)) return
+
+      yield* server.value.notifications["notifications/progress"]({
+        progressToken: token.value,
+        progress,
+        message: "Waiting for an answer in the Glass Inbox",
+      }).pipe(Effect.ignore)
+    }),
+})
 
 const unauthorized = HttpServerResponse.empty({
   status: 401,
@@ -40,7 +64,11 @@ const McpAccess = HttpRouter.middleware(
         }
 
         const response = yield* Effect.raceFirst(
-          Effect.provideService(httpEffect, McpCaller, caller),
+          Effect.provideService(
+            Effect.provideService(httpEffect, McpCaller, caller),
+            AskProgress,
+            askProgress,
+          ),
           Effect.as(revoked, unauthorized),
         )
 

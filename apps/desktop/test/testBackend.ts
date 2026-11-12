@@ -114,6 +114,7 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         ChangeAgentModel: unused,
         ChangePermissionMode: unused,
         AnswerRequest: unused,
+        AnswerOutsideQuestion: unused,
         GetRemovalWarnings: unused,
         RemoveAgent: unused,
         GetGlobalConversationModel: () => Effect.succeed({ model: null, effort: null }),

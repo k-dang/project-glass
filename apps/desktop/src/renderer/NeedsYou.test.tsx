@@ -10,6 +10,9 @@ import {
   GitHubConnection,
   type NeedsYou,
   noListings,
+  OutsideChoice,
+  OutsideQuestion,
+  OutsideText,
   PermissionRequestPart,
   PullRequest,
   type PullRequestListings,
@@ -17,6 +20,7 @@ import {
   PullRequestRef,
   PullRequestSummary,
   PullRequestWorkspace,
+  type OutsideQuestionAnswer,
   type RequestAnswer,
   ReviewRequested,
   SettingsError,
@@ -311,6 +315,67 @@ it("answers a permission in the detail pane and selects the next item when that 
 
   expect(await screen.findByRole("heading", { name: "agent/quiet-lynx" })).toBeTruthy()
   expect(screen.queryByRole("button", { name: /agent\/swift-otter/ })).toBeNull()
+})
+
+const outsideQuestion = OutsideQuestion.make({
+  id: "ask-1",
+  question: "Ship the retry change?",
+  choices: ["Ship it", "Hold it"],
+  session: "demo-session",
+  label: "Claude Code",
+  since: ago({ minutes: 1 }),
+})
+
+it("answers an outside question in Stopped on you and still moves with j and k", async () => {
+  const answers: Array<{ id: string; answer: OutsideQuestionAnswer }> = []
+  const needsYou = needsYouRef([outsideQuestion, reviewRequested])
+
+  const user = mount(needsYou, {
+    AnswerOutsideQuestion: (payload) => Effect.sync(() => void answers.push(payload)),
+  })
+
+  const stopped = await screen.findByRole("region", { name: "Stopped on you" })
+  const row = within(stopped).getByRole("button", { name: /Ship the retry change/ })
+  expect(row.getAttribute("aria-current")).toBe("true")
+  expect(within(stopped).getByText(/Asked by Claude Code · demo-session/)).toBeTruthy()
+
+  await user.keyboard("{Enter}")
+  expect(window.location.hash).toBe("#/inbox")
+
+  await user.keyboard("j")
+  expect(
+    screen.getByRole("button", { name: /Retry flaky upload/ }).getAttribute("aria-current"),
+  ).toBe("true")
+  await user.keyboard("k")
+  expect(row.getAttribute("aria-current")).toBe("true")
+
+  const pane = within(articleOf("Ship the retry change?"))
+  await user.click(pane.getByRole("radio", { name: "Ship it" }))
+  await user.click(pane.getByRole("button", { name: "Send" }))
+
+  expect(answers).toEqual([{ id: "ask-1", answer: OutsideChoice.make({ choice: "Ship it" }) }])
+
+  await setNeedsYou(needsYou, [reviewRequested])
+  expect(await screen.findByRole("heading", { name: "Retry flaky upload" })).toBeTruthy()
+  expect(screen.queryByRole("button", { name: /Ship the retry change/ })).toBeNull()
+})
+
+it("sends a typed answer when an outside question has no choices", async () => {
+  const answers: Array<{ id: string; answer: OutsideQuestionAnswer }> = []
+
+  const user = mount(
+    needsYouRef([OutsideQuestion.make({ ...outsideQuestion, id: "ask-2", choices: [] })]),
+    {
+      AnswerOutsideQuestion: (payload) => Effect.sync(() => void answers.push(payload)),
+    },
+  )
+
+  await screen.findByRole("heading", { name: "Ship the retry change?" })
+  const pane = within(articleOf("Ship the retry change?"))
+  await user.type(pane.getByRole("textbox", { name: "Your answer" }), "Not yet")
+  await user.click(pane.getByRole("button", { name: "Send" }))
+
+  expect(answers).toEqual([{ id: "ask-2", answer: OutsideText.make({ text: "Not yet" }) }])
 })
 
 it("moves with j and k, opens a pull request with Enter, and allows with a", async () => {

@@ -1,4 +1,5 @@
 import {
+  AskUserResult,
   type ActivityLogError,
   ActivityPage,
   Agent,
@@ -34,7 +35,7 @@ import {
   AgentPlace,
   localPlace,
 } from "@glass/contracts"
-import { Context, Effect, Match, Option, Schema, Stream } from "effect"
+import { Context, Duration, Effect, Match, Option, Schema, Stream } from "effect"
 import { Tool, Toolkit } from "effect/ai"
 import { ActivityLog } from "../ActivityLog"
 import { AgentReviews } from "../AgentReviews"
@@ -45,7 +46,15 @@ import { GitHubClient } from "../github/GitHubClient"
 import { BackgroundGitHubRequest } from "../github/GitHubRequestPolicy"
 import { FollowedRepositories } from "../FollowedRepositories"
 import { LocalCheckouts } from "../LocalCheckouts"
+import { AskProgress } from "./AskProgress"
+import { McpCaller } from "./McpCredentials"
 import { NeedsYou } from "../NeedsYou"
+import {
+  ASK_PROGRESS_SECONDS,
+  ASK_TIMEOUT_DEFAULT_SECONDS,
+  ASK_TIMEOUT_MAX_SECONDS,
+  OutsideQuestions,
+} from "../OutsideQuestions"
 import { Sandboxes } from "../Sandboxes"
 import { PullRequestLists } from "../PullRequestLists"
 import { Queue } from "../Queue"
@@ -118,7 +127,7 @@ const ListAgents = Tool.make("list_agents", {
 
 const ListNeedsYou = Tool.make("list_needs_you", {
   description:
-    "Lists what waits on the user in Glass now: Agents with a Permission request or Question waiting, PRs that request their Review, and queued PRs whose Agent review is finished. Agents come first, then the longest waiting.",
+    "Lists what waits on the user in Glass now: Agents with a Permission request or Question waiting, questions from an agent outside Glass, PRs that request their Review, and queued PRs whose Agent review is finished. Agents and outside questions come first, then the longest waiting.",
   success: Schema.Struct({ items: Schema.Array(NeedsYouItem) }),
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)
@@ -251,6 +260,44 @@ const ReadAgentReview = Tool.make("read_agent_review", {
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)
 
+const minutes = ASK_TIMEOUT_DEFAULT_SECONDS / 60
+
+const AskUser = Tool.make("ask_user", {
+  description:
+    `Asks the user a question and waits for their answer in the Glass Inbox, in Stopped on you. ` +
+    `Waits ${minutes} minutes unless timeoutSeconds is set. timeoutSeconds is a whole number of seconds from 1 to ${ASK_TIMEOUT_MAX_SECONDS}, and cannot be longer than that. ` +
+    `Glass sends a progress notification immediately and every ${ASK_PROGRESS_SECONDS} seconds while it waits, so a client that resets its timeout when progress arrives is not cut off before Glass's own limit. ` +
+    `Pass a progress token on the call. The result is Answered with the user's answer (by is choice or text), TimedOut when they do not answer in time, or Cancelled when Glass shuts down. ` +
+    `A timed out or cancelled question leaves the Inbox. choices are optional. The user can pick one or type their own answer. from is your name, shown beside the session that called.`,
+  parameters: Schema.Struct({
+    question: Schema.Trimmed.check(Schema.isNonEmpty(), Schema.isMaxLength(2_000)).annotate({
+      description: "The question to show in the Inbox.",
+    }),
+    choices: Schema.optional(
+      Schema.Array(Schema.Trimmed.check(Schema.isNonEmpty(), Schema.isMaxLength(200)))
+        .check(Schema.isMinLength(1), Schema.isMaxLength(8), Schema.isUnique())
+        .annotate({
+          description:
+            "Choices the user can pick. They can still type their own answer. Omit this to ask for text only.",
+        }),
+    ),
+    from: Schema.optional(
+      Schema.Trimmed.check(Schema.isNonEmpty(), Schema.isMaxLength(80)).annotate({
+        description: "Your name, shown beside the session that called. For example, Claude Code.",
+      }),
+    ),
+    timeoutSeconds: Schema.optional(
+      Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: ASK_TIMEOUT_MAX_SECONDS })).annotate(
+        {
+          description: `Seconds to wait. Defaults to ${ASK_TIMEOUT_DEFAULT_SECONDS}. At most ${ASK_TIMEOUT_MAX_SECONDS}.`,
+        },
+      ),
+    ),
+  }),
+  success: AskUserResult,
+  failure: GlassToolFailure,
+}).annotateMerge(action)
+
 const StartAgentReview = Tool.make("start_agent_review", {
   description:
     "Starts an Agent review of a PR at a Revision, as the user would from the PR. It appears beside the PR's diff once written. This returns once the review started, not when it is written, which takes minutes: read_agent_review shows its progress and result, or why it failed, such as the PR having changed since that Revision. Starting one replaces any review being written for the PR, so read_agent_review first and ask the user before replacing one.",
@@ -279,6 +326,7 @@ export const GlassTools = Toolkit.make(
   ListAgentOptions,
   CreateAgent,
   SendAgentMessage,
+  AskUser,
 )
 
 type ServiceFailure =
@@ -364,6 +412,18 @@ const withinBudget = (files: ReadonlyArray<FileMaterial>) => {
 const first = <A, E, R>(stream: Stream.Stream<A, E, R>) =>
   stream.pipe(Stream.runHead, Effect.map(Option.getOrThrow))
 
+/** Talks to the MCP server already handling this call, so progress stays on that response. */
+const waitingProgress = Effect.gen(function* () {
+  const progress = yield* AskProgress.current
+  let step = 0
+
+  while (true) {
+    step += 1
+    yield* progress.notify(step)
+    yield* Effect.sleep(Duration.seconds(ASK_PROGRESS_SECONDS))
+  }
+}).pipe(Effect.ignore)
+
 export const GlassToolHandlers = GlassTools.toLayer(
   Effect.gen(function* () {
     const lists = yield* PullRequestLists
@@ -377,6 +437,7 @@ export const GlassToolHandlers = GlassTools.toLayer(
     const sandboxes = yield* Sandboxes
     const agentReviews = yield* AgentReviews
     const needsYou = yield* NeedsYou
+    const outsideQuestions = yield* OutsideQuestions
 
     const refuseUnofferedModel = Effect.fnUntraced(function* ({
       engine,
@@ -499,6 +560,22 @@ export const GlassToolHandlers = GlassTools.toLayer(
           Effect.uninterruptible,
           Effect.map((delivery) => ({ delivery })),
           Effect.mapError(explained),
+        ),
+      ask_user: ({ question, choices, from, timeoutSeconds }) =>
+        Effect.scoped(
+          Effect.gen(function* () {
+            const caller = yield* McpCaller.current
+
+            yield* Effect.forkScoped(waitingProgress)
+
+            return yield* outsideQuestions.ask({
+              question,
+              choices: choices ?? [],
+              session: caller.conversationId,
+              label: from ?? null,
+              timeout: Duration.seconds(timeoutSeconds ?? ASK_TIMEOUT_DEFAULT_SECONDS),
+            })
+          }),
         ),
     })
   }),

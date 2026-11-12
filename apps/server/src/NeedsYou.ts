@@ -4,6 +4,7 @@ import {
   finishedReview,
   canRunQueueWork,
   type NeedsYouItem,
+  type OutsideQuestion,
   PullRequestNeedsYou,
   type PullRequestReason,
   type PullRequestSummary,
@@ -15,6 +16,7 @@ import {
 import { Array as Arr, Context, DateTime, Effect, Layer, Order, Predicate, Stream } from "effect"
 import { AgentReviews } from "./AgentReviews"
 import { Agents, type WaitingAgent } from "./Agents"
+import { OutsideQuestions } from "./OutsideQuestions"
 import { PullRequestLists, type RequestedReview } from "./PullRequestLists"
 import { Queue } from "./Queue"
 
@@ -29,7 +31,11 @@ interface PullRequestWait {
   readonly since: DateTime.Utc
 }
 
-const rank: Record<NeedsYouItem["_tag"], number> = { Agent: 0, PullRequest: 1 }
+const rank: Record<NeedsYouItem["_tag"], number> = {
+  Agent: 0,
+  OutsideQuestion: 0,
+  PullRequest: 1,
+}
 
 const order: Order.Order<NeedsYouItem> = Order.combine(
   Order.mapInput(Order.Number, (item: NeedsYouItem) => rank[item._tag]),
@@ -68,6 +74,7 @@ const needsYouOf = (
   waiting: ReadonlyArray<WaitingAgent>,
   requested: ReadonlyArray<RequestedReview>,
   finished: ReadonlyArray<FinishedAgentReview>,
+  outside: ReadonlyArray<OutsideQuestion>,
 ): ReadonlyArray<NeedsYouItem> => {
   const waits: ReadonlyArray<PullRequestWait> = [
     ...requested.map(({ pullRequest, since }) => ({
@@ -85,6 +92,7 @@ const needsYouOf = (
   return Arr.sort(
     [
       ...waiting.map(agentItem),
+      ...outside,
       ...Object.values(Arr.groupBy(waits, ({ pullRequest }) => referenceKey(pullRequest.ref))).map(
         pullRequestItem,
       ),
@@ -124,6 +132,7 @@ export class NeedsYou extends Context.Service<
       const lists = yield* PullRequestLists
       const queue = yield* Queue
       const agentReviews = yield* AgentReviews
+      const outside = yield* OutsideQuestions
 
       const finishedReviewOf = (pullRequest: PullRequestSummary) =>
         agentReviews.watch(pullRequest.ref).pipe(
@@ -168,9 +177,10 @@ export class NeedsYou extends Context.Service<
             agents.watchWaiting(),
             lists.watchNeedsReview(),
             finishedAgentReviews,
+            outside.watch(),
           ).pipe(
-            Stream.map(([waiting, requested, finished]) =>
-              needsYouOf(waiting, requested, finished),
+            Stream.map(([waiting, requested, finished, questions]) =>
+              needsYouOf(waiting, requested, finished, questions),
             ),
           ),
       })

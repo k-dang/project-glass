@@ -1,7 +1,11 @@
 import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
 import {
   AllowRequest,
+  OutsideChoice,
+  OutsideText,
   type NeedsYouItem,
+  type OutsideQuestion,
+  type OutsideQuestionAnswer,
   type PullRequestNeedsYou,
   type RequestPart,
   referenceKey,
@@ -9,9 +13,15 @@ import {
 import { Link, useNavigate } from "@tanstack/react-router"
 import { cn } from "cn"
 import { DateTime, Match, Option, Predicate } from "effect"
-import { GitPullRequest, Sparkles } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import { Atom } from "effect/reactivity"
+import { CircleHelp, GitPullRequest, Sparkles } from "lucide-react"
+import { useEffect, useId, useMemo, useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Kbd } from "@/components/ui/kbd"
+import { Label } from "@/components/ui/label"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Backend, backendRuntime } from "./backend"
 import { AgentRequest, answerRequestAtom } from "./agentsArea"
 import { agentConversation, ConversationContext } from "./conversation"
 import {
@@ -23,7 +33,7 @@ import {
 } from "./needsYou"
 import { watchedListingsAtom } from "./pullRequestLists"
 import { ProblemAlert } from "./ProblemAlert"
-import { streamProblem } from "./problems"
+import { settledProblem, streamProblem } from "./problems"
 import { ago } from "./PullRequestRow"
 import { referenceText } from "./queue"
 import { readAgentReviewOnOpenAtom } from "./reviewsArea"
@@ -49,9 +59,14 @@ const pullRequestReasonLabels = {
   AgentReviewFinished: "Agent review finished",
 } as const satisfies Record<PullRequestNeedsYou["reasons"][number]["_tag"], string>
 
+const askedBy = (question: OutsideQuestion) =>
+  question.label === null ? question.session : `${question.label} · ${question.session}`
+
 const sectionOf = (item: NeedsYouItem): SectionId =>
   Match.valueTags(item, {
     Agent: (): SectionId => "stopped",
+    // The caller is blocked until this is answered, the same way an Agent's question blocks its Turn.
+    OutsideQuestion: (): SectionId => "stopped",
     PullRequest: (pullRequest): SectionId =>
       pullRequest.reasons.some((reason) => Predicate.isTagged(reason, "ReviewRequested"))
         ? "holding"
@@ -69,6 +84,7 @@ const reasonText = (item: NeedsYouItem) =>
         )
         .filter((label, index, labels) => labels.indexOf(label) === index)
         .join(" · "),
+    OutsideQuestion: (question) => `Asked by ${askedBy(question)}`,
     PullRequest: ({ reasons }) =>
       reasons.map((reason) => pullRequestReasonLabels[reason._tag]).join(" · "),
   })
@@ -79,6 +95,7 @@ const requestsOf = (item: NeedsYouItem): ReadonlyArray<RequestPart> =>
       reasons.flatMap((reason) =>
         Match.valueTags(reason, { WaitingRequests: ({ requests }) => requests }),
       ),
+    OutsideQuestion: () => [],
     PullRequest: () => [],
   })
 
@@ -91,6 +108,7 @@ const firstPermission = (item: NeedsYouItem) =>
 
       return part === undefined ? null : { agentId: agent.agent.id, requestId: part.requestId }
     },
+    OutsideQuestion: () => null,
     PullRequest: () => null,
   })
 
@@ -124,6 +142,7 @@ const nextRemaining = (
 const titleOf = (item: NeedsYouItem) =>
   Match.valueTags(item, {
     Agent: ({ agent }) => agent.name,
+    OutsideQuestion: ({ question }) => question,
     PullRequest: ({ pullRequest }) => pullRequest.title,
   })
 
@@ -228,7 +247,7 @@ function InboxSections(props: {
                   onClick={() => props.onPick(key)}
                 >
                   <span className="flex items-baseline gap-2">
-                    <span className="min-w-0 flex-1 font-medium" title={titleOf(item)}>
+                    <span className="min-w-0 flex-1 font-medium break-words" title={titleOf(item)}>
                       {titleOf(item)}
                     </span>
                     <Waited since={item.since} now={props.now} />
@@ -322,6 +341,7 @@ export function Inbox() {
     Match.valueTags(selected, {
       Agent: ({ agent }) =>
         void navigate({ to: "/agents/$agentId", params: { agentId: agent.id } }),
+      OutsideQuestion: () => undefined,
       PullRequest: ({ pullRequest }) =>
         void navigate({ to: "/reviews/$owner/$repo/$number", params: pullRequest.ref }),
     })
@@ -402,6 +422,7 @@ const lineOf = (item: NeedsYouItem) =>
   Match.valueTags(item, {
     Agent: (agent) =>
       `${agent.agent.repository.owner}/${agent.agent.repository.repo} · ${reasonText(agent)}`,
+    OutsideQuestion: (question) => reasonText(question),
     PullRequest: (pullRequest) =>
       [
         referenceText(pullRequest.pullRequest.ref),
@@ -419,10 +440,97 @@ function InboxDetail(props: {
 }) {
   return Match.valueTags(props.item, {
     Agent: (item) => <AgentDetail item={item} now={props.now} />,
+    OutsideQuestion: (item) => <OutsideQuestionDetail item={item} now={props.now} />,
     PullRequest: (item) => (
       <PullRequestDetail item={item} now={props.now} onReadReview={props.onReadReview} />
     ),
   })
+}
+
+const answerOutsideQuestionAtom = Atom.family((id: string) =>
+  backendRuntime.fn((answer: OutsideQuestionAnswer) =>
+    Backend.use((backend) => backend.AnswerOutsideQuestion({ id, answer })),
+  ),
+)
+
+function OutsideQuestionDetail(props: { item: OutsideQuestion; now: Date }) {
+  const { item } = props
+  const answering = answerOutsideQuestionAtom(item.id)
+  const sent = useAtomValue(answering)
+  const answer = useAtomSet(answering)
+  const [choice, setChoice] = useState<string | null>(null)
+  const [text, setText] = useState("")
+  const textId = useId()
+  const choicesId = useId()
+  const typed = text.trim()
+  const problem = settledProblem(sent)
+  const textLabel = item.choices.length > 0 ? "Or type an answer" : "Your answer"
+
+  const submit = () => {
+    if (typed !== "") answer(OutsideText.make({ text: typed }))
+    else if (choice !== null) answer(OutsideChoice.make({ choice }))
+  }
+
+  return (
+    <article className="flex max-w-2xl flex-col gap-4">
+      <header className="flex flex-col gap-1">
+        <div className="flex items-center gap-2">
+          <CircleHelp className="size-4 text-muted-foreground" aria-hidden />
+          <h2 className="text-lg font-semibold text-pretty break-words">{item.question}</h2>
+          <Waited since={item.since} now={props.now} />
+        </div>
+        <p className="text-sm text-pretty text-muted-foreground">Asked by {askedBy(item)}</p>
+      </header>
+      <form
+        className="flex flex-col gap-3"
+        onSubmit={(event) => {
+          event.preventDefault()
+          submit()
+        }}
+      >
+        {item.choices.length > 0 && (
+          <RadioGroup<string | null>
+            aria-labelledby={choicesId}
+            value={choice}
+            onValueChange={setChoice}
+          >
+            <span id={choicesId} className="sr-only">
+              Choices
+            </span>
+            {item.choices.map((label) => (
+              <Label key={label} className="flex items-start gap-2 font-normal">
+                <RadioGroupItem value={label} />
+                <span>{label}</span>
+              </Label>
+            ))}
+          </RadioGroup>
+        )}
+        <Label htmlFor={textId} className="sr-only">
+          {textLabel}
+        </Label>
+        <Input
+          id={textId}
+          placeholder={textLabel}
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+        />
+        <div className="flex items-center gap-3">
+          <Button type="submit" disabled={sent.waiting || (typed === "" && choice === null)}>
+            Send
+          </Button>
+          <p className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+            <Kbd>Enter</Kbd>
+            sends
+          </p>
+        </div>
+        {problem !== null && (
+          <p role="alert" className="text-xs text-destructive">
+            {problem.detail}
+          </p>
+        )}
+      </form>
+    </article>
+  )
 }
 
 const actionLink =

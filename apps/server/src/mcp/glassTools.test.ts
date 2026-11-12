@@ -64,6 +64,7 @@ describe("Glass tools over MCP", () => {
           ["list_agent_options", true],
           ["create_agent", false],
           ["send_agent_message", false],
+          ["ask_user", false],
         ],
       )
     }),

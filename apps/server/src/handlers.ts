@@ -10,6 +10,7 @@ import { BackgroundGitHubRequest } from "./github/GitHubRequestPolicy"
 import { FollowedRepositories } from "./FollowedRepositories"
 import { LocalCheckouts } from "./LocalCheckouts"
 import { NeedsYou } from "./NeedsYou"
+import { OutsideQuestions } from "./OutsideQuestions"
 import { PullRequestLists } from "./PullRequestLists"
 import { PullRequestWorkspaces } from "./PullRequestWorkspaces"
 import { Queue } from "./Queue"
@@ -44,6 +45,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
     const skillPacks = yield* SkillPacks
     const localSkills = yield* LocalSkills
     const needsYou = yield* NeedsYou
+    const outsideQuestions = yield* OutsideQuestions
 
     return GlassRpcs.of({
       GetSavedPlaces: () => savedPlaces.list(),
@@ -153,6 +155,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       WatchWaitingAgents: () =>
         agents.watchWaiting().pipe(Stream.map((waiting) => waiting.map(({ agent }) => agent.id))),
       WatchNeedsYou: () => needsYou.watch(),
+      AnswerOutsideQuestion: ({ id, answer }) => outsideQuestions.answer(id, answer),
       ChangeAgentModel: ({ agentId, model, effort }) =>
         agents.changeModel(agentId, { model, effort }),
       ChangePermissionMode: ({ agentId, permissionMode }) =>
