@@ -1,6 +1,6 @@
 # Glass boundary and wait checks
 
-`pnpm check` runs `glass/architecture` and `glass/test-waits` through the root
+`pnpm check` runs `glass/architecture`, `glass/module-casing`, and `glass/test-waits` through the root
 Vite+/Oxlint configuration.
 
 ## Imports
@@ -42,6 +42,13 @@ the Node platform's HTTP exports, and `effect/ai`'s `McpServer` and `McpProtocol
 `*.test.*`, `*.spec.*`, and files under `apps/*/test/` or `apps/*/e2e/` may import across
 tiers. This preserves fixtures such as `apps/desktop/e2e/glass.ts`. Production renderer
 code cannot use those fixtures as an import bridge.
+
+## Module casing
+
+[module-casing.ts](module-casing.ts) rejects a source file whose name, without its
+extension, differs only in case from a sibling's, such as `needsYou.ts` beside
+`NeedsYou.tsx`. Linux resolves each import to its own file, but macOS's case-insensitive
+file system can load the wrong one, so the renderer build failed only on macOS.
 
 ## Test waits
 

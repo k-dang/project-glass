@@ -14,7 +14,7 @@ import {
   repositoryKey,
   type SettingsError,
 } from "@glass/contracts"
-import { Array as Arr, Context, DateTime, Effect, Layer, Stream, SubscriptionRef } from "effect"
+import { Context, Effect, Layer } from "effect"
 import { ActivityLog } from "./ActivityLog"
 import { FollowedRepositories } from "./FollowedRepositories"
 import { GitHubClient } from "./github/GitHubClient"
@@ -42,14 +42,12 @@ const viewerOf = (mirror: Mirror, login: string, touched: ReadonlySet<string>): 
   touched,
 })
 
-const viewerRequests = (pr: MirroredPullRequest, viewer: Viewer) => [
-  ...pr.requestedUsers.filter((user) => user === viewer.login.toLowerCase()),
-  ...pr.requestedTeams.filter((team) => viewer.teams.has(team)),
-]
-
 const belongs: Record<PullRequestList, (pr: MirroredPullRequest, viewer: Viewer) => boolean> = {
   "needs-review": (pr, viewer) =>
-    !pr.viewerIsAuthor && !pr.isDraft && viewerRequests(pr, viewer).length > 0,
+    !pr.viewerIsAuthor &&
+    !pr.isDraft &&
+    (pr.requestedUsers.includes(viewer.login.toLowerCase()) ||
+      pr.requestedTeams.some((team) => viewer.teams.has(team))),
   "my-prs": (pr) => pr.viewerIsAuthor,
   reviewing: (pr, viewer) =>
     !pr.viewerIsAuthor &&
@@ -97,33 +95,6 @@ const summaryOf = (pr: MirroredPullRequest) =>
     updatedAt: pr.updatedAt,
   })
 
-export interface RequestedReview {
-  readonly pullRequest: PullRequestSummary
-  readonly since: DateTime.Utc
-}
-
-const requestedReviewsOf = (
-  rows: ReadonlyArray<RepositoryRows>,
-  viewer: Viewer,
-): ReadonlyArray<RequestedReview> =>
-  rows.flatMap(({ pullRequests }) =>
-    pullRequests.flatMap((pr) => {
-      const requests = viewerRequests(pr, viewer)
-
-      return Arr.isReadonlyArrayNonEmpty(requests)
-        ? [
-            {
-              pullRequest: summaryOf(pr),
-              since: Arr.min(
-                Arr.map(requests, (key) => pr.requestedSince[key] ?? pr.updatedAt),
-                DateTime.Order,
-              ),
-            },
-          ]
-        : []
-    }),
-  )
-
 const listingsOf = (
   lists: ReturnType<typeof classify>,
   touched: Touched,
@@ -163,7 +134,6 @@ export class PullRequestLists extends Context.Service<
   {
     readonly list: () => Effect.Effect<PullRequestListings, SettingsError | ConnectionError>
     readonly saved: () => Effect.Effect<PullRequestListings | null, SettingsError>
-    readonly watchNeedsReview: () => Stream.Stream<ReadonlyArray<RequestedReview>>
   }
 >()("@glass/server/PullRequestLists") {
   static readonly layer = Layer.effect(
@@ -173,25 +143,6 @@ export class PullRequestLists extends Context.Service<
       const github = yield* GitHubClient
       const activity = yield* ActivityLog
       const pullRequests = yield* PullRequestMirror
-
-      const savedRequests = Effect.gen(function* () {
-        const followed = yield* repositories.list()
-        const mirror = yield* pullRequests.saved
-
-        if (mirror === undefined) return []
-
-        const viewer = viewerOf(mirror, mirror.viewer, new Set())
-
-        return requestedReviewsOf(classify(mirror, followed, viewer)["needs-review"], viewer)
-      }).pipe(
-        Effect.catch((cause) =>
-          Effect.logWarning("Couldn't read the saved Review requests", cause).pipe(Effect.as([])),
-        ),
-      )
-
-      const needsReview = yield* SubscriptionRef.make<ReadonlyArray<RequestedReview>>(
-        yield* savedRequests,
-      )
 
       const touchedBy = (login: string) =>
         activity.touchedPullRequests(login).pipe(
@@ -208,11 +159,7 @@ export class PullRequestLists extends Context.Service<
         list: Effect.fn("PullRequestLists.list")(function* () {
           const followed = yield* repositories.list()
 
-          if (followed.length === 0) {
-            yield* SubscriptionRef.set(needsReview, [])
-
-            return noListings
-          }
+          if (followed.length === 0) return noListings
 
           const { login } = yield* github.viewer
           const touched = yield* touchedBy(login)
@@ -221,12 +168,11 @@ export class PullRequestLists extends Context.Service<
             shownIn(classify(synced, followed, viewerOf(synced, login, touched.touched))),
           )
 
-          const viewer = viewerOf(mirror, login, touched.touched)
-          const lists = classify(mirror, followed, viewer)
-
-          yield* SubscriptionRef.set(needsReview, requestedReviewsOf(lists["needs-review"], viewer))
-
-          return listingsOf(lists, touched, failures)
+          return listingsOf(
+            classify(mirror, followed, viewerOf(mirror, login, touched.touched)),
+            touched,
+            failures,
+          )
         }),
         saved: Effect.fn("PullRequestLists.saved")(function* () {
           const followed = yield* repositories.list()
@@ -247,7 +193,6 @@ export class PullRequestLists extends Context.Service<
             new Map(),
           )
         }),
-        watchNeedsReview: () => SubscriptionRef.changes(needsReview),
       })
     }),
   )

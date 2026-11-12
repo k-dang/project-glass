@@ -409,7 +409,10 @@ it("refreshes on entry, window focus, every 30 seconds while visible, and on req
   await refreshed(5)
 
   await user.click(screen.getByRole("link", { name: "Settings" }))
-  act(() => void vi.advanceTimersByTime(30_000))
+  act(() => void vi.advanceTimersByTime(180_000))
+  act(() => void window.dispatchEvent(new Event("focus")))
+  expect(requests).toHaveLength(5)
+  await user.click(screen.getByRole("link", { name: "Reviews" }))
   await refreshed(6)
 })
 

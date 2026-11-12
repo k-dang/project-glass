@@ -3,7 +3,6 @@ import {
   AllowRequest,
   AnswerQuestion,
   type AgentReviewState,
-  FollowedRepository,
   isWaiting,
   type NeedsYou,
   PullRequestRef,
@@ -17,7 +16,7 @@ import { vi } from "vite-plus/test"
 import { agentsFixture } from "../test/agentsFixture"
 import { startFakeGitHub } from "../test/fakeGitHub"
 import { type FakePullRequest, type FakePullRequestSeed, VIEWER } from "../test/fakePullRequest"
-import { isolatedHome, startBackend, startSignedInBackend } from "../test/harness"
+import { isolatedHome, startBackend } from "../test/harness"
 import { type ScriptedSettings, scriptedAgentRunners } from "../test/scriptedAgentRunners"
 
 type Client = Effect.Success<ReturnType<typeof startBackend>>["client"]
@@ -25,8 +24,6 @@ type Client = Effect.Success<ReturnType<typeof startBackend>>["client"]
 const scriptedHost = fileURLToPath(new URL("../dist-test/scriptedAgentHost.mjs", import.meta.url))
 
 const answer = { markdown: "**Nothing stands out.** The greeting now takes a name." }
-
-const longAgo = "2024-06-01T10:00:00.000Z"
 
 const needsYou = (client: Client, until: (items: NeedsYou) => boolean) =>
   client.WatchNeedsYou().pipe(Stream.filter(until), Stream.runHead, Effect.map(Option.getOrThrow))
@@ -191,61 +188,6 @@ it.live("lists a Sandbox Agent still waiting when Glass opens again", () =>
 )
 
 it.live(
-  "lists PRs requesting the user's or their team's Review as of the latest PR list, since Glass first saw each request",
-  () =>
-    Effect.gen(function* () {
-      const { github, client } = yield* startSignedInBackend
-      yield* client.FollowRepository({ input: "octo-org/glass" })
-
-      const seed = (title: string, extra: Partial<FakePullRequestSeed>) =>
-        github.seedPullRequest({
-          owner: "octo-org",
-          repo: "glass",
-          title,
-          author: "hubot",
-          updatedAt: longAgo,
-          base: { sha: "b0", files: {} },
-          head: { sha: "h1", files: {} },
-          ...extra,
-        })
-
-      const direct = seed("Greet the world", { requestedReviewers: [VIEWER.login] })
-
-      const team = seed("Wave at the world", {
-        requestedTeams: [VIEWER.teams[0]],
-        updatedAt: "2024-06-02T10:00:00.000Z",
-      })
-
-      seed("My own change", { author: VIEWER.login, requestedTeams: [VIEWER.teams[0]] })
-      seed("Not ready yet", { isDraft: true, requestedReviewers: [VIEWER.login] })
-      seed("For someone else", { requestedReviewers: ["mona"], requestedTeams: ["octo-org/other"] })
-
-      assert.deepStrictEqual(yield* current(client), [])
-      yield* client.ListPullRequests()
-
-      const listed = yield* current(client)
-      assert.deepStrictEqual(titles(listed), ["Greet the world", "Wave at the world"])
-      assert.deepStrictEqual(reasonsOf(listed, direct), ["ReviewRequested"])
-      assert.strictEqual(sinceOf(listed, direct), longAgo)
-      assert.strictEqual(sinceOf(listed, team), "2024-06-02T10:00:00.000Z")
-
-      direct.edit({})
-      yield* client.ListPullRequests()
-      assert.strictEqual(sinceOf(yield* current(client), direct), longAgo)
-
-      direct.addReview({ author: VIEWER.login, state: "APPROVED" })
-      yield* client.ListPullRequests()
-      assert.deepStrictEqual(titles(yield* current(client)), ["Wave at the world"])
-
-      yield* client.UnfollowRepository({
-        repository: new FollowedRepository({ owner: "octo-org", repo: "glass" }),
-      })
-      yield* client.ListPullRequests()
-      assert.deepStrictEqual(yield* current(client), [])
-    }),
-)
-
-it.live(
   "lists a queued PR once its Agent review is finished, not while one waits, runs, or failed",
   () =>
     Effect.gen(function* () {
@@ -323,37 +265,18 @@ it.live("lists a queued draft with a finished Agent review, but not a closed or 
   }),
 )
 
-it.live(
-  "lists a PR with a Review request and a finished Agent review once, since the earlier",
-  () =>
-    Effect.gen(function* () {
-      const f = yield* reviewsFixture()
-      yield* f.client.FollowRepository({ input: "octo-org/hello-world" })
-      const pr = f.seed("Greet", { requestedReviewers: [VIEWER.login], updatedAt: longAgo })
-      yield* f.client.ListPullRequests()
-      yield* f.client.AddToQueue({ references: [ref(pr)] })
-      yield* f.review(pr)
-
-      const listed = yield* needsYou(f.client, (items) => reasonsOf(items, pr)?.length === 2)
-
-      assert.deepStrictEqual(titles(listed), ["Greet"])
-      assert.deepStrictEqual(reasonsOf(listed, pr), ["ReviewRequested", "AgentReviewFinished"])
-      assert.strictEqual(sinceOf(listed, pr), longAgo)
-    }),
-)
-
 it.live("lists a waiting Agent before a PR that has waited longer", () =>
   Effect.gen(function* () {
-    const f = yield* agentsFixture
-    yield* f.client.FollowRepository({ input: "octo-org/hello-world" })
-    f.github.seedPullRequest({
-      requestedReviewers: [VIEWER.login],
-      updatedAt: longAgo,
-      base: { sha: "b0", files: {} },
-      head: { sha: "h1", files: {} },
+    const f = yield* reviewsFixture()
+    const pr = f.seed("Greet")
+    yield* f.client.AddToQueue({ references: [ref(pr)] })
+    yield* f.review(pr)
+
+    yield* f.client.FollowUpAgentReview({
+      pullRequest: ref(pr),
+      revision: revisionOf(pr),
+      message: "Please ask permission",
     })
-    yield* f.client.ListPullRequests()
-    const agent = yield* f.start("Please ask permission")
 
     const listed = yield* needsYou(f.client, (items) => items.length === 2)
 
@@ -361,7 +284,6 @@ it.live("lists a waiting Agent before a PR that has waited longer", () =>
       listed.map(({ _tag }) => _tag),
       ["Agent", "PullRequest"],
     )
-    assert.strictEqual(agentItem(listed, agent.id)?.agent.id, agent.id)
     assert.isTrue(DateTime.isLessThan(listed[1]!.since, listed[0]!.since))
   }),
 )
