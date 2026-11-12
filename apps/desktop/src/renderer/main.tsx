@@ -6,7 +6,7 @@ import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import { codeThemeFor, CodeThemeSync } from "./codeTheme"
 import { Root } from "./Root"
-import { applyTheme, savedTheme } from "./theme"
+import { applyAppearance, savedAppearance } from "./theme"
 import "./styles.css"
 
 const poolOptions: WorkerPoolOptions = {
@@ -14,15 +14,15 @@ const poolOptions: WorkerPoolOptions = {
   poolSize: Math.min(3, Math.max(1, navigator.hardwareConcurrency - 1)),
 }
 
-const theme = savedTheme()
+const appearance = savedAppearance()
 
-void applyTheme(theme)
+void applyAppearance(appearance)
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <WorkerPoolContextProvider
       poolOptions={poolOptions}
-      highlighterOptions={{ theme: codeThemeFor(theme) }}
+      highlighterOptions={{ theme: codeThemeFor(appearance.theme) }}
     >
       <RegistryProvider>
         <CodeThemeSync />

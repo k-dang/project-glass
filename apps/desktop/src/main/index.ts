@@ -11,9 +11,10 @@ import {
   RECORD_DOGFOOD_REPORT_CHANNEL,
   RELAUNCH_CHANNEL,
   RESOURCE_USAGE_CHANNEL,
-  SET_THEME_CHANNEL,
-  type Theme,
+  SET_APPEARANCE_CHANNEL,
+  type Appearance,
 } from "@glass/contracts/desktop"
+import type { Theme } from "@glass/contracts"
 import { Cause, Effect, Fiber, Option } from "effect"
 import {
   app,
@@ -96,17 +97,32 @@ const openInBrowser = (url: string) => {
   if (scheme === "https:" || scheme === "http:") void shell.openExternal(url)
 }
 
-let theme: Theme = "system"
+let theme: Theme = "glass"
 
-const windowColors = () => {
-  if (theme === "charcoal") return { color: "#111111", symbolColor: "#cecece" }
+const titleBarColors = {
+  glass: {
+    light: { color: "#ffffff", symbolColor: "#0a0a0a" },
+    dark: { color: "#0a0a0a", symbolColor: "#fafafa" },
+  },
+  charcoal: {
+    light: { color: "#f4f4f4", symbolColor: "#2b2b2b" },
+    dark: { color: "#111111", symbolColor: "#cecece" },
+  },
+  catppuccin: {
+    light: { color: "#e6e9ef", symbolColor: "#4c4f69" },
+    dark: { color: "#181825", symbolColor: "#cdd6f4" },
+  },
+  linear: {
+    light: { color: "#fcfcfd", symbolColor: "#282a30" },
+    dark: { color: "#010102", symbolColor: "#f7f8f8" },
+  },
+  vercel: {
+    light: { color: "#fafafa", symbolColor: "#171717" },
+    dark: { color: "#000000", symbolColor: "#ededed" },
+  },
+} satisfies Record<Theme, Record<"light" | "dark", { color: string; symbolColor: string }>>
 
-  if (theme === "catppuccin-mocha") return { color: "#181825", symbolColor: "#cdd6f4" }
-
-  return nativeTheme.shouldUseDarkColors
-    ? { color: "#0a0a0a", symbolColor: "#fafafa" }
-    : { color: "#ffffff", symbolColor: "#0a0a0a" }
-}
+const windowColors = () => titleBarColors[theme][nativeTheme.shouldUseDarkColors ? "dark" : "light"]
 
 const updateWindowTheme = (window: BrowserWindow) => {
   const colors = windowColors()
@@ -280,9 +296,9 @@ void app.whenReady().then(() => {
   ipcMain.handle(BACKEND_ENDPOINT_CHANNEL, () => backendReady.promise)
   ipcMain.handle(BACKEND_FAILURE_CHANNEL, () => backendFailed.promise)
   ipcMain.handle(RESOURCE_USAGE_CHANNEL, () => summarizeResourceUsage(app.getAppMetrics()))
-  ipcMain.handle(SET_THEME_CHANNEL, (_event, next: Theme) => {
-    theme = next
-    nativeTheme.themeSource = next === "charcoal" || next === "catppuccin-mocha" ? "dark" : next
+  ipcMain.handle(SET_APPEARANCE_CHANNEL, (_event, next: Appearance) => {
+    theme = next.theme
+    nativeTheme.themeSource = next.colorScheme
 
     for (const window of BrowserWindow.getAllWindows()) updateWindowTheme(window)
 

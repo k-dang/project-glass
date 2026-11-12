@@ -1,33 +1,36 @@
-import type { ColorScheme, Theme } from "@glass/contracts"
+import { type Appearance, type ColorScheme, ColorSchemePreference, Theme } from "@glass/contracts"
 import { useAtom } from "@effect/atom-react"
+import { Option, Schema } from "effect"
 import { Atom } from "effect/reactivity"
 
-const storageKey = "glass.theme"
+const themeKey = "glass.theme"
 
-const themeAtom = Atom.writable(savedTheme, (ctx, theme: Theme) => {
-  localStorage.setItem(storageKey, theme)
-  ctx.setSelf(theme)
+const colorSchemeKey = "glass.colorScheme"
+
+const appearanceAtom = Atom.writable(savedAppearance, (ctx, appearance: Appearance) => {
+  localStorage.setItem(themeKey, appearance.theme)
+  localStorage.setItem(colorSchemeKey, appearance.colorScheme)
+  ctx.setSelf(appearance)
 }).pipe(Atom.keepAlive)
 
-export function savedTheme(): Theme {
-  const saved = localStorage.getItem(storageKey)
+const decodeTheme = Schema.decodeUnknownOption(Theme)
 
-  if (
-    saved === "light" ||
-    saved === "dark" ||
-    saved === "system" ||
-    saved === "charcoal" ||
-    saved === "catppuccin-mocha"
-  )
-    return saved
+const decodeColorScheme = Schema.decodeUnknownOption(ColorSchemePreference)
 
-  return "system"
+export function savedAppearance(): Appearance {
+  return {
+    theme: Option.getOrElse(decodeTheme(localStorage.getItem(themeKey)), () => "glass" as const),
+    colorScheme: Option.getOrElse(
+      decodeColorScheme(localStorage.getItem(colorSchemeKey)),
+      () => "system" as const,
+    ),
+  }
 }
 
-export function applyTheme(theme: Theme) {
-  document.documentElement.dataset.theme = theme
+export function applyAppearance(appearance: Appearance) {
+  document.documentElement.dataset.theme = appearance.theme
 
-  return window.glass.setTheme(theme)
+  return window.glass.setAppearance(appearance)
 }
 
 const colorSchemeTimeout = 300
@@ -53,23 +56,26 @@ const colorSchemeFollows = (colorScheme: ColorScheme) =>
     scheme.addEventListener("change", done)
   })
 
-function transitionTheme(theme: Theme) {
+function transitionAppearance(appearance: Appearance) {
   document.startViewTransition({
     types: ["theme"],
     update: async () => {
-      await colorSchemeFollows(await applyTheme(theme))
+      await colorSchemeFollows(await applyAppearance(appearance))
     },
   })
 }
 
-export function useTheme() {
-  const [theme, saveTheme] = useAtom(themeAtom)
+export function useAppearance() {
+  const [appearance, saveAppearance] = useAtom(appearanceAtom)
+
+  const change = (next: Appearance) => {
+    saveAppearance(next)
+    transitionAppearance(next)
+  }
 
   return {
-    theme,
-    setTheme: (next: Theme) => {
-      saveTheme(next)
-      transitionTheme(next)
-    },
+    ...appearance,
+    setTheme: (theme: Theme) => change({ ...appearance, theme }),
+    setColorScheme: (colorScheme: ColorSchemePreference) => change({ ...appearance, colorScheme }),
   }
 }

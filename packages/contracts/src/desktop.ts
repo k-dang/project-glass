@@ -1,6 +1,7 @@
 import type { CapturedContext } from "./agent"
 import type { AgentReview } from "./agentReview"
 import type { Tour } from "./tour"
+import type { ColorSchemePreference, Theme } from "./appearance"
 
 export interface BackendEndpoint {
   readonly url: string
@@ -13,9 +14,12 @@ export interface BackendFailure {
   readonly logFile: string
 }
 
-export type Theme = "light" | "dark" | "system" | "charcoal" | "catppuccin-mocha"
-
 export type ColorScheme = "light" | "dark"
+
+export interface Appearance {
+  readonly theme: Theme
+  readonly colorScheme: ColorSchemePreference
+}
 
 export type ResourceProcess = "Main" | "Renderer" | "Backend" | "GPU / other"
 
@@ -32,7 +36,7 @@ export interface DesktopBridge {
   readonly backendEndpoint: () => Promise<BackendEndpoint>
   readonly backendFailure: () => Promise<BackendFailure>
   readonly relaunch: () => Promise<void>
-  readonly setTheme: (theme: Theme) => Promise<ColorScheme>
+  readonly setAppearance: (appearance: Appearance) => Promise<ColorScheme>
   readonly resourceUsage: () => Promise<ResourceUsage>
   readonly chooseFolder: () => Promise<string | null>
   readonly dogfoodReports: DogfoodReportsBridge
@@ -68,7 +72,7 @@ export const BACKEND_FAILURE_CHANNEL = "glass:backend-failure"
 
 export const RELAUNCH_CHANNEL = "glass:relaunch"
 
-export const SET_THEME_CHANNEL = "glass:set-theme"
+export const SET_APPEARANCE_CHANNEL = "glass:set-appearance"
 
 export const RESOURCE_USAGE_CHANNEL = "glass:resource-usage"
 
