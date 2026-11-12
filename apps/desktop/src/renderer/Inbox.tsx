@@ -222,6 +222,7 @@ function InboxSections(props: {
               <li key={key}>
                 <button
                   type="button"
+                  data-inbox-row={key}
                   aria-current={key === props.selectedKey ? "true" : undefined}
                   className="flex w-full flex-col gap-0.5 px-4 py-2 text-left text-sm outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring aria-[current=true]:bg-accent"
                   onClick={() => props.onPick(key)}
@@ -332,13 +333,21 @@ export function Inbox() {
     const at = keys.indexOf(selectedKey)
     const next = keys[Math.min(keys.length - 1, Math.max(0, at + delta))]
 
-    if (next !== undefined) setPicked(next)
+    if (next === undefined) return
+
+    setPicked(next)
+    document.querySelector<HTMLElement>(`[data-inbox-row="${CSS.escape(next)}"]`)?.focus()
   }
 
   useShortcuts([
     { key: "j", run: () => move(1) },
     { key: "k", run: () => move(-1) },
-    { key: "Enter", skipOnControl: true, run: openSelected },
+    {
+      key: "Enter",
+      skipOnControl: true,
+      except: "[data-inbox-row]",
+      run: openSelected,
+    },
     {
       key: "a",
       run: () => {
