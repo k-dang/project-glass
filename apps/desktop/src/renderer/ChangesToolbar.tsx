@@ -60,8 +60,7 @@ export function ChangesToolbar(props: {
     readonly on: boolean
     readonly onChange: (on: boolean) => void
   } | null
-  agentReview: ReactNode
-  outdatedTour: ReactNode
+  agentWork: ReactNode
 }) {
   const { display, onDisplayChange, tourOrder, fullScreen } = props
   const set = (change: Partial<Display>) => onDisplayChange({ ...display, ...change })
@@ -96,9 +95,8 @@ export function ChangesToolbar(props: {
           </ToggleGroupItem>
         </ToggleGroup>
       )}
-      {props.outdatedTour}
       <span className="flex-1" />
-      {props.agentReview}
+      {props.agentWork}
       {props.viewedCount !== null && (
         <span className="mr-2 tabular-nums" aria-live="polite">
           {props.viewedCount}/{props.fileCount} viewed

@@ -1,5 +1,6 @@
 import { useAtom, useAtomRefresh, useAtomValue } from "@effect/atom-react"
 import {
+  type AgentReview,
   emptyTranscript,
   nothingUnsent,
   type SentMessage,
@@ -29,6 +30,8 @@ import { AgentComposer, ToolCallView, Transcript, UserMessage } from "./AgentVie
 import type { ShowNote } from "./changesView"
 import { LineLocation, pathLineName } from "./Discussions"
 import { Elapsed } from "./Elapsed"
+import { type HotspotLinks, HotspotPoints } from "./Hotspots"
+import { rankHotspots } from "./rankedHotspots"
 import { type ComposerSuggestion, MessageBox } from "./MessageBox"
 import { ProblemAlert } from "./ProblemAlert"
 import { fileName } from "./fileName"
@@ -47,6 +50,30 @@ export function AgentReviewMarkdown(props: { markdown: string; className?: strin
     >
       {props.markdown}
     </Streamdown>
+  )
+}
+
+export const splitLead = (markdown: string) => {
+  const end = /\n\s*\n/.exec(markdown)
+
+  return end === null
+    ? { lead: markdown, rest: "" }
+    : { lead: markdown.slice(0, end.index), rest: markdown.slice(end.index + end[0].length) }
+}
+
+function ReviewBody(props: { review: AgentReview; links: HotspotLinks; outdated: boolean }) {
+  const { lead, rest } = splitLead(props.review.markdown)
+
+  return (
+    <>
+      <AgentReviewMarkdown markdown={lead} />
+      <HotspotPoints
+        hotspots={rankHotspots(props.review.hotspots)}
+        links={props.links}
+        outdated={props.outdated}
+      />
+      {rest !== "" && <AgentReviewMarkdown markdown={rest} />}
+    </>
   )
 }
 
@@ -288,10 +315,11 @@ export function AgentReviewPanel(props: {
   controls: AgentReviewControls
   drafts: DraftStore
   show: ShowNote
+  hotspotLinks: HotspotLinks
 }) {
   const { review } = props
   const { job, outdated } = props.controls
-  const markdown = <AgentReviewMarkdown markdown={review.markdown} />
+  const markdown = <ReviewBody review={review} links={props.hotspotLinks} outdated={outdated} />
 
   if (review.agentId !== null)
     return (

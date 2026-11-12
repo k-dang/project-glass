@@ -20,7 +20,7 @@ import {
   useOpenedFiles,
   type ViewHandle,
 } from "./ChangedFilesView"
-import { type CollapseChoices, layOut } from "./changesView"
+import { type CollapseChoices, layOut, noneCollapsedAtFirst } from "./changesView"
 import { ChangesToolbar } from "./ChangesToolbar"
 import { type FeedbackAnnotation, isOlder } from "./feedbackLines"
 import { FilePanelTabsList, FilePanelTabTrigger } from "./FilePanelTabs"
@@ -207,8 +207,7 @@ function ChangesWithFeedback(props: {
           onAllChange={showAll}
           tourOrder={null}
           fullScreen={null}
-          agentReview={null}
-          outdatedTour={null}
+          agentWork={null}
         />
         {store.notes.length > 0 && (
           <ReviewFeedback
@@ -237,6 +236,7 @@ function ChangesWithFeedback(props: {
               display={display}
               opened={opened}
               all={all}
+              collapsedAtFirst={noneCollapsedAtFirst}
               onOpenChange={setFileOpen}
               {...feedback.diffProps}
             />

@@ -1,5 +1,5 @@
 import { useAtom, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
-import type { PullRequestRef, Revision } from "@glass/contracts"
+import type { AgentReview, AgentReviewState, PullRequestRef, Revision } from "@glass/contracts"
 import { Equal, Exit, Option, Predicate, Stream } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
 import { useCallback, useMemo, useRef } from "react"
@@ -8,9 +8,17 @@ import { describeError, settledProblem, unexpectedProblem } from "./problems"
 
 type AgentReviewCommand = "start" | "cancel"
 
+const keepReview = (previous: AgentReview | null, state: AgentReviewState) => {
+  const review = Equal.equals(previous, state.review) ? previous : state.review
+
+  return [review, [{ ...state, review }]] as const
+}
+
 export const agentReviewStates = Atom.family((pullRequest: PullRequestRef) =>
   backendRuntime.atom(
-    Stream.unwrap(Backend.useSync((backend) => backend.WatchAgentReview({ pullRequest }))),
+    Stream.unwrap(Backend.useSync((backend) => backend.WatchAgentReview({ pullRequest }))).pipe(
+      Stream.mapAccum((): AgentReview | null => null, keepReview),
+    ),
   ),
 )
 
@@ -73,12 +81,13 @@ export const useAgentReview = (
   }
 
   const review = latest?.review ?? null
-  const current = review !== null && Equal.equals(review.revision, revision)
+  const current = review !== null && Equal.equals(review.revision, revision) ? review : null
 
   return {
     job: latest?.job ?? null,
     review,
-    outdated: review !== null && !current,
+    current,
+    outdated: review !== null && current === null,
     commandProblem: settledProblem(commandResult),
     followUpProblem: settledProblem(followUpResult),
     followUpPending: followUpResult.waiting,

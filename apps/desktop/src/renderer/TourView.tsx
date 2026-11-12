@@ -1,9 +1,10 @@
-import type { DiffSide, TourCodeTarget } from "@glass/contracts"
+import type { TourCodeTarget } from "@glass/contracts"
 import { cn } from "cn"
 import { Check, ChevronRight, ChevronUp } from "lucide-react"
 import { useAtomValue } from "@effect/atom-react"
 import { DateTime } from "effect"
 import {
+  type ReactNode,
   type Ref,
   type RefObject,
   useCallback,
@@ -23,11 +24,12 @@ import { annotationSides, type ParsedFile } from "./changesView"
 import { LineCounts } from "./LineCounts"
 import { plural } from "./plural"
 import { allViewed, twoDigits } from "./tourProgress"
-import type { TourChapter, TourReading } from "./tourReading"
+import { hasOverview, type TourChapter, type TourReading } from "./tourReading"
 import { TourText } from "./TourText"
 import { TourDiagram } from "./TourDiagram"
 import { TourBeforeAfter } from "./TourBeforeAfter"
 import { StartReading } from "./TourSidebar"
+import { AttentionMark, ChapterHotspots, TourHotspots } from "./Hotspots"
 import { useViewedFiles, type ViewedFilesStore } from "./useViewedFiles"
 
 type ScrollBehavior = "smooth" | "instant"
@@ -35,13 +37,18 @@ type ScrollBehavior = "smooth" | "instant"
 const tourProse =
   "max-w-[80ch] text-[13px] leading-[1.8] text-muted-foreground wrap-anywhere [&_code]:bg-transparent [&_code]:p-0 [&_code]:text-xs [&_code]:text-inherit"
 
-const chapterGrid =
-  "grid grid-cols-[clamp(300px,30%,400px)_minmax(0,1fr)] overflow-clip rounded-[10px] border bg-[color-mix(in_oklch,var(--muted)_35%,var(--background))] @max-[850px]/tour:grid-cols-[280px_minmax(0,1fr)] @max-[700px]/tour:grid-cols-1"
+const tourCard =
+  "overflow-clip rounded-[10px] border bg-[color-mix(in_oklch,var(--muted)_35%,var(--background))]"
+
+const chapterGrid = cn(
+  tourCard,
+  "grid grid-cols-[clamp(300px,30%,400px)_minmax(0,1fr)] @max-[850px]/tour:grid-cols-[280px_minmax(0,1fr)] @max-[700px]/tour:grid-cols-1",
+)
 
 export interface TourViewHandle {
   showFile: (path: string, behavior?: ScrollBehavior) => void
   returnTo: (path: string) => void
-  showLine: (path: string, side: DiffSide, line: number) => void
+  showRange: (target: TourCodeTarget) => void
   showChapter: (index: number, behavior: ScrollBehavior) => void
   showOverview: () => void
   currentChapter: () => number
@@ -53,6 +60,7 @@ interface TourViewProps extends Omit<
   "files" | "summaries" | "searchGroup" | "ref"
 > {
   reading: TourReading
+  onShowInReview: (rank: number) => void
   ref: Ref<TourViewHandle>
 }
 
@@ -107,6 +115,7 @@ const useReopenedChapters = (done: string) => {
 }
 
 export function TourView(props: TourViewProps) {
+  const { onShowInReview, ...diff } = props
   const { reading, ref, onCurrentPathChange, onOpenChange } = props
   const container = useRef<HTMLDivElement>(null)
   const sections = useRef(new Map<number, ChapterSection>())
@@ -335,8 +344,7 @@ export function TourView(props: TourViewProps) {
         if (collapsed(index)) revealChapter(index, "instant")
         else scrollToFile(index, path, "instant")
       },
-      showLine: (path, side, line) =>
-        showTargetInChapter({ path, side, startLine: line, endLine: line }),
+      showRange: showTargetInChapter,
     }),
     [
       currentChapter,
@@ -366,10 +374,10 @@ export function TourView(props: TourViewProps) {
         if (path !== undefined) onCurrentPathChange(path)
       }}
     >
-      {reading.beforeAfter !== null && (
+      {hasOverview(reading) && (
         <TourOverview
-          intent={reading.intent}
-          beforeAfter={reading.beforeAfter}
+          reading={reading}
+          onShowInReview={onShowInReview}
           chapterCount={reading.chapters.length}
           fileCount={reading.files.length}
           onStart={() => showChapter(0, "smooth")}
@@ -379,7 +387,8 @@ export function TourView(props: TourViewProps) {
       {groups.map(({ chapter, files }, index) => (
         <ChapterCard
           key={`${DateTime.formatIso(reading.writtenAt)}:${index}`}
-          diff={props}
+          diff={diff}
+          onShowInReview={onShowInReview}
           searchGroup={searchGroup}
           chapter={chapter}
           chapterCount={reading.chapters.length}
@@ -405,17 +414,21 @@ export function TourView(props: TourViewProps) {
 }
 
 function TourOverview(props: {
-  intent: string
-  beforeAfter: NonNullable<TourReading["beforeAfter"]>
+  reading: TourReading
+  onShowInReview: (rank: number) => void
   chapterCount: number
   fileCount: number
   onStart: () => void
   onShowTarget: (target: TourCodeTarget) => void
 }) {
+  const { intent, beforeAfter, hotspots } = props.reading
   const heading = useId()
 
   return (
-    <section className={cn(chapterGrid, "[&+section]:mt-5")} aria-labelledby={heading}>
+    <section
+      className={cn(beforeAfter === null ? tourCard : chapterGrid, "[&+section]:mt-5")}
+      aria-labelledby={heading}
+    >
       <div className="min-w-0 px-5 py-5.5 @max-[850px]/tour:p-4">
         <h2 id={heading} className="text-base leading-6 font-semibold">
           Tour overview
@@ -424,21 +437,31 @@ function TourOverview(props: {
           {plural(props.chapterCount, "Chapter")} · {plural(props.fileCount, "file")}
         </p>
         <p className={tourProse}>
-          <TourText text={props.intent} />
+          <TourText text={intent} />
         </p>
         <div className="mt-4">
           <StartReading onStart={props.onStart} />
         </div>
+        {hotspots !== null && (
+          <TourHotspots
+            hotspots={hotspots}
+            onShowPlace={props.onShowTarget}
+            onShowInReview={props.onShowInReview}
+          />
+        )}
       </div>
-      <div className="min-w-0 border-l p-4.5 @max-[850px]/tour:p-3.5 @max-[700px]/tour:border-t @max-[700px]/tour:border-l-0">
-        <TourBeforeAfter beforeAfter={props.beforeAfter} onSelect={props.onShowTarget} />
-      </div>
+      {beforeAfter !== null && (
+        <div className="min-w-0 border-l p-4.5 @max-[850px]/tour:p-3.5 @max-[700px]/tour:border-t @max-[700px]/tour:border-l-0">
+          <TourBeforeAfter beforeAfter={beforeAfter} onSelect={props.onShowTarget} />
+        </div>
+      )}
     </section>
   )
 }
 
 function ChapterCard(props: {
-  diff: TourViewProps
+  diff: Omit<TourViewProps, "onShowInReview">
+  onShowInReview: (rank: number) => void
   searchGroup: NonNullable<ChangedFilesViewProps["searchGroup"]>
   chapter: TourChapter | null
   chapterCount: number
@@ -549,6 +572,7 @@ function ChapterCard(props: {
               )}
             </div>
             <ChapterProgress
+              attention={chapter !== null && <AttentionMark chapter={chapter} />}
               title={title}
               chapter={chapter}
               count={props.chapterCount}
@@ -563,6 +587,14 @@ function ChapterCard(props: {
                 </p>
               ))}
             </div>
+            {chapter !== null && (
+              <ChapterHotspots
+                hotspots={chapter.hotspots}
+                title={title}
+                onShowPlace={props.onShowTarget}
+                onShowInReview={props.onShowInReview}
+              />
+            )}
             {chapter !== null && chapter.callouts.length > 0 && (
               <ChapterCallouts
                 callouts={chapter.callouts}
@@ -623,6 +655,7 @@ function ChapterCard(props: {
 }
 
 function ChapterProgress(props: {
+  attention: ReactNode
   title: string
   chapter: TourChapter | null
   count: number
@@ -642,6 +675,7 @@ function ChapterProgress(props: {
           CHAPTER {twoDigits(props.chapter.index + 1)} / {twoDigits(props.count)}
         </span>
       )}
+      {props.attention}
       {props.paths.length > 0 && (
         <>
           <Label

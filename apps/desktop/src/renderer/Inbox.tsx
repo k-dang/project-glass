@@ -450,7 +450,7 @@ function OutsideQuestionDetail(props: { item: OutsideQuestion; now: Date }) {
     <article className="flex max-w-2xl flex-col gap-4">
       <header className="flex flex-col gap-1">
         <div className="flex items-center gap-2">
-          <CircleHelp className="size-4 text-muted-foreground" aria-hidden />
+          <CircleHelp className="size-4 shrink-0 text-muted-foreground" aria-hidden />
           <h2 className="text-lg font-semibold text-pretty break-words">{item.question}</h2>
           <Waited since={item.since} now={props.now} />
         </div>
@@ -518,8 +518,8 @@ function AgentDetail(props: { item: Extract<NeedsYouItem, { _tag: "Agent" }>; no
   return (
     <article className="flex max-w-2xl flex-col gap-4">
       <header className="flex flex-col gap-1">
-        <div className="flex items-center gap-2">
-          <Sparkles className="size-4 text-muted-foreground" aria-hidden />
+        <div className="flex items-baseline gap-2">
+          <Sparkles className="size-4 shrink-0 text-muted-foreground" aria-hidden />
           <h2 className="text-lg font-semibold">{agent.name}</h2>
           <Waited since={since} now={props.now} />
         </div>
@@ -554,8 +554,8 @@ function PullRequestDetail(props: {
   return (
     <article className="flex max-w-2xl flex-col gap-4">
       <header className="flex flex-col gap-1">
-        <div className="flex items-center gap-2">
-          <GitPullRequest className="size-4 text-muted-foreground" aria-hidden />
+        <div className="flex items-baseline gap-2">
+          <GitPullRequest className="size-4 shrink-0 text-muted-foreground" aria-hidden />
           <h2 className="text-lg font-semibold text-pretty">{pullRequest.title}</h2>
           <Waited since={since} now={props.now} />
         </div>

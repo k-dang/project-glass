@@ -21,5 +21,5 @@ Use no em-dashes or emoji.
 PR material (JSON data):
 ${JSON.stringify(agentReviewMaterial(input, review.revision))}
 
-The Agent review (Markdown data):
-${JSON.stringify(review.markdown)}`
+The Agent review (JSON data: its Markdown, its hotspots ranked most important first, and the files it found need little attention):
+${JSON.stringify({ markdown: review.markdown, hotspots: review.hotspots, lowAttention: review.lowAttention })}`

@@ -31,7 +31,10 @@ it("writes only on request", async () => {
   })
   expect(await screen.findByText("Writing Tour…")).toBeDefined()
   expect(screen.getByText("openai/gpt-test")).toBeDefined()
-  expect(screen.getByLabelText("Time elapsed").textContent).toMatch(/^[3-5]s$/)
+  expect(
+    within(screen.getByRole("tabpanel", { name: "Tour" })).getByLabelText("Time elapsed")
+      .textContent,
+  ).toMatch(/^0:0[3-5]$/)
   await f.user.click(screen.getByRole("button", { name: "Cancel" }))
   await waitFor(() => expect(f.cancel).toHaveBeenCalled())
   expect(await screen.findByRole("button", { name: "Write Tour" })).toBeDefined()

@@ -1,24 +1,12 @@
 import type {
   ChangedFile,
   Chapter,
-  TourCodeTarget,
   TourDiagram,
   TourDiagramNode,
   TourBeforeAfter,
   TourCallouts,
 } from "@glass/contracts"
-import { Predicate } from "effect"
-import { rangeInPatch } from "./github/patchLines"
-
-const validTarget = (target: TourCodeTarget, files: ReadonlyArray<ChangedFile>) => {
-  const file = files.find((entry) => entry.path === target.path)
-
-  return (
-    file !== undefined &&
-    Predicate.isTagged(file.patch, "TextPatch") &&
-    rangeInPatch(file.patch.hunks, target.side, target.startLine, target.endLine)
-  )
-}
+import { rangeInFiles } from "./github/patchLines"
 
 const validNode = (
   node: Pick<TourDiagramNode, "change" | "target">,
@@ -26,7 +14,7 @@ const validNode = (
 ) =>
   (node.change !== "added" || node.target.side === "new") &&
   (node.change !== "removed" || node.target.side === "old") &&
-  validTarget(node.target, files)
+  rangeInFiles(files, node.target)
 
 export const validateTourDiagram = (
   diagram: TourDiagram,
@@ -99,13 +87,13 @@ export const validateTourBeforeAfter = (
   return {
     ...beforeAfter,
     lines: beforeAfter.lines.map((line) =>
-      line.target === null || validTarget(line.target, files) ? line : { ...line, target: null },
+      line.target === null || rangeInFiles(files, line.target) ? line : { ...line, target: null },
     ),
   }
 }
 
 export const validateTourCallouts = (callouts: TourCallouts, files: ReadonlyArray<ChangedFile>) =>
-  callouts.filter((callout) => validTarget(callout.target, files))
+  callouts.filter((callout) => rangeInFiles(files, callout.target))
 
 export const repairChapterVisuals = (
   chapter: Chapter,

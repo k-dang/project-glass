@@ -4,6 +4,7 @@ import { Revision } from "./revision"
 import { CheckoutRunReason } from "./checkoutRun"
 import { DiffSide } from "./discussion"
 import { AgentRunnerIdentity } from "./engine"
+import { TourCodeTarget } from "./tour"
 
 export const FollowUpMessage = Schema.Trimmed.check(Schema.isNonEmpty())
 
@@ -25,10 +26,38 @@ export const acceptedSuggestedDraftOf = (call: typeof ToolCallPart.Type): Sugges
     ? Option.getOrNull(decodeSuggestedDraft(call.input))
     : null
 
+/** Saved Agent reviews hold these kinds, so removing or renaming one needs a data migration. */
+export const RiskKind = Schema.Literals([
+  "data-access",
+  "migration",
+  "auth",
+  "concurrency",
+  "public-contract",
+])
+
+export type RiskKind = typeof RiskKind.Type
+
+export const Hotspot = Schema.Struct({
+  title: Schema.String,
+  kind: RiskKind,
+  place: Schema.NullOr(TourCodeTarget),
+  why: Schema.String,
+  evidence: Schema.String,
+  check: Schema.String,
+})
+
+export type Hotspot = typeof Hotspot.Type
+
+export const LowAttentionFile = Schema.Struct({ path: Schema.String, reason: Schema.String })
+
+export type LowAttentionFile = typeof LowAttentionFile.Type
+
 export const AgentReview = Schema.Struct({
   revision: Revision,
   writtenAt: Schema.DateTimeUtcFromString,
   markdown: Schema.String,
+  hotspots: Schema.Array(Hotspot),
+  lowAttention: Schema.Array(LowAttentionFile),
   agentId: Schema.NullOr(Schema.String),
 })
 
