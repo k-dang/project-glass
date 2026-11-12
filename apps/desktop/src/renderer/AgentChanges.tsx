@@ -207,8 +207,7 @@ function ChangesWithFeedback(props: {
           onAllChange={showAll}
           tourOrder={null}
           fullScreen={null}
-          agentReview={null}
-          outdatedTour={null}
+          agentWork={null}
         />
         {store.notes.length > 0 && (
           <ReviewFeedback
