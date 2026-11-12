@@ -149,7 +149,7 @@ export function NewAgent(props: { repository: string | undefined }) {
         checkouts={linked}
         providers={providers}
         repository={props.repository}
-        newest={agents.at(-1)}
+        newest={agents.findLast((agent) => !agent.forReview)}
       />
     ))
     .render()

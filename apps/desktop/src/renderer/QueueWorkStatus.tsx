@@ -1,5 +1,11 @@
 import { useAtomValue } from "@effect/atom-react"
-import type { AgentReviewState, QueuedPullRequest, Revision, TourState } from "@glass/contracts"
+import {
+  type AgentReviewState,
+  finishedReview,
+  type QueuedPullRequest,
+  type Revision,
+  type TourState,
+} from "@glass/contracts"
 import { cn } from "cn"
 import { Equal, Option } from "effect"
 import { AsyncResult } from "effect/reactivity"
@@ -64,12 +70,16 @@ const tourStatus = ({ tour, job }: TourState, revision: Revision | null) => {
   return tour === null ? null : writtenStatus("Tour", Route, tour.revision, revision)
 }
 
-const agentReviewStatus = ({ review, job }: AgentReviewState, revision: Revision | null) => {
+const agentReviewStatus = (state: AgentReviewState, revision: Revision | null) => {
+  const { job } = state
+
   if (job.status === "waiting") return waiting("Agent review waiting")
 
   if (job.status === "reviewing") return running("Agent reviewing")
 
   if (job.status === "failed") return failed("Agent review failed", job.reason.message)
+
+  const review = finishedReview(state)
 
   return review === null
     ? null

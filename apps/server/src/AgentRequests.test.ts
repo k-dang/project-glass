@@ -69,7 +69,7 @@ it.live("keeps a supplied request waiting, refuses messages, and forwards the us
     assert.isTrue(before.turns[0]?.parts.some(isWaiting))
 
     const marked = yield* f.agents.watchWaiting().pipe(
-      Stream.filter((ids) => ids.includes(agent.id)),
+      Stream.filter((waiting) => waiting.some(({ agent: found }) => found.id === agent.id)),
       Stream.runHead,
     )
 
@@ -99,7 +99,7 @@ it.live("keeps a supplied request waiting, refuses messages, and forwards the us
       }),
     )
     yield* f.agents.watchWaiting().pipe(
-      Stream.filter((ids) => !ids.includes(agent.id)),
+      Stream.filter((waiting) => !waiting.some(({ agent: found }) => found.id === agent.id)),
       Stream.runHead,
     )
 

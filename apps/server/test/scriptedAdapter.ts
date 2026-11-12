@@ -2,6 +2,7 @@ import {
   AgentModels,
   PartSet,
   PermissionRequestPart,
+  QuestionPart,
   type RequestPart,
   RequestNotWaiting,
   type MessageWithContext,
@@ -112,6 +113,14 @@ export const scriptedAdapter = (gates: string): AgentAdapter => {
             return report(PartSet.make({ turnId, index, part: set })).pipe(Effect.as(index))
           })
 
+        const waitFor = (turnId: string, request: RequestPart) =>
+          Effect.gen(function* () {
+            const answered = yield* Deferred.make<void>()
+            const index = yield* part(turnId, request)
+            turn!.waiting = { part: request, index, answered }
+            yield* Deferred.await(answered)
+          })
+
         const end = (turnId: string, ending: TurnEnding) =>
           Effect.gen(function* () {
             turn = null
@@ -194,19 +203,38 @@ export const scriptedAdapter = (gates: string): AgentAdapter => {
             }
 
             if (/ask permission/i.test(message)) {
-              const request = PermissionRequestPart.make({
-                requestId: randomUUID(),
-                toolName: "Bash",
-                inputSummary: "touch notes.txt",
-                input: JSON.stringify({ command: "touch notes.txt" }),
-                status: "waiting",
-                reason: null,
-              })
+              yield* waitFor(
+                turnId,
+                PermissionRequestPart.make({
+                  requestId: randomUUID(),
+                  toolName: "Bash",
+                  inputSummary: "touch notes.txt",
+                  input: JSON.stringify({ command: "touch notes.txt" }),
+                  status: "waiting",
+                  reason: null,
+                }),
+              )
+            }
 
-              const answered = yield* Deferred.make<void>()
-              const index = yield* part(turnId, request)
-              turn!.waiting = { part: request, index, answered }
-              yield* Deferred.await(answered)
+            if (/ask a question/i.test(message)) {
+              yield* waitFor(
+                turnId,
+                QuestionPart.make({
+                  requestId: randomUUID(),
+                  questions: [
+                    {
+                      header: null,
+                      question: "Which files should change?",
+                      detail: null,
+                      options: [{ label: "Only source files", description: null }],
+                      multiSelect: false,
+                      freeText: true,
+                    },
+                  ],
+                  status: "waiting",
+                  answers: null,
+                }),
+              )
             }
 
             if (prompt.includes("<glass_feedback>"))

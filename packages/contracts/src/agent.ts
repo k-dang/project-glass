@@ -1,5 +1,5 @@
 import { agentEngines } from "@glass/plugin"
-import { Match, Predicate, Schema } from "effect"
+import { Effect, Match, Predicate, Schema } from "effect"
 import { FeedbackNote } from "./feedbackNote"
 import { FollowedRepository } from "./followedRepository"
 import { ChangedFile, PullRequestRef } from "./pullRequest"
@@ -127,6 +127,7 @@ export class Agent extends Schema.Class<Agent>("Agent")({
   localSkills: Schema.Boolean,
   createdAt: Schema.DateTimeUtcFromString,
   sandbox: Schema.NullOr(SandboxStatus),
+  forReview: Schema.Boolean.pipe(Schema.withConstructorDefault(Effect.succeed(false))),
 }) {}
 
 export const ImageMediaType = Schema.Literals([

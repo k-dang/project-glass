@@ -24,6 +24,8 @@ export * from "./feedbackNote"
 
 export * from "./followedRepository"
 
+export * from "./needsYou"
+
 export * from "./pullRequest"
 
 export * from "./pullRequestList"

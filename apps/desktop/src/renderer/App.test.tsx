@@ -287,11 +287,11 @@ it("jumps between rail areas with Mod and the area's number, even while typing",
   await user.type(await screen.findByRole("textbox", { name: "Open a PR" }), "octo")
   await user.keyboard("{Control>}4{/Control}")
   await waitFor(() =>
-    expect(screen.getByRole("link", { name: "Agents" }).getAttribute("aria-current")).toBe("page"),
+    expect(screen.getByRole("link", { name: "To-dos" }).getAttribute("aria-current")).toBe("page"),
   )
   await user.keyboard("{Meta>}2{/Meta}")
   await waitFor(() =>
-    expect(screen.getByRole("link", { name: "Reviews" }).getAttribute("aria-current")).toBe("page"),
+    expect(screen.getByRole("link", { name: "Inbox" }).getAttribute("aria-current")).toBe("page"),
   )
 })
 

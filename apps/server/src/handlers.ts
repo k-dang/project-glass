@@ -1,5 +1,5 @@
 import { GlassRpcs } from "@glass/contracts"
-import { Effect, Predicate } from "effect"
+import { Effect, Predicate, Stream } from "effect"
 import { ActivityLog } from "./ActivityLog"
 import { AgentReviews } from "./AgentReviews"
 import { Asks } from "./Asks"
@@ -9,6 +9,7 @@ import { GlobalConversation } from "./GlobalConversation"
 import { BackgroundGitHubRequest } from "./github/GitHubRequestPolicy"
 import { FollowedRepositories } from "./FollowedRepositories"
 import { LocalCheckouts } from "./LocalCheckouts"
+import { NeedsYou } from "./NeedsYou"
 import { PullRequestLists } from "./PullRequestLists"
 import { PullRequestWorkspaces } from "./PullRequestWorkspaces"
 import { Queue } from "./Queue"
@@ -42,6 +43,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
     const storage = yield* Storage
     const skillPacks = yield* SkillPacks
     const localSkills = yield* LocalSkills
+    const needsYou = yield* NeedsYou
 
     return GlassRpcs.of({
       GetSavedPlaces: () => savedPlaces.list(),
@@ -148,7 +150,9 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       ListAgentFiles: ({ agentId }) => agents.files(agentId),
       ListSandboxProviders: () => Effect.succeed(sandboxes.providers),
       CreateAgent: (input) => agents.create(input),
-      WatchWaitingAgents: () => agents.watchWaiting(),
+      WatchWaitingAgents: () =>
+        agents.watchWaiting().pipe(Stream.map((waiting) => waiting.map(({ agent }) => agent.id))),
+      WatchNeedsYou: () => needsYou.watch(),
       ChangeAgentModel: ({ agentId, model, effort }) =>
         agents.changeModel(agentId, { model, effort }),
       ChangePermissionMode: ({ agentId, permissionMode }) =>

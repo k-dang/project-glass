@@ -110,6 +110,8 @@ export const workspaceViewAtom = Atom.make(defaultWorkspaceView).pipe(Atom.keepA
 
 export const resumeNoticeAtom = Atom.make<string | null>(null).pipe(Atom.keepAlive)
 
+export const readAgentReviewOnOpenAtom = Atom.make<string | null>(null).pipe(Atom.keepAlive)
+
 export const targetAtom = Atom.make<PullRequestRef | null>(null).pipe(Atom.keepAlive)
 
 export const reviewsLinkAtom = Atom.make((get) => {

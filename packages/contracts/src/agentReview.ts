@@ -73,3 +73,15 @@ export const AgentReviewState = Schema.Struct({
 })
 
 export type AgentReviewState = typeof AgentReviewState.Type
+
+const finishedWhile: Record<AgentReviewState["job"]["status"], boolean> = {
+  idle: true,
+  "starting-agent": true,
+  "agent-start-failed": true,
+  waiting: false,
+  reviewing: false,
+  failed: false,
+}
+
+export const finishedReview = (state: AgentReviewState): AgentReview | null =>
+  state.review !== null && finishedWhile[state.job.status] ? state.review : null

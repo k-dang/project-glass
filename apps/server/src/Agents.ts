@@ -38,6 +38,7 @@ import {
   type UnsentFeedback,
 } from "@glass/contracts"
 import {
+  Array as Arr,
   Context,
   Data,
   DateTime,
@@ -68,7 +69,7 @@ import { LocalPlacement } from "./LocalPlacement"
 import { type AgentRole, ReviewBrief, ReviewRole, WorkRole } from "./agentHost/protocol"
 import { LocalSkills } from "./LocalSkills"
 import { SkillPacks } from "./SkillPacks"
-import { Transcripts } from "./Transcripts"
+import { Transcripts, type WaitingRequest } from "./Transcripts"
 import { annotateUnit } from "./wideEvents"
 
 const encodeFiles = Schema.encodeSync(Schema.Array(ChangedFile))
@@ -112,6 +113,7 @@ const toRow = (
 ): PlacedAgent => ({
   agent: new Agent({
     ...agent,
+    forReview,
     skillPacks,
     place:
       sandboxProvider === null ? localPlace : SandboxPlace.make({ providerId: sandboxProvider }),
@@ -158,11 +160,16 @@ export interface NewReviewAgent {
   readonly message: string
 }
 
+export interface WaitingAgent {
+  readonly agent: Agent
+  readonly requests: Arr.NonEmptyReadonlyArray<WaitingRequest>
+}
+
 export class Agents extends Context.Service<
   Agents,
   {
     readonly watch: () => Stream.Stream<ReadonlyArray<Agent>, AgentError>
-    readonly watchWaiting: () => Stream.Stream<ReadonlyArray<string>>
+    readonly watchWaiting: () => Stream.Stream<ReadonlyArray<WaitingAgent>>
     readonly readTranscript: (
       agentId: string,
     ) => Effect.Effect<Transcript, AgentNotFound | AgentError>
@@ -486,6 +493,7 @@ export class Agents extends Context.Service<
           localSkills: false,
           createdAt: yield* DateTime.now,
           sandbox: null,
+          forReview: true,
         })
 
         return yield* insert(
@@ -751,15 +759,17 @@ export class Agents extends Context.Service<
         )
       })
 
+      const placed = Stream.zipLatest(SubscriptionRef.changes(rows), sandboxes.statuses).pipe(
+        Stream.map(([current, statuses]) =>
+          current.map((row) => ({
+            ...row,
+            agent: agentWith(row.agent, { sandbox: statuses.get(row.agent.id) ?? null }),
+          })),
+        ),
+      )
+
       return Agents.of({
-        watch: () =>
-          Stream.zipLatest(SubscriptionRef.changes(rows), sandboxes.statuses).pipe(
-            Stream.map(([current, statuses]) =>
-              current.flatMap(({ agent, forReview }) =>
-                forReview ? [] : [agentWith(agent, { sandbox: statuses.get(agent.id) ?? null })],
-              ),
-            ),
-          ),
+        watch: () => placed.pipe(Stream.map((current) => current.map(({ agent }) => agent))),
         transcript: (agentId) =>
           Stream.unwrap(find(agentId).pipe(Effect.as(transcripts.watch(agentId)))),
         readTranscript: (agentId) => find(agentId).pipe(Effect.andThen(transcripts.read(agentId))),
@@ -808,7 +818,15 @@ export class Agents extends Context.Service<
         unsent,
         saveUnsent,
         watchWaiting: () =>
-          transcripts.waiting.pipe(Stream.map((waiting) => Array.from(waiting).toSorted())),
+          Stream.zipLatest(placed, transcripts.waiting).pipe(
+            Stream.map(([current, waiting]) =>
+              current.flatMap(({ agent }) => {
+                const requests = waiting.get(agent.id)
+
+                return requests === undefined ? [] : [{ agent, requests }]
+              }),
+            ),
+          ),
         changeModel: update,
         changePermissionMode,
         answer,

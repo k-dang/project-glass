@@ -1,10 +1,12 @@
 import { RegistryContext, useAtom, useAtomValue } from "@effect/atom-react"
+import { Option } from "effect"
 import { Link, type LinkOptions, Outlet, useBlocker, useNavigate } from "@tanstack/react-router"
 import { cn } from "cn"
 import {
   LayoutDashboard,
   GitPullRequest,
   History,
+  Inbox,
   ListTodo,
   LoaderCircle,
   type LucideIcon,
@@ -12,12 +14,14 @@ import {
   Settings,
   Sparkles,
 } from "lucide-react"
-import { useContext } from "react"
+import { useContext, useId } from "react"
 import { TooltipHint } from "@/components/ui/tooltip"
 import { backendReachableAtom } from "./backend"
 import { ConfirmationDialog } from "./ConfirmationDialog"
 import { globalConversationOpenAtom } from "./globalConversation"
 import { GlobalConversationDialog } from "./GlobalConversationDialog"
+import { NeedsYouBadge } from "./NeedsYou"
+import { needsYouCount as countOf, watchedNeedsYouAtom } from "./needsYou"
 import { confirmLeave, discardPromptAtom, leavesPullRequest, reviewsLinkAtom } from "./reviewsArea"
 import { ConnectionAvatar } from "./Settings"
 import { ResourceUsage } from "./ResourceUsage"
@@ -39,6 +43,7 @@ function useAreas(): ReadonlyArray<Area> {
 
   return [
     { label: "Dashboard", icon: LayoutDashboard, link: { to: "/dashboard" } },
+    { label: "Inbox", icon: Inbox, link: { to: "/inbox" } },
     { label: "Reviews", icon: GitPullRequest, link: reviewsLink },
     { label: "To-dos", icon: ListTodo, link: { to: "/to-dos" } },
     { label: "Agents", icon: Sparkles, link: { to: "/agents" } },
@@ -70,6 +75,8 @@ export function AppShell() {
   const areas = useAreas()
   const navigate = useNavigate()
   const [conversing, setConversing] = useAtom(globalConversationOpenAtom)
+  const needsYouBadgeId = useId()
+  const needsYouCount = countOf(useAtomValue(watchedNeedsYouAtom))
 
   useShortcuts([
     ...areas.map(({ link }, index) => ({
@@ -111,10 +118,16 @@ export function AppShell() {
                   {...link}
                   activeOptions={{ includeSearch: false }}
                   aria-label={label}
+                  aria-describedby={
+                    label === "Inbox" && Option.isSome(needsYouCount) && needsYouCount.value > 0
+                      ? needsYouBadgeId
+                      : undefined
+                  }
                   aria-keyshortcuts={`Meta+${index + 1} Control+${index + 1}`}
                   className={cn(railLink, label === "Settings" && "mt-auto")}
                 >
                   <Icon className="size-4" aria-hidden />
+                  {label === "Inbox" && <NeedsYouBadge id={needsYouBadgeId} />}
                 </Link>
               </TooltipHint>
             ))}

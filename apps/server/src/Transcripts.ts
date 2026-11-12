@@ -6,6 +6,7 @@ import {
   endTurnEvents,
   FeedbackNote,
   isRequestPart,
+  isWaiting,
   Image,
   type MessageDelivery,
   type MessageWithContext,
@@ -14,6 +15,7 @@ import {
   QueuedMessagesChanged,
   QueuedMessage,
   QueuedMessageStarted,
+  type RequestPart,
   requestPartTags,
   SentMessage,
   StatusChanged,
@@ -28,6 +30,7 @@ import {
   TurnStarted,
 } from "@glass/contracts"
 import {
+  Array as Arr,
   Context,
   Data,
   DateTime,
@@ -97,7 +100,9 @@ const decodeRunning = Schema.decodeUnknownEffect(
   ),
 )
 
-const decodeExists = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ found: Schema.Int })))
+const decodeWaiting = Schema.decodeUnknownEffect(
+  Schema.Array(Schema.Struct({ agentId: Schema.String, part: Schema.fromJsonString(TurnPart) })),
+)
 
 export const StoredMessage = Schema.Struct({ ...SentMessage.fields, images: ImagesJson })
 
@@ -138,6 +143,13 @@ interface Published {
   readonly agentId: string
   readonly update: TranscriptUpdate
 }
+
+export interface WaitingRequest {
+  readonly part: RequestPart
+  readonly since: DateTime.Utc
+}
+
+export type WaitingByAgent = ReadonlyMap<string, Arr.NonEmptyReadonlyArray<WaitingRequest>>
 
 export type StartedTurn = typeof TurnStarted.Type & { readonly agentId: string }
 
@@ -217,7 +229,7 @@ export class Transcripts extends Context.Service<
       queuedId: string,
     ) => Effect.Effect<void, AgentBusy | AgentError>
     readonly subscribeStarted: Effect.Effect<Stream.Stream<StartedTurn>, never, Scope.Scope>
-    readonly waiting: Stream.Stream<ReadonlySet<string>>
+    readonly waiting: Stream.Stream<WaitingByAgent>
     readonly isWaiting: (agentId: string) => Effect.Effect<boolean>
     readonly setStatus: (agentId: string, status: string | null) => Effect.Effect<void>
     readonly remove: (agentId: string) => Effect.Effect<void, AgentError>
@@ -230,31 +242,66 @@ export class Transcripts extends Context.Service<
       const published = yield* PubSub.unbounded<Published>()
       const locks = new Map<string, Semaphore.Semaphore>()
       const statuses = new Map<string, string>()
-      const waitingAgents = yield* SubscriptionRef.make<ReadonlySet<string>>(new Set())
 
-      const hasWaitingRequest = (agentId: string) =>
+      const waitingParts = (agentId?: string) =>
         sql`
-          SELECT EXISTS (
-            SELECT 1 FROM agent_turn_part p JOIN agent_turn t ON t.id = p.turn_id
-            WHERE t.agent_id = ${agentId}
-              AND json_extract(p.part, '$._tag') IN ${sql.in(requestPartTags)}
-              AND json_extract(p.part, '$.status') = 'waiting'
-          ) AS found
+          SELECT t.agent_id AS agentId, p.part AS part
+          FROM agent_turn_part p JOIN agent_turn t ON t.id = p.turn_id
+          WHERE ${sql.and([
+            ...(agentId === undefined ? [] : [sql`t.agent_id = ${agentId}`]),
+            sql`json_extract(p.part, '$._tag') IN ${sql.in(requestPartTags)}`,
+            "json_extract(p.part, '$.status') = 'waiting'",
+          ])}
+          ORDER BY t.rowid, p.position
         `.pipe(
-          Effect.flatMap(decodeExists),
-          Effect.map(([row]) => row?.found === 1),
+          Effect.flatMap(decodeWaiting),
+          Effect.map((rows) =>
+            rows.flatMap(({ agentId: owner, part }) =>
+              isWaiting(part) ? [{ agentId: owner, part }] : [],
+            ),
+          ),
         )
 
-      const markWaiting = (agentId: string, waits: boolean) =>
-        SubscriptionRef.update(waitingAgents, (current) => {
-          if (current.has(agentId) === waits) return current
-          const next = new Set(current)
+      const launchedAt = yield* DateTime.now
 
-          if (waits) next.add(agentId)
+      const seeded = yield* waitingParts().pipe(
+        Effect.catch((cause) =>
+          Effect.logWarning("Couldn't read the waiting requests", cause).pipe(Effect.as([])),
+        ),
+      )
+
+      const waiting = yield* SubscriptionRef.make<WaitingByAgent>(
+        new Map(
+          Object.entries(Arr.groupBy(seeded, ({ agentId }) => agentId)).map(
+            ([agentId, rows]) =>
+              [agentId, Arr.map(rows, ({ part }) => ({ part, since: launchedAt }))] as const,
+          ),
+        ),
+      )
+
+      const markWaiting = Effect.fnUntraced(function* (
+        agentId: string,
+        parts: ReadonlyArray<RequestPart>,
+      ) {
+        const now = yield* DateTime.now
+
+        yield* SubscriptionRef.update(waiting, (current) => {
+          const before = current.get(agentId) ?? []
+
+          const requests = parts.map((part) => ({
+            part,
+            since:
+              before.find((request) => request.part.requestId === part.requestId)?.since ?? now,
+          }))
+
+          const next = new Map(current)
+
+          if (Arr.isReadonlyArrayNonEmpty(requests)) next.set(agentId, requests)
           else next.delete(agentId)
 
           return next
         })
+      })
 
       const lockFor = (agentId: string) => {
         const lock = locks.get(agentId) ?? Semaphore.makeUnsafe(1)
@@ -407,7 +454,10 @@ export class Transcripts extends Context.Service<
             const [decided, updates] = yield* sql.withTransaction(effect)
 
             if (updates.some(changesRequest))
-              yield* markWaiting(agentId, yield* hasWaitingRequest(agentId))
+              yield* markWaiting(
+                agentId,
+                (yield* waitingParts(agentId)).map(({ part }) => part),
+              )
 
             yield* PubSub.publishAll(
               published,
@@ -664,9 +714,9 @@ export class Transcripts extends Context.Service<
             ),
           ),
         ),
-        waiting: SubscriptionRef.changes(waitingAgents),
+        waiting: SubscriptionRef.changes(waiting),
         isWaiting: (agentId) =>
-          SubscriptionRef.get(waitingAgents).pipe(Effect.map((current) => current.has(agentId))),
+          SubscriptionRef.get(waiting).pipe(Effect.map((current) => current.has(agentId))),
         setStatus: (agentId, status) =>
           lockFor(agentId).withPermits(1)(
             Effect.suspend(() => {
@@ -692,7 +742,7 @@ export class Transcripts extends Context.Service<
           )
           locks.delete(agentId)
           statuses.delete(agentId)
-          yield* markWaiting(agentId, false)
+          yield* markWaiting(agentId, [])
         }, Effect.mapError(storageFailure)),
       })
     }),

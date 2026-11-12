@@ -167,7 +167,7 @@ const checksLabels: Record<
   unavailable: { label: "Unavailable", icon: CircleDashed, tone: "text-muted-foreground/60" },
 }
 
-const ago = (date: Date, now: Date) => {
+export const ago = (date: Date, now: Date) => {
   const minutes = Math.floor((now.getTime() - date.getTime()) / 60_000)
 
   if (minutes < 1) return "now"
