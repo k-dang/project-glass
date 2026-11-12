@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react"
 
+const clock = (seconds: number) =>
+  `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`
+
 export function Elapsed(props: { startedAt: number }) {
   const [now, setNow] = useState(Date.now)
   useEffect(() => {
@@ -13,7 +16,7 @@ export function Elapsed(props: { startedAt: number }) {
       aria-label="Time elapsed"
       className="font-mono text-xs text-muted-foreground tabular-nums"
     >
-      {Math.max(0, Math.floor((now - props.startedAt) / 1000))}s
+      {clock(Math.max(0, Math.floor((now - props.startedAt) / 1000)))}
     </span>
   )
 }

@@ -1,4 +1,4 @@
-import type { Revision, TourState } from "@glass/contracts"
+import type { TourState } from "@glass/contracts"
 import { cn } from "cn"
 import { Equal } from "effect"
 import {
@@ -11,17 +11,15 @@ import {
   Sparkles,
   TriangleAlert,
 } from "lucide-react"
-import { useEffect, useEffectEvent, useRef, useState } from "react"
+import { useEffect, useEffectEvent, useRef } from "react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Item, ItemContent, ItemMedia, ItemTitle } from "@/components/ui/item"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { toast } from "@/components/ui/toast"
 import { Elapsed } from "./Elapsed"
 import { ProblemAlert } from "./ProblemAlert"
 import { warningTone } from "./PullRequestRow"
-import { ShortSha } from "./shortSha"
 import type { TourChapter, TourReading } from "./tourReading"
 import { twoDigits, useProgress } from "./tourProgress"
 import { plural } from "./plural"
@@ -78,45 +76,13 @@ function ChapterRow(props: {
   )
 }
 
-export function OutdatedTourFlag(props: { revision: Revision; tour: ReturnType<typeof useTour> }) {
-  const [open, setOpen] = useState(false)
-
-  return (
-    <Popover open={open && !props.tour.writing} onOpenChange={setOpen}>
-      <PopoverTrigger
-        render={<Button variant="ghost" size="xs" className={cn("ml-1", warningTone)} />}
-      >
-        <TriangleAlert aria-hidden data-icon="inline-start" />
-        Tour outdated
-      </PopoverTrigger>
-      <PopoverContent align="start">
-        <p className="leading-relaxed break-words text-muted-foreground">
-          Written for an older Revision (head <ShortSha sha={props.revision.head} />
-          ), so some Chapters may not match the diff.
-        </p>
-        <div className="flex justify-end">
-          <RewriteTour tour={props.tour} variant="outline" />
-        </div>
-      </PopoverContent>
-    </Popover>
-  )
-}
-
-export function RewriteTour(props: {
-  tour: ReturnType<typeof useTour>
-  variant: "outline" | "ghost"
-}) {
+function RewriteTour(props: { tour: ReturnType<typeof useTour> }) {
   const { tour } = props
 
   if (tour.writing) return null
 
   return (
-    <Button
-      variant={props.variant}
-      title="Write a new Tour"
-      onClick={tour.write}
-      disabled={tour.pending}
-    >
+    <Button variant="ghost" title="Write a new Tour" onClick={tour.write} disabled={tour.pending}>
       <RotateCw aria-hidden data-icon="inline-start" />
       Rewrite
     </Button>
@@ -337,7 +303,7 @@ export function TourSidebar(props: {
               )}
               {plural(reading.chapters.length, "Chapter")}
             </p>
-            <RewriteTour tour={tour} variant="ghost" />
+            <RewriteTour tour={tour} />
           </div>
           <ol className="space-y-0.5">
             {reading.chapters.map((chapter) => (

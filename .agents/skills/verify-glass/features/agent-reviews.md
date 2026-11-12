@@ -9,13 +9,13 @@ An Agent review is private criticism of a PR Revision. Read it beside Changes or
 
 ## How to get to it (user POV)
 
-Open a PR, choose Changes, then Agent review and, once written, Read Agent review.
+Open a PR, open Agent work in its header, then Start on the Agent review row and, once written, Read.
 
 ## Driving it with glass-verify
 
 1. `node $V launch --backend fake`, then doctor and snapshot. This uses the shared demo PRs and synthetic Agent runners, without model charges.
 2. `type --role textbox --name "Open a PR" --text "https://github.com/octo-org/hello-world/pull/1"`, `click --role button --name Open`, `wait --text Reload`, then `click --role tab --name Changes`.
-3. Snapshot and screenshot `review-before`. `click --role button --name "Agent review"`, `wait --text "Read Agent review"`, then `click --role button --name "Read Agent review"`.
+3. Snapshot and screenshot `review-before`. `click --role button --name "Agent work"`, then `click --role button --name Start` (the Agent review row's; the Tour row's says Write). Wait for the row to say `Ready`, then `click --role button --name Read`.
 4. `wait --text "Synthetic point"`. Snapshot and screenshot `review-beside`: the Agent review panel and full synthetic Markdown appear right of the diff.
 5. `type --role textbox --name "Follow up" --text "Is the first point blocking?"`, `click --role button --name Send`, then `wait --text "Done in" --timeout 40000`. Screenshot `review-follow-up`: the message and the demo pi Agent's Turn under the review. The demo model asks for `bash`, which the review's Agent doesn't have, so no tool call runs.
 6. Send a second Follow-up the same way and wait for its reply (`Got it: …`). Both Turns sit under the review, and `.verify/<id>/state/home/.project-glass/agent-review-checkouts/` holds one checkout. Open the Agents rail: the review's Agent isn't listed.

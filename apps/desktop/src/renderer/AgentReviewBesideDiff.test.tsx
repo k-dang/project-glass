@@ -13,7 +13,7 @@ import { act, screen, waitFor, within } from "@testing-library/react"
 import { DateTime, Deferred, Effect } from "effect"
 import { afterEach, expect, it } from "vite-plus/test"
 import { reviewOf } from "../../test/agentReview"
-import { changes, mountTourWorkspace, resetTourWorkspace } from "../../test/tourWorkspace"
+import { mountTourWorkspace, resetTourWorkspace } from "../../test/tourWorkspace"
 import { changedFile, revision, savedTour } from "../../test/workspace"
 
 afterEach(resetTourWorkspace)
@@ -75,12 +75,17 @@ it("leaves the Tour order to read the Agent review", async () => {
   const tourOrder = await screen.findByRole("button", { name: "Tour" })
   expect(tourOrder.getAttribute("aria-pressed")).toBe("true")
 
-  await f.user.click(within(changes()).getByRole("button", { name: "Read Agent review" }))
+  await f.user.click(screen.getByRole("button", { name: "Agent work" }))
+  await f.user.click(
+    within(await screen.findByRole("listitem", { name: "Agent review" })).getByRole("button", {
+      name: "Read",
+    }),
+  )
   expect(tourOrder.getAttribute("aria-pressed")).toBe("false")
   expect(sidePanel()).not.toBeNull()
 })
 
-it("marks an outdated Agent review on Changes and still reads it", async () => {
+it("marks an outdated Agent review and still reads it", async () => {
   const f = mountTourWorkspace({
     files,
     agentReview: {
@@ -91,12 +96,11 @@ it("marks an outdated Agent review on Changes and still reads it", async () => {
 
   await f.user.click(await screen.findByRole("tab", { name: "Changes" }))
 
-  const banner = await waitFor(() =>
-    within(changes()).getByRole("status", { name: "Agent review" }),
-  )
+  await f.user.click(screen.getByRole("button", { name: "Agent work" }))
+  const row = within(await screen.findByRole("listitem", { name: "Agent review" }))
 
-  expect(banner.textContent).toContain("Outdated: written for an older Revision (head 0123456)")
-  await f.user.click(within(banner).getByRole("button", { name: "Read beside the diff" }))
+  expect(row.getByText(/Written for head/).textContent).toBe("Written for head 0123456")
+  await f.user.click(row.getByRole("button", { name: "Read" }))
   expect(sidePanel()).not.toBeNull()
 })
 
