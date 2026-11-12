@@ -16,6 +16,7 @@ import {
   Layer,
   Match,
   Option,
+  Schema,
   Stream,
   SubscriptionRef,
 } from "effect"
@@ -31,6 +32,14 @@ export const ASK_TIMEOUT_DEFAULT_SECONDS = ASK_TIMEOUT_MAX_SECONDS
  * Each notification resets that wait, so Glass's own limit is the one that ends the call.
  */
 export const ASK_PROGRESS_SECONDS = 15
+
+/** One question at a time. A second ask fails until the Inbox one is answered, times out, or is cancelled. */
+const WAITING_PER_SESSION = 1
+
+export class OutsideQuestionAlreadyWaiting extends Schema.TaggedError<OutsideQuestionAlreadyWaiting>()(
+  "OutsideQuestionAlreadyWaiting",
+  {},
+) {}
 
 interface Pending {
   readonly question: OutsideQuestion
@@ -55,7 +64,7 @@ export class OutsideQuestions extends Context.Service<
       readonly session: string
       readonly label: string | null
       readonly timeout: Duration.Duration
-    }) => Effect.Effect<AskUserResult>
+    }) => Effect.Effect<AskUserResult, OutsideQuestionAlreadyWaiting>
     readonly answer: (
       id: string,
       answer: OutsideQuestionAnswer,
@@ -125,10 +134,15 @@ export class OutsideQuestions extends Context.Service<
               since: yield* DateTime.now,
             })
 
-            yield* SubscriptionRef.update(pending, (items) => [
-              ...items,
-              { question, slot, finished },
-            ])
+            const admitted = yield* SubscriptionRef.modify(pending, (items) => {
+              const waiting = items.filter((item) => item.question.session === input.session).length
+
+              if (waiting >= WAITING_PER_SESSION) return [false, items] as const
+
+              return [true, [...items, { question, slot, finished }]] as const
+            })
+
+            if (!admitted) return yield* new OutsideQuestionAlreadyWaiting()
             yield* Effect.sleep(input.timeout).pipe(
               Effect.andThen(settle(question.id, timedOut)),
               Effect.forkScoped,

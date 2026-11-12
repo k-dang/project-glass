@@ -10,7 +10,7 @@ import {
 } from "@glass/contracts"
 import { Effect, Exit, Fiber, Option, Predicate, Redacted, Schema, Scope, Stream } from "effect"
 import { startBackend } from "../../test/harness"
-import { connectMcp, initialize, mcpPost, toolResult } from "../../test/mcpClient"
+import { connectMcp, initialize, mcpPost, toolResult, toolText } from "../../test/mcpClient"
 
 const outside = (items: NeedsYou) =>
   items.filter((item) => Predicate.isTagged(item, "OutsideQuestion"))
@@ -244,6 +244,42 @@ describe("ask_user", () => {
         answer: OutsideText.make({ text: "Ship it" }),
       })
       yield* Effect.promise(() => body.reader.cancel())
+    }),
+  )
+
+  it.live("refuses a second question while one from that session is waiting", () =>
+    Effect.gen(function* () {
+      const { client, mcp } = yield* start
+
+      const first = mcp.request("tools/call", {
+        name: "ask_user",
+        arguments: { question: "Ship the retry change?" },
+      })
+
+      const inFlight = yield* Effect.forkChild(first.response)
+
+      yield* needsYou(client, (items) => outside(items).length === 1)
+
+      const second = toolResult(
+        yield* mcp.request("tools/call", {
+          name: "ask_user",
+          arguments: { question: "And the follow-up?" },
+        }).response,
+      )
+
+      assert.isTrue(second.isError)
+      assert.include(toolText(second), "already waiting")
+      assert.equal(outside(yield* needsYou(client, () => true)).length, 1)
+
+      const shown = yield* needsYou(client, (items) => outside(items).length === 1)
+      const question = outside(shown)[0]
+
+      assert.ok(question !== undefined)
+      yield* client.AnswerOutsideQuestion({
+        id: question.id,
+        answer: OutsideText.make({ text: "Ship it" }),
+      })
+      yield* Fiber.join(inFlight)
     }),
   )
 })

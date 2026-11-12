@@ -12,7 +12,7 @@ import { OutsideAgents } from "../OutsideAgents"
 import { AskProgress } from "./AskProgress"
 import { GlassToolHandlers, GlassTools } from "./glassTools"
 import { McpCaller, McpCredentials } from "./McpCredentials"
-import { urlsFromHost } from "./McpOAuth"
+import { boundPort, urlsFromHost } from "./McpOAuth"
 
 export const MCP_PATH = "/mcp"
 
@@ -41,23 +41,15 @@ const askProgress = AskProgress.of({
     }),
 })
 
-const challenge = (request: HttpServerRequest.HttpServerRequest, presented: boolean) => {
-  const urls = urlsFromHost(request.headers.host)
-
-  const metadata =
-    urls === undefined ? undefined : `${urls.issuer}/.well-known/oauth-protected-resource/mcp`
-
-  const params: Array<string> = []
-
-  if (metadata !== undefined) params.push(`resource_metadata="${metadata}"`)
+const challenge = (issuer: string, presented: boolean) => {
+  const metadata = `${issuer}/.well-known/oauth-protected-resource/mcp`
+  const params = [`resource_metadata="${metadata}"`]
 
   if (presented) params.push(`error="invalid_token"`)
 
   return HttpServerResponse.empty({
     status: 401,
-    headers: {
-      "www-authenticate": params.length === 0 ? "Bearer" : `Bearer ${params.join(", ")}`,
-    },
+    headers: { "www-authenticate": `Bearer ${params.join(", ")}` },
   })
 }
 
@@ -69,6 +61,16 @@ const McpAccess = HttpRouter.middleware(
     return (httpEffect) =>
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
+        const port = boundPort(request)
+        const urls = port === undefined ? undefined : urlsFromHost(request.headers.host, port)
+
+        if (urls === undefined) {
+          return HttpServerResponse.empty({
+            status: 401,
+            headers: { "www-authenticate": "Bearer" },
+          })
+        }
+
         const bearer = yield* HttpApiBuilder.securityDecode(HttpApiSecurity.bearer)
         const conversation = credentials.authenticate(bearer)
 
@@ -79,7 +81,7 @@ const McpAccess = HttpRouter.middleware(
         const credential = Option.isSome(conversation) ? conversation : outside
 
         if (Option.isNone(credential)) {
-          return challenge(request, Redacted.value(bearer) !== "")
+          return challenge(urls.issuer, Redacted.value(bearer) !== "")
         }
 
         const { caller, ownedSessions, revoked } = credential.value
@@ -95,7 +97,7 @@ const McpAccess = HttpRouter.middleware(
             AskProgress,
             askProgress,
           ),
-          Effect.as(revoked, challenge(request, true)),
+          Effect.as(revoked, challenge(urls.issuer, true)),
         )
 
         // Effect sets an opened session's id in its own pre-response handler, so read it after.

@@ -11,17 +11,18 @@ import {
   redirectForError,
   renderApproval,
   renderError,
+  boundPort,
   urlsFromHost,
   type AuthorizationQuery,
 } from "./McpOAuth"
 
-// form-action has to name loopback and https, not only 'self'. This page asks
-// the browser not to send a referrer, Chrome then treats the page's origin as
+// form-action has to name loopback hosts, not only 'self'. This page asks the
+// browser not to send a referrer, Chrome then treats the page's origin as
 // null, and 'self' no longer matches the form. The redirect after approval is
-// the client's own loopback or https address, which is also not 'self'.
+// the client's own loopback address, which is also not 'self'.
 const PAGE_HEADERS = {
   "content-security-policy":
-    "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' http://127.0.0.1:* http://localhost:* http://[::1]:* https:; frame-ancestors 'none'",
+    "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' http://127.0.0.1:* http://localhost:* http://[::1]:*; frame-ancestors 'none'",
   "x-frame-options": "DENY",
   "cache-control": "no-store",
   "referrer-policy": "no-referrer",
@@ -56,9 +57,14 @@ const page = (status: number, html: string) =>
     headers: PAGE_HEADERS,
   })
 
-const hostUrls = Effect.map(HttpServerRequest.HttpServerRequest, (request) =>
-  Option.fromNullishOr(urlsFromHost(request.headers.host)),
-)
+const hostUrls = Effect.gen(function* () {
+  const request = yield* HttpServerRequest.HttpServerRequest
+  const port = boundPort(request)
+
+  if (port === undefined) return Option.none<OAuthUrls>()
+
+  return Option.fromNullishOr(urlsFromHost(request.headers.host, port))
+})
 
 const missingHost = json(400, {
   error: "invalid_request",
@@ -185,10 +191,10 @@ const decide = Effect.gen(function* () {
 
   const origin = request.headers.origin
 
-  // Chrome sends the literal origin "null" for this form. The page's referrer
-  // policy is no-referrer, and Chrome withholds the origin instead of omitting
-  // the header. A page on another site still sends its own origin. The CSRF
-  // token binds the approval to the page Glass rendered.
+  // The Host check above already requires a loopback name on the bound port, so
+  // this request reached the process Glass is listening on. Chrome sends the
+  // literal origin "null" for this form because the page's referrer policy is
+  // no-referrer. A page on another site still sends its own origin.
   if (origin !== undefined && origin !== "null" && origin !== found.value.issuer) {
     return page(400, renderError("This approval page is out of date. Start the sign-in again."))
   }
@@ -244,6 +250,9 @@ const decide = Effect.gen(function* () {
 
 const register = Effect.gen(function* () {
   const oauth = yield* McpOAuth
+
+  if (Option.isNone(yield* hostUrls)) return yield* missingHost
+
   const body = yield* HttpServerRequest.schemaBodyJson(Schema.JsonObject).pipe(Effect.result)
 
   if (Result.isFailure(body)) {

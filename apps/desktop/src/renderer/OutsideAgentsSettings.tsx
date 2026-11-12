@@ -39,7 +39,7 @@ export function OutsideAgentsSettings() {
   return (
     <SettingsSection
       title="Outside agents"
-      description="Agents you approved to use Glass's MCP tools on this computer. Revoking one signs it out."
+      description="Agents you approved to use Glass's MCP tools on this computer. Disconnecting one signs it out."
     >
       {AsyncResult.builder(endpoint)
         .onInitialOrWaiting(() => (
@@ -76,7 +76,7 @@ export function OutsideAgentsSettings() {
                     disabled={revoke.waiting}
                     onClick={() => disconnect(agent.id)}
                   >
-                    {revoke.waiting ? "Revoking…" : "Revoke"}
+                    {revoke.waiting ? "Disconnecting…" : "Disconnect"}
                   </Button>
                 </li>
               ))}

@@ -2,6 +2,7 @@ import { assert, describe, it } from "@effect/vitest"
 import { AskUserAnswered, AskUserResult, type NeedsYou, OutsideText } from "@glass/contracts"
 import { Effect, Fiber, Option, Predicate, Redacted, Schema, Stream } from "effect"
 import { createHash, randomBytes } from "node:crypto"
+import { request as httpRequest } from "node:http"
 import { DatabaseSync } from "node:sqlite"
 import { join } from "node:path"
 import { isolatedHome, LAUNCH_TOKEN, startBackend } from "../../test/harness"
@@ -30,6 +31,10 @@ const decodeError = Schema.decodeUnknownSync(ErrorResponse)
 const RegistrationResponse = Schema.Struct({ client_id: Schema.String })
 
 const decodeRegistration = Schema.decodeUnknownSync(RegistrationResponse)
+
+const decodeRegisteredJson = Schema.decodeUnknownSync(Schema.fromJsonString(RegistrationResponse))
+
+const decodeCount = Schema.decodeUnknownSync(Schema.Struct({ n: Schema.Number }))
 
 const ProtectedResource = Schema.Struct({
   resource: Schema.String,
@@ -391,23 +396,24 @@ describe("MCP OAuth", () => {
     }),
   )
 
-  it.live("rejects a redirect that is not loopback or https", () =>
+  it.live("rejects a redirect that is not loopback", () =>
     Effect.gen(function* () {
       const { baseUrl } = yield* start
 
-      const rejected = yield* postJson(`${baseUrl}/oauth/mcp/register`, {
+      const http = yield* postJson(`${baseUrl}/oauth/mcp/register`, {
         client_name: "Claude Code",
         redirect_uris: ["http://example.com/callback"],
       })
 
-      const accepted = yield* postJson(`${baseUrl}/oauth/mcp/register`, {
+      const https = yield* postJson(`${baseUrl}/oauth/mcp/register`, {
         client_name: "Claude Code",
         redirect_uris: ["https://example.com/callback"],
       })
 
-      assert.strictEqual(rejected.status, 400)
-      assert.strictEqual(decodeError(yield* read(rejected)).error, "invalid_redirect_uri")
-      assert.strictEqual(accepted.status, 201)
+      assert.strictEqual(http.status, 400)
+      assert.strictEqual(decodeError(yield* read(http)).error, "invalid_redirect_uri")
+      assert.strictEqual(https.status, 400)
+      assert.strictEqual(decodeError(yield* read(https)).error, "invalid_redirect_uri")
     }),
   )
 
@@ -493,7 +499,7 @@ describe("MCP OAuth", () => {
 
       assert.match(policy, /form-action[^;]*http:\/\/127\.0\.0\.1:\*/)
       assert.match(policy, /form-action[^;]*http:\/\/localhost:\*/)
-      assert.match(policy, /form-action[^;]*https:/)
+      assert.notMatch(policy, /https:/)
 
       const form = new URLSearchParams({
         client_id: clientId,
@@ -527,6 +533,156 @@ describe("MCP OAuth", () => {
 
       assert.strictEqual(withheld.status, 302)
       assert.ok(new URL(location).searchParams.get("code") !== null)
+    }),
+  )
+
+  it.live("rejects a foreign Host before it can sign an outside agent in", () =>
+    Effect.gen(function* () {
+      const { baseUrl, home, mcpCredentials } = yield* start
+      const target = new URL(baseUrl)
+      const redirect = "http://127.0.0.1:9/callback"
+      const verifier = "a".repeat(43)
+      const challenge = createHash("sha256").update(verifier).digest("base64url")
+
+      const send = (
+        method: string,
+        path: string,
+        body: string,
+        contentType: string,
+        bearer?: string,
+      ) =>
+        Effect.promise(
+          () =>
+            new Promise<{ status: number; body: string; location: string | undefined }>(
+              (resolve, reject) => {
+                const headers = {
+                  host: `rebind.example:${target.port}`,
+                  origin: "null",
+                  "content-type": contentType,
+                  accept: "application/json, text/event-stream",
+                }
+
+                const signed =
+                  bearer === undefined ? headers : { ...headers, authorization: `Bearer ${bearer}` }
+
+                const sent = httpRequest(
+                  {
+                    hostname: target.hostname,
+                    port: target.port,
+                    path,
+                    method,
+                    headers: signed,
+                  },
+                  (response) => {
+                    const chunks: Buffer[] = []
+
+                    response.on("data", (chunk: Buffer) => chunks.push(chunk))
+                    response.on("end", () =>
+                      resolve({
+                        status: response.statusCode ?? 0,
+                        body: Buffer.concat(chunks).toString("utf8"),
+                        location: response.headers.location,
+                      }),
+                    )
+                  },
+                )
+
+                sent.on("error", reject)
+                sent.end(body)
+              },
+            ),
+        )
+
+      const registered = yield* send(
+        "POST",
+        "/oauth/mcp/register",
+        JSON.stringify({ client_name: "Rebinding", redirect_uris: [redirect] }),
+        "application/json",
+      )
+
+      const clientId =
+        registered.status === 201 ? decodeRegisteredJson(registered.body).client_id : "missing"
+
+      const query = new URLSearchParams({
+        client_id: clientId,
+        redirect_uri: redirect,
+        code_challenge: challenge,
+        code_challenge_method: "S256",
+        response_type: "code",
+        state: "rebind",
+        resource: `http://rebind.example:${target.port}/mcp`,
+      })
+
+      const authorized = yield* send(
+        "GET",
+        `/oauth/mcp/authorize?${query.toString()}`,
+        "",
+        "text/plain",
+      )
+
+      const csrf = /name="csrf" value="([^"]+)"/.exec(authorized.body)?.[1] ?? "missing"
+
+      const decided = yield* send(
+        "POST",
+        "/oauth/mcp/decision",
+        new URLSearchParams({
+          client_id: clientId,
+          redirect_uri: redirect,
+          code_challenge: challenge,
+          code_challenge_method: "S256",
+          response_type: "code",
+          state: "rebind",
+          resource: `http://rebind.example:${target.port}/mcp`,
+          csrf,
+          decision: "approve",
+        }).toString(),
+        "application/x-www-form-urlencoded",
+      )
+
+      const code =
+        decided.location === undefined
+          ? "missing"
+          : (new URL(decided.location, baseUrl).searchParams.get("code") ?? "missing")
+
+      const traded = yield* send(
+        "POST",
+        "/oauth/mcp/token",
+        new URLSearchParams({
+          grant_type: "authorization_code",
+          code,
+          redirect_uri: redirect,
+          client_id: clientId,
+          code_verifier: verifier,
+          resource: `http://rebind.example:${target.port}/mcp`,
+        }).toString(),
+        "application/x-www-form-urlencoded",
+      )
+
+      const conversation = yield* mcpCredentials.issue({ conversationId: "rebind" })
+
+      const mcp = yield* send(
+        "POST",
+        "/mcp",
+        JSON.stringify(initialize),
+        "application/json",
+        Redacted.value(conversation),
+      )
+
+      const database = new DatabaseSync(join(home, ".project-glass", "glass.db"))
+      const rows = decodeCount(database.prepare("SELECT COUNT(*) AS n FROM outside_agent").get())
+
+      database.close()
+      assert.deepStrictEqual(
+        {
+          registered: registered.status,
+          authorized: authorized.status,
+          decided: decided.status,
+          traded: traded.status,
+          mcp: mcp.status,
+          rows: rows.n,
+        },
+        { registered: 400, authorized: 400, decided: 400, traded: 400, mcp: 401, rows: 0 },
+      )
     }),
   )
 

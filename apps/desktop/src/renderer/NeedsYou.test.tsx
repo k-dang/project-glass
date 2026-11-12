@@ -277,7 +277,7 @@ it("answers an outside question in Stopped on you and still moves with j and k",
   const stopped = await screen.findByRole("region", { name: "Stopped on you" })
   const row = within(stopped).getByRole("button", { name: /Ship the retry change/ })
   expect(row.getAttribute("aria-current")).toBe("true")
-  expect(within(stopped).getByText(/Asked by Claude Code · demo-session/)).toBeTruthy()
+  expect(within(stopped).getByText("Asked by Claude Code")).toBeTruthy()
 
   await user.keyboard("{Enter}")
   expect(window.location.hash).toBe("#/inbox")

@@ -59,8 +59,7 @@ const pullRequestReasonLabels = {
   AgentReviewFinished: "Agent review finished",
 } as const satisfies Record<PullRequestNeedsYou["reasons"][number]["_tag"], string>
 
-const askedBy = (question: OutsideQuestion) =>
-  question.label === null ? question.session : `${question.label} · ${question.session}`
+const askedBy = (question: OutsideQuestion) => question.label ?? "An agent"
 
 const reasonText = (item: NeedsYouItem) =>
   Match.valueTags(item, {

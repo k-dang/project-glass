@@ -566,21 +566,36 @@ export const GlassToolHandlers = GlassTools.toLayer(
           Effect.gen(function* () {
             const caller = yield* McpCaller.current
 
-            const label = Match.value(caller).pipe(
-              Match.tag("Conversation", () => from ?? null),
-              Match.tag("OutsideAgent", (agent) => from ?? agent.name),
+            const label = yield* Match.value(caller).pipe(
+              Match.tag("Conversation", (conversation) =>
+                from === undefined
+                  ? agents.displayedName(conversation.conversationId)
+                  : Effect.succeed<string | null>(from),
+              ),
+              Match.tag("OutsideAgent", (agent) =>
+                Effect.succeed<string | null>(from ?? agent.name),
+              ),
               Match.exhaustive,
             )
 
             yield* Effect.forkScoped(waitingProgress)
 
-            return yield* outsideQuestions.ask({
-              question,
-              choices: choices ?? [],
-              session: sessionOf(caller),
-              label,
-              timeout: Duration.seconds(timeoutSeconds ?? ASK_TIMEOUT_DEFAULT_SECONDS),
-            })
+            return yield* outsideQuestions
+              .ask({
+                question,
+                choices: choices ?? [],
+                session: sessionOf(caller),
+                label,
+                timeout: Duration.seconds(timeoutSeconds ?? ASK_TIMEOUT_DEFAULT_SECONDS),
+              })
+              .pipe(
+                Effect.mapError(
+                  () =>
+                    new GlassToolFailure({
+                      message: "A question from this session is already waiting in the Inbox.",
+                    }),
+                ),
+              )
           }),
         ),
     })

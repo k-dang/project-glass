@@ -104,7 +104,8 @@ export class OutsideAgents extends Context.Service<
           live.set(id, created)
 
           if (revokedIds.has(id)) {
-            yield* Deferred.succeed(revoked, undefined)
+            live.delete(id)
+            yield* Deferred.succeed(revoked, undefined).pipe(Effect.ignore)
 
             return Option.none<McpCredential>()
           }
@@ -130,6 +131,16 @@ export class OutsideAgents extends Context.Service<
           return listed === undefined ? [] : [listed]
         })
       })
+
+      const forget = (id: string) =>
+        Effect.gen(function* () {
+          const session = live.get(id)
+
+          if (session === undefined) return
+
+          live.delete(id)
+          yield* Deferred.succeed(session.revoked, undefined).pipe(Effect.ignore)
+        })
 
       return OutsideAgents.of({
         issue: (input) =>
@@ -163,14 +174,20 @@ export class OutsideAgents extends Context.Service<
             const decoded = yield* decodeRows(rows).pipe(Effect.orDie)
             const row = decoded[0]
 
-            if (row === undefined || row.revoked_at !== null || revokedIds.has(row.id)) {
-              return Option.none<McpCredential>()
-            }
+            if (row === undefined) return Option.none<McpCredential>()
 
             const listed = agent(row)
             const now = DateTime.toEpochMillis(yield* DateTime.now)
+            const expired = listed !== undefined && DateTime.toEpochMillis(listed.expiresAt) <= now
 
-            if (listed === undefined || DateTime.toEpochMillis(listed.expiresAt) <= now) {
+            if (
+              row.revoked_at !== null ||
+              revokedIds.has(row.id) ||
+              listed === undefined ||
+              expired
+            ) {
+              yield* forget(row.id)
+
               return Option.none<McpCredential>()
             }
 
@@ -193,9 +210,7 @@ export class OutsideAgents extends Context.Service<
             if (updated.length === 0) return yield* new OutsideAgentNotFound()
 
             revokedIds.add(id)
-            const session = live.get(id)
-
-            if (session !== undefined) yield* Deferred.succeed(session.revoked, undefined)
+            yield* forget(id)
 
             return yield* Effect.void
           }),

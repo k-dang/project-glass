@@ -1,11 +1,13 @@
 import { Clock, Context, Effect, FileSystem, Layer, Option, Ref, Schema } from "effect"
+import type { HttpServerRequest } from "effect/http"
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto"
 import { join } from "node:path"
 import { writeDataFile } from "../dataFiles"
 import { ServerConfig } from "../ServerConfig"
 
 // Registration is a signed client id, so an open register endpoint cannot fill the database.
-// The approval page is enough because Glass listens on 127.0.0.1: only this machine can open it.
+// Glass listens on 127.0.0.1. The issuer is that bound address, and a request is accepted only
+// when its Host is a loopback name on that same port.
 
 const SIGNING_KEY = "mcp-oauth.key"
 
@@ -25,7 +27,7 @@ const CODE_CHALLENGE = /^[A-Za-z0-9_-]{43}$/
 
 const CODE_VERIFIER = /^[A-Za-z0-9\-._~]{43,128}$/
 
-const SAFE_HOST = /^[A-Za-z0-9.:[\]-]+$/
+const LOOPBACK_NAMES = new Set(["localhost", "127.0.0.1", "::1"])
 
 const ClientIdPayload = Schema.Struct({
   v: Schema.Literal(1),
@@ -40,12 +42,51 @@ export interface OAuthUrls {
   readonly resource: string
 }
 
-export const urlsFromHost = (host: string | undefined): OAuthUrls | undefined => {
-  if (host === undefined || !SAFE_HOST.test(host)) return undefined
+const hostNameAndPort = (host: string): { name: string; port: string } | undefined => {
+  if (host.startsWith("[")) {
+    const end = host.indexOf("]")
 
-  const issuer = `http://${host}`
+    if (end <= 1 || !host.slice(end + 1).startsWith(":")) return undefined
+
+    return { name: host.slice(1, end), port: host.slice(end + 2) }
+  }
+
+  const colon = host.lastIndexOf(":")
+
+  if (colon <= 0) return undefined
+
+  return { name: host.slice(0, colon), port: host.slice(colon + 1) }
+}
+
+export const issuerForPort = (port: number): OAuthUrls => {
+  const issuer = `http://127.0.0.1:${port}`
 
   return { issuer, resource: `${issuer}/mcp` }
+}
+
+const decodeLocalPort = Schema.decodeUnknownOption(
+  Schema.Struct({ socket: Schema.Struct({ localPort: Schema.Number }) }),
+)
+
+/** The port this request arrived on. Glass may have asked the OS to choose it. */
+export const boundPort = (request: HttpServerRequest.HttpServerRequest): number | undefined => {
+  const decoded = decodeLocalPort(request.source)
+
+  if (Option.isNone(decoded) || decoded.value.socket.localPort <= 0) return undefined
+
+  return decoded.value.socket.localPort
+}
+
+export const urlsFromHost = (host: string | undefined, port: number): OAuthUrls | undefined => {
+  if (host === undefined) return undefined
+
+  const parts = hostNameAndPort(host.trim())
+
+  if (parts === undefined || parts.port !== String(port)) return undefined
+
+  if (!LOOPBACK_NAMES.has(parts.name.toLowerCase())) return undefined
+
+  return issuerForPort(port)
 }
 
 export const protectedResourceMetadata = (urls: OAuthUrls) => ({
@@ -73,8 +114,7 @@ const parseRedirect = (value: string): URL | undefined => {
   try {
     const url = new URL(value)
 
-    const allowed =
-      url.protocol === "https:" || (url.protocol === "http:" && LOOPBACK_HOSTS.has(url.hostname))
+    const allowed = url.protocol === "http:" && LOOPBACK_HOSTS.has(url.hostname)
 
     return allowed && url.username === "" && url.password === "" ? url : undefined
   } catch {
@@ -87,8 +127,6 @@ const redirectMatches = (registered: string, presented: string) => {
   const right = parseRedirect(presented)
 
   if (left === undefined || right === undefined) return false
-
-  if (left.protocol === "https:" || right.protocol === "https:") return left.href === right.href
 
   return (
     left.hostname === right.hostname &&
@@ -260,7 +298,7 @@ export const renderApproval = (authorization: Authorization, csrf: string) => {
 <body>
 <main>
   <h1>${name} wants to connect</h1>
-  <p>${name} will be able to use Glass's tools on this computer, including asking you a question in the Inbox. The connection lasts 30 days. You can disconnect it in Settings.</p>
+  <p>${name} will be able to read your pull requests, to-dos, and agents, start and message agents, start a review, and ask you a question in the Inbox. The connection lasts 30 days. You can disconnect it in Settings.</p>
   <p>Glass sends this approval back to <strong>${host}</strong>. Approve only a sign-in you just started.</p>
   <form method="post" action="/oauth/mcp/decision">
     ${hidden("client_id", authorization.clientId)}
