@@ -59,6 +59,8 @@ export const AgentReview = Schema.Struct({
   hotspots: Schema.Array(Hotspot),
   lowAttention: Schema.Array(LowAttentionFile),
   agentId: Schema.NullOr(Schema.String),
+  /** The user marked it done in the Inbox; writing it again clears this. */
+  done: Schema.Boolean,
 })
 
 export type AgentReview = typeof AgentReview.Type

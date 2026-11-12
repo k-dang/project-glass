@@ -1,4 +1,4 @@
-import { type NeedsYouItem, referenceKey } from "@glass/contracts"
+import { type NeedsYouItem, type PullRequestNeedsYou, referenceKey } from "@glass/contracts"
 import { type Cause, Match, Option, Stream } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
 import { type BackendError, Backend, backendRuntime } from "./backend"
@@ -27,3 +27,9 @@ export const needsYouKey = (item: NeedsYouItem): string =>
     Agent: ({ agent }) => `agent:${agent.id}`,
     PullRequest: ({ pullRequest }) => `pr:${referenceKey(pullRequest.ref)}`,
   })
+
+export const markDoneAtom = backendRuntime.fn((item: PullRequestNeedsYou) =>
+  Backend.use((backend) =>
+    backend.MarkAgentReviewDone({ pullRequest: item.pullRequest.ref, writtenAt: item.since }),
+  ),
+)

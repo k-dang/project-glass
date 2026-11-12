@@ -16,6 +16,7 @@ import { Kbd } from "@/components/ui/kbd"
 import { AgentRequest, answerRequestAtom } from "./agentsArea"
 import { agentConversation, ConversationContext } from "./conversation"
 import {
+  markDoneAtom,
   needsYouCount,
   needsYouKey,
   type NeedsYouResult,
@@ -257,6 +258,7 @@ export function Inbox() {
 
   const navigate = useNavigate()
   const markReview = useAtomSet(readAgentReviewOnOpenAtom)
+  const markDone = useAtomSet(markDoneAtom)
 
   const items = AsyncResult.isSuccess(status) ? status.value : []
 
@@ -301,26 +303,18 @@ export function Inbox() {
     })
   }
 
-  const move = (delta: number) => {
-    if (selectedKey === null) return
-
-    const at = keys.indexOf(selectedKey)
-    const next = keys[Math.min(keys.length - 1, Math.max(0, at + delta))]
-
-    if (next === undefined) return
-
-    setPicked(next)
-    document.querySelector<HTMLElement>(`[data-inbox-row="${CSS.escape(next)}"]`)?.focus()
-  }
-
   useShortcuts([
-    { key: "j", run: () => move(1) },
-    { key: "k", run: () => move(-1) },
     {
       key: "Enter",
       skipOnControl: true,
       except: "[data-inbox-row]",
       run: openSelected,
+    },
+    {
+      key: "e",
+      run: () => {
+        if (Predicate.isTagged(selected, "PullRequest")) markDone(selected)
+      },
     },
     {
       key: "a",
@@ -339,14 +333,13 @@ export function Inbox() {
           </h1>
           <p className="flex flex-wrap items-center justify-end gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1">
-              <Kbd>J</Kbd>
-              <Kbd>K</Kbd>
-              move
+              <Kbd>Enter</Kbd>
+              open
             </span>
             <span aria-hidden>·</span>
             <span className="inline-flex items-center gap-1">
-              <Kbd>Enter</Kbd>
-              open
+              <Kbd>E</Kbd>
+              done
             </span>
             <span aria-hidden>·</span>
             <span className="inline-flex items-center gap-1">
@@ -440,6 +433,7 @@ function PullRequestDetail(props: {
   onReadReview: (pullRequest: string) => void
 }) {
   const { pullRequest, since } = props.item
+  const markDone = useAtomSet(markDoneAtom)
   const updated = DateTime.toDateUtc(pullRequest.updatedAt)
 
   return (
@@ -472,6 +466,13 @@ function PullRequestDetail(props: {
         >
           Read Agent review
         </Link>
+        <button
+          type="button"
+          className={cn(actionLink, "border")}
+          onClick={() => markDone(props.item)}
+        >
+          Done
+        </button>
       </div>
     </article>
   )
