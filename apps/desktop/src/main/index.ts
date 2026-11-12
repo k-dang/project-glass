@@ -15,7 +15,18 @@ import {
   type Theme,
 } from "@glass/contracts/desktop"
 import { Cause, Effect, Fiber, Option } from "effect"
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, net, protocol, shell } from "electron"
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  Menu,
+  type MenuItemConstructorOptions,
+  nativeTheme,
+  net,
+  protocol,
+  shell,
+} from "electron"
 import { execFile } from "node:child_process"
 import { homedir } from "node:os"
 import { join, relative } from "node:path"
@@ -156,6 +167,7 @@ const createWindow = () => {
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
+      spellcheck: true,
       // Throttled timers in a hidden window can interrupt WebSocket pings.
       backgroundThrottling: false,
     },
@@ -167,6 +179,47 @@ const createWindow = () => {
   window.once("closed", () => nativeTheme.off("updated", updateTheme))
 
   window.removeMenu()
+  window.webContents.on("context-menu", (_event, params) => {
+    const { webContents } = window
+    const { editFlags, isEditable, misspelledWord, selectionText } = params
+    const items: MenuItemConstructorOptions[] = []
+
+    if (isEditable) {
+      if (misspelledWord) {
+        for (const suggestion of params.dictionarySuggestions) {
+          items.push({
+            label: suggestion,
+            click: () => webContents.replaceMisspelling(suggestion),
+          })
+        }
+
+        if (params.dictionarySuggestions.length === 0)
+          items.push({ label: "No spelling suggestions", enabled: false })
+
+        items.push(
+          {
+            label: "Add to dictionary",
+            click: () => {
+              webContents.session.addWordToSpellCheckerDictionary(misspelledWord)
+            },
+          },
+          { type: "separator" },
+        )
+      }
+
+      items.push(
+        { role: "cut", enabled: editFlags.canCut },
+        { role: "copy", enabled: editFlags.canCopy },
+        { role: "paste", enabled: editFlags.canPaste },
+        { type: "separator" },
+        { role: "selectAll", enabled: editFlags.canSelectAll },
+      )
+    } else if (selectionText) {
+      items.push({ role: "copy", enabled: editFlags.canCopy })
+    }
+
+    if (items.length > 0) Menu.buildFromTemplate(items).popup({ window })
+  })
   window.once("ready-to-show", () => window.show())
   window.webContents.setWindowOpenHandler(({ url }) => {
     openInBrowser(url)
