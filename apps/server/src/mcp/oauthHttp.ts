@@ -15,9 +15,13 @@ import {
   type AuthorizationQuery,
 } from "./McpOAuth"
 
+// form-action has to name loopback and https, not only 'self'. This page asks
+// the browser not to send a referrer, Chrome then treats the page's origin as
+// null, and 'self' no longer matches the form. The redirect after approval is
+// the client's own loopback or https address, which is also not 'self'.
 const PAGE_HEADERS = {
   "content-security-policy":
-    "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'",
+    "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' http://127.0.0.1:* http://localhost:* http://[::1]:* https:; frame-ancestors 'none'",
   "x-frame-options": "DENY",
   "cache-control": "no-store",
   "referrer-policy": "no-referrer",
@@ -181,7 +185,11 @@ const decide = Effect.gen(function* () {
 
   const origin = request.headers.origin
 
-  if (origin !== undefined && origin !== found.value.issuer) {
+  // Chrome sends the literal origin "null" for this form. The page's referrer
+  // policy is no-referrer, and Chrome withholds the origin instead of omitting
+  // the header. A page on another site still sends its own origin. The CSRF
+  // token binds the approval to the page Glass rendered.
+  if (origin !== undefined && origin !== "null" && origin !== found.value.issuer) {
     return page(400, renderError("This approval page is out of date. Start the sign-in again."))
   }
 

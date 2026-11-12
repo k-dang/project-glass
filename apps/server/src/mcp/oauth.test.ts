@@ -461,6 +461,75 @@ describe("MCP OAuth", () => {
     }),
   )
 
+  it.live("approves when the browser withholds its origin, and rejects a foreign one", () =>
+    Effect.gen(function* () {
+      const { baseUrl } = yield* start
+      const redirectUri = "http://127.0.0.1:9/callback"
+      const { challenge } = verifierPair()
+
+      const registered = yield* postJson(`${baseUrl}/oauth/mcp/register`, {
+        client_name: "Claude Code",
+        redirect_uris: [redirectUri],
+      })
+
+      const clientId = decodeRegistration(yield* read(registered)).client_id
+      const authorize = new URL(`${baseUrl}/oauth/mcp/authorize`)
+
+      authorize.searchParams.set("response_type", "code")
+      authorize.searchParams.set("client_id", clientId)
+      authorize.searchParams.set("redirect_uri", redirectUri)
+      authorize.searchParams.set("code_challenge", challenge)
+      authorize.searchParams.set("code_challenge_method", "S256")
+      authorize.searchParams.set("state", "chrome")
+
+      const page = yield* Effect.promise(() => fetch(authorize))
+      const html = yield* Effect.promise(() => page.text())
+      const csrf = html.match(/name="csrf" value="([^"]+)"/)?.[1]
+
+      assert.strictEqual(page.status, 200)
+      assert.ok(csrf !== undefined)
+
+      const policy = page.headers.get("content-security-policy") ?? ""
+
+      assert.match(policy, /form-action[^;]*http:\/\/127\.0\.0\.1:\*/)
+      assert.match(policy, /form-action[^;]*http:\/\/localhost:\*/)
+      assert.match(policy, /form-action[^;]*https:/)
+
+      const form = new URLSearchParams({
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        code_challenge: challenge,
+        code_challenge_method: "S256",
+        response_type: "code",
+        state: "chrome",
+        resource: `${baseUrl}/mcp`,
+        csrf,
+        decision: "approve",
+      })
+
+      const post = (origin: string) =>
+        Effect.promise(() =>
+          fetch(`${baseUrl}/oauth/mcp/decision`, {
+            method: "POST",
+            redirect: "manual",
+            headers: { "content-type": "application/x-www-form-urlencoded", origin },
+            body: form,
+          }),
+        )
+
+      const foreign = yield* post("https://evil.example")
+
+      assert.strictEqual(foreign.status, 400)
+      assert.strictEqual(foreign.headers.get("location"), null)
+
+      const withheld = yield* post("null")
+      const location = withheld.headers.get("location") ?? ""
+
+      assert.strictEqual(withheld.status, 302)
+      assert.ok(new URL(location).searchParams.get("code") !== null)
+    }),
+  )
+
   it.live("keeps accepting a conversation bearer", () =>
     Effect.gen(function* () {
       const { baseUrl, client, mcpCredentials } = yield* start
