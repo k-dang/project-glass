@@ -169,7 +169,6 @@ export class Agents extends Context.Service<
   Agents,
   {
     readonly watch: () => Stream.Stream<ReadonlyArray<Agent>, AgentError>
-    readonly displayedName: (agentId: string) => Effect.Effect<string | null>
     readonly watchWaiting: () => Stream.Stream<ReadonlyArray<WaitingAgent>>
     readonly readTranscript: (
       agentId: string,
@@ -771,12 +770,6 @@ export class Agents extends Context.Service<
 
       return Agents.of({
         watch: () => placed.pipe(Stream.map((current) => current.map(({ agent }) => agent))),
-        displayedName: (agentId) =>
-          SubscriptionRef.get(rows).pipe(
-            Effect.map(
-              (current) => current.find((row) => row.agent.id === agentId)?.agent.name ?? null,
-            ),
-          ),
         transcript: (agentId) =>
           Stream.unwrap(find(agentId).pipe(Effect.as(transcripts.watch(agentId)))),
         readTranscript: (agentId) => find(agentId).pipe(Effect.andThen(transcripts.read(agentId))),

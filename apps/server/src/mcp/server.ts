@@ -1,4 +1,4 @@
-import { Effect, Layer, Option, Redacted, Schema } from "effect"
+import { Effect, Layer, Option, Predicate, Redacted, Schema } from "effect"
 import { McpProtocol, McpSchema, McpServer } from "effect/ai"
 import {
   HttpEffect,
@@ -11,7 +11,7 @@ import { HttpApiBuilder, HttpApiSecurity } from "effect/http-api"
 import { OutsideAgents } from "../OutsideAgents"
 import { AskProgress } from "./AskProgress"
 import { GlassToolHandlers, GlassTools } from "./glassTools"
-import { McpCaller, McpCredentials } from "./McpCredentials"
+import { McpCaller, McpCredentials, OutsideAgentCaller } from "./McpCredentials"
 import { boundPort, urlsFromHost } from "./McpOAuth"
 
 export const MCP_PATH = "/mcp"
@@ -91,9 +91,14 @@ const McpAccess = HttpRouter.middleware(
           return HttpServerResponse.empty({ status: 404 })
         }
 
+        const calling =
+          Predicate.isTagged(caller, "OutsideAgent") && session !== undefined
+            ? new OutsideAgentCaller({ agentId: caller.agentId, name: caller.name, session })
+            : caller
+
         const response = yield* Effect.raceFirst(
           Effect.provideService(
-            Effect.provideService(httpEffect, McpCaller, caller),
+            Effect.provideService(httpEffect, McpCaller, calling),
             AskProgress,
             askProgress,
           ),

@@ -161,9 +161,8 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       WatchNeedsYou: () => needsYou.watch(),
       AnswerOutsideQuestion: ({ id, answer }) => outsideQuestions.answer(id, answer),
       GetMcpEndpoint: () => mcpCredentials.endpoint.pipe(Effect.map((url) => ({ url }))),
-      ListOutsideAgents: () => outsideAgents.list(),
-      RevokeOutsideAgent: ({ id }) =>
-        outsideAgents.revoke(id).pipe(Effect.andThen(outsideAgents.list())),
+      WatchOutsideAgents: () => outsideAgents.watch(),
+      RevokeOutsideAgent: ({ id }) => outsideAgents.revoke(id),
       ChangeAgentModel: ({ agentId, model, effort }) =>
         agents.changeModel(agentId, { model, effort }),
       ChangePermissionMode: ({ agentId, permissionMode }) =>

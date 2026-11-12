@@ -6,7 +6,7 @@ import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { ASK_TIMEOUT_MAX_SECONDS, OutsideQuestions } from "../src/OutsideQuestions"
+import { ASK_TIMEOUT_SECONDS, OutsideQuestions } from "../src/OutsideQuestions"
 import { GlassMcpTools } from "../src/mcp/server"
 import { serve } from "../src/server"
 import { ServerConfig } from "../src/ServerConfig"
@@ -98,8 +98,8 @@ const main = Effect.gen(function* () {
       question: "Ship the retry change?",
       choices: ["Ship it", "Hold it"],
       session: "demo-session",
-      label: "Claude Code",
-      timeout: Duration.seconds(ASK_TIMEOUT_MAX_SECONDS),
+      askedBy: "Claude Code",
+      timeout: Duration.seconds(ASK_TIMEOUT_SECONDS),
     })
     .pipe(Effect.forkScoped)
 

@@ -1,30 +1,23 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import type { OutsideAgent } from "@glass/contracts"
-import { DateTime, Option } from "effect"
+import { DateTime, Stream } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
 import { Button } from "@/components/ui/button"
 import { Backend, backendRuntime } from "./backend"
 import { ProblemAlert } from "./ProblemAlert"
-import { problemOf, settledProblem } from "./problems"
+import { problemOf, settledProblem, streamProblem } from "./problems"
 import { SettingsSection } from "./SettingsSection"
 
 const endpointAtom = backendRuntime
   .atom(Backend.use((backend) => backend.GetMcpEndpoint()))
   .pipe(Atom.keepAlive)
 
-const listedAtom = backendRuntime
-  .atom(Backend.use((backend) => backend.ListOutsideAgents()))
-  .pipe(Atom.keepAlive)
+const agentsAtom = backendRuntime.atom(
+  Stream.unwrap(Backend.useSync((backend) => backend.WatchOutsideAgents())),
+)
 
-const revokeAtom = backendRuntime
-  .fn((id: string) => Backend.use((backend) => backend.RevokeOutsideAgent({ id })))
-  .pipe(Atom.keepAlive)
-
-const agentsAtom = Atom.make((get) =>
-  Option.match(AsyncResult.value(get(revokeAtom)), {
-    onSome: (agents) => AsyncResult.success(agents),
-    onNone: () => get(listedAtom),
-  }),
+const revokeAtom = backendRuntime.fn((id: string) =>
+  Backend.use((backend) => backend.RevokeOutsideAgent({ id })),
 )
 
 const connectedUntil = (agent: OutsideAgent) => DateTime.formatIsoDateUtc(agent.expiresAt)
@@ -56,7 +49,7 @@ export function OutsideAgentsSettings() {
         .onInitialOrWaiting(() => (
           <p className="text-sm text-muted-foreground">Loading outside agents…</p>
         ))
-        .onFailure((cause) => <ProblemAlert problem={problemOf(cause)} />)
+        .onFailure((cause) => <ProblemAlert problem={streamProblem(cause)} />)
         .onSuccess((connected) =>
           connected.length === 0 ? (
             <p className="text-sm text-muted-foreground">No outside agents are connected.</p>

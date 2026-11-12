@@ -261,8 +261,7 @@ const outsideQuestion = OutsideQuestion.make({
   id: "ask-1",
   question: "Ship the retry change?",
   choices: ["Ship it", "Hold it"],
-  session: "demo-session",
-  label: "Claude Code",
+  askedBy: "Claude Code",
   since: ago({ minutes: 1 }),
 })
 

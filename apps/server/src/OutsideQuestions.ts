@@ -22,19 +22,14 @@ import {
 } from "effect"
 import { randomUUID } from "node:crypto"
 
-/** A caller may not ask Glass to wait longer than this. The default wait is the same length. */
-export const ASK_TIMEOUT_MAX_SECONDS = 10 * 60
-
-export const ASK_TIMEOUT_DEFAULT_SECONDS = ASK_TIMEOUT_MAX_SECONDS
+/** The default wait, and the longest a caller may ask Glass to wait. */
+export const ASK_TIMEOUT_SECONDS = 10 * 60
 
 /**
  * Shorter than the minute a typical MCP client waits before it gives up on a call.
  * Each notification resets that wait, so Glass's own limit is the one that ends the call.
  */
 export const ASK_PROGRESS_SECONDS = 15
-
-/** One question at a time. A second ask fails until the Inbox one is answered, times out, or is cancelled. */
-const WAITING_PER_SESSION = 1
 
 export class OutsideQuestionAlreadyWaiting extends Schema.TaggedError<OutsideQuestionAlreadyWaiting>()(
   "OutsideQuestionAlreadyWaiting",
@@ -43,6 +38,8 @@ export class OutsideQuestionAlreadyWaiting extends Schema.TaggedError<OutsideQue
 
 interface Pending {
   readonly question: OutsideQuestion
+  /** The MCP session that asked. It may have one question waiting at a time. */
+  readonly session: string
   readonly slot: Deferred.Deferred<AskUserResult>
   /** Completes once `ask` has a result, so shutdown can finish the response before the server closes. */
   readonly finished: Deferred.Deferred<void>
@@ -62,7 +59,7 @@ export class OutsideQuestions extends Context.Service<
       readonly question: string
       readonly choices: ReadonlyArray<string>
       readonly session: string
-      readonly label: string | null
+      readonly askedBy: string
       readonly timeout: Duration.Duration
     }) => Effect.Effect<AskUserResult, OutsideQuestionAlreadyWaiting>
     readonly answer: (
@@ -109,15 +106,11 @@ export class OutsideQuestions extends Context.Service<
         })
       })
 
-      // Pending questions are not stored. This runs after the listener's own finalizer has already
-      // answered callers that were still in flight when the process began to stop.
-      yield* Effect.addFinalizer(() => cancelAll())
-
       const ask = (input: {
         readonly question: string
         readonly choices: ReadonlyArray<string>
         readonly session: string
-        readonly label: string | null
+        readonly askedBy: string
         readonly timeout: Duration.Duration
       }) =>
         Effect.scoped(
@@ -129,18 +122,18 @@ export class OutsideQuestions extends Context.Service<
               id: randomUUID(),
               question: input.question,
               choices: [...input.choices],
-              session: input.session,
-              label: input.label,
+              askedBy: input.askedBy,
               since: yield* DateTime.now,
             })
 
-            const admitted = yield* SubscriptionRef.modify(pending, (items) => {
-              const waiting = items.filter((item) => item.question.session === input.session).length
-
-              if (waiting >= WAITING_PER_SESSION) return [false, items] as const
-
-              return [true, [...items, { question, slot, finished }]] as const
-            })
+            const admitted = yield* SubscriptionRef.modify(pending, (items) =>
+              items.some((item) => item.session === input.session)
+                ? ([false, items] as const)
+                : ([
+                    true,
+                    [...items, { question, session: input.session, slot, finished }],
+                  ] as const),
+            )
 
             if (!admitted) return yield* new OutsideQuestionAlreadyWaiting()
             yield* Effect.sleep(input.timeout).pipe(

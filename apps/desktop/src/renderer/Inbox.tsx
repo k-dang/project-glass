@@ -59,8 +59,6 @@ const pullRequestReasonLabels = {
   AgentReviewFinished: "Agent review finished",
 } as const satisfies Record<PullRequestNeedsYou["reasons"][number]["_tag"], string>
 
-const askedBy = (question: OutsideQuestion) => question.label ?? "An agent"
-
 const reasonText = (item: NeedsYouItem) =>
   Match.valueTags(item, {
     Agent: ({ reasons }) =>
@@ -72,7 +70,7 @@ const reasonText = (item: NeedsYouItem) =>
         )
         .filter((label, index, labels) => labels.indexOf(label) === index)
         .join(" · "),
-    OutsideQuestion: (question) => `Asked by ${askedBy(question)}`,
+    OutsideQuestion: ({ askedBy }) => `Asked by ${askedBy}`,
     PullRequest: ({ reasons }) =>
       reasons.map((reason) => pullRequestReasonLabels[reason._tag]).join(" · "),
   })
@@ -454,7 +452,7 @@ function OutsideQuestionDetail(props: { item: OutsideQuestion; now: Date }) {
           <h2 className="text-lg font-semibold text-pretty break-words">{item.question}</h2>
           <Waited since={item.since} now={props.now} />
         </div>
-        <p className="text-sm text-pretty text-muted-foreground">Asked by {askedBy(item)}</p>
+        <p className="text-sm text-pretty text-muted-foreground">Asked by {item.askedBy}</p>
       </header>
       <form
         className="flex flex-col gap-3"

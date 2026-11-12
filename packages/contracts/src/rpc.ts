@@ -343,10 +343,9 @@ export class GlassRpcs extends RpcGroup.make(
     error: OutsideQuestionNotWaiting,
   }),
   Rpc.make("GetMcpEndpoint", { success: Schema.Struct({ url: Schema.String }) }),
-  Rpc.make("ListOutsideAgents", { success: Schema.Array(OutsideAgent) }),
+  Rpc.make("WatchOutsideAgents", { success: Schema.Array(OutsideAgent), stream: true }),
   Rpc.make("RevokeOutsideAgent", {
     payload: { id: Schema.String },
-    success: Schema.Array(OutsideAgent),
     error: OutsideAgentNotFound,
   }),
   Rpc.make("WatchTranscript", {

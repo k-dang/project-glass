@@ -10,6 +10,7 @@ import {
 } from "@glass/contracts"
 import { Effect, Exit, Fiber, Option, Predicate, Redacted, Schema, Scope, Stream } from "effect"
 import { startBackend } from "../../test/harness"
+import { OUTSIDE_AGENT_TTL } from "../OutsideAgents"
 import { connectMcp, initialize, mcpPost, toolResult, toolText } from "../../test/mcpClient"
 
 const outside = (items: NeedsYou) =>
@@ -23,9 +24,14 @@ const needsYou = (
 ) =>
   client.WatchNeedsYou().pipe(Stream.filter(until), Stream.runHead, Effect.map(Option.getOrThrow))
 
+const approve = (backend: Effect.Success<ReturnType<typeof startBackend>>) =>
+  backend.outsideAgents
+    .issue({ name: "Claude Code", ttl: OUTSIDE_AGENT_TTL })
+    .pipe(Effect.map(({ token }) => token))
+
 const start = Effect.gen(function* () {
   const backend = yield* startBackend({})
-  const bearer = yield* backend.mcpCredentials.issue({ conversationId: "claude-code" })
+  const bearer = yield* approve(backend)
   const mcp = yield* connectMcp(backend.baseUrl, bearer)
 
   return { ...backend, bearer, mcp }
@@ -38,7 +44,7 @@ describe("ask_user", () => {
 
       const call = mcp.request("tools/call", {
         name: "ask_user",
-        arguments: { question: "Ship the retry change?", from: "Claude Code" },
+        arguments: { question: "Ship the retry change?" },
       })
 
       const inFlight = yield* Effect.forkChild(call.response)
@@ -48,8 +54,7 @@ describe("ask_user", () => {
       assert.ok(question !== undefined)
       assert.equal(question.question, "Ship the retry change?")
       assert.deepStrictEqual(question.choices, [])
-      assert.equal(question.session, "claude-code")
-      assert.equal(question.label, "Claude Code")
+      assert.equal(question.askedBy, "Claude Code")
 
       yield* client.AnswerOutsideQuestion({
         id: question.id,
@@ -84,7 +89,6 @@ describe("ask_user", () => {
 
       assert.ok(question !== undefined)
       assert.deepStrictEqual(question.choices, ["Ship it", "Hold it"])
-      assert.equal(question.label, null)
 
       yield* client.AnswerOutsideQuestion({
         id: question.id,
@@ -156,7 +160,7 @@ describe("ask_user", () => {
     Effect.gen(function* () {
       const scope = yield* Scope.make()
       const backend = yield* startBackend({}).pipe(Scope.provide(scope))
-      const bearer = yield* backend.mcpCredentials.issue({ conversationId: "claude-code" })
+      const bearer = yield* approve(backend)
       const mcp = yield* connectMcp(backend.baseUrl, bearer)
 
       const call = mcp.request("tools/call", {
@@ -178,8 +182,9 @@ describe("ask_user", () => {
 
   it.live("sends progress before the answer so the call outlives a client timeout", () =>
     Effect.gen(function* () {
-      const { baseUrl, client, mcpCredentials } = yield* startBackend({})
-      const bearer = yield* mcpCredentials.issue({ conversationId: "claude-code" })
+      const backend = yield* startBackend({})
+      const { baseUrl, client } = backend
+      const bearer = yield* approve(backend)
       const opened = yield* mcpPost(baseUrl, initialize, { bearer })
 
       assert.equal(opened.status, 200)
@@ -247,16 +252,17 @@ describe("ask_user", () => {
     }),
   )
 
-  it.live("refuses a second question while one from that session is waiting", () =>
+  it.live("refuses a second question from the same MCP session, not from another", () =>
     Effect.gen(function* () {
-      const { client, mcp } = yield* start
+      const { baseUrl, bearer, client, mcp } = yield* start
+      const otherTerminal = yield* connectMcp(baseUrl, bearer)
 
-      const first = mcp.request("tools/call", {
-        name: "ask_user",
-        arguments: { question: "Ship the retry change?" },
-      })
-
-      const inFlight = yield* Effect.forkChild(first.response)
+      const first = yield* Effect.forkChild(
+        mcp.request("tools/call", {
+          name: "ask_user",
+          arguments: { question: "Ship the retry change?" },
+        }).response,
+      )
 
       yield* needsYou(client, (items) => outside(items).length === 1)
 
@@ -269,17 +275,38 @@ describe("ask_user", () => {
 
       assert.isTrue(second.isError)
       assert.include(toolText(second), "already waiting")
-      assert.equal(outside(yield* needsYou(client, () => true)).length, 1)
 
-      const shown = yield* needsYou(client, (items) => outside(items).length === 1)
-      const question = outside(shown)[0]
+      const other = yield* Effect.forkChild(
+        otherTerminal.request("tools/call", {
+          name: "ask_user",
+          arguments: { question: "Rebase first?" },
+        }).response,
+      )
 
-      assert.ok(question !== undefined)
-      yield* client.AnswerOutsideQuestion({
-        id: question.id,
-        answer: OutsideText.make({ text: "Ship it" }),
-      })
-      yield* Fiber.join(inFlight)
+      const shown = outside(yield* needsYou(client, (items) => outside(items).length === 2))
+
+      yield* Effect.forEach(shown, (question) =>
+        client.AnswerOutsideQuestion({
+          id: question.id,
+          answer: OutsideText.make({ text: "Yes" }),
+        }),
+      )
+      yield* Fiber.join(first)
+      yield* Fiber.join(other)
+    }),
+  )
+
+  it.live("refuses a conversation Glass launched", () =>
+    Effect.gen(function* () {
+      const { baseUrl, client, mcpCredentials } = yield* startBackend({})
+      const bearer = yield* mcpCredentials.issue({ conversationId: "conversation-1" })
+      const mcp = yield* connectMcp(baseUrl, bearer)
+
+      const result = yield* mcp.call("ask_user", { question: "Ship it?" })
+
+      assert.isTrue(result.isError)
+      assert.include(toolText(result), "its own Question tool")
+      assert.equal(outside(yield* needsYou(client, () => true)).length, 0)
     }),
   )
 })

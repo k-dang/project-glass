@@ -37,10 +37,8 @@ export const OutsideQuestion = Schema.TaggedStruct("OutsideQuestion", {
   id: Schema.String,
   question: Schema.String,
   choices: Schema.Array(Schema.String),
-  /** The MCP credential's conversation, which is the session that asked. */
-  session: Schema.String,
-  /** A name the caller gave, such as Claude Code. Null when they gave none. */
-  label: Schema.NullOr(Schema.String),
+  /** The name the user approved the outside agent under, such as Claude Code. */
+  askedBy: Schema.String,
   since: Schema.DateTimeUtcFromString,
 })
 

@@ -4,7 +4,7 @@ import { Deferred, Duration, Effect, Fiber } from "effect"
 import { type UtilityProcess, utilityProcess } from "electron"
 import { randomBytes, randomUUID } from "node:crypto"
 import { BackendError, keepRunning, openBackendLog, waitForBackend } from "./backendIo"
-import { choosePort } from "./mcpPort"
+import { choosePort } from "./backendPort"
 
 const STOP_DEADLINE = Duration.seconds(10)
 

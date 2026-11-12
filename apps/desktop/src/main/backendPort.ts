@@ -5,7 +5,7 @@ import { join } from "node:path"
 
 const decodeAddress = Schema.decodeUnknownOption(Schema.Struct({ port: Schema.Number }))
 
-const PORT_FILE = "mcp-port"
+const PORT_FILE = "backend-port"
 
 const listen = (port: number) =>
   new Promise<number>((resolve, reject) => {
@@ -24,7 +24,10 @@ const listen = (port: number) =>
     })
   })
 
-/** Reuse the port Glass last bound, and take another only when that port is already taken. */
+/**
+ * Reuse the port the backend last bound, so the MCP address outside agents saved stays valid,
+ * and take another only when that port is already taken.
+ */
 export const choosePort = async (directory: string): Promise<number> => {
   await mkdir(directory, { recursive: true })
 

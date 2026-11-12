@@ -191,10 +191,10 @@ const decide = Effect.gen(function* () {
 
   const origin = request.headers.origin
 
-  // The Host check above already requires a loopback name on the bound port, so
-  // this request reached the process Glass is listening on. Chrome sends the
-  // literal origin "null" for this form because the page's referrer policy is
-  // no-referrer. A page on another site still sends its own origin.
+  // Chrome sends the literal origin "null" for this form because the page's referrer policy is
+  // no-referrer, so "null" is accepted. A sandboxed frame on another site sends "null" too, so
+  // this check does not stop a forged decision: the signed csrf field below does, because only
+  // a page that read the approval Glass rendered can carry it.
   if (origin !== undefined && origin !== "null" && origin !== found.value.issuer) {
     return page(400, renderError("This approval page is out of date. Start the sign-in again."))
   }

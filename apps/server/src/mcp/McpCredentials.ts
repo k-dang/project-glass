@@ -1,14 +1,4 @@
-import {
-  Context,
-  Deferred,
-  Effect,
-  Layer,
-  Match,
-  Option,
-  Redacted,
-  Schema,
-  type Scope,
-} from "effect"
+import { Context, Deferred, Effect, Layer, Option, Redacted, Schema, type Scope } from "effect"
 import { createHash, randomBytes } from "node:crypto"
 
 export class ConversationCaller extends Schema.TaggedClass<ConversationCaller>()("Conversation", {
@@ -16,18 +6,13 @@ export class ConversationCaller extends Schema.TaggedClass<ConversationCaller>()
 }) {}
 
 export class OutsideAgentCaller extends Schema.TaggedClass<OutsideAgentCaller>()("OutsideAgent", {
-  sessionId: Schema.String,
+  agentId: Schema.String,
   name: Schema.String,
+  /** The MCP session that called. One approved app can hold several, one per terminal. */
+  session: Schema.String,
 }) {}
 
 export type McpCallerIdentity = ConversationCaller | OutsideAgentCaller
-
-export const sessionOf = (caller: McpCallerIdentity) =>
-  Match.value(caller).pipe(
-    Match.tag("Conversation", ({ conversationId }) => conversationId),
-    Match.tag("OutsideAgent", ({ sessionId }) => sessionId),
-    Match.exhaustive,
-  )
 
 export class McpCaller extends Context.Service<McpCaller, McpCallerIdentity>()(
   "@glass/server/McpCaller",

@@ -5,13 +5,16 @@ import { createHash, randomBytes } from "node:crypto"
 import { request as httpRequest } from "node:http"
 import { DatabaseSync } from "node:sqlite"
 import { join } from "node:path"
-import { isolatedHome, LAUNCH_TOKEN, startBackend } from "../../test/harness"
+import { isolatedHome, startBackend } from "../../test/harness"
 import { connectMcp, initialize, mcpPost, toolResult } from "../../test/mcpClient"
 
 const outside = (items: NeedsYou) =>
   items.filter((item) => Predicate.isTagged(item, "OutsideQuestion"))
 
 const askResult = Schema.decodeUnknownSync(AskUserResult)
+
+const connectedAgents = (client: Effect.Success<ReturnType<typeof startBackend>>["client"]) =>
+  client.WatchOutsideAgents().pipe(Stream.runHead, Effect.map(Option.getOrThrow))
 
 const TokenResponse = Schema.Struct({
   access_token: Schema.String,
@@ -228,6 +231,14 @@ describe("MCP OAuth", () => {
   it.live("issues a token that can ask the user", () =>
     Effect.gen(function* () {
       const { baseUrl, client } = yield* start
+
+      const shownInSettings = yield* client.WatchOutsideAgents().pipe(
+        Stream.filter((agents) => agents.length > 0),
+        Stream.runHead,
+        Effect.map(Option.getOrThrow),
+        Effect.forkChild,
+      )
+
       const { token, expiresIn } = yield* signIn(baseUrl, "Claude Code")
       const mcp = yield* connectMcp(baseUrl, token)
 
@@ -250,14 +261,15 @@ describe("MCP OAuth", () => {
         (item) => item.question === "May I land the retry change?",
       )
 
-      const listed = yield* client.ListOutsideAgents()
+      const listed = yield* Fiber.join(shownInSettings)
 
       assert.ok(expiresIn > 29 * 24 * 60 * 60)
       assert.ok(expiresIn <= 30 * 24 * 60 * 60)
       assert.ok(question !== undefined)
-      assert.strictEqual(question.label, "Claude Code")
-      assert.ok(
-        listed.some((agent) => agent.id === question.session && agent.name === "Claude Code"),
+      assert.strictEqual(question.askedBy, "Claude Code")
+      assert.deepStrictEqual(
+        listed.map((agent) => agent.name),
+        ["Claude Code"],
       )
 
       yield* client.AnswerOutsideQuestion({
@@ -423,17 +435,12 @@ describe("MCP OAuth", () => {
       const { token } = yield* signIn(baseUrl, "Claude Code")
 
       const health = yield* Effect.promise(() =>
-        fetch(`${baseUrl}/health?token=${LAUNCH_TOKEN}`, {
+        fetch(`${baseUrl}/health`, {
           headers: { authorization: `Bearer ${Redacted.value(token)}` },
         }),
       )
 
-      const body = yield* Effect.promise(() => health.text())
-      const open = yield* Effect.promise(() => fetch(`${baseUrl}/health?token=${LAUNCH_TOKEN}`))
-
       assert.strictEqual(health.status, 401)
-      assert.strictEqual(body, "MCP client sessions are only accepted by the MCP endpoint.")
-      assert.strictEqual(open.status, 204)
     }),
   )
 
@@ -442,7 +449,7 @@ describe("MCP OAuth", () => {
       const { baseUrl, client, home } = yield* start
       const { token } = yield* signIn(baseUrl, "Claude Code")
       const mcp = yield* connectMcp(baseUrl, token)
-      const [agent] = yield* client.ListOutsideAgents()
+      const [agent] = yield* connectedAgents(client)
 
       assert.ok(agent !== undefined)
       assert.strictEqual((yield* mcp.request("tools/list", {}).response).status, 200)
@@ -450,7 +457,7 @@ describe("MCP OAuth", () => {
       yield* client.RevokeOutsideAgent({ id: agent.id })
 
       assert.strictEqual((yield* mcp.request("tools/list", {}).response).status, 401)
-      assert.deepStrictEqual(yield* client.ListOutsideAgents(), [])
+      assert.deepStrictEqual(yield* connectedAgents(client), [])
 
       const again = yield* signIn(baseUrl, "Claude Code")
 
@@ -693,7 +700,7 @@ describe("MCP OAuth", () => {
       const mcp = yield* connectMcp(baseUrl, bearer)
 
       assert.strictEqual((yield* mcp.request("tools/list", {}).response).status, 200)
-      assert.deepStrictEqual(yield* client.ListOutsideAgents(), [])
+      assert.deepStrictEqual(yield* connectedAgents(client), [])
     }),
   )
 })

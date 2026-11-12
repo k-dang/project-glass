@@ -116,7 +116,7 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         AnswerRequest: unused,
         AnswerOutsideQuestion: unused,
         GetMcpEndpoint: () => Effect.succeed({ url: "http://127.0.0.1:0/mcp" }),
-        ListOutsideAgents: () => Effect.succeed([]),
+        WatchOutsideAgents: () => Stream.make([]),
         RevokeOutsideAgent: unused,
         GetRemovalWarnings: unused,
         RemoveAgent: unused,

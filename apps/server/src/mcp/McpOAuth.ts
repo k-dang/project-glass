@@ -21,13 +21,12 @@ const MAX_REDIRECT_URI_LENGTH = 512
 
 const DEFAULT_CLIENT_NAME = "MCP client"
 
-const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"])
-
 const CODE_CHALLENGE = /^[A-Za-z0-9_-]{43}$/
 
 const CODE_VERIFIER = /^[A-Za-z0-9\-._~]{43,128}$/
 
-const LOOPBACK_NAMES = new Set(["localhost", "127.0.0.1", "::1"])
+/** Host names as `URL.hostname` spells them, so IPv6 keeps its brackets. */
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"])
 
 const ClientIdPayload = Schema.Struct({
   v: Schema.Literal(1),
@@ -48,7 +47,7 @@ const hostNameAndPort = (host: string): { name: string; port: string } | undefin
 
     if (end <= 1 || !host.slice(end + 1).startsWith(":")) return undefined
 
-    return { name: host.slice(1, end), port: host.slice(end + 2) }
+    return { name: host.slice(0, end + 1), port: host.slice(end + 2) }
   }
 
   const colon = host.lastIndexOf(":")
@@ -84,7 +83,7 @@ export const urlsFromHost = (host: string | undefined, port: number): OAuthUrls 
 
   if (parts === undefined || parts.port !== String(port)) return undefined
 
-  if (!LOOPBACK_NAMES.has(parts.name.toLowerCase())) return undefined
+  if (!LOOPBACK_HOSTS.has(parts.name.toLowerCase())) return undefined
 
   return issuerForPort(port)
 }
@@ -453,8 +452,7 @@ export class McpOAuth extends Context.Service<
           if (!redirectUris.every((uri) => parseRedirect(uri) !== undefined)) {
             return yield* new OAuthRegistrationError({
               error: "invalid_redirect_uri",
-              description:
-                "Redirect URIs must be https, or http on localhost, 127.0.0.1, or [::1].",
+              description: "Redirect URIs must be http on localhost, 127.0.0.1, or [::1].",
             })
           }
 

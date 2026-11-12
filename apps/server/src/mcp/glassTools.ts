@@ -35,7 +35,7 @@ import {
   AgentPlace,
   localPlace,
 } from "@glass/contracts"
-import { Context, Duration, Effect, Match, Option, Schema, Stream } from "effect"
+import { Context, Duration, Effect, Match, Option, Predicate, Schema, Stream } from "effect"
 import { Tool, Toolkit } from "effect/ai"
 import { ActivityLog } from "../ActivityLog"
 import { AgentReviews } from "../AgentReviews"
@@ -47,14 +47,9 @@ import { BackgroundGitHubRequest } from "../github/GitHubRequestPolicy"
 import { FollowedRepositories } from "../FollowedRepositories"
 import { LocalCheckouts } from "../LocalCheckouts"
 import { AskProgress } from "./AskProgress"
-import { McpCaller, sessionOf } from "./McpCredentials"
+import { McpCaller } from "./McpCredentials"
 import { NeedsYou } from "../NeedsYou"
-import {
-  ASK_PROGRESS_SECONDS,
-  ASK_TIMEOUT_DEFAULT_SECONDS,
-  ASK_TIMEOUT_MAX_SECONDS,
-  OutsideQuestions,
-} from "../OutsideQuestions"
+import { ASK_PROGRESS_SECONDS, ASK_TIMEOUT_SECONDS, OutsideQuestions } from "../OutsideQuestions"
 import { Sandboxes } from "../Sandboxes"
 import { PullRequestLists } from "../PullRequestLists"
 import { Queue } from "../Queue"
@@ -260,15 +255,14 @@ const ReadAgentReview = Tool.make("read_agent_review", {
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)
 
-const minutes = ASK_TIMEOUT_DEFAULT_SECONDS / 60
-
 const AskUser = Tool.make("ask_user", {
   description:
-    `Asks the user a question and waits for their answer in the Glass Inbox, in Stopped on you. ` +
-    `Waits ${minutes} minutes unless timeoutSeconds is set. timeoutSeconds is a whole number of seconds from 1 to ${ASK_TIMEOUT_MAX_SECONDS}, and cannot be longer than that. ` +
+    `For an agent outside Glass: asks the user a question and waits for their answer in the Glass Inbox, in Stopped on you, under the name the user approved. ` +
+    `An Agent Glass launched asks with its own Question tool instead. ` +
+    `Waits ${ASK_TIMEOUT_SECONDS / 60} minutes unless timeoutSeconds is set. timeoutSeconds is a whole number of seconds from 1 to ${ASK_TIMEOUT_SECONDS}. ` +
     `Glass sends a progress notification immediately and every ${ASK_PROGRESS_SECONDS} seconds while it waits, so a client that resets its timeout when progress arrives is not cut off before Glass's own limit. ` +
     `Pass a progress token on the call. The result is Answered with the user's answer (by is choice or text), TimedOut when they do not answer in time, or Cancelled when Glass shuts down. ` +
-    `A timed out or cancelled question leaves the Inbox. choices are optional. The user can pick one or type their own answer. from is your name, shown beside the session that called.`,
+    `A timed out or cancelled question leaves the Inbox. choices are optional. The user can pick one or type their own answer. Each MCP session may have one question waiting.`,
   parameters: Schema.Struct({
     question: Schema.Trimmed.check(Schema.isNonEmpty(), Schema.isMaxLength(2_000)).annotate({
       description: "The question to show in the Inbox.",
@@ -281,17 +275,10 @@ const AskUser = Tool.make("ask_user", {
             "Choices the user can pick. They can still type their own answer. Omit this to ask for text only.",
         }),
     ),
-    from: Schema.optional(
-      Schema.Trimmed.check(Schema.isNonEmpty(), Schema.isMaxLength(80)).annotate({
-        description: "Your name, shown beside the session that called. For example, Claude Code.",
-      }),
-    ),
     timeoutSeconds: Schema.optional(
-      Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: ASK_TIMEOUT_MAX_SECONDS })).annotate(
-        {
-          description: `Seconds to wait. Defaults to ${ASK_TIMEOUT_DEFAULT_SECONDS}. At most ${ASK_TIMEOUT_MAX_SECONDS}.`,
-        },
-      ),
+      Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: ASK_TIMEOUT_SECONDS })).annotate({
+        description: `Seconds to wait. Defaults to ${ASK_TIMEOUT_SECONDS}, the most allowed.`,
+      }),
     ),
   }),
   success: AskUserResult,
@@ -561,22 +548,16 @@ export const GlassToolHandlers = GlassTools.toLayer(
           Effect.map((delivery) => ({ delivery })),
           Effect.mapError(explained),
         ),
-      ask_user: ({ question, choices, from, timeoutSeconds }) =>
+      ask_user: ({ question, choices, timeoutSeconds }) =>
         Effect.scoped(
           Effect.gen(function* () {
             const caller = yield* McpCaller.current
 
-            const label = yield* Match.value(caller).pipe(
-              Match.tag("Conversation", (conversation) =>
-                from === undefined
-                  ? agents.displayedName(conversation.conversationId)
-                  : Effect.succeed<string | null>(from),
-              ),
-              Match.tag("OutsideAgent", (agent) =>
-                Effect.succeed<string | null>(from ?? agent.name),
-              ),
-              Match.exhaustive,
-            )
+            if (!Predicate.isTagged(caller, "OutsideAgent")) {
+              return yield* new GlassToolFailure({
+                message: "An Agent Glass launched asks the user with its own Question tool.",
+              })
+            }
 
             yield* Effect.forkScoped(waitingProgress)
 
@@ -584,9 +565,9 @@ export const GlassToolHandlers = GlassTools.toLayer(
               .ask({
                 question,
                 choices: choices ?? [],
-                session: sessionOf(caller),
-                label,
-                timeout: Duration.seconds(timeoutSeconds ?? ASK_TIMEOUT_DEFAULT_SECONDS),
+                session: caller.session,
+                askedBy: caller.name,
+                timeout: Duration.seconds(timeoutSeconds ?? ASK_TIMEOUT_SECONDS),
               })
               .pipe(
                 Effect.mapError(

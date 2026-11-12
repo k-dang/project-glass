@@ -3,7 +3,7 @@ import { createServer } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vite-plus/test"
-import { choosePort } from "./mcpPort"
+import { choosePort } from "./backendPort"
 
 const hold = (port: number) =>
   new Promise<ReturnType<typeof createServer>>((resolve, reject) => {
