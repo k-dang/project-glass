@@ -1,5 +1,5 @@
-import { ActivityPullRequest, GlassRpcs, PullRequestOpened } from "@glass/contracts"
-import { Effect, Stream } from "effect"
+import { GlassRpcs } from "@glass/contracts"
+import { Effect, Predicate, Stream } from "effect"
 import { ActivityLog } from "./ActivityLog"
 import { AgentReviews } from "./AgentReviews"
 import { Asks } from "./Asks"
@@ -92,23 +92,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       RemoveFromQueue: ({ reference }) => queue.remove(reference),
       RestoreToQueue: ({ queued }) => queue.restore(queued),
       GetConnection: () => github.viewer,
-      OpenPullRequest: ({ pullRequest: ref }) =>
-        workspaces.open(ref).pipe(
-          Effect.tap(({ pullRequest, revision }) =>
-            Effect.all([
-              activityLog.record(
-                PullRequestOpened.make({
-                  pullRequest: new ActivityPullRequest({
-                    ref: pullRequest.ref,
-                    title: pullRequest.title,
-                    revision,
-                  }),
-                }),
-              ),
-              queue.opened(pullRequest.ref),
-            ]),
-          ),
-        ),
+      LoadPullRequest: ({ pullRequest: ref }) => workspaces.open(ref),
       HasPullRequestChanged: ({ pullRequestId, revision, updatedAt }) =>
         github
           .hasChanged(pullRequestId, revision, updatedAt)
@@ -131,7 +115,16 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
         github.setDiscussionResolved(discussionId, resolved),
       SetReaction: ({ commentId, reaction, reacted }) =>
         github.setReaction(commentId, reaction, reacted),
-      RecordActivity: (activity) => activityLog.record(activity),
+      RecordActivity: (activity) =>
+        activityLog
+          .record(activity)
+          .pipe(
+            Effect.andThen(
+              Predicate.isTagged(activity, "PullRequestOpened")
+                ? queue.opened(activity.pullRequest.ref)
+                : Effect.void,
+            ),
+          ),
       ListActivity: ({ limit }) =>
         github.viewer.pipe(Effect.flatMap(({ login }) => activityLog.list(login, limit))),
       ListActivityStamps: ({ since, kinds }) =>

@@ -30,7 +30,7 @@ describe("Discussion resolution", () => {
         true,
       )
       assert.strictEqual(
-        (yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(pr) })).discussions
+        (yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })).discussions
           .onLines[0]?.resolved,
         true,
       )
@@ -46,7 +46,7 @@ describe("Discussion resolution", () => {
         false,
       )
       assert.strictEqual(
-        (yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(pr) })).discussions
+        (yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })).discussions
           .onLines[0]?.resolved,
         false,
       )
@@ -87,7 +87,7 @@ describe("Discussion resolution", () => {
       )
       assert.strictEqual(pr.reviewThreads[0]?.resolved, false)
       assert.strictEqual(
-        (yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(pr) })).discussions
+        (yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })).discussions
           .onLines[0]?.resolved,
         false,
       )

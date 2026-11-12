@@ -132,7 +132,7 @@ it("answers a waiting Agent's Permission request in its row, and drops the row w
 it("lists a PR with its reasons and opens it", async () => {
   const opened: Array<Held<{ readonly pullRequest: PullRequestRef }, never, never>> = []
 
-  const user = mount(needsYouRef([reviewRequested]), { OpenPullRequest: hold(opened) })
+  const user = mount(needsYouRef([reviewRequested]), { LoadPullRequest: hold(opened) })
 
   const list = await screen.findByRole("list", { name: "Needs you" })
   const link = within(list).getByRole("link", { name: /Retry flaky upload/ })

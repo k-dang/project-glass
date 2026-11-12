@@ -107,7 +107,7 @@ const base = { sha: "b0", files: { "README.md": "Hello\n" } }
 
 const head = { sha: "h1", files: { "README.md": "Hello, world\n" } }
 
-describe("OpenPullRequest", () => {
+describe("LoadPullRequest", () => {
   it.live("opens the PR's metadata pinned to its current Revision", () =>
     Effect.gen(function* () {
       const { github, client } = yield* startSignedInBackend
@@ -125,7 +125,7 @@ describe("OpenPullRequest", () => {
         head,
       })
 
-      const workspace = yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(pr) })
+      const workspace = yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })
 
       assert.deepStrictEqual(
         workspace,
@@ -163,7 +163,7 @@ describe("OpenPullRequest", () => {
       const { github, client } = yield* startSignedInBackend
       github.seedPullRequest({ owner: "octo-org", repo: "Hello-World", number: 3, base, head })
 
-      const { pullRequest } = yield* client.OpenPullRequest({
+      const { pullRequest } = yield* client.LoadPullRequest({
         pullRequest: new PullRequestRef({ owner: "OCTO-ORG", repo: "hello-world", number: 3 }),
       })
 
@@ -178,10 +178,10 @@ describe("OpenPullRequest", () => {
     Effect.gen(function* () {
       const { github, client } = yield* startSignedInBackend
       const pr = github.seedPullRequest({ base, head })
-      const opened = yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(pr) })
+      const opened = yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })
 
       pr.push({ head: { sha: "h2", files: { "README.md": "Hi, world\n" } } })
-      const reopened = yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(pr) })
+      const reopened = yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })
 
       assert.deepStrictEqual(opened.revision, new Revision({ base: "b0", head: "h1" }))
       assert.deepStrictEqual(reopened.revision, new Revision({ base: "b0", head: "h2" }))
@@ -193,7 +193,7 @@ describe("OpenPullRequest", () => {
       const { github, client } = yield* startSignedInBackend
       const pr = github.seedPullRequest({ base, head })
 
-      const { pullRequest, revision, updatedAt } = yield* client.OpenPullRequest({
+      const { pullRequest, revision, updatedAt } = yield* client.LoadPullRequest({
         pullRequest: new PullRequestRef(pr),
       })
 
@@ -215,7 +215,7 @@ describe("OpenPullRequest", () => {
       const { github, client } = yield* startSignedInBackend
       const pr = github.seedPullRequest({ base, head })
 
-      const { pullRequest, revision, updatedAt } = yield* client.OpenPullRequest({
+      const { pullRequest, revision, updatedAt } = yield* client.LoadPullRequest({
         pullRequest: new PullRequestRef(pr),
       })
 
@@ -247,7 +247,7 @@ describe("OpenPullRequest", () => {
       pr.addReview({ author: "octocat", state: "APPROVED" })
       pr.requestedReviewers.add("octocat")
 
-      const { pullRequest } = yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(pr) })
+      const { pullRequest } = yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })
 
       assert.strictEqual(pullRequest.approval, "changes-requested")
       assert.deepStrictEqual(pullRequest.reviewers, [
@@ -282,7 +282,7 @@ describe("OpenPullRequest", () => {
         head,
       })
 
-      const { pullRequest } = yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(pr) })
+      const { pullRequest } = yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })
 
       assert.deepStrictEqual(pullRequest.checks, [
         new Check({ name: "ci / test", state: "passed", url: "https://ci.test/1" }),
@@ -307,7 +307,7 @@ describe("OpenPullRequest", () => {
       ] as const) {
         const pr = github.seedPullRequest({ mergeable: seed, base, head })
 
-        const { pullRequest } = yield* client.OpenPullRequest({
+        const { pullRequest } = yield* client.LoadPullRequest({
           pullRequest: new PullRequestRef(pr),
         })
 
@@ -330,7 +330,7 @@ describe("OpenPullRequest", () => {
       for (const { expected, ...seed } of seeds) {
         const pr = github.seedPullRequest({ ...seed, author: null, base, head })
 
-        const { pullRequest } = yield* client.OpenPullRequest({
+        const { pullRequest } = yield* client.LoadPullRequest({
           pullRequest: new PullRequestRef(pr),
         })
 
@@ -351,7 +351,7 @@ describe("OpenPullRequest", () => {
       ]
 
       for (const ref of refs) {
-        const error = yield* Effect.flip(client.OpenPullRequest({ pullRequest: ref }))
+        const error = yield* Effect.flip(client.LoadPullRequest({ pullRequest: ref }))
 
         assert.deepStrictEqual(error, new PullRequestNotFound({ ref }))
       }
@@ -369,7 +369,7 @@ describe("OpenPullRequest", () => {
       github.failNextGraphQL({ type: "FORBIDDEN", message: reason })
 
       const error = yield* Effect.flip(
-        client.OpenPullRequest({ pullRequest: new PullRequestRef(pr) }),
+        client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) }),
       )
 
       assert.deepStrictEqual(
@@ -389,7 +389,7 @@ describe("OpenPullRequest", () => {
       github.failNextGraphQL({ type: "INTERNAL", message: "Something went wrong" })
 
       const error = yield* Effect.flip(
-        client.OpenPullRequest({ pullRequest: new PullRequestRef(pr) }),
+        client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) }),
       )
 
       assert.deepStrictEqual(
@@ -423,7 +423,7 @@ const openThenPush = Effect.gen(function* () {
     changedFiles: contentsChangedFiles,
   })
 
-  const { pullRequest, revision } = yield* client.OpenPullRequest({
+  const { pullRequest, revision } = yield* client.LoadPullRequest({
     pullRequest: new PullRequestRef(pr),
   })
 
@@ -462,7 +462,7 @@ describe("file contents", () => {
         },
       })
 
-      const { pullRequest, revision } = yield* client.OpenPullRequest({
+      const { pullRequest, revision } = yield* client.LoadPullRequest({
         pullRequest: new PullRequestRef(pr),
       })
 

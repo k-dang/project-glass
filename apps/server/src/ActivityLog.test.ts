@@ -7,7 +7,6 @@ import {
   Draft,
   FileViewed,
   FollowedRepository,
-  GitHubUnavailable,
   LinePlace,
   type PullRequestListings,
   PullRequestOpened,
@@ -25,7 +24,7 @@ import { join } from "node:path"
 import { DatabaseSync } from "node:sqlite"
 import { startFakeGitHub } from "../test/fakeGitHub"
 import { VIEWER } from "../test/fakePullRequest"
-import { isolatedHome, startBackend } from "../test/harness"
+import { isolatedHome, openPullRequest, startBackend } from "../test/harness"
 
 const pullRequest = new ActivityPullRequest({
   ref: new PullRequestRef({ owner: "acme", repo: "api", number: 42 }),
@@ -76,82 +75,6 @@ const readLog = (home: string) => {
 }
 
 describe("Activity log", () => {
-  it.live("records successful PR opens and reloads before returning, excluding failed opens", () =>
-    Effect.gen(function* () {
-      const home = yield* isolatedHome
-      const github = yield* startFakeGitHub()
-
-      const pr = github.seedPullRequest({
-        owner: "acme",
-        repo: "api",
-        number: 42,
-        title: pullRequest.title,
-        base: { sha: "b0", files: {} },
-        head: { sha: "h1", files: {} },
-      })
-
-      const { client } = yield* startBackend(
-        { GH_TOKEN: VIEWER.token, GLASS_GITHUB_API_URL: github.url },
-        home,
-      )
-
-      yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(pr) })
-      assert.deepStrictEqual(
-        readLog(home).map(({ activity }) => activity),
-        [opened],
-      )
-
-      pr.push({ head: { sha: "h2", files: {} } })
-      yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(pr) })
-      assert.deepStrictEqual(
-        readLog(home).map(({ activity }) => activity),
-        [
-          opened,
-          PullRequestOpened.make({
-            pullRequest: new ActivityPullRequest({
-              ref: pullRequest.ref,
-              title: pullRequest.title,
-              revision: new Revision({ base: "b0", head: "h2" }),
-            }),
-          }),
-        ],
-      )
-
-      github.failNext(503)
-      assert.instanceOf(
-        yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(pr) }).pipe(Effect.flip),
-        GitHubUnavailable,
-      )
-      assert.strictEqual(readLog(home).length, 2)
-    }),
-  )
-
-  it.live("keeps a successful PR open usable when recording its Activity fails", () =>
-    Effect.gen(function* () {
-      const home = yield* isolatedHome
-      const github = yield* startFakeGitHub()
-
-      const pr = github.seedPullRequest({
-        base: { sha: "b0", files: {} },
-        head: { sha: "h1", files: {} },
-      })
-
-      const { client } = yield* startBackend(
-        { GH_TOKEN: VIEWER.token, GLASS_GITHUB_API_URL: github.url },
-        home,
-      )
-
-      github.beforeNext("/user", () => github.failNext(503))
-      const workspace = yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(pr) })
-
-      assert.strictEqual(workspace.pullRequest.url, pr.url)
-      assert.isEmpty(readLog(home))
-
-      yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(pr) })
-      assert.strictEqual(readLog(home).length, 1)
-    }),
-  )
-
   it.live("records each kind of Activity as it was sent", () =>
     Effect.gen(function* () {
       const home = yield* isolatedHome
@@ -365,10 +288,10 @@ describe("Activity log", () => {
         ).pipe(Effect.provideService(FetchHttpClient.Fetch, fetch))
 
         yield* client.FollowRepository({ input: "acme/api" })
-        yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(alicePr) })
+        yield* openPullRequest(client, new PullRequestRef(alicePr))
         login = "bob"
         assert.strictEqual((yield* client.GetConnection()).login, "bob")
-        yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(bobPr) })
+        yield* openPullRequest(client, new PullRequestRef(bobPr))
 
         assert.deepStrictEqual(
           readLog(home).map((entry) => entry.login),
@@ -464,8 +387,8 @@ describe("Activity log", () => {
         Effect.gen(function* () {
           const { client } = yield* startBackend(env, home)
           yield* client.FollowRepository({ input: "acme/api" })
-          yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(touched) })
-          yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(touched) })
+          yield* openPullRequest(client, new PullRequestRef(touched))
+          yield* openPullRequest(client, new PullRequestRef(touched))
 
           const database = new DatabaseSync(join(home, ".project-glass", "glass.db"))
 

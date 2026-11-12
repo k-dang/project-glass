@@ -46,7 +46,7 @@ import { EngineFeature, EngineSettings } from "./engine"
 import { FeedbackNote, UnsentFeedback } from "./feedbackNote"
 import { FollowedRepository, InvalidRepositoryInput } from "./followedRepository"
 import { NeedsYou } from "./needsYou"
-import { OpenPullRequestError, PullRequestRef, PullRequestWorkspace } from "./pullRequest"
+import { LoadPullRequestError, PullRequestRef, PullRequestWorkspace } from "./pullRequest"
 import { PullRequestListings } from "./pullRequestList"
 import { Queue, QueueAddition, QueueError, QueuedPullRequest } from "./queue"
 import { FileContents, GetFileContentsError, RepositoryFiles } from "./repository"
@@ -233,10 +233,11 @@ export class GlassRpcs extends RpcGroup.make(
     success: GitHubConnection,
     error: ConnectionError,
   }),
-  Rpc.make("OpenPullRequest", {
+  /** Only reads; recording PullRequestOpened is what marks a PR opened. */
+  Rpc.make("LoadPullRequest", {
     payload: { pullRequest: PullRequestRef },
     success: PullRequestWorkspace,
-    error: OpenPullRequestError,
+    error: LoadPullRequestError,
   }),
   /** Misses changes GitHub makes without touching the PR's updatedAt, like a removed Review request. */
   Rpc.make("HasPullRequestChanged", {
@@ -309,6 +310,7 @@ export class GlassRpcs extends RpcGroup.make(
     success: Schema.Array(ReactionGroup),
     error: ReactionError,
   }),
+  /** PullRequestOpened also marks the PR opened in the Queue. */
   Rpc.make("RecordActivity", { payload: Activity }),
   Rpc.make("ListActivity", {
     payload: { limit: Schema.Int.check(Schema.isGreaterThan(0)) },

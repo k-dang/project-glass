@@ -292,7 +292,7 @@ it.live("drops a queued PR once it leaves the Queue or the user submits a Review
     yield* f.client.RemoveFromQueue({ reference: ref(removed) })
     assert.deepStrictEqual(titles(yield* current(f.client)), ["Wave"])
 
-    const opened = yield* f.client.OpenPullRequest({ pullRequest: ref(submitted) })
+    const opened = yield* f.client.LoadPullRequest({ pullRequest: ref(submitted) })
     yield* f.client.SubmitReview({
       pullRequestId: opened.pullRequest.id,
       revision: opened.revision,

@@ -10,7 +10,7 @@ import {
   NoCredentials,
   OutdatedDiscussion,
   PublishedComment,
-  type OpenPullRequestError,
+  type LoadPullRequestError,
   PullRequest,
   PullRequestNotFound,
   PullRequestRef,
@@ -242,7 +242,7 @@ it("distinguishes no followed repositories, no PRs needing review, and a failed 
 
 it("arranges PRs by repository, kept through Back to PRs", async () => {
   const user = mount({
-    OpenPullRequest: () => Effect.succeed(workspaceOf(wave, "head001")),
+    LoadPullRequest: () => Effect.succeed(workspaceOf(wave, "head001")),
   })
 
   await rowFor("Wave at the world")
@@ -268,7 +268,7 @@ it("opens only full URLs or repository-qualified references", async () => {
   const opens: Array<PullRequestRef> = []
 
   const user = mount({
-    OpenPullRequest: ({ pullRequest }) => {
+    LoadPullRequest: ({ pullRequest }) => {
       opens.push(pullRequest)
 
       return Effect.succeed(workspaceOf(greet, "head001"))
@@ -302,7 +302,7 @@ it("opens another PR from a PR workspace with ⌘L or Open another PR", async ()
   }
 
   const user = mount({
-    OpenPullRequest: ({ pullRequest }) => Effect.succeed(opened[referenceKey(pullRequest)]!),
+    LoadPullRequest: ({ pullRequest }) => Effect.succeed(opened[referenceKey(pullRequest)]!),
   })
 
   await user.click(await rowFor("Greet the world"))
@@ -328,7 +328,7 @@ it("opens another PR from a PR workspace with ⌘L or Open another PR", async ()
 })
 
 it("opens a PR from the Reviews list with ⌘L", async () => {
-  const user = mount({ OpenPullRequest: () => Effect.succeed(workspaceOf(greet, "head001")) })
+  const user = mount({ LoadPullRequest: () => Effect.succeed(workspaceOf(greet, "head001")) })
   await rowFor("Greet the world")
 
   await user.keyboard("{Meta>}l{/Meta}")
@@ -339,7 +339,7 @@ it("opens a PR from the Reviews list with ⌘L", async () => {
 })
 
 it("scopes Copy to every loaded PR workspace tab and removes it when leaving", async () => {
-  const user = mount({ OpenPullRequest: () => Effect.succeed(workspaceOf(greet, "head001")) })
+  const user = mount({ LoadPullRequest: () => Effect.succeed(workspaceOf(greet, "head001")) })
   await user.click(await rowFor("Greet the world"))
   await screen.findByText("head001")
 
@@ -535,7 +535,7 @@ it("opens a PR from the list, and Back to PRs closes it", async () => {
   const opens: Array<PullRequestRef> = []
 
   const user = mount({
-    OpenPullRequest: ({ pullRequest }) => {
+    LoadPullRequest: ({ pullRequest }) => {
       opens.push(pullRequest)
 
       return Effect.succeed(workspaceOf(greet, "head001", [savedDraft]))
@@ -566,7 +566,7 @@ it("opens nothing without GitHub credentials, showing the problem once until Try
       credentials
         ? Effect.succeed(new GitHubConnection({ login: "kevin", tokenSource: "gh" }))
         : Effect.fail(new NoCredentials()),
-    OpenPullRequest: ({ pullRequest }) => {
+    LoadPullRequest: ({ pullRequest }) => {
       opens.push(pullRequest)
 
       return Effect.succeed(workspaceOf(greet, "head001"))
@@ -586,7 +586,7 @@ it("opens nothing without GitHub credentials, showing the problem once until Try
 })
 
 it("goes Back to PRs with Escape once nothing else needs closing", async () => {
-  const user = mount({ OpenPullRequest: () => Effect.succeed(workspaceOf(greet, "head001")) })
+  const user = mount({ LoadPullRequest: () => Effect.succeed(workspaceOf(greet, "head001")) })
 
   await user.click(await rowFor("Greet the world"))
   await screen.findByText("head001")
@@ -602,10 +602,10 @@ it("goes Back to PRs with Escape once nothing else needs closing", async () => {
 
 it("names the PR while it opens, and Back to PRs leaves before it arrives", async () => {
   const opens: Array<
-    Held<{ pullRequest: PullRequestRef }, PullRequestWorkspace, OpenPullRequestError>
+    Held<{ pullRequest: PullRequestRef }, PullRequestWorkspace, LoadPullRequestError>
   > = []
 
-  const user = mount({ OpenPullRequest: hold(opens) })
+  const user = mount({ LoadPullRequest: hold(opens) })
 
   await user.click(await rowFor("Greet the world"))
   await next(opens)
@@ -624,11 +624,11 @@ const reloadHint = () => screen.getByRole("tooltip").textContent
 
 it("reopens a PR as Glass last loaded it, marking Reload once GitHub says it changed", async () => {
   const opens: Array<
-    Held<{ pullRequest: PullRequestRef }, PullRequestWorkspace, OpenPullRequestError>
+    Held<{ pullRequest: PullRequestRef }, PullRequestWorkspace, LoadPullRequestError>
   > = []
 
   const checks: Array<Held<{ updatedAt: DateTime.Utc }, boolean, ConnectionError>> = []
-  const user = mount({ OpenPullRequest: hold(opens), HasPullRequestChanged: hold(checks) })
+  const user = mount({ LoadPullRequest: hold(opens), HasPullRequestChanged: hold(checks) })
 
   await user.click(await rowFor("Greet the world"))
   ;(await next(opens)).answer(Effect.succeed(workspaceOf(greet, "head001", [savedDraft])))
@@ -664,7 +664,7 @@ it("monitors a visible workspace without overlapping reads or replacing its Revi
   const opens: Array<PullRequestRef> = []
 
   const user = mount({
-    OpenPullRequest: ({ pullRequest }) => {
+    LoadPullRequest: ({ pullRequest }) => {
       opens.push(pullRequest)
 
       return Effect.succeed(workspaceOf(greet, "head001", [savedDraft]))
@@ -748,7 +748,7 @@ it.each(["resolution", "Viewed-file"])(
     const registry = testRegistry({
       GetConnection: () =>
         Effect.succeed(new GitHubConnection({ login: "kevin", tokenSource: "gh" })),
-      OpenPullRequest: ({ pullRequest }) => {
+      LoadPullRequest: ({ pullRequest }) => {
         opened.push(pullRequest)
 
         return Effect.succeed(
@@ -808,14 +808,14 @@ it.each(["success", "failure"])(
   "waits for a resolution %s before Reload and unlocks controls if a later Reload fails",
   async (outcome) => {
     const opens: Array<
-      Held<{ pullRequest: PullRequestRef }, PullRequestWorkspace, OpenPullRequestError>
+      Held<{ pullRequest: PullRequestRef }, PullRequestWorkspace, LoadPullRequestError>
     > = []
 
     const resolves: Array<
       Held<{ discussionId: string; resolved: boolean }, boolean, ConnectionError>
     > = []
 
-    const user = mount({ OpenPullRequest: hold(opens), SetDiscussionResolved: hold(resolves) })
+    const user = mount({ LoadPullRequest: hold(opens), SetDiscussionResolved: hold(resolves) })
 
     await user.click(await rowFor("Greet the world"))
     ;(await next(opens)).answer(Effect.succeed(withDiscussion("head001")))
@@ -861,7 +861,7 @@ it.each(["load failure", "target navigation"])(
   "restores the old workspace's editability after Reload ends through %s",
   async (ending) => {
     const opens: Array<
-      Held<{ pullRequest: PullRequestRef }, PullRequestWorkspace, OpenPullRequestError>
+      Held<{ pullRequest: PullRequestRef }, PullRequestWorkspace, LoadPullRequestError>
     > = []
 
     const interrupted = vi.fn<() => void>()
@@ -869,7 +869,7 @@ it.each(["load failure", "target navigation"])(
     const registry = testRegistry({
       GetConnection: () =>
         Effect.succeed(new GitHubConnection({ login: "kevin", tokenSource: "gh" })),
-      OpenPullRequest: (payload) =>
+      LoadPullRequest: (payload) =>
         hold(opens)(payload).pipe(Effect.onInterrupt(() => Effect.sync(interrupted))),
       SetFileViewed: () => Effect.void,
       SetDiscussionResolved: () => Effect.succeed(true),
@@ -944,7 +944,7 @@ it("dismisses Reload's discard prompt when the target changes, preserving the ol
   const registry = testRegistry({
     GetConnection: () =>
       Effect.succeed(new GitHubConnection({ login: "kevin", tokenSource: "gh" })),
-    OpenPullRequest: ({ pullRequest }) => {
+    LoadPullRequest: ({ pullRequest }) => {
       opened.push(pullRequest)
 
       return Effect.succeed(
@@ -993,7 +993,7 @@ it("declines Reload's discard prompt when leaving asks instead, so staying keeps
   const registry = testRegistry({
     GetConnection: () =>
       Effect.succeed(new GitHubConnection({ login: "kevin", tokenSource: "gh" })),
-    OpenPullRequest: () => Effect.succeed(withDiscussion("head001")),
+    LoadPullRequest: () => Effect.succeed(withDiscussion("head001")),
     CreateDraft: () => Effect.fail(new GitHubUnavailable({ message: "Offline" })),
   })
 
@@ -1034,7 +1034,7 @@ it("leaves a PR while a resolution is in flight and shows its result when return
   > = []
 
   const user = mount({
-    OpenPullRequest: () => Effect.succeed(withDiscussion("head001")),
+    LoadPullRequest: () => Effect.succeed(withDiscussion("head001")),
     SetDiscussionResolved: hold(resolves),
   })
 
@@ -1053,7 +1053,7 @@ it("leaves a PR while a resolution is in flight and shows its result when return
 
 it("reopens a PR with the Drafts GitHub saved or deleted since it loaded", async () => {
   const user = mount({
-    OpenPullRequest: () => Effect.succeed(workspaceOf(greet, "head001", [savedDraft])),
+    LoadPullRequest: () => Effect.succeed(workspaceOf(greet, "head001", [savedDraft])),
     DeleteDraft: () => Effect.void,
   })
 
@@ -1069,10 +1069,10 @@ it("reopens a PR with the Drafts GitHub saved or deleted since it loaded", async
 
 it("reopens a PR without discarded feedback, and keeps it open when a Reload can't reach GitHub", async () => {
   const opens: Array<
-    Held<{ pullRequest: PullRequestRef }, PullRequestWorkspace, OpenPullRequestError>
+    Held<{ pullRequest: PullRequestRef }, PullRequestWorkspace, LoadPullRequestError>
   > = []
 
-  const user = mount({ OpenPullRequest: hold(opens) })
+  const user = mount({ LoadPullRequest: hold(opens) })
 
   await user.click(await rowFor("Greet the world"))
   ;(await next(opens)).answer(Effect.succeed(workspaceOf(greet, "head001", [savedDraft])))
@@ -1097,7 +1097,7 @@ it("returns to Reviewing after opening a PR", async () => {
   const user = mount({
     ListPullRequests: () =>
       Effect.succeed(listings({ reviewing: [listed(glass, touched ? [greet] : [])] })),
-    OpenPullRequest: () =>
+    LoadPullRequest: () =>
       Effect.sync(() => {
         touched = true
 
@@ -1115,10 +1115,10 @@ it("returns to Reviewing after opening a PR", async () => {
 
 it("keeps summary text typed during a Reload, and holds Back to PRs until it finishes", async () => {
   const opens: Array<
-    Held<{ pullRequest: PullRequestRef }, PullRequestWorkspace, OpenPullRequestError>
+    Held<{ pullRequest: PullRequestRef }, PullRequestWorkspace, LoadPullRequestError>
   > = []
 
-  const user = mount({ OpenPullRequest: hold(opens) })
+  const user = mount({ LoadPullRequest: hold(opens) })
   await user.click(await rowFor("Greet the world"))
   ;(await next(opens)).answer(Effect.succeed(workspaceOf(greet, "head001")))
 
@@ -1139,7 +1139,7 @@ it("submits a Review with ⌘↵ from the Changes tab, staying open through a st
   const submits: Array<Held<{ decision: string; summary: string }, void, never>> = []
 
   const user = mount({
-    OpenPullRequest: () => Effect.succeed(workspaceOf(greet, "head001", [savedDraft])),
+    LoadPullRequest: () => Effect.succeed(workspaceOf(greet, "head001", [savedDraft])),
     SubmitReview: hold(submits),
   })
 
@@ -1165,7 +1165,7 @@ it("goes back only after in-flight Draft writes finish, without asking about Git
   const deletes: Array<Held<{ id: string }, void, ConnectionError>> = []
 
   const user = mount({
-    OpenPullRequest: () =>
+    LoadPullRequest: () =>
       Effect.succeed(
         workspaceOf(greet, "head001", [
           savedDraft,
@@ -1195,7 +1195,7 @@ it("asks before Back to PRs discards unsaved feedback, and stays on the PR when 
   const deletes: Array<Held<{ id: string }, void, ConnectionError>> = []
 
   const user = mount({
-    OpenPullRequest: ({ pullRequest }) =>
+    LoadPullRequest: ({ pullRequest }) =>
       referenceKey(pullRequest) === referenceKey(wave.ref)
         ? Effect.fail(new PullRequestNotFound({ ref: wave.ref }))
         : Effect.succeed(workspaceOf(greet, "head001", [savedDraft])),
@@ -1229,7 +1229,7 @@ it("asks before Back to PRs discards unsaved feedback, and stays on the PR when 
 })
 
 it("asks before history leaves another area for the list, discarding the open PR's summary", async () => {
-  const user = mount({ OpenPullRequest: () => Effect.succeed(workspaceOf(greet, "head001")) })
+  const user = mount({ LoadPullRequest: () => Effect.succeed(workspaceOf(greet, "head001")) })
 
   await user.click(await rowFor("Greet the world"))
   await user.type(await openReview(user), "Almost there")
@@ -1247,11 +1247,11 @@ it("asks before history leaves another area for the list, discarding the open PR
 
 it("waits for the discard choice before reloading unsaved Drafts and unlocks them on Escape", async () => {
   const opens: Array<
-    Held<{ pullRequest: PullRequestRef }, PullRequestWorkspace, OpenPullRequestError>
+    Held<{ pullRequest: PullRequestRef }, PullRequestWorkspace, LoadPullRequestError>
   > = []
 
   const user = mount({
-    OpenPullRequest: hold(opens),
+    LoadPullRequest: hold(opens),
     DeleteDraft: () => Effect.fail(new GitHubUnavailable({ message: "Offline." })),
   })
 
@@ -1297,7 +1297,7 @@ it("switches between the PR lists, opens a PR from each, and Back to PRs returns
           reviewing: [listed(effect, [revisited])],
         })
       }),
-    OpenPullRequest: ({ pullRequest }) => {
+    LoadPullRequest: ({ pullRequest }) => {
       opens.push(pullRequest)
 
       return Effect.succeed(
@@ -1344,7 +1344,7 @@ it("switches between the PR lists, opens a PR from each, and Back to PRs returns
 })
 
 it("returns to the PR's tab after another area", async () => {
-  const user = mount({ OpenPullRequest: () => Effect.succeed(workspaceOf(greet, "head001")) })
+  const user = mount({ LoadPullRequest: () => Effect.succeed(workspaceOf(greet, "head001")) })
 
   await user.click(await rowFor("Greet the world"))
   await user.click(await screen.findByRole("tab", { name: "Changes" }))
