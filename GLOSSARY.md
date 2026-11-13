@@ -17,6 +17,9 @@ The Agents, questions from an agent outside Glass, and PRs waiting on the user n
 in the Inbox, grouped by why they are waiting, with their count on the Inbox rail link in every area.
 A queued PR waits once its Agent review is finished, until the user marks that Agent review done;
 writing it again puts the PR back.
+An Agent waits once its latest Turn ends while the user isn't looking, unless they stopped it,
+until they look at its Chat with Glass focused; an Agent review's own Agent waits only through its
+PR.
 The user's own open PRs in followed repositories wait while changes are requested, checks fail, or
 a review thread is unresolved with someone else's comment last; with none of those, an approved PR
 GitHub would merge waits as ready to merge.

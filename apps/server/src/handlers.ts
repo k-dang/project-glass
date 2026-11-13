@@ -161,6 +161,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       WatchWaitingAgents: () =>
         agents.watchWaiting().pipe(Stream.map((waiting) => waiting.map(({ agent }) => agent.id))),
       WatchNeedsYou: () => needsYou.watch(),
+      MarkTurnSeen: ({ agentId, endedAt }) => agents.markTurnSeen(agentId, endedAt),
       AnswerOutsideQuestion: ({ id, answer }) => outsideQuestions.answer(id, answer),
       GetMcpEndpoint: () => mcpCredentials.endpoint.pipe(Effect.map((url) => ({ url }))),
       WatchOutsideAgents: () => outsideAgents.watch(),

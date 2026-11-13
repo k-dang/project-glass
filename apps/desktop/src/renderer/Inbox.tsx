@@ -10,6 +10,8 @@ import {
   type PullRequestReason,
   type RequestPart,
   referenceKey,
+  stopsOnYou,
+  type TurnEnding,
 } from "@glass/contracts"
 import { Link, useNavigate } from "@tanstack/react-router"
 import { cn } from "cn"
@@ -44,19 +46,28 @@ import { useShortcuts } from "./useShortcuts"
 
 const sections: ReadonlyArray<{
   readonly title: string
-  readonly tags: ReadonlyArray<NeedsYouItem["_tag"]>
+  readonly stopped: boolean
 }> = [
-  { title: "Stopped on you", tags: ["Agent", "OutsideQuestion"] },
-  { title: "Waiting on you", tags: ["PullRequest"] },
+  { title: "Stopped on you", stopped: true },
+  { title: "Waiting on you", stopped: false },
 ]
 
 const inSection = (section: (typeof sections)[number]) => (item: NeedsYouItem) =>
-  section.tags.includes(item._tag)
+  stopsOnYou(item) === section.stopped
 
 const requestLabel = (part: RequestPart) =>
   Match.valueTags(part, {
     PermissionRequest: () => "Permission request",
     Question: () => "Question",
+  })
+
+const turnEndingLabel = (ending: TurnEnding) =>
+  Match.valueTags(ending, {
+    Done: () => "Finished",
+    Failed: () => "Failed",
+    Stopped: () => "Stopped",
+    CutOff: () => "Cut off",
+    Interrupted: () => "Interrupted",
   })
 
 const pullRequestReasonLabel = (reason: PullRequestReason) =>
@@ -76,6 +87,7 @@ const reasonText = (item: NeedsYouItem) =>
         .flatMap((reason) =>
           Match.valueTags(reason, {
             WaitingRequests: ({ requests }) => requests.map(requestLabel),
+            TurnFinished: ({ ended }) => [turnEndingLabel(ended.ending)],
           }),
         )
         .filter((label, index, labels) => labels.indexOf(label) === index)
@@ -88,7 +100,10 @@ const requestsOf = (item: NeedsYouItem): ReadonlyArray<RequestPart> =>
   Match.valueTags(item, {
     Agent: ({ reasons }) =>
       reasons.flatMap((reason) =>
-        Match.valueTags(reason, { WaitingRequests: ({ requests }) => requests }),
+        Match.valueTags(reason, {
+          WaitingRequests: ({ requests }) => requests,
+          TurnFinished: () => [],
+        }),
       ),
     OutsideQuestion: () => [],
     PullRequest: () => [],

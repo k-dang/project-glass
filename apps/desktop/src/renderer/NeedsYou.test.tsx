@@ -23,6 +23,8 @@ import {
   type OutsideQuestionAnswer,
   ReadyToMerge,
   type RequestAnswer,
+  TurnFailed,
+  TurnFinished,
   WaitingRequests,
 } from "@glass/contracts"
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react"
@@ -240,6 +242,31 @@ it("groups Agents and finished reviews, and labels a draft", async () => {
   expect(within(waiting).getByText(/Draft/)).toBeTruthy()
   expect(within(waiting).getByRole("button", { name: /Sketch the empty state/ })).toBeTruthy()
   expect(screen.getByRole("heading", { name: agent.name })).toBeTruthy()
+})
+
+it("puts an Agent whose Turn finished unseen under Waiting on you, saying how it ended", async () => {
+  const user = mount(
+    needsYouRef([
+      AgentNeedsYou.make({
+        agent,
+        reasons: [
+          TurnFinished.make({
+            ended: {
+              at: ago({ minutes: 2 }),
+              ending: TurnFailed.make({ reason: "Out of tokens" }),
+            },
+          }),
+        ],
+        since: ago({ minutes: 2 }),
+      }),
+    ]),
+  )
+
+  const waiting = await screen.findByRole("region", { name: "Waiting on you" })
+  await user.click(within(waiting).getByRole("button", { name: /agent\/swift-otter/ }))
+  expect(within(waiting).getByText("glass-demo/greeter · Failed")).toBeTruthy()
+  expect(screen.queryByRole("region", { name: "Stopped on you" })).toBeNull()
+  expect(within(articleOf(agent.name)).getByRole("link", { name: "Open the Agent" })).toBeTruthy()
 })
 
 it("answers a permission in the detail pane and selects the next item when that one leaves", async () => {
