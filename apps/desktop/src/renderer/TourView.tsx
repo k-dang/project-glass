@@ -388,7 +388,6 @@ export function TourView(props: TourViewProps) {
         <ChapterCard
           key={`${DateTime.formatIso(reading.writtenAt)}:${index}`}
           diff={diff}
-          onShowInReview={onShowInReview}
           searchGroup={searchGroup}
           chapter={chapter}
           chapterCount={reading.chapters.length}
@@ -461,7 +460,6 @@ function TourOverview(props: {
 
 function ChapterCard(props: {
   diff: Omit<TourViewProps, "onShowInReview">
-  onShowInReview: (rank: number) => void
   searchGroup: NonNullable<ChangedFilesViewProps["searchGroup"]>
   chapter: TourChapter | null
   chapterCount: number
@@ -592,7 +590,6 @@ function ChapterCard(props: {
                 hotspots={chapter.hotspots}
                 title={title}
                 onShowPlace={props.onShowTarget}
-                onShowInReview={props.onShowInReview}
               />
             )}
             {chapter !== null && chapter.callouts.length > 0 && (

@@ -1,6 +1,6 @@
 import type { RiskKind, TourCodeTarget } from "@glass/contracts"
 import { cn } from "cn"
-import { ArrowUpRight, EyeOff, Flame, Route, ScanSearch } from "lucide-react"
+import { ArrowUpRight, EyeOff, Flame, Route } from "lucide-react"
 import { type ReactNode, useLayoutEffect, useRef } from "react"
 import { Badge } from "@/components/ui/badge"
 import { pathLineName } from "./Discussions"
@@ -252,7 +252,6 @@ export function ChapterHotspots(props: {
   hotspots: ReadonlyArray<ChapterHotspot>
   title: string
   onShowPlace: ShowPlace
-  onShowInReview: (rank: number) => void
 }) {
   if (props.hotspots.length === 0) return null
 
@@ -277,15 +276,6 @@ export function ChapterHotspots(props: {
               <span className="font-medium text-foreground">Check: </span>
               <TourText text={hotspot.check} />
             </p>
-            <button
-              type="button"
-              onClick={() => props.onShowInReview(rank)}
-              className="mt-1.5 ml-7 flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
-            >
-              <ScanSearch aria-hidden className="size-3" />
-              Read in the Agent review
-              <ArrowUpRight aria-hidden className="size-3" />
-            </button>
           </li>
         ))}
       </ol>

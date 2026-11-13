@@ -76,7 +76,7 @@ it("ranks the Agent review's hotspots and links a placed one to its Tour Chapter
   expect(screen.getByRole("button", { name: "Tour" }).getAttribute("aria-pressed")).toBe("true")
 })
 
-it("opens the Tour on where to look first, and reads a Chapter's hotspot in the Agent review", async () => {
+it("opens the Tour on where to look first, and marks each Chapter's hotspots", async () => {
   const f = mount()
   await startReading(f)
 
@@ -91,10 +91,6 @@ it("opens the Tour on where to look first, and reads a Chapter's hotspot in the 
   expect(within(greet).getByText("1 hotspot")).toBeDefined()
   const release = screen.getByRole("region", { name: "Release it" })
   expect(within(release).getAllByText("Low attention")).toHaveLength(2)
-
-  const hotspots = within(greet).getByRole("navigation", { name: "Hotspots in Greet by name" })
-  await f.user.click(within(hotspots).getByRole("button", { name: /Read in the Agent review/ }))
-  expect(within(sidePanel()).getByText("Callers pass no name")).toBeDefined()
 })
 
 it("leaves hotspots out of a Tour of another Revision than the Agent review's", async () => {
