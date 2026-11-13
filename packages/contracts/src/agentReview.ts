@@ -5,6 +5,14 @@ import { CheckoutRunReason } from "./checkoutRun"
 import { DiffSide } from "./discussion"
 import { AgentRunnerIdentity } from "./engine"
 import { TourCodeTarget } from "./tour"
+import { PullRequestRef } from "./pullRequest"
+
+export const AgentReviewDone = Schema.Struct({
+  pullRequest: PullRequestRef,
+  writtenAt: Schema.DateTimeUtcFromString,
+})
+
+export type AgentReviewDone = typeof AgentReviewDone.Type
 
 export const FollowUpMessage = Schema.Trimmed.check(Schema.isNonEmpty())
 

@@ -1,4 +1,4 @@
-import type { FakePullRequest } from "./fakePullRequest"
+import type { FakePullRequest, FakeReview } from "./fakePullRequest"
 
 export const PAGE_SIZE = 100
 
@@ -30,3 +30,16 @@ export const reviewRequestNodes = (pr: FakePullRequest) => [
     return { requestedReviewer: { __typename: "Team", slug, organization: { login: owner } } }
   }),
 ]
+
+export const latestOpinionatedReviews = (pr: FakePullRequest) => {
+  const latest = new Map<string | null, FakeReview>()
+
+  for (const review of pr.reviews) {
+    if (review.state !== "COMMENTED") latest.set(review.author, review)
+  }
+
+  return [...latest.values()].map((review) => ({
+    author: author(review.author),
+    state: review.state,
+  }))
+}

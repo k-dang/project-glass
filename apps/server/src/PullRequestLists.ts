@@ -6,7 +6,6 @@ import {
   noListings,
   PullRequestList,
   type PullRequestListings,
-  PullRequestSummary,
   referenceKey,
   type RepositoryListing,
   RepositoryPullRequests,
@@ -14,16 +13,20 @@ import {
   repositoryKey,
   type SettingsError,
 } from "@glass/contracts"
-import { Context, Effect, Layer } from "effect"
+import { Context, Duration, Effect, Layer, Stream } from "effect"
 import { ActivityLog } from "./ActivityLog"
 import { FollowedRepositories } from "./FollowedRepositories"
 import { GitHubClient } from "./github/GitHubClient"
+import { BackgroundGitHubRequest } from "./github/GitHubRequestPolicy"
 import {
   type Mirror,
   type MirroredPullRequest,
   mirrorOf,
   PullRequestMirror,
+  summaryOf,
 } from "./PullRequestMirror"
+
+const REFRESH_AFTER = Duration.minutes(2)
 
 interface Touched {
   readonly touched: ReadonlySet<string>
@@ -83,17 +86,6 @@ const classify = (
     reviewing: rows("reviewing"),
   }
 }
-
-const summaryOf = (pr: MirroredPullRequest) =>
-  new PullRequestSummary({
-    ref: pr.ref,
-    url: pr.url,
-    title: pr.title,
-    author: pr.author,
-    isDraft: pr.isDraft,
-    checks: pr.checks,
-    updatedAt: pr.updatedAt,
-  })
 
 const listingsOf = (
   lists: ReturnType<typeof classify>,
@@ -155,25 +147,43 @@ export class PullRequestLists extends Context.Service<
           }),
         )
 
+      const list = Effect.fn("PullRequestLists.list")(function* () {
+        const followed = yield* repositories.list()
+
+        if (followed.length === 0) {
+          yield* pullRequests.forgetRepositories
+
+          return noListings
+        }
+
+        const { login } = yield* github.viewer
+        const touched = yield* touchedBy(login)
+
+        const { mirror, failures } = yield* pullRequests.sync(login, followed, (synced) =>
+          shownIn(classify(synced, followed, viewerOf(synced, login, touched.touched))),
+        )
+
+        return listingsOf(
+          classify(mirror, followed, viewerOf(mirror, login, touched.touched)),
+          touched,
+          failures,
+        )
+      })
+
+      const refresh = list().pipe(
+        Effect.provideService(BackgroundGitHubRequest, true),
+        Effect.withSpan("PullRequestLists.refresh", { root: true }),
+        Effect.catch((error) => Effect.logWarning("Couldn't refresh the PR lists", error)),
+      )
+
+      yield* pullRequests.changes.pipe(
+        Stream.switchMap(() => Stream.tick(REFRESH_AFTER).pipe(Stream.drop(1))),
+        Stream.runForEach(() => refresh),
+        Effect.forkScoped,
+      )
+
       return PullRequestLists.of({
-        list: Effect.fn("PullRequestLists.list")(function* () {
-          const followed = yield* repositories.list()
-
-          if (followed.length === 0) return noListings
-
-          const { login } = yield* github.viewer
-          const touched = yield* touchedBy(login)
-
-          const { mirror, failures } = yield* pullRequests.sync(login, followed, (synced) =>
-            shownIn(classify(synced, followed, viewerOf(synced, login, touched.touched))),
-          )
-
-          return listingsOf(
-            classify(mirror, followed, viewerOf(mirror, login, touched.touched)),
-            touched,
-            failures,
-          )
-        }),
+        list,
         saved: Effect.fn("PullRequestLists.saved")(function* () {
           const followed = yield* repositories.list()
           const mirror = yield* pullRequests.saved

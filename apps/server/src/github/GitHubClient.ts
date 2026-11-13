@@ -82,14 +82,17 @@ import {
   GitHubRequestPolicy,
 } from "./GitHubRequestPolicy"
 import {
+  type Attention,
   type CheckObservation,
   type CandidatesPage,
+  PULL_REQUEST_ATTENTION_QUERY,
   PULL_REQUEST_CHECKS_QUERY,
   REPOSITORY_PULL_REQUESTS_QUERY,
   REVIEW_REQUESTS_QUERY,
   type ReviewRequestsPage,
   SEARCH_PULL_REQUESTS_QUERY,
   updatedSinceSearch,
+  toAttention,
   toCandidatesPage,
   toChecks,
   toReviewRequestsPage,
@@ -127,6 +130,7 @@ import {
   FileContentsResponse,
   RepositoryPullRequestsResponse,
   SearchPullRequestsResponse,
+  PullRequestAttentionResponse,
   PullRequestChecksResponse,
   ReviewRequestsResponse,
   AddDraftResponse,
@@ -194,6 +198,8 @@ const foundRepository = <A>({ repository }: { readonly repository: A | null }) =
   repository === null ? Effect.fail(new RepositoryMissing()) : Effect.succeed(repository)
 
 const CHECKS_BATCH_SIZE = 100
+
+const ATTENTION_BATCH_SIZE = 50
 
 const QUEUED_BATCH_SIZE = 50
 
@@ -294,6 +300,9 @@ export class GitHubClient extends Context.Service<
     readonly pullRequestChecks: (
       pullRequestIds: ReadonlyArray<string>,
     ) => Effect.Effect<ReadonlyMap<string, CheckObservation>, ConnectionError>
+    readonly pullRequestAttention: (
+      pullRequestIds: ReadonlyArray<string>,
+    ) => Effect.Effect<ReadonlyMap<string, Attention>, ConnectionError>
     readonly queuedPullRequests: (
       refs: ReadonlyArray<PullRequestRef>,
     ) => Effect.Effect<ReadonlyArray<LookedUpPullRequest | null>, ConnectionError>
@@ -839,24 +848,59 @@ export class GitHubClient extends Context.Service<
         },
       )
 
-      const pullRequestChecks = Effect.fn("GitHubClient.pullRequestChecks")(function* (
+      const nodesById = Effect.fnUntraced(function* <Data, A>(
+        operation: {
+          readonly name: string
+          readonly query: string
+          readonly response: Schema.Codec<GraphQLBody<Data>, unknown>
+          readonly batchSize: number
+          readonly decode: (data: Data) => ReadonlyMap<string, A>
+        },
         pullRequestIds: ReadonlyArray<string>,
       ) {
         const batches = yield* Effect.forEach(
-          Arr.chunksOf(pullRequestIds, CHECKS_BATCH_SIZE),
+          Arr.chunksOf(pullRequestIds, operation.batchSize),
           (ids) =>
             graphql({
-              name: "PullRequestChecks",
-              query: PULL_REQUEST_CHECKS_QUERY,
+              name: operation.name,
+              query: operation.query,
               variables: { ids },
-              response: PullRequestChecksResponse,
+              response: operation.response,
               domainError: () => undefined,
-            }).pipe(Effect.map(toChecks)),
+            }).pipe(Effect.map(operation.decode)),
           { concurrency: "unbounded" },
         )
 
-        return new Map(batches.flatMap((checks) => [...checks]))
+        return new Map(batches.flatMap((batch) => [...batch]))
       })
+
+      const pullRequestChecks = Effect.fn("GitHubClient.pullRequestChecks")(
+        (pullRequestIds: ReadonlyArray<string>) =>
+          nodesById(
+            {
+              name: "PullRequestChecks",
+              query: PULL_REQUEST_CHECKS_QUERY,
+              response: PullRequestChecksResponse,
+              batchSize: CHECKS_BATCH_SIZE,
+              decode: toChecks,
+            },
+            pullRequestIds,
+          ),
+      )
+
+      const pullRequestAttention = Effect.fn("GitHubClient.pullRequestAttention")(
+        (pullRequestIds: ReadonlyArray<string>) =>
+          nodesById(
+            {
+              name: "PullRequestAttention",
+              query: PULL_REQUEST_ATTENTION_QUERY,
+              response: PullRequestAttentionResponse,
+              batchSize: ATTENTION_BATCH_SIZE,
+              decode: toAttention,
+            },
+            pullRequestIds,
+          ),
+      )
 
       const lookUpQueued = Effect.fnUntraced(function* (refs: ReadonlyArray<PullRequestRef>) {
         const { body } = yield* send(
@@ -1304,6 +1348,7 @@ export class GitHubClient extends Context.Service<
         repositoryPullRequests,
         pullRequestsUpdatedSince,
         pullRequestChecks,
+        pullRequestAttention,
         queuedPullRequests,
         reviewRequests,
         viewerTeams,

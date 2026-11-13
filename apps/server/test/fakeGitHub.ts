@@ -13,12 +13,18 @@ import {
   type FakeCommit,
   FakePullRequest,
   type FakePullRequestSeed,
-  type FakeReview,
   type FakeReviewState,
   type FakeReviewThread,
   VIEWER,
 } from "./fakePullRequest.ts"
-import { author, connectionPage, inRepo, PAGE_SIZE, reviewRequestNodes } from "./fakeNodes.ts"
+import {
+  author,
+  connectionPage,
+  inRepo,
+  latestOpinionatedReviews,
+  PAGE_SIZE,
+  reviewRequestNodes,
+} from "./fakeNodes.ts"
 import { answerListing, ListingRequest } from "./fakePullRequestListing.ts"
 import { startFakeGitRemote, type TrafficMeter, trafficMeter } from "./fakeGitRemote.ts"
 import { gitBasicAuthorization } from "../src/gitEnv.ts"
@@ -300,19 +306,6 @@ const threadNode = <Comment>(
   subjectType: thread.line === undefined ? "FILE" : "LINE",
   comments: { nodes: comments },
 })
-
-const latestOpinionatedReviews = (pr: FakePullRequest) => {
-  const latest = new Map<string | null, FakeReview>()
-
-  for (const review of pr.reviews) {
-    if (review.state !== "COMMENTED") latest.set(review.author, review)
-  }
-
-  return [...latest.values()].map((review) => ({
-    author: author(review.author),
-    state: review.state,
-  }))
-}
 
 const checkRunNode = ({
   status = "COMPLETED",
@@ -868,6 +861,7 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
       case "RepositoryPullRequests":
       case "SearchPullRequests":
       case "PullRequestChecks":
+      case "PullRequestAttention":
       case "QueuedPullRequests":
         return answerListing(request, pullRequests, unavailableRepositories, timingOutRepositories)
 

@@ -7,6 +7,7 @@ import {
   type OutsideQuestion,
   type OutsideQuestionAnswer,
   type PullRequestNeedsYou,
+  type PullRequestReason,
   type RequestPart,
   referenceKey,
 } from "@glass/contracts"
@@ -25,6 +26,7 @@ import { Backend, backendRuntime } from "./backend"
 import { AgentRequest, answerRequestAtom } from "./agentsArea"
 import { agentConversation, ConversationContext } from "./conversation"
 import {
+  finishedAgentReviewOf,
   markDoneAtom,
   needsYouCount,
   needsYouKey,
@@ -57,9 +59,15 @@ const requestLabel = (part: RequestPart) =>
     Question: () => "Question",
   })
 
-const pullRequestReasonLabels = {
-  AgentReviewFinished: "Agent review finished",
-} as const satisfies Record<PullRequestNeedsYou["reasons"][number]["_tag"], string>
+const pullRequestReasonLabel = (reason: PullRequestReason) =>
+  Match.valueTags(reason, {
+    AgentReviewFinished: () => "Agent review finished",
+    ChangesRequested: () => "Changes requested",
+    ChecksFailing: () => "CI failing",
+    AwaitingReply: ({ threads }) =>
+      threads === 1 ? "1 thread awaiting reply" : `${threads} threads awaiting reply`,
+    ReadyToMerge: () => "Ready to merge",
+  })
 
 const reasonText = (item: NeedsYouItem) =>
   Match.valueTags(item, {
@@ -73,8 +81,7 @@ const reasonText = (item: NeedsYouItem) =>
         .filter((label, index, labels) => labels.indexOf(label) === index)
         .join(" · "),
     OutsideQuestion: ({ askedBy }) => `Asked by ${askedBy}`,
-    PullRequest: ({ reasons }) =>
-      reasons.map((reason) => pullRequestReasonLabels[reason._tag]).join(" · "),
+    PullRequest: ({ reasons }) => reasons.map(pullRequestReasonLabel).join(" · "),
   })
 
 const requestsOf = (item: NeedsYouItem): ReadonlyArray<RequestPart> =>
@@ -333,7 +340,13 @@ export function Inbox() {
     {
       key: "e",
       run: () => {
-        if (Predicate.isTagged(selected, "PullRequest")) markDone(selected)
+        if (!Predicate.isTagged(selected, "PullRequest")) return
+
+        const review = finishedAgentReviewOf(selected)
+
+        if (review !== undefined) {
+          markDone({ pullRequest: selected.pullRequest.ref, writtenAt: review.writtenAt })
+        }
       },
     },
     {
@@ -542,6 +555,7 @@ function PullRequestDetail(props: {
 }) {
   const { pullRequest, since } = props.item
   const markDone = useAtomSet(markDoneAtom)
+  const review = finishedAgentReviewOf(props.item)
   const updated = DateTime.toDateUtc(pullRequest.updatedAt)
 
   return (
@@ -566,21 +580,27 @@ function PullRequestDetail(props: {
         >
           Open pull request
         </Link>
-        <Link
-          to="/reviews/$owner/$repo/$number"
-          params={pullRequest.ref}
-          className={cn(actionLink, "border")}
-          onClick={() => props.onReadReview(referenceKey(pullRequest.ref))}
-        >
-          Read Agent review
-        </Link>
-        <button
-          type="button"
-          className={cn(actionLink, "border")}
-          onClick={() => markDone(props.item)}
-        >
-          Done
-        </button>
+        {review === undefined ? null : (
+          <>
+            <Link
+              to="/reviews/$owner/$repo/$number"
+              params={pullRequest.ref}
+              className={cn(actionLink, "border")}
+              onClick={() => props.onReadReview(referenceKey(pullRequest.ref))}
+            >
+              Read Agent review
+            </Link>
+            <button
+              type="button"
+              className={cn(actionLink, "border")}
+              onClick={() =>
+                markDone({ pullRequest: pullRequest.ref, writtenAt: review.writtenAt })
+              }
+            >
+              Done
+            </button>
+          </>
+        )}
       </div>
     </article>
   )

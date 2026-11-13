@@ -4,6 +4,7 @@ import {
   FollowedRepository,
   GitHubUnavailable,
   PullRequestRef,
+  PullRequestSummary,
   repositoryKey,
 } from "@glass/contracts"
 import {
@@ -15,14 +16,20 @@ import {
   FileSystem,
   Layer,
   Order,
-  Ref,
   Schema,
   Semaphore,
+  Stream,
+  SubscriptionRef,
 } from "effect"
 import { join } from "node:path"
 import { writeDataFile } from "./dataFiles"
 import { GitHubClient } from "./github/GitHubClient"
-import type { Candidate, CandidatesPage, CheckObservation } from "./github/repositoryPullRequests"
+import {
+  Attention,
+  type Candidate,
+  type CandidatesPage,
+  type CheckObservation,
+} from "./github/repositoryPullRequests"
 import { ServerConfig } from "./ServerConfig"
 
 const FULL_READ_INTERVAL = Duration.minutes(10)
@@ -39,6 +46,7 @@ const MirroredPullRequest = Schema.Struct({
   updatedAt: Schema.DateTimeUtcFromString,
   head: Schema.String,
   checks: Checks,
+  attention: Schema.NullOr(Attention),
   viewerIsAuthor: Schema.Boolean,
   viewerHasDrafts: Schema.Boolean,
   viewerHasSubmittedReview: Schema.Boolean,
@@ -47,6 +55,17 @@ const MirroredPullRequest = Schema.Struct({
 })
 
 export type MirroredPullRequest = typeof MirroredPullRequest.Type
+
+export const summaryOf = (pr: MirroredPullRequest) =>
+  new PullRequestSummary({
+    ref: pr.ref,
+    url: pr.url,
+    title: pr.title,
+    author: pr.author,
+    isDraft: pr.isDraft,
+    checks: pr.checks,
+    updatedAt: pr.updatedAt,
+  })
 
 const RepositoryMirror = Schema.Struct({
   repository: FollowedRepository,
@@ -88,6 +107,8 @@ export class PullRequestMirror extends Context.Service<
   PullRequestMirror,
   {
     readonly saved: Effect.Effect<Mirror | undefined>
+    readonly changes: Stream.Stream<Mirror | undefined>
+    readonly forgetRepositories: Effect.Effect<void>
     readonly sync: (
       viewer: string,
       followed: ReadonlyArray<FollowedRepository>,
@@ -112,10 +133,10 @@ export class PullRequestMirror extends Context.Service<
         ),
       )
 
-      const state = yield* Ref.make<Mirror | undefined>(loaded)
+      const state = yield* SubscriptionRef.make<Mirror | undefined>(loaded)
 
       const commit = Effect.fnUntraced(function* (mirror: Mirror) {
-        yield* Ref.set(state, mirror)
+        yield* SubscriptionRef.set(state, mirror)
         yield* encodeMirror(mirror).pipe(
           Effect.flatMap((json) => writeDataFile(fs, path, json)),
           Effect.catch((error) => Effect.logWarning("Couldn't save the PR lists", error)),
@@ -164,6 +185,7 @@ export class PullRequestMirror extends Context.Service<
         return {
           ...fields,
           checks: known?.head === fields.head ? known.checks : "unavailable",
+          attention: known?.attention ?? null,
           requestedUsers,
           requestedTeams,
         } satisfies MirroredPullRequest
@@ -217,11 +239,22 @@ export class PullRequestMirror extends Context.Service<
         } satisfies RepositoryMirror
       })
 
-      const withLatestChecks = Effect.fnUntraced(function* (
+      const latestAttention = (shown: ReadonlyArray<MirroredPullRequest>) =>
+        github
+          .pullRequestAttention(shown.flatMap((pr) => (pr.viewerIsAuthor ? [pr.id] : [])))
+          .pipe(
+            Effect.catch((error) =>
+              Effect.logWarning("Couldn't read what the user's PRs wait on", error).pipe(
+                Effect.as(new Map<string, Attention>()),
+              ),
+            ),
+          )
+
+      const withLatestStatus = Effect.fnUntraced(function* (
         mirror: Mirror,
         shown: ReadonlyArray<MirroredPullRequest>,
       ) {
-        const result = yield* github.pullRequestChecks(shown.map((pr) => pr.id)).pipe(
+        const latestChecks = github.pullRequestChecks(shown.map((pr) => pr.id)).pipe(
           Effect.tapError((error) => Effect.logWarning("Couldn't read PR checks", error)),
           Effect.match({
             onSuccess: (checks) => ({ checks, problem: null }),
@@ -234,6 +267,10 @@ export class PullRequestMirror extends Context.Service<
           }),
         )
 
+        const [result, attention] = yield* Effect.all([latestChecks, latestAttention(shown)], {
+          concurrency: "unbounded",
+        })
+
         const shownRepositories = new Set(shown.map((pr) => repositoryKey(pr.ref)))
         const problem = result.problem
 
@@ -243,9 +280,11 @@ export class PullRequestMirror extends Context.Service<
             repositories: mirror.repositories.map((repository) => ({
               ...repository,
               pullRequests: repository.pullRequests.map((pr) => {
-                const observed = result.checks.get(pr.id)
-
-                return observed === undefined ? pr : { ...pr, ...observed }
+                return {
+                  ...pr,
+                  ...result.checks.get(pr.id),
+                  attention: attention.get(pr.id) ?? pr.attention,
+                }
               }),
             })),
           } satisfies Mirror,
@@ -261,7 +300,7 @@ export class PullRequestMirror extends Context.Service<
         shown: (mirror: Mirror) => ReadonlyArray<MirroredPullRequest>,
       ) {
         const now = yield* DateTime.now
-        const current = yield* Ref.get(state)
+        const current = yield* SubscriptionRef.get(state)
 
         const previous =
           current?.viewer.toLowerCase() === viewer.toLowerCase() ? current : undefined
@@ -316,7 +355,7 @@ export class PullRequestMirror extends Context.Service<
           ),
         }
 
-        const { mirror, failures } = yield* withLatestChecks(synced, shown(synced))
+        const { mirror, failures } = yield* withLatestStatus(synced, shown(synced))
         yield* commit(mirror)
 
         return {
@@ -330,7 +369,20 @@ export class PullRequestMirror extends Context.Service<
         } satisfies Synced
       }, lock.withPermits(1))
 
-      return PullRequestMirror.of({ saved: Ref.get(state), sync })
+      const forgetRepositories = Effect.gen(function* () {
+        const current = yield* SubscriptionRef.get(state)
+
+        if (current !== undefined && current.repositories.length > 0) {
+          yield* commit({ ...current, repositories: [] })
+        }
+      }).pipe(lock.withPermits(1))
+
+      return PullRequestMirror.of({
+        saved: SubscriptionRef.get(state),
+        changes: SubscriptionRef.changes(state),
+        forgetRepositories,
+        sync,
+      })
     }),
   )
 }
