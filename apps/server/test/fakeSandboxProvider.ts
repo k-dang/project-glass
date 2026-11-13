@@ -1,4 +1,3 @@
-import { AgentEngine } from "@glass/contracts"
 import { Schema } from "effect"
 import { execFile, execFileSync, spawn } from "node:child_process"
 import {
@@ -186,7 +185,7 @@ const claudeEfforts = ["low", "medium", "high", "xhigh", "max"]
 
 const piModel = { id: "glass-test/gpt-test", name: "gpt-test", efforts: [] }
 
-const sandboxModels: Record<AgentEngine, AgentModels> = {
+const sandboxModels: Record<"claude-code" | "pi", AgentModels> = {
   "claude-code": {
     defaultModel: { id: "default", name: "Opus", efforts: claudeEfforts },
     models: [
@@ -292,7 +291,11 @@ export const fakeSandboxProvider =
 
         rmSync(folder, { recursive: true, force: true })
       },
-      models: async (engine) => sandboxModels[engine],
+      models: async (engine) => {
+        if (engine === "opencode") throw new Error("Fake Sandboxes do not run OpenCode")
+
+        return sandboxModels[engine]
+      },
     })
   }
 

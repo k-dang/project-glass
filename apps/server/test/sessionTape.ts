@@ -55,7 +55,14 @@ export const recordingSessions = process.env["GLASS_RECORD_SESSIONS"] === "1"
 
 const uuids = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi
 
-const idFields = new Set(["request_id", "uuid", "session_id", "tool_use_id", "toolUseID"])
+const idFields = new Set([
+  "request_id",
+  "uuid",
+  "session_id",
+  "tool_use_id",
+  "toolUseID",
+  "messageID",
+])
 
 const learn = (ids: Map<string, string>, recorded: string, actual: string) => {
   const known = ids.get(recorded)
@@ -114,7 +121,7 @@ const matches = (recorded: Json, actual: Json, ids: Map<string, string>, field =
   return recorded === actual
 }
 
-const tryMatch = (recorded: Json, actual: Json, ids: Map<string, string>) => {
+export const tryMatch = (recorded: Json, actual: Json, ids: Map<string, string>) => {
   const learned = new Map(ids)
 
   if (!matches(recorded, actual, learned)) return false
@@ -149,7 +156,7 @@ const isMachineModel = (model: Json) =>
   !model["provider"].startsWith("glass-") &&
   (model["provider"] !== "<pi-provider>" || model["id"] !== "<pi-model>")
 
-const blankPersonal = (value: Json, field = ""): Json =>
+export const blankPersonal = (value: Json, field = ""): Json =>
   personal.test(field) || machine.test(field)
     ? "<redacted>"
     : usage.test(field)

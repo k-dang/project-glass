@@ -1,6 +1,6 @@
 import { assert, it } from "@effect/vitest"
 import {
-  type AgentEngine,
+  type RunnerEngine,
   AgentReviewFailure,
   type AgentReviewState,
   applyTranscriptUpdate,
@@ -40,7 +40,7 @@ type BackendClient = Effect.Success<ReturnType<typeof startBackend>>["client"]
 
 const fixture = Effect.fnUntraced(function* (
   settings: ScriptedSettings = { reply: { answer } },
-  engine: AgentEngine = "pi",
+  engine: RunnerEngine = "pi",
 ) {
   const runners = yield* scriptedAgentRunners(settings)
 

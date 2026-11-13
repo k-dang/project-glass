@@ -4,14 +4,14 @@ TBD
 
 ## Layout
 
-| Path                 | What it is                                                                     |
-| -------------------- | ------------------------------------------------------------------------------ |
-| `apps/desktop`       | Electron app: main, preload, and React renderer, built separately.             |
-| `apps/server`        | Effect backend: RPC over WebSocket on `127.0.0.1`, behind a per-launch secret. |
-| `packages/contracts` | Effect Schema RPC definitions and errors shared by every app.                  |
-| `packages/plugin`    | The types a Plugin implements to add a kind of Sandbox (ADR 0010).             |
-| `examples`           | A fake Sandbox provider Plugin and a prompt for writing your own.              |
-| `tools/oxlint`       | Lint rules `pnpm check` runs, including Glass's import and test-wait policies. |
+| Path                 | What it is                                                                         |
+| -------------------- | ---------------------------------------------------------------------------------- |
+| `apps/desktop`       | Electron app: main, preload, and React renderer, built separately.                 |
+| `apps/server`        | Effect backend: RPC over WebSocket on `127.0.0.1`, behind a per-launch secret.     |
+| `packages/contracts` | Effect Schema RPC definitions and errors shared by every app.                      |
+| `packages/plugin`    | The types a Plugin implements to add a kind of Sandbox (ADR 0010).                 |
+| `examples`           | Fake and Docker Cloud Sandbox provider Plugins, and a prompt for writing your own. |
+| `tools/oxlint`       | Lint rules `pnpm check` runs, including Glass's import and test-wait policies.     |
 
 ## Requirements
 
@@ -21,9 +21,19 @@ Tooling is [Vite+](https://viteplus.dev) (`vp`), configured in each package's `v
 
 Glass signs in to GitHub with `GH_TOKEN`, `GITHUB_TOKEN`, or your GitHub CLI login (`gh auth login`).
 
-Tours, Agent reviews, and Agents use either an authenticated Claude Code CLI or an installed pi CLI.
-If Glass can't find them on your `PATH`, set `claudeCommand` or `piCommand` in `~/.project-glass/settings.json` to the full path and restart Glass.
-pi reuses the credentials and model configuration in `~/.pi/agent` (or `PI_CODING_AGENT_DIR`);
+Tours and Agent reviews use an authenticated Claude Code CLI or an installed pi CLI. Ordinary
+Agents also support OpenCode 1.19.5. If Glass can't find a program on `PATH`, set `claudeCommand`,
+`piCommand`, or `opencodeCommand` in `~/.project-glass/settings.json` to its full path and restart
+Glass. pi and OpenCode use their native model configuration and logins.
+
+The [Docker Cloud Plugin](examples/docker-cloud/README.md) runs OpenCode remotely without a local
+OpenCode installation. Its README covers installation, credentials, costs, and verification.
+
+OpenCode's adapter/session tests replay real native HTTP/SSE recordings. To refresh them, install
+OpenCode 1.19.5 on PATH (or set `GLASS_OPENCODE_COMMAND`) and run
+`pnpm --filter @glass/server record:sessions opencode`. The recording run uses an isolated local
+model fixture and needs no model login.
+OpenCode fixtures use NDJSON: a program/version header followed by one compact frame per line.
 
 ## Commands
 

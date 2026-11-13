@@ -86,7 +86,7 @@ describe("Glass's Agent tools over MCP", () => {
 
       assert.deepStrictEqual(places.structuredContent, {
         local: {
-          engines: ["claude-code", "pi"],
+          engines: ["claude-code", "pi", "opencode"],
           localCheckouts: [
             { repository: { owner: "glass-demo", repo: "greeter" }, path: f.clone.checkout },
           ],

@@ -47,7 +47,7 @@ import { VIEWER } from "./fakePullRequest"
 import { isolatedHome, startBackend, stubHome } from "./harness"
 import { PI_MODEL, PI_PROVIDER, type PiSettings, writePiLogin, writePiSettings } from "./piLogin"
 import { claudeLoginEnvironment, pinnedClaude, pinnedClaudeProgram } from "./pinnedClaude"
-import { writeSentSkills } from "../src/agentHost/sentSkills"
+import { writeSentSkills, type WrittenSkills } from "../src/agentHost/sentSkills"
 import { recordingSessions, sessionTape } from "./sessionTape"
 
 export const run = (tool: string, command: string, reply: string) =>
@@ -72,9 +72,9 @@ export const waiting = (turns: ReadonlyArray<Turn>) =>
 
 type Work = typeof WorkRole.Type
 
-const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
+export const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
   adapter: AgentAdapter<Role | Work>,
-  tape: ReturnType<typeof sessionTape>,
+  tape: Pick<ReturnType<typeof sessionTape>, "finish" | "mismatch">,
   folder: string,
   defaults: Partial<TurnSettings> = {},
 ) {
@@ -100,8 +100,12 @@ const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
     Effect.map((current) => waiting(current)!),
   )
 
-  const open = (conversation: string, role: Role | Work = WorkRole.make({})) =>
-    adapter.start({ folder, conversation, role, skills: [], report }).pipe(
+  const open = (
+    conversation: string,
+    role: Role | Work = WorkRole.make({}),
+    skills: ReadonlyArray<WrittenSkills> = [],
+  ) =>
+    adapter.start({ folder, conversation, role, skills, report }).pipe(
       Effect.map((session: AgentSession) => ({
         session,
         configure: (settings: Partial<TurnSettings>) =>
@@ -112,14 +116,14 @@ const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
             ...defaults,
             ...settings,
           }),
-        send: (message: string, images: ReadonlyArray<Image> = []) =>
+        send: (message: string, images: ReadonlyArray<Image> = [], prompt = message) =>
           Effect.gen(function* () {
             const turnId = `turn-${++nextTurn}`
             const sentAt = yield* DateTime.now
             yield* report(
               TurnStarted.make({ turnId, message, images, context: null, feedback: [], sentAt }),
             )
-            yield* session.startTurn(turnId, { message, images, context: null, prompt: message })
+            yield* session.startTurn(turnId, { message, images, context: null, prompt })
 
             return turnId
           }),

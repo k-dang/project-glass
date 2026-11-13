@@ -19,7 +19,7 @@ import {
   type MessageDelivery,
   type MessageInput,
   type ModelChoice,
-  defaultPermissionMode,
+  supportedPermissionMode,
   engineCapabilities,
   type NewAgent,
   type PermissionMode,
@@ -518,7 +518,7 @@ export class Agents extends Context.Service<
           engineCapabilities[engine].permissionModes.length === 0
             ? null
             : asksPermission(place)
-              ? (input.permissionMode ?? defaultPermissionMode)
+              ? supportedPermissionMode(engine, input.permissionMode)
               : "bypassPermissions"
 
         const { name, folder, discard } = yield* placement.place(repository, baseBranch)

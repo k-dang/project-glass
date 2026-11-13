@@ -70,6 +70,7 @@ export class LocalAgentHost extends Context.Service<
               env: {
                 GLASS_HOST_TOKEN: token,
                 GLASS_PI_COMMAND: commands.piCommand,
+                GLASS_OPENCODE_COMMAND: commands.opencodeCommand,
                 GLASS_CLAUDE_COMMAND: commands.claudeCommand,
               },
               extendEnv: true,

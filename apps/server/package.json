@@ -18,6 +18,7 @@
     "@glass/contracts": "workspace:*",
     "@glass/plugin": "workspace:*",
     "@octokit/graphql-schema": "15.26.1",
+    "@opencode-ai/sdk": "1.15.13",
     "@types/node": "catalog:",
     "effect": "catalog:",
     "graphql": "16.14.2",

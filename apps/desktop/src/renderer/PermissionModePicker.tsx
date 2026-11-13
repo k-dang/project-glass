@@ -1,4 +1,9 @@
-import { type AgentEngine, engineCapabilities, type PermissionMode } from "@glass/contracts"
+import {
+  type AgentEngine,
+  engineCapabilities,
+  type PermissionMode,
+  supportedPermissionMode,
+} from "@glass/contracts"
 import { cn } from "cn"
 import { Lock, type LucideIcon, PencilLine, ShieldOff, Sparkles } from "lucide-react"
 import {
@@ -34,7 +39,7 @@ export function PermissionModePicker(props: {
 
   if (modes.length === 0) return null
 
-  const { permissionMode } = props
+  const permissionMode = supportedPermissionMode(props.engine, props.permissionMode)
   const Icon = permissionMode === null ? null : icons[permissionMode]
   const name = permissionMode === null ? undefined : permissionModeNames[permissionMode]
 
@@ -61,18 +66,23 @@ export function PermissionModePicker(props: {
         {modes.map((mode) => {
           const ModeIcon = icons[mode]
 
+          const description =
+            props.engine === "opencode" && mode === "default"
+              ? "Uses your OpenCode permission rules."
+              : descriptions[mode]
+
           return (
             <SelectItem
               key={mode}
               value={mode}
               aria-label={permissionModeNames[mode]}
-              aria-description={descriptions[mode]}
+              aria-description={description}
               className="items-start py-1.5 text-xs *:first:whitespace-normal"
             >
               <ModeIcon aria-hidden className="mt-0.5 size-3.5" />
               <span className="flex flex-col">
                 {permissionModeNames[mode]}
-                <span className="text-muted-foreground">{descriptions[mode]}</span>
+                <span className="text-muted-foreground">{description}</span>
               </span>
             </SelectItem>
           )

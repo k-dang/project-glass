@@ -1,16 +1,16 @@
-import { AgentEngine, type EngineSettings, type PiModel } from "@glass/contracts"
+import { RunnerEngine, type EngineSettings, type PiModel } from "@glass/contracts"
 import { cn } from "cn"
 import { useId } from "react"
 import { Input } from "@/components/ui/input"
 import { engineNames } from "./engines"
 
-const hasModel = (engine: AgentEngine, models: EngineSettings["models"]) =>
+const hasModel = (engine: RunnerEngine, models: EngineSettings["models"]) =>
   engine === "claude-code"
     ? models["claude-code"] !== ""
     : models[engine].provider !== "" && models[engine].modelId !== ""
 
 export const missingModel = (settings: EngineSettings) =>
-  AgentEngine.literals.find((engine) => !hasModel(engine, settings.models))
+  RunnerEngine.literals.find((engine) => !hasModel(engine, settings.models))
 
 export function EnginePicker(props: {
   legend: string
@@ -32,7 +32,7 @@ export function EnginePicker(props: {
         {props.description}
       </p>
       <div className="flex w-fit flex-wrap gap-0.5 rounded-lg border bg-muted p-0.5">
-        {AgentEngine.literals.map((option) => (
+        {RunnerEngine.literals.map((option) => (
           <label key={option} className="relative">
             <input
               type="radio"

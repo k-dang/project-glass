@@ -187,7 +187,7 @@ _Avoid_: Task, action item
 ### Agents
 
 **Agent**:
-One named conversation, started from Glass, with Claude Code or pi working in one place: a worktree on
+One named conversation, started from Glass, with Claude Code, pi, or OpenCode working in one place: a worktree on
 this device, a Sandbox, or, for an Agent review's Follow-ups, a checkout of the review's Revision.
 _Avoid_: Session, thread, bot, box
 
@@ -200,7 +200,7 @@ and Revision, or the Agent, in view when it was sent.
 _Avoid_: Assistant, chat, copilot, global Agent
 
 **Agent program**:
-Claude Code or pi, the program an Agent runs. It decides which models and efforts the user can pick,
+Claude Code, pi, or OpenCode, the program an Agent runs. It decides which models and efforts the user can pick,
 and leaving either to it runs its own default.
 _Avoid_: Engine (in UI copy), harness, provider
 
@@ -280,8 +280,9 @@ publishes them.
 _Avoid_: Draft, review comment
 
 **Permission mode**:
-How much a local Claude Code Agent may do without asking: default, accept edits, auto, or bypass.
-Agents in a Sandbox always bypass.
+How much a local Agent may do without asking, using the choices its Agent program supports.
+Claude Code offers default, accept edits, auto, and bypass; OpenCode offers its native default
+rules or bypass. Agents in a Sandbox always bypass.
 
 **Permission request**:
 An Agent asking the user to allow one tool call, waiting in its transcript until they answer.

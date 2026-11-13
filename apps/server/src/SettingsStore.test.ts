@@ -34,6 +34,7 @@ describe("settings file", () => {
         reviewPrompt: defaultReviewPrompt,
         claudeCommand: "claude",
         piCommand: "pi",
+        opencodeCommand: "opencode",
       })
     }),
   )
@@ -68,7 +69,11 @@ describe("settings file", () => {
         ),
       )
 
-      assert.deepStrictEqual(commands, { claudeCommand: "/opt/claude/bin/claude", piCommand: "pi" })
+      assert.deepStrictEqual(commands, {
+        claudeCommand: "/opt/claude/bin/claude",
+        piCommand: "pi",
+        opencodeCommand: "opencode",
+      })
     }),
   )
 
@@ -102,6 +107,7 @@ describe("settings file", () => {
         reviewPrompt: defaultReviewPrompt,
         claudeCommand: "claude",
         piCommand: "pi",
+        opencodeCommand: "opencode",
       })
     }),
   )
