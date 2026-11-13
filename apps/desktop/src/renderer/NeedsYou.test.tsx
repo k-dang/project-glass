@@ -310,9 +310,6 @@ it("answers an outside question in Stopped on you", async () => {
   expect(row.getAttribute("aria-current")).toBe("true")
   expect(within(stopped).getByText("Asked by Claude Code")).toBeTruthy()
 
-  await user.keyboard("{Enter}")
-  expect(window.location.hash).toBe("#/inbox")
-
   const pane = within(articleOf("Ship the retry change?"))
   await user.click(pane.getByRole("radio", { name: "Ship it" }))
   await user.click(pane.getByRole("button", { name: "Send" }))
@@ -381,13 +378,11 @@ it("starts the next outside question with an empty answer", async () => {
   ])
 })
 
-it("allows with a, and opens the clicked pull request with Enter", async () => {
+it("allows the selected permission with a", async () => {
   const answers: Array<{ agentId: string; requestId: string; answer: RequestAnswer }> = []
-  const opened: Array<Held<{ readonly pullRequest: PullRequestRef }, never, never>> = []
 
   const user = mount(needsYouRef([waitingAgent, finishedReview]), {
     AnswerRequest: (payload) => Effect.sync(() => void answers.push(payload)),
-    LoadPullRequest: hold(opened),
   })
 
   const agentRow = await screen.findByRole("button", { name: /agent\/swift-otter/ })
@@ -397,12 +392,6 @@ it("allows with a, and opens the clicked pull request with Enter", async () => {
   expect(answers).toEqual([
     { agentId: agent.id, requestId: "bash-1", answer: AllowRequest.make({}) },
   ])
-
-  await user.click(screen.getByRole("button", { name: /Retry flaky upload/ }))
-  await user.keyboard("{Enter}")
-
-  expect((await next(opened)).payload.pullRequest).toEqual(ref)
-  expect(window.location.hash).toBe("#/reviews/octo-org/glass/42")
 })
 
 it("marks a finished Agent review done with Done or e, naming the review it saw", async () => {
@@ -537,43 +526,6 @@ it("opens Changes and the Agent review when the pull request is still loading", 
   expect(screen.queryByRole("tab", { name: "Changes" })).toBeNull()
 
   ;(await next(opened)).answer(loadedWorkspace())
-
-  await waitFor(() =>
-    expect(screen.getByRole("tab", { name: "Changes" }).getAttribute("aria-selected")).toBe("true"),
-  )
-  expect(screen.getByRole("complementary", { name: "Agent review" })).toBeTruthy()
-})
-
-it("leaves Enter on a focused button or link to that control", async () => {
-  const answers: Array<{ agentId: string; requestId: string; answer: RequestAnswer }> = []
-
-  const user = mount(needsYouRef([waitingAgent, finishedReview]), {
-    AnswerRequest: (payload) => Effect.sync(() => void answers.push(payload)),
-    LoadPullRequest: () => loadedWorkspace(),
-    ...reviewHandlers,
-  })
-
-  ;(await screen.findByRole("button", { name: "Allow" })).focus()
-  await user.keyboard("{Enter}")
-  expect(answers).toEqual([
-    { agentId: agent.id, requestId: "bash-1", answer: AllowRequest.make({}) },
-  ])
-  expect(window.location.hash).toBe("#/inbox")
-
-  screen.getByRole("link", { name: "Settings" }).focus()
-  await user.keyboard("{Enter}")
-  expect(window.location.hash).toBe("#/settings")
-})
-
-it("lets Enter on Read Agent review open the review", async () => {
-  const user = mount(needsYouRef([finishedReview]), {
-    LoadPullRequest: () => loadedWorkspace(),
-    ...reviewHandlers,
-  })
-
-  const link = await screen.findByRole("link", { name: "Read Agent review" })
-  link.focus()
-  await user.keyboard("{Enter}")
 
   await waitFor(() =>
     expect(screen.getByRole("tab", { name: "Changes" }).getAttribute("aria-selected")).toBe("true"),

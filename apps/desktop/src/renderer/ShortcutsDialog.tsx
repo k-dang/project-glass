@@ -60,7 +60,6 @@ const groups: ReadonlyArray<ShortcutGroup> = [
     shortcuts: [
       { label: "Next item", keys: ["J"] },
       { label: "Previous item", keys: ["K"] },
-      { label: "Open the selected item", keys: ["Enter"] },
       { label: "Allow the selected permission", keys: ["A"] },
     ],
   },
