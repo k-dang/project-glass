@@ -88,7 +88,7 @@ import { useTour } from "./useTour"
 import { useAgentReview } from "./useAgentReview"
 import { positionOf } from "./reviewPosition"
 import { rememberPlace } from "./savedPlace"
-import { TourCard, TourSidebar, useTourReadyToast } from "./TourSidebar"
+import { TourSidebar, useTourReadyToast } from "./TourSidebar"
 
 const wideWorkspaceQuery = "(min-width: 1024px)"
 
@@ -559,7 +559,6 @@ export function Workspace(props: {
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]">
             <div className="flex flex-col gap-8 px-6 py-8">
-              {reading !== null && <TourCard reading={reading} onStartReading={startReading} />}
               <AgentReviewCard
                 controls={agentReview}
                 onRead={readAgentReview}

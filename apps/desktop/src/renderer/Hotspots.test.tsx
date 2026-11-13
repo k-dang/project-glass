@@ -43,12 +43,14 @@ const mount = (reviewed = revision) =>
 
 const sidePanel = () => screen.getByRole("complementary", { name: "Agent review" })
 
-const startReading = async (f: ReturnType<typeof mount>) =>
-  f.user.click(
-    within(await screen.findByRole("region", { name: "Tour" })).getByRole("button", {
+const startReading = async (f: ReturnType<typeof mount>) => {
+  await f.user.click(await screen.findByRole("tab", { name: "Tour" }))
+  await f.user.click(
+    within(await screen.findByRole("region", { name: "Saved Tour" })).getByRole("button", {
       name: "Start reading",
     }),
   )
+}
 
 it("ranks the Agent review's hotspots and links a placed one to its Tour Chapter", async () => {
   const scrolled = vi.spyOn(Element.prototype, "scrollIntoView")
