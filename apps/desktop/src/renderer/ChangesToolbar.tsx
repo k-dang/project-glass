@@ -73,28 +73,6 @@ export function ChangesToolbar(props: {
     <div className="flex items-center gap-1 px-6 py-2 text-sm text-muted-foreground">
       {props.filePanelToggle}
       <span>{plural(props.fileCount, "file")} changed</span>
-      {tourOrder !== null && (
-        <ToggleGroup
-          aria-label="File order"
-          variant="outline"
-          size="sm"
-          spacing={0}
-          className="ml-3"
-          value={[tourOrder.current]}
-          onValueChange={([chosen]) => {
-            if (chosen === "path" || chosen === "tour") tourOrder.onChange(chosen)
-          }}
-        >
-          <ToggleGroupItem value="path">
-            <FolderTree aria-hidden />
-            Path
-          </ToggleGroupItem>
-          <ToggleGroupItem value="tour">
-            <Route aria-hidden />
-            Tour
-          </ToggleGroupItem>
-        </ToggleGroup>
-      )}
       <span className="flex-1" />
       {props.agentWork}
       {props.viewedCount !== null && (
@@ -180,6 +158,28 @@ export function ChangesToolbar(props: {
           </div>
         </PopoverContent>
       </Popover>
+      {tourOrder !== null && (
+        <ToggleGroup
+          aria-label="File order"
+          variant="outline"
+          size="sm"
+          spacing={0}
+          className="ml-2"
+          value={[tourOrder.current]}
+          onValueChange={([chosen]) => {
+            if (chosen === "path" || chosen === "tour") tourOrder.onChange(chosen)
+          }}
+        >
+          <ToggleGroupItem value="path">
+            <FolderTree aria-hidden />
+            Path
+          </ToggleGroupItem>
+          <ToggleGroupItem value="tour">
+            <Route aria-hidden />
+            Tour
+          </ToggleGroupItem>
+        </ToggleGroup>
+      )}
     </div>
   )
 }
