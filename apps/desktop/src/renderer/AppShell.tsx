@@ -21,6 +21,7 @@ import { backendReachableAtom } from "./backend"
 import { ConfirmationDialog } from "./ConfirmationDialog"
 import { globalConversationOpenAtom, globalUnseenAtom } from "./globalConversation"
 import { GlobalConversationDialog } from "./GlobalConversationDialog"
+import { HistoryNav } from "./HistoryNav"
 import { NeedsYouBadge } from "./NeedsYouCount"
 import { needsYouCount as countOf, watchedNeedsYouAtom } from "./needsYou"
 import { confirmLeave, discardPromptAtom, leavesPullRequest, reviewsLinkAtom } from "./reviewsArea"
@@ -104,10 +105,12 @@ export function AppShell() {
   })
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <aside className="flex w-12 shrink-0 flex-col">
-        <div className="title-strip shrink-0 border-b" />
-        <div className="flex flex-1 flex-col items-center gap-4 border-r bg-muted/40 py-3">
+    <div className="flex h-screen flex-col overflow-hidden">
+      <div className="title-strip flex shrink-0 items-center border-b pr-2 pl-[calc(env(titlebar-area-x,0px)+0.75rem)]">
+        <HistoryNav />
+      </div>
+      <div className="flex min-h-0 flex-1">
+        <aside className="flex w-12 shrink-0 flex-col items-center gap-4 border-r bg-muted/40 py-3">
           <TooltipHint content="Glass" side="right">
             <div className="flex h-8 items-center">
               <GlassMark />
@@ -153,18 +156,17 @@ export function AppShell() {
             </button>
           </TooltipHint>
           <ConnectionAvatar />
+        </aside>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <Reconnecting />
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <Outlet />
+          </div>
+          <footer className="flex h-7 shrink-0 items-center justify-end gap-1 border-t bg-muted/20 px-3">
+            <ShortcutsDialog />
+            <ResourceUsage />
+          </footer>
         </div>
-      </aside>
-      <div className="flex min-w-0 flex-1 flex-col">
-        <div className="title-strip shrink-0 border-b" aria-hidden />
-        <Reconnecting />
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <Outlet />
-        </div>
-        <footer className="flex h-7 shrink-0 items-center justify-end gap-1 border-t bg-muted/20 px-3">
-          <ShortcutsDialog />
-          <ResourceUsage />
-        </footer>
       </div>
       <GlobalConversationDialog />
       <DiscardDialog />

@@ -394,6 +394,27 @@ it("allows the selected permission with a", async () => {
   ])
 })
 
+it("goes Back from an opened item to the Inbox with that item still selected", async () => {
+  const opened: Array<Held<{ readonly pullRequest: PullRequestRef }, never, never>> = []
+
+  const user = mount(needsYouRef([waitingAgent, finishedReview]), {
+    LoadPullRequest: hold(opened),
+  })
+
+  await user.click(await screen.findByRole("button", { name: /Retry flaky upload/ }))
+  await user.click(screen.getByRole("link", { name: "Open pull request" }))
+  await next(opened)
+
+  await user.click(screen.getByRole("button", { name: "Back" }))
+
+  await waitFor(() => expect(window.location.hash).toBe("#/inbox"))
+  const row = await screen.findByRole("button", { name: /Retry flaky upload/ })
+  expect(row.getAttribute("aria-current")).toBe("true")
+
+  await user.click(screen.getByRole("button", { name: "Forward" }))
+  await waitFor(() => expect(window.location.hash).toBe("#/reviews/octo-org/glass/42"))
+})
+
 it("marks a finished Agent review done with Done or e, naming the review it saw", async () => {
   const done: Array<{ readonly pullRequest: PullRequestRef; readonly writtenAt: DateTime.Utc }> = []
 
