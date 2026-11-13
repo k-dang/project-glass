@@ -24,14 +24,15 @@ const expectTourOrder = async () => {
   await waitFor(() => expect(fileOrder()).toEqual(["greet.ts", "api.ts", "notes.md"]))
 }
 
-it("offers the Tour at the top of Overview, without announcing one already written", async () => {
+it("offers the saved Tour in the sidebar, without announcing one already written", async () => {
   const f = mount()
-  const card = await screen.findByRole("region", { name: "Tour" })
-  expect(within(card).getByText("Greet people by name.")).toBeDefined()
-  expect(within(card).getByText("3 Chapters")).toBeDefined()
+  await f.user.click(await screen.findByRole("tab", { name: "Tour" }))
+  const saved = await screen.findByRole("region", { name: "Saved Tour" })
+  expect(within(saved).getByText("Greet people by name.")).toBeDefined()
+  expect(within(saved).getByText("3 Chapters")).toBeDefined()
   expect(screen.queryByText("Tour ready")).toBeNull()
 
-  await f.user.click(within(card).getByRole("button", { name: "Start reading" }))
+  await f.user.click(within(saved).getByRole("button", { name: "Start reading" }))
   await expectTourOrder()
 })
 
@@ -39,7 +40,8 @@ it("announces a Tour that finishes writing, but not a cancelled or failed one", 
   const older = savedTour([tourChapter("Greet by name", ["greet.ts"])])
   const writing = { status: "writing" as const, startedAt: Date.now(), runner: null }
   const f = mountTourWorkspace({ files, initial: { tour: older, job: writing } })
-  await screen.findByRole("region", { name: "Tour" })
+  await f.user.click(await screen.findByRole("tab", { name: "Tour" }))
+  await screen.findByRole("region", { name: "Saved Tour" })
 
   await f.publish({ tour: older, job: { status: "idle" } })
   expect(screen.queryByText("Tour ready")).toBeNull()

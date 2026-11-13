@@ -7,14 +7,12 @@ import {
   Clock,
   LoaderCircle,
   RotateCw,
-  Route,
   Sparkles,
   TriangleAlert,
 } from "lucide-react"
 import { useEffect, useEffectEvent, useRef } from "react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Item, ItemContent, ItemMedia, ItemTitle } from "@/components/ui/item"
 import { toast } from "@/components/ui/toast"
 import { Elapsed } from "./Elapsed"
@@ -137,37 +135,6 @@ export const useTourReadyToast = (
 
     return finishedWriting(previous, latest) ? announce() : undefined
   }, [latest])
-}
-
-export function TourCard(props: { reading: TourReading; onStartReading: () => void }) {
-  const { reading } = props
-
-  return (
-    <Card render={<section />} aria-label="Tour">
-      <CardHeader>
-        <CardTitle
-          render={
-            <h2>
-              <Route aria-hidden className="size-4 text-muted-foreground" />
-              Tour
-            </h2>
-          }
-          className="flex items-center gap-2 text-sm"
-        />
-      </CardHeader>
-      <CardContent>
-        <p className="leading-relaxed break-words">
-          <TourText text={reading.intent} />
-        </p>
-      </CardContent>
-      <CardFooter className="flex-wrap gap-3">
-        <StartReading onStart={props.onStartReading} />
-        <span className="text-sm text-muted-foreground">
-          {plural(reading.chapters.length, "Chapter")}
-        </span>
-      </CardFooter>
-    </Card>
-  )
 }
 
 export function TourSidebar(props: {

@@ -2,7 +2,7 @@
 import type { Tour } from "@glass/contracts"
 import { screen, waitFor, within } from "@testing-library/react"
 import { afterEach, expect, it, vi } from "vite-plus/test"
-import { mountTourWorkspace, resetTourWorkspace } from "../../test/tourWorkspace"
+import { changes, mountTourWorkspace, resetTourWorkspace } from "../../test/tourWorkspace"
 import { changedFile, savedTour, tourChapter } from "../../test/workspace"
 
 afterEach(resetTourWorkspace)
@@ -27,12 +27,14 @@ const chapters = [tourChapter("Greet by name", ["greet.ts"]), tourChapter("Expos
 const mount = (tour: Tour = { ...savedTour(chapters), beforeAfter }) =>
   mountTourWorkspace({ files, initial: { tour, job: { status: "idle" } } })
 
-const startReading = async (f: ReturnType<typeof mount>) =>
-  f.user.click(
-    within(await screen.findByRole("region", { name: "Tour" })).getByRole("button", {
+const startReading = async (f: ReturnType<typeof mount>) => {
+  await f.user.click(await screen.findByRole("tab", { name: "Tour" }))
+  await f.user.click(
+    within(await screen.findByRole("region", { name: "Saved Tour" })).getByRole("button", {
       name: "Start reading",
     }),
   )
+}
 
 it("opens on the Tour overview, with the Before / after above the first Chapter", async () => {
   const scrollTo = vi.spyOn(Element.prototype, "scrollTo")
@@ -62,7 +64,7 @@ it("reopens a viewed Chapter when the Before / after points into it", async () =
   await f.user.click(
     within(chapter).getByRole("checkbox", { name: "Chapter viewed: Greet by name" }),
   )
-  await screen.findByRole("button", { name: /Greet by name/ })
+  await within(changes()).findByRole("button", { name: /Greet by name/ })
 
   await f.user.click(within(overview).getByRole("button", { name: /use the name/ }))
 
