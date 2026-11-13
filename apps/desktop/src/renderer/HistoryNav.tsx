@@ -45,25 +45,25 @@ export function HistoryNav() {
       <TooltipHint content={`Back (${shortcutLabel("←")})`}>
         <Button
           variant="ghost"
-          size="icon-xs"
+          size="icon-sm"
           aria-label="Back"
           aria-keyshortcuts="Meta+ArrowLeft Control+ArrowLeft"
           disabled={!canGoBack}
           onClick={back}
         >
-          <ArrowLeft aria-hidden />
+          <ArrowLeft className="size-3.5" aria-hidden />
         </Button>
       </TooltipHint>
       <TooltipHint content={`Forward (${shortcutLabel("→")})`}>
         <Button
           variant="ghost"
-          size="icon-xs"
+          size="icon-sm"
           aria-label="Forward"
           aria-keyshortcuts="Meta+ArrowRight Control+ArrowRight"
           disabled={!canGoForward}
           onClick={forward}
         >
-          <ArrowRight aria-hidden />
+          <ArrowRight className="size-3.5" aria-hidden />
         </Button>
       </TooltipHint>
     </nav>
