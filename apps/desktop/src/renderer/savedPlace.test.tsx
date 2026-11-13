@@ -13,7 +13,6 @@ import {
   SavedPlace,
   SavedPlaceError,
   type TourState,
-  noListings,
 } from "@glass/contracts"
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
@@ -70,7 +69,6 @@ const mount = (handlers: Partial<Handlers>) => {
             GetConnection: () =>
               Effect.succeed(new GitHubConnection({ login: pr.viewer.login, tokenSource: "gh" })),
             ListFollowedRepositories: () => Effect.succeed([]),
-            ListPullRequests: () => Effect.succeed(noListings),
             ListActivity: () =>
               Effect.succeed(new ActivityPage({ activities: [], hasMore: false })),
             GetSavedPlaces: () => Effect.succeed([savedPlace()]),

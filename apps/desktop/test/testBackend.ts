@@ -1,6 +1,7 @@
 import {
   emptyTranscript,
   GlassRpcs,
+  Listed,
   noListings,
   nothingUnsent,
   SavedPlace,
@@ -57,7 +58,7 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         UpdateSkillPack: unused,
         RemoveSkillPack: unused,
         ListPullRequests: () => Effect.succeed(noListings),
-        ListSavedPullRequests: () => Effect.succeed(null),
+        WatchPullRequests: () => Stream.make(Listed.make({ listings: noListings, problem: null })),
         ListSavedQueue: () => Effect.succeed([]),
         RefreshQueue: () => Effect.void,
         AddToQueue: unused,

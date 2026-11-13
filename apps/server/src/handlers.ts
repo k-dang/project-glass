@@ -92,7 +92,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       ListLocalSkills: ({ engine }) => localSkills.names(engine),
       ListPullRequests: () =>
         lists.list().pipe(Effect.provideService(BackgroundGitHubRequest, true)),
-      ListSavedPullRequests: () => lists.saved(),
+      WatchPullRequests: () => lists.watch(),
       ListSavedQueue: () => queue.saved(),
       RefreshQueue: () =>
         queue.refresh().pipe(Effect.provideService(BackgroundGitHubRequest, true)),

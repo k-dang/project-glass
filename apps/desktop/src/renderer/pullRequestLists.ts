@@ -1,17 +1,15 @@
 import type {
   FollowedRepository,
+  LatestPullRequestListings,
   PullRequestList,
   PullRequestListings,
   PullRequestSummary,
   RepositoryListing,
 } from "@glass/contracts"
-import { Data, Effect, Match, Option, Record } from "effect"
-import { AsyncResult, Atom } from "effect/reactivity"
-import { Backend, type BackendError, backendRuntime } from "./backend"
-import { followedRepositoriesRevisionAtom } from "./FollowedRepositories"
-import { describeError, type Problem, problemOf } from "./problems"
-import { watched } from "./watched"
-import { reviewingRevisionAtom } from "./workspaceEvents"
+import { Data, Effect, Match, Option, Record, Stream } from "effect"
+import { Atom } from "effect/reactivity"
+import { Backend, backendRuntime } from "./backend"
+import { describeError, type Problem } from "./problems"
 
 export type Health = Data.TaggedEnum<{
   Current: {}
@@ -76,51 +74,59 @@ const listingsOf = (listings: PullRequestListings): Listings => ({
   },
 })
 
-const CACHE_IDLE_TTL = "5 minutes"
+export type Latest = Data.TaggedEnum<{
+  Listed: { readonly listings: Listings }
+  Failed: { readonly problem: Problem }
+}>
 
-const listingsAtom = backendRuntime
-  .atom((get) => {
-    get(followedRepositoriesRevisionAtom)
-    get(reviewingRevisionAtom)
+export const Latest = Data.taggedEnum<Latest>()
 
-    const load = (known: Option.Option<Listings>) =>
-      Backend.use((backend) => backend.ListPullRequests()).pipe(
-        Effect.map(listingsOf),
-        Effect.catchCause((cause) =>
-          Option.match(known, {
-            onNone: () => Effect.failCause(cause),
-            onSome: (lists): Effect.Effect<Listings> => {
-              const problem = problemOf(cause)
+const notRefreshed = (listings: Listings, problem: Problem): Listings =>
+  Record.map(listings, (listing) => ({
+    ...listing,
+    groups: listing.groups.map(markNotRefreshed(problem)),
+    notRefreshed: problem,
+  }))
 
-              return Effect.succeed(
-                Record.map(lists, (listing) => ({
-                  ...listing,
-                  groups: listing.groups.map(markNotRefreshed(problem)),
-                  notRefreshed: problem,
-                })),
-              )
-            },
-          }),
-        ),
-      )
-
-    const known = get
-      .self<AsyncResult.AsyncResult<Listings, BackendError>>()
-      .pipe(Option.flatMap(AsyncResult.value))
-
-    if (Option.isSome(known)) return load(known)
-
-    return Effect.gen(function* () {
-      const saved = yield* Backend.use((backend) => backend.ListSavedPullRequests()).pipe(
-        Effect.map((listings) => Option.map(Option.fromNullOr(listings), listingsOf)),
-        Effect.orElseSucceed(() => Option.none<Listings>()),
-      )
-
-      if (Option.isSome(saved)) get.setSelf(AsyncResult.success(saved.value, { waiting: true }))
-
-      return yield* load(saved)
-    })
+const latestOf = (update: LatestPullRequestListings): Latest =>
+  Match.valueTags(update, {
+    Listed: ({ listings, problem }) =>
+      Latest.Listed({
+        listings:
+          problem === null
+            ? listingsOf(listings)
+            : notRefreshed(listingsOf(listings), describeError(problem)),
+      }),
+    ListFailed: ({ problem }) => Latest.Failed({ problem: describeError(problem) }),
   })
-  .pipe(Atom.setIdleTTL(CACHE_IDLE_TTL))
 
-export const watchedListingsAtom = watched(listingsAtom)
+const visible = () => document.visibilityState === "visible"
+
+const documentVisibleAtom = Atom.make((get) => {
+  const changed = () => get.setSelf(visible())
+
+  document.addEventListener("visibilitychange", changed)
+  get.addFinalizer(() => document.removeEventListener("visibilitychange", changed))
+
+  return visible()
+})
+
+const lastSeenAtom = Atom.make(Option.none<Latest>()).pipe(Atom.keepAlive)
+
+export const listingsAtom = backendRuntime.atom((get) => {
+  const lastSeen = Stream.fromIterable(Option.toArray(get.once(lastSeenAtom)))
+
+  if (!get(documentVisibleAtom)) return Stream.concat(lastSeen, Stream.never)
+
+  return Stream.concat(
+    lastSeen,
+    Stream.unwrap(Backend.useSync((backend) => backend.WatchPullRequests())).pipe(
+      Stream.map(latestOf),
+      Stream.tap((latest) => Effect.sync(() => get.set(lastSeenAtom, Option.some(latest)))),
+    ),
+  )
+})
+
+export const syncListingsAtom = backendRuntime
+  .fn(() => Backend.use((backend) => backend.ListPullRequests()))
+  .pipe(Atom.keepAlive)

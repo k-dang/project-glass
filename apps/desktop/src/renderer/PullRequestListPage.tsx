@@ -8,7 +8,7 @@ import {
 } from "@glass/contracts"
 import { Link } from "@tanstack/react-router"
 import { cn } from "cn"
-import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
+import { useAtom, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
 import { DateTime } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import { ArrowRight, RefreshCw, RotateCw, TriangleAlert } from "lucide-react"
@@ -29,7 +29,7 @@ import { Empty } from "./Lists"
 import { OpenPullRequestDialog } from "./OpenPullRequestDialog"
 import { plural } from "./plural"
 import { ProblemAlert } from "./ProblemAlert"
-import { type Problem, problemOf, problemText } from "./problems"
+import { type Problem, problemText, streamProblem } from "./problems"
 import {
   columns,
   columnsWithRepository,
@@ -39,7 +39,7 @@ import {
   subgridRow,
   warningTone,
 } from "./PullRequestRow"
-import { type Group, Health, watchedListingsAtom } from "./pullRequestLists"
+import { type Group, Health, Latest, listingsAtom, syncListingsAtom } from "./pullRequestLists"
 import { queueRefreshAtom } from "./queue"
 import { QueueTab, QueueTabTrigger } from "./QueueTab"
 import { recency, recencyOf } from "./recency"
@@ -78,11 +78,9 @@ export function PullRequestListPage(props: {
   onSearch: (search: ListSearch) => void
   onOpen: (pullRequest: PullRequestRef) => void
 }) {
-  const listings = useAtomValue(watchedListingsAtom)
+  const [synced, sync] = useAtom(syncListingsAtom)
 
   const queue = useAtomValue(queueRefreshAtom)
-
-  const refreshListings = useAtomRefresh(watchedListingsAtom)
 
   const refreshQueue = useAtomRefresh(queueRefreshAtom)
 
@@ -114,9 +112,9 @@ export function PullRequestListPage(props: {
               ))}
             </ToggleGroup>
             <RefreshButton
-              results={[listings, queue]}
+              results={[synced, queue]}
               onRefresh={() => {
-                refreshListings()
+                sync()
                 refreshQueue()
               }}
             />
@@ -189,11 +187,11 @@ function RefreshButton(props: {
 }
 
 function NotRefreshedNote(props: { list: PullRequestList }) {
-  const result = useAtomValue(watchedListingsAtom)
+  const result = useAtomValue(listingsAtom)
 
-  if (!AsyncResult.isSuccess(result)) return null
+  if (!AsyncResult.isSuccess(result) || !Latest.$is("Listed")(result.value)) return null
 
-  const { notRefreshed } = result.value[props.list]
+  const { notRefreshed } = result.value.listings[props.list]
 
   if (notRefreshed === undefined) return null
 
@@ -209,12 +207,33 @@ function ListResults(props: {
   view: ListView
   onOpen: (pullRequest: PullRequestRef) => void
 }) {
-  const result = useAtomValue(watchedListingsAtom)
+  const result = useAtomValue(listingsAtom)
 
-  const refresh = useAtomRefresh(watchedListingsAtom)
+  const resubscribe = useAtomRefresh(listingsAtom)
 
-  if (AsyncResult.isSuccess(result)) {
-    const { groups, problem, notRefreshed } = result.value[props.tab.list]
+  const sync = useAtomSet(syncListingsAtom)
+
+  if (AsyncResult.isFailure(result)) {
+    return (
+      <div className="py-4">
+        <ProblemAlert
+          problem={streamProblem(result.cause)}
+          action={{ label: "Retry", run: resubscribe }}
+        />
+      </div>
+    )
+  }
+
+  if (AsyncResult.isSuccess(result) && Latest.$is("Failed")(result.value)) {
+    return (
+      <div className="py-4">
+        <ProblemAlert problem={result.value.problem} action={{ label: "Retry", run: sync }} />
+      </div>
+    )
+  }
+
+  if (AsyncResult.isSuccess(result) && Latest.$is("Listed")(result.value)) {
+    const { groups, problem, notRefreshed } = result.value.listings[props.tab.list]
 
     return (
       <LoadedList
@@ -224,17 +243,9 @@ function ListResults(props: {
         view={props.view}
         emptyTitle={props.tab.emptyTitle}
         emptyBody={props.tab.emptyBody}
-        onRefresh={refresh}
+        onRefresh={sync}
         onOpen={props.onOpen}
       />
-    )
-  }
-
-  if (AsyncResult.isFailure(result) && !result.waiting) {
-    return (
-      <div className="py-4">
-        <ProblemAlert problem={problemOf(result.cause)} action={{ label: "Retry", run: refresh }} />
-      </div>
     )
   }
 

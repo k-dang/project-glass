@@ -4,7 +4,7 @@ import {
   repositoryKey,
   SettingsError,
 } from "@glass/contracts"
-import { Context, Effect, Layer, Schema, SchemaGetter } from "effect"
+import { Context, Effect, Layer, Schema, SchemaGetter, Stream, SubscriptionRef } from "effect"
 import { SettingsStore } from "./SettingsStore"
 
 const repositoryInput = Schema.Trim.pipe(
@@ -33,6 +33,7 @@ export class FollowedRepositories extends Context.Service<
   FollowedRepositories,
   {
     readonly list: () => Effect.Effect<ReadonlyArray<FollowedRepository>, SettingsError>
+    readonly changes: Stream.Stream<number>
     readonly follow: (
       input: string,
     ) => Effect.Effect<ReadonlyArray<FollowedRepository>, InvalidRepositoryInput | SettingsError>
@@ -45,6 +46,7 @@ export class FollowedRepositories extends Context.Service<
     FollowedRepositories,
     Effect.gen(function* () {
       const settings = yield* SettingsStore
+      const writes = yield* SubscriptionRef.make(0)
 
       const update = (
         change: (
@@ -56,9 +58,13 @@ export class FollowedRepositories extends Context.Service<
             ...current,
             followedRepositories: change(current.followedRepositories),
           }))
-          .pipe(Effect.map((updated) => updated.followedRepositories))
+          .pipe(
+            Effect.map((updated) => updated.followedRepositories),
+            Effect.ensuring(SubscriptionRef.update(writes, (count) => count + 1)),
+          )
 
       return FollowedRepositories.of({
+        changes: SubscriptionRef.changes(writes),
         list: Effect.fn("FollowedRepositories.list")(function* () {
           return (yield* settings.read()).followedRepositories
         }),
