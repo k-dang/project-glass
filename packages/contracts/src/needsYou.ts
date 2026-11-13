@@ -10,9 +10,25 @@ export const AgentReason = Schema.Union([WaitingRequests])
 
 export type AgentReason = typeof AgentReason.Type
 
-export const AgentReviewFinished = Schema.TaggedStruct("AgentReviewFinished", {})
+export const AgentReviewFinished = Schema.TaggedStruct("AgentReviewFinished", {
+  writtenAt: Schema.DateTimeUtcFromString,
+})
 
-export const PullRequestReason = Schema.Union([AgentReviewFinished])
+export const ChangesRequested = Schema.TaggedStruct("ChangesRequested", {})
+
+export const ChecksFailing = Schema.TaggedStruct("ChecksFailing", {})
+
+export const AwaitingReply = Schema.TaggedStruct("AwaitingReply", { threads: Schema.Int })
+
+export const ReadyToMerge = Schema.TaggedStruct("ReadyToMerge", {})
+
+export const PullRequestReason = Schema.Union([
+  AgentReviewFinished,
+  ChangesRequested,
+  ChecksFailing,
+  AwaitingReply,
+  ReadyToMerge,
+])
 
 export type PullRequestReason = typeof PullRequestReason.Type
 
@@ -27,7 +43,6 @@ export type AgentNeedsYou = typeof AgentNeedsYou.Type
 export const PullRequestNeedsYou = Schema.TaggedStruct("PullRequest", {
   pullRequest: PullRequestSummary,
   reasons: Schema.NonEmptyArray(PullRequestReason),
-  /** The finished Agent review's writtenAt, which also names that review when marking it done. */
   since: Schema.DateTimeUtcFromString,
 })
 

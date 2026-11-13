@@ -1,7 +1,7 @@
 import { type Approval, Check, type CheckState, type Mergeable, Reviewer } from "@glass/contracts"
 import { Schema } from "effect"
 import { GitHubAuthor, login } from "./author"
-import { ReviewRequest, StatusState } from "./repositoryPullRequests"
+import { ReviewRequest, ReviewState, StatusState } from "./repositoryPullRequests"
 
 const MAX_STATUS_ITEMS = 100
 
@@ -44,13 +44,7 @@ export const PullRequestStatusFields = {
     nodes: Schema.Array(
       Schema.Struct({
         author: GitHubAuthor,
-        state: Schema.Literals([
-          "APPROVED",
-          "CHANGES_REQUESTED",
-          "COMMENTED",
-          "DISMISSED",
-          "PENDING",
-        ]),
+        state: ReviewState,
       }),
     ),
   }),

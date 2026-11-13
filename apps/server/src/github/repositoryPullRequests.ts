@@ -36,6 +36,17 @@ export const PULL_REQUEST_CHECKS_QUERY = `query PullRequestChecks($ids: [ID!]!) 
   }
 }`
 
+export const PULL_REQUEST_ATTENTION_QUERY = `query PullRequestAttention($ids: [ID!]!) {
+  nodes(ids: $ids) {
+    ... on PullRequest {
+      id
+      mergeStateStatus
+      latestOpinionatedReviews(first: 100) { nodes { state } }
+      reviewThreads(first: 100) { nodes { isResolved comments(last: 1) { nodes { viewerDidAuthor } } } }
+    }
+  }
+}`
+
 export const REVIEW_REQUESTS_QUERY = `query PullRequestReviewRequests($id: ID!, $after: String) {
   node(id: $id) { ... on PullRequest {
     connection: reviewRequests(first: 100, after: $after) {
@@ -96,6 +107,14 @@ export const toReviewRequestsPage = (
 
   return { users, teams, nextCursor: page.pageInfo.hasNextPage ? page.pageInfo.endCursor : null }
 }
+
+export const ReviewState = Schema.Literals([
+  "APPROVED",
+  "CHANGES_REQUESTED",
+  "COMMENTED",
+  "DISMISSED",
+  "PENDING",
+])
 
 export const StatusState = Schema.Literals(["SUCCESS", "FAILURE", "ERROR", "PENDING", "EXPECTED"])
 
@@ -213,6 +232,64 @@ export const toChecks = (
             ] as const,
           ],
     ),
+  )
+
+export const PullRequestAttentionData = Schema.Struct({
+  nodes: Schema.Array(
+    Schema.NullOr(
+      Schema.Struct({
+        id: Schema.String,
+        mergeStateStatus: Schema.String,
+        latestOpinionatedReviews: Schema.Struct({
+          nodes: Schema.Array(Schema.Struct({ state: ReviewState })),
+        }),
+        reviewThreads: Schema.Struct({
+          nodes: Schema.Array(
+            Schema.Struct({
+              isResolved: Schema.Boolean,
+              comments: Schema.Struct({
+                nodes: Schema.Array(Schema.Struct({ viewerDidAuthor: Schema.Boolean })),
+              }),
+            }),
+          ),
+        }),
+      }),
+    ),
+  ),
+})
+
+export const Attention = Schema.Struct({
+  changesRequested: Schema.Boolean,
+  approved: Schema.Boolean,
+  mergeClean: Schema.Boolean,
+  awaitingReply: Schema.Int,
+})
+
+export type Attention = typeof Attention.Type
+
+const cleanMergeStates = new Set(["CLEAN", "HAS_HOOKS"])
+
+export const toAttention = (
+  data: typeof PullRequestAttentionData.Type,
+): ReadonlyMap<string, Attention> =>
+  new Map(
+    data.nodes.flatMap((node) => {
+      if (node === null) return []
+
+      const states = node.latestOpinionatedReviews.nodes.map(({ state }) => state)
+
+      const attention: Attention = {
+        changesRequested: states.includes("CHANGES_REQUESTED"),
+        approved: states.includes("APPROVED"),
+        mergeClean: cleanMergeStates.has(node.mergeStateStatus),
+        awaitingReply: node.reviewThreads.nodes.filter(
+          ({ isResolved, comments }) =>
+            !isResolved && comments.nodes.some(({ viewerDidAuthor }) => !viewerDidAuthor),
+        ).length,
+      }
+
+      return [[node.id, attention] as const]
+    }),
   )
 
 export const toCandidatesPage = (page: typeof CandidatesConnection.Type): CandidatesPage => ({

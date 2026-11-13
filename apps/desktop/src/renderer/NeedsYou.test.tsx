@@ -5,6 +5,9 @@ import {
   AgentNeedsYou,
   AgentReviewFinished,
   AllowRequest,
+  AwaitingReply,
+  ChangesRequested,
+  ChecksFailing,
   Discussions,
   GitHubConnection,
   type NeedsYou,
@@ -18,6 +21,7 @@ import {
   PullRequestSummary,
   PullRequestWorkspace,
   type OutsideQuestionAnswer,
+  ReadyToMerge,
   type RequestAnswer,
   WaitingRequests,
 } from "@glass/contracts"
@@ -87,9 +91,11 @@ const summary = (
     updatedAt,
   })
 
+const finished = (since: DateTime.Utc) => AgentReviewFinished.make({ writtenAt: since })
+
 const finishedReview = PullRequestNeedsYou.make({
   pullRequest: summary(ref, "Retry flaky upload", false, ago({ hours: 5 })),
-  reasons: [AgentReviewFinished.make({})],
+  reasons: [finished(ago({ hours: 3 }))],
   since: ago({ hours: 3 }),
 })
 
@@ -97,7 +103,7 @@ const draftRef = new PullRequestRef({ owner: "octo-org", repo: "glass", number: 
 
 const finishedDraft = PullRequestNeedsYou.make({
   pullRequest: summary(draftRef, "Sketch the empty state", true, ago({ hours: 1 })),
-  reasons: [AgentReviewFinished.make({})],
+  reasons: [finished(ago({ minutes: 12 }))],
   since: ago({ minutes: 12 }),
 })
 
@@ -206,7 +212,7 @@ it("advances the wait while the Inbox stays open", async () => {
 
   const fresh = PullRequestNeedsYou.make({
     pullRequest: summary(ref, "Retry flaky upload", false, openedAt),
-    reasons: [AgentReviewFinished.make({})],
+    reasons: [finished(openedAt)],
     since: openedAt,
   })
 
@@ -392,6 +398,42 @@ it("marks a finished Agent review done with Done or e, naming the review it saw"
       { pullRequest: draftRef, writtenAt: finishedDraft.since },
     ]),
   )
+})
+
+it("shows why the user's own PRs wait on them, without Agent review actions", async () => {
+  const mineRef = new PullRequestRef({ owner: "octo-org", repo: "glass", number: 51 })
+  const readyRef = new PullRequestRef({ owner: "octo-org", repo: "glass", number: 52 })
+
+  const user = mount(
+    needsYouRef([
+      PullRequestNeedsYou.make({
+        pullRequest: summary(mineRef, "Cache the diff", false, ago({ hours: 2 })),
+        reasons: [
+          ChangesRequested.make({}),
+          ChecksFailing.make({}),
+          AwaitingReply.make({ threads: 2 }),
+        ],
+        since: ago({ hours: 2 }),
+      }),
+      PullRequestNeedsYou.make({
+        pullRequest: summary(readyRef, "Trim the log", false, ago({ hours: 1 })),
+        reasons: [ReadyToMerge.make({})],
+        since: ago({ hours: 1 }),
+      }),
+    ]),
+  )
+
+  const waiting = await screen.findByRole("region", { name: "Waiting on you" })
+  expect(
+    within(waiting).getByText(/Changes requested · CI failing · 2 threads awaiting reply/),
+  ).toBeTruthy()
+  expect(within(waiting).getByText(/Ready to merge/)).toBeTruthy()
+
+  await user.click(screen.getByRole("button", { name: /Cache the diff/ }))
+  const pane = within(articleOf("Cache the diff"))
+  expect(pane.getByRole("link", { name: "Open pull request" })).toBeTruthy()
+  expect(pane.queryByRole("link", { name: "Read Agent review" })).toBeNull()
+  expect(pane.queryByRole("button", { name: "Done" })).toBeNull()
 })
 
 it("opens the pull request and offers its finished Agent review", async () => {

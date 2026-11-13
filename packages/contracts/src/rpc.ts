@@ -1,7 +1,13 @@
 import { Schema } from "effect"
 import { Rpc, RpcGroup } from "effect/rpc"
 import { Activity, ActivityKind, ActivityLogError, ActivityPage, ActivityStamp } from "./activity"
-import { AgentReviewFailure, AgentReviewState, FollowUpMessage, ReviewPrompt } from "./agentReview"
+import {
+  AgentReviewDone,
+  AgentReviewFailure,
+  AgentReviewState,
+  FollowUpMessage,
+  ReviewPrompt,
+} from "./agentReview"
 import { AskAnswer, AskFailure, AskPlace, AskQuestion } from "./ask"
 import {
   Agent,
@@ -125,7 +131,7 @@ export class GlassRpcs extends RpcGroup.make(
   }),
   /** Marks the Agent review written at writtenAt done; a newer one is left as it is. */
   Rpc.make("MarkAgentReviewDone", {
-    payload: { pullRequest: PullRequestRef, writtenAt: Schema.DateTimeUtcFromString },
+    payload: AgentReviewDone,
     error: AgentReviewFailure,
   }),
   Rpc.make("WatchAgentReview", {

@@ -8,15 +8,17 @@ import {
   PullRequestRef,
   Revision,
 } from "@glass/contracts"
-import { DateTime, Effect, Option, Predicate, Stream } from "effect"
+import { Clock, DateTime, Effect, Option, Predicate, Stream } from "effect"
+import { TestClock } from "effect/testing"
 import { mkdirSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { vi } from "vite-plus/test"
 import { agentsFixture } from "../test/agentsFixture"
+import { watchDeadlines } from "../test/deadlines"
 import { startFakeGitHub } from "../test/fakeGitHub"
 import { type FakePullRequest, type FakePullRequestSeed, VIEWER } from "../test/fakePullRequest"
-import { isolatedHome, startBackend } from "../test/harness"
+import { isolatedHome, startBackend, startSignedInBackend } from "../test/harness"
 import { type ScriptedSettings, scriptedAgentRunners } from "../test/scriptedAgentRunners"
 
 type Client = Effect.Success<ReturnType<typeof startBackend>>["client"]
@@ -45,7 +47,9 @@ const titles = (items: NeedsYou) =>
 const reasonsOf = (items: NeedsYou, pr: FakePullRequest) =>
   pullRequestItems(items)
     .find(({ pullRequest }) => pullRequest.url === pr.url)
-    ?.reasons.map(({ _tag }) => _tag)
+    ?.reasons.map((reason) =>
+      Predicate.isTagged(reason, "AwaitingReply") ? `AwaitingReply:${reason.threads}` : reason._tag,
+    )
 
 const sinceOf = (items: NeedsYou, pr: FakePullRequest) => {
   const found = pullRequestItems(items).find(({ pullRequest }) => pullRequest.url === pr.url)
@@ -328,5 +332,154 @@ it.live("lists an Agent review's Follow-up Agent while its request waits", () =>
     assert.strictEqual(requestsOf(listed, agentId)[0]?._tag, "PermissionRequest")
     const agents = yield* f.client.WatchAgents().pipe(Stream.runHead, Effect.map(Option.getOrThrow))
     assert.isTrue(agents.some(({ id, forReview }) => id === agentId && forReview))
+  }),
+)
+
+const mine = {
+  owner: "octo-org",
+  repo: "glass",
+  author: VIEWER.login,
+  base: { sha: "b0", files: {} },
+}
+
+it.live("lists the user's own PRs with what they wait on, until nothing does", () =>
+  Effect.gen(function* () {
+    const { github, client } = yield* startSignedInBackend
+    yield* client.FollowRepository({ input: "octo-org/glass" })
+
+    const pr = github.seedPullRequest({
+      ...mine,
+      checks: "FAILURE",
+      head: { sha: "h1", files: {} },
+    })
+
+    pr.addReview({ author: "mona", state: "CHANGES_REQUESTED" })
+
+    const asked = pr.addReviewThread({
+      path: "README.md",
+      comments: [{ author: "mona", bodyHtml: "<p>Why?</p>" }],
+    })
+
+    pr.addReviewThread({
+      path: "README.md",
+      comments: [
+        { author: "mona", bodyHtml: "<p>Rename this?</p>" },
+        { author: VIEWER.login, bodyHtml: "<p>Done</p>" },
+      ],
+    })
+    pr.addReviewThread({
+      path: "README.md",
+      resolved: true,
+      comments: [{ author: "mona", bodyHtml: "<p>Nit</p>" }],
+    })
+
+    yield* client.ListPullRequests()
+    const listed = yield* needsYou(client, (items) => reasonsOf(items, pr) !== undefined)
+    assert.deepStrictEqual(reasonsOf(listed, pr), [
+      "ChangesRequested",
+      "ChecksFailing",
+      "AwaitingReply:1",
+    ])
+    assert.strictEqual(Date.parse(sinceOf(listed, pr) ?? ""), Date.parse(pr.updatedAt))
+
+    pr.addReview({ author: "mona", state: "APPROVED" })
+    pr.checks = "SUCCESS"
+    pr.setResolved(asked.id, true)
+    yield* client.ListPullRequests()
+    const ready = yield* needsYou(client, (items) => reasonsOf(items, pr)?.[0] === "ReadyToMerge")
+    assert.deepStrictEqual(reasonsOf(ready, pr), ["ReadyToMerge"])
+
+    pr.mergeable = "CONFLICTING"
+    yield* client.ListPullRequests()
+    yield* needsYou(client, (items) => reasonsOf(items, pr) === undefined)
+  }),
+)
+
+it.live("drops the user's PRs once their repository is unfollowed", () =>
+  Effect.gen(function* () {
+    const { github, client } = yield* startSignedInBackend
+    const [followed] = yield* client.FollowRepository({ input: "octo-org/glass" })
+
+    const pr = github.seedPullRequest({
+      ...mine,
+      checks: "FAILURE",
+      head: { sha: "h1", files: {} },
+    })
+
+    yield* client.ListPullRequests()
+    yield* needsYou(client, (items) => reasonsOf(items, pr) !== undefined)
+
+    yield* client.UnfollowRepository({ repository: followed! })
+    yield* client.ListPullRequests()
+
+    yield* needsYou(client, (items) => reasonsOf(items, pr) === undefined)
+  }),
+)
+
+it.live("leaves out others' PRs and the user's PRs nobody has approved yet", () =>
+  Effect.gen(function* () {
+    const { github, client } = yield* startSignedInBackend
+    yield* client.FollowRepository({ input: "octo-org/glass" })
+    github.seedPullRequest({
+      ...mine,
+      author: "mona",
+      checks: "FAILURE",
+      head: { sha: "h1", files: {} },
+    })
+    github.seedPullRequest({ ...mine, checks: "SUCCESS", head: { sha: "h2", files: {} } })
+    const draft = github.seedPullRequest({ ...mine, isDraft: true, head: { sha: "h3", files: {} } })
+    draft.addReview({ author: "mona", state: "APPROVED" })
+
+    yield* client.ListPullRequests()
+
+    assert.deepStrictEqual(yield* current(client), [])
+  }),
+)
+
+it.live(
+  "lists the user's own queued PR once, with its finished Agent review and failing checks",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* reviewsFixture()
+      yield* f.client.FollowRepository({ input: "octo-org/hello-world" })
+      const pr = f.seed("Greet", { author: VIEWER.login, checks: "FAILURE" })
+      yield* f.client.AddToQueue({ references: [ref(pr)] })
+      yield* f.review(pr)
+
+      yield* f.client.ListPullRequests()
+      const listed = yield* needsYou(f.client, (items) => reasonsOf(items, pr)?.length === 2)
+
+      assert.deepStrictEqual(titles(listed), ["Greet"])
+      assert.deepStrictEqual(reasonsOf(listed, pr), ["AgentReviewFinished", "ChecksFailing"])
+    }),
+)
+
+it.effect("refreshes the user's PRs once two minutes pass without a sync", () =>
+  Effect.gen(function* () {
+    const { watched, deadlineSet } = yield* watchDeadlines(120_000)
+    const github = yield* startFakeGitHub()
+
+    const { client } = yield* startBackend({
+      GH_TOKEN: VIEWER.token,
+      GLASS_GITHUB_API_URL: github.url,
+    }).pipe(Effect.provideService(Clock.Clock, watched))
+
+    yield* client.FollowRepository({ input: "octo-org/glass" })
+
+    const pr = github.seedPullRequest({
+      ...mine,
+      checks: "FAILURE",
+      head: { sha: "h1", files: {} },
+    })
+
+    yield* deadlineSet
+    yield* client.ListPullRequests()
+    yield* needsYou(client, (items) => reasonsOf(items, pr) !== undefined)
+    yield* deadlineSet
+
+    pr.checks = "SUCCESS"
+    yield* TestClock.adjust("2 minutes")
+
+    yield* needsYou(client, (items) => reasonsOf(items, pr) === undefined)
   }),
 )
