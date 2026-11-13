@@ -38,7 +38,7 @@ export const choosePort = async (directory: string): Promise<number> => {
   const reusable = Number.isInteger(remembered) && remembered > 0 && remembered < 65536
   const port = reusable ? await listen(remembered).catch(() => listen(0)) : await listen(0)
 
-  await writeFile(join(directory, PORT_FILE), `${port}\n`, { mode: 0o600 })
+  if (port !== remembered) await writeFile(join(directory, PORT_FILE), `${port}\n`, { mode: 0o600 })
 
   return port
 }

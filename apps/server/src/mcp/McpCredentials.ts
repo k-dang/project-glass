@@ -1,5 +1,5 @@
 import { Context, Deferred, Effect, Layer, Option, Redacted, Schema, type Scope } from "effect"
-import { createHash, randomBytes } from "node:crypto"
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto"
 
 export class ConversationCaller extends Schema.TaggedClass<ConversationCaller>()("Conversation", {
   conversationId: Schema.String,
@@ -29,7 +29,17 @@ export class McpCaller extends Context.Service<McpCaller, McpCallerIdentity>()(
   )
 }
 
-const digest = (bearer: string) => createHash("sha256").update(bearer).digest("hex")
+export const digest = (bearer: string) => createHash("sha256").update(bearer).digest("hex")
+
+export const mintBearer = () => randomBytes(32).toString("base64url")
+
+/** Compares two secrets in constant time. */
+export const sameSecret = (left: string, right: string) => {
+  const a = Buffer.from(left)
+  const b = Buffer.from(right)
+
+  return a.length === b.length && timingSafeEqual(a, b)
+}
 
 export interface McpCredential {
   readonly caller: McpCallerIdentity
@@ -60,7 +70,7 @@ export class McpCredentials extends Context.Service<
         issue: (caller) =>
           Effect.acquireRelease(
             Effect.gen(function* () {
-              const bearer = randomBytes(32).toString("base64url")
+              const bearer = mintBearer()
               const key = digest(bearer)
               const revoked = yield* Deferred.make<void>()
 

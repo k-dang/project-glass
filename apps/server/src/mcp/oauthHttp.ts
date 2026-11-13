@@ -1,4 +1,4 @@
-import { DateTime, Effect, Layer, Match, Option, Redacted, Result, Schema } from "effect"
+import { Duration, Effect, Layer, Match, Option, Redacted, Result, Schema } from "effect"
 import { HttpRouter, HttpServerRequest, HttpServerResponse, UrlParams } from "effect/http"
 import { OUTSIDE_AGENT_TTL, OutsideAgents } from "../OutsideAgents"
 import {
@@ -11,8 +11,7 @@ import {
   redirectForError,
   renderApproval,
   renderError,
-  boundPort,
-  urlsFromHost,
+  requestUrls,
   type AuthorizationQuery,
 } from "./McpOAuth"
 
@@ -57,19 +56,21 @@ const page = (status: number, html: string) =>
     headers: PAGE_HEADERS,
   })
 
-const hostUrls = Effect.gen(function* () {
-  const request = yield* HttpServerRequest.HttpServerRequest
-  const port = boundPort(request)
+const hostUrls = HttpServerRequest.HttpServerRequest.pipe(
+  Effect.map((request) => Option.fromNullishOr(requestUrls(request))),
+)
 
-  if (port === undefined) return Option.none<OAuthUrls>()
+const oauthError = (error: string, description: string) =>
+  json(400, { error, error_description: description })
 
-  return Option.fromNullishOr(urlsFromHost(request.headers.host, port))
-})
+const missingHost = oauthError("invalid_request", "The request host is missing.")
 
-const missingHost = json(400, {
-  error: "invalid_request",
-  error_description: "The request host is missing.",
-})
+const missingHostPage = page(400, renderError("The request host is missing."))
+
+const staleApproval = page(
+  400,
+  renderError("This approval page is out of date. Start the sign-in again."),
+)
 
 const queryOf = (url: URL): AuthorizationQuery => ({
   client_id: url.searchParams.get("client_id") ?? undefined,
@@ -89,8 +90,6 @@ const Decision = Schema.Struct({
   client_id: Schema.String,
   redirect_uri: Schema.String,
   code_challenge: Schema.String,
-  code_challenge_method: Schema.String,
-  response_type: Schema.String,
   state: Schema.String,
   resource: Schema.String,
   csrf: Schema.String,
@@ -154,7 +153,7 @@ const authorize = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest
   const found = yield* hostUrls
 
-  if (Option.isNone(found)) return page(400, renderError("The request host is missing."))
+  if (Option.isNone(found)) return missingHostPage
 
   const validated = yield* oauth
     .validateAuthorization({
@@ -167,19 +166,7 @@ const authorize = Effect.gen(function* () {
 
   const authorization = validated.success
 
-  return page(
-    200,
-    renderApproval(
-      authorization,
-      oauth.csrfFor({
-        clientId: authorization.clientId,
-        redirectUri: authorization.redirectUri,
-        codeChallenge: authorization.codeChallenge,
-        state: authorization.state,
-        resource: authorization.resource,
-      }),
-    ),
-  )
+  return page(200, renderApproval(authorization, oauth.csrfFor(authorization)))
 })
 
 const decide = Effect.gen(function* () {
@@ -187,7 +174,7 @@ const decide = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest
   const found = yield* hostUrls
 
-  if (Option.isNone(found)) return page(400, renderError("The request host is missing."))
+  if (Option.isNone(found)) return missingHostPage
 
   const origin = request.headers.origin
 
@@ -196,14 +183,12 @@ const decide = Effect.gen(function* () {
   // this check does not stop a forged decision: the signed csrf field below does, because only
   // a page that read the approval Glass rendered can carry it.
   if (origin !== undefined && origin !== "null" && origin !== found.value.issuer) {
-    return page(400, renderError("This approval page is out of date. Start the sign-in again."))
+    return staleApproval
   }
 
   const decoded = yield* HttpServerRequest.schemaBodyUrlParams(Decision).pipe(Effect.result)
 
-  if (Result.isFailure(decoded)) {
-    return page(400, renderError("This approval page is out of date. Start the sign-in again."))
-  }
+  if (Result.isFailure(decoded)) return staleApproval
 
   const form = decoded.success
 
@@ -219,21 +204,13 @@ const decide = Effect.gen(function* () {
       form.csrf,
     )
   ) {
-    return page(400, renderError("This approval page is out of date. Start the sign-in again."))
+    return staleApproval
   }
 
   const validated = yield* oauth
     .validateAuthorization({
       urls: found.value,
-      request: {
-        client_id: form.client_id,
-        redirect_uri: form.redirect_uri,
-        response_type: form.response_type,
-        code_challenge: form.code_challenge,
-        code_challenge_method: form.code_challenge_method,
-        state: form.state,
-        resource: form.resource,
-      },
+      request: { ...form, response_type: "code", code_challenge_method: "S256" },
     })
     .pipe(Effect.result)
 
@@ -256,19 +233,13 @@ const register = Effect.gen(function* () {
   const body = yield* HttpServerRequest.schemaBodyJson(Schema.JsonObject).pipe(Effect.result)
 
   if (Result.isFailure(body)) {
-    return yield* json(400, {
-      error: "invalid_client_metadata",
-      error_description: "Expected a JSON registration object.",
-    })
+    return yield* oauthError("invalid_client_metadata", "Expected a JSON registration object.")
   }
 
   const redirectUris = stringArray(body.success.redirect_uris)
 
   if (Option.isNone(redirectUris)) {
-    return yield* json(400, {
-      error: "invalid_redirect_uri",
-      error_description: "redirect_uris must be an array of strings.",
-    })
+    return yield* oauthError("invalid_redirect_uri", "redirect_uris must be an array of strings.")
   }
 
   const registered = yield* oauth
@@ -279,10 +250,7 @@ const register = Effect.gen(function* () {
     .pipe(Effect.result)
 
   if (Result.isFailure(registered)) {
-    return yield* json(400, {
-      error: registered.failure.error,
-      error_description: registered.failure.description,
-    })
+    return yield* oauthError(registered.failure.error, registered.failure.description)
   }
 
   return yield* json(201, {
@@ -305,10 +273,7 @@ const token = Effect.gen(function* () {
   const fields = yield* tokenFields.pipe(Effect.result)
 
   if (Result.isFailure(fields)) {
-    return yield* json(400, {
-      error: "invalid_request",
-      error_description: "The token request could not be read.",
-    })
+    return yield* oauthError("invalid_request", "The token request could not be read.")
   }
 
   const exchanged = yield* oauth
@@ -324,26 +289,15 @@ const token = Effect.gen(function* () {
     .pipe(Effect.result)
 
   if (Result.isFailure(exchanged)) {
-    return yield* json(400, {
-      error: exchanged.failure.error,
-      error_description: exchanged.failure.description,
-    })
+    return yield* oauthError(exchanged.failure.error, exchanged.failure.description)
   }
 
-  const now = yield* DateTime.now
-
-  const issued = yield* outsideAgents.issue({
-    name: exchanged.success.name,
-    ttl: OUTSIDE_AGENT_TTL,
-  })
+  const issued = yield* outsideAgents.issue(exchanged.success.name)
 
   return yield* json(200, {
-    access_token: Redacted.value(issued.token),
+    access_token: Redacted.value(issued),
     token_type: "Bearer",
-    expires_in: Math.max(
-      0,
-      Math.floor((DateTime.toEpochMillis(issued.expiresAt) - DateTime.toEpochMillis(now)) / 1000),
-    ),
+    expires_in: Duration.toSeconds(OUTSIDE_AGENT_TTL),
   })
 })
 

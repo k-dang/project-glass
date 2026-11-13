@@ -40,15 +40,16 @@ import { readAgentReviewOnOpenAtom } from "./reviewsArea"
 import { RequestCard } from "./RequestCard"
 import { useShortcuts } from "./useShortcuts"
 
-const inStopped = (item: NeedsYouItem) =>
-  Predicate.isTagged(item, "Agent") || Predicate.isTagged(item, "OutsideQuestion")
+const sections: ReadonlyArray<{
+  readonly title: string
+  readonly tags: ReadonlyArray<NeedsYouItem["_tag"]>
+}> = [
+  { title: "Stopped on you", tags: ["Agent", "OutsideQuestion"] },
+  { title: "Waiting on you", tags: ["PullRequest"] },
+]
 
-const inWaiting = (item: NeedsYouItem) => Predicate.isTagged(item, "PullRequest")
-
-const sections = [
-  { id: "stopped", title: "Stopped on you", include: inStopped },
-  { id: "waiting", title: "Waiting on you", include: inWaiting },
-] as const
+const inSection = (section: (typeof sections)[number]) => (item: NeedsYouItem) =>
+  section.tags.includes(item._tag)
 
 const requestLabel = (part: RequestPart) =>
   Match.valueTags(part, {
@@ -208,12 +209,12 @@ function InboxSections(props: {
   onPick: (key: string) => void
 }) {
   return sections.map((section) => {
-    const rows = props.items.filter(section.include)
+    const rows = props.items.filter(inSection(section))
 
     if (rows.length === 0) return null
 
     return (
-      <section key={section.id} aria-label={section.title} className="py-2">
+      <section key={section.title} aria-label={section.title} className="py-2">
         <h2 className="px-4 py-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
           {section.title}
         </h2>
@@ -280,7 +281,7 @@ export function Inbox() {
 
   const items = AsyncResult.isSuccess(status) ? status.value : []
 
-  const flat = sections.flatMap((section) => items.filter(section.include))
+  const flat = sections.flatMap((section) => items.filter(inSection(section)))
   const keys = flat.map(needsYouKey)
   const order = keys.join("\n")
   const [picked, setPicked] = useState<string | null>(null)

@@ -1,6 +1,7 @@
-import { Effect, Layer, Option, Predicate, Redacted, Schema } from "effect"
+import { Effect, Layer, Option, Predicate, Redacted, Schema, Stream } from "effect"
 import { McpProtocol, McpSchema, McpServer } from "effect/ai"
 import {
+  HttpBody,
   HttpEffect,
   HttpRouter,
   HttpServer,
@@ -12,7 +13,7 @@ import { OutsideAgents } from "../OutsideAgents"
 import { AskProgress } from "./AskProgress"
 import { GlassToolHandlers, GlassTools } from "./glassTools"
 import { McpCaller, McpCredentials, OutsideAgentCaller } from "./McpCredentials"
-import { boundPort, urlsFromHost } from "./McpOAuth"
+import { requestUrls } from "./McpOAuth"
 
 export const MCP_PATH = "/mcp"
 
@@ -61,8 +62,7 @@ const McpAccess = HttpRouter.middleware(
     return (httpEffect) =>
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
-        const port = boundPort(request)
-        const urls = port === undefined ? undefined : urlsFromHost(request.headers.host, port)
+        const urls = requestUrls(request)
 
         if (urls === undefined) {
           return HttpServerResponse.empty({
@@ -116,7 +116,16 @@ const McpAccess = HttpRouter.middleware(
           }),
         )
 
-        return response
+        // A streamed answer, such as ask_user waiting with progress, outlives the race above. Ending
+        // its body on revoke closes the request, and Effect then interrupts the tool call.
+        if (!Predicate.isTagged(response.body, "Stream")) return response
+
+        const { stream, contentType, contentLength } = response.body
+
+        return HttpServerResponse.setBody(
+          response,
+          HttpBody.stream(Stream.interruptWhen(stream, revoked), contentType, contentLength),
+        )
       })
   }),
 )

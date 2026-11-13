@@ -13,12 +13,10 @@ import {
   SubscriptionRef,
 } from "effect"
 import { SqlClient } from "effect/sql"
-import { createHash, randomBytes, randomUUID } from "node:crypto"
-import { OutsideAgentCaller, type McpCredential } from "./mcp/McpCredentials"
+import { randomUUID } from "node:crypto"
+import { digest, mintBearer, OutsideAgentCaller, type McpCredential } from "./mcp/McpCredentials"
 
 export const OUTSIDE_AGENT_TTL = Duration.days(30)
-
-const digest = (bearer: string) => createHash("sha256").update(bearer).digest("hex")
 
 const AgentRow = Schema.Struct({
   id: Schema.String,
@@ -47,14 +45,8 @@ interface LiveAgent {
 export class OutsideAgents extends Context.Service<
   OutsideAgents,
   {
-    readonly issue: (input: {
-      readonly name: string
-      readonly ttl: Duration.Duration
-    }) => Effect.Effect<{
-      readonly id: string
-      readonly token: Redacted.Redacted
-      readonly expiresAt: DateTime.DateTime
-    }>
+    /** Approves an app under `name` for `OUTSIDE_AGENT_TTL` and returns its bearer. */
+    readonly issue: (name: string) => Effect.Effect<Redacted.Redacted>
     readonly authenticate: (
       bearer: Redacted.Redacted,
     ) => Effect.Effect<Option.Option<McpCredential>>
@@ -103,23 +95,25 @@ export class OutsideAgents extends Context.Service<
       })
 
       return OutsideAgents.of({
-        issue: (input) =>
+        issue: (name) =>
           Effect.gen(function* () {
             const issuedAt = yield* DateTime.now
-            const expiresAt = DateTime.addDuration(issuedAt, input.ttl)
-            const id = randomUUID()
-            const token = randomBytes(32).toString("base64url")
+            const expiresAt = DateTime.addDuration(issuedAt, OUTSIDE_AGENT_TTL)
+            const token = mintBearer()
 
-            yield* sql`
+            const spent = yield* sql`
               DELETE FROM outside_agent
               WHERE revoked_at IS NOT NULL OR expires_at <= ${DateTime.formatIso(issuedAt)}
+              RETURNING id
             `.pipe(Effect.orDie)
+
+            for (const { id } of yield* decodeIds(spent).pipe(Effect.orDie)) live.delete(id)
 
             yield* sql`
               INSERT INTO outside_agent (id, name, token_digest, issued_at, expires_at)
               VALUES (
-                ${id},
-                ${input.name},
+                ${randomUUID()},
+                ${name},
                 ${digest(token)},
                 ${DateTime.formatIso(issuedAt)},
                 ${DateTime.formatIso(expiresAt)}
@@ -128,7 +122,7 @@ export class OutsideAgents extends Context.Service<
 
             yield* bump
 
-            return { id, token: Redacted.make(token), expiresAt }
+            return Redacted.make(token)
           }),
         authenticate: (bearer) =>
           Effect.gen(function* () {

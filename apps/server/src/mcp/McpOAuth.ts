@@ -1,8 +1,9 @@
 import { Clock, Context, Effect, FileSystem, Layer, Option, Ref, Schema } from "effect"
 import type { HttpServerRequest } from "effect/http"
-import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto"
+import { createHash, createHmac, randomBytes } from "node:crypto"
 import { join } from "node:path"
 import { writeDataFile } from "../dataFiles"
+import { mintBearer, sameSecret } from "./McpCredentials"
 import { ServerConfig } from "../ServerConfig"
 
 // Registration is a signed client id, so an open register endpoint cannot fill the database.
@@ -57,35 +58,32 @@ const hostNameAndPort = (host: string): { name: string; port: string } | undefin
   return { name: host.slice(0, colon), port: host.slice(colon + 1) }
 }
 
-export const issuerForPort = (port: number): OAuthUrls => {
-  const issuer = `http://127.0.0.1:${port}`
-
-  return { issuer, resource: `${issuer}/mcp` }
-}
-
 const decodeLocalPort = Schema.decodeUnknownOption(
   Schema.Struct({ socket: Schema.Struct({ localPort: Schema.Number }) }),
 )
 
-/** The port this request arrived on. Glass may have asked the OS to choose it. */
-export const boundPort = (request: HttpServerRequest.HttpServerRequest): number | undefined => {
+/**
+ * The issuer and resource for a request whose Host is a loopback name on the port it arrived on,
+ * which Glass may have asked the OS to choose.
+ */
+export const requestUrls = (
+  request: HttpServerRequest.HttpServerRequest,
+): OAuthUrls | undefined => {
   const decoded = decodeLocalPort(request.source)
+  const host = request.headers.host
 
-  if (Option.isNone(decoded) || decoded.value.socket.localPort <= 0) return undefined
+  if (Option.isNone(decoded) || host === undefined) return undefined
 
-  return decoded.value.socket.localPort
-}
-
-export const urlsFromHost = (host: string | undefined, port: number): OAuthUrls | undefined => {
-  if (host === undefined) return undefined
-
+  const port = decoded.value.socket.localPort
   const parts = hostNameAndPort(host.trim())
 
-  if (parts === undefined || parts.port !== String(port)) return undefined
+  if (port <= 0 || parts === undefined || parts.port !== String(port)) return undefined
 
   if (!LOOPBACK_HOSTS.has(parts.name.toLowerCase())) return undefined
 
-  return issuerForPort(port)
+  const issuer = `http://127.0.0.1:${port}`
+
+  return { issuer, resource: `${issuer}/mcp` }
 }
 
 export const protectedResourceMetadata = (urls: OAuthUrls) => ({
@@ -223,13 +221,10 @@ interface PendingCode {
   readonly expiresAt: number
 }
 
-export interface CsrfFields {
-  readonly clientId: string
-  readonly redirectUri: string
-  readonly codeChallenge: string
-  readonly state: string
-  readonly resource: string
-}
+export type CsrfFields = Pick<
+  Authorization,
+  "clientId" | "redirectUri" | "codeChallenge" | "state" | "resource"
+>
 
 const escapeHtml = (value: string) =>
   value.replace(/[&<>"']/g, (char) => {
@@ -303,8 +298,6 @@ export const renderApproval = (authorization: Authorization, csrf: string) => {
     ${hidden("client_id", authorization.clientId)}
     ${hidden("redirect_uri", authorization.redirectUri)}
     ${hidden("code_challenge", authorization.codeChallenge)}
-    ${hidden("code_challenge_method", "S256")}
-    ${hidden("response_type", "code")}
     ${hidden("state", authorization.state)}
     ${hidden("resource", authorization.resource)}
     ${hidden("csrf", csrf)}
@@ -324,20 +317,13 @@ export const redirectForError = (error: OAuthRedirectError, issuer: string) =>
     iss: issuer,
   })
 
-const tokensMatch = (left: string, right: string) => {
-  const a = Buffer.from(left)
-  const b = Buffer.from(right)
-
-  return a.length === b.length && timingSafeEqual(a, b)
-}
-
 const tokenError = (error: OAuthTokenError["error"], description: string) =>
   new OAuthTokenError({ error, description })
 
 const pkceMatches = (verifier: string, challenge: string) => {
   if (!CODE_VERIFIER.test(verifier) || !CODE_CHALLENGE.test(challenge)) return false
 
-  return tokensMatch(createHash("sha256").update(verifier).digest("base64url"), challenge)
+  return sameSecret(createHash("sha256").update(verifier).digest("base64url"), challenge)
 }
 
 export class McpOAuth extends Context.Service<
@@ -415,7 +401,7 @@ export class McpOAuth extends Context.Service<
         const body = clientId.slice(0, dot)
         const signature = clientId.slice(dot + 1)
 
-        if (!tokensMatch(sign("mcp-client-id", body), signature)) return undefined
+        if (!sameSecret(sign("mcp-client-id", body), signature)) return undefined
 
         const payload = decodeClientIdPayload(Buffer.from(body, "base64url").toString("utf8"))
 
@@ -541,7 +527,7 @@ export class McpOAuth extends Context.Service<
       const approve = (authorization: Authorization) =>
         Effect.gen(function* () {
           const now = yield* Clock.currentTimeMillis
-          const code = randomBytes(32).toString("base64url")
+          const code = mintBearer()
 
           yield* Ref.update(codes, (current) => {
             const next = new Map([...current].filter(([, pending]) => pending.expiresAt > now))
@@ -637,7 +623,7 @@ export class McpOAuth extends Context.Service<
         register,
         validateAuthorization,
         csrfFor,
-        csrfMatches: (fields, given) => tokensMatch(csrfFor(fields), given),
+        csrfMatches: (fields, given) => sameSecret(csrfFor(fields), given),
         approve,
         deny: (authorization) =>
           redirectWith(authorization.redirectUri, {

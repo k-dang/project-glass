@@ -10,7 +10,6 @@ import {
 } from "@glass/contracts"
 import { Effect, Exit, Fiber, Option, Predicate, Redacted, Schema, Scope, Stream } from "effect"
 import { startBackend } from "../../test/harness"
-import { OUTSIDE_AGENT_TTL } from "../OutsideAgents"
 import { connectMcp, initialize, mcpPost, toolResult, toolText } from "../../test/mcpClient"
 
 const outside = (items: NeedsYou) =>
@@ -25,9 +24,7 @@ const needsYou = (
   client.WatchNeedsYou().pipe(Stream.filter(until), Stream.runHead, Effect.map(Option.getOrThrow))
 
 const approve = (backend: Effect.Success<ReturnType<typeof startBackend>>) =>
-  backend.outsideAgents
-    .issue({ name: "Claude Code", ttl: OUTSIDE_AGENT_TTL })
-    .pipe(Effect.map(({ token }) => token))
+  backend.outsideAgents.issue("Claude Code")
 
 const start = Effect.gen(function* () {
   const backend = yield* startBackend({})
@@ -36,6 +33,59 @@ const start = Effect.gen(function* () {
 
   return { ...backend, bearer, mcp }
 })
+
+const askUntilProgress = (baseUrl: string, bearer: Redacted.Redacted) =>
+  Effect.gen(function* () {
+    const opened = yield* mcpPost(baseUrl, initialize, { bearer })
+
+    assert.equal(opened.status, 200)
+    assert.ok(opened.sessionId !== undefined)
+
+    yield* mcpPost(
+      baseUrl,
+      { jsonrpc: "2.0", method: "notifications/initialized" },
+      { bearer, sessionId: opened.sessionId },
+    )
+
+    return yield* Effect.promise(async () => {
+      const response = await fetch(`${baseUrl}/mcp`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+          authorization: `Bearer ${Redacted.value(bearer)}`,
+          "mcp-session-id": opened.sessionId ?? "",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/call",
+          params: {
+            name: "ask_user",
+            arguments: { question: "Ship the retry change?" },
+            _meta: { progressToken: "ask-1" },
+          },
+        }),
+      })
+
+      const reader = response.body?.getReader()
+
+      if (reader === undefined) throw new Error("ask_user returned no body")
+
+      const decoder = new TextDecoder()
+      let text = ""
+
+      while (!text.includes("notifications/progress")) {
+        const chunk = await reader.read()
+
+        if (chunk.value !== undefined) text += decoder.decode(chunk.value)
+
+        if (chunk.done) break
+      }
+
+      return { status: response.status, text, reader }
+    })
+  })
 
 describe("ask_user", () => {
   it.live("returns the free-text answer from the Inbox", () =>
@@ -183,72 +233,53 @@ describe("ask_user", () => {
   it.live("sends progress before the answer so the call outlives a client timeout", () =>
     Effect.gen(function* () {
       const backend = yield* startBackend({})
-      const { baseUrl, client } = backend
-      const bearer = yield* approve(backend)
-      const opened = yield* mcpPost(baseUrl, initialize, { bearer })
-
-      assert.equal(opened.status, 200)
-      assert.ok(opened.sessionId !== undefined)
-
-      yield* mcpPost(
-        baseUrl,
-        { jsonrpc: "2.0", method: "notifications/initialized" },
-        { bearer, sessionId: opened.sessionId },
-      )
-
-      const body = yield* Effect.promise(async () => {
-        const response = await fetch(`${baseUrl}/mcp`, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            accept: "application/json, text/event-stream",
-            authorization: `Bearer ${Redacted.value(bearer)}`,
-            "mcp-session-id": opened.sessionId ?? "",
-          },
-          body: JSON.stringify({
-            jsonrpc: "2.0",
-            id: 1,
-            method: "tools/call",
-            params: {
-              name: "ask_user",
-              arguments: { question: "Ship the retry change?" },
-              _meta: { progressToken: "ask-1" },
-            },
-          }),
-        })
-
-        const reader = response.body?.getReader()
-
-        if (reader === undefined) throw new Error("ask_user returned no body")
-
-        const decoder = new TextDecoder()
-        let text = ""
-
-        while (!text.includes("notifications/progress")) {
-          const chunk = await reader.read()
-
-          if (chunk.value !== undefined) text += decoder.decode(chunk.value)
-
-          if (chunk.done) break
-        }
-
-        return { status: response.status, text, reader }
-      })
+      const body = yield* askUntilProgress(backend.baseUrl, yield* approve(backend))
 
       assert.equal(body.status, 200)
       assert.include(body.text, "notifications/progress")
       assert.include(body.text, "ask-1")
       assert.equal(body.text.includes('"id":1'), false)
 
-      const shown = yield* needsYou(client, (items) => outside(items).length === 1)
+      const shown = yield* needsYou(backend.client, (items) => outside(items).length === 1)
       const question = outside(shown)[0]
 
       assert.ok(question !== undefined)
-      yield* client.AnswerOutsideQuestion({
+      yield* backend.client.AnswerOutsideQuestion({
         id: question.id,
         answer: OutsideText.make({ text: "Ship it" }),
       })
       yield* Effect.promise(() => body.reader.cancel())
+    }),
+  )
+
+  it.live("ends a waiting question when its agent is disconnected", () =>
+    Effect.gen(function* () {
+      const backend = yield* startBackend({})
+      const body = yield* askUntilProgress(backend.baseUrl, yield* approve(backend))
+
+      yield* needsYou(backend.client, (items) => outside(items).length === 1)
+
+      const [agent] = yield* backend.client
+        .WatchOutsideAgents()
+        .pipe(Stream.runHead, Effect.map(Option.getOrThrow))
+
+      assert.ok(agent !== undefined)
+      yield* backend.client.RevokeOutsideAgent({ id: agent.id })
+
+      yield* needsYou(backend.client, (items) => outside(items).length === 0)
+
+      const rest = yield* Effect.promise(async () => {
+        const decoder = new TextDecoder()
+        let text = ""
+
+        for (let chunk = await body.reader.read(); !chunk.done; chunk = await body.reader.read()) {
+          text += decoder.decode(chunk.value)
+        }
+
+        return text
+      })
+
+      assert.equal(rest.includes("Answered"), false)
     }),
   )
 
