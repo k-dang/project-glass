@@ -46,9 +46,7 @@ export function OutsideAgentsSettings() {
         ))
         .render()}
       {AsyncResult.builder(agents)
-        .onInitialOrWaiting(() => (
-          <p className="text-sm text-muted-foreground">Loading outside agents…</p>
-        ))
+        .onInitial(() => <p className="text-sm text-muted-foreground">Loading outside agents…</p>)
         .onFailure((cause) => <ProblemAlert problem={streamProblem(cause)} />)
         .onSuccess((connected) =>
           connected.length === 0 ? (
@@ -66,6 +64,7 @@ export function OutsideAgentsSettings() {
                   <Button
                     type="button"
                     variant="outline"
+                    aria-label={`Disconnect ${agent.name}`}
                     disabled={revoke.waiting}
                     onClick={() => disconnect(agent.id)}
                   >

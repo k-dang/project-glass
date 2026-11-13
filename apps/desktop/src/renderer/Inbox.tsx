@@ -406,7 +406,7 @@ function InboxDetail(props: {
 }) {
   return Match.valueTags(props.item, {
     Agent: (item) => <AgentDetail item={item} now={props.now} />,
-    OutsideQuestion: (item) => <OutsideQuestionDetail item={item} now={props.now} />,
+    OutsideQuestion: (item) => <OutsideQuestionDetail key={item.id} item={item} now={props.now} />,
     PullRequest: (item) => (
       <PullRequestDetail item={item} now={props.now} onReadReview={props.onReadReview} />
     ),

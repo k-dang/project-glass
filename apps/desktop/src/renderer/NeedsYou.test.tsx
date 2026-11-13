@@ -310,6 +310,45 @@ it("sends a typed answer when an outside question has no choices", async () => {
   expect(answers).toEqual([{ id: "ask-2", answer: OutsideText.make({ text: "Not yet" }) }])
 })
 
+it("starts the next outside question with an empty answer", async () => {
+  const answers: Array<{ id: string; answer: OutsideQuestionAnswer }> = []
+  const typed = OutsideQuestion.make({ ...outsideQuestion, id: "ask-3", choices: [] })
+
+  const chosen = OutsideQuestion.make({
+    ...outsideQuestion,
+    id: "ask-4",
+    question: "Merge it today?",
+    choices: ["Merge today", "Wait for CI"],
+  })
+
+  const needsYou = needsYouRef([typed, chosen])
+
+  const user = mount(needsYou, {
+    AnswerOutsideQuestion: (payload) => Effect.sync(() => void answers.push(payload)),
+  })
+
+  await screen.findByRole("heading", { name: "Ship the retry change?" })
+  await user.type(
+    within(articleOf("Ship the retry change?")).getByRole("textbox", { name: "Your answer" }),
+    "release/2026-11",
+  )
+  await user.click(
+    within(articleOf("Ship the retry change?")).getByRole("button", { name: "Send" }),
+  )
+  await setNeedsYou(needsYou, [chosen])
+
+  await screen.findByRole("heading", { name: "Merge it today?" })
+  const pane = within(articleOf("Merge it today?"))
+  expect(pane.getByRole("textbox", { name: "Or type an answer" })).toHaveProperty("value", "")
+  await user.click(pane.getByRole("radio", { name: "Wait for CI" }))
+  await user.click(pane.getByRole("button", { name: "Send" }))
+
+  expect(answers).toEqual([
+    { id: "ask-3", answer: OutsideText.make({ text: "release/2026-11" }) },
+    { id: "ask-4", answer: OutsideChoice.make({ choice: "Wait for CI" }) },
+  ])
+})
+
 it("allows with a, and opens the clicked pull request with Enter", async () => {
   const answers: Array<{ agentId: string; requestId: string; answer: RequestAnswer }> = []
   const opened: Array<Held<{ readonly pullRequest: PullRequestRef }, never, never>> = []
