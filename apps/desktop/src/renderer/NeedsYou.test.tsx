@@ -93,21 +93,24 @@ const summary = (
     updatedAt,
   })
 
-const finished = (since: DateTime.Utc) => AgentReviewFinished.make({ writtenAt: since })
+const finished = (pullRequest: PullRequestSummary, writtenAt: DateTime.Utc) =>
+  PullRequestNeedsYou.make({
+    pullRequest,
+    reasons: [AgentReviewFinished.make({ writtenAt })],
+    since: writtenAt,
+  })
 
-const finishedReview = PullRequestNeedsYou.make({
-  pullRequest: summary(ref, "Retry flaky upload", false, ago({ hours: 5 })),
-  reasons: [finished(ago({ hours: 3 }))],
-  since: ago({ hours: 3 }),
-})
+const finishedReview = finished(
+  summary(ref, "Retry flaky upload", false, ago({ hours: 5 })),
+  ago({ hours: 3 }),
+)
 
 const draftRef = new PullRequestRef({ owner: "octo-org", repo: "glass", number: 8 })
 
-const finishedDraft = PullRequestNeedsYou.make({
-  pullRequest: summary(draftRef, "Sketch the empty state", true, ago({ hours: 1 })),
-  reasons: [finished(ago({ minutes: 12 }))],
-  since: ago({ minutes: 12 }),
-})
+const finishedDraft = finished(
+  summary(draftRef, "Sketch the empty state", true, ago({ hours: 1 })),
+  ago({ minutes: 12 }),
+)
 
 const needsYouRef = (items: NeedsYou) => Effect.runSync(SubscriptionRef.make(items))
 
@@ -212,11 +215,7 @@ it("advances the wait while the Inbox stays open", async () => {
   vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] })
   const openedAt = DateTime.nowUnsafe()
 
-  const fresh = PullRequestNeedsYou.make({
-    pullRequest: summary(ref, "Retry flaky upload", false, openedAt),
-    reasons: [finished(openedAt)],
-    since: openedAt,
-  })
+  const fresh = finished(summary(ref, "Retry flaky upload", false, openedAt), openedAt)
 
   mount(needsYouRef([fresh]))
 
