@@ -17,8 +17,14 @@ import { Link, useNavigate } from "@tanstack/react-router"
 import { cn } from "cn"
 import { Array as Arr, DateTime, Match, Option, Predicate } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
-import { CircleHelp, GitPullRequest, MessagesSquare, Sparkles } from "lucide-react"
-import { useEffect, useId, useMemo, useState } from "react"
+import {
+  CircleHelp,
+  GitPullRequest,
+  Inbox as InboxIcon,
+  MessagesSquare,
+  Sparkles,
+} from "lucide-react"
+import { type ReactNode, useEffect, useId, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Kbd } from "@/components/ui/kbd"
@@ -159,6 +165,17 @@ const titleOf = (item: NeedsYouItem) =>
     GlobalConversation: () => "Global conversation",
   })
 
+function KindIcon(props: { item: NeedsYouItem; className: string }) {
+  const icon = { className: props.className, "aria-hidden": true }
+
+  return Match.valueTags(props.item, {
+    Agent: () => <Sparkles {...icon} />,
+    OutsideQuestion: () => <CircleHelp {...icon} />,
+    PullRequest: () => <GitPullRequest {...icon} />,
+    GlobalConversation: () => <MessagesSquare {...icon} />,
+  })
+}
+
 const minute = 60_000
 
 function useMinuteClock() {
@@ -246,7 +263,7 @@ function InboxSections(props: {
         <h2 className="px-4 py-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
           {section.title}
         </h2>
-        <ul>
+        <ul className="px-2">
           {rows.map((item) => {
             const key = needsYouKey(item)
 
@@ -256,17 +273,26 @@ function InboxSections(props: {
                   type="button"
                   data-inbox-row={key}
                   aria-current={key === props.selectedKey ? "true" : undefined}
-                  className="flex w-full flex-col gap-0.5 px-4 py-2 text-left text-sm outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring aria-[current=true]:bg-accent"
+                  className="flex w-full items-start gap-3 rounded-md px-2 py-2 text-left text-sm outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring aria-[current=true]:bg-accent"
                   onClick={() => props.onPick(key)}
                 >
-                  <span className="flex items-baseline gap-2">
-                    <span className="min-w-0 flex-1 font-medium break-words" title={titleOf(item)}>
-                      {titleOf(item)}
+                  <KindIcon item={item} className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="flex items-baseline gap-2">
+                      <span
+                        className="min-w-0 flex-1 font-medium break-words"
+                        title={titleOf(item)}
+                      >
+                        {titleOf(item)}
+                      </span>
+                      <Waited since={item.since} now={props.now} />
                     </span>
-                    <Waited since={item.since} now={props.now} />
-                  </span>
-                  <span className="text-pretty text-xs text-muted-foreground" title={lineOf(item)}>
-                    {lineOf(item)}
+                    <span
+                      className="text-pretty text-xs text-muted-foreground"
+                      title={lineOf(item)}
+                    >
+                      {lineOf(item)}
+                    </span>
                   </span>
                 </button>
               </li>
@@ -289,9 +315,16 @@ function InboxPane(props: {
     onFailure: () => null,
     onSuccess: ({ value: items }) =>
       props.selected === null ? (
-        <p className="text-sm text-muted-foreground">
-          {items.length === 0 ? "Nothing needs you right now." : "Select something that needs you."}
-        </p>
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+          <span className="flex size-10 items-center justify-center rounded-full border bg-muted/50 text-muted-foreground">
+            <InboxIcon className="size-5" aria-hidden />
+          </span>
+          <p className="text-sm text-muted-foreground">
+            {items.length === 0
+              ? "Nothing needs you right now."
+              : "Select something that needs you."}
+          </p>
+        </div>
       ) : (
         <InboxDetail item={props.selected} now={props.now} onReadReview={props.onReadReview} />
       ),
@@ -414,8 +447,10 @@ export function Inbox() {
           />
         </div>
       </div>
-      <div className="min-w-0 flex-1 overflow-y-auto p-6">
-        <InboxPane status={status} selected={selected} now={now} onReadReview={markReview} />
+      <div className="min-w-0 flex-1 overflow-y-auto">
+        <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col px-8 py-10">
+          <InboxPane status={status} selected={selected} now={now} onReadReview={markReview} />
+        </div>
       </div>
     </div>
   )
@@ -452,6 +487,30 @@ function InboxDetail(props: {
   })
 }
 
+function DetailHeader(props: {
+  item: NeedsYouItem
+  title: string
+  now: Date
+  children: ReactNode
+}) {
+  return (
+    <header className="flex items-start gap-3">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-muted/50 text-muted-foreground">
+        <KindIcon item={props.item} className="size-4" />
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex items-baseline gap-3">
+          <h2 className="min-w-0 flex-1 text-xl leading-tight font-semibold text-pretty break-words">
+            {props.title}
+          </h2>
+          <Waited since={props.item.since} now={props.now} />
+        </div>
+        {props.children}
+      </div>
+    </header>
+  )
+}
+
 const answerOutsideQuestionAtom = Atom.family((id: string) =>
   backendRuntime.fn((answer: OutsideQuestionAnswer) =>
     Backend.use((backend) => backend.AnswerOutsideQuestion({ id, answer })),
@@ -477,17 +536,12 @@ function OutsideQuestionDetail(props: { item: OutsideQuestion; now: Date }) {
   }
 
   return (
-    <article className="flex max-w-2xl flex-col gap-4">
-      <header className="flex flex-col gap-1">
-        <div className="flex items-center gap-2">
-          <CircleHelp className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-          <h2 className="text-lg font-semibold text-pretty break-words">{item.question}</h2>
-          <Waited since={item.since} now={props.now} />
-        </div>
+    <article className="flex flex-col gap-6">
+      <DetailHeader item={item} title={item.question} now={props.now}>
         <p className="text-sm text-pretty text-muted-foreground">Asked by {item.askedBy}</p>
-      </header>
+      </DetailHeader>
       <form
-        className="flex flex-col gap-3"
+        className="flex flex-col gap-4 rounded-xl border bg-card p-4"
         onSubmit={(event) => {
           event.preventDefault()
           submit()
@@ -503,9 +557,12 @@ function OutsideQuestionDetail(props: { item: OutsideQuestion; now: Date }) {
               Choices
             </span>
             {item.choices.map((label) => (
-              <Label key={label} className="flex items-start gap-2 font-normal">
-                <RadioGroupItem value={label} />
-                <span>{label}</span>
+              <Label
+                key={label}
+                className="flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 font-normal transition-colors duration-150 ease-out hover:bg-muted/50 has-data-checked:border-primary/60 has-data-checked:bg-primary/5"
+              >
+                <RadioGroupItem value={label} className="mt-px" />
+                <span className="min-w-0 text-pretty break-words">{label}</span>
               </Label>
             ))}
           </RadioGroup>
@@ -519,14 +576,14 @@ function OutsideQuestionDetail(props: { item: OutsideQuestion; now: Date }) {
           value={text}
           onChange={(event) => setText(event.target.value)}
         />
-        <div className="flex items-center gap-3">
-          <Button type="submit" disabled={sent.waiting || (typed === "" && choice === null)}>
-            Send
-          </Button>
+        <div className="flex items-center justify-end gap-3">
           <p className="inline-flex items-center gap-1 text-xs text-muted-foreground">
             <Kbd>Enter</Kbd>
             sends
           </p>
+          <Button type="submit" disabled={sent.waiting || (typed === "" && choice === null)}>
+            Send
+          </Button>
         </div>
         {problem !== null && (
           <p role="alert" className="text-xs text-destructive">
@@ -542,28 +599,23 @@ const actionLink =
   "inline-flex h-8 items-center rounded-md px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
 
 function AgentDetail(props: { item: Extract<NeedsYouItem, { _tag: "Agent" }>; now: Date }) {
-  const { agent, since } = props.item
+  const { agent } = props.item
   const conversation = useMemo(() => agentConversation(agent.id), [agent.id])
 
   return (
-    <article className="flex max-w-2xl flex-col gap-4">
-      <header className="flex flex-col gap-1">
-        <div className="flex items-baseline gap-2">
-          <Sparkles className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-          <h2 className="text-lg font-semibold">{agent.name}</h2>
-          <Waited since={since} now={props.now} />
-        </div>
+    <article className="flex flex-col gap-6">
+      <DetailHeader item={props.item} title={agent.name} now={props.now}>
         <p className="text-sm text-pretty text-muted-foreground">
           {agent.repository.owner}/{agent.repository.repo} · {reasonText(props.item)}
         </p>
         <Link
           to="/agents/$agentId"
           params={{ agentId: agent.id }}
-          className={cn(actionLink, "w-fit bg-primary text-primary-foreground")}
+          className={cn(actionLink, "mt-2 w-fit bg-primary text-primary-foreground")}
         >
           Open the Agent
         </Link>
-      </header>
+      </DetailHeader>
       <ConversationContext value={conversation}>
         {requestsOf(props.item).map((part) => (
           <RequestCard key={part.requestId} part={part} />
@@ -580,18 +632,13 @@ function GlobalConversationDetail(props: {
   const open = useAtomSet(globalConversationOpenAtom)
 
   return (
-    <article className="flex max-w-2xl flex-col gap-4">
-      <header className="flex flex-col gap-1">
-        <div className="flex items-baseline gap-2">
-          <MessagesSquare className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-          <h2 className="text-lg font-semibold">Global conversation</h2>
-          <Waited since={props.item.since} now={props.now} />
-        </div>
+    <article className="flex flex-col gap-6">
+      <DetailHeader item={props.item} title="Global conversation" now={props.now}>
         <p className="text-sm text-pretty text-muted-foreground">{reasonText(props.item)}</p>
-        <Button className="w-fit" onClick={() => open(true)}>
+        <Button className="mt-2 w-fit" onClick={() => open(true)}>
           Open the Global conversation
         </Button>
-      </header>
+      </DetailHeader>
       <ConversationContext value={globalConversation}>
         {props.item.requests.map((part) => (
           <RequestCard key={part.requestId} part={part} />
@@ -606,26 +653,21 @@ function PullRequestDetail(props: {
   now: Date
   onReadReview: (pullRequest: string) => void
 }) {
-  const { pullRequest, since } = props.item
+  const { pullRequest } = props.item
   const markDone = useAtomSet(markDoneAtom)
   const review = finishedAgentReviewOf(props.item)
   const updated = DateTime.toDateUtc(pullRequest.updatedAt)
 
   return (
-    <article className="flex max-w-2xl flex-col gap-4">
-      <header className="flex flex-col gap-1">
-        <div className="flex items-baseline gap-2">
-          <GitPullRequest className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-          <h2 className="text-lg font-semibold text-pretty">{pullRequest.title}</h2>
-          <Waited since={since} now={props.now} />
-        </div>
+    <article className="flex flex-col gap-6">
+      <DetailHeader item={props.item} title={pullRequest.title} now={props.now}>
         <p className="text-sm text-pretty text-muted-foreground">
           {referenceText(pullRequest.ref)} · {pullRequest.author}
           {pullRequest.isDraft ? " · Draft" : ""} · Updated {ago(updated, props.now)}
         </p>
         <p className="text-sm text-pretty">{reasonText(props.item)}</p>
-      </header>
-      <div className="flex flex-wrap gap-2">
+      </DetailHeader>
+      <div className="flex flex-wrap gap-2 pl-12">
         <Link
           to="/reviews/$owner/$repo/$number"
           params={pullRequest.ref}
