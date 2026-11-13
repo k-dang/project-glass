@@ -43,7 +43,7 @@ import { sdkExecutable } from "../processes"
 import { claudeTools } from "../agentTools"
 import type { AgentAdapter } from "./adapter"
 import { Input, isFailure, machine } from "./claudeTurn"
-import type { DeliveredMessage } from "./deliveredMessage"
+import type { DeliveredMessage, DeliveredTurn } from "./deliveredMessage"
 import {
   type AgentRole,
   couldNotSwitch,
@@ -207,7 +207,7 @@ const toModel = (info: ModelInfo): AgentModel => ({
   efforts: info.supportedEffortLevels ?? [],
 })
 
-const userMessage = ({ prompt, images }: DeliveredMessage): SDKUserMessage => ({
+const userMessage = ({ prompt, images }: DeliveredTurn): SDKUserMessage => ({
   type: "user",
   message: {
     role: "user",
@@ -459,7 +459,7 @@ export const claudeAdapter = (
         if (permissionMode !== null)
           yield* control("Permission mode", () => session.setPermissionMode(permissionMode))
       }),
-      startTurn: Effect.fnUntraced(function* (turnId: string, sent: DeliveredMessage) {
+      startTurn: Effect.fnUntraced(function* (turnId: string, sent: DeliveredTurn) {
         yield* turns.begin(turnId, withContextOf(sent))
 
         return yield* Queue.offer(prompts, { ...userMessage(sent), uuid: randomUUID() }).pipe(

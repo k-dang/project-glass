@@ -1,5 +1,6 @@
 import { RegistryContext, useAtom, useAtomValue } from "@effect/atom-react"
 import { Option } from "effect"
+import { AsyncResult } from "effect/reactivity"
 import { Link, type LinkOptions, Outlet, useBlocker, useNavigate } from "@tanstack/react-router"
 import { cn } from "cn"
 import {
@@ -18,7 +19,7 @@ import { useContext, useId } from "react"
 import { TooltipHint } from "@/components/ui/tooltip"
 import { backendReachableAtom } from "./backend"
 import { ConfirmationDialog } from "./ConfirmationDialog"
-import { globalConversationOpenAtom } from "./globalConversation"
+import { globalConversationOpenAtom, globalUnseenAtom } from "./globalConversation"
 import { GlobalConversationDialog } from "./GlobalConversationDialog"
 import { NeedsYouBadge } from "./NeedsYouCount"
 import { needsYouCount as countOf, watchedNeedsYouAtom } from "./needsYou"
@@ -77,6 +78,8 @@ export function AppShell() {
   const [conversing, setConversing] = useAtom(globalConversationOpenAtom)
   const needsYouBadgeId = useId()
   const needsYouCount = countOf(useAtomValue(watchedNeedsYouAtom))
+  const unseen = Option.getOrNull(AsyncResult.value(useAtomValue(globalUnseenAtom)))
+  const unread = unseen !== null && !conversing
 
   useShortcuts([
     ...areas.map(({ link }, index) => ({
@@ -142,6 +145,11 @@ export function AppShell() {
               onClick={() => setConversing((open) => !open)}
             >
               <MessagesSquare className="size-4" aria-hidden />
+              {unread && (
+                <span className="absolute top-1 right-1 size-2 rounded-full bg-primary">
+                  <span className="sr-only">Unread reply</span>
+                </span>
+              )}
             </button>
           </TooltipHint>
           <ConnectionAvatar />

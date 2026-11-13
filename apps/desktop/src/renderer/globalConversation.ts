@@ -8,7 +8,7 @@ import {
   type PullRequestRef,
   type RequestAnswer,
 } from "@glass/contracts"
-import { Data, Effect, Option, Stream } from "effect"
+import { Data, type DateTime, Effect, Option, Stream } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
 import { agentsAtom, noCommands, noFiles, TRANSCRIPT_IDLE_TTL, transcriptOf } from "./agentsArea"
 import { Backend, backendRuntime, backendRuntimeOf } from "./backend"
@@ -16,6 +16,14 @@ import type { Conversation } from "./conversation"
 import { openWorkspaceAtom, sameRef } from "./reviewsArea"
 
 export const globalConversationOpenAtom = Atom.make(false).pipe(Atom.keepAlive)
+
+export const globalUnseenAtom = backendRuntime
+  .atom(Stream.unwrap(Backend.useSync((backend) => backend.WatchGlobalUnseen())))
+  .pipe(Atom.keepAlive)
+
+export const markGlobalTurnSeenAtom = backendRuntime.fn((endedAt: DateTime.Utc) =>
+  Backend.use((backend) => backend.MarkGlobalTurnSeen({ endedAt })),
+)
 
 export const globalModelAtom = backendRuntime
   .atom(Backend.use((backend) => backend.GetGlobalConversationModel()))

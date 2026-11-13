@@ -10,6 +10,7 @@ import agentReviewHotspots from "./migrations/0002_agent_review_hotspots"
 import agentReviewDone from "./migrations/0003_agent_review_done"
 import outsideAgent from "./migrations/0004_outside_agent"
 import conversationStartedWork from "./migrations/0005_conversation_started_work"
+import turnSeen from "./migrations/0006_turn_seen"
 import { migrationLoader } from "./Migrations"
 
 const encodeEnd = Schema.encodeSync(Schema.fromJsonString(TurnEnd))
@@ -27,6 +28,7 @@ it.live("creates the schema once and reads Activity through its indexes after re
         [4, "outside_agent"],
         [5, "conversation_started_work"],
         [6, "turn_seen"],
+        [7, "work_reports"],
       ],
       [],
     ] as const) {
@@ -134,6 +136,52 @@ it.live("counts the Turns that ended before Turns could be seen as seen", () =>
       assert.deepStrictEqual(yield* sql`SELECT id, turn_seen_at FROM agent ORDER BY id`, [
         { id: "fresh", turn_seen_at: null },
         { id: "worked", turn_seen_at: "2026-11-11T02:00:00.000Z" },
+      ])
+    }).pipe(Effect.provide(SqliteClient.layer({ filename: join(home, "glass.db") })), Effect.scoped)
+  }),
+)
+
+it.live("counts work the Global conversation started before reports as reported", () =>
+  Effect.gen(function* () {
+    const home = yield* isolatedHome
+
+    yield* Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient
+
+      yield* SqliteMigrator.run({
+        loader: SqliteMigrator.fromRecord({
+          "0001_baseline": baseline,
+          "0002_agent_review_hotspots": agentReviewHotspots,
+          "0003_agent_review_done": agentReviewDone,
+          "0004_outside_agent": outsideAgent,
+          "0005_conversation_started_work": conversationStartedWork,
+          "0006_turn_seen": turnSeen,
+        }),
+      })
+
+      yield* sql`INSERT INTO global_conversation (id) VALUES ('global')`
+      yield* sql`INSERT INTO agent_turn (id, agent_id, message, sent_at, ended)
+        VALUES ('asked', 'global', 'Review #7', '2026-11-11T00:00:00.000Z',
+          ${encodeEnd({ at: DateTime.makeUnsafe("2026-11-11T01:00:00.000Z"), ending: TurnDone.make({}) })})`
+      yield* sql`INSERT INTO conversation_agent (conversation_id, agent_id, started_at)
+        VALUES ('global', 'agent', '2026-11-11T00:00:00.000Z')`
+      yield* sql`INSERT INTO conversation_agent_review (conversation_id, owner, repo, number, started_at)
+        VALUES ('global', 'glass-demo', 'greeter', 7, '2026-11-11T00:00:00.000Z')`
+
+      yield* SqliteMigrator.run({ loader: migrationLoader })
+
+      const [agent] = yield* sql<{
+        reported_at: string
+      }>`SELECT reported_at FROM conversation_agent`
+
+      const [review] = yield* sql<{
+        reported_at: string
+      }>`SELECT reported_at FROM conversation_agent_review`
+
+      assert.isTrue(agent!.reported_at > "2026-11-11T01:00:00.000Z")
+      assert.isTrue(review!.reported_at > "2026-11-11T01:00:00.000Z")
+      assert.deepStrictEqual(yield* sql`SELECT turn_seen_at FROM global_conversation`, [
+        { turn_seen_at: "2026-11-11T01:00:00.000Z" },
       ])
     }).pipe(Effect.provide(SqliteClient.layer({ filename: join(home, "glass.db") })), Effect.scoped)
   }),

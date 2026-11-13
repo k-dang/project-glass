@@ -36,6 +36,7 @@ import {
   SendAgentMessage,
   SentMessage,
   TranscriptUpdate,
+  TurnEnd,
 } from "./agent"
 import { ConnectionError, GitHubConnection } from "./connection"
 import {
@@ -531,6 +532,12 @@ export class GlassRpcs extends RpcGroup.make(
   }),
   Rpc.make("GetGlobalUnsentMessage", { success: SentMessage, error: AgentError }),
   Rpc.make("SaveGlobalUnsentMessage", { payload: SentMessage, error: AgentError }),
+  /** The Global conversation's latest Turn while it ended after the user last looked, else null. */
+  Rpc.make("WatchGlobalUnseen", { success: Schema.NullOr(TurnEnd), stream: true }),
+  Rpc.make("MarkGlobalTurnSeen", {
+    payload: { endedAt: Schema.DateTimeUtcFromString },
+    error: AgentError,
+  }),
 ) {}
 
 export type GlassRpcError = Rpc.Error<RpcGroup.Rpcs<typeof GlassRpcs>>

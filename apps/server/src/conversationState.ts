@@ -1,4 +1,4 @@
-import type { FeedbackNote, QueuedMessage, TurnEnding } from "@glass/contracts"
+import type { FeedbackNote, QueuedMessage, TurnEnding, TurnMessage } from "@glass/contracts"
 import { Match, Predicate } from "effect"
 
 export interface ConversationState {
@@ -11,8 +11,10 @@ export type ConversationEvent =
   | { readonly type: "sendQueued" | "cancelQueued"; readonly queuedId: string }
   | { readonly type: "turnEnded"; readonly ending: TurnEnding }
 
+export type StartingTurn = Omit<QueuedMessage, "context"> & Pick<TurnMessage, "context">
+
 export type ConversationWrite =
-  | { readonly type: "startTurn"; readonly message: QueuedMessage }
+  | { readonly type: "startTurn"; readonly message: StartingTurn }
   | { readonly type: "enqueue"; readonly message: QueuedMessage }
   | { readonly type: "prepend"; readonly messages: ReadonlyArray<QueuedMessage> }
   | { readonly type: "dequeue"; readonly queuedId: string }

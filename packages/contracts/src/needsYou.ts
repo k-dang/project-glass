@@ -2,8 +2,12 @@ import { Predicate, Schema } from "effect"
 import { Agent, PermissionRequestPart, QuestionPart, TurnEnd } from "./agent"
 import { PullRequestSummary } from "./pullRequestList"
 
+const WaitingRequestParts = Schema.NonEmptyArray(
+  Schema.Union([PermissionRequestPart, QuestionPart]),
+)
+
 export const WaitingRequests = Schema.TaggedStruct("WaitingRequests", {
-  requests: Schema.NonEmptyArray(Schema.Union([PermissionRequestPart, QuestionPart])),
+  requests: WaitingRequestParts,
 })
 
 export const TurnFinished = Schema.TaggedStruct("TurnFinished", { ended: TurnEnd })
@@ -62,6 +66,14 @@ export const OutsideQuestion = Schema.TaggedStruct("OutsideQuestion", {
 
 export type OutsideQuestion = typeof OutsideQuestion.Type
 
+/** The Global conversation waiting on the user's answer, which they give in the conversation. */
+export const GlobalConversationNeedsYou = Schema.TaggedStruct("GlobalConversation", {
+  requests: WaitingRequestParts,
+  since: Schema.DateTimeUtcFromString,
+})
+
+export type GlobalConversationNeedsYou = typeof GlobalConversationNeedsYou.Type
+
 export const OutsideChoice = Schema.TaggedStruct("Choice", {
   choice: Schema.String,
 })
@@ -92,7 +104,12 @@ export const AskUserResult = Schema.Union([AskUserAnswered, AskUserTimedOut, Ask
 
 export type AskUserResult = typeof AskUserResult.Type
 
-export const NeedsYouItem = Schema.Union([AgentNeedsYou, PullRequestNeedsYou, OutsideQuestion])
+export const NeedsYouItem = Schema.Union([
+  AgentNeedsYou,
+  PullRequestNeedsYou,
+  OutsideQuestion,
+  GlobalConversationNeedsYou,
+])
 
 export type NeedsYouItem = typeof NeedsYouItem.Type
 
@@ -100,6 +117,7 @@ export const NeedsYou = Schema.Array(NeedsYouItem)
 
 export const stopsOnYou = (item: NeedsYouItem) =>
   Predicate.isTagged(item, "OutsideQuestion") ||
+  Predicate.isTagged(item, "GlobalConversation") ||
   (Predicate.isTagged(item, "Agent") && item.reasons.some(Predicate.isTagged("WaitingRequests")))
 
 export type NeedsYou = typeof NeedsYou.Type

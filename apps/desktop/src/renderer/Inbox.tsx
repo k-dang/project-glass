@@ -15,9 +15,9 @@ import {
 } from "@glass/contracts"
 import { Link, useNavigate } from "@tanstack/react-router"
 import { cn } from "cn"
-import { DateTime, Match, Option, Predicate } from "effect"
+import { Array as Arr, DateTime, Match, Option, Predicate } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
-import { CircleHelp, GitPullRequest, Sparkles } from "lucide-react"
+import { CircleHelp, GitPullRequest, MessagesSquare, Sparkles } from "lucide-react"
 import { useEffect, useId, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -27,6 +27,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Backend, backendRuntime } from "./backend"
 import { AgentRequest, answerRequestAtom } from "./agentsArea"
 import { agentConversation, ConversationContext } from "./conversation"
+import { globalConversation, globalConversationOpenAtom } from "./globalConversation"
 import {
   finishedAgentReviewOf,
   markDoneAtom,
@@ -61,6 +62,8 @@ const requestLabel = (part: RequestPart) =>
     Question: () => "Question",
   })
 
+const labelsText = (labels: ReadonlyArray<string>) => Arr.dedupe(labels).join(" · ")
+
 const turnEndingLabel = (ending: TurnEnding) =>
   Match.valueTags(ending, {
     Done: () => "Finished",
@@ -83,17 +86,17 @@ const pullRequestReasonLabel = (reason: PullRequestReason) =>
 const reasonText = (item: NeedsYouItem) =>
   Match.valueTags(item, {
     Agent: ({ reasons }) =>
-      reasons
-        .flatMap((reason) =>
+      labelsText(
+        reasons.flatMap((reason) =>
           Match.valueTags(reason, {
             WaitingRequests: ({ requests }) => requests.map(requestLabel),
             TurnFinished: ({ ended }) => [turnEndingLabel(ended.ending)],
           }),
-        )
-        .filter((label, index, labels) => labels.indexOf(label) === index)
-        .join(" · "),
+        ),
+      ),
     OutsideQuestion: ({ askedBy }) => `Asked by ${askedBy}`,
     PullRequest: ({ reasons }) => reasons.map(pullRequestReasonLabel).join(" · "),
+    GlobalConversation: ({ requests }) => labelsText(requests.map(requestLabel)),
   })
 
 const requestsOf = (item: NeedsYouItem): ReadonlyArray<RequestPart> =>
@@ -107,6 +110,7 @@ const requestsOf = (item: NeedsYouItem): ReadonlyArray<RequestPart> =>
       ),
     OutsideQuestion: () => [],
     PullRequest: () => [],
+    GlobalConversation: ({ requests }) => requests,
   })
 
 const firstPermission = (item: NeedsYouItem) =>
@@ -120,6 +124,7 @@ const firstPermission = (item: NeedsYouItem) =>
     },
     OutsideQuestion: () => null,
     PullRequest: () => null,
+    GlobalConversation: () => null,
   })
 
 const nextRemaining = (
@@ -151,6 +156,7 @@ const titleOf = (item: NeedsYouItem) =>
     Agent: ({ agent }) => agent.name,
     OutsideQuestion: ({ question }) => question,
     PullRequest: ({ pullRequest }) => pullRequest.title,
+    GlobalConversation: () => "Global conversation",
   })
 
 const minute = 60_000
@@ -300,6 +306,7 @@ export function Inbox() {
   const navigate = useNavigate()
   const markReview = useAtomSet(readAgentReviewOnOpenAtom)
   const markDone = useAtomSet(markDoneAtom)
+  const openGlobal = useAtomSet(globalConversationOpenAtom)
 
   const items = AsyncResult.isSuccess(status) ? status.value : []
 
@@ -342,6 +349,7 @@ export function Inbox() {
       OutsideQuestion: () => undefined,
       PullRequest: ({ pullRequest }) =>
         void navigate({ to: "/reviews/$owner/$repo/$number", params: pullRequest.ref }),
+      GlobalConversation: () => openGlobal(true),
     })
   }
 
@@ -418,6 +426,7 @@ const lineOf = (item: NeedsYouItem) =>
     Agent: (agent) =>
       `${agent.agent.repository.owner}/${agent.agent.repository.repo} · ${reasonText(agent)}`,
     OutsideQuestion: (question) => reasonText(question),
+    GlobalConversation: (asked) => reasonText(asked),
     PullRequest: (pullRequest) =>
       [
         referenceText(pullRequest.pullRequest.ref),
@@ -439,6 +448,7 @@ function InboxDetail(props: {
     PullRequest: (item) => (
       <PullRequestDetail item={item} now={props.now} onReadReview={props.onReadReview} />
     ),
+    GlobalConversation: (item) => <GlobalConversationDetail item={item} now={props.now} />,
   })
 }
 
@@ -556,6 +566,34 @@ function AgentDetail(props: { item: Extract<NeedsYouItem, { _tag: "Agent" }>; no
       </header>
       <ConversationContext value={conversation}>
         {requestsOf(props.item).map((part) => (
+          <RequestCard key={part.requestId} part={part} />
+        ))}
+      </ConversationContext>
+    </article>
+  )
+}
+
+function GlobalConversationDetail(props: {
+  item: Extract<NeedsYouItem, { _tag: "GlobalConversation" }>
+  now: Date
+}) {
+  const open = useAtomSet(globalConversationOpenAtom)
+
+  return (
+    <article className="flex max-w-2xl flex-col gap-4">
+      <header className="flex flex-col gap-1">
+        <div className="flex items-baseline gap-2">
+          <MessagesSquare className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          <h2 className="text-lg font-semibold">Global conversation</h2>
+          <Waited since={props.item.since} now={props.now} />
+        </div>
+        <p className="text-sm text-pretty text-muted-foreground">{reasonText(props.item)}</p>
+        <Button className="w-fit" onClick={() => open(true)}>
+          Open the Global conversation
+        </Button>
+      </header>
+      <ConversationContext value={globalConversation}>
+        {props.item.requests.map((part) => (
           <RequestCard key={part.requestId} part={part} />
         ))}
       </ConversationContext>

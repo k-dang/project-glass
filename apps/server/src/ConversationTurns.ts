@@ -1,5 +1,5 @@
 import {
-  type AcceptedMessage,
+  type Turn,
   AgentBusy,
   AgentError,
   type FeedbackNote,
@@ -12,6 +12,9 @@ import {
   type RequestNotWaiting,
   RequestWaiting,
   type SentMessage,
+  type TurnContext,
+  type TurnMessage,
+  withContextOf,
   TurnCutOff,
   TurnEnded,
   TurnFailed,
@@ -31,7 +34,7 @@ import {
   Stream,
 } from "effect"
 import { SqlClient } from "effect/sql"
-import type { DeliveredMessage } from "./agentHost/deliveredMessage"
+import type { DeliveredTurn } from "./agentHost/deliveredMessage"
 import type { TurnSettings } from "./agentHost/protocol"
 import { type HostCallError, type HostClient, hostFailure } from "./Placement"
 import { prompt } from "./prompt"
@@ -60,9 +63,11 @@ export interface Served {
 
 export type Delivery = "dispatched" | "superseded" | "failed"
 
+type StartedMessage = Pick<Turn, "message" | "images" | "context" | "feedback">
+
 interface Prepared {
   readonly client: HostClient
-  readonly message: DeliveredMessage
+  readonly message: DeliveredTurn
 }
 
 const decodeUnsent = Schema.decodeUnknownEffect(Schema.Array(StoredMessage))
@@ -87,6 +92,12 @@ export class ConversationTurns extends Context.Service<
       conversation: Conversation,
       message: MessageWithContext,
     ) => Effect.Effect<void, RequestWaiting | AgentError>
+    readonly whenIdle: <E>(
+      conversationId: string,
+      effect: (
+        start: (message: TurnMessage) => Effect.Effect<void, AgentError>,
+      ) => Effect.Effect<void, E>,
+    ) => Effect.Effect<void, E | AgentError>
     readonly sendQueued: (
       conversationId: string,
       queuedId: string,
@@ -114,8 +125,8 @@ export class ConversationTurns extends Context.Service<
       const turnLock = yield* Semaphore.make(1)
       const scope = yield* Scope.Scope
 
-      const delivered = Effect.fnUntraced(function* (
-        sent: MessageWithContext,
+      const delivered = Effect.fnUntraced(function* <Context extends TurnContext>(
+        sent: SentMessage & { readonly context: Context | null },
         feedback: ReadonlyArray<FeedbackNote> = [],
       ) {
         const ids = mentionedToDoIds(sent.message)
@@ -133,14 +144,12 @@ export class ConversationTurns extends Context.Service<
         const mentioned = ids.flatMap((id) => listed.find((toDo) => toDo.id === id) ?? [])
 
         return {
-          message: sent.message,
-          images: sent.images,
-          context: sent.context,
+          ...withContextOf(sent),
           prompt: prompt(sent.message, mentioned, sent.context, feedback),
-        } satisfies DeliveredMessage
+        }
       })
 
-      const prepare = (conversation: Conversation, sent: AcceptedMessage) =>
+      const prepare = (conversation: Conversation, sent: StartedMessage) =>
         Effect.gen(function* () {
           const client = yield* conversation.host
 
@@ -180,7 +189,7 @@ export class ConversationTurns extends Context.Service<
           Effect.as("failed" as const satisfies Delivery),
         )
 
-      const deliver = (conversation: Conversation, turnId: string, sent: AcceptedMessage) =>
+      const deliver = (conversation: Conversation, turnId: string, sent: StartedMessage) =>
         prepare(conversation, sent).pipe(
           Effect.flatMap((prepared) => dispatch(conversation, turnId, prepared)),
           Effect.catch((error) => failTurn(conversation.id, turnId, hostFailure(error))),
@@ -349,6 +358,14 @@ export class ConversationTurns extends Context.Service<
 
           if (!(yield* trySteer(conversation, sent))) yield* startOrQueue(conversation.id, sent)
         }),
+        whenIdle: (conversationId, effect) =>
+          turnLock.withPermits(1)(
+            Effect.gen(function* () {
+              if (!(yield* transcripts.idle(conversationId))) return
+
+              yield* effect((message) => transcripts.startIfNotRunning(conversationId, message))
+            }),
+          ),
         sendQueued: (conversationId, queuedId) =>
           turnLock.withPermits(1)(transcripts.startQueued(conversationId, queuedId)),
         stop,

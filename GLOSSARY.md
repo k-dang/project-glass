@@ -13,10 +13,11 @@ device for them to continue. Each area keeps its own: the last PR in Reviews, th
 Agents. Visiting Settings or Activity leaves every Saved place unchanged.
 
 **Needs you**:
-The Agents, questions from an agent outside Glass, and PRs waiting on the user now. They live
-in the Inbox, grouped by why they are waiting, with their count on the Inbox rail link in every area.
-A queued PR waits once its Agent review is finished, until the user marks that Agent review done;
-writing it again puts the PR back.
+The Agents, questions from an agent outside Glass or the Global conversation, and PRs waiting on
+the user now. They live in the Inbox, grouped by why they are waiting, with their count on the Inbox
+rail link in every area.
+A queued PR waits once its Agent review is finished, until the user marks that Agent review done or
+the Global conversation reports it; writing it again puts the PR back.
 An Agent waits once its latest Turn ends while the user isn't looking, unless they stopped it,
 until they look at its Chat with Glass focused; an Agent review's own Agent waits only through its
 PR.
@@ -223,8 +224,18 @@ run by pi. It works in no repository and needs no Local checkout; it reads no fi
 runs no commands, but reads the user's work in Glass through Glass's tools, starts Agent reviews,
 creates Agents and messages them, and asks the user Questions. Glass keeps a record of the Agents and
 Agent reviews it started or messaged, so it can say how they stand. A message keeps the PR workspace
-and Revision, or the Agent, in view when it was sent.
+and Revision, or the Agent, in view when it was sent. Its rail button carries a marker while a Turn
+ended that the user hasn't seen with the conversation open.
 _Avoid_: Assistant, chat, copilot, global Agent
+
+**Report**:
+A Turn Glass starts in the Global conversation, without a message from the user, once work it
+started finishes, fails, or waits on a Permission request or Question. Work that reaches its outcome
+while the conversation is busy waits, and goes out together in one Report once nothing runs or is
+Queued. An Agent the user stopped isn't reported. The conversation says what happened in terms of
+what the user asked, offers a next step, and acts on nothing until the user says so. A reported Agent
+Turn or finished Agent review leaves Needs you, without the review being marked done.
+_Avoid_: Notification, event, wake-up
 
 **Agent program**:
 Claude Code or pi, the program an Agent runs. It decides which models and efforts the user can pick,

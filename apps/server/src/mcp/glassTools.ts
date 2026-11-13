@@ -35,7 +35,17 @@ import {
   AgentPlace,
   localPlace,
 } from "@glass/contracts"
-import { Context, Duration, Effect, Match, Option, Predicate, Schema, Stream } from "effect"
+import {
+  Context,
+  DateTime,
+  Duration,
+  Effect,
+  Match,
+  Option,
+  Predicate,
+  Schema,
+  Stream,
+} from "effect"
 import { Tool, Toolkit } from "effect/ai"
 import { ActivityLog } from "../ActivityLog"
 import { AgentReviews } from "../AgentReviews"
@@ -408,13 +418,20 @@ const withinBudget = (files: ReadonlyArray<FileMaterial>) => {
 const first = <A, E, R>(stream: Stream.Stream<A, E, R>) =>
   stream.pipe(Stream.runHead, Effect.map(Option.getOrThrow))
 
-const fromConversation = <E>(record: (conversationId: string) => Effect.Effect<void, E>) =>
-  McpCaller.current.pipe(
-    Effect.flatMap((caller) =>
-      Predicate.isTagged(caller, "Conversation") ? record(caller.conversationId) : Effect.void,
-    ),
-    Effect.ignore,
-  )
+const recordedFor = <A, E, R, E2>(
+  work: Effect.Effect<A, E, R>,
+  record: (conversationId: string, since: DateTime.Utc, done: A) => Effect.Effect<void, E2>,
+) =>
+  Effect.gen(function* () {
+    const since = yield* DateTime.now
+    const done = yield* work
+    const caller = yield* McpCaller.current
+
+    if (Predicate.isTagged(caller, "Conversation"))
+      yield* record(caller.conversationId, since, done).pipe(Effect.ignore)
+
+    return done
+  }).pipe(Effect.uninterruptible)
 
 /** Talks to the MCP server already handling this call, so progress stays on that response. */
 const waitingProgress = Effect.gen(function* () {
@@ -537,14 +554,9 @@ export const GlassToolHandlers = GlassTools.toLayer(
       read_agent_review: ({ pullRequest }) =>
         first(agentReviews.watch(pullRequest)).pipe(Effect.mapError(explained)),
       start_agent_review: ({ pullRequest, revision }) =>
-        agentReviews.start(pullRequest, revision).pipe(
-          Effect.tap(() =>
-            fromConversation((id) => startedWork.startedAgentReview(id, pullRequest)),
-          ),
-          Effect.uninterruptible,
-          Effect.andThen(first(agentReviews.watch(pullRequest))),
-          Effect.mapError(explained),
-        ),
+        recordedFor(agentReviews.start(pullRequest, revision), (id, since) =>
+          startedWork.startedAgentReview(id, pullRequest, since),
+        ).pipe(Effect.andThen(first(agentReviews.watch(pullRequest))), Effect.mapError(explained)),
       list_agent_places: () =>
         Effect.gen(function* () {
           return {
@@ -566,27 +578,23 @@ export const GlassToolHandlers = GlassTools.toLayer(
         Effect.gen(function* () {
           yield* refuseUnofferedModel(input)
 
-          const agent = yield* agents
-            .create({
+          const agent = yield* recordedFor(
+            agents.create({
               ...input,
               permissionMode: null,
               skillPacks: [],
               localSkills: false,
               images: [],
-            })
-            .pipe(
-              Effect.tap(({ id }) =>
-                fromConversation((conversationId) => startedWork.linkAgent(conversationId, id)),
-              ),
-              Effect.uninterruptible,
-            )
+            }),
+            (conversationId, since, { id }) => startedWork.linkAgent(conversationId, id, since),
+          )
 
           return { agent }
         }).pipe(Effect.mapError(explained)),
       send_agent_message: ({ agentId, message }) =>
-        agents.send(agentId, { message, images: [] }).pipe(
-          Effect.tap(() => fromConversation((id) => startedWork.linkAgent(id, agentId))),
-          Effect.uninterruptible,
+        recordedFor(agents.send(agentId, { message, images: [] }), (id, since) =>
+          startedWork.linkAgent(id, agentId, since),
+        ).pipe(
           Effect.map((delivery) => ({ delivery })),
           Effect.mapError(explained),
         ),

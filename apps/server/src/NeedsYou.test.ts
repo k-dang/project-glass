@@ -565,3 +565,62 @@ it.effect("refreshes the user's PRs once two minutes pass without a sync", () =>
     yield* needsYou(client, (items) => reasonsOf(items, pr) === undefined)
   }),
 )
+
+it.live(
+  "lists the Global conversation while its own Question waits, until the user answers it",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* agentsFixture
+      yield* f.client.SendGlobalMessage({
+        message: "Please ask a question",
+        images: [],
+        context: null,
+      })
+
+      const listed = yield* needsYou(f.client, (items) =>
+        items.some(Predicate.isTagged("GlobalConversation")),
+      )
+
+      const asked = listed.flatMap((item) =>
+        Predicate.isTagged(item, "GlobalConversation") ? [item] : [],
+      )[0]
+
+      assert.strictEqual(listed[0], asked)
+      const [question] = asked?.requests ?? []
+      assert.strictEqual(question?._tag, "Question")
+
+      yield* f.client.AnswerGlobalRequest({
+        requestId: question?.requestId ?? "",
+        answer: AnswerQuestion.make({ answers: [{ chosen: [], text: "Only source files" }] }),
+      })
+
+      yield* needsYou(f.client, (items) => !items.some(Predicate.isTagged("GlobalConversation")))
+    }),
+)
+
+it.live(
+  "drops a queued PR once the Global conversation reports the Agent review it started, leaving it not done",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* reviewsFixture({ reply: "hold" })
+      const pr = f.seed("Greet")
+      yield* f.client.AddToQueue({ references: [ref(pr)] })
+
+      const start = { pullRequest: ref(pr), revision: revisionOf(pr) }
+      yield* f.client.SendGlobalMessage({
+        message: `call:start_agent_review ${JSON.stringify(start)}`,
+        images: [],
+        context: null,
+      })
+      yield* f.reviewState(pr, status("reviewing"))
+      yield* f.runners.release({ answer })
+
+      const { review } = yield* f.reviewState(
+        pr,
+        (state) => reviewed(state) && state.review?.reported === true,
+      )
+
+      assert.isFalse(review?.done)
+      yield* needsYou(f.client, (items) => titles(items).length === 0)
+    }),
+)

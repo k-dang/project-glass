@@ -33,6 +33,7 @@ export const needsYouKey = (item: NeedsYouItem): string =>
     Agent: ({ agent }) => `agent:${agent.id}`,
     OutsideQuestion: ({ id }) => `ask:${id}`,
     PullRequest: ({ pullRequest }) => `pr:${referenceKey(pullRequest.ref)}`,
+    GlobalConversation: () => "global",
   })
 
 export const finishedAgentReviewOf = (item: PullRequestNeedsYou) =>

@@ -2,14 +2,12 @@ import {
   Agent,
   AgentError,
   type AgentEvent,
-  CapturedContext,
   endTurnEvents,
   FeedbackNote,
   isRequestPart,
   isWaiting,
   Image,
   type MessageDelivery,
-  type MessageWithContext,
   PartAppended,
   AgentBusy,
   QueuedMessagesChanged,
@@ -26,6 +24,10 @@ import {
   TurnEnd,
   type TurnEnded,
   type TurnEnding,
+  TurnContext,
+  CapturedContext,
+  type MessageWithContext,
+  type TurnMessage,
   TurnPart,
   TurnStarted,
 } from "@glass/contracts"
@@ -47,7 +49,7 @@ import {
   Stream,
   SubscriptionRef,
 } from "effect"
-import { SqlClient, type SqlError } from "effect/sql"
+import { SqlClient, type SqlError, type Statement } from "effect/sql"
 import { randomUUID } from "node:crypto"
 import {
   type ConversationEvent,
@@ -65,7 +67,7 @@ export const ImagesJson = Schema.fromJsonString(Schema.Array(Image))
 
 export const encodeImages = Schema.encodeSync(ImagesJson)
 
-const ContextJson = Schema.NullOr(Schema.fromJsonString(CapturedContext))
+const ContextJson = Schema.NullOr(Schema.fromJsonString(TurnContext))
 
 const encodeContext = Schema.encodeSync(ContextJson)
 
@@ -102,10 +104,16 @@ const decodeRunning = Schema.decodeUnknownEffect(
 )
 
 const decodeWaiting = Schema.decodeUnknownEffect(
-  Schema.Array(Schema.Struct({ agentId: Schema.String, part: Schema.fromJsonString(TurnPart) })),
+  Schema.Array(
+    Schema.Struct({
+      agentId: Schema.String,
+      sentAt: Turn.fields.sentAt,
+      part: Schema.fromJsonString(TurnPart),
+    }),
+  ),
 )
 
-const decodeUnseen = Schema.decodeUnknownEffect(
+const decodeEnds = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ agentId: Schema.String, ended: Schema.fromJsonString(TurnEnd) })),
 )
 
@@ -116,7 +124,7 @@ const decodeQueued = Schema.decodeUnknownEffect(
     Schema.Struct({
       ...QueuedMessage.fields,
       ...StoredMessage.fields,
-      context: ContextJson,
+      context: Schema.NullOr(Schema.fromJsonString(CapturedContext)),
       feedback: FeedbackJson,
     }),
   ),
@@ -226,6 +234,11 @@ export class Transcripts extends Context.Service<
       agentIds: ReadonlyArray<string>,
     ) => Effect.Effect<void, AgentError>
     readonly runningTurn: (agentId: string) => Effect.Effect<string | null, AgentError>
+    readonly idle: (agentId: string) => Effect.Effect<boolean, AgentError>
+    readonly startIfNotRunning: (
+      agentId: string,
+      input: TurnMessage,
+    ) => Effect.Effect<void, AgentError>
     readonly runningMessage: (agentId: string) => Effect.Effect<string | null, AgentError>
     readonly startOrQueue: (
       agentId: string,
@@ -246,7 +259,12 @@ export class Transcripts extends Context.Service<
       queuedId: string,
     ) => Effect.Effect<void, AgentBusy | AgentError>
     readonly subscribeStarted: Effect.Effect<Stream.Stream<StartedTurn>, never, Scope.Scope>
+    readonly subscribeEnded: Effect.Effect<Stream.Stream<string>, never, Scope.Scope>
+    readonly lastEnds: (
+      agentIds: ReadonlyArray<string>,
+    ) => Effect.Effect<ReadonlyMap<string, TurnEnd>, AgentError>
     readonly waiting: Stream.Stream<WaitingByAgent>
+    readonly waitingNow: Effect.Effect<WaitingByAgent>
     readonly isWaiting: (agentId: string) => Effect.Effect<boolean>
     readonly unseen: Stream.Stream<UnseenByAgent>
     readonly markSeen: (agentId: string, endedAt: DateTime.Utc) => Effect.Effect<void, AgentError>
@@ -264,7 +282,7 @@ export class Transcripts extends Context.Service<
 
       const waitingParts = (agentId?: string) =>
         sql`
-          SELECT t.agent_id AS agentId, p.part AS part
+          SELECT t.agent_id AS agentId, t.sent_at AS sentAt, p.part AS part
           FROM agent_turn_part p JOIN agent_turn t ON t.id = p.turn_id
           WHERE ${sql.and([
             ...(agentId === undefined ? [] : [sql`t.agent_id = ${agentId}`]),
@@ -275,13 +293,11 @@ export class Transcripts extends Context.Service<
         `.pipe(
           Effect.flatMap(decodeWaiting),
           Effect.map((rows) =>
-            rows.flatMap(({ agentId: owner, part }) =>
-              isWaiting(part) ? [{ agentId: owner, part }] : [],
+            rows.flatMap(({ agentId: owner, sentAt, part }) =>
+              isWaiting(part) ? [{ agentId: owner, sentAt, part }] : [],
             ),
           ),
         )
-
-      const launchedAt = yield* DateTime.now
 
       const seeded = yield* waitingParts().pipe(
         Effect.catch((cause) =>
@@ -293,7 +309,7 @@ export class Transcripts extends Context.Service<
         new Map(
           Object.entries(Arr.groupBy(seeded, ({ agentId }) => agentId)).map(
             ([agentId, rows]) =>
-              [agentId, Arr.map(rows, ({ part }) => ({ part, since: launchedAt }))] as const,
+              [agentId, Arr.map(rows, ({ part, sentAt }) => ({ part, since: sentAt }))] as const,
           ),
         ),
       )
@@ -322,17 +338,22 @@ export class Transcripts extends Context.Service<
         })
       })
 
-      const unseenEnds = (agentId?: string) =>
+      const lastEnds = (conditions: ReadonlyArray<string | Statement.Fragment>) =>
         sql`
           SELECT a.id AS agentId, t.ended AS ended
-          FROM agent a
+          FROM (
+            SELECT id, turn_seen_at FROM agent
+            UNION ALL SELECT id, turn_seen_at FROM global_conversation
+          ) a
           JOIN agent_turn t ON t.rowid = (SELECT MAX(rowid) FROM agent_turn WHERE agent_id = a.id)
-          WHERE ${sql.and([
-            ...(agentId === undefined ? [] : [sql`a.id = ${agentId}`]),
-            "t.ended IS NOT NULL",
-            "(a.turn_seen_at IS NULL OR json_extract(t.ended, '$.at') > a.turn_seen_at)",
-          ])}
-        `.pipe(Effect.flatMap(decodeUnseen))
+          WHERE ${sql.and(["t.ended IS NOT NULL", ...conditions])}
+        `.pipe(Effect.flatMap(decodeEnds))
+
+      const unseenEnds = (agentId?: string) =>
+        lastEnds([
+          ...(agentId === undefined ? [] : [sql`a.id = ${agentId}`]),
+          "(a.turn_seen_at IS NULL OR json_extract(t.ended, '$.at') > a.turn_seen_at)",
+        ])
 
       const unseen = yield* SubscriptionRef.make<UnseenByAgent>(
         new Map(
@@ -705,12 +726,36 @@ export class Transcripts extends Context.Service<
             lockFor(agentId).withPermits(1)(snapshot(agentId)),
           ),
         runningTurn: (agentId) => withStorageFailure("read a running Turn", runningTurn(agentId)),
+        idle: (agentId) =>
+          withStorageFailure(
+            "read whether a conversation is idle",
+            conversation(agentId).pipe(
+              Effect.map((state) => state.running === null && state.queued.length === 0),
+            ),
+          ),
         runningMessage: (agentId) =>
           withStorageFailure(
             "read a running Turn",
             sql`SELECT message FROM agent_turn WHERE agent_id = ${agentId} AND ended IS NULL`.pipe(
               Effect.flatMap(decodeMessages),
               Effect.map(([turn]) => turn?.message ?? null),
+            ),
+          ),
+        startIfNotRunning: (agentId, sent) =>
+          withStorageFailure(
+            "start a Turn",
+            changeWith(
+              agentId,
+              Effect.gen(function* () {
+                if ((yield* runningTurn(agentId)) !== null) return [undefined, []] as const
+
+                const message = { ...sent, feedback: [], id: randomUUID() }
+
+                return [
+                  undefined,
+                  yield* execute(agentId, [{ type: "startTurn", message }]),
+                ] as const
+              }),
             ),
           ),
         startOrQueue: (agentId, sent, feedback = Effect.succeed([])) =>
@@ -787,7 +832,25 @@ export class Transcripts extends Context.Service<
             ),
           ),
         ),
+        subscribeEnded: PubSub.subscribe(published).pipe(
+          Effect.map((live) =>
+            Stream.fromSubscription(live).pipe(
+              Stream.filter(({ update }) => Predicate.isTagged(update, "TurnEnded")),
+              Stream.map(({ agentId }) => agentId),
+            ),
+          ),
+        ),
+        lastEnds: (agentIds) =>
+          withStorageFailure(
+            "read how Turns ended",
+            agentIds.length === 0
+              ? Effect.succeed(new Map())
+              : lastEnds([sql.in("a.id", agentIds)]).pipe(
+                  Effect.map((rows) => new Map(rows.map(({ agentId, ended }) => [agentId, ended]))),
+                ),
+          ),
         waiting: SubscriptionRef.changes(waiting),
+        waitingNow: SubscriptionRef.get(waiting),
         isWaiting: (agentId) =>
           SubscriptionRef.get(waiting).pipe(Effect.map((current) => current.has(agentId))),
         unseen: SubscriptionRef.changes(unseen),
@@ -797,10 +860,19 @@ export class Transcripts extends Context.Service<
           return withStorageFailure(
             "mark a Turn seen",
             lockFor(agentId).withPermits(1)(
-              sql`
-                UPDATE agent SET turn_seen_at = ${at}
-                WHERE id = ${agentId} AND (turn_seen_at IS NULL OR turn_seen_at < ${at})
-              `.pipe(Effect.andThen(refreshUnseen(agentId))),
+              Effect.all(
+                [
+                  sql`
+                    UPDATE agent SET turn_seen_at = ${at}
+                    WHERE id = ${agentId} AND (turn_seen_at IS NULL OR turn_seen_at < ${at})
+                  `,
+                  sql`
+                    UPDATE global_conversation SET turn_seen_at = ${at}
+                    WHERE id = ${agentId} AND (turn_seen_at IS NULL OR turn_seen_at < ${at})
+                  `,
+                ],
+                { discard: true },
+              ).pipe(Effect.andThen(refreshUnseen(agentId))),
             ),
           )
         },

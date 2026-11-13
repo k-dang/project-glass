@@ -10,6 +10,7 @@ import {
   emptyTranscript,
   asksPermission,
   type CapturedContext,
+  type ReportedWork,
   type FeedbackNote,
   type Image,
   isNothingUnsent,
@@ -371,6 +372,36 @@ export const contextLabel = (context: CapturedContext) =>
 const sentFrom = (context: CapturedContext | null) =>
   context === null ? undefined : `From ${contextLabel(context)}`
 
+const outcomeText: Record<ReportedWork["outcome"], string> = {
+  finished: "finished",
+  failed: "failed",
+  waiting: "is waiting on you",
+}
+
+const reportedText = (work: ReportedWork) => {
+  const subject = Match.valueTags(work, {
+    Agent: ({ name }) => name,
+    AgentReview: ({ pullRequest }) => `Agent review on ${referenceText(pullRequest)}`,
+  })
+
+  return `${subject} ${outcomeText[work.outcome]}`
+}
+
+function ReportMessage(props: { work: ReadonlyArray<ReportedWork> }) {
+  return (
+    <Message align="end">
+      <MessageContent>
+        <span className="self-end text-xs text-muted-foreground">Report from Glass</span>
+        <ul className="flex flex-col gap-1 self-end text-sm text-muted-foreground">
+          {props.work.map((work, index) => (
+            <li key={index}>{reportedText(work)}</li>
+          ))}
+        </ul>
+      </MessageContent>
+    </Message>
+  )
+}
+
 export function UserMessage(props: {
   message: string
   images: ReadonlyArray<Image>
@@ -411,12 +442,16 @@ const TurnView = memo(function TurnView(props: {
   return (
     <MessageScrollerItem messageId={turn.id} scrollAnchor exactHeight={props.latest}>
       <MessageGroup className="gap-4">
-        <UserMessage
-          message={turn.message}
-          images={turn.images}
-          feedback={turn.feedback}
-          label={sentFrom(turn.context)}
-        />
+        {Predicate.isTagged(turn.context, "Report") ? (
+          <ReportMessage work={turn.context.work} />
+        ) : (
+          <UserMessage
+            message={turn.message}
+            images={turn.images}
+            feedback={turn.feedback}
+            label={sentFrom(turn.context)}
+          />
+        )}
         <Message>
           <MessageContent>
             {nestParts(turn.parts).map(({ part, index, nested }) => (
