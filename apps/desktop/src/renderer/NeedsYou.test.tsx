@@ -7,6 +7,7 @@ import {
   AllowRequest,
   AwaitingReply,
   ChangesRequested,
+  Check,
   ChecksFailing,
   Discussions,
   GitHubConnection,
@@ -96,7 +97,12 @@ const summary = (
 const finished = (pullRequest: PullRequestSummary, writtenAt: DateTime.Utc) =>
   PullRequestNeedsYou.make({
     pullRequest,
-    reasons: [AgentReviewFinished.make({ writtenAt })],
+    reasons: [
+      AgentReviewFinished.make({
+        writtenAt,
+        lead: "**The retry loses the upload's checksum.** It retries the whole upload on a 503.",
+      }),
+    ],
     since: writtenAt,
   })
 
@@ -234,16 +240,16 @@ it("groups Agents and finished reviews, and labels a draft", async () => {
   mount(needsYouRef([waitingAgent, finishedReview, finishedDraft]))
 
   const stopped = await screen.findByRole("region", { name: "Stopped on you" })
-  const waiting = screen.getByRole("region", { name: "Waiting on you" })
+  const reviews = screen.getByRole("region", { name: "Agent reviews to read" })
 
   expect(within(stopped).getByRole("button", { name: /agent\/swift-otter/ })).toBeTruthy()
-  expect(within(waiting).getByRole("button", { name: /Retry flaky upload/ })).toBeTruthy()
-  expect(within(waiting).getByText(/Draft/)).toBeTruthy()
-  expect(within(waiting).getByRole("button", { name: /Sketch the empty state/ })).toBeTruthy()
+  expect(within(reviews).getByRole("button", { name: /Retry flaky upload/ })).toBeTruthy()
+  expect(within(reviews).getByText(/Draft/)).toBeTruthy()
+  expect(within(reviews).getByRole("button", { name: /Sketch the empty state/ })).toBeTruthy()
   expect(screen.getByRole("heading", { name: agent.name })).toBeTruthy()
 })
 
-it("puts an Agent whose Turn finished unseen under Waiting on you, saying how it ended", async () => {
+it("puts an Agent whose Turn finished unseen under Agents that finished, saying how it ended", async () => {
   const user = mount(
     needsYouRef([
       AgentNeedsYou.make({
@@ -261,9 +267,11 @@ it("puts an Agent whose Turn finished unseen under Waiting on you, saying how it
     ]),
   )
 
-  const waiting = await screen.findByRole("region", { name: "Waiting on you" })
-  await user.click(within(waiting).getByRole("button", { name: /agent\/swift-otter/ }))
-  expect(within(waiting).getByText("glass-demo/greeter · Failed")).toBeTruthy()
+  const finishedAgents = await screen.findByRole("region", { name: "Agents that finished" })
+  const row = within(finishedAgents).getByRole("button", { name: /agent\/swift-otter/ })
+  await user.click(row)
+  expect(within(row).getByText("glass-demo/greeter")).toBeTruthy()
+  expect(within(row).getByText("Failed")).toBeTruthy()
   expect(screen.queryByRole("region", { name: "Stopped on you" })).toBeNull()
   expect(within(articleOf(agent.name)).getByRole("link", { name: "Open the Agent" })).toBeTruthy()
 })
@@ -415,6 +423,32 @@ it("goes Back from an opened item to the Inbox with that item still selected", a
   await waitFor(() => expect(window.location.hash).toBe("#/reviews/octo-org/glass/42"))
 })
 
+it("moves through the rows with j and k, held or pressed, skipping a folded group", async () => {
+  const user = mount(needsYouRef([waitingAgent, laterAgent, finishedReview]))
+
+  const first = await screen.findByRole("button", { name: /agent\/swift-otter/ })
+  expect(first.getAttribute("aria-current")).toBe("true")
+
+  await user.keyboard("j")
+  const second = screen.getByRole("button", { name: /agent\/quiet-lynx/ })
+  expect(second.getAttribute("aria-current")).toBe("true")
+  expect(document.activeElement).toBe(second)
+
+  await user.keyboard("k")
+  await user.keyboard("{j>2/}")
+  expect(screen.getByRole("heading", { name: "Retry flaky upload" })).toBeTruthy()
+
+  await user.keyboard("k")
+  expect(screen.getByRole("heading", { name: "agent/quiet-lynx" })).toBeTruthy()
+
+  await user.click(screen.getByRole("button", { name: /^Stopped on you/ }))
+  expect(screen.queryByRole("button", { name: /agent\/quiet-lynx/ })).toBeNull()
+  expect(screen.getByRole("heading", { name: "Retry flaky upload" })).toBeTruthy()
+
+  await user.keyboard("k")
+  expect(screen.getByRole("heading", { name: "Retry flaky upload" })).toBeTruthy()
+})
+
 it("marks a finished Agent review done with Done or e, naming the review it saw", async () => {
   const done: Array<{ readonly pullRequest: PullRequestRef; readonly writtenAt: DateTime.Utc }> = []
 
@@ -446,7 +480,11 @@ it("shows why the user's own PRs wait on them, without Agent review actions", as
         pullRequest: summary(mineRef, "Cache the diff", false, ago({ hours: 2 })),
         reasons: [
           ChangesRequested.make({}),
-          ChecksFailing.make({}),
+          ChecksFailing.make({
+            failing: ["CI / test", "CI / lint", "deploy", "e2e"].map(
+              (name) => new Check({ name, state: "failed", url: null }),
+            ),
+          }),
           AwaitingReply.make({ threads: 2 }),
         ],
         since: ago({ hours: 2 }),
@@ -459,14 +497,25 @@ it("shows why the user's own PRs wait on them, without Agent review actions", as
     ]),
   )
 
-  const waiting = await screen.findByRole("region", { name: "Waiting on you" })
-  expect(
-    within(waiting).getByText(/Changes requested · CI failing · 2 threads awaiting reply/),
-  ).toBeTruthy()
-  expect(within(waiting).getByText(/Ready to merge/)).toBeTruthy()
+  const mine = await screen.findByRole("region", { name: "Your pull requests" })
+  const cache = within(mine).getByRole("button", { name: /Cache the diff/ })
+
+  for (const reason of ["Changes requested", "CI failing", "2 threads awaiting reply"]) {
+    expect(within(cache).getByText(reason)).toBeTruthy()
+  }
+
+  expect(within(mine).getByText("Ready to merge")).toBeTruthy()
 
   await user.click(screen.getByRole("button", { name: /Cache the diff/ }))
   const pane = within(articleOf("Cache the diff"))
+  const failing = within(pane.getByRole("region", { name: "Failing checks" }))
+  expect(failing.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+    "CI / test",
+    "CI / lint",
+    "deploy",
+  ])
+  expect(failing.getByText("and 1 more")).toBeTruthy()
+  expect(pane.queryByRole("region", { name: "Agent review" })).toBeNull()
   expect(pane.getByRole("link", { name: "Open pull request" })).toBeTruthy()
   expect(pane.queryByRole("link", { name: "Read Agent review" })).toBeNull()
   expect(pane.queryByRole("button", { name: "Done" })).toBeNull()
@@ -483,9 +532,16 @@ it("opens the pull request and offers its finished Agent review", async () => {
   const pane = within(articleOf("Retry flaky upload"))
   expect(pane.getByText(/hubot/)).toBeTruthy()
   expect(pane.getByText("Agent review finished")).toBeTruthy()
+  expect(
+    within(pane.getByRole("region", { name: "Agent review" })).getByText(
+      "The retry loses the upload's checksum.",
+    ),
+  ).toBeTruthy()
   expect(pane.getByText(/Updated/)).toBeTruthy()
 
-  expect(screen.getByRole("region", { name: "Waiting on you" }).textContent).toContain("Draft")
+  expect(screen.getByRole("region", { name: "Agent reviews to read" }).textContent).toContain(
+    "Draft",
+  )
 
   await user.click(pane.getByRole("link", { name: "Read Agent review" }))
 

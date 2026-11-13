@@ -5,6 +5,7 @@ import {
   nothingUnsent,
   type SentMessage,
   type SuggestedDraft,
+  splitLead,
   acceptedSuggestedDraftOf,
   type ToolCallPart,
 } from "@glass/contracts"
@@ -51,14 +52,6 @@ export function AgentReviewMarkdown(props: { markdown: string; className?: strin
       {props.markdown}
     </Streamdown>
   )
-}
-
-export const splitLead = (markdown: string) => {
-  const end = /\n\s*\n/.exec(markdown)
-
-  return end === null
-    ? { lead: markdown, rest: "" }
-    : { lead: markdown.slice(0, end.index), rest: markdown.slice(end.index + end[0].length) }
 }
 
 function ReviewBody(props: { review: AgentReview; links: HotspotLinks; outdated: boolean }) {

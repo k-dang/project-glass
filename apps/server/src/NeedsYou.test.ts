@@ -44,12 +44,13 @@ const agentItem = (items: NeedsYou, agentId: string) =>
 const titles = (items: NeedsYou) =>
   pullRequestItems(items).map(({ pullRequest }) => pullRequest.title)
 
+const itemOf = (items: NeedsYou, pr: FakePullRequest) =>
+  pullRequestItems(items).find(({ pullRequest }) => pullRequest.url === pr.url)
+
 const reasonsOf = (items: NeedsYou, pr: FakePullRequest) =>
-  pullRequestItems(items)
-    .find(({ pullRequest }) => pullRequest.url === pr.url)
-    ?.reasons.map((reason) =>
-      Predicate.isTagged(reason, "AwaitingReply") ? `AwaitingReply:${reason.threads}` : reason._tag,
-    )
+  itemOf(items, pr)?.reasons.map((reason) =>
+    Predicate.isTagged(reason, "AwaitingReply") ? `AwaitingReply:${reason.threads}` : reason._tag,
+  )
 
 const sinceOf = (items: NeedsYou, pr: FakePullRequest) => {
   const found = pullRequestItems(items).find(({ pullRequest }) => pullRequest.url === pr.url)
@@ -432,6 +433,11 @@ it.live("lists the user's own PRs with what they wait on, until nothing does", (
     const pr = github.seedPullRequest({
       ...mine,
       checks: "FAILURE",
+      checkContexts: [
+        { kind: "CheckRun", name: "test", workflow: "CI", conclusion: "FAILURE" },
+        { kind: "CheckRun", name: "lint", workflow: "CI" },
+        { kind: "StatusContext", context: "deploy", state: "ERROR" },
+      ],
       head: { sha: "h1", files: {} },
     })
 
@@ -462,6 +468,12 @@ it.live("lists the user's own PRs with what they wait on, until nothing does", (
       "ChecksFailing",
       "AwaitingReply:1",
     ])
+    assert.deepStrictEqual(
+      (itemOf(listed, pr)?.reasons ?? []).flatMap((reason) =>
+        Predicate.isTagged(reason, "ChecksFailing") ? reason.failing.map(({ name }) => name) : [],
+      ),
+      ["CI / test", "deploy"],
+    )
     assert.strictEqual(Date.parse(sinceOf(listed, pr) ?? ""), Date.parse(pr.updatedAt))
 
     pr.addReview({ author: "mona", state: "APPROVED" })
@@ -533,6 +545,12 @@ it.live(
 
       assert.deepStrictEqual(titles(listed), ["Greet"])
       assert.deepStrictEqual(reasonsOf(listed, pr), ["AgentReviewFinished", "ChecksFailing"])
+      assert.deepStrictEqual(
+        (itemOf(listed, pr)?.reasons ?? []).flatMap((reason) =>
+          Predicate.isTagged(reason, "AgentReviewFinished") ? [reason.lead] : [],
+        ),
+        [answer.markdown],
+      )
     }),
 )
 

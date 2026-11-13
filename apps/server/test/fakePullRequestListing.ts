@@ -1,6 +1,7 @@
 import { absurd, Schema } from "effect"
 import {
   author,
+  checkContextsNode,
   connectionPage,
   inRepo,
   latestOpinionatedReviews,
@@ -72,6 +73,7 @@ const attentionNode = (pr: FakePullRequest) => ({
       },
     })),
   },
+  commits: checkContextsNode(pr),
 })
 
 const candidatesPage = (

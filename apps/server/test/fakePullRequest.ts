@@ -1,4 +1,4 @@
-import type { StatusState } from "../src/github/repositoryPullRequests"
+import type { StatusState } from "../src/github/checkContexts"
 
 export const VIEWER = {
   id: 1,

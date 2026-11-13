@@ -1,6 +1,13 @@
-import { type Checks, type FollowedRepository, PullRequestRef } from "@glass/contracts"
+import { Check, type Checks, type FollowedRepository, PullRequestRef } from "@glass/contracts"
 import { DateTime, Schema } from "effect"
 import { GitHubAuthor, login } from "./author"
+import {
+  CHECK_CONTEXTS_FIELDS,
+  CheckContexts,
+  checksOfCommits,
+  checksOfRollup,
+  StatusState,
+} from "./checkContexts"
 
 const CANDIDATE_FIELDS = `id number url title author { login } updatedAt headRefOid isDraft state viewerDidAuthor
   repository { owner { login } name }
@@ -43,6 +50,7 @@ export const PULL_REQUEST_ATTENTION_QUERY = `query PullRequestAttention($ids: [I
       mergeStateStatus
       latestOpinionatedReviews(first: 100) { nodes { state } }
       reviewThreads(first: 100) { nodes { isResolved comments(last: 1) { nodes { viewerDidAuthor } } } }
+      ${CHECK_CONTEXTS_FIELDS}
     }
   }
 }`
@@ -115,8 +123,6 @@ export const ReviewState = Schema.Literals([
   "DISMISSED",
   "PENDING",
 ])
-
-export const StatusState = Schema.Literals(["SUCCESS", "FAILURE", "ERROR", "PENDING", "EXPECTED"])
 
 const GitHubCandidate = Schema.Struct({
   id: Schema.String,
@@ -198,18 +204,6 @@ export const PullRequestChecksData = Schema.Struct({
   ),
 })
 
-const checksOf: Record<typeof StatusState.Type, Checks> = {
-  SUCCESS: "passing",
-  FAILURE: "failing",
-  ERROR: "failing",
-  PENDING: "running",
-  EXPECTED: "running",
-}
-
-export const toCheck = (
-  rollup: { readonly state: typeof StatusState.Type } | null | undefined,
-): Checks => (rollup == null ? "unavailable" : checksOf[rollup.state])
-
 export interface CheckObservation {
   readonly head: string
   readonly checks: Checks
@@ -227,7 +221,7 @@ export const toChecks = (
               node.id,
               {
                 head: node.headRefOid,
-                checks: toCheck(node.commits.nodes[0]?.commit.statusCheckRollup),
+                checks: checksOfRollup(node.commits.nodes[0]?.commit.statusCheckRollup),
               },
             ] as const,
           ],
@@ -253,6 +247,7 @@ export const PullRequestAttentionData = Schema.Struct({
             }),
           ),
         }),
+        commits: CheckContexts,
       }),
     ),
   ),
@@ -263,6 +258,7 @@ export const Attention = Schema.Struct({
   approved: Schema.Boolean,
   mergeClean: Schema.Boolean,
   awaitingReply: Schema.Int,
+  failingChecks: Schema.Array(Check),
 })
 
 export type Attention = typeof Attention.Type
@@ -286,6 +282,7 @@ export const toAttention = (
           ({ isResolved, comments }) =>
             !isResolved && comments.nodes.some(({ viewerDidAuthor }) => !viewerDidAuthor),
         ).length,
+        failingChecks: checksOfCommits(node.commits).filter((check) => check.state === "failed"),
       }
 
       return [[node.id, attention] as const]

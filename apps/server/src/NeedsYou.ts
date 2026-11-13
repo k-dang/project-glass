@@ -5,6 +5,7 @@ import {
   ChangesRequested,
   ChecksFailing,
   finishedReview,
+  splitLead,
   GlobalConversationNeedsYou,
   canRunQueueWork,
   type NeedsYouItem,
@@ -16,7 +17,8 @@ import {
   type QueuedPullRequest,
   ReadyToMerge,
   referenceKey,
-  stopsOnYou,
+  needsYouGroupOf,
+  needsYouGroups,
   TurnFinished,
   WaitingRequests,
 } from "@glass/contracts"
@@ -51,7 +53,9 @@ interface WaitingPullRequest {
 }
 
 const order: Order.Order<NeedsYouItem> = Order.combine(
-  Order.mapInput(Order.Number, (item: NeedsYouItem) => (stopsOnYou(item) ? 0 : 1)),
+  Order.mapInput(Order.Number, (item: NeedsYouItem) =>
+    needsYouGroups.indexOf(needsYouGroupOf(item)),
+  ),
   Order.mapInput(DateTime.Order, (item: NeedsYouItem) => item.since),
 )
 
@@ -120,7 +124,9 @@ const reasonsOf = ({
 
   if (attention?.changesRequested) reasons.push(ChangesRequested.make({}))
 
-  if (checks === "failing") reasons.push(ChecksFailing.make({}))
+  if (checks === "failing") {
+    reasons.push(ChecksFailing.make({ failing: attention?.failingChecks ?? [] }))
+  }
 
   if (attention && attention.awaitingReply > 0) {
     reasons.push(AwaitingReply.make({ threads: attention.awaitingReply }))
@@ -187,7 +193,12 @@ export class NeedsYou extends Context.Service<
               ? null
               : {
                   pullRequest,
-                  reasons: [AgentReviewFinished.make({ writtenAt: review.writtenAt })],
+                  reasons: [
+                    AgentReviewFinished.make({
+                      writtenAt: review.writtenAt,
+                      lead: splitLead(review.markdown).lead,
+                    }),
+                  ],
                   since: review.writtenAt,
                 }
           }),

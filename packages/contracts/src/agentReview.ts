@@ -124,5 +124,13 @@ const finishedWhile: Record<AgentReviewState["job"]["status"], boolean> = {
   failed: false,
 }
 
+export const splitLead = (markdown: string) => {
+  const end = /\n\s*\n/.exec(markdown)
+
+  return end === null
+    ? { lead: markdown, rest: "" }
+    : { lead: markdown.slice(0, end.index), rest: markdown.slice(end.index + end[0].length) }
+}
+
 export const finishedReview = (state: AgentReviewState): AgentReview | null =>
   state.review !== null && finishedWhile[state.job.status] ? state.review : null
