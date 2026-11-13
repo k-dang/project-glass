@@ -1,5 +1,6 @@
-import { Predicate, Schema } from "effect"
+import { Match, Predicate, Schema } from "effect"
 import { Agent, PermissionRequestPart, QuestionPart, TurnEnd } from "./agent"
+import { Check } from "./pullRequest"
 import { PullRequestSummary } from "./pullRequestList"
 
 const WaitingRequestParts = Schema.NonEmptyArray(
@@ -18,11 +19,20 @@ export type AgentReason = typeof AgentReason.Type
 
 export const AgentReviewFinished = Schema.TaggedStruct("AgentReviewFinished", {
   writtenAt: Schema.DateTimeUtcFromString,
+  /** The review's opening paragraph, as Markdown: its main risk, then what the change does. */
+  lead: Schema.String,
 })
 
 export const ChangesRequested = Schema.TaggedStruct("ChangesRequested", {})
 
-export const ChecksFailing = Schema.TaggedStruct("ChecksFailing", {})
+export const ChecksFailing = Schema.TaggedStruct("ChecksFailing", {
+  /**
+   * The head commit's failed checks. The reason itself follows the checks' overall state, read on
+   * every PR list sync, while these come from the separate read of what the user's PRs wait on, so
+   * they can be empty or a sync behind.
+   */
+  failing: Schema.Array(Check),
+})
 
 export const AwaitingReply = Schema.TaggedStruct("AwaitingReply", { threads: Schema.Int })
 
@@ -115,9 +125,23 @@ export type NeedsYouItem = typeof NeedsYouItem.Type
 
 export const NeedsYou = Schema.Array(NeedsYouItem)
 
-export const stopsOnYou = (item: NeedsYouItem) =>
-  Predicate.isTagged(item, "OutsideQuestion") ||
-  Predicate.isTagged(item, "GlobalConversation") ||
-  (Predicate.isTagged(item, "Agent") && item.reasons.some(Predicate.isTagged("WaitingRequests")))
+/** Why an item waits, as the Inbox groups it, in the order the Inbox shows the groups. */
+export const needsYouGroups = ["stopped", "reviews", "mine", "finished"] as const
+
+export type NeedsYouGroup = (typeof needsYouGroups)[number]
+
+export const needsYouGroupOf = (item: NeedsYouItem): NeedsYouGroup =>
+  Match.valueTags(item, {
+    OutsideQuestion: () => "stopped" as const,
+    GlobalConversation: () => "stopped" as const,
+    Agent: ({ reasons }) =>
+      reasons.some(Predicate.isTagged("WaitingRequests"))
+        ? ("stopped" as const)
+        : ("finished" as const),
+    PullRequest: ({ reasons }) =>
+      reasons.some(Predicate.isTagged("AgentReviewFinished"))
+        ? ("reviews" as const)
+        : ("mine" as const),
+  })
 
 export type NeedsYou = typeof NeedsYou.Type

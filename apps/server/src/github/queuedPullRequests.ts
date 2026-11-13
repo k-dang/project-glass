@@ -6,7 +6,7 @@ import {
 } from "@glass/contracts"
 import { Result, Schema } from "effect"
 import { login, GitHubAuthor } from "./author"
-import { StatusState, toCheck } from "./repositoryPullRequests"
+import { checksOfRollup, StatusState } from "./checkContexts"
 
 export const queuedPullRequestsQuery = (count: number) => {
   const indexes = Array.from({ length: count }, (_, index) => index)
@@ -109,7 +109,7 @@ const toLookedUp = (node: typeof GitHubQueuedPullRequest.Type): LookedUpPullRequ
     title: node.title,
     author: login(node.author),
     isDraft: node.isDraft,
-    checks: toCheck(node.commits.nodes[0]?.commit.statusCheckRollup),
+    checks: checksOfRollup(node.commits.nodes[0]?.commit.statusCheckRollup),
     updatedAt: node.updatedAt,
   }),
   state: node.state === "OPEN" && node.isDraft ? "draft" : states[node.state],

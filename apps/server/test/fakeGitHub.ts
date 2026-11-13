@@ -7,7 +7,6 @@ import { createServer } from "node:http"
 import { fromGitHubSide, GitHubDiffSide } from "../src/github/diffSide.ts"
 import { lineInPatch } from "../src/github/patchLines.ts"
 import {
-  type FakeCheck,
   type FakeComment,
   type FakeReactionContent,
   type FakeCommit,
@@ -19,6 +18,7 @@ import {
 } from "./fakePullRequest.ts"
 import {
   author,
+  checkContextsNode,
   connectionPage,
   inRepo,
   latestOpinionatedReviews,
@@ -307,30 +307,6 @@ const threadNode = <Comment>(
   comments: { nodes: comments },
 })
 
-const checkRunNode = ({
-  status = "COMPLETED",
-  ...check
-}: Extract<FakeCheck, { kind: "CheckRun" }>) => ({
-  __typename: "CheckRun",
-  name: check.name,
-  status,
-  conclusion: status === "COMPLETED" ? (check.conclusion ?? "SUCCESS") : null,
-  detailsUrl: check.url ?? null,
-  checkSuite: {
-    workflowRun: check.workflow === undefined ? null : { workflow: { name: check.workflow } },
-  },
-})
-
-const checkContextNode = (check: FakeCheck) =>
-  check.kind === "StatusContext"
-    ? {
-        __typename: "StatusContext",
-        context: check.context,
-        state: check.state,
-        targetUrl: check.url ?? null,
-      }
-    : checkRunNode(check)
-
 const connections = {
   PullRequestViewedFiles: (pr: FakePullRequest) =>
     pr.changedFiles.map((file) => ({
@@ -587,18 +563,7 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
             mergeable: pr.mergeable,
             latestOpinionatedReviews: { nodes: latestOpinionatedReviews(pr) },
             reviewRequests: { nodes: reviewRequestNodes(pr) },
-            commits: {
-              nodes: [
-                {
-                  commit: {
-                    statusCheckRollup:
-                      pr.checks === null && pr.checkContexts.length === 0
-                        ? null
-                        : { contexts: { nodes: pr.checkContexts.map(checkContextNode) } },
-                  },
-                },
-              ],
-            },
+            commits: checkContextsNode(pr),
           },
         },
       },

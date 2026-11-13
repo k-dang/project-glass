@@ -1,6 +1,7 @@
 import {
   type AgentReviewDone,
   AgentReviewFinished,
+  ChecksFailing,
   type NeedsYouItem,
   type PullRequestNeedsYou,
   referenceKey,
@@ -38,6 +39,17 @@ export const needsYouKey = (item: NeedsYouItem): string =>
 
 export const finishedAgentReviewOf = (item: PullRequestNeedsYou) =>
   item.reasons.find(Schema.is(AgentReviewFinished))
+
+export const failingChecksOf = (item: PullRequestNeedsYou) =>
+  item.reasons.find(Schema.is(ChecksFailing))?.failing ?? []
+
+export const reviewDoneOf = (item: PullRequestNeedsYou): AgentReviewDone | null => {
+  const review = finishedAgentReviewOf(item)
+
+  return review === undefined
+    ? null
+    : { pullRequest: item.pullRequest.ref, writtenAt: review.writtenAt }
+}
 
 export const markDoneAtom = backendRuntime.fn((review: AgentReviewDone) =>
   Backend.use((backend) => backend.MarkAgentReviewDone(review)),

@@ -1,4 +1,4 @@
-import type { FakePullRequest, FakeReview } from "./fakePullRequest"
+import type { FakeCheck, FakePullRequest, FakeReview } from "./fakePullRequest"
 
 export const PAGE_SIZE = 100
 
@@ -43,3 +43,41 @@ export const latestOpinionatedReviews = (pr: FakePullRequest) => {
     state: review.state,
   }))
 }
+
+const checkRunNode = ({
+  status = "COMPLETED",
+  ...check
+}: Extract<FakeCheck, { kind: "CheckRun" }>) => ({
+  __typename: "CheckRun",
+  name: check.name,
+  status,
+  conclusion: status === "COMPLETED" ? (check.conclusion ?? "SUCCESS") : null,
+  detailsUrl: check.url ?? null,
+  checkSuite: {
+    workflowRun: check.workflow === undefined ? null : { workflow: { name: check.workflow } },
+  },
+})
+
+const checkContextNode = (check: FakeCheck) =>
+  check.kind === "StatusContext"
+    ? {
+        __typename: "StatusContext",
+        context: check.context,
+        state: check.state,
+        targetUrl: check.url ?? null,
+      }
+    : checkRunNode(check)
+
+/** The head commit's checks, as `CHECK_CONTEXTS_FIELDS` asks for them. */
+export const checkContextsNode = (pr: FakePullRequest) => ({
+  nodes: [
+    {
+      commit: {
+        statusCheckRollup:
+          pr.checks === null && pr.checkContexts.length === 0
+            ? null
+            : { contexts: { nodes: pr.checkContexts.map(checkContextNode) } },
+      },
+    },
+  ],
+})

@@ -63,6 +63,7 @@ const groups: ReadonlyArray<ShortcutGroup> = [
       { label: "Next item", keys: ["J"] },
       { label: "Previous item", keys: ["K"] },
       { label: "Allow the selected permission", keys: ["A"] },
+      { label: "Mark the selected Agent review done", keys: ["E"] },
     ],
   },
   {
