@@ -178,7 +178,7 @@ function InboxRow(props: {
       type="button"
       data-inbox-row={key}
       aria-current={props.selected ? "true" : undefined}
-      className="grid w-full grid-cols-[1rem_minmax(0,1fr)_auto] gap-x-3 gap-y-1 rounded-md px-2 py-2 text-left text-sm outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring aria-[current=true]:bg-accent"
+      className="grid w-full grid-cols-[1rem_minmax(0,1fr)_auto] gap-x-3 gap-y-1 rounded-md px-2 py-2 text-left text-sm outline-none hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring aria-[current=true]:bg-accent aria-[current=true]:focus-visible:ring-0"
       onClick={() => props.onPick(key)}
     >
       <ItemIcon item={item} className="row-span-2 mt-0.5 size-4 text-muted-foreground" />
@@ -220,6 +220,7 @@ function InboxPane(props: {
         </div>
       ) : (
         <InboxDetail
+          key={needsYouKey(props.selected)}
           item={props.selected}
           now={props.now}
           actions={props.actions}
@@ -294,7 +295,7 @@ export function Inbox() {
   const selected = flat.find((item) => needsYouKey(item) === selectedKey) ?? null
   const actions = useInboxActions(selected)
 
-  // Moves the selection a row up or down and focuses that row, which scrolls it into view.
+  // Scrolls only as far as the row needs, so each step moves the list by at most a row.
   const move = (by: 1 | -1) => {
     const at = selectedKey === null ? -1 : keys.indexOf(selectedKey)
     const key = keys[at === -1 ? 0 : Math.min(keys.length - 1, Math.max(0, at + by))]
@@ -302,7 +303,9 @@ export function Inbox() {
     if (key === undefined) return
 
     setPicked(key)
-    list.current?.querySelector<HTMLElement>(`[data-inbox-row="${CSS.escape(key)}"]`)?.focus()
+    const row = list.current?.querySelector<HTMLElement>(`[data-inbox-row="${CSS.escape(key)}"]`)
+    row?.focus({ preventScroll: true })
+    row?.scrollIntoView({ block: "nearest" })
   }
 
   const fold = (group: NeedsYouGroup) =>
@@ -315,8 +318,8 @@ export function Inbox() {
     })
 
   useShortcuts([
-    { key: "j", run: () => move(1) },
-    { key: "k", run: () => move(-1) },
+    { key: "j", allowRepeat: true, run: () => move(1) },
+    { key: "k", allowRepeat: true, run: () => move(-1) },
     ...actions.map(({ key, run }) => ({ key, run })),
   ])
 

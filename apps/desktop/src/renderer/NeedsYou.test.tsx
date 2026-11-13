@@ -423,7 +423,7 @@ it("goes Back from an opened item to the Inbox with that item still selected", a
   await waitFor(() => expect(window.location.hash).toBe("#/reviews/octo-org/glass/42"))
 })
 
-it("moves through the rows with j and k, skipping a folded group", async () => {
+it("moves through the rows with j and k, held or pressed, skipping a folded group", async () => {
   const user = mount(needsYouRef([waitingAgent, laterAgent, finishedReview]))
 
   const first = await screen.findByRole("button", { name: /agent\/swift-otter/ })
@@ -434,7 +434,8 @@ it("moves through the rows with j and k, skipping a folded group", async () => {
   expect(second.getAttribute("aria-current")).toBe("true")
   expect(document.activeElement).toBe(second)
 
-  await user.keyboard("j")
+  await user.keyboard("k")
+  await user.keyboard("{j>2/}")
   expect(screen.getByRole("heading", { name: "Retry flaky upload" })).toBeTruthy()
 
   await user.keyboard("k")
