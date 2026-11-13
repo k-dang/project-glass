@@ -4,7 +4,7 @@ import { AsyncResult } from "effect/reactivity"
 import { Sparkles } from "lucide-react"
 import { agentsAtom, placeNames } from "./agentsArea"
 import { engineNames } from "./engines"
-import { ContinueCard, ContinueInvitation } from "./ContinueCard"
+import { ContinueCard, ContinueCardLoading, ContinueInvitation } from "./ContinueCard"
 import { ProblemAlert } from "./ProblemAlert"
 import { streamProblem } from "./problems"
 
@@ -50,7 +50,5 @@ function LastAgent(props: { destination: AgentDestination }) {
     .onFailure((cause) => (
       <ProblemAlert problem={streamProblem(cause)} action={{ label: "Try again", run: retry }} />
     ))
-    .orElse(() => (
-      <output className="py-6 text-sm text-muted-foreground">Loading your Agents…</output>
-    ))
+    .orElse(() => <ContinueCardLoading label="Loading your Agents…" />)
 }

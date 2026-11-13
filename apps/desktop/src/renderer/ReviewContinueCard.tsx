@@ -2,7 +2,7 @@ import type { ReviewDestination, ReviewPosition } from "@glass/contracts"
 import { AsyncResult } from "effect/reactivity"
 import { GitPullRequest } from "lucide-react"
 import { useConnection } from "./connection"
-import { ContinueCard, ContinueInvitation } from "./ContinueCard"
+import { ContinueCard, ContinueCardLoading, ContinueInvitation } from "./ContinueCard"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf } from "./problems"
 import { defaultListSearch } from "./reviewsArea"
@@ -69,7 +69,5 @@ function LastPullRequest(props: { destination: ReviewDestination }) {
     .onFailure((cause) => (
       <ProblemAlert problem={problemOf(cause)} action={{ label: "Try again", run: retry }} />
     ))
-    .orElse(() => (
-      <output className="py-6 text-sm text-muted-foreground">Checking your GitHub account…</output>
-    ))
+    .orElse(() => <ContinueCardLoading label="Checking your GitHub account…" />)
 }
