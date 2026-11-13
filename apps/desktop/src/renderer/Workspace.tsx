@@ -153,11 +153,7 @@ export function Workspace(props: {
 
     if (!reviewOpen) setReviewOpen(true)
 
-    setView((previous) =>
-      previous.tab === "changes" && previous.order === "path"
-        ? previous
-        : { ...previous, tab: "changes", order: "path" },
-    )
+    setView((previous) => (previous.tab === "changes" ? previous : { ...previous, tab: "changes" }))
   }
 
   const fullFiles = useFullFiles(pullRequest.ref, revision)
@@ -366,10 +362,10 @@ export function Workspace(props: {
   const readAgentReview = () => {
     flushSync(() => {
       setReviewOpen(true)
-      setView((previous) => ({ ...previous, tab: "changes", order: "path" }))
+      setView((previous) => ({ ...previous, tab: "changes" }))
     })
 
-    returnToCurrent(false)
+    returnToCurrent(tourShown !== null)
   }
 
   const reviewShown = inChanges && reviewOpen

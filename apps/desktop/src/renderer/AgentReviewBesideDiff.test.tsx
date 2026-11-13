@@ -55,7 +55,7 @@ it("opens and closes the Agent review with Mod+D, even from its composer", async
   expect(sidePanel()).toBeNull()
 })
 
-it("leaves the Tour order to read the Agent review", async () => {
+it("keeps the Tour order while reading the Agent review", async () => {
   const f = mountTourWorkspace({
     files,
     initial: {
@@ -81,8 +81,8 @@ it("leaves the Tour order to read the Agent review", async () => {
       name: "Read",
     }),
   )
-  expect(tourOrder.getAttribute("aria-pressed")).toBe("false")
   expect(sidePanel()).not.toBeNull()
+  expect(tourOrder.getAttribute("aria-pressed")).toBe("true")
 })
 
 it("marks an outdated Agent review and still reads it", async () => {
