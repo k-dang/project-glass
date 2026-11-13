@@ -746,6 +746,7 @@ export class Agents extends Context.Service<
             yield* turns.removeUnsent(agentId)
             yield* notes.removeAll(agentId)
             yield* skillPacks.releaseAgent(agentId)
+            yield* sql`DELETE FROM conversation_agent WHERE agent_id = ${agentId}`
             yield* sql`DELETE FROM agent WHERE id = ${agentId}`
           }).pipe(sql.withTransaction, Effect.mapError(storageFailure))
         }).pipe(

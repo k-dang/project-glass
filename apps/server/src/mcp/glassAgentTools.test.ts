@@ -15,6 +15,7 @@ import { VIEWER } from "../../test/fakePullRequest"
 import { isolatedHome, startBackend } from "../../test/harness"
 import { connectMcp, toolText } from "../../test/mcpClient"
 import { scriptedAgentRunners } from "../../test/scriptedAgentRunners"
+import { StartedItem } from "../StartedWork"
 
 const caller = { conversationId: "global-conversation" }
 
@@ -39,6 +40,8 @@ const onThisDevice = (message: string) => ({
 const decodeCreated = Schema.decodeUnknownSync(Schema.Struct({ agent: Agent }))
 
 const decodeNeedsYou = Schema.decodeUnknownSync(Schema.Struct({ items: NeedsYou }))
+
+const decodeStarted = Schema.decodeUnknownSync(Schema.Struct({ items: Schema.Array(StartedItem) }))
 
 describe("Glass's Agent tools over MCP", () => {
   it.live("creates an Agent that appears in Agents and runs its first Turn", () =>
@@ -155,6 +158,27 @@ describe("Glass's Agent tools over MCP", () => {
     }),
   )
 
+  it.live(
+    "lists an Agent it messaged as finished once stopped, though a message stays queued",
+    () =>
+      Effect.gen(function* () {
+        const f = yield* startGlass
+        const agent = yield* f.start("hold:first")
+        yield* f.transcript(agent.id, holding)
+        yield* f.call("send_agent_message", { agentId: agent.id, message: "Next" })
+
+        yield* f.client.StopTurn({ agentId: agent.id })
+        yield* f.transcript(agent.id, settled(1))
+
+        const listed = yield* f.call("list_started_work")
+
+        assert.deepStrictEqual(
+          decodeStarted(listed.structuredContent).items.map(({ state }) => state),
+          ["finished"],
+        )
+      }),
+  )
+
   it.live("refuses a message while the Agent waits for the user's answer", () =>
     Effect.gen(function* () {
       const f = yield* startGlass
@@ -253,6 +277,25 @@ describe("Glass's Agent review tools over MCP", () => {
       assert.equal(job.status, "idle")
       assert.equal(review?.markdown, markdown)
       assert.equal(review?.revision.head, f.revision.head)
+    }),
+  )
+
+  it.live("lists an Agent review the conversation started once it's written", () =>
+    Effect.gen(function* () {
+      const f = yield* startReviewing
+
+      yield* f.call("start_agent_review", { pullRequest: f.pullRequest, revision: f.revision })
+      yield* f.review(({ review }) => review !== null)
+
+      const listed = yield* f.call("list_started_work")
+
+      assert.deepStrictEqual(
+        decodeStarted(listed.structuredContent).items.map((item) => [
+          Predicate.isTagged(item, "AgentReview") && item.pullRequest,
+          item.state,
+        ]),
+        [[new PullRequestRef(f.pullRequest), "finished"]],
+      )
     }),
   )
 

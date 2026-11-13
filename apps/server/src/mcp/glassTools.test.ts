@@ -56,6 +56,7 @@ describe("Glass tools over MCP", () => {
           ["list_recent_activity", true],
           ["list_agents", true],
           ["list_needs_you", true],
+          ["list_started_work", true],
           ["read_agent_transcript", true],
           ["read_pull_request", true],
           ["read_agent_review", true],
