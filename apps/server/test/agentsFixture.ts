@@ -239,6 +239,17 @@ export const sendGlobal = (
   context: CapturedContext | null = null,
 ) => client.SendGlobalMessage({ message, images: [], context })
 
+export const reported = (turns: ReadonlyArray<Turn>) =>
+  turns.flatMap(({ context }) => (Predicate.isTagged(context, "Report") ? context.work : []))
+
+export const reportedAgents = (turns: ReadonlyArray<Turn>) =>
+  reported(turns).flatMap((work) =>
+    Predicate.isTagged(work, "Agent") ? [[work.agentId, work.outcome] as const] : [],
+  )
+
+export const lastSettled = (message: string) => (turns: ReadonlyArray<Turn>) =>
+  turns.at(-1)?.message === message && turns.every((turn) => turn.ended !== null)
+
 export const glassCalls = (turn: Turn | undefined) =>
   turn?.parts.flatMap((part) =>
     Predicate.isTagged(part, "ToolCall") ? [{ status: part.status, output: part.output }] : [],

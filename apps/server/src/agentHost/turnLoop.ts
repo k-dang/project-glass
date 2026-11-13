@@ -1,4 +1,4 @@
-import type { AgentEvent, MessageWithContext } from "@glass/contracts"
+import type { AgentEvent, TurnMessage } from "@glass/contracts"
 import type { DeliveredMessage } from "./deliveredMessage"
 import { type Cause, DateTime, Deferred, Effect, Queue, Scope, Stream } from "effect"
 import { HostAgentError } from "./protocol"
@@ -22,7 +22,7 @@ export interface TurnMachine<State extends Steering, Input, Command> {
     readonly events: ReadonlyArray<AgentEvent>
     readonly commands?: ReadonlyArray<Command>
   }
-  readonly begin: (turnId: string, message: MessageWithContext, at: DateTime.Utc) => State
+  readonly begin: (turnId: string, message: TurnMessage, at: DateTime.Utc) => State
   readonly exitInput: Input
   readonly stoppedReason: string
 }
@@ -103,7 +103,7 @@ export const runTurns = Effect.fnUntraced(function* <
       return state.steers
     }),
     offer,
-    begin: Effect.fnUntraced(function* (turnId: string, message: MessageWithContext) {
+    begin: Effect.fnUntraced(function* (turnId: string, message: TurnMessage) {
       const at = yield* DateTime.now
 
       if (exited) return yield* new HostAgentError({ message: machine.stoppedReason })

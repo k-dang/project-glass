@@ -5,6 +5,8 @@ import {
   agentsFixture,
   glassCalls,
   globalTurns,
+  lastSettled,
+  reportedAgents,
   repository,
   sendGlobal,
   settled,
@@ -58,12 +60,18 @@ it.live(
       yield* f.transcript(created.id, settled(1))
       yield* f.transcript(messaged.id, settled(2))
 
+      yield* globalTurns(f.client, (turns) =>
+        [created.id, messaged.id].every((id) =>
+          reportedAgents(turns).some(([agentId]) => agentId === id),
+        ),
+      )
+
       const restarted = yield* f.restart
       yield* sendGlobal(restarted, "call:list_started_work")
-      const turns = yield* globalTurns(restarted, settled(3))
+      const turns = yield* globalTurns(restarted, lastSettled("call:list_started_work"))
 
       assert.deepStrictEqual(
-        listedBy(turns[2]).map((item) => [
+        listedBy(turns.at(-1)).map((item) => [
           Predicate.isTagged(item, "Agent") && item.agent.id,
           item.state,
           item.askedWith,

@@ -21,7 +21,7 @@ import { randomUUID } from "node:crypto"
 import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs"
 import { basename, dirname, join } from "node:path"
 import type { AgentAdapter, AgentSession } from "../src/agentHost/adapter"
-import type { DeliveredMessage } from "../src/agentHost/deliveredMessage"
+import type { DeliveredTurn } from "../src/agentHost/deliveredMessage"
 import { GlassToolsAccess, notRunning } from "../src/agentHost/protocol"
 import type { WrittenSkills } from "../src/agentHost/sentSkills"
 import { MCP_PATH } from "../src/mcp/server"
@@ -127,7 +127,7 @@ export const scriptedAdapter = (gates: string): AgentAdapter => {
             yield* report(TurnEnded.make({ turnId, ended: { at: yield* DateTime.now, ending } }))
           })
 
-        const run = (turnId: string, { message, prompt }: DeliveredMessage) =>
+        const run = (turnId: string, { message, prompt }: DeliveredTurn) =>
           Effect.gen(function* () {
             const called = scriptedCall.exec(message)
 

@@ -203,6 +203,8 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       AnswerGlobalRequest: ({ requestId, answer }) => globalConversation.answer(requestId, answer),
       GetGlobalUnsentMessage: () => globalConversation.unsent,
       SaveGlobalUnsentMessage: (unsent) => globalConversation.saveUnsent(unsent),
+      WatchGlobalUnseen: () => globalConversation.unseen,
+      MarkGlobalTurnSeen: ({ endedAt }) => globalConversation.markSeen(endedAt),
     })
   }),
 )

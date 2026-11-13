@@ -2,13 +2,28 @@ import {
   Agent,
   AgentError,
   type AgentReviewFailure,
+  AgentReported,
   type AgentReviewState,
+  AgentReviewReported,
   finishedReview,
   PullRequestRef,
-  type Transcript,
+  type ReportedWork,
+  TurnEnd,
   type TurnEnding,
 } from "@glass/contracts"
-import { Context, DateTime, Effect, Layer, Match, Option, Schema, Stream } from "effect"
+import {
+  Array as Arr,
+  Context,
+  DateTime,
+  Effect,
+  Layer,
+  Match,
+  Option,
+  Predicate,
+  Schema,
+  Stream,
+  SubscriptionRef,
+} from "effect"
 import { SqlClient } from "effect/sql"
 import { AgentReviews } from "./AgentReviews"
 import { Agents } from "./Agents"
@@ -38,11 +53,16 @@ const StartedAgentReview = Schema.TaggedStruct("AgentReview", {
 
 export const StartedItem = Schema.Union([StartedAgent, StartedAgentReview])
 
+const reported_at = Schema.NullOr(Schema.DateTimeUtcFromString)
+
 const AgentRow = Schema.Struct({
   agent_id: Schema.String,
   asked_with: Schema.NullOr(Schema.String),
   started_at: Schema.DateTimeUtcFromString,
+  reported_at,
 })
+
+type AgentRow = typeof AgentRow.Type
 
 const ReviewRow = Schema.Struct({
   owner: Schema.String,
@@ -50,11 +70,43 @@ const ReviewRow = Schema.Struct({
   number: Schema.Int,
   asked_with: Schema.NullOr(Schema.String),
   started_at: Schema.DateTimeUtcFromString,
+  reported_at,
 })
+
+type ReviewRow = typeof ReviewRow.Type
 
 const decodeAgentRows = Schema.decodeUnknownEffect(Schema.Array(AgentRow))
 
 const decodeReviewRows = Schema.decodeUnknownEffect(Schema.Array(ReviewRow))
+
+const pullRequestOf = ({ owner, repo, number }: ReviewRow) =>
+  new PullRequestRef({ owner, repo, number })
+
+export interface Unreported {
+  readonly work: ReportedWork
+  readonly at: DateTime.Utc
+}
+
+const endingReason = (ending: TurnEnding) =>
+  Match.value(ending).pipe(
+    Match.tagsExhaustive({
+      Done: () => null,
+      Stopped: () => null,
+      Failed: ({ reason }) => reason,
+      CutOff: () => "Glass lost the Agent while it worked.",
+      Interrupted: () => "Glass quit while it worked.",
+    }),
+  )
+
+const ifNew = (
+  row: AgentRow | ReviewRow,
+  at: DateTime.Utc,
+  work: ReportedWork,
+): ReadonlyArray<Unreported> =>
+  DateTime.isGreaterThanOrEqualTo(at, row.started_at) &&
+  (row.reported_at === null || DateTime.isGreaterThan(at, row.reported_at))
+    ? [{ work, at }]
+    : []
 
 const storageFailure = () =>
   new AgentError({ message: "Couldn't read or save what the Global conversation started." })
@@ -70,14 +122,10 @@ const endingState = (ending: TurnEnding): StartedState =>
     }),
   )
 
-const agentState = ({ turns }: Transcript, waiting: boolean): StartedState => {
+const agentState = (ended: TurnEnd | undefined, waiting: boolean): StartedState => {
   if (waiting) return "waiting"
 
-  const last = turns.at(-1)
-
-  if (last?.ended == null) return "running"
-
-  return endingState(last.ended.ending)
+  return ended === undefined ? "running" : endingState(ended.ending)
 }
 
 const reviewState = (state: AgentReviewState): StartedState => {
@@ -96,14 +144,28 @@ const saved = (what: string) => (statement: Effect.Effect<unknown, unknown>) =>
 export class StartedWork extends Context.Service<
   StartedWork,
   {
-    readonly linkAgent: (conversationId: string, agentId: string) => Effect.Effect<void, AgentError>
+    /** `since` is when the conversation acted, so only outcomes from then on are reported. */
+    readonly linkAgent: (
+      conversationId: string,
+      agentId: string,
+      since: DateTime.Utc,
+    ) => Effect.Effect<void, AgentError>
     readonly startedAgentReview: (
       conversationId: string,
       pullRequest: PullRequestRef,
+      since: DateTime.Utc,
     ) => Effect.Effect<void, AgentError>
     readonly list: (
       conversationId: string,
     ) => Effect.Effect<ReadonlyArray<typeof StartedItem.Type>, AgentError | AgentReviewFailure>
+    readonly unreported: (
+      conversationId: string,
+    ) => Effect.Effect<ReadonlyArray<Unreported>, AgentError | AgentReviewFailure>
+    readonly markReported: (
+      conversationId: string,
+      reported: ReadonlyArray<Unreported>,
+    ) => Effect.Effect<void, AgentError | AgentReviewFailure>
+    readonly changes: (conversationId: string) => Stream.Stream<void>
   }
 >()("@glass/server/StartedWork") {
   static readonly layer = Layer.effect(
@@ -113,67 +175,92 @@ export class StartedWork extends Context.Service<
       const agents = yield* Agents
       const agentReviews = yield* AgentReviews
       const transcripts = yield* Transcripts
+      const recorded = yield* SubscriptionRef.make(0)
 
-      const asked = (conversationId: string) =>
-        Effect.all({
-          askedWith: transcripts.runningMessage(conversationId),
-          startedAt: DateTime.now.pipe(Effect.map(DateTime.formatIso)),
+      const rows = (conversationId: string) =>
+        Effect.all(
+          {
+            agentRows: sql`
+              SELECT agent_id, asked_with, started_at, reported_at FROM conversation_agent
+              WHERE conversation_id = ${conversationId}
+            `.pipe(Effect.flatMap(decodeAgentRows)),
+            reviewRows: sql`
+              SELECT owner, repo, number, asked_with, started_at, reported_at
+              FROM conversation_agent_review
+              WHERE conversation_id = ${conversationId}
+            `.pipe(Effect.flatMap(decodeReviewRows)),
+          },
+          { concurrency: "unbounded" },
+        ).pipe(Effect.mapError(storageFailure))
+
+      const agentsOf = (agentRows: ReadonlyArray<AgentRow>) =>
+        Effect.gen(function* () {
+          const [listed, ends, waiting] = yield* Effect.all(
+            [
+              agents.watch().pipe(Stream.runHead, Effect.map(Option.getOrThrow)),
+              transcripts.lastEnds(agentRows.map(({ agent_id }) => agent_id)),
+              transcripts.waitingNow,
+            ],
+            { concurrency: "unbounded" },
+          )
+
+          const byId = new Map(listed.map((agent) => [agent.id, agent]))
+
+          const started = agentRows.flatMap((row) => {
+            const agent = byId.get(row.agent_id)
+
+            return agent === undefined ? [] : [{ row, agent }]
+          })
+
+          return { started, ends, waiting }
         })
 
+      const reviewNow = (row: ReviewRow) =>
+        agentReviews.watch(pullRequestOf(row)).pipe(Stream.runHead, Effect.map(Option.getOrThrow))
+
+      const changedRows = SubscriptionRef.update(recorded, (count) => count + 1)
+
       return StartedWork.of({
-        linkAgent: (conversationId, agentId) =>
+        linkAgent: (conversationId, agentId, since) =>
           Effect.gen(function* () {
-            const { askedWith, startedAt } = yield* asked(conversationId)
+            const askedWith = yield* transcripts.runningMessage(conversationId)
+            const startedAt = DateTime.formatIso(since)
 
             yield* sql`
               INSERT INTO conversation_agent (conversation_id, agent_id, asked_with, started_at)
               VALUES (${conversationId}, ${agentId}, ${askedWith}, ${startedAt})
               ON CONFLICT DO NOTHING
             `.pipe(saved("a started Agent"))
+            yield* changedRows
           }),
-        startedAgentReview: (conversationId, { owner, repo, number }) =>
+        startedAgentReview: (conversationId, { owner, repo, number }, since) =>
           Effect.gen(function* () {
-            const { askedWith, startedAt } = yield* asked(conversationId)
+            const askedWith = yield* transcripts.runningMessage(conversationId)
+            const startedAt = DateTime.formatIso(since)
 
             yield* sql`
               INSERT INTO conversation_agent_review
                 (conversation_id, owner, repo, number, asked_with, started_at)
               VALUES (${conversationId}, ${owner}, ${repo}, ${number}, ${askedWith}, ${startedAt})
               ON CONFLICT DO UPDATE
-                SET asked_with = excluded.asked_with, started_at = excluded.started_at
+                SET asked_with = excluded.asked_with, started_at = excluded.started_at,
+                  reported_at = NULL
             `.pipe(saved("a started Agent review"))
+            yield* changedRows
           }),
         list: (conversationId) =>
           Effect.gen(function* () {
-            const { agentRows, reviewRows, listed } = yield* Effect.all(
-              {
-                agentRows: sql`
-                  SELECT agent_id, asked_with, started_at FROM conversation_agent
-                  WHERE conversation_id = ${conversationId}
-                `.pipe(Effect.flatMap(decodeAgentRows), Effect.mapError(storageFailure)),
-                reviewRows: sql`
-                  SELECT owner, repo, number, asked_with, started_at FROM conversation_agent_review
-                  WHERE conversation_id = ${conversationId}
-                `.pipe(Effect.flatMap(decodeReviewRows), Effect.mapError(storageFailure)),
-                listed: agents.watch().pipe(Stream.runHead, Effect.map(Option.getOrThrow)),
-              },
-              { concurrency: "unbounded" },
-            )
+            const { agentRows, reviewRows } = yield* rows(conversationId)
+            const { started, ends, waiting } = yield* agentsOf(agentRows)
 
-            const byId = new Map(listed.map((agent) => [agent.id, agent]))
-
-            const startedAgents = Effect.forEach(
-              agentRows.flatMap((row) => {
-                const agent = byId.get(row.agent_id)
-
-                return agent === undefined ? [] : [{ row, agent }]
-              }),
-              ({ row, agent }) =>
-                Effect.all([transcripts.read(agent.id), transcripts.isWaiting(agent.id)]).pipe(
-                  Effect.map(([transcript, waiting]) =>
-                    StartedAgent.make({
-                      agent,
-                      state: agentState(transcript, waiting),
+            const reviews = yield* Effect.forEach(
+              reviewRows,
+              (row) =>
+                reviewNow(row).pipe(
+                  Effect.map((state) =>
+                    StartedAgentReview.make({
+                      pullRequest: pullRequestOf(row),
+                      state: reviewState(state),
                       askedWith: row.asked_with,
                       startedAt: row.started_at,
                     }),
@@ -182,38 +269,161 @@ export class StartedWork extends Context.Service<
               { concurrency: "unbounded" },
             )
 
-            const startedReviews = Effect.forEach(
-              reviewRows,
-              (row) => {
-                const pullRequest = new PullRequestRef({
-                  owner: row.owner,
-                  repo: row.repo,
-                  number: row.number,
-                })
-
-                return agentReviews.watch(pullRequest).pipe(
-                  Stream.runHead,
-                  Effect.map((state) =>
-                    StartedAgentReview.make({
-                      pullRequest,
-                      state: reviewState(Option.getOrThrow(state)),
-                      askedWith: row.asked_with,
-                      startedAt: row.started_at,
-                    }),
-                  ),
-                )
-              },
-              { concurrency: "unbounded" },
+            const agentItems = started.map(({ row, agent }) =>
+              StartedAgent.make({
+                agent,
+                state: agentState(ends.get(agent.id), waiting.has(agent.id)),
+                askedWith: row.asked_with,
+                startedAt: row.started_at,
+              }),
             )
 
-            const [started, reviews] = yield* Effect.all([startedAgents, startedReviews], {
-              concurrency: "unbounded",
-            })
-
-            return [...started, ...reviews].toSorted((a, b) =>
+            return [...agentItems, ...reviews].toSorted((a, b) =>
               DateTime.Order(a.startedAt, b.startedAt),
             )
           }),
+        unreported: (conversationId) =>
+          Effect.gen(function* () {
+            const { agentRows, reviewRows } = yield* rows(conversationId)
+            const { started, ends, waiting } = yield* agentsOf(agentRows)
+
+            const fromAgents = started.flatMap(({ row, agent }): ReadonlyArray<Unreported> => {
+              const subject = { agentId: agent.id, name: agent.name, askedWith: row.asked_with }
+              const requests = waiting.get(agent.id)
+
+              if (requests !== undefined) {
+                const latest = Arr.max(
+                  Arr.map(requests, ({ since }) => since),
+                  DateTime.Order,
+                )
+
+                return ifNew(
+                  row,
+                  latest,
+                  AgentReported.make({ ...subject, outcome: "waiting", reason: null }),
+                )
+              }
+
+              const ended = ends.get(agent.id)
+
+              if (ended === undefined || Predicate.isTagged(ended.ending, "Stopped")) return []
+
+              return ifNew(
+                row,
+                ended.at,
+                AgentReported.make({
+                  ...subject,
+                  outcome: endingState(ended.ending) === "failed" ? "failed" : "finished",
+                  reason: endingReason(ended.ending),
+                }),
+              )
+            })
+
+            const fromReviews = yield* Effect.forEach(
+              reviewRows,
+              (row) =>
+                reviewNow(row).pipe(
+                  Effect.map((state): ReadonlyArray<Unreported> => {
+                    const subject = { pullRequest: pullRequestOf(row), askedWith: row.asked_with }
+                    const written = finishedReview(state)
+                    const { job } = state
+
+                    if (written !== null)
+                      return ifNew(
+                        row,
+                        written.writtenAt,
+                        AgentReviewReported.make({ ...subject, outcome: "finished", reason: null }),
+                      )
+
+                    return job.status === "failed"
+                      ? ifNew(
+                          row,
+                          row.started_at,
+                          AgentReviewReported.make({
+                            ...subject,
+                            outcome: "failed",
+                            reason: job.reason.message,
+                          }),
+                        )
+                      : []
+                  }),
+                ),
+              { concurrency: "unbounded" },
+            )
+
+            return [...fromAgents, ...fromReviews.flat()]
+          }),
+        markReported: (conversationId, reported) =>
+          Effect.forEach(
+            reported,
+            ({ work, at }) => {
+              const reportedAt = DateTime.formatIso(at)
+
+              return Match.value(work).pipe(
+                Match.tagsExhaustive({
+                  Agent: ({ agentId, outcome }) =>
+                    sql`
+                      UPDATE conversation_agent SET reported_at = ${reportedAt}
+                      WHERE conversation_id = ${conversationId} AND agent_id = ${agentId}
+                    `.pipe(
+                      saved("what the Global conversation reported"),
+                      Effect.andThen(
+                        outcome === "waiting" ? Effect.void : agents.markTurnSeen(agentId, at),
+                      ),
+                    ),
+                  AgentReview: ({ pullRequest, outcome }) =>
+                    sql`
+                      UPDATE conversation_agent_review SET reported_at = ${reportedAt}
+                      WHERE conversation_id = ${conversationId} AND owner = ${pullRequest.owner}
+                        AND repo = ${pullRequest.repo} AND number = ${pullRequest.number}
+                    `.pipe(
+                      saved("what the Global conversation reported"),
+                      Effect.andThen(
+                        outcome === "finished"
+                          ? agentReviews.markReported(pullRequest, at)
+                          : Effect.void,
+                      ),
+                    ),
+                }),
+              )
+            },
+            { discard: true },
+          ),
+        changes: (conversationId) =>
+          SubscriptionRef.changes(recorded).pipe(
+            Stream.switchMap(() =>
+              Stream.unwrap(
+                Effect.gen(function* () {
+                  const ended = yield* transcripts.subscribeEnded
+                  const { agentRows, reviewRows } = yield* rows(conversationId)
+                  const agentIds = agentRows.map(({ agent_id }) => agent_id)
+
+                  return Stream.mergeAll(
+                    [
+                      ended.pipe(Stream.filter((agentId) => agentIds.includes(agentId))),
+                      transcripts.waiting.pipe(
+                        Stream.map((waiting) => agentIds.map((agentId) => waiting.get(agentId))),
+                        Stream.changesWith(Arr.makeEquivalence((a, b) => a === b)),
+                      ),
+                      ...reviewRows.map((row) =>
+                        agentReviews
+                          .watch(pullRequestOf(row))
+                          .pipe(Stream.catch(() => Stream.empty)),
+                      ),
+                    ].map((changed: Stream.Stream<unknown>) => Stream.as(changed, undefined)),
+                    { concurrency: "unbounded" },
+                  )
+                }).pipe(
+                  Effect.catch((cause) =>
+                    Effect.logWarning(
+                      "Couldn't read what the Global conversation started",
+                      cause,
+                    ).pipe(Effect.as(Stream.empty)),
+                  ),
+                ),
+              ),
+            ),
+          ),
       })
     }),
   )

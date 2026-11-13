@@ -8,7 +8,7 @@ import {
 } from "@glass/contracts"
 import { Context, Effect, Exit, FileSystem, Layer, Scope, Semaphore } from "effect"
 import type { AgentAdapter, AgentSession } from "./adapter"
-import type { DeliveredMessage } from "./deliveredMessage"
+import type { DeliveredMessage, DeliveredTurn } from "./deliveredMessage"
 import { Journal } from "./Journal"
 import { writeSentSkills } from "./sentSkills"
 import {
@@ -47,7 +47,7 @@ export class HostAgents extends Context.Service<
     readonly startTurn: (
       agentId: string,
       turnId: string,
-      message: DeliveredMessage,
+      message: DeliveredTurn,
       settings: TurnSettings,
     ) => Effect.Effect<void, HostAgentError>
     readonly steer: (

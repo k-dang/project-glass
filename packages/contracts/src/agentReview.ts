@@ -69,6 +69,8 @@ export const AgentReview = Schema.Struct({
   agentId: Schema.NullOr(Schema.String),
   /** The user marked it done in the Inbox; writing it again clears this. */
   done: Schema.Boolean,
+  /** The Global conversation reported it to the user; writing it again clears this. */
+  reported: Schema.Boolean,
 })
 
 export type AgentReview = typeof AgentReview.Type

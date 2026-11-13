@@ -3,6 +3,7 @@ import { emptyTranscript, localPlace, type ModelChoice } from "@glass/contracts"
 import { Option } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import { X } from "lucide-react"
+import { useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { placeKey } from "./agentsArea"
@@ -14,10 +15,13 @@ import {
   globalConversation,
   globalConversationOpenAtom,
   globalModelAtom,
+  globalUnseenAtom,
+  markGlobalTurnSeenAtom,
 } from "./globalConversation"
 import { ModelPicker } from "./ModelPicker"
 import { ProblemAlert } from "./ProblemAlert"
 import { settledProblem, streamProblem } from "./problems"
+import { useWindowFocused } from "./useWindowFocused"
 
 function GlobalModelPicker(props: { choice: ModelChoice }) {
   const change = useAtomSet(changeGlobalModelAtom)
@@ -55,11 +59,20 @@ function GlobalConversation() {
   const choice = Option.getOrNull(AsyncResult.value(useAtomValue(globalModelAtom)))
   const changed = useAtomValue(changeGlobalModelAtom)
   const context = useAtomValue(capturedContextAtom)
+  const markSeen = useAtomSet(markGlobalTurnSeenAtom)
+  const focused = useWindowFocused()
+  const unseen = Option.getOrNull(AsyncResult.value(useAtomValue(globalUnseenAtom)))
 
   const { turns, queued, status } = Option.getOrElse(
     AsyncResult.value(transcript),
     () => emptyTranscript,
   )
+
+  const endedAt = turns.at(-1)?.ended?.at
+
+  useEffect(() => {
+    if (focused && unseen !== null && endedAt !== undefined) markSeen(endedAt)
+  }, [markSeen, focused, unseen, endedAt])
 
   return (
     <ConversationContext value={globalConversation}>

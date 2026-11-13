@@ -5,6 +5,7 @@ import {
   ChangesRequested,
   ChecksFailing,
   finishedReview,
+  GlobalConversationNeedsYou,
   canRunQueueWork,
   type NeedsYouItem,
   NeedsYou as NeedsYouList,
@@ -32,6 +33,7 @@ import {
 } from "effect"
 import { AgentReviews } from "./AgentReviews"
 import { Agents, type FinishedAgent, type WaitingAgent } from "./Agents"
+import { GlobalConversation } from "./GlobalConversation"
 import { OutsideQuestions } from "./OutsideQuestions"
 import {
   type Mirror,
@@ -40,6 +42,7 @@ import {
   summaryOf,
 } from "./PullRequestMirror"
 import { Queue } from "./Queue"
+import type { WaitingRequest } from "./Transcripts"
 
 interface WaitingPullRequest {
   readonly pullRequest: PullRequestSummary
@@ -52,15 +55,28 @@ const order: Order.Order<NeedsYouItem> = Order.combine(
   Order.mapInput(DateTime.Order, (item: NeedsYouItem) => item.since),
 )
 
-const waitingItem = ({ agent, requests }: WaitingAgent) =>
-  AgentNeedsYou.make({
+const waitingOn = (requests: Arr.NonEmptyReadonlyArray<WaitingRequest>) => ({
+  requests: Arr.map(requests, ({ part }) => part),
+  since: Arr.min(
+    Arr.map(requests, ({ since }) => since),
+    DateTime.Order,
+  ),
+})
+
+const waitingItem = ({ agent, requests }: WaitingAgent) => {
+  const { requests: parts, since } = waitingOn(requests)
+
+  return AgentNeedsYou.make({
     agent,
-    reasons: [WaitingRequests.make({ requests: Arr.map(requests, ({ part }) => part) })],
-    since: Arr.min(
-      Arr.map(requests, ({ since }) => since),
-      DateTime.Order,
-    ),
+    reasons: [WaitingRequests.make({ requests: parts })],
+    since,
   })
+}
+
+const globalItem = (requests: ReadonlyArray<WaitingRequest>) =>
+  Arr.isReadonlyArrayNonEmpty(requests)
+    ? [GlobalConversationNeedsYou.make(waitingOn(requests))]
+    : []
 
 const finishedItem = ({ agent, ended }: FinishedAgent) =>
   AgentNeedsYou.make({ agent, reasons: [TurnFinished.make({ ended })], since: ended.at })
@@ -83,12 +99,14 @@ const needsYouOf = (
   finished: ReadonlyArray<FinishedAgent>,
   pullRequests: ReadonlyArray<WaitingPullRequest>,
   outside: ReadonlyArray<OutsideQuestion>,
+  global: ReadonlyArray<WaitingRequest>,
 ): ReadonlyArray<NeedsYouItem> =>
   Arr.sort(
     [
       ...waiting.map(waitingItem),
       ...finished.map(finishedItem),
       ...outside,
+      ...globalItem(global),
       ...pullRequestItems(pullRequests),
     ],
     order,
@@ -158,13 +176,14 @@ export class NeedsYou extends Context.Service<
       const agentReviews = yield* AgentReviews
       const questions = yield* OutsideQuestions
       const mirror = yield* PullRequestMirror
+      const conversation = yield* GlobalConversation
 
       const finishedReviewOf = (pullRequest: PullRequestSummary) =>
         agentReviews.watch(pullRequest.ref).pipe(
           Stream.map((state): WaitingPullRequest | null => {
             const review = finishedReview(state)
 
-            return review === null || review.done
+            return review === null || review.done || review.reported
               ? null
               : {
                   pullRequest,
@@ -214,9 +233,10 @@ export class NeedsYou extends Context.Service<
             agents.watchFinished(),
             waitingPullRequests,
             questions.watch(),
+            conversation.waiting,
           ).pipe(
-            Stream.map(([waiting, finished, pullRequests, asked]) =>
-              needsYouOf(waiting, finished, pullRequests, asked),
+            Stream.map(([waiting, finished, pullRequests, asked, global]) =>
+              needsYouOf(waiting, finished, pullRequests, asked, global),
             ),
             Stream.changesWith(Schema.toEquivalence(NeedsYouList)),
           ),

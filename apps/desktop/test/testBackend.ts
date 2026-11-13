@@ -133,6 +133,8 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         AnswerGlobalRequest: unused,
         GetGlobalUnsentMessage: () => Effect.succeed(nothingUnsent),
         SaveGlobalUnsentMessage: () => Effect.void,
+        WatchGlobalUnseen: () => Stream.make(null),
+        MarkGlobalTurnSeen: () => Effect.void,
         ...handlers,
       }),
     ),
