@@ -17,7 +17,7 @@ import {
   TranscriptSnapshot,
 } from "@glass/contracts"
 import { cleanup, screen, waitFor, within } from "@testing-library/react"
-import { Deferred, Effect, Exit, Predicate, Stream } from "effect"
+import { Deferred, Effect, Exit, Predicate, Stream, SubscriptionRef } from "effect"
 import { expect, it } from "vite-plus/test"
 import { placeKey } from "./agentsArea"
 import { agent, agentFields } from "../../test/agent"
@@ -57,12 +57,29 @@ interface PlaceRepository {
   readonly repository: FollowedRepository
 }
 
+const listedOnCreate = (
+  created: Array<NewAgent>,
+  listed: ReadonlyArray<Agent>,
+  creating: Effect.Effect<void> = Effect.void,
+) => {
+  const agents = Effect.runSync(SubscriptionRef.make(listed))
+
+  return {
+    WatchAgents: () => SubscriptionRef.changes(agents),
+    CreateAgent: (input: NewAgent) =>
+      creating.pipe(
+        Effect.andThen(Effect.sync(() => created.push(input))),
+        Effect.andThen(SubscriptionRef.update(agents, (all) => [...all, agent])),
+        Effect.as(agent),
+      ),
+  }
+}
+
 const newAgentHandlers = (created: Array<NewAgent>, agents: ReadonlyArray<Agent>) => ({
-  WatchAgents: () => Stream.make(agents),
+  ...listedOnCreate(created, agents),
   ListLocalCheckouts: () =>
     Effect.succeed([new LocalCheckout({ repository: agent.repository, path: "/src/greeter" })]),
   ...branchesAt({}),
-  CreateAgent: (input: NewAgent) => Effect.sync(() => created.push(input)).pipe(Effect.as(agent)),
   WatchTranscript: () =>
     Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
 })
@@ -74,11 +91,10 @@ it("starts an Agent from its first message, on the repository's default branch",
 
   const user = mount(
     {
-      WatchAgents: () => Stream.make([]),
+      ...listedOnCreate(created, []),
       ListLocalCheckouts: () =>
         Effect.succeed([new LocalCheckout({ repository: agent.repository, path: "/src/greeter" })]),
       ...branchesAt({ local: () => ["main", ["develop", "main"]] }),
-      CreateAgent: (input) => Effect.sync(() => created.push(input)).pipe(Effect.as(agent)),
       WatchTranscript: () =>
         Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
     },
@@ -294,11 +310,10 @@ it("shows the first message at once while the Agent starts", async () => {
 
   const user = mount(
     {
-      WatchAgents: () => Stream.make([]),
+      ...listedOnCreate([], [], Deferred.await(started)),
       ListLocalCheckouts: () =>
         Effect.succeed([new LocalCheckout({ repository: agent.repository, path: "/src/greeter" })]),
       ...branchesAt({}),
-      CreateAgent: () => Deferred.await(started).pipe(Effect.as(agent)),
       WatchTranscript: () =>
         Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
     },

@@ -42,6 +42,7 @@
   --radius-xl: calc(var(--radius) * 1.4);
   --radius-4xl: calc(var(--radius) * 2.6);
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 }
 
 :root,
@@ -453,6 +454,46 @@
 :active-view-transition-type(theme)::view-transition-new(root) {
   animation-duration: 200ms;
   animation-timing-function: --theme(--ease-out);
+}
+
+:active-view-transition-type(start-agent)::view-transition-old(root),
+:active-view-transition-type(start-agent)::view-transition-new(root),
+:active-view-transition-type(start-agent)::view-transition-old(new-agent-options),
+:active-view-transition-type(start-agent)::view-transition-old(new-agent-composer) {
+  animation-duration: 120ms;
+  animation-timing-function: --theme(--ease-out);
+}
+
+:active-view-transition-type(start-agent)::view-transition-group(new-agent-composer) {
+  animation-duration: 250ms;
+  animation-timing-function: --theme(--ease-in-out);
+}
+
+:active-view-transition-type(start-agent)::view-transition-new(new-agent-start) {
+  animation: start-agent-message 200ms --theme(--ease-out) 50ms both;
+}
+
+@keyframes start-agent-message {
+  from {
+    opacity: 0;
+    translate: 0 0.5rem;
+  }
+}
+
+@keyframes start-agent-message-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :active-view-transition-type(start-agent)::view-transition-group(new-agent-composer) {
+    animation: none;
+  }
+
+  :active-view-transition-type(start-agent)::view-transition-new(new-agent-start) {
+    animation-name: start-agent-message-fade;
+  }
 }
 
 .title-strip {

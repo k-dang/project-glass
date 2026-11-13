@@ -22,7 +22,7 @@ import {
   localPlace,
 } from "@glass/contracts"
 import { Data, Effect, Exit, Option, Predicate, Schema, Stream } from "effect"
-import { AsyncResult, Atom, type AtomRegistry } from "effect/reactivity"
+import { AsyncResult, Atom, AtomRegistry } from "effect/reactivity"
 import { Cloud, Laptop, type LucideIcon } from "lucide-react"
 import { toast } from "@/components/ui/toast"
 import { Backend, type BackendError, backendRuntime, backendRuntimeOf } from "./backend"
@@ -310,8 +310,19 @@ export const answerRequestAtom = Atom.family((request: AgentRequest) =>
   ),
 )
 
-export const createAgentAtom = backendRuntime.fn((input: NewAgent) =>
-  Backend.use((backend) => backend.CreateAgent(input)),
+export const createAgentAtom = backendRuntime.fn((input: NewAgent, get) =>
+  Effect.gen(function* () {
+    const created = yield* Backend.use((backend) => backend.CreateAgent(input))
+
+    yield* AtomRegistry.toStreamResult(get.registry, agentsAtom).pipe(
+      Stream.filter((agents) => agents.some(({ id }) => id === created.id)),
+      Stream.runHead,
+      Effect.ignore,
+    )
+    yield* AtomRegistry.getResult(get.registry, transcriptAtom(created.id)).pipe(Effect.ignore)
+
+    return created
+  }),
 )
 
 export const sendMessageAtom = Atom.family((agentId: string) =>
