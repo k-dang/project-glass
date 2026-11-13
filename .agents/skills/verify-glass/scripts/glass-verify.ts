@@ -401,15 +401,17 @@ const launch = async (options: {
   let fake: RunState["fake"]
   try {
     const agentsOff = !options.realAgents && !fakeBackend
-    writeAgentCommands(
-      join(paths.home, ".project-glass"),
-      agentsOff
-        ? {
-            claudeCommand: join(paths.state, "claude-disabled"),
-            piCommand: join(paths.state, "pi-disabled"),
-          }
-        : undefined,
-    )
+    if (!fakeBackend) {
+      writeAgentCommands(
+        join(paths.home, ".project-glass"),
+        agentsOff
+          ? {
+              claudeCommand: join(paths.state, "claude-disabled"),
+              piCommand: join(paths.state, "pi-disabled"),
+            }
+          : undefined,
+      )
+    }
     if (agentsOff) {
       console.log("Agents: off, so no model charges. Use --backend fake for synthetic runners.")
     }

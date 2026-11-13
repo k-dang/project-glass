@@ -13,7 +13,7 @@ import { ServerConfig } from "../src/ServerConfig"
 import { runMain, wideEventsToStdout } from "../src/wideEvents"
 import { writeAgentCommands } from "./agentCommands"
 import { bundledPi, seedDemoAgent, startDemoClaude, startDemoPi } from "./demoAgent"
-import { DEMO_REPOSITORY, seedDemoPullRequests } from "./demoPullRequests"
+import { DEMO_GATEWAY_REPOSITORY, DEMO_REPOSITORY, seedDemoPullRequests } from "./demoPullRequests"
 import { startFakeGitHub } from "./fakeGitHub"
 import { VIEWER } from "./fakePullRequest"
 import { fakeAgentRunners } from "./fakeAgentRunners"
@@ -29,7 +29,7 @@ const seedDemoSettings = (dataDirectory: string) => {
   writeFileSync(
     settings,
     JSON.stringify({
-      followedRepositories: [DEMO_REPOSITORY],
+      followedRepositories: [DEMO_REPOSITORY, DEMO_GATEWAY_REPOSITORY],
       agentReviewModels: { pi: FAKE_PI_MODEL },
     }),
   )

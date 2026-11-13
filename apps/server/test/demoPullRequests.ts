@@ -1,7 +1,9 @@
 import type { FakeGitHub } from "./fakeGitHub"
-import { type FakeChangedFile, VIEWER } from "./fakePullRequest"
+import { type FakeChangedFile, type FakePullRequestSeed, VIEWER } from "./fakePullRequest"
 
 export const DEMO_REPOSITORY = { owner: "octo-org", repo: "hello-world" } as const
+
+export const DEMO_GATEWAY_REPOSITORY = { owner: "octo-org", repo: "api-gateway" } as const
 
 export const RATE_LIMIT_TITLE = "Rate-limit the public API"
 
@@ -55,13 +57,33 @@ const added = (path: string, texts: ReadonlyArray<string>): DemoFile => ({
   },
 })
 
+type CheckRun = readonly [name: string, conclusion: "SUCCESS" | "FAILURE" | "IN_PROGRESS"]
+
+type DemoPullRequest = Omit<
+  FakePullRequestSeed,
+  "owner" | "bodyHtml" | "base" | "head" | "changedFiles" | "checks" | "checkContexts"
+> & {
+  readonly title: string
+  readonly body: string
+  readonly checkRuns?: ReadonlyArray<CheckRun>
+}
+
+const rollup = (runs: ReadonlyArray<CheckRun>) =>
+  runs.some(([, conclusion]) => conclusion === "FAILURE")
+    ? "FAILURE"
+    : runs.some(([, conclusion]) => conclusion === "IN_PROGRESS")
+      ? "PENDING"
+      : "SUCCESS"
+
+const slug = (title: string) => title.toLowerCase().replaceAll(/\W+/g, "-")
+
 const seed = (
   github: FakeGitHub,
-  pr: { title: string; author: string; body: string; reviewers: Array<string> },
+  { checkRuns, ...pr }: DemoPullRequest,
   files: ReadonlyArray<DemoFile>,
 ) => {
   const commit = (side: "base" | "head") => ({
-    sha: `${side}-${pr.title.toLowerCase().replaceAll(/\W+/g, "-")}`,
+    sha: `${side}-${slug(pr.title)}`,
     files: Object.fromEntries(
       files.flatMap((file) => (file[side] === null ? [] : [[file.path, file[side]]])),
     ),
@@ -69,11 +91,20 @@ const seed = (
 
   return github.seedPullRequest({
     ...DEMO_REPOSITORY,
-    title: pr.title,
-    author: pr.author,
-    body: pr.body,
+    headBranch: slug(pr.title),
+    ...pr,
     bodyHtml: `<p>${pr.body}</p>`,
-    requestedReviewers: pr.reviewers,
+    ...(checkRuns && {
+      checks: rollup(checkRuns),
+      checkContexts: checkRuns.map(([name, conclusion]) => ({
+        kind: "CheckRun" as const,
+        name,
+        workflow: "CI",
+        ...(conclusion === "IN_PROGRESS"
+          ? { status: "IN_PROGRESS" as const }
+          : { status: "COMPLETED" as const, conclusion }),
+      })),
+    }),
     base: commit("base"),
     head: commit("head"),
     changedFiles: files.map((file) => file.change),
@@ -241,16 +272,52 @@ export const rateLimitFiles = [
 ]
 
 export const seedDemoPullRequests = (github: FakeGitHub) => {
-  seed(
+  const rateLimit = seed(
     github,
     {
       title: RATE_LIMIT_TITLE,
       author: "hubot",
       body: "Adds a per-client token bucket in front of the public API.",
-      reviewers: [VIEWER.login],
+      requestedReviewers: [VIEWER.login],
+      checkRuns: [
+        ["build", "SUCCESS"],
+        ["lint", "SUCCESS"],
+        ["test", "IN_PROGRESS"],
+      ],
     },
     rateLimitFiles,
   )
+
+  rateLimit.addComment({
+    author: "monalisa",
+    bodyHtml: "<p>Can we ship this behind the flag first and turn it on per environment?</p>",
+  })
+
+  const proxyThread = rateLimit.addReviewThread({
+    path: "src/server/middleware.ts",
+    line: 14,
+    resolved: true,
+    comments: [
+      {
+        author: "monalisa",
+        bodyHtml: "<p>Behind the load balancer every client shares one IP.</p>",
+      },
+      {
+        author: "hubot",
+        bodyHtml: "<p>The gateway sets <code>request.ip</code> from the forwarded header.</p>",
+      },
+    ],
+  })
+
+  rateLimit.react(proxyThread.comments[1]!.id, "THUMBS_UP", "monalisa")
+
+  rateLimit.addReview({
+    author: "monalisa",
+    state: "COMMENTED",
+    bodyHtml: "<p>Looks right to me; one question on the proxy case.</p>",
+  })
+
+  const readme = modified("README.md", [...remove("Helo"), ...add("Hello")])
 
   seed(
     github,
@@ -258,14 +325,26 @@ export const seedDemoPullRequests = (github: FakeGitHub) => {
       title: "Fix the typo in the README",
       author: "monalisa",
       body: "Hello, not Helo.",
-      reviewers: [VIEWER.login],
+      requestedReviewers: [VIEWER.login],
+      checkRuns: [["build", "SUCCESS"]],
+      pendingReview: {
+        drafts: [
+          {
+            path: "README.md",
+            line: 1,
+            side: "RIGHT",
+            body: "Could this say Hello, world?",
+            diffHunk: readme.change.patch!,
+          },
+        ],
+      },
     },
-    [modified("README.md", [...remove("Helo"), ...add("Hello")])],
+    [readme],
   )
 
   const health = seed(
     github,
-    { title: "Add a health check", author: VIEWER.login, body: "Answers ok.", reviewers: [] },
+    { title: "Add a health check", author: VIEWER.login, body: "Answers ok." },
     [added("src/health.ts", ['export const health = () => "ok"'])],
   )
 
@@ -274,4 +353,105 @@ export const seedDemoPullRequests = (github: FakeGitHub) => {
     line: 1,
     comments: [{ author: "hubot", bodyHtml: "<p>Does this stay this small?</p>" }],
   })
+
+  const retries = seed(
+    github,
+    {
+      title: "Retry failed webhook deliveries",
+      author: VIEWER.login,
+      body: "Retries a failed delivery up to three times.",
+      reviewDecision: "CHANGES_REQUESTED",
+      checkRuns: [
+        ["build", "SUCCESS"],
+        ["test", "FAILURE"],
+      ],
+    },
+    [
+      modified("src/webhooks/deliver.ts", [
+        ...keep("export const deliver = async (url: string, body: string) => {"),
+        ...remove('  await fetch(url, { method: "POST", body })'),
+        ...add(
+          "  for (let attempt = 1; attempt <= 3; attempt++) {",
+          '    const response = await fetch(url, { method: "POST", body })',
+          "",
+          "    if (response.ok) return",
+          "  }",
+        ),
+        ...keep("}"),
+      ]),
+    ],
+  )
+
+  retries.addReview({
+    author: "monalisa",
+    state: "CHANGES_REQUESTED",
+    bodyHtml: "<p>Back off between attempts, or a down receiver gets three requests at once.</p>",
+  })
+
+  const slowQueries = seed(
+    github,
+    {
+      title: "Log slow database queries",
+      author: VIEWER.login,
+      body: "Logs any query slower than 500 ms.",
+      reviewDecision: "APPROVED",
+      checkRuns: [
+        ["build", "SUCCESS"],
+        ["test", "SUCCESS"],
+      ],
+    },
+    [
+      added("src/database/slowQueries.ts", [
+        "export const slowQueryMs = 500",
+        "",
+        "export const logIfSlow = (sql: string, ms: number) => {",
+        "  if (ms > slowQueryMs) console.warn(`Slow query (${ms} ms): ${sql}`)",
+        "}",
+      ]),
+    ],
+  )
+
+  slowQueries.addReview({ author: "hubot", state: "APPROVED", bodyHtml: "<p>Ship it.</p>" })
+
+  seed(
+    github,
+    {
+      title: "Sketch a dark mode toggle",
+      author: VIEWER.login,
+      body: "Not ready: the toggle doesn't persist yet.",
+      isDraft: true,
+      checkRuns: [["build", "IN_PROGRESS"]],
+    },
+    [
+      added("src/ui/darkMode.ts", [
+        "export const toggleDarkMode = () =>",
+        '  document.documentElement.classList.toggle("dark")',
+      ]),
+    ],
+  )
+
+  seed(
+    github,
+    {
+      ...DEMO_GATEWAY_REPOSITORY,
+      title: "Cache upstream responses",
+      author: "monalisa",
+      body: "Caches GET responses for the time their cache-control header allows.",
+      requestedTeams: VIEWER.teams,
+      checkRuns: [["build", "SUCCESS"]],
+    },
+    [
+      modified("src/proxy.ts", [
+        ...keep("export const proxy = async (request: Request) => {"),
+        ...add(
+          '  const cache = await caches.open("upstream")',
+          "  const cached = await cache.match(request)",
+          "",
+          "  if (cached) return cached",
+          "",
+        ),
+        ...keep("  return fetch(request)", "}"),
+      ]),
+    ],
+  )
 }
