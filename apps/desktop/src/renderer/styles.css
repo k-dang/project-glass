@@ -496,10 +496,18 @@
   }
 }
 
+:root {
+  --rail-width: 3rem;
+}
+
 .title-strip {
   height: max(2.25rem, calc(env(titlebar-area-height, 0px) + 1px));
   app-region: drag;
   user-select: none;
+}
+
+.title-strip-after-rail {
+  padding-left: max(0.5rem, calc(env(titlebar-area-x, 0px) - var(--rail-width) + 0.5rem));
 }
 
 [data-diffs-search] {

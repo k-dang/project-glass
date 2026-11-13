@@ -1,4 +1,4 @@
-import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
+import { useAtom, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
 import {
   AllowRequest,
   OutsideChoice,
@@ -132,6 +132,8 @@ const firstPermission = (item: NeedsYouItem) =>
     PullRequest: () => null,
     GlobalConversation: () => null,
   })
+
+const pickedAtom = Atom.make<string | null>(null).pipe(Atom.keepAlive)
 
 const nextRemaining = (
   previous: readonly string[],
@@ -343,7 +345,7 @@ export function Inbox() {
   const flat = sections.flatMap((section) => items.filter(inSection(section)))
   const keys = flat.map(needsYouKey)
   const order = keys.join("\n")
-  const [picked, setPicked] = useState<string | null>(null)
+  const [picked, setPicked] = useAtom(pickedAtom)
 
   const [seen, setSeen] = useState<{ order: string; keys: readonly string[] }>({
     order,

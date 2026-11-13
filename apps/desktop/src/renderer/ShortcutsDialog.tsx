@@ -48,6 +48,8 @@ const groups: ReadonlyArray<ShortcutGroup> = [
       { label: "Agents", keys: ["Mod", "5"] },
       { label: "Activity", keys: ["Mod", "6"] },
       { label: "Settings", keys: ["Mod", "7"] },
+      { label: "Back", keys: ["Mod", "←"] },
+      { label: "Forward", keys: ["Mod", "→"] },
       { label: "Open or close the Global conversation", keys: ["Mod", "J"] },
       { label: "Record a Dogfood report", keys: ["Mod", "Shift", "."] },
       { label: "Show keyboard shortcuts", keys: ["?"] },

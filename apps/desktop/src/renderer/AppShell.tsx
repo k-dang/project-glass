@@ -21,6 +21,7 @@ import { backendReachableAtom } from "./backend"
 import { ConfirmationDialog } from "./ConfirmationDialog"
 import { globalConversationOpenAtom, globalUnseenAtom } from "./globalConversation"
 import { GlobalConversationDialog } from "./GlobalConversationDialog"
+import { HistoryNav } from "./HistoryNav"
 import { NeedsYouBadge } from "./NeedsYouCount"
 import { needsYouCount as countOf, watchedNeedsYouAtom } from "./needsYou"
 import { confirmLeave, discardPromptAtom, leavesPullRequest, reviewsLinkAtom } from "./reviewsArea"
@@ -105,7 +106,7 @@ export function AppShell() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <aside className="flex w-12 shrink-0 flex-col">
+      <aside className="flex w-(--rail-width) shrink-0 flex-col">
         <div className="title-strip shrink-0 border-b" />
         <div className="flex flex-1 flex-col items-center gap-4 border-r bg-muted/40 py-3">
           <TooltipHint content="Glass" side="right">
@@ -156,7 +157,9 @@ export function AppShell() {
         </div>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="title-strip shrink-0 border-b" aria-hidden />
+        <div className="title-strip title-strip-after-rail flex shrink-0 items-center border-b pr-2">
+          <HistoryNav />
+        </div>
         <Reconnecting />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <Outlet />
