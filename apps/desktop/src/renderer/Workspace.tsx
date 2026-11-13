@@ -35,7 +35,7 @@ import {
   useState,
 } from "react"
 import { flushSync } from "react-dom"
-import { Badge } from "@/components/ui/badge"
+import { TooltipHint } from "@/components/ui/tooltip"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -738,58 +738,64 @@ function PullRequestHeader(props: {
   const { owner, repo, number } = pullRequest.ref
 
   return (
-    <header className="flex flex-col gap-2 border-b px-6 pt-4">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 lg:flex-nowrap">
-        <BackToPullRequests onBack={props.onBack} disabled={props.busy} />
-        <h1 className="order-first min-w-0 basis-full text-lg font-semibold tracking-tight wrap-anywhere lg:order-none lg:flex-1 lg:truncate">
+    <header className="flex flex-col border-b px-4">
+      <div className="flex h-11 items-center gap-2">
+        <BackToPullRequests onBack={props.onBack} disabled={props.busy} iconOnly />
+        <StateIcon pullRequest={pullRequest} />
+        <h1 className="min-w-0 truncate text-base font-semibold tracking-tight">
           {pullRequest.title} <span className="font-normal text-muted-foreground">#{number}</span>
         </h1>
-        <div className="ml-auto flex shrink-0 items-center gap-2 text-sm text-muted-foreground">
+        <span className="hidden min-w-0 shrink-[2] truncate text-sm text-muted-foreground xl:inline">
+          {owner}/{repo} by{" "}
+          <span className="font-medium text-foreground">{pullRequest.author}</span>
+        </span>
+        <div className="ml-auto flex shrink-0 items-center gap-1 text-sm text-muted-foreground">
           {props.open}
-          <span>
-            Head <ShortSha sha={revision.head} />
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={props.onReload}
-            disabled={props.busy}
-            className={cn(
-              props.changedOnGitHub &&
-                "border-amber-500/60 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 hover:text-amber-200",
-            )}
-            title={
+          <TooltipHint
+            content={
               props.changedOnGitHub
                 ? "Changed on GitHub since Glass loaded it. Reload to see it as it is now."
                 : "Reopen at the pull request's current revision"
             }
           >
-            <RotateCw className={props.reloading ? "animate-spin" : undefined} aria-hidden />
-            Reload
-          </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Reload"
+              onClick={props.onReload}
+              disabled={props.busy}
+              className={cn(
+                props.changedOnGitHub &&
+                  "bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 hover:text-amber-200",
+              )}
+            >
+              <RotateCw className={props.reloading ? "animate-spin" : undefined} aria-hidden />
+            </Button>
+          </TooltipHint>
           {props.review}
         </div>
       </div>
-      <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm text-muted-foreground">
-        <StateBadge pullRequest={pullRequest} />
-        <span>
-          {owner}/{repo}
-        </span>
-        <span aria-hidden>·</span>
-        <span className="font-medium text-foreground">{pullRequest.author}</span>
-        <span aria-hidden>·</span>
-        <Branch name={pullRequest.baseBranch} />
-        <span aria-label="from">←</span>
-        <Branch name={pullRequest.headBranch} />
-        <span aria-hidden>·</span>
-        <StatusChips pullRequest={pullRequest} />
+      <div className="flex min-w-0 items-center gap-4">
+        {props.tabs}
+        <div className="ml-auto flex min-w-0 items-center gap-2 overflow-hidden text-sm text-muted-foreground">
+          <span className="hidden min-w-0 items-center gap-1 lg:flex">
+            <Branch name={pullRequest.baseBranch} />
+            <span aria-label="from">←</span>
+            <Branch name={pullRequest.headBranch} />
+            <span className="ml-1 shrink-0">
+              Head <ShortSha sha={revision.head} />
+            </span>
+          </span>
+          <span className="flex shrink-0 items-center gap-1">
+            <StatusChips pullRequest={pullRequest} />
+          </span>
+        </div>
       </div>
-      {props.tabs}
     </header>
   )
 }
 
-const badges: Record<
+const states: Record<
   PullRequestState,
   { readonly label: string; readonly icon: LucideIcon; readonly className: string }
 > = {
@@ -799,20 +805,23 @@ const badges: Record<
   merged: { label: "Merged", icon: GitMerge, className: "bg-violet-600 text-white" },
 }
 
-function StateBadge(props: { pullRequest: PullRequest }) {
-  const { label, icon: Icon, className } = badges[props.pullRequest.state]
+function StateIcon(props: { pullRequest: PullRequest }) {
+  const { label, icon: Icon, className } = states[props.pullRequest.state]
 
   return (
-    <Badge className={className}>
-      <Icon data-icon="inline-start" aria-hidden />
-      {label}
-    </Badge>
+    <TooltipHint content={label}>
+      <span
+        className={cn("flex size-5 shrink-0 items-center justify-center rounded-full", className)}
+      >
+        <Icon aria-label={label} className="size-3" />
+      </span>
+    </TooltipHint>
   )
 }
 
 function Branch(props: { name: string }) {
   return (
-    <code className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">
+    <code className="min-w-0 truncate rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">
       {props.name}
     </code>
   )
