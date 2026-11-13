@@ -13,7 +13,7 @@ import {
   stopsOnYou,
   type TurnEnding,
 } from "@glass/contracts"
-import { Link, useNavigate } from "@tanstack/react-router"
+import { Link } from "@tanstack/react-router"
 import { cn } from "cn"
 import { Array as Arr, DateTime, Match, Option, Predicate } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
@@ -271,7 +271,6 @@ function InboxSections(props: {
               <li key={key}>
                 <button
                   type="button"
-                  data-inbox-row={key}
                   aria-current={key === props.selectedKey ? "true" : undefined}
                   className="flex w-full items-start gap-3 rounded-md px-2 py-2 text-left text-sm outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring aria-[current=true]:bg-accent"
                   onClick={() => props.onPick(key)}
@@ -336,10 +335,8 @@ export function Inbox() {
   const now = useMinuteClock()
   const retry = useAtomRefresh(needsYouStreamAtom)
 
-  const navigate = useNavigate()
   const markReview = useAtomSet(readAgentReviewOnOpenAtom)
   const markDone = useAtomSet(markDoneAtom)
-  const openGlobal = useAtomSet(globalConversationOpenAtom)
 
   const items = AsyncResult.isSuccess(status) ? status.value : []
 
@@ -373,26 +370,7 @@ export function Inbox() {
     ),
   )
 
-  const openSelected = () => {
-    if (selected === null) return
-
-    Match.valueTags(selected, {
-      Agent: ({ agent }) =>
-        void navigate({ to: "/agents/$agentId", params: { agentId: agent.id } }),
-      OutsideQuestion: () => undefined,
-      PullRequest: ({ pullRequest }) =>
-        void navigate({ to: "/reviews/$owner/$repo/$number", params: pullRequest.ref }),
-      GlobalConversation: () => openGlobal(true),
-    })
-  }
-
   useShortcuts([
-    {
-      key: "Enter",
-      skipOnControl: true,
-      except: "[data-inbox-row]",
-      run: openSelected,
-    },
     {
       key: "e",
       run: () => {
@@ -421,11 +399,6 @@ export function Inbox() {
             Inbox <InboxCount status={status} />
           </h1>
           <p className="flex flex-wrap items-center justify-end gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
-            <span className="inline-flex items-center gap-1">
-              <Kbd>Enter</Kbd>
-              open
-            </span>
-            <span aria-hidden>·</span>
             <span className="inline-flex items-center gap-1">
               <Kbd>E</Kbd>
               done

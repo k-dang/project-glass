@@ -6,8 +6,6 @@ interface Shortcut {
   readonly allowShift?: boolean
   readonly allowInEditable?: boolean
   readonly allowInDialog?: boolean
-  readonly skipOnControl?: boolean
-  readonly except?: string
   readonly run: () => void
 }
 
@@ -24,23 +22,14 @@ export function useShortcuts(shortcuts: ReadonlyArray<Shortcut>) {
       target.matches('dialog, [role="dialog"], [role="alertdialog"]'),
     )
 
-    const controls = "a, button, [role='link'], [role='button']"
-
-    const owner =
-      elements.find((target) => target.matches(controls)) ??
-      (event.target instanceof Element ? event.target.closest(controls) : null)
-
     for (const shortcut of shortcuts) {
-      const passthrough = shortcut.except !== undefined && owner?.matches(shortcut.except) === true
-
       if (
         event.key.toLowerCase() !== shortcut.key.toLowerCase() ||
         (event.metaKey || event.ctrlKey) !== (shortcut.mod ?? false) ||
         event.altKey ||
         (event.shiftKey && !shortcut.allowShift) ||
         (editable && !shortcut.allowInEditable) ||
-        (dialog && !shortcut.allowInDialog) ||
-        (shortcut.skipOnControl && owner !== null && !passthrough)
+        (dialog && !shortcut.allowInDialog)
       )
         continue
 
