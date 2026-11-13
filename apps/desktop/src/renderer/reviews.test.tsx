@@ -19,6 +19,9 @@ import {
   PullRequestWorkspace,
   noListings,
   referenceKey,
+  type LatestPullRequestListings,
+  ListFailed,
+  Listed,
   type PullRequestListings,
   type RepositoryListing,
   RepositoryPullRequests,
@@ -29,7 +32,7 @@ import {
 import { RegistryProvider } from "@effect/atom-react"
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { DateTime, Effect } from "effect"
+import { DateTime, Effect, Predicate, PubSub, Stream } from "effect"
 import { AtomRegistry } from "effect/reactivity"
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test"
 import { App } from "./App"
@@ -42,8 +45,16 @@ import {
   reloadPullRequest,
   targetAtom,
 } from "./reviewsArea"
+import { eventually } from "../../test/eventually"
 import { openReview } from "../../test/finishReview"
-import { type Held, hold, next, testLayer, testRegistry } from "../../test/testBackend"
+import {
+  type Handlers,
+  type Held,
+  hold,
+  next,
+  testLayer,
+  testRegistry,
+} from "../../test/testBackend"
 import { viewer } from "../../test/workspace"
 
 const glass = new FollowedRepository({ owner: "octo-org", repo: "glass" })
@@ -100,6 +111,57 @@ const listings = (
 const needing = (...repositories: ReadonlyArray<RepositoryListing>) =>
   listings({ "needs-review": repositories })
 
+const showing = (shown: PullRequestListings) =>
+  Stream.concat(Stream.make(Listed.make({ listings: shown, problem: null })), Stream.never)
+
+type ListCall = Held<void, PullRequestListings, ConnectionError | SettingsError>
+
+const fakeLists = (saved?: PullRequestListings) => {
+  const updates = Effect.runSync(PubSub.unbounded<LatestPullRequestListings>({ replay: 1 }))
+  const syncs: Array<ListCall> = []
+  let last = saved
+  let watchers = 0
+
+  const publish = (update: LatestPullRequestListings) =>
+    Effect.runSync(PubSub.publish(updates, update))
+
+  const settle = (result: Effect.Effect<PullRequestListings, ConnectionError | SettingsError>) =>
+    result.pipe(
+      Effect.tap((shown) =>
+        Effect.sync(() => {
+          last = shown
+          publish(Listed.make({ listings: shown, problem: null }))
+        }),
+      ),
+      Effect.tapError((problem) =>
+        Effect.sync(() =>
+          publish(
+            last === undefined
+              ? ListFailed.make({ problem })
+              : Listed.make({ listings: last, problem }),
+          ),
+        ),
+      ),
+    )
+
+  if (saved !== undefined) publish(Listed.make({ listings: saved, problem: null }))
+
+  return {
+    syncs,
+    watchers: () => watchers,
+    finish: (result: Effect.Effect<PullRequestListings, ConnectionError | SettingsError>) =>
+      void Effect.runSync(Effect.exit(settle(result))),
+    handlers: {
+      WatchPullRequests: () =>
+        Stream.fromPubSub(updates).pipe(
+          Stream.onStart(Effect.sync(() => void watchers++)),
+          Stream.ensuring(Effect.sync(() => void watchers--)),
+        ),
+      ListPullRequests: () => settle(hold(syncs)(undefined)),
+    } satisfies Partial<Handlers>,
+  }
+}
+
 const workspaceOf = (
   pr: PullRequestSummary,
   head: string,
@@ -144,7 +206,7 @@ const mount = (handlers: Parameters<typeof testLayer>[0]) => {
     GetConnection: () =>
       Effect.succeed(new GitHubConnection({ login: "kevin", tokenSource: "gh" })),
     ListFollowedRepositories: () => Effect.succeed([glass, effect, quiet]),
-    ListPullRequests: () => Effect.succeed(needing(...needsReview)),
+    WatchPullRequests: () => showing(needing(...needsReview)),
     HasPullRequestChanged: () => Effect.succeed(false),
     SubmitReview: () => Effect.die("Navigation must not submit a Review"),
     ReplyToDiscussion: () => Effect.die("Navigation must not publish a Reply"),
@@ -200,8 +262,8 @@ it("names a repository by its owner too when another listed repository shares it
   const fork = new FollowedRepository({ owner: "mona", repo: "glass" })
 
   mount({
-    ListPullRequests: () =>
-      Effect.succeed(
+    WatchPullRequests: () =>
+      showing(
         needing(
           ...needsReview,
           new RepositoryPullRequests({
@@ -218,26 +280,27 @@ it("names a repository by its owner too when another listed repository shares it
 })
 
 it("distinguishes no followed repositories, no PRs needing review, and a failed load", async () => {
-  const lists: Array<ListCall> = []
+  const lists = fakeLists()
 
   const user = mount({
-    ListPullRequests: hold(lists),
+    ...lists.handlers,
     FollowRepository: () => Effect.succeed([quiet]),
   })
 
-  ;(await next(lists)).answer(Effect.fail(new GitHubUnavailable({ message: "Try again later." })))
+  lists.finish(Effect.fail(new GitHubUnavailable({ message: "Try again later." })))
   expect((await screen.findByRole("alert")).textContent).toContain("Try again later.")
   expect(screen.queryByText("No PRs need your review")).toBeNull()
 
   await user.click(screen.getByRole("button", { name: "Retry" }))
-  ;(await next(lists)).answer(Effect.succeed(listings({})))
+  ;(await next(lists.syncs)).answer(Effect.succeed(listings({})))
   await user.click(await screen.findByRole("link", { name: "Follow repositories" }))
   await user.type(screen.getByRole("textbox", { name: "Repository" }), "octo-org/quiet{Enter}")
   await screen.findByRole("button", { name: "Unfollow octo-org/quiet" })
+  lists.finish(Effect.succeed(needing(listed(quiet, []))))
   await user.click(screen.getByRole("link", { name: "Reviews" }))
-  ;(await next(lists)).answer(Effect.succeed(needing(listed(quiet, []))))
   await screen.findByText("No PRs need your review")
   expect(screen.queryByRole("link", { name: "Follow repositories" })).toBeNull()
+  expect(lists.syncs).toHaveLength(0)
 })
 
 it("arranges PRs by repository, kept through Back to PRs", async () => {
@@ -360,8 +423,6 @@ it("scopes Copy to every loaded PR workspace tab and removes it when leaving", a
   expect(screen.queryByRole("dialog", { name: "Copy" })).toBeNull()
 })
 
-type ListCall = Held<void, PullRequestListings, ConnectionError | SettingsError>
-
 const listed = (repository: FollowedRepository, pullRequests: ReadonlyArray<PullRequestSummary>) =>
   new RepositoryPullRequests({ repository, pullRequests })
 
@@ -380,111 +441,81 @@ const setDocumentVisible = (visible: boolean) => {
   document.dispatchEvent(new Event("visibilitychange"))
 }
 
-it("refreshes on entry, window focus, every 30 seconds while visible, and on request", async () => {
-  vi.useFakeTimers({ shouldAdvanceTime: true })
-  const requests: Array<void> = []
+it("shows each sync while Reviews is visible, and asks for one only on Refresh", async () => {
+  const lists = fakeLists(needing(...needsReview))
+  const user = mount(lists.handlers)
 
-  const user = mount({
-    ListPullRequests: (request) => {
-      requests.push(request)
-
-      return Effect.succeed(needing(...needsReview))
-    },
-  })
-
-  const refreshed = (count: number) => waitFor(() => expect(requests).toHaveLength(count))
-  await refreshed(1)
   await rowFor("Greet the world")
+  expect(lists.watchers()).toBe(1)
+  lists.finish(Effect.succeed(needing(listed(glass, [wave]))))
+  await waitFor(() => expect(screen.queryByRole("button", { name: /^Greet/ })).toBeNull())
 
-  act(() => void vi.advanceTimersByTime(30_000))
-  await refreshed(2)
   act(() => void window.dispatchEvent(new Event("focus")))
-  await refreshed(3)
   await user.click(screen.getByRole("button", { name: "Refresh" }))
-  await refreshed(4)
+  ;(await next(lists.syncs)).answer(Effect.succeed(needing(...needsReview)))
+  await rowFor("Greet the world")
+  expect(lists.syncs).toHaveLength(0)
 
   act(() => setDocumentVisible(false))
-  act(() => void vi.advanceTimersByTime(180_000))
+  await eventually(() => expect(lists.watchers()).toBe(0))
   act(() => setDocumentVisible(true))
-  await refreshed(5)
+  await eventually(() => expect(lists.watchers()).toBe(1))
 
-  await user.click(screen.getByRole("link", { name: "Settings" }))
-  act(() => void vi.advanceTimersByTime(180_000))
-  act(() => void window.dispatchEvent(new Event("focus")))
-  expect(requests).toHaveLength(5)
+  await user.click(screen.getByRole("link", { name: "Inbox" }))
+  await eventually(() => expect(lists.watchers()).toBe(0))
   await user.click(screen.getByRole("link", { name: "Reviews" }))
-  await refreshed(6)
+  await eventually(() => expect(lists.watchers()).toBe(1))
+  expect(lists.syncs).toHaveLength(0)
 })
 
-it("shows cached rows on return and refreshes them behind the list once stale", async () => {
-  vi.useFakeTimers({ shouldAdvanceTime: true })
-  const calls: Array<ListCall> = []
+it("shows the last rows at once on return to Reviews", async () => {
+  let subscriptions = 0
 
-  const user = mount({ ListPullRequests: hold(calls) })
+  const user = mount({
+    WatchPullRequests: () =>
+      subscriptions++ === 0 ? showing(needing(listed(glass, [wave]))) : Stream.never,
+  })
 
-  ;(await next(calls)).answer(Effect.succeed(needing(listed(glass, [wave]))))
   await rowFor("Wave at the world")
-
   await user.click(screen.getByRole("link", { name: "Settings" }))
   await user.click(screen.getByRole("link", { name: "Reviews" }))
   await rowFor("Wave at the world")
-  expect(calls).toHaveLength(0)
-
-  await user.click(screen.getByRole("link", { name: "Settings" }))
-  act(() => void vi.advanceTimersByTime(30_000))
-  await user.click(screen.getByRole("link", { name: "Reviews" }))
-  const revalidation = await next(calls)
   expect(screen.queryByText("Loading PRs…")).toBeNull()
-  await rowFor("Wave at the world")
-  revalidation.answer(Effect.succeed(needing(listed(glass, [greet]))))
-  await rowFor("Greet the world")
+  expect(subscriptions).toBe(2)
 })
 
 const refresh = () => screen.getByRole("button", { name: "Refresh" })
 
-it("shows the saved list while GitHub answers, and spins Refresh only when asked", async () => {
-  const calls: Array<ListCall> = []
-
-  const user = mount({
-    ListSavedPullRequests: () => Effect.succeed(needing(listed(glass, [wave]))),
-    ListPullRequests: hold(calls),
-  })
+it("spins Refresh only while the sync it asked for runs", async () => {
+  const lists = fakeLists(needing(listed(glass, [wave])))
+  const user = mount(lists.handlers)
 
   await rowFor("Wave at the world")
-  const background = await next(calls)
-  expect(refresh().getAttribute("aria-busy")).toBe("false")
-  background.answer(Effect.succeed(needing(listed(glass, [greet]))))
+  lists.finish(Effect.succeed(needing(listed(glass, [greet]))))
   await rowFor("Greet the world")
-  expect(screen.queryByRole("button", { name: /^Wave/ })).toBeNull()
+  expect(refresh().getAttribute("aria-busy")).toBe("false")
 
   await user.click(refresh())
-  const asked = await next(calls)
+  const asked = await next(lists.syncs)
   expect(refresh().getAttribute("aria-busy")).toBe("true")
   asked.answer(Effect.succeed(needing(listed(glass, [greet]))))
   await waitFor(() => expect(refresh().getAttribute("aria-busy")).toBe("false"))
-
-  act(() => void window.dispatchEvent(new Event("focus")))
-  const later = await next(calls)
-  expect(refresh().getAttribute("aria-busy")).toBe("false")
-  later.answer(Effect.succeed(needing(listed(glass, [greet]))))
 })
 
 it("keeps healthy repositories usable and a failed repository's rows marked not refreshed until a refresh", async () => {
-  const calls: Array<ListCall> = []
-  const user = mount({ ListPullRequests: hold(calls) })
+  const lists = fakeLists()
+  const user = mount(lists.handlers)
 
   const fibers = summary(effect, 7, "Speed up fibers")
 
-  ;(await next(calls)).answer(
-    Effect.succeed(needing(listed(effect, [fibers]), listed(glass, [wave, greet]))),
-  )
+  lists.finish(Effect.succeed(needing(listed(effect, [fibers]), listed(glass, [wave, greet]))))
   await rowFor("Greet the world")
 
   await user.click(screen.getByRole("button", { name: "Refresh" }))
 
   const streams = summary(effect, 8, "Speed up streams")
 
-  ;(await next(calls)).answer(
+  ;(await next(lists.syncs)).answer(
     Effect.succeed(needing(listed(effect, [streams]), offline(glass, [wave, greet]))),
   )
 
@@ -497,7 +528,7 @@ it("keeps healthy repositories usable and a failed repository's rows marked not 
   expect(screen.queryByRole("button", { name: "Retry" })).toBeNull()
 
   await user.click(screen.getByRole("button", { name: "Refresh" }))
-  const retry = await next(calls)
+  const retry = await next(lists.syncs)
   expect(screen.getByRole("button", { name: /^Speed up streams/ })).toBeTruthy()
   retry.answer(Effect.succeed(needing(listed(effect, [streams]), listed(glass, [greet]))))
   await waitFor(() => expect(screen.queryByRole("button", { name: /^Wave/ })).toBeNull())
@@ -506,30 +537,33 @@ it("keeps healthy repositories usable and a failed repository's rows marked not 
 })
 
 it("shows a failed repository without rows instead of an empty list, and keeps rows through a failed refresh", async () => {
-  const calls: Array<ListCall> = []
+  const lists = fakeLists()
+  const user = mount(lists.handlers)
 
-  const user = mount({ ListPullRequests: hold(calls) })
-
-  ;(await next(calls)).answer(Effect.succeed(needing(offline(glass), listed(quiet, []))))
+  lists.finish(Effect.succeed(needing(offline(glass), listed(quiet, []))))
   await screen.findByText("Couldn't load octo-org/glass")
   expect(screen.queryByText("No PRs need your review")).toBeNull()
   expect(screen.queryByRole("region", { name: "octo-org/quiet" })).toBeNull()
 
   await user.click(screen.getByRole("button", { name: "Retry" }))
-  ;(await next(calls)).answer(Effect.succeed(needing(listed(glass, [wave]))))
+  ;(await next(lists.syncs)).answer(Effect.succeed(needing(listed(glass, [wave]))))
   await rowFor("Wave at the world")
   await user.click(screen.getByRole("button", { name: "Refresh" }))
-  ;(await next(calls)).answer(Effect.fail(new GitHubUnavailable({ message: "Try again later." })))
+  ;(await next(lists.syncs)).answer(
+    Effect.fail(new GitHubUnavailable({ message: "Try again later." })),
+  )
   await listNotRefreshed("Try again later.")
   expect(screen.getByRole("button", { name: /^Wave at the world/ }).textContent).toContain(
     "Not refreshed",
   )
 
   await user.click(screen.getByRole("button", { name: "Refresh" }))
-  ;(await next(calls)).answer(Effect.succeed(needing(listed(glass, []))))
+  ;(await next(lists.syncs)).answer(Effect.succeed(needing(listed(glass, []))))
   await screen.findByText("No PRs need your review")
   await user.click(screen.getByRole("button", { name: "Refresh" }))
-  ;(await next(calls)).answer(Effect.fail(new GitHubUnavailable({ message: "Try again later." })))
+  ;(await next(lists.syncs)).answer(
+    Effect.fail(new GitHubUnavailable({ message: "Try again later." })),
+  )
   await listNotRefreshed("Try again later.")
   expect(screen.queryByText("No PRs need your review")).toBeNull()
 })
@@ -1095,17 +1129,18 @@ it("reopens a PR without discarded feedback, and keeps it open when a Reload can
 
 it("returns to Reviewing after opening a PR", async () => {
   window.history.replaceState(null, "", "#/reviews?list=reviewing")
-  let touched = false
+
+  const lists = fakeLists(listings({ reviewing: [listed(glass, [])] }))
 
   const user = mount({
-    ListPullRequests: () =>
-      Effect.succeed(listings({ reviewing: [listed(glass, touched ? [greet] : [])] })),
-    LoadPullRequest: () =>
+    ...lists.handlers,
+    RecordActivity: (activity) =>
       Effect.sync(() => {
-        touched = true
-
-        return workspaceOf(greet, "head001")
+        if (Predicate.isTagged(activity, "PullRequestOpened")) {
+          lists.finish(Effect.succeed(listings({ reviewing: [listed(glass, [greet])] })))
+        }
       }),
+    LoadPullRequest: () => Effect.succeed(workspaceOf(greet, "head001")),
   })
 
   await screen.findByText("No PRs to resume")
@@ -1287,19 +1322,20 @@ it("switches between the PR lists, opens a PR from each, and Back to PRs returns
   const myDraft = summary(glass, 50, "Sketch the inbox", { author: "kevin", isDraft: true })
   const revisited = summary(effect, 9, "Trim the scheduler", { author: "mona" })
 
-  let requests = 0
+  let subscriptions = 0
 
   const user = mount({
-    ListPullRequests: () =>
-      Effect.sync(() => {
-        requests++
+    WatchPullRequests: () => {
+      subscriptions++
 
-        return listings({
+      return showing(
+        listings({
           "needs-review": needsReview,
           "my-prs": [listed(glass, [myDraft])],
           reviewing: [listed(effect, [revisited])],
-        })
-      }),
+        }),
+      )
+    },
     LoadPullRequest: ({ pullRequest }) => {
       opens.push(pullRequest)
 
@@ -1321,10 +1357,10 @@ it("switches between the PR lists, opens a PR from each, and Back to PRs returns
   ])
 
   await rowFor("Greet the world")
-  const loaded = requests
+  const loaded = subscriptions
   await user.click(screen.getByRole("tab", { name: "My PRs" }))
   const mine = await screen.findByRole("tabpanel", { name: "My PRs" })
-  expect(requests).toBe(loaded)
+  expect(subscriptions).toBe(loaded)
   expect(within(mine).queryByText("Greet the world")).toBeNull()
   expect(
     (await within(mine).findByRole("button", { name: /^Sketch the inbox/ })).textContent,

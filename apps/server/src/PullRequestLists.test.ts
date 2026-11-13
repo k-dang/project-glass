@@ -2,6 +2,7 @@ import { afterEach, assert, describe, it } from "@effect/vitest"
 import {
   FollowedRepository,
   GitHubUnavailable,
+  type LatestPullRequestListings,
   PullRequestList,
   type PullRequestListings,
   PullRequestRef,
@@ -10,10 +11,12 @@ import {
   RepositoryPullRequests,
   RepositoryUnavailable,
 } from "@glass/contracts"
-import { DateTime, Effect } from "effect"
+import { Clock, DateTime, Effect, Option, Predicate, Queue, Stream } from "effect"
+import { TestClock } from "effect/testing"
 import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { vi } from "vite-plus/test"
+import { watchDeadlines } from "../test/deadlines"
 import { type FakeGitHub, startFakeGitHub } from "../test/fakeGitHub"
 import type { FakePullRequest } from "../test/fakePullRequest"
 import { VIEWER } from "../test/fakePullRequest"
@@ -75,6 +78,45 @@ const membership = Effect.fnUntraced(function* (
       byList.flatMap(([list, members]) => (members.has(pr.url) ? [list] : [])),
     ]),
   )
+})
+
+const firstUpdate = (client: Client) =>
+  client.WatchPullRequests().pipe(Stream.runHead, Effect.map(Option.getOrThrow))
+
+const listingsIn = (update: LatestPullRequestListings) =>
+  Predicate.isTagged(update, "Listed") ? update.listings : undefined
+
+const requestedNumbers = (update: LatestPullRequestListings) =>
+  (listingsIn(update)?.["needs-review"] ?? []).flatMap((listing) =>
+    listing.pullRequests.map((pr) => pr.ref.number),
+  )
+
+const follow = Effect.fnUntraced(function* (client: Client, input: string) {
+  yield* client.FollowRepository({ input })
+  yield* client.WatchPullRequests().pipe(
+    Stream.filter((update) =>
+      (listingsIn(update)?.["my-prs"] ?? []).some(
+        ({ repository }) => `${repository.owner}/${repository.repo}` === input,
+      ),
+    ),
+    Stream.runHead,
+  )
+})
+
+const watching = Effect.fnUntraced(function* (client: Client) {
+  const updates = yield* Queue.unbounded<LatestPullRequestListings>()
+  yield* client.WatchPullRequests().pipe(
+    Stream.runForEach((update) => Queue.offer(updates, update)),
+    Effect.forkScoped,
+  )
+
+  return Effect.fnUntraced(function* (until: (update: LatestPullRequestListings) => boolean) {
+    for (;;) {
+      const update = yield* Queue.take(updates)
+
+      if (until(update)) return update
+    }
+  })
 })
 
 const operations = (github: FakeGitHub) =>
@@ -525,14 +567,13 @@ describe("Keeping up with GitHub", () => {
   it.live("catches up on what changed since the last sync without reading every PR", () =>
     Effect.gen(function* () {
       const { github, client } = yield* startSignedInBackend
-      yield* client.FollowRepository({ input: "octo-org/glass" })
       const seed = { owner: "octo-org", repo: "glass", requestedReviewers: [VIEWER.login] }
 
       const [closing, ...others] = Array.from({ length: 150 }, (_, index) =>
         github.seedPullRequest({ ...seed, updatedAt: minute(index), base, head }),
       )
 
-      yield* listed(client, "needs-review")
+      yield* follow(client, "octo-org/glass")
       const firstSync = github.graphQLRequests.length
       closing!.edit({ state: "CLOSED" })
       const added = github.seedPullRequest({ ...seed, base, head })
@@ -583,7 +624,7 @@ describe("Keeping up with GitHub", () => {
   it.live("reads checks for listed PRs only, and shows them as they change", () =>
     Effect.gen(function* () {
       const { github, client } = yield* startSignedInBackend
-      yield* client.FollowRepository({ input: "octo-org/glass" })
+      yield* follow(client, "octo-org/glass")
       const seed = { owner: "octo-org", repo: "glass", base, head }
 
       const pr = github.seedPullRequest({
@@ -744,38 +785,125 @@ describe("Keeping up with GitHub", () => {
   )
 })
 
-describe("Saved lists", () => {
-  it.live("keeps the lists across restarts, without asking GitHub", () =>
+describe("Watching", () => {
+  it.effect("syncs at once for a new watcher, then every 30 seconds while watched", () =>
+    Effect.gen(function* () {
+      const { watched, deadlineSet } = yield* watchDeadlines(30_000)
+      const github = yield* startFakeGitHub()
+
+      const { client } = yield* startBackend({
+        GH_TOKEN: VIEWER.token,
+        GLASS_GITHUB_API_URL: github.url,
+      }).pipe(Effect.provideService(Clock.Clock, watched))
+
+      yield* client.FollowRepository({ input: "octo-org/glass" })
+      const seed = { owner: "octo-org", repo: "glass", requestedReviewers: [VIEWER.login] }
+      const first = github.seedPullRequest({ ...seed, base, head })
+      const latest = yield* watching(client)
+
+      yield* latest((update) => requestedNumbers(update).includes(first.number))
+      yield* deadlineSet
+      const second = github.seedPullRequest({ ...seed, base, head })
+      yield* TestClock.adjust("30 seconds")
+
+      yield* latest((update) => requestedNumbers(update).includes(second.number))
+    }),
+  )
+
+  it.effect("goes back to syncing every two minutes once the last watcher leaves", () =>
+    Effect.gen(function* () {
+      const { watched, deadlineSet } = yield* watchDeadlines(120_000)
+      const github = yield* startFakeGitHub()
+
+      const { client } = yield* startBackend({
+        GH_TOKEN: VIEWER.token,
+        GLASS_GITHUB_API_URL: github.url,
+      }).pipe(Effect.provideService(Clock.Clock, watched))
+
+      yield* deadlineSet
+      yield* client.FollowRepository({ input: "octo-org/glass" })
+      yield* client.WatchPullRequests().pipe(Stream.runHead)
+
+      yield* deadlineSet
+    }),
+  )
+
+  it.live("tells watchers why a sync failed, until one succeeds", () =>
+    Effect.gen(function* () {
+      const { github, client } = yield* startSignedInBackend
+      yield* client.FollowRepository({ input: "octo-org/glass" })
+      github.beforeNext("/user/teams", () => github.failNext(503))
+      const latest = yield* watching(client)
+
+      const failed = yield* latest(({ problem }) => problem !== null)
+      assert.strictEqual(failed._tag, "ListFailed")
+      assert.instanceOf(failed.problem, GitHubUnavailable)
+
+      yield* client.ListPullRequests()
+      yield* latest((update) => Predicate.isTagged(update, "Listed") && update.problem === null)
+    }),
+  )
+
+  it.live("clears a failed sync once a sync succeeds with nothing followed", () =>
+    Effect.gen(function* () {
+      const { github, client } = yield* startSignedInBackend
+      yield* client.FollowRepository({ input: "octo-org/glass" })
+      github.beforeNext("/user/teams", () => github.failNext(503))
+      const latest = yield* watching(client)
+      yield* latest(({ problem }) => problem !== null)
+
+      yield* client.UnfollowRepository({
+        repository: new FollowedRepository({ owner: "octo-org", repo: "glass" }),
+      })
+      yield* client.ListPullRequests()
+
+      yield* latest(
+        (update) =>
+          Predicate.isTagged(update, "Listed") &&
+          update.problem === null &&
+          update.listings["needs-review"].length === 0,
+      )
+    }),
+  )
+
+  it.live("moves an opened PR into Reviewing for watchers without asking GitHub", () =>
+    Effect.gen(function* () {
+      const { github, client } = yield* startSignedInBackend
+      yield* client.FollowRepository({ input: "octo-org/glass" })
+      const pr = github.seedPullRequest({ owner: "octo-org", repo: "glass", base, head })
+      const latest = yield* watching(client)
+      yield* latest(Predicate.isTagged("Listed"))
+
+      yield* openPullRequest(client, new PullRequestRef(pr))
+      const asked = github.graphQLRequests.length
+
+      const reviewing = yield* latest((update) =>
+        (listingsIn(update)?.reviewing ?? []).some((listing) => listing.pullRequests.length > 0),
+      )
+
+      assert.deepStrictEqual(numbers(listingsIn(reviewing)?.reviewing ?? []), [
+        { repository: "octo-org/glass", numbers: [pr.number] },
+      ])
+      assert.strictEqual(github.graphQLRequests.length, asked)
+    }),
+  )
+
+  it.live("shows a new watcher the lists saved by the last run when GitHub can't answer", () =>
     Effect.gen(function* () {
       const home = yield* isolatedHome
       const github = yield* startFakeGitHub()
       const env = { GH_TOKEN: VIEWER.token, GLASS_GITHUB_API_URL: github.url }
       const { client } = yield* startBackend(env, home)
-      yield* client.FollowRepository({ input: "octo-org/broken" })
       yield* client.FollowRepository({ input: "octo-org/glass" })
-      const seed = { requestedReviewers: [VIEWER.login], base, head }
-      const broken = github.seedPullRequest({ owner: "octo-org", repo: "broken", ...seed })
-      const healthy = github.seedPullRequest({ owner: "octo-org", repo: "glass", ...seed })
-
-      assert.isNull(yield* client.ListSavedPullRequests())
+      const seed = { owner: "octo-org", repo: "glass", requestedReviewers: [VIEWER.login] }
+      const pr = github.seedPullRequest({ ...seed, base, head })
       yield* client.ListPullRequests()
+      pr.edit({ state: "CLOSED" })
+      github.unavailableRepositories.add("octo-org/glass")
 
       const restarted = yield* startBackend(env, home)
-      const asked = github.graphQLRequests.length
-      const saved = yield* restarted.client.ListSavedPullRequests()
-      assert.strictEqual(github.graphQLRequests.length, asked)
-      assert.deepStrictEqual(numbers(saved!["needs-review"]), [
-        { repository: "octo-org/broken", numbers: [broken.number] },
-        { repository: "octo-org/glass", numbers: [healthy.number] },
-      ])
 
-      yield* restarted.client.UnfollowRepository({
-        repository: new FollowedRepository({ owner: "octo-org", repo: "broken" }),
-      })
-      assert.deepStrictEqual(
-        numbers((yield* restarted.client.ListSavedPullRequests())!["needs-review"]),
-        [{ repository: "octo-org/glass", numbers: [healthy.number] }],
-      )
+      assert.deepStrictEqual(requestedNumbers(yield* firstUpdate(restarted.client)), [pr.number])
     }),
   )
 
@@ -792,12 +920,13 @@ describe("Saved lists", () => {
       yield* client.FollowRepository({ input: "octo-org/glass" })
       const seed = { owner: "octo-org", repo: "glass", requestedReviewers: [VIEWER.login] }
       const pr = github.seedPullRequest({ ...seed, base, head })
-
-      assert.isNull(yield* client.ListSavedPullRequests())
       yield* client.ListPullRequests()
-      assert.deepStrictEqual(numbers((yield* client.ListSavedPullRequests())!["needs-review"]), [
-        { repository: "octo-org/glass", numbers: [pr.number] },
-      ])
+      pr.edit({ state: "CLOSED" })
+      github.unavailableRepositories.add("octo-org/glass")
+
+      const restarted = yield* startBackend(env, home)
+
+      assert.deepStrictEqual(requestedNumbers(yield* firstUpdate(restarted.client)), [pr.number])
     }),
   )
 })

@@ -7,7 +7,7 @@ import {
   LoggedActivity,
   PullRequestRef,
 } from "@glass/contracts"
-import { Context, DateTime, Effect, Layer, Option, Schema } from "effect"
+import { Context, DateTime, Effect, Layer, Option, Schema, Stream, SubscriptionRef } from "effect"
 import { SqlClient } from "effect/sql"
 import { GitHubClient } from "./github/GitHubClient"
 
@@ -27,6 +27,7 @@ export class ActivityLog extends Context.Service<
   ActivityLog,
   {
     readonly record: (activity: Activity) => Effect.Effect<void>
+    readonly changes: Stream.Stream<number>
     readonly touchedPullRequests: (
       login: string,
     ) => Effect.Effect<ReadonlyArray<PullRequestRef>, ActivityLogError>
@@ -43,6 +44,7 @@ export class ActivityLog extends Context.Service<
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
       const github = yield* GitHubClient
+      const writes = yield* SubscriptionRef.make(0)
 
       const record = Effect.fn("ActivityLog.record")(
         function* (activity: Activity) {
@@ -58,6 +60,7 @@ export class ActivityLog extends Context.Service<
           })}`
         },
         Effect.catch((cause) => Effect.logWarning("Couldn't record an Activity", cause)),
+        Effect.ensuring(SubscriptionRef.update(writes, (count) => count + 1)),
       )
 
       const touchedPullRequests = Effect.fn("ActivityLog.touchedPullRequests")(
@@ -132,7 +135,13 @@ export class ActivityLog extends Context.Service<
         ),
       )
 
-      return ActivityLog.of({ record, touchedPullRequests, list, stamps })
+      return ActivityLog.of({
+        record,
+        changes: SubscriptionRef.changes(writes),
+        touchedPullRequests,
+        list,
+        stamps,
+      })
     }),
   )
 }

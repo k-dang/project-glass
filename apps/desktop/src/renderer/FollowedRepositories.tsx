@@ -22,16 +22,12 @@ const repositoryInputAtom = Atom.make("").pipe(Atom.keepAlive)
 
 const changeTargetAtom = Atom.make("").pipe(Atom.keepAlive)
 
-export const followedRepositoriesRevisionAtom = Atom.make(0).pipe(Atom.keepAlive)
-
 const changeAtom = backendRuntime
   .fn((change: RepositoryChange, get) =>
     Effect.sync(() => get.set(changeTargetAtom, change.target)).pipe(
       Effect.andThen(change.save),
       Effect.tap(() =>
         Effect.sync(() => {
-          get.registry.update(followedRepositoriesRevisionAtom, (revision) => revision + 1)
-
           if (change.target === "follow") get.set(repositoryInputAtom, "")
         }),
       ),

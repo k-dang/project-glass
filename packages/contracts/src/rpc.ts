@@ -55,7 +55,7 @@ import { FollowedRepository, InvalidRepositoryInput } from "./followedRepository
 import { NeedsYou, OutsideQuestionAnswer, OutsideQuestionNotWaiting } from "./needsYou"
 import { OutsideAgent, OutsideAgentNotFound } from "./outsideAgent"
 import { LoadPullRequestError, PullRequestRef, PullRequestWorkspace } from "./pullRequest"
-import { PullRequestListings } from "./pullRequestList"
+import { LatestPullRequestListings, PullRequestListings } from "./pullRequestList"
 import { Queue, QueueAddition, QueueError, QueuedPullRequest } from "./queue"
 import { FileContents, GetFileContentsError, RepositoryFiles } from "./repository"
 import { ReviewDecision, SubmitReviewError } from "./review"
@@ -222,10 +222,7 @@ export class GlassRpcs extends RpcGroup.make(
     success: PullRequestListings,
     error: Schema.Union([SettingsError, ConnectionError]),
   }),
-  Rpc.make("ListSavedPullRequests", {
-    success: Schema.NullOr(PullRequestListings),
-    error: SettingsError,
-  }),
+  Rpc.make("WatchPullRequests", { success: LatestPullRequestListings, stream: true }),
   Rpc.make("ListSavedQueue", { success: Queue, error: QueueError }),
   Rpc.make("RefreshQueue", { error: Schema.Union([QueueError, ConnectionError]) }),
   Rpc.make("AddToQueue", {

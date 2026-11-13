@@ -11,7 +11,6 @@ import {
   PullRequestWorkspace,
   QueueAddition,
   QueuedPullRequest,
-  noListings,
   referenceKey,
   Revision,
   TourFailure,
@@ -98,7 +97,6 @@ const mount = (initial: ReadonlyArray<QueuedPullRequest>, handlers: Partial<Hand
     GetConnection: () =>
       Effect.succeed(new GitHubConnection({ login: "kevin", tokenSource: "gh" })),
     ListFollowedRepositories: () => Effect.succeed([]),
-    ListPullRequests: () => Effect.succeed(noListings),
     ListSavedQueue: () => Effect.sync(() => entries),
     RefreshQueue: () => Effect.void,
     AddToQueue: ({ references }) =>
@@ -215,7 +213,6 @@ it("keeps pasted text in the field when GitHub can't be reached", async () => {
     GetConnection: () =>
       Effect.succeed(new GitHubConnection({ login: "kevin", tokenSource: "gh" })),
     ListFollowedRepositories: () => Effect.succeed([]),
-    ListPullRequests: () => Effect.succeed(noListings),
     AddToQueue: () => Effect.fail(new GitHubUnavailable({ message: "Offline." })),
   })
 

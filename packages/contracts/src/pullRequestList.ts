@@ -1,8 +1,9 @@
 import { Schema } from "effect"
 import { ActivityLogError } from "./activity"
-import { GitHubUnavailable } from "./connection"
+import { ConnectionError, GitHubUnavailable } from "./connection"
 import { FollowedRepository } from "./followedRepository"
 import { PullRequestRef } from "./pullRequest"
+import { SettingsError } from "./settings"
 
 export const PullRequestList = Schema.Literals(["needs-review", "my-prs", "reviewing"])
 
@@ -60,3 +61,16 @@ export const noListings: PullRequestListings = {
   reviewing: [],
   reviewingProblem: null,
 }
+
+const ListingsProblem = Schema.Union([SettingsError, ConnectionError])
+
+export const Listed = Schema.TaggedStruct("Listed", {
+  listings: PullRequestListings,
+  problem: Schema.NullOr(ListingsProblem),
+})
+
+export const ListFailed = Schema.TaggedStruct("ListFailed", { problem: ListingsProblem })
+
+export const LatestPullRequestListings = Schema.Union([Listed, ListFailed])
+
+export type LatestPullRequestListings = typeof LatestPullRequestListings.Type

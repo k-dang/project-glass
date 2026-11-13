@@ -30,7 +30,6 @@ import {
   StorageError,
   StorageItem,
   Revision,
-  noListings,
   ToDoDone,
   type EngineFeature,
   type EngineSettings,
@@ -96,7 +95,6 @@ const mount = (handlers: Parameters<typeof testLayer>[0]) => {
     GetEngineSettings: ({ feature }) =>
       Effect.succeed(feature === "tours" ? tourSettings : { ...tourSettings, engine: "pi" }),
     GetReviewPrompt: () => Effect.succeed(defaultReviewPrompt),
-    ListPullRequests: () => Effect.succeed(noListings),
     ...handlers,
   })
 
