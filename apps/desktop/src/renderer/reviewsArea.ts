@@ -5,7 +5,7 @@ import {
   type PullRequestWorkspace,
 } from "@glass/contracts"
 import { linkOptions } from "@tanstack/react-router"
-import { Effect, Option, Predicate, Schema, Stream } from "effect"
+import { Effect, Fiber, Option, Predicate, Schema, Stream } from "effect"
 import { AsyncResult, Atom, AtomRegistry } from "effect/reactivity"
 import { ActivityRecorder } from "./activity"
 import { Backend, backendRuntime, backendRuntimeOf } from "./backend"
@@ -184,7 +184,11 @@ export const openWorkspaceAtom = backendRuntime
           .pipe(
             Stream.filter(AsyncResult.isSuccess),
             Stream.runHead,
-            Effect.andThen(load(request, get.registry)),
+            Effect.andThen(
+              request.previous === undefined
+                ? loadShared(request.ref, get.registry)
+                : load(request, get.registry),
+            ),
           ))
 
       void open.activity
@@ -238,6 +242,40 @@ const load = (request: OpenRequest, registry: AtomRegistry.AtomRegistry) =>
     }),
   )
 
+type Loading = Fiber.Fiber<OpenWorkspace, Effect.Error<ReturnType<typeof load>>>
+
+const loadingIn = new WeakMap<AtomRegistry.AtomRegistry, Map<string, Loading>>()
+
+const loadShared = (ref: PullRequestRef, registry: AtomRegistry.AtomRegistry) =>
+  Effect.suspend(() => {
+    const recalled = recall(registry, ref)
+
+    if (recalled !== undefined) return Effect.succeed(recalled)
+
+    const url = urlOf(ref)
+    const loading = loadingIn.get(registry) ?? new Map<string, Loading>()
+    const running = loading.get(url)
+
+    loadingIn.set(registry, loading)
+
+    if (running !== undefined) return Fiber.join(running)
+
+    return load({ ref }, registry).pipe(
+      Effect.forkDetach,
+      Effect.tap((started) =>
+        Effect.sync(() => {
+          loading.set(url, started)
+          started.addObserver(() => loading.delete(url))
+        }),
+      ),
+      Effect.flatMap(Fiber.join),
+    )
+  })
+
+export const preloadPullRequestAtom = backendRuntime.fn((ref: PullRequestRef, get) =>
+  loadShared(ref, get.registry).pipe(Effect.asVoid),
+)
+
 const setAgingSince = (
   registry: AtomRegistry.AtomRegistry,
   ref: PullRequestRef,
@@ -253,12 +291,9 @@ export const preloadAtom = Atom.family((ref: PullRequestRef) =>
   backendRuntime.atom((get) => {
     get.addFinalizer(() => setAgingSince(get.registry, ref, Date.now()))
 
-    const loaded =
-      recall(get.registry, ref) === undefined
-        ? load({ ref }, get.registry).pipe(Effect.asVoid)
-        : Effect.void
-
-    return loaded.pipe(Effect.andThen(Effect.sync(() => setAgingSince(get.registry, ref, null))))
+    return loadShared(ref, get.registry).pipe(
+      Effect.andThen(Effect.sync(() => setAgingSince(get.registry, ref, null))),
+    )
   }),
 )
 
