@@ -51,6 +51,7 @@ import { McpCaller } from "./McpCredentials"
 import { NeedsYou } from "../NeedsYou"
 import { ASK_PROGRESS_SECONDS, ASK_TIMEOUT_SECONDS, OutsideQuestions } from "../OutsideQuestions"
 import { Sandboxes } from "../Sandboxes"
+import { StartedItem, StartedWork } from "../StartedWork"
 import { PullRequestLists } from "../PullRequestLists"
 import { Queue } from "../Queue"
 import { ToDos } from "../ToDos"
@@ -124,6 +125,13 @@ const ListNeedsYou = Tool.make("list_needs_you", {
   description:
     "Lists what waits on the user in Glass now: Agents with a Permission request or Question waiting, questions from an agent outside Glass, queued PRs whose Agent review is finished, and the user's own PRs with changes requested, failing checks, review threads awaiting their reply, or ready to merge. Agents and outside questions come first, then the longest waiting.",
   success: Schema.Struct({ items: Schema.Array(NeedsYouItem) }),
+  failure: GlassToolFailure,
+}).annotateMerge(readOnly)
+
+const ListStartedWork = Tool.make("list_started_work", {
+  description:
+    "Lists the Agents and Agent reviews this conversation started, or Agents it messaged, oldest first: each with its state now and the user's message that asked for it. Answer how the work you started is going from this, not from the chat. Agents and reviews the user started themselves, and deleted Agents, aren't listed.",
+  success: Schema.Struct({ items: Schema.Array(StartedItem) }),
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)
 
@@ -305,6 +313,7 @@ export const GlassTools = Toolkit.make(
   ListRecentActivity,
   ListAgents,
   ListNeedsYou,
+  ListStartedWork,
   ReadAgentTranscript,
   ReadPullRequest,
   ReadAgentReview,
@@ -399,6 +408,14 @@ const withinBudget = (files: ReadonlyArray<FileMaterial>) => {
 const first = <A, E, R>(stream: Stream.Stream<A, E, R>) =>
   stream.pipe(Stream.runHead, Effect.map(Option.getOrThrow))
 
+const fromConversation = <E>(record: (conversationId: string) => Effect.Effect<void, E>) =>
+  McpCaller.current.pipe(
+    Effect.flatMap((caller) =>
+      Predicate.isTagged(caller, "Conversation") ? record(caller.conversationId) : Effect.void,
+    ),
+    Effect.ignore,
+  )
+
 /** Talks to the MCP server already handling this call, so progress stays on that response. */
 const waitingProgress = Effect.gen(function* () {
   const progress = yield* AskProgress.current
@@ -425,6 +442,7 @@ export const GlassToolHandlers = GlassTools.toLayer(
     const agentReviews = yield* AgentReviews
     const needsYou = yield* NeedsYou
     const outsideQuestions = yield* OutsideQuestions
+    const startedWork = yield* StartedWork
 
     const refuseUnofferedModel = Effect.fnUntraced(function* ({
       engine,
@@ -477,6 +495,23 @@ export const GlassToolHandlers = GlassTools.toLayer(
           Effect.mapError(explained),
         ),
       list_needs_you: () => first(needsYou.watch()).pipe(Effect.map((items) => ({ items }))),
+      list_started_work: () =>
+        Effect.gen(function* () {
+          const caller = yield* McpCaller.current
+
+          if (!Predicate.isTagged(caller, "Conversation")) return { items: [] }
+
+          const items = yield* startedWork
+            .list(caller.conversationId)
+            .pipe(Effect.mapError(explained))
+
+          return {
+            items: items.map((item) => ({
+              ...item,
+              askedWith: item.askedWith === null ? null : textOf(item.askedWith),
+            })),
+          }
+        }),
       read_agent_transcript: ({ agentId, turns }) =>
         agents.readTranscript(agentId).pipe(
           Effect.map((transcript) => ({
@@ -502,13 +537,14 @@ export const GlassToolHandlers = GlassTools.toLayer(
       read_agent_review: ({ pullRequest }) =>
         first(agentReviews.watch(pullRequest)).pipe(Effect.mapError(explained)),
       start_agent_review: ({ pullRequest, revision }) =>
-        agentReviews
-          .start(pullRequest, revision)
-          .pipe(
-            Effect.uninterruptible,
-            Effect.andThen(first(agentReviews.watch(pullRequest))),
-            Effect.mapError(explained),
+        agentReviews.start(pullRequest, revision).pipe(
+          Effect.tap(() =>
+            fromConversation((id) => startedWork.startedAgentReview(id, pullRequest)),
           ),
+          Effect.uninterruptible,
+          Effect.andThen(first(agentReviews.watch(pullRequest))),
+          Effect.mapError(explained),
+        ),
       list_agent_places: () =>
         Effect.gen(function* () {
           return {
@@ -538,12 +574,18 @@ export const GlassToolHandlers = GlassTools.toLayer(
               localSkills: false,
               images: [],
             })
-            .pipe(Effect.uninterruptible)
+            .pipe(
+              Effect.tap(({ id }) =>
+                fromConversation((conversationId) => startedWork.linkAgent(conversationId, id)),
+              ),
+              Effect.uninterruptible,
+            )
 
           return { agent }
         }).pipe(Effect.mapError(explained)),
       send_agent_message: ({ agentId, message }) =>
         agents.send(agentId, { message, images: [] }).pipe(
+          Effect.tap(() => fromConversation((id) => startedWork.linkAgent(id, agentId))),
           Effect.uninterruptible,
           Effect.map((delivery) => ({ delivery })),
           Effect.mapError(explained),

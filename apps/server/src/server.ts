@@ -42,6 +42,7 @@ import { AgentCommands, SettingsStore } from "./SettingsStore"
 import { SavedPlaces } from "./SavedPlaces"
 import { LocalSkills } from "./LocalSkills"
 import { SkillPacks } from "./SkillPacks"
+import { StartedWork } from "./StartedWork"
 import { Storage } from "./Storage"
 import { ToDos } from "./ToDos"
 import { AgentRunners } from "./agentRunners"
@@ -73,7 +74,7 @@ const AgentsLive = Layer.merge(Agents.layer, GlobalConversation.layer).pipe(
   Layer.provide(ConversationTurns.layer),
   Layer.provide(FeedbackNotes.layer),
   Layer.provide(LocalAgentHost.layer),
-  Layer.provide(Transcripts.layer),
+  Layer.provideMerge(Transcripts.layer),
   Layer.provide(ToDos.layer),
   Layer.provideMerge(LocalCheckouts.layer),
 )
@@ -90,6 +91,7 @@ const services = (
   Layer.merge(GlassRpcHandlers, mcpTools)
     .pipe(
       Layer.provide(NeedsYou.layer),
+      Layer.provide(StartedWork.layer),
       Layer.provide(PullRequestLists.layer),
       Layer.provide(PullRequestMirror.layer),
       Layer.provide(ToDos.layer),

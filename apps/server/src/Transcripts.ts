@@ -133,6 +133,10 @@ const decodeEndedTurn = Schema.decodeUnknownEffect(
 
 const decodeTurnIds = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ id: Schema.String })))
 
+const decodeMessages = Schema.decodeUnknownEffect(
+  Schema.Array(Schema.Struct({ message: Schema.String })),
+)
+
 const decodePositions = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({ first: Schema.NullOr(Schema.Int), last: Schema.NullOr(Schema.Int) }),
@@ -210,6 +214,7 @@ export class Transcripts extends Context.Service<
       agentIds: ReadonlyArray<string>,
     ) => Effect.Effect<void, AgentError>
     readonly runningTurn: (agentId: string) => Effect.Effect<string | null, AgentError>
+    readonly runningMessage: (agentId: string) => Effect.Effect<string | null, AgentError>
     readonly startOrQueue: (
       agentId: string,
       input: MessageWithContext,
@@ -640,6 +645,14 @@ export class Transcripts extends Context.Service<
             lockFor(agentId).withPermits(1)(snapshot(agentId)),
           ),
         runningTurn: (agentId) => withStorageFailure("read a running Turn", runningTurn(agentId)),
+        runningMessage: (agentId) =>
+          withStorageFailure(
+            "read a running Turn",
+            sql`SELECT message FROM agent_turn WHERE agent_id = ${agentId} AND ended IS NULL`.pipe(
+              Effect.flatMap(decodeMessages),
+              Effect.map(([turn]) => turn?.message ?? null),
+            ),
+          ),
         startOrQueue: (agentId, sent, feedback = Effect.succeed([])) =>
           withStorageFailure(
             "send a message",
