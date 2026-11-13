@@ -1,6 +1,6 @@
 # PR workspace
 
-The user opens a PR from the [PR list](./pr-list.md) or pastes its GitHub URL into the form above that list and chooses Open. `Back to PRs` in the workspace header, or Escape when no menu, dialog, or text field is taking it, closes the PR and returns to the list. From a workspace, `Open another PR` (the icon left of "Head") or ⌘L (Ctrl+L) opens a dialog that takes a URL or `owner/repo#number`. An open PR's address is `#/reviews/<owner>/<repo>/<number>`. The page shows the repository, the title and number, a state badge (Open, Draft, Closed, Merged), the author, the base and head branches, and the description as GitHub renders it. The workspace is pinned: "Head <sha>" shows the first seven characters of the head commit and stays put when the PR gets new commits, until the user chooses Reload. Text that isn't a PR URL leaves Open disabled; a PR that doesn't exist or can't be seen, and access GitHub refuses, each show their own alert with Back to PRs and Try again.
+The user opens a PR from the [PR list](./pr-list.md) or pastes its GitHub URL into the form above that list and chooses Open. `Back to PRs` (the arrow at the start of the workspace header), or Escape when no menu, dialog, or text field is taking it, closes the PR and returns to the list. From a workspace, `Open another PR` (the icon left of Reload) or ⌘L (Ctrl+L) opens a dialog that takes a URL or `owner/repo#number`. An open PR's address is `#/reviews/<owner>/<repo>/<number>`. The page shows the repository, the title and number, a state badge (Open, Draft, Closed, Merged), the author, the base and head branches, and the description as GitHub renders it. The workspace is pinned: "Head <sha>", after the branches on the tab row, shows the first seven characters of the head commit and stays put when the PR gets new commits, until the user chooses Reload. Text that isn't a PR URL leaves Open disabled; a PR that doesn't exist or can't be seen, and access GitHub refuses, each show their own alert with Back to PRs and Try again.
 
 ## Sub-features
 
@@ -19,7 +19,7 @@ The user opens a PR from the [PR list](./pr-list.md) or pastes its GitHub URL in
 
 - Paste a URL into the `Pull request URL` field above the PR list in Reviews and choose `Open` (or press Enter).
 - With a PR open, choose `Open another PR` or press ⌘L, paste a URL, and press Enter.
-- Choose `Reload` at the top right of an open workspace.
+- Choose `Reload` (the circular-arrow icon) at the top right of an open workspace.
 
 ## Driving it with glass-verify
 
