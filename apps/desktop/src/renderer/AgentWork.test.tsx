@@ -11,6 +11,7 @@ import { controls, reviewOf } from "../../test/agentReview"
 afterEach(cleanup)
 
 const noTour: ReturnType<typeof useTour> = {
+  known: true,
   latest: { tour: null, job: { status: "idle" } },
   saved: null,
   writing: false,

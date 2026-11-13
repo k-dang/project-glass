@@ -57,6 +57,7 @@ export const useTour = (pullRequest: PullRequestRef, revision: Revision) => {
   })
 
   return {
+    known: AsyncResult.isNotInitial(state),
     latest,
     saved,
     writing: latest?.job.status === "writing",
