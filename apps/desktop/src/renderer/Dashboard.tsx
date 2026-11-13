@@ -6,6 +6,7 @@ import { Circle } from "lucide-react"
 import { type ReactNode, useId } from "react"
 import { ActivityChart } from "./ActivityChart"
 import { AgentContinueCard } from "./AgentContinueCard"
+import { ContinueCardLoading } from "./ContinueCard"
 import type { BackendError } from "./backend"
 import { Count, SectionLink } from "./Lists"
 import { NeedsYouSummary } from "./NeedsYouCount"
@@ -20,6 +21,8 @@ import { loadedPlacesAtom, savedDestinationsAtom, savedIn } from "./savedPlace"
 import { openToDosAtom, savedToDosAtom } from "./toDoList"
 
 const panelLimit = 5
+
+const continueGrid = "grid gap-4 @3xl:grid-cols-2"
 
 export function Dashboard() {
   return (
@@ -47,7 +50,7 @@ function Continue() {
       </h2>
       {AsyncResult.builder(result)
         .onSuccess((destinations) => (
-          <div className="grid gap-4 @3xl:grid-cols-2">
+          <div className={continueGrid}>
             <ReviewContinueCard destination={savedIn(destinations, "reviews")} />
             <AgentContinueCard destination={savedIn(destinations, "agents")} />
           </div>
@@ -56,7 +59,10 @@ function Continue() {
           <ProblemAlert problem={problemOf(cause)} action={{ label: "Retry", run: retry }} />
         ))
         .orElse(() => (
-          <output className="py-6 text-sm text-muted-foreground">Loading your saved place…</output>
+          <div className={continueGrid}>
+            <ContinueCardLoading label="Loading your last pull request…" />
+            <ContinueCardLoading label="Loading your last Agent…" />
+          </div>
         ))}
     </section>
   )

@@ -2,8 +2,13 @@ import { Link, type LinkProps } from "@tanstack/react-router"
 import { ArrowRight, type LucideIcon } from "lucide-react"
 import { type ReactNode, useId } from "react"
 
-const slot =
-  "flex min-w-0 items-center gap-4 rounded-xl border p-5 outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+const slot = "flex min-h-33 min-w-0 items-center gap-4 rounded-xl border p-5"
+
+const linkSlot = `${slot} outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring`
+
+export function ContinueCardLoading(props: { label: string }) {
+  return <output className={`${slot} text-sm text-muted-foreground`}>{props.label}</output>
+}
 
 export function ContinueCard(props: {
   link: LinkProps
@@ -16,7 +21,11 @@ export function ContinueCard(props: {
   const Icon = props.icon
 
   return (
-    <Link {...props.link} aria-label={`Continue ${props.name}`} className={`${slot} bg-muted/20`}>
+    <Link
+      {...props.link}
+      aria-label={`Continue ${props.name}`}
+      className={`${linkSlot} bg-muted/20`}
+    >
       <Icon className="size-5 shrink-0 text-muted-foreground" aria-hidden />
       <div className="min-w-0 flex-1">
         <p className="truncate text-base font-medium" title={props.name}>
@@ -47,7 +56,7 @@ export function ContinueInvitation(props: {
       {...props.link}
       aria-label={props.action}
       aria-describedby={titleId}
-      className={`group ${slot} border-dashed`}
+      className={`group ${linkSlot} border-dashed`}
     >
       <Icon className="size-5 shrink-0 text-muted-foreground" aria-hidden />
       <div className="min-w-0 flex-1">
