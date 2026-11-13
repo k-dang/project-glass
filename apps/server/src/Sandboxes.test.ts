@@ -374,3 +374,32 @@ it.effect(
       assert.deepStrictEqual((yield* f.agents.feedbackNotes(agent.id)).notes, [note])
     }),
 )
+
+it.effect("keeps an Agent's Sandbox gone, though its host still answers", () =>
+  Effect.gen(function* () {
+    const f = yield* agentServicesFixture
+    const agent = yield* createSandboxed(f)
+    yield* end(yield* f.started)
+    yield* f.transcript(agent.id, settled(1))
+
+    f.sandboxes.setGone(agent.id, true)
+    yield* TestClock.adjust("1 day")
+    yield* sandboxOf(f.agents, agent.id).pipe(
+      Stream.filter(({ reach }) => reach === "deleted"),
+      Stream.runHead,
+    )
+
+    f.sandboxes.setGone(agent.id, false)
+    const relaunched = yield* f.restart
+
+    const status = yield* sandboxOf(relaunched.agents, agent.id).pipe(
+      Stream.runHead,
+      Effect.map(Option.getOrThrow),
+    )
+
+    assert.equal(status.reach, "deleted")
+
+    const refused = yield* relaunched.agents.send(agent.id, say("Still there?")).pipe(Effect.flip)
+    assert.include(refused.message, "deleted")
+  }),
+)

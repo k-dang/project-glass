@@ -21,6 +21,7 @@ import { Exit, Option, Predicate } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
 import { FolderGit2, FolderPlus, GitBranch, LoaderCircle } from "lucide-react"
 import { useCallback, useMemo, useState } from "react"
+import { flushSync } from "react-dom"
 import { MessageGroup } from "@/components/ui/message"
 import { Trace, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace"
 import {
@@ -149,7 +150,7 @@ export function NewAgent(props: { repository: string | undefined }) {
         checkouts={linked}
         providers={providers}
         repository={props.repository}
-        newest={agents.at(-1)}
+        newest={agents.findLast((agent) => !agent.forReview)}
       />
     ))
     .render()
@@ -384,7 +385,10 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
     if (repository === undefined || key === undefined || baseBranch === null || awaitingModels)
       return false
 
-    setStarting({ ...message, key, baseBranch })
+    await document.startViewTransition({
+      types: ["start-agent"],
+      update: () => flushSync(() => setStarting({ ...message, key, baseBranch })),
+    }).updateCallbackDone
 
     const exit = await create({
       repository,
@@ -404,7 +408,10 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
   }
 
   return (
-    <section aria-label="New Agent" className="flex min-h-0 flex-1 flex-col">
+    <section
+      aria-label="New Agent"
+      className="flex min-h-0 flex-1 flex-col [&_[data-slot=input-group]]:[view-transition-name:new-agent-composer]"
+    >
       <AgentHeader
         heading={
           <h1 className="truncate font-medium">
@@ -422,7 +429,7 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto px-6 py-4">
-          <MessageGroup className="mx-auto max-w-3xl gap-4">
+          <MessageGroup className="mx-auto max-w-3xl gap-4 [view-transition-name:new-agent-start]">
             <UserMessage message={starting.message} images={starting.images} />
             <Trace>
               <TraceLine status="running">
@@ -461,92 +468,94 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
         commands={commands}
         files={files}
         pickers={
-          <ModelPicker
-            engine={program.engine}
-            placeKey={placeKey(where.place)}
-            model={program.model}
-            effort={program.effort}
-            onChange={chooseModel}
-            programs={programs}
-          />
-        }
-      >
-        <div className="flex min-w-0 flex-wrap items-center gap-1 [&>button]:min-w-0">
-          {props.providers.length > 0 && (
-            <ChipSelect
-              label="Where the Agent runs"
-              icon={<PlaceIcon aria-hidden />}
-              value={placeKey(where.place)}
-              items={[
-                { value: placeKey(localPlace), label: placeNames["local"] },
-                ...props.providers.map((provider) => ({
-                  value: placeKey(SandboxPlace.make({ providerId: provider.id })),
-                  label: provider.name,
-                })),
-              ]}
-              onValueChange={(chosen) => props.onPlaceChange(placeOfKey(chosen))}
+          <>
+            <ModelPicker
+              engine={program.engine}
+              placeKey={placeKey(where.place)}
+              model={program.model}
+              effort={program.effort}
+              onChange={chooseModel}
+              programs={programs}
             />
-          )}
-          <ChipSelect
-            label="Repository"
-            icon={<FolderGit2 aria-hidden />}
-            value={key ?? null}
-            items={props.repositories.map((choosable) => ({
-              value: repositoryKey(choosable.repository),
-              label: repositoryKey(choosable.repository),
-              title: choosable.title,
-            }))}
-            onValueChange={(chosen) =>
-              void navigate({ to: "/agents/new", search: { repository: chosen } })
-            }
-            placeholder="No repositories"
-            action={
-              where.choosesFolder
-                ? {
-                    label: "Choose folder…",
-                    icon: <FolderPlus aria-hidden />,
-                    onSelect: () => void folder.choose(),
-                    disabled: folder.waiting,
-                  }
-                : undefined
-            }
-          />
-          <ChipSelect
-            key={branchContext}
-            label="Base branch"
-            icon={<GitBranch aria-hidden />}
-            value={baseBranch}
-            items={(listed ?? (baseBranch === null ? [] : [baseBranch])).map((branch) => ({
-              value: branch,
-              label: branch,
-            }))}
-            onOpenChange={(open) => open && setBrowsed(branchContext)}
-            onValueChange={(branch) => key !== undefined && props.setBase(branchContext, branch)}
-            placeholder={key === undefined ? "No branches" : "Loading branches…"}
-            disabled={Option.isNone(defaultBranch) || key === undefined}
-          />
-          <SkillPackPicker
-            names={skills.names}
-            chosen={skills.chosen}
-            onChange={skills.setChosen}
-          />
-          {skills.offersLocalSkills && (
-            <LocalSkillsToggle
-              checked={skills.sendsLocalSkills}
-              onCheckedChange={skills.setLocalSkills}
-            />
-          )}
-          {asksPermission(where.place) && (
-            <div className="ml-auto">
+            {asksPermission(where.place) && (
               <PermissionModePicker
                 engine={program.engine}
                 permissionMode={program.permissionMode ?? defaultPermissionMode}
                 onChange={choosePermissionMode}
               />
-            </div>
-          )}
-          <SharedSkillNames shared={skills.shared} />
-        </div>
+            )}
+          </>
+        }
+      >
+        {starting === null && (
+          <div className="flex min-w-0 flex-wrap items-center gap-1 [view-transition-name:new-agent-options] [&>button]:min-w-0">
+            {props.providers.length > 0 && (
+              <ChipSelect
+                label="Where the Agent runs"
+                icon={<PlaceIcon aria-hidden />}
+                value={placeKey(where.place)}
+                items={[
+                  { value: placeKey(localPlace), label: placeNames["local"] },
+                  ...props.providers.map((provider) => ({
+                    value: placeKey(SandboxPlace.make({ providerId: provider.id })),
+                    label: provider.name,
+                  })),
+                ]}
+                onValueChange={(chosen) => props.onPlaceChange(placeOfKey(chosen))}
+              />
+            )}
+            <ChipSelect
+              label="Repository"
+              icon={<FolderGit2 aria-hidden />}
+              value={key ?? null}
+              items={props.repositories.map((choosable) => ({
+                value: repositoryKey(choosable.repository),
+                label: repositoryKey(choosable.repository),
+                title: choosable.title,
+              }))}
+              onValueChange={(chosen) =>
+                void navigate({ to: "/agents/new", search: { repository: chosen } })
+              }
+              placeholder="No repositories"
+              action={
+                where.choosesFolder
+                  ? {
+                      label: "Choose folder…",
+                      icon: <FolderPlus aria-hidden />,
+                      onSelect: () => void folder.choose(),
+                      disabled: folder.waiting,
+                    }
+                  : undefined
+              }
+            />
+            <ChipSelect
+              key={branchContext}
+              label="Base branch"
+              icon={<GitBranch aria-hidden />}
+              value={baseBranch}
+              items={(listed ?? (baseBranch === null ? [] : [baseBranch])).map((branch) => ({
+                value: branch,
+                label: branch,
+              }))}
+              onOpenChange={(open) => open && setBrowsed(branchContext)}
+              onValueChange={(branch) => key !== undefined && props.setBase(branchContext, branch)}
+              placeholder={key === undefined ? "No branches" : "Loading branches…"}
+              disabled={Option.isNone(defaultBranch) || key === undefined}
+            />
+            <SkillPackPicker
+              names={skills.names}
+              chosen={skills.chosen}
+              onChange={skills.setChosen}
+            />
+            {skills.offersLocalSkills && (
+              <LocalSkillsToggle
+                checked={skills.sendsLocalSkills}
+                onCheckedChange={skills.setLocalSkills}
+              />
+            )}
+            <SharedSkillNames shared={skills.shared} />
+          </div>
+        )}
       </MessageBox>
       {starting === null && <div className="flex-1" />}
     </section>

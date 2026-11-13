@@ -1,7 +1,13 @@
 import { Schema } from "effect"
 import { Rpc, RpcGroup } from "effect/rpc"
 import { Activity, ActivityKind, ActivityLogError, ActivityPage, ActivityStamp } from "./activity"
-import { AgentReviewFailure, AgentReviewState, FollowUpMessage, ReviewPrompt } from "./agentReview"
+import {
+  AgentReviewDone,
+  AgentReviewFailure,
+  AgentReviewState,
+  FollowUpMessage,
+  ReviewPrompt,
+} from "./agentReview"
 import { AskAnswer, AskFailure, AskPlace, AskQuestion } from "./ask"
 import {
   Agent,
@@ -30,6 +36,7 @@ import {
   SendAgentMessage,
   SentMessage,
   TranscriptUpdate,
+  TurnEnd,
 } from "./agent"
 import { ConnectionError, GitHubConnection } from "./connection"
 import {
@@ -45,7 +52,9 @@ import { CreateDraftError, Draft, UpdateDraftError } from "./draft"
 import { EngineFeature, EngineSettings } from "./engine"
 import { FeedbackNote, UnsentFeedback } from "./feedbackNote"
 import { FollowedRepository, InvalidRepositoryInput } from "./followedRepository"
-import { OpenPullRequestError, PullRequestRef, PullRequestWorkspace } from "./pullRequest"
+import { NeedsYou, OutsideQuestionAnswer, OutsideQuestionNotWaiting } from "./needsYou"
+import { OutsideAgent, OutsideAgentNotFound } from "./outsideAgent"
+import { LoadPullRequestError, PullRequestRef, PullRequestWorkspace } from "./pullRequest"
 import { PullRequestListings } from "./pullRequestList"
 import { Queue, QueueAddition, QueueError, QueuedPullRequest } from "./queue"
 import { FileContents, GetFileContentsError, RepositoryFiles } from "./repository"
@@ -119,6 +128,11 @@ export class GlassRpcs extends RpcGroup.make(
   }),
   Rpc.make("CancelAgentReview", {
     payload: { pullRequest: PullRequestRef },
+    error: AgentReviewFailure,
+  }),
+  /** Marks the Agent review written at writtenAt done; a newer one is left as it is. */
+  Rpc.make("MarkAgentReviewDone", {
+    payload: AgentReviewDone,
     error: AgentReviewFailure,
   }),
   Rpc.make("WatchAgentReview", {
@@ -232,10 +246,11 @@ export class GlassRpcs extends RpcGroup.make(
     success: GitHubConnection,
     error: ConnectionError,
   }),
-  Rpc.make("OpenPullRequest", {
+  /** Only reads; recording PullRequestOpened is what marks a PR opened. */
+  Rpc.make("LoadPullRequest", {
     payload: { pullRequest: PullRequestRef },
     success: PullRequestWorkspace,
-    error: OpenPullRequestError,
+    error: LoadPullRequestError,
   }),
   /** Misses changes GitHub makes without touching the PR's updatedAt, like a removed Review request. */
   Rpc.make("HasPullRequestChanged", {
@@ -308,6 +323,7 @@ export class GlassRpcs extends RpcGroup.make(
     success: Schema.Array(ReactionGroup),
     error: ReactionError,
   }),
+  /** PullRequestOpened also marks the PR opened in the Queue. */
   Rpc.make("RecordActivity", { payload: Activity }),
   Rpc.make("ListActivity", {
     payload: { limit: Schema.Int.check(Schema.isGreaterThan(0)) },
@@ -332,6 +348,22 @@ export class GlassRpcs extends RpcGroup.make(
     success: Schema.Array(Schema.String),
     error: AgentError,
     stream: true,
+  }),
+  Rpc.make("WatchNeedsYou", { success: NeedsYou, stream: true }),
+  /** Marks the Agent's Turn that ended at endedAt seen; a Turn that ended later is left as it is. */
+  Rpc.make("MarkTurnSeen", {
+    payload: { agentId: Schema.String, endedAt: Schema.DateTimeUtcFromString },
+    error: AgentError,
+  }),
+  Rpc.make("AnswerOutsideQuestion", {
+    payload: { id: Schema.String, answer: OutsideQuestionAnswer },
+    error: OutsideQuestionNotWaiting,
+  }),
+  Rpc.make("GetMcpEndpoint", { success: Schema.Struct({ url: Schema.String }) }),
+  Rpc.make("WatchOutsideAgents", { success: Schema.Array(OutsideAgent), stream: true }),
+  Rpc.make("RevokeOutsideAgent", {
+    payload: { id: Schema.String },
+    error: OutsideAgentNotFound,
   }),
   Rpc.make("WatchTranscript", {
     payload: { agentId: Schema.String },
@@ -500,6 +532,12 @@ export class GlassRpcs extends RpcGroup.make(
   }),
   Rpc.make("GetGlobalUnsentMessage", { success: SentMessage, error: AgentError }),
   Rpc.make("SaveGlobalUnsentMessage", { payload: SentMessage, error: AgentError }),
+  /** The Global conversation's latest Turn while it ended after the user last looked, else null. */
+  Rpc.make("WatchGlobalUnseen", { success: Schema.NullOr(TurnEnd), stream: true }),
+  Rpc.make("MarkGlobalTurnSeen", {
+    payload: { endedAt: Schema.DateTimeUtcFromString },
+    error: AgentError,
+  }),
 ) {}
 
 export type GlassRpcError = Rpc.Error<RpcGroup.Rpcs<typeof GlassRpcs>>

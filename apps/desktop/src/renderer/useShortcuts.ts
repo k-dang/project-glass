@@ -6,12 +6,14 @@ interface Shortcut {
   readonly allowShift?: boolean
   readonly allowInEditable?: boolean
   readonly allowInDialog?: boolean
+  /** Runs again while the key is held, for keys that step through something. */
+  readonly allowRepeat?: boolean
   readonly run: () => void
 }
 
 export function useShortcuts(shortcuts: ReadonlyArray<Shortcut>) {
   const handle = useEffectEvent((event: KeyboardEvent) => {
-    if (event.defaultPrevented || event.isComposing || event.repeat) return
+    if (event.defaultPrevented || event.isComposing) return
     const elements = event.composedPath().filter((target) => target instanceof Element)
 
     const editable = elements.some((target) =>
@@ -29,7 +31,8 @@ export function useShortcuts(shortcuts: ReadonlyArray<Shortcut>) {
         event.altKey ||
         (event.shiftKey && !shortcut.allowShift) ||
         (editable && !shortcut.allowInEditable) ||
-        (dialog && !shortcut.allowInDialog)
+        (dialog && !shortcut.allowInDialog) ||
+        (event.repeat && !shortcut.allowRepeat)
       )
         continue
 

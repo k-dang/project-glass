@@ -1,133 +1,40 @@
 import { SqliteClient, SqliteMigrator } from "@effect/sql-sqlite-node"
 import { assert, it } from "@effect/vitest"
-import {
-  Activity,
-  AgentStarted,
-  applyTranscriptUpdate,
-  emptyTranscript,
-  ActivityPullRequest,
-  FileViewed,
-  PullRequestOpened,
-  PullRequestRef,
-  Revision,
-  TextPart,
-} from "@glass/contracts"
-import { Effect, Option, Schema, Stream } from "effect"
+import { TurnDone, TurnEnd } from "@glass/contracts"
+import { DateTime, Effect, Schema } from "effect"
 import { SqlClient } from "effect/sql"
-import { mkdir } from "node:fs/promises"
 import { join } from "node:path"
-import { isolatedHome, startBackend } from "../test/harness"
-import { migrationLoader, migrations } from "./Migrations"
-import createActivity from "./migrations/0001_create_activity"
+import { isolatedHome } from "../test/harness"
+import baseline from "./migrations/0001_baseline"
+import agentReviewHotspots from "./migrations/0002_agent_review_hotspots"
+import agentReviewDone from "./migrations/0003_agent_review_done"
+import outsideAgent from "./migrations/0004_outside_agent"
+import conversationStartedWork from "./migrations/0005_conversation_started_work"
+import turnSeen from "./migrations/0006_turn_seen"
+import { migrationLoader } from "./Migrations"
 
-const decodeStored = Schema.decodeUnknownSync(Schema.fromJsonString(Activity))
+const encodeEnd = Schema.encodeSync(Schema.fromJsonString(TurnEnd))
 
-it.live("upgrades existing Activity history and uses its indexes after reopening", () =>
+it.live("creates the schema once and reads Activity through its indexes after reopening", () =>
   Effect.gen(function* () {
     const home = yield* isolatedHome
     const filename = join(home, "glass.db")
-    const ref = new PullRequestRef({ owner: "acme", repo: "api", number: 42 })
-    const revision = new Revision({ base: "b0", head: "h1" })
-    const pullRequest = new ActivityPullRequest({ ref, title: "Greet them", revision })
 
-    const before = (kind: string) =>
-      `{"pullRequest":${JSON.stringify(ref)},"title":"Greet them","revision":${JSON.stringify(revision)},"kind":${kind}}`
-
-    const opened = '{"_tag":"PullRequestOpened"}'
-    const viewed = '{"_tag":"FileViewed","path":"greet.ts"}'
-    const occurredAt = "2026-10-20T00:00:00Z"
-
-    yield* Effect.gen(function* () {
-      const sql = yield* SqlClient.SqlClient
-      yield* SqliteMigrator.run({
-        loader: SqliteMigrator.fromRecord({ "0001_create_activity": createActivity }),
-      })
-      yield* sql`
-        INSERT INTO activity (kind, payload, occurred_at, login)
-        VALUES ('PullRequestOpened', ${before(opened)}, ${occurredAt}, 'Kevin'),
-               ('FileViewed', ${before(viewed)}, ${occurredAt}, 'Kevin'),
-               ('PullRequestOpened', ${before(opened)}, ${occurredAt}, 'another-user')
-      `
-    }).pipe(Effect.provide(SqliteClient.layer({ filename })), Effect.scoped)
-
-    const upgrade = [
-      [2, "index_touched_prs"],
-      [3, "index_activity_by_login"],
-      [4, "create_to_do"],
-      [5, "nest_pull_request_in_activity"],
-      [6, "create_queued_pull_request"],
-      [7, "create_tours"],
-      [8, "add_revision_to_queued_pull_request"],
-      [9, "create_saved_place"],
-      [10, "create_agent_reviews"],
-      [11, "create_agents"],
-      [12, "agent_models"],
-      [13, "images_queued_and_unsent_messages"],
-      [14, "agent_permission_mode"],
-      [15, "agent_reviews_as_markdown"],
-      [16, "agent_sandboxes"],
-      [17, "agent_place"],
-      [18, "saved_place_per_area"],
-      [19, "agent_journal_saved"],
-      [20, "create_agent_review_follow_ups"],
-      [21, "agent_review_follow_ups_as_agent"],
-      [22, "index_activity_by_kind"],
-      [23, "create_global_conversation"],
-      [24, "name_local_place"],
-      [25, "global_conversation_on_pi"],
-      [26, "create_skill_packs"],
-      [27, "create_agent_feedback_notes"],
-      [28, "agent_skill_packs"],
-      [29, "agent_local_skills"],
-      [30, "send_feedback_notes"],
-    ] as const
-
-    for (const expected of [upgrade, []] as const) {
+    for (const expected of [
+      [
+        [1, "baseline"],
+        [2, "agent_review_hotspots"],
+        [3, "agent_review_done"],
+        [4, "outside_agent"],
+        [5, "conversation_started_work"],
+        [6, "turn_seen"],
+        [7, "work_reports"],
+      ],
+      [],
+    ] as const) {
       yield* Effect.gen(function* () {
         const sql = yield* SqlClient.SqlClient
         assert.deepStrictEqual(yield* SqliteMigrator.run({ loader: migrationLoader }), expected)
-
-        const rows = yield* sql<{
-          kind: string
-          payload: string
-          occurred_at: string
-          login: string
-        }>`
-          SELECT kind, payload, occurred_at, login FROM activity ORDER BY id
-        `
-
-        assert.deepStrictEqual(
-          rows.map((row) => ({ ...row, payload: decodeStored(row.payload) })),
-          [
-            {
-              kind: "PullRequestOpened",
-              payload: PullRequestOpened.make({ pullRequest }),
-              occurred_at: occurredAt,
-              login: "Kevin",
-            },
-            {
-              kind: "FileViewed",
-              payload: FileViewed.make({ pullRequest, path: "greet.ts" }),
-              occurred_at: occurredAt,
-              login: "Kevin",
-            },
-            {
-              kind: "PullRequestOpened",
-              payload: PullRequestOpened.make({ pullRequest }),
-              occurred_at: occurredAt,
-              login: "another-user",
-            },
-          ],
-        )
-        assert.deepStrictEqual(
-          yield* sql`
-            SELECT DISTINCT json_extract(payload, '$.pullRequest.ref') AS ref
-            FROM activity
-            WHERE lower(login) = lower(${"kevin"})
-              AND json_extract(payload, '$.pullRequest.ref') IS NOT NULL
-          `,
-          [{ ref: JSON.stringify(ref) }],
-        )
 
         const plan = yield* sql<{ detail: string }>`
           EXPLAIN QUERY PLAN
@@ -158,7 +65,7 @@ it.live("upgrades existing Activity history and uses its indexes after reopening
           EXPLAIN QUERY PLAN
           SELECT kind, occurred_at FROM activity
           WHERE lower(login) = lower(${"kevin"})
-            AND occurred_at >= ${occurredAt}
+            AND occurred_at >= ${"2026-10-20T00:00:00Z"}
             AND kind IN ('ReplySent', 'ToDoDone')
         `
 
@@ -172,245 +79,110 @@ it.live("upgrades existing Activity history and uses its indexes after reopening
   }),
 )
 
-it.live("keeps an Agent's Turns, with no images, when Queued and unsent messages arrive", () =>
+it.live("keeps Agent reviews written before hotspots, with none", () =>
   Effect.gen(function* () {
     const home = yield* isolatedHome
-    yield* Effect.promise(() => mkdir(join(home, ".project-glass"), { recursive: true }))
-
-    const before = Object.fromEntries(Object.entries(migrations).filter(([id]) => id < "0013"))
 
     yield* Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
-      yield* SqliteMigrator.run({ loader: SqliteMigrator.fromRecord(before) })
-      yield* sql`
-        INSERT INTO agent (id, name, machine, owner, repo, base_branch, engine, worktree, created_at)
-        VALUES ('agent-1', 'agent/swift-otter', 'this-mac', 'acme', 'api', 'main', 'pi',
-          ${join(home, "worktree")}, '2026-10-20T00:00:00Z')
-      `
-      yield* sql`
-        INSERT INTO agent_turn (id, agent_id, message, sent_at, ended)
-        VALUES ('turn-1', 'agent-1', 'Say hello', '2026-10-20T00:00:00Z',
-          '{"at":"2026-10-20T00:00:03Z","ending":{"_tag":"Done"}}')
-      `
-      yield* sql`
-        INSERT INTO agent_turn_part (turn_id, position, part)
-        VALUES ('turn-1', 0, '{"_tag":"Text","text":"Hello!"}')
-      `
-    }).pipe(
-      Effect.provide(SqliteClient.layer({ filename: join(home, ".project-glass", "glass.db") })),
-      Effect.scoped,
-    )
 
-    const { client } = yield* startBackend({}, home)
+      yield* SqliteMigrator.run({
+        loader: SqliteMigrator.fromRecord({ "0001_baseline": baseline }),
+      })
+      yield* sql`INSERT INTO agent_reviews (owner, repo, number, base, head, written_at, markdown)
+        VALUES ('octo-org', 'hello-world', 1, 'b', 'h', '2026-11-11T00:00:00Z', 'Looks fine.')`
 
-    const transcript = yield* client.WatchTranscript({ agentId: "agent-1" }).pipe(
-      Stream.scan(() => emptyTranscript, applyTranscriptUpdate),
-      Stream.drop(1),
-      Stream.runHead,
-      Effect.map(Option.getOrThrow),
-    )
+      yield* SqliteMigrator.run({ loader: migrationLoader })
 
-    assert.deepStrictEqual(transcript.queued, [])
-    assert.deepStrictEqual(
-      transcript.turns.map(({ message, images, feedback, parts }) => ({
-        message,
-        images,
-        feedback,
-        parts,
-      })),
-      [
-        {
-          message: "Say hello",
-          images: [],
-          feedback: [],
-          parts: [TextPart.make({ text: "Hello!" })],
-        },
-      ],
-    )
+      assert.deepStrictEqual(
+        yield* sql`SELECT markdown, hotspots, low_attention FROM agent_reviews`,
+        [{ markdown: "Looks fine.", hotspots: "[]", low_attention: "[]" }],
+      )
+    }).pipe(Effect.provide(SqliteClient.layer({ filename: join(home, "glass.db") })), Effect.scoped)
   }),
 )
 
-it.live("rewrites saved Agent reviews as Markdown and drops those that no longer decode", () =>
+it.live("counts the Turns that ended before Turns could be seen as seen", () =>
   Effect.gen(function* () {
     const home = yield* isolatedHome
-    const filename = join(home, "glass.db")
-    const before = Object.fromEntries(Object.entries(migrations).filter(([id]) => id < "0015"))
-
-    const saved = {
-      headline: "The greeting drops punctuation.",
-      summary: "It takes a name now.",
-      findings: [
-        {
-          rating: "blocking",
-          title: "Punctuation is dropped",
-          body: "`greet` strips the `!`.",
-          place: { kind: "line", path: "greet.ts", side: "new", line: 2 },
-        },
-        {
-          rating: "nit",
-          title: "Old wording",
-          body: "It read better.",
-          place: { kind: "file", path: "greet.ts", lineOutsideDiff: { side: "old", line: 1 } },
-        },
-        {
-          rating: "should-fix",
-          title: "No tests",
-          body: "Add one.",
-          place: { kind: "pull-request" },
-        },
-      ],
-    }
-
-    const run = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) =>
-      effect.pipe(Effect.provide(SqliteClient.layer({ filename })), Effect.scoped)
-
-    yield* run(
-      Effect.gen(function* () {
-        const sql = yield* SqlClient.SqlClient
-        yield* SqliteMigrator.run({ loader: SqliteMigrator.fromRecord(before) })
-        yield* sql`
-          INSERT INTO agent_reviews (owner, repo, number, base, head, written_at, content, folded)
-          VALUES ('acme', 'api', 1, 'b0', 'h1', '2026-10-20T00:00:00Z', ${JSON.stringify(saved)}, '[1]'),
-                 ('acme', 'api', 2, 'b0', 'h1', '2026-10-20T00:00:00Z', 'not JSON', '[]')
-        `
-      }),
-    )
-
-    const rows = yield* run(
-      Effect.gen(function* () {
-        const sql = yield* SqlClient.SqlClient
-        yield* SqliteMigrator.run({ loader: migrationLoader })
-
-        return yield* sql`SELECT * FROM agent_reviews`
-      }),
-    )
-
-    assert.deepStrictEqual(rows, [
-      {
-        owner: "acme",
-        repo: "api",
-        number: 1,
-        base: "b0",
-        head: "h1",
-        written_at: "2026-10-20T00:00:00Z",
-        markdown: [
-          "**The greeting drops punctuation.** It takes a name now.",
-          "## Punctuation is dropped\n\nBlocking · `greet.ts:2`\n\n`greet` strips the `!`.",
-          "## Old wording\n\nNit · `greet.ts:1` (old)\n\nIt read better.",
-          "## No tests\n\nShould fix\n\nAdd one.",
-        ].join("\n\n"),
-        agent_id: null,
-      },
-    ])
-  }),
-)
-
-it.live("keeps the saved place as its area's saved place", () =>
-  Effect.gen(function* () {
-    const home = yield* isolatedHome
-    const filename = join(home, "glass.db")
-    const before = Object.fromEntries(Object.entries(migrations).filter(([id]) => id < "0018"))
-    const destination = JSON.stringify({ area: "agents", agentId: "agent-1" })
-
-    const run = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) =>
-      effect.pipe(Effect.provide(SqliteClient.layer({ filename })), Effect.scoped)
-
-    yield* run(
-      Effect.gen(function* () {
-        const sql = yield* SqlClient.SqlClient
-        yield* SqliteMigrator.run({ loader: SqliteMigrator.fromRecord(before) })
-        yield* sql`
-          INSERT INTO saved_place (id, destination, saved_at)
-          VALUES (1, ${destination}, '2026-10-20T00:00:00.000Z')
-        `
-      }),
-    )
-
-    const rows = yield* run(
-      Effect.gen(function* () {
-        const sql = yield* SqlClient.SqlClient
-        yield* SqliteMigrator.run({ loader: migrationLoader })
-
-        return yield* sql`SELECT * FROM saved_place`
-      }),
-    )
-
-    assert.deepStrictEqual(rows, [
-      { area: "agents", destination, saved_at: "2026-10-20T00:00:00.000Z" },
-    ])
-  }),
-)
-
-// An AgentStarted payload as Glass saved it before migration 0024.
-const savedAgentStarted = (machine: string) =>
-  `{"_tag":"AgentStarted","agentId":"agent-${machine}","name":"agent/swift-otter",` +
-  `"repository":{"owner":"acme","repo":"api"},"machine":"${machine}","engine":"pi",` +
-  `"message":"Say hello"}`
-
-const decodeAgentStarted = Schema.decodeUnknownSync(Schema.fromJsonString(AgentStarted))
-
-it.live("keeps Agents started on this device in Activity history", () =>
-  Effect.gen(function* () {
-    const home = yield* isolatedHome
-    const filename = join(home, "glass.db")
-    const before = Object.fromEntries(Object.entries(migrations).filter(([id]) => id < "0024"))
-
-    const run = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) =>
-      effect.pipe(Effect.provide(SqliteClient.layer({ filename })), Effect.scoped)
-
-    yield* run(
-      Effect.gen(function* () {
-        const sql = yield* SqlClient.SqlClient
-        yield* SqliteMigrator.run({ loader: SqliteMigrator.fromRecord(before) })
-
-        for (const machine of ["this-mac", "sandbox"])
-          yield* sql`
-            INSERT INTO activity (kind, payload, occurred_at, login)
-            VALUES ('AgentStarted', ${savedAgentStarted(machine)}, '2026-10-20T00:00:00Z', 'octocat')
-          `
-      }),
-    )
-
-    const rows = yield* run(
-      Effect.gen(function* () {
-        const sql = yield* SqlClient.SqlClient
-        yield* SqliteMigrator.run({ loader: migrationLoader })
-
-        return yield* sql<{ payload: string }>`SELECT payload FROM activity ORDER BY id`
-      }),
-    )
-
-    assert.deepStrictEqual(
-      rows.map(({ payload }) => decodeAgentStarted(payload).machine),
-      ["local", "sandbox"],
-    )
-  }),
-)
-
-it.live("moves a Global conversation from Claude Code to pi with pi's default model", () =>
-  Effect.gen(function* () {
-    const home = yield* isolatedHome
-    yield* Effect.promise(() => mkdir(join(home, ".project-glass"), { recursive: true }))
-
-    const before = Object.fromEntries(Object.entries(migrations).filter(([id]) => id < "0025"))
 
     yield* Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
-      yield* SqliteMigrator.run({ loader: SqliteMigrator.fromRecord(before) })
-      yield* sql`
-        INSERT INTO global_conversation (id, engine, model, effort)
-        VALUES ('global-1', 'claude-code', 'opus', 'high')
-      `
-    }).pipe(
-      Effect.provide(SqliteClient.layer({ filename: join(home, ".project-glass", "glass.db") })),
-      Effect.scoped,
-    )
 
-    const { client } = yield* startBackend({}, home)
+      yield* SqliteMigrator.run({
+        loader: SqliteMigrator.fromRecord({
+          "0001_baseline": baseline,
+          "0002_agent_review_hotspots": agentReviewHotspots,
+          "0003_agent_review_done": agentReviewDone,
+          "0004_outside_agent": outsideAgent,
+          "0005_conversation_started_work": conversationStartedWork,
+        }),
+      })
 
-    assert.deepStrictEqual(yield* client.GetGlobalConversationModel(), {
-      model: null,
-      effort: null,
-    })
+      for (const id of ["worked", "fresh"])
+        yield* sql`INSERT INTO agent (id, name, owner, repo, base_branch, engine, folder, created_at)
+          VALUES (${id}, ${id}, 'glass-demo', 'greeter', 'main', 'pi', ${id}, '2026-11-11T00:00:00.000Z')`
+
+      for (const [id, at] of [
+        ["first", "2026-11-11T01:00:00.000Z"],
+        ["second", "2026-11-11T02:00:00.000Z"],
+      ] as const)
+        yield* sql`INSERT INTO agent_turn (id, agent_id, message, sent_at, ended)
+          VALUES (${id}, 'worked', 'Say hello', '2026-11-11T00:00:00.000Z',
+            ${encodeEnd({ at: DateTime.makeUnsafe(at), ending: TurnDone.make({}) })})`
+
+      yield* SqliteMigrator.run({ loader: migrationLoader })
+
+      assert.deepStrictEqual(yield* sql`SELECT id, turn_seen_at FROM agent ORDER BY id`, [
+        { id: "fresh", turn_seen_at: null },
+        { id: "worked", turn_seen_at: "2026-11-11T02:00:00.000Z" },
+      ])
+    }).pipe(Effect.provide(SqliteClient.layer({ filename: join(home, "glass.db") })), Effect.scoped)
+  }),
+)
+
+it.live("counts work the Global conversation started before reports as reported", () =>
+  Effect.gen(function* () {
+    const home = yield* isolatedHome
+
+    yield* Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient
+
+      yield* SqliteMigrator.run({
+        loader: SqliteMigrator.fromRecord({
+          "0001_baseline": baseline,
+          "0002_agent_review_hotspots": agentReviewHotspots,
+          "0003_agent_review_done": agentReviewDone,
+          "0004_outside_agent": outsideAgent,
+          "0005_conversation_started_work": conversationStartedWork,
+          "0006_turn_seen": turnSeen,
+        }),
+      })
+
+      yield* sql`INSERT INTO global_conversation (id) VALUES ('global')`
+      yield* sql`INSERT INTO agent_turn (id, agent_id, message, sent_at, ended)
+        VALUES ('asked', 'global', 'Review #7', '2026-11-11T00:00:00.000Z',
+          ${encodeEnd({ at: DateTime.makeUnsafe("2026-11-11T01:00:00.000Z"), ending: TurnDone.make({}) })})`
+      yield* sql`INSERT INTO conversation_agent (conversation_id, agent_id, started_at)
+        VALUES ('global', 'agent', '2026-11-11T00:00:00.000Z')`
+      yield* sql`INSERT INTO conversation_agent_review (conversation_id, owner, repo, number, started_at)
+        VALUES ('global', 'glass-demo', 'greeter', 7, '2026-11-11T00:00:00.000Z')`
+
+      yield* SqliteMigrator.run({ loader: migrationLoader })
+
+      const [agent] = yield* sql<{
+        reported_at: string
+      }>`SELECT reported_at FROM conversation_agent`
+
+      const [review] = yield* sql<{
+        reported_at: string
+      }>`SELECT reported_at FROM conversation_agent_review`
+
+      assert.isTrue(agent!.reported_at > "2026-11-11T01:00:00.000Z")
+      assert.isTrue(review!.reported_at > "2026-11-11T01:00:00.000Z")
+      assert.deepStrictEqual(yield* sql`SELECT turn_seen_at FROM global_conversation`, [
+        { turn_seen_at: "2026-11-11T01:00:00.000Z" },
+      ])
+    }).pipe(Effect.provide(SqliteClient.layer({ filename: join(home, "glass.db") })), Effect.scoped)
   }),
 )

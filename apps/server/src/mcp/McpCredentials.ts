@@ -1,9 +1,18 @@
-import { Context, Deferred, Effect, Layer, Option, Redacted, type Scope } from "effect"
-import { createHash, randomBytes } from "node:crypto"
+import { Context, Deferred, Effect, Layer, Option, Redacted, Schema, type Scope } from "effect"
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto"
 
-export interface McpCallerIdentity {
-  readonly conversationId: string
-}
+export class ConversationCaller extends Schema.TaggedClass<ConversationCaller>()("Conversation", {
+  conversationId: Schema.String,
+}) {}
+
+export class OutsideAgentCaller extends Schema.TaggedClass<OutsideAgentCaller>()("OutsideAgent", {
+  agentId: Schema.String,
+  name: Schema.String,
+  /** The MCP session that called. One approved app can hold several, one per terminal. */
+  session: Schema.String,
+}) {}
+
+export type McpCallerIdentity = ConversationCaller | OutsideAgentCaller
 
 export class McpCaller extends Context.Service<McpCaller, McpCallerIdentity>()(
   "@glass/server/McpCaller",
@@ -20,7 +29,17 @@ export class McpCaller extends Context.Service<McpCaller, McpCallerIdentity>()(
   )
 }
 
-const digest = (bearer: string) => createHash("sha256").update(bearer).digest("hex")
+export const digest = (bearer: string) => createHash("sha256").update(bearer).digest("hex")
+
+export const mintBearer = () => randomBytes(32).toString("base64url")
+
+/** Compares two secrets in constant time. */
+export const sameSecret = (left: string, right: string) => {
+  const a = Buffer.from(left)
+  const b = Buffer.from(right)
+
+  return a.length === b.length && timingSafeEqual(a, b)
+}
 
 export interface McpCredential {
   readonly caller: McpCallerIdentity
@@ -32,9 +51,9 @@ export class McpCredentials extends Context.Service<
   McpCredentials,
   {
     /** Issues a credential for `caller`, revoked when the scope closes. */
-    readonly issue: (
-      caller: McpCallerIdentity,
-    ) => Effect.Effect<Redacted.Redacted, never, Scope.Scope>
+    readonly issue: (caller: {
+      readonly conversationId: string
+    }) => Effect.Effect<Redacted.Redacted, never, Scope.Scope>
     readonly authenticate: (bearer: Redacted.Redacted) => Option.Option<McpCredential>
     /** The endpoint's URL, once the backend listens. */
     readonly endpoint: Effect.Effect<string>
@@ -51,12 +70,12 @@ export class McpCredentials extends Context.Service<
         issue: (caller) =>
           Effect.acquireRelease(
             Effect.gen(function* () {
-              const bearer = randomBytes(32).toString("base64url")
+              const bearer = mintBearer()
               const key = digest(bearer)
               const revoked = yield* Deferred.make<void>()
 
               credentialsByDigest.set(key, {
-                caller,
+                caller: new ConversationCaller({ conversationId: caller.conversationId }),
                 ownedSessions: new Set(),
                 revoked: Deferred.await(revoked),
               })

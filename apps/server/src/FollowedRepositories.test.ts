@@ -165,7 +165,7 @@ describe("followed repositories", () => {
       })
 
       assert.strictEqual(
-        (yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(pr) })).pullRequest.url,
+        (yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })).pullRequest.url,
         pr.url,
       )
       assert.deepStrictEqual(yield* client.ListFollowedRepositories(), followed)

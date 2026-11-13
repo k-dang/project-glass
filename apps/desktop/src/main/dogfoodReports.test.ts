@@ -56,7 +56,11 @@ it("keeps the logs as they were when captured, and names the report after its no
         revision,
         writtenAt: "2026-11-09T14:00:00.000Z",
         markdown: "# Main risk",
+        hotspots: [],
+        lowAttention: [],
         agentId: null,
+        done: false,
+        reported: false,
       },
     },
   })
@@ -75,7 +79,15 @@ it("keeps the logs as they were when captured, and names the report after its no
     glassCommit: "86aa4de-dirty",
     route: "/reviews/octo-org/glass/42",
     context,
-    agentReview: { revision, writtenAt: "2026-11-09T14:00:00.000Z", agentId: null },
+    agentReview: {
+      revision,
+      writtenAt: "2026-11-09T14:00:00.000Z",
+      hotspots: [],
+      lowAttention: [],
+      agentId: null,
+      done: false,
+      reported: false,
+    },
   })
 })
 

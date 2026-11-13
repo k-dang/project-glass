@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { Revision, type Tour, TourFailure, type TourState } from "@glass/contracts"
 import { screen, waitFor, within } from "@testing-library/react"
+import type { UserEvent } from "@testing-library/user-event"
 import { afterEach, expect, it } from "vite-plus/test"
 import {
   chapter,
@@ -30,6 +31,12 @@ const mount = (tour: Tour) => mountTourWorkspace({ files, initial: idle(tour) })
 
 const sidebar = () => screen.getByRole("region", { name: "Saved Tour" })
 
+const tourInMenu = async (user: UserEvent) => {
+  await user.click(screen.getByRole("button", { name: "Agent work" }))
+
+  return within(await screen.findByRole("listitem", { name: "Tour" }))
+}
+
 it("reads an outdated Tour against the files the PR has now", async () => {
   const f = mount(older)
   await f.user.click(await screen.findByRole("tab", { name: "Tour" }))
@@ -45,10 +52,10 @@ it("reads an outdated Tour against the files the PR has now", async () => {
 
   await f.user.click(screen.getByRole("tab", { name: "Changes" }))
   await waitFor(() => expect(fileOrder()).toEqual(["greet.ts", "api.ts", "new.ts"]))
-  await f.user.click(within(changes()).getByRole("button", { name: "Tour outdated" }))
-  expect((await screen.findByRole("dialog")).textContent).toContain(
-    "Written for an older Revision (head 0123456)",
+  expect((await tourInMenu(f.user)).getByText(/Written for head/).textContent).toBe(
+    "Written for head 0123456",
   )
+  await f.user.keyboard("{Escape}")
   expect(within(changes()).getByText("greet.ts summary")).toBeDefined()
   expect(within(changes()).queryByText("gone.ts summary")).toBeNull()
   expect(chapter("Everything else").textContent).toContain("0/1 viewed")
@@ -89,10 +96,8 @@ it("keeps the old Tour readable through a rewrite until its replacement arrives"
   await f.user.click(await screen.findByRole("tab", { name: "Changes" }))
   await waitFor(() => expect(fileOrder()).toEqual(["greet.ts", "api.ts", "new.ts"]))
   await f.user.click(screen.getByRole("tab", { name: "Tour" }))
-  await f.user.click(within(changes()).getByRole("button", { name: "Tour outdated" }))
-  await f.user.click(
-    within(await screen.findByRole("dialog")).getByRole("button", { name: "Rewrite" }),
-  )
+  await f.user.click((await tourInMenu(f.user)).getByRole("button", { name: "Rewrite" }))
+  await f.user.keyboard("{Escape}")
   expect(f.write).toHaveBeenCalledWith({ pullRequest: pullRequestRef, revision }, expect.anything())
   expect(await screen.findByText("Checking agent…")).toBeDefined()
   expect(screen.queryByRole("button", { name: "Rewrite" })).toBeNull()
@@ -133,7 +138,8 @@ it("keeps the old Tour readable through a rewrite until its replacement arrives"
     }),
   )
   expect(await within(sidebar()).findByText("Welcome newcomers.")).toBeDefined()
-  expect(screen.queryByRole("button", { name: "Tour outdated" })).toBeNull()
+  expect((await tourInMenu(f.user)).queryByText("Outdated")).toBeNull()
+  await f.user.keyboard("{Escape}")
   expect(within(sidebar()).queryByText("Greet by name")).toBeNull()
   await waitFor(() => expect(fileOrder()).toEqual(["new.ts", "greet.ts", "api.ts"]))
   expect(chapter("Add the welcome").textContent).toContain("CHAPTER 01 / 01")

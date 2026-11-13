@@ -1,5 +1,12 @@
 import { absurd, Schema } from "effect"
-import { author, connectionPage, inRepo, reviewRequestNodes } from "./fakeNodes.ts"
+import {
+  author,
+  checkContextsNode,
+  connectionPage,
+  inRepo,
+  latestOpinionatedReviews,
+  reviewRequestNodes,
+} from "./fakeNodes.ts"
 import { type FakePullRequest, VIEWER } from "./fakePullRequest.ts"
 
 export const ListingRequest = Schema.Union([
@@ -25,6 +32,10 @@ export const ListingRequest = Schema.Union([
     variables: Schema.Struct({ ids: Schema.Array(Schema.String) }),
   }),
   Schema.Struct({
+    operationName: Schema.Literal("PullRequestAttention"),
+    variables: Schema.Struct({ ids: Schema.Array(Schema.String) }),
+  }),
+  Schema.Struct({
     operationName: Schema.Literal("QueuedPullRequests"),
     variables: Schema.Record(Schema.String, Schema.Union([Schema.String, Schema.Number])),
   }),
@@ -32,6 +43,37 @@ export const ListingRequest = Schema.Union([
 
 const checksNode = (pr: FakePullRequest) => ({
   nodes: [{ commit: { statusCheckRollup: pr.checks === null ? null : { state: pr.checks } } }],
+})
+
+const mergeStateStatus = (pr: FakePullRequest) => {
+  if (pr.isDraft) return "DRAFT"
+
+  if (pr.mergeable === "CONFLICTING") return "DIRTY"
+
+  if (pr.mergeable === "UNKNOWN") return "UNKNOWN"
+
+  if (pr.reviewDecision === "REVIEW_REQUIRED" || pr.reviewDecision === "CHANGES_REQUESTED") {
+    return "BLOCKED"
+  }
+
+  return pr.checks === null || pr.checks === "SUCCESS" ? "CLEAN" : "UNSTABLE"
+}
+
+const attentionNode = (pr: FakePullRequest) => ({
+  id: pr.id,
+  mergeStateStatus: mergeStateStatus(pr),
+  latestOpinionatedReviews: { nodes: latestOpinionatedReviews(pr) },
+  reviewThreads: {
+    nodes: pr.reviewThreads.map((thread) => ({
+      isResolved: thread.resolved,
+      comments: {
+        nodes: thread.comments
+          .slice(-1)
+          .map((comment) => ({ viewerDidAuthor: comment.author === VIEWER.login })),
+      },
+    })),
+  },
+  commits: checkContextsNode(pr),
 })
 
 const candidatesPage = (
@@ -249,6 +291,17 @@ export const answerListing = (
             return pr === undefined
               ? null
               : { id: pr.id, headRefOid: pr.head.sha, commits: checksNode(pr) }
+          }),
+        },
+      }
+
+    case "PullRequestAttention":
+      return {
+        data: {
+          nodes: request.variables.ids.map((id) => {
+            const pr = pullRequests.find((candidate) => candidate.id === id)
+
+            return pr === undefined ? null : attentionNode(pr)
           }),
         },
       }

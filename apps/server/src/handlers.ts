@@ -1,5 +1,5 @@
-import { ActivityPullRequest, GlassRpcs, PullRequestOpened } from "@glass/contracts"
-import { Effect } from "effect"
+import { GlassRpcs } from "@glass/contracts"
+import { Effect, Predicate, Stream } from "effect"
 import { ActivityLog } from "./ActivityLog"
 import { AgentReviews } from "./AgentReviews"
 import { Asks } from "./Asks"
@@ -9,6 +9,10 @@ import { GlobalConversation } from "./GlobalConversation"
 import { BackgroundGitHubRequest } from "./github/GitHubRequestPolicy"
 import { FollowedRepositories } from "./FollowedRepositories"
 import { LocalCheckouts } from "./LocalCheckouts"
+import { NeedsYou } from "./NeedsYou"
+import { OutsideAgents } from "./OutsideAgents"
+import { OutsideQuestions } from "./OutsideQuestions"
+import { McpCredentials } from "./mcp/McpCredentials"
 import { PullRequestLists } from "./PullRequestLists"
 import { PullRequestWorkspaces } from "./PullRequestWorkspaces"
 import { Queue } from "./Queue"
@@ -42,6 +46,10 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
     const storage = yield* Storage
     const skillPacks = yield* SkillPacks
     const localSkills = yield* LocalSkills
+    const needsYou = yield* NeedsYou
+    const outsideQuestions = yield* OutsideQuestions
+    const outsideAgents = yield* OutsideAgents
+    const mcpCredentials = yield* McpCredentials
 
     return GlassRpcs.of({
       GetSavedPlaces: () => savedPlaces.list(),
@@ -53,6 +61,8 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       FollowUpAgentReview: ({ pullRequest, revision, message }) =>
         agentReviews.followUp(pullRequest, revision, message),
       CancelAgentReview: ({ pullRequest }) => agentReviews.cancel(pullRequest),
+      MarkAgentReviewDone: ({ pullRequest, writtenAt }) =>
+        agentReviews.markDone(pullRequest, writtenAt),
       Ask: ({ pullRequest, revision, place, question }) =>
         asks.ask(pullRequest, revision, place, question),
       WatchAgentReview: ({ pullRequest }) => agentReviews.watch(pullRequest),
@@ -90,23 +100,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       RemoveFromQueue: ({ reference }) => queue.remove(reference),
       RestoreToQueue: ({ queued }) => queue.restore(queued),
       GetConnection: () => github.viewer,
-      OpenPullRequest: ({ pullRequest: ref }) =>
-        workspaces.open(ref).pipe(
-          Effect.tap(({ pullRequest, revision }) =>
-            Effect.all([
-              activityLog.record(
-                PullRequestOpened.make({
-                  pullRequest: new ActivityPullRequest({
-                    ref: pullRequest.ref,
-                    title: pullRequest.title,
-                    revision,
-                  }),
-                }),
-              ),
-              queue.opened(pullRequest.ref),
-            ]),
-          ),
-        ),
+      LoadPullRequest: ({ pullRequest: ref }) => workspaces.open(ref),
       HasPullRequestChanged: ({ pullRequestId, revision, updatedAt }) =>
         github
           .hasChanged(pullRequestId, revision, updatedAt)
@@ -129,7 +123,16 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
         github.setDiscussionResolved(discussionId, resolved),
       SetReaction: ({ commentId, reaction, reacted }) =>
         github.setReaction(commentId, reaction, reacted),
-      RecordActivity: (activity) => activityLog.record(activity),
+      RecordActivity: (activity) =>
+        activityLog
+          .record(activity)
+          .pipe(
+            Effect.andThen(
+              Predicate.isTagged(activity, "PullRequestOpened")
+                ? queue.opened(activity.pullRequest.ref)
+                : Effect.void,
+            ),
+          ),
       ListActivity: ({ limit }) =>
         github.viewer.pipe(Effect.flatMap(({ login }) => activityLog.list(login, limit))),
       ListActivityStamps: ({ since, kinds }) =>
@@ -155,7 +158,14 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       ListAgentFiles: ({ agentId }) => agents.files(agentId),
       ListSandboxProviders: () => Effect.succeed(sandboxes.providers),
       CreateAgent: (input) => agents.create(input),
-      WatchWaitingAgents: () => agents.watchWaiting(),
+      WatchWaitingAgents: () =>
+        agents.watchWaiting().pipe(Stream.map((waiting) => waiting.map(({ agent }) => agent.id))),
+      WatchNeedsYou: () => needsYou.watch(),
+      MarkTurnSeen: ({ agentId, endedAt }) => agents.markTurnSeen(agentId, endedAt),
+      AnswerOutsideQuestion: ({ id, answer }) => outsideQuestions.answer(id, answer),
+      GetMcpEndpoint: () => mcpCredentials.endpoint.pipe(Effect.map((url) => ({ url }))),
+      WatchOutsideAgents: () => outsideAgents.watch(),
+      RevokeOutsideAgent: ({ id }) => outsideAgents.revoke(id),
       ChangeAgentModel: ({ agentId, model, effort }) =>
         agents.changeModel(agentId, { model, effort }),
       ChangePermissionMode: ({ agentId, permissionMode }) =>
@@ -193,6 +203,8 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       AnswerGlobalRequest: ({ requestId, answer }) => globalConversation.answer(requestId, answer),
       GetGlobalUnsentMessage: () => globalConversation.unsent,
       SaveGlobalUnsentMessage: (unsent) => globalConversation.saveUnsent(unsent),
+      WatchGlobalUnseen: () => globalConversation.unseen,
+      MarkGlobalTurnSeen: ({ endedAt }) => globalConversation.markSeen(endedAt),
     })
   }),
 )

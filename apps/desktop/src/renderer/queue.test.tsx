@@ -19,8 +19,8 @@ import {
 } from "@glass/contracts"
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { DateTime, Effect, Stream, SubscriptionRef } from "effect"
-import { afterEach, beforeEach, expect, it } from "vite-plus/test"
+import { DateTime, Effect, Predicate, Stream, SubscriptionRef } from "effect"
+import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test"
 import { App } from "./App"
 import { backendLayerAtom } from "./backend"
 import { openReview } from "../../test/finishReview"
@@ -84,11 +84,14 @@ const workspaceOf = (pr: PullRequestSummary) =>
 
 const keyOf = (entry: QueuedPullRequest) => referenceKey(entry.pullRequest.ref)
 
-const mount = (
-  initial: ReadonlyArray<QueuedPullRequest>,
-  known = [greet, wave, fibers],
-  watchTour: Handlers["WatchTour"] = () => Stream.make({ tour: null, job: { status: "idle" } }),
-) => {
+const knownPullRequests = [greet, wave, fibers]
+
+const find = (ref: PullRequestRef) =>
+  knownPullRequests.find((pr) => referenceKey(pr.ref) === referenceKey(ref))
+
+const known = (ref: PullRequestRef) => workspaceOf(find(ref)!)
+
+const mount = (initial: ReadonlyArray<QueuedPullRequest>, handlers: Partial<Handlers> = {}) => {
   let entries = [...initial]
 
   const backend = testLayer({
@@ -105,7 +108,7 @@ const mount = (
         const notFound: Array<PullRequestRef> = []
 
         for (const ref of references) {
-          const found = known.find((pr) => referenceKey(pr.ref) === referenceKey(ref))
+          const found = find(ref)
 
           if (entries.some((entry) => keyOf(entry) === referenceKey(ref))) alreadyQueued.push(ref)
           else if (found === undefined) notFound.push(ref)
@@ -130,16 +133,12 @@ const mount = (
           (a, b) => DateTime.toEpochMillis(a.queuedAt) - DateTime.toEpochMillis(b.queuedAt),
         )
       }),
-    OpenPullRequest: ({ pullRequest }) =>
-      Effect.succeed(
-        workspaceOf(known.find((pr) => referenceKey(pr.ref) === referenceKey(pullRequest))!),
-      ),
-    RecordActivity: () => Effect.void,
+    LoadPullRequest: ({ pullRequest }) => Effect.succeed(known(pullRequest)),
     SubmitReview: ({ pullRequestId }) =>
       Effect.sync(() => {
         entries = entries.filter((entry) => entry.id !== pullRequestId)
       }),
-    WatchTour: watchTour,
+    ...handlers,
   })
 
   render(
@@ -156,6 +155,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   cleanup()
   window.history.replaceState(null, "", "#/")
 })
@@ -330,9 +330,9 @@ it("shows where each queued PR's Tour stands as it changes", async () => {
     [referenceKey(fibers.ref), Stream.make(savedTour("older-head"))],
   ])
 
-  mount([queued(greet), queued(wave), queued(fibers)], undefined, ({ pullRequest }) =>
-    states.get(referenceKey(pullRequest))!,
-  )
+  mount([queued(greet), queued(wave), queued(fibers)], {
+    WatchTour: ({ pullRequest }) => states.get(referenceKey(pullRequest))!,
+  })
 
   const panel = await screen.findByRole("tabpanel", { name: /^Queue/ })
   await waitFor(() =>
@@ -418,6 +418,42 @@ it.each(["Control", "Meta"])(
     await screen.findByText("Your Queue is empty")
   },
 )
+
+it("loads the next queued PR while the user reviews one, keeps it however long that takes, and records it opened only once shown", async () => {
+  window.history.replaceState(null, "", "#/reviews?list=queue")
+  const loaded: Array<string> = []
+  const opened: Array<string> = []
+
+  const user = mount([queued(greet), queued(wave)], {
+    LoadPullRequest: ({ pullRequest }) =>
+      Effect.sync(() => {
+        const workspace = known(pullRequest)
+        loaded.push(workspace.pullRequest.title)
+
+        return workspace
+      }),
+    RecordActivity: (activity) =>
+      Effect.sync(() => {
+        if (Predicate.isTagged(activity, "PullRequestOpened"))
+          opened.push(activity.pullRequest.title)
+      }),
+  })
+
+  await user.click(await screen.findByRole("button", { name: /Greet the world/ }))
+  await showing("Greet the world")
+  await waitFor(() => expect(loaded).toEqual(["Greet the world", "Wave at the world"]))
+  expect(opened).toEqual(["Greet the world"])
+
+  vi.useFakeTimers({ toFake: ["Date"] })
+  vi.setSystemTime(Date.now() + 60 * 60_000)
+
+  await user.click(within(bar()).getByRole("button", { name: "Next PR" }))
+  await showing("Wave at the world")
+  await waitFor(() => expect(opened).toEqual(["Greet the world", "Wave at the world"]))
+  await waitFor(() =>
+    expect(loaded).toEqual(["Greet the world", "Wave at the world", "Greet the world"]),
+  )
+})
 
 it("keeps the bar while a reviewed PR stays open, offering the next one, until the user leaves it", async () => {
   window.history.replaceState(null, "", "#/reviews?list=queue")

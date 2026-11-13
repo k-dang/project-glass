@@ -36,7 +36,7 @@ import {
 import { cleanup, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { DateTime, Deferred, Effect, Exit, Stream } from "effect"
-import { expect, it } from "vite-plus/test"
+import { expect, it, vi } from "vite-plus/test"
 import { agent, agentFields } from "../../test/agent"
 import { choice, mount, pixel } from "../../test/agentApp"
 
@@ -100,6 +100,47 @@ it("shows the Agent under Local and its Turn's parts as they stream", async () =
   expect(within(transcript).getByText("Done in 3s")).toBeTruthy()
 })
 
+it("marks the finished Turn seen once Glass is focused on the Agent's Chat", async () => {
+  const focused = vi.spyOn(document, "hasFocus").mockReturnValue(false)
+  const seen: Array<{ agentId: string; endedAt: string }> = []
+  const endedAt = DateTime.add(sentAt, { seconds: 3 })
+
+  mount({
+    WatchTranscript: () =>
+      Stream.make(
+        TranscriptSnapshot.make({
+          turns: [
+            {
+              id: "turn-1",
+              message: "Run echo",
+              images: [],
+              context: null,
+              feedback: [],
+              sentAt,
+              parts: [TextPart.make({ text: "It says hi." })],
+              ended: { at: endedAt, ending: TurnDone.make({}) },
+            },
+          ],
+          queued: [],
+          status: null,
+        }),
+      ),
+    MarkTurnSeen: ({ agentId, endedAt: at }) =>
+      Effect.sync(() => void seen.push({ agentId, endedAt: DateTime.formatIso(at) })),
+  })
+
+  expect(await screen.findByText("It says hi.")).toBeTruthy()
+  expect(seen).toEqual([])
+
+  focused.mockReturnValue(true)
+  window.dispatchEvent(new Event("focus"))
+
+  await waitFor(() =>
+    expect(seen).toEqual([{ agentId: agent.id, endedAt: DateTime.formatIso(endedAt) }]),
+  )
+  focused.mockRestore()
+})
+
 it("sends a message with Enter and clears the composer", async () => {
   const sent: Array<string> = []
 
@@ -145,6 +186,31 @@ it("sends Markdown and HTML exactly as written", async () => {
   await user.type(composer, "Rename `foo_bar` in **<App>** *now*{Enter}")
 
   expect(sent).toEqual(["Rename `foo_bar` in **<App>** *now*"])
+})
+
+it("opens a Follow-up Agent and keeps it out of the Agents list", async () => {
+  const reviewAgent = new Agent({
+    ...agentFields,
+    id: "review-agent",
+    name: "agent/review-hare",
+    forReview: true,
+  })
+
+  mount(
+    {
+      WatchAgents: () => Stream.make([agent, reviewAgent]),
+      WatchTranscript: () =>
+        Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
+    },
+    "/agents/review-agent",
+  )
+
+  expect(await screen.findByRole("heading", { name: reviewAgent.name })).toBeTruthy()
+  expect(
+    screen.queryByText("This Agent is gone. Pick another Agent or start a new one."),
+  ).toBeNull()
+  expect(screen.queryByRole("link", { name: reviewAgent.name })).toBeNull()
+  expect(screen.getByRole("link", { name: agent.name })).toBeTruthy()
 })
 
 it("keeps the hidden panel recoverable across Agent navigation", async () => {

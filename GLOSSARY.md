@@ -12,6 +12,21 @@ The last piece of work the user was doing in an area of Glass, with their place 
 device for them to continue. Each area keeps its own: the last PR in Reviews, the last Agent in
 Agents. Visiting Settings or Activity leaves every Saved place unchanged.
 
+**Needs you**:
+The Agents, questions from an agent outside Glass or the Global conversation, and PRs waiting on
+the user now. They live in the Inbox, grouped by why they are waiting, with their count on the Inbox
+rail link in every area.
+A queued PR waits once its Agent review is finished, until the user marks that Agent review done or
+the Global conversation reports it; writing it again puts the PR back.
+An Agent waits once its latest Turn ends while the user isn't looking, unless they stopped it,
+until they look at its Chat with Glass focused; an Agent review's own Agent waits only through its
+PR.
+The user's own open PRs in followed repositories wait while changes are requested, checks fail, or
+a review thread is unresolved with someone else's comment last; with none of those, an approved PR
+GitHub would merge waits as ready to merge.
+The Dashboard shows that count once Needs you has loaded, and links to the Inbox.
+While it is loading or the stream has failed, the count stays off the Dashboard, the Inbox header, and the rail.
+
 ### Reviewing
 
 **PR list**:
@@ -104,11 +119,23 @@ own model for each engine. It starts as pi.
 _Avoid_: Default engine, runner (in UI copy), reviewer
 
 **Agent review**:
-An agent-written critique of one Revision of a PR, kept on this device for the user alone: one
-Markdown document that opens with the PR's main risk, read beside the diff. Glass keeps the latest
-one for each PR and leaves it outdated after new commits. Unlike a Review, it is never published
-and never suggests a Review decision.
+An agent-written critique of one Revision of a PR, kept on this device for the user alone:
+Markdown that opens with the PR's main risk, its Hotspots, and its Low-attention files, read beside
+the diff. Glass keeps the latest one for each PR and leaves it outdated after new commits. Unlike a
+Review, it is never published and never suggests a Review decision.
 _Avoid_: AI review, code review, critique
+
+**Hotspot**:
+One of the few places in a PR an Agent review ranks for the closest read, at most five: a risk
+kind, why it matters in this PR, the code it rests on, and what to check, usually with the diff
+lines it is about. A Tour of the same Revision shows them where to look first and in their Chapters.
+An Agent review with nothing that stands out has none.
+_Avoid_: Finding, issue, risk area
+
+**Low-attention file**:
+A changed file an Agent review says needs little attention, such as generated code, wiring, or a
+version bump. The diff collapses it at first and keeps it one click away.
+_Avoid_: Plumbing, noise, skippable file
 
 **Follow-up**:
 A message the user sends about an Agent review, read beside it, and the agent's answer, which may
@@ -195,9 +222,20 @@ _Avoid_: Session, thread, bot, box
 The one conversation the user has with Glass itself, opened over any area without leaving it,
 run by pi. It works in no repository and needs no Local checkout; it reads no files and
 runs no commands, but reads the user's work in Glass through Glass's tools, starts Agent reviews,
-creates Agents and messages them, and asks the user Questions. A message keeps the PR workspace
-and Revision, or the Agent, in view when it was sent.
+creates Agents and messages them, and asks the user Questions. Glass keeps a record of the Agents and
+Agent reviews it started or messaged, so it can say how they stand. A message keeps the PR workspace
+and Revision, or the Agent, in view when it was sent. Its rail button carries a marker while a Turn
+ended that the user hasn't seen with the conversation open.
 _Avoid_: Assistant, chat, copilot, global Agent
+
+**Report**:
+A Turn Glass starts in the Global conversation, without a message from the user, once work it
+started finishes, fails, or waits on a Permission request or Question. Work that reaches its outcome
+while the conversation is busy waits, and goes out together in one Report once nothing runs or is
+Queued. An Agent the user stopped isn't reported. The conversation says what happened in terms of
+what the user asked, offers a next step, and acts on nothing until the user says so. A reported Agent
+Turn or finished Agent review leaves Needs you, without the review being marked done.
+_Avoid_: Notification, event, wake-up
 
 **Agent program**:
 Claude Code, pi, or OpenCode, the program an Agent runs. It decides which models and efforts the user can pick,
@@ -291,7 +329,15 @@ _Avoid_: Approval, prompt
 **Question**:
 An Agent asking the user to choose between options or answer in their own words, waiting in its
 transcript until they answer.
-An Agent with a Permission request or Question waiting is marked in the Agents list.
+An Agent with a Permission request or Question waiting is marked in the Agents list and listed in
+Needs you.
+An agent outside Glass can ask through Glass's MCP endpoint after the user approves it. That
+question waits in the Inbox, under Stopped on you, until the user answers or the wait ends.
+
+**Outside agent**:
+An agent Glass did not launch. The user approves it once, and it can then use Glass's MCP tools
+on this computer, including asking a question. It is not a conversation Glass started.
+_Avoid_: Session, client, login
 
 ### Identity
 

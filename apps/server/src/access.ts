@@ -1,18 +1,11 @@
 import { TOKEN_PARAM } from "@glass/contracts"
 import { Effect, Redacted } from "effect"
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http"
-import { timingSafeEqual } from "node:crypto"
+import { sameSecret } from "./mcp/McpCredentials"
 import { ServerConfig } from "./ServerConfig"
 
-export const isToken = (token: Redacted.Redacted) => {
-  const expected = Buffer.from(Redacted.value(token))
-
-  return (candidate: string | null | undefined) => {
-    const given = Buffer.from(candidate ?? "")
-
-    return given.length === expected.length && timingSafeEqual(given, expected)
-  }
-}
+export const isToken = (token: Redacted.Redacted) => (candidate: string | null | undefined) =>
+  sameSecret(candidate ?? "", Redacted.value(token))
 
 const carriesToken = (token: Redacted.Redacted) => {
   const matches = isToken(token)

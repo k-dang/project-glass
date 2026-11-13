@@ -1,5 +1,6 @@
 import {
   applyTranscriptUpdate,
+  type CapturedContext,
   emptyTranscript,
   FollowedRepository,
   type Image,
@@ -217,4 +218,39 @@ export const lastText = (turn: Turn | undefined) =>
 export const holding = (turns: ReadonlyArray<Turn>) =>
   turns.some(({ parts }) =>
     parts.some((part) => Predicate.isTagged(part, "Text") && part.text === "Holding."),
+  )
+
+type Client = Effect.Success<typeof agentsFixture>["client"]
+
+export const watchGlobal = (client: Client, until: (transcript: Transcript) => boolean) =>
+  client.WatchGlobalTranscript().pipe(
+    Stream.scan(() => emptyTranscript, applyTranscriptUpdate),
+    Stream.filter(until),
+    Stream.runHead,
+    Effect.map(Option.getOrThrow),
+  )
+
+export const globalTurns = (client: Client, until: (turns: ReadonlyArray<Turn>) => boolean) =>
+  watchGlobal(client, ({ turns }) => until(turns)).pipe(Effect.map(({ turns }) => turns))
+
+export const sendGlobal = (
+  client: Client,
+  message: string,
+  context: CapturedContext | null = null,
+) => client.SendGlobalMessage({ message, images: [], context })
+
+export const reported = (turns: ReadonlyArray<Turn>) =>
+  turns.flatMap(({ context }) => (Predicate.isTagged(context, "Report") ? context.work : []))
+
+export const reportedAgents = (turns: ReadonlyArray<Turn>) =>
+  reported(turns).flatMap((work) =>
+    Predicate.isTagged(work, "Agent") ? [[work.agentId, work.outcome] as const] : [],
+  )
+
+export const lastSettled = (message: string) => (turns: ReadonlyArray<Turn>) =>
+  turns.at(-1)?.message === message && turns.every((turn) => turn.ended !== null)
+
+export const glassCalls = (turn: Turn | undefined) =>
+  turn?.parts.flatMap((part) =>
+    Predicate.isTagged(part, "ToolCall") ? [{ status: part.status, output: part.output }] : [],
   )

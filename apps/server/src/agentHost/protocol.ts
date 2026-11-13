@@ -14,7 +14,7 @@ import { Schema, SchemaTransformation } from "effect"
 import { randomBytes } from "node:crypto"
 import { resolve } from "node:path"
 import { Rpc, RpcGroup } from "effect/rpc"
-import { DeliveredMessage } from "./deliveredMessage"
+import { DeliveredMessage, DeliveredTurn } from "./deliveredMessage"
 
 export const JournalEntry = Schema.Struct({
   sequence: Schema.Int,
@@ -145,7 +145,7 @@ export class AgentHostRpcs extends RpcGroup.make(
     payload: {
       agentId: Schema.String,
       turnId: Schema.String,
-      ...DeliveredMessage.fields,
+      ...DeliveredTurn.fields,
       ...TurnSettings.fields,
     },
     error: HostAgentError,

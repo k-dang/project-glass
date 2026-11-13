@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest"
-import { Deferred, Effect, Exit, Fiber, Layer, Redacted, Schema, Scope } from "effect"
+import { Deferred, Effect, Exit, Fiber, Layer, Match, Redacted, Schema, Scope } from "effect"
 import { McpServer, Tool, Toolkit } from "effect/ai"
 import { AgentRunners } from "../agentRunners"
 import { LAUNCH_TOKEN, RENDERER_ORIGIN, startBackend } from "../../test/harness"
@@ -29,7 +29,10 @@ const startMcpBackend = Effect.gen(function* () {
       TestTools.toLayer({
         describe_target: ({ conversationId }) =>
           Effect.map(McpCaller.current, (caller) => ({
-            caller: caller.conversationId,
+            caller: Match.valueTags(caller, {
+              Conversation: (conversation) => conversation.conversationId,
+              OutsideAgent: ({ agentId }) => agentId,
+            }),
             target: conversationId,
           })),
         await_release: () =>

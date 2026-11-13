@@ -173,12 +173,14 @@ function AgentList() {
     .onFailure((cause) => (
       <ProblemAlert problem={streamProblem(cause)} action={{ label: "Retry", run: retry }} />
     ))
-    .onSuccess((list) =>
-      list.length === 0 ? (
+    .onSuccess((list) => {
+      const shown = list.filter((agent) => !agent.forReview)
+
+      return shown.length === 0 ? (
         <p className="px-2 text-sm text-muted-foreground">No Agents yet.</p>
       ) : (
         <nav aria-label="Agents list" className="flex flex-col gap-4">
-          {groupAgents(list).map(({ machine, agents: onMachine }) => (
+          {groupAgents(shown).map(({ machine, agents: onMachine }) => (
             <section key={machine} aria-label={groupNames[machine]} className="flex flex-col gap-1">
               <h2 className="px-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
                 {groupNames[machine]}
@@ -191,8 +193,8 @@ function AgentList() {
             </section>
           ))}
         </nav>
-      ),
-    )
+      )
+    })
     .render()
 }
 

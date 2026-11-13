@@ -34,7 +34,7 @@ describe("Drafts", () => {
       const { github, client } = yield* startSignedInBackend
       const pr = github.seedPullRequest({ base, head, changedFiles })
 
-      const { pullRequest, revision } = yield* client.OpenPullRequest({
+      const { pullRequest, revision } = yield* client.LoadPullRequest({
         pullRequest: new PullRequestRef(pr),
       })
 
@@ -53,7 +53,7 @@ describe("Drafts", () => {
         ],
       )
 
-      const reopened = yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(pr) })
+      const reopened = yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })
 
       assert.deepStrictEqual(reopened.drafts, [added, removed])
     }),
@@ -75,7 +75,7 @@ describe("Drafts", () => {
       const pendingReviewId = pr.pendingReview?.id
       const earlier = pr.pendingReview!.drafts[0]!
 
-      const { pullRequest, revision, drafts } = yield* client.OpenPullRequest({
+      const { pullRequest, revision, drafts } = yield* client.LoadPullRequest({
         pullRequest: new PullRequestRef(pr),
       })
 
@@ -103,7 +103,7 @@ describe("Drafts", () => {
       const { github, client } = yield* startSignedInBackend
       const pr = github.seedPullRequest({ base, head, changedFiles })
 
-      const { pullRequest, revision } = yield* client.OpenPullRequest({
+      const { pullRequest, revision } = yield* client.LoadPullRequest({
         pullRequest: new PullRequestRef(pr),
       })
 
@@ -220,7 +220,7 @@ describe("Drafts", () => {
       const { github, client } = yield* startSignedInBackend
       const pr = github.seedPullRequest({ base, head, changedFiles })
 
-      const { pullRequest, revision } = yield* client.OpenPullRequest({
+      const { pullRequest, revision } = yield* client.LoadPullRequest({
         pullRequest: new PullRequestRef(pr),
       })
 
@@ -234,7 +234,7 @@ describe("Drafts", () => {
         outdatedDrafts: [changed.id],
       })
 
-      const { drafts } = yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(pr) })
+      const { drafts } = yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })
 
       assert.deepStrictEqual(drafts, [
         new Draft({
@@ -261,7 +261,7 @@ describe("Drafts", () => {
         },
       })
 
-      const { drafts } = yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(pr) })
+      const { drafts } = yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })
 
       assert.deepStrictEqual(
         drafts.map(({ path, place }) => [path, place]),

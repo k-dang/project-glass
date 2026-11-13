@@ -9,11 +9,12 @@ import {
   type RequestWaiting,
   type SentMessage,
   type TranscriptUpdate,
-  TurnCutOff,
-  TurnInterrupted,
+  TurnEnd,
+  type WorkReport,
 } from "@glass/contracts"
 import {
   Context,
+  type DateTime,
   Effect,
   Exit,
   FileSystem,
@@ -34,7 +35,7 @@ import { LocalAgentHost } from "./LocalAgentHost"
 import { McpCredentials } from "./mcp/McpCredentials"
 import type { HostClient } from "./Placement"
 import { ServerConfig } from "./ServerConfig"
-import { Transcripts } from "./Transcripts"
+import { Transcripts, type WaitingRequest } from "./Transcripts"
 
 const StoredConversation = Schema.Struct({ id: Schema.String, ...ModelChoice.fields })
 
@@ -68,6 +69,15 @@ export class GlobalConversation extends Context.Service<
     ) => Effect.Effect<void, RequestNotWaiting | AgentError>
     readonly unsent: Effect.Effect<SentMessage, AgentError>
     readonly saveUnsent: (unsent: SentMessage) => Effect.Effect<void, AgentError>
+    readonly id: string
+    readonly waiting: Stream.Stream<ReadonlyArray<WaitingRequest>>
+    readonly unseen: Stream.Stream<TurnEnd | null>
+    readonly markSeen: (endedAt: DateTime.Utc) => Effect.Effect<void, AgentError>
+    readonly whenIdle: <E>(
+      effect: (
+        report: (report: WorkReport) => Effect.Effect<void, AgentError>,
+      ) => Effect.Effect<void, E>,
+    ) => Effect.Effect<void, E | AgentError>
   }
 >()("@glass/server/GlobalConversation") {
   static readonly layer = Layer.effect(
@@ -80,7 +90,6 @@ export class GlobalConversation extends Context.Service<
       const turns = yield* ConversationTurns
       const host = yield* LocalAgentHost
       const credentials = yield* McpCredentials
-      const scope = yield* Scope.Scope
       const folder = join(config.dataDirectory, "global-conversation")
 
       const [stored] = yield* sql`
@@ -144,15 +153,6 @@ export class GlobalConversation extends Context.Service<
           }),
         )
 
-      yield* (yield* host.subscribeStopped).pipe(
-        Stream.runForEach(() =>
-          transcripts
-            .endRunning(TurnCutOff.make({}), [id])
-            .pipe(Effect.catch((cause) => Effect.logWarning("Couldn't cut off a Turn", cause))),
-        ),
-        Effect.forkIn(scope),
-      )
-
       const conversation = SubscriptionRef.get(model).pipe(
         Effect.map((choice): Conversation => ({
           id,
@@ -163,11 +163,12 @@ export class GlobalConversation extends Context.Service<
         })),
       )
 
-      yield* turns.deliverTurnsOf((conversationId) =>
-        conversationId === id ? conversation.pipe(Effect.map(Option.some)) : Effect.succeedNone,
-      )
-
-      yield* transcripts.endRunning(TurnInterrupted.make({}), [id]).pipe(Effect.orDie)
+      yield* turns.serve({
+        claim: (conversationId) =>
+          conversationId === id ? conversation.pipe(Effect.map(Option.some)) : Effect.succeedNone,
+        lost: (yield* host.subscribeStopped).pipe(Stream.map(() => [id])),
+        interrupted: Effect.succeed([id]),
+      })
 
       const changeModel = Effect.fn("GlobalConversation.changeModel")(function* (
         choice: ModelChoice,
@@ -199,6 +200,17 @@ export class GlobalConversation extends Context.Service<
           conversation.pipe(Effect.flatMap((current) => turns.answer(current, requestId, answer))),
         unsent: turns.unsent(id),
         saveUnsent: (unsent) => turns.saveUnsent(id, unsent),
+        id,
+        waiting: transcripts.waiting.pipe(Stream.map((waiting) => waiting.get(id) ?? [])),
+        unseen: transcripts.unseen.pipe(
+          Stream.map((unseen) => unseen.get(id) ?? null),
+          Stream.changesWith(Schema.toEquivalence(Schema.NullOr(TurnEnd))),
+        ),
+        markSeen: (endedAt) => transcripts.markSeen(id, endedAt),
+        whenIdle: (effect) =>
+          turns.whenIdle(id, (begin) =>
+            effect((report) => begin({ message: "", images: [], context: report })),
+          ),
       })
     }),
   )

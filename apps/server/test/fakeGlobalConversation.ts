@@ -20,7 +20,8 @@ export const isGlobalConversation = (input: FakeModelRequest) =>
 
 /**
  * Answers as the Global conversation: reads "this PR" when a message was sent from one, starts
- * the Agent a message asks for, asks a Question when asked to, and otherwise echoes the message.
+ * the Agent a message asks for, asks a Question when asked to, acknowledges a Report without
+ * acting on it, and otherwise echoes the message.
  */
 export const globalConversationReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
   const last = input.messages.at(-1)
@@ -28,6 +29,9 @@ export const globalConversationReply = (input: FakeModelRequest): ReadonlyArray<
   if (last?.role === "tool") return [{ text: `The fake model saw: ${textOf(last).slice(0, 200)}` }]
 
   const words = lastUserText(input)
+
+  if (words.startsWith("<glass_report>"))
+    return [{ text: "The Agent you started is done. Want me to look at what it changed?" }]
 
   const call = (name: string, args: Schema.JsonObject): ReadonlyArray<FakeModelDelta> => [
     { toolCall: { id: `call-${input.messages.length}`, name, arguments: args } },

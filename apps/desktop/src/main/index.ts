@@ -11,11 +11,23 @@ import {
   RECORD_DOGFOOD_REPORT_CHANNEL,
   RELAUNCH_CHANNEL,
   RESOURCE_USAGE_CHANNEL,
-  SET_THEME_CHANNEL,
-  type Theme,
+  SET_APPEARANCE_CHANNEL,
+  type Appearance,
 } from "@glass/contracts/desktop"
+import type { Theme } from "@glass/contracts"
 import { Cause, Effect, Fiber, Option } from "effect"
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, net, protocol, shell } from "electron"
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  Menu,
+  type MenuItemConstructorOptions,
+  nativeTheme,
+  net,
+  protocol,
+  shell,
+} from "electron"
 import { execFile } from "node:child_process"
 import { homedir } from "node:os"
 import { join, relative } from "node:path"
@@ -85,17 +97,32 @@ const openInBrowser = (url: string) => {
   if (scheme === "https:" || scheme === "http:") void shell.openExternal(url)
 }
 
-let theme: Theme = "system"
+let theme: Theme = "glass"
 
-const windowColors = () => {
-  if (theme === "charcoal") return { color: "#111111", symbolColor: "#cecece" }
+const titleBarColors = {
+  glass: {
+    light: { color: "#ffffff", symbolColor: "#0a0a0a" },
+    dark: { color: "#0a0a0a", symbolColor: "#fafafa" },
+  },
+  charcoal: {
+    light: { color: "#f4f4f4", symbolColor: "#2b2b2b" },
+    dark: { color: "#111111", symbolColor: "#cecece" },
+  },
+  catppuccin: {
+    light: { color: "#e6e9ef", symbolColor: "#4c4f69" },
+    dark: { color: "#181825", symbolColor: "#cdd6f4" },
+  },
+  linear: {
+    light: { color: "#fcfcfd", symbolColor: "#282a30" },
+    dark: { color: "#010102", symbolColor: "#f7f8f8" },
+  },
+  vercel: {
+    light: { color: "#fafafa", symbolColor: "#171717" },
+    dark: { color: "#000000", symbolColor: "#ededed" },
+  },
+} satisfies Record<Theme, Record<"light" | "dark", { color: string; symbolColor: string }>>
 
-  if (theme === "catppuccin-mocha") return { color: "#181825", symbolColor: "#cdd6f4" }
-
-  return nativeTheme.shouldUseDarkColors
-    ? { color: "#0a0a0a", symbolColor: "#fafafa" }
-    : { color: "#ffffff", symbolColor: "#0a0a0a" }
-}
+const windowColors = () => titleBarColors[theme][nativeTheme.shouldUseDarkColors ? "dark" : "light"]
 
 const updateWindowTheme = (window: BrowserWindow) => {
   const colors = windowColors()
@@ -156,6 +183,7 @@ const createWindow = () => {
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
+      spellcheck: true,
       // Throttled timers in a hidden window can interrupt WebSocket pings.
       backgroundThrottling: false,
     },
@@ -167,6 +195,47 @@ const createWindow = () => {
   window.once("closed", () => nativeTheme.off("updated", updateTheme))
 
   window.removeMenu()
+  window.webContents.on("context-menu", (_event, params) => {
+    const { webContents } = window
+    const { editFlags, isEditable, misspelledWord, selectionText } = params
+    const items: MenuItemConstructorOptions[] = []
+
+    if (isEditable) {
+      if (misspelledWord) {
+        for (const suggestion of params.dictionarySuggestions) {
+          items.push({
+            label: suggestion,
+            click: () => webContents.replaceMisspelling(suggestion),
+          })
+        }
+
+        if (params.dictionarySuggestions.length === 0)
+          items.push({ label: "No spelling suggestions", enabled: false })
+
+        items.push(
+          {
+            label: "Add to dictionary",
+            click: () => {
+              webContents.session.addWordToSpellCheckerDictionary(misspelledWord)
+            },
+          },
+          { type: "separator" },
+        )
+      }
+
+      items.push(
+        { role: "cut", enabled: editFlags.canCut },
+        { role: "copy", enabled: editFlags.canCopy },
+        { role: "paste", enabled: editFlags.canPaste },
+        { type: "separator" },
+        { role: "selectAll", enabled: editFlags.canSelectAll },
+      )
+    } else if (selectionText) {
+      items.push({ role: "copy", enabled: editFlags.canCopy })
+    }
+
+    if (items.length > 0) Menu.buildFromTemplate(items).popup({ window })
+  })
   window.once("ready-to-show", () => window.show())
   window.webContents.setWindowOpenHandler(({ url }) => {
     openInBrowser(url)
@@ -227,9 +296,9 @@ void app.whenReady().then(() => {
   ipcMain.handle(BACKEND_ENDPOINT_CHANNEL, () => backendReady.promise)
   ipcMain.handle(BACKEND_FAILURE_CHANNEL, () => backendFailed.promise)
   ipcMain.handle(RESOURCE_USAGE_CHANNEL, () => summarizeResourceUsage(app.getAppMetrics()))
-  ipcMain.handle(SET_THEME_CHANNEL, (_event, next: Theme) => {
-    theme = next
-    nativeTheme.themeSource = next === "charcoal" || next === "catppuccin-mocha" ? "dark" : next
+  ipcMain.handle(SET_APPEARANCE_CHANNEL, (_event, next: Appearance) => {
+    theme = next.theme
+    nativeTheme.themeSource = next.colorScheme
 
     for (const window of BrowserWindow.getAllWindows()) updateWindowTheme(window)
 

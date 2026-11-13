@@ -1,11 +1,13 @@
 // @vitest-environment happy-dom
 import {
   AgentModels,
+  AgentReviewReported,
   defaultReviewPrompt,
   PullRequestContext,
   TextPart,
   TranscriptSnapshot,
   TurnDone,
+  WorkReport,
   type Activity,
   ActivityPage,
   ActivityPullRequest,
@@ -37,7 +39,7 @@ import { RegistryProvider } from "@effect/atom-react"
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { DateTime, Effect, Stream } from "effect"
-import { afterEach, beforeEach, expect, it } from "vite-plus/test"
+import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test"
 import { ACTIVITY_PAGE_SIZE } from "./ActivityLogPage"
 import { App } from "./App"
 import { backendLayerAtom } from "./backend"
@@ -113,6 +115,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  vi.restoreAllMocks()
   window.history.replaceState(null, "", "#/")
 })
 
@@ -287,11 +290,11 @@ it("jumps between rail areas with Mod and the area's number, even while typing",
   await user.type(await screen.findByRole("textbox", { name: "Open a PR" }), "octo")
   await user.keyboard("{Control>}4{/Control}")
   await waitFor(() =>
-    expect(screen.getByRole("link", { name: "Agents" }).getAttribute("aria-current")).toBe("page"),
+    expect(screen.getByRole("link", { name: "To-dos" }).getAttribute("aria-current")).toBe("page"),
   )
   await user.keyboard("{Meta>}2{/Meta}")
   await waitFor(() =>
-    expect(screen.getByRole("link", { name: "Reviews" }).getAttribute("aria-current")).toBe("page"),
+    expect(screen.getByRole("link", { name: "Inbox" }).getAttribute("aria-current")).toBe("page"),
   )
 })
 
@@ -328,7 +331,7 @@ it("keeps the active PR workspace, Revision, and unpublished feedback when its r
   const user = mount({
     ListFollowedRepositories: () => Effect.succeed([repository]),
     UnfollowRepository: () => Effect.succeed([]),
-    OpenPullRequest: () => Effect.succeed(workspace),
+    LoadPullRequest: () => Effect.succeed(workspace),
   })
 
   await user.type(
@@ -351,7 +354,7 @@ it("keeps the active PR workspace, Revision, and unpublished feedback when its r
 
 it("uses the supplied backend for repository file listing and reading", async () => {
   const user = mount({
-    OpenPullRequest: () => Effect.succeed(workspace),
+    LoadPullRequest: () => Effect.succeed(workspace),
     ListRepositoryFiles: () =>
       Effect.succeed(new RepositoryFiles({ paths: ["README.md"], truncated: false })),
     GetFileContents: () => Effect.succeed(FileTooLarge.make({})),
@@ -505,4 +508,58 @@ it("opens the Global conversation over the current area, labelling each message 
   await within(await screen.findByRole("dialog", { name: "Global conversation" })).findByText(
     "Nearly.",
   )
+})
+
+it("marks the rail while a Global conversation reply is unseen, and shows a Report as from Glass", async () => {
+  vi.spyOn(document, "hasFocus").mockReturnValue(true)
+  const at = DateTime.makeUnsafe("2026-11-05T12:00:00Z")
+  const ended = { at, ending: TurnDone.make({}) }
+  const seen: Array<string> = []
+
+  const user = mount({
+    ListAgentModels: () => Effect.succeed(new AgentModels({ defaultModel: null, models: [] })),
+    WatchGlobalUnseen: () => Stream.make(ended),
+    MarkGlobalTurnSeen: ({ endedAt }) =>
+      Effect.sync(() => void seen.push(DateTime.formatIso(endedAt))),
+    WatchGlobalTranscript: () =>
+      Stream.make(
+        TranscriptSnapshot.make({
+          turns: [
+            {
+              id: "report-1",
+              message: "",
+              images: [],
+              context: WorkReport.make({
+                work: [
+                  AgentReviewReported.make({
+                    pullRequest: workspace.pullRequest.ref,
+                    outcome: "finished",
+                    reason: null,
+                    askedWith: "Review #42",
+                  }),
+                ],
+              }),
+              feedback: [],
+              sentAt: at,
+              ended,
+              parts: [TextPart.make({ text: "The review on #42 is in." })],
+            },
+          ],
+          queued: [],
+          status: null,
+        }),
+      ),
+  })
+
+  const rail = await screen.findByRole("button", { name: /Global conversation/ })
+  await within(rail).findByText("Unread reply")
+
+  await user.click(rail)
+
+  const conversation = await screen.findByRole("dialog", { name: "Global conversation" })
+  await within(conversation).findByText("The review on #42 is in.")
+  expect(within(conversation).getByText("Report from Glass")).toBeTruthy()
+  expect(within(conversation).getByText("Agent review on octo-org/glass#42 finished")).toBeTruthy()
+  expect(within(rail).queryByText("Unread reply")).toBeNull()
+  await waitFor(() => expect(seen).toEqual([DateTime.formatIso(at)]))
 })

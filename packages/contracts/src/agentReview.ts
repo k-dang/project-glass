@@ -4,6 +4,15 @@ import { Revision } from "./revision"
 import { CheckoutRunReason } from "./checkoutRun"
 import { DiffSide } from "./discussion"
 import { AgentRunnerIdentity } from "./engine"
+import { TourCodeTarget } from "./tour"
+import { PullRequestRef } from "./pullRequest"
+
+export const AgentReviewDone = Schema.Struct({
+  pullRequest: PullRequestRef,
+  writtenAt: Schema.DateTimeUtcFromString,
+})
+
+export type AgentReviewDone = typeof AgentReviewDone.Type
 
 export const FollowUpMessage = Schema.Trimmed.check(Schema.isNonEmpty())
 
@@ -25,11 +34,43 @@ export const acceptedSuggestedDraftOf = (call: typeof ToolCallPart.Type): Sugges
     ? Option.getOrNull(decodeSuggestedDraft(call.input))
     : null
 
+/** Saved Agent reviews hold these kinds, so removing or renaming one needs a data migration. */
+export const RiskKind = Schema.Literals([
+  "data-access",
+  "migration",
+  "auth",
+  "concurrency",
+  "public-contract",
+])
+
+export type RiskKind = typeof RiskKind.Type
+
+export const Hotspot = Schema.Struct({
+  title: Schema.String,
+  kind: RiskKind,
+  place: Schema.NullOr(TourCodeTarget),
+  why: Schema.String,
+  evidence: Schema.String,
+  check: Schema.String,
+})
+
+export type Hotspot = typeof Hotspot.Type
+
+export const LowAttentionFile = Schema.Struct({ path: Schema.String, reason: Schema.String })
+
+export type LowAttentionFile = typeof LowAttentionFile.Type
+
 export const AgentReview = Schema.Struct({
   revision: Revision,
   writtenAt: Schema.DateTimeUtcFromString,
   markdown: Schema.String,
+  hotspots: Schema.Array(Hotspot),
+  lowAttention: Schema.Array(LowAttentionFile),
   agentId: Schema.NullOr(Schema.String),
+  /** The user marked it done in the Inbox; writing it again clears this. */
+  done: Schema.Boolean,
+  /** The Global conversation reported it to the user; writing it again clears this. */
+  reported: Schema.Boolean,
 })
 
 export type AgentReview = typeof AgentReview.Type
@@ -73,3 +114,23 @@ export const AgentReviewState = Schema.Struct({
 })
 
 export type AgentReviewState = typeof AgentReviewState.Type
+
+const finishedWhile: Record<AgentReviewState["job"]["status"], boolean> = {
+  idle: true,
+  "starting-agent": true,
+  "agent-start-failed": true,
+  waiting: false,
+  reviewing: false,
+  failed: false,
+}
+
+export const splitLead = (markdown: string) => {
+  const end = /\n\s*\n/.exec(markdown)
+
+  return end === null
+    ? { lead: markdown, rest: "" }
+    : { lead: markdown.slice(0, end.index), rest: markdown.slice(end.index + end[0].length) }
+}
+
+export const finishedReview = (state: AgentReviewState): AgentReview | null =>
+  state.review !== null && finishedWhile[state.job.status] ? state.review : null

@@ -2,6 +2,7 @@ import {
   AgentModels,
   PartSet,
   PermissionRequestPart,
+  QuestionPart,
   type RequestPart,
   RequestNotWaiting,
   type MessageWithContext,
@@ -18,12 +19,13 @@ import {
 import { DateTime, Deferred, Effect, Fiber, Predicate, Schema, Scope } from "effect"
 import { randomUUID } from "node:crypto"
 import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs"
-import { basename, dirname, join, relative } from "node:path"
+import { basename, dirname, join } from "node:path"
 import type { AgentAdapter, AgentSession } from "../src/agentHost/adapter"
-import type { DeliveredMessage } from "../src/agentHost/deliveredMessage"
+import type { DeliveredTurn } from "../src/agentHost/deliveredMessage"
 import { GlassToolsAccess, notRunning } from "../src/agentHost/protocol"
 import type { WrittenSkills } from "../src/agentHost/sentSkills"
 import { MCP_PATH } from "../src/mcp/server"
+import { filesIn } from "./filesIn"
 import { connectMcp, initialize, mcpPost } from "./mcpClient"
 import { settleWith } from "../src/agentHost/requests"
 import { placeSuggestedDraft } from "../src/agentHost/suggestDraftTool"
@@ -65,12 +67,6 @@ const skillCommands = (written: ReadonlyArray<WrittenSkills>) =>
   written.flatMap(({ plugin, skills }) =>
     skills.map((skill) => ({ name: `${basename(plugin)}:${basename(skill)}`, description: "" })),
   )
-
-const filesUnder = (folder: string): ReadonlyArray<string> =>
-  readdirSync(folder, { recursive: true, withFileTypes: true })
-    .filter((entry) => entry.isFile())
-    .map((entry) => relative(folder, join(entry.parentPath, entry.name)).replaceAll("\\", "/"))
-    .toSorted()
 
 export const scriptedAdapter = (gates: string): AgentAdapter => {
   // The Global conversation's starts are kept beside the gates, so they outlive this host.
@@ -117,13 +113,21 @@ export const scriptedAdapter = (gates: string): AgentAdapter => {
             return report(PartSet.make({ turnId, index, part: set })).pipe(Effect.as(index))
           })
 
+        const waitFor = (turnId: string, request: RequestPart) =>
+          Effect.gen(function* () {
+            const answered = yield* Deferred.make<void>()
+            const index = yield* part(turnId, request)
+            turn!.waiting = { part: request, index, answered }
+            yield* Deferred.await(answered)
+          })
+
         const end = (turnId: string, ending: TurnEnding) =>
           Effect.gen(function* () {
             turn = null
             yield* report(TurnEnded.make({ turnId, ended: { at: yield* DateTime.now, ending } }))
           })
 
-        const run = (turnId: string, { message, prompt }: DeliveredMessage) =>
+        const run = (turnId: string, { message, prompt }: DeliveredTurn) =>
           Effect.gen(function* () {
             const called = scriptedCall.exec(message)
 
@@ -188,7 +192,7 @@ export const scriptedAdapter = (gates: string): AgentAdapter => {
 
             if (message === "show the skills") {
               const [first] = skills
-              const written = first === undefined ? [] : filesUnder(dirname(first.plugin))
+              const written = first === undefined ? [] : filesIn(dirname(first.plugin))
 
               yield* part(turnId, TextPart.make({ text: written.join(",") }))
             }
@@ -199,19 +203,38 @@ export const scriptedAdapter = (gates: string): AgentAdapter => {
             }
 
             if (/ask permission/i.test(message)) {
-              const request = PermissionRequestPart.make({
-                requestId: randomUUID(),
-                toolName: "Bash",
-                inputSummary: "touch notes.txt",
-                input: JSON.stringify({ command: "touch notes.txt" }),
-                status: "waiting",
-                reason: null,
-              })
+              yield* waitFor(
+                turnId,
+                PermissionRequestPart.make({
+                  requestId: randomUUID(),
+                  toolName: "Bash",
+                  inputSummary: "touch notes.txt",
+                  input: JSON.stringify({ command: "touch notes.txt" }),
+                  status: "waiting",
+                  reason: null,
+                }),
+              )
+            }
 
-              const answered = yield* Deferred.make<void>()
-              const index = yield* part(turnId, request)
-              turn!.waiting = { part: request, index, answered }
-              yield* Deferred.await(answered)
+            if (/ask a question/i.test(message)) {
+              yield* waitFor(
+                turnId,
+                QuestionPart.make({
+                  requestId: randomUUID(),
+                  questions: [
+                    {
+                      header: null,
+                      question: "Which files should change?",
+                      detail: null,
+                      options: [{ label: "Only source files", description: null }],
+                      multiSelect: false,
+                      freeText: true,
+                    },
+                  ],
+                  status: "waiting",
+                  answers: null,
+                }),
+              )
             }
 
             if (prompt.includes("<glass_feedback>"))

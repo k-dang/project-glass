@@ -29,7 +29,7 @@ import {
 } from "effect"
 import { RpcTest } from "effect/rpc"
 import type { AgentAdapter, AgentSession } from "../src/agentHost/adapter"
-import type { DeliveredMessage } from "../src/agentHost/deliveredMessage"
+import type { DeliveredTurn } from "../src/agentHost/deliveredMessage"
 import { Changes } from "../src/agentHost/Changes"
 import { AgentHostHandlers } from "../src/agentHost/handlers"
 import { HostAgents } from "../src/agentHost/HostAgents"
@@ -55,7 +55,7 @@ import { inProcessSandboxes } from "./inProcessSandboxes"
 interface Started {
   readonly agentId: string
   readonly turnId: string
-  readonly input: DeliveredMessage
+  readonly input: DeliveredTurn
   readonly settings: TurnSettings
   readonly emit: (event: AgentEvent) => Effect.Effect<void>
 }

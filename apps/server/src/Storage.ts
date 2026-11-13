@@ -31,6 +31,8 @@ const groupOfItem = new Map<string, StorageGroup>([
   ["agent_feedback_note", "agents"],
   ["local_checkout", "agents"],
   ["global_conversation", "agents"],
+  ["conversation_agent", "agents"],
+  ["conversation_agent_review", "agents"],
   ["skill_pack", "agents"],
   ["skill_pack_pin", "agents"],
   ["skill_pack_skill", "agents"],

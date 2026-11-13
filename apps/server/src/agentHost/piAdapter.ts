@@ -30,7 +30,7 @@ import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import type { AgentAdapter } from "./adapter"
-import type { DeliveredMessage } from "./deliveredMessage"
+import type { DeliveredMessage, DeliveredTurn } from "./deliveredMessage"
 import {
   AvailableCommands,
   AvailableModels,
@@ -145,7 +145,7 @@ const freshThinkingLevel = (folder: string, model: { provider: string; id: strin
   )
 }
 
-const piMessage = (type: "prompt" | "steer", { prompt, images }: DeliveredMessage) => ({
+const piMessage = (type: "prompt" | "steer", { prompt, images }: DeliveredTurn) => ({
   type,
   message: prompt,
   images: images.map(({ mediaType, data }) => ({
@@ -396,7 +396,7 @@ export const piAdapter = (command: string) =>
 
             return undefined
           }),
-          startTurn: Effect.fnUntraced(function* (turnId: string, sent: DeliveredMessage) {
+          startTurn: Effect.fnUntraced(function* (turnId: string, sent: DeliveredTurn) {
             yield* turns.begin(turnId, withContextOf(sent))
 
             const answer = yield* rpc.request(piMessage("prompt", sent), PromptAccepted).pipe(

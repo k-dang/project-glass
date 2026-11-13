@@ -6,7 +6,7 @@ import type {
   RequestNotWaiting,
 } from "@glass/contracts"
 import type { Effect, Scope } from "effect"
-import type { DeliveredMessage } from "./deliveredMessage"
+import type { DeliveredMessage, DeliveredTurn } from "./deliveredMessage"
 import type { ConversationRole, HostAgentError, SteersNotTakenIn, TurnSettings } from "./protocol"
 import type { WrittenSkills } from "./sentSkills"
 
@@ -14,7 +14,7 @@ export interface AgentSession {
   readonly configure: (settings: TurnSettings) => Effect.Effect<void, HostAgentError>
   readonly startTurn: (
     turnId: string,
-    message: DeliveredMessage,
+    message: DeliveredTurn,
   ) => Effect.Effect<void, HostAgentError>
   readonly steer: (message: DeliveredMessage) => Effect.Effect<void, HostAgentError>
   readonly stopTurn: Effect.Effect<SteersNotTakenIn | null>

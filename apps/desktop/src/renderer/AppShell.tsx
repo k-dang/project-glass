@@ -1,10 +1,13 @@
 import { RegistryContext, useAtom, useAtomValue } from "@effect/atom-react"
+import { Option } from "effect"
+import { AsyncResult } from "effect/reactivity"
 import { Link, type LinkOptions, Outlet, useBlocker, useNavigate } from "@tanstack/react-router"
 import { cn } from "cn"
 import {
   LayoutDashboard,
   GitPullRequest,
   History,
+  Inbox,
   ListTodo,
   LoaderCircle,
   type LucideIcon,
@@ -12,12 +15,15 @@ import {
   Settings,
   Sparkles,
 } from "lucide-react"
-import { useContext } from "react"
+import { useContext, useId } from "react"
 import { TooltipHint } from "@/components/ui/tooltip"
 import { backendReachableAtom } from "./backend"
 import { ConfirmationDialog } from "./ConfirmationDialog"
-import { globalConversationOpenAtom } from "./globalConversation"
+import { globalConversationOpenAtom, globalUnseenAtom } from "./globalConversation"
 import { GlobalConversationDialog } from "./GlobalConversationDialog"
+import { HistoryNav } from "./HistoryNav"
+import { NeedsYouBadge } from "./NeedsYouCount"
+import { needsYouCount as countOf, watchedNeedsYouAtom } from "./needsYou"
 import { confirmLeave, discardPromptAtom, leavesPullRequest, reviewsLinkAtom } from "./reviewsArea"
 import { ConnectionAvatar } from "./Settings"
 import { ResourceUsage } from "./ResourceUsage"
@@ -39,6 +45,7 @@ function useAreas(): ReadonlyArray<Area> {
 
   return [
     { label: "Dashboard", icon: LayoutDashboard, link: { to: "/dashboard" } },
+    { label: "Inbox", icon: Inbox, link: { to: "/inbox" } },
     { label: "Reviews", icon: GitPullRequest, link: reviewsLink },
     { label: "To-dos", icon: ListTodo, link: { to: "/to-dos" } },
     { label: "Agents", icon: Sparkles, link: { to: "/agents" } },
@@ -70,6 +77,10 @@ export function AppShell() {
   const areas = useAreas()
   const navigate = useNavigate()
   const [conversing, setConversing] = useAtom(globalConversationOpenAtom)
+  const needsYouBadgeId = useId()
+  const needsYouCount = countOf(useAtomValue(watchedNeedsYouAtom))
+  const unseen = Option.getOrNull(AsyncResult.value(useAtomValue(globalUnseenAtom)))
+  const unread = unseen !== null && !conversing
 
   useShortcuts([
     ...areas.map(({ link }, index) => ({
@@ -94,10 +105,12 @@ export function AppShell() {
   })
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <aside className="flex w-12 shrink-0 flex-col">
-        <div className="title-strip shrink-0 border-b" />
-        <div className="flex flex-1 flex-col items-center gap-4 border-r bg-muted/40 py-3">
+    <div className="flex h-screen flex-col overflow-hidden">
+      <div className="title-strip flex shrink-0 items-center border-b pr-2 pl-[calc(env(titlebar-area-x,0px)+0.75rem)]">
+        <HistoryNav />
+      </div>
+      <div className="flex min-h-0 flex-1">
+        <aside className="flex w-12 shrink-0 flex-col items-center gap-4 border-r bg-muted/40 py-3">
           <TooltipHint content="Glass" side="right">
             <div className="flex h-8 items-center">
               <GlassMark />
@@ -111,10 +124,16 @@ export function AppShell() {
                   {...link}
                   activeOptions={{ includeSearch: false }}
                   aria-label={label}
+                  aria-describedby={
+                    label === "Inbox" && Option.isSome(needsYouCount) && needsYouCount.value > 0
+                      ? needsYouBadgeId
+                      : undefined
+                  }
                   aria-keyshortcuts={`Meta+${index + 1} Control+${index + 1}`}
                   className={cn(railLink, label === "Settings" && "mt-auto")}
                 >
                   <Icon className="size-4" aria-hidden />
+                  {label === "Inbox" && <NeedsYouBadge id={needsYouBadgeId} />}
                 </Link>
               </TooltipHint>
             ))}
@@ -129,21 +148,25 @@ export function AppShell() {
               onClick={() => setConversing((open) => !open)}
             >
               <MessagesSquare className="size-4" aria-hidden />
+              {unread && (
+                <span className="absolute top-1 right-1 size-2 rounded-full bg-primary">
+                  <span className="sr-only">Unread reply</span>
+                </span>
+              )}
             </button>
           </TooltipHint>
           <ConnectionAvatar />
+        </aside>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <Reconnecting />
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <Outlet />
+          </div>
+          <footer className="flex h-7 shrink-0 items-center justify-end gap-1 border-t bg-muted/20 px-3">
+            <ShortcutsDialog />
+            <ResourceUsage />
+          </footer>
         </div>
-      </aside>
-      <div className="flex min-w-0 flex-1 flex-col">
-        <div className="title-strip shrink-0 border-b" aria-hidden />
-        <Reconnecting />
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <Outlet />
-        </div>
-        <footer className="flex h-7 shrink-0 items-center justify-end gap-1 border-t bg-muted/20 px-3">
-          <ShortcutsDialog />
-          <ResourceUsage />
-        </footer>
       </div>
       <GlobalConversationDialog />
       <DiscardDialog />

@@ -1,5 +1,12 @@
 import { NodeSocket } from "@effect/platform-node"
-import { GlassRpcs, RPC_PATH, TOKEN_PARAM } from "@glass/contracts"
+import {
+  ActivityPullRequest,
+  GlassRpcs,
+  PullRequestOpened,
+  type PullRequestRef,
+  RPC_PATH,
+  TOKEN_PARAM,
+} from "@glass/contracts"
 import { Clock, ConfigProvider, Context, Effect, Layer, Option } from "effect"
 import { HttpServer } from "effect/http"
 import { Socket } from "effect/socket"
@@ -10,6 +17,7 @@ import { afterEach, vi } from "vite-plus/test"
 import { connectRpcClient } from "../src/rpcSocket"
 import { AgentRunners } from "../src/agentRunners"
 import { McpCredentials } from "../src/mcp/McpCredentials"
+import { OutsideAgents } from "../src/OutsideAgents"
 import { GlassMcpTools } from "../src/mcp/server"
 import { serve } from "../src/server"
 import { ServerConfig } from "../src/ServerConfig"
@@ -101,7 +109,12 @@ export const startBackend = Effect.fnUntraced(function* (
   // throws as an uncaught exception; a test that never calls the client would end that way.
   yield* client.ListSandboxProviders()
 
-  return { baseUrl, client, mcpCredentials: Context.get(services, McpCredentials) }
+  return {
+    baseUrl,
+    client,
+    mcpCredentials: Context.get(services, McpCredentials),
+    outsideAgents: Context.get(services, OutsideAgents),
+  }
 })
 
 export const startSignedInBackend = Effect.gen(function* () {
@@ -113,4 +126,23 @@ export const startSignedInBackend = Effect.gen(function* () {
   })
 
   return { github, client }
+})
+
+type Client = Effect.Success<ReturnType<typeof startBackend>>["client"]
+
+export const openPullRequest = Effect.fnUntraced(function* (client: Client, ref: PullRequestRef) {
+  const workspace = yield* client.LoadPullRequest({ pullRequest: ref })
+  const { pullRequest, revision } = workspace
+
+  yield* client.RecordActivity(
+    PullRequestOpened.make({
+      pullRequest: new ActivityPullRequest({
+        ref: pullRequest.ref,
+        title: pullRequest.title,
+        revision,
+      }),
+    }),
+  )
+
+  return workspace
 })

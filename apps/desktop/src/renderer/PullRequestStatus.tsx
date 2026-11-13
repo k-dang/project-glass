@@ -186,7 +186,7 @@ function ReviewerList(props: { reviewers: ReadonlyArray<Reviewer> }) {
   )
 }
 
-function CheckList(props: { checks: ReadonlyArray<Check> }) {
+export function CheckList(props: { checks: ReadonlyArray<Check> }) {
   return (
     <ul className="flex max-h-80 flex-col overflow-y-auto">
       {props.checks.map((check, index) => {

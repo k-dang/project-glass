@@ -401,16 +401,18 @@ const launch = async (options: {
   let fake: RunState["fake"]
   try {
     const agentsOff = !options.realAgents && !fakeBackend
-    writeAgentCommands(
-      join(paths.home, ".project-glass"),
-      agentsOff
-        ? {
-            claudeCommand: join(paths.state, "claude-disabled"),
-            piCommand: join(paths.state, "pi-disabled"),
-            opencodeCommand: join(paths.state, "opencode-disabled"),
-          }
-        : undefined,
-    )
+    if (!fakeBackend) {
+      writeAgentCommands(
+        join(paths.home, ".project-glass"),
+        agentsOff
+          ? {
+              claudeCommand: join(paths.state, "claude-disabled"),
+              piCommand: join(paths.state, "pi-disabled"),
+              opencodeCommand: join(paths.state, "opencode-disabled"),
+            }
+          : undefined,
+      )
+    }
     if (agentsOff) {
       console.log("Agents: off, so no model charges. Use --backend fake for synthetic runners.")
     }
@@ -830,7 +832,11 @@ const main = async () => {
         const { key, meta, shift } = values
         if (!key) fail("press needs --key")
         const pressed = { key, code: key, modifiers: (meta ? 4 : 0) | (shift ? 8 : 0) }
-        await page.send("Input.dispatchKeyEvent", EmptyResponse, { type: "rawKeyDown", ...pressed })
+        const down =
+          key === "Enter"
+            ? { type: "keyDown", ...pressed, windowsVirtualKeyCode: 13, text: "\r" }
+            : { type: "rawKeyDown", ...pressed }
+        await page.send("Input.dispatchKeyEvent", EmptyResponse, down)
         await page.send("Input.dispatchKeyEvent", EmptyResponse, { type: "keyUp", ...pressed })
         return console.log(`Pressed ${meta ? "⌘" : ""}${shift ? "⇧" : ""}${key}`)
       }

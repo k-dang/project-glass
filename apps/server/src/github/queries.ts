@@ -8,6 +8,7 @@ import { PULL_REQUEST_STATUS_FIELDS, PullRequestStatusFields } from "./pullReque
 import {
   RepositoryPullRequestsData,
   SearchPullRequestsData,
+  PullRequestAttentionData,
   PullRequestChecksData,
   ReviewRequestsConnection,
 } from "./repositoryPullRequests"
@@ -184,6 +185,8 @@ export const RepositoryPullRequestsResponse = GraphQLResponse(RepositoryPullRequ
 export const SearchPullRequestsResponse = GraphQLResponse(SearchPullRequestsData)
 
 export const PullRequestChecksResponse = GraphQLResponse(PullRequestChecksData)
+
+export const PullRequestAttentionResponse = GraphQLResponse(PullRequestAttentionData)
 
 export const ReviewRequestsResponse = GraphQLResponse(
   Schema.Struct({

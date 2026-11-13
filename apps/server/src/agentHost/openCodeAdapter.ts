@@ -18,7 +18,7 @@ import { homedir } from "node:os"
 import { join } from "node:path"
 import { writeDataFile } from "../dataFiles"
 import type { AgentAdapter } from "./adapter"
-import type { DeliveredMessage } from "./deliveredMessage"
+import type { DeliveredTurn } from "./deliveredMessage"
 import {
   openCodeRequest,
   openCodeRuntime,
@@ -589,7 +589,7 @@ export const openCodeAdapter = (command: string, program = startOpenCode) =>
         )).data
 
         const send = Effect.fnUntraced(function* (
-          sent: DeliveredMessage,
+          sent: DeliveredTurn,
           id: string,
           owner: ActiveTurn,
         ) {
@@ -668,7 +668,7 @@ export const openCodeAdapter = (command: string, program = startOpenCode) =>
         })
 
         const deliver = Effect.fnUntraced(function* (
-          sent: DeliveredMessage,
+          sent: DeliveredTurn,
           id: string,
           owner: ActiveTurn,
         ) {

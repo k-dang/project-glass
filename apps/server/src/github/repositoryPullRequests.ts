@@ -1,6 +1,13 @@
-import { type Checks, type FollowedRepository, PullRequestRef } from "@glass/contracts"
+import { Check, type Checks, type FollowedRepository, PullRequestRef } from "@glass/contracts"
 import { DateTime, Schema } from "effect"
 import { GitHubAuthor, login } from "./author"
+import {
+  CHECK_CONTEXTS_FIELDS,
+  CheckContexts,
+  checksOfCommits,
+  checksOfRollup,
+  StatusState,
+} from "./checkContexts"
 
 const CANDIDATE_FIELDS = `id number url title author { login } updatedAt headRefOid isDraft state viewerDidAuthor
   repository { owner { login } name }
@@ -33,6 +40,18 @@ export const SEARCH_PULL_REQUESTS_QUERY = `query SearchPullRequests($query: Stri
 export const PULL_REQUEST_CHECKS_QUERY = `query PullRequestChecks($ids: [ID!]!) {
   nodes(ids: $ids) {
     ... on PullRequest { id headRefOid commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } }
+  }
+}`
+
+export const PULL_REQUEST_ATTENTION_QUERY = `query PullRequestAttention($ids: [ID!]!) {
+  nodes(ids: $ids) {
+    ... on PullRequest {
+      id
+      mergeStateStatus
+      latestOpinionatedReviews(first: 100) { nodes { state } }
+      reviewThreads(first: 100) { nodes { isResolved comments(last: 1) { nodes { viewerDidAuthor } } } }
+      ${CHECK_CONTEXTS_FIELDS}
+    }
   }
 }`
 
@@ -97,7 +116,13 @@ export const toReviewRequestsPage = (
   return { users, teams, nextCursor: page.pageInfo.hasNextPage ? page.pageInfo.endCursor : null }
 }
 
-export const StatusState = Schema.Literals(["SUCCESS", "FAILURE", "ERROR", "PENDING", "EXPECTED"])
+export const ReviewState = Schema.Literals([
+  "APPROVED",
+  "CHANGES_REQUESTED",
+  "COMMENTED",
+  "DISMISSED",
+  "PENDING",
+])
 
 const GitHubCandidate = Schema.Struct({
   id: Schema.String,
@@ -179,18 +204,6 @@ export const PullRequestChecksData = Schema.Struct({
   ),
 })
 
-const checksOf: Record<typeof StatusState.Type, Checks> = {
-  SUCCESS: "passing",
-  FAILURE: "failing",
-  ERROR: "failing",
-  PENDING: "running",
-  EXPECTED: "running",
-}
-
-export const toCheck = (
-  rollup: { readonly state: typeof StatusState.Type } | null | undefined,
-): Checks => (rollup == null ? "unavailable" : checksOf[rollup.state])
-
 export interface CheckObservation {
   readonly head: string
   readonly checks: Checks
@@ -208,11 +221,72 @@ export const toChecks = (
               node.id,
               {
                 head: node.headRefOid,
-                checks: toCheck(node.commits.nodes[0]?.commit.statusCheckRollup),
+                checks: checksOfRollup(node.commits.nodes[0]?.commit.statusCheckRollup),
               },
             ] as const,
           ],
     ),
+  )
+
+export const PullRequestAttentionData = Schema.Struct({
+  nodes: Schema.Array(
+    Schema.NullOr(
+      Schema.Struct({
+        id: Schema.String,
+        mergeStateStatus: Schema.String,
+        latestOpinionatedReviews: Schema.Struct({
+          nodes: Schema.Array(Schema.Struct({ state: ReviewState })),
+        }),
+        reviewThreads: Schema.Struct({
+          nodes: Schema.Array(
+            Schema.Struct({
+              isResolved: Schema.Boolean,
+              comments: Schema.Struct({
+                nodes: Schema.Array(Schema.Struct({ viewerDidAuthor: Schema.Boolean })),
+              }),
+            }),
+          ),
+        }),
+        commits: CheckContexts,
+      }),
+    ),
+  ),
+})
+
+export const Attention = Schema.Struct({
+  changesRequested: Schema.Boolean,
+  approved: Schema.Boolean,
+  mergeClean: Schema.Boolean,
+  awaitingReply: Schema.Int,
+  failingChecks: Schema.Array(Check),
+})
+
+export type Attention = typeof Attention.Type
+
+const cleanMergeStates = new Set(["CLEAN", "HAS_HOOKS"])
+
+export const toAttention = (
+  data: typeof PullRequestAttentionData.Type,
+): ReadonlyMap<string, Attention> =>
+  new Map(
+    data.nodes.flatMap((node) => {
+      if (node === null) return []
+
+      const states = node.latestOpinionatedReviews.nodes.map(({ state }) => state)
+
+      const attention: Attention = {
+        changesRequested: states.includes("CHANGES_REQUESTED"),
+        approved: states.includes("APPROVED"),
+        mergeClean: cleanMergeStates.has(node.mergeStateStatus),
+        awaitingReply: node.reviewThreads.nodes.filter(
+          ({ isResolved, comments }) =>
+            !isResolved && comments.nodes.some(({ viewerDidAuthor }) => !viewerDidAuthor),
+        ).length,
+        failingChecks: checksOfCommits(node.commits).filter((check) => check.state === "failed"),
+      }
+
+      return [[node.id, attention] as const]
+    }),
   )
 
 export const toCandidatesPage = (page: typeof CandidatesConnection.Type): CandidatesPage => ({

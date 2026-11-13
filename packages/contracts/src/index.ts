@@ -2,6 +2,8 @@ export * from "./activity"
 
 export * from "./agentReview"
 
+export * from "./appearance"
+
 export * from "./ask"
 
 export * from "./checkoutRun"
@@ -21,6 +23,10 @@ export * from "./engine"
 export * from "./feedbackNote"
 
 export * from "./followedRepository"
+
+export * from "./needsYou"
+
+export * from "./outsideAgent"
 
 export * from "./pullRequest"
 

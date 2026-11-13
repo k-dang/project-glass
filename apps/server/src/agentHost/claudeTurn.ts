@@ -16,7 +16,7 @@ import {
   TurnFailed,
   type TurnPart,
   TurnStopped,
-  type MessageWithContext,
+  type TurnMessage,
   withContextOf,
 } from "@glass/contracts"
 import { Data, type DateTime, Option, Schema } from "effect"
@@ -57,11 +57,7 @@ interface Step {
 export const stoppedReason =
   "Claude Code stopped unexpectedly. Check its installation, then send your message again."
 
-export const beginTurn = (
-  turnId: string,
-  sent: MessageWithContext,
-  at: DateTime.Utc,
-): TurnState => ({
+export const beginTurn = (turnId: string, sent: TurnMessage, at: DateTime.Utc): TurnState => ({
   turn: { id: turnId, ...sent, feedback: [], sentAt: at, ended: null, parts: [] },
   partByBlock: new Map(),
   toolCalls: new Map(),

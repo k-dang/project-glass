@@ -1,4 +1,4 @@
-import type { ChangedFile, DiffSide } from "@glass/contracts"
+import type { ChangedFile, DiffSide, TourCodeTarget } from "@glass/contracts"
 import { Predicate } from "effect"
 
 function* patchLines(hunks: string, side: DiffSide) {
@@ -62,6 +62,16 @@ export const rangeInPatch = (hunks: string, side: DiffSide, start: number, end: 
   }
 
   return count === end - start + 1
+}
+
+export const rangeInFiles = (files: ReadonlyArray<ChangedFile>, range: TourCodeTarget) => {
+  const file = files.find((entry) => entry.path === range.path)
+
+  return (
+    file !== undefined &&
+    Predicate.isTagged(file.patch, "TextPatch") &&
+    rangeInPatch(file.patch.hunks, range.side, range.startLine, range.endLine)
+  )
 }
 
 export const patchLineNumbers = (hunks: string, side: DiffSide) =>

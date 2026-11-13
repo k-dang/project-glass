@@ -1,4 +1,4 @@
-import type { FakePullRequest } from "./fakePullRequest"
+import type { FakeCheck, FakePullRequest, FakeReview } from "./fakePullRequest"
 
 export const PAGE_SIZE = 100
 
@@ -30,3 +30,54 @@ export const reviewRequestNodes = (pr: FakePullRequest) => [
     return { requestedReviewer: { __typename: "Team", slug, organization: { login: owner } } }
   }),
 ]
+
+export const latestOpinionatedReviews = (pr: FakePullRequest) => {
+  const latest = new Map<string | null, FakeReview>()
+
+  for (const review of pr.reviews) {
+    if (review.state !== "COMMENTED") latest.set(review.author, review)
+  }
+
+  return [...latest.values()].map((review) => ({
+    author: author(review.author),
+    state: review.state,
+  }))
+}
+
+const checkRunNode = ({
+  status = "COMPLETED",
+  ...check
+}: Extract<FakeCheck, { kind: "CheckRun" }>) => ({
+  __typename: "CheckRun",
+  name: check.name,
+  status,
+  conclusion: status === "COMPLETED" ? (check.conclusion ?? "SUCCESS") : null,
+  detailsUrl: check.url ?? null,
+  checkSuite: {
+    workflowRun: check.workflow === undefined ? null : { workflow: { name: check.workflow } },
+  },
+})
+
+const checkContextNode = (check: FakeCheck) =>
+  check.kind === "StatusContext"
+    ? {
+        __typename: "StatusContext",
+        context: check.context,
+        state: check.state,
+        targetUrl: check.url ?? null,
+      }
+    : checkRunNode(check)
+
+/** The head commit's checks, as `CHECK_CONTEXTS_FIELDS` asks for them. */
+export const checkContextsNode = (pr: FakePullRequest) => ({
+  nodes: [
+    {
+      commit: {
+        statusCheckRollup:
+          pr.checks === null && pr.checkContexts.length === 0
+            ? null
+            : { contexts: { nodes: pr.checkContexts.map(checkContextNode) } },
+      },
+    },
+  ],
+})

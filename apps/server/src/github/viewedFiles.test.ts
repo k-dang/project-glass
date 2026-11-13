@@ -23,7 +23,7 @@ describe("Viewed files", () => {
         })),
       })
 
-      const workspace = yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(pr) })
+      const workspace = yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })
 
       assert.deepStrictEqual(
         workspace.viewedPaths,
@@ -42,20 +42,20 @@ describe("Viewed files", () => {
         changedFiles: [{ path: "renamed.ts", previousPath: "name.ts", status: "renamed" }],
       })
 
-      const { revision } = yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(pr) })
+      const { revision } = yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })
       const file = { pullRequestId: pr.id, revision, path: "renamed.ts" }
 
       yield* client.SetFileViewed({ ...file, viewed: true })
 
       assert.deepStrictEqual(
-        (yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(pr) })).viewedPaths,
+        (yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })).viewedPaths,
         ["renamed.ts"],
       )
 
       yield* client.SetFileViewed({ ...file, viewed: false })
 
       assert.deepStrictEqual(
-        (yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(pr) })).viewedPaths,
+        (yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })).viewedPaths,
         [],
       )
     }),
@@ -71,7 +71,7 @@ describe("Viewed files", () => {
         changedFiles: [{ path: "renamed.ts", status: "added" }],
       })
 
-      const { revision } = yield* client.OpenPullRequest({ pullRequest: new PullRequestRef(pr) })
+      const { revision } = yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })
       const file = { pullRequestId: pr.id, revision, path: "renamed.ts", viewed: true }
 
       github.beforeNext("/graphql", () => {

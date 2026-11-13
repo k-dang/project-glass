@@ -10,6 +10,7 @@ import {
   emptyTranscript,
   asksPermission,
   type CapturedContext,
+  type ReportedWork,
   type FeedbackNote,
   type Image,
   isNothingUnsent,
@@ -118,7 +119,9 @@ import { rememberPlace } from "./savedPlace"
 import { shortcutLabel } from "./shortcutLabel"
 import { useStagedFeedback } from "./useStagedFeedback"
 import { type FeedbackNotesStore, useFeedbackNotes } from "./useFeedbackNotes"
+import { markTurnSeenAtom } from "./needsYou"
 import { useShortcuts } from "./useShortcuts"
+import { useWindowFocused } from "./useWindowFocused"
 
 const TURNS_PER_PAGE = 20
 
@@ -199,6 +202,15 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
   useEffect(() => {
     rememberPlace(registry, { area: "agents", agentId: agent.id })
   }, [registry, agent.id])
+
+  const markTurnSeen = useAtomSet(markTurnSeenAtom)
+  const focused = useWindowFocused()
+  const endedAt = turns.at(-1)?.ended?.at
+
+  useEffect(() => {
+    if (focused && tab === "chat" && endedAt !== undefined)
+      markTurnSeen({ agentId: agent.id, endedAt })
+  }, [markTurnSeen, focused, tab, endedAt, agent.id])
 
   return (
     <ConversationContext value={conversation}>
@@ -360,6 +372,36 @@ export const contextLabel = (context: CapturedContext) =>
 const sentFrom = (context: CapturedContext | null) =>
   context === null ? undefined : `From ${contextLabel(context)}`
 
+const outcomeText: Record<ReportedWork["outcome"], string> = {
+  finished: "finished",
+  failed: "failed",
+  waiting: "is waiting on you",
+}
+
+const reportedText = (work: ReportedWork) => {
+  const subject = Match.valueTags(work, {
+    Agent: ({ name }) => name,
+    AgentReview: ({ pullRequest }) => `Agent review on ${referenceText(pullRequest)}`,
+  })
+
+  return `${subject} ${outcomeText[work.outcome]}`
+}
+
+function ReportMessage(props: { work: ReadonlyArray<ReportedWork> }) {
+  return (
+    <Message align="end">
+      <MessageContent>
+        <span className="self-end text-xs text-muted-foreground">Report from Glass</span>
+        <ul className="flex flex-col gap-1 self-end text-sm text-muted-foreground">
+          {props.work.map((work, index) => (
+            <li key={index}>{reportedText(work)}</li>
+          ))}
+        </ul>
+      </MessageContent>
+    </Message>
+  )
+}
+
 export function UserMessage(props: {
   message: string
   images: ReadonlyArray<Image>
@@ -400,12 +442,16 @@ const TurnView = memo(function TurnView(props: {
   return (
     <MessageScrollerItem messageId={turn.id} scrollAnchor exactHeight={props.latest}>
       <MessageGroup className="gap-4">
-        <UserMessage
-          message={turn.message}
-          images={turn.images}
-          feedback={turn.feedback}
-          label={sentFrom(turn.context)}
-        />
+        {Predicate.isTagged(turn.context, "Report") ? (
+          <ReportMessage work={turn.context.work} />
+        ) : (
+          <UserMessage
+            message={turn.message}
+            images={turn.images}
+            feedback={turn.feedback}
+            label={sentFrom(turn.context)}
+          />
+        )}
         <Message>
           <MessageContent>
             {nestParts(turn.parts).map(({ part, index, nested }) => (

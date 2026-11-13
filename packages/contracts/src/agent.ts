@@ -1,5 +1,5 @@
 import { agentEngines } from "@glass/plugin"
-import { Match, Predicate, Schema } from "effect"
+import { Effect, Match, Predicate, Schema } from "effect"
 import { FeedbackNote } from "./feedbackNote"
 import { FollowedRepository } from "./followedRepository"
 import { ChangedFile, PullRequestRef } from "./pullRequest"
@@ -136,6 +136,7 @@ export class Agent extends Schema.Class<Agent>("Agent")({
   localSkills: Schema.Boolean,
   createdAt: Schema.DateTimeUtcFromString,
   sandbox: Schema.NullOr(SandboxStatus),
+  forReview: Schema.Boolean.pipe(Schema.withConstructorDefault(Effect.succeed(false))),
 }) {}
 
 export const ImageMediaType = Schema.Literals([
@@ -178,11 +179,49 @@ export const MessageWithContext = Schema.Struct({
 
 export type MessageWithContext = typeof MessageWithContext.Type
 
-export const withContextOf = ({
+const reportedFields = {
+  outcome: Schema.Literals(["finished", "failed", "waiting"]),
+  reason: Schema.NullOr(Schema.String),
+  askedWith: Schema.NullOr(Schema.String),
+}
+
+export const AgentReported = Schema.TaggedStruct("Agent", {
+  agentId: Schema.String,
+  name: Schema.String,
+  ...reportedFields,
+})
+
+export const AgentReviewReported = Schema.TaggedStruct("AgentReview", {
+  pullRequest: PullRequestRef,
+  ...reportedFields,
+})
+
+export const ReportedWork = Schema.Union([AgentReported, AgentReviewReported])
+
+export type ReportedWork = typeof ReportedWork.Type
+
+export const WorkReport = Schema.TaggedStruct("Report", {
+  work: Schema.NonEmptyArray(ReportedWork),
+})
+
+export type WorkReport = typeof WorkReport.Type
+
+export const TurnContext = Schema.Union([PullRequestContext, AgentContext, WorkReport])
+
+export type TurnContext = typeof TurnContext.Type
+
+export const TurnMessage = Schema.Struct({
+  ...SentMessage.fields,
+  context: Schema.NullOr(TurnContext),
+})
+
+export type TurnMessage = typeof TurnMessage.Type
+
+export const withContextOf = <Context extends TurnContext>({
   message,
   images,
   context,
-}: MessageWithContext): MessageWithContext => ({ message, images, context })
+}: SentMessage & { readonly context: Context | null }) => ({ message, images, context })
 
 export const AcceptedMessage = Schema.Struct({
   ...MessageWithContext.fields,
@@ -338,6 +377,7 @@ export type TurnEnd = typeof TurnEnd.Type
 export const Turn = Schema.Struct({
   id: Schema.String,
   ...AcceptedMessage.fields,
+  context: TurnMessage.fields.context,
   sentAt: Schema.DateTimeUtcFromString,
   ended: Schema.NullOr(TurnEnd),
   parts: Schema.Array(TurnPart),
@@ -348,6 +388,7 @@ export type Turn = typeof Turn.Type
 export const TurnStarted = Schema.TaggedStruct("TurnStarted", {
   turnId: Schema.String,
   ...AcceptedMessage.fields,
+  context: TurnMessage.fields.context,
   sentAt: Schema.DateTimeUtcFromString,
 })
 

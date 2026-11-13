@@ -74,7 +74,7 @@ const mount = (handlers: Partial<Handlers>) => {
             ListActivity: () =>
               Effect.succeed(new ActivityPage({ activities: [], hasMore: false })),
             GetSavedPlaces: () => Effect.succeed([savedPlace()]),
-            OpenPullRequest: () => Effect.succeed(pr),
+            LoadPullRequest: () => Effect.succeed(pr),
             HasPullRequestChanged: () => Effect.succeed(false),
             RecordActivity: () => Effect.void,
             ...handlers,
@@ -335,7 +335,7 @@ it("keeps tracking the Tour after Reload removes the selected file", async () =>
           position: { tab: "changes", file: "third.ts", order: "tour" },
         }),
       ]),
-    OpenPullRequest: () => Effect.succeed(opens++ === 0 ? pr : refreshed),
+    LoadPullRequest: () => Effect.succeed(opens++ === 0 ? pr : refreshed),
     WatchTour: () =>
       Stream.make({
         tour: savedTour([
@@ -392,7 +392,7 @@ it("continues the newest work even while an older destination is still saving", 
 
   const user = mount({
     SavePlace: hold(calls),
-    OpenPullRequest: ({ pullRequest }) => Effect.succeed(pullRequest.number === 43 ? other : pr),
+    LoadPullRequest: ({ pullRequest }) => Effect.succeed(pullRequest.number === 43 ? other : pr),
   })
 
   await user.click(await screen.findByRole("link", { name: /^Continue / }))
