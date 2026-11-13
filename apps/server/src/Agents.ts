@@ -34,6 +34,7 @@ import {
   localPlace,
   type Transcript,
   type TranscriptUpdate,
+  type TurnEnd,
   type SentMessage,
   type UnsentFeedback,
 } from "@glass/contracts"
@@ -165,11 +166,21 @@ export interface WaitingAgent {
   readonly requests: Arr.NonEmptyReadonlyArray<WaitingRequest>
 }
 
+export interface FinishedAgent {
+  readonly agent: Agent
+  readonly ended: TurnEnd
+}
+
 export class Agents extends Context.Service<
   Agents,
   {
     readonly watch: () => Stream.Stream<ReadonlyArray<Agent>, AgentError>
     readonly watchWaiting: () => Stream.Stream<ReadonlyArray<WaitingAgent>>
+    readonly watchFinished: () => Stream.Stream<ReadonlyArray<FinishedAgent>>
+    readonly markTurnSeen: (
+      agentId: string,
+      endedAt: DateTime.Utc,
+    ) => Effect.Effect<void, AgentError>
     readonly readTranscript: (
       agentId: string,
     ) => Effect.Effect<Transcript, AgentNotFound | AgentError>
@@ -828,6 +839,21 @@ export class Agents extends Context.Service<
               }),
             ),
           ),
+        watchFinished: () =>
+          Stream.zipLatest(placed, transcripts.unseen).pipe(
+            Stream.map(([current, unseen]) =>
+              current.flatMap(({ agent }) => {
+                const ended = unseen.get(agent.id)
+
+                return ended === undefined ||
+                  agent.forReview ||
+                  Predicate.isTagged(ended.ending, "Stopped")
+                  ? []
+                  : [{ agent, ended }]
+              }),
+            ),
+          ),
+        markTurnSeen: transcripts.markSeen,
         changeModel: update,
         changePermissionMode,
         answer,

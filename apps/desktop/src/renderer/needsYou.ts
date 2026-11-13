@@ -5,7 +5,7 @@ import {
   type PullRequestNeedsYou,
   referenceKey,
 } from "@glass/contracts"
-import { type Cause, Match, Option, Schema, Stream } from "effect"
+import { type Cause, type DateTime, Match, Option, Schema, Stream } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
 import { type BackendError, Backend, backendRuntime } from "./backend"
 import { queueRefreshAtom } from "./queue"
@@ -40,4 +40,9 @@ export const finishedAgentReviewOf = (item: PullRequestNeedsYou) =>
 
 export const markDoneAtom = backendRuntime.fn((review: AgentReviewDone) =>
   Backend.use((backend) => backend.MarkAgentReviewDone(review)),
+)
+
+export const markTurnSeenAtom = backendRuntime.fn(
+  (seen: { readonly agentId: string; readonly endedAt: DateTime.Utc }) =>
+    Backend.use((backend) => backend.MarkTurnSeen(seen)),
 )

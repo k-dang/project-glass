@@ -1,12 +1,14 @@
-import { Schema } from "effect"
-import { Agent, PermissionRequestPart, QuestionPart } from "./agent"
+import { Predicate, Schema } from "effect"
+import { Agent, PermissionRequestPart, QuestionPart, TurnEnd } from "./agent"
 import { PullRequestSummary } from "./pullRequestList"
 
 export const WaitingRequests = Schema.TaggedStruct("WaitingRequests", {
   requests: Schema.NonEmptyArray(Schema.Union([PermissionRequestPart, QuestionPart])),
 })
 
-export const AgentReason = Schema.Union([WaitingRequests])
+export const TurnFinished = Schema.TaggedStruct("TurnFinished", { ended: TurnEnd })
+
+export const AgentReason = Schema.Union([WaitingRequests, TurnFinished])
 
 export type AgentReason = typeof AgentReason.Type
 
@@ -95,5 +97,9 @@ export const NeedsYouItem = Schema.Union([AgentNeedsYou, PullRequestNeedsYou, Ou
 export type NeedsYouItem = typeof NeedsYouItem.Type
 
 export const NeedsYou = Schema.Array(NeedsYouItem)
+
+export const stopsOnYou = (item: NeedsYouItem) =>
+  Predicate.isTagged(item, "OutsideQuestion") ||
+  (Predicate.isTagged(item, "Agent") && item.reasons.some(Predicate.isTagged("WaitingRequests")))
 
 export type NeedsYou = typeof NeedsYou.Type

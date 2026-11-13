@@ -38,6 +38,7 @@ import {
   Exit,
   Layer,
   Match,
+  Option,
   Predicate,
   PubSub,
   Schema,
@@ -104,6 +105,10 @@ const decodeWaiting = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ agentId: Schema.String, part: Schema.fromJsonString(TurnPart) })),
 )
 
+const decodeUnseen = Schema.decodeUnknownEffect(
+  Schema.Array(Schema.Struct({ agentId: Schema.String, ended: Schema.fromJsonString(TurnEnd) })),
+)
+
 export const StoredMessage = Schema.Struct({ ...SentMessage.fields, images: ImagesJson })
 
 const decodeQueued = Schema.decodeUnknownEffect(
@@ -155,6 +160,8 @@ export interface WaitingRequest {
 
 export type WaitingByAgent = ReadonlyMap<string, Arr.NonEmptyReadonlyArray<WaitingRequest>>
 
+export type UnseenByAgent = ReadonlyMap<string, TurnEnd>
+
 export type StartedTurn = typeof TurnStarted.Type & { readonly agentId: string }
 
 const joinConsecutiveAppends = (events: ReadonlyArray<AgentEvent>) => {
@@ -181,6 +188,11 @@ const joinConsecutiveAppends = (events: ReadonlyArray<AgentEvent>) => {
 
 const changesRequest = (update: TranscriptUpdate) =>
   Predicate.isTagged(update, "PartSet") && isRequestPart(update.part)
+
+const sameEnd = Schema.toEquivalence(TurnEnd)
+
+const startsOrEndsTurn = (update: TranscriptUpdate) =>
+  Predicate.isTagged(update, "TurnStarted") || Predicate.isTagged(update, "TurnEnded")
 
 class TurnFailure extends Data.TaggedError("TurnFailure")<{ readonly message: string }> {}
 
@@ -236,6 +248,8 @@ export class Transcripts extends Context.Service<
     readonly subscribeStarted: Effect.Effect<Stream.Stream<StartedTurn>, never, Scope.Scope>
     readonly waiting: Stream.Stream<WaitingByAgent>
     readonly isWaiting: (agentId: string) => Effect.Effect<boolean>
+    readonly unseen: Stream.Stream<UnseenByAgent>
+    readonly markSeen: (agentId: string, endedAt: DateTime.Utc) => Effect.Effect<void, AgentError>
     readonly setStatus: (agentId: string, status: string | null) => Effect.Effect<void>
     readonly remove: (agentId: string) => Effect.Effect<void, AgentError>
   }
@@ -307,6 +321,50 @@ export class Transcripts extends Context.Service<
           return next
         })
       })
+
+      const unseenEnds = (agentId?: string) =>
+        sql`
+          SELECT a.id AS agentId, t.ended AS ended
+          FROM agent a
+          JOIN agent_turn t ON t.rowid = (SELECT MAX(rowid) FROM agent_turn WHERE agent_id = a.id)
+          WHERE ${sql.and([
+            ...(agentId === undefined ? [] : [sql`a.id = ${agentId}`]),
+            "t.ended IS NOT NULL",
+            "(a.turn_seen_at IS NULL OR json_extract(t.ended, '$.at') > a.turn_seen_at)",
+          ])}
+        `.pipe(Effect.flatMap(decodeUnseen))
+
+      const unseen = yield* SubscriptionRef.make<UnseenByAgent>(
+        new Map(
+          (yield* unseenEnds().pipe(
+            Effect.catch((cause) =>
+              Effect.logWarning("Couldn't read the unseen Turns", cause).pipe(Effect.as([])),
+            ),
+          )).map(({ agentId, ended }) => [agentId, ended] as const),
+        ),
+      )
+
+      const setUnseen = (agentId: string, ended: TurnEnd | undefined) =>
+        SubscriptionRef.updateSome(unseen, (current) => {
+          const before = current.get(agentId)
+
+          if (
+            before === undefined
+              ? ended === undefined
+              : ended !== undefined && sameEnd(before, ended)
+          )
+            return Option.none()
+
+          const next = new Map(current)
+
+          if (ended === undefined) next.delete(agentId)
+          else next.set(agentId, ended)
+
+          return Option.some(next)
+        })
+
+      const refreshUnseen = (agentId: string) =>
+        unseenEnds(agentId).pipe(Effect.flatMap(([row]) => setUnseen(agentId, row?.ended)))
 
       const lockFor = (agentId: string) => {
         const lock = locks.get(agentId) ?? Semaphore.makeUnsafe(1)
@@ -463,6 +521,8 @@ export class Transcripts extends Context.Service<
                 agentId,
                 (yield* waitingParts(agentId)).map(({ part }) => part),
               )
+
+            if (updates.some(startsOrEndsTurn)) yield* refreshUnseen(agentId)
 
             yield* PubSub.publishAll(
               published,
@@ -730,6 +790,20 @@ export class Transcripts extends Context.Service<
         waiting: SubscriptionRef.changes(waiting),
         isWaiting: (agentId) =>
           SubscriptionRef.get(waiting).pipe(Effect.map((current) => current.has(agentId))),
+        unseen: SubscriptionRef.changes(unseen),
+        markSeen: (agentId, endedAt) => {
+          const at = DateTime.formatIso(endedAt)
+
+          return withStorageFailure(
+            "mark a Turn seen",
+            lockFor(agentId).withPermits(1)(
+              sql`
+                UPDATE agent SET turn_seen_at = ${at}
+                WHERE id = ${agentId} AND (turn_seen_at IS NULL OR turn_seen_at < ${at})
+              `.pipe(Effect.andThen(refreshUnseen(agentId))),
+            ),
+          )
+        },
         setStatus: (agentId, status) =>
           lockFor(agentId).withPermits(1)(
             Effect.suspend(() => {
@@ -756,6 +830,7 @@ export class Transcripts extends Context.Service<
           locks.delete(agentId)
           statuses.delete(agentId)
           yield* markWaiting(agentId, [])
+          yield* setUnseen(agentId, undefined)
         }, Effect.mapError(storageFailure)),
       })
     }),

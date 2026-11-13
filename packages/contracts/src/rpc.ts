@@ -349,6 +349,11 @@ export class GlassRpcs extends RpcGroup.make(
     stream: true,
   }),
   Rpc.make("WatchNeedsYou", { success: NeedsYou, stream: true }),
+  /** Marks the Agent's Turn that ended at endedAt seen; a Turn that ended later is left as it is. */
+  Rpc.make("MarkTurnSeen", {
+    payload: { agentId: Schema.String, endedAt: Schema.DateTimeUtcFromString },
+    error: AgentError,
+  }),
   Rpc.make("AnswerOutsideQuestion", {
     payload: { id: Schema.String, answer: OutsideQuestionAnswer },
     error: OutsideQuestionNotWaiting,

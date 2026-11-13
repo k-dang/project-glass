@@ -118,7 +118,9 @@ import { rememberPlace } from "./savedPlace"
 import { shortcutLabel } from "./shortcutLabel"
 import { useStagedFeedback } from "./useStagedFeedback"
 import { type FeedbackNotesStore, useFeedbackNotes } from "./useFeedbackNotes"
+import { markTurnSeenAtom } from "./needsYou"
 import { useShortcuts } from "./useShortcuts"
+import { useWindowFocused } from "./useWindowFocused"
 
 const TURNS_PER_PAGE = 20
 
@@ -199,6 +201,15 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
   useEffect(() => {
     rememberPlace(registry, { area: "agents", agentId: agent.id })
   }, [registry, agent.id])
+
+  const markTurnSeen = useAtomSet(markTurnSeenAtom)
+  const focused = useWindowFocused()
+  const endedAt = turns.at(-1)?.ended?.at
+
+  useEffect(() => {
+    if (focused && tab === "chat" && endedAt !== undefined)
+      markTurnSeen({ agentId: agent.id, endedAt })
+  }, [markTurnSeen, focused, tab, endedAt, agent.id])
 
   return (
     <ConversationContext value={conversation}>

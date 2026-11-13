@@ -15,6 +15,8 @@ import {
   type QueuedPullRequest,
   ReadyToMerge,
   referenceKey,
+  stopsOnYou,
+  TurnFinished,
   WaitingRequests,
 } from "@glass/contracts"
 import {
@@ -29,7 +31,7 @@ import {
   Stream,
 } from "effect"
 import { AgentReviews } from "./AgentReviews"
-import { Agents, type WaitingAgent } from "./Agents"
+import { Agents, type FinishedAgent, type WaitingAgent } from "./Agents"
 import { OutsideQuestions } from "./OutsideQuestions"
 import {
   type Mirror,
@@ -45,18 +47,12 @@ interface WaitingPullRequest {
   readonly since: DateTime.Utc
 }
 
-const rank: Record<NeedsYouItem["_tag"], number> = {
-  Agent: 0,
-  OutsideQuestion: 0,
-  PullRequest: 1,
-}
-
 const order: Order.Order<NeedsYouItem> = Order.combine(
-  Order.mapInput(Order.Number, (item: NeedsYouItem) => rank[item._tag]),
+  Order.mapInput(Order.Number, (item: NeedsYouItem) => (stopsOnYou(item) ? 0 : 1)),
   Order.mapInput(DateTime.Order, (item: NeedsYouItem) => item.since),
 )
 
-const agentItem = ({ agent, requests }: WaitingAgent) =>
+const waitingItem = ({ agent, requests }: WaitingAgent) =>
   AgentNeedsYou.make({
     agent,
     reasons: [WaitingRequests.make({ requests: Arr.map(requests, ({ part }) => part) })],
@@ -65,6 +61,9 @@ const agentItem = ({ agent, requests }: WaitingAgent) =>
       DateTime.Order,
     ),
   })
+
+const finishedItem = ({ agent, ended }: FinishedAgent) =>
+  AgentNeedsYou.make({ agent, reasons: [TurnFinished.make({ ended })], since: ended.at })
 
 const pullRequestItems = (waiting: ReadonlyArray<WaitingPullRequest>) =>
   Object.values(Arr.groupBy(waiting, ({ pullRequest }) => referenceKey(pullRequest.ref))).map(
@@ -80,11 +79,20 @@ const pullRequestItems = (waiting: ReadonlyArray<WaitingPullRequest>) =>
   )
 
 const needsYouOf = (
-  agents: ReadonlyArray<WaitingAgent>,
+  waiting: ReadonlyArray<WaitingAgent>,
+  finished: ReadonlyArray<FinishedAgent>,
   pullRequests: ReadonlyArray<WaitingPullRequest>,
   outside: ReadonlyArray<OutsideQuestion>,
 ): ReadonlyArray<NeedsYouItem> =>
-  Arr.sort([...agents.map(agentItem), ...outside, ...pullRequestItems(pullRequests)], order)
+  Arr.sort(
+    [
+      ...waiting.map(waitingItem),
+      ...finished.map(finishedItem),
+      ...outside,
+      ...pullRequestItems(pullRequests),
+    ],
+    order,
+  )
 
 const reasonsOf = ({
   attention,
@@ -201,9 +209,14 @@ export class NeedsYou extends Context.Service<
 
       return NeedsYou.of({
         watch: () =>
-          Stream.zipLatestAll(agents.watchWaiting(), waitingPullRequests, questions.watch()).pipe(
-            Stream.map(([waiting, pullRequests, asked]) =>
-              needsYouOf(waiting, pullRequests, asked),
+          Stream.zipLatestAll(
+            agents.watchWaiting(),
+            agents.watchFinished(),
+            waitingPullRequests,
+            questions.watch(),
+          ).pipe(
+            Stream.map(([waiting, finished, pullRequests, asked]) =>
+              needsYouOf(waiting, finished, pullRequests, asked),
             ),
             Stream.changesWith(Schema.toEquivalence(NeedsYouList)),
           ),
