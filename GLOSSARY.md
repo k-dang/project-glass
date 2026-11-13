@@ -13,8 +13,8 @@ device for them to continue. Each area keeps its own: the last PR in Reviews, th
 Agents. Visiting Settings or Activity leaves every Saved place unchanged.
 
 **Needs you**:
-The Agents and queued PRs waiting on the user now. They live in the Inbox,
-grouped by why they are waiting, with their count on the Inbox rail link in every area.
+The Agents, questions from an agent outside Glass, and queued PRs waiting on the user now. They live
+in the Inbox, grouped by why they are waiting, with their count on the Inbox rail link in every area.
 A queued PR waits once its Agent review is finished, until the user marks that Agent review done;
 writing it again puts the PR back.
 The Dashboard shows that count once Needs you has loaded, and links to the Inbox.
@@ -312,6 +312,13 @@ An Agent asking the user to choose between options or answer in their own words,
 transcript until they answer.
 An Agent with a Permission request or Question waiting is marked in the Agents list and listed in
 Needs you.
+An agent outside Glass can ask through Glass's MCP endpoint after the user approves it. That
+question waits in the Inbox, under Stopped on you, until the user answers or the wait ends.
+
+**Outside agent**:
+An agent Glass did not launch. The user approves it once, and it can then use Glass's MCP tools
+on this computer, including asking a question. It is not a conversation Glass started.
+_Avoid_: Session, client, login
 
 ### Identity
 

@@ -27,8 +27,12 @@ import { Sandboxes } from "./Sandboxes"
 import { ServerConfig } from "./ServerConfig"
 import { LocalPlacement } from "./LocalPlacement"
 import { McpCredentials } from "./mcp/McpCredentials"
+import { McpOAuth } from "./mcp/McpOAuth"
+import { OAuthRoutes } from "./mcp/oauthHttp"
 import { GlassMcpTools, McpRoutes } from "./mcp/server"
+import { OutsideAgents } from "./OutsideAgents"
 import { NeedsYou } from "./NeedsYou"
+import { OutsideQuestions } from "./OutsideQuestions"
 import { FollowedRepositories } from "./FollowedRepositories"
 import { PullRequestLists } from "./PullRequestLists"
 import { PullRequestMirror } from "./PullRequestMirror"
@@ -107,28 +111,44 @@ const services = (
       Layer.provide(agentRunners),
       Layer.provide(agentCommands),
       Layer.provide(Layer.merge(ActivityLog.layer, Storage.layer)),
+      Layer.provideMerge(OutsideAgents.layer),
+      Layer.provideMerge(McpOAuth.layer),
       Layer.provide(DatabaseLive),
       Layer.provide(FollowedRepositories.layer),
       Layer.provide(SettingsStore.layer),
       Layer.provide(GitHubClient.layer),
       Layer.provide(GitHubAuth.layer),
       Layer.provideMerge(McpCredentials.layer),
+      Layer.provideMerge(OutsideQuestions.layer),
     )
+
+const releaseAskers = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const questions = yield* OutsideQuestions
+
+    // Acquired after the listener, so this runs before server.close waits on open responses.
+    yield* Effect.addFinalizer(() => questions.cancelAll())
+  }),
+)
 
 export const serve = (
   agentRunners: AgentRunnersLayer,
   mcpTools: McpToolsLayer,
   agentCommands: AgentCommandsLayer = AgentCommands.layer,
 ) =>
-  HttpRouter.serve(Layer.merge(RendererRoutes, McpRoutes), {
-    disableLogger: true,
-  }).pipe(
-    // Provided first so it listens last: Effect's Node server leaves connections hanging until it serves.
-    Layer.provideMerge(NodeServerLive),
-    Layer.provideMerge(services(agentRunners, mcpTools, agentCommands)),
-    Layer.provide(RpcSerialization.layerJson),
-    Layer.provide(NodeServices.layer),
-    Layer.provide(Layer.succeed(UrlParams.CurrentRedactedNames)([TOKEN_PARAM])),
+  releaseAskers.pipe(
+    Layer.provideMerge(
+      HttpRouter.serve(Layer.mergeAll(RendererRoutes, McpRoutes, OAuthRoutes), {
+        disableLogger: true,
+      }).pipe(
+        // Provided first so it listens last: Effect's Node server leaves connections hanging until it serves.
+        Layer.provideMerge(NodeServerLive),
+        Layer.provideMerge(services(agentRunners, mcpTools, agentCommands)),
+        Layer.provide(RpcSerialization.layerJson),
+        Layer.provide(NodeServices.layer),
+        Layer.provide(Layer.succeed(UrlParams.CurrentRedactedNames)([TOKEN_PARAM])),
+      ),
+    ),
   )
 
 export const ServerLive = serve(AgentRunners.layer, GlassMcpTools)

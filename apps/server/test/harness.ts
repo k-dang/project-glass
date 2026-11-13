@@ -17,6 +17,7 @@ import { afterEach, vi } from "vite-plus/test"
 import { connectRpcClient } from "../src/rpcSocket"
 import { AgentRunners } from "../src/agentRunners"
 import { McpCredentials } from "../src/mcp/McpCredentials"
+import { OutsideAgents } from "../src/OutsideAgents"
 import { GlassMcpTools } from "../src/mcp/server"
 import { serve } from "../src/server"
 import { ServerConfig } from "../src/ServerConfig"
@@ -107,7 +108,12 @@ export const startBackend = Effect.fnUntraced(function* (
   // throws as an uncaught exception; a test that never calls the client would end that way.
   yield* client.ListSandboxProviders()
 
-  return { baseUrl, client, mcpCredentials: Context.get(services, McpCredentials) }
+  return {
+    baseUrl,
+    client,
+    mcpCredentials: Context.get(services, McpCredentials),
+    outsideAgents: Context.get(services, OutsideAgents),
+  }
 })
 
 export const startSignedInBackend = Effect.gen(function* () {

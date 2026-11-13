@@ -45,7 +45,8 @@ import { CreateDraftError, Draft, UpdateDraftError } from "./draft"
 import { EngineFeature, EngineSettings } from "./engine"
 import { FeedbackNote, UnsentFeedback } from "./feedbackNote"
 import { FollowedRepository, InvalidRepositoryInput } from "./followedRepository"
-import { NeedsYou } from "./needsYou"
+import { NeedsYou, OutsideQuestionAnswer, OutsideQuestionNotWaiting } from "./needsYou"
+import { OutsideAgent, OutsideAgentNotFound } from "./outsideAgent"
 import { LoadPullRequestError, PullRequestRef, PullRequestWorkspace } from "./pullRequest"
 import { PullRequestListings } from "./pullRequestList"
 import { Queue, QueueAddition, QueueError, QueuedPullRequest } from "./queue"
@@ -342,6 +343,16 @@ export class GlassRpcs extends RpcGroup.make(
     stream: true,
   }),
   Rpc.make("WatchNeedsYou", { success: NeedsYou, stream: true }),
+  Rpc.make("AnswerOutsideQuestion", {
+    payload: { id: Schema.String, answer: OutsideQuestionAnswer },
+    error: OutsideQuestionNotWaiting,
+  }),
+  Rpc.make("GetMcpEndpoint", { success: Schema.Struct({ url: Schema.String }) }),
+  Rpc.make("WatchOutsideAgents", { success: Schema.Array(OutsideAgent), stream: true }),
+  Rpc.make("RevokeOutsideAgent", {
+    payload: { id: Schema.String },
+    error: OutsideAgentNotFound,
+  }),
   Rpc.make("WatchTranscript", {
     payload: { agentId: Schema.String },
     success: TranscriptUpdate,

@@ -17,6 +17,7 @@ it.live("creates the schema once and reads Activity through its indexes after re
         [1, "baseline"],
         [2, "agent_review_hotspots"],
         [3, "agent_review_done"],
+        [4, "outside_agent"],
       ],
       [],
     ] as const) {

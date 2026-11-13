@@ -8,6 +8,7 @@ import { FollowedRepositoriesSettings } from "./FollowedRepositories"
 import { ProblemAlert } from "./ProblemAlert"
 import { describeSource, problemOf } from "./problems"
 import { SettingsSection } from "./SettingsSection"
+import { OutsideAgentsSettings } from "./OutsideAgentsSettings"
 import { SkillPacksSettings } from "./SkillPacks"
 import { StorageSettings } from "./StorageSettings"
 
@@ -76,6 +77,7 @@ export function Settings() {
         <ConnectionDetails />
       </SettingsSection>
       <FollowedRepositoriesSettings />
+      <OutsideAgentsSettings />
       <AppearanceSettings />
       <AgentSettings />
       <SkillPacksSettings />

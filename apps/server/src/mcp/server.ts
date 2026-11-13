@@ -1,6 +1,7 @@
-import { Effect, Layer, Option } from "effect"
-import { McpProtocol, McpServer } from "effect/ai"
+import { Effect, Layer, Option, Predicate, Redacted, Schema, Stream } from "effect"
+import { McpProtocol, McpSchema, McpServer } from "effect/ai"
 import {
+  HttpBody,
   HttpEffect,
   HttpRouter,
   HttpServer,
@@ -8,40 +9,100 @@ import {
   HttpServerResponse,
 } from "effect/http"
 import { HttpApiBuilder, HttpApiSecurity } from "effect/http-api"
+import { OutsideAgents } from "../OutsideAgents"
+import { AskProgress } from "./AskProgress"
 import { GlassToolHandlers, GlassTools } from "./glassTools"
-import { McpCaller, McpCredentials } from "./McpCredentials"
+import { McpCaller, McpCredentials, OutsideAgentCaller } from "./McpCredentials"
+import { requestUrls } from "./McpOAuth"
 
 export const MCP_PATH = "/mcp"
 
 const SESSION_HEADER = "mcp-session-id"
 
-const unauthorized = HttpServerResponse.empty({
-  status: 401,
-  headers: { "www-authenticate": "Bearer" },
+const progressTokenOf = (metadata: Schema.JsonObject | undefined) =>
+  Schema.decodeUnknownOption(McpSchema.ProgressToken)(metadata?.["progressToken"])
+
+const askProgress = AskProgress.of({
+  notify: (progress) =>
+    Effect.gen(function* () {
+      const server = yield* Effect.serviceOption(McpServer.McpServer)
+      const client = yield* Effect.serviceOption(McpSchema.McpServerClient)
+
+      const token = Option.isSome(client)
+        ? progressTokenOf(client.value.requestMetadata)
+        : Option.none()
+
+      if (Option.isNone(server) || Option.isNone(token)) return
+
+      yield* server.value.notifications["notifications/progress"]({
+        progressToken: token.value,
+        progress,
+        message: "Waiting for an answer in the Glass Inbox",
+      }).pipe(Effect.ignore)
+    }),
 })
+
+const challenge = (issuer: string, presented: boolean) => {
+  const metadata = `${issuer}/.well-known/oauth-protected-resource/mcp`
+  const params = [`resource_metadata="${metadata}"`]
+
+  if (presented) params.push(`error="invalid_token"`)
+
+  return HttpServerResponse.empty({
+    status: 401,
+    headers: { "www-authenticate": `Bearer ${params.join(", ")}` },
+  })
+}
 
 const McpAccess = HttpRouter.middleware(
   Effect.gen(function* () {
     const credentials = yield* McpCredentials
+    const outsideAgents = yield* OutsideAgents
 
     return (httpEffect) =>
       Effect.gen(function* () {
-        const bearer = yield* HttpApiBuilder.securityDecode(HttpApiSecurity.bearer)
-        const credential = credentials.authenticate(bearer)
+        const request = yield* HttpServerRequest.HttpServerRequest
+        const urls = requestUrls(request)
 
-        if (Option.isNone(credential)) return unauthorized
+        if (urls === undefined) {
+          return HttpServerResponse.empty({
+            status: 401,
+            headers: { "www-authenticate": "Bearer" },
+          })
+        }
+
+        const bearer = yield* HttpApiBuilder.securityDecode(HttpApiSecurity.bearer)
+        const conversation = credentials.authenticate(bearer)
+
+        const outside = Option.isSome(conversation)
+          ? Option.none()
+          : yield* outsideAgents.authenticate(bearer)
+
+        const credential = Option.isSome(conversation) ? conversation : outside
+
+        if (Option.isNone(credential)) {
+          return challenge(urls.issuer, Redacted.value(bearer) !== "")
+        }
 
         const { caller, ownedSessions, revoked } = credential.value
-        const request = yield* HttpServerRequest.HttpServerRequest
         const session = request.headers[SESSION_HEADER]
 
         if (session !== undefined && !ownedSessions.has(session)) {
           return HttpServerResponse.empty({ status: 404 })
         }
 
+        const calling =
+          Predicate.isTagged(caller, "OutsideAgent") && session !== undefined
+            ? new OutsideAgentCaller({ agentId: caller.agentId, name: caller.name, session })
+            : caller
+
         const response = yield* Effect.raceFirst(
-          Effect.provideService(httpEffect, McpCaller, caller),
-          Effect.as(revoked, unauthorized),
+          Effect.provideService(
+            Effect.provideService(httpEffect, McpCaller, calling),
+            AskProgress,
+            askProgress,
+          ),
+          Effect.as(revoked, challenge(urls.issuer, true)),
         )
 
         // Effect sets an opened session's id in its own pre-response handler, so read it after.
@@ -55,7 +116,16 @@ const McpAccess = HttpRouter.middleware(
           }),
         )
 
-        return response
+        // A streamed answer, such as ask_user waiting with progress, outlives the race above. Ending
+        // its body on revoke closes the request, and Effect then interrupts the tool call.
+        if (!Predicate.isTagged(response.body, "Stream")) return response
+
+        const { stream, contentType, contentLength } = response.body
+
+        return HttpServerResponse.setBody(
+          response,
+          HttpBody.stream(Stream.interruptWhen(stream, revoked), contentType, contentLength),
+        )
       })
   }),
 )

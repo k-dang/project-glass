@@ -33,7 +33,49 @@ export const PullRequestNeedsYou = Schema.TaggedStruct("PullRequest", {
 
 export type PullRequestNeedsYou = typeof PullRequestNeedsYou.Type
 
-export const NeedsYouItem = Schema.Union([AgentNeedsYou, PullRequestNeedsYou])
+/** One question from an agent outside Glass. It is one Needs you row until the user answers, or the wait ends. */
+export const OutsideQuestion = Schema.TaggedStruct("OutsideQuestion", {
+  id: Schema.String,
+  question: Schema.String,
+  choices: Schema.Array(Schema.String),
+  /** The name the user approved the outside agent under, such as Claude Code. */
+  askedBy: Schema.String,
+  since: Schema.DateTimeUtcFromString,
+})
+
+export type OutsideQuestion = typeof OutsideQuestion.Type
+
+export const OutsideChoice = Schema.TaggedStruct("Choice", {
+  choice: Schema.String,
+})
+
+export const OutsideText = Schema.TaggedStruct("Text", {
+  text: Schema.Trimmed.check(Schema.isNonEmpty()),
+})
+
+export const OutsideQuestionAnswer = Schema.Union([OutsideChoice, OutsideText])
+
+export type OutsideQuestionAnswer = typeof OutsideQuestionAnswer.Type
+
+export class OutsideQuestionNotWaiting extends Schema.TaggedError<OutsideQuestionNotWaiting>()(
+  "OutsideQuestionNotWaiting",
+  {},
+) {}
+
+export const AskUserAnswered = Schema.TaggedStruct("Answered", {
+  answer: Schema.String,
+  by: Schema.Literals(["choice", "text"]),
+})
+
+export const AskUserTimedOut = Schema.TaggedStruct("TimedOut", {})
+
+export const AskUserCancelled = Schema.TaggedStruct("Cancelled", {})
+
+export const AskUserResult = Schema.Union([AskUserAnswered, AskUserTimedOut, AskUserCancelled])
+
+export type AskUserResult = typeof AskUserResult.Type
+
+export const NeedsYouItem = Schema.Union([AgentNeedsYou, PullRequestNeedsYou, OutsideQuestion])
 
 export type NeedsYouItem = typeof NeedsYouItem.Type
 

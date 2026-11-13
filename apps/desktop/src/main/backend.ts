@@ -1,35 +1,12 @@
 import { RPC_PATH } from "@glass/contracts"
 import type { BackendEndpoint } from "@glass/contracts/desktop"
-import { Deferred, Duration, Effect, Fiber, Schema } from "effect"
+import { Deferred, Duration, Effect, Fiber } from "effect"
 import { type UtilityProcess, utilityProcess } from "electron"
 import { randomBytes, randomUUID } from "node:crypto"
-import { createServer } from "node:net"
 import { BackendError, keepRunning, openBackendLog, waitForBackend } from "./backendIo"
+import { choosePort } from "./backendPort"
 
 const STOP_DEADLINE = Duration.seconds(10)
-
-const decodeTcpAddress = Schema.decodeUnknownEffect(Schema.Struct({ port: Schema.Number }))
-
-const freePort = Effect.callback<number, BackendError>((resume) => {
-  const server = createServer()
-  server.once("error", (cause) =>
-    resume(Effect.fail(new BackendError({ message: `No free port: ${cause.message}` }))),
-  )
-  server.listen(0, "127.0.0.1", () => {
-    const address = server.address()
-
-    server.close(() =>
-      resume(
-        decodeTcpAddress(address).pipe(
-          Effect.map(({ port }) => port),
-          Effect.mapError(
-            (cause) => new BackendError({ message: `No listening port: ${cause.message}` }),
-          ),
-        ),
-      ),
-    )
-  })
-})
 
 // `kill()` SIGKILLs a backend still running two seconds after its SIGTERM (Chromium's
 // EnsureProcessTerminated), cutting off its shutdown of the Agent host.
@@ -52,7 +29,14 @@ export const startBackend = Effect.fn("startBackend")(function* (options: {
   readonly logFile: string
   readonly dataDirectory: string
 }) {
-  const port = yield* freePort
+  const port = yield* Effect.tryPromise({
+    try: () => choosePort(options.dataDirectory),
+    catch: (cause) =>
+      new BackendError({
+        message: cause instanceof Error ? cause.message : "No free port",
+      }),
+  })
+
   const token = randomBytes(32).toString("base64url")
   const log = yield* openBackendLog(options.logFile)
   const ready = yield* Deferred.make<void>()
