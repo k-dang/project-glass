@@ -82,6 +82,11 @@ const decodeReviewRows = Schema.decodeUnknownEffect(Schema.Array(ReviewRow))
 const pullRequestOf = ({ owner, repo, number }: ReviewRow) =>
   new PullRequestRef({ owner, repo, number })
 
+interface ConversationIds {
+  readonly conversationId: string
+  readonly sessionId: string
+}
+
 export interface Unreported {
   readonly work: ReportedWork
   readonly at: DateTime.Utc
@@ -146,12 +151,12 @@ export class StartedWork extends Context.Service<
   {
     /** `since` is when the conversation acted, so only outcomes from then on are reported. */
     readonly linkAgent: (
-      conversationId: string,
+      caller: ConversationIds,
       agentId: string,
       since: DateTime.Utc,
     ) => Effect.Effect<void, AgentError>
     readonly startedAgentReview: (
-      conversationId: string,
+      caller: ConversationIds,
       pullRequest: PullRequestRef,
       since: DateTime.Utc,
     ) => Effect.Effect<void, AgentError>
@@ -221,9 +226,9 @@ export class StartedWork extends Context.Service<
       const changedRows = SubscriptionRef.update(recorded, (count) => count + 1)
 
       return StartedWork.of({
-        linkAgent: (conversationId, agentId, since) =>
+        linkAgent: ({ conversationId, sessionId }, agentId, since) =>
           Effect.gen(function* () {
-            const askedWith = yield* transcripts.runningMessage(conversationId)
+            const askedWith = yield* transcripts.runningMessage(sessionId)
             const startedAt = DateTime.formatIso(since)
 
             yield* sql`
@@ -233,9 +238,9 @@ export class StartedWork extends Context.Service<
             `.pipe(saved("a started Agent"))
             yield* changedRows
           }),
-        startedAgentReview: (conversationId, { owner, repo, number }, since) =>
+        startedAgentReview: ({ conversationId, sessionId }, { owner, repo, number }, since) =>
           Effect.gen(function* () {
-            const askedWith = yield* transcripts.runningMessage(conversationId)
+            const askedWith = yield* transcripts.runningMessage(sessionId)
             const startedAt = DateTime.formatIso(since)
 
             yield* sql`

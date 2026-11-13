@@ -34,7 +34,10 @@ const startGlass = Effect.gen(function* () {
 
   const mcp = yield* connectMcp(
     backend.baseUrl,
-    yield* backend.mcpCredentials.issue({ conversationId: "global-conversation" }),
+    yield* backend.mcpCredentials.issue({
+      conversationId: "global-conversation",
+      sessionId: "global-session",
+    }),
   )
 
   return { ...backend, github, pr, mcp, call: mcp.call }

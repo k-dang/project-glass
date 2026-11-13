@@ -3,6 +3,7 @@ import { AnswerQuestion, localPlace, type NeedsYou, type Turn } from "@glass/con
 import { Effect, Option, Predicate, Stream } from "effect"
 import {
   agentsFixture,
+  glassCalls,
   globalTurns,
   holding,
   lastSettled,
@@ -127,4 +128,38 @@ it.live("leaves out an Agent it started that the user stopped", () =>
 
     assert.deepStrictEqual(reported(turns), [])
   }),
+)
+
+it.live(
+  "reports work started before Start fresh into the new conversation, which still lists it as started",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* agentsFixture
+      yield* f.client.LinkLocalCheckout({ path: f.clone.checkout })
+
+      const asked = createAgent("hold:first")
+      yield* sendGlobal(f.client, asked)
+      yield* globalTurns(f.client, settled(1))
+      const [agent] = yield* f.agents
+      assert.isDefined(agent)
+
+      yield* f.client.StartGlobalConversationFresh()
+      yield* f.release("first")
+
+      const [report] = yield* globalTurns(f.client, settled(1))
+
+      assert.deepStrictEqual(
+        reported(report === undefined ? [] : [report]).map((work) => [
+          Predicate.isTagged(work, "Agent") && work.agentId,
+          work.outcome,
+          work.askedWith,
+        ]),
+        [[agent.id, "finished", asked]],
+      )
+
+      yield* sendGlobal(f.client, "call:list_started_work")
+      const [, listed] = yield* globalTurns(f.client, settled(2))
+
+      assert.include(glassCalls(listed)?.[0]?.output, agent.id)
+    }),
 )

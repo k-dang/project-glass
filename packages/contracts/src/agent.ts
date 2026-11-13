@@ -595,6 +595,24 @@ export class RequestNotWaiting extends Schema.TaggedError<RequestNotWaiting>()(
   {},
 ) {}
 
+export class StartFreshRefused extends Schema.TaggedError<StartFreshRefused>()(
+  "StartFreshRefused",
+  { reason: Schema.Literals(["running", "queued", "waiting"]) },
+) {}
+
+export const PastConversation = Schema.Struct({
+  id: Schema.String,
+  startedAt: Schema.DateTimeUtcFromString,
+  endedAt: Schema.DateTimeUtcFromString,
+})
+
+export type PastConversation = typeof PastConversation.Type
+
+export class PastConversationNotFound extends Schema.TaggedError<PastConversationNotFound>()(
+  "PastConversationNotFound",
+  { id: Schema.String },
+) {}
+
 export class NoPermissionModes extends Schema.TaggedError<NoPermissionModes>()(
   "NoPermissionModes",
   {},

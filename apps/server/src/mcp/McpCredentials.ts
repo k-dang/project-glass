@@ -3,6 +3,7 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto"
 
 export class ConversationCaller extends Schema.TaggedClass<ConversationCaller>()("Conversation", {
   conversationId: Schema.String,
+  sessionId: Schema.String,
 }) {}
 
 export class OutsideAgentCaller extends Schema.TaggedClass<OutsideAgentCaller>()("OutsideAgent", {
@@ -53,6 +54,7 @@ export class McpCredentials extends Context.Service<
     /** Issues a credential for `caller`, revoked when the scope closes. */
     readonly issue: (caller: {
       readonly conversationId: string
+      readonly sessionId: string
     }) => Effect.Effect<Redacted.Redacted, never, Scope.Scope>
     readonly authenticate: (bearer: Redacted.Redacted) => Option.Option<McpCredential>
     /** The endpoint's URL, once the backend listens. */
@@ -75,7 +77,7 @@ export class McpCredentials extends Context.Service<
               const revoked = yield* Deferred.make<void>()
 
               credentialsByDigest.set(key, {
-                caller: new ConversationCaller({ conversationId: caller.conversationId }),
+                caller: ConversationCaller.make(caller),
                 ownedSessions: new Set(),
                 revoked: Deferred.await(revoked),
               })

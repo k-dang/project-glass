@@ -87,7 +87,7 @@ export const scriptedAdapter = (gates: string): AgentAdapter => {
       }),
     ),
     commands: (_folder, skills) => Effect.succeed(skillCommands(skills)),
-    start: ({ folder, role, skills, report }) =>
+    start: ({ folder, conversation, role, skills, report }) =>
       Effect.gen(function* () {
         const review = Predicate.isTagged(role, "Review") ? role.brief : null
         const glass = Predicate.isTagged(role, "Global") ? role.tools : null
@@ -196,6 +196,9 @@ export const scriptedAdapter = (gates: string): AgentAdapter => {
 
               yield* part(turnId, TextPart.make({ text: written.join(",") }))
             }
+
+            if (message === "show the session")
+              yield* part(turnId, TextPart.make({ text: conversation }))
 
             if (message === "show the review" && review !== null) {
               yield* part(turnId, TextPart.make({ text: review.instructions }))

@@ -508,6 +508,85 @@ it("opens the Global conversation over the current area, labelling each message 
   )
 })
 
+it("starts the Global conversation fresh once confirmed and reads a past one", async () => {
+  const at = DateTime.makeUnsafe("2026-11-05T12:00:00Z")
+  let started = 0
+
+  const user = mount({
+    ListAgentModels: () => Effect.succeed(new AgentModels({ defaultModel: null, models: [] })),
+    StartGlobalConversationFresh: () => Effect.sync(() => void started++),
+    ListPastGlobalConversations: () =>
+      Effect.succeed([{ id: "past-1", startedAt: at, endedAt: at }]),
+    ReadPastGlobalConversation: () =>
+      Effect.succeed({
+        turns: [
+          {
+            id: "turn-1",
+            message: "Old question",
+            images: [],
+            context: null,
+            feedback: [],
+            sentAt: at,
+            ended: { at, ending: TurnDone.make({}) },
+            parts: [TextPart.make({ text: "Old reply" })],
+          },
+        ],
+        queued: [],
+        status: null,
+      }),
+  })
+
+  await user.click(await screen.findByRole("button", { name: "Global conversation" }))
+  const conversation = await screen.findByRole("dialog", { name: "Global conversation" })
+
+  await user.click(within(conversation).getByRole("button", { name: "Start fresh" }))
+  const confirm = await screen.findByRole("alertdialog", { name: "Start fresh?" })
+  await user.click(within(confirm).getByRole("button", { name: "Start fresh" }))
+  await waitFor(() => expect(started).toBe(1))
+
+  await user.click(within(conversation).getByRole("button", { name: "Past conversations" }))
+  const past = await screen.findByRole("dialog", { name: "Past conversations" })
+  await user.click(within(within(past).getByRole("listitem")).getByRole("button"))
+
+  await screen.findByText("Old reply")
+  expect(screen.queryByRole("textbox")).toBeNull()
+})
+
+it("won't start fresh while a Turn runs, and says why", async () => {
+  const sentAt = DateTime.makeUnsafe("2026-11-05T12:00:00Z")
+
+  const user = mount({
+    ListAgentModels: () => Effect.succeed(new AgentModels({ defaultModel: null, models: [] })),
+    WatchGlobalTranscript: () =>
+      Stream.make(
+        TranscriptSnapshot.make({
+          turns: [
+            {
+              id: "turn-1",
+              message: "Still thinking",
+              images: [],
+              context: null,
+              feedback: [],
+              sentAt,
+              ended: null,
+              parts: [],
+            },
+          ],
+          queued: [],
+          status: null,
+        }),
+      ),
+  })
+
+  await user.click(await screen.findByRole("button", { name: "Global conversation" }))
+  const conversation = await screen.findByRole("dialog", { name: "Global conversation" })
+
+  await within(conversation).findByText(/A Turn is running/)
+  expect(
+    within(conversation).getByRole("button", { name: "Start fresh" }).hasAttribute("disabled"),
+  ).toBe(true)
+})
+
 it("marks the rail while a Global conversation reply is unseen, and shows a Report as from Glass", async () => {
   vi.spyOn(document, "hasFocus").mockReturnValue(true)
   const at = DateTime.makeUnsafe("2026-11-05T12:00:00Z")

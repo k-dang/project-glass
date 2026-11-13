@@ -26,6 +26,8 @@ import {
   ModelChoice,
   NewAgent,
   NoPermissionModes,
+  PastConversation,
+  PastConversationNotFound,
   PermissionMode,
   QueuedMessageStarted,
   RemovalWarnings,
@@ -35,6 +37,8 @@ import {
   SandboxProviderInfo,
   SendAgentMessage,
   SentMessage,
+  StartFreshRefused,
+  Transcript,
   TranscriptUpdate,
   TurnEnd,
 } from "./agent"
@@ -534,6 +538,18 @@ export class GlassRpcs extends RpcGroup.make(
   Rpc.make("MarkGlobalTurnSeen", {
     payload: { endedAt: Schema.DateTimeUtcFromString },
     error: AgentError,
+  }),
+  Rpc.make("StartGlobalConversationFresh", {
+    error: Schema.Union([StartFreshRefused, AgentError]),
+  }),
+  Rpc.make("ListPastGlobalConversations", {
+    success: Schema.Array(PastConversation),
+    error: AgentError,
+  }),
+  Rpc.make("ReadPastGlobalConversation", {
+    payload: { id: Schema.String },
+    success: Transcript,
+    error: Schema.Union([PastConversationNotFound, AgentError]),
   }),
 ) {}
 

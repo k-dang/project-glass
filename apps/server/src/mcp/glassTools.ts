@@ -57,7 +57,7 @@ import { BackgroundGitHubRequest } from "../github/GitHubRequestPolicy"
 import { FollowedRepositories } from "../FollowedRepositories"
 import { LocalCheckouts } from "../LocalCheckouts"
 import { AskProgress } from "./AskProgress"
-import { McpCaller } from "./McpCredentials"
+import { type ConversationCaller, McpCaller } from "./McpCredentials"
 import { NeedsYou } from "../NeedsYou"
 import { ASK_PROGRESS_SECONDS, ASK_TIMEOUT_SECONDS, OutsideQuestions } from "../OutsideQuestions"
 import { Sandboxes } from "../Sandboxes"
@@ -420,7 +420,7 @@ const first = <A, E, R>(stream: Stream.Stream<A, E, R>) =>
 
 const recordedFor = <A, E, R, E2>(
   work: Effect.Effect<A, E, R>,
-  record: (conversationId: string, since: DateTime.Utc, done: A) => Effect.Effect<void, E2>,
+  record: (caller: ConversationCaller, since: DateTime.Utc, done: A) => Effect.Effect<void, E2>,
 ) =>
   Effect.gen(function* () {
     const since = yield* DateTime.now
@@ -428,7 +428,7 @@ const recordedFor = <A, E, R, E2>(
     const caller = yield* McpCaller.current
 
     if (Predicate.isTagged(caller, "Conversation"))
-      yield* record(caller.conversationId, since, done).pipe(Effect.ignore)
+      yield* record(caller, since, done).pipe(Effect.ignore)
 
     return done
   }).pipe(Effect.uninterruptible)
@@ -554,8 +554,8 @@ export const GlassToolHandlers = GlassTools.toLayer(
       read_agent_review: ({ pullRequest }) =>
         first(agentReviews.watch(pullRequest)).pipe(Effect.mapError(explained)),
       start_agent_review: ({ pullRequest, revision }) =>
-        recordedFor(agentReviews.start(pullRequest, revision), (id, since) =>
-          startedWork.startedAgentReview(id, pullRequest, since),
+        recordedFor(agentReviews.start(pullRequest, revision), (caller, since) =>
+          startedWork.startedAgentReview(caller, pullRequest, since),
         ).pipe(Effect.andThen(first(agentReviews.watch(pullRequest))), Effect.mapError(explained)),
       list_agent_places: () =>
         Effect.gen(function* () {
@@ -586,14 +586,14 @@ export const GlassToolHandlers = GlassTools.toLayer(
               localSkills: false,
               images: [],
             }),
-            (conversationId, since, { id }) => startedWork.linkAgent(conversationId, id, since),
+            (caller, since, { id }) => startedWork.linkAgent(caller, id, since),
           )
 
           return { agent }
         }).pipe(Effect.mapError(explained)),
       send_agent_message: ({ agentId, message }) =>
-        recordedFor(agents.send(agentId, { message, images: [] }), (id, since) =>
-          startedWork.linkAgent(id, agentId, since),
+        recordedFor(agents.send(agentId, { message, images: [] }), (caller, since) =>
+          startedWork.linkAgent(caller, agentId, since),
         ).pipe(
           Effect.map((delivery) => ({ delivery })),
           Effect.mapError(explained),

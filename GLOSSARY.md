@@ -225,8 +225,16 @@ runs no commands, but reads the user's work in Glass through Glass's tools, star
 creates Agents and messages them, and asks the user Questions. Glass keeps a record of the Agents and
 Agent reviews it started or messaged, so it can say how they stand. A message keeps the PR workspace
 and Revision, or the Agent, in view when it was sent. Its rail button carries a marker while a Turn
-ended that the user hasn't seen with the conversation open.
+ended that the user hasn't seen with the conversation open. Start fresh ends it into a Past
+conversation and starts an empty one with the same model, Effort, Unsent message, and record of what
+it started; Glass refuses while a Turn runs, a Queued message waits, or a Question waits on the user.
 _Avoid_: Assistant, chat, copilot, global Agent
+
+**Past conversation**:
+A Global conversation the user ended with Start fresh, kept with its start and end dates to read
+but not to continue. The Global conversation that follows doesn't see it. Its id is the id of
+the pi session it ran in, which is the one place "session" belongs.
+_Avoid_: Session (in UI copy), history, archived chat
 
 **Report**:
 A Turn Glass starts in the Global conversation, without a message from the user, once work it
