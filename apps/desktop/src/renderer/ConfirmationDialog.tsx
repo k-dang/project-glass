@@ -14,6 +14,7 @@ export function ConfirmationDialog(props: {
   title: string
   description: string
   confirmLabel: string
+  confirmVariant?: "default" | "destructive"
   onConfirm: () => void
   onCancel: () => void
 }) {
@@ -31,7 +32,10 @@ export function ConfirmationDialog(props: {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" onClick={props.onConfirm}>
+          <AlertDialogAction
+            variant={props.confirmVariant ?? "destructive"}
+            onClick={props.onConfirm}
+          >
             {props.confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>

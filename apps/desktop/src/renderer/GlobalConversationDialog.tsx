@@ -1,15 +1,20 @@
 import { useAtom, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
 import {
   emptyTranscript,
+  isWaiting,
   localPlace,
   type ModelChoice,
   type PastConversation,
+  type QueuedMessage,
+  StartFreshRefused,
+  type Turn,
 } from "@glass/contracts"
-import { Data, DateTime, Option } from "effect"
+import { Cause, Data, DateTime, Option, Predicate } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import { ArrowLeft, History, SquarePen, X } from "lucide-react"
 import { type ReactNode, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { placeKey } from "./agentsArea"
 import { AgentComposer, contextLabel, Transcript } from "./AgentView"
@@ -29,7 +34,7 @@ import {
 } from "./globalConversation"
 import { ModelPicker } from "./ModelPicker"
 import { ProblemAlert } from "./ProblemAlert"
-import { settledProblem, streamProblem } from "./problems"
+import { describeError, settledProblem, streamProblem } from "./problems"
 import { useWindowFocused } from "./useWindowFocused"
 
 function GlobalModelPicker(props: { choice: ModelChoice }) {
@@ -122,9 +127,60 @@ function Header(props: { title: string; onBack?: () => void; children?: ReactNod
 
 function PaddedProblem(props: Parameters<typeof ProblemAlert>[0]) {
   return (
-    <div className="px-4 pt-4">
+    <div className="px-6 pt-4">
       <ProblemAlert {...props} />
     </div>
+  )
+}
+
+const freshBlocked = (
+  turns: ReadonlyArray<Turn>,
+  queued: ReadonlyArray<QueuedMessage>,
+): StartFreshRefused["reason"] | null => {
+  const last = turns.at(-1)
+
+  if (last?.parts.some(isWaiting)) return "waiting"
+
+  if (last?.ended === null) return "running"
+
+  if (queued.length > 0) return "queued"
+
+  return null
+}
+
+const refusedFresh = (result: AsyncResult.AsyncResult<unknown, unknown>) =>
+  AsyncResult.isFailure(result) &&
+  Predicate.isTagged(Option.getOrNull(Cause.findErrorOption(result.cause)), "StartFreshRefused")
+
+function StartFreshButton(props: {
+  blocked: StartFreshRefused["reason"] | null
+  pending: boolean
+  onClick: () => void
+}) {
+  const button = (
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Start fresh"
+      disabled={props.blocked !== null || props.pending}
+      onClick={props.onClick}
+    >
+      <SquarePen aria-hidden />
+    </Button>
+  )
+
+  if (props.blocked === null) return button
+
+  const reason = describeError(new StartFreshRefused({ reason: props.blocked })).detail
+
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<span />}>
+        {button}
+        <span className="sr-only">{reason}</span>
+      </TooltipTrigger>
+      <TooltipContent>{reason}</TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -151,7 +207,7 @@ function GlobalConversation(props: { onShowPast: () => void }) {
     if (focused && unseen !== null && endedAt !== undefined) markSeen(endedAt)
   }, [markSeen, focused, unseen, endedAt])
 
-  const startProblem = settledProblem(started)
+  const startProblem = refusedFresh(started) ? null : settledProblem(started)
 
   return (
     <>
@@ -164,15 +220,11 @@ function GlobalConversation(props: { onShowPast: () => void }) {
         >
           <History aria-hidden />
         </Button>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Start fresh"
-          disabled={started.waiting}
+        <StartFreshButton
+          blocked={freshBlocked(turns, queued)}
+          pending={started.waiting}
           onClick={() => setConfirming(true)}
-        >
-          <SquarePen aria-hidden />
-        </Button>
+        />
       </Header>
       {AsyncResult.isFailure(transcript) && !transcript.waiting && (
         <PaddedProblem
@@ -197,6 +249,7 @@ function GlobalConversation(props: { onShowPast: () => void }) {
         title="Start fresh?"
         description="This conversation ends and stays readable under Past conversations. The next message starts a new conversation that doesn't see this one. Your model, unsent message, and the work Glass started for you carry over."
         confirmLabel="Start fresh"
+        confirmVariant="default"
         onConfirm={() => {
           setConfirming(false)
           startFresh()
