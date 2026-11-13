@@ -181,7 +181,7 @@ const ReleaseTools = Toolkit.make(WaitForRelease)
  * A backend serving Glass's tools, with one To-do and one PR, beside a tool that waits until the
  * test stops the Turn calling it. Its endpoint and credential reach recordings only by placeholder.
  */
-export const glassToolsBackend = Effect.fnUntraced(function* (conversationId: string) {
+export const glassToolsBackend = Effect.fnUntraced(function* (sessionId: string) {
   const github = yield* startFakeGitHub()
 
   github.seedPullRequest({
@@ -237,7 +237,7 @@ export const glassToolsBackend = Effect.fnUntraced(function* (conversationId: st
   yield* client.AddToDo({ title: "Reply to Sam" })
 
   const url = yield* mcpCredentials.endpoint
-  const bearer = yield* mcpCredentials.issue({ conversationId })
+  const bearer = yield* mcpCredentials.issue({ conversationId: "global-conversation", sessionId })
 
   return {
     role: GlobalRole.make({ tools: { url, bearer } }),

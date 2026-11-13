@@ -330,7 +330,12 @@ describe("ask_user", () => {
   it.live("refuses a conversation Glass launched", () =>
     Effect.gen(function* () {
       const { baseUrl, client, mcpCredentials } = yield* startBackend({})
-      const bearer = yield* mcpCredentials.issue({ conversationId: "conversation-1" })
+
+      const bearer = yield* mcpCredentials.issue({
+        conversationId: "conversation-1",
+        sessionId: "session-1",
+      })
+
       const mcp = yield* connectMcp(baseUrl, bearer)
 
       const result = yield* mcp.call("ask_user", { question: "Ship it?" })

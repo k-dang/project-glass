@@ -343,7 +343,7 @@ export class Transcripts extends Context.Service<
           SELECT a.id AS agentId, t.ended AS ended
           FROM (
             SELECT id, turn_seen_at FROM agent
-            UNION ALL SELECT id, turn_seen_at FROM global_conversation
+            UNION ALL SELECT session_id, turn_seen_at FROM global_conversation
           ) a
           JOIN agent_turn t ON t.rowid = (SELECT MAX(rowid) FROM agent_turn WHERE agent_id = a.id)
           WHERE ${sql.and(["t.ended IS NOT NULL", ...conditions])}
@@ -868,7 +868,7 @@ export class Transcripts extends Context.Service<
                   `,
                   sql`
                     UPDATE global_conversation SET turn_seen_at = ${at}
-                    WHERE id = ${agentId} AND (turn_seen_at IS NULL OR turn_seen_at < ${at})
+                    WHERE session_id = ${agentId} AND (turn_seen_at IS NULL OR turn_seen_at < ${at})
                   `,
                 ],
                 { discard: true },

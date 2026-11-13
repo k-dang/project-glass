@@ -17,7 +17,7 @@ import { connectMcp, toolText } from "../../test/mcpClient"
 import { scriptedAgentRunners } from "../../test/scriptedAgentRunners"
 import { StartedItem } from "../StartedWork"
 
-const caller = { conversationId: "global-conversation" }
+const caller = { conversationId: "global-conversation", sessionId: "global-session" }
 
 const startGlass = Effect.gen(function* () {
   const f = yield* agentsFixture

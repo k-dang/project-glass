@@ -665,7 +665,10 @@ describe("MCP OAuth", () => {
         "application/x-www-form-urlencoded",
       )
 
-      const conversation = yield* mcpCredentials.issue({ conversationId: "rebind" })
+      const conversation = yield* mcpCredentials.issue({
+        conversationId: "rebind",
+        sessionId: "rebind",
+      })
 
       const mcp = yield* send(
         "POST",
@@ -696,7 +699,12 @@ describe("MCP OAuth", () => {
   it.live("keeps accepting a conversation bearer", () =>
     Effect.gen(function* () {
       const { baseUrl, client, mcpCredentials } = yield* start
-      const bearer = yield* mcpCredentials.issue({ conversationId: "claude-code" })
+
+      const bearer = yield* mcpCredentials.issue({
+        conversationId: "claude-code",
+        sessionId: "claude-code",
+      })
+
       const mcp = yield* connectMcp(baseUrl, bearer)
 
       assert.strictEqual((yield* mcp.request("tools/list", {}).response).status, 200)

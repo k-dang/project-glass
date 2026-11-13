@@ -50,7 +50,7 @@ const startMcpBackend = Effect.gen(function* () {
   return { ...backend, started, released, interrupted }
 })
 
-const GLOBAL = { conversationId: "global-conversation" }
+const GLOBAL = { conversationId: "global-conversation", sessionId: "global-session" }
 
 describe("MCP endpoint", () => {
   it.live("discovers and calls tools with the runtime's credential", () =>
@@ -83,7 +83,11 @@ describe("MCP endpoint", () => {
     Effect.gen(function* () {
       const { baseUrl, mcpCredentials } = yield* startMcpBackend
       const mcp = yield* connectMcp(baseUrl, yield* mcpCredentials.issue(GLOBAL))
-      const other = yield* mcpCredentials.issue({ conversationId: "other-runtime" })
+
+      const other = yield* mcpCredentials.issue({
+        conversationId: "other-runtime",
+        sessionId: "other-runtime",
+      })
 
       const intruding = yield* mcp.request("tools/list", {}, other).response
 

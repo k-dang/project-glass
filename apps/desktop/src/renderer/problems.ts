@@ -159,6 +159,18 @@ export const describeError = (error: BackendError): Problem =>
         title: "Too late to cancel",
         detail: "That message already started a Turn, so it stays in the conversation.",
       }),
+      StartFreshRefused: ({ reason }) => ({
+        title: "Can't start fresh yet",
+        detail: {
+          running: "A Turn is running. Stop it or wait for it to end, then start fresh.",
+          queued: "A Queued message is waiting to send. Send or remove it, then start fresh.",
+          waiting: "The conversation is waiting on you. Answer its Question, then start fresh.",
+        }[reason],
+      }),
+      PastConversationNotFound: () => ({
+        title: "That conversation is gone",
+        detail: "Glass couldn't find that past conversation. Go back and pick another.",
+      }),
       RequestNotWaiting: () => ({
         title: "Already settled",
         detail: "That request was answered already, or its Turn ended.",

@@ -1,6 +1,7 @@
 import { assert, it } from "@effect/vitest"
 import {
   AgentContext,
+  AnswerQuestion,
   PullRequestContext,
   PullRequestRef,
   Revision,
@@ -9,8 +10,9 @@ import {
   TurnDone,
   TurnInterrupted,
   TurnStopped,
+  type Turn,
 } from "@glass/contracts"
-import { Effect } from "effect"
+import { Effect, Predicate } from "effect"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 import {
@@ -161,4 +163,88 @@ it.live("leaves an Agent it created running when its own Turn stops", () =>
 
     assert.deepStrictEqual(worked?.ended?.ending, TurnDone.make({}))
   }),
+)
+
+const shownSession = (turn: Turn | undefined) => {
+  const [shown] = turn?.parts ?? []
+
+  return Predicate.isTagged(shown, "Text") ? shown.text : undefined
+}
+
+it.live(
+  "starts fresh in a new pi session, carrying over the model and Unsent message and keeping the old transcript readable",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* agentsFixture
+      const model = { model: "scripted", effort: null }
+      const unsent = { message: "Still writing", images: [] }
+
+      yield* f.client.ChangeGlobalConversationModel(model)
+      yield* sendGlobal(f.client, "show the session")
+      const [before] = yield* globalTurns(f.client, settled(1))
+      yield* f.client.SaveGlobalUnsentMessage(unsent)
+
+      yield* f.client.StartGlobalConversationFresh()
+
+      assert.deepStrictEqual(yield* globalTurns(f.client, () => true), [])
+      assert.deepStrictEqual(yield* f.client.GetGlobalConversationModel(), model)
+      assert.deepStrictEqual(yield* f.client.GetGlobalUnsentMessage(), unsent)
+
+      yield* sendGlobal(f.client, "show the session")
+      const [after] = yield* globalTurns(f.client, settled(1))
+      const [past, ...earlier] = yield* f.client.ListPastGlobalConversations()
+
+      assert.isDefined(past)
+      assert.deepStrictEqual(earlier, [])
+      assert.strictEqual(shownSession(before), past.id)
+      assert.notStrictEqual(shownSession(after), past.id)
+
+      const { turns } = yield* f.client.ReadPastGlobalConversation({ id: past.id })
+
+      assert.deepStrictEqual(turns, before === undefined ? [] : [before])
+    }),
+)
+
+it.live(
+  "refuses to start fresh while it waits on the user, runs a Turn, or has a Queued message",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* agentsFixture
+
+      const refusal = f.client.StartGlobalConversationFresh().pipe(
+        Effect.flip,
+        Effect.map((error) =>
+          Predicate.isTagged(error, "StartFreshRefused") ? error.reason : error,
+        ),
+      )
+
+      yield* sendGlobal(f.client, "Please ask a question")
+
+      const [asking] = yield* globalTurns(f.client, (turns) =>
+        turns.some(({ parts }) => parts.some((part) => Predicate.isTagged(part, "Question"))),
+      )
+
+      const question = asking?.parts.find((part) => Predicate.isTagged(part, "Question"))
+      assert.strictEqual(yield* refusal, "waiting")
+      yield* f.client.AnswerGlobalRequest({
+        requestId: question?.requestId ?? "",
+        answer: AnswerQuestion.make({ answers: [{ chosen: [], text: "Only source files" }] }),
+      })
+      yield* globalTurns(f.client, settled(1))
+
+      yield* sendGlobal(f.client, "hold:never")
+      yield* globalTurns(f.client, holding)
+      assert.strictEqual(yield* refusal, "running")
+
+      yield* sendGlobal(f.client, "Next")
+      yield* watchGlobal(f.client, ({ queued }) => queued.length === 1)
+      yield* f.client.StopGlobalTurn()
+      yield* watchGlobal(
+        f.client,
+        ({ turns, queued }) => queued.length === 1 && turns.every(({ ended }) => ended !== null),
+      )
+      assert.strictEqual(yield* refusal, "queued")
+
+      assert.deepStrictEqual(yield* f.client.ListPastGlobalConversations(), [])
+    }),
 )

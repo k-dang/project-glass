@@ -4,6 +4,7 @@ import {
   AgentReviewReported,
   defaultReviewPrompt,
   PullRequestContext,
+  StartFreshRefused,
   TextPart,
   TranscriptSnapshot,
   TurnDone,
@@ -508,6 +509,59 @@ it("opens the Global conversation over the current area, labelling each message 
   await within(await screen.findByRole("dialog", { name: "Global conversation" })).findByText(
     "Nearly.",
   )
+})
+
+it("starts the Global conversation fresh once confirmed, says why it can't, and reads a past one", async () => {
+  const at = DateTime.makeUnsafe("2026-11-05T12:00:00Z")
+  let tries = 0
+
+  const user = mount({
+    ListAgentModels: () => Effect.succeed(new AgentModels({ defaultModel: null, models: [] })),
+    StartGlobalConversationFresh: () =>
+      ++tries === 1 ? Effect.fail(new StartFreshRefused({ reason: "running" })) : Effect.void,
+    ListPastGlobalConversations: () =>
+      Effect.succeed([{ id: "past-1", startedAt: at, endedAt: at }]),
+    ReadPastGlobalConversation: () =>
+      Effect.succeed({
+        turns: [
+          {
+            id: "turn-1",
+            message: "Old question",
+            images: [],
+            context: null,
+            feedback: [],
+            sentAt: at,
+            ended: { at, ending: TurnDone.make({}) },
+            parts: [TextPart.make({ text: "Old reply" })],
+          },
+        ],
+        queued: [],
+        status: null,
+      }),
+  })
+
+  await user.click(await screen.findByRole("button", { name: "Global conversation" }))
+  const conversation = await screen.findByRole("dialog", { name: "Global conversation" })
+
+  const startFresh = async () => {
+    await user.click(within(conversation).getByRole("button", { name: "Start fresh" }))
+    const confirm = await screen.findByRole("alertdialog", { name: "Start fresh?" })
+    await user.click(within(confirm).getByRole("button", { name: "Start fresh" }))
+  }
+
+  await startFresh()
+  await within(conversation).findByText(/A Turn is running/)
+
+  await startFresh()
+  await waitFor(() => expect(within(conversation).queryByText(/A Turn is running/)).toBeNull())
+  expect(tries).toBe(2)
+
+  await user.click(within(conversation).getByRole("button", { name: "Past conversations" }))
+  const past = await screen.findByRole("dialog", { name: "Past conversations" })
+  await user.click(within(within(past).getByRole("listitem")).getByRole("button"))
+
+  await screen.findByText("Old reply")
+  expect(screen.queryByRole("textbox")).toBeNull()
 })
 
 it("marks the rail while a Global conversation reply is unseen, and shows a Report as from Glass", async () => {

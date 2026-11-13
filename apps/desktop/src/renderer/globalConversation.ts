@@ -35,6 +35,20 @@ export const changeGlobalModelAtom = backendRuntime.fn((choice: ModelChoice, get
   ),
 )
 
+export const pastGlobalConversationsAtom = backendRuntime.atom(
+  Backend.use((backend) => backend.ListPastGlobalConversations()),
+)
+
+export const pastGlobalTranscriptAtom = Atom.family((id: string) =>
+  backendRuntime.atom(Backend.use((backend) => backend.ReadPastGlobalConversation({ id }))),
+)
+
+export const startGlobalFreshAtom = backendRuntime.fn((_: void, get) =>
+  Backend.use((backend) => backend.StartGlobalConversationFresh()).pipe(
+    Effect.tap(() => Effect.sync(() => get.refresh(pastGlobalConversationsAtom))),
+  ),
+)
+
 /** The PR workspace or Agent the current route shows, which the router keeps up to date. */
 export type Viewed = Data.TaggedEnum<{
   PullRequest: { readonly ref: PullRequestRef }
