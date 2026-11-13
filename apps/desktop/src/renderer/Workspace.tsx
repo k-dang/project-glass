@@ -66,6 +66,7 @@ import { RepositoryBrowser } from "./RepositoryBrowser"
 import { FinishReview } from "./FinishReview"
 import { OpenPullRequestDialog } from "./OpenPullRequestDialog"
 import { closedAs, StatusChips } from "./PullRequestStatus"
+import { PullRequestHeaderPrototype } from "./PullRequestHeaderPrototype"
 import {
   type ChangesOrder,
   readAgentReviewOnOpenAtom,
@@ -426,7 +427,7 @@ export function Workspace(props: {
       {fullScreen ? (
         <div className="title-strip shrink-0 border-b" aria-hidden />
       ) : (
-        <PullRequestHeader
+        <PullRequestHeaderPrototype
           pullRequest={pullRequest}
           revision={revision}
           reloading={props.reloading}
@@ -722,7 +723,7 @@ function ViewedFilesProblem(props: { store: ViewedFilesStore; onReload: () => vo
   )
 }
 
-function PullRequestHeader(props: {
+export function PullRequestHeader(props: {
   pullRequest: PullRequest
   revision: Revision
   reloading: boolean
@@ -789,7 +790,7 @@ function PullRequestHeader(props: {
   )
 }
 
-const badges: Record<
+export const badges: Record<
   PullRequestState,
   { readonly label: string; readonly icon: LucideIcon; readonly className: string }
 > = {
@@ -799,7 +800,7 @@ const badges: Record<
   merged: { label: "Merged", icon: GitMerge, className: "bg-violet-600 text-white" },
 }
 
-function StateBadge(props: { pullRequest: PullRequest }) {
+export function StateBadge(props: { pullRequest: PullRequest }) {
   const { label, icon: Icon, className } = badges[props.pullRequest.state]
 
   return (
@@ -810,7 +811,7 @@ function StateBadge(props: { pullRequest: PullRequest }) {
   )
 }
 
-function Branch(props: { name: string }) {
+export function Branch(props: { name: string }) {
   return (
     <code className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">
       {props.name}
