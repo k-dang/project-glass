@@ -58,8 +58,12 @@ import {
   useRef,
   useState,
 } from "react"
-import { mermaid } from "@streamdown/mermaid"
-import { type Components, defaultComponents, Streamdown } from "streamdown"
+import {
+  type Components,
+  defaultComponents,
+  Streamdown,
+  useIsCodeFenceIncomplete,
+} from "streamdown"
 import { Button } from "@/components/ui/button"
 import { Kbd } from "@/components/ui/kbd"
 import { Bubble, BubbleContent } from "@/components/ui/bubble"
@@ -129,7 +133,7 @@ import { referenceText } from "./queue"
 import { rememberPlace } from "./savedPlace"
 import { shortcutLabel } from "./shortcutLabel"
 import { useStagedFeedback } from "./useStagedFeedback"
-import { useDarkColorScheme } from "./theme"
+import { MermaidDiagram } from "./MermaidDiagram"
 import { type FeedbackNotesStore, useFeedbackNotes } from "./useFeedbackNotes"
 import { markTurnSeenAtom } from "./needsYou"
 import { useShortcuts } from "./useShortcuts"
@@ -675,8 +679,6 @@ const toolStatus = {
   failed: { label: "Failed", line: "error" },
 } as const
 
-const markdownPlugins = { mermaid }
-
 function FencedCode(props: { code: string; language: string }) {
   const lines = useHighlightedCode(props.code, props.language)
 
@@ -697,28 +699,46 @@ function FencedCode(props: { code: string; language: string }) {
   )
 }
 
+function MermaidBlock(props: { code: string }) {
+  const incomplete = useIsCodeFenceIncomplete()
+  const [invalid, setInvalid] = useState(false)
+  const onInvalid = useCallback(() => setInvalid(true), [])
+
+  return incomplete || invalid ? (
+    <FencedCode code={props.code} language="mermaid" />
+  ) : (
+    <CodeBlock className="rounded-xl border-0 bg-muted dark:bg-muted">
+      <CodeBlockHeader>
+        <CodeBlockTitle>mermaid</CodeBlockTitle>
+        <CodeBlockActions>
+          <CodeBlockCopyButton value={props.code} />
+        </CodeBlockActions>
+      </CodeBlockHeader>
+      <div className="m-1.5 mt-3 rounded-lg bg-background p-3">
+        <MermaidDiagram source={props.code} onInvalid={onInvalid} />
+      </div>
+    </CodeBlock>
+  )
+}
+
 const markdownComponents: Components = {
   code: (props) => {
     const language = /language-(\S+)/.exec(props.className ?? "")?.[1] ?? ""
 
-    return "data-block" in props && language !== "mermaid" && Predicate.isString(props.children) ? (
-      <FencedCode code={props.children} language={language} />
+    if (!("data-block" in props) || !Predicate.isString(props.children))
+      return <defaultComponents.code {...props} />
+
+    return language === "mermaid" ? (
+      <MermaidBlock code={props.children} />
     ) : (
-      <defaultComponents.code {...props} />
+      <FencedCode code={props.children} language={language} />
     )
   },
 }
 
 function AgentMarkdown(props: { text: string }) {
-  const theme = useDarkColorScheme() ? "dark" : "default"
-
   return (
-    <Streamdown
-      className="text-sm"
-      plugins={markdownPlugins}
-      components={markdownComponents}
-      mermaid={{ config: { theme } }}
-    >
+    <Streamdown className="text-sm" components={markdownComponents}>
       {props.text}
     </Streamdown>
   )
