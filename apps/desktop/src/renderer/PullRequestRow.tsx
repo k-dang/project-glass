@@ -1,3 +1,4 @@
+import { useAtomSet } from "@effect/atom-react"
 import type { Checks, PullRequestRef, PullRequestState, PullRequestSummary } from "@glass/contracts"
 import { cn } from "cn"
 import { DateTime } from "effect"
@@ -11,11 +12,12 @@ import {
   History,
   type LucideIcon,
 } from "lucide-react"
-import { type ReactNode, useId, useState } from "react"
+import { type ReactNode, useEffect, useId, useRef, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipHint } from "@/components/ui/tooltip"
 import { type Problem, problemText } from "./problems"
+import { preloadPullRequestAtom } from "./reviewsArea"
 
 export const warningTone = "text-amber-600 dark:text-amber-400"
 
@@ -32,6 +34,29 @@ export function NotRefreshed(props: { problem: Problem; showLabel?: boolean }) {
       <TooltipContent>{reason}</TooltipContent>
     </Tooltip>
   )
+}
+
+const HOVER_INTENT_MS = 100
+
+const usePreloadOnHover = (ref: PullRequestRef) => {
+  const preload = useAtomSet(preloadPullRequestAtom)
+  const pending = useRef<ReturnType<typeof setTimeout>>(undefined)
+
+  const cancel = () => clearTimeout(pending.current)
+
+  useEffect(() => () => clearTimeout(pending.current), [])
+
+  return {
+    onPointerEnter: () => {
+      cancel()
+      pending.current = setTimeout(() => preload(ref), HOVER_INTENT_MS)
+    },
+    onPointerLeave: cancel,
+    onPointerDown: () => {
+      cancel()
+      preload(ref)
+    },
+  }
 }
 
 export const columnsWithRepository =
@@ -67,6 +92,7 @@ export function PullRequestRow(props: {
   const { pullRequest } = props
   const statusId = useId()
   const [statusHintOpen, setStatusHintOpen] = useState(false)
+  const preloadOnHover = usePreloadOnHover(pullRequest.ref)
 
   const { owner, repo, number } = pullRequest.ref
 
@@ -83,6 +109,7 @@ export function PullRequestRow(props: {
     <Button
       type="button"
       variant="ghost"
+      {...preloadOnHover}
       onClick={() => props.onOpen(pullRequest.ref)}
       onFocus={(event) => {
         if (event.target === event.currentTarget) setStatusHintOpen(true)

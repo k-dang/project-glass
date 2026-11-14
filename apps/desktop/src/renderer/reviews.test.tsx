@@ -654,6 +654,24 @@ it("names the PR while it opens, and Back to PRs leaves before it arrives", asyn
   await screen.findByRole("tabpanel", { name: "Needs review" })
 })
 
+it("starts loading a hovered PR and opens it from that same load", async () => {
+  const opens: Array<
+    Held<{ pullRequest: PullRequestRef }, PullRequestWorkspace, LoadPullRequestError>
+  > = []
+
+  const user = mount({ LoadPullRequest: hold(opens) })
+
+  await user.hover(await rowFor("Greet the world"))
+  const preload = await next(opens)
+  expect(preload.payload.pullRequest).toEqual(greet.ref)
+
+  await user.click(await rowFor("Greet the world"))
+  await screen.findByRole("status", { name: "Loading pull request" })
+  preload.answer(Effect.succeed(workspaceOf(greet, "head001")))
+  await screen.findByText("head001")
+  expect(opens).toHaveLength(0)
+})
+
 const deleteDraft = () =>
   screen.getByRole<HTMLButtonElement>("button", { name: /Delete Draft on greet.ts/ })
 
