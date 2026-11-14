@@ -19,7 +19,8 @@ import {
 import { Context, Effect, Layer, Schema } from "effect"
 import { SqlClient } from "effect/sql"
 import type { SkillSource } from "./agentHost/protocol"
-import { GitHubClient, type TreeBlob } from "./github/GitHubClient"
+import { GitHubClient } from "./github/GitHubClient"
+import { type ArchiveFile, filesInArchive } from "./skillPackArchive"
 import {
   filesBySkill,
   lastSegment,
@@ -30,16 +31,16 @@ import {
   claimFolder,
 } from "./skillPackContents"
 
+type PackFile = Omit<ArchiveFile, "contents">
+
 interface PackSkill {
   readonly directory: string
   readonly skill: Skill
-  readonly files: ReadonlyArray<TreeBlob>
+  readonly files: ReadonlyArray<PackFile>
 }
 
-interface PackContents {
-  readonly skills: ReadonlyArray<PackSkill>
-  readonly skipped: ReadonlyArray<SkippedSkill>
-  readonly downloaded: ReadonlyMap<string, Uint8Array>
+interface ArchiveSkill extends PackSkill {
+  readonly files: ReadonlyArray<ArchiveFile>
 }
 
 const decodePacks = Schema.decodeUnknownEffect(
@@ -120,9 +121,9 @@ const nothingToAdd = (source: SkillPackSource, commit: string) =>
 const isCommitRef = (ref: string, commit: string) =>
   /^[0-9a-f]{7,40}$/.test(ref) && commit.startsWith(ref)
 
-const fileKey = ({ path, sha, executable }: TreeBlob) => `${path}\0${sha}\0${executable}`
+const fileKey = ({ path, sha, executable }: PackFile) => `${path}\0${sha}\0${executable}`
 
-const sameFiles = (a: ReadonlyArray<TreeBlob>, b: ReadonlyArray<TreeBlob>) =>
+const sameFiles = (a: ReadonlyArray<PackFile>, b: ReadonlyArray<PackFile>) =>
   a.map(fileKey).toSorted().join("\n") === b.map(fileKey).toSorted().join("\n")
 
 const sameSkill = (a: PackSkill, b: PackSkill) =>
@@ -205,25 +206,27 @@ export class SkillPacks extends Context.Service<
       })
 
       const read = Effect.fnUntraced(function* (source: SkillPackSource, commit: string) {
-        const tree = yield* github
-          .folderTree(source, commit, source.path)
-          .pipe(Effect.catchTag("RepositoryMissing", () => Effect.fail(repositoryMissing(source))))
+        const archive = yield* github.tarball(source, commit)
 
-        if (tree === null) {
+        const files = yield* filesInArchive(archive, source.path).pipe(
+          Effect.tapError((cause) =>
+            Effect.logWarning("Couldn't read a Skill pack's archive", cause),
+          ),
+          Effect.mapError(
+            () =>
+              new SkillPackNotReadable({
+                message: `GitHub sent a copy of ${folderLabel(source, commit)} that Glass couldn't read.`,
+              }),
+          ),
+        )
+
+        if (files === null) {
           return yield* new SkillPackNotReadable({
             message: `${atCommit(source, commit)} has no folder ${source.path}.`,
           })
         }
 
-        const { blobs, truncated } = yield* github.treeBlobs(source, tree)
-
-        if (truncated) {
-          return yield* new SkillPackNotReadable({
-            message: `GitHub can't list every file in ${folderLabel(source, commit)}.`,
-          })
-        }
-
-        const skillFiles = filesBySkill(blobs)
+        const skillFiles = filesBySkill(files)
 
         if (skillFiles.size === 0) {
           return yield* new SkillPackNotReadable({
@@ -231,30 +234,22 @@ export class SkillPacks extends Context.Service<
           })
         }
 
-        const loaded = yield* Effect.forEach(
-          skillFiles,
-          ([directory, files]) => {
-            const skillFile = files.find(({ path }) => path === skillFilePath(directory))!
+        const loaded = [...skillFiles].map(([directory, owned]) => {
+          const skillFile = owned.find(({ path }) => path === skillFilePath(directory))!
 
-            return github.blob(source, skillFile.sha).pipe(
-              Effect.map((bytes) => ({
-                directory,
-                files,
-                skillFile: [skillFile.sha, bytes] as const,
-                result: readSkill(directory, new TextDecoder().decode(bytes)),
-              })),
-            )
-          },
-          { concurrency: 8 },
-        )
+          return {
+            directory,
+            owned,
+            result: readSkill(directory, new TextDecoder().decode(skillFile.contents)),
+          }
+        })
 
         return {
-          skills: loaded.flatMap(({ directory, files, result }) =>
-            result instanceof Skill ? [{ directory, files, skill: result }] : [],
+          skills: loaded.flatMap(({ directory, owned, result }): Array<ArchiveSkill> =>
+            result instanceof Skill ? [{ directory, files: owned, skill: result }] : [],
           ),
           skipped: loaded.flatMap(({ result }) => (result instanceof SkippedSkill ? [result] : [])),
-          downloaded: new Map(loaded.map(({ skillFile }) => skillFile)),
-        } satisfies PackContents
+        }
       })
 
       const packRows = Effect.gen(function* () {
@@ -324,24 +319,11 @@ export class SkillPacks extends Context.Service<
           )
         }
 
-        const { skills, downloaded } = yield* read(source, commit)
+        const { skills } = yield* read(source, commit)
 
         if (skills.length === 0) return yield* nothingToAdd(source, commit)
 
         const files = skills.flatMap((skill) => skill.files)
-
-        const missing = [...new Set(files.map(({ sha }) => sha))].filter(
-          (sha) => !downloaded.has(sha),
-        )
-
-        const contents = new Map([
-          ...downloaded,
-          ...(yield* Effect.forEach(
-            missing,
-            (sha) => github.blob(source, sha).pipe(Effect.map((bytes) => [sha, bytes] as const)),
-            { concurrency: 8 },
-          )),
-        ])
 
         return Effect.gen(function* () {
           const storedMeanwhile = yield* existingPin(source, commit)
@@ -375,12 +357,12 @@ export class SkillPacks extends Context.Service<
 
           yield* sql`
             INSERT INTO skill_pack_file ${sql.insert(
-              files.map(({ path, sha, executable }) => ({
+              files.map(({ path, sha, executable, contents }) => ({
                 pin_id: pinId,
                 path,
                 blob_sha: sha,
                 executable: executable ? 1 : 0,
-                contents: contents.get(sha)!,
+                contents,
               })),
             )}
           `

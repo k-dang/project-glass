@@ -279,32 +279,3 @@ export const CommitAtRevisionResponse = GraphQLResponse(
     ),
   }),
 )
-
-export const TREE_AT_EXPRESSION_QUERY = `query TreeAtExpression($owner: String!, $name: String!, $expression: String!) {
-  repository(owner: $owner, name: $name) {
-    object(expression: $expression) {
-      __typename
-      ... on Tree { oid }
-      ... on Commit { tree { oid } }
-    }
-  }
-}`
-
-export const TreeAtExpressionResponse = GraphQLResponse(
-  Schema.Struct({
-    repository: Schema.NullOr(
-      Schema.Struct({
-        object: Schema.NullOr(
-          Schema.Union([
-            Schema.Struct({ __typename: Schema.Literal("Tree"), oid: Schema.String }),
-            Schema.Struct({
-              __typename: Schema.Literal("Commit"),
-              tree: Schema.Struct({ oid: Schema.String }),
-            }),
-            OtherObject,
-          ]),
-        ),
-      }),
-    ),
-  }),
-)

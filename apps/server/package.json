@@ -23,6 +23,7 @@
     "graphql": "16.14.2",
     "jiti": "2.7.0",
     "pele": "catalog:",
+    "tar": "7.5.22",
     "vite": "catalog:",
     "vite-plus": "catalog:",
     "vitest": "catalog:",
