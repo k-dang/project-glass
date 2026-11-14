@@ -280,6 +280,11 @@ describe("DraftStore", () => {
     store.edit("D1", "Hi!")
 
     const submitting = store.submit("approve", "LGTM")
+    expect(store.submission().type).toBe("draining")
+    expect(store.locked()).toBe(true)
+    store.edit("D1", "Ignored")
+    expect(store.view("D1")?.body).toBe("Hi!")
+    expect(await store.submit("comment", "Duplicate")).toEqual({ type: "blocked" })
 
     const update = await next(updates)
 
@@ -288,6 +293,9 @@ describe("DraftStore", () => {
 
     update.answer(Effect.void)
     const submit = await next(submits)
+    expect(store.submission().type).toBe("submitting")
+    expect(store.locked()).toBe(true)
+    expect(await store.submit("comment", "Duplicate")).toEqual({ type: "blocked" })
 
     expect(submit.payload).toEqual({
       pullRequestId: "PR_1",
@@ -300,6 +308,7 @@ describe("DraftStore", () => {
 
     expect(await submitting).toEqual({ type: "submitted", published: 1 })
     expect(store.views()).toEqual([])
+    expect(await store.submit("comment", "Duplicate")).toEqual({ type: "blocked" })
   })
 
   it("keeps a published Draft on its line, read-only, until Reload replaces the store", async () => {
@@ -353,6 +362,14 @@ describe("DraftStore", () => {
 
     ;(await next(submits)).answer(Effect.fail(new ReviewRejected({ message: "No" })))
     await failing
+    expect(store.submission()).toMatchObject({
+      type: "editable",
+      problem: { title: "GitHub didn't accept the Review", detail: "No" },
+    })
+    expect(store.locked()).toBe(false)
+    store.edit("D1", "Still editable")
+    expect(store.view("D1")?.body).toBe("Still editable")
+    store.edit("D1", "Hi")
 
     const submitting = store.submit("comment", "Second try")
 
@@ -377,6 +394,7 @@ describe("DraftStore", () => {
     ;(await next(submits)).answer(Effect.fail(new StaleRevision()))
 
     expect(await submitting).toMatchObject({ type: "failed", problem: { fixedByReload: true } })
+    expect(store.submission().type).toBe("reload-required")
     expect(store.views().map((view) => view.body)).toEqual(["Hi"])
     expect(store.locked()).toBe(false)
   })
@@ -397,13 +415,20 @@ describe("DraftStore", () => {
     const { store, submits } = draftStore([loaded])
 
     const submitting = store.submit("approve", "")
-    expect(store.submission()).toEqual({ type: "sending" })
+    expect(store.submission().type).toBe("draining")
 
     ;(await next(submits)).answer(Effect.fail(new GitHubUnavailable({ message: "Timed out" })))
     await submitting
+    store.setSummary("A different summary")
     store.clearSubmitFailure()
 
-    expect(store.submission()).toMatchObject({ type: "failed", problem: { fixedByReload: true } })
+    expect(store.submission()).toMatchObject({
+      type: "reload-required",
+      problem: { fixedByReload: true },
+    })
+    store.discardUnsaved()
+    expect(await store.submit("approve", "")).toMatchObject({ type: "failed" })
+    expect(submits).toHaveLength(0)
   })
 
   it("clears a retryable submission failure when asked", async () => {
@@ -413,11 +438,11 @@ describe("DraftStore", () => {
     ;(await next(updates)).answer(Effect.fail(new GitHubUnavailable({ message: "Down" })))
     await eventually(() => expect(store.view("D1")?.feedback?.type).toBe("failed"))
     await store.submit("approve", "")
-    expect(store.submission().type).toBe("failed")
+    expect(store.submission()).toMatchObject({ type: "editable", problem: expect.anything() })
 
     store.clearSubmitFailure()
 
-    expect(store.submission()).toEqual({ type: "idle" })
+    expect(store.submission()).toEqual({ type: "editable", problem: null })
   })
 
   it("submits no Review while a Draft hasn't saved to GitHub", async () => {
@@ -428,7 +453,45 @@ describe("DraftStore", () => {
     await eventually(() => expect(store.view("D1")?.feedback?.type).toBe("failed"))
 
     expect(await store.submit("approve", "")).toMatchObject({ type: "failed" })
+    expect(store.submission()).toMatchObject({
+      type: "editable",
+      problem: { title: "Some Drafts haven't saved to GitHub" },
+    })
     expect(submits).toHaveLength(0)
     expect(store.locked()).toBe(false)
   })
+
+  it.each(["draining", "submitting"])(
+    "keeps a hand-off hold after publication finishes from %s",
+    async (phase) => {
+      const { store, updates, submits } = draftStore([loaded])
+      store.edit("D1", "Hi!")
+      const submitting = store.submit("approve", "")
+      const update = await next(updates)
+
+      if (phase === "submitting") {
+        update.answer(Effect.void)
+      }
+
+      const submit = phase === "submitting" ? await next(submits) : null
+      expect(store.submission().type).toBe(phase)
+
+      const locked = store.lock().then(() => store.submission().type)
+
+      if (phase === "draining") update.answer(Effect.void)
+
+      ;(submit ?? (await next(submits))).answer(Effect.fail(new ReviewRejected({ message: "No" })))
+      await submitting
+      expect(await locked).toBe("editable")
+
+      expect(store.locked()).toBe(true)
+      expect(await store.submit("approve", "")).toEqual({ type: "blocked" })
+      store.edit("D1", "Ignored")
+      expect(store.view("D1")?.body).toBe("Hi!")
+
+      store.unlock()
+      store.edit("D1", "Editable")
+      expect(store.view("D1")?.body).toBe("Editable")
+    },
+  )
 })
