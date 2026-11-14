@@ -82,7 +82,7 @@ function DetailShell(props: {
         </div>
       </div>
       <footer className="border-t">
-        <div className="mx-auto flex w-full max-w-2xl flex-wrap items-center gap-2 px-8 py-3">
+        <div className="mx-auto flex min-h-14 w-full max-w-2xl flex-wrap items-center gap-2 px-8 py-3">
           {props.buttons}
           <p className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
             {[{ key: "J K", label: "move" }, ...props.actions].map(({ key, label }) => (
