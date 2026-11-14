@@ -247,7 +247,7 @@ function GlobalConversation(props: { onShowPast: () => void }) {
       <ConfirmationDialog
         open={confirming}
         title="Start fresh?"
-        description="This conversation ends and stays readable under Past conversations. The next message starts a new conversation that doesn't see this one. Your model, unsent message, and the work Glass started for you carry over."
+        description="Your next message starts a new conversation. This one moves to Past conversations."
         confirmLabel="Start fresh"
         confirmVariant="default"
         onConfirm={() => {
