@@ -22,6 +22,7 @@ import {
   type RequestAnswer,
   RequestNotWaiting,
   type RequestPart,
+  DRAW_DIAGRAM_TOOL,
   SUGGEST_DRAFT_TOOL,
   withContextOf,
 } from "@glass/contracts"
@@ -38,7 +39,6 @@ import {
 } from "effect"
 import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
-import * as z from "zod"
 import { sdkExecutable } from "../processes"
 import { claudeTools } from "../agentTools"
 import type { AgentAdapter } from "./adapter"
@@ -53,11 +53,9 @@ import {
 } from "./protocol"
 import { settleWith } from "./requests"
 import type { WrittenSkills } from "./sentSkills"
-import {
-  placeSuggestedDraft,
-  suggestDraftDescription,
-  suggestDraftFields,
-} from "./suggestDraftTool"
+import { claudeToolInput, type ToolReply } from "./hostTool"
+import { suggestDraft, suggestDraftDescription, suggestDraftParameters } from "./suggestDraftTool"
+import { drawDiagram, drawDiagramDescription, drawDiagramParameters } from "./drawDiagramTool"
 import { GLASS_MCP_PREFIX, GLASS_MCP_SERVER, permissionRequest, ToolInput } from "./toolCalls"
 import { runTurns } from "./turnLoop"
 
@@ -100,6 +98,13 @@ const startFailure = (cause: unknown) =>
       : "Claude Code could not start. Check its installation.",
   })
 
+const suggestDraftInput = claudeToolInput(suggestDraftParameters)
+
+const drawDiagramInput = claudeToolInput(drawDiagramParameters)
+
+const toolResult = ({ accepted, text }: ToolReply) =>
+  Promise.resolve({ content: [{ type: "text" as const, text }], isError: !accepted })
+
 const reviewOptions = (brief: ReviewBrief): Options => ({
   systemPrompt: { type: "preset", preset: "claude_code", append: brief.instructions },
   tools: [...claudeTools.shell],
@@ -110,20 +115,22 @@ const reviewOptions = (brief: ReviewBrief): Options => ({
     [GLASS_MCP_SERVER]: createSdkMcpServer({
       name: GLASS_MCP_SERVER,
       tools: [
-        tool(
-          SUGGEST_DRAFT_TOOL,
-          suggestDraftDescription,
-          {
-            path: z.string().describe(suggestDraftFields.path),
-            side: z.enum(["new", "old"]).describe(suggestDraftFields.side),
-            line: z.number().int().positive().describe(suggestDraftFields.line),
-            body: z.string().trim().min(1).describe(suggestDraftFields.body),
-          },
-          (draft) => {
-            const { placed, text } = placeSuggestedDraft(brief, draft)
+        tool(SUGGEST_DRAFT_TOOL, suggestDraftDescription, suggestDraftInput, (input) =>
+          toolResult(suggestDraft(brief)(input)),
+        ),
+      ],
+    }),
+  },
+})
 
-            return Promise.resolve({ content: [{ type: "text", text }], isError: !placed })
-          },
+const workOptions = (): Options => ({
+  allowedTools: [`${GLASS_MCP_PREFIX}${DRAW_DIAGRAM_TOOL}`],
+  mcpServers: {
+    [GLASS_MCP_SERVER]: createSdkMcpServer({
+      name: GLASS_MCP_SERVER,
+      tools: [
+        tool(DRAW_DIAGRAM_TOOL, drawDiagramDescription, drawDiagramInput, (input) =>
+          toolResult(drawDiagram(input)),
         ),
       ],
     }),
@@ -133,7 +140,7 @@ const reviewOptions = (brief: ReviewBrief): Options => ({
 const roleOptions = (role: AgentRole): Options =>
   Match.value(role).pipe(
     Match.tagsExhaustive({
-      Work: () => ({}),
+      Work: workOptions,
       Review: ({ brief }) => reviewOptions(brief),
     }),
   )

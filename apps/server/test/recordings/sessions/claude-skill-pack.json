@@ -12,13 +12,13 @@
         "--permission-prompt-tool=stdio",
         "--allow-dangerously-skip-permissions",
         "--include-partial-messages",
-        "--plugin-dir-no-mcp=<folder>.skills-eb3d301d-f215-4380-8a09-f77a4598bac0/team"
+        "--plugin-dir-no-mcp=<folder>.skills-ce2dbb9f-701b-4749-822d-69e712c13ab6/team"
       ],
       "cwd": "<folder>",
       "frames": [
         {
           "out": {
-            "request_id": "9nfe0b8ip1e",
+            "request_id": "k5xb3ky8ny9",
             "type": "control_request",
             "request": {
               "subtype": "initialize"
@@ -30,7 +30,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "9nfe0b8ip1e",
+              "request_id": "k5xb3ky8ny9",
               "response": {
                 "commands": [
                   {

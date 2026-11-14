@@ -1,4 +1,6 @@
 import {
+  type Diagram,
+  DRAW_DIAGRAM_TOOL,
   GlassRpcs,
   type NewAgent,
   type PullRequestRef,
@@ -61,6 +63,31 @@ const diagramReply = [
   "```",
 ].join("\n")
 
+const messageFlow = [
+  "flowchart LR",
+  "  A[Message box] --> B[Backend]",
+  "  B --> C[Agent]",
+  "  C -->|streams reply| A",
+]
+
+const diagramDrawings = {
+  "Diagram the message flow": {
+    title: "Message flow",
+    kind: "existing",
+    mermaid: messageFlow.join("\n"),
+  },
+  "Add a queue to it": {
+    title: "Message flow",
+    kind: "proposed",
+    mermaid: [...messageFlow, "  B --> Q[[Queue]]", "  Q --> C"].join("\n"),
+  },
+  "Break the diagram": {
+    title: "Message flow",
+    kind: "existing",
+    mermaid: "flowchart LR\n  A -->> [[",
+  },
+} satisfies Record<string, Diagram>
+
 const demoReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
   if (isGlobalConversation(input)) return globalConversationReply(input)
 
@@ -72,6 +99,23 @@ const demoReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
   if (Object.hasOwn(changes, lastUserText(input))) return runCommands(changes)(input)
   const { messages } = input
   const last = messages.at(-1)
+
+  const drawing = Object.entries(diagramDrawings).find(
+    ([words]) => words === lastUserText(input),
+  )?.[1]
+
+  if (drawing !== undefined)
+    return last?.role === "tool"
+      ? [{ text: "It's beside the conversation." }]
+      : [
+          {
+            toolCall: {
+              id: `demo-diagram-${messages.length}`,
+              name: DRAW_DIAGRAM_TOOL,
+              arguments: drawing,
+            },
+          },
+        ]
 
   if (last?.role === "tool")
     return [

@@ -30,6 +30,7 @@ import { vi } from "vite-plus/test"
 import type { AgentAdapter, AgentSession } from "../src/agentHost/adapter"
 import { claudeAdapter, type ClaudeSdk } from "../src/agentHost/claudeAdapter"
 import { piAdapter } from "../src/agentHost/piAdapter"
+import { piDrawDiagramExtension } from "../src/agentHost/piAdapter"
 import { AgentRunners } from "../src/agentRunners"
 import { GlassMcpTools } from "../src/mcp/server"
 import {
@@ -345,6 +346,7 @@ export const piSession = Effect.fnUntraced(function* (
     "<pi-home>": home,
     "<pi-model>": PI_MODEL,
     "<pi-provider>": PI_PROVIDER,
+    "<pi-draw-diagram>": piDrawDiagramExtension,
     ...places,
   })
 

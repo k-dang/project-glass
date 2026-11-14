@@ -3,7 +3,14 @@
   "program": "@earendil-works/pi-coding-agent 1.3.0",
   "processes": [
     {
-      "args": ["--mode", "rpc", "--session-id", "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d"],
+      "args": [
+        "--mode",
+        "rpc",
+        "--session-id",
+        "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
+        "--extension",
+        "<pi-draw-diagram>"
+      ],
       "cwd": "<folder>",
       "frames": [
         {
@@ -70,7 +77,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T23-33-17-104Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-14T16-42-10-520Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -197,7 +204,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1793748797201,
+              "timestamp": 1794674531248,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -303,6 +310,30 @@
                   "constrainedSampling": {
                     "type": "json_schema",
                     "strict": "prefer"
+                  }
+                },
+                {
+                  "name": "draw_diagram",
+                  "description": "Draw a Diagram beside the conversation in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string",
+                        "description": "A short name for the Diagram, shown above it. The same title redraws that Diagram."
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": ["existing", "proposed", "uncertain"],
+                        "description": "What the Diagram shows: \"existing\" for how things work now, \"proposed\" for a design that doesn't exist yet, or \"uncertain\" when it rests on inferences you couldn't confirm."
+                      },
+                      "mermaid": {
+                        "type": "string",
+                        "description": "The diagram in Mermaid syntax, such as a flowchart or sequence diagram. Glass draws no links or images."
+                      }
+                    },
+                    "required": ["title", "kind", "mermaid"],
+                    "additionalProperties": false
                   }
                 }
               ]
@@ -316,7 +347,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1793748797201,
+              "timestamp": 1794674531248,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -422,6 +453,30 @@
                   "constrainedSampling": {
                     "type": "json_schema",
                     "strict": "prefer"
+                  }
+                },
+                {
+                  "name": "draw_diagram",
+                  "description": "Draw a Diagram beside the conversation in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string",
+                        "description": "A short name for the Diagram, shown above it. The same title redraws that Diagram."
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": ["existing", "proposed", "uncertain"],
+                        "description": "What the Diagram shows: \"existing\" for how things work now, \"proposed\" for a design that doesn't exist yet, or \"uncertain\" when it rests on inferences you couldn't confirm."
+                      },
+                      "mermaid": {
+                        "type": "string",
+                        "description": "The diagram in Mermaid syntax, such as a flowchart or sequence diagram. Glass draws no links or images."
+                      }
+                    },
+                    "required": ["title", "kind", "mermaid"],
+                    "additionalProperties": false
                   }
                 }
               ]
@@ -439,7 +494,7 @@
                   "text": "Reply with exactly: FIRST"
                 }
               ],
-              "timestamp": 1793748797200
+              "timestamp": 1794674531247
             }
           }
         },
@@ -454,7 +509,7 @@
                   "text": "Reply with exactly: FIRST"
                 }
               ],
-              "timestamp": 1793748797200
+              "timestamp": 1794674531247
             }
           }
         },
@@ -482,7 +537,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1793748797221
+              "timestamp": 1794674531273
             }
           }
         },
@@ -590,10 +645,10 @@
                 "cacheWrite1h": 0
               },
               "stopReason": "stop",
-              "timestamp": 1793748797221,
-              "responseId": "gen_01M6HW51VD4NW5B3VF67CXP7ZA",
+              "timestamp": 1794674531273,
+              "responseId": "gen_01M7DF0709260RC1TPC286BYER",
               "rawStopReason": "end_turn",
-              "durationMs": 662,
+              "durationMs": 695,
               "thinkingLevel": "high"
             }
           }
@@ -628,10 +683,10 @@
                 "cacheWrite1h": 0
               },
               "stopReason": "stop",
-              "timestamp": 1793748797221,
-              "responseId": "gen_01M6HW51VD4NW5B3VF67CXP7ZA",
+              "timestamp": 1794674531273,
+              "responseId": "gen_01M7DF0709260RC1TPC286BYER",
               "rawStopReason": "end_turn",
-              "durationMs": 662,
+              "durationMs": 695,
               "thinkingLevel": "high"
             },
             "toolResults": []
@@ -645,7 +700,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1793748797201,
+                "timestamp": 1794674531248,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -752,6 +807,30 @@
                       "type": "json_schema",
                       "strict": "prefer"
                     }
+                  },
+                  {
+                    "name": "draw_diagram",
+                    "description": "Draw a Diagram beside the conversation in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
+                    "parameters": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string",
+                          "description": "A short name for the Diagram, shown above it. The same title redraws that Diagram."
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": ["existing", "proposed", "uncertain"],
+                          "description": "What the Diagram shows: \"existing\" for how things work now, \"proposed\" for a design that doesn't exist yet, or \"uncertain\" when it rests on inferences you couldn't confirm."
+                        },
+                        "mermaid": {
+                          "type": "string",
+                          "description": "The diagram in Mermaid syntax, such as a flowchart or sequence diagram. Glass draws no links or images."
+                        }
+                      },
+                      "required": ["title", "kind", "mermaid"],
+                      "additionalProperties": false
+                    }
                   }
                 ]
               },
@@ -763,7 +842,7 @@
                     "text": "Reply with exactly: FIRST"
                   }
                 ],
-                "timestamp": 1793748797200
+                "timestamp": 1794674531247
               },
               {
                 "role": "assistant",
@@ -792,10 +871,10 @@
                   "cacheWrite1h": 0
                 },
                 "stopReason": "stop",
-                "timestamp": 1793748797221,
-                "responseId": "gen_01M6HW51VD4NW5B3VF67CXP7ZA",
+                "timestamp": 1794674531273,
+                "responseId": "gen_01M7DF0709260RC1TPC286BYER",
                 "rawStopReason": "end_turn",
-                "durationMs": 662,
+                "durationMs": 695,
                 "thinkingLevel": "high"
               }
             ],
@@ -872,7 +951,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T23-33-17-104Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-14T16-42-10-520Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 3,
@@ -1003,7 +1082,7 @@
                   "text": "Reply with exactly: SECOND"
                 }
               ],
-              "timestamp": 1793748797889
+              "timestamp": 1794674531973
             }
           }
         },
@@ -1018,7 +1097,7 @@
                   "text": "Reply with exactly: SECOND"
                 }
               ],
-              "timestamp": 1793748797889
+              "timestamp": 1794674531973
             }
           }
         },
@@ -1046,7 +1125,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1793748797892
+              "timestamp": 1794674531975
             }
           }
         },
@@ -1154,10 +1233,10 @@
                 "cacheWrite1h": 0
               },
               "stopReason": "stop",
-              "timestamp": 1793748797892,
-              "responseId": "gen_01M6HW52ESN8601PN3SXA1YC7E",
+              "timestamp": 1794674531975,
+              "responseId": "gen_01M7DF07N0JK7VK765M16EF0RN",
               "rawStopReason": "end_turn",
-              "durationMs": 616,
+              "durationMs": 634,
               "thinkingLevel": "medium"
             }
           }
@@ -1192,10 +1271,10 @@
                 "cacheWrite1h": 0
               },
               "stopReason": "stop",
-              "timestamp": 1793748797892,
-              "responseId": "gen_01M6HW52ESN8601PN3SXA1YC7E",
+              "timestamp": 1794674531975,
+              "responseId": "gen_01M7DF07N0JK7VK765M16EF0RN",
               "rawStopReason": "end_turn",
-              "durationMs": 616,
+              "durationMs": 634,
               "thinkingLevel": "medium"
             },
             "toolResults": []
@@ -1213,7 +1292,7 @@
                     "text": "Reply with exactly: SECOND"
                   }
                 ],
-                "timestamp": 1793748797889
+                "timestamp": 1794674531973
               },
               {
                 "role": "assistant",
@@ -1242,10 +1321,10 @@
                   "cacheWrite1h": 0
                 },
                 "stopReason": "stop",
-                "timestamp": 1793748797892,
-                "responseId": "gen_01M6HW52ESN8601PN3SXA1YC7E",
+                "timestamp": 1794674531975,
+                "responseId": "gen_01M7DF07N0JK7VK765M16EF0RN",
                 "rawStopReason": "end_turn",
-                "durationMs": 616,
+                "durationMs": 634,
                 "thinkingLevel": "medium"
               }
             ],
@@ -1322,7 +1401,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T23-33-17-104Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-14T16-42-10-520Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 5,

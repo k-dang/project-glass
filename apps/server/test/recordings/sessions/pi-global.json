@@ -61,7 +61,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-05T22-43-12-285Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-14T16-42-24-714Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -105,7 +105,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1793918592382,
+              "timestamp": 1794674544878,
               "toolsAdded": [
                 {
                   "name": "ask_user",
@@ -173,6 +173,22 @@
                 {
                   "name": "mcp__glass__list_agents",
                   "description": "Lists the user's Agents: the named coding conversations working in a repository, with each one's repository, base branch, program, and whether it waits for the user's answer.",
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": false
+                  }
+                },
+                {
+                  "name": "mcp__glass__list_needs_you",
+                  "description": "Lists what waits on the user in Glass now: Agents with a Permission request or Question waiting, questions from an agent outside Glass, queued PRs whose Agent review is finished, and the user's own PRs with changes requested, failing checks, review threads awaiting their reply, or ready to merge. Agents and outside questions come first, then the longest waiting.",
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": false
+                  }
+                },
+                {
+                  "name": "mcp__glass__list_started_work",
+                  "description": "Lists the Agents and Agent reviews this conversation started, or Agents it messaged, oldest first: each with its state now and the user's message that asked for it. Answer how the work you started is going from this, not from the chat. Agents and reviews the user started themselves, and deleted Agents, aren't listed.",
                   "parameters": {
                     "type": "object",
                     "additionalProperties": false
@@ -254,6 +270,335 @@
                         "additionalProperties": true
                       }
                     }
+                  }
+                },
+                {
+                  "name": "mcp__glass__read_agent_review",
+                  "description": "Reads a PR's Agent review: the latest one written, with the Revision it reviewed, and whether one is being written now or failed.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "pullRequest": {
+                        "$ref": "#/$defs/PullRequestRefEncoded"
+                      }
+                    },
+                    "required": ["pullRequest"],
+                    "additionalProperties": true,
+                    "$defs": {
+                      "PullRequestRefEncoded": {
+                        "type": "object",
+                        "properties": {
+                          "owner": {
+                            "type": "string"
+                          },
+                          "repo": {
+                            "type": "string"
+                          },
+                          "number": {
+                            "type": "integer",
+                            "maximum": 2147483647,
+                            "exclusiveMinimum": 0
+                          }
+                        },
+                        "required": ["owner", "repo", "number"],
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "mcp__glass__start_agent_review",
+                  "description": "Starts an Agent review of a PR at a Revision, as the user would from the PR. It appears beside the PR's diff once written. This returns once the review started, not when it is written, which takes minutes: read_agent_review shows its progress and result, or why it failed, such as the PR having changed since that Revision. Starting one replaces any review being written for the PR, so read_agent_review first and ask the user before replacing one.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "pullRequest": {
+                        "$ref": "#/$defs/PullRequestRefEncoded"
+                      },
+                      "revision": {
+                        "$ref": "#/$defs/RevisionEncoded"
+                      }
+                    },
+                    "required": ["pullRequest", "revision"],
+                    "additionalProperties": true,
+                    "$defs": {
+                      "PullRequestRefEncoded": {
+                        "type": "object",
+                        "properties": {
+                          "owner": {
+                            "type": "string"
+                          },
+                          "repo": {
+                            "type": "string"
+                          },
+                          "number": {
+                            "type": "integer",
+                            "maximum": 2147483647,
+                            "exclusiveMinimum": 0
+                          }
+                        },
+                        "required": ["owner", "repo", "number"],
+                        "additionalProperties": true
+                      },
+                      "RevisionEncoded": {
+                        "type": "object",
+                        "properties": {
+                          "base": {
+                            "type": "string"
+                          },
+                          "head": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["base", "head"],
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "mcp__glass__list_agent_places",
+                  "description": "Lists where the user can start an Agent. An Agent on this device works in a copy of a Local checkout, so its repository must be one of localCheckouts. An Agent in a Sandbox works in any followed repository, in a Sandbox from one of sandboxProviders. Each place runs only the Agent programs listed with it.",
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": false
+                  }
+                },
+                {
+                  "name": "mcp__glass__list_agent_options",
+                  "description": "Lists the base branches and models an Agent can start with, for a repository, place, and Agent program from list_agent_places.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "place": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "_tag": {
+                                "type": "string",
+                                "enum": ["local"]
+                              }
+                            },
+                            "required": ["_tag"],
+                            "additionalProperties": true
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "_tag": {
+                                "type": "string",
+                                "enum": ["sandbox"]
+                              },
+                              "providerId": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["_tag", "providerId"],
+                            "additionalProperties": true
+                          }
+                        ]
+                      },
+                      "repository": {
+                        "$ref": "#/$defs/FollowedRepositoryEncoded"
+                      },
+                      "engine": {
+                        "type": "string",
+                        "enum": ["claude-code", "pi"]
+                      }
+                    },
+                    "required": ["place", "repository", "engine"],
+                    "additionalProperties": true,
+                    "$defs": {
+                      "FollowedRepositoryEncoded": {
+                        "type": "object",
+                        "properties": {
+                          "owner": {
+                            "type": "string"
+                          },
+                          "repo": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["owner", "repo"],
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "mcp__glass__create_agent",
+                  "description": "Creates an Agent: a named coding conversation working on a branch of its own, made from a base branch of a repository. It starts its first Turn with the message, and appears in the user's Agents. This returns once Glass created the Agent, not when it finishes its Turn: read_agent_transcript shows its progress. Choose the place, program, base branch, and model from list_agent_places and list_agent_options, never from guesses. If this call fails without saying why, or is cut off, call list_agents before trying again rather than creating a second Agent.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "repository": {
+                        "$ref": "#/$defs/FollowedRepositoryEncoded"
+                      },
+                      "baseBranch": {
+                        "type": "string",
+                        "description": "The branch the Agent's branch starts from."
+                      },
+                      "place": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "_tag": {
+                                "type": "string",
+                                "enum": ["local"]
+                              }
+                            },
+                            "required": ["_tag"],
+                            "additionalProperties": true
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "_tag": {
+                                "type": "string",
+                                "enum": ["sandbox"]
+                              },
+                              "providerId": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["_tag", "providerId"],
+                            "additionalProperties": true
+                          }
+                        ],
+                        "description": "Where the Agent works: on this device, or in a Sandbox from a provider."
+                      },
+                      "engine": {
+                        "type": "string",
+                        "enum": ["claude-code", "pi"],
+                        "description": "The Agent program that runs the Agent."
+                      },
+                      "model": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "A model id from list_agent_options, or null for the program's default."
+                      },
+                      "effort": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "One of the model's Efforts, or null for its default."
+                      },
+                      "message": {
+                        "type": "string",
+                        "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                        "minLength": 1,
+                        "description": "The Agent's first message: its task."
+                      }
+                    },
+                    "required": [
+                      "repository",
+                      "baseBranch",
+                      "place",
+                      "engine",
+                      "model",
+                      "effort",
+                      "message"
+                    ],
+                    "additionalProperties": true,
+                    "$defs": {
+                      "FollowedRepositoryEncoded": {
+                        "type": "object",
+                        "properties": {
+                          "owner": {
+                            "type": "string"
+                          },
+                          "repo": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["owner", "repo"],
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "mcp__glass__send_agent_message",
+                  "description": "Sends a message to one of the user's Agents, as the user would from the Agent. An idle Agent starts a Turn with it; a busy Agent keeps it as a Queued message and starts on it after its running Turn. This returns once Glass accepted the message, not when the Agent answers: read_agent_transcript shows its progress. If this call fails without saying why, or is cut off, read the Agent's transcript before sending again rather than sending it twice.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "agentId": {
+                        "type": "string",
+                        "description": "The Agent's id, from list_agents."
+                      },
+                      "message": {
+                        "type": "string",
+                        "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                        "minLength": 1
+                      }
+                    },
+                    "required": ["agentId", "message"],
+                    "additionalProperties": true
+                  }
+                },
+                {
+                  "name": "mcp__glass__ask_user",
+                  "description": "For an agent outside Glass: asks the user a question and waits for their answer in the Glass Inbox, in Stopped on you, under the name the user approved. An Agent Glass launched asks with its own Question tool instead. Waits 10 minutes unless timeoutSeconds is set. timeoutSeconds is a whole number of seconds from 1 to 600. Glass sends a progress notification immediately and every 15 seconds while it waits, so a client that resets its timeout when progress arrives is not cut off before Glass's own limit. Pass a progress token on the call. The result is Answered with the user's answer (by is choice or text), TimedOut when they do not answer in time, or Cancelled when Glass shuts down. A timed out or cancelled question leaves the Inbox. choices are optional. The user can pick one or type their own answer. Each MCP session may have one question waiting.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "question": {
+                        "type": "string",
+                        "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                        "minLength": 1,
+                        "maxLength": 2000,
+                        "description": "The question to show in the Inbox."
+                      },
+                      "choices": {
+                        "anyOf": [
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                              "minLength": 1,
+                              "maxLength": 200
+                            },
+                            "minItems": 1,
+                            "maxItems": 8,
+                            "uniqueItems": true,
+                            "description": "Choices the user can pick. They can still type their own answer. Omit this to ask for text only."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "timeoutSeconds": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 600,
+                            "description": "Seconds to wait. Defaults to 600, the most allowed."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": ["question"],
+                    "additionalProperties": true
                   }
                 },
                 {
@@ -275,7 +620,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1793918592382,
+              "timestamp": 1794674544878,
               "toolsAdded": [
                 {
                   "name": "ask_user",
@@ -343,6 +688,22 @@
                 {
                   "name": "mcp__glass__list_agents",
                   "description": "Lists the user's Agents: the named coding conversations working in a repository, with each one's repository, base branch, program, and whether it waits for the user's answer.",
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": false
+                  }
+                },
+                {
+                  "name": "mcp__glass__list_needs_you",
+                  "description": "Lists what waits on the user in Glass now: Agents with a Permission request or Question waiting, questions from an agent outside Glass, queued PRs whose Agent review is finished, and the user's own PRs with changes requested, failing checks, review threads awaiting their reply, or ready to merge. Agents and outside questions come first, then the longest waiting.",
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": false
+                  }
+                },
+                {
+                  "name": "mcp__glass__list_started_work",
+                  "description": "Lists the Agents and Agent reviews this conversation started, or Agents it messaged, oldest first: each with its state now and the user's message that asked for it. Answer how the work you started is going from this, not from the chat. Agents and reviews the user started themselves, and deleted Agents, aren't listed.",
                   "parameters": {
                     "type": "object",
                     "additionalProperties": false
@@ -424,6 +785,335 @@
                         "additionalProperties": true
                       }
                     }
+                  }
+                },
+                {
+                  "name": "mcp__glass__read_agent_review",
+                  "description": "Reads a PR's Agent review: the latest one written, with the Revision it reviewed, and whether one is being written now or failed.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "pullRequest": {
+                        "$ref": "#/$defs/PullRequestRefEncoded"
+                      }
+                    },
+                    "required": ["pullRequest"],
+                    "additionalProperties": true,
+                    "$defs": {
+                      "PullRequestRefEncoded": {
+                        "type": "object",
+                        "properties": {
+                          "owner": {
+                            "type": "string"
+                          },
+                          "repo": {
+                            "type": "string"
+                          },
+                          "number": {
+                            "type": "integer",
+                            "maximum": 2147483647,
+                            "exclusiveMinimum": 0
+                          }
+                        },
+                        "required": ["owner", "repo", "number"],
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "mcp__glass__start_agent_review",
+                  "description": "Starts an Agent review of a PR at a Revision, as the user would from the PR. It appears beside the PR's diff once written. This returns once the review started, not when it is written, which takes minutes: read_agent_review shows its progress and result, or why it failed, such as the PR having changed since that Revision. Starting one replaces any review being written for the PR, so read_agent_review first and ask the user before replacing one.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "pullRequest": {
+                        "$ref": "#/$defs/PullRequestRefEncoded"
+                      },
+                      "revision": {
+                        "$ref": "#/$defs/RevisionEncoded"
+                      }
+                    },
+                    "required": ["pullRequest", "revision"],
+                    "additionalProperties": true,
+                    "$defs": {
+                      "PullRequestRefEncoded": {
+                        "type": "object",
+                        "properties": {
+                          "owner": {
+                            "type": "string"
+                          },
+                          "repo": {
+                            "type": "string"
+                          },
+                          "number": {
+                            "type": "integer",
+                            "maximum": 2147483647,
+                            "exclusiveMinimum": 0
+                          }
+                        },
+                        "required": ["owner", "repo", "number"],
+                        "additionalProperties": true
+                      },
+                      "RevisionEncoded": {
+                        "type": "object",
+                        "properties": {
+                          "base": {
+                            "type": "string"
+                          },
+                          "head": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["base", "head"],
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "mcp__glass__list_agent_places",
+                  "description": "Lists where the user can start an Agent. An Agent on this device works in a copy of a Local checkout, so its repository must be one of localCheckouts. An Agent in a Sandbox works in any followed repository, in a Sandbox from one of sandboxProviders. Each place runs only the Agent programs listed with it.",
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": false
+                  }
+                },
+                {
+                  "name": "mcp__glass__list_agent_options",
+                  "description": "Lists the base branches and models an Agent can start with, for a repository, place, and Agent program from list_agent_places.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "place": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "_tag": {
+                                "type": "string",
+                                "enum": ["local"]
+                              }
+                            },
+                            "required": ["_tag"],
+                            "additionalProperties": true
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "_tag": {
+                                "type": "string",
+                                "enum": ["sandbox"]
+                              },
+                              "providerId": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["_tag", "providerId"],
+                            "additionalProperties": true
+                          }
+                        ]
+                      },
+                      "repository": {
+                        "$ref": "#/$defs/FollowedRepositoryEncoded"
+                      },
+                      "engine": {
+                        "type": "string",
+                        "enum": ["claude-code", "pi"]
+                      }
+                    },
+                    "required": ["place", "repository", "engine"],
+                    "additionalProperties": true,
+                    "$defs": {
+                      "FollowedRepositoryEncoded": {
+                        "type": "object",
+                        "properties": {
+                          "owner": {
+                            "type": "string"
+                          },
+                          "repo": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["owner", "repo"],
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "mcp__glass__create_agent",
+                  "description": "Creates an Agent: a named coding conversation working on a branch of its own, made from a base branch of a repository. It starts its first Turn with the message, and appears in the user's Agents. This returns once Glass created the Agent, not when it finishes its Turn: read_agent_transcript shows its progress. Choose the place, program, base branch, and model from list_agent_places and list_agent_options, never from guesses. If this call fails without saying why, or is cut off, call list_agents before trying again rather than creating a second Agent.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "repository": {
+                        "$ref": "#/$defs/FollowedRepositoryEncoded"
+                      },
+                      "baseBranch": {
+                        "type": "string",
+                        "description": "The branch the Agent's branch starts from."
+                      },
+                      "place": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "_tag": {
+                                "type": "string",
+                                "enum": ["local"]
+                              }
+                            },
+                            "required": ["_tag"],
+                            "additionalProperties": true
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "_tag": {
+                                "type": "string",
+                                "enum": ["sandbox"]
+                              },
+                              "providerId": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["_tag", "providerId"],
+                            "additionalProperties": true
+                          }
+                        ],
+                        "description": "Where the Agent works: on this device, or in a Sandbox from a provider."
+                      },
+                      "engine": {
+                        "type": "string",
+                        "enum": ["claude-code", "pi"],
+                        "description": "The Agent program that runs the Agent."
+                      },
+                      "model": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "A model id from list_agent_options, or null for the program's default."
+                      },
+                      "effort": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "One of the model's Efforts, or null for its default."
+                      },
+                      "message": {
+                        "type": "string",
+                        "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                        "minLength": 1,
+                        "description": "The Agent's first message: its task."
+                      }
+                    },
+                    "required": [
+                      "repository",
+                      "baseBranch",
+                      "place",
+                      "engine",
+                      "model",
+                      "effort",
+                      "message"
+                    ],
+                    "additionalProperties": true,
+                    "$defs": {
+                      "FollowedRepositoryEncoded": {
+                        "type": "object",
+                        "properties": {
+                          "owner": {
+                            "type": "string"
+                          },
+                          "repo": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["owner", "repo"],
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "mcp__glass__send_agent_message",
+                  "description": "Sends a message to one of the user's Agents, as the user would from the Agent. An idle Agent starts a Turn with it; a busy Agent keeps it as a Queued message and starts on it after its running Turn. This returns once Glass accepted the message, not when the Agent answers: read_agent_transcript shows its progress. If this call fails without saying why, or is cut off, read the Agent's transcript before sending again rather than sending it twice.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "agentId": {
+                        "type": "string",
+                        "description": "The Agent's id, from list_agents."
+                      },
+                      "message": {
+                        "type": "string",
+                        "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                        "minLength": 1
+                      }
+                    },
+                    "required": ["agentId", "message"],
+                    "additionalProperties": true
+                  }
+                },
+                {
+                  "name": "mcp__glass__ask_user",
+                  "description": "For an agent outside Glass: asks the user a question and waits for their answer in the Glass Inbox, in Stopped on you, under the name the user approved. An Agent Glass launched asks with its own Question tool instead. Waits 10 minutes unless timeoutSeconds is set. timeoutSeconds is a whole number of seconds from 1 to 600. Glass sends a progress notification immediately and every 15 seconds while it waits, so a client that resets its timeout when progress arrives is not cut off before Glass's own limit. Pass a progress token on the call. The result is Answered with the user's answer (by is choice or text), TimedOut when they do not answer in time, or Cancelled when Glass shuts down. A timed out or cancelled question leaves the Inbox. choices are optional. The user can pick one or type their own answer. Each MCP session may have one question waiting.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "question": {
+                        "type": "string",
+                        "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                        "minLength": 1,
+                        "maxLength": 2000,
+                        "description": "The question to show in the Inbox."
+                      },
+                      "choices": {
+                        "anyOf": [
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                              "minLength": 1,
+                              "maxLength": 200
+                            },
+                            "minItems": 1,
+                            "maxItems": 8,
+                            "uniqueItems": true,
+                            "description": "Choices the user can pick. They can still type their own answer. Omit this to ask for text only."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "timeoutSeconds": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 600,
+                            "description": "Seconds to wait. Defaults to 600, the most allowed."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": ["question"],
+                    "additionalProperties": true
                   }
                 },
                 {
@@ -449,7 +1139,7 @@
                   "text": "Ask me which greeting I prefer."
                 }
               ],
-              "timestamp": 1793918592381
+              "timestamp": 1794674544876
             }
           }
         },
@@ -464,7 +1154,7 @@
                   "text": "Ask me which greeting I prefer."
                 }
               ],
-              "timestamp": 1793918592381
+              "timestamp": 1794674544876
             }
           }
         },
@@ -492,7 +1182,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1793918592394
+              "timestamp": 1794674544908
             }
           }
         },
@@ -611,10 +1301,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1793918592394,
+              "timestamp": 1794674544908,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 6,
+              "durationMs": 9,
               "thinkingLevel": "off"
             }
           }
@@ -633,7 +1323,7 @@
         {
           "in": {
             "type": "extension_ui_request",
-            "id": "aa266111-5a37-41cf-9ec5-d8aa35d08a62",
+            "id": "293e2173-aef1-4b8c-be75-65a38bc90b31",
             "method": "select",
             "title": "Which greeting?",
             "options": ["Hi", "Hello"]
@@ -642,7 +1332,7 @@
         {
           "out": {
             "type": "extension_ui_response",
-            "id": "aa266111-5a37-41cf-9ec5-d8aa35d08a62",
+            "id": "293e2173-aef1-4b8c-be75-65a38bc90b31",
             "value": "Hello"
           }
         },
@@ -660,7 +1350,7 @@
               ]
             },
             "isError": false,
-            "durationMs": 4
+            "durationMs": 1
           }
         },
         {
@@ -677,8 +1367,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 4,
-              "timestamp": 1793918592406
+              "durationMs": 1,
+              "timestamp": 1794674544920
             }
           }
         },
@@ -696,8 +1386,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 4,
-              "timestamp": 1793918592406
+              "durationMs": 1,
+              "timestamp": 1794674544920
             }
           }
         },
@@ -735,10 +1425,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1793918592394,
+              "timestamp": 1794674544908,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 6,
+              "durationMs": 9,
               "thinkingLevel": "off"
             },
             "toolResults": [
@@ -753,8 +1443,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 4,
-                "timestamp": 1793918592406
+                "durationMs": 1,
+                "timestamp": 1794674544920
               }
             ]
           }
@@ -788,7 +1478,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1793918592408
+              "timestamp": 1794674544922
             }
           }
         },
@@ -892,7 +1582,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1793918592408,
+              "timestamp": 1794674544922,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -929,7 +1619,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1793918592408,
+              "timestamp": 1794674544922,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -946,7 +1636,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1793918592382,
+                "timestamp": 1794674544878,
                 "toolsAdded": [
                   {
                     "name": "ask_user",
@@ -1014,6 +1704,22 @@
                   {
                     "name": "mcp__glass__list_agents",
                     "description": "Lists the user's Agents: the named coding conversations working in a repository, with each one's repository, base branch, program, and whether it waits for the user's answer.",
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": false
+                    }
+                  },
+                  {
+                    "name": "mcp__glass__list_needs_you",
+                    "description": "Lists what waits on the user in Glass now: Agents with a Permission request or Question waiting, questions from an agent outside Glass, queued PRs whose Agent review is finished, and the user's own PRs with changes requested, failing checks, review threads awaiting their reply, or ready to merge. Agents and outside questions come first, then the longest waiting.",
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": false
+                    }
+                  },
+                  {
+                    "name": "mcp__glass__list_started_work",
+                    "description": "Lists the Agents and Agent reviews this conversation started, or Agents it messaged, oldest first: each with its state now and the user's message that asked for it. Answer how the work you started is going from this, not from the chat. Agents and reviews the user started themselves, and deleted Agents, aren't listed.",
                     "parameters": {
                       "type": "object",
                       "additionalProperties": false
@@ -1098,6 +1804,335 @@
                     }
                   },
                   {
+                    "name": "mcp__glass__read_agent_review",
+                    "description": "Reads a PR's Agent review: the latest one written, with the Revision it reviewed, and whether one is being written now or failed.",
+                    "parameters": {
+                      "type": "object",
+                      "properties": {
+                        "pullRequest": {
+                          "$ref": "#/$defs/PullRequestRefEncoded"
+                        }
+                      },
+                      "required": ["pullRequest"],
+                      "additionalProperties": true,
+                      "$defs": {
+                        "PullRequestRefEncoded": {
+                          "type": "object",
+                          "properties": {
+                            "owner": {
+                              "type": "string"
+                            },
+                            "repo": {
+                              "type": "string"
+                            },
+                            "number": {
+                              "type": "integer",
+                              "maximum": 2147483647,
+                              "exclusiveMinimum": 0
+                            }
+                          },
+                          "required": ["owner", "repo", "number"],
+                          "additionalProperties": true
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "name": "mcp__glass__start_agent_review",
+                    "description": "Starts an Agent review of a PR at a Revision, as the user would from the PR. It appears beside the PR's diff once written. This returns once the review started, not when it is written, which takes minutes: read_agent_review shows its progress and result, or why it failed, such as the PR having changed since that Revision. Starting one replaces any review being written for the PR, so read_agent_review first and ask the user before replacing one.",
+                    "parameters": {
+                      "type": "object",
+                      "properties": {
+                        "pullRequest": {
+                          "$ref": "#/$defs/PullRequestRefEncoded"
+                        },
+                        "revision": {
+                          "$ref": "#/$defs/RevisionEncoded"
+                        }
+                      },
+                      "required": ["pullRequest", "revision"],
+                      "additionalProperties": true,
+                      "$defs": {
+                        "PullRequestRefEncoded": {
+                          "type": "object",
+                          "properties": {
+                            "owner": {
+                              "type": "string"
+                            },
+                            "repo": {
+                              "type": "string"
+                            },
+                            "number": {
+                              "type": "integer",
+                              "maximum": 2147483647,
+                              "exclusiveMinimum": 0
+                            }
+                          },
+                          "required": ["owner", "repo", "number"],
+                          "additionalProperties": true
+                        },
+                        "RevisionEncoded": {
+                          "type": "object",
+                          "properties": {
+                            "base": {
+                              "type": "string"
+                            },
+                            "head": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["base", "head"],
+                          "additionalProperties": true
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "name": "mcp__glass__list_agent_places",
+                    "description": "Lists where the user can start an Agent. An Agent on this device works in a copy of a Local checkout, so its repository must be one of localCheckouts. An Agent in a Sandbox works in any followed repository, in a Sandbox from one of sandboxProviders. Each place runs only the Agent programs listed with it.",
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": false
+                    }
+                  },
+                  {
+                    "name": "mcp__glass__list_agent_options",
+                    "description": "Lists the base branches and models an Agent can start with, for a repository, place, and Agent program from list_agent_places.",
+                    "parameters": {
+                      "type": "object",
+                      "properties": {
+                        "place": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "_tag": {
+                                  "type": "string",
+                                  "enum": ["local"]
+                                }
+                              },
+                              "required": ["_tag"],
+                              "additionalProperties": true
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "_tag": {
+                                  "type": "string",
+                                  "enum": ["sandbox"]
+                                },
+                                "providerId": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["_tag", "providerId"],
+                              "additionalProperties": true
+                            }
+                          ]
+                        },
+                        "repository": {
+                          "$ref": "#/$defs/FollowedRepositoryEncoded"
+                        },
+                        "engine": {
+                          "type": "string",
+                          "enum": ["claude-code", "pi"]
+                        }
+                      },
+                      "required": ["place", "repository", "engine"],
+                      "additionalProperties": true,
+                      "$defs": {
+                        "FollowedRepositoryEncoded": {
+                          "type": "object",
+                          "properties": {
+                            "owner": {
+                              "type": "string"
+                            },
+                            "repo": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["owner", "repo"],
+                          "additionalProperties": true
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "name": "mcp__glass__create_agent",
+                    "description": "Creates an Agent: a named coding conversation working on a branch of its own, made from a base branch of a repository. It starts its first Turn with the message, and appears in the user's Agents. This returns once Glass created the Agent, not when it finishes its Turn: read_agent_transcript shows its progress. Choose the place, program, base branch, and model from list_agent_places and list_agent_options, never from guesses. If this call fails without saying why, or is cut off, call list_agents before trying again rather than creating a second Agent.",
+                    "parameters": {
+                      "type": "object",
+                      "properties": {
+                        "repository": {
+                          "$ref": "#/$defs/FollowedRepositoryEncoded"
+                        },
+                        "baseBranch": {
+                          "type": "string",
+                          "description": "The branch the Agent's branch starts from."
+                        },
+                        "place": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "_tag": {
+                                  "type": "string",
+                                  "enum": ["local"]
+                                }
+                              },
+                              "required": ["_tag"],
+                              "additionalProperties": true
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "_tag": {
+                                  "type": "string",
+                                  "enum": ["sandbox"]
+                                },
+                                "providerId": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["_tag", "providerId"],
+                              "additionalProperties": true
+                            }
+                          ],
+                          "description": "Where the Agent works: on this device, or in a Sandbox from a provider."
+                        },
+                        "engine": {
+                          "type": "string",
+                          "enum": ["claude-code", "pi"],
+                          "description": "The Agent program that runs the Agent."
+                        },
+                        "model": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "A model id from list_agent_options, or null for the program's default."
+                        },
+                        "effort": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "One of the model's Efforts, or null for its default."
+                        },
+                        "message": {
+                          "type": "string",
+                          "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                          "minLength": 1,
+                          "description": "The Agent's first message: its task."
+                        }
+                      },
+                      "required": [
+                        "repository",
+                        "baseBranch",
+                        "place",
+                        "engine",
+                        "model",
+                        "effort",
+                        "message"
+                      ],
+                      "additionalProperties": true,
+                      "$defs": {
+                        "FollowedRepositoryEncoded": {
+                          "type": "object",
+                          "properties": {
+                            "owner": {
+                              "type": "string"
+                            },
+                            "repo": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["owner", "repo"],
+                          "additionalProperties": true
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "name": "mcp__glass__send_agent_message",
+                    "description": "Sends a message to one of the user's Agents, as the user would from the Agent. An idle Agent starts a Turn with it; a busy Agent keeps it as a Queued message and starts on it after its running Turn. This returns once Glass accepted the message, not when the Agent answers: read_agent_transcript shows its progress. If this call fails without saying why, or is cut off, read the Agent's transcript before sending again rather than sending it twice.",
+                    "parameters": {
+                      "type": "object",
+                      "properties": {
+                        "agentId": {
+                          "type": "string",
+                          "description": "The Agent's id, from list_agents."
+                        },
+                        "message": {
+                          "type": "string",
+                          "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["agentId", "message"],
+                      "additionalProperties": true
+                    }
+                  },
+                  {
+                    "name": "mcp__glass__ask_user",
+                    "description": "For an agent outside Glass: asks the user a question and waits for their answer in the Glass Inbox, in Stopped on you, under the name the user approved. An Agent Glass launched asks with its own Question tool instead. Waits 10 minutes unless timeoutSeconds is set. timeoutSeconds is a whole number of seconds from 1 to 600. Glass sends a progress notification immediately and every 15 seconds while it waits, so a client that resets its timeout when progress arrives is not cut off before Glass's own limit. Pass a progress token on the call. The result is Answered with the user's answer (by is choice or text), TimedOut when they do not answer in time, or Cancelled when Glass shuts down. A timed out or cancelled question leaves the Inbox. choices are optional. The user can pick one or type their own answer. Each MCP session may have one question waiting.",
+                    "parameters": {
+                      "type": "object",
+                      "properties": {
+                        "question": {
+                          "type": "string",
+                          "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                          "minLength": 1,
+                          "maxLength": 2000,
+                          "description": "The question to show in the Inbox."
+                        },
+                        "choices": {
+                          "anyOf": [
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                                "minLength": 1,
+                                "maxLength": 200
+                              },
+                              "minItems": 1,
+                              "maxItems": 8,
+                              "uniqueItems": true,
+                              "description": "Choices the user can pick. They can still type their own answer. Omit this to ask for text only."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "timeoutSeconds": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 600,
+                              "description": "Seconds to wait. Defaults to 600, the most allowed."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": ["question"],
+                      "additionalProperties": true
+                    }
+                  },
+                  {
                     "name": "mcp__glass__wait_for_release",
                     "description": "Waits until Glass releases it. Call it only when the user asks you to.",
                     "parameters": {
@@ -1115,7 +2150,7 @@
                     "text": "Ask me which greeting I prefer."
                   }
                 ],
-                "timestamp": 1793918592381
+                "timestamp": 1794674544876
               },
               {
                 "role": "assistant",
@@ -1148,10 +2183,10 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1793918592394,
+                "timestamp": 1794674544908,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
-                "durationMs": 6,
+                "durationMs": 9,
                 "thinkingLevel": "off"
               },
               {
@@ -1165,8 +2200,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 4,
-                "timestamp": 1793918592406
+                "durationMs": 1,
+                "timestamp": 1794674544920
               },
               {
                 "role": "assistant",
@@ -1194,7 +2229,7 @@
                   }
                 },
                 "stopReason": "stop",
-                "timestamp": 1793918592408,
+                "timestamp": 1794674544922,
                 "responseId": "test-completion",
                 "rawStopReason": "stop",
                 "durationMs": 2,
@@ -1245,7 +2280,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-05T22-43-12-285Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-14T16-42-24-714Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 5,

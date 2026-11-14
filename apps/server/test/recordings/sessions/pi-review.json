@@ -59,7 +59,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-09T16-23-15-241Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-14T16-42-23-719Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -103,7 +103,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794241395321,
+              "timestamp": 1794674543846,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -242,12 +242,13 @@
                       },
                       "side": {
                         "type": "string",
-                        "enum": ["new", "old"],
+                        "enum": ["old", "new"],
                         "description": "Either \"new\", for a line of the PR's head, or \"old\", for a line only in its base."
                       },
                       "line": {
                         "type": "integer",
-                        "minimum": 1,
+                        "maximum": 9007199254740991,
+                        "exclusiveMinimum": 0,
                         "description": "The line's number on that side."
                       },
                       "body": {
@@ -270,7 +271,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794241395321,
+              "timestamp": 1794674543846,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -409,12 +410,13 @@
                       },
                       "side": {
                         "type": "string",
-                        "enum": ["new", "old"],
+                        "enum": ["old", "new"],
                         "description": "Either \"new\", for a line of the PR's head, or \"old\", for a line only in its base."
                       },
                       "line": {
                         "type": "integer",
-                        "minimum": 1,
+                        "maximum": 9007199254740991,
+                        "exclusiveMinimum": 0,
                         "description": "The line's number on that side."
                       },
                       "body": {
@@ -441,7 +443,7 @@
                   "text": "Draft comments on greet.ts."
                 }
               ],
-              "timestamp": 1794241395321
+              "timestamp": 1794674543845
             }
           }
         },
@@ -456,7 +458,7 @@
                   "text": "Draft comments on greet.ts."
                 }
               ],
-              "timestamp": 1794241395321
+              "timestamp": 1794674543845
             }
           }
         },
@@ -484,7 +486,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794241395332
+              "timestamp": 1794674543867
             }
           }
         },
@@ -601,10 +603,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794241395332,
+              "timestamp": 1794674543867,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 17,
+              "durationMs": 18,
               "thinkingLevel": "off"
             }
           }
@@ -667,11 +669,11 @@
                 "output": "hi\nhello name\nbye\n",
                 "truncated": false,
                 "exit_code": 0,
-                "wall_time_seconds": 0
+                "wall_time_seconds": 0.1
               }
             },
             "isError": false,
-            "durationMs": 15
+            "durationMs": 65
           }
         },
         {
@@ -688,8 +690,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 15,
-              "timestamp": 1794241395366
+              "durationMs": 65,
+              "timestamp": 1794674543952
             }
           }
         },
@@ -707,8 +709,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 15,
-              "timestamp": 1794241395366
+              "durationMs": 65,
+              "timestamp": 1794674543952
             }
           }
         },
@@ -745,10 +747,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794241395332,
+              "timestamp": 1794674543867,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 17,
+              "durationMs": 18,
               "thinkingLevel": "off"
             },
             "toolResults": [
@@ -763,8 +765,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 15,
-                "timestamp": 1794241395366
+                "durationMs": 65,
+                "timestamp": 1794674543952
               }
             ]
           }
@@ -798,7 +800,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794241395367
+              "timestamp": 1794674543955
             }
           }
         },
@@ -921,10 +923,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794241395367,
+              "timestamp": 1794674543955,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 2,
+              "durationMs": 3,
               "thinkingLevel": "off"
             }
           }
@@ -974,7 +976,7 @@
               ],
               "isError": false,
               "durationMs": 0,
-              "timestamp": 1794241395370
+              "timestamp": 1794674543959
             }
           }
         },
@@ -993,7 +995,7 @@
               ],
               "isError": false,
               "durationMs": 0,
-              "timestamp": 1794241395370
+              "timestamp": 1794674543959
             }
           }
         },
@@ -1033,10 +1035,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794241395367,
+              "timestamp": 1794674543955,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 2,
+              "durationMs": 3,
               "thinkingLevel": "off"
             },
             "toolResults": [
@@ -1052,7 +1054,7 @@
                 ],
                 "isError": false,
                 "durationMs": 0,
-                "timestamp": 1794241395370
+                "timestamp": 1794674543959
               }
             ]
           }
@@ -1086,7 +1088,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794241395371
+              "timestamp": 1794674543960
             }
           }
         },
@@ -1209,7 +1211,7 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794241395371,
+              "timestamp": 1794674543960,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
               "durationMs": 2,
@@ -1264,7 +1266,7 @@
               "details": {},
               "isError": true,
               "durationMs": 0,
-              "timestamp": 1794241395373
+              "timestamp": 1794674543963
             }
           }
         },
@@ -1284,7 +1286,7 @@
               "details": {},
               "isError": true,
               "durationMs": 0,
-              "timestamp": 1794241395373
+              "timestamp": 1794674543963
             }
           }
         },
@@ -1324,7 +1326,7 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794241395371,
+              "timestamp": 1794674543960,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
               "durationMs": 2,
@@ -1344,7 +1346,7 @@
                 "details": {},
                 "isError": true,
                 "durationMs": 0,
-                "timestamp": 1794241395373
+                "timestamp": 1794674543963
               }
             ]
           }
@@ -1378,7 +1380,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794241395373
+              "timestamp": 1794674543965
             }
           }
         },
@@ -1482,7 +1484,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794241395373,
+              "timestamp": 1794674543965,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -1519,7 +1521,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794241395373,
+              "timestamp": 1794674543965,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -1536,7 +1538,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1794241395321,
+                "timestamp": 1794674543846,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -1675,12 +1677,13 @@
                         },
                         "side": {
                           "type": "string",
-                          "enum": ["new", "old"],
+                          "enum": ["old", "new"],
                           "description": "Either \"new\", for a line of the PR's head, or \"old\", for a line only in its base."
                         },
                         "line": {
                           "type": "integer",
-                          "minimum": 1,
+                          "maximum": 9007199254740991,
+                          "exclusiveMinimum": 0,
                           "description": "The line's number on that side."
                         },
                         "body": {
@@ -1702,7 +1705,7 @@
                     "text": "Draft comments on greet.ts."
                   }
                 ],
-                "timestamp": 1794241395321
+                "timestamp": 1794674543845
               },
               {
                 "role": "assistant",
@@ -1734,10 +1737,10 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1794241395332,
+                "timestamp": 1794674543867,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
-                "durationMs": 17,
+                "durationMs": 18,
                 "thinkingLevel": "off"
               },
               {
@@ -1751,8 +1754,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 15,
-                "timestamp": 1794241395366
+                "durationMs": 65,
+                "timestamp": 1794674543952
               },
               {
                 "role": "assistant",
@@ -1787,10 +1790,10 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1794241395367,
+                "timestamp": 1794674543955,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
-                "durationMs": 2,
+                "durationMs": 3,
                 "thinkingLevel": "off"
               },
               {
@@ -1805,7 +1808,7 @@
                 ],
                 "isError": false,
                 "durationMs": 0,
-                "timestamp": 1794241395370
+                "timestamp": 1794674543959
               },
               {
                 "role": "assistant",
@@ -1840,7 +1843,7 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1794241395371,
+                "timestamp": 1794674543960,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
                 "durationMs": 2,
@@ -1859,7 +1862,7 @@
                 "details": {},
                 "isError": true,
                 "durationMs": 0,
-                "timestamp": 1794241395373
+                "timestamp": 1794674543963
               },
               {
                 "role": "assistant",
@@ -1887,7 +1890,7 @@
                   }
                 },
                 "stopReason": "stop",
-                "timestamp": 1794241395373,
+                "timestamp": 1794674543965,
                 "responseId": "test-completion",
                 "rawStopReason": "stop",
                 "durationMs": 2,
@@ -1938,7 +1941,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-09T16-23-15-241Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-14T16-42-23-719Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 9,

@@ -1,4 +1,4 @@
-import { useAtom, useAtomRefresh, useAtomValue } from "@effect/atom-react"
+import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
 import {
   type AgentReview,
   emptyTranscript,
@@ -12,16 +12,8 @@ import {
 import { cn } from "cn"
 import { Option } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
-import { Check, LoaderCircle, Pencil, X } from "lucide-react"
-import {
-  type KeyboardEvent,
-  type PointerEvent,
-  type ReactNode,
-  useCallback,
-  useMemo,
-  useRef,
-  useState,
-} from "react"
+import { Check, LoaderCircle, Pencil } from "lucide-react"
+import { type ReactNode, useCallback, useMemo, useState } from "react"
 import { Streamdown } from "streamdown"
 import { Button } from "@/components/ui/button"
 import { Marker, MarkerContent } from "@/components/ui/marker"
@@ -35,6 +27,7 @@ import { type HotspotLinks, HotspotPoints } from "./Hotspots"
 import { rankHotspots } from "./rankedHotspots"
 import { type ComposerSuggestion, MessageBox } from "./MessageBox"
 import { ProblemAlert } from "./ProblemAlert"
+import { SidePanel } from "./SidePanel"
 import { fileName } from "./fileName"
 import { streamProblem } from "./problems"
 import type { AgentReviewControls } from "./useAgentReview"
@@ -345,87 +338,19 @@ export function AgentReviewPanel(props: {
   )
 }
 
-const minWidth = 320
-
-const widthStep = 32
-
 /** The width the user last dragged the Agent review panel to, kept across PR workspaces. */
 const panelWidthAtom = Atom.make(480).pipe(Atom.keepAlive)
 
-const maxWidth = () => Math.max(minWidth, Math.round(window.innerWidth * 0.6))
-
-const clampWidth = (width: number) => Math.min(maxWidth(), Math.max(minWidth, width))
-
-function ResizeHandle(props: { width: number; onResize: (width: number) => void }) {
-  const drag = useRef<{ x: number; width: number } | null>(null)
-
-  const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    event.currentTarget.setPointerCapture(event.pointerId)
-    drag.current = { x: event.clientX, width: props.width }
-  }
-
-  const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
-    if (drag.current === null) return
-
-    props.onResize(drag.current.width + drag.current.x - event.clientX)
-  }
-
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const step = { ArrowLeft: widthStep, ArrowRight: -widthStep }[event.key]
-
-    if (step === undefined) return
-
-    event.preventDefault()
-    props.onResize(props.width + step)
-  }
-
-  return (
-    <div
-      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- A focusable separator is the ARIA window splitter, which `hr` can't be.
-      role="separator"
-      aria-label="Resize the Agent review"
-      aria-orientation="vertical"
-      aria-valuenow={props.width}
-      aria-valuemin={minWidth}
-      aria-valuemax={maxWidth()}
-      tabIndex={0}
-      className="absolute inset-y-0 -left-1 z-10 w-2 cursor-col-resize touch-none outline-none after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 hover:after:bg-ring focus-visible:after:bg-ring"
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={() => (drag.current = null)}
-      onPointerCancel={() => (drag.current = null)}
-      onKeyDown={onKeyDown}
-    />
-  )
-}
-
-/**
- * The Agent review beside the diff, on its right, at a width the user can drag. Its content comes
- * in as `children`, so a drag re-renders only the frame, not the transcript and composer.
- */
+/** The Agent review beside the diff, on its right. */
 export function AgentReviewSidePanel(props: { onClose: () => void; children: ReactNode }) {
-  const [stored, setWidth] = useAtom(panelWidthAtom)
-  const width = clampWidth(stored)
-
   return (
-    <aside
-      aria-label="Agent review"
-      style={{ width }}
-      className="relative flex shrink-0 flex-col border-l bg-background"
+    <SidePanel
+      name="Agent review"
+      heading="Agent review"
+      width={panelWidthAtom}
+      onClose={props.onClose}
     >
-      <ResizeHandle width={width} onResize={(next) => setWidth(clampWidth(next))} />
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b px-5">
-        <h2 className="flex-1 truncate font-medium">Agent review</h2>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Close the Agent review"
-          onClick={props.onClose}
-        >
-          <X aria-hidden />
-        </Button>
-      </header>
       {props.children}
-    </aside>
+    </SidePanel>
   )
 }
