@@ -12,6 +12,7 @@ import {
   validateTourBeforeAfter,
   validateTourDiagram,
   validateTourCallouts,
+  repairTourVisuals,
 } from "./tourVisuals"
 
 const file = new ChangedFile({
@@ -93,6 +94,17 @@ const beforeAfter: TourBeforeAfter = {
 
 it("keeps a Before / after whose changed lines are anchored to the diff", () => {
   expect(validateTourBeforeAfter(beforeAfter, [file])).toEqual(beforeAfter)
+})
+
+it("keeps one overview map, retaining the outline when a diagram cannot be anchored", () => {
+  expect(repairTourVisuals({ diagram, beforeAfter }, [file])).toEqual({
+    diagram,
+    beforeAfter: null,
+  })
+  expect(repairTourVisuals({ diagram: { ...diagram, edges: [] }, beforeAfter }, [file])).toEqual({
+    diagram: null,
+    beforeAfter,
+  })
 })
 
 it("drops the reference from an unchanged line outside the diff, keeping the line", () => {

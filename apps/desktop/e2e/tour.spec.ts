@@ -1,6 +1,10 @@
 import type { Page } from "@playwright/test"
 import type { TourAnswer } from "../../server/src/tourPrompt"
 import type { FakeGitHub } from "../../server/test/fakeGitHub"
+import {
+  seedTourOverviewPullRequests,
+  tourOverviewExamples,
+} from "../../server/test/demoTourOverviews"
 import { expect, openPullRequest, startLineDraft, test } from "./glass"
 
 test.use({ git: true })
@@ -77,6 +81,74 @@ const seedTourPullRequest = (github: FakeGitHub) =>
       { path: "notes.txt", status: "added", additions: 1, patch: added(["note"]) },
     ],
   })
+
+test("follows an overview diagram into other Chapters and both sides of the diff", async ({
+  github,
+  claude,
+  window,
+  relaunch,
+}, testInfo) => {
+  await window.setViewportSize({ width: 1500, height: 1100 })
+  const [pr] = seedTourOverviewPullRequests(github)
+  await claude.answer(tourOverviewExamples[0]!.tour)
+  await openPullRequest(window, pr!)
+  await writeTour(window)
+  const changes = window.getByRole("tabpanel", { name: "Changes" })
+  const overview = changes.getByRole("region", { name: "Tour overview", exact: true })
+  await expect(overview.getByRole("heading", { name: "Tour overview" })).toBeInViewport()
+  await expect(overview.getByText("+ OpenCode", { exact: true })).toBeVisible()
+  await window.screenshot({ path: testInfo.outputPath("overview-branching.png") })
+
+  const runtime = changes.getByRole("region", { name: "Run the OpenCode service", exact: true })
+  await runtime.getByRole("checkbox", { name: "Chapter viewed: Run the OpenCode service" }).click()
+  await expect(runtime.getByRole("button", { name: /Run the OpenCode service/ })).toBeVisible()
+  await overview.getByRole("button", { name: /^OpenCode service,/ }).click()
+  await expect(
+    runtime.locator("[data-selected-line]").filter({ hasText: "createService({ token" }),
+  ).toBeInViewport()
+  await expect(
+    runtime.getByRole("checkbox", { name: "Viewed: openCodeRuntime.ts", exact: true }),
+  ).toBeChecked()
+
+  await overview.getByRole("button", { name: /^Claude Code,/ }).click()
+  const host = changes.getByRole("region", { name: "Start the selected program", exact: true })
+  await expect(
+    host.locator("[data-selected-line]").filter({ hasText: 'adapters["claude-code"]' }),
+  ).toBeInViewport()
+
+  const translate = overview.getByRole("button", { name: /^Translate events and history,/ })
+  await translate.focus()
+  await window.keyboard.press("Enter")
+
+  const turns = changes.getByRole("region", {
+    name: "Turn native history into Glass Turns",
+    exact: true,
+  })
+
+  await expect(
+    turns.locator("[data-selected-line]").filter({ hasText: "export const openCodeTurn" }),
+  ).toBeInViewport()
+  await window.screenshot({ path: testInfo.outputPath("overview-node-code.png") })
+
+  await window.setViewportSize({ width: 800, height: 1000 })
+  await overview.getByRole("heading", { name: "Tour overview" }).scrollIntoViewIfNeeded()
+  await expect
+    .poll(() => overview.evaluate((element) => element.scrollWidth <= element.clientWidth))
+    .toBe(true)
+  await window.screenshot({ path: testInfo.outputPath("overview-narrow.png") })
+
+  const reopened = await relaunch()
+  await openPullRequest(reopened, pr!)
+  const savedOverview = reopened.getByRole("region", { name: "Tour overview", exact: true })
+  await expect(savedOverview.getByRole("figure").locator("[data-diagram-node]")).toHaveCount(6)
+  await savedOverview.getByRole("button", { name: /^OpenCode service,/ }).click()
+  await expect(
+    reopened
+      .getByRole("region", { name: "Run the OpenCode service", exact: true })
+      .locator("[data-selected-line]")
+      .filter({ hasText: "createService({ token" }),
+  ).toBeInViewport()
+})
 
 test("reads linked visuals and steps through flows without changing viewed progress", async ({
   github,
@@ -265,12 +337,22 @@ test("reads linked visuals and steps through flows without changing viewed progr
 
       return {
         aboveCode: figure.bottom <= code.top,
-        horizontal: nodes.every((node) => Math.abs(node.top - nodes[0]!.top) < 1),
+        nonOverlapping: nodes.every((node, index) =>
+          nodes
+            .slice(index + 1)
+            .every(
+              (other) =>
+                node.right <= other.left ||
+                other.right <= node.left ||
+                node.bottom <= other.top ||
+                other.bottom <= node.top,
+            ),
+        ),
         fits: element.scrollWidth <= element.clientWidth,
       }
     })
 
-  await expect.poll(rail).toEqual({ aboveCode: true, horizontal: true, fits: true })
+  await expect.poll(rail).toEqual({ aboveCode: true, nonOverlapping: true, fits: true })
   await flow.getByRole("button", { name: "Next flow step" }).click()
   await expect(flow.getByRole("button", { name: "Next flow step" })).toBeDisabled()
   await flow.getByRole("button", { name: "Previous flow step" }).click()
@@ -283,13 +365,13 @@ test("reads linked visuals and steps through flows without changing viewed progr
   const check = diagram.getByRole("button", { name: /^Check input,/ })
   await check.focus()
   await window.keyboard.press("Enter")
-  await expect(check).toHaveAttribute("aria-pressed", "true")
   await expect(
     chapter.locator("[data-selected-line]").filter({ hasText: "export function validate(input)" }),
   ).toBeVisible()
   await expect(
     chapter.locator("[data-selected-line]").filter({ hasText: "Name required" }),
   ).toBeVisible()
+  await expect(check).toHaveAttribute("aria-pressed", "true")
   await expect(chapter).toContainText("0/2 viewed")
   await window.screenshot({ path: testInfo.outputPath("diagram-selected.png") })
 
@@ -310,7 +392,7 @@ test("reads linked visuals and steps through flows without changing viewed progr
   await window.setViewportSize({ width: 800, height: 1000 })
   await expect(diagram).toBeVisible()
 
-  await expect.poll(rail).toEqual({ aboveCode: true, horizontal: true, fits: true })
+  await expect.poll(rail).toEqual({ aboveCode: true, nonOverlapping: true, fits: true })
   await window.screenshot({ path: testInfo.outputPath("diagram-narrow.png") })
 })
 
@@ -386,7 +468,7 @@ test("opens on the Tour overview and returns to it from the keyboard", async ({
   await writeTour(window)
 
   const changes = window.getByRole("tabpanel", { name: "Changes" })
-  const overview = changes.getByRole("region", { name: "Tour overview" })
+  const overview = changes.getByRole("region", { name: "Tour overview", exact: true })
   const heading = overview.getByRole("heading", { name: "Tour overview" })
   const firstChapter = changes.getByRole("heading", { name: "Spell out the greeting" })
   await expect(heading).toBeInViewport()

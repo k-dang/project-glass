@@ -2,7 +2,7 @@ import { describe, expect, it } from "vite-plus/test"
 import { changedFile, savedTour, tourChapter, revision } from "../../test/workspace"
 import { Revision } from "@glass/contracts"
 import { layOut } from "./changesView"
-import { readTour } from "./tourReading"
+import { hasOverview, readTour } from "./tourReading"
 
 const files = layOut(["a.ts", "b.ts", "c.ts", "d.ts"].map((path) => changedFile(path))).files
 
@@ -40,9 +40,30 @@ describe("readTour", () => {
 
     const callouts = [{ label: "Inspect B", target: diagram.nodes[1].target }]
 
-    const tour = savedTour([
-      { ...tourChapter("One", ["a.ts", "b.ts"]), diagram, beforeAfter, callouts },
-    ])
+    const tour = {
+      ...savedTour([{ ...tourChapter("One", ["a.ts", "b.ts"]), diagram, beforeAfter, callouts }]),
+      diagram,
+    }
+
+    expect(readTour(files, tour, revision, null).diagram).toEqual(diagram)
+
+    const outdatedReading = readTour(
+      files,
+      tour,
+      new Revision({ base: revision.base, head: "new-head" }),
+      null,
+    )
+
+    expect(outdatedReading.diagram).toBeNull()
+    expect(hasOverview(outdatedReading)).toBe(false)
+    expect(
+      readTour(
+        files.filter(({ file }) => file.path !== "b.ts"),
+        tour,
+        revision,
+        null,
+      ).diagram,
+    ).toBeNull()
 
     const current = readTour(files, tour, revision, null).chapters[0]!
     expect(current.diagram).toEqual(diagram)

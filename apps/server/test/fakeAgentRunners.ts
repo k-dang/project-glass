@@ -7,6 +7,7 @@ import type { TourAnswer } from "../src/tourPrompt"
 import { RATE_LIMIT_TITLE } from "./demoPullRequests"
 import { demoAgentReview } from "./demoAgentReview"
 import { demoTour } from "./demoTour"
+import { tourOverviewExamples } from "./demoTourOverviews"
 
 const chapterSize = 2
 
@@ -24,6 +25,10 @@ const syntheticTour = (prompt: string): TourAnswer => {
   const { title, files = [] } = decodeMaterial(prompt)
 
   if (title === RATE_LIMIT_TITLE) return demoTour
+
+  const example = tourOverviewExamples.find((entry) => entry.title === title)
+
+  if (example !== undefined) return example.tour
 
   const paths = files.map((file) => file.path)
   const placed = paths.length > chapterSize ? paths.slice(0, -1) : paths
