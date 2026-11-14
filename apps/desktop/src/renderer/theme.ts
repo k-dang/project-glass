@@ -1,6 +1,5 @@
 import { type Appearance, type ColorScheme, ColorSchemePreference, Theme } from "@glass/contracts"
 import { useAtom } from "@effect/atom-react"
-import { useSyncExternalStore } from "react"
 import { Option, Schema } from "effect"
 import { Atom } from "effect/reactivity"
 
@@ -80,12 +79,3 @@ export function useAppearance() {
     setColorScheme: (colorScheme: ColorSchemePreference) => change({ ...appearance, colorScheme }),
   }
 }
-
-const subscribeToColorScheme = (onChange: () => void) => {
-  darkScheme.addEventListener("change", onChange)
-
-  return () => darkScheme.removeEventListener("change", onChange)
-}
-
-export const useDarkColorScheme = () =>
-  useSyncExternalStore(subscribeToColorScheme, () => darkScheme.matches)

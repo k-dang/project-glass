@@ -605,3 +605,18 @@
   --trees-theme-git-renamed-fg: var(--modified);
   --truncate-marker-fade-in-duration: 0s;
 }
+
+.pele {
+  --pele-font: var(--font-ui);
+  --pele-font-mono: var(--font-code);
+  --pele-bg: var(--background);
+  --pele-fg: var(--foreground);
+  --pele-muted: var(--muted-foreground);
+  --pele-line: var(--muted-foreground);
+  --pele-surface: var(--muted);
+  --pele-surface-alt: var(--secondary);
+  --pele-border: var(--border);
+  --pele-accent: var(--primary);
+  --pele-error: var(--destructive);
+  --pele-radius: calc(var(--radius) * 0.6);
+}
