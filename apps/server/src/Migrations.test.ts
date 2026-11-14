@@ -13,131 +13,114 @@ import conversationStartedWork from "./migrations/0005_conversation_started_work
 import turnSeen from "./migrations/0006_turn_seen"
 import workReports from "./migrations/0007_work_reports"
 import pastGlobalConversations from "./migrations/0008_past_global_conversations"
-import reportDelivery from "./migrations/0009_report_delivery"
-import workUpdateTerminology from "./migrations/0010_work_update_terminology"
 import { migrationLoader } from "./Migrations"
 import { Transcripts } from "./Transcripts"
 
 const encodeEnd = Schema.encodeSync(Schema.fromJsonString(TurnEnd))
 
-for (const version of [9, 10])
-  it.live(
-    `upgrades saved updates from migration ${version} without losing completed or unfinished delivery`,
-    () =>
-      Effect.gen(function* () {
-        const sql = yield* SqlClient.SqlClient
+it.live("upgrades main's schema directly, preserving completed and unfinished updates", () =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
 
-        const previousMigrations = {
-          "0001_baseline": baseline,
-          "0002_agent_review_hotspots": agentReviewHotspots,
-          "0003_agent_review_done": agentReviewDone,
-          "0004_outside_agent": outsideAgent,
-          "0005_conversation_started_work": conversationStartedWork,
-          "0006_turn_seen": turnSeen,
-          "0007_work_reports": workReports,
-          "0008_past_global_conversations": pastGlobalConversations,
-          "0009_report_delivery": reportDelivery,
-        }
+    const previousMigrations = {
+      "0001_baseline": baseline,
+      "0002_agent_review_hotspots": agentReviewHotspots,
+      "0003_agent_review_done": agentReviewDone,
+      "0004_outside_agent": outsideAgent,
+      "0005_conversation_started_work": conversationStartedWork,
+      "0006_turn_seen": turnSeen,
+      "0007_work_reports": workReports,
+      "0008_past_global_conversations": pastGlobalConversations,
+    }
 
-        yield* SqliteMigrator.run({ loader: SqliteMigrator.fromRecord(previousMigrations) })
+    yield* SqliteMigrator.run({ loader: SqliteMigrator.fromRecord(previousMigrations) })
 
-        const at = "2026-11-14T12:00:00.000Z"
+    const at = "2026-11-14T12:00:00.000Z"
 
-        const globalConversationUpdate = GlobalConversationUpdate.make({
-          work: [
-            AgentOutcome.make({
-              agentId: "started",
-              name: "Started",
-              askedWith: "Build it",
-              outcome: "finished",
-              reason: null,
-            }),
-          ],
-        })
+    const globalConversationUpdate = GlobalConversationUpdate.make({
+      work: [
+        AgentOutcome.make({
+          agentId: "started",
+          name: "Started",
+          askedWith: "Build it",
+          outcome: "finished",
+          reason: null,
+        }),
+      ],
+    })
 
-        const context = JSON.stringify(globalConversationUpdate).replace(
-          '"_tag":"GlobalConversationUpdate"',
-          '"_tag":"Report"',
-        )
+    const context = JSON.stringify(globalConversationUpdate).replace(
+      '"_tag":"GlobalConversationUpdate"',
+      '"_tag":"Report"',
+    )
 
-        const ended = encodeEnd({ at: DateTime.makeUnsafe(at), ending: TurnDone.make({}) })
+    const ended = encodeEnd({ at: DateTime.makeUnsafe(at), ending: TurnDone.make({}) })
 
-        yield* sql`INSERT INTO global_conversation (id) VALUES ('global')`
+    yield* sql`INSERT INTO global_conversation (id) VALUES ('global')`
 
-        for (const [id, end] of [
-          ["pending", null],
-          ["completed", ended],
-        ] as const)
-          yield* sql`INSERT INTO agent_turn (id, agent_id, message, context, sent_at, ended)
+    for (const [id, end] of [
+      ["pending", null],
+      ["completed", ended],
+    ] as const)
+      yield* sql`INSERT INTO agent_turn (id, agent_id, message, context, sent_at, ended)
         VALUES (${id}, 'global', '', ${context}, ${at}, ${end})`
-        yield* sql`INSERT INTO agent_turn (id, agent_id, message, sent_at, ended)
+    yield* sql`INSERT INTO agent_turn (id, agent_id, message, sent_at, ended)
       VALUES ('ordinary', 'global', 'Report a bug', ${at}, ${ended})`
-        yield* sql`INSERT INTO conversation_agent (conversation_id, agent_id, started_at, reported_at, report_turn_id)
-      VALUES ('global', 'started', ${at}, ${at}, 'pending')`
-        yield* sql`INSERT INTO conversation_agent_review (conversation_id, owner, repo, number, started_at, reported_at, report_turn_id)
-      VALUES ('global', 'glass-demo', 'greeter', 7, ${at}, ${at}, 'completed')`
-        yield* sql`INSERT INTO agent_reviews (owner, repo, number, base, head, written_at, markdown, reported)
+    yield* sql`INSERT INTO conversation_agent (conversation_id, agent_id, started_at, reported_at)
+      VALUES ('global', 'started', ${at}, ${at})`
+    yield* sql`INSERT INTO conversation_agent_review (conversation_id, owner, repo, number, started_at, reported_at)
+      VALUES ('global', 'glass-demo', 'greeter', 7, ${at}, ${at})`
+    yield* sql`INSERT INTO agent_reviews (owner, repo, number, base, head, written_at, markdown, reported)
       VALUES ('glass-demo', 'greeter', 7, 'b', 'h', ${at}, 'Looks fine.', 1)`
 
-        if (version === 10)
-          yield* SqliteMigrator.run({
-            loader: SqliteMigrator.fromRecord({
-              ...previousMigrations,
-              "0010_work_update_terminology": workUpdateTerminology,
-            }),
-          })
-
-        const applied = yield* SqliteMigrator.run({ loader: migrationLoader })
-        assert.deepStrictEqual(
-          applied.map(([id]) => id),
-          version === 9 ? [10, 11] : [11],
-        )
-        const transcripts = yield* Transcripts
-        const { turns } = yield* transcripts.read("global")
-        assert.deepStrictEqual(
-          turns.filter((turn) => turn.id !== "ordinary").map((turn) => turn.context),
-          [globalConversationUpdate, globalConversationUpdate],
-        )
-        assert.equal(turns.find((turn) => turn.id === "ordinary")?.message, "Report a bug")
-        assert.deepStrictEqual(
-          (yield* transcripts.recoverGlobalConversationUpdates(["global"])).map(
-            (turn) => turn.turnId,
-          ),
-          ["pending"],
-        )
-        assert.deepStrictEqual(
-          yield* sql`SELECT global_conversation_update_outcome_at, global_conversation_update_turn_id FROM conversation_agent`,
-          [
-            {
-              global_conversation_update_outcome_at: at,
-              global_conversation_update_turn_id: "pending",
-            },
-          ],
-        )
-        assert.deepStrictEqual(
-          yield* sql`SELECT global_conversation_update_outcome_at, global_conversation_update_turn_id FROM conversation_agent_review`,
-          [
-            {
-              global_conversation_update_outcome_at: at,
-              global_conversation_update_turn_id: "completed",
-            },
-          ],
-        )
-        assert.deepStrictEqual(
-          yield* sql`SELECT included_in_global_conversation_update, done FROM agent_reviews`,
-          [{ included_in_global_conversation_update: 1, done: 0 }],
-        )
-        yield* sql`DELETE FROM agent_turn WHERE id = 'completed'`
-        assert.deepStrictEqual(
-          yield* sql`SELECT global_conversation_update_turn_id FROM conversation_agent_review`,
-          [{ global_conversation_update_turn_id: null }],
-        )
-      }).pipe(
-        Effect.provide(Transcripts.layer),
-        Effect.provide(SqliteClient.layer({ filename: ":memory:" })),
-        Effect.scoped,
-      ),
-  )
+    assert.deepStrictEqual(yield* SqliteMigrator.run({ loader: migrationLoader }), [
+      [9, "global_conversation_updates"],
+    ])
+    const transcripts = yield* Transcripts
+    const { turns } = yield* transcripts.read("global")
+    assert.deepStrictEqual(
+      turns.filter((turn) => turn.id !== "ordinary").map((turn) => turn.context),
+      [globalConversationUpdate, globalConversationUpdate],
+    )
+    assert.equal(turns.find((turn) => turn.id === "ordinary")?.message, "Report a bug")
+    assert.deepStrictEqual(
+      (yield* transcripts.recoverGlobalConversationUpdates(["global"])).map((turn) => turn.turnId),
+      ["pending"],
+    )
+    assert.deepStrictEqual(
+      yield* sql`SELECT global_conversation_update_outcome_at, global_conversation_update_turn_id FROM conversation_agent`,
+      [
+        {
+          global_conversation_update_outcome_at: at,
+          global_conversation_update_turn_id: null,
+        },
+      ],
+    )
+    assert.deepStrictEqual(
+      yield* sql`SELECT global_conversation_update_outcome_at, global_conversation_update_turn_id FROM conversation_agent_review`,
+      [
+        {
+          global_conversation_update_outcome_at: at,
+          global_conversation_update_turn_id: null,
+        },
+      ],
+    )
+    assert.deepStrictEqual(
+      yield* sql`SELECT included_in_global_conversation_update, done FROM agent_reviews`,
+      [{ included_in_global_conversation_update: 1, done: 0 }],
+    )
+    yield* sql`UPDATE conversation_agent_review SET global_conversation_update_turn_id = 'completed'`
+    yield* sql`DELETE FROM agent_turn WHERE id = 'completed'`
+    assert.deepStrictEqual(
+      yield* sql`SELECT global_conversation_update_turn_id FROM conversation_agent_review`,
+      [{ global_conversation_update_turn_id: null }],
+    )
+  }).pipe(
+    Effect.provide(Transcripts.layer),
+    Effect.provide(SqliteClient.layer({ filename: ":memory:" })),
+    Effect.scoped,
+  ),
+)
 
 it.live("creates the schema once and reads Activity through its indexes after reopening", () =>
   Effect.gen(function* () {
@@ -154,9 +137,7 @@ it.live("creates the schema once and reads Activity through its indexes after re
         [6, "turn_seen"],
         [7, "work_reports"],
         [8, "past_global_conversations"],
-        [9, "report_delivery"],
-        [10, "work_update_terminology"],
-        [11, "global_conversation_update_terminology"],
+        [9, "global_conversation_updates"],
       ],
       [],
     ] as const) {

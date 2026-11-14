@@ -7,9 +7,7 @@ import conversationStartedWork from "./migrations/0005_conversation_started_work
 import turnSeen from "./migrations/0006_turn_seen"
 import workReports from "./migrations/0007_work_reports"
 import pastGlobalConversations from "./migrations/0008_past_global_conversations"
-import workUpdateDelivery from "./migrations/0009_report_delivery"
-import workUpdateTerminology from "./migrations/0010_work_update_terminology"
-import globalConversationUpdateTerminology from "./migrations/0011_global_conversation_update_terminology"
+import globalConversationUpdates from "./migrations/0009_global_conversation_updates"
 
 export const migrationLoader = SqliteMigrator.fromRecord({
   "0001_baseline": baseline,
@@ -20,7 +18,5 @@ export const migrationLoader = SqliteMigrator.fromRecord({
   "0006_turn_seen": turnSeen,
   "0007_work_reports": workReports,
   "0008_past_global_conversations": pastGlobalConversations,
-  "0009_report_delivery": workUpdateDelivery,
-  "0010_work_update_terminology": workUpdateTerminology,
-  "0011_global_conversation_update_terminology": globalConversationUpdateTerminology,
+  "0009_global_conversation_updates": globalConversationUpdates,
 })

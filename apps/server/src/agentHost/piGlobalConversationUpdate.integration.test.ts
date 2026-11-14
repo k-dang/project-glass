@@ -142,51 +142,44 @@ it.live(
     }).pipe(Effect.provide(NodeServices.layer)),
 )
 
-for (const marker of [
-  "glass_global_conversation_update_turn",
-  "glass_work_update_turn",
-  "glass_report_turn",
-])
-  it.live(
-    `finishes and restores a Global conversation update saved with ${marker} without repeating its original input`,
-    () =>
-      Effect.gen(function* () {
-        const f = yield* fixture
-        const saved = SessionManager.create(f.home)
+it.live(
+  "finishes and restores an accepted Global conversation update without repeating its original input",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* fixture
+      const saved = SessionManager.create(f.home)
 
-        const pending = globalConversationUpdateDelivery(
-          "global-conversation-update-1",
-          sent.prompt,
-          [],
-        )
+      const pending = globalConversationUpdateDelivery(
+        "global-conversation-update-1",
+        sent.prompt,
+        [],
+      )
 
-        if (pending.state !== "pending")
-          assert.fail("Expected a pending Global conversation update")
-        const original = pending.prompt.replaceAll("glass_global_conversation_update_turn", marker)
-        saved.appendMessage({ role: "user", content: original, timestamp: 1 })
+      if (pending.state !== "pending") assert.fail("Expected a pending Global conversation update")
+      saved.appendMessage({ role: "user", content: pending.prompt, timestamp: 1 })
 
-        const restored = yield* f.open(saved.getSessionId())
-        yield* restored.session.startTurn("global-conversation-update-1", sent)
-        yield* restored.ended
+      const restored = yield* f.open(saved.getSessionId())
+      yield* restored.session.startTurn("global-conversation-update-1", sent)
+      yield* restored.ended
 
-        assert.lengthOf(f.model.calls, 1)
-        assert.include(lastUserText(f.model.calls[0]!), "Finish that Global conversation update")
-        const branch = SessionManager.open(saved.getSessionFile()!).getBranch()
+      assert.lengthOf(f.model.calls, 1)
+      assert.include(lastUserText(f.model.calls[0]!), "Finish that Global conversation update")
+      const branch = SessionManager.open(saved.getSessionFile()!).getBranch()
 
-        const users = branch.flatMap((entry) =>
-          entry.type === "message" && entry.message.role === "user" ? [entry.message] : [],
-        )
+      const users = branch.flatMap((entry) =>
+        entry.type === "message" && entry.message.role === "user" ? [entry.message] : [],
+      )
 
-        assert.lengthOf(users, 2)
-        assert.equal(users[0]?.content, original)
+      assert.lengthOf(users, 2)
+      assert.equal(users[0]?.content, pending.prompt)
 
-        yield* restored.close
-        const completed = yield* f.open(saved.getSessionId())
-        yield* completed.session.startTurn("global-conversation-update-1", sent)
-        yield* completed.ended
-        assert.lengthOf(f.model.calls, 1)
-      }).pipe(Effect.provide(NodeServices.layer)),
-  )
+      yield* restored.close
+      const completed = yield* f.open(saved.getSessionId())
+      yield* completed.session.startTurn("global-conversation-update-1", sent)
+      yield* completed.ended
+      assert.lengthOf(f.model.calls, 1)
+    }).pipe(Effect.provide(NodeServices.layer)),
+)
 
 it.live(
   "keeps a Global conversation update unfinished when pi's prompt response is invalid and the process exits",

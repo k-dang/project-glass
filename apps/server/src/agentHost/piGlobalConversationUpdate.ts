@@ -18,13 +18,6 @@ export const globalConversationUpdateDelivery = (
 ): GlobalConversationUpdateDelivery => {
   const identity = `\n\n<glass_global_conversation_update_turn>${turnId}</glass_global_conversation_update_turn>`
 
-  // pi's saved conversations are not migrated with Glass's database.
-  const identities = [
-    identity,
-    `\n\n<glass_work_update_turn>${turnId}</glass_work_update_turn>`,
-    `\n\n<glass_report_turn>${turnId}</glass_report_turn>`,
-  ]
-
   const omitted = new Set<string>()
 
   for (const entry of entries)
@@ -40,15 +33,13 @@ export const globalConversationUpdateDelivery = (
   const accepted = messages.findIndex(
     (message) =>
       message.role === "user" &&
-      identities.some((marker) =>
-        (Predicate.isString(message.content)
-          ? message.content
-          : message.content
-              .filter((block) => block.type === "text")
-              .map((block) => block.text)
-              .join("\n")
-        ).endsWith(marker),
-      ),
+      (Predicate.isString(message.content)
+        ? message.content
+        : message.content
+            .filter((block) => block.type === "text")
+            .map((block) => block.text)
+            .join("\n")
+      ).endsWith(identity),
   )
 
   if (accepted === -1) return { state: "pending", prompt: prompt + identity, events: [] }
