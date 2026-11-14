@@ -5,6 +5,7 @@ import type {
   TourDiagramNode,
   TourBeforeAfter,
   TourCallouts,
+  Tour,
 } from "@glass/contracts"
 import { rangeInFiles } from "./github/patchLines"
 
@@ -94,6 +95,20 @@ export const validateTourBeforeAfter = (
 
 export const validateTourCallouts = (callouts: TourCallouts, files: ReadonlyArray<ChangedFile>) =>
   callouts.filter((callout) => rangeInFiles(files, callout.target))
+
+export const repairTourVisuals = (
+  tour: Pick<Tour, "diagram" | "beforeAfter">,
+  files: ReadonlyArray<ChangedFile>,
+) => {
+  const diagram = tour.diagram == null ? null : validateTourDiagram(tour.diagram, files)
+
+  const beforeAfter =
+    diagram !== null || tour.beforeAfter == null
+      ? null
+      : validateTourBeforeAfter(tour.beforeAfter, files)
+
+  return { diagram, beforeAfter }
+}
 
 export const repairChapterVisuals = (
   chapter: Chapter,

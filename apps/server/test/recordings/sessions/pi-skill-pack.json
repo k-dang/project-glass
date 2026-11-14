@@ -7,7 +7,7 @@
         "--mode",
         "rpc",
         "--skill",
-        "<folder>.skills-19e320d2-f532-459e-a6f3-a2ab948b75e9/team/skills/greet"
+        "<folder>.skills-98fb81f7-3bab-49f8-b67e-44b3b03cbc41/team/skills/greet"
       ],
       "cwd": "<folder>",
       "frames": [
@@ -52,11 +52,11 @@
                   "description": "Greets the team by name.",
                   "source": "skill",
                   "sourceInfo": {
-                    "path": "<folder>.skills-19e320d2-f532-459e-a6f3-a2ab948b75e9/team/skills/greet/SKILL.md",
+                    "path": "<folder>.skills-98fb81f7-3bab-49f8-b67e-44b3b03cbc41/team/skills/greet/SKILL.md",
                     "source": "local",
                     "scope": "temporary",
                     "origin": "top-level",
-                    "baseDir": "<folder>.skills-19e320d2-f532-459e-a6f3-a2ab948b75e9/team/skills/greet"
+                    "baseDir": "<folder>.skills-98fb81f7-3bab-49f8-b67e-44b3b03cbc41/team/skills/greet"
                   }
                 }
               ]
@@ -70,7 +70,7 @@
         "--mode",
         "rpc",
         "--skill",
-        "<folder>.skills-403de8c1-a7c2-4e09-a92d-4b8c73bc52f3/team/skills/greet"
+        "<folder>.skills-2ea3f378-77b4-4188-9f1e-02477bb5622b/team/skills/greet"
       ],
       "cwd": "<folder>",
       "frames": [

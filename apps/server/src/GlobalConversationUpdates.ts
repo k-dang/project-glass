@@ -1,25 +1,32 @@
-import { WorkReport } from "@glass/contracts"
+import { GlobalConversationUpdate } from "@glass/contracts"
 import { Array as Arr, Effect, Layer, Predicate, Stream } from "effect"
 import { GlobalConversation } from "./GlobalConversation"
 import { StartedWork } from "./StartedWork"
 
-export const WorkReports = Layer.effectDiscard(
+export const GlobalConversationUpdates = Layer.effectDiscard(
   Effect.gen(function* () {
     const conversation = yield* GlobalConversation
     const started = yield* StartedWork
 
-    const reportOnce = conversation
-      .whenIdle((report) =>
+    const sendUpdateOnce = conversation
+      .whenIdle((globalConversationUpdate) =>
         Effect.gen(function* () {
-          const found = yield* started.unreported(conversation.id)
+          const found = yield* started.pendingOutcomes(conversation.id)
 
           if (!Arr.isReadonlyArrayNonEmpty(found)) return
 
-          yield* report(WorkReport.make({ work: Arr.map(found, ({ work }) => work) }))
-          yield* started.markReported(conversation.id, found)
+          yield* globalConversationUpdate(
+            GlobalConversationUpdate.make({ work: Arr.map(found, ({ work }) => work) }),
+            (turnId) => started.recordGlobalConversationUpdate(conversation.id, turnId, found),
+          )
         }),
       )
-      .pipe(Effect.catch((cause) => Effect.logWarning("Couldn't report started work", cause)))
+      .pipe(
+        Effect.andThen(started.reconcileGlobalConversationUpdates(conversation.id)),
+        Effect.catch((cause) =>
+          Effect.logWarning("Couldn't send a Global conversation update", cause),
+        ),
+      )
 
     const settled = conversation.transcript.pipe(
       Stream.filter(
@@ -32,7 +39,7 @@ export const WorkReports = Layer.effectDiscard(
 
     yield* Stream.merge(started.changes(conversation.id), settled).pipe(
       Stream.buffer({ capacity: 1, strategy: "sliding" }),
-      Stream.runForEach(() => reportOnce),
+      Stream.runForEach(() => sendUpdateOnce),
       Effect.forkScoped,
     )
   }),

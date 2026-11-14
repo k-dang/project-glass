@@ -2,6 +2,7 @@ import {
   type ModelRuntime,
   resolveModelScopeWithDiagnostics,
   SettingsManager,
+  SessionManager,
 } from "@earendil-works/pi-coding-agent"
 import {
   type AgentCommand,
@@ -66,6 +67,8 @@ import type { WrittenSkills } from "./sentSkills"
 import { piLoadsNothing, piTools } from "../agentTools"
 import { piSuggestDraftExtension } from "./suggestDraftTool"
 import { runTurns } from "./turnLoop"
+import { globalConversationUpdateDelivery } from "./piGlobalConversationUpdate"
+import piDrawDiagramSource from "virtual:pi-draw-diagram"
 
 const thinkingLevels = ["off", "minimal", "low", "medium", "high", "xhigh", "max"]
 
@@ -162,22 +165,37 @@ const refused = (what: "model" | "effort") => (error: string) =>
     Effect.andThen(Effect.fail(couldNotSwitch("pi", what))),
   )
 
-const lockedDownFlags = Effect.fnUntraced(function* (
+interface PiExtension {
+  readonly name: string
+  readonly source: string
+}
+
+const writtenExtensions = Effect.fnUntraced(function* (
   folder: string,
-  tools: ReadonlyArray<string>,
-  extensions: ReadonlyArray<{ readonly name: string; readonly source: string }>,
-  instructionsText: string,
+  extensions: ReadonlyArray<PiExtension>,
 ) {
   const fs = yield* FileSystem.FileSystem
   const directory = yield* scopedFolder(`${folder}.pi`)
 
-  const instructions = join(directory, "instructions.md")
-
-  const extensionFlags = yield* Effect.forEach(extensions, ({ name, source }) => {
+  const flags = yield* Effect.forEach(extensions, ({ name, source }) => {
     const file = join(directory, name)
 
     return fs.writeFileString(file, source).pipe(Effect.as(["--extension", file]))
   })
+
+  return { directory, flags: flags.flat() }
+})
+
+const lockedDownFlags = Effect.fnUntraced(function* (
+  folder: string,
+  tools: ReadonlyArray<string>,
+  extensions: ReadonlyArray<PiExtension>,
+  instructionsText: string,
+) {
+  const fs = yield* FileSystem.FileSystem
+  const { directory, flags } = yield* writtenExtensions(folder, extensions)
+
+  const instructions = join(directory, "instructions.md")
 
   yield* fs.writeFileString(instructions, instructionsText)
 
@@ -185,7 +203,7 @@ const lockedDownFlags = Effect.fnUntraced(function* (
     "--tools",
     tools.join(","),
     ...piLoadsNothing,
-    ...extensionFlags.flat(),
+    ...flags,
     "--append-system-prompt",
     instructions,
   ]
@@ -197,7 +215,10 @@ const skillFlags = (skills: ReadonlyArray<WrittenSkills>) =>
 const roleFlags = (folder: string, role: ConversationRole, skills: ReadonlyArray<WrittenSkills>) =>
   Match.value(role).pipe(
     Match.tagsExhaustive({
-      Work: () => Effect.succeed(skillFlags(skills)),
+      Work: () =>
+        writtenExtensions(folder, [{ name: "draw-diagram.mjs", source: piDrawDiagramSource }]).pipe(
+          Effect.map(({ flags }) => [...skillFlags(skills), ...flags]),
+        ),
       Review: ({ brief }) =>
         lockedDownFlags(
           folder,
@@ -375,6 +396,78 @@ export const piAdapter = (command: string) =>
             }),
         })
 
+        const startMessage = Effect.fnUntraced(function* (turnId: string, sent: DeliveredTurn) {
+          yield* turns.begin(turnId, withContextOf(sent))
+
+          const answer = yield* rpc.request(piMessage("prompt", sent), PromptAccepted).pipe(
+            Effect.map(({ disposition }) =>
+              Input.Accepted({ turnId, handled: disposition === "handled" }),
+            ),
+            Effect.tapError((error) => Effect.logWarning("pi refused a message", error)),
+            Effect.orElseSucceed(() => Input.Refused({ turnId })),
+          )
+
+          yield* Queue.offer(inbox, answer)
+        })
+
+        const startGlobalConversationUpdate = Effect.fnUntraced(function* (
+          turnId: string,
+          sent: DeliveredTurn,
+        ) {
+          const delivery = yield* Effect.gen(function* () {
+            const { sessionFile } = yield* rpc.request({ type: "get_state" }, SessionState)
+
+            const entries =
+              sessionFile == null || !(yield* fs.exists(sessionFile))
+                ? []
+                : yield* Effect.try(() => SessionManager.open(sessionFile).getBranch())
+
+            return globalConversationUpdateDelivery(turnId, sent.prompt, entries)
+          }).pipe(
+            Effect.tapError((error) =>
+              Effect.logWarning("Couldn't recover pi's Global conversation update", error),
+            ),
+            Effect.mapError(
+              () =>
+                new HostAgentError({
+                  message:
+                    "Couldn't recover pi's Global conversation update. Restart Glass to try again.",
+                }),
+            ),
+          )
+
+          yield* turns.begin(turnId, withContextOf(sent))
+
+          for (const event of delivery.events) yield* Queue.offer(inbox, Input.Event({ event }))
+
+          if (delivery.state === "completed") {
+            yield* Queue.offer(inbox, Input.Idle({ idle: true, generation: 0 }))
+
+            return
+          }
+
+          const { disposition } = yield* rpc
+            .request(piMessage("prompt", { ...sent, prompt: delivery.prompt }), PromptAccepted)
+            .pipe(
+              Effect.tapError(() => Queue.offer(inbox, Input.Refused({ turnId }))),
+              Effect.tapError((error) =>
+                Effect.logWarning(
+                  "Couldn't confirm pi's Global conversation update delivery",
+                  error,
+                ),
+              ),
+              Effect.mapError(
+                () =>
+                  new HostAgentError({
+                    message:
+                      "Couldn't confirm pi's Global conversation update delivery. Restart Glass to try again.",
+                  }),
+              ),
+            )
+
+          yield* Queue.offer(inbox, Input.Accepted({ turnId, handled: disposition === "handled" }))
+        })
+
         return {
           closed: turns.closed,
           stopped: turns.stopped,
@@ -400,19 +493,10 @@ export const piAdapter = (command: string) =>
 
             return undefined
           }),
-          startTurn: Effect.fnUntraced(function* (turnId: string, sent: DeliveredTurn) {
-            yield* turns.begin(turnId, withContextOf(sent))
-
-            const answer = yield* rpc.request(piMessage("prompt", sent), PromptAccepted).pipe(
-              Effect.map(({ disposition }) =>
-                Input.Accepted({ turnId, handled: disposition === "handled" }),
-              ),
-              Effect.tapError((error) => Effect.logWarning("pi refused a message", error)),
-              Effect.orElseSucceed(() => Input.Refused({ turnId })),
-            )
-
-            return yield* Queue.offer(inbox, answer)
-          }),
+          startTurn: (turnId, sent) =>
+            Predicate.isTagged(sent.context, "GlobalConversationUpdate")
+              ? startGlobalConversationUpdate(turnId, sent)
+              : startMessage(turnId, sent),
           answer: Effect.fnUntraced(function* (requestId: string, answer: RequestAnswer) {
             const dialog = dialogs.get(requestId)
 

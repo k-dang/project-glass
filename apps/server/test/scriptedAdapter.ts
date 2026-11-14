@@ -172,7 +172,7 @@ export const scriptedAdapter = (gates: string): AgentAdapter => {
                 body: body!,
               }
 
-              const { placed, text } = placeSuggestedDraft(review, draft)
+              const { accepted, text } = placeSuggestedDraft(review, draft)
 
               yield* part(
                 turnId,
@@ -182,7 +182,7 @@ export const scriptedAdapter = (gates: string): AgentAdapter => {
                   inputSummary: path!,
                   input: JSON.stringify(draft),
                   output: text,
-                  status: placed ? "done" : "failed",
+                  status: accepted ? "done" : "failed",
                   parentToolCallId: null,
                 }),
               )

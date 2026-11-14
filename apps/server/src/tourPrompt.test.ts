@@ -70,9 +70,16 @@ it("omits a malformed Tour Before / after without discarding its Chapters", () =
   expect(decode({ ...answer, beforeAfter: { title: "Empty", lines: [] } })).toEqual(answer)
 })
 
+it("accepts an overview diagram and preserves it when only playback is malformed", () => {
+  const labeled = { ...diagram, edges: [{ ...diagram.edges[0]!, label: "use the name" }] }
+  expect(decode({ ...answer, diagram: { ...labeled, steps: [] } }).diagram).toEqual(labeled)
+  expect(decode({ ...answer, diagram: { nodes: [], edges: [] } })).toEqual(answer)
+})
+
 it("still asks the agent for the strict output schema", () => {
   const strict = Schema.Struct({
     intent: TourAnswer.fields.intent,
+    diagram: Tour.fields.diagram,
     beforeAfter: Tour.fields.beforeAfter,
     chapters: Schema.Array(Chapter),
     unplacedFiles: TourAnswer.fields.unplacedFiles,

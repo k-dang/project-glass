@@ -1,13 +1,13 @@
 // @vitest-environment happy-dom
 import {
   AgentModels,
-  AgentReviewReported,
+  AgentReviewOutcome,
   defaultReviewPrompt,
   PullRequestContext,
   TextPart,
   TranscriptSnapshot,
   TurnDone,
-  WorkReport,
+  GlobalConversationUpdate,
   type Activity,
   ActivityPage,
   ActivityPullRequest,
@@ -587,7 +587,7 @@ it("won't start fresh while a Turn runs, and says why", async () => {
   ).toBe(true)
 })
 
-it("marks the rail while a Global conversation reply is unseen, and shows a Report as from Glass", async () => {
+it("marks the rail while a Global conversation reply is unseen, and shows a Global conversation update as from Glass", async () => {
   vi.spyOn(document, "hasFocus").mockReturnValue(true)
   const at = DateTime.makeUnsafe("2026-11-05T12:00:00Z")
   const ended = { at, ending: TurnDone.make({}) }
@@ -606,9 +606,9 @@ it("marks the rail while a Global conversation reply is unseen, and shows a Repo
               id: "report-1",
               message: "",
               images: [],
-              context: WorkReport.make({
+              context: GlobalConversationUpdate.make({
                 work: [
-                  AgentReviewReported.make({
+                  AgentReviewOutcome.make({
                     pullRequest: workspace.pullRequest.ref,
                     outcome: "finished",
                     reason: null,
@@ -635,7 +635,7 @@ it("marks the rail while a Global conversation reply is unseen, and shows a Repo
 
   const conversation = await screen.findByRole("dialog", { name: "Global conversation" })
   await within(conversation).findByText("The review on #42 is in.")
-  expect(within(conversation).getByText("Report from Glass")).toBeTruthy()
+  expect(within(conversation).getByText("Global conversation update from Glass")).toBeTruthy()
   expect(within(conversation).getByText("Agent review on octo-org/glass#42 finished")).toBeTruthy()
   expect(within(rail).queryByText("Unread reply")).toBeNull()
   await waitFor(() => expect(seen).toEqual([DateTime.formatIso(at)]))

@@ -1,15 +1,11 @@
 import type { TourDiagram as Diagram, TourDiagramNode } from "@glass/contracts"
-import { useId, useLayoutEffect, useRef, useState } from "react"
+import { cn } from "cn"
 import { ChevronLeft, ChevronRight } from "lucide-react"
+import { useId, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { fileName } from "./fileName"
-
-interface Box {
-  readonly left: number
-  readonly top: number
-  readonly width: number
-  readonly height: number
-}
+import { diagramEdgeText, layOutTourDiagram, type DiagramSize } from "./tourDiagramLayout"
+import { twoDigits } from "./tourProgress"
 
 const colors = {
   unchanged: "var(--muted-foreground)",
@@ -21,44 +17,33 @@ const roomForFocusOutlines = "-m-1.5 p-1.5"
 
 const changes = { unchanged: "Unchanged", added: "Added", removed: "Removed" }
 
-const acrossRail = (from: Box, to: Box) => {
-  const startX = from.left + from.width
-  const endX = to.left
-  const center = from.top + from.height / 2
-
-  return {
-    path: `M ${startX} ${center} L ${endX - 3} ${to.top + to.height / 2}`,
-    labelX: (startX + endX) / 2,
-    labelY: center - 8,
-  }
-}
-
-const belowRailInLane = (from: Box, to: Box, lane: number) => {
-  const startX = from.left + from.width / 2
-  const endX = to.left + to.width / 2
-  const y = from.top + from.height + 12 + lane * 10
-
-  return {
-    path: `M ${startX} ${from.top + from.height} V ${y} H ${endX} V ${to.top + to.height + 3}`,
-    labelX: (startX + endX) / 2,
-    labelY: y - 4,
-  }
-}
+const signs = { unchanged: "", added: "+ ", removed: "− " }
 
 export function TourDiagram(props: {
   diagram: Diagram
   chapterTitle: string
-  path: string | undefined
+  chapterOf?: ReadonlyMap<string, number>
+  className?: string
   onSelect: (node: TourDiagramNode) => void
 }) {
   const { diagram } = props
   const marker = useId().replaceAll(":", "")
   const container = useRef<HTMLDivElement>(null)
-  const [boxes, setBoxes] = useState<ReadonlyMap<string, Box>>(new Map())
+
+  const [sizes, setSizes] = useState<{
+    nodes: ReadonlyMap<string, DiagramSize>
+    edges: ReadonlyArray<DiagramSize>
+  }>({ nodes: new Map(), edges: [] })
+
+  const drawing = useMemo(
+    () => layOutTourDiagram(diagram, sizes.nodes, sizes.edges),
+    [diagram, sizes],
+  )
+
   const [selected, setSelected] = useState<string | null>(null)
   const [stepIndex, setStepIndex] = useState(-1)
   const steps = diagram.steps ?? []
-  const step = stepIndex < 0 ? null : steps[stepIndex]!
+  const step = steps[stepIndex] ?? null
 
   const selectStep = (index: number) => {
     setStepIndex(index)
@@ -73,10 +58,6 @@ export function TourDiagram(props: {
       ?.scrollIntoView({ block: "nearest", inline: "nearest" })
   }
 
-  const order = new Map(diagram.nodes.map((node, index) => [node.id, index]))
-  const routed = diagram.edges.filter((edge) => order.get(edge.to)! !== order.get(edge.from)! + 1)
-  const gutter = routed.length === 0 ? 0 : 16 + routed.length * 10
-
   useLayoutEffect(() => {
     const root = container.current
 
@@ -90,30 +71,30 @@ export function TourDiagram(props: {
     )
 
     const measure = () => {
-      const origin = root.getBoundingClientRect()
+      const nodeSizes = new Map<string, DiagramSize>(
+        diagram.nodes.map((node) => {
+          const button = buttons.get(node.id)!
 
-      setBoxes(
-        new Map(
-          diagram.nodes.map((node) => {
-            const box = buttons.get(node.id)!.getBoundingClientRect()
-
-            return [
-              node.id,
-              {
-                left: box.left - origin.left,
-                top: box.top - origin.top,
-                width: box.width,
-                height: box.height,
-              },
-            ]
-          }),
-        ),
+          return [node.id, { width: button.offsetWidth || 184, height: button.offsetHeight || 88 }]
+        }),
       )
+
+      const edgeSizes = diagram.edges.map((edge, index) => {
+        const label = diagramEdgeText(edge)
+        const text = root.querySelector<SVGTextElement>(`[data-edge-label="${index}"]`)
+        const box = text?.getBoundingClientRect()
+
+        return {
+          width: box?.width || label.length * 7,
+          height: label === "" ? 0 : 18,
+        }
+      })
+
+      setSizes({ nodes: nodeSizes, edges: edgeSizes })
     }
 
     measure()
     const observer = new ResizeObserver(measure)
-    observer.observe(root)
 
     for (const button of buttons.values()) observer.observe(button)
 
@@ -124,7 +105,7 @@ export function TourDiagram(props: {
 
   return (
     <figure
-      className="mb-3 shrink-0 border-b pb-3"
+      className={cn("flex min-h-0 shrink-0 flex-col", props.className)}
       aria-label={`Change diagram for ${props.chapterTitle}`}
     >
       {steps.length > 0 && (
@@ -171,8 +152,12 @@ export function TourDiagram(props: {
           </div>
         </fieldset>
       )}
-      <div className={`${roomForFocusOutlines} overflow-x-auto [scrollbar-width:thin]`}>
-        <div className="relative min-w-min" ref={container}>
+      <div className={cn(roomForFocusOutlines, "min-h-0 overflow-auto [scrollbar-width:thin]")}>
+        <div
+          className="relative mx-auto"
+          ref={container}
+          style={{ width: drawing.width, height: drawing.height }}
+        >
           <svg
             className="pointer-events-none absolute inset-0 size-full overflow-visible"
             aria-hidden
@@ -193,62 +178,65 @@ export function TourDiagram(props: {
                 </marker>
               ))}
             </defs>
-            {diagram.edges.map((edge, edgeIndex) => {
-              const from = boxes.get(edge.from)
-              const to = boxes.get(edge.to)
-
-              if (from === undefined || to === undefined) return null
-
-              const lane = routed.indexOf(edge)
-
-              const { path, labelX, labelY } =
-                lane === -1 ? acrossRail(from, to) : belowRailInLane(from, to, lane)
-
-              return (
-                <g
-                  key={`${edge.from}-${edge.to}`}
-                  className="transition-opacity duration-200 ease-out"
-                  opacity={step === null || step.edges.includes(edgeIndex) ? 1 : 0.25}
-                >
-                  <path
-                    d={path}
-                    fill="none"
-                    stroke={colors[edge.change]}
-                    strokeWidth="1.5"
-                    strokeLinejoin="round"
-                    strokeDasharray={edge.change === "removed" ? "4 3" : undefined}
-                    markerEnd={`url(#${marker}-${edge.change})`}
-                  />
-                  {edge.change !== "unchanged" && (
-                    <text
-                      x={labelX}
-                      y={labelY}
-                      fill={colors[edge.change]}
-                      className="font-mono text-[11px]"
-                    >
-                      {edge.change === "added" ? "+" : "−"}
-                    </text>
-                  )}
-                </g>
-              )
-            })}
+            {drawing.edges.map((edge, edgeIndex) => (
+              <g
+                key={`${edge.from}-${edge.to}`}
+                className="transition-opacity duration-200 ease-out motion-reduce:transition-none"
+                opacity={step === null || step.edges.includes(edgeIndex) ? 1 : 0.25}
+              >
+                <path
+                  d={edge.path}
+                  fill="none"
+                  stroke={colors[edge.change]}
+                  strokeWidth="1.5"
+                  strokeLinejoin="round"
+                  strokeDasharray={edge.change === "removed" ? "4 3" : undefined}
+                  markerEnd={`url(#${marker}-${edge.change})`}
+                />
+                {edge.text !== "" && (
+                  <text
+                    data-edge-label={edgeIndex}
+                    x={edge.x}
+                    y={edge.y}
+                    fill={colors[edge.change]}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    className="font-mono text-[11px]"
+                    style={{
+                      paintOrder: "stroke",
+                      stroke: "var(--background)",
+                      strokeWidth: 5,
+                      strokeLinejoin: "round",
+                    }}
+                  >
+                    {edge.text}
+                  </text>
+                )}
+              </g>
+            ))}
           </svg>
-          <ol className="relative flex gap-7" style={{ paddingBottom: gutter }}>
-            {diagram.nodes.map((node) => {
+          <ol>
+            {drawing.nodes.map((node) => {
               const { target } = node
-              const name = fileName(target.path)
 
               const range =
                 target.startLine === target.endLine
                   ? `${target.startLine}`
                   : `${target.startLine}–${target.endLine}`
 
+              const chapter = props.chapterOf?.get(target.path)
+
               return (
-                <li key={node.id} className="max-w-80 min-w-40 flex-1">
+                <li
+                  key={node.id}
+                  className="absolute w-46"
+                  style={{ left: node.left, top: node.top }}
+                >
                   <button
                     type="button"
                     data-diagram-node={node.id}
-                    aria-pressed={selected === node.id && props.path === target.path}
+                    data-change={node.change}
+                    aria-pressed={selected === node.id}
                     data-flow-active={step?.nodes.includes(node.id) || undefined}
                     aria-label={`${node.label}, ${changes[node.change]}. Show ${target.path}, ${target.side} lines ${range}`}
                     title={`${node.label}\n${target.path}:${range} (${target.side})`}
@@ -256,23 +244,22 @@ export function TourDiagram(props: {
                       setSelected(node.id)
                       props.onSelect(node)
                     }}
-                    className="h-full w-full cursor-pointer rounded-[7px] border bg-background px-2.5 py-2 text-left transition-transform duration-150 ease-out hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring active:scale-[0.98] aria-pressed:border-(--viewed) aria-pressed:bg-[color-mix(in_oklch,var(--viewed)_10%,var(--background))] data-flow-active:border-(--viewed)"
+                    className="w-full cursor-pointer rounded-[7px] border bg-background px-3 py-2.5 text-left hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring active:scale-[0.98] data-[change=added]:border-added/50 data-[change=added]:bg-[color-mix(in_oklch,var(--added)_5%,var(--background))] data-[change=removed]:border-deleted/50 data-[change=removed]:bg-[color-mix(in_oklch,var(--deleted)_5%,var(--background))] aria-pressed:border-(--viewed) aria-pressed:outline-2 aria-pressed:outline-(--viewed) data-flow-active:border-(--viewed)"
                   >
-                    <span className="line-clamp-2 text-xs leading-4.5 font-medium wrap-anywhere">
+                    <span className="mb-1 flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
+                      <span style={{ color: colors[node.change] }}>
+                        {signs[node.change]}
+                        {changes[node.change]}
+                      </span>
+                      {chapter !== undefined && (
+                        <span className="font-mono">Chapter {twoDigits(chapter + 1)} ↗</span>
+                      )}
+                    </span>
+                    <span className="block text-xs leading-4.5 font-medium wrap-anywhere">
                       {node.label}
                     </span>
-                    <span className="mt-1 flex items-center gap-1.5 text-[10px] leading-4">
-                      {node.change !== "unchanged" && (
-                        <span
-                          className={node.change === "added" ? "text-added" : "text-deleted"}
-                          aria-hidden
-                        >
-                          {node.change === "added" ? "+" : "−"}
-                        </span>
-                      )}
-                      <span className="min-w-0 truncate font-mono text-muted-foreground">
-                        {name}:{range}
-                      </span>
+                    <span className="mt-1 block truncate font-mono text-[10px] text-muted-foreground">
+                      {fileName(target.path)}:{range}
                     </span>
                   </button>
                 </li>
@@ -285,6 +272,7 @@ export function TourDiagram(props: {
         {diagram.edges.map((edge) => (
           <li key={`${edge.from}-${edge.to}`}>
             {labels.get(edge.from)} → {labels.get(edge.to)}: {changes[edge.change]}
+            {edge.label !== undefined && `, ${edge.label}`}
           </li>
         ))}
       </ul>

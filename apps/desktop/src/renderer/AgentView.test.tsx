@@ -237,7 +237,7 @@ it("keeps the hidden panel recoverable across Agent navigation", async () => {
   expect(toggle.getAttribute("aria-controls")).toBe(panel.id)
   expect(toggle.getAttribute("aria-expanded")).toBe("false")
 
-  await user.click(screen.getByRole("link", { name: "New Agent" }))
+  await user.keyboard("{Control>}n{/Control}")
   await screen.findByRole("region", { name: "New Agent" })
   expect(screen.getByRole("button", { name: "Show Agents panel" })).toBeTruthy()
 

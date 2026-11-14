@@ -17,6 +17,7 @@ import { DEMO_GATEWAY_REPOSITORY, DEMO_REPOSITORY, seedDemoPullRequests } from "
 import { startFakeGitHub } from "./fakeGitHub"
 import { VIEWER } from "./fakePullRequest"
 import { fakeAgentRunners } from "./fakeAgentRunners"
+import { seedTourOverviewPullRequests } from "./demoTourOverviews"
 import { FAKE_PI_MODEL } from "./fakeModelProvider"
 import { installFakeSandboxProvider } from "./fakeSandboxProvider"
 
@@ -38,6 +39,7 @@ const seedDemoSettings = (dataDirectory: string) => {
 const main = Effect.gen(function* () {
   const github = yield* startFakeGitHub({ git: true })
   const reviewed = seedDemoPullRequests(github)
+  seedTourOverviewPullRequests(github)
 
   const claudeDirectory = yield* Effect.acquireRelease(
     Effect.promise(() => mkdtemp(join(tmpdir(), "glass-fake-claude-"))),

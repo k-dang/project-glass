@@ -20,7 +20,7 @@ export const SuggestedDraft = Schema.Struct({
   path: Schema.String,
   side: DiffSide,
   line: Schema.Int.check(Schema.isGreaterThan(0)),
-  body: Schema.String,
+  body: Schema.Trim.check(Schema.isNonEmpty()),
 })
 
 export type SuggestedDraft = typeof SuggestedDraft.Type
@@ -67,7 +67,7 @@ export const AgentReview = Schema.Struct({
   lowAttention: Schema.Array(LowAttentionFile),
   agentId: Schema.NullOr(Schema.String),
   done: Schema.Boolean,
-  reported: Schema.Boolean,
+  includedInGlobalConversationUpdate: Schema.Boolean,
 })
 
 export type AgentReview = typeof AgentReview.Type

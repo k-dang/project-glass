@@ -10,7 +10,7 @@ import {
   emptyTranscript,
   asksPermission,
   type CapturedContext,
-  type ReportedWork,
+  type WorkOutcome,
   type FeedbackNote,
   type Image,
   isNothingUnsent,
@@ -134,6 +134,7 @@ import { rememberPlace } from "./savedPlace"
 import { shortcutLabel } from "./shortcutLabel"
 import { useStagedFeedback } from "./useStagedFeedback"
 import { MermaidDiagram } from "./MermaidDiagram"
+import { DiagramPane, useDiagrams } from "./AgentDiagrams"
 import { type FeedbackNotesStore, useFeedbackNotes } from "./useFeedbackNotes"
 import { markTurnSeenAtom } from "./needsYou"
 import { useShortcuts } from "./useShortcuts"
@@ -192,12 +193,11 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
   const transcript = useAtomValue(conversation.transcript)
   const reconnect = useAtomRefresh(conversation.transcript)
 
-  const { turns, queued, status } = Option.getOrElse(
-    AsyncResult.value(transcript),
-    () => emptyTranscript,
-  )
+  const loaded = AsyncResult.value(transcript)
+  const { turns, queued, status } = Option.getOrElse(loaded, () => emptyTranscript)
 
   const [changesOpened, setChangesOpened] = useState(tab === "changes")
+  const diagrams = useDiagrams(turns, Option.isSome(loaded))
 
   if (tab === "changes" && !changesOpened) setChangesOpened(true)
 
@@ -278,15 +278,22 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
             />
           </div>
         )}
-        <div hidden={tab !== "chat"} className="flex min-h-0 flex-1 flex-col">
-          <Transcript turns={turns} status={status} />
-          {reach === "unreachable" && <UnreachableNotice agentId={agent.id} />}
-          {gone === null ? (
-            <Composer agent={agent} turns={turns} queued={queued} />
-          ) : (
-            <output className="mx-auto block w-full max-w-3xl px-6 py-4 text-sm text-muted-foreground">
-              {goneExplanation(gone)}
-            </output>
+        <div hidden={tab !== "chat"} className="flex min-h-0 flex-1">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <ToolCallView value={diagrams.cardOf}>
+              <Transcript turns={turns} status={status} />
+            </ToolCallView>
+            {reach === "unreachable" && <UnreachableNotice agentId={agent.id} />}
+            {gone === null ? (
+              <Composer agent={agent} turns={turns} queued={queued} />
+            ) : (
+              <output className="mx-auto block w-full max-w-3xl px-6 py-4 text-sm text-muted-foreground">
+                {goneExplanation(gone)}
+              </output>
+            )}
+          </div>
+          {diagrams.opened !== null && (
+            <DiagramPane diagram={diagrams.opened} onClose={diagrams.close} />
           )}
         </div>
         <section
@@ -388,13 +395,13 @@ export const contextLabel = (context: CapturedContext) =>
 const sentFrom = (context: CapturedContext | null) =>
   context === null ? undefined : `From ${contextLabel(context)}`
 
-const outcomeText: Record<ReportedWork["outcome"], string> = {
+const outcomeText: Record<WorkOutcome["outcome"], string> = {
   finished: "finished",
   failed: "failed",
   waiting: "is waiting on you",
 }
 
-const reportedText = (work: ReportedWork) => {
+const workOutcomeText = (work: WorkOutcome) => {
   const subject = Match.valueTags(work, {
     Agent: ({ name }) => name,
     AgentReview: ({ pullRequest }) => `Agent review on ${referenceText(pullRequest)}`,
@@ -403,14 +410,16 @@ const reportedText = (work: ReportedWork) => {
   return `${subject} ${outcomeText[work.outcome]}`
 }
 
-function ReportMessage(props: { work: ReadonlyArray<ReportedWork> }) {
+function GlobalConversationUpdateMessage(props: { work: ReadonlyArray<WorkOutcome> }) {
   return (
     <Message align="end">
       <MessageContent>
-        <span className="self-end text-xs text-muted-foreground">Report from Glass</span>
+        <span className="self-end text-xs text-muted-foreground">
+          Global conversation update from Glass
+        </span>
         <ul className="flex flex-col gap-1 self-end text-sm text-muted-foreground">
           {props.work.map((work, index) => (
-            <li key={index}>{reportedText(work)}</li>
+            <li key={index}>{workOutcomeText(work)}</li>
           ))}
         </ul>
       </MessageContent>
@@ -458,8 +467,8 @@ const TurnView = memo(function TurnView(props: {
   return (
     <MessageScrollerItem messageId={turn.id} scrollAnchor exactHeight={props.latest}>
       <MessageGroup className="gap-4">
-        {Predicate.isTagged(turn.context, "Report") ? (
-          <ReportMessage work={turn.context.work} />
+        {Predicate.isTagged(turn.context, "GlobalConversationUpdate") ? (
+          <GlobalConversationUpdateMessage work={turn.context.work} />
         ) : (
           <UserMessage
             message={turn.message}

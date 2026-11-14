@@ -17,7 +17,7 @@ The Agents, questions from an agent outside Glass or the Global conversation, an
 the user now. They live in the Inbox, grouped by why they are waiting, with their count on the Inbox
 rail link in every area.
 A queued PR waits once its Agent review is finished, until the user marks that Agent review done or
-the Global conversation reports it; writing it again puts the PR back.
+a Global conversation update includes it; writing it again puts the PR back.
 An Agent waits once its latest Turn ends while the user isn't looking, unless they stopped it,
 until they look at its Chat with Glass focused; an Agent review's own Agent waits only through its
 PR.
@@ -86,7 +86,7 @@ An automated run reporting on a PR's head commit, such as a CI job: passed, fail
 skipped.
 
 **Tour**:
-An agent-written reading order for one Revision of a PR: why the change exists, a Before / after
+An agent-written reading order for one Revision of a PR: why the change exists, a diagram or Before / after
 of the whole change when it has one, then Chapters ordered from the part that matters most to the
 glue.
 _Avoid_: Code tour, guided review, guide, walkthrough
@@ -98,8 +98,8 @@ Chapter may carry one for its own part.
 _Avoid_: Call tree, show me, summary diagram
 
 **Tour overview**:
-The card that opens a Tour with a Before / after: why the change exists beside its Before / after,
-above the first Chapter.
+The card that opens a Tour: why the change exists beside one map, either a diagram or a Before / after,
+when available, above the first Chapter. A diagram links its parts to Chapters and the code behind them.
 _Avoid_: Overview (the PR's Overview tab is a different place)
 
 **Chapter**:
@@ -236,14 +236,12 @@ but not to continue. The Global conversation that follows doesn't see it. Its id
 the pi session it ran in, which is the one place "session" belongs.
 _Avoid_: Session (in UI copy), history, archived chat
 
-**Report**:
-A Turn Glass starts in the Global conversation, without a message from the user, once work it
-started finishes, fails, or waits on a Permission request or Question. Work that reaches its outcome
-while the conversation is busy waits, and goes out together in one Report once nothing runs or is
-Queued. An Agent the user stopped isn't reported. The conversation says what happened in terms of
-what the user asked, offers a next step, and acts on nothing until the user says so. A reported Agent
-Turn or finished Agent review leaves Needs you, without the review being marked done.
-_Avoid_: Notification, event, wake-up
+**Global conversation update**:
+A Turn Glass starts in the Global conversation to tell the user about work it started or messaged
+that finished, failed, or needs their input, combining pending outcomes once the conversation is idle.
+It offers a next step without acting until the user says so, and clears completed work from Needs you
+without marking an Agent review done; an Agent the user stopped is excluded.
+_Avoid_: Work update, Report, notification, event, wake-up
 
 **Agent program**:
 Claude Code or pi, the program an Agent runs. It decides which models and efforts the user can pick,
@@ -289,6 +287,13 @@ One message to an Agent and its whole response. It ends done, failed, stopped by
 when Glass loses the Agent, or interrupted when Glass quits; a Sandbox Agent's Turn carries on
 while Glass is closed.
 _Avoid_: Run, execution, exchange
+
+**Diagram**:
+A named Mermaid picture an Agent draws beside its conversation when the user asks for one, labeled
+as existing behavior, a proposed design, or an uncertain inference. Asking for changes redraws it
+under the same name; a version Glass can't draw leaves the last one in place. An Agent keeps its
+Diagrams with its Turns.
+_Avoid_: Artifact, chart, whiteboard
 
 **Queued message**:
 A message sent while a Turn runs, waiting to start the next Turn; the user can cancel it before then.
