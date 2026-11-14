@@ -84,6 +84,7 @@ export const useAgentReview = (
   const current = review !== null && Equal.equals(review.revision, revision) ? review : null
 
   return {
+    known: AsyncResult.isNotInitial(state),
     job: latest?.job ?? null,
     review,
     current,

@@ -271,8 +271,7 @@ it("restores a later Chapter and file when the saved Tour arrives after the work
 
   await user.click(await screen.findByRole("link", { name: /^Continue / }))
   const watch = await next(watches)
-  await screen.findByRole("tabpanel", { name: "Changes" })
-  expect(screen.queryByLabelText("Tour Chapters")).toBeNull()
+  expect(screen.queryByRole("tabpanel", { name: "Changes" })).toBeNull()
 
   await act(async () =>
     watch.answer(

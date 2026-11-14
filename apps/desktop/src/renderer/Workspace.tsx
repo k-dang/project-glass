@@ -369,6 +369,7 @@ export function Workspace(props: {
   }
 
   const reviewShown = inChanges && reviewOpen
+  const layoutKnown = tour.known && agentReview.known
 
   const agentWork = (
     <AgentWork
@@ -459,163 +460,141 @@ export function Workspace(props: {
       )}
       <ProblemBanner problem={fullFiles.problem} />
       <ViewedFilesProblem store={props.viewedFiles} onReload={props.onReload} />
-      <div className="flex min-h-0 flex-1">
-        <aside
-          id={filePanelId}
-          className={cn(
-            "flex w-80 shrink-0 flex-col border-r",
-            (!filePanelOpen || tab === "files" || tourInChanges) && "hidden",
-          )}
-        >
-          <Tabs value={panelTab} onValueChange={setPanelTab} className="min-h-0 flex-1 gap-0">
-            <FilePanelTabsList>
-              <FilePanelTabTrigger value="tree" icon={FolderTree}>
-                Tree
-              </FilePanelTabTrigger>
-              <FilePanelTabTrigger value="notes" icon={MessageCircle}>
-                Notes
-                {noteCount > 0 && (
-                  <span className="text-xs text-muted-foreground tabular-nums">{noteCount}</span>
+      {layoutKnown && (
+        <div className="flex min-h-0 flex-1">
+          <aside
+            id={filePanelId}
+            className={cn(
+              "flex w-80 shrink-0 flex-col border-r",
+              (!filePanelOpen || tab === "files" || tourInChanges) && "hidden",
+            )}
+          >
+            <Tabs value={panelTab} onValueChange={setPanelTab} className="min-h-0 flex-1 gap-0">
+              <FilePanelTabsList>
+                <FilePanelTabTrigger value="tree" icon={FolderTree}>
+                  Tree
+                </FilePanelTabTrigger>
+                <FilePanelTabTrigger value="notes" icon={MessageCircle}>
+                  Notes
+                  {noteCount > 0 && (
+                    <span className="text-xs text-muted-foreground tabular-nums">{noteCount}</span>
+                  )}
+                </FilePanelTabTrigger>
+                <FilePanelTabTrigger value="tour" icon={Route}>
+                  Tour
+                </FilePanelTabTrigger>
+              </FilePanelTabsList>
+              <TabsContent value="tree" keepMounted className="flex min-h-0 flex-col">
+                {files.length === 0 ? (
+                  <p className="px-4 py-6 text-sm text-muted-foreground">No files changed.</p>
+                ) : (
+                  <ChangedFilesTree
+                    key={revisionKey}
+                    layout={layout}
+                    onSelect={showFile}
+                    viewedFiles={viewedInTree}
+                  />
                 )}
-              </FilePanelTabTrigger>
-              <FilePanelTabTrigger value="tour" icon={Route}>
-                Tour
-              </FilePanelTabTrigger>
-            </FilePanelTabsList>
-            <TabsContent value="tree" keepMounted className="flex min-h-0 flex-col">
-              {files.length === 0 ? (
-                <p className="px-4 py-6 text-sm text-muted-foreground">No files changed.</p>
-              ) : (
-                <ChangedFilesTree
-                  key={revisionKey}
-                  layout={layout}
-                  onSelect={showFile}
-                  viewedFiles={viewedInTree}
+              </TabsContent>
+              <TabsContent value="notes" className="flex min-h-0 flex-col">
+                <NotesList
+                  paths={layout.tree.paths}
+                  discussions={discussions.onLines}
+                  drafts={drafts}
+                  show={show}
                 />
-              )}
-            </TabsContent>
-            <TabsContent value="notes" className="flex min-h-0 flex-col">
-              <NotesList
-                paths={layout.tree.paths}
-                discussions={discussions.onLines}
-                drafts={drafts}
-                show={show}
-              />
-            </TabsContent>
-            <TabsContent value="tour" className="flex min-h-0 flex-col">
-              <TourSidebar
-                tour={tour}
-                reading={reading}
-                viewedFiles={props.viewedFiles}
-                onShowChapter={openChapter}
-                onStartReading={startReading}
-              />
-            </TabsContent>
-          </Tabs>
-          <details open className="group/stats mx-3 shrink-0 border-t pb-2">
-            <summary className="flex cursor-pointer list-none items-center gap-2 py-3 text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden">
-              <ChevronRight aria-hidden className="size-3 group-open/stats:rotate-90" />
-              <FileDiff aria-hidden className="size-3.5" />
-              Diff stats
-            </summary>
-            <table className="w-full text-xs" aria-label="Diff stats for this Revision">
-              <tbody>
-                <tr className="border-t">
-                  <th scope="row" className="py-1.5 text-left font-normal text-muted-foreground">
-                    Files
-                  </th>
-                  <td className="text-right font-mono tabular-nums">
-                    {files.length.toLocaleString()}
-                  </td>
-                </tr>
-                <tr className="border-t">
-                  <th scope="row" className="py-1.5 text-left font-normal text-muted-foreground">
-                    Additions
-                  </th>
-                  <td className="text-right font-mono text-added tabular-nums">
-                    {additions.toLocaleString()}
-                  </td>
-                </tr>
-                <tr className="border-t">
-                  <th scope="row" className="py-1.5 text-left font-normal text-muted-foreground">
-                    Deletions
-                  </th>
-                  <td className="text-right font-mono text-deleted tabular-nums">
-                    {deletions.toLocaleString()}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </details>
-        </aside>
-        <TabsContent value="overview" keepMounted className="flex min-h-0 min-w-0 flex-col">
-          <div className="flex items-center gap-1 px-6 py-2 text-sm text-muted-foreground">
-            {filePanelToggle}
-            <span>PR overview</span>
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]">
-            <div className="flex flex-col gap-8 px-6 py-8">
-              <AgentReviewCard
-                controls={agentReview}
-                onRead={readAgentReview}
-                onReadHotspot={showInReview}
-              />
-              <Description html={pullRequest.descriptionHtml} />
-              <DraftList store={drafts} onShow={(draft) => showDraft(show, draft)} />
-              <Timeline items={discussions.timeline} reactions={reactions} />
-              <OutdatedDiscussions
-                discussions={discussions.outdated}
-                replies={replies}
-                resolutions={resolutions}
-                reactions={reactions}
-              />
+              </TabsContent>
+              <TabsContent value="tour" className="flex min-h-0 flex-col">
+                <TourSidebar
+                  tour={tour}
+                  reading={reading}
+                  viewedFiles={props.viewedFiles}
+                  onShowChapter={openChapter}
+                  onStartReading={startReading}
+                />
+              </TabsContent>
+            </Tabs>
+            <details open className="group/stats mx-3 shrink-0 border-t pb-2">
+              <summary className="flex cursor-pointer list-none items-center gap-2 py-3 text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden">
+                <ChevronRight aria-hidden className="size-3 group-open/stats:rotate-90" />
+                <FileDiff aria-hidden className="size-3.5" />
+                Diff stats
+              </summary>
+              <table className="w-full text-xs" aria-label="Diff stats for this Revision">
+                <tbody>
+                  <tr className="border-t">
+                    <th scope="row" className="py-1.5 text-left font-normal text-muted-foreground">
+                      Files
+                    </th>
+                    <td className="text-right font-mono tabular-nums">
+                      {files.length.toLocaleString()}
+                    </td>
+                  </tr>
+                  <tr className="border-t">
+                    <th scope="row" className="py-1.5 text-left font-normal text-muted-foreground">
+                      Additions
+                    </th>
+                    <td className="text-right font-mono text-added tabular-nums">
+                      {additions.toLocaleString()}
+                    </td>
+                  </tr>
+                  <tr className="border-t">
+                    <th scope="row" className="py-1.5 text-left font-normal text-muted-foreground">
+                      Deletions
+                    </th>
+                    <td className="text-right font-mono text-deleted tabular-nums">
+                      {deletions.toLocaleString()}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </details>
+          </aside>
+          <TabsContent value="overview" keepMounted className="flex min-h-0 min-w-0 flex-col">
+            <div className="flex items-center gap-1 px-6 py-2 text-sm text-muted-foreground">
+              {filePanelToggle}
+              <span>PR overview</span>
             </div>
-          </div>
-        </TabsContent>
-        <TabsContent value="changes" className="flex min-w-0 flex-col">
-          <ChangesToolbar
-            filePanelToggle={tourInChanges ? null : filePanelToggle}
-            fileCount={files.length}
-            viewedCount={viewed.viewed.size}
-            display={display}
-            onDisplayChange={setDisplay}
-            all={all}
-            onAllChange={showAll}
-            tourOrder={reading === null ? null : { current: chosenOrder, onChange: showOrder }}
-            fullScreen={{ on: fullScreen, onChange: setFullScreen }}
-            agentWork={fullScreen && agentWork}
-          />
-          {tourShown !== null ? (
-            <TourView
-              key={revisionKey}
-              initialPath={currentPath}
-              ref={tourView}
-              reading={tourShown}
-              onShowInReview={showInReview}
-              lowAttention={lowAttention}
-              discussions={discussions.onLines}
-              drafts={drafts}
-              asks={asks}
-              replies={replies}
-              resolutions={resolutions}
-              reactions={reactions}
-              onReload={props.onReload}
-              viewedFiles={props.viewedFiles}
-              onViewedChange={setViewed}
+            <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]">
+              <div className="flex flex-col gap-8 px-6 py-8">
+                <AgentReviewCard
+                  controls={agentReview}
+                  onRead={readAgentReview}
+                  onReadHotspot={showInReview}
+                />
+                <Description html={pullRequest.descriptionHtml} />
+                <DraftList store={drafts} onShow={(draft) => showDraft(show, draft)} />
+                <Timeline items={discussions.timeline} reactions={reactions} />
+                <OutdatedDiscussions
+                  discussions={discussions.outdated}
+                  replies={replies}
+                  resolutions={resolutions}
+                  reactions={reactions}
+                />
+              </div>
+            </div>
+          </TabsContent>
+          <TabsContent value="changes" className="flex min-w-0 flex-col">
+            <ChangesToolbar
+              filePanelToggle={tourInChanges ? null : filePanelToggle}
+              fileCount={files.length}
+              viewedCount={viewed.viewed.size}
               display={display}
-              loadDiffFiles={fullFiles.loadDiffFiles}
-              opened={opened}
+              onDisplayChange={setDisplay}
               all={all}
-              onOpenChange={setFileOpen}
-              onCurrentPathChange={setCurrentPath}
+              onAllChange={showAll}
+              tourOrder={reading === null ? null : { current: chosenOrder, onChange: showOrder }}
+              fullScreen={{ on: fullScreen, onChange: setFullScreen }}
+              agentWork={fullScreen && agentWork}
             />
-          ) : (
-            files.length > 0 && (
-              <ChangedFilesView
+            {tourShown !== null ? (
+              <TourView
                 key={revisionKey}
                 initialPath={currentPath}
-                ref={view}
-                files={shown}
+                ref={tourView}
+                reading={tourShown}
+                onShowInReview={showInReview}
+                lowAttention={lowAttention}
                 discussions={discussions.onLines}
                 drafts={drafts}
                 asks={asks}
@@ -631,42 +610,66 @@ export function Workspace(props: {
                 all={all}
                 onOpenChange={setFileOpen}
                 onCurrentPathChange={setCurrentPath}
-                summaries={null}
-                lowAttention={lowAttention}
               />
-            )
+            ) : (
+              files.length > 0 && (
+                <ChangedFilesView
+                  key={revisionKey}
+                  initialPath={currentPath}
+                  ref={view}
+                  files={shown}
+                  discussions={discussions.onLines}
+                  drafts={drafts}
+                  asks={asks}
+                  replies={replies}
+                  resolutions={resolutions}
+                  reactions={reactions}
+                  onReload={props.onReload}
+                  viewedFiles={props.viewedFiles}
+                  onViewedChange={setViewed}
+                  display={display}
+                  loadDiffFiles={fullFiles.loadDiffFiles}
+                  opened={opened}
+                  all={all}
+                  onOpenChange={setFileOpen}
+                  onCurrentPathChange={setCurrentPath}
+                  summaries={null}
+                  lowAttention={lowAttention}
+                />
+              )
+            )}
+          </TabsContent>
+          {reviewShown && agentReview.review !== null && (
+            <AgentReviewSidePanel onClose={() => setReviewOpen(false)}>
+              <AgentReviewPanel
+                review={agentReview.review}
+                controls={agentReview}
+                drafts={drafts}
+                show={show}
+                hotspotLinks={{
+                  onShowPlace: (place) => showPlace(place),
+                  chapterOf: (rank) =>
+                    reading?.hotspots?.find((entry) => entry.rank === rank)?.chapter ?? null,
+                  onShowInTour: (place) => showPlace(place, "tour"),
+                  focus: hotspotFocus,
+                }}
+              />
+            </AgentReviewSidePanel>
           )}
-        </TabsContent>
-        {reviewShown && agentReview.review !== null && (
-          <AgentReviewSidePanel onClose={() => setReviewOpen(false)}>
-            <AgentReviewPanel
-              review={agentReview.review}
-              controls={agentReview}
-              drafts={drafts}
-              show={show}
-              hotspotLinks={{
-                onShowPlace: (place) => showPlace(place),
-                chapterOf: (rank) =>
-                  reading?.hotspots?.find((entry) => entry.rank === rank)?.chapter ?? null,
-                onShowInTour: (place) => showPlace(place, "tour"),
-                focus: hotspotFocus,
-              }}
-            />
-          </AgentReviewSidePanel>
-        )}
-        <TabsContent value="files" keepMounted className="flex min-w-0">
-          {browsed && (
-            <RepositoryBrowser
-              key={revisionKey}
-              pullRequest={pullRequest.ref}
-              revision={revision}
-              changedFiles={files}
-              path={repositoryFile}
-              onSelect={(path) => setView((previous) => ({ ...previous, repositoryFile: path }))}
-            />
-          )}
-        </TabsContent>
-      </div>
+          <TabsContent value="files" keepMounted className="flex min-w-0">
+            {browsed && (
+              <RepositoryBrowser
+                key={revisionKey}
+                pullRequest={pullRequest.ref}
+                revision={revision}
+                changedFiles={files}
+                path={repositoryFile}
+                onSelect={(path) => setView((previous) => ({ ...previous, repositoryFile: path }))}
+              />
+            )}
+          </TabsContent>
+        </div>
+      )}
     </Tabs>
   )
 }

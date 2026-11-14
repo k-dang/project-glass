@@ -4,6 +4,7 @@ import { vi } from "vite-plus/test"
 import type { AgentReviewControls } from "../src/renderer/useAgentReview"
 
 export const controls = (overrides: Partial<AgentReviewControls>): AgentReviewControls => ({
+  known: true,
   job: { status: "idle" },
   review: null,
   current: null,
