@@ -59,11 +59,18 @@ import {
   useState,
 } from "react"
 import { mermaid } from "@streamdown/mermaid"
-import { Streamdown } from "streamdown"
+import { type Components, defaultComponents, Streamdown } from "streamdown"
 import { Button } from "@/components/ui/button"
 import { Kbd } from "@/components/ui/kbd"
 import { Bubble, BubbleContent } from "@/components/ui/bubble"
-import { CodeBlock, CodeBlockContent } from "@/components/ui/code-block"
+import {
+  CodeBlock,
+  CodeBlockActions,
+  CodeBlockContent,
+  CodeBlockCopyButton,
+  CodeBlockLine,
+} from "@/components/ui/code-block"
+import { useHighlightedCode } from "@/hooks/use-highlighted-code"
 import { Message, MessageContent, MessageGroup } from "@/components/ui/message"
 import {
   MessageScroller,
@@ -668,11 +675,45 @@ const toolStatus = {
 
 const markdownPlugins = { mermaid }
 
+function FencedCode(props: { code: string; language: string }) {
+  const lines = useHighlightedCode(props.code, props.language)
+
+  return (
+    <CodeBlock size="sm">
+      <CodeBlockActions>
+        <CodeBlockCopyButton value={props.code} />
+      </CodeBlockActions>
+      <CodeBlockContent>
+        {lines.map((line, index) => (
+          <CodeBlockLine key={index}>{line}</CodeBlockLine>
+        ))}
+      </CodeBlockContent>
+    </CodeBlock>
+  )
+}
+
+const markdownComponents: Components = {
+  code: (props) => {
+    const language = /language-(\S+)/.exec(props.className ?? "")?.[1] ?? ""
+
+    return "data-block" in props && language !== "mermaid" && Predicate.isString(props.children) ? (
+      <FencedCode code={props.children} language={language} />
+    ) : (
+      <defaultComponents.code {...props} />
+    )
+  },
+}
+
 function AgentMarkdown(props: { text: string }) {
   const theme = useDarkColorScheme() ? "dark" : "default"
 
   return (
-    <Streamdown className="text-sm" plugins={markdownPlugins} mermaid={{ config: { theme } }}>
+    <Streamdown
+      className="text-sm"
+      plugins={markdownPlugins}
+      components={markdownComponents}
+      mermaid={{ config: { theme } }}
+    >
       {props.text}
     </Streamdown>
   )
