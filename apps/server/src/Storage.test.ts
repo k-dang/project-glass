@@ -6,7 +6,18 @@ it.live("measures the database by table, counting each index toward its table", 
   Effect.scoped(
     Effect.gen(function* () {
       const { client } = yield* startBackend({})
-      yield* client.AddToDo({ title: "Measure storage", notes: "" })
+      yield* client.AddToDo({
+        title: "Measure storage",
+        notes: "",
+        images: [
+          {
+            mediaType: "image/png",
+            data: "AQIDBA==",
+            thumbnail: "BQYH",
+            thumbnailMediaType: "image/png",
+          },
+        ],
+      })
 
       const items = yield* client.GetStorageBreakdown()
 
@@ -18,6 +29,8 @@ it.live("measures the database by table, counting each index toward its table", 
       const bytesOf = (item: string) => items.find(({ name }) => name === item)?.bytes ?? 0
 
       assert.isAbove(bytesOf("to_do"), 0)
+      assert.isAbove(bytesOf("To-do images"), 0)
+      assert.equal(items.find(({ name }) => name === "To-do images")?.group, "toDos")
       assert.isAbove(bytesOf("sqlite_schema"), 0)
       assert.isAbove(bytesOf("activity"), bytesOf("to_do"))
       assert.isEmpty(items.filter(({ name }) => /^(activity_login_|sqlite_autoindex_)/.test(name)))

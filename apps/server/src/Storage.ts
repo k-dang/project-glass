@@ -1,6 +1,7 @@
 import { type StorageGroup, StorageError, StorageItem } from "@glass/contracts"
 import { Context, Effect, FileSystem, Layer, Schema } from "effect"
 import { Worker } from "node:worker_threads"
+import { join } from "node:path"
 import { databaseFile } from "./Database"
 import { bundledEntry } from "./processes"
 import { ServerConfig } from "./ServerConfig"
@@ -45,6 +46,7 @@ const groupOfItem = new Map<string, StorageGroup>([
   ["activity", "activity"],
   ["to_do", "toDos"],
   ["to_do_image", "toDos"],
+  ["To-do images", "toDos"],
   [FREE_SPACE, "overhead"],
   [WRITE_AHEAD_LOG, "overhead"],
 ])
@@ -91,9 +93,25 @@ export class Storage extends Context.Service<
           { concurrency: "unbounded" },
         )
 
+        const imageNames = yield* fs
+          .readDirectory(join(dataDirectory, "to-do-images"))
+          .pipe(Effect.orElseSucceed(() => []))
+
+        const imageBytes = sumBytes(
+          yield* Effect.forEach(
+            imageNames,
+            (name) => fileBytes(join(dataDirectory, "to-do-images", name)),
+            { concurrency: "unbounded" },
+          ),
+        )
+
         const logBytes = sumBytes(fileSizes) - sumBytes(measured.map(({ bytes }) => bytes))
 
-        return [...measured, { name: WRITE_AHEAD_LOG, bytes: Math.max(logBytes, 0) }].map(
+        return [
+          ...measured,
+          { name: WRITE_AHEAD_LOG, bytes: Math.max(logBytes, 0) },
+          { name: "To-do images", bytes: imageBytes },
+        ].map(
           ({ name, bytes }) =>
             new StorageItem({ name, bytes, group: groupOfItem.get(name) ?? "internals" }),
         )

@@ -6,6 +6,13 @@ const isImageMediaType = Schema.is(ImageMediaType)
 
 const thumbnailEdge = 320
 
+export const maxToDoImageBytes = 32 * 1024 * 1024
+
+const fallbackThumbnail = {
+  mediaType: "image/png" as const,
+  data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+}
+
 export const imageFiles = (data: DataTransfer | null) =>
   Array.from(data?.files ?? []).filter((file) => isImageMediaType(file.type))
 
@@ -23,15 +30,10 @@ export const readImages = async (files: Iterable<File>) => {
   return read.filter(Predicate.isNotNull)
 }
 
-const thumbnailOf = async (
-  file: File,
-  bytes: Uint8Array,
-  mediaType: ImageMediaType,
-): Promise<{ mediaType: ImageMediaType; data: string }> => {
-  const original = { mediaType, data: Base64.encode(bytes) }
+const thumbnailOf = async (file: File): Promise<{ mediaType: ImageMediaType; data: string }> => {
   const createBitmap = globalThis.createImageBitmap
 
-  if (createBitmap === undefined) return original
+  if (createBitmap === undefined) return fallbackThumbnail
 
   try {
     const bitmap = await createBitmap(file)
@@ -46,7 +48,7 @@ const thumbnailOf = async (
     if (context === null) {
       bitmap.close()
 
-      return original
+      return fallbackThumbnail
     }
 
     context.drawImage(bitmap, 0, 0, width, height)
@@ -54,32 +56,40 @@ const thumbnailOf = async (
     const url = canvas.toDataURL("image/png")
     const data = url.slice(url.indexOf(",") + 1)
 
-    return data === "" ? original : { mediaType: "image/png", data }
+    return data === "" ? fallbackThumbnail : { mediaType: "image/png", data }
   } catch {
-    return original
+    return fallbackThumbnail
   }
 }
 
-export const readToDoImages = async (files: Iterable<File>): Promise<Array<ToDoImageUpload>> => {
+export const readToDoImages = async (files: Iterable<File>) => {
   const accepted = Array.from(files).flatMap((file) => {
     const mediaType = file.type
 
     return isImageMediaType(mediaType) ? [{ file, mediaType }] : []
   })
 
-  return Promise.all(
-    accepted.map(async ({ file, mediaType }) => {
-      const bytes = new Uint8Array(await file.arrayBuffer())
-      const thumbnail = await thumbnailOf(file, bytes, mediaType)
+  const rejected = accepted
+    .filter(({ file }) => file.size > maxToDoImageBytes)
+    .map(({ file }) => file.name)
 
-      return {
-        mediaType,
-        data: Base64.encode(bytes),
-        thumbnail: thumbnail.data,
-        thumbnailMediaType: thumbnail.mediaType,
-      }
-    }),
+  const images = await Promise.all(
+    accepted
+      .filter(({ file }) => file.size <= maxToDoImageBytes)
+      .map(async ({ file, mediaType }) => {
+        const bytes = new Uint8Array(await file.arrayBuffer())
+        const thumbnail = await thumbnailOf(file)
+
+        return {
+          mediaType,
+          data: Base64.encode(bytes),
+          thumbnail: thumbnail.data,
+          thumbnailMediaType: thumbnail.mediaType,
+        } satisfies ToDoImageUpload
+      }),
   )
+
+  return { images, rejected }
 }
 
 export const imageSrc = (mediaType: string, data: string) => `data:${mediaType};base64,${data}`

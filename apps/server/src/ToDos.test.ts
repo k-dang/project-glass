@@ -2,7 +2,7 @@ import { assert, it } from "@effect/vitest"
 import { ToDo, ToDoError, type ToDoImageUpload } from "@glass/contracts"
 import { Effect, Result } from "effect"
 import { Base64 } from "effect/encoding"
-import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises"
+import { chmod, mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { DatabaseSync } from "node:sqlite"
 import { isolatedHome, startBackend } from "../test/harness"
@@ -94,9 +94,15 @@ const imageRows = (home: string) =>
     const db = new DatabaseSync(join(home, ".project-glass", "glass.db"), { readOnly: true })
 
     try {
-      const rows = db.prepare("SELECT id, to_do_id, media_type FROM to_do_image ORDER BY id").all()
-
-      return rows
+      return db
+        .prepare("SELECT id, to_do_id, file_name, media_type FROM to_do_image ORDER BY id")
+        .all()
+        .map((row) => ({
+          id: Number(row.id),
+          to_do_id: Number(row.to_do_id),
+          file_name: String(row.file_name),
+          media_type: String(row.media_type),
+        }))
     } finally {
       db.close()
     }
@@ -131,9 +137,15 @@ it.live("keeps pasted images with a to-do until they are removed or the to-do is
             ],
           }),
         ])
-        assert.deepStrictEqual(yield* bytesOf(home, "1"), Buffer.from(decoded(png)))
+        const stored = yield* imageRows(home)
+        const firstFile = stored.find((row) => row.id === 1)?.file_name
+
+        if (firstFile === undefined) throw new Error("missing image file")
+
+        assert.notEqual(firstFile, "1")
+        assert.deepStrictEqual(yield* bytesOf(home, firstFile), Buffer.from(decoded(png)))
         assert.deepStrictEqual(
-          yield* bytesOf(home, "1.thumb"),
+          yield* bytesOf(home, `${firstFile}.thumb`),
           Buffer.from(decoded(first.thumbnail)),
         )
         assert.deepStrictEqual(yield* client.ReadToDoImage({ id: 1, size: "full" }), {
@@ -154,21 +166,26 @@ it.live("keeps pasted images with a to-do until they are removed or the to-do is
           [1, 2, 3],
         )
 
+        const removedFile = (yield* imageRows(home)).find((row) => row.id === 2)?.file_name
         const removed = yield* client.RemoveToDoImage({ id: 2 })
         assert.deepStrictEqual(
           removed[0]?.images.map(({ id }) => id),
           [1, 3],
         )
+        assert.equal(removedFile === undefined, false)
         assert.deepStrictEqual(
-          (yield* filesIn(home)).filter((name) => name.startsWith("2")),
+          (yield* filesIn(home)).filter((name) => name.startsWith(removedFile ?? "")),
           [],
         )
       }),
     )
 
+    yield* Effect.promise(() => writeFile(join(imageDir(home), "leftover"), "stale"))
+
     yield* Effect.scoped(
       Effect.gen(function* () {
         const { client } = yield* startBackend({}, home)
+        assert.equal((yield* filesIn(home)).includes("leftover"), false)
         assert.deepStrictEqual(
           (yield* client.ListToDos())[0]?.images.map(({ id }) => id),
           [1, 3],
@@ -212,5 +229,51 @@ it.live("leaves no image files when saving a to-do with images fails", () =>
     assert.deepStrictEqual(yield* client.ListToDos(), [toDo(1, "Keep me")])
     assert.isTrue((yield* Effect.promise(() => stat(join(directory, "to-do-images")))).isFile())
     assert.deepStrictEqual(yield* imageRows(home), [])
+  }),
+)
+
+it.live("still deletes a to-do when an image file cannot be removed", () =>
+  Effect.gen(function* () {
+    const home = yield* isolatedHome
+
+    const { client } = yield* startBackend({}, home)
+    yield* client.AddToDo({
+      title: "Screenshot the dialog",
+      notes: "",
+      images: [shot("AQIDBA==")],
+    })
+
+    const stored = yield* imageRows(home)
+    const fileName = stored[0]?.file_name
+
+    if (fileName === undefined) throw new Error("missing image file")
+
+    yield* Effect.promise(() => chmod(imageDir(home), 0o555))
+
+    const removed = yield* client
+      .DeleteToDo({ id: 1 })
+      .pipe(Effect.ensuring(Effect.promise(() => chmod(imageDir(home), 0o755))))
+
+    assert.deepStrictEqual(removed, [])
+    assert.deepStrictEqual(yield* imageRows(home), [])
+    assert.equal((yield* filesIn(home)).includes(fileName), true)
+
+    const again = yield* client.AddToDo({
+      title: "Next",
+      notes: "",
+      images: [{ ...shot("AQID"), data: "BQYH" }],
+    })
+
+    const created = again[0]?.images[0]
+
+    if (created === undefined) throw new Error("missing image")
+
+    const replacement = (yield* imageRows(home)).find((row) => row.id === created.id)
+
+    assert.notEqual(replacement?.file_name, fileName)
+    assert.deepStrictEqual(yield* client.ReadToDoImage({ id: created.id, size: "full" }), {
+      mediaType: "image/png",
+      data: "BQYH",
+    })
   }),
 )

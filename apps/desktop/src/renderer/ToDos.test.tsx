@@ -13,6 +13,7 @@ import { Effect } from "effect"
 import { afterEach, expect, it } from "vite-plus/test"
 import { App } from "./App"
 import { backendLayerAtom } from "./backend"
+import { maxToDoImageBytes } from "./pastedImages"
 import { type Handlers, type Held, hold, next, testLayer } from "../../test/testBackend"
 
 const mount = (handlers: Parameters<typeof testLayer>[0]) => {
@@ -327,7 +328,16 @@ const pasteImage = async (user: ReturnType<typeof userEvent.setup>, name = "pixe
 it("adds a to-do with pasted images and can drop one before saving", async () => {
   const adds: Array<Held<Parameters<Handlers["AddToDo"]>[0], ReadonlyArray<ToDo>, ToDoError>> = []
 
-  const user = mount({ ListToDos: () => Effect.succeed([]), AddToDo: hold(adds) })
+  const attaches: Array<
+    Held<Parameters<Handlers["AttachToDoImages"]>[0], ReadonlyArray<ToDo>, ToDoError>
+  > = []
+
+  const user = mount({
+    ListToDos: () => Effect.succeed([]),
+    AddToDo: hold(adds),
+    AttachToDoImages: hold(attaches),
+  })
+
   const form = within(await screen.findByRole("form", { name: "Add a to-do" }))
   const title = form.getByRole("textbox", { name: "New to-do" })
 
@@ -343,42 +353,21 @@ it("adds a to-do with pasted images and can drop one before saving", async () =>
   await user.type(title, "Screenshot the dialog")
   await user.click(form.getByRole("button", { name: "Add" }))
   const add = await next(adds)
-  const images = add.payload.images ?? []
   expect(add.payload.title).toBe("Screenshot the dialog")
+  expect(add.payload.images ?? []).toEqual([])
+  add.answer(
+    Effect.succeed([
+      new ToDo({ id: 1, title: "Screenshot the dialog", notes: "", done: false, images: [] }),
+    ]),
+  )
+
+  const attach = await next(attaches)
+  const images = attach.payload.images ?? []
+  expect(attach.payload.id).toBe(1)
   expect(images).toHaveLength(1)
   expect(images[0]?.mediaType).toBe("image/png")
   expect(images[0]?.data.length).toBeGreaterThan(0)
-  expect(images[0]?.thumbnail.length).toBeGreaterThan(0)
-})
-
-it("pastes an image onto an existing to-do, opens it, and removes it", async () => {
-  const user = mount(fakeToDos())
-  const page = await screen.findByRole("main", { name: "To-dos" })
-  const title = within(page).getByRole("textbox", { name: "New to-do" })
-  await user.type(title, "Screenshot the dialog{Enter}")
-  const open = await within(page).findByRole("list", { name: "Open to-dos" })
-  const row = within(open).getByText("Screenshot the dialog")
-
-  await user.click(row)
-  await pasteImage(user)
-
-  const opener = await within(open).findByRole("button", {
-    name: "Open image 1 of Screenshot the dialog",
-  })
-
-  await user.click(opener)
-  expect(await screen.findByRole("dialog")).toBeTruthy()
-  expect(screen.getByRole("heading", { name: "Image 1" })).toBeTruthy()
-  await user.keyboard("{Escape}")
-
-  await user.click(
-    within(open).getByRole("button", { name: "Remove image 1 of Screenshot the dialog" }),
-  )
-  await waitFor(() =>
-    expect(
-      within(open).queryByRole("button", { name: "Open image 1 of Screenshot the dialog" }),
-    ).toBeNull(),
-  )
+  expect(images[0]?.thumbnail).not.toBe(images[0]?.data)
 })
 
 it("sends each pasted image in its own message", async () => {
@@ -427,4 +416,127 @@ it("sends each pasted image in its own message", async () => {
   expect(second.payload.id).toBe(4)
   expect(second.payload.images).toHaveLength(1)
   expect(attaches).toHaveLength(0)
+})
+
+it("keeps an image that failed to attach and retries it on the same to-do", async () => {
+  const adds: Array<Held<Parameters<Handlers["AddToDo"]>[0], ReadonlyArray<ToDo>, ToDoError>> = []
+
+  const attaches: Array<
+    Held<Parameters<Handlers["AttachToDoImages"]>[0], ReadonlyArray<ToDo>, ToDoError>
+  > = []
+
+  const user = mount({
+    ListToDos: () => Effect.succeed([]),
+    AddToDo: hold(adds),
+    AttachToDoImages: hold(attaches),
+  })
+
+  const form = within(await screen.findByRole("form", { name: "Add a to-do" }))
+  const title = form.getByRole("textbox", { name: "New to-do" })
+
+  await user.click(title)
+  await pasteImage(user)
+  await user.type(title, "Retry the shot")
+  await user.click(form.getByRole("button", { name: "Add" }))
+
+  const add = await next(adds)
+  add.answer(
+    Effect.succeed([
+      new ToDo({ id: 4, title: "Retry the shot", notes: "", done: false, images: [] }),
+    ]),
+  )
+
+  const failed = await next(attaches)
+  expect(failed.payload.images).toHaveLength(1)
+  failed.answer(Effect.fail(new ToDoError({ message: "Couldn't save your to-do. Try again." })))
+
+  expect(await form.findByText("Couldn't save every image. Try again.")).toBeTruthy()
+  expect(form.getByRole("button", { name: "Open image 1" })).toBeTruthy()
+  await user.click(form.getByRole("button", { name: "Try again" }))
+
+  const retry = await next(attaches)
+  expect(retry.payload.id).toBe(4)
+  expect(retry.payload.images).toHaveLength(1)
+  expect(adds).toHaveLength(0)
+})
+
+it("tells you when a pasted image is too big to send and keeps the smaller ones", async () => {
+  const user = mount({ ListToDos: () => Effect.succeed([]) })
+  const form = within(await screen.findByRole("form", { name: "Add a to-do" }))
+  const huge = new File([pixel], "huge.png", { type: "image/png" })
+  Object.defineProperty(huge, "size", { value: maxToDoImageBytes + 1 })
+  const clipboard = new DataTransfer()
+  clipboard.items.add(huge)
+  clipboard.items.add(new File([pixel], "ok.png", { type: "image/png" }))
+
+  await user.click(form.getByRole("textbox", { name: "New to-do" }))
+  await user.paste(clipboard)
+
+  expect(await screen.findByText("huge.png is too big to attach")).toBeTruthy()
+  expect(form.getByRole("button", { name: "Open image 1" })).toBeTruthy()
+  expect(form.queryByRole("button", { name: "Open image 2" })).toBeNull()
+})
+
+it("keeps a paste made while another to-do change is saving", async () => {
+  const toDo = new ToDo({ id: 1, title: "Write release notes", notes: "", done: false })
+  const changes: Array<Held<{ id: number; done: boolean }, ReadonlyArray<ToDo>, ToDoError>> = []
+
+  const attaches: Array<
+    Held<Parameters<Handlers["AttachToDoImages"]>[0], ReadonlyArray<ToDo>, ToDoError>
+  > = []
+
+  const user = mount({
+    ListToDos: () => Effect.succeed([toDo]),
+    SetToDoDone: hold(changes),
+    AttachToDoImages: hold(attaches),
+  })
+
+  const open = await screen.findByRole("list", { name: "Open to-dos" })
+
+  await user.click(within(open).getByRole("checkbox", { name: toDo.title }))
+  const saving = await next(changes)
+  await user.click(within(open).getByText(toDo.title))
+  await pasteImage(user)
+
+  expect(
+    await within(open).findByRole("list", { name: "Images to save on Write release notes" }),
+  ).toBeTruthy()
+  expect(attaches).toHaveLength(0)
+
+  saving.answer(
+    Effect.succeed([new ToDo({ id: toDo.id, title: toDo.title, notes: toDo.notes, done: true })]),
+  )
+  const attach = await next(attaches)
+  expect(attach.payload.id).toBe(toDo.id)
+  expect(attach.payload.images).toHaveLength(1)
+})
+
+it("pastes an image onto an existing to-do, opens it, and removes it", async () => {
+  const user = mount(fakeToDos())
+  const page = await screen.findByRole("main", { name: "To-dos" })
+  const title = within(page).getByRole("textbox", { name: "New to-do" })
+  await user.type(title, "Screenshot the dialog{Enter}")
+  const open = await within(page).findByRole("list", { name: "Open to-dos" })
+  const row = within(open).getByText("Screenshot the dialog")
+
+  await user.click(row)
+  await pasteImage(user)
+
+  const opener = await within(open).findByRole("button", {
+    name: "Open image 1 of Screenshot the dialog",
+  })
+
+  await user.click(opener)
+  expect(await screen.findByRole("dialog")).toBeTruthy()
+  expect(screen.getByRole("heading", { name: "Image 1" })).toBeTruthy()
+  await user.keyboard("{Escape}")
+
+  await user.click(
+    within(open).getByRole("button", { name: "Remove image 1 of Screenshot the dialog" }),
+  )
+  await waitFor(() =>
+    expect(
+      within(open).queryByRole("button", { name: "Open image 1 of Screenshot the dialog" }),
+    ).toBeNull(),
+  )
 })

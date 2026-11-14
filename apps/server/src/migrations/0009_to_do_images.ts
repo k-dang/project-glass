@@ -8,6 +8,7 @@ export default Effect.gen(function* () {
     CREATE TABLE to_do_image (
       id INTEGER PRIMARY KEY,
       to_do_id INTEGER NOT NULL,
+      file_name TEXT NOT NULL UNIQUE,
       media_type TEXT NOT NULL,
       thumbnail_type TEXT NOT NULL,
       created_at TEXT NOT NULL
