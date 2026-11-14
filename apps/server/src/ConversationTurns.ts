@@ -19,7 +19,7 @@ import {
   TurnFailed,
   TurnInterrupted,
   TurnStopped,
-  type WorkReport,
+  type WorkUpdate,
 } from "@glass/contracts"
 import {
   Context,
@@ -95,7 +95,7 @@ export class ConversationTurns extends Context.Service<
       conversationId: string,
       effect: (
         start: (
-          report: WorkReport,
+          workUpdate: WorkUpdate,
           record: (turnId: string) => Effect.Effect<void, AgentError>,
         ) => Effect.Effect<void, AgentError>,
       ) => Effect.Effect<void, E>,
@@ -195,7 +195,7 @@ export class ConversationTurns extends Context.Service<
         prepare(conversation, sent).pipe(
           Effect.flatMap((prepared) => dispatch(conversation, turnId, prepared)),
           Effect.catch((error) =>
-            Predicate.isTagged(sent.context, "Report")
+            Predicate.isTagged(sent.context, "WorkUpdate")
               ? transcripts
                   .setStatus(conversation.id, hostFailure(error))
                   .pipe(Effect.as("pending" as const satisfies Delivery))
@@ -221,7 +221,7 @@ export class ConversationTurns extends Context.Service<
 
         const interruptedIds = yield* interrupted
 
-        const recovered = yield* transcripts.recoverReports(interruptedIds).pipe(Effect.orDie)
+        const recovered = yield* transcripts.recoverWorkUpdates(interruptedIds).pipe(Effect.orDie)
 
         yield* Stream.merge(Stream.fromIterable(recovered), started).pipe(
           Stream.runForEach(({ agentId, turnId, message, images, context, feedback }) =>
@@ -378,8 +378,8 @@ export class ConversationTurns extends Context.Service<
             Effect.gen(function* () {
               if (!(yield* transcripts.idle(conversationId))) return
 
-              yield* effect((report, record) =>
-                transcripts.startReport(conversationId, report, record),
+              yield* effect((workUpdate, record) =>
+                transcripts.startWorkUpdate(conversationId, workUpdate, record),
               )
             }),
           ),

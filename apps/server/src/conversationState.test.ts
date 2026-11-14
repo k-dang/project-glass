@@ -59,18 +59,18 @@ it("starts a Turn when idle and queues at the back while running", () => {
   })
 })
 
-it("starts a Report only after the running Turn and all Queued messages", () => {
-  const report = message("report")
+it("starts a Work update only after the running Turn and all Queued messages", () => {
+  const workUpdate = message("workUpdate")
 
   for (const state of [busy, idle])
-    assert.deepStrictEqual(stepConversation(state, { type: "report", message: report }), {
+    assert.deepStrictEqual(stepConversation(state, { type: "workUpdate", message: workUpdate }), {
       outcome: { type: "busy" },
       writes: [],
     })
 
   assert.deepStrictEqual(
-    stepConversation({ running: null, queued: [] }, { type: "report", message: report }),
-    { outcome: { type: "started" }, writes: [{ type: "startTurn", message: report }] },
+    stepConversation({ running: null, queued: [] }, { type: "workUpdate", message: workUpdate }),
+    { outcome: { type: "started" }, writes: [{ type: "startTurn", message: workUpdate }] },
   )
 })
 

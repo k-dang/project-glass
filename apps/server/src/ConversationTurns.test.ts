@@ -2,14 +2,14 @@ import { SqliteClient, SqliteMigrator } from "@effect/sql-sqlite-node"
 import { assert, it } from "@effect/vitest"
 import {
   AgentError,
-  AgentReported,
+  AgentOutcome,
   TurnDone,
   TurnCutOff,
   TurnInterrupted,
   TurnEnded,
   TurnFailed,
   TurnStopped,
-  WorkReport,
+  WorkUpdate,
 } from "@glass/contracts"
 import { DateTime, Deferred, Effect, Exit, Layer, Option, Schema, Scope, Stream } from "effect"
 import { eventually } from "../test/eventually"
@@ -42,9 +42,9 @@ const decodeLine = Schema.decodeUnknownSync(Schema.fromJsonString(UnitLine))
 
 const sent = (message: string) => ({ message, images: [], context: null })
 
-const report = WorkReport.make({
+const workUpdate = WorkUpdate.make({
   work: [
-    AgentReported.make({
+    AgentOutcome.make({
       agentId: "started",
       name: "Started",
       askedWith: "Build it",
@@ -138,7 +138,7 @@ it.live("fails a Turn whose program won't start, then starts the next queued mes
 )
 
 it.live(
-  "recovers the same saved Report before advancing Queued messages, and leaves a completed Report alone",
+  "recovers the same saved Work update before advancing Queued messages, and leaves a completed Work update alone",
   () =>
     Effect.gen(function* () {
       const transcripts = yield* Transcripts
@@ -146,7 +146,7 @@ it.live(
       let savedId = ""
 
       // No delivery subscriber exists when the transaction commits, as in a crash before dispatch.
-      yield* transcripts.startReport("agent-1", report, (turnId) =>
+      yield* transcripts.startWorkUpdate("agent-1", workUpdate, (turnId) =>
         Effect.sync(() => {
           savedId = turnId
         }),
@@ -178,15 +178,15 @@ it.live(
 )
 
 it.live(
-  "keeps a Report pending after a recovery read fails, then retries the same Turn on restart",
+  "keeps a Work update pending after a recovery read fails, then retries the same Turn on restart",
   () =>
     Effect.gen(function* () {
       const transcripts = yield* Transcripts
-      yield* transcripts.startReport("agent-1", report, () => Effect.void)
+      yield* transcripts.startWorkUpdate("agent-1", workUpdate, () => Effect.void)
       const savedId = yield* transcripts.runningTurn("agent-1")
       yield* transcripts.startOrQueue("agent-1", sent("After"))
       const firstScope = yield* Scope.make()
-      const reason = "Couldn't recover pi's Report. Restart Glass to try again."
+      const reason = "Couldn't recover pi's Work update. Restart Glass to try again."
 
       const first = yield* harness(
         () => Effect.void,

@@ -2,21 +2,23 @@ import type { SessionEntry } from "@earendil-works/pi-coding-agent"
 import { Predicate } from "effect"
 import type { PiEvent } from "./piRpc"
 
-export type ReportDelivery =
+export type WorkUpdateDelivery =
   | {
       readonly state: "pending" | "responding"
       readonly prompt: string
       readonly events: ReadonlyArray<PiEvent>
     }
-  | { readonly state: "reported"; readonly events: ReadonlyArray<PiEvent> }
+  | { readonly state: "completed"; readonly events: ReadonlyArray<PiEvent> }
 
-/** Uses the full saved branch, including messages before compaction, to find this Report. */
-export const reportDelivery = (
+/** Uses the full saved branch, including messages before compaction, to find this Work update. */
+export const workUpdateDelivery = (
   turnId: string,
   prompt: string,
   entries: ReadonlyArray<SessionEntry>,
-): ReportDelivery => {
-  const identity = `\n\n<glass_report_turn>${turnId}</glass_report_turn>`
+): WorkUpdateDelivery => {
+  const identity = `\n\n<glass_work_update_turn>${turnId}</glass_work_update_turn>`
+  // pi owns saved conversations, including Work updates accepted before the terminology changed.
+  const previousIdentity = `\n\n<glass_report_turn>${turnId}</glass_report_turn>`
   const omitted = new Set<string>()
 
   for (const entry of entries)
@@ -32,13 +34,15 @@ export const reportDelivery = (
   const accepted = messages.findIndex(
     (message) =>
       message.role === "user" &&
-      (Predicate.isString(message.content)
-        ? message.content
-        : message.content
-            .filter((block) => block.type === "text")
-            .map((block) => block.text)
-            .join("\n")
-      ).endsWith(identity),
+      [identity, previousIdentity].some((marker) =>
+        (Predicate.isString(message.content)
+          ? message.content
+          : message.content
+              .filter((block) => block.type === "text")
+              .map((block) => block.text)
+              .join("\n")
+        ).endsWith(marker),
+      ),
   )
 
   if (accepted === -1) return { state: "pending", prompt: prompt + identity, events: [] }
@@ -100,12 +104,12 @@ export const reportDelivery = (
     last?.role === "assistant" &&
     (last.stopReason === "stop" || last.stopReason === "length" || last.stopReason === "error")
   )
-    return { state: "reported", events }
+    return { state: "completed", events }
 
   return {
     state: "responding",
     prompt:
-      "Glass restarted while you were writing the Report above. Finish that Report using the saved conversation. Do not repeat what you already reported or take any action on the user's behalf.",
+      "Glass restarted while you were writing the Work update above. Finish that Work update using the saved conversation. Do not repeat what you already said or take any action on the user's behalf.",
     events,
   }
 }

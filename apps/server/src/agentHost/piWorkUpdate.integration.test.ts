@@ -1,7 +1,7 @@
 import { SessionManager } from "@earendil-works/pi-coding-agent"
 import { NodeServices } from "@effect/platform-node"
 import { assert, it } from "@effect/vitest"
-import { AgentReported, type AgentEvent, TextPart, WorkReport } from "@glass/contracts"
+import { AgentOutcome, type AgentEvent, TextPart, WorkUpdate } from "@glass/contracts"
 import { Deferred, Effect, Exit, Predicate, Scope } from "effect"
 import { randomUUID } from "node:crypto"
 import { writeFileSync } from "node:fs"
@@ -11,16 +11,16 @@ import { bundledPi } from "../../test/demoAgent"
 import { fakeModelProvider, lastUserText } from "../../test/fakeModelProvider"
 import { isolatedHome, stubHome } from "../../test/harness"
 import { piAdapter } from "./piAdapter"
-import { reportDelivery } from "./piReport"
+import { workUpdateDelivery } from "./piWorkUpdate"
 import { WorkRole } from "./protocol"
 
 const sent = {
   message: "",
   images: [],
-  prompt: "Report the completed work.",
-  context: WorkReport.make({
+  prompt: "Work update the completed work.",
+  context: WorkUpdate.make({
     work: [
-      AgentReported.make({
+      AgentOutcome.make({
         agentId: "started",
         name: "Started",
         outcome: "finished",
@@ -69,11 +69,11 @@ const fixture = Effect.gen(function* () {
 })
 
 for (const stopReason of ["error", "length"] as const)
-  it(`continues a Report whose ${stopReason} attempt pi omitted for recovery`, () => {
+  it(`continues a Work update whose ${stopReason} attempt pi omitted for recovery`, () => {
     const saved = SessionManager.inMemory()
-    const pending = reportDelivery("report-1", sent.prompt, [])
+    const pending = workUpdateDelivery("work-update-1", sent.prompt, [])
 
-    if (pending.state !== "pending") assert.fail("Expected a pending Report")
+    if (pending.state !== "pending") assert.fail("Expected a pending Work update")
     saved.appendMessage({ role: "user", content: pending.prompt, timestamp: 1 })
 
     const failed = saved.appendMessage({
@@ -100,24 +100,24 @@ for (const stopReason of ["error", "length"] as const)
     if (stopReason === "length")
       saved.appendCompaction("Earlier context summarized", failed, 100_000)
 
-    const delivery = reportDelivery("report-1", sent.prompt, saved.getBranch())
+    const delivery = workUpdateDelivery("work-update-1", sent.prompt, saved.getBranch())
     assert.equal(delivery.state, "responding")
     assert.isFalse(delivery.events.some((event) => event.type === "message_end"))
   })
 
 it.live(
-  "restores pi's saved Report response into the same Turn without another model request",
+  "restores pi's saved Work update response into the same Turn without another model request",
   () =>
     Effect.gen(function* () {
       const f = yield* fixture
       const conversation = randomUUID()
       const first = yield* f.open(conversation)
-      yield* first.session.startTurn("report-1", sent)
+      yield* first.session.startTurn("work-update-1", sent)
       yield* first.ended
       yield* first.close
 
       const restored = yield* f.open(conversation)
-      yield* restored.session.startTurn("report-1", {
+      yield* restored.session.startTurn("work-update-1", {
         ...sent,
         prompt: "The instructions changed after an upgrade.",
       })
@@ -128,40 +128,48 @@ it.live(
       assert.deepInclude(output, {
         part: TextPart.make({ text: "The work finished. Want to review it?" }),
       })
-      assert.deepInclude(restored.events.at(-1), { turnId: "report-1" })
+      assert.deepInclude(restored.events.at(-1), { turnId: "work-update-1" })
     }).pipe(Effect.provide(NodeServices.layer)),
 )
 
+for (const marker of ["glass_work_update_turn", "glass_report_turn"])
+  it.live(
+    `finishes and restores a Work update saved with ${marker} without repeating its original input`,
+    () =>
+      Effect.gen(function* () {
+        const f = yield* fixture
+        const saved = SessionManager.create(f.home)
+        const pending = workUpdateDelivery("work-update-1", sent.prompt, [])
+
+        if (pending.state !== "pending") assert.fail("Expected a pending Work update")
+        const original = pending.prompt.replaceAll("glass_work_update_turn", marker)
+        saved.appendMessage({ role: "user", content: original, timestamp: 1 })
+
+        const restored = yield* f.open(saved.getSessionId())
+        yield* restored.session.startTurn("work-update-1", sent)
+        yield* restored.ended
+
+        assert.lengthOf(f.model.calls, 1)
+        assert.include(lastUserText(f.model.calls[0]!), "Finish that Work update")
+        const branch = SessionManager.open(saved.getSessionFile()!).getBranch()
+
+        const users = branch.flatMap((entry) =>
+          entry.type === "message" && entry.message.role === "user" ? [entry.message] : [],
+        )
+
+        assert.lengthOf(users, 2)
+        assert.equal(users[0]?.content, original)
+
+        yield* restored.close
+        const completed = yield* f.open(saved.getSessionId())
+        yield* completed.session.startTurn("work-update-1", sent)
+        yield* completed.ended
+        assert.lengthOf(f.model.calls, 1)
+      }).pipe(Effect.provide(NodeServices.layer)),
+  )
+
 it.live(
-  "finishes a Report pi accepted before a crash without sending its original input twice",
-  () =>
-    Effect.gen(function* () {
-      const f = yield* fixture
-      const saved = SessionManager.create(f.home)
-      const pending = reportDelivery("report-1", sent.prompt, [])
-
-      if (pending.state !== "pending") assert.fail("Expected a pending Report")
-      saved.appendMessage({ role: "user", content: pending.prompt, timestamp: 1 })
-
-      const restored = yield* f.open(saved.getSessionId())
-      yield* restored.session.startTurn("report-1", sent)
-      yield* restored.ended
-
-      assert.lengthOf(f.model.calls, 1)
-      assert.include(lastUserText(f.model.calls[0]!), "Finish that Report")
-      const branch = SessionManager.open(saved.getSessionFile()!).getBranch()
-
-      const users = branch.flatMap((entry) =>
-        entry.type === "message" && entry.message.role === "user" ? [entry.message] : [],
-      )
-
-      assert.lengthOf(users, 2)
-      assert.equal(users[0]?.content, pending.prompt)
-    }).pipe(Effect.provide(NodeServices.layer)),
-)
-
-it.live(
-  "keeps a Report unfinished when pi's prompt response is invalid and the process exits",
+  "keeps a Work update unfinished when pi's prompt response is invalid and the process exits",
   () =>
     Effect.gen(function* () {
       const home = yield* isolatedHome
@@ -193,10 +201,10 @@ it.live(
           }),
       })
 
-      const error = yield* Effect.flip(session.startTurn("report-transport", sent))
+      const error = yield* Effect.flip(session.startTurn("work-update-transport", sent))
       assert.equal(
         error.message,
-        "Couldn't confirm pi's Report delivery. Restart Glass to try again.",
+        "Couldn't confirm pi's Work update delivery. Restart Glass to try again.",
       )
       yield* session.closed
       assert.isFalse(events.some(Predicate.isTagged("TurnEnded")))

@@ -14,7 +14,7 @@ import {
   type Transcript,
   type TranscriptUpdate,
   TurnEnd,
-  type WorkReport,
+  type WorkUpdate,
 } from "@glass/contracts"
 import {
   Context,
@@ -99,8 +99,8 @@ export class GlobalConversation extends Context.Service<
     readonly markSeen: (endedAt: DateTime.Utc) => Effect.Effect<void, AgentError>
     readonly whenIdle: <E>(
       effect: (
-        report: (
-          report: WorkReport,
+        workUpdate: (
+          workUpdate: WorkUpdate,
           record: (turnId: string) => Effect.Effect<void, AgentError>,
         ) => Effect.Effect<void, AgentError>,
       ) => Effect.Effect<void, E>,

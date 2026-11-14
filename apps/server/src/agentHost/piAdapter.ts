@@ -67,7 +67,7 @@ import type { WrittenSkills } from "./sentSkills"
 import { piLoadsNothing, piTools } from "../agentTools"
 import { piSuggestDraftExtension } from "./suggestDraftTool"
 import { runTurns } from "./turnLoop"
-import { reportDelivery } from "./piReport"
+import { workUpdateDelivery } from "./piWorkUpdate"
 
 const thinkingLevels = ["off", "minimal", "low", "medium", "high", "xhigh", "max"]
 
@@ -391,7 +391,7 @@ export const piAdapter = (command: string) =>
           yield* Queue.offer(inbox, answer)
         })
 
-        const startReport = Effect.fnUntraced(function* (turnId: string, sent: DeliveredTurn) {
+        const startWorkUpdate = Effect.fnUntraced(function* (turnId: string, sent: DeliveredTurn) {
           const delivery = yield* Effect.gen(function* () {
             const { sessionFile } = yield* rpc.request({ type: "get_state" }, SessionState)
 
@@ -400,13 +400,15 @@ export const piAdapter = (command: string) =>
                 ? []
                 : yield* Effect.try(() => SessionManager.open(sessionFile).getBranch())
 
-            return reportDelivery(turnId, sent.prompt, entries)
+            return workUpdateDelivery(turnId, sent.prompt, entries)
           }).pipe(
-            Effect.tapError((error) => Effect.logWarning("Couldn't recover pi's Report", error)),
+            Effect.tapError((error) =>
+              Effect.logWarning("Couldn't recover pi's Work update", error),
+            ),
             Effect.mapError(
               () =>
                 new HostAgentError({
-                  message: "Couldn't recover pi's Report. Restart Glass to try again.",
+                  message: "Couldn't recover pi's Work update. Restart Glass to try again.",
                 }),
             ),
           )
@@ -415,7 +417,7 @@ export const piAdapter = (command: string) =>
 
           for (const event of delivery.events) yield* Queue.offer(inbox, Input.Event({ event }))
 
-          if (delivery.state === "reported") {
+          if (delivery.state === "completed") {
             yield* Queue.offer(inbox, Input.Idle({ idle: true, generation: 0 }))
 
             return
@@ -426,12 +428,13 @@ export const piAdapter = (command: string) =>
             .pipe(
               Effect.tapError(() => Queue.offer(inbox, Input.Refused({ turnId }))),
               Effect.tapError((error) =>
-                Effect.logWarning("Couldn't confirm pi's Report delivery", error),
+                Effect.logWarning("Couldn't confirm pi's Work update delivery", error),
               ),
               Effect.mapError(
                 () =>
                   new HostAgentError({
-                    message: "Couldn't confirm pi's Report delivery. Restart Glass to try again.",
+                    message:
+                      "Couldn't confirm pi's Work update delivery. Restart Glass to try again.",
                   }),
               ),
             )
@@ -465,8 +468,8 @@ export const piAdapter = (command: string) =>
             return undefined
           }),
           startTurn: (turnId, sent) =>
-            Predicate.isTagged(sent.context, "Report")
-              ? startReport(turnId, sent)
+            Predicate.isTagged(sent.context, "WorkUpdate")
+              ? startWorkUpdate(turnId, sent)
               : startMessage(turnId, sent),
           answer: Effect.fnUntraced(function* (requestId: string, answer: RequestAnswer) {
             const dialog = dialogs.get(requestId)

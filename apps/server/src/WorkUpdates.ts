@@ -1,28 +1,29 @@
-import { WorkReport } from "@glass/contracts"
+import { WorkUpdate } from "@glass/contracts"
 import { Array as Arr, Effect, Layer, Predicate, Stream } from "effect"
 import { GlobalConversation } from "./GlobalConversation"
 import { StartedWork } from "./StartedWork"
 
-export const WorkReports = Layer.effectDiscard(
+export const WorkUpdates = Layer.effectDiscard(
   Effect.gen(function* () {
     const conversation = yield* GlobalConversation
     const started = yield* StartedWork
 
-    const reportOnce = conversation
-      .whenIdle((report) =>
+    const sendUpdateOnce = conversation
+      .whenIdle((workUpdate) =>
         Effect.gen(function* () {
-          const found = yield* started.unreported(conversation.id)
+          const found = yield* started.pendingOutcomes(conversation.id)
 
           if (!Arr.isReadonlyArrayNonEmpty(found)) return
 
-          yield* report(WorkReport.make({ work: Arr.map(found, ({ work }) => work) }), (turnId) =>
-            started.recordReport(conversation.id, turnId, found),
+          yield* workUpdate(
+            WorkUpdate.make({ work: Arr.map(found, ({ work }) => work) }),
+            (turnId) => started.recordWorkUpdate(conversation.id, turnId, found),
           )
         }),
       )
       .pipe(
-        Effect.andThen(started.reconcileReported(conversation.id)),
-        Effect.catch((cause) => Effect.logWarning("Couldn't report started work", cause)),
+        Effect.andThen(started.reconcileWorkUpdates(conversation.id)),
+        Effect.catch((cause) => Effect.logWarning("Couldn't send a Work update", cause)),
       )
 
     const settled = conversation.transcript.pipe(
@@ -36,7 +37,7 @@ export const WorkReports = Layer.effectDiscard(
 
     yield* Stream.merge(started.changes(conversation.id), settled).pipe(
       Stream.buffer({ capacity: 1, strategy: "sliding" }),
-      Stream.runForEach(() => reportOnce),
+      Stream.runForEach(() => sendUpdateOnce),
       Effect.forkScoped,
     )
   }),

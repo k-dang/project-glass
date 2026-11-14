@@ -1,13 +1,13 @@
 import { assert, it } from "@effect/vitest"
 import {
-  AgentReported,
+  AgentOutcome,
   SteerPart,
   TextPart,
   TurnDone,
   TurnEnded,
   TurnFailed,
   TurnStopped,
-  WorkReport,
+  WorkUpdate,
 } from "@glass/contracts"
 import { DateTime, Predicate } from "effect"
 import type { PiEvent } from "./piRpc"
@@ -17,14 +17,14 @@ const now = DateTime.makeUnsafe("2026-10-26T12:00:00Z")
 
 const started = beginTurn("turn-1", { message: "Say hello", images: [], context: null }, now)
 
-const reporting = beginTurn(
+const updating = beginTurn(
   "turn-1",
   {
     message: "",
     images: [],
-    context: WorkReport.make({
+    context: WorkUpdate.make({
       work: [
-        AgentReported.make({
+        AgentOutcome.make({
           agentId: "started",
           name: "Started",
           askedWith: "Build it",
@@ -57,15 +57,15 @@ const assistantEnd = (stopReason: string, errorMessage = ""): PiEvent => ({
   message: { role: "assistant", stopReason, errorMessage },
 })
 
-it("releases a Report after transport failure without claiming it ended", () => {
+it("releases a Work update after transport failure without claiming it ended", () => {
   for (const input of [Input.Refused({ turnId: "turn-1" }), Input.Exited()]) {
-    const lost = run([input], reporting)
+    const lost = run([input], updating)
     assert.isNull(lost.state)
     assert.deepStrictEqual(lost.events, [])
   }
 })
 
-it("keeps a completed provider failure terminal for a Report", () => {
+it("keeps a completed provider failure terminal for a Work update", () => {
   const failed = run(
     [
       { type: "agent_start" },
@@ -73,7 +73,7 @@ it("keeps a completed provider failure terminal for a Report", () => {
       { type: "agent_settled" },
       Input.Idle({ idle: true, generation: 1 }),
     ],
-    reporting,
+    updating,
   )
 
   assert.isNull(failed.state)

@@ -161,8 +161,8 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
     end(turn, turn.stopping ? TurnStopped.make({}) : ending)
 
   const loseDelivery = (turn: TurnState, ending: TurnEnding) => {
-    // A transport failure cannot consume a durable Report; the next host recovers its saved input.
-    if (Predicate.isTagged(turn.turn.context, "Report") && !turn.stopping) state = null
+    // A transport failure cannot consume a durable Work update; the next host recovers its saved input.
+    if (Predicate.isTagged(turn.turn.context, "WorkUpdate") && !turn.stopping) state = null
     else end(turn, ending)
   }
 
