@@ -7,7 +7,7 @@ const programs = Config.String("GLASS_SCRIPTED_GATES").pipe(
   Effect.map((gates) => {
     const adapter = scriptedAdapter(gates)
 
-    return { "claude-code": adapter, pi: adapter }
+    return { "claude-code": adapter, pi: adapter, opencode: adapter }
   }),
 )
 

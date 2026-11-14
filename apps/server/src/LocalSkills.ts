@@ -18,6 +18,15 @@ interface SkillFolders {
 
 const foldersOf = (home: string): Record<AgentEngine, SkillFolders> => ({
   "claude-code": { folders: [join(home, ".claude", "skills")], readsNestedSkills: false },
+  opencode: {
+    folders: [
+      join(home, ".config", "opencode", "skills"),
+      join(home, ".config", "opencode", "skill"),
+      join(home, ".claude", "skills"),
+      join(home, ".agents", "skills"),
+    ],
+    readsNestedSkills: true,
+  },
   pi: {
     folders: [join(home, ".pi", "agent", "skills"), join(home, ".agents", "skills")],
     readsNestedSkills: true,

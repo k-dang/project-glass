@@ -45,7 +45,11 @@ const fixture = Effect.fnUntraced(function* (
     Effect.scoped,
     Effect.provide(
       runnersLayer(
-        { claudeCommand: join(home, "claude"), piCommand: join(home, "pi") },
+        {
+          claudeCommand: join(home, "claude"),
+          piCommand: join(home, "pi"),
+          opencodeCommand: "glass-missing-opencode",
+        },
         replay.layer,
       ),
     ),
@@ -204,7 +208,11 @@ it.live("reports a runner whose executable is missing as not installed", () =>
         Effect.scoped,
         Effect.flip,
         Effect.provide(
-          runnersLayer({ claudeCommand: "glass-missing-claude", piCommand: "glass-missing-pi" }),
+          runnersLayer({
+            claudeCommand: "glass-missing-claude",
+            piCommand: "glass-missing-pi",
+            opencodeCommand: "glass-missing-opencode",
+          }),
         ),
       ),
     )

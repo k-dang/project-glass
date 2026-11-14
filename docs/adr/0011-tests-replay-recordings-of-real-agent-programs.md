@@ -1,6 +1,6 @@
 # Tests replay recordings of the real Agent programs
 
-Glass's use of Claude Code and pi is tested by replaying recordings of the real programs, matched
+Glass's use of Claude Code, pi, and OpenCode is tested by replaying recordings of the real programs, matched
 launch by launch and message by message, so a change in what Glass sends fails until it is recorded
 again. Glass's own rules are tested at seams Glass owns. Recordings also capture model behaviour a
 hand-written fake can't.

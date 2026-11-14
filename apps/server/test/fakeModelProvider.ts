@@ -74,10 +74,13 @@ export const FAKE_PI_MODEL = { provider: "glass-test", modelId: "gpt-test" }
 export interface FakeModelSettings {
   readonly output?: string | ((input: typeof request.Type) => string)
   readonly reply?: (input: FakeModelRequest) => ReadonlyArray<FakeModelDelta>
+  readonly failureStatus?: number
+  readonly failureMessage?: string
   readonly failFirst?: number
   readonly hang?: boolean
   readonly finishReason?: "stop" | "length"
   readonly chunkDelay?: (input: FakeModelRequest) => number
+  readonly tokens?: (input: FakeModelRequest) => number
 }
 
 interface CompletionDelta {
@@ -91,16 +94,24 @@ interface CompletionDelta {
   }>
 }
 
-const sseChunk = (delta: CompletionDelta, finishReason: string | null) =>
+const sseChunk = (delta: CompletionDelta, finishReason: string | null, tokens?: number) =>
   `data: ${JSON.stringify({
     id: "test-completion",
     object: "chat.completion.chunk",
     created: 0,
     model: "gpt-test",
     choices: [{ index: 0, delta, finish_reason: finishReason }],
+    usage:
+      tokens === undefined
+        ? undefined
+        : { prompt_tokens: tokens, completion_tokens: 10, total_tokens: tokens + 10 },
   })}\n\n`
 
-const replyChunks = (deltas: ReadonlyArray<FakeModelDelta>, finishReason = "stop") => {
+const replyChunks = (
+  deltas: ReadonlyArray<FakeModelDelta>,
+  finishReason = "stop",
+  tokens?: number,
+) => {
   let toolCalls = 0
 
   const streamed = deltas.map((delta) => {
@@ -128,7 +139,7 @@ const replyChunks = (deltas: ReadonlyArray<FakeModelDelta>, finishReason = "stop
 
   return [
     ...streamed,
-    sseChunk({}, toolCalls > 0 ? "tool_calls" : finishReason),
+    sseChunk({}, toolCalls > 0 ? "tool_calls" : finishReason, tokens),
     "data: [DONE]\n\n",
   ]
 }
@@ -148,7 +159,12 @@ export const fakeModelProvider = Effect.fnUntraced(function* (
       ? current.output(input)
       : (current.output ?? "")
 
-    const chunks = replyChunks(current.reply?.(input) ?? [{ text: output }], current.finishReason)
+    const chunks = replyChunks(
+      current.reply?.(input) ?? [{ text: output }],
+      current.finishReason,
+      current.tokens?.(input),
+    )
+
     const delay = current.chunkDelay?.(input) ?? 0
 
     const send = ([chunk, ...rest]: ReadonlyArray<string>) => {
@@ -175,8 +191,8 @@ export const fakeModelProvider = Effect.fnUntraced(function* (
     const current = settings
 
     if (current.failFirst !== undefined && calls.length <= current.failFirst) {
-      res.writeHead(500, { "content-type": "application/json" })
-      res.end(JSON.stringify({ error: { message: "overloaded" } }))
+      res.writeHead(current.failureStatus ?? 500, { "content-type": "application/json" })
+      res.end(JSON.stringify({ error: { message: current.failureMessage ?? "overloaded" } }))
 
       return
     }

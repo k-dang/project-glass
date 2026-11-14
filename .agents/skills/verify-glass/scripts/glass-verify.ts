@@ -35,7 +35,7 @@ const USAGE = `Usage: node .agents/skills/verify-glass/scripts/glass-verify.ts <
          [--no-build] [--run <id>]
                                          build, start an isolated Glass, wait until ready
                                          GitHub defaults to fake; --github real selects live GitHub
-                                         Claude Code and pi are off unless --real-agents, which may
+                                         Agent programs are off unless --real-agents, which may
                                          incur model charges
                                          --backend fake runs pnpm dev:fake's backend and its demo
                                          Agents; it brings its own fake GitHub and providers, and
@@ -408,6 +408,7 @@ const launch = async (options: {
           ? {
               claudeCommand: join(paths.state, "claude-disabled"),
               piCommand: join(paths.state, "pi-disabled"),
+              opencodeCommand: join(paths.state, "opencode-disabled"),
             }
           : undefined,
       )

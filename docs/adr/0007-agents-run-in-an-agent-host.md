@@ -3,7 +3,8 @@
 Agents run on this device and in Sandboxes, and Glass must render a structured transcript, answer
 Permission requests, Steer, and survive dropped connections for both. So every Agent runs inside an
 agent host: a small Node server built from Glass's own code that drives Claude Code through the
-Claude Agent SDK (pointed at the user's installed `claude`) and pi through `pi --mode rpc`, keeps a
+Claude Agent SDK (pointed at the user's installed `claude`), pi through `pi --mode rpc`, and OpenCode
+through its authenticated native V1 HTTP/event API, keeps a
 journal of numbered events, and serves Effect RPC over WebSocket. The backend starts a host as a
 child process for local Agents; in a Sandbox, its provider starts the same host (ADR 0010). The
 backend persists every event in SQLite as the transcript of record and, after a dropped connection,

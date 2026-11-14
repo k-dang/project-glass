@@ -76,6 +76,7 @@ export const startBackend = Effect.fnUntraced(function* (
       Layer.succeed(AgentCommands, {
         claudeCommand: "glass-missing-claude",
         piCommand: "glass-missing-pi",
+        opencodeCommand: "glass-missing-opencode",
       }),
     ).pipe(
       Layer.provide(ServerConfig.layer),

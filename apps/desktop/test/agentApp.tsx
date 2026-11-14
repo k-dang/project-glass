@@ -22,8 +22,17 @@ export const claudeModels = new AgentModels({
   models: [{ id: "sonnet", name: "Sonnet 5.5", efforts: ["low", "high"] }],
 })
 
-export const listModels = ({ engine }: { engine: AgentEngine }) =>
-  Effect.succeed(engine === "pi" ? piModels : claudeModels)
+export const listModels = ({ engine }: { engine: AgentEngine }) => {
+  if (engine === "opencode")
+    return Effect.succeed(
+      new AgentModels({
+        defaultModel: { id: "opencode/big-pickle", name: "Big Pickle", efforts: [] },
+        models: [],
+      }),
+    )
+
+  return Effect.succeed(engine === "pi" ? piModels : claudeModels)
+}
 
 export const mount = (handlers: Parameters<typeof testLayer>[0], path = `/agents/${agent.id}`) => {
   const backend = testLayer({

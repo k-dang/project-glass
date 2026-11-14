@@ -6,11 +6,21 @@ const decodeSettings = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Jso
 
 export const writeAgentCommands = (
   dataDirectory: string,
-  commands?: { readonly claudeCommand: string; readonly piCommand: string },
+  commands?: {
+    readonly claudeCommand: string
+    readonly piCommand: string
+    readonly opencodeCommand?: string
+  },
 ) => {
   const settings = join(dataDirectory, "settings.json")
   const saved = existsSync(settings) ? decodeSettings(readFileSync(settings, "utf8")) : {}
-  const { claudeCommand: _claudeCommand, piCommand: _piCommand, ...rest } = saved
+
+  const {
+    claudeCommand: _claudeCommand,
+    piCommand: _piCommand,
+    opencodeCommand: _opencodeCommand,
+    ...rest
+  } = saved
 
   mkdirSync(dataDirectory, { recursive: true })
   writeFileSync(settings, JSON.stringify({ ...rest, ...commands }, null, 2))

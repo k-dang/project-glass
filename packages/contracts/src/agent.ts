@@ -64,6 +64,15 @@ export interface AgentCapabilities {
 export const engineCapabilities: Record<AgentEngine, AgentCapabilities> = {
   "claude-code": { permissionModes: PermissionMode.literals },
   pi: { permissionModes: [] },
+  opencode: { permissionModes: ["default", "bypassPermissions"] },
+}
+
+export const supportedPermissionMode = (engine: AgentEngine, selected: PermissionMode | null) => {
+  const modes = engineCapabilities[engine].permissionModes
+
+  if (selected !== null && modes.includes(selected)) return selected
+
+  return modes.includes(defaultPermissionMode) ? defaultPermissionMode : (modes[0] ?? null)
 }
 
 export const AgentCommand = Schema.Struct({
