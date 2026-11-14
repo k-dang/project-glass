@@ -8,7 +8,7 @@ export interface ConversationState {
 
 export type ConversationEvent =
   | { readonly type: "send"; readonly message: QueuedMessage }
-  | { readonly type: "workUpdate"; readonly message: StartingTurn }
+  | { readonly type: "globalConversationUpdate"; readonly message: StartingTurn }
   | { readonly type: "sendQueued" | "cancelQueued"; readonly queuedId: string }
   | { readonly type: "turnEnded"; readonly ending: TurnEnding }
 
@@ -46,7 +46,7 @@ export const stepConversation = (
   Match.value(event).pipe(
     Match.withReturnType<ConversationStep>(),
     Match.discriminatorsExhaustive("type")({
-      workUpdate: ({ message }) =>
+      globalConversationUpdate: ({ message }) =>
         state.running === null && state.queued.length === 0
           ? { outcome: { type: "started" }, writes: [{ type: "startTurn", message }] }
           : { outcome: { type: "busy" }, writes: [] },

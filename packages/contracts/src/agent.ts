@@ -191,13 +191,17 @@ export const WorkOutcome = Schema.Union([AgentOutcome, AgentReviewOutcome])
 
 export type WorkOutcome = typeof WorkOutcome.Type
 
-export const WorkUpdate = Schema.TaggedStruct("WorkUpdate", {
+export const GlobalConversationUpdate = Schema.TaggedStruct("GlobalConversationUpdate", {
   work: Schema.NonEmptyArray(WorkOutcome),
 })
 
-export type WorkUpdate = typeof WorkUpdate.Type
+export type GlobalConversationUpdate = typeof GlobalConversationUpdate.Type
 
-export const TurnContext = Schema.Union([PullRequestContext, AgentContext, WorkUpdate])
+export const TurnContext = Schema.Union([
+  PullRequestContext,
+  AgentContext,
+  GlobalConversationUpdate,
+])
 
 export type TurnContext = typeof TurnContext.Type
 

@@ -29,7 +29,7 @@ import {
   type MessageWithContext,
   TurnPart,
   TurnStarted,
-  type WorkUpdate,
+  type GlobalConversationUpdate,
 } from "@glass/contracts"
 import {
   Array as Arr,
@@ -236,12 +236,12 @@ export class Transcripts extends Context.Service<
     readonly runningTurn: (agentId: string) => Effect.Effect<string | null, AgentError>
     readonly idle: (agentId: string) => Effect.Effect<boolean, AgentError>
     /** Records the covered outcomes in the Turn's transaction, before publishing TurnStarted. */
-    readonly startWorkUpdate: (
+    readonly startGlobalConversationUpdate: (
       agentId: string,
-      workUpdate: WorkUpdate,
+      globalConversationUpdate: GlobalConversationUpdate,
       record: (turnId: string) => Effect.Effect<void, AgentError>,
     ) => Effect.Effect<void, AgentError>
-    readonly recoverWorkUpdates: (
+    readonly recoverGlobalConversationUpdates: (
       agentIds: ReadonlyArray<string>,
     ) => Effect.Effect<ReadonlyArray<StartedTurn>, AgentError>
     readonly runningMessage: (agentId: string) => Effect.Effect<string | null, AgentError>
@@ -675,7 +675,9 @@ export class Transcripts extends Context.Service<
         const conditions = [sql`t.ended IS NULL`, sql.in("t.agent_id", agentIds)]
 
         if (Predicate.isTagged(ending, "CutOff") || Predicate.isTagged(ending, "Interrupted"))
-          conditions.push(sql`COALESCE(json_extract(t.context, '$._tag'), '') != 'WorkUpdate'`)
+          conditions.push(
+            sql`COALESCE(json_extract(t.context, '$._tag'), '') != 'GlobalConversationUpdate'`,
+          )
 
         const running = yield* sql`
           SELECT t.agent_id AS agentId, t.id AS turnId, p.part AS part
@@ -751,29 +753,29 @@ export class Transcripts extends Context.Service<
               Effect.map(([turn]) => turn?.message ?? null),
             ),
           ),
-        recoverWorkUpdates: (agentIds) =>
+        recoverGlobalConversationUpdates: (agentIds) =>
           withStorageFailure(
-            "recover Work updates",
+            "recover Global conversation updates",
             Effect.forEach(agentIds, (agentId) =>
               lockFor(agentId).withPermits(1)(
                 Effect.gen(function* () {
-                  const workUpdates = yield* sql`
+                  const globalConversationUpdates = yield* sql`
                     SELECT id, message, images, context, feedback, sent_at AS sentAt, ended
                     FROM agent_turn WHERE agent_id = ${agentId} AND ended IS NULL
-                      AND json_extract(context, '$._tag') = 'WorkUpdate'
+                      AND json_extract(context, '$._tag') = 'GlobalConversationUpdate'
                   `.pipe(Effect.flatMap(decodeTurns))
 
                   // pi restores complete messages; discard streaming fragments before replaying.
-                  for (const turn of workUpdates)
+                  for (const turn of globalConversationUpdates)
                     yield* sql`DELETE FROM agent_turn_part WHERE turn_id = ${turn.id}`
 
-                  if (workUpdates.length > 0)
+                  if (globalConversationUpdates.length > 0)
                     yield* markWaiting(
                       agentId,
                       (yield* waitingParts(agentId)).map(({ part }) => part),
                     )
 
-                  return workUpdates.map((turn) => ({
+                  return globalConversationUpdates.map((turn) => ({
                     ...TurnStarted.make({
                       turnId: turn.id,
                       message: turn.message,
@@ -786,9 +788,9 @@ export class Transcripts extends Context.Service<
                   }))
                 }),
               ),
-            ).pipe(Effect.map((workUpdates) => workUpdates.flat())),
+            ).pipe(Effect.map((globalConversationUpdates) => globalConversationUpdates.flat())),
           ),
-        startWorkUpdate: (agentId, workUpdate, record) =>
+        startGlobalConversationUpdate: (agentId, globalConversationUpdate, record) =>
           withStorageFailure(
             "start a Turn",
             changeWith(
@@ -797,12 +799,15 @@ export class Transcripts extends Context.Service<
                 const message = {
                   message: "",
                   images: [],
-                  context: workUpdate,
+                  context: globalConversationUpdate,
                   feedback: [],
                   id: randomUUID(),
                 }
 
-                const { outcome, updates } = yield* step(agentId, { type: "workUpdate", message })
+                const { outcome, updates } = yield* step(agentId, {
+                  type: "globalConversationUpdate",
+                  message,
+                })
 
                 if (outcome.type === "started") yield* record(message.id)
 

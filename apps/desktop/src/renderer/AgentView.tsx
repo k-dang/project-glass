@@ -410,11 +410,13 @@ const workOutcomeText = (work: WorkOutcome) => {
   return `${subject} ${outcomeText[work.outcome]}`
 }
 
-function WorkUpdateMessage(props: { work: ReadonlyArray<WorkOutcome> }) {
+function GlobalConversationUpdateMessage(props: { work: ReadonlyArray<WorkOutcome> }) {
   return (
     <Message align="end">
       <MessageContent>
-        <span className="self-end text-xs text-muted-foreground">Work update from Glass</span>
+        <span className="self-end text-xs text-muted-foreground">
+          Global conversation update from Glass
+        </span>
         <ul className="flex flex-col gap-1 self-end text-sm text-muted-foreground">
           {props.work.map((work, index) => (
             <li key={index}>{workOutcomeText(work)}</li>
@@ -465,8 +467,8 @@ const TurnView = memo(function TurnView(props: {
   return (
     <MessageScrollerItem messageId={turn.id} scrollAnchor exactHeight={props.latest}>
       <MessageGroup className="gap-4">
-        {Predicate.isTagged(turn.context, "WorkUpdate") ? (
-          <WorkUpdateMessage work={turn.context.work} />
+        {Predicate.isTagged(turn.context, "GlobalConversationUpdate") ? (
+          <GlobalConversationUpdateMessage work={turn.context.work} />
         ) : (
           <UserMessage
             message={turn.message}

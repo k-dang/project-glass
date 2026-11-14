@@ -9,7 +9,7 @@ import {
   TurnEnded,
   TurnFailed,
   TurnStopped,
-  WorkUpdate,
+  GlobalConversationUpdate,
 } from "@glass/contracts"
 import { DateTime, Deferred, Effect, Exit, Layer, Option, Schema, Scope, Stream } from "effect"
 import { eventually } from "../test/eventually"
@@ -42,7 +42,7 @@ const decodeLine = Schema.decodeUnknownSync(Schema.fromJsonString(UnitLine))
 
 const sent = (message: string) => ({ message, images: [], context: null })
 
-const workUpdate = WorkUpdate.make({
+const globalConversationUpdate = GlobalConversationUpdate.make({
   work: [
     AgentOutcome.make({
       agentId: "started",
@@ -138,7 +138,7 @@ it.live("fails a Turn whose program won't start, then starts the next queued mes
 )
 
 it.live(
-  "recovers the same saved Work update before advancing Queued messages, and leaves a completed Work update alone",
+  "recovers the same saved Global conversation update before advancing Queued messages, and leaves a completed Global conversation update alone",
   () =>
     Effect.gen(function* () {
       const transcripts = yield* Transcripts
@@ -146,10 +146,13 @@ it.live(
       let savedId = ""
 
       // No delivery subscriber exists when the transaction commits, as in a crash before dispatch.
-      yield* transcripts.startWorkUpdate("agent-1", workUpdate, (turnId) =>
-        Effect.sync(() => {
-          savedId = turnId
-        }),
+      yield* transcripts.startGlobalConversationUpdate(
+        "agent-1",
+        globalConversationUpdate,
+        (turnId) =>
+          Effect.sync(() => {
+            savedId = turnId
+          }),
       )
       yield* transcripts.startOrQueue("agent-1", sent("After"))
       const firstScope = yield* Scope.make()
@@ -178,15 +181,19 @@ it.live(
 )
 
 it.live(
-  "keeps a Work update pending after a recovery read fails, then retries the same Turn on restart",
+  "keeps a Global conversation update pending after a recovery read fails, then retries the same Turn on restart",
   () =>
     Effect.gen(function* () {
       const transcripts = yield* Transcripts
-      yield* transcripts.startWorkUpdate("agent-1", workUpdate, () => Effect.void)
+      yield* transcripts.startGlobalConversationUpdate(
+        "agent-1",
+        globalConversationUpdate,
+        () => Effect.void,
+      )
       const savedId = yield* transcripts.runningTurn("agent-1")
       yield* transcripts.startOrQueue("agent-1", sent("After"))
       const firstScope = yield* Scope.make()
-      const reason = "Couldn't recover pi's Work update. Restart Glass to try again."
+      const reason = "Couldn't recover pi's Global conversation update. Restart Glass to try again."
 
       const first = yield* harness(
         () => Effect.void,

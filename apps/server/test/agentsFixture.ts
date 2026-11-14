@@ -239,11 +239,13 @@ export const sendGlobal = (
   context: CapturedContext | null = null,
 ) => client.SendGlobalMessage({ message, images: [], context })
 
-export const outcomesInUpdates = (turns: ReadonlyArray<Turn>) =>
-  turns.flatMap(({ context }) => (Predicate.isTagged(context, "WorkUpdate") ? context.work : []))
+export const outcomesInGlobalConversationUpdates = (turns: ReadonlyArray<Turn>) =>
+  turns.flatMap(({ context }) =>
+    Predicate.isTagged(context, "GlobalConversationUpdate") ? context.work : [],
+  )
 
-export const agentOutcomesInUpdates = (turns: ReadonlyArray<Turn>) =>
-  outcomesInUpdates(turns).flatMap((work) =>
+export const agentOutcomesInGlobalConversationUpdates = (turns: ReadonlyArray<Turn>) =>
+  outcomesInGlobalConversationUpdates(turns).flatMap((work) =>
     Predicate.isTagged(work, "Agent") ? [[work.agentId, work.outcome] as const] : [],
   )
 

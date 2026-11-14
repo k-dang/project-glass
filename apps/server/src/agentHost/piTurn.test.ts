@@ -7,7 +7,7 @@ import {
   TurnEnded,
   TurnFailed,
   TurnStopped,
-  WorkUpdate,
+  GlobalConversationUpdate,
 } from "@glass/contracts"
 import { DateTime, Predicate } from "effect"
 import type { PiEvent } from "./piRpc"
@@ -22,7 +22,7 @@ const updating = beginTurn(
   {
     message: "",
     images: [],
-    context: WorkUpdate.make({
+    context: GlobalConversationUpdate.make({
       work: [
         AgentOutcome.make({
           agentId: "started",
@@ -57,7 +57,7 @@ const assistantEnd = (stopReason: string, errorMessage = ""): PiEvent => ({
   message: { role: "assistant", stopReason, errorMessage },
 })
 
-it("releases a Work update after transport failure without claiming it ended", () => {
+it("releases a Global conversation update after transport failure without claiming it ended", () => {
   for (const input of [Input.Refused({ turnId: "turn-1" }), Input.Exited()]) {
     const lost = run([input], updating)
     assert.isNull(lost.state)
@@ -65,7 +65,7 @@ it("releases a Work update after transport failure without claiming it ended", (
   }
 })
 
-it("keeps a completed provider failure terminal for a Work update", () => {
+it("keeps a completed provider failure terminal for a Global conversation update", () => {
   const failed = run(
     [
       { type: "agent_start" },

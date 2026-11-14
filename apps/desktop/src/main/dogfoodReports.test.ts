@@ -60,7 +60,7 @@ it("keeps the logs as they were when captured, and names the report after its no
         lowAttention: [],
         agentId: null,
         done: false,
-        includedInWorkUpdate: false,
+        includedInGlobalConversationUpdate: false,
       },
     },
   })
@@ -86,7 +86,7 @@ it("keeps the logs as they were when captured, and names the report after its no
       lowAttention: [],
       agentId: null,
       done: false,
-      includedInWorkUpdate: false,
+      includedInGlobalConversationUpdate: false,
     },
   })
 })

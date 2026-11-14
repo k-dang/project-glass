@@ -19,7 +19,7 @@ import {
   TurnFailed,
   TurnInterrupted,
   TurnStopped,
-  type WorkUpdate,
+  type GlobalConversationUpdate,
 } from "@glass/contracts"
 import {
   Context,
@@ -95,7 +95,7 @@ export class ConversationTurns extends Context.Service<
       conversationId: string,
       effect: (
         start: (
-          workUpdate: WorkUpdate,
+          globalConversationUpdate: GlobalConversationUpdate,
           record: (turnId: string) => Effect.Effect<void, AgentError>,
         ) => Effect.Effect<void, AgentError>,
       ) => Effect.Effect<void, E>,
@@ -195,7 +195,7 @@ export class ConversationTurns extends Context.Service<
         prepare(conversation, sent).pipe(
           Effect.flatMap((prepared) => dispatch(conversation, turnId, prepared)),
           Effect.catch((error) =>
-            Predicate.isTagged(sent.context, "WorkUpdate")
+            Predicate.isTagged(sent.context, "GlobalConversationUpdate")
               ? transcripts
                   .setStatus(conversation.id, hostFailure(error))
                   .pipe(Effect.as("pending" as const satisfies Delivery))
@@ -221,7 +221,9 @@ export class ConversationTurns extends Context.Service<
 
         const interruptedIds = yield* interrupted
 
-        const recovered = yield* transcripts.recoverWorkUpdates(interruptedIds).pipe(Effect.orDie)
+        const recovered = yield* transcripts
+          .recoverGlobalConversationUpdates(interruptedIds)
+          .pipe(Effect.orDie)
 
         yield* Stream.merge(Stream.fromIterable(recovered), started).pipe(
           Stream.runForEach(({ agentId, turnId, message, images, context, feedback }) =>
@@ -378,8 +380,12 @@ export class ConversationTurns extends Context.Service<
             Effect.gen(function* () {
               if (!(yield* transcripts.idle(conversationId))) return
 
-              yield* effect((workUpdate, record) =>
-                transcripts.startWorkUpdate(conversationId, workUpdate, record),
+              yield* effect((globalConversationUpdate, record) =>
+                transcripts.startGlobalConversationUpdate(
+                  conversationId,
+                  globalConversationUpdate,
+                  record,
+                ),
               )
             }),
           ),

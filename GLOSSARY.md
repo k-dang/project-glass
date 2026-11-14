@@ -17,7 +17,7 @@ The Agents, questions from an agent outside Glass or the Global conversation, an
 the user now. They live in the Inbox, grouped by why they are waiting, with their count on the Inbox
 rail link in every area.
 A queued PR waits once its Agent review is finished, until the user marks that Agent review done or
-the Global conversation includes it in a Work update; writing it again puts the PR back.
+a Global conversation update includes it; writing it again puts the PR back.
 An Agent waits once its latest Turn ends while the user isn't looking, unless they stopped it,
 until they look at its Chat with Glass focused; an Agent review's own Agent waits only through its
 PR.
@@ -236,12 +236,12 @@ but not to continue. The Global conversation that follows doesn't see it. Its id
 the pi session it ran in, which is the one place "session" belongs.
 _Avoid_: Session (in UI copy), history, archived chat
 
-**Work update**:
+**Global conversation update**:
 A Turn Glass starts in the Global conversation to tell the user about work it started or messaged
 that finished, failed, or needs their input, combining pending outcomes once the conversation is idle.
 It offers a next step without acting until the user says so, and clears completed work from Needs you
 without marking an Agent review done; an Agent the user stopped is excluded.
-_Avoid_: Report, notification, event, wake-up
+_Avoid_: Work update, Report, notification, event, wake-up
 
 **Agent program**:
 Claude Code or pi, the program an Agent runs. It decides which models and efforts the user can pick,

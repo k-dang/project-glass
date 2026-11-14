@@ -2,7 +2,7 @@ import type { SessionEntry } from "@earendil-works/pi-coding-agent"
 import { Predicate } from "effect"
 import type { PiEvent } from "./piRpc"
 
-export type WorkUpdateDelivery =
+export type GlobalConversationUpdateDelivery =
   | {
       readonly state: "pending" | "responding"
       readonly prompt: string
@@ -10,15 +10,21 @@ export type WorkUpdateDelivery =
     }
   | { readonly state: "completed"; readonly events: ReadonlyArray<PiEvent> }
 
-/** Uses the full saved branch, including messages before compaction, to find this Work update. */
-export const workUpdateDelivery = (
+/** Uses the full saved branch, including messages before compaction, to find this Global conversation update. */
+export const globalConversationUpdateDelivery = (
   turnId: string,
   prompt: string,
   entries: ReadonlyArray<SessionEntry>,
-): WorkUpdateDelivery => {
-  const identity = `\n\n<glass_work_update_turn>${turnId}</glass_work_update_turn>`
-  // pi owns saved conversations, including Work updates accepted before the terminology changed.
-  const previousIdentity = `\n\n<glass_report_turn>${turnId}</glass_report_turn>`
+): GlobalConversationUpdateDelivery => {
+  const identity = `\n\n<glass_global_conversation_update_turn>${turnId}</glass_global_conversation_update_turn>`
+
+  // pi's saved conversations are not migrated with Glass's database.
+  const identities = [
+    identity,
+    `\n\n<glass_work_update_turn>${turnId}</glass_work_update_turn>`,
+    `\n\n<glass_report_turn>${turnId}</glass_report_turn>`,
+  ]
+
   const omitted = new Set<string>()
 
   for (const entry of entries)
@@ -34,7 +40,7 @@ export const workUpdateDelivery = (
   const accepted = messages.findIndex(
     (message) =>
       message.role === "user" &&
-      [identity, previousIdentity].some((marker) =>
+      identities.some((marker) =>
         (Predicate.isString(message.content)
           ? message.content
           : message.content
@@ -109,7 +115,7 @@ export const workUpdateDelivery = (
   return {
     state: "responding",
     prompt:
-      "Glass restarted while you were writing the Work update above. Finish that Work update using the saved conversation. Do not repeat what you already said or take any action on the user's behalf.",
+      "Glass restarted while you were writing the Global conversation update above. Finish that Global conversation update using the saved conversation. Do not repeat what you already said or take any action on the user's behalf.",
     events,
   }
 }
