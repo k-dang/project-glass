@@ -46,6 +46,7 @@ export const TourDiagram = Schema.Struct({
       from: Schema.NonEmptyString,
       to: Schema.NonEmptyString,
       change: DiagramChange,
+      label: Schema.optionalKey(Schema.NonEmptyString.check(Schema.isMaxLength(40))),
     }),
   ).check(Schema.isMinLength(1), Schema.isMaxLength(8)),
   steps: Schema.optionalKey(
@@ -93,6 +94,7 @@ export const Tour = Schema.Struct({
   revision: Revision,
   writtenAt: Schema.DateTimeUtcFromString,
   intent: Schema.String,
+  diagram: Schema.optionalKey(Schema.NullOr(TourDiagram)),
   beforeAfter: Schema.optionalKey(Schema.NullOr(TourBeforeAfter)),
   chapters: Schema.Array(Chapter),
   everythingElse: Schema.Array(Schema.String),

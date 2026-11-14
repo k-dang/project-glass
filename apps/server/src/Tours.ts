@@ -15,7 +15,7 @@ import { GitHubClient } from "./github/GitHubClient"
 import { type JobState, pullRequestJobs, type PullRequestJob } from "./pullRequestJobs"
 import { Deadlines } from "./ServerConfig"
 import { TourAnswer, tourInstructions, tourPrompt } from "./tourPrompt"
-import { repairChapterVisuals, validateTourBeforeAfter } from "./tourVisuals"
+import { repairChapterVisuals, repairTourVisuals } from "./tourVisuals"
 
 const BACKGROUND_SLOTS = 2
 
@@ -37,6 +37,7 @@ const toState = ({ output, run }: JobState<Tour, Progress, TourFailure>): TourSt
 
 const content = Schema.Struct({
   intent: Tour.fields.intent,
+  diagram: Tour.fields.diagram,
   beforeAfter: Tour.fields.beforeAfter,
   chapters: Tour.fields.chapters,
   everythingElse: Tour.fields.everythingElse,
@@ -80,10 +81,12 @@ const repair = (answer: TourAnswer, changedFiles: ReadonlyArray<ChangedFile>) =>
     ...new Set([...answer.unplacedFiles.filter((path) => remaining.has(path)), ...remaining]),
   ]
 
-  const beforeAfter =
-    answer.beforeAfter == null ? null : validateTourBeforeAfter(answer.beforeAfter, changedFiles)
-
-  return { intent: answer.intent, beforeAfter, chapters, everythingElse }
+  return {
+    intent: answer.intent,
+    ...repairTourVisuals(answer, changedFiles),
+    chapters,
+    everythingElse,
+  }
 }
 
 export class Tours extends Context.Service<
@@ -163,7 +166,11 @@ export class Tours extends Context.Service<
 
           const repaired = repair(answer, input.files)
 
-          if (answer.beforeAfter != null && repaired.beforeAfter === null)
+          if (
+            answer.beforeAfter != null &&
+            repaired.beforeAfter === null &&
+            repaired.diagram === null
+          )
             yield* Effect.logWarning(
               "Dropped a Tour's Before / after: it changed nothing or a changed line isn't in the diff",
             )

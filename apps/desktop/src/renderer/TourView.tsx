@@ -376,7 +376,12 @@ export function TourView(props: TourViewProps) {
     >
       {hasOverview(reading) && (
         <TourOverview
+          key={DateTime.formatIso(reading.writtenAt)}
           reading={reading}
+          onShowChapter={(index) => {
+            open(index)
+            showChapter(index, "instant")
+          }}
           onShowInReview={onShowInReview}
           chapterCount={reading.chapters.length}
           fileCount={reading.files.length}
@@ -414,18 +419,22 @@ export function TourView(props: TourViewProps) {
 
 function TourOverview(props: {
   reading: TourReading
+  onShowChapter: (index: number) => void
   onShowInReview: (rank: number) => void
   chapterCount: number
   fileCount: number
   onStart: () => void
   onShowTarget: (target: TourCodeTarget) => void
 }) {
-  const { intent, beforeAfter, hotspots } = props.reading
+  const { intent, diagram, beforeAfter, hotspots } = props.reading
   const heading = useId()
 
   return (
     <section
-      className={cn(beforeAfter === null ? tourCard : chapterGrid, "[&+section]:mt-5")}
+      className={cn(
+        diagram === null && beforeAfter === null ? tourCard : chapterGrid,
+        "[&+section]:mt-5",
+      )}
       aria-labelledby={heading}
     >
       <div className="min-w-0 px-5 py-5.5 @max-[850px]/tour:p-4">
@@ -441,6 +450,32 @@ function TourOverview(props: {
         <div className="mt-4">
           <StartReading onStart={props.onStart} />
         </div>
+        {diagram !== null && (
+          <nav className="mt-6 border-t pt-4" aria-label="Tour reading order">
+            <h3 className="mb-2 font-mono text-[10px] font-normal tracking-wider text-muted-foreground uppercase">
+              Reading order
+            </h3>
+            <ol className="divide-y border-y">
+              {props.reading.chapters.map((chapter) => (
+                <li key={chapter.index}>
+                  <button
+                    type="button"
+                    className="flex w-full cursor-pointer items-baseline gap-2.5 py-2.5 text-left text-xs hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
+                    onClick={() => props.onShowChapter(chapter.index)}
+                  >
+                    <span className="font-mono text-[10px] text-muted-foreground">
+                      {twoDigits(chapter.index + 1)}
+                    </span>
+                    <span className="min-w-0 flex-1 wrap-anywhere">{chapter.title}</span>
+                    <span aria-hidden className="text-muted-foreground">
+                      ↗
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ol>
+          </nav>
+        )}
         {hotspots !== null && (
           <TourHotspots
             hotspots={hotspots}
@@ -449,9 +484,36 @@ function TourOverview(props: {
           />
         )}
       </div>
-      {beforeAfter !== null && (
+      {(diagram !== null || beforeAfter !== null) && (
         <div className="min-w-0 border-l p-4.5 @max-[850px]/tour:p-3.5 @max-[700px]/tour:border-t @max-[700px]/tour:border-l-0">
-          <TourBeforeAfter beforeAfter={beforeAfter} onSelect={props.onShowTarget} />
+          {diagram !== null ? (
+            <section aria-label="Before / after: Tour overview">
+              <header className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b pb-3">
+                <h3 className="text-xs font-medium">Before / after</h3>
+                <div
+                  className="flex gap-3 text-[10px] text-muted-foreground"
+                  aria-label="Change legend"
+                >
+                  <span>Unchanged</span>
+                  <span className="text-added">+ Added</span>
+                  <span className="text-deleted">− Removed</span>
+                </div>
+              </header>
+              <TourDiagram
+                diagram={diagram}
+                chapterTitle="Tour overview"
+                chapterOf={props.reading.chapterOf}
+                onSelect={(node) => props.onShowTarget(node.target)}
+              />
+              <p className="mt-4 border-t pt-3 text-[11px] text-muted-foreground">
+                Select a node to read its Chapter and the code behind it.
+              </p>
+            </section>
+          ) : (
+            beforeAfter !== null && (
+              <TourBeforeAfter beforeAfter={beforeAfter} onSelect={props.onShowTarget} />
+            )
+          )}
         </div>
       )}
     </section>
@@ -627,7 +689,7 @@ function ChapterCard(props: {
               <TourDiagram
                 diagram={chapter.diagram}
                 chapterTitle={title}
-                path={props.path}
+                className="mb-3 max-h-[45%] border-b pb-3"
                 onSelect={(node) => props.onShowTarget(node.target)}
               />
             )}
