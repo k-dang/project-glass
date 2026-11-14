@@ -74,8 +74,8 @@ it("opens a Turn for work pi starts on its own after the last Turn ended", () =>
   )
 
   const [opened] = woke.events
-  assert.isTrue(Predicate.isTagged(opened, "TurnStarted"))
-  const turnId = Predicate.isTagged(opened, "TurnStarted") ? opened.turnId : ""
+  assert.ok(Predicate.isTagged(opened, "TurnStarted"))
+  const { turnId } = opened
 
   assert.deepStrictEqual(
     opened,

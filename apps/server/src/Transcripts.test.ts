@@ -85,8 +85,8 @@ it.live("hands its program only the Turns Glass started, not one the Agent start
 
     const { turns } = yield* transcripts.read("agent-1")
     assert.deepStrictEqual(
-      turns.map(({ id, message }) => (id === "woke" ? id : message)),
-      ["woke", "Next"],
+      turns.map(({ message }) => message),
+      ["", "Next"],
     )
   }).pipe(Effect.scoped, Effect.provide(transcriptsLayer)),
 )
