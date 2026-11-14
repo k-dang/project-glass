@@ -68,7 +68,9 @@ import {
   CodeBlockActions,
   CodeBlockContent,
   CodeBlockCopyButton,
+  CodeBlockHeader,
   CodeBlockLine,
+  CodeBlockTitle,
 } from "@/components/ui/code-block"
 import { useHighlightedCode } from "@/hooks/use-highlighted-code"
 import { Message, MessageContent, MessageGroup } from "@/components/ui/message"
@@ -679,11 +681,14 @@ function FencedCode(props: { code: string; language: string }) {
   const lines = useHighlightedCode(props.code, props.language)
 
   return (
-    <CodeBlock size="sm">
-      <CodeBlockActions>
-        <CodeBlockCopyButton value={props.code} />
-      </CodeBlockActions>
-      <CodeBlockContent>
+    <CodeBlock className="rounded-xl border-0 bg-muted dark:bg-muted">
+      <CodeBlockHeader>
+        <CodeBlockTitle>{props.language}</CodeBlockTitle>
+        <CodeBlockActions>
+          <CodeBlockCopyButton value={props.code} />
+        </CodeBlockActions>
+      </CodeBlockHeader>
+      <CodeBlockContent lineNumbers>
         {lines.map((line, index) => (
           <CodeBlockLine key={index}>{line}</CodeBlockLine>
         ))}
