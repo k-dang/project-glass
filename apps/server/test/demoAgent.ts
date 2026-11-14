@@ -50,6 +50,17 @@ const slowReply = `Working through it one step at a time. ${Array.from(
   (_, step) => `Step ${step + 1} looks fine.`,
 ).join(" ")} All done.`
 
+const diagramReply = [
+  "Here's how a message reaches the Agent:",
+  "",
+  "```mermaid",
+  "flowchart LR",
+  "  A[Message box] --> B[Backend]",
+  "  B --> C[Agent]",
+  "  C -->|streams reply| A",
+  "```",
+].join("\n")
+
 const demoReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
   if (isGlobalConversation(input)) return globalConversationReply(input)
 
@@ -70,6 +81,8 @@ const demoReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
     ]
 
   if (workingSlowly(input)) return slowReply.split(/(?<= )/).map((text) => ({ text }))
+
+  if (lastUserText(input) === "Draw a diagram") return [{ text: diagramReply }]
 
   if (messages.some(({ role }) => role === "assistant"))
     return [{ text: `Got it: “${textOf(last)}”.` }]

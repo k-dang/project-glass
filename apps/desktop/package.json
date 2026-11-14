@@ -27,6 +27,7 @@
     "@pierre/trees": "catalog:",
     "@playwright/test": "catalog:",
     "@shadcn/react": "catalog:",
+    "@streamdown/mermaid": "catalog:",
     "@tailwindcss/vite": "catalog:",
     "@tanstack/react-router": "catalog:",
     "@testing-library/react": "catalog:",
