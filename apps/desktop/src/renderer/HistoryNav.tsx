@@ -30,8 +30,11 @@ export function HistoryNav() {
   ])
 
   const onMouseUp = useEffectEvent((event: MouseEvent) => {
+    if (event.button !== BACK_BUTTON && event.button !== FORWARD_BUTTON) return
+    event.preventDefault()
+
     if (event.button === BACK_BUTTON) back()
-    else if (event.button === FORWARD_BUTTON) forward()
+    else forward()
   })
 
   useEffect(() => {
