@@ -201,7 +201,7 @@ export function DiscussionThread(props: {
         {resolved ? (
           <CollapsibleTrigger
             render={<Button type="button" variant="ghost" />}
-            className="h-auto min-w-0 flex-1 justify-start gap-2 px-0 py-0 text-left font-normal aria-expanded:bg-transparent"
+            className="h-auto min-w-0 flex-1 justify-start gap-2 px-0 py-0 text-left font-normal aria-expanded:bg-transparent motion-safe:active:not-focus-visible:scale-100"
           >
             <ChevronRight
               className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 ease-out group-data-panel-open/button:rotate-90 motion-reduce:transition-none"
