@@ -40,6 +40,7 @@ import {
   CircleStop,
   CircleX,
   FileDiff,
+  Layers,
   LoaderCircle,
   MessageCircle,
   Unplug,
@@ -456,9 +457,7 @@ const TurnView = memo(function TurnView(props: {
         )}
         <Message>
           <MessageContent>
-            {nestParts(turn.parts).map(({ part, index, nested }) => (
-              <PartView key={index} part={part} nested={nested} />
-            ))}
+            <TurnParts parts={turn.parts} />
             <Trace>
               {turn.ended === null ? (
                 <TraceLine status="running">
@@ -578,6 +577,87 @@ const nestParts = (parts: ReadonlyArray<TurnPart>): ReadonlyArray<NestedPart> =>
     })
 
   return under(null)
+}
+
+const groupSteps = (
+  parts: ReadonlyArray<NestedPart>,
+  isStep: (part: TurnPart) => boolean,
+): ReadonlyArray<ReadonlyArray<NestedPart>> =>
+  parts.reduce<Array<Array<NestedPart>>>((groups, item) => {
+    const last = groups.at(-1)
+    const lastItem = last?.at(-1)
+
+    if (last !== undefined && lastItem !== undefined && isStep(lastItem.part) && isStep(item.part))
+      last.push(item)
+    else groups.push([item])
+
+    return groups
+  }, [])
+
+const counted = (count: number, noun: string) =>
+  count === 0 ? null : `${count} ${noun}${count === 1 ? "" : "s"}`
+
+const runningCall = (parts: ReadonlyArray<TurnPart>) =>
+  parts.find((part) => Predicate.isTagged(part, "ToolCall") && part.status === "running")
+
+const stepsTitle = (parts: ReadonlyArray<TurnPart>) => {
+  const calls = parts.filter((part) => Predicate.isTagged(part, "ToolCall"))
+  const running = calls.find((call) => call.status === "running")
+  const failed = calls.filter((call) => call.status === "failed").length
+
+  const summary = [
+    counted(calls.length, "tool call"),
+    counted(parts.length - calls.length, "thought"),
+    failed === 0 ? null : `${failed} failed`,
+  ]
+    .filter(Predicate.isString)
+    .join(", ")
+
+  return `${running === undefined ? "Worked" : `Running ${running.name}`} · ${summary}`
+}
+
+function TurnParts(props: { parts: ReadonlyArray<TurnPart> }) {
+  const toolCallView = useContext(ToolCallView)
+
+  const isStep = (part: TurnPart) =>
+    Predicate.isTagged(part, "Thinking") ||
+    (Predicate.isTagged(part, "ToolCall") && (toolCallView?.(part) ?? null) === null)
+
+  return groupSteps(nestParts(props.parts), isStep).map((group) => {
+    const [first] = group
+
+    if (first === undefined) return null
+
+    return group.length === 1 ? (
+      <PartView key={first.index} part={first.part} nested={first.nested} />
+    ) : (
+      <Steps key={first.index} steps={group} />
+    )
+  })
+}
+
+function Steps(props: { steps: ReadonlyArray<NestedPart> }) {
+  const parts = props.steps.map(({ part }) => part)
+
+  return (
+    <Trace>
+      <TraceCollapsible>
+        <TraceCollapsibleTrigger>
+          <TraceLine status={runningCall(parts) === undefined ? undefined : "running"}>
+            <TraceIcon>
+              <Layers />
+            </TraceIcon>
+            <TraceTitle>{stepsTitle(parts)}</TraceTitle>
+          </TraceLine>
+        </TraceCollapsibleTrigger>
+        <TraceCollapsibleContent className="flex flex-col gap-2">
+          {props.steps.map(({ part, index, nested }) => (
+            <PartView key={index} part={part} nested={nested} />
+          ))}
+        </TraceCollapsibleContent>
+      </TraceCollapsible>
+    </Trace>
+  )
 }
 
 const toolStatus = {

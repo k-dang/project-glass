@@ -87,10 +87,15 @@ it("shows the Agent under Local and its Turn's parts as they stream", async () =
   const transcript = await screen.findByRole("region", { name: "Transcript" })
   expect(await within(transcript).findByText("It says hi.")).toBeTruthy()
   expect(within(transcript).getByText("Run echo")).toBeTruthy()
-  const thinking = within(transcript).getByRole("button", { name: "Thinking" })
-  expect(thinking.getAttribute("aria-expanded")).toBe("false")
+  expect(within(transcript).queryByRole("button", { name: "Thinking" })).toBeNull()
 
   const user = userEvent.setup()
+  await user.click(
+    within(transcript).getByRole("button", { name: "Worked · 1 tool call, 1 thought" }),
+  )
+  const thinking = await within(transcript).findByRole("button", { name: "Thinking" })
+  expect(thinking.getAttribute("aria-expanded")).toBe("false")
+
   await user.click(thinking)
   expect(await within(transcript).findByText("I should run echo.")).toBeTruthy()
 
@@ -430,6 +435,43 @@ it("nests a subagent's tool calls under the tool call that started it", async ()
 
   await user.click(parent)
   expect(await within(transcript).findByRole("button", { name: "Done: Bash bash-1" })).toBeTruthy()
+})
+
+it("folds a run of steps into one line naming the tool call still running", async () => {
+  mount({
+    WatchTranscript: () =>
+      Stream.make(
+        TranscriptSnapshot.make({
+          queued: [],
+          status: null,
+          turns: [
+            {
+              id: "turn-1",
+              message: "Fix it",
+              images: [],
+              context: null,
+              feedback: [],
+              sentAt,
+              ended: null,
+              parts: [
+                ThinkingPart.make({ text: "Look first." }),
+                call("read-1", "Read", null),
+                ToolCallPart.make({ ...call("bash-1", "Bash", null), status: "failed" }),
+                ToolCallPart.make({ ...call("bash-2", "Bash", null), status: "running" }),
+              ],
+            },
+          ],
+        }),
+      ),
+  })
+
+  const transcript = await screen.findByRole("region", { name: "Transcript" })
+  expect(
+    await within(transcript).findByRole("button", {
+      name: "Running Bash · 3 tool calls, 1 thought, 1 failed",
+    }),
+  ).toBeTruthy()
+  expect(within(transcript).queryByRole("button", { name: "Done: Read read-1" })).toBeNull()
 })
 
 it.each(["{Control>}n{/Control}", "{Meta>}n{/Meta}"])(
