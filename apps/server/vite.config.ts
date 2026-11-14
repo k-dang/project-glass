@@ -12,12 +12,19 @@ const agentHost = (
   outDir: string,
   entry: Record<string, string> = { agentHost: "src/agentHost.ts" },
 ) =>
-  ({
-    ...node,
+  [
     entry,
-    outDir,
-    outputOptions: { codeSplitting: false },
-  }) as const
+    // pi loads its Diagram tool from a file beside the agent host, in pi's own process.
+    { piDrawDiagram: "src/agentHost/piDrawDiagram.ts" },
+  ].map(
+    (bundle) =>
+      ({
+        ...node,
+        entry: bundle,
+        outDir,
+        outputOptions: { codeSplitting: false },
+      }) as const,
+  )
 
 export default defineConfig({
   pack: [
@@ -26,7 +33,7 @@ export default defineConfig({
       entry: { bin: "src/bin.ts", sqlReadWorker: "src/sqlReadWorker.ts" },
       outDir: "dist",
     },
-    agentHost("dist"),
+    ...agentHost("dist"),
     {
       ...node,
       entry: { fakeBackend: "test/fakeBackend.ts", sqlReadWorker: "src/sqlReadWorker.ts" },
@@ -34,9 +41,9 @@ export default defineConfig({
       // It reads ../schema.json relative to its own module, which breaks once bundled.
       deps: { ...node.deps, neverBundle: ["@octokit/graphql-schema"] },
     },
-    agentHost("dist-fake"),
+    ...agentHost("dist-fake"),
     ...(process.env["GLASS_PACK_TEST_HOST"] === "1"
-      ? [agentHost("dist-test", { scriptedAgentHost: "test/scriptedAgentHost.ts" })]
+      ? agentHost("dist-test", { scriptedAgentHost: "test/scriptedAgentHost.ts" })
       : []),
   ],
   test: {

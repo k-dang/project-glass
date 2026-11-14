@@ -66,6 +66,7 @@ import type { WrittenSkills } from "./sentSkills"
 import { piLoadsNothing, piTools } from "../agentTools"
 import { piSuggestDraftExtension } from "./suggestDraftTool"
 import { runTurns } from "./turnLoop"
+import { fileURLToPath } from "node:url"
 
 const thinkingLevels = ["off", "minimal", "low", "medium", "high", "xhigh", "max"]
 
@@ -191,13 +192,21 @@ const lockedDownFlags = Effect.fnUntraced(function* (
   ]
 })
 
+/** pi loads Glass's Diagram tool from its own module: built beside the agent host, or the source under test. */
+export const piDrawDiagramExtension = fileURLToPath(
+  new URL(
+    import.meta.url.endsWith(".ts") ? "./piDrawDiagram.ts" : "./piDrawDiagram.mjs",
+    import.meta.url,
+  ),
+)
+
 const skillFlags = (skills: ReadonlyArray<WrittenSkills>) =>
   skills.flatMap((plugin) => plugin.skills.flatMap((skill) => ["--skill", skill]))
 
 const roleFlags = (folder: string, role: ConversationRole, skills: ReadonlyArray<WrittenSkills>) =>
   Match.value(role).pipe(
     Match.tagsExhaustive({
-      Work: () => Effect.succeed(skillFlags(skills)),
+      Work: () => Effect.succeed([...skillFlags(skills), "--extension", piDrawDiagramExtension]),
       Review: ({ brief }) =>
         lockedDownFlags(
           folder,

@@ -3,7 +3,14 @@
   "program": "@earendil-works/pi-coding-agent 1.3.0",
   "processes": [
     {
-      "args": ["--mode", "rpc", "--session-id", "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d"],
+      "args": [
+        "--mode",
+        "rpc",
+        "--session-id",
+        "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
+        "--extension",
+        "<pi-draw-diagram>"
+      ],
       "cwd": "<folder>",
       "frames": [
         {
@@ -70,7 +77,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T23-33-28-370Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-14T16-42-21-418Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -114,7 +121,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1793748808537,
+              "timestamp": 1794674542223,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -220,6 +227,30 @@
                   "constrainedSampling": {
                     "type": "json_schema",
                     "strict": "prefer"
+                  }
+                },
+                {
+                  "name": "draw_diagram",
+                  "description": "Draw a Diagram beside the conversation in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string",
+                        "description": "A short name for the Diagram, shown above it. The same title redraws that Diagram."
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": ["existing", "proposed", "uncertain"],
+                        "description": "What the Diagram shows: \"existing\" for how things work now, \"proposed\" for a design that doesn't exist yet, or \"uncertain\" when it rests on inferences you couldn't confirm."
+                      },
+                      "mermaid": {
+                        "type": "string",
+                        "description": "The diagram in Mermaid syntax, such as a flowchart or sequence diagram. Glass draws no links or images."
+                      }
+                    },
+                    "required": ["title", "kind", "mermaid"],
+                    "additionalProperties": false
                   }
                 }
               ]
@@ -233,7 +264,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1793748808537,
+              "timestamp": 1794674542223,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -339,6 +370,30 @@
                   "constrainedSampling": {
                     "type": "json_schema",
                     "strict": "prefer"
+                  }
+                },
+                {
+                  "name": "draw_diagram",
+                  "description": "Draw a Diagram beside the conversation in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string",
+                        "description": "A short name for the Diagram, shown above it. The same title redraws that Diagram."
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": ["existing", "proposed", "uncertain"],
+                        "description": "What the Diagram shows: \"existing\" for how things work now, \"proposed\" for a design that doesn't exist yet, or \"uncertain\" when it rests on inferences you couldn't confirm."
+                      },
+                      "mermaid": {
+                        "type": "string",
+                        "description": "The diagram in Mermaid syntax, such as a flowchart or sequence diagram. Glass draws no links or images."
+                      }
+                    },
+                    "required": ["title", "kind", "mermaid"],
+                    "additionalProperties": false
                   }
                 }
               ]
@@ -356,7 +411,7 @@
                   "text": "Use the bash tool to run exactly `echo hi` and nothing else, then reply with exactly: DONE"
                 }
               ],
-              "timestamp": 1793748808536
+              "timestamp": 1794674542222
             }
           }
         },
@@ -371,7 +426,7 @@
                   "text": "Use the bash tool to run exactly `echo hi` and nothing else, then reply with exactly: DONE"
                 }
               ],
-              "timestamp": 1793748808536
+              "timestamp": 1794674542222
             }
           }
         },
@@ -399,7 +454,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1793748808561
+              "timestamp": 1794674542248
             }
           }
         },
@@ -424,7 +479,7 @@
             "assistantMessageEvent": {
               "type": "toolcall_start",
               "contentIndex": 0,
-              "id": "toolu_01R5oYAY941tEFGGnJXwLHuf",
+              "id": "toolu_01MhLnAQzUvXtCjFLu2WY8R4",
               "toolName": "bash"
             }
           }
@@ -502,7 +557,7 @@
               "contentIndex": 0,
               "toolCall": {
                 "type": "toolCall",
-                "id": "toolu_01R5oYAY941tEFGGnJXwLHuf",
+                "id": "toolu_01MhLnAQzUvXtCjFLu2WY8R4",
                 "name": "bash",
                 "arguments": {
                   "command": "echo hi"
@@ -519,7 +574,7 @@
               "content": [
                 {
                   "type": "toolCall",
-                  "id": "toolu_01R5oYAY941tEFGGnJXwLHuf",
+                  "id": "toolu_01MhLnAQzUvXtCjFLu2WY8R4",
                   "name": "bash",
                   "arguments": {
                     "command": "echo hi"
@@ -545,10 +600,10 @@
                 "cacheWrite1h": 0
               },
               "stopReason": "toolUse",
-              "timestamp": 1793748808561,
-              "responseId": "gen_01M6HW5CXWYPCYGA8P92DAQBQX",
+              "timestamp": 1794674542248,
+              "responseId": "gen_01M7DF0HQEBXHZBG7A5SX6R6QK",
               "rawStopReason": "tool_use",
-              "durationMs": 839,
+              "durationMs": 845,
               "thinkingLevel": "medium"
             }
           }
@@ -556,7 +611,7 @@
         {
           "in": {
             "type": "tool_execution_start",
-            "toolCallId": "toolu_01R5oYAY941tEFGGnJXwLHuf",
+            "toolCallId": "toolu_01MhLnAQzUvXtCjFLu2WY8R4",
             "toolName": "bash",
             "args": {
               "command": "echo hi"
@@ -566,7 +621,7 @@
         {
           "in": {
             "type": "extension_ui_request",
-            "id": "97728542-c0b7-4d5d-b053-9c7986c46d80",
+            "id": "eebc3566-d2c0-4d64-ad5c-5a0e22dc9f17",
             "method": "confirm",
             "title": "Run it?",
             "message": "bash"
@@ -600,7 +655,7 @@
         {
           "out": {
             "type": "extension_ui_response",
-            "id": "97728542-c0b7-4d5d-b053-9c7986c46d80",
+            "id": "eebc3566-d2c0-4d64-ad5c-5a0e22dc9f17",
             "cancelled": true
           }
         },
@@ -613,7 +668,7 @@
         {
           "in": {
             "type": "tool_execution_end",
-            "toolCallId": "toolu_01R5oYAY941tEFGGnJXwLHuf",
+            "toolCallId": "toolu_01MhLnAQzUvXtCjFLu2WY8R4",
             "toolName": "bash",
             "result": {
               "content": [
@@ -632,7 +687,7 @@
             "type": "message_start",
             "message": {
               "role": "toolResult",
-              "toolCallId": "toolu_01R5oYAY941tEFGGnJXwLHuf",
+              "toolCallId": "toolu_01MhLnAQzUvXtCjFLu2WY8R4",
               "toolName": "bash",
               "content": [
                 {
@@ -642,7 +697,7 @@
               ],
               "details": {},
               "isError": true,
-              "timestamp": 1793748809404
+              "timestamp": 1794674543096
             }
           }
         },
@@ -651,7 +706,7 @@
             "type": "message_end",
             "message": {
               "role": "toolResult",
-              "toolCallId": "toolu_01R5oYAY941tEFGGnJXwLHuf",
+              "toolCallId": "toolu_01MhLnAQzUvXtCjFLu2WY8R4",
               "toolName": "bash",
               "content": [
                 {
@@ -661,7 +716,7 @@
               ],
               "details": {},
               "isError": true,
-              "timestamp": 1793748809404
+              "timestamp": 1794674543096
             }
           }
         },
@@ -673,7 +728,7 @@
               "content": [
                 {
                   "type": "toolCall",
-                  "id": "toolu_01R5oYAY941tEFGGnJXwLHuf",
+                  "id": "toolu_01MhLnAQzUvXtCjFLu2WY8R4",
                   "name": "bash",
                   "arguments": {
                     "command": "echo hi"
@@ -699,16 +754,16 @@
                 "cacheWrite1h": 0
               },
               "stopReason": "toolUse",
-              "timestamp": 1793748808561,
-              "responseId": "gen_01M6HW5CXWYPCYGA8P92DAQBQX",
+              "timestamp": 1794674542248,
+              "responseId": "gen_01M7DF0HQEBXHZBG7A5SX6R6QK",
               "rawStopReason": "tool_use",
-              "durationMs": 839,
+              "durationMs": 845,
               "thinkingLevel": "medium"
             },
             "toolResults": [
               {
                 "role": "toolResult",
-                "toolCallId": "toolu_01R5oYAY941tEFGGnJXwLHuf",
+                "toolCallId": "toolu_01MhLnAQzUvXtCjFLu2WY8R4",
                 "toolName": "bash",
                 "content": [
                   {
@@ -718,7 +773,7 @@
                 ],
                 "details": {},
                 "isError": true,
-                "timestamp": 1793748809404
+                "timestamp": 1794674543096
               }
             ]
           }
@@ -752,7 +807,7 @@
                 }
               },
               "stopReason": "aborted",
-              "timestamp": 1793748809407,
+              "timestamp": 1794674543098,
               "errorMessage": "Request aborted",
               "durationMs": 3,
               "thinkingLevel": "medium"
@@ -783,7 +838,7 @@
                 }
               },
               "stopReason": "aborted",
-              "timestamp": 1793748809407,
+              "timestamp": 1794674543098,
               "errorMessage": "Request aborted",
               "durationMs": 3,
               "thinkingLevel": "medium"
@@ -814,7 +869,7 @@
                 }
               },
               "stopReason": "aborted",
-              "timestamp": 1793748809407,
+              "timestamp": 1794674543098,
               "errorMessage": "Request aborted",
               "durationMs": 3,
               "thinkingLevel": "medium"
@@ -830,7 +885,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1793748808537,
+                "timestamp": 1794674542223,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -937,6 +992,30 @@
                       "type": "json_schema",
                       "strict": "prefer"
                     }
+                  },
+                  {
+                    "name": "draw_diagram",
+                    "description": "Draw a Diagram beside the conversation in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
+                    "parameters": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string",
+                          "description": "A short name for the Diagram, shown above it. The same title redraws that Diagram."
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": ["existing", "proposed", "uncertain"],
+                          "description": "What the Diagram shows: \"existing\" for how things work now, \"proposed\" for a design that doesn't exist yet, or \"uncertain\" when it rests on inferences you couldn't confirm."
+                        },
+                        "mermaid": {
+                          "type": "string",
+                          "description": "The diagram in Mermaid syntax, such as a flowchart or sequence diagram. Glass draws no links or images."
+                        }
+                      },
+                      "required": ["title", "kind", "mermaid"],
+                      "additionalProperties": false
+                    }
                   }
                 ]
               },
@@ -948,14 +1027,14 @@
                     "text": "Use the bash tool to run exactly `echo hi` and nothing else, then reply with exactly: DONE"
                   }
                 ],
-                "timestamp": 1793748808536
+                "timestamp": 1794674542222
               },
               {
                 "role": "assistant",
                 "content": [
                   {
                     "type": "toolCall",
-                    "id": "toolu_01R5oYAY941tEFGGnJXwLHuf",
+                    "id": "toolu_01MhLnAQzUvXtCjFLu2WY8R4",
                     "name": "bash",
                     "arguments": {
                       "command": "echo hi"
@@ -981,15 +1060,15 @@
                   "cacheWrite1h": 0
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1793748808561,
-                "responseId": "gen_01M6HW5CXWYPCYGA8P92DAQBQX",
+                "timestamp": 1794674542248,
+                "responseId": "gen_01M7DF0HQEBXHZBG7A5SX6R6QK",
                 "rawStopReason": "tool_use",
-                "durationMs": 839,
+                "durationMs": 845,
                 "thinkingLevel": "medium"
               },
               {
                 "role": "toolResult",
-                "toolCallId": "toolu_01R5oYAY941tEFGGnJXwLHuf",
+                "toolCallId": "toolu_01MhLnAQzUvXtCjFLu2WY8R4",
                 "toolName": "bash",
                 "content": [
                   {
@@ -999,7 +1078,7 @@
                 ],
                 "details": {},
                 "isError": true,
-                "timestamp": 1793748809404
+                "timestamp": 1794674543096
               },
               {
                 "role": "assistant",
@@ -1022,7 +1101,7 @@
                   }
                 },
                 "stopReason": "aborted",
-                "timestamp": 1793748809407,
+                "timestamp": 1794674543098,
                 "errorMessage": "Request aborted",
                 "durationMs": 3,
                 "thinkingLevel": "medium"
@@ -1109,7 +1188,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--\\2026-11-03T23-33-28-370Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-14T16-42-21-418Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 5,

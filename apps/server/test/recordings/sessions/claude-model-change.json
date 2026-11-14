@@ -10,6 +10,7 @@
         "--input-format",
         "stream-json",
         "--permission-prompt-tool=stdio",
+        "--allowedTools=mcp__glass__draw_diagram",
         "--allow-dangerously-skip-permissions",
         "--include-partial-messages",
         "--session-id=6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
@@ -18,10 +19,58 @@
       "frames": [
         {
           "out": {
-            "request_id": "pllbli28qf",
+            "request_id": "zu5sk3v8hgj",
             "type": "control_request",
             "request": {
-              "subtype": "initialize"
+              "subtype": "initialize",
+              "sdkMcpServers": ["glass"],
+              "sdkMcpServerManifests": {
+                "glass": {
+                  "initializeResult": {
+                    "protocolVersion": "2025-11-25",
+                    "capabilities": {
+                      "tools": {
+                        "listChanged": true
+                      }
+                    },
+                    "serverInfo": {
+                      "name": "glass",
+                      "version": "1.0.0"
+                    }
+                  },
+                  "toolsListResult": {
+                    "tools": [
+                      {
+                        "name": "draw_diagram",
+                        "description": "Draw a Diagram beside the conversation in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
+                        "inputSchema": {
+                          "$schema": "http://json-schema.org/draft-07/schema#",
+                          "type": "object",
+                          "properties": {
+                            "title": {
+                              "type": "string",
+                              "description": "A short name for the Diagram, shown above it. The same title redraws that Diagram."
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": ["existing", "proposed", "uncertain"],
+                              "description": "What the Diagram shows: \"existing\" for how things work now, \"proposed\" for a design that doesn't exist yet, or \"uncertain\" when it rests on inferences you couldn't confirm."
+                            },
+                            "mermaid": {
+                              "type": "string",
+                              "description": "The diagram in Mermaid syntax, such as a flowchart or sequence diagram. Glass draws no links or images."
+                            }
+                          },
+                          "required": ["title", "kind", "mermaid"]
+                        },
+                        "execution": {
+                          "taskSupport": "forbidden"
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
             }
           }
         },
@@ -30,7 +79,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "pllbli28qf",
+              "request_id": "zu5sk3v8hgj",
               "response": {
                 "commands": [
                   {
@@ -319,6 +368,11 @@
                     "description": "Catch-all for any task that doesn't fit a more specific agent. FleetView's default when no agent name is typed."
                   },
                   {
+                    "name": "claude-code-guide",
+                    "description": "Use this agent when the user asks questions (\"Can Claude...\", \"Does Claude...\", \"How do I...\") about: (1) Claude Code (the CLI tool) - features, hooks, slash commands, MCP servers, settings, IDE integrations, keyboard shortcuts; (2) Claude Agent SDK - building custom agents; (3) Claude API (formerly Anthropic API) - Messages API for directly passing messages to Claude, Tool Runner (`client.beta.messages.tool_runner`) for running an agentic loop over your own tools, manual tool-use loops, Managed Agents for server-hosted agents with a managed sandbox, prompt caching, and general Anthropic SDK usage; (4) Claude Tag (Claude in Slack) - what it is, setting it up for a Slack workspace, `/install-slack-app`; (5) `claude plugin eval` (writing and running plugin eval suites, its JSON/report, sandbox, CI) and the `/skill-doctor` report. **IMPORTANT:** Before spawning a new agent, check if there is already a running or recently completed claude-code-guide agent that you can continue via SendMessage.",
+                    "model": "haiku"
+                  },
+                  {
                     "name": "Explore",
                     "description": "Fast read-only search agent for locating code. Use it to find files by pattern (eg. \"src/components/**/*.tsx\"), grep for symbols or keywords (eg. \"API endpoints\"), or answer \"where is X defined / which files reference Y.\" Do NOT use it for code review, design-doc auditing, cross-file consistency checks, or open-ended analysis — it reads excerpts rather than whole files and will miss content past its read window. When calling, specify search breadth: \"quick\" for a single targeted lookup, \"medium\" for moderate exploration, or \"very thorough\" to search across multiple locations and naming conventions.",
                     "model": "inherit"
@@ -338,7 +392,7 @@
                     "model": "sonnet"
                   }
                 ],
-                "output_style": "default",
+                "output_style": "<redacted>",
                 "available_output_styles": [
                   "default",
                   "Proactive",
@@ -406,9 +460,12 @@
                   }
                 ],
                 "account": "<redacted>",
-                "pid": 145820,
+                "pid": "<redacted>",
                 "claude_code_version": "2.1.309",
                 "current_permission_mode": "default",
+                "sdk_mcp_manifests_parked": {
+                  "glass": "parked"
+                },
                 "feedback_mode": {
                   "kind": "disabled"
                 },
@@ -430,7 +487,7 @@
         },
         {
           "out": {
-            "request_id": "kpxtuwqyvg8",
+            "request_id": "etsfjpzg4hg",
             "type": "control_request",
             "request": {
               "subtype": "set_model",
@@ -443,7 +500,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "kpxtuwqyvg8",
+              "request_id": "etsfjpzg4hg",
               "response": {
                 "model": "claude-haiku-5-5"
               }
@@ -452,7 +509,7 @@
         },
         {
           "out": {
-            "request_id": "ug259qy1yge",
+            "request_id": "vq7sekfzvus",
             "type": "control_request",
             "request": {
               "subtype": "apply_flag_settings",
@@ -467,7 +524,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "ug259qy1yge"
+              "request_id": "vq7sekfzvus"
             }
           }
         },
@@ -479,7 +536,7 @@
               "content": "Reply with exactly: FIRST"
             },
             "parent_tool_use_id": null,
-            "uuid": "11dc9e78-923d-4cb3-8b37-2d15aebfb694"
+            "uuid": "b203feda-6a91-431d-ad19-bff94de6df30"
           }
         },
         {
@@ -488,25 +545,25 @@
             "subtype": "session_state_changed",
             "state": "running",
             "sdk_host_only": true,
-            "uuid": "de11a020-4314-49ad-9d0f-23c9b9eff5be",
+            "uuid": "4d1d135f-de49-4bed-81ec-25da2394a5ed",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "11dc9e78-923d-4cb3-8b37-2d15aebfb694",
+            "command_uuid": "b203feda-6a91-431d-ad19-bff94de6df30",
             "state": "queued",
-            "uuid": "129374ab-0c1e-4e60-9c6e-707192876213",
+            "uuid": "6fae4173-7fd1-4315-b78d-a6d1a16d6856",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "11dc9e78-923d-4cb3-8b37-2d15aebfb694",
+            "command_uuid": "b203feda-6a91-431d-ad19-bff94de6df30",
             "state": "started",
-            "uuid": "a79ec4cd-3a56-4963-814b-0fa6cace23e6",
+            "uuid": "7906331a-c84a-4f8a-85c2-1b163f546ac8",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -543,9 +600,16 @@
               "WebFetch",
               "WebSearch",
               "Workflow",
-              "Write"
+              "Write",
+              "mcp__glass__draw_diagram"
             ],
-            "mcp_servers": [],
+            "mcp_servers": [
+              {
+                "name": "glass",
+                "status": "connected",
+                "source": "sdk"
+              }
+            ],
             "model": "claude-haiku-5-5",
             "permissionMode": "default",
             "slash_commands": [
@@ -598,8 +662,15 @@
             "terminal_slash_commands": ["doctor", "color", "focus", "reload-plugins"],
             "apiKeySource": "<redacted>",
             "claude_code_version": "2.1.309",
-            "output_style": "default",
-            "agents": ["claude", "Explore", "general-purpose", "Plan", "statusline-setup"],
+            "output_style": "<redacted>",
+            "agents": [
+              "claude",
+              "claude-code-guide",
+              "Explore",
+              "general-purpose",
+              "Plan",
+              "statusline-setup"
+            ],
             "skills": [
               "deep-research",
               "dataviz",
@@ -648,19 +719,19 @@
             ],
             "analytics_disabled": true,
             "product_feedback_disabled": false,
-            "uuid": "d695508f-4539-4027-8fce-7383365fa8f7",
+            "uuid": "ed42db0f-56d3-4296-9fdd-e7d4a8d7dbe8",
             "memory_paths": {
               "auto": "<folder>/.claude/projects\\<folder>/memory\\"
             },
             "original_cwd": "<folder>",
             "additional_directories": [],
-            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-2f910d142f76cd8bc11ebd635a108fcc",
+            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-9b57c357c710aa5cfd1542611ea25d68",
             "fast_mode_state": "off",
             "fast_mode_disabled_reason": "sdk_opt_in_required",
             "per_turn_effort_active": true,
             "view_mode": "default",
             "powershell_path": "<home>/AppData/Local/Programs/PowerShell/7/pwsh.exe",
-            "user_message_uuids": ["11dc9e78-923d-4cb3-8b37-2d15aebfb694"]
+            "user_message_uuids": ["b203feda-6a91-431d-ad19-bff94de6df30"]
           }
         },
         {
@@ -669,8 +740,8 @@
             "subtype": "status",
             "status": "requesting",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "e8832ff9-b53f-436e-97e9-ee2667c6ad36",
-            "user_message_uuids": ["11dc9e78-923d-4cb3-8b37-2d15aebfb694"]
+            "uuid": "b5be2464-09e8-4976-9dbc-6a8f22f5b1d4",
+            "user_message_uuids": ["b203feda-6a91-431d-ad19-bff94de6df30"]
           }
         },
         {
@@ -680,7 +751,7 @@
               "type": "message_start",
               "message": {
                 "model": "claude-haiku-5-5",
-                "id": "msg_011CgfWtU9vLR35tpDNx5WHM",
+                "id": "msg_011Ch39oYJTKGQ24GFy1EQUn",
                 "type": "message",
                 "role": "assistant",
                 "content": [],
@@ -708,12 +779,12 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "a3f57e71-b21a-4446-b259-52734363e766",
-            "ttft_ms": 1071,
+            "uuid": "0b9c66c0-7617-4a4e-a74e-b50dcc297cb8",
+            "ttft_ms": 637,
             "thinking_display": "updates",
-            "api_message_id": "msg_011CgfWtU9vLR35tpDNx5WHM",
-            "user_message_uuid": "11dc9e78-923d-4cb3-8b37-2d15aebfb694",
-            "user_message_uuids": ["11dc9e78-923d-4cb3-8b37-2d15aebfb694"]
+            "api_message_id": "msg_011Ch39oYJTKGQ24GFy1EQUn",
+            "user_message_uuid": "b203feda-6a91-431d-ad19-bff94de6df30",
+            "user_message_uuids": ["b203feda-6a91-431d-ad19-bff94de6df30"]
           }
         },
         {
@@ -729,8 +800,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "261cbd13-446d-4b80-9eb3-4842a01ce0be",
-            "api_message_id": "msg_011CgfWtU9vLR35tpDNx5WHM"
+            "uuid": "79a28402-ea64-48f4-85ed-a08c07b41d60",
+            "api_message_id": "msg_011Ch39oYJTKGQ24GFy1EQUn"
           }
         },
         {
@@ -746,8 +817,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "e795885a-3b5c-4080-b7d3-82feb574b644",
-            "api_message_id": "msg_011CgfWtU9vLR35tpDNx5WHM"
+            "uuid": "6aed6668-7f76-4772-8332-de57dd84964f",
+            "api_message_id": "msg_011Ch39oYJTKGQ24GFy1EQUn"
           }
         },
         {
@@ -755,7 +826,7 @@
             "type": "assistant",
             "message": {
               "model": "claude-haiku-5-5",
-              "id": "msg_011CgfWtU9vLR35tpDNx5WHM",
+              "id": "msg_011Ch39oYJTKGQ24GFy1EQUn",
               "type": "message",
               "role": "assistant",
               "content": [
@@ -787,11 +858,11 @@
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "43eca3c9-8636-45bd-8408-281e1392b2a0",
-            "timestamp": "2026-11-03T06:24:24.692Z",
-            "request_id": "req_011CgfWtTx2EH37BXJgwkKxD",
-            "user_message_uuid": "11dc9e78-923d-4cb3-8b37-2d15aebfb694",
-            "user_message_uuids": ["11dc9e78-923d-4cb3-8b37-2d15aebfb694"]
+            "uuid": "bef88e16-62eb-4913-8fa3-7ce679132e5f",
+            "timestamp": "2026-11-14T16:40:58.418Z",
+            "request_id": "req_011Ch39oY73cxSK7G7sM9XGw",
+            "user_message_uuid": "b203feda-6a91-431d-ad19-bff94de6df30",
+            "user_message_uuids": ["b203feda-6a91-431d-ad19-bff94de6df30"]
           }
         },
         {
@@ -803,8 +874,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "0438f2c6-de23-4186-b003-78d71e25d368",
-            "api_message_id": "msg_011CgfWtU9vLR35tpDNx5WHM"
+            "uuid": "405c90df-cf61-453d-a8c8-c44c4fdefd75",
+            "api_message_id": "msg_011Ch39oYJTKGQ24GFy1EQUn"
           }
         },
         {
@@ -833,8 +904,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "b7a1b0ba-a327-4612-8339-3ffb3436fc98",
-            "api_message_id": "msg_011CgfWtU9vLR35tpDNx5WHM"
+            "uuid": "f74b7c54-32e5-4c8e-800b-e7f20233ce3f",
+            "api_message_id": "msg_011Ch39oYJTKGQ24GFy1EQUn"
           }
         },
         {
@@ -845,21 +916,21 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "c767be81-02e5-434e-914d-d78fa1cb913d",
-            "api_message_id": "msg_011CgfWtU9vLR35tpDNx5WHM"
+            "uuid": "5e58a78c-8c37-4c11-b5d8-4a62c73e8752",
+            "api_message_id": "msg_011Ch39oYJTKGQ24GFy1EQUn"
           }
         },
         {
           "in": {
             "type": "rate_limit_event",
             "rate_limit_info": "<redacted>",
-            "uuid": "660b7e3f-014b-44d8-9019-44bf78f5d497",
+            "uuid": "9be9e226-8e30-47fa-a119-0f32fde6b2a4",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
-            "duration_api_ms": 1079,
+            "duration_api_ms": 644,
             "stop_reason": "end_turn",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "total_cost_usd": 0,
@@ -935,16 +1006,16 @@
             "subtype": "success",
             "api_error_status": null,
             "result": "FIRST",
-            "ttft_ms": 1134,
+            "ttft_ms": 682,
             "type": "result",
-            "duration_ms": 1142,
-            "uuid": "7fa47b03-f052-4b76-ba6d-ff6f1c9d1151",
-            "ttft_stream_ms": 1133,
-            "time_to_request_ms": 64,
-            "first_content_frame_ms": 1133,
-            "user_message_uuid": "11dc9e78-923d-4cb3-8b37-2d15aebfb694",
-            "user_message_uuids": ["11dc9e78-923d-4cb3-8b37-2d15aebfb694"],
-            "request_sent_wall_ms": 1793687063622,
+            "duration_ms": 689,
+            "uuid": "b0604b06-20f9-4de2-af6d-daec893ee226",
+            "ttft_stream_ms": 681,
+            "time_to_request_ms": 46,
+            "first_content_frame_ms": 682,
+            "user_message_uuid": "b203feda-6a91-431d-ad19-bff94de6df30",
+            "user_message_uuids": ["b203feda-6a91-431d-ad19-bff94de6df30"],
+            "request_sent_wall_ms": 1794674457782,
             "first_request_input_tokens": 0,
             "queued_turn_count": 0,
             "result_index": 0,
@@ -968,7 +1039,7 @@
         },
         {
           "out": {
-            "request_id": "m2qiuv6h4z",
+            "request_id": "3ae76nyl0tt",
             "type": "control_request",
             "request": {
               "subtype": "set_model",
@@ -979,9 +1050,9 @@
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "11dc9e78-923d-4cb3-8b37-2d15aebfb694",
+            "command_uuid": "b203feda-6a91-431d-ad19-bff94de6df30",
             "state": "completed",
-            "uuid": "d82b7b75-9f60-46ac-8fc7-010cf3fbb7b8",
+            "uuid": "60d1c4ca-b76f-4345-9a54-8d9054f08041",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -991,7 +1062,7 @@
             "subtype": "session_state_changed",
             "state": "idle",
             "sdk_host_only": true,
-            "uuid": "cce47385-6c9d-45cb-978d-6e9754e238bc",
+            "uuid": "88c492fd-0136-41aa-95ec-94fafca89ace",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1000,7 +1071,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "m2qiuv6h4z",
+              "request_id": "3ae76nyl0tt",
               "response": {
                 "model": "claude-haiku-5-5"
               }
@@ -1009,7 +1080,7 @@
         },
         {
           "out": {
-            "request_id": "b3sl75gnesn",
+            "request_id": "mpjq3ndc5h",
             "type": "control_request",
             "request": {
               "subtype": "apply_flag_settings",
@@ -1024,7 +1095,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "b3sl75gnesn"
+              "request_id": "mpjq3ndc5h"
             }
           }
         },
@@ -1036,7 +1107,7 @@
               "content": "Reply with exactly: SECOND"
             },
             "parent_tool_use_id": null,
-            "uuid": "cfb1d049-900c-4d7c-a073-4da951005a3b"
+            "uuid": "7f763d56-a8cb-4677-8825-b3be30e0e839"
           }
         },
         {
@@ -1045,25 +1116,25 @@
             "subtype": "session_state_changed",
             "state": "running",
             "sdk_host_only": true,
-            "uuid": "868c32de-d04e-49c1-9b77-ee724c2a6ef6",
+            "uuid": "8f52adbb-6f8b-4877-ab6d-154bffc92d48",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "cfb1d049-900c-4d7c-a073-4da951005a3b",
+            "command_uuid": "7f763d56-a8cb-4677-8825-b3be30e0e839",
             "state": "queued",
-            "uuid": "0e80874e-7c12-41bf-a741-a970cf3de44a",
+            "uuid": "c42a90b9-2349-40e4-a4bc-54a486a08805",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "cfb1d049-900c-4d7c-a073-4da951005a3b",
+            "command_uuid": "7f763d56-a8cb-4677-8825-b3be30e0e839",
             "state": "started",
-            "uuid": "d95e4f61-699b-4d14-9156-75b4e475c7d9",
+            "uuid": "ee0aa1d3-3434-4089-97b3-def83e9e631d",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1100,9 +1171,16 @@
               "WebFetch",
               "WebSearch",
               "Workflow",
-              "Write"
+              "Write",
+              "mcp__glass__draw_diagram"
             ],
-            "mcp_servers": [],
+            "mcp_servers": [
+              {
+                "name": "glass",
+                "status": "connected",
+                "source": "sdk"
+              }
+            ],
             "model": "claude-haiku-5-5",
             "permissionMode": "default",
             "slash_commands": [
@@ -1155,8 +1233,15 @@
             "terminal_slash_commands": ["doctor", "color", "focus", "reload-plugins"],
             "apiKeySource": "<redacted>",
             "claude_code_version": "2.1.309",
-            "output_style": "default",
-            "agents": ["claude", "Explore", "general-purpose", "Plan", "statusline-setup"],
+            "output_style": "<redacted>",
+            "agents": [
+              "claude",
+              "claude-code-guide",
+              "Explore",
+              "general-purpose",
+              "Plan",
+              "statusline-setup"
+            ],
             "skills": [
               "deep-research",
               "dataviz",
@@ -1205,19 +1290,19 @@
             ],
             "analytics_disabled": true,
             "product_feedback_disabled": false,
-            "uuid": "53617f99-c47f-4169-8490-63e7d925a8a3",
+            "uuid": "67112948-ee16-48de-b756-9cdd91403716",
             "memory_paths": {
               "auto": "<folder>/.claude/projects\\<folder>/memory\\"
             },
             "original_cwd": "<folder>",
             "additional_directories": [],
-            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-2f910d142f76cd8bc11ebd635a108fcc",
+            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-9b57c357c710aa5cfd1542611ea25d68",
             "fast_mode_state": "off",
             "fast_mode_disabled_reason": "sdk_opt_in_required",
             "per_turn_effort_active": true,
             "view_mode": "default",
             "powershell_path": "<home>/AppData/Local/Programs/PowerShell/7/pwsh.exe",
-            "user_message_uuids": ["cfb1d049-900c-4d7c-a073-4da951005a3b"]
+            "user_message_uuids": ["7f763d56-a8cb-4677-8825-b3be30e0e839"]
           }
         },
         {
@@ -1226,8 +1311,8 @@
             "subtype": "status",
             "status": "requesting",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "935f60d3-ac5b-431a-8813-c972744c9afe",
-            "user_message_uuids": ["cfb1d049-900c-4d7c-a073-4da951005a3b"]
+            "uuid": "fe00d435-e1fc-46cf-9a66-a87a05335448",
+            "user_message_uuids": ["7f763d56-a8cb-4677-8825-b3be30e0e839"]
           }
         },
         {
@@ -1237,7 +1322,7 @@
               "type": "message_start",
               "message": {
                 "model": "claude-haiku-5-5",
-                "id": "msg_011CgfWtYzNsSS7EgspNnjNa",
+                "id": "msg_011Ch39obAMzZHEwPvHAALwe",
                 "type": "message",
                 "role": "assistant",
                 "content": [],
@@ -1269,12 +1354,12 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "a0302980-eef9-4e3e-b800-dd3ee17a587c",
-            "ttft_ms": 1297,
+            "uuid": "a250cf97-541f-4e8a-bc44-9505d3c64bd9",
+            "ttft_ms": 673,
             "thinking_display": "updates",
-            "api_message_id": "msg_011CgfWtYzNsSS7EgspNnjNa",
-            "user_message_uuid": "cfb1d049-900c-4d7c-a073-4da951005a3b",
-            "user_message_uuids": ["cfb1d049-900c-4d7c-a073-4da951005a3b"]
+            "api_message_id": "msg_011Ch39obAMzZHEwPvHAALwe",
+            "user_message_uuid": "7f763d56-a8cb-4677-8825-b3be30e0e839",
+            "user_message_uuids": ["7f763d56-a8cb-4677-8825-b3be30e0e839"]
           }
         },
         {
@@ -1290,8 +1375,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "fdb1230f-636c-425a-9a90-b2ead1d00a21",
-            "api_message_id": "msg_011CgfWtYzNsSS7EgspNnjNa"
+            "uuid": "47e187c6-a758-4636-8a16-b6da1de40881",
+            "api_message_id": "msg_011Ch39obAMzZHEwPvHAALwe"
           }
         },
         {
@@ -1307,8 +1392,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "cd655ca9-9632-4a6f-868b-42cfcf1ec3f6",
-            "api_message_id": "msg_011CgfWtYzNsSS7EgspNnjNa"
+            "uuid": "f1e17a4d-6ed0-4bb7-8ec8-75be55109699",
+            "api_message_id": "msg_011Ch39obAMzZHEwPvHAALwe"
           }
         },
         {
@@ -1316,7 +1401,7 @@
             "type": "assistant",
             "message": {
               "model": "claude-haiku-5-5",
-              "id": "msg_011CgfWtYzNsSS7EgspNnjNa",
+              "id": "msg_011Ch39obAMzZHEwPvHAALwe",
               "type": "message",
               "role": "assistant",
               "content": [
@@ -1352,11 +1437,11 @@
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "61e43b3b-1f81-454a-ae7b-4afd436c1de3",
-            "timestamp": "2026-11-03T06:24:26.043Z",
-            "request_id": "req_011CgfWtYjVwdmuKnk1GrhSE",
-            "user_message_uuid": "cfb1d049-900c-4d7c-a073-4da951005a3b",
-            "user_message_uuids": ["cfb1d049-900c-4d7c-a073-4da951005a3b"]
+            "uuid": "0bff5bd1-4bf2-4ade-8246-c8d64bfa1b15",
+            "timestamp": "2026-11-14T16:40:59.133Z",
+            "request_id": "req_011Ch39oavyCgp4mzuEFrtUA",
+            "user_message_uuid": "7f763d56-a8cb-4677-8825-b3be30e0e839",
+            "user_message_uuids": ["7f763d56-a8cb-4677-8825-b3be30e0e839"]
           }
         },
         {
@@ -1368,8 +1453,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "8991a3d6-0a8a-4c5e-9e80-7bafe8ad4fe7",
-            "api_message_id": "msg_011CgfWtYzNsSS7EgspNnjNa"
+            "uuid": "f3fbbae0-dce3-401b-adc3-cb5880c9ff26",
+            "api_message_id": "msg_011Ch39obAMzZHEwPvHAALwe"
           }
         },
         {
@@ -1398,8 +1483,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "2506dd28-b796-405b-8bef-a691af0bb29a",
-            "api_message_id": "msg_011CgfWtYzNsSS7EgspNnjNa"
+            "uuid": "de797f8d-6e7e-4a04-928b-c390cfbaaba8",
+            "api_message_id": "msg_011Ch39obAMzZHEwPvHAALwe"
           }
         },
         {
@@ -1410,13 +1495,13 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "cf4120f9-9a2e-47d1-8eeb-8ae01d3d1f23",
-            "api_message_id": "msg_011CgfWtYzNsSS7EgspNnjNa"
+            "uuid": "639d13e5-de91-4dd2-90a3-ba081d16c7e0",
+            "api_message_id": "msg_011Ch39obAMzZHEwPvHAALwe"
           }
         },
         {
           "in": {
-            "duration_api_ms": 2381,
+            "duration_api_ms": 1320,
             "stop_reason": "end_turn",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "total_cost_usd": 0,
@@ -1492,16 +1577,16 @@
             "subtype": "success",
             "api_error_status": null,
             "result": "SECOND",
-            "ttft_ms": 1315,
+            "ttft_ms": 687,
             "type": "result",
-            "duration_ms": 1320,
-            "uuid": "07b66117-d182-4d33-b8c2-c815999c095c",
-            "ttft_stream_ms": 1314,
-            "time_to_request_ms": 19,
-            "first_content_frame_ms": 1315,
-            "user_message_uuid": "cfb1d049-900c-4d7c-a073-4da951005a3b",
-            "user_message_uuids": ["cfb1d049-900c-4d7c-a073-4da951005a3b"],
-            "request_sent_wall_ms": 1793687064747,
+            "duration_ms": 690,
+            "uuid": "0c1ce4f1-e764-4b46-946a-ec36df67efdd",
+            "ttft_stream_ms": 686,
+            "time_to_request_ms": 14,
+            "first_content_frame_ms": 686,
+            "user_message_uuid": "7f763d56-a8cb-4677-8825-b3be30e0e839",
+            "user_message_uuids": ["7f763d56-a8cb-4677-8825-b3be30e0e839"],
+            "request_sent_wall_ms": 1794674458461,
             "first_request_input_tokens": 0,
             "queued_turn_count": 0,
             "result_index": 1,
@@ -1526,9 +1611,9 @@
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "cfb1d049-900c-4d7c-a073-4da951005a3b",
+            "command_uuid": "7f763d56-a8cb-4677-8825-b3be30e0e839",
             "state": "completed",
-            "uuid": "ee7f768a-88a4-4656-b5b6-3261550fa1c8",
+            "uuid": "6260a0e1-0ec0-429e-a31c-948f874b5b8c",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1538,7 +1623,7 @@
             "subtype": "session_state_changed",
             "state": "idle",
             "sdk_host_only": true,
-            "uuid": "29a11b05-856b-4f56-875b-a4c2f5f29331",
+            "uuid": "533b1c3f-e065-4f36-8d12-c99918e3930a",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },

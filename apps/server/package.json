@@ -22,6 +22,7 @@
     "effect": "catalog:",
     "graphql": "16.14.2",
     "jiti": "2.7.0",
+    "pele": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:",
     "vitest": "catalog:",
