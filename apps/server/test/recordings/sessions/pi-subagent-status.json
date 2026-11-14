@@ -1,0 +1,120 @@
+{
+  "scenario": "pi-subagent-status",
+  "program": "@earendil-works/pi-coding-agent 1.3.0",
+  "processes": [
+    {
+      "args": [
+        "--mode",
+        "rpc",
+        "--session-id",
+        "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
+        "--extension",
+        "<folder>.pi/draw-diagram.mjs",
+        "--extension",
+        "<folder>.pi/subagent-status.js"
+      ],
+      "cwd": "<folder>",
+      "frames": [
+        {
+          "out": {
+            "type": "get_state",
+            "id": "glass-1"
+          }
+        },
+        {
+          "in": {
+            "id": "glass-1",
+            "type": "response",
+            "command": "get_state",
+            "success": true,
+            "data": {
+              "model": {
+                "id": "gpt-test",
+                "name": "gpt-test",
+                "api": "<pi-provider>-completions",
+                "provider": "glass-test",
+                "baseUrl": "<redacted>",
+                "reasoning": false,
+                "input": ["text", "image"],
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0
+                },
+                "contextWindow": 128000,
+                "maxTokens": 4096
+              },
+              "thinkingLevel": "off",
+              "isStreaming": false,
+              "isCompacting": false,
+              "steeringMode": "one-at-a-time",
+              "followUpMode": "one-at-a-time",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-14T23-11-44-156Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
+              "autoCompactionEnabled": true,
+              "messageCount": 0,
+              "pendingMessageCount": 0
+            }
+          }
+        },
+        {
+          "out": {
+            "type": "prompt",
+            "message": "/spawn",
+            "images": [],
+            "id": "glass-2"
+          }
+        },
+        {
+          "in": {
+            "type": "extension_ui_request",
+            "id": "f2ed1292-832a-4840-8dd5-6771c11bcfbb",
+            "method": "setStatus",
+            "statusKey": "glass-subagents",
+            "statusText": "Running a subagent: Explore: Trace composer to harness"
+          }
+        },
+        {
+          "in": {
+            "id": "glass-2",
+            "type": "response",
+            "command": "prompt",
+            "success": true,
+            "data": {
+              "disposition": "handled"
+            }
+          }
+        },
+        {
+          "out": {
+            "type": "prompt",
+            "message": "/finish",
+            "images": [],
+            "id": "glass-3"
+          }
+        },
+        {
+          "in": {
+            "type": "extension_ui_request",
+            "id": "7da73b2d-4248-445b-a8cf-547f58b643ed",
+            "method": "setStatus",
+            "statusKey": "glass-subagents"
+          }
+        },
+        {
+          "in": {
+            "id": "glass-3",
+            "type": "response",
+            "command": "prompt",
+            "success": true,
+            "data": {
+              "disposition": "handled"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "calls": []
+}

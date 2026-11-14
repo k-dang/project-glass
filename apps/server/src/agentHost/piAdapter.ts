@@ -67,6 +67,7 @@ import { settleWith } from "./requests"
 import { scopedFolder } from "./scopedFolder"
 import type { WrittenSkills } from "./sentSkills"
 import { piLoadsNothing, piTools } from "../agentTools"
+import { piSubagentStatusExtension } from "./piSubagentStatus"
 import { piSuggestDraftExtension } from "./suggestDraftTool"
 import { runTurns } from "./turnLoop"
 import { globalConversationUpdateDelivery } from "./piGlobalConversationUpdate"
@@ -218,9 +219,10 @@ const roleFlags = (folder: string, role: ConversationRole, skills: ReadonlyArray
   Match.value(role).pipe(
     Match.tagsExhaustive({
       Work: () =>
-        writtenExtensions(folder, [{ name: "draw-diagram.mjs", source: piDrawDiagramSource }]).pipe(
-          Effect.map(({ flags }) => [...skillFlags(skills), ...flags]),
-        ),
+        writtenExtensions(folder, [
+          { name: "draw-diagram.mjs", source: piDrawDiagramSource },
+          { name: "subagent-status.js", source: piSubagentStatusExtension },
+        ]).pipe(Effect.map(({ flags }) => [...skillFlags(skills), ...flags])),
       Review: ({ brief }) =>
         lockedDownFlags(
           folder,

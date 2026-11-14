@@ -179,6 +179,35 @@ it.live("reports a pi extension's statuses as plain text, outside any Turn", () 
   }).pipe(Effect.scoped),
 )
 
+it.live("shows the subagents pi-subagents runs as a status until they finish", () =>
+  Effect.gen(function* () {
+    const f = yield* piSession("pi-subagent-status", { fake: { output: "Done." } })
+    yield* f.extension(
+      "fake-subagents.js",
+      `export default (pi) => {
+  pi.registerCommand("spawn", {
+    handler: async () =>
+      pi.events.emit("subagents:started", { id: "a1", type: "Explore", description: "Trace composer to harness" }),
+  })
+  pi.registerCommand("finish", {
+    handler: async () => pi.events.emit("subagents:completed", { id: "a1" }),
+  })
+}`,
+    )
+    const agent = yield* f.open(conversation)
+
+    yield* agent.send("/spawn")
+    yield* f.untilStatuses((statuses) => statuses.length > 0)
+    assert.deepStrictEqual(yield* f.statuses, [
+      "Running a subagent: Explore: Trace composer to harness",
+    ])
+
+    yield* f.until(settled(1))
+    yield* agent.send("/finish")
+    yield* f.untilStatuses((statuses) => statuses.length === 0)
+  }).pipe(Effect.scoped),
+)
+
 it.live("fails a Turn with a reason that leaves out the provider's own words", () =>
   Effect.gen(function* () {
     const f = yield* piSession("pi-rejected", { apiKey: "glass-rejected-key" })
