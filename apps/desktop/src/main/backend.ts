@@ -4,7 +4,7 @@ import { Deferred, Duration, Effect, Fiber } from "effect"
 import { type UtilityProcess, utilityProcess } from "electron"
 import { randomBytes, randomUUID } from "node:crypto"
 import { BackendError, keepRunning, openBackendLog, waitForBackend } from "./backendIo"
-import { choosePort } from "./backendPort"
+import { lastBoundPortOrFree } from "./backendPort"
 
 const STOP_DEADLINE = Duration.seconds(10)
 
@@ -30,7 +30,7 @@ export const startBackend = Effect.fn("startBackend")(function* (options: {
   readonly dataDirectory: string
 }) {
   const port = yield* Effect.tryPromise({
-    try: () => choosePort(options.dataDirectory),
+    try: () => lastBoundPortOrFree(options.dataDirectory),
     catch: (cause) =>
       new BackendError({
         message: cause instanceof Error ? cause.message : "No free port",
@@ -45,7 +45,6 @@ export const startBackend = Effect.fn("startBackend")(function* (options: {
     log.stream.write(chunk)
   }
 
-  // Stderr is filed and echoed, so warnings, errors and crash text show up in the terminal.
   const relayStderr = (chunk: Buffer) => {
     writeOutput(chunk)
     process.stderr.write(chunk)

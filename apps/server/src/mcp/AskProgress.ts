@@ -4,7 +4,6 @@ const idle = {
   notify: (_progress: number) => Effect.void,
 }
 
-/** Progress for the MCP call already in flight. Missing when the call is not an MCP request. */
 export class AskProgress extends Context.Service<
   AskProgress,
   { readonly notify: (progress: number) => Effect.Effect<void> }

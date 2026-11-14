@@ -14,15 +14,9 @@ const toolNames = ({ tools = [] }: FakeModelRequest) =>
       : [],
   )
 
-/** Whether pi is running as the Global conversation, the only role with pi's Question tool. */
 export const isGlobalConversation = (input: FakeModelRequest) =>
   toolNames(input).includes("ask_user")
 
-/**
- * Answers as the Global conversation: reads "this PR" when a message was sent from one, starts
- * the Agent a message asks for, asks a Question when asked to, acknowledges a Report without
- * acting on it, and otherwise echoes the message.
- */
 export const globalConversationReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
   const last = input.messages.at(-1)
 

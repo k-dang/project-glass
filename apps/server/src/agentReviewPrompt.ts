@@ -124,7 +124,6 @@ export const pullRequestMaterial = (input: ReviewInput): PullRequestMaterial => 
   files: input.files.map(fileMaterial),
 })
 
-// No diffs: the agent reads the change from the checkout, so a PR of any size fits.
 export const agentReviewMaterial = (input: ReviewInput, revision: Revision) => ({
   ...describedPullRequest(input),
   base: revision.base,

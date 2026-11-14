@@ -17,23 +17,31 @@ const colors = {
   removed: "var(--deleted)",
 }
 
+const roomForFocusOutlines = "-m-1.5 p-1.5"
+
 const changes = { unchanged: "Unchanged", added: "Added", removed: "Removed" }
 
-// Edges to the next node run straight across the rail; any other edge routes
-// below it in its own lane so skips and loops never cross the nodes.
-const connection = (from: Box, to: Box, lane: number) => {
-  const direct = lane === -1
-  const startX = direct ? from.left + from.width : from.left + from.width / 2
-  const endX = direct ? to.left : to.left + to.width / 2
+const acrossRail = (from: Box, to: Box) => {
+  const startX = from.left + from.width
+  const endX = to.left
   const center = from.top + from.height / 2
+
+  return {
+    path: `M ${startX} ${center} L ${endX - 3} ${to.top + to.height / 2}`,
+    labelX: (startX + endX) / 2,
+    labelY: center - 8,
+  }
+}
+
+const belowRailInLane = (from: Box, to: Box, lane: number) => {
+  const startX = from.left + from.width / 2
+  const endX = to.left + to.width / 2
   const y = from.top + from.height + 12 + lane * 10
 
   return {
-    path: direct
-      ? `M ${startX} ${center} L ${endX - 3} ${to.top + to.height / 2}`
-      : `M ${startX} ${from.top + from.height} V ${y} H ${endX} V ${to.top + to.height + 3}`,
+    path: `M ${startX} ${from.top + from.height} V ${y} H ${endX} V ${to.top + to.height + 3}`,
     labelX: (startX + endX) / 2,
-    labelY: direct ? center - 8 : y - 4,
+    labelY: y - 4,
   }
 }
 
@@ -163,8 +171,7 @@ export function TourDiagram(props: {
           </div>
         </fieldset>
       )}
-      {/* The padding leaves room for focus outlines the scroller would otherwise clip. */}
-      <div className="-m-1.5 overflow-x-auto p-1.5 [scrollbar-width:thin]">
+      <div className={`${roomForFocusOutlines} overflow-x-auto [scrollbar-width:thin]`}>
         <div className="relative min-w-min" ref={container}>
           <svg
             className="pointer-events-none absolute inset-0 size-full overflow-visible"
@@ -192,7 +199,10 @@ export function TourDiagram(props: {
 
               if (from === undefined || to === undefined) return null
 
-              const { path, labelX, labelY } = connection(from, to, routed.indexOf(edge))
+              const lane = routed.indexOf(edge)
+
+              const { path, labelX, labelY } =
+                lane === -1 ? acrossRail(from, to) : belowRailInLane(from, to, lane)
 
               return (
                 <g

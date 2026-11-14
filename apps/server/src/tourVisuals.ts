@@ -110,8 +110,6 @@ export const repairChapterVisuals = (
   if (chapter.callouts != null)
     repaired.callouts = validateTourCallouts(chapter.callouts, inChapter)
 
-  // A Chapter shows one map. The diagram wins because it also carries branches and
-  // flow steps; a Before / after survives only when no usable diagram does.
   if (repaired.diagram != null && repaired.beforeAfter != null) repaired.beforeAfter = null
 
   return repaired

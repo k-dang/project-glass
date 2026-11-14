@@ -100,10 +100,6 @@ const useFocusedPoint = (focus: HotspotFocus | null) => {
   }
 }
 
-/**
- * The Agent review's hotspots, read in full beside the diff. An outdated review's lines may not
- * match the diff, so they don't link there.
- */
 export function HotspotPoints(props: {
   hotspots: ReadonlyArray<RankedHotspot>
   links: HotspotLinks

@@ -10,7 +10,7 @@ import { ASK_TIMEOUT_SECONDS, OutsideQuestions } from "../src/OutsideQuestions"
 import { GlassMcpTools } from "../src/mcp/server"
 import { serve } from "../src/server"
 import { ServerConfig } from "../src/ServerConfig"
-import { runMain, wideEventsToStdout } from "../src/wideEvents"
+import { runMain, wideEventsToStdoutAndOtlp } from "../src/wideEvents"
 import { writeAgentCommands } from "./agentCommands"
 import { bundledPi, seedDemoAgents, startDemoClaude, startDemoPi } from "./demoAgent"
 import { DEMO_GATEWAY_REPOSITORY, DEMO_REPOSITORY, seedDemoPullRequests } from "./demoPullRequests"
@@ -128,5 +128,5 @@ const main = Effect.gen(function* () {
 main.pipe(
   Effect.provide(NodeSocket.layerWebSocketConstructor),
   Effect.scoped,
-  runMain(wideEventsToStdout("backend").pipe(Layer.provide(FetchHttpClient.layer))),
+  runMain(wideEventsToStdoutAndOtlp("backend").pipe(Layer.provide(FetchHttpClient.layer))),
 )

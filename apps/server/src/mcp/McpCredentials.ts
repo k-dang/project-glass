@@ -9,7 +9,6 @@ export class ConversationCaller extends Schema.TaggedClass<ConversationCaller>()
 export class OutsideAgentCaller extends Schema.TaggedClass<OutsideAgentCaller>()("OutsideAgent", {
   agentId: Schema.String,
   name: Schema.String,
-  /** The MCP session that called. One approved app can hold several, one per terminal. */
   session: Schema.String,
 }) {}
 
@@ -34,8 +33,7 @@ export const digest = (bearer: string) => createHash("sha256").update(bearer).di
 
 export const mintBearer = () => randomBytes(32).toString("base64url")
 
-/** Compares two secrets in constant time. */
-export const sameSecret = (left: string, right: string) => {
+export const timingSafeSameSecret = (left: string, right: string) => {
   const a = Buffer.from(left)
   const b = Buffer.from(right)
 
@@ -51,13 +49,11 @@ export interface McpCredential {
 export class McpCredentials extends Context.Service<
   McpCredentials,
   {
-    /** Issues a credential for `caller`, revoked when the scope closes. */
     readonly issue: (caller: {
       readonly conversationId: string
       readonly sessionId: string
     }) => Effect.Effect<Redacted.Redacted, never, Scope.Scope>
     readonly authenticate: (bearer: Redacted.Redacted) => Option.Option<McpCredential>
-    /** The endpoint's URL, once the backend listens. */
     readonly endpoint: Effect.Effect<string>
     readonly listening: (url: string) => Effect.Effect<void>
   }

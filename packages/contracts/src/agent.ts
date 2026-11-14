@@ -550,7 +550,6 @@ export const NewAgent = Schema.Struct({
   permissionMode: Schema.NullOr(PermissionMode),
   place: AgentPlace,
   skillPacks: Schema.Array(Schema.String),
-  /** Whether a Sandbox Agent gets the user's Local skills; a local Agent's program reads them itself. */
   localSkills: Schema.Boolean,
   ...MessageInput.fields,
 })
