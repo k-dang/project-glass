@@ -1,15 +1,22 @@
-import { SUGGEST_DRAFT_TOOL, type SuggestedDraft } from "@glass/contracts"
+import { SUGGEST_DRAFT_TOOL, SuggestedDraft } from "@glass/contracts"
+import { replyTo, type ToolReply, toolParameters } from "./hostTool"
 import type { ReviewBrief } from "./protocol"
 
 export const suggestDraftDescription =
   "Propose a comment for the PR's author on one line of the diff, for the reviewer to edit and add as a Draft. Glass refuses a line outside the diff's hunks."
 
-export const suggestDraftFields = {
-  path: "The file's path relative to the checkout root.",
-  side: 'Either "new", for a line of the PR\'s head, or "old", for a line only in its base.',
-  line: "The line's number on that side.",
-  body: "The comment in GitHub Markdown, written to the PR's author in the reviewer's voice.",
-} as const
+export const suggestDraftParameters = toolParameters({
+  path: [SuggestedDraft.fields.path, "The file's path relative to the checkout root."],
+  side: [
+    SuggestedDraft.fields.side,
+    'Either "new", for a line of the PR\'s head, or "old", for a line only in its base.',
+  ],
+  line: [SuggestedDraft.fields.line, "The line's number on that side."],
+  body: [
+    SuggestedDraft.fields.body,
+    "The comment in GitHub Markdown, written to the PR's author in the reviewer's voice.",
+  ],
+})
 
 export const SUGGEST_DRAFT_PLACED = "Glass shows this Suggested draft to the reviewer."
 
@@ -23,10 +30,13 @@ const onDiff = (
   line: number,
 ) => diffLines[side][path]?.includes(line) === true
 
-export const placeSuggestedDraft = (brief: ReviewBrief, draft: SuggestedDraft) =>
+export const placeSuggestedDraft = (brief: ReviewBrief, draft: SuggestedDraft): ToolReply =>
   onDiff(brief.diffLines, draft.side, draft.path, draft.line)
-    ? { placed: true, text: SUGGEST_DRAFT_PLACED }
-    : { placed: false, text: refusal(draft.path, draft.side, draft.line) }
+    ? { accepted: true, text: SUGGEST_DRAFT_PLACED }
+    : { accepted: false, text: refusal(draft.path, draft.side, draft.line) }
+
+export const suggestDraft = (brief: ReviewBrief) =>
+  replyTo(SuggestedDraft, (draft) => placeSuggestedDraft(brief, draft))
 
 /** pi loads an extension in its own process, out of the host's reach, so the check goes into the file. */
 export const piSuggestDraftExtension = (brief: ReviewBrief) => `
@@ -39,17 +49,7 @@ export default function (pi) {
     name: ${JSON.stringify(SUGGEST_DRAFT_TOOL)},
     label: "Suggest draft",
     description: ${JSON.stringify(suggestDraftDescription)},
-    parameters: {
-      type: "object",
-      properties: {
-        path: { type: "string", description: ${JSON.stringify(suggestDraftFields.path)} },
-        side: { type: "string", enum: ["new", "old"], description: ${JSON.stringify(suggestDraftFields.side)} },
-        line: { type: "integer", minimum: 1, description: ${JSON.stringify(suggestDraftFields.line)} },
-        body: { type: "string", description: ${JSON.stringify(suggestDraftFields.body)} },
-      },
-      required: ["path", "side", "line", "body"],
-      additionalProperties: false,
-    },
+    parameters: ${JSON.stringify(suggestDraftParameters)},
     async execute(_toolCallId, { path, side, line, body }) {
       if (typeof body !== "string" || body.trim() === "") throw new Error("The comment is empty.")
       if (!onDiff(diffLines, side, path, line)) throw new Error(refusal(path, side, line))

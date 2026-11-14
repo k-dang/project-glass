@@ -290,6 +290,13 @@ when Glass loses the Agent, or interrupted when Glass quits; a Sandbox Agent's T
 while Glass is closed.
 _Avoid_: Run, execution, exchange
 
+**Diagram**:
+A named Mermaid picture an Agent draws beside its conversation when the user asks for one, labeled
+as existing behavior, a proposed design, or an uncertain inference. Asking for changes redraws it
+under the same name; a version Glass can't draw leaves the last one in place. An Agent keeps its
+Diagrams with its Turns.
+_Avoid_: Artifact, chart, whiteboard
+
 **Queued message**:
 A message sent while a Turn runs, waiting to start the next Turn; the user can cancel it before then.
 Canceling one returns its Feedback notes to the Agent's unsent feedback.

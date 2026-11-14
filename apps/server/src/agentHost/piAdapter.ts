@@ -66,6 +66,7 @@ import type { WrittenSkills } from "./sentSkills"
 import { piLoadsNothing, piTools } from "../agentTools"
 import { piSuggestDraftExtension } from "./suggestDraftTool"
 import { runTurns } from "./turnLoop"
+import piDrawDiagramSource from "virtual:pi-draw-diagram"
 
 const thinkingLevels = ["off", "minimal", "low", "medium", "high", "xhigh", "max"]
 
@@ -162,22 +163,37 @@ const refused = (what: "model" | "effort") => (error: string) =>
     Effect.andThen(Effect.fail(couldNotSwitch("pi", what))),
   )
 
-const lockedDownFlags = Effect.fnUntraced(function* (
+interface PiExtension {
+  readonly name: string
+  readonly source: string
+}
+
+const writtenExtensions = Effect.fnUntraced(function* (
   folder: string,
-  tools: ReadonlyArray<string>,
-  extensions: ReadonlyArray<{ readonly name: string; readonly source: string }>,
-  instructionsText: string,
+  extensions: ReadonlyArray<PiExtension>,
 ) {
   const fs = yield* FileSystem.FileSystem
   const directory = yield* scopedFolder(`${folder}.pi`)
 
-  const instructions = join(directory, "instructions.md")
-
-  const extensionFlags = yield* Effect.forEach(extensions, ({ name, source }) => {
+  const flags = yield* Effect.forEach(extensions, ({ name, source }) => {
     const file = join(directory, name)
 
     return fs.writeFileString(file, source).pipe(Effect.as(["--extension", file]))
   })
+
+  return { directory, flags: flags.flat() }
+})
+
+const lockedDownFlags = Effect.fnUntraced(function* (
+  folder: string,
+  tools: ReadonlyArray<string>,
+  extensions: ReadonlyArray<PiExtension>,
+  instructionsText: string,
+) {
+  const fs = yield* FileSystem.FileSystem
+  const { directory, flags } = yield* writtenExtensions(folder, extensions)
+
+  const instructions = join(directory, "instructions.md")
 
   yield* fs.writeFileString(instructions, instructionsText)
 
@@ -185,7 +201,7 @@ const lockedDownFlags = Effect.fnUntraced(function* (
     "--tools",
     tools.join(","),
     ...piLoadsNothing,
-    ...extensionFlags.flat(),
+    ...flags,
     "--append-system-prompt",
     instructions,
   ]
@@ -197,7 +213,10 @@ const skillFlags = (skills: ReadonlyArray<WrittenSkills>) =>
 const roleFlags = (folder: string, role: ConversationRole, skills: ReadonlyArray<WrittenSkills>) =>
   Match.value(role).pipe(
     Match.tagsExhaustive({
-      Work: () => Effect.succeed(skillFlags(skills)),
+      Work: () =>
+        writtenExtensions(folder, [{ name: "draw-diagram.mjs", source: piDrawDiagramSource }]).pipe(
+          Effect.map(({ flags }) => [...skillFlags(skills), ...flags]),
+        ),
       Review: ({ brief }) =>
         lockedDownFlags(
           folder,

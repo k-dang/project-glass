@@ -134,6 +134,7 @@ import { rememberPlace } from "./savedPlace"
 import { shortcutLabel } from "./shortcutLabel"
 import { useStagedFeedback } from "./useStagedFeedback"
 import { MermaidDiagram } from "./MermaidDiagram"
+import { DiagramPane, useDiagrams } from "./AgentDiagrams"
 import { type FeedbackNotesStore, useFeedbackNotes } from "./useFeedbackNotes"
 import { markTurnSeenAtom } from "./needsYou"
 import { useShortcuts } from "./useShortcuts"
@@ -192,12 +193,11 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
   const transcript = useAtomValue(conversation.transcript)
   const reconnect = useAtomRefresh(conversation.transcript)
 
-  const { turns, queued, status } = Option.getOrElse(
-    AsyncResult.value(transcript),
-    () => emptyTranscript,
-  )
+  const loaded = AsyncResult.value(transcript)
+  const { turns, queued, status } = Option.getOrElse(loaded, () => emptyTranscript)
 
   const [changesOpened, setChangesOpened] = useState(tab === "changes")
+  const diagrams = useDiagrams(turns, Option.isSome(loaded))
 
   if (tab === "changes" && !changesOpened) setChangesOpened(true)
 
@@ -278,15 +278,22 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
             />
           </div>
         )}
-        <div hidden={tab !== "chat"} className="flex min-h-0 flex-1 flex-col">
-          <Transcript turns={turns} status={status} />
-          {reach === "unreachable" && <UnreachableNotice agentId={agent.id} />}
-          {gone === null ? (
-            <Composer agent={agent} turns={turns} queued={queued} />
-          ) : (
-            <output className="mx-auto block w-full max-w-3xl px-6 py-4 text-sm text-muted-foreground">
-              {goneExplanation(gone)}
-            </output>
+        <div hidden={tab !== "chat"} className="flex min-h-0 flex-1">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <ToolCallView value={diagrams.cardOf}>
+              <Transcript turns={turns} status={status} />
+            </ToolCallView>
+            {reach === "unreachable" && <UnreachableNotice agentId={agent.id} />}
+            {gone === null ? (
+              <Composer agent={agent} turns={turns} queued={queued} />
+            ) : (
+              <output className="mx-auto block w-full max-w-3xl px-6 py-4 text-sm text-muted-foreground">
+                {goneExplanation(gone)}
+              </output>
+            )}
+          </div>
+          {diagrams.opened !== null && (
+            <DiagramPane diagram={diagrams.opened} onClose={diagrams.close} />
           )}
         </div>
         <section
