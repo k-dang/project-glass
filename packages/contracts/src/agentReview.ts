@@ -20,7 +20,7 @@ export const SuggestedDraft = Schema.Struct({
   path: Schema.String,
   side: DiffSide,
   line: Schema.Int.check(Schema.isGreaterThan(0)),
-  body: Schema.String,
+  body: Schema.Trim.check(Schema.isNonEmpty()),
 })
 
 export type SuggestedDraft = typeof SuggestedDraft.Type

@@ -1,4 +1,6 @@
+import { fileURLToPath } from "node:url"
 import { defineConfig } from "vite-plus"
+import { Rolldown } from "vite-plus/pack"
 
 const node = {
   format: "esm",
@@ -8,16 +10,39 @@ const node = {
   deps: { onlyBundle: false },
 } as const
 
+const PI_DRAW_DIAGRAM = "virtual:pi-draw-diagram"
+
+/**
+ * A Sandbox gets the agent host as one file, so the host carries pi's Diagram extension as text,
+ * built here with Pele and the rest of its imports, and writes it out for pi.
+ */
+const piDrawDiagram = {
+  name: "pi-draw-diagram",
+  resolveId: (id: string) => (id === PI_DRAW_DIAGRAM ? `\0${PI_DRAW_DIAGRAM}` : null),
+  load: async (id: string) => {
+    if (id !== `\0${PI_DRAW_DIAGRAM}`) return null
+
+    const { output } = await Rolldown.build({
+      input: fileURLToPath(new URL("src/agentHost/piDrawDiagram.ts", import.meta.url)),
+      platform: "node",
+      write: false,
+      output: { format: "esm", codeSplitting: false },
+    })
+
+    return `export default ${JSON.stringify(output[0].code)}`
+  },
+}
+
 const agentHost = (
   outDir: string,
   entry: Record<string, string> = { agentHost: "src/agentHost.ts" },
-) =>
-  ({
-    ...node,
-    entry,
-    outDir,
-    outputOptions: { codeSplitting: false },
-  }) as const
+) => ({
+  ...node,
+  entry,
+  outDir,
+  outputOptions: { codeSplitting: false } as const,
+  plugins: [piDrawDiagram],
+})
 
 export default defineConfig({
   pack: [
@@ -39,6 +64,7 @@ export default defineConfig({
       ? [agentHost("dist-test", { scriptedAgentHost: "test/scriptedAgentHost.ts" })]
       : []),
   ],
+  plugins: [piDrawDiagram],
   test: {
     include: ["src/**/*.test.ts", "test/**/*.test.ts"],
     testTimeout: 30_000,
