@@ -99,7 +99,10 @@ export class GlobalConversation extends Context.Service<
     readonly markSeen: (endedAt: DateTime.Utc) => Effect.Effect<void, AgentError>
     readonly whenIdle: <E>(
       effect: (
-        report: (report: WorkReport) => Effect.Effect<void, AgentError>,
+        report: (
+          report: WorkReport,
+          record: (turnId: string) => Effect.Effect<void, AgentError>,
+        ) => Effect.Effect<void, AgentError>,
       ) => Effect.Effect<void, E>,
     ) => Effect.Effect<void, E | AgentError>
   }
@@ -343,12 +346,7 @@ export class GlobalConversation extends Context.Service<
           transcripts.unseen.pipe(Stream.map((unseen) => unseen.get(sessionId) ?? null)),
         ).pipe(Stream.changesWith(Schema.toEquivalence(Schema.NullOr(TurnEnd)))),
         markSeen: (endedAt) => inSession((sessionId) => transcripts.markSeen(sessionId, endedAt)),
-        whenIdle: (effect) =>
-          inSession((sessionId) =>
-            turns.whenIdle(sessionId, (begin) =>
-              effect((report) => begin({ message: "", images: [], context: report })),
-            ),
-          ),
+        whenIdle: (effect) => inSession((sessionId) => turns.whenIdle(sessionId, effect)),
       })
     }),
   )

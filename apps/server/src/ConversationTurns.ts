@@ -13,13 +13,13 @@ import {
   RequestWaiting,
   type SentMessage,
   type TurnContext,
-  type TurnMessage,
   withContextOf,
   TurnCutOff,
   TurnEnded,
   TurnFailed,
   TurnInterrupted,
   TurnStopped,
+  type WorkReport,
 } from "@glass/contracts"
 import {
   Context,
@@ -61,7 +61,7 @@ export interface Served {
   readonly interrupted: Effect.Effect<ReadonlyArray<string>>
 }
 
-export type Delivery = "dispatched" | "superseded" | "failed"
+export type Delivery = "dispatched" | "superseded" | "failed" | "pending"
 
 type StartedMessage = Pick<Turn, "message" | "images" | "context" | "feedback">
 
@@ -95,7 +95,10 @@ export class ConversationTurns extends Context.Service<
     readonly whenIdle: <E>(
       conversationId: string,
       effect: (
-        start: (message: TurnMessage) => Effect.Effect<void, AgentError>,
+        start: (
+          report: WorkReport,
+          record: (turnId: string) => Effect.Effect<void, AgentError>,
+        ) => Effect.Effect<void, AgentError>,
       ) => Effect.Effect<void, E>,
     ) => Effect.Effect<void, E | AgentError>
     readonly sendQueued: (
@@ -192,7 +195,13 @@ export class ConversationTurns extends Context.Service<
       const deliver = (conversation: Conversation, turnId: string, sent: StartedMessage) =>
         prepare(conversation, sent).pipe(
           Effect.flatMap((prepared) => dispatch(conversation, turnId, prepared)),
-          Effect.catch((error) => failTurn(conversation.id, turnId, hostFailure(error))),
+          Effect.catch((error) =>
+            Predicate.isTagged(sent.context, "Report")
+              ? transcripts
+                  .setStatus(conversation.id, hostFailure(error))
+                  .pipe(Effect.as("pending" as const satisfies Delivery))
+              : failTurn(conversation.id, turnId, hostFailure(error)),
+          ),
           Effect.tap((delivery) =>
             annotateUnit({ agent_id: conversation.id, turn_id: turnId, delivery }),
           ),
@@ -211,7 +220,11 @@ export class ConversationTurns extends Context.Service<
 
         const started = yield* transcripts.subscribeStarted.pipe(Scope.provide(scope))
 
-        yield* started.pipe(
+        const interruptedIds = yield* interrupted
+
+        const recovered = yield* transcripts.recoverReports(interruptedIds).pipe(Effect.orDie)
+
+        yield* Stream.merge(Stream.fromIterable(recovered), started).pipe(
           Stream.runForEach(({ agentId, turnId, message, images, context, feedback }) =>
             claim(agentId).pipe(
               Effect.flatMap(
@@ -231,7 +244,10 @@ export class ConversationTurns extends Context.Service<
         )
 
         yield* transcripts
-          .endRunning(TurnInterrupted.make({}), yield* interrupted)
+          .endRunning(
+            TurnInterrupted.make({}),
+            interruptedIds.filter((id) => !recovered.some(({ agentId }) => agentId === id)),
+          )
           .pipe(Effect.orDie)
       })
 
@@ -363,7 +379,9 @@ export class ConversationTurns extends Context.Service<
             Effect.gen(function* () {
               if (!(yield* transcripts.idle(conversationId))) return
 
-              yield* effect((message) => transcripts.startIfNotRunning(conversationId, message))
+              yield* effect((report, record) =>
+                transcripts.startReport(conversationId, report, record),
+              )
             }),
           ),
         sendQueued: (conversationId, queuedId) =>

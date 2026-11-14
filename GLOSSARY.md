@@ -243,6 +243,7 @@ while the conversation is busy waits, and goes out together in one Report once n
 Queued. An Agent the user stopped isn't reported. The conversation says what happened in terms of
 what the user asked, offers a next step, and acts on nothing until the user says so. A reported Agent
 Turn or finished Agent review leaves Needs you, without the review being marked done.
+An unfinished Report continues after Glass restarts; a completed Report isn't sent again.
 _Avoid_: Notification, event, wake-up
 
 **Agent program**:

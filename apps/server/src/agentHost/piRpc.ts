@@ -128,6 +128,7 @@ export const SessionState = Schema.Struct({
   model: Schema.optional(Schema.NullOr(PiModel)),
   isStreaming: Schema.Boolean,
   isCompacting: Schema.Boolean,
+  sessionFile: Schema.optional(Schema.NullOr(Schema.String)),
 })
 
 export const AvailableModels = Schema.Struct({ models: Schema.Array(PiModel) })

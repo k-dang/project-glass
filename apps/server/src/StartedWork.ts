@@ -10,6 +10,7 @@ import {
   type ReportedWork,
   TurnEnd,
   type TurnEnding,
+  WorkReport,
 } from "@glass/contracts"
 import {
   Array as Arr,
@@ -53,13 +54,16 @@ const StartedAgentReview = Schema.TaggedStruct("AgentReview", {
 
 export const StartedItem = Schema.Union([StartedAgent, StartedAgentReview])
 
-const reported_at = Schema.NullOr(Schema.DateTimeUtcFromString)
+const reportFields = {
+  reported_at: Schema.NullOr(Schema.DateTimeUtcFromString),
+  report: Schema.NullOr(Schema.fromJsonString(WorkReport)),
+}
 
 const AgentRow = Schema.Struct({
   agent_id: Schema.String,
   asked_with: Schema.NullOr(Schema.String),
   started_at: Schema.DateTimeUtcFromString,
-  reported_at,
+  ...reportFields,
 })
 
 type AgentRow = typeof AgentRow.Type
@@ -70,7 +74,7 @@ const ReviewRow = Schema.Struct({
   number: Schema.Int,
   asked_with: Schema.NullOr(Schema.String),
   started_at: Schema.DateTimeUtcFromString,
-  reported_at,
+  ...reportFields,
 })
 
 type ReviewRow = typeof ReviewRow.Type
@@ -166,9 +170,14 @@ export class StartedWork extends Context.Service<
     readonly unreported: (
       conversationId: string,
     ) => Effect.Effect<ReadonlyArray<Unreported>, AgentError | AgentReviewFailure>
-    readonly markReported: (
+    /** Unreported outcomes become reporting in their saved Report Turn, then reported when it ends. */
+    readonly recordReport: (
       conversationId: string,
+      turnId: string,
       reported: ReadonlyArray<Unreported>,
+    ) => Effect.Effect<void, AgentError>
+    readonly reconcileReported: (
+      conversationId: string,
     ) => Effect.Effect<void, AgentError | AgentReviewFailure>
     readonly changes: (conversationId: string) => Stream.Stream<void>
   }
@@ -186,13 +195,16 @@ export class StartedWork extends Context.Service<
         Effect.all(
           {
             agentRows: sql`
-              SELECT agent_id, asked_with, started_at, reported_at FROM conversation_agent
-              WHERE conversation_id = ${conversationId}
+              SELECT c.agent_id, c.asked_with, c.started_at, c.reported_at,
+                t.context AS report
+              FROM conversation_agent c LEFT JOIN agent_turn t ON t.id = c.report_turn_id
+              WHERE c.conversation_id = ${conversationId}
             `.pipe(Effect.flatMap(decodeAgentRows)),
             reviewRows: sql`
-              SELECT owner, repo, number, asked_with, started_at, reported_at
-              FROM conversation_agent_review
-              WHERE conversation_id = ${conversationId}
+              SELECT c.owner, c.repo, c.number, c.asked_with, c.started_at, c.reported_at,
+                t.context AS report
+              FROM conversation_agent_review c LEFT JOIN agent_turn t ON t.id = c.report_turn_id
+              WHERE c.conversation_id = ${conversationId}
             `.pipe(Effect.flatMap(decodeReviewRows)),
           },
           { concurrency: "unbounded" },
@@ -249,7 +261,7 @@ export class StartedWork extends Context.Service<
               VALUES (${conversationId}, ${owner}, ${repo}, ${number}, ${askedWith}, ${startedAt})
               ON CONFLICT DO UPDATE
                 SET asked_with = excluded.asked_with, started_at = excluded.started_at,
-                  reported_at = NULL
+                  reported_at = NULL, report_turn_id = NULL
             `.pipe(saved("a started Agent review"))
             yield* changedRows
           }),
@@ -358,7 +370,7 @@ export class StartedWork extends Context.Service<
 
             return [...fromAgents, ...fromReviews.flat()]
           }),
-        markReported: (conversationId, reported) =>
+        recordReport: (conversationId, turnId, reported) =>
           Effect.forEach(
             reported,
             ({ work, at }) => {
@@ -366,34 +378,53 @@ export class StartedWork extends Context.Service<
 
               return Match.value(work).pipe(
                 Match.tagsExhaustive({
-                  Agent: ({ agentId, outcome }) =>
+                  Agent: ({ agentId }) =>
                     sql`
-                      UPDATE conversation_agent SET reported_at = ${reportedAt}
+                      UPDATE conversation_agent SET reported_at = ${reportedAt}, report_turn_id = ${turnId}
                       WHERE conversation_id = ${conversationId} AND agent_id = ${agentId}
-                    `.pipe(
-                      saved("what the Global conversation reported"),
-                      Effect.andThen(
-                        outcome === "waiting" ? Effect.void : agents.markTurnSeen(agentId, at),
-                      ),
-                    ),
-                  AgentReview: ({ pullRequest, outcome }) =>
+                    `.pipe(saved("what the Global conversation reported")),
+                  AgentReview: ({ pullRequest }) =>
                     sql`
-                      UPDATE conversation_agent_review SET reported_at = ${reportedAt}
+                      UPDATE conversation_agent_review SET reported_at = ${reportedAt}, report_turn_id = ${turnId}
                       WHERE conversation_id = ${conversationId} AND owner = ${pullRequest.owner}
                         AND repo = ${pullRequest.repo} AND number = ${pullRequest.number}
-                    `.pipe(
-                      saved("what the Global conversation reported"),
-                      Effect.andThen(
-                        outcome === "finished"
-                          ? agentReviews.markReported(pullRequest, at)
-                          : Effect.void,
-                      ),
-                    ),
+                    `.pipe(saved("what the Global conversation reported")),
                 }),
               )
             },
             { discard: true },
           ),
+        reconcileReported: Effect.fn("StartedWork.reconcileReported")(function* (conversationId) {
+          const { agentRows, reviewRows } = yield* rows(conversationId)
+
+          for (const row of [...agentRows, ...reviewRows]) {
+            const context = row.report
+
+            if (context === null || row.reported_at === null) continue
+
+            if ("agent_id" in row) {
+              const matched = context.work.find(
+                (work) => Predicate.isTagged(work, "Agent") && work.agentId === row.agent_id,
+              )
+
+              if (matched !== undefined && matched.outcome !== "waiting")
+                yield* agents.markTurnSeen(row.agent_id, row.reported_at)
+            } else {
+              const pr = pullRequestOf(row)
+
+              const matched = context.work.find(
+                (work) =>
+                  Predicate.isTagged(work, "AgentReview") &&
+                  work.pullRequest.owner === pr.owner &&
+                  work.pullRequest.repo === pr.repo &&
+                  work.pullRequest.number === pr.number,
+              )
+
+              if (matched?.outcome === "finished")
+                yield* agentReviews.markReported(pr, row.reported_at)
+            }
+          }
+        }),
         changes: (conversationId) =>
           SubscriptionRef.changes(recorded).pipe(
             Stream.switchMap(() =>

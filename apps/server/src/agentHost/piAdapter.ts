@@ -2,6 +2,7 @@ import {
   type ModelRuntime,
   resolveModelScopeWithDiagnostics,
   SettingsManager,
+  SessionManager,
 } from "@earendil-works/pi-coding-agent"
 import {
   type AgentCommand,
@@ -64,6 +65,7 @@ import type { WrittenSkills } from "./sentSkills"
 import { piLoadsNothing, piTools } from "../agentTools"
 import { piSuggestDraftExtension } from "./suggestDraftTool"
 import { runTurns } from "./turnLoop"
+import { reportDelivery } from "./piReport"
 
 const thinkingLevels = ["off", "minimal", "low", "medium", "high", "xhigh", "max"]
 
@@ -371,6 +373,68 @@ export const piAdapter = (command: string) =>
             }),
         })
 
+        const startMessage = Effect.fnUntraced(function* (turnId: string, sent: DeliveredTurn) {
+          yield* turns.begin(turnId, withContextOf(sent))
+
+          const answer = yield* rpc.request(piMessage("prompt", sent), PromptAccepted).pipe(
+            Effect.map(({ disposition }) =>
+              Input.Accepted({ turnId, handled: disposition === "handled" }),
+            ),
+            Effect.tapError((error) => Effect.logWarning("pi refused a message", error)),
+            Effect.orElseSucceed(() => Input.Refused({ turnId })),
+          )
+
+          yield* turns.offer(answer)
+        })
+
+        const startReport = Effect.fnUntraced(function* (turnId: string, sent: DeliveredTurn) {
+          const delivery = yield* Effect.gen(function* () {
+            const { sessionFile } = yield* rpc.request({ type: "get_state" }, SessionState)
+
+            const entries =
+              sessionFile == null || !(yield* fs.exists(sessionFile))
+                ? []
+                : yield* Effect.try(() => SessionManager.open(sessionFile).getBranch())
+
+            return reportDelivery(turnId, sent.prompt, entries)
+          }).pipe(
+            Effect.tapError((error) => Effect.logWarning("Couldn't recover pi's Report", error)),
+            Effect.mapError(
+              () =>
+                new HostAgentError({
+                  message: "Couldn't recover pi's Report. Restart Glass to try again.",
+                }),
+            ),
+          )
+
+          yield* turns.begin(turnId, withContextOf(sent))
+
+          for (const event of delivery.events) yield* turns.offer(Input.Event({ event }))
+
+          if (delivery.state === "reported") {
+            yield* turns.offer(Input.Idle({ idle: true, generation: 0 }))
+
+            return
+          }
+
+          const { disposition } = yield* rpc
+            .request(piMessage("prompt", { ...sent, prompt: delivery.prompt }), PromptAccepted)
+            .pipe(
+              Effect.tapError(() => turns.offer(Input.Refused({ turnId }))),
+              Effect.tapError((error) =>
+                Effect.logWarning("Couldn't confirm pi's Report delivery", error),
+              ),
+              Effect.mapError(
+                () =>
+                  new HostAgentError({
+                    message: "Couldn't confirm pi's Report delivery. Restart Glass to try again.",
+                  }),
+              ),
+            )
+
+          yield* turns.offer(Input.Accepted({ turnId, handled: disposition === "handled" }))
+        })
+
         return {
           closed: turns.closed,
           stopped: turns.stopped,
@@ -396,19 +460,10 @@ export const piAdapter = (command: string) =>
 
             return undefined
           }),
-          startTurn: Effect.fnUntraced(function* (turnId: string, sent: DeliveredTurn) {
-            yield* turns.begin(turnId, withContextOf(sent))
-
-            const answer = yield* rpc.request(piMessage("prompt", sent), PromptAccepted).pipe(
-              Effect.map(({ disposition }) =>
-                Input.Accepted({ turnId, handled: disposition === "handled" }),
-              ),
-              Effect.tapError((error) => Effect.logWarning("pi refused a message", error)),
-              Effect.orElseSucceed(() => Input.Refused({ turnId })),
-            )
-
-            return yield* turns.offer(answer)
-          }),
+          startTurn: (turnId, sent) =>
+            Predicate.isTagged(sent.context, "Report")
+              ? startReport(turnId, sent)
+              : startMessage(turnId, sent),
           answer: Effect.fnUntraced(function* (requestId: string, answer: RequestAnswer) {
             const dialog = dialogs.get(requestId)
 

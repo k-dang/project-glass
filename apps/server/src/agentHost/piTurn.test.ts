@@ -1,5 +1,14 @@
 import { assert, it } from "@effect/vitest"
-import { SteerPart, TextPart, TurnDone, TurnEnded, TurnFailed, TurnStopped } from "@glass/contracts"
+import {
+  AgentReported,
+  SteerPart,
+  TextPart,
+  TurnDone,
+  TurnEnded,
+  TurnFailed,
+  TurnStopped,
+  WorkReport,
+} from "@glass/contracts"
 import { DateTime, Predicate } from "effect"
 import type { PiEvent } from "./piRpc"
 import { beginTurn, Command, Input, leftover, step, stoppedReason, type TurnState } from "./piTurn"
@@ -7,6 +16,26 @@ import { beginTurn, Command, Input, leftover, step, stoppedReason, type TurnStat
 const now = DateTime.makeUnsafe("2026-10-26T12:00:00Z")
 
 const started = beginTurn("turn-1", { message: "Say hello", images: [], context: null }, now)
+
+const reporting = beginTurn(
+  "turn-1",
+  {
+    message: "",
+    images: [],
+    context: WorkReport.make({
+      work: [
+        AgentReported.make({
+          agentId: "started",
+          name: "Started",
+          askedWith: "Build it",
+          outcome: "finished",
+          reason: null,
+        }),
+      ],
+    }),
+  },
+  now,
+)
 
 const run = (inputs: ReadonlyArray<Input | PiEvent>, from: TurnState | null = started) => {
   let state = from
@@ -26,6 +55,32 @@ const run = (inputs: ReadonlyArray<Input | PiEvent>, from: TurnState | null = st
 const assistantEnd = (stopReason: string, errorMessage = ""): PiEvent => ({
   type: "message_end",
   message: { role: "assistant", stopReason, errorMessage },
+})
+
+it("releases a Report after transport failure without claiming it ended", () => {
+  for (const input of [Input.Refused({ turnId: "turn-1" }), Input.Exited()]) {
+    const lost = run([input], reporting)
+    assert.isNull(lost.state)
+    assert.deepStrictEqual(lost.events, [])
+  }
+})
+
+it("keeps a completed provider failure terminal for a Report", () => {
+  const failed = run(
+    [
+      { type: "agent_start" },
+      assistantEnd("error", "Invalid API key"),
+      { type: "agent_settled" },
+      Input.Idle({ idle: true, generation: 1 }),
+    ],
+    reporting,
+  )
+
+  assert.isNull(failed.state)
+  const ended = failed.events.at(-1)
+  assert.isTrue(
+    Predicate.isTagged(ended, "TurnEnded") && Predicate.isTagged(ended.ended.ending, "Failed"),
+  )
 })
 
 it("ends a Turn only when pi is idle after settling, ignoring a stale idle answer", () => {

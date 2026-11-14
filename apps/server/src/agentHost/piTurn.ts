@@ -161,6 +161,12 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
   const finish = (turn: TurnState, ending: TurnEnding) =>
     end(turn, turn.stopping ? TurnStopped.make({}) : ending)
 
+  const loseDelivery = (turn: TurnState, ending: TurnEnding) => {
+    // A transport failure cannot consume a durable Report; the next host recovers its saved input.
+    if (Predicate.isTagged(turn.turn.context, "Report") && !turn.stopping) state = null
+    else end(turn, ending)
+  }
+
   const showSteer = (turn: TurnState, steer: Steer) => {
     state = { ...turn, steers: turn.steers.filter((sent) => sent !== steer) }
     setPart(state, turn.turn.parts.length, SteerPart.make(withContextOf(steer)))
@@ -263,7 +269,11 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
       if (handled && state?.turn.id === turnId) finish(state, TurnDone.make({}))
     },
     Refused: ({ turnId }) => {
-      if (state?.turn.id === turnId) finish(state, TurnFailed.make({ reason: refusedReason }))
+      if (state?.turn.id === turnId)
+        loseDelivery(
+          state,
+          state.stopping ? TurnStopped.make({}) : TurnFailed.make({ reason: refusedReason }),
+        )
     },
     Idle: ({ idle, generation }) => {
       if (state === null || !idle || generation !== state.generation) return
@@ -285,7 +295,7 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
       if (state !== null) showSteer(state, steer)
     },
     Exited: () => {
-      if (state !== null) end(state, TurnFailed.make({ reason: stoppedReason }))
+      if (state !== null) loseDelivery(state, TurnFailed.make({ reason: stoppedReason }))
     },
   })
 

@@ -130,6 +130,30 @@ it.live("leaves out an Agent it started that the user stopped", () =>
   }),
 )
 
+it.live("keeps a sent Report after restart without reporting the same outcome again", () =>
+  Effect.gen(function* () {
+    const f = yield* agentsFixture
+    yield* f.client.LinkLocalCheckout({ path: f.clone.checkout })
+    yield* sendGlobal(f.client, createAgent("Finish this"))
+
+    const before = yield* globalTurns(
+      f.client,
+      (all) => reports(all).length === 1 && all.every(({ ended }) => ended !== null),
+    )
+
+    const reportId = reports(before)[0]?.id
+    const restarted = yield* f.restart
+    yield* sendGlobal(restarted, "After restart")
+    const after = yield* globalTurns(restarted, lastSettled("After restart"))
+
+    assert.deepStrictEqual(
+      reports(after).map(({ id }) => id),
+      [reportId],
+    )
+    assert.deepStrictEqual(reportedAgents(after), reportedAgents(before))
+  }),
+)
+
 it.live(
   "reports work started before Start fresh into the new conversation, which still lists it as started",
   () =>

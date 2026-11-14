@@ -15,11 +15,15 @@ export const WorkReports = Layer.effectDiscard(
 
           if (!Arr.isReadonlyArrayNonEmpty(found)) return
 
-          yield* report(WorkReport.make({ work: Arr.map(found, ({ work }) => work) }))
-          yield* started.markReported(conversation.id, found)
+          yield* report(WorkReport.make({ work: Arr.map(found, ({ work }) => work) }), (turnId) =>
+            started.recordReport(conversation.id, turnId, found),
+          )
         }),
       )
-      .pipe(Effect.catch((cause) => Effect.logWarning("Couldn't report started work", cause)))
+      .pipe(
+        Effect.andThen(started.reconcileReported(conversation.id)),
+        Effect.catch((cause) => Effect.logWarning("Couldn't report started work", cause)),
+      )
 
     const settled = conversation.transcript.pipe(
       Stream.filter(
