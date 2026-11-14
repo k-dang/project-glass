@@ -772,10 +772,10 @@ const PartView = memo(function PartView(props: {
                   <TraceIcon>
                     <Wrench />
                   </TraceIcon>
-                  <TraceTitle>
+                  <TraceTitle className="flex items-center gap-1">
                     <span className="sr-only">{status.label}: </span>
-                    <span className="font-medium text-foreground">{call.name}</span>{" "}
-                    <span className="font-mono text-xs">{call.inputSummary}</span>
+                    <span className="shrink-0 font-medium text-foreground">{call.name}</span>{" "}
+                    <span className="truncate font-mono text-xs">{call.inputSummary}</span>
                   </TraceTitle>
                 </TraceLine>
               </TraceCollapsibleTrigger>
