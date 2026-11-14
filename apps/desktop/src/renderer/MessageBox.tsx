@@ -14,8 +14,7 @@ import { Placeholder, UndoRedo } from "@tiptap/extensions"
 import { Selection, TextSelection } from "@tiptap/pm/state"
 import { type EditorView } from "@tiptap/pm/view"
 import { EditorContent, useEditor } from "@tiptap/react"
-import { Predicate, Schema } from "effect"
-import { Base64 } from "effect/encoding"
+import { Predicate } from "effect"
 import { ArrowUp, LoaderCircle, Paperclip, Square, X } from "lucide-react"
 import { memo, type ReactNode, useLayoutEffect, useRef, useState } from "react"
 import { InputGroup, InputGroupAddon, InputGroupButton } from "@/components/ui/input-group"
@@ -23,26 +22,11 @@ import { Suggestion, Suggestions } from "@/components/ui/suggestion"
 import { noCommands, noFiles } from "./agentsArea"
 import { CommandHighlight, useCommandPicker } from "./Commands"
 import { pastedSlice, toContent, Mention, toMessage } from "./composerDocument"
+import { imageFiles, readImages } from "./pastedImages"
 import { MarkdownStyling } from "./markdownStyling"
 import { useMentionPicker } from "./Mentions"
 import { type Problem } from "./problems"
 import { ProblemAlert } from "./ProblemAlert"
-
-const isMediaType = Schema.is(ImageMediaType)
-
-const readImages = async (files: Iterable<File>) => {
-  const read = await Promise.all(
-    Array.from(files, async (file): Promise<Image | null> => {
-      const mediaType = file.type
-
-      return isMediaType(mediaType)
-        ? { mediaType, data: Base64.encode(new Uint8Array(await file.arrayBuffer())) }
-        : null
-    }),
-  )
-
-  return read.filter(Predicate.isNotNull)
-}
 
 export const Attachment = memo(function Attachment(props: {
   image: Image
@@ -219,9 +203,9 @@ export function MessageBox(props: {
   }
 
   const takeImages = (data: DataTransfer | null) => {
-    const files = Array.from(data?.files ?? [])
+    const files = imageFiles(data)
 
-    if (props.textOnly || !files.some(({ type }) => isMediaType(type))) return false
+    if (props.textOnly || files.length === 0) return false
     addImages(files)
 
     return true
