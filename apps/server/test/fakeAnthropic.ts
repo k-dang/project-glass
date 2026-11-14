@@ -35,11 +35,13 @@ type Block = typeof Block.Type
 
 type Message = typeof Message.Type
 
-type FakeAnthropicRequest = typeof Request.Type
+export type FakeAnthropicRequest = typeof Request.Type
 
-type Reply =
+type Answer =
   | { readonly type: "text"; readonly text: string }
   | { readonly type: "tool_use"; readonly name: string; readonly input: Schema.Json }
+
+type Reply = Answer | { readonly type: "error"; readonly message: string }
 
 const blocks = (message: Message | undefined): ReadonlyArray<Block> =>
   message === undefined
@@ -62,7 +64,10 @@ const lastWords = (message: Message | undefined) =>
 
 const isSideRequest = (request: FakeAnthropicRequest) => (request.tools ?? []).length === 0
 
-const replyTo = (request: FakeAnthropicRequest): Reply => {
+export const lastUserWords = (request: FakeAnthropicRequest) =>
+  lastWords(request.messages?.findLast((message) => message.role === "user"))
+
+export const replyTo = (request: FakeAnthropicRequest): Reply => {
   const last = request.messages?.findLast((message) => message.role === "user")
 
   if (isSideRequest(request)) return { type: "text", text: "Fake session" }
@@ -107,7 +112,7 @@ const send = (response: ServerResponse, status: number, body: Schema.Json) => {
   response.end(JSON.stringify(body))
 }
 
-const stream = (response: ServerResponse, model: string, reply: Reply) => {
+const stream = (response: ServerResponse, model: string, reply: Answer) => {
   const id = `msg_${randomUUID()}`
 
   const event = (type: string, data: Readonly<Record<string, Schema.Json>>) =>
@@ -152,7 +157,7 @@ const stream = (response: ServerResponse, model: string, reply: Reply) => {
   response.end()
 }
 
-const message = (model: string, reply: Reply) => ({
+const message = (model: string, reply: Answer) => ({
   id: `msg_${randomUUID()}`,
   type: "message",
   role: "assistant",
@@ -191,8 +196,14 @@ export const startFakeAnthropic = Effect.gen(function* () {
     const reply = respond(parsed)
 
     console.log(
-      `${new Date().toISOString()} messages ${model} -> ${reply.type === "text" ? "text" : reply.name}`,
+      `${new Date().toISOString()} messages ${model} -> ${reply.type === "tool_use" ? reply.name : reply.type}`,
     )
+
+    if (reply.type === "error")
+      return send(response, 400, {
+        type: "error",
+        error: { type: "invalid_request_error", message: reply.message },
+      })
 
     return parsed.stream === true
       ? stream(response, model, reply)

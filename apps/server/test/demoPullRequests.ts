@@ -1,3 +1,4 @@
+import { PullRequestRef } from "@glass/contracts"
 import type { FakeGitHub } from "./fakeGitHub"
 import { type FakeChangedFile, type FakePullRequestSeed, VIEWER } from "./fakePullRequest"
 
@@ -413,6 +414,112 @@ export const seedDemoPullRequests = (github: FakeGitHub) => {
 
   slowQueries.addReview({ author: "hubot", state: "APPROVED", bodyHtml: "<p>Ship it.</p>" })
 
+  const auditLog = seed(
+    github,
+    {
+      title: "Paginate the audit log",
+      author: VIEWER.login,
+      body: "Returns the audit log 50 entries at a time, newest first.",
+      checkRuns: [
+        ["build", "SUCCESS"],
+        ["lint", "FAILURE"],
+        ["test", "SUCCESS"],
+      ],
+    },
+    [
+      modified("src/audit/list.ts", [
+        ...remove("export const listAudit = (db: Db) =>"),
+        ...remove('  db.query("select * from audit order by at desc")'),
+        ...add(
+          "export const pageSize = 50",
+          "",
+          "export const listAudit = (db: Db, before?: Date) =>",
+          "  db.query(",
+          '    "select * from audit where at < $1 order by at desc limit $2",',
+          "    [before ?? new Date(), pageSize],",
+          "  )",
+        ),
+      ]),
+    ],
+  )
+
+  auditLog.addReviewThread({
+    path: "src/audit/list.ts",
+    line: 1,
+    comments: [{ author: "monalisa", bodyHtml: "<p>Should the page size come from config?</p>" }],
+  })
+
+  auditLog.addReviewThread({
+    path: "src/audit/list.ts",
+    line: 5,
+    comments: [
+      { author: "hubot", bodyHtml: "<p>Two entries with the same timestamp can be skipped.</p>" },
+      { author: VIEWER.login, bodyHtml: "<p>Good catch. Page on the id too?</p>" },
+      { author: "hubot", bodyHtml: "<p>Yes, <code>(at, id)</code> keeps it stable.</p>" },
+    ],
+  })
+
+  const requestIds = seed(
+    github,
+    {
+      ...DEMO_GATEWAY_REPOSITORY,
+      title: "Forward request ids upstream",
+      author: VIEWER.login,
+      body: "Passes the caller's <code>x-request-id</code> on, or makes one up.",
+      reviewDecision: "CHANGES_REQUESTED",
+      checkRuns: [["build", "SUCCESS"]],
+    },
+    [
+      modified("src/proxy.ts", [
+        ...keep("export const proxy = async (request: Request) => {"),
+        ...add(
+          '  const id = request.headers.get("x-request-id") ?? crypto.randomUUID()',
+          "",
+          '  request.headers.set("x-request-id", id)',
+          "",
+        ),
+        ...keep("  return fetch(request)", "}"),
+      ]),
+    ],
+  )
+
+  requestIds.addReview({
+    author: "monalisa",
+    state: "CHANGES_REQUESTED",
+    bodyHtml: "<p>Request headers are immutable here; copy the request first.</p>",
+  })
+
+  requestIds.addReviewThread({
+    path: "src/proxy.ts",
+    line: 2,
+    comments: [{ author: "monalisa", bodyHtml: "<p>Do we trust ids from outside callers?</p>" }],
+  })
+
+  const timeouts = seed(
+    github,
+    {
+      ...DEMO_GATEWAY_REPOSITORY,
+      title: "Time out slow upstreams",
+      author: VIEWER.login,
+      body: "Gives up on an upstream after 10 seconds with a 504.",
+      reviewDecision: "APPROVED",
+      checkRuns: [
+        ["build", "SUCCESS"],
+        ["test", "SUCCESS"],
+      ],
+    },
+    [
+      modified("src/proxy.ts", [
+        ...keep("export const proxy = async (request: Request) => {"),
+        ...remove("  return fetch(request)"),
+        ...add("  return fetch(request, { signal: AbortSignal.timeout(10_000) })"),
+        ...keep("}"),
+      ]),
+    ],
+  )
+
+  timeouts.addReview({ author: "monalisa", state: "APPROVED", bodyHtml: "<p>Nice and small.</p>" })
+
   seed(
     github,
     {
@@ -454,4 +561,10 @@ export const seedDemoPullRequests = (github: FakeGitHub) => {
       ]),
     ],
   )
+
+  return new PullRequestRef({
+    owner: rateLimit.owner,
+    repo: rateLimit.repo,
+    number: rateLimit.number,
+  })
 }

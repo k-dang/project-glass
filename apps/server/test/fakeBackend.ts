@@ -12,7 +12,7 @@ import { serve } from "../src/server"
 import { ServerConfig } from "../src/ServerConfig"
 import { runMain, wideEventsToStdout } from "../src/wideEvents"
 import { writeAgentCommands } from "./agentCommands"
-import { bundledPi, seedDemoAgent, startDemoClaude, startDemoPi } from "./demoAgent"
+import { bundledPi, seedDemoAgents, startDemoClaude, startDemoPi } from "./demoAgent"
 import { DEMO_GATEWAY_REPOSITORY, DEMO_REPOSITORY, seedDemoPullRequests } from "./demoPullRequests"
 import { startFakeGitHub } from "./fakeGitHub"
 import { VIEWER } from "./fakePullRequest"
@@ -37,7 +37,7 @@ const seedDemoSettings = (dataDirectory: string) => {
 
 const main = Effect.gen(function* () {
   const github = yield* startFakeGitHub({ git: true })
-  seedDemoPullRequests(github)
+  const reviewed = seedDemoPullRequests(github)
 
   const claudeDirectory = yield* Effect.acquireRelease(
     Effect.promise(() => mkdtemp(join(tmpdir(), "glass-fake-claude-"))),
@@ -93,7 +93,9 @@ const main = Effect.gen(function* () {
     ),
   )
 
-  yield* Context.get(running, OutsideQuestions)
+  const questions = Context.get(running, OutsideQuestions)
+
+  yield* questions
     .ask({
       question: "Ship the retry change?",
       choices: ["Ship it", "Hold it"],
@@ -103,9 +105,22 @@ const main = Effect.gen(function* () {
     })
     .pipe(Effect.forkScoped)
 
-  yield* seedDemoAgent(config.port, Redacted.value(config.token), join(demo, "repositories")).pipe(
-    Effect.catchCause((cause) => Effect.logWarning("Couldn't start the demo Agent", cause)),
-  )
+  yield* questions
+    .ask({
+      question: "Which branch should the gateway timeout fix go to?",
+      choices: ["main", "release/1.5", "Both"],
+      session: "demo-session-2",
+      askedBy: "Codex",
+      timeout: Duration.seconds(ASK_TIMEOUT_SECONDS),
+    })
+    .pipe(Effect.forkScoped)
+
+  yield* seedDemoAgents(
+    config.port,
+    Redacted.value(config.token),
+    join(demo, "repositories"),
+    reviewed,
+  ).pipe(Effect.catchCause((cause) => Effect.logWarning("Couldn't start the demo Agents", cause)))
 
   return yield* Effect.never
 })
