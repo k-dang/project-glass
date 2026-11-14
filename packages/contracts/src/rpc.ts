@@ -334,7 +334,7 @@ export class GlassRpcs extends RpcGroup.make(
     error: Schema.Union([ConnectionError, ActivityLogError]),
   }),
   Rpc.make("ListToDos", toDoList),
-  Rpc.make("AddToDo", { payload: { title: ToDoTitle }, ...toDoList }),
+  Rpc.make("AddToDo", { payload: { title: ToDoTitle, notes: Schema.String }, ...toDoList }),
   Rpc.make("EditToDo", {
     payload: { id: Schema.Int, title: ToDoTitle, notes: Schema.String },
     ...toDoList,

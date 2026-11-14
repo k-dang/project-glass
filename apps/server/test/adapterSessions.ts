@@ -229,7 +229,7 @@ export const glassToolsBackend = Effect.fnUntraced(function* (sessionId: string)
 
   for (const [name, value] of homes) vi.stubEnv(name, value)
 
-  yield* client.AddToDo({ title: "Reply to Sam" })
+  yield* client.AddToDo({ title: "Reply to Sam", notes: "" })
 
   const url = yield* mcpCredentials.endpoint
   const bearer = yield* mcpCredentials.issue({ conversationId: "global-conversation", sessionId })

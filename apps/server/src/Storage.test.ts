@@ -6,7 +6,7 @@ it.live("measures the database by table, counting each index toward its table", 
   Effect.scoped(
     Effect.gen(function* () {
       const { client } = yield* startBackend({})
-      yield* client.AddToDo({ title: "Measure storage" })
+      yield* client.AddToDo({ title: "Measure storage", notes: "" })
 
       const items = yield* client.GetStorageBreakdown()
 
