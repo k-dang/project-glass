@@ -159,6 +159,7 @@ const decodePositions = Schema.decodeUnknownEffect(
 interface Published {
   readonly agentId: string
   readonly update: TranscriptUpdate
+  readonly reported?: true
 }
 
 export interface WaitingRequest {
@@ -531,11 +532,16 @@ export class Transcripts extends Context.Service<
 
       const changeWith = <A, E, R>(
         agentId: string,
-        effect: Effect.Effect<readonly [A, ReadonlyArray<TranscriptUpdate>], E, R>,
+        effect: Effect.Effect<
+          readonly [A, ReadonlyArray<TranscriptUpdate>, ReadonlyArray<AgentEvent>?],
+          E,
+          R
+        >,
       ) =>
         lockFor(agentId).withPermits(1)(
           Effect.gen(function* () {
-            const [decided, updates] = yield* sql.withTransaction(effect)
+            const [decided, decidedUpdates, reported = []] = yield* sql.withTransaction(effect)
+            const updates = [...reported, ...decidedUpdates]
 
             if (updates.some(changesRequest))
               yield* markWaiting(
@@ -545,10 +551,10 @@ export class Transcripts extends Context.Service<
 
             if (updates.some(startsOrEndsTurn)) yield* refreshUnseen(agentId)
 
-            yield* PubSub.publishAll(
-              published,
-              updates.map((update) => ({ agentId, update })),
-            )
+            yield* PubSub.publishAll(published, [
+              ...reported.map((update) => ({ agentId, update, reported: true as const })),
+              ...decidedUpdates.map((update) => ({ agentId, update })),
+            ])
 
             return decided
           }),
@@ -621,7 +627,7 @@ export class Transcripts extends Context.Service<
               step(agentId, { type: "turnEnded", ending }),
             )
 
-            return [ended, [...written, ...next.flatMap(({ updates }) => updates)]] as const
+            return [ended, next.flatMap(({ updates }) => updates), written] as const
           }),
         ).pipe(
           Effect.tapError((cause) => Effect.logWarning("Couldn't save a transcript", cause)),
@@ -824,8 +830,8 @@ export class Transcripts extends Context.Service<
         subscribeStarted: PubSub.subscribe(published).pipe(
           Effect.map((live) =>
             Stream.fromSubscription(live).pipe(
-              Stream.flatMap(({ agentId, update }) =>
-                Predicate.isTagged(update, "TurnStarted")
+              Stream.flatMap(({ agentId, update, reported }) =>
+                Predicate.isTagged(update, "TurnStarted") && reported === undefined
                   ? Stream.succeed({ ...update, agentId })
                   : Stream.empty,
               ),

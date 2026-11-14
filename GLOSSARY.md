@@ -285,7 +285,8 @@ always have them; a Sandbox Agent has them only if the user picks them when crea
 _Avoid_: My skills, user skills
 
 **Turn**:
-One message to an Agent and its whole response. It ends done, failed, stopped by the user, cut off
+One message to an Agent and its whole response, or work a pi Agent starts on its own, such as
+when an extension's background task reports back. It ends done, failed, stopped by the user, cut off
 when Glass loses the Agent, or interrupted when Glass quits; a Sandbox Agent's Turn carries on
 while Glass is closed.
 _Avoid_: Run, execution, exchange

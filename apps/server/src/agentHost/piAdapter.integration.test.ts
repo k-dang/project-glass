@@ -11,6 +11,7 @@ import {
   TurnStopped,
 } from "@glass/contracts"
 import { Effect, Predicate, Schema } from "effect"
+import { mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import {
   writeGreetPack,
@@ -124,6 +125,37 @@ it.live("ends a Turn when pi settles after retrying, not at the first agent_end"
 
     assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
     assert.deepInclude(turn?.parts ?? [], TextPart.make({ text: "Recovered." }))
+  }).pipe(Effect.scoped),
+)
+
+it.live("opens a Turn for work a pi extension starts after the last Turn ended", () =>
+  Effect.gen(function* () {
+    const f = yield* piSession("pi-woken", { fake: { output: "Here is the diagram." } })
+    const signals = join(f.home, "signals")
+    mkdirSync(signals)
+    yield* f.extension(
+      "report.js",
+      `import { watch } from "node:fs"
+export default (pi) => {
+  const watcher = watch(${JSON.stringify(signals)}, () => {
+    watcher.close()
+    pi.sendMessage(
+      { customType: "report", content: "The background task finished.", display: true },
+      { triggerTurn: true },
+    )
+  })
+}`,
+    )
+    const agent = yield* f.open(conversation)
+
+    yield* agent.send("Start the background task")
+    yield* f.until(settled(1))
+    writeFileSync(join(signals, "finished"), "")
+    const [, woken] = yield* f.until(settled(2))
+
+    assert.equal(woken?.message, "")
+    assert.deepStrictEqual(woken?.ended?.ending, TurnDone.make({}))
+    assert.deepStrictEqual(lastText(woken), TextPart.make({ text: "Here is the diagram." }))
   }).pipe(Effect.scoped),
 )
 
