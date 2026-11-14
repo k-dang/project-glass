@@ -4,7 +4,7 @@ import { FolderGit2, GitBranch, Package, PanelTop } from "lucide-react"
 import type { ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { AgentsPanelToggle, NewAgentLink } from "./Agents"
+import { AgentsPanelToggle } from "./Agents"
 import { placeIcons, placeNames } from "./agentsArea"
 import { LOCAL_SKILLS_LABEL } from "./skillChoice"
 
@@ -32,7 +32,6 @@ export function AgentHeader(props: {
     <header className="flex h-11 shrink-0 items-center gap-2 border-b px-4 text-sm">
       <AgentsPanelToggle />
       <div className="flex min-w-0 flex-1 items-center gap-2">{props.heading}</div>
-      <NewAgentLink />
       {PlaceIcon !== null && props.place !== null && (
         <Popover>
           <PopoverTrigger render={<Button variant="ghost" size="icon-sm" aria-label="Details" />}>
