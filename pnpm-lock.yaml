@@ -135,6 +135,9 @@ catalogs:
     shadcn:
       specifier: 4.21.4
       version: 4.21.4
+    shiki:
+      specifier: 4.5.0
+      version: 4.5.0
     streamdown:
       specifier: 2.7.1
       version: 2.7.1
@@ -316,6 +319,9 @@ importers:
       shadcn:
         specifier: 'catalog:'
         version: 4.21.4
+      shiki:
+        specifier: 'catalog:'
+        version: 4.5.0
       streamdown:
         specifier: 'catalog:'
         version: 2.7.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0)

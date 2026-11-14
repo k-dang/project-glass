@@ -57,6 +57,7 @@
     "react-dom": "catalog:",
     "recharts": "catalog:",
     "shadcn": "catalog:",
+    "shiki": "catalog:",
     "streamdown": "catalog:",
     "tailwindcss": "catalog:",
     "tw-animate-css": "catalog:",
