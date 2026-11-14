@@ -520,6 +520,10 @@
   cursor: zoom-in;
 }
 
+.markdown-body [data-mermaid] {
+  margin-bottom: 16px;
+}
+
 /* Tailwind resets list markers and inline media defaults that github-markdown-css leaves unset. */
 .markdown-body :where(ul, ol, menu) {
   list-style: revert;
