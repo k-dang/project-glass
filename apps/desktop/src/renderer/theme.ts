@@ -1,5 +1,6 @@
 import { type Appearance, type ColorScheme, ColorSchemePreference, Theme } from "@glass/contracts"
 import { useAtom } from "@effect/atom-react"
+import { useSyncExternalStore } from "react"
 import { Option, Schema } from "effect"
 import { Atom } from "effect/reactivity"
 
@@ -35,11 +36,11 @@ export function applyAppearance(appearance: Appearance) {
 
 const colorSchemeTimeout = 300
 
+const darkScheme = window.matchMedia("(prefers-color-scheme: dark)")
+
 const colorSchemeFollows = (colorScheme: ColorScheme) =>
   new Promise<void>((resolve) => {
-    const scheme = window.matchMedia("(prefers-color-scheme: dark)")
-
-    if (scheme.matches === (colorScheme === "dark")) {
+    if (darkScheme.matches === (colorScheme === "dark")) {
       resolve()
 
       return
@@ -47,13 +48,13 @@ const colorSchemeFollows = (colorScheme: ColorScheme) =>
 
     const done = () => {
       clearTimeout(timeout)
-      scheme.removeEventListener("change", done)
+      darkScheme.removeEventListener("change", done)
       resolve()
     }
 
     const timeout = setTimeout(done, colorSchemeTimeout)
 
-    scheme.addEventListener("change", done)
+    darkScheme.addEventListener("change", done)
   })
 
 function transitionAppearance(appearance: Appearance) {
@@ -79,3 +80,12 @@ export function useAppearance() {
     setColorScheme: (colorScheme: ColorSchemePreference) => change({ ...appearance, colorScheme }),
   }
 }
+
+const subscribeToColorScheme = (onChange: () => void) => {
+  darkScheme.addEventListener("change", onChange)
+
+  return () => darkScheme.removeEventListener("change", onChange)
+}
+
+export const useDarkColorScheme = () =>
+  useSyncExternalStore(subscribeToColorScheme, () => darkScheme.matches)

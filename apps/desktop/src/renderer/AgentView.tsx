@@ -57,6 +57,7 @@ import {
   useRef,
   useState,
 } from "react"
+import { mermaid } from "@streamdown/mermaid"
 import { Streamdown } from "streamdown"
 import { Button } from "@/components/ui/button"
 import { Kbd } from "@/components/ui/kbd"
@@ -118,6 +119,7 @@ import { referenceText } from "./queue"
 import { rememberPlace } from "./savedPlace"
 import { shortcutLabel } from "./shortcutLabel"
 import { useStagedFeedback } from "./useStagedFeedback"
+import { useDarkColorScheme } from "./theme"
 import { type FeedbackNotesStore, useFeedbackNotes } from "./useFeedbackNotes"
 import { markTurnSeenAtom } from "./needsYou"
 import { useShortcuts } from "./useShortcuts"
@@ -584,6 +586,18 @@ const toolStatus = {
   failed: { label: "Failed", line: "error" },
 } as const
 
+const markdownPlugins = { mermaid }
+
+function AgentMarkdown(props: { text: string }) {
+  const theme = useDarkColorScheme() ? "dark" : "default"
+
+  return (
+    <Streamdown className="text-sm" plugins={markdownPlugins} mermaid={{ config: { theme } }}>
+      {props.text}
+    </Streamdown>
+  )
+}
+
 const PartView = memo(function PartView(props: {
   part: TurnPart
   nested: ReadonlyArray<NestedPart>
@@ -592,7 +606,7 @@ const PartView = memo(function PartView(props: {
 
   return Match.value(props.part).pipe(
     Match.tagsExhaustive({
-      Text: ({ text }) => <Streamdown className="text-sm">{text}</Streamdown>,
+      Text: ({ text }) => <AgentMarkdown text={text} />,
       Steer: ({ message, images, context }) => (
         <UserMessage
           label={["Steered", sentFrom(context)].filter(Predicate.isString).join(" · ")}
