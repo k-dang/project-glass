@@ -320,7 +320,7 @@ export function MessageBox(props: {
             {picker.choices !== null && (
               <div className="absolute inset-x-0 bottom-full z-50 mb-2">{picker.choices}</div>
             )}
-            <InputGroup>
+            <InputGroup className="has-[[data-slot=input-group-control]:focus-visible]:border-foreground/25 has-[[data-slot=input-group-control]:focus-visible]:ring-0">
               {composed.images.length > 0 && (
                 <InputGroupAddon align="block-start" className="flex-wrap gap-2">
                   {composed.images.map((image, index) => (
