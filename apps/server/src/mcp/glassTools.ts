@@ -98,7 +98,8 @@ const ListQueue = Tool.make("list_queue", {
 }).annotateMerge(readOnly)
 
 const ListToDos = Tool.make("list_to_dos", {
-  description: "Lists the user's To-dos in Glass, done or not, with their notes.",
+  description:
+    "Lists the user's To-dos in Glass, done or not, with their notes. An image is an id and a media type; its file stays on this device.",
   success: Schema.Struct({ toDos: Schema.Array(ToDo) }),
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)

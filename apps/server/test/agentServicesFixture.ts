@@ -216,6 +216,15 @@ export const agentServicesFixture = Effect.gen(function* () {
           Layer.provideMerge(Transcripts.layer),
           Layer.provide(Layer.succeed(LocalPlacement, placement)),
           Layer.provide(ToDos.layer),
+          Layer.provide(
+            ServerConfig.layer.pipe(
+              Layer.provide(
+                ConfigProvider.layer(
+                  ConfigProvider.fromEnvRecord({ GLASS_PORT: "0", GLASS_TOKEN: "unused" }),
+                ),
+              ),
+            ),
+          ),
           Layer.provide(Layer.mock(ActivityLog)({ record: () => Effect.void })),
           Layer.provide(NodeFileSystem.layer),
         ),

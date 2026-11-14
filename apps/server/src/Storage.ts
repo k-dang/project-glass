@@ -44,6 +44,7 @@ const groupOfItem = new Map<string, StorageGroup>([
   ["tours", "reviews"],
   ["activity", "activity"],
   ["to_do", "toDos"],
+  ["to_do_image", "toDos"],
   [FREE_SPACE, "overhead"],
   [WRITE_AHEAD_LOG, "overhead"],
 ])
