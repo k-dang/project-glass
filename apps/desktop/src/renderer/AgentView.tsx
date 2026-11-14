@@ -33,6 +33,7 @@ import { cn } from "cn"
 import { DateTime, Exit, Match, Option, Predicate } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import {
+  ArrowDown,
   ArrowUp,
   Brain,
   CircleCheck,
@@ -64,14 +65,6 @@ import { Kbd } from "@/components/ui/kbd"
 import { Bubble, BubbleContent } from "@/components/ui/bubble"
 import { CodeBlock, CodeBlockContent } from "@/components/ui/code-block"
 import { Message, MessageContent, MessageGroup } from "@/components/ui/message"
-import {
-  MessageScroller,
-  MessageScrollerButton,
-  MessageScrollerContent,
-  MessageScrollerItem,
-  MessageScrollerProvider,
-  MessageScrollerViewport,
-} from "@/components/ui/message-scroller"
 import {
   Trace,
   TraceCollapsible,
@@ -123,6 +116,7 @@ import { useDarkColorScheme } from "./theme"
 import { type FeedbackNotesStore, useFeedbackNotes } from "./useFeedbackNotes"
 import { markTurnSeenAtom } from "./needsYou"
 import { useShortcuts } from "./useShortcuts"
+import { ANCHORED_TURN_CLASS, useTranscriptScroll } from "./useTranscriptScroll"
 import { useWindowFocused } from "./useWindowFocused"
 
 const TURNS_PER_PAGE = 20
@@ -299,6 +293,11 @@ export function Transcript(props: {
   lead?: ReactNode
 }) {
   const [shown, setShown] = useState(TURNS_PER_PAGE)
+
+  const { viewportProps, contentRef, anchored, following, jumpToEnd } = useTranscriptScroll(
+    props.turns,
+  )
+
   const hidden = Math.max(0, props.turns.length - shown)
   const showMore = () => setShown((count) => count + TURNS_PER_PAGE)
 
@@ -315,33 +314,49 @@ export function Transcript(props: {
   }, [])
 
   return (
-    <MessageScrollerProvider autoScroll scrollPreviousItemPeek={16}>
-      <section aria-label="Transcript" className="flex min-h-0 flex-1 flex-col">
-        <MessageScroller className="min-h-0 flex-1">
-          <MessageScrollerViewport className="px-6 py-4">
-            <MessageScrollerContent className="mx-auto w-full max-w-3xl">
-              {props.lead}
-              {hidden > 0 && (
-                <div className="text-center">
-                  <Button ref={showMoreWhenSeen} variant="ghost" size="sm" onClick={showMore}>
-                    Show {Math.min(hidden, TURNS_PER_PAGE)} earlier Turns
-                  </Button>
-                </div>
-              )}
-              {props.turns.slice(hidden).map((turn) => (
-                <TurnView
-                  key={turn.id}
-                  turn={turn}
-                  latest={turn === props.turns.at(-1)}
-                  status={turn === props.turns.at(-1) ? props.status : null}
-                />
-              ))}
-            </MessageScrollerContent>
-          </MessageScrollerViewport>
-          <MessageScrollerButton />
-        </MessageScroller>
-      </section>
-    </MessageScrollerProvider>
+    <section aria-label="Transcript" className="relative flex min-h-0 flex-1 flex-col">
+      <div
+        {...viewportProps}
+        className="size-full min-h-0 min-w-0 scroll-fade-b scrollbar-thin overflow-y-auto overscroll-contain px-6 contain-content [container-type:size] [scrollbar-gutter:stable_both-edges]"
+      >
+        <div
+          ref={contentRef}
+          role="log"
+          aria-relevant="additions"
+          className="mx-auto flex h-max min-h-full w-full max-w-3xl flex-col gap-6 py-4"
+        >
+          {props.lead}
+          {hidden > 0 && (
+            <div className="text-center [overflow-anchor:none]">
+              <Button ref={showMoreWhenSeen} variant="ghost" size="sm" onClick={showMore}>
+                Show {Math.min(hidden, TURNS_PER_PAGE)} earlier Turns
+              </Button>
+            </div>
+          )}
+          {props.turns.slice(hidden).map((turn) => (
+            <TurnView
+              key={turn.id}
+              turn={turn}
+              latest={turn === props.turns.at(-1)}
+              anchored={turn.id === anchored}
+              status={turn === props.turns.at(-1) ? props.status : null}
+            />
+          ))}
+        </div>
+      </div>
+      <Button
+        variant="secondary"
+        size="icon-sm"
+        data-active={!following}
+        aria-hidden={following}
+        tabIndex={following ? -1 : 0}
+        onClick={jumpToEnd}
+        className="absolute bottom-4 left-1/2 -translate-x-1/2 border-border bg-background text-foreground transition-[translate,scale,opacity] duration-200 hover:bg-muted hover:text-foreground data-[active=false]:pointer-events-none data-[active=false]:translate-y-full data-[active=false]:scale-95 data-[active=false]:opacity-0 data-[active=false]:duration-400 data-[active=false]:ease-[cubic-bezier(0.7,0,0.84,0)] data-[active=true]:translate-y-0 data-[active=true]:scale-100 data-[active=true]:opacity-100 data-[active=true]:ease-[cubic-bezier(0.23,1,0.32,1)]"
+      >
+        <ArrowDown />
+        <span className="sr-only">Scroll to end</span>
+      </Button>
+    </section>
   )
 }
 
@@ -437,12 +452,19 @@ export function UserMessage(props: {
 const TurnView = memo(function TurnView(props: {
   turn: Turn
   latest: boolean
+  anchored: boolean
   status: string | null
 }) {
   const { turn } = props
 
   return (
-    <MessageScrollerItem messageId={turn.id} scrollAnchor exactHeight={props.latest}>
+    <div
+      className={cn(
+        "min-w-0 shrink-0",
+        !props.latest && "[contain-intrinsic-size:auto_10rem] [content-visibility:auto]",
+        props.anchored && ANCHORED_TURN_CLASS,
+      )}
+    >
       <MessageGroup className="gap-4">
         {Predicate.isTagged(turn.context, "Report") ? (
           <ReportMessage work={turn.context.work} />
@@ -474,7 +496,7 @@ const TurnView = memo(function TurnView(props: {
           </MessageContent>
         </Message>
       </MessageGroup>
-    </MessageScrollerItem>
+    </div>
   )
 })
 
