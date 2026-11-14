@@ -380,3 +380,51 @@ it("pastes an image onto an existing to-do, opens it, and removes it", async () 
     ).toBeNull(),
   )
 })
+
+it("sends each pasted image in its own message", async () => {
+  const adds: Array<Held<Parameters<Handlers["AddToDo"]>[0], ReadonlyArray<ToDo>, ToDoError>> = []
+
+  const attaches: Array<
+    Held<Parameters<Handlers["AttachToDoImages"]>[0], ReadonlyArray<ToDo>, ToDoError>
+  > = []
+
+  const user = mount({
+    ListToDos: () => Effect.succeed([]),
+    AddToDo: hold(adds),
+    AttachToDoImages: hold(attaches),
+  })
+
+  const form = within(await screen.findByRole("form", { name: "Add a to-do" }))
+  const title = form.getByRole("textbox", { name: "New to-do" })
+
+  await user.click(title)
+  await pasteImage(user, "one.png")
+  await pasteImage(user, "two.png")
+  await user.type(title, "Two shots")
+  await user.click(form.getByRole("button", { name: "Add" }))
+
+  const add = await next(adds)
+  expect(add.payload.images ?? []).toEqual([])
+  add.answer(
+    Effect.succeed([new ToDo({ id: 4, title: "Two shots", notes: "", done: false, images: [] })]),
+  )
+
+  const first = await next(attaches)
+  expect(first.payload.images).toHaveLength(1)
+  first.answer(
+    Effect.succeed([
+      new ToDo({
+        id: 4,
+        title: "Two shots",
+        notes: "",
+        done: false,
+        images: [new ToDoImage({ id: 1, mediaType: "image/png" })],
+      }),
+    ]),
+  )
+
+  const second = await next(attaches)
+  expect(second.payload.id).toBe(4)
+  expect(second.payload.images).toHaveLength(1)
+  expect(attaches).toHaveLength(0)
+})
