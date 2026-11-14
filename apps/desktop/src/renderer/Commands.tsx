@@ -25,12 +25,12 @@ const messageStart = (doc: ProseMirrorNode) => {
   return null
 }
 
-export const leadingCommand = (doc: ProseMirrorNode, names: ReadonlySet<string>) => {
+export const leadingCommand = (doc: ProseMirrorNode, names: Pick<ReadonlySet<string>, "has">) => {
   const start = messageStart(doc)
   const name = start === null ? undefined : /^\/(\S+)/.exec(start.text)?.[1]
 
   return start !== null && name !== undefined && names.has(name)
-    ? { from: start.from, to: start.from + 1 + name.length }
+    ? { name, from: start.from, to: start.from + 1 + name.length }
     : null
 }
 
@@ -42,16 +42,21 @@ const typedCommand = ({ before, at }: Caret, doc: ProseMirrorNode) => {
     : undefined
 }
 
-const key = new PluginKey<ReadonlySet<string>>("commandHighlight")
+type Descriptions = ReadonlyMap<string, string>
 
-const highlighted = (doc: ProseMirrorNode, names: ReadonlySet<string>) => {
-  const leading = leadingCommand(doc, names)
+const key = new PluginKey<Descriptions>("commandHighlight")
+
+const highlighted = (doc: ProseMirrorNode, descriptions: Descriptions) => {
+  const leading = leadingCommand(doc, descriptions)
 
   return leading === null
     ? DecorationSet.empty
     : DecorationSet.create(doc, [
         Decoration.inline(leading.from, leading.to, {
-          class: "rounded-sm bg-primary/15 font-medium text-primary",
+          class:
+            "font-medium text-command before:mr-[0.2em] before:inline-block before:size-[0.9em] before:bg-current before:align-[-0.1em] before:content-[''] before:mask-(--command-icon) before:mask-contain before:mask-center before:mask-no-repeat",
+          spellcheck: "false",
+          title: descriptions.get(leading.name) ?? "",
         }),
       ])
 }
@@ -63,22 +68,26 @@ export const CommandHighlight = Extension.create({
     new Plugin({
       key,
       state: {
-        init: () => new Set<string>(),
-        apply: (transaction, names): ReadonlySet<string> => transaction.getMeta(key) ?? names,
+        init: (): Descriptions => new Map(),
+        apply: (transaction, descriptions): Descriptions =>
+          transaction.getMeta(key) ?? descriptions,
       },
       props: {
-        decorations: (state) => highlighted(state.doc, key.getState(state) ?? new Set()),
+        decorations: (state) => highlighted(state.doc, key.getState(state) ?? new Map()),
       },
     }),
   ],
 })
 
 export function useCommandPicker(editor: Editor, commands: ReadonlyArray<AgentCommand>) {
-  const names = useMemo(() => new Set(commands.map(({ name }) => name)), [commands])
+  const descriptions = useMemo(
+    () => new Map(commands.map(({ name, description }) => [name, description])),
+    [commands],
+  )
 
   useLayoutEffect(() => {
-    editor.view.dispatch(editor.state.tr.setMeta(key, names).setMeta("addToHistory", false))
-  }, [editor, names])
+    editor.view.dispatch(editor.state.tr.setMeta(key, descriptions).setMeta("addToHistory", false))
+  }, [editor, descriptions])
 
   return usePicker<AgentCommand>(
     editor,
