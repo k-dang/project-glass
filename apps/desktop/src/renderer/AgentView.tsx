@@ -43,6 +43,7 @@ import {
   Layers,
   LoaderCircle,
   MessageCircle,
+  Puzzle,
   Unplug,
   Wrench,
   X,
@@ -194,7 +195,11 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
   const reconnect = useAtomRefresh(conversation.transcript)
 
   const loaded = AsyncResult.value(transcript)
-  const { turns, queued, status } = Option.getOrElse(loaded, () => emptyTranscript)
+
+  const { turns, queued, status, extensionStatuses } = Option.getOrElse(
+    loaded,
+    () => emptyTranscript,
+  )
 
   const [changesOpened, setChangesOpened] = useState(tab === "changes")
   const diagrams = useDiagrams(turns, Option.isSome(loaded))
@@ -283,6 +288,7 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
             <ToolCallView value={diagrams.cardOf}>
               <Transcript turns={turns} status={status} />
             </ToolCallView>
+            <ExtensionStatuses statuses={extensionStatuses} />
             {reach === "unreachable" && <UnreachableNotice agentId={agent.id} />}
             {gone === null ? (
               <Composer agent={agent} turns={turns} queued={queued} />
@@ -872,6 +878,24 @@ function WaitingNotice(props: { waiting: RequestPart }) {
         Show it
       </Button>
     </p>
+  )
+}
+
+function ExtensionStatuses(props: { statuses: ReadonlyArray<string> }) {
+  return (
+    props.statuses.length > 0 && (
+      <output
+        aria-label="Extension statuses"
+        className="mx-auto flex w-full max-w-3xl flex-wrap gap-x-4 gap-y-1 px-6 pt-2 text-xs text-muted-foreground"
+      >
+        {props.statuses.map((status) => (
+          <span key={status} className="flex items-center gap-1.5">
+            <Puzzle aria-hidden className="size-3" />
+            {status}
+          </span>
+        ))}
+      </output>
+    )
   )
 }
 

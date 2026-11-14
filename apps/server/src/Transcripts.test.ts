@@ -3,6 +3,7 @@ import { assert, it } from "@effect/vitest"
 import {
   applyTranscriptUpdate,
   emptyTranscript,
+  ExtensionStatusesChanged,
   PartSet,
   ToolCallPart,
   TurnCutOff,
@@ -89,6 +90,20 @@ it.live("hands its program only the Turns Glass started, not one the Agent start
       ["", "Next"],
     )
   }).pipe(Effect.scoped, Effect.provide(transcriptsLayer)),
+)
+
+it.live("shows an Agent's extension statuses until Glass loses the Agent", () =>
+  Effect.gen(function* () {
+    const transcripts = yield* Transcripts
+
+    yield* transcripts.save("agent-1", [
+      ExtensionStatusesChanged.make({ extensionStatuses: ["Plan mode"] }),
+    ])
+    assert.deepStrictEqual((yield* transcripts.read("agent-1")).extensionStatuses, ["Plan mode"])
+
+    yield* transcripts.endRunning(TurnCutOff.make({}), ["agent-1"])
+    assert.deepStrictEqual((yield* transcripts.read("agent-1")).extensionStatuses, [])
+  }).pipe(Effect.provide(transcriptsLayer)),
 )
 
 const TurnUnit = Schema.Struct({

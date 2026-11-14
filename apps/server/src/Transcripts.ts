@@ -3,6 +3,7 @@ import {
   AgentError,
   type AgentEvent,
   endTurnEvents,
+  ExtensionStatusesChanged,
   FeedbackNote,
   isRequestPart,
   isWaiting,
@@ -57,6 +58,7 @@ import {
   type ConversationWrite,
   stepConversation,
 } from "./conversationState"
+import type { HostEvent } from "./agentHost/protocol"
 import { recordUnit } from "./wideEvents"
 
 const encodePart = Schema.encodeSync(Schema.fromJsonString(TurnPart))
@@ -225,7 +227,7 @@ export class Transcripts extends Context.Service<
   {
     readonly save: (
       agentId: string,
-      events: ReadonlyArray<AgentEvent>,
+      events: ReadonlyArray<HostEvent>,
       throughJournalEntry?: number,
     ) => Effect.Effect<void, AgentError>
     readonly watch: (agentId: string) => Stream.Stream<TranscriptUpdate, AgentError>
@@ -285,6 +287,22 @@ export class Transcripts extends Context.Service<
       const published = yield* PubSub.unbounded<Published>()
       const locks = new Map<string, Semaphore.Semaphore>()
       const statuses = new Map<string, string>()
+      const extensionStatuses = new Map<string, ReadonlyArray<string>>()
+
+      const setExtensionStatuses = (agentId: string, shown: ReadonlyArray<string>) =>
+        lockFor(agentId).withPermits(1)(
+          Effect.suspend(() => {
+            if (shown.length === 0 && !extensionStatuses.has(agentId)) return Effect.void
+
+            if (shown.length === 0) extensionStatuses.delete(agentId)
+            else extensionStatuses.set(agentId, shown)
+
+            return PubSub.publish(published, {
+              agentId,
+              update: ExtensionStatusesChanged.make({ extensionStatuses: shown }),
+            })
+          }),
+        )
 
       const waitingParts = (agentId?: string) =>
         sql`
@@ -617,10 +635,18 @@ export class Transcripts extends Context.Service<
 
       const save = (
         agentId: string,
-        events: ReadonlyArray<AgentEvent>,
+        hostEvents: ReadonlyArray<HostEvent>,
         throughJournalEntry?: number,
-      ) =>
-        changeWith(
+      ) => {
+        const events = hostEvents.filter(
+          (event): event is AgentEvent => !Predicate.isTagged(event, "ExtensionStatusesChanged"),
+        )
+
+        const shown = hostEvents.findLast((event) =>
+          Predicate.isTagged(event, "ExtensionStatusesChanged"),
+        )
+
+        return changeWith(
           agentId,
           Effect.gen(function* () {
             if (throughJournalEntry !== undefined)
@@ -646,7 +672,13 @@ export class Transcripts extends Context.Service<
               Effect.catch((cause) => Effect.logWarning("Couldn't describe an ended Turn", cause)),
             ),
           ),
+          Effect.andThen(
+            shown === undefined
+              ? Effect.void
+              : setExtensionStatuses(agentId, shown.extensionStatuses),
+          ),
         )
+      }
 
       const snapshot = Effect.fnUntraced(function* (agentId: string) {
         const turns = yield* decodeTurns(
@@ -673,6 +705,7 @@ export class Transcripts extends Context.Service<
           })),
           queued: yield* queued(agentId),
           status: statuses.get(agentId) ?? null,
+          extensionStatuses: extensionStatuses.get(agentId) ?? [],
         })
       })
 
@@ -711,6 +744,10 @@ export class Transcripts extends Context.Service<
 
           yield* save(runningAgent, events.flat())
         }
+
+        yield* Effect.forEach(agentIds, (agentId) => setExtensionStatuses(agentId, []), {
+          discard: true,
+        })
       })
 
       const withStorageFailure = <A, E, R>(name: string, effect: Effect.Effect<A, E, R>) =>
@@ -968,6 +1005,7 @@ export class Transcripts extends Context.Service<
           )
           locks.delete(agentId)
           statuses.delete(agentId)
+          extensionStatuses.delete(agentId)
           yield* markWaiting(agentId, [])
           yield* setUnseen(agentId, undefined)
         }, Effect.mapError(storageFailure)),

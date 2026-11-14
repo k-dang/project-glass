@@ -159,6 +159,26 @@ export default (pi) => {
   }).pipe(Effect.scoped),
 )
 
+it.live("reports a pi extension's statuses as plain text, outside any Turn", () =>
+  Effect.gen(function* () {
+    const f = yield* piSession("pi-extension-statuses", { fake: { output: "Done." } })
+    yield* f.extension(
+      "mode.js",
+      `export default (pi) => {
+  pi.on("session_start", (_event, ctx) => ctx.ui.setStatus("mode", "\\u001b[33mPlan mode\\u001b[39m"))
+  pi.registerCommand("leave", { handler: async (_args, ctx) => ctx.ui.setStatus("mode", undefined) })
+}`,
+    )
+    const agent = yield* f.open(conversation)
+
+    yield* f.untilStatuses((statuses) => statuses.length > 0)
+    assert.deepStrictEqual(yield* f.statuses, ["Plan mode"])
+
+    yield* agent.send("/leave")
+    yield* f.untilStatuses((statuses) => statuses.length === 0)
+  }).pipe(Effect.scoped),
+)
+
 it.live("fails a Turn with a reason that leaves out the provider's own words", () =>
   Effect.gen(function* () {
     const f = yield* piSession("pi-rejected", { apiKey: "glass-rejected-key" })

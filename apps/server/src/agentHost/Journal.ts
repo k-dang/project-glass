@@ -1,11 +1,10 @@
-import type { AgentEvent } from "@glass/contracts"
 import { Context, Effect, Layer, PubSub, Stream } from "effect"
-import type { JournalEntry } from "./protocol"
+import type { HostEvent, JournalEntry } from "./protocol"
 
 export class Journal extends Context.Service<
   Journal,
   {
-    readonly append: (agentId: string, event: AgentEvent) => Effect.Effect<void>
+    readonly append: (agentId: string, event: HostEvent) => Effect.Effect<void>
     readonly watch: (after: number) => Stream.Stream<JournalEntry>
     readonly acknowledge: (through: number) => Effect.Effect<void>
   }

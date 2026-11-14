@@ -35,6 +35,7 @@ import { GlassMcpTools } from "../src/mcp/server"
 import {
   type ConversationRole,
   GlobalRole,
+  type HostEvent,
   type ReviewBrief,
   type SkillSource,
   type TurnSettings,
@@ -81,15 +82,28 @@ const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
   yield* Effect.addFinalizer(() => tape.finish)
   const turns = yield* SubscriptionRef.make<ReadonlyArray<Turn>>([])
   const events: Array<AgentEvent> = []
+  const statuses = yield* SubscriptionRef.make<ReadonlyArray<string>>([])
   let nextTurn = 0
 
-  const report = (event: AgentEvent) =>
-    Effect.sync(() => events.push(event)).pipe(
-      Effect.andThen(SubscriptionRef.update(turns, (current) => applyAgentEvent(current, event))),
-    )
+  const report = (event: HostEvent) =>
+    Predicate.isTagged(event, "ExtensionStatusesChanged")
+      ? SubscriptionRef.set(statuses, event.extensionStatuses)
+      : Effect.sync(() => events.push(event)).pipe(
+          Effect.andThen(
+            SubscriptionRef.update(turns, (current) => applyAgentEvent(current, event)),
+          ),
+        )
 
   const until = (holds: (current: ReadonlyArray<Turn>) => boolean) =>
     SubscriptionRef.changes(turns).pipe(
+      Stream.filter(holds),
+      Stream.runHead,
+      Effect.map(Option.getOrThrow),
+      Effect.raceFirst(tape.mismatch),
+    )
+
+  const untilStatuses = (holds: (current: ReadonlyArray<string>) => boolean) =>
+    SubscriptionRef.changes(statuses).pipe(
       Stream.filter(holds),
       Stream.runHead,
       Effect.map(Option.getOrThrow),
@@ -129,7 +143,17 @@ const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
       })),
     )
 
-  return { adapter, folder, events, turns: SubscriptionRef.get(turns), until, request, open }
+  return {
+    adapter,
+    folder,
+    events,
+    turns: SubscriptionRef.get(turns),
+    statuses: SubscriptionRef.get(statuses),
+    until,
+    untilStatuses,
+    request,
+    open,
+  }
 })
 
 export const reviewBrief: ReviewBrief = {

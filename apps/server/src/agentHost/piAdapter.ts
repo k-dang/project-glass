@@ -8,6 +8,7 @@ import {
   type AgentCommand,
   type AgentModel,
   AgentModels,
+  ExtensionStatusesChanged,
   type RequestAnswer,
   RequestNotWaiting,
   type RequestPart,
@@ -29,6 +30,7 @@ import {
 } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import { randomUUID } from "node:crypto"
+import { stripVTControlCharacters } from "node:util"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import type { AgentAdapter } from "./adapter"
@@ -335,6 +337,28 @@ export const piAdapter = (command: string) =>
               )
         }
 
+        const statuses = new Map<string, string>()
+
+        const showStatuses = Effect.suspend(() =>
+          report(ExtensionStatusesChanged.make({ extensionStatuses: [...statuses.values()] })),
+        )
+
+        const trackStatus = (event: PiEvent) => {
+          if (
+            event.type !== "extension_ui_request" ||
+            event.method !== "setStatus" ||
+            event.statusKey === undefined
+          )
+            return Effect.void
+
+          const text = stripVTControlCharacters(event.statusText ?? "").trim()
+
+          if (text === "") statuses.delete(event.statusKey)
+          else statuses.set(event.statusKey, text)
+
+          return showStatuses
+        }
+
         const rpc = yield* startPi(
           folder,
           conversation,
@@ -342,13 +366,25 @@ export const piAdapter = (command: string) =>
           Predicate.isTagged(role, "Global") ? role.tools : undefined,
           (event) =>
             trackDialog(event).pipe(
+              Effect.andThen(trackStatus(event)),
               Effect.andThen(logProviderError(event)),
               Effect.andThen(Queue.offer(inbox, Input.Event({ event }))),
               Effect.asVoid,
             ),
         )
 
-        yield* rpc.exited.pipe(Effect.andThen(Queue.end(inbox)), Effect.forkIn(scope))
+        yield* rpc.exited.pipe(
+          Effect.andThen(Queue.end(inbox)),
+          Effect.andThen(
+            Effect.suspend(() => {
+              if (statuses.size === 0) return Effect.void
+              statuses.clear()
+
+              return showStatuses
+            }),
+          ),
+          Effect.forkIn(scope),
+        )
 
         const startingModel = (yield* rpc.request({ type: "get_state" }, SessionState).pipe(
           Effect.tapError((error) => Effect.logWarning("pi didn't report its state", error)),

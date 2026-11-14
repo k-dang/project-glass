@@ -289,6 +289,12 @@ when Glass loses the Agent, or interrupted when Glass quits; a Sandbox Agent's T
 while Glass is closed.
 _Avoid_: Run, execution, exchange
 
+**Extension status**:
+A short line one of a pi Agent's extensions shows about itself, such as a mode it is in or work it
+runs in the background. Glass shows it on the Agent whether or not a Turn is running, until the
+extension clears it or Glass loses the Agent.
+_Avoid_: Widget, banner
+
 **Diagram**:
 A named Mermaid picture an Agent draws beside its conversation when the user asks for one, labeled
 as existing behavior, a proposed design, or an uncertain inference. Asking for changes redraws it

@@ -1,7 +1,6 @@
 import {
   type AgentCommand,
   type AgentEngine,
-  type AgentEvent,
   type AgentModels,
   type RequestAnswer,
   RequestNotWaiting,
@@ -16,6 +15,7 @@ import {
   type ConversationStart,
   type StartOutcome,
   HostAgentError,
+  type HostEvent,
   type SkillSource,
   type SteersNotTakenIn,
   type TurnSettings,
@@ -87,7 +87,7 @@ export class HostAgents extends Context.Service<
               return "alreadyRunning" as const
 
             const scope = yield* Scope.fork(hostScope)
-            const report = (event: AgentEvent) => journal.append(agentId, event)
+            const report = (event: HostEvent) => journal.append(agentId, event)
 
             const started = Effect.gen(function* () {
               const skills = yield* written(folder, starting.skills)
