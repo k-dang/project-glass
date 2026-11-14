@@ -30,6 +30,7 @@
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
   --color-primary-hover: var(--primary-hover);
+  --color-command: var(--command);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
@@ -73,6 +74,8 @@
   --modified: light-dark(#9a6700, #d29922);
   --deleted: light-dark(#cf222e, #f85149);
   --viewed: light-dark(#6255c4, #a6a8ff);
+  --command: oklch(0.62 0.16 322);
+  --command-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z'/%3E%3Cpath d='m3.3 7 8.7 5 8.7-5'/%3E%3Cpath d='M12 22V12'/%3E%3C/svg%3E");
 }
 
 [data-theme="charcoal"] {
