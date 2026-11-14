@@ -185,3 +185,34 @@ it("shows image failures without trapping the gallery and closes stale previews 
   view.rerender(<GitHubHtml html="<p>Updated description</p>" />)
   expect(screen.queryByRole("dialog")).toBeNull()
 })
+
+const enrichmentSection = (type: string, source: string) => `
+  <section class="js-render-needs-enrichment render-needs-enrichment" data-type="${type}">
+    <div class="js-render-enrichment-target">
+      <div class="render-plaintext-hidden"><pre lang="${type}" aria-label="Raw ${type} code">${source}</pre></div>
+    </div>
+    <span class="js-render-enrichment-loader" role="presentation"><span class="sr-only">Loading</span></span>
+  </section>
+`
+
+it("draws GitHub's mermaid sections and shows the source of the ones it can't draw", async () => {
+  const { container } = render(
+    <GitHubHtml
+      html={[
+        enrichmentSection("mermaid", "flowchart LR\n  Glass --&gt; Host[Agent host]"),
+        enrichmentSection("mermaid", "flowchart LR\n  A --&gt;&gt; [["),
+        enrichmentSection("geojson", '{"type": "Point"}'),
+      ].join("")}
+    />,
+  )
+
+  await waitFor(() => expect(container.querySelectorAll(".pele-node")).toHaveLength(2))
+  await waitFor(() =>
+    expect([...container.querySelectorAll("pre")].map((pre) => pre.textContent)).toEqual([
+      "flowchart LR\n  A -->> [[",
+      '{"type": "Point"}',
+    ]),
+  )
+  expect(container.querySelector("section")).toBeNull()
+  expect(container.textContent).not.toContain("Loading")
+})

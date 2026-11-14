@@ -105,7 +105,7 @@ it.live(
     Effect.gen(function* () {
       const f = yield* agentsFixture
       const earlierHosts = childProcesses(process.pid, "scriptedAgentHost.mjs")
-      yield* f.client.AddToDo({ title: "Reply to Sam" })
+      yield* f.client.AddToDo({ title: "Reply to Sam", notes: "" })
 
       yield* sendGlobal(f.client, "hold:never")
       yield* globalTurns(f.client, holding)

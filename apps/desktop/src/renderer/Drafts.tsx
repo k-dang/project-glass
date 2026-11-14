@@ -15,6 +15,7 @@ import {
   type DraftStore,
   isPublishing,
   type Submission,
+  submissionProblem,
   useDraft,
   useDraftCount,
   useDraftsLocked,
@@ -147,8 +148,8 @@ function DraftActions(props: {
   onAsk: () => void
 }) {
   const { draft, disabled, empty, canComment, canAsk, submission } = props
-  const failure = submission.type === "failed" ? submission.problem : null
-  const awaitingReload = failure?.fixedByReload === true
+  const failure = submissionProblem(submission)
+  const awaitingReload = submission.type === "reload-required"
   const unsaved = draft.feedback?.type === "unsaved"
 
   return (

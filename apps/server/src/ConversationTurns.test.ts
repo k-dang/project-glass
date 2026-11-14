@@ -55,7 +55,7 @@ const report = WorkReport.make({
 })
 
 const harness = (
-  start: Conversation["start"],
+  ensureStarted: Conversation["ensureStarted"],
   startTurn: (turnId: string) => Effect.Effect<void, HostAgentError> = () => Effect.void,
 ) =>
   Effect.gen(function* () {
@@ -70,7 +70,7 @@ const harness = (
 
     const conversation: Conversation = {
       id: "agent-1",
-      start,
+      ensureStarted,
       settings: { model: null, effort: null, permissionMode: null },
       host: Effect.succeed(client),
       runningHost: Effect.succeedNone,

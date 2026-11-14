@@ -3,12 +3,8 @@ import type { HttpServerRequest } from "effect/http"
 import { createHash, createHmac, randomBytes } from "node:crypto"
 import { join } from "node:path"
 import { writeDataFile } from "../dataFiles"
-import { mintBearer, sameSecret } from "./McpCredentials"
+import { mintBearer, timingSafeSameSecret } from "./McpCredentials"
 import { ServerConfig } from "../ServerConfig"
-
-// Registration is a signed client id, so an open register endpoint cannot fill the database.
-// Glass listens on 127.0.0.1. The issuer is that bound address, and a request is accepted only
-// when its Host is a loopback name on that same port.
 
 const SIGNING_KEY = "mcp-oauth.key"
 
@@ -62,10 +58,6 @@ const decodeLocalPort = Schema.decodeUnknownOption(
   Schema.Struct({ socket: Schema.Struct({ localPort: Schema.Number }) }),
 )
 
-/**
- * The issuer and resource for a request whose Host is a loopback name on the port it arrived on,
- * which Glass may have asked the OS to choose.
- */
 export const requestUrls = (
   request: HttpServerRequest.HttpServerRequest,
 ): OAuthUrls | undefined => {
@@ -323,7 +315,7 @@ const tokenError = (error: OAuthTokenError["error"], description: string) =>
 const pkceMatches = (verifier: string, challenge: string) => {
   if (!CODE_VERIFIER.test(verifier) || !CODE_CHALLENGE.test(challenge)) return false
 
-  return sameSecret(createHash("sha256").update(verifier).digest("base64url"), challenge)
+  return timingSafeSameSecret(createHash("sha256").update(verifier).digest("base64url"), challenge)
 }
 
 export class McpOAuth extends Context.Service<
@@ -401,7 +393,7 @@ export class McpOAuth extends Context.Service<
         const body = clientId.slice(0, dot)
         const signature = clientId.slice(dot + 1)
 
-        if (!sameSecret(sign("mcp-client-id", body), signature)) return undefined
+        if (!timingSafeSameSecret(sign("mcp-client-id", body), signature)) return undefined
 
         const payload = decodeClientIdPayload(Buffer.from(body, "base64url").toString("utf8"))
 
@@ -623,7 +615,7 @@ export class McpOAuth extends Context.Service<
         register,
         validateAuthorization,
         csrfFor,
-        csrfMatches: (fields, given) => sameSecret(csrfFor(fields), given),
+        csrfMatches: (fields, given) => timingSafeSameSecret(csrfFor(fields), given),
         approve,
         deny: (authorization) =>
           redirectWith(authorization.redirectUri, {

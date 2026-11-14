@@ -85,7 +85,6 @@ const endingOf = (result: SDKResultMessage): TurnEnding => {
         "Claude Code couldn't sign in. Run claude in a terminal to sign in, then send your message again.",
     })
 
-  // A Sandbox's agent host logs where the user can't read, so the Turn carries Claude Code's words.
   const words = said.trim()
 
   return TurnFailed.make({
@@ -108,6 +107,9 @@ const Answered = Schema.Struct({
 })
 
 const decodeAnswered = Schema.decodeUnknownOption(Answered)
+
+// A local command like `/mcp` replies in one unstreamed message that Claude Code marks with this field.
+const isLocalCommandReply = Schema.is(Schema.Struct({ local_command_source: Schema.Unknown }))
 
 const answered = (message: SDKMessage): ReadonlyArray<string> =>
   Option.match(decodeAnswered(message), {
@@ -241,6 +243,11 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
         break
       case "assistant":
         for (const block of message.message.content) {
+          if (block.type === "text" && isLocalCommandReply(message)) {
+            addPart(TextPart.make({ text: block.text }))
+            continue
+          }
+
           if (block.type !== "tool_use" || state.toolCalls.has(block.id)) continue
 
           const index = addPart(

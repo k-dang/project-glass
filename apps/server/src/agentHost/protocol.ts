@@ -80,7 +80,6 @@ export const WorkRole = Schema.TaggedStruct("Work", {})
 
 export const ReviewRole = Schema.TaggedStruct("Review", { brief: ReviewBrief })
 
-/** Where a conversation's runtime reaches Glass's tools, and the credential it calls them with. */
 export const GlassToolsAccess = Schema.Struct({
   url: Schema.String,
   bearer: Schema.RedactedFromValue(Schema.String),
@@ -96,7 +95,10 @@ export type AgentRole = typeof AgentRole.Type
 
 export type ConversationRole = AgentRole | typeof GlobalRole.Type
 
-/** An Agent runs in either Agent program; the Global conversation runs only in pi. */
+export const StartOutcome = Schema.Literals(["started", "alreadyRunning"])
+
+export type StartOutcome = typeof StartOutcome.Type
+
 export const ConversationStart = Schema.Union([
   Schema.Struct({
     agentId: Schema.String,
@@ -137,8 +139,7 @@ export class AgentHostRpcs extends RpcGroup.make(
   }),
   Rpc.make("StartAgent", {
     payload: ConversationStart,
-    /** Whether it started the program, rather than finding it already running. */
-    success: Schema.Boolean,
+    success: StartOutcome,
     error: HostAgentError,
   }),
   Rpc.make("StartTurn", {

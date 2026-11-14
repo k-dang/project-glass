@@ -77,7 +77,7 @@ describe("Glass tools over MCP", () => {
   it.live("reads the user's To-dos", () =>
     Effect.gen(function* () {
       const { client, call } = yield* startGlass
-      yield* client.AddToDo({ title: "Reply to Sam" })
+      yield* client.AddToDo({ title: "Reply to Sam", notes: "" })
 
       const result = yield* call("list_to_dos")
 

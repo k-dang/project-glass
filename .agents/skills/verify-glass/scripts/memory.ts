@@ -213,8 +213,8 @@ export interface Sampler {
 }
 
 /**
- * Starts collecting from a page target. Worker heaps live in their own V8 isolate and are absent from
- * the page's numbers, so auto-attach is what makes the Shiki workers visible at all.
+ * Worker heaps live in their own V8 isolate and are absent from the page's numbers, so auto-attach
+ * is what makes the Shiki workers visible at all.
  */
 export const startSampler = async (page: Cdp, rootPid: number | undefined): Promise<Sampler> => {
   const sessions = new Map<string, { type: string; url: string }>()

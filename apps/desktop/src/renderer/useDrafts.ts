@@ -29,14 +29,23 @@ import { type Problem, problemOf } from "./problems"
 export type SubmitOutcome =
   | { readonly type: "submitted"; readonly published: number }
   | { readonly type: "failed"; readonly problem: Problem }
+  | { readonly type: "blocked" }
 
 export type Submission =
-  | { readonly type: "idle" | "sending" | "submitted" }
-  | Extract<SubmitOutcome, { readonly type: "failed" }>
+  | { readonly type: "editable"; readonly problem: Problem | null }
+  | { readonly type: "draining" | "submitting"; readonly done: Promise<void> }
+  | { readonly type: "submitted" }
+  | { readonly type: "reload-required"; readonly problem: Problem }
 
-const idle: Submission = { type: "idle" }
+const editable: Submission = { type: "editable", problem: null }
 
-export const isPublishing = ({ type }: Submission) => type === "sending" || type === "submitted"
+export const isPublishing = ({ type }: Submission) =>
+  type === "draining" || type === "submitting" || type === "submitted"
+
+export const submissionProblem = (submission: Submission) =>
+  submission.type === "editable" || submission.type === "reload-required"
+    ? submission.problem
+    : null
 
 const unsavedProblem: Problem = {
   title: "Some Drafts haven't saved to GitHub",
@@ -49,13 +58,24 @@ const mayHaveSubmittedProblem: Problem = {
   fixedByReload: true,
 }
 
-const submitProblem = (cause: Cause.Cause<BackendError>) =>
+const submitFailure = (
+  cause: Cause.Cause<BackendError>,
+): { readonly type: "editable" | "reload-required"; readonly problem: Problem } =>
   Option.match(Cause.findErrorOption(cause), {
-    onSome: (error) =>
-      Predicate.isTagged(error, "GitHubUnavailable") || Predicate.isTagged(error, "RpcClientError")
-        ? mayHaveSubmittedProblem
-        : problemOf(cause),
-    onNone: () => mayHaveSubmittedProblem,
+    onSome: (error) => {
+      if (
+        Predicate.isTagged(error, "GitHubUnavailable") ||
+        Predicate.isTagged(error, "RpcClientError")
+      ) {
+        return { type: "reload-required", problem: mayHaveSubmittedProblem }
+      }
+
+      return {
+        type: Predicate.isTagged(error, "StaleRevision") ? "reload-required" : "editable",
+        problem: problemOf(cause),
+      }
+    },
+    onNone: () => ({ type: "reload-required", problem: mayHaveSubmittedProblem }),
   })
 
 const isDraftNotFound = (cause: Cause.Cause<unknown>) =>
@@ -65,8 +85,11 @@ export class DraftStore {
   readonly #runtime: BackendRuntime
   readonly #record: (activity: Activity) => void
   readonly #entriesAtom = Atom.make<ReadonlyMap<string, DraftEntry>>(new Map())
-  readonly #calls = new Set<Promise<void>>()
-  readonly #holdsAtom = Atom.make(0)
+  readonly #draftCalls = new Set<Promise<void>>()
+  readonly #stateAtom = Atom.make<{
+    readonly submission: Submission
+    readonly handOffHolds: number
+  }>({ submission: editable, handOffHolds: 0 })
   readonly viewAtom = Atom.family((key: string) =>
     Atom.map(
       Atom.make((get) => get(this.#entriesAtom).get(key)),
@@ -89,9 +112,13 @@ export class DraftStore {
         : [],
     ),
   ).pipe(Atom.withEquality<ReadonlyArray<LineNotePlace>>(sameLineNotePlaces))
-  readonly lockedAtom = Atom.make((get) => get(this.#holdsAtom) > 0)
+  readonly lockedAtom = Atom.make((get) => {
+    const { submission, handOffHolds } = get(this.#stateAtom)
+
+    return handOffHolds > 0 || submission.type === "draining" || submission.type === "submitting"
+  })
   readonly summaryAtom = Atom.make("")
-  readonly submissionAtom = Atom.make<Submission>(idle)
+  readonly submissionAtom = Atom.map(this.#stateAtom, (state) => state.submission)
   readonly dispose: () => void
   #lastKey = 0
   #started: string | null = null
@@ -139,8 +166,8 @@ export class DraftStore {
   clearSubmitFailure() {
     const submission = this.submission()
 
-    if (submission.type === "failed" && submission.problem.fixedByReload !== true) {
-      this.#setSubmission(idle)
+    if (submission.type === "editable" && submission.problem !== null) {
+      this.#setSubmission(editable)
     }
   }
 
@@ -218,52 +245,73 @@ export class DraftStore {
   }
 
   async lock() {
-    this.registry.update(this.#holdsAtom, (holds) => holds + 1)
+    this.registry.update(this.#stateAtom, (state) => ({
+      ...state,
+      handOffHolds: state.handOffHolds + 1,
+    }))
+    await this.#drainDrafts()
 
+    const submission = this.submission()
+
+    if (submission.type === "draining" || submission.type === "submitting") await submission.done
+  }
+
+  async #drainDrafts() {
     for (const entry of this.registry.get(this.#entriesAtom).values()) {
       if (entry.sync.type !== "failed") this.#transition(entry.key, { type: "save" })
     }
 
-    while (this.#calls.size > 0) await Promise.all(this.#calls)
+    while (this.#draftCalls.size > 0) await Promise.all(this.#draftCalls)
   }
 
   unlock() {
-    this.registry.update(this.#holdsAtom, (holds) => holds - 1)
+    this.registry.update(this.#stateAtom, (state) => ({
+      ...state,
+      handOffHolds: state.handOffHolds - 1,
+    }))
   }
 
   async submit(decision: ReviewDecision, summary: string): Promise<SubmitOutcome> {
     const submission = this.submission()
 
-    if (submission.type === "failed" && submission.problem.fixedByReload === true) {
-      return submission
+    if (submission.type === "reload-required") {
+      return { type: "failed", problem: submission.problem }
     }
 
-    this.#setSubmission({ type: "sending" })
-    await this.lock()
+    if (submission.type !== "editable" || this.locked()) return { type: "blocked" }
+
+    const { promise: done, resolve } = Promise.withResolvers<void>()
+    this.#setSubmission({ type: "draining", done })
+
+    try {
+      return await this.#publish(decision, summary, done)
+    } finally {
+      resolve()
+    }
+  }
+
+  async #publish(
+    decision: ReviewDecision,
+    summary: string,
+    done: Promise<void>,
+  ): Promise<SubmitOutcome> {
+    await this.#drainDrafts()
 
     if (this.hasUnsaved()) {
-      this.#setSubmission({ type: "failed", problem: unsavedProblem })
-      this.unlock()
+      this.#setSubmission({ type: "editable", problem: unsavedProblem })
 
       return { type: "failed", problem: unsavedProblem }
     }
 
     const { pullRequest, revision } = this.workspace
 
-    const call = this.#runtime.runPromiseExit(
+    this.#setSubmission({ type: "submitting", done })
+
+    const exit = await this.#runtime.runPromiseExit(
       Backend.use((backend) =>
         backend.SubmitReview({ pullRequestId: pullRequest.id, revision, decision, summary }),
       ),
     )
-
-    const done = call.then(() => {
-      this.#calls.delete(done)
-    })
-
-    this.#calls.add(done)
-    const exit = await call
-
-    let outcome: SubmitOutcome
 
     if (Exit.isSuccess(exit)) {
       const drafts = [...this.registry.get(this.#entriesAtom).values()].flatMap(
@@ -284,15 +332,15 @@ export class DraftStore {
         this.#entriesAtom,
         (entries) => new Map([...entries].filter(([, entry]) => entry.saved !== null)),
       )
-      outcome = { type: "submitted", published: drafts.length }
-    } else {
-      outcome = { type: "failed", problem: submitProblem(exit.cause) }
+      this.#setSubmission({ type: "submitted" })
+
+      return { type: "submitted", published: drafts.length }
     }
 
-    this.#setSubmission(outcome.type === "failed" ? outcome : { type: "submitted" })
-    this.unlock()
+    const failed = submitFailure(exit.cause)
+    this.#setSubmission(failed)
 
-    return outcome
+    return { type: "failed", problem: failed.problem }
   }
 
   discardUnsaved() {
@@ -310,7 +358,7 @@ export class DraftStore {
 
     this.#started = null
     this.registry.set(this.summaryAtom, "")
-    this.registry.set(this.submissionAtom, idle)
+    this.clearSubmitFailure()
   }
 
   hasUnsaved() {
@@ -383,7 +431,7 @@ export class DraftStore {
     if (write === null) return
 
     const done = this.#runtime.runPromiseExit(this.#run(write)).then((exit) => {
-      this.#calls.delete(done)
+      this.#draftCalls.delete(done)
       this.#transition(
         key,
         Exit.isSuccess(exit)
@@ -394,11 +442,11 @@ export class DraftStore {
       )
     })
 
-    this.#calls.add(done)
+    this.#draftCalls.add(done)
   }
 
   #setSubmission(submission: Submission) {
-    this.registry.set(this.submissionAtom, submission)
+    this.registry.update(this.#stateAtom, (state) => ({ ...state, submission }))
   }
 }
 

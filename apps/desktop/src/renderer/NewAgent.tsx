@@ -300,11 +300,10 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
   )
 
   const chosenBase = props.bases[branchContext]
-  // A chosen base keeps the list read, so a branch deleted since falls back to the default.
-  const wantsList = chosenBase !== undefined || browsed === branchContext
+  const readsBranchList = chosenBase !== undefined || browsed === branchContext
 
   const branches = useAtomValue(
-    repository === undefined || !wantsList
+    repository === undefined || !readsBranchList
       ? unlistedBranches
       : newAgentBranchesAtom(placeKey(where.place), repository),
   )

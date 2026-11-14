@@ -211,6 +211,25 @@ it.live("shows a Steer a pi extension handles itself", () =>
   }).pipe(Effect.scoped),
 )
 
+it.live("shows the notice a pi extension's command answers with", () =>
+  Effect.gen(function* () {
+    const f = yield* piSession("pi-command-notice")
+    yield* f.extension(
+      "status.js",
+      `export default (pi) => pi.registerCommand("status", {
+        handler: async (_args, ctx) => ctx.ui.notify("All systems go", "info"),
+      })`,
+    )
+    const agent = yield* f.open(conversation)
+
+    yield* agent.send("/status")
+
+    const [turn] = yield* f.until(settled(1))
+    assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
+    assert.deepStrictEqual(shownParts(turn), [{ text: "All systems go" }])
+  }).pipe(Effect.scoped),
+)
+
 it.live("hands back what pi held when the Turn stops: Steers as written, then pi's own", () =>
   Effect.gen(function* () {
     const f = yield* piSession("pi-held-steers")
@@ -523,7 +542,6 @@ it.live(
 const toolContent = ({ content }: FakeModelRequest["messages"][number]) =>
   Predicate.isString(content) ? content : (content ?? []).map(({ text }) => text ?? "").join("")
 
-/** Calls the tool a message names, then repeats what the tool returned. */
 const globalReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
   const last = input.messages.at(-1)
 
@@ -618,7 +636,6 @@ it.live("stops the Global conversation's Turn while a Glass tool runs, cancellin
 
     yield* agent.send("Wait for release.")
 
-    // Replayed, pi calls no endpoint, so only its own report shows the call.
     if (recordingSessions) yield* glass.waitStarted
     else yield* f.until(runningTool("wait_for_release"))
 

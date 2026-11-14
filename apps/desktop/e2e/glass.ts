@@ -74,7 +74,6 @@ const launch = (glass: Pick<Glass, "github" | "claude" | "pi" | "home">) => {
       GH_TOKEN: VIEWER.token,
       GLASS_GITHUB_API_URL: github.url,
       ...claude.environment,
-      // Keeps pi from refreshing its model catalog over the network.
       PI_OFFLINE: "1",
       GLASS_GIT_REMOTE: github.gitUrl,
     },

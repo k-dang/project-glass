@@ -37,7 +37,6 @@ interface Waiting {
   readonly answered: Deferred.Deferred<void>
 }
 
-/** Calls one of Glass's tools as a conversation's program would, saying how it went. */
 const callGlass = (access: GlassToolsAccess, name: string, args: Schema.JsonObject) =>
   Effect.gen(function* () {
     const baseUrl = access.url.slice(0, -MCP_PATH.length)
@@ -69,7 +68,6 @@ const skillCommands = (written: ReadonlyArray<WrittenSkills>) =>
   )
 
 export const scriptedAdapter = (gates: string): AgentAdapter => {
-  // The Global conversation's starts are kept beside the gates, so they outlive this host.
   const currentStart = join(gates, "global-start.json")
   const previousStart = join(gates, "previous-global-start.json")
 

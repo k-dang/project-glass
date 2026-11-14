@@ -39,7 +39,6 @@ interface Area {
   readonly link: LinkOptions
 }
 
-// Rail order is shortcut order: Mod+1 opens the first area.
 function useAreas(): ReadonlyArray<Area> {
   const reviewsLink = useAtomValue(reviewsLinkAtom)
 

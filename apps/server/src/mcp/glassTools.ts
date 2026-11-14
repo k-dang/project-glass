@@ -76,7 +76,6 @@ const MAX_TURNS = 20
 
 const MAX_TEXT_CHARS = 4_000
 
-/** Caps a PR's diffs, the bulk of its material, within what the Agent programs take from one tool result. */
 const MAX_DIFF_CHARS = 60_000
 
 const readOnly = Context.make(Tool.Readonly, true).pipe(
@@ -398,8 +397,7 @@ const activityOf = (turn: Turn) =>
     ),
   )
 
-/** Leaves out the largest diffs first until the rest fit. */
-const withinBudget = (files: ReadonlyArray<FileMaterial>) => {
+const dropLargestDiffsToFit = (files: ReadonlyArray<FileMaterial>) => {
   const leftOut = new Set<FileMaterial>()
   let total = files.reduce((sum, file) => sum + (file.diff?.length ?? 0), 0)
 
@@ -433,7 +431,6 @@ const recordedFor = <A, E, R, E2>(
     return done
   }).pipe(Effect.uninterruptible)
 
-/** Talks to the MCP server already handling this call, so progress stays on that response. */
 const waitingProgress = Effect.gen(function* () {
   const progress = yield* AskProgress.current
   let step = 0
@@ -549,7 +546,7 @@ export const GlassToolHandlers = GlassTools.toLayer(
 
           const material = pullRequestMaterial(yield* github.reviewInput(pullRequest, read))
 
-          return { revision: read, ...material, ...withinBudget(material.files) }
+          return { revision: read, ...material, ...dropLargestDiffsToFit(material.files) }
         }).pipe(Effect.mapError(explained)),
       read_agent_review: ({ pullRequest }) =>
         first(agentReviews.watch(pullRequest)).pipe(Effect.mapError(explained)),

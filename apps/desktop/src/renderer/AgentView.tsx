@@ -58,12 +58,25 @@ import {
   useRef,
   useState,
 } from "react"
-import { mermaid } from "@streamdown/mermaid"
-import { Streamdown } from "streamdown"
+import {
+  type Components,
+  defaultComponents,
+  Streamdown,
+  useIsCodeFenceIncomplete,
+} from "streamdown"
 import { Button } from "@/components/ui/button"
 import { Kbd } from "@/components/ui/kbd"
 import { Bubble, BubbleContent } from "@/components/ui/bubble"
-import { CodeBlock, CodeBlockContent } from "@/components/ui/code-block"
+import {
+  CodeBlock,
+  CodeBlockActions,
+  CodeBlockContent,
+  CodeBlockCopyButton,
+  CodeBlockHeader,
+  CodeBlockLine,
+  CodeBlockTitle,
+} from "@/components/ui/code-block"
+import { useHighlightedCode } from "@/hooks/use-highlighted-code"
 import { Message, MessageContent, MessageGroup } from "@/components/ui/message"
 import {
   MessageScroller,
@@ -120,7 +133,7 @@ import { referenceText } from "./queue"
 import { rememberPlace } from "./savedPlace"
 import { shortcutLabel } from "./shortcutLabel"
 import { useStagedFeedback } from "./useStagedFeedback"
-import { useDarkColorScheme } from "./theme"
+import { MermaidDiagram } from "./MermaidDiagram"
 import { type FeedbackNotesStore, useFeedbackNotes } from "./useFeedbackNotes"
 import { markTurnSeenAtom } from "./needsYou"
 import { useShortcuts } from "./useShortcuts"
@@ -666,13 +679,66 @@ const toolStatus = {
   failed: { label: "Failed", line: "error" },
 } as const
 
-const markdownPlugins = { mermaid }
-
-function AgentMarkdown(props: { text: string }) {
-  const theme = useDarkColorScheme() ? "dark" : "default"
+function FencedCode(props: { code: string; language: string }) {
+  const lines = useHighlightedCode(props.code, props.language)
 
   return (
-    <Streamdown className="text-sm" plugins={markdownPlugins} mermaid={{ config: { theme } }}>
+    <CodeBlock className="rounded-xl border-0 bg-muted dark:bg-muted">
+      <CodeBlockHeader>
+        <CodeBlockTitle>{props.language}</CodeBlockTitle>
+        <CodeBlockActions>
+          <CodeBlockCopyButton value={props.code} />
+        </CodeBlockActions>
+      </CodeBlockHeader>
+      <CodeBlockContent lineNumbers>
+        {lines.map((line, index) => (
+          <CodeBlockLine key={index}>{line}</CodeBlockLine>
+        ))}
+      </CodeBlockContent>
+    </CodeBlock>
+  )
+}
+
+function MermaidBlock(props: { code: string }) {
+  const incomplete = useIsCodeFenceIncomplete()
+  const [invalid, setInvalid] = useState(false)
+  const onInvalid = useCallback(() => setInvalid(true), [])
+
+  return incomplete || invalid ? (
+    <FencedCode code={props.code} language="mermaid" />
+  ) : (
+    <CodeBlock className="rounded-xl border-0 bg-muted dark:bg-muted">
+      <CodeBlockHeader>
+        <CodeBlockTitle>mermaid</CodeBlockTitle>
+        <CodeBlockActions>
+          <CodeBlockCopyButton value={props.code} />
+        </CodeBlockActions>
+      </CodeBlockHeader>
+      <div className="m-1.5 mt-3 rounded-lg bg-background p-3">
+        <MermaidDiagram source={props.code} onInvalid={onInvalid} />
+      </div>
+    </CodeBlock>
+  )
+}
+
+const markdownComponents: Components = {
+  code: (props) => {
+    const language = /language-(\S+)/.exec(props.className ?? "")?.[1] ?? ""
+
+    if (!("data-block" in props) || !Predicate.isString(props.children))
+      return <defaultComponents.code {...props} />
+
+    return language === "mermaid" ? (
+      <MermaidBlock code={props.children} />
+    ) : (
+      <FencedCode code={props.children} language={language} />
+    )
+  },
+}
+
+function AgentMarkdown(props: { text: string }) {
+  return (
+    <Streamdown className="text-sm" components={markdownComponents}>
       {props.text}
     </Streamdown>
   )
@@ -726,10 +792,10 @@ const PartView = memo(function PartView(props: {
                   <TraceIcon>
                     <Wrench />
                   </TraceIcon>
-                  <TraceTitle>
+                  <TraceTitle className="flex items-center gap-1">
                     <span className="sr-only">{status.label}: </span>
-                    <span className="font-medium text-foreground">{call.name}</span>{" "}
-                    <span className="font-mono text-xs">{call.inputSummary}</span>
+                    <span className="shrink-0 font-medium text-foreground">{call.name}</span>{" "}
+                    <span className="truncate font-mono text-xs">{call.inputSummary}</span>
                   </TraceTitle>
                 </TraceLine>
               </TraceCollapsibleTrigger>

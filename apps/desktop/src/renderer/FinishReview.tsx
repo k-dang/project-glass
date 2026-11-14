@@ -20,6 +20,7 @@ import { submitOnShortcut } from "./submitShortcut"
 import {
   type DraftStore,
   isPublishing,
+  submissionProblem,
   useDraftCount,
   useDraftsLocked,
   useReviewSummary,
@@ -61,12 +62,12 @@ export function FinishReview(props: {
   const [decision, setDecision] = useState<ReviewDecision>("comment")
   const summaryRef = useRef<HTMLTextAreaElement>(null)
   const sending = isPublishing(submission)
-  const failure = submission.type === "failed" ? submission.problem : null
-  const awaitingReload = failure?.fixedByReload === true
+  const failure = submissionProblem(submission)
+  const awaitingReload = submission.type === "reload-required"
 
   const chosen = props.viewerIsAuthor ? "comment" : decision
   const empty = chosen === "comment" && draftCount === 0 && summary.trim() === ""
-  const blocked = empty || locked || awaitingReload || sending
+  const blocked = empty || locked || submission.type !== "editable"
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()

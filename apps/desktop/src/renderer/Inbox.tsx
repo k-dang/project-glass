@@ -230,7 +230,6 @@ function InboxPane(props: {
   })
 }
 
-/** What the user can do to the selected item; its keys and the detail pane's hints both come from here. */
 function useInboxActions(selected: NeedsYouItem | null): ReadonlyArray<InboxAction> {
   const markDone = useAtomSet(markDoneAtom)
   const permission = selected === null ? null : firstPermission(selected)
@@ -295,7 +294,6 @@ export function Inbox() {
   const selected = flat.find((item) => needsYouKey(item) === selectedKey) ?? null
   const actions = useInboxActions(selected)
 
-  // Scrolls only as far as the row needs, so each step moves the list by at most a row.
   const move = (by: 1 | -1) => {
     const at = selectedKey === null ? -1 : keys.indexOf(selectedKey)
     const key = keys[at === -1 ? 0 : Math.min(keys.length - 1, Math.max(0, at + by))]

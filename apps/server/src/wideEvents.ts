@@ -173,10 +173,6 @@ type Sink = (line: string) => void
 
 const isLoud = (line: UnitLine | LogLine) => line.level === "WARN" || line.level === "ERROR"
 
-/**
- * Both producers meet here: `lineLogger` for `Effect.log*` and `asUnit` for units, which a
- * `Logger` never sees. Each line reaches one sink, so nothing is written twice.
- */
 const emitter = (source: Source, stdout: Sink, stderr?: Sink): Emit => {
   const launch = {
     source,
@@ -207,11 +203,7 @@ export const wideEvents = (source: Source, stdout: Sink, stderr?: Sink) => {
   )
 }
 
-/**
- * Also sends every span and log line to an OTLP collector when the standard `OTEL_*` variables ask
- * for it, for profiling during development (ADR 0012).
- */
-export const wideEventsToStdout = (source: Source) => {
+export const wideEventsToStdoutAndOtlp = (source: Source) => {
   const resource = {
     serviceName: `glass-${source}`,
     attributes: { "service.instance.id": launchId },
@@ -242,7 +234,6 @@ export const runMain =
       NodeRuntime.runMain({ disableErrorReporting: true }),
     )
 
-/** Does nothing outside a unit of work. */
 export const annotateUnit = (fields: UnitFields) =>
   Effect.withFiber((fiber) =>
     Effect.sync(() => {

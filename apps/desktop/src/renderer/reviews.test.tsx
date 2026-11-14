@@ -27,7 +27,9 @@ import {
   RepositoryPullRequests,
   RepositoryUnavailable,
   Revision,
+  ReviewRejected,
   type SettingsError,
+  type SubmitReviewError,
 } from "@glass/contracts"
 import { RegistryProvider } from "@effect/atom-react"
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react"
@@ -1216,6 +1218,48 @@ it("submits a Review with ⌘↵ from the Changes tab, staying open through a st
   await screen.findByText("Approved and published 1 Draft.")
   expect(screen.queryByRole("dialog", { name: "Finish your Review" })).toBeNull()
 })
+
+it.each([
+  {
+    failure: "rejected",
+    error: new ReviewRejected({ message: "No" }),
+    title: "GitHub didn't accept the Review",
+    requiresReload: false,
+  },
+  {
+    failure: "uncertain",
+    error: new GitHubUnavailable({ message: "Timed out" }),
+    title: "Glass lost track of the Review",
+    requiresReload: true,
+  },
+])(
+  "allows another Review only when safe after a $failure send",
+  async ({ error, title, requiresReload }) => {
+    const submits: Array<
+      Held<{ decision: string; summary: string }, void, typeof SubmitReviewError.Type>
+    > = []
+
+    const user = mount({
+      LoadPullRequest: () => Effect.succeed(workspaceOf(greet, "head001", [savedDraft])),
+      SubmitReview: hold(submits),
+    })
+
+    await user.click(await rowFor("Greet the world"))
+    const summaryBox = await openReview(user)
+    const submit = screen.getByRole<HTMLButtonElement>("button", { name: /^Submit Review/ })
+    await user.click(submit)
+    ;(await next(submits)).answer(Effect.fail(error))
+    await screen.findByText(title)
+
+    expect(submit.disabled).toBe(requiresReload)
+    const dialog = screen.getByRole("dialog", { name: "Finish your Review" })
+    expect(within(dialog).queryByRole("button", { name: "Reload" }) !== null).toBe(requiresReload)
+
+    await user.type(summaryBox, "Revised summary")
+    expect(submit.disabled).toBe(requiresReload)
+    expect(summaryBox.readOnly).toBe(false)
+  },
+)
 
 it("goes back only after in-flight Draft writes finish, without asking about GitHub-saved Drafts", async () => {
   const deletes: Array<Held<{ id: string }, void, ConnectionError>> = []

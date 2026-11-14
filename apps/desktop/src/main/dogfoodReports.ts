@@ -55,7 +55,6 @@ type AgentReview = NonNullable<DogfoodReportSubject["agentReview"]>
 interface SubjectFile extends Recorded {
   readonly route?: string
   readonly context?: DogfoodReportSubject["context"]
-  /** `agent-review.md` holds the Markdown; everything else about the review stays here. */
   readonly agentReview?: Omit<AgentReview, "markdown">
 }
 
