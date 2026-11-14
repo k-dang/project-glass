@@ -1,11 +1,18 @@
-import { GlassRpcs, RPC_PATH, localPlace, TOKEN_PARAM } from "@glass/contracts"
+import {
+  GlassRpcs,
+  type NewAgent,
+  type PullRequestRef,
+  RPC_PATH,
+  localPlace,
+  TOKEN_PARAM,
+} from "@glass/contracts"
 import { Effect, Option, Schema, Stream } from "effect"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { connectRpcClient } from "../src/rpcSocket"
 import { DEMO_REPOSITORY } from "./demoPullRequests"
-import { startFakeAnthropic } from "./fakeAnthropic"
+import { lastUserWords, replyTo, startFakeAnthropic } from "./fakeAnthropic"
 import { globalConversationReply, isGlobalConversation } from "./fakeGlobalConversation"
 import {
   type FakeModelDelta,
@@ -73,8 +80,15 @@ const demoReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
   ]
 }
 
+const failingPrompt = "Upgrade every dependency"
+
 export const startDemoClaude = Effect.fnUntraced(function* (directory: string) {
-  const { url } = yield* startFakeAnthropic
+  const { url, respond } = yield* startFakeAnthropic
+  yield* respond((request) =>
+    lastUserWords(request).includes(failingPrompt)
+      ? { type: "error", message: "The demo model refused this prompt." }
+      : replyTo(request),
+  )
   const environment = fakeAnthropicEnvironment(directory, url)
   Object.assign(process.env, environment)
 
@@ -89,10 +103,16 @@ export const startDemoPi = Effect.fnUntraced(function* (directory: string) {
   process.env["PI_CODING_AGENT_DIR"] = join(directory, ".pi", "agent")
 })
 
-export const seedDemoAgent = Effect.fnUntraced(function* (
+/**
+ * Seeds one of each kind of Agent work the Inbox lists: pi Agents that finish, Claude Code Agents
+ * that wait on a Permission request or Question or whose Turn fails, a Question from the Global
+ * conversation, and a finished Agent review of a queued PR.
+ */
+export const seedDemoAgents = Effect.fnUntraced(function* (
   port: number,
   token: string,
   directory: string,
+  reviewed: PullRequestRef,
 ) {
   const client = yield* connectRpcClient(
     GlassRpcs,
@@ -110,17 +130,40 @@ export const seedDemoAgent = Effect.fnUntraced(function* (
   if (!existsSync(checkout)) seedClone(directory, DEMO_REPOSITORY.owner, DEMO_REPOSITORY.repo)
 
   const linked = yield* client.LinkLocalCheckout({ path: checkout })
-  yield* client.CreateAgent({
-    repository: linked.repository,
-    baseBranch: "main",
-    engine: "pi",
-    model: null,
-    effort: null,
-    permissionMode: null,
-    place: localPlace,
-    message: "Show me around this repository.",
+
+  const agent = (engine: NewAgent["engine"], message: string) =>
+    client.CreateAgent({
+      repository: linked.repository,
+      baseBranch: "main",
+      engine,
+      model: null,
+      effort: null,
+      permissionMode: engine === "claude-code" ? "default" : null,
+      place: localPlace,
+      message,
+      images: [],
+      skillPacks: [],
+      localSkills: false,
+    })
+
+  yield* agent("pi", "Show me around this repository.")
+  yield* agent("pi", "Write a note")
+  yield* agent("claude-code", "Run `pnpm test` and tell me what fails.")
+  yield* agent("claude-code", "Ask me which part of the code to look at first.")
+  yield* agent("claude-code", `${failingPrompt} to its latest major version.`)
+
+  yield* client.SendGlobalMessage({
+    message: "Ask me which PR to start with.",
     images: [],
-    skillPacks: [],
-    localSkills: false,
+    context: null,
   })
+
+  yield* client.AddToQueue({ references: [reviewed] })
+  const queued = yield* client.ListSavedQueue()
+
+  const revision = queued.find(
+    ({ pullRequest }) => pullRequest.ref.number === reviewed.number,
+  )?.revision
+
+  if (revision) yield* client.StartAgentReview({ pullRequest: reviewed, revision })
 })
