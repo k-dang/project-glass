@@ -382,6 +382,9 @@ importers:
       pele:
         specifier: 'catalog:'
         version: 1.13.0
+      tar:
+        specifier: 7.5.22
+        version: 7.5.22
       vite:
         specifier: 'catalog:'
         version: '@voidzero-dev/vite-plus-core@1.1.0(@types/node@24.19.2)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0)'

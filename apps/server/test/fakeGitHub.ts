@@ -222,14 +222,6 @@ const GraphQLRequest = Schema.Union([
     }),
   }),
   Schema.Struct({
-    operationName: Schema.Literal("TreeAtExpression"),
-    variables: Schema.Struct({
-      owner: Schema.String,
-      name: Schema.String,
-      expression: Schema.String,
-    }),
-  }),
-  Schema.Struct({
     operationName: Schema.Literal("RepositoryBranches"),
     variables: Schema.Struct({
       owner: Schema.String,
@@ -358,7 +350,11 @@ const TreeParams = Schema.Struct({
   recursive: Schema.Literal("1"),
 })
 
-const BlobParams = Schema.Struct({ owner: Schema.String, repo: Schema.String, sha: Schema.String })
+const TarballParams = Schema.Struct({
+  owner: Schema.String,
+  repo: Schema.String,
+  ref: Schema.String,
+})
 
 const BLOB_TEXT_LIMIT = 512_000
 
@@ -929,26 +925,6 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
         }
       }
 
-      case "TreeAtExpression": {
-        const { owner, name, expression } = request.variables
-        const folder = repositories.folder(owner, name, expression)
-
-        if (folder === undefined) return unresolvedRepository(owner, name)
-
-        return {
-          data: {
-            repository: {
-              object:
-                folder === null
-                  ? null
-                  : folder.kind === "tree"
-                    ? { __typename: "Tree", oid: folder.oid }
-                    : { __typename: "Commit", tree: { oid: folder.oid } },
-            },
-          },
-        }
-      }
-
       case "RepositoryBranches": {
         const { owner, name, after } = request.variables
         const seeded = repositories.branches(owner, name)
@@ -1013,11 +989,6 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
 
   const gitTree = Effect.gen(function* () {
     const params = yield* Effect.orDie(HttpRouter.schemaParams(TreeParams))
-    const pushed = repositories.tree(params.owner, params.repo, params.sha)
-
-    if (pushed !== undefined)
-      return HttpServerResponse.jsonUnsafe({ tree: pushed, truncated: false })
-
     const commit = commitIn(params.owner, params.repo, params.sha)
 
     if (commit === undefined) {
@@ -1033,20 +1004,13 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
     })
   })
 
-  const gitBlob = Effect.gen(function* () {
-    const { sha } = yield* Effect.orDie(HttpRouter.schemaParams(BlobParams))
-    const contents = repositories.blob(sha)
+  const tarball = Effect.gen(function* () {
+    const { owner, repo, ref } = yield* Effect.orDie(HttpRouter.schemaParams(TarballParams))
+    const archive = repositories.tarball(owner, repo, ref)
 
-    if (contents === undefined) {
-      return HttpServerResponse.jsonUnsafe({ message: "Not Found" }, { status: 404 })
-    }
-
-    return HttpServerResponse.jsonUnsafe({
-      sha,
-      size: contents.length,
-      encoding: "base64",
-      content: contents.toString("base64").replace(/(.{60})/g, "$1\n"),
-    })
+    return archive === undefined
+      ? HttpServerResponse.jsonUnsafe({ message: "Not Found" }, { status: 404 })
+      : HttpServerResponse.uint8Array(archive, { contentType: "application/x-gzip" })
   })
 
   const Routes = Layer.mergeAll(
@@ -1101,7 +1065,7 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
     ),
     HttpRouter.add("GET", "/repos/:owner/:repo/pulls/:number/files", pullRequestFiles),
     HttpRouter.add("GET", "/repos/:owner/:repo/git/trees/:sha", gitTree),
-    HttpRouter.add("GET", "/repos/:owner/:repo/git/blobs/:sha", gitBlob),
+    HttpRouter.add("GET", "/repos/:owner/:repo/tarball/:ref", tarball),
     ...(gitRemote === undefined ? [] : [gitRemote.route]),
     FailuresAndAuth,
   )

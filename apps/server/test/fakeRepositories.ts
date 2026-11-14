@@ -1,4 +1,7 @@
 import { createHash } from "node:crypto"
+import { gzipSync } from "node:zlib"
+import { Header, Pax } from "tar"
+import { gitBlobSha } from "../src/skillPackArchive.ts"
 
 export class ExecutableFile {
   readonly contents: string
@@ -29,14 +32,31 @@ const sha1 = (...parts: ReadonlyArray<string | Buffer>) => {
 const contentsOf = (file: FakeFile) =>
   Buffer.from(file instanceof ExecutableFile ? file.contents : file)
 
-export const blobSha = (contents: string | Buffer) => {
-  const bytes = Buffer.from(contents)
+export const blobSha = (contents: string | Buffer) => gitBlobSha(Buffer.from(contents))
 
-  return sha1(`blob ${bytes.length}\0`, bytes)
+const tarEntry = (path: string, contents: Buffer, mode: number) => {
+  const data = { path, mode, size: contents.length, type: "File" as const, mtime: new Date(0) }
+  const header = new Header(data)
+  const pax = header.encode() ? [new Pax(data).encode()] : []
+  const padding = Buffer.alloc((512 - (contents.length % 512)) % 512)
+
+  return [...pax, header.block!, contents, padding]
 }
 
-const within = (folder: string, path: string) =>
-  folder === "" ? path : path.startsWith(`${folder}/`) ? path.slice(folder.length + 1) : null
+const tarball = (root: string, commit: string, files: FakeFiles) =>
+  gzipSync(
+    Buffer.concat([
+      new Pax({ path: "pax_global_header", comment: commit }, true).encode(),
+      ...Object.entries(files).flatMap(([path, file]) =>
+        tarEntry(
+          `${root}/${path}`,
+          contentsOf(file),
+          file instanceof ExecutableFile ? 0o775 : 0o664,
+        ),
+      ),
+      Buffer.alloc(1024),
+    ]),
+  )
 
 interface Repository {
   readonly owner: string
@@ -47,16 +67,7 @@ const keyOf = (owner: string, repo: string) => `${owner}/${repo}`.toLowerCase()
 
 export const fakeRepositories = () => {
   const repositories = new Map<string, FakeRepository>()
-  const trees = new Map<string, { readonly commit: string; readonly path: string }>()
-  const blobs = new Map<string, Buffer>()
   let pushes = 0
-
-  const treeOid = (commit: string, path: string) => {
-    const oid = sha1("tree", commit, ":", path)
-    trees.set(oid, { commit, path })
-
-    return oid
-  }
 
   const resolve = (repository: FakeRepository, revision: string) => {
     const branch = repository.refs.get(
@@ -109,11 +120,6 @@ export const fakeRepositories = () => {
       const key = keyOf(owner, repo)
       const repository = repositoryAt(key, ref)
 
-      for (const file of Object.values(files)) {
-        const bytes = contentsOf(file)
-        blobs.set(blobSha(bytes), bytes)
-      }
-
       return commitTo(repository, key, ref, files)
     },
 
@@ -132,54 +138,16 @@ export const fakeRepositories = () => {
       return repository === undefined ? undefined : resolve(repository, revision)
     },
 
-    folder: (owner: string, repo: string, expression: string) => {
+    tarball: (owner: string, repo: string, revision: string) => {
       const repository = repositories.get(keyOf(owner, repo))
 
       if (repository === undefined) return undefined
 
-      const separator = expression.indexOf(":")
-      const revision = separator === -1 ? expression : expression.slice(0, separator)
-      const path = separator === -1 ? "" : expression.slice(separator + 1).replace(/\/$/, "")
       const commit = resolve(repository, revision)
 
-      if (commit === null) return null
-
-      const isFolder =
-        path === "" ||
-        Object.keys(repository.commits.get(commit)!).some((file) => within(path, file) !== null)
-
-      return isFolder
-        ? {
-            kind: separator === -1 ? ("commit" as const) : ("tree" as const),
-            oid: treeOid(commit, path),
-          }
-        : null
+      return commit === null
+        ? undefined
+        : tarball(`${owner}-${repo}-${commit.slice(0, 7)}`, commit, repository.commits.get(commit)!)
     },
-
-    tree: (owner: string, repo: string, oid: string) => {
-      const tree = trees.get(oid)
-      const files = repositories.get(keyOf(owner, repo))?.commits.get(tree?.commit ?? "")
-
-      if (tree === undefined || files === undefined) return undefined
-
-      return Object.entries(files)
-        .flatMap(([path, file]) => {
-          const relative = within(tree.path, path)
-
-          return relative === null
-            ? []
-            : [
-                {
-                  path: relative,
-                  mode: file instanceof ExecutableFile ? "100755" : "100644",
-                  type: "blob",
-                  sha: blobSha(contentsOf(file)),
-                },
-              ]
-        })
-        .toSorted((a, b) => (a.path < b.path ? -1 : 1))
-    },
-
-    blob: (sha: string) => blobs.get(sha),
   }
 }
