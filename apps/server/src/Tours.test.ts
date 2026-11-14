@@ -217,13 +217,14 @@ it.live(
             target: { path: "greet.ts", side: "new", startLine: 1, endLine: 1 },
           },
         ],
-        edges: [{ from: "old", to: "new", change: "added" }],
+        edges: [{ from: "old", to: "new", change: "added", label: "use the name" }],
       }
 
-      const valid = { ...answer, chapters: [{ ...answer.chapters[0]!, diagram }] }
+      const valid = { ...answer, diagram, chapters: [{ ...answer.chapters[0]!, diagram }] }
 
       const invalid = {
         ...valid,
+        diagram: { ...diagram, edges: [{ from: "old", to: "missing", change: "added" }] },
         chapters: [
           {
             ...valid.chapters[0]!,
@@ -236,12 +237,14 @@ it.live(
       yield* f.write
       const repaired = yield* f.state(completed)
       assert.equal(repaired.tour?.chapters[0]?.diagram, null)
+      assert.equal(repaired.tour?.diagram, null)
       assert.equal(repaired.tour?.chapters[0]?.explanation, answer.chapters[0]!.explanation)
 
       yield* f.runners.configure({ reply: { answer: valid } })
       yield* f.write
       const saved = yield* f.state(completed)
       assert.deepStrictEqual(saved.tour?.chapters[0]?.diagram, diagram)
+      assert.deepStrictEqual(saved.tour?.diagram, diagram)
       assert.deepStrictEqual((yield* f.restart).tour, saved.tour)
     }),
 )

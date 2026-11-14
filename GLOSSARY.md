@@ -86,7 +86,7 @@ An automated run reporting on a PR's head commit, such as a CI job: passed, fail
 skipped.
 
 **Tour**:
-An agent-written reading order for one Revision of a PR: why the change exists, a Before / after
+An agent-written reading order for one Revision of a PR: why the change exists, a diagram or Before / after
 of the whole change when it has one, then Chapters ordered from the part that matters most to the
 glue.
 _Avoid_: Code tour, guided review, guide, walkthrough
@@ -98,8 +98,8 @@ Chapter may carry one for its own part.
 _Avoid_: Call tree, show me, summary diagram
 
 **Tour overview**:
-The card that opens a Tour with a Before / after: why the change exists beside its Before / after,
-above the first Chapter.
+The card that opens a Tour: why the change exists beside one map, either a diagram or a Before / after,
+when available, above the first Chapter. A diagram links its parts to Chapters and the code behind them.
 _Avoid_: Overview (the PR's Overview tab is a different place)
 
 **Chapter**:
@@ -287,6 +287,13 @@ One message to an Agent and its whole response. It ends done, failed, stopped by
 when Glass loses the Agent, or interrupted when Glass quits; a Sandbox Agent's Turn carries on
 while Glass is closed.
 _Avoid_: Run, execution, exchange
+
+**Diagram**:
+A named Mermaid picture an Agent draws beside its conversation when the user asks for one, labeled
+as existing behavior, a proposed design, or an uncertain inference. Asking for changes redraws it
+under the same name; a version Glass can't draw leaves the last one in place. An Agent keeps its
+Diagrams with its Turns.
+_Avoid_: Artifact, chart, whiteboard
 
 **Queued message**:
 A message sent while a Turn runs, waiting to start the next Turn; the user can cancel it before then.

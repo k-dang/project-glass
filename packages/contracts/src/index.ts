@@ -14,6 +14,8 @@ export * from "./connection"
 
 export * from "./desktop"
 
+export * from "./diagram"
+
 export * from "./discussion"
 
 export * from "./draft"

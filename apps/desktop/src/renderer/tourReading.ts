@@ -37,6 +37,7 @@ export interface TourChapter {
 export interface TourReading {
   readonly writtenAt: Tour["writtenAt"]
   readonly intent: string
+  readonly diagram: TourDiagram | null
   readonly beforeAfter: TourBeforeAfter | null
   readonly hotspots: ReadonlyArray<TourHotspot> | null
   readonly chapters: ReadonlyArray<TourChapter>
@@ -137,6 +138,12 @@ export const readTour = (
   return {
     writtenAt: tour.writtenAt,
     intent: tour.intent,
+    diagram:
+      current &&
+      tour.diagram != null &&
+      tour.diagram.nodes.every((node) => byPath.has(node.target.path))
+        ? tour.diagram
+        : null,
     beforeAfter: shownBeforeAfter(tour.beforeAfter, (path) => byPath.has(path)),
     hotspots,
     chapters,
@@ -147,4 +154,4 @@ export const readTour = (
 }
 
 export const hasOverview = (reading: TourReading) =>
-  reading.beforeAfter !== null || reading.hotspots !== null
+  reading.diagram !== null || reading.beforeAfter !== null || reading.hotspots !== null

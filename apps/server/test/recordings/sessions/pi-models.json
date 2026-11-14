@@ -134,8 +134,8 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<pi-home>--\\2026-11-03T23-33-14-279Z_01a1a3c2-7ba6-759a-a147-545ffd5204b4.jsonl",
-              "sessionId": "01a1a3c2-7ba6-759a-a147-545ffd5204b4",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<pi-home>--/2026-11-14T20-34-35-078Z_01a1dbc4-dfc6-7280-8d3e-249d854189fb.jsonl",
+              "sessionId": "01a1dbc4-dfc6-7280-8d3e-249d854189fb",
               "autoCompactionEnabled": true,
               "messageCount": 0,
               "pendingMessageCount": 0

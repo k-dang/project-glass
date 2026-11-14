@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
-import type { Tour } from "@glass/contracts"
+import { Tour } from "@glass/contracts"
+import { DateTime, Schema } from "effect"
 import { screen, waitFor, within } from "@testing-library/react"
 import { afterEach, expect, it, vi } from "vite-plus/test"
 import { changes, mountTourWorkspace, resetTourWorkspace } from "../../test/tourWorkspace"
@@ -79,4 +80,100 @@ it("has no Tour overview without a Before / after", async () => {
 
   await screen.findByRole("region", { name: "Greet by name" })
   expect(screen.queryByRole("region", { name: "Tour overview" })).toBeNull()
+})
+
+it("opens a diagram-only overview and follows nodes across Chapters, reopening viewed code", async () => {
+  const f = mount({
+    ...savedTour(chapters),
+    diagram: {
+      nodes: [
+        {
+          id: "greet",
+          label: "Greet by name",
+          change: "added",
+          target: { path: "greet.ts", side: "new", startLine: 2, endLine: 2 },
+        },
+        {
+          id: "api",
+          label: "Expose the greeting",
+          change: "unchanged",
+          target: { path: "api.ts", side: "old", startLine: 2, endLine: 2 },
+        },
+      ],
+      edges: [{ from: "greet", to: "api", change: "added", label: "return greeting" }],
+    },
+  })
+
+  await startReading(f)
+  const overview = await screen.findByRole("region", { name: "Tour overview" })
+  const diagram = within(overview).getByRole("figure", { name: "Change diagram for Tour overview" })
+  expect(within(diagram).getByText(/Chapter 02/)).toBeDefined()
+  expect(within(diagram).getByText("+ return greeting")).toBeDefined()
+  const chapter = screen.getByRole("region", { name: "Expose it" })
+  await f.user.click(within(chapter).getByRole("checkbox", { name: "Chapter viewed: Expose it" }))
+  await within(chapter).findByRole("button", { name: /Expose it/ })
+  await f.user.click(within(diagram).getByRole("button", { name: /^Expose the greeting,/ }))
+  expect(await screen.findByRole("checkbox", { name: "Chapter viewed: Expose it" })).toBeDefined()
+  expect(f.setViewed).toHaveBeenCalledTimes(1)
+})
+
+it("keeps diagram selection and playback through job updates, and resets them for a new Tour", async () => {
+  const tour: Tour = {
+    ...savedTour(chapters),
+    diagram: {
+      nodes: [
+        {
+          id: "greet",
+          label: "Build greeting",
+          change: "added",
+          target: { path: "greet.ts", side: "new", startLine: 2, endLine: 2 },
+        },
+        {
+          id: "api",
+          label: "Return greeting",
+          change: "unchanged",
+          target: { path: "api.ts", side: "new", startLine: 2, endLine: 2 },
+        },
+      ],
+      edges: [{ from: "greet", to: "api", change: "added" }],
+      steps: [
+        { caption: "Build the named greeting.", nodes: ["greet"], edges: [], stateChanges: [] },
+        { caption: "Return it through the API.", nodes: ["api"], edges: [0], stateChanges: [] },
+      ],
+    },
+  }
+
+  const freshTour = () => Schema.decodeUnknownSync(Tour)(Schema.encodeSync(Tour)(tour))
+  const f = mount(tour)
+  await startReading(f)
+  const changePanel = within(changes())
+  const overview = () => within(changePanel.getByRole("region", { name: /^Tour overview$/ }))
+  const flow = () => within(overview().getByRole("group", { name: "Flow steps" }))
+  const returned = () => overview().getByRole("button", { name: /^Return greeting,/ })
+
+  await f.user.click(flow().getByRole("button", { name: "Next flow step" }))
+  await f.user.click(flow().getByRole("button", { name: "Next flow step" }))
+  expect(flow().getByText("2 / 2")).toBeDefined()
+  expect(returned().getAttribute("aria-pressed")).toBe("true")
+
+  await f.publish({
+    tour: freshTour(),
+    job: { status: "writing", startedAt: f.startedAt, runner: null },
+  })
+  expect(flow().getByText("2 / 2")).toBeDefined()
+  expect(returned().getAttribute("aria-pressed")).toBe("true")
+
+  await f.publish({ tour: freshTour(), job: { status: "idle" } })
+  expect(flow().getByText("2 / 2")).toBeDefined()
+  expect(returned().getAttribute("aria-pressed")).toBe("true")
+
+  await f.publish({
+    tour: { ...freshTour(), writtenAt: DateTime.makeUnsafe("2026-10-23T00:00:00Z") },
+    job: { status: "idle" },
+  })
+  expect(flow().getByText("Overview")).toBeDefined()
+  expect(returned().getAttribute("aria-pressed")).toBe("false")
+  expect(flow().getByRole("button", { name: "Previous flow step" }).hasAttribute("disabled")).toBe(
+    true,
+  )
 })
