@@ -211,6 +211,25 @@ it.live("shows a Steer a pi extension handles itself", () =>
   }).pipe(Effect.scoped),
 )
 
+it.live("shows the notice a pi extension's command answers with", () =>
+  Effect.gen(function* () {
+    const f = yield* piSession("pi-command-notice")
+    yield* f.extension(
+      "status.js",
+      `export default (pi) => pi.registerCommand("status", {
+        handler: async (_args, ctx) => ctx.ui.notify("All systems go", "info"),
+      })`,
+    )
+    const agent = yield* f.open(conversation)
+
+    yield* agent.send("/status")
+
+    const [turn] = yield* f.until(settled(1))
+    assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
+    assert.deepStrictEqual(shownParts(turn), [{ text: "All systems go" }])
+  }).pipe(Effect.scoped),
+)
+
 it.live("hands back what pi held when the Turn stops: Steers as written, then pi's own", () =>
   Effect.gen(function* () {
     const f = yield* piSession("pi-held-steers")

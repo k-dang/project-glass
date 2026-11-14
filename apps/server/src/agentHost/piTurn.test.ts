@@ -130,6 +130,14 @@ it("declines pi's extension dialogs, even between Turns", () => {
   assert.deepStrictEqual(commands, [Command.DeclineDialog({ id: "ask-1" })])
 })
 
+it("shows an extension's notice in the Turn, as a command like /mcp answers with one", () => {
+  const { state } = run([
+    { type: "extension_ui_request", id: "note-1", method: "notify", message: "2 MCP servers" },
+  ])
+
+  assert.deepStrictEqual(state?.turn.parts, [TextPart.make({ text: "2 MCP servers" })])
+})
+
 it("goes on with the Steers pi went idle holding, sending each prompt again and showing what the user wrote", () => {
   const steer = {
     message: "Use tabs",

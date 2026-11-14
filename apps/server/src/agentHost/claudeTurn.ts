@@ -109,6 +109,9 @@ const Answered = Schema.Struct({
 
 const decodeAnswered = Schema.decodeUnknownOption(Answered)
 
+// A local command like `/mcp` replies in one unstreamed message that Claude Code marks with this field.
+const isLocalCommandReply = Schema.is(Schema.Struct({ local_command_source: Schema.Unknown }))
+
 const answered = (message: SDKMessage): ReadonlyArray<string> =>
   Option.match(decodeAnswered(message), {
     onNone: () => [],
@@ -241,6 +244,11 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
         break
       case "assistant":
         for (const block of message.message.content) {
+          if (block.type === "text" && isLocalCommandReply(message)) {
+            addPart(TextPart.make({ text: block.text }))
+            continue
+          }
+
           if (block.type !== "tool_use" || state.toolCalls.has(block.id)) continue
 
           const index = addPart(
