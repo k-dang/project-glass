@@ -44,8 +44,7 @@ import { annotateUnit } from "./wideEvents"
 
 export interface Conversation {
   readonly id: string
-  /** Starts the conversation's program on `client` unless it is already running there. */
-  readonly start: (client: HostClient) => Effect.Effect<void, HostCallError>
+  readonly ensureStarted: (client: HostClient) => Effect.Effect<void, HostCallError>
   readonly settings: TurnSettings
   readonly host: Effect.Effect<HostClient, AgentError>
   readonly runningHost: Effect.Effect<Option.Option<HostClient>>
@@ -154,7 +153,7 @@ export class ConversationTurns extends Context.Service<
           const client = yield* conversation.host
 
           const [, message] = yield* Effect.all(
-            [conversation.start(client), delivered(sent, sent.feedback)],
+            [conversation.ensureStarted(client), delivered(sent, sent.feedback)],
             { concurrency: "unbounded" },
           )
 

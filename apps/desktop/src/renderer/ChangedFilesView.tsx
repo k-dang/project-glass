@@ -113,7 +113,7 @@ export interface DiffViewProps<M> {
   loadDiffFiles?: FileDiffContentsLoader
   opened: CollapseChoices["opened"]
   all: CollapseChoices["all"]
-  collapsedAtFirst: CollapseChoices["collapsedAtFirst"]
+  collapsedWhenSuggested: CollapseChoices["collapsedWhenSuggested"]
   onOpenChange: (path: string, open: boolean) => void
   onCurrentPathChange: (path: string) => void
   summaries: ReadonlyMap<string, string> | null
@@ -159,10 +159,10 @@ export function DiffView<M>(props: DiffViewProps<M>) {
       toItems(
         files,
         annotationsFor,
-        { opened, all: props.all, collapsedAtFirst: props.collapsedAtFirst },
+        { opened, all: props.all, collapsedWhenSuggested: props.collapsedWhenSuggested },
         leads,
       ),
-    [files, annotationsFor, opened, props.all, props.collapsedAtFirst, leads],
+    [files, annotationsFor, opened, props.all, props.collapsedWhenSuggested, leads],
   )
 
   const options = useMemo((): CodeViewReactOptions<M, undefined> => {
@@ -349,7 +349,7 @@ export interface ChangedFilesViewProps extends Omit<
   | "selectedLines"
   | "onSelectedLinesChange"
   | "renderFileActions"
-  | "collapsedAtFirst"
+  | "collapsedWhenSuggested"
 > {
   discussions: ReadonlyArray<LineDiscussion>
   drafts: DraftStore
@@ -450,7 +450,7 @@ export function ChangedFilesView(props: ChangedFilesViewProps) {
       renderAnnotation={renderAnnotation}
       renderGutterUtility={renderGutterUtility}
       renderFileActions={renderFileActions}
-      collapsedAtFirst={lowAttention}
+      collapsedWhenSuggested={lowAttention}
     />
   )
 }

@@ -116,11 +116,6 @@ export const startDemoPi = Effect.fnUntraced(function* (directory: string) {
   process.env["PI_CODING_AGENT_DIR"] = join(directory, ".pi", "agent")
 })
 
-/**
- * Seeds one of each kind of Agent work the Inbox lists: pi Agents that finish, Claude Code Agents
- * that wait on a Permission request or Question or whose Turn fails, a Question from the Global
- * conversation, and a finished Agent review of a queued PR.
- */
 export const seedDemoAgents = Effect.fnUntraced(function* (
   port: number,
   token: string,

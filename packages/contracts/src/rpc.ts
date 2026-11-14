@@ -134,7 +134,6 @@ export class GlassRpcs extends RpcGroup.make(
     payload: { pullRequest: PullRequestRef },
     error: AgentReviewFailure,
   }),
-  /** Marks the Agent review written at writtenAt done; a newer one is left as it is. */
   Rpc.make("MarkAgentReviewDone", {
     payload: AgentReviewDone,
     error: AgentReviewFailure,
@@ -247,7 +246,6 @@ export class GlassRpcs extends RpcGroup.make(
     success: GitHubConnection,
     error: ConnectionError,
   }),
-  /** Only reads; recording PullRequestOpened is what marks a PR opened. */
   Rpc.make("LoadPullRequest", {
     payload: { pullRequest: PullRequestRef },
     success: PullRequestWorkspace,
@@ -324,7 +322,6 @@ export class GlassRpcs extends RpcGroup.make(
     success: Schema.Array(ReactionGroup),
     error: ReactionError,
   }),
-  /** PullRequestOpened also marks the PR opened in the Queue. */
   Rpc.make("RecordActivity", { payload: Activity }),
   Rpc.make("ListActivity", {
     payload: { limit: Schema.Int.check(Schema.isGreaterThan(0)) },
@@ -351,7 +348,6 @@ export class GlassRpcs extends RpcGroup.make(
     stream: true,
   }),
   Rpc.make("WatchNeedsYou", { success: NeedsYou, stream: true }),
-  /** Marks the Agent's Turn that ended at endedAt seen; a Turn that ended later is left as it is. */
   Rpc.make("MarkTurnSeen", {
     payload: { agentId: Schema.String, endedAt: Schema.DateTimeUtcFromString },
     error: AgentError,
@@ -533,7 +529,6 @@ export class GlassRpcs extends RpcGroup.make(
   }),
   Rpc.make("GetGlobalUnsentMessage", { success: SentMessage, error: AgentError }),
   Rpc.make("SaveGlobalUnsentMessage", { payload: SentMessage, error: AgentError }),
-  /** The Global conversation's latest Turn while it ended after the user last looked, else null. */
   Rpc.make("WatchGlobalUnseen", { success: Schema.NullOr(TurnEnd), stream: true }),
   Rpc.make("MarkGlobalTurnSeen", {
     payload: { endedAt: Schema.DateTimeUtcFromString },

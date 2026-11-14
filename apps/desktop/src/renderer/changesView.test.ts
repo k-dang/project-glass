@@ -60,8 +60,8 @@ const notesOf = (some: Partial<LineNotes> = {}) => lineNoteAnnotations(lineNotes
 const choose = (
   opened: ReadonlyMap<string, boolean> = none,
   all: CollapseChoices["all"] = "expanded",
-  collapsedAtFirst: ReadonlySet<string> = new Set(),
-): CollapseChoices => ({ opened, all, collapsedAtFirst })
+  collapsedWhenSuggested: ReadonlySet<string> = new Set(),
+): CollapseChoices => ({ opened, all, collapsedWhenSuggested })
 
 const redrawn = (before: ReturnType<typeof toItems>, after: ReturnType<typeof toItems>) =>
   after.filter((item, index) => item.version !== before[index]!.version).map((item) => item.id)

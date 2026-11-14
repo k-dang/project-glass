@@ -61,7 +61,6 @@ const Showing = Data.taggedEnum<Showing>()
 
 const showingCurrent = Showing.Current()
 
-/** The Global conversation, floating over whichever area is open so that area stays in view. */
 export function GlobalConversationDialog() {
   const [open, setOpen] = useAtom(globalConversationOpenAtom)
   const [showing, setShowing] = useState<Showing>(showingCurrent)

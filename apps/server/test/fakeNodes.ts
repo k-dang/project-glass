@@ -68,7 +68,6 @@ const checkContextNode = (check: FakeCheck) =>
       }
     : checkRunNode(check)
 
-/** The head commit's checks, as `CHECK_CONTEXTS_FIELDS` asks for them. */
 export const checkContextsNode = (pr: FakePullRequest) => ({
   nodes: [
     {

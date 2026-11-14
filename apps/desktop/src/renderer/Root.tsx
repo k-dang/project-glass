@@ -13,7 +13,6 @@ export function Root() {
     void window.glass.backendFailure().then(setFailure)
   }, [])
 
-  // Dogfood reports stay mounted across a backend failure, when its log matters most.
   return (
     <>
       {failure === null ? (

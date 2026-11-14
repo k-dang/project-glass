@@ -39,7 +39,6 @@ const loaded = <A, E>(
   atom: Atom.Atom<AsyncResult.AsyncResult<A, E>>,
 ) => Option.getOrNull(AsyncResult.value(registry.get(atom)))
 
-/** What the screen is about, with the Tour and Agent review its PR workspace has loaded. */
 const subjectOf = (registry: AtomRegistry.AtomRegistry): DogfoodReportSubject => {
   const context = registry.get(capturedContextAtom)
   const pullRequest = context?._tag === "PullRequest" ? context.pullRequest : null
@@ -69,30 +68,28 @@ const isDogfoodShortcut = (event: KeyboardEvent) =>
   !event.altKey &&
   !event.repeat
 
-/** Records a Dogfood report on Mod+Shift+., then asks for its note. */
 export function DogfoodReports(props: { bridge: DogfoodReportsBridge }) {
   const { bridge } = props
   const registry = useContext(RegistryContext)
   const [pending, setPending] = useState<Pending | null>(null)
   const [note, setNote] = useState("")
   const noteRef = useRef<HTMLTextAreaElement>(null)
-  // The report in progress, read synchronously so one runs at a time and finishes only once.
-  const current = useRef<Pending | "recording" | null>(null)
+  const reportInFlight = useRef<Pending | "recording" | null>(null)
 
   const record = useEffectEvent(async () => {
-    if (current.current !== null) return
+    if (reportInFlight.current !== null) return
 
-    current.current = "recording"
+    reportInFlight.current = "recording"
     const subject = subjectOf(registry)
 
     try {
-      // The screenshot is taken before the dialog opens, so it shows only what was on screen.
-      const report = { ...(await bridge.record()), subject }
-      current.current = report
+      const captured = await bridge.record()
+      const report = { ...captured, subject }
+      reportInFlight.current = report
       setNote("")
       setPending(report)
     } catch (error) {
-      current.current = null
+      reportInFlight.current = null
       toast.add({
         type: "error",
         title: "Couldn't record a Dogfood report",
@@ -115,11 +112,11 @@ export function DogfoodReports(props: { bridge: DogfoodReportsBridge }) {
   }, [])
 
   const takePending = () => {
-    const report = current.current
+    const report = reportInFlight.current
 
     if (report === null || report === "recording") return null
 
-    current.current = null
+    reportInFlight.current = null
     setPending(null)
 
     return report

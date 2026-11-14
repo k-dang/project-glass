@@ -111,12 +111,11 @@ export const inHunk = (fileDiff: FileDiffMetadata, side: DiffSide, line: number)
 
 export interface CollapseChoices {
   readonly opened: ReadonlyMap<string, boolean>
-  /** "suggested" until the user collapses or expands every file: `collapsedAtFirst` start closed. */
   readonly all: "suggested" | "collapsed" | "expanded"
-  readonly collapsedAtFirst: ReadonlySet<string>
+  readonly collapsedWhenSuggested: ReadonlySet<string>
 }
 
-export const noneCollapsedAtFirst: ReadonlySet<string> = new Set()
+export const noneCollapsedWhenSuggested: ReadonlySet<string> = new Set()
 
 const isCollapsed = (entry: ParsedFile, choices: CollapseChoices) => {
   const { path } = entry.file
@@ -126,7 +125,7 @@ const isCollapsed = (entry: ParsedFile, choices: CollapseChoices) => {
 
   if (opened !== undefined) return !opened
 
-  if (choices.all === "suggested") return choices.collapsedAtFirst.has(path)
+  if (choices.all === "suggested") return choices.collapsedWhenSuggested.has(path)
 
   return choices.all === "collapsed"
 }

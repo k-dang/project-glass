@@ -20,7 +20,7 @@ import {
   useOpenedFiles,
   type ViewHandle,
 } from "./ChangedFilesView"
-import { type CollapseChoices, layOut, noneCollapsedAtFirst } from "./changesView"
+import { type CollapseChoices, layOut, noneCollapsedWhenSuggested } from "./changesView"
 import { ChangesToolbar } from "./ChangesToolbar"
 import { type FeedbackAnnotation, isOlder } from "./feedbackLines"
 import { FilePanelTabsList, FilePanelTabTrigger } from "./FilePanelTabs"
@@ -236,7 +236,7 @@ function ChangesWithFeedback(props: {
               display={display}
               opened={opened}
               all={all}
-              collapsedAtFirst={noneCollapsedAtFirst}
+              collapsedWhenSuggested={noneCollapsedWhenSuggested}
               onOpenChange={setFileOpen}
               {...feedback.diffProps}
             />

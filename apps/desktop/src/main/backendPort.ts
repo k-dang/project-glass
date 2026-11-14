@@ -24,11 +24,7 @@ const listen = (port: number) =>
     })
   })
 
-/**
- * Reuse the port the backend last bound, so the MCP address outside agents saved stays valid,
- * and take another only when that port is already taken.
- */
-export const choosePort = async (directory: string): Promise<number> => {
+export const lastBoundPortOrFree = async (directory: string): Promise<number> => {
   await mkdir(directory, { recursive: true })
 
   const remembered = Number(

@@ -124,7 +124,6 @@ export const pullRequestJobs = Effect.fnUntraced(function* <O, P, F, S, E>(optio
       }),
     )
 
-  /** Saves and settles the job, deriving the new output from the current one so a change made meanwhile survives. */
   const commit = <E2>(
     job: PullRequestJob<O, P, F>,
     save: Effect.Effect<void, E2>,
@@ -141,7 +140,6 @@ export const pullRequestJobs = Effect.fnUntraced(function* <O, P, F, S, E>(optio
       job.lock.withPermits(1),
     )
 
-  /** Changes the saved output without touching the run, so a job in progress keeps going. */
   const amend = <E2>(
     job: PullRequestJob<O, P, F>,
     change: (output: O | null) => Effect.Effect<O | null, E2>,

@@ -172,7 +172,6 @@ export const startPiRpc = Effect.fnUntraced(function* (
   conversation?: string,
   flags: ReadonlyArray<string> = [],
   tools?: GlassToolsAccess,
-  // Called as pi writes each event, so it comes before pi's answer to any later request.
   deliver: (event: PiEvent) => Effect.Effect<void> = () => Effect.void,
 ) {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner

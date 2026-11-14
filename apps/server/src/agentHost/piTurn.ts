@@ -112,8 +112,7 @@ const outputText = (result: ToolResult) =>
 const failureReason = (providerError: string) =>
   saysSignInFailed(providerError)
     ? "pi couldn't sign in to its model provider. Run pi in a terminal to sign in, then send your message again."
-    : // A Sandbox's agent host logs where the user can't read, so the Turn carries pi's words.
-      `pi's model provider returned an error: ${providerError}`
+    : `pi's model provider returned an error: ${providerError}`
 
 const emptyBlock = (type: string): TurnPart =>
   type.startsWith("text") ? TextPart.make({ text: "" }) : ThinkingPart.make({ text: "" })

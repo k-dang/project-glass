@@ -1,11 +1,11 @@
 import { TOKEN_PARAM } from "@glass/contracts"
 import { Effect, Redacted } from "effect"
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http"
-import { sameSecret } from "./mcp/McpCredentials"
+import { timingSafeSameSecret } from "./mcp/McpCredentials"
 import { ServerConfig } from "./ServerConfig"
 
 export const isToken = (token: Redacted.Redacted) => (candidate: string | null | undefined) =>
-  sameSecret(candidate ?? "", Redacted.value(token))
+  timingSafeSameSecret(candidate ?? "", Redacted.value(token))
 
 const carriesToken = (token: Redacted.Redacted) => {
   const matches = isToken(token)

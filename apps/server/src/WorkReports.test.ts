@@ -14,17 +14,20 @@ import {
   settled,
 } from "../test/agentsFixture"
 
-/** Escapes "ask" so the scripted Global conversation passes the Agent's request on, not acts on it. */
+const hiddenFromScriptedAskUser = (json: string) => json.replaceAll("ask", "\\u0061sk")
+
 const createAgent = (message: string) =>
-  `call:create_agent ${JSON.stringify({
-    repository: { owner: repository.owner, repo: repository.repo },
-    baseBranch: "main",
-    place: localPlace,
-    engine: "pi",
-    model: null,
-    effort: null,
-    message,
-  }).replaceAll("ask", "\\u0061sk")}`
+  `call:create_agent ${hiddenFromScriptedAskUser(
+    JSON.stringify({
+      repository: { owner: repository.owner, repo: repository.repo },
+      baseBranch: "main",
+      place: localPlace,
+      engine: "pi",
+      model: null,
+      effort: null,
+      message,
+    }),
+  )}`
 
 const reports = (turns: ReadonlyArray<Turn>) =>
   turns.filter(({ context }) => Predicate.isTagged(context, "Report"))

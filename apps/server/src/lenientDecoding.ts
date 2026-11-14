@@ -2,10 +2,6 @@ import { Effect, Option, Schema, SchemaIssue, SchemaTransformation } from "effec
 
 const formatIssue = SchemaIssue.makeFormatterDefault()
 
-/**
- * A `Schema.catchDecoding` handler that logs a malformed part of an agent's answer and decodes it
- * as `fallback`, so one bad part never fails the whole answer.
- */
 export const dropMalformed =
   <A>(what: string, fallback: Option.Option<A>) =>
   (issue: SchemaIssue.Issue) =>

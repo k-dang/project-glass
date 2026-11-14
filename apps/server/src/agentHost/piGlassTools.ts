@@ -8,17 +8,11 @@ const BEARER_VARIABLE = "GLASS_TOOLS_BEARER"
 
 export const PI_GLASS_TOOLS = `${GLASS_MCP_PREFIX}*`
 
-/** The variables pi's Glass tools read, empty unless `access` is given so none are inherited. */
 export const piGlassToolsEnvironment = (access?: GlassToolsAccess) => ({
   [URL_VARIABLE]: access?.url ?? "",
   [BEARER_VARIABLE]: access === undefined ? "" : Redacted.value(access.bearer),
 })
 
-/**
- * A pi extension that offers the tools of Glass's MCP endpoint, forwarding calls, failures, and
- * cancellation. It reads the endpoint and credential from its environment when pi loads it, so
- * the file holds neither.
- */
 export const piGlassToolsExtension = `
 const url = process.env[${JSON.stringify(URL_VARIABLE)}]
 const bearer = process.env[${JSON.stringify(BEARER_VARIABLE)}]

@@ -17,7 +17,6 @@ export const checksOfRollup = (
   rollup: { readonly state: typeof StatusState.Type } | null | undefined,
 ): Checks => (rollup == null ? "unavailable" : rollupStates[rollup.state])
 
-/** The checks on a PR's head commit, each one a check run or a commit status. */
 export const CHECK_CONTEXTS_FIELDS = `commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: ${MAX_CHECK_CONTEXTS}) { nodes {
         __typename
         ... on CheckRun { name status conclusion detailsUrl checkSuite { workflowRun { workflow { name } } } }
