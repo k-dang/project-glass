@@ -1,4 +1,4 @@
-import { Cause, Deferred, Effect, Option, Predicate, Queue, Schema, Scope, Stream } from "effect"
+import { Deferred, Effect, Option, Predicate, Queue, Schema, Scope, Stream } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import { launchCommand } from "../processes"
 import { piGlassToolsEnvironment } from "./piGlassTools"
@@ -140,7 +140,7 @@ export const AvailableCommands = Schema.Struct({
 })
 
 interface PiRpc {
-  readonly events: Stream.Stream<PiEvent>
+  readonly exited: Effect.Effect<void>
   readonly send: (command: PiCommand) => Effect.Effect<void>
   readonly request: <A>(command: PiCommand, schema: Schema.Decoder<A>) => Effect.Effect<A, string>
 }
@@ -172,6 +172,8 @@ export const startPiRpc = Effect.fnUntraced(function* (
   conversation?: string,
   flags: ReadonlyArray<string> = [],
   tools?: GlassToolsAccess,
+  // Called as pi writes each event, so it comes before pi's answer to any later request.
+  deliver: (event: PiEvent) => Effect.Effect<void> = () => Effect.void,
 ) {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
   const scope = yield* Scope.Scope
@@ -207,7 +209,7 @@ export const startPiRpc = Effect.fnUntraced(function* (
     )
 
   const outgoing = yield* Queue.unbounded<Uint8Array>()
-  const events = yield* Queue.unbounded<PiEvent, Cause.Done>()
+  const done = yield* Deferred.make<void>()
   const pending = new Map<string, Deferred.Deferred<unknown, string>>()
   const encoder = new TextEncoder()
   let nextRequest = 0
@@ -220,7 +222,7 @@ export const startPiRpc = Effect.fnUntraced(function* (
     Option.match(decodeRecord(line), {
       onNone: () => Effect.void,
       onSome: (record) => {
-        if (record.type !== "response") return Queue.offer(events, record)
+        if (record.type !== "response") return deliver(record)
 
         const waiting = pending.get(record.id)
 
@@ -262,11 +264,11 @@ export const startPiRpc = Effect.fnUntraced(function* (
     exited = true
 
     for (const waiting of pending.values()) yield* Deferred.fail(waiting, "pi has stopped")
-    yield* Queue.end(events)
+    yield* Deferred.succeed(done, undefined)
   }).pipe(Effect.forkIn(scope))
 
   return {
-    events: Stream.fromQueue(events),
+    exited: Deferred.await(done),
     send: write,
     request: <A>(command: PiCommand, schema: Schema.Decoder<A>) =>
       Effect.gen(function* () {

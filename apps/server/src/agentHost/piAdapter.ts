@@ -14,6 +14,7 @@ import {
   withContextOf,
 } from "@glass/contracts"
 import {
+  type Cause,
   Duration,
   Effect,
   FileSystem,
@@ -39,6 +40,7 @@ import {
   PromptAccepted,
   SessionState,
   startPiRpc,
+  type PiEvent,
 } from "./piRpc"
 import {
   Command,
@@ -216,6 +218,11 @@ const roleFlags = (folder: string, role: ConversationRole, skills: ReadonlyArray
     }),
   )
 
+const logProviderError = (event: PiEvent) =>
+  event.type === "message_end" && event.message.stopReason === "error"
+    ? Effect.logWarning("pi's model provider returned an error", event.message.errorMessage)
+    : Effect.void
+
 export const piAdapter = (command: string) =>
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
@@ -226,8 +233,9 @@ export const piAdapter = (command: string) =>
       conversation?: string,
       flags?: ReadonlyArray<string>,
       tools?: GlassToolsAccess,
+      deliver?: (event: PiEvent) => Effect.Effect<void>,
     ) =>
-      startPiRpc(command, folder, conversation, flags, tools).pipe(
+      startPiRpc(command, folder, conversation, flags, tools, deliver).pipe(
         Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
       )
 
@@ -282,58 +290,55 @@ export const piAdapter = (command: string) =>
           ),
         )
 
+        // One inbox keeps pi's events ahead of the answers to requests pi wrote after them.
+        const inbox = yield* Queue.unbounded<Input, Cause.Done>()
+        const dialogs = new Map<string, { readonly method: string; readonly part: RequestPart }>()
+
+        const expire = (id: string) =>
+          Effect.suspend(() =>
+            dialogs.delete(id) ? Queue.offer(inbox, Input.Expired({ requestId: id })) : Effect.void,
+          )
+
+        const trackDialog = (event: PiEvent) => {
+          if (event.type !== "extension_ui_request" || !dialogMethods.has(event.method))
+            return Effect.void
+
+          dialogs.set(event.id, { method: event.method, part: dialogQuestion(event) })
+
+          // pi answers a dialog itself once its timeout passes.
+          return event.timeout === undefined
+            ? Effect.void
+            : expire(event.id).pipe(
+                Effect.delay(Duration.millis(event.timeout)),
+                Effect.forkIn(scope),
+                Effect.asVoid,
+              )
+        }
+
         const rpc = yield* startPi(
           folder,
           conversation,
           flags,
           Predicate.isTagged(role, "Global") ? role.tools : undefined,
+          (event) =>
+            trackDialog(event).pipe(
+              Effect.andThen(logProviderError(event)),
+              Effect.andThen(Queue.offer(inbox, Input.Event({ event }))),
+              Effect.asVoid,
+            ),
         )
+
+        yield* rpc.exited.pipe(Effect.andThen(Queue.end(inbox)), Effect.forkIn(scope))
 
         const startingModel = (yield* rpc.request({ type: "get_state" }, SessionState).pipe(
           Effect.tapError((error) => Effect.logWarning("pi didn't report its state", error)),
           Effect.mapError(() => new HostAgentError({ message: stoppedReason })),
         )).model
 
-        const settles = yield* Queue.unbounded<Input>()
-        const dialogs = new Map<string, { readonly method: string; readonly part: RequestPart }>()
-
-        const expire = (id: string) =>
-          Effect.suspend(() =>
-            dialogs.delete(id)
-              ? Queue.offer(settles, Input.Expired({ requestId: id }))
-              : Effect.void,
-          )
-
         const turns = yield* runTurns({
           program: "pi",
           machine,
-          events: rpc.events.pipe(
-            Stream.tap((event) => {
-              if (event.type !== "extension_ui_request" || !dialogMethods.has(event.method))
-                return Effect.void
-
-              dialogs.set(event.id, { method: event.method, part: dialogQuestion(event) })
-
-              // pi answers a dialog itself once its timeout passes.
-              return event.timeout === undefined
-                ? Effect.void
-                : expire(event.id).pipe(
-                    Effect.delay(Duration.millis(event.timeout)),
-                    Effect.forkIn(scope),
-                    Effect.asVoid,
-                  )
-            }),
-            Stream.tap((event) =>
-              event.type === "message_end" && event.message.stopReason === "error"
-                ? Effect.logWarning(
-                    "pi's model provider returned an error",
-                    event.message.errorMessage,
-                  )
-                : Effect.void,
-            ),
-            Stream.map((event) => Input.Event({ event })),
-            Stream.merge(Stream.fromQueue(settles), { haltStrategy: "left" }),
-          ),
+          events: Stream.fromQueue(inbox),
           report,
           run: (piCommand, offer) =>
             Command.$match(piCommand, {
@@ -407,7 +412,7 @@ export const piAdapter = (command: string) =>
               Effect.orElseSucceed(() => Input.Refused({ turnId })),
             )
 
-            return yield* turns.offer(answer)
+            return yield* Queue.offer(inbox, answer)
           }),
           answer: Effect.fnUntraced(function* (requestId: string, answer: RequestAnswer) {
             const dialog = dialogs.get(requestId)
@@ -419,7 +424,7 @@ export const piAdapter = (command: string) =>
             const value = reply?.text ?? reply?.chosen[0] ?? ""
 
             dialogs.delete(requestId)
-            yield* Queue.offer(settles, Input.Answered({ requestId, answer }))
+            yield* Queue.offer(inbox, Input.Answered({ requestId, answer }))
             yield* rpc.send(
               dialog.method === "confirm"
                 ? { type: "extension_ui_response", id: requestId, confirmed: value === "Yes" }
@@ -443,7 +448,8 @@ export const piAdapter = (command: string) =>
 
             yield* turns.dropSteer(steer.id)
 
-            if (Option.isSome(accepted)) return yield* turns.offer(Input.SteerHandled({ steer }))
+            if (Option.isSome(accepted))
+              return yield* Queue.offer(inbox, Input.SteerHandled({ steer }))
 
             return yield* new HostAgentError({ message: "pi didn't take the message in." })
           }),

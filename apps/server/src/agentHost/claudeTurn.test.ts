@@ -224,6 +224,24 @@ it("streams thinking, text, and tool calls, nesting a subagent's under its paren
   ])
 })
 
+it("shows a local command's reply, which Claude Code doesn't stream", () => {
+  const { state } = run(
+    [
+      sdk({
+        type: "assistant",
+        parent_tool_use_id: null,
+        local_command_source: "/mcp",
+        message: { content: [{ type: "text", text: "4 MCP server(s): 2 connected" }] },
+      }),
+    ],
+    fresh,
+  )
+
+  assert.deepStrictEqual(state?.turn.parts, [
+    TextPart.make({ text: "4 MCP server(s): 2 connected" }),
+  ])
+})
+
 it("fails a Turn Claude Code couldn't sign in for, leaving out Claude Code's own words", () => {
   const { ending } = run(
     [

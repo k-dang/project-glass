@@ -237,6 +237,8 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
       }
 
       case "extension_ui_request":
+        if (event.method === "notify" && event.message !== undefined)
+          setPart(turn, turn.turn.parts.length, TextPart.make({ text: event.message }))
     }
   }
 
