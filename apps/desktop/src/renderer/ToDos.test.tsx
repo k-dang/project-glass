@@ -231,6 +231,8 @@ it("saves notes typed while adding a to-do", async () => {
   const title = within(form).getByRole<HTMLInputElement>("textbox", { name: "New to-do" })
   const notes = within(form).getByRole<HTMLTextAreaElement>("textbox", { name: "Notes" })
   expect(notes.value).toBe("")
+  expect(form.textContent).toContain("↵")
+  expect(within(form).getByRole("button", { name: "Add" }).textContent).toBe("Add")
 
   await user.type(notes, "After CI passes   ")
   await user.type(title, "Follow up on #42{Enter}")

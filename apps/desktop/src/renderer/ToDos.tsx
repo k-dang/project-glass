@@ -5,6 +5,7 @@ import { AsyncResult, Atom } from "effect/reactivity"
 import { Pencil, Trash2 } from "lucide-react"
 import type { KeyboardEvent } from "react"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -12,6 +13,7 @@ import { toast } from "@/components/ui/toast"
 import { Backend } from "./backend"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf, settledProblem } from "./problems"
+import { shortcutLabel } from "./shortcutLabel"
 import { submitOnShortcut } from "./submitShortcut"
 import {
   changeAtom,
@@ -128,39 +130,50 @@ function AddToDo() {
   const trimmed = title.trim()
 
   return (
-    <form
-      aria-label="Add a to-do"
-      className="flex flex-col gap-2"
-      onSubmit={(event) => {
-        event.preventDefault()
+    <Card
+      render={
+        <form
+          aria-label="Add a to-do"
+          onSubmit={(event) => {
+            event.preventDefault()
 
-        if (trimmed === "") return
+            if (trimmed === "") return
 
-        const submitted = draft
-        add(trimmed, notes.trimEnd(), () =>
-          setDraft((typed) => (typed === submitted ? emptyToDo : typed)),
-        )
-      }}
+            const submitted = draft
+            add(trimmed, notes.trimEnd(), () =>
+              setDraft((typed) => (typed === submitted ? emptyToDo : typed)),
+            )
+          }}
+        />
+      }
+      className="focus-within:ring-3 focus-within:ring-ring/50"
     >
-      <div className="flex items-center gap-2">
+      <CardContent className="flex flex-col gap-1">
         <Input
           aria-label="New to-do"
           placeholder="Add a to-do"
           value={title}
           onChange={(event) => setDraft({ title: event.target.value, notes })}
+          className="h-8 border-0 bg-transparent px-0 font-medium shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
         />
-        <Button type="submit" disabled={pending || trimmed === ""}>
+        <Textarea
+          aria-label="Notes"
+          placeholder="Notes"
+          value={notes}
+          onChange={(event) => setDraft({ title, notes: event.target.value })}
+          onKeyDown={submitOnShortcut}
+          className="min-h-10 resize-none border-0 bg-transparent px-0 py-0 text-sm shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
+        />
+      </CardContent>
+      <CardFooter className="justify-end gap-2">
+        <span className="text-xs text-muted-foreground" aria-hidden>
+          {shortcutLabel("↵")}
+        </span>
+        <Button type="submit" size="sm" disabled={pending || trimmed === ""}>
           Add
         </Button>
-      </div>
-      <Textarea
-        aria-label="Notes"
-        placeholder="Notes"
-        value={notes}
-        onChange={(event) => setDraft({ title, notes: event.target.value })}
-        onKeyDown={submitOnShortcut}
-      />
-    </form>
+      </CardFooter>
+    </Card>
   )
 }
 

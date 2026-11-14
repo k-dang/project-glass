@@ -1,6 +1,6 @@
 # To-dos
 
-The To-dos rail area holds the user's own to-do list, kept on this device and never sent to GitHub. Open to-dos are listed in the order they were added, followed by a form to add one: a title input and an optional Notes field under it. Each row has a checkbox named after its title, its notes beneath, and Edit and Delete buttons. Edit swaps the row for Title and Notes fields with Save and Cancel. Checking a to-do moves it into a collapsed "Done (n)" section, struck through; unchecking it there reopens it. Delete removes a to-do without asking. With no open to-dos the list reads "Nothing to do.", and a failed load or save shows a "Couldn't access your to-dos" alert.
+The To-dos rail area holds the user's own to-do list, kept on this device and never sent to GitHub. Open to-dos are listed in the order they were added, followed by one card to add one: a title line, an optional Notes field under it, and Add in the card footer. Each row has a checkbox named after its title, its notes beneath, and Edit and Delete buttons. Edit swaps the row for Title and Notes fields with Save and Cancel. Checking a to-do moves it into a collapsed "Done (n)" section, struck through; unchecking it there reopens it. Delete removes a to-do without asking. With no open to-dos the list reads "Nothing to do.", and a failed load or save shows a "Couldn't access your to-dos" alert.
 
 ## Sub-features
 
@@ -13,7 +13,7 @@ The To-dos rail area holds the user's own to-do list, kept on this device and ne
 ## How to get to it (user POV)
 
 - Choose To-dos in the left icon rail.
-- Type in "Add a to-do" and press Enter or choose Add. Notes under the title are optional; Enter there starts a new line, and ⌘ or Ctrl+Enter adds the to-do.
+- Type in "Add a to-do" and press Enter, or choose Add in the card footer. Notes under the title are optional. Enter there starts a new line, and the footer shows ⌘ or Ctrl+Enter, which adds the to-do. The card takes one focus ring while either field is focused.
 - Choose the pencil (Edit) or trash (Delete) on a row, or tick its checkbox.
 - Expand "Done (n)" to see completed to-dos.
 
