@@ -28,7 +28,7 @@ export class ToDos extends Context.Service<
   ToDos,
   {
     readonly list: () => ToDoList
-    readonly add: (title: string) => ToDoList
+    readonly add: (title: string, notes: string) => ToDoList
     readonly edit: (id: number, title: string, notes: string) => ToDoList
     readonly setDone: (id: number, done: boolean) => ToDoList
     readonly remove: (id: number) => ToDoList
@@ -79,12 +79,12 @@ export class ToDos extends Context.Service<
 
       return ToDos.of({
         list: Effect.fn("ToDos.list")(() => list),
-        add: Effect.fn("ToDos.add")(function* (title) {
+        add: Effect.fn("ToDos.add")(function* (title, notes) {
           const createdAt = yield* now
 
           return yield* changeAndRecord(
             sql`
-              INSERT INTO to_do ${sql.insert({ title, notes: "", created_at: createdAt })}
+              INSERT INTO to_do ${sql.insert({ title, notes, created_at: createdAt })}
               RETURNING id, title
             `,
             (toDo) => ToDoAdded.make({ toDo }),

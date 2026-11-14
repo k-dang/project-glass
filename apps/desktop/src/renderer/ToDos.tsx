@@ -12,6 +12,7 @@ import { toast } from "@/components/ui/toast"
 import { Backend } from "./backend"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf, settledProblem } from "./problems"
+import { submitOnShortcut } from "./submitShortcut"
 import {
   changeAtom,
   pendingToggleAtom,
@@ -20,14 +21,18 @@ import {
   toDosAtom,
 } from "./toDoList"
 
-const newTitleAtom = Atom.make("").pipe(Atom.keepAlive)
-
-interface ToDoEdit {
+interface ToDoFields {
   readonly title: string
   readonly notes: string
 }
 
-const editAtom = Atom.family((_id: number) => Atom.make<ToDoEdit | null>(null).pipe(Atom.keepAlive))
+const emptyToDo: ToDoFields = { title: "", notes: "" }
+
+const newToDoAtom = Atom.make<ToDoFields>(emptyToDo).pipe(Atom.keepAlive)
+
+const editAtom = Atom.family((_id: number) =>
+  Atom.make<ToDoFields | null>(null).pipe(Atom.keepAlive),
+)
 
 function useToDoChanges() {
   const change = useAtomValue(changeAtom)
@@ -41,8 +46,8 @@ function useToDoChanges() {
   return {
     pending,
     problem: settledProblem(change),
-    add: (title: string, onSaved: () => void) =>
-      run({ save: Backend.use((backend) => backend.AddToDo({ title })), onSaved }),
+    add: (title: string, notes: string, onSaved: () => void) =>
+      run({ save: Backend.use((backend) => backend.AddToDo({ title, notes })), onSaved }),
     edit: (id: number, title: string, notes: string, onSaved: () => void) =>
       run({ save: Backend.use((backend) => backend.EditToDo({ id, title, notes })), onSaved }),
     setDone: (toDo: ToDo, done: boolean) =>
@@ -117,28 +122,44 @@ function ToDoItems(props: { label: string; toDos: ReadonlyArray<ToDo>; className
 }
 
 function AddToDo() {
-  const [title, setTitle] = useAtom(newTitleAtom)
+  const [draft, setDraft] = useAtom(newToDoAtom)
   const { pending, add } = useToDoChanges()
+  const { title, notes } = draft
   const trimmed = title.trim()
 
   return (
     <form
-      className="flex items-center gap-2"
+      aria-label="Add a to-do"
+      className="flex flex-col gap-2"
       onSubmit={(event) => {
         event.preventDefault()
 
-        if (trimmed !== "") add(trimmed, () => setTitle((typed) => (typed === title ? "" : typed)))
+        if (trimmed === "") return
+
+        const submitted = draft
+        add(trimmed, notes.trimEnd(), () =>
+          setDraft((typed) => (typed === submitted ? emptyToDo : typed)),
+        )
       }}
     >
-      <Input
-        aria-label="New to-do"
-        placeholder="Add a to-do"
-        value={title}
-        onChange={(event) => setTitle(event.target.value)}
+      <div className="flex items-center gap-2">
+        <Input
+          aria-label="New to-do"
+          placeholder="Add a to-do"
+          value={title}
+          onChange={(event) => setDraft({ title: event.target.value, notes })}
+        />
+        <Button type="submit" disabled={pending || trimmed === ""}>
+          Add
+        </Button>
+      </div>
+      <Textarea
+        aria-label="Notes"
+        placeholder="Notes"
+        value={notes}
+        onChange={(event) => setDraft({ title, notes: event.target.value })}
+        onKeyDown={submitOnShortcut}
       />
-      <Button type="submit" disabled={pending || trimmed === ""}>
-        Add
-      </Button>
     </form>
   )
 }
@@ -203,7 +224,7 @@ function ToDoRow(props: { toDo: ToDo }) {
 
 const focusOnMount = (element: HTMLInputElement | null) => element?.focus()
 
-function ToDoEditor(props: { toDo: ToDo; edit: ToDoEdit }) {
+function ToDoEditor(props: { toDo: ToDo; edit: ToDoFields }) {
   const { pending, edit } = useToDoChanges()
   const setEdit = useAtomSet(editAtom(props.toDo.id))
   const { title, notes } = props.edit

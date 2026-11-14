@@ -317,7 +317,7 @@ describe("Activity log", () => {
       const { client } = yield* startSignedInBackend(home)
       yield* client.FollowRepository({ input: "acme/api" })
 
-      yield* client.AddToDo({ title: "Write the release notes" })
+      yield* client.AddToDo({ title: "Write the release notes", notes: "" })
       yield* client.SetToDoDone({ id: 1, done: true })
       yield* client.SetToDoDone({ id: 1, done: true })
       yield* client.EditToDo({ id: 1, title: "Ship the release notes", notes: "" })
@@ -355,8 +355,8 @@ describe("Activity log", () => {
         home,
       )
 
-      yield* client.AddToDo({ title: "Write the release notes" })
-      yield* client.AddToDo({ title: "Follow up on #42" })
+      yield* client.AddToDo({ title: "Write the release notes", notes: "" })
+      yield* client.AddToDo({ title: "Follow up on #42", notes: "" })
       yield* client.SetToDoDone({ id: 1, done: true })
 
       assert.deepStrictEqual(

@@ -15,17 +15,22 @@ it.live("keeps open to-dos in the order added, above done ones, across restarts"
         const { client } = yield* startBackend({}, home)
         assert.deepStrictEqual(yield* client.ListToDos(), [])
 
-        yield* client.AddToDo({ title: "Write the release notes" })
-        yield* client.AddToDo({ title: "Follow up on #42" })
-        assert.deepStrictEqual(yield* client.AddToDo({ title: "Rebase the branch" }), [
-          toDo(1, "Write the release notes"),
-          toDo(2, "Follow up on #42"),
-          toDo(3, "Rebase the branch"),
-        ])
+        yield* client.AddToDo({ title: "Write the release notes", notes: "" })
+        yield* client.AddToDo({ title: "Follow up on #42", notes: "" })
+        assert.deepStrictEqual(
+          yield* client.AddToDo({ title: "Rebase the branch", notes: "Onto main" }),
+          [
+            toDo(1, "Write the release notes"),
+            toDo(2, "Follow up on #42"),
+            toDo(3, "Rebase the branch", false, "Onto main"),
+          ],
+        )
+        yield* client.AddToDo({ title: "Ship the flag", notes: "Mention the flag" })
 
         assert.deepStrictEqual(yield* client.SetToDoDone({ id: 1, done: true }), [
           toDo(2, "Follow up on #42"),
-          toDo(3, "Rebase the branch"),
+          toDo(3, "Rebase the branch", false, "Onto main"),
+          toDo(4, "Ship the flag", false, "Mention the flag"),
           toDo(1, "Write the release notes", true),
         ])
 
@@ -37,11 +42,13 @@ it.live("keeps open to-dos in the order added, above done ones, across restarts"
     const { client } = yield* startBackend({}, home)
     assert.deepStrictEqual(yield* client.ListToDos(), [
       toDo(2, "Follow up on #43", false, "After CI\npasses"),
+      toDo(4, "Ship the flag", false, "Mention the flag"),
       toDo(1, "Write the release notes", true),
     ])
     assert.deepStrictEqual(yield* client.SetToDoDone({ id: 1, done: false }), [
       toDo(1, "Write the release notes"),
       toDo(2, "Follow up on #43", false, "After CI\npasses"),
+      toDo(4, "Ship the flag", false, "Mention the flag"),
     ])
   }),
 )

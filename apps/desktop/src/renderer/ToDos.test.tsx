@@ -51,8 +51,8 @@ const fakeToDos = () => {
 
   return {
     ListToDos: sorted,
-    AddToDo: ({ title }) => {
-      toDos = [...toDos, new ToDo({ id: nextId++, title, notes: "", done: false })]
+    AddToDo: ({ title, notes }) => {
+      toDos = [...toDos, new ToDo({ id: nextId++, title, notes, done: false })]
 
       return sorted()
     },
@@ -156,14 +156,14 @@ it("adds, edits, completes, reopens, and deletes to-dos", async () => {
 })
 
 it("keeps the typed to-do and shows the problem when saving fails", async () => {
-  const adds: Array<Held<{ title: string }, ReadonlyArray<ToDo>, ToDoError>> = []
+  const adds: Array<Held<{ title: string; notes: string }, ReadonlyArray<ToDo>, ToDoError>> = []
   const user = mount({ ListToDos: () => Effect.succeed([]), AddToDo: hold(adds) })
   const page = await screen.findByRole("main", { name: "To-dos" })
 
   const input = await within(page).findByRole<HTMLInputElement>("textbox", { name: "New to-do" })
   await user.type(input, "Rebase the branch{Enter}")
   const add = await next(adds)
-  expect(add.payload.title).toBe("Rebase the branch")
+  expect(add.payload).toEqual({ title: "Rebase the branch", notes: "" })
   expect(within(page).getByRole<HTMLButtonElement>("button", { name: "Add" }).disabled).toBe(true)
 
   add.answer(Effect.fail(new ToDoError({ message: "Couldn't save your to-do. Try again." })))
@@ -173,7 +173,7 @@ it("keeps the typed to-do and shows the problem when saving fails", async () => 
 })
 
 it("keeps text typed while an add is saving", async () => {
-  const adds: Array<Held<{ title: string }, ReadonlyArray<ToDo>, ToDoError>> = []
+  const adds: Array<Held<{ title: string; notes: string }, ReadonlyArray<ToDo>, ToDoError>> = []
   const user = mount({ ListToDos: () => Effect.succeed([]), AddToDo: hold(adds) })
   const page = await screen.findByRole("main", { name: "To-dos" })
 
@@ -199,23 +199,58 @@ it("keeps an unfinished edit across areas and text typed while it saves", async 
   const user = mount({ ListToDos: () => Effect.succeed([toDo]), EditToDo: hold(edits) })
 
   await user.click(await screen.findByRole("button", { name: "Edit Rebase the branch" }))
-  await user.type(screen.getByRole("textbox", { name: "Notes" }), "Onto main")
+  const formName = "Edit Rebase the branch"
+
+  const notes = () =>
+    within(screen.getByRole("form", { name: formName })).getByRole<HTMLTextAreaElement>("textbox", {
+      name: "Notes",
+    })
+
+  await user.type(notes(), "Onto main")
   await user.click(screen.getByRole("link", { name: "Settings" }))
   await screen.findByRole("main", { name: "Settings" })
   await user.click(screen.getByRole("link", { name: "To-dos" }))
-  const notes = await screen.findByRole<HTMLTextAreaElement>("textbox", { name: "Notes" })
-  expect(notes.value).toBe("Onto main")
+  expect(notes().value).toBe("Onto main")
 
   await user.click(screen.getByRole("button", { name: "Save" }))
   const edit = await next(edits)
   expect(edit.payload.notes).toBe("Onto main")
-  await user.type(notes, ", then squash")
+  await user.type(notes(), ", then squash")
   edit.answer(Effect.succeed([new ToDo({ ...edit.payload, done: false })]))
 
   await waitFor(() =>
     expect(screen.getByRole<HTMLButtonElement>("button", { name: "Save" }).disabled).toBe(false),
   )
-  expect(screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Notes" }).value).toBe(
-    "Onto main, then squash",
-  )
+  expect(notes().value).toBe("Onto main, then squash")
+})
+
+it("saves notes typed while adding a to-do", async () => {
+  const user = mount(fakeToDos())
+  const page = await screen.findByRole("main", { name: "To-dos" })
+  const form = within(page).getByRole("form", { name: "Add a to-do" })
+  const title = within(form).getByRole<HTMLInputElement>("textbox", { name: "New to-do" })
+  const notes = within(form).getByRole<HTMLTextAreaElement>("textbox", { name: "Notes" })
+  expect(notes.value).toBe("")
+
+  await user.type(notes, "After CI passes   ")
+  await user.type(title, "Follow up on #42{Enter}")
+  const open = await within(page).findByRole("list", { name: "Open to-dos" })
+  expect(within(open).getByText("Follow up on #42")).toBeTruthy()
+  expect(within(open).getByText(/After CI passes/).textContent).toBe("After CI passes")
+  expect(title.value).toBe("")
+  expect(notes.value).toBe("")
+
+  await user.type(title, "Rebase the branch")
+  await user.type(notes, "Onto main{Enter}then squash")
+  expect(within(open).queryByText("Rebase the branch")).toBeNull()
+  await user.keyboard("{Control>}{Enter}{/Control}")
+  expect(await within(open).findByText(/then squash/)).toBeTruthy()
+  expect(within(open).getByText(/then squash/).textContent).toBe("Onto main\nthen squash")
+
+  await user.type(title, "Ship the flag")
+  await user.type(notes, "Mention the flag")
+  await user.keyboard("{Meta>}{Enter}{/Meta}")
+  expect(await within(open).findByText("Mention the flag")).toBeTruthy()
+  expect(title.value).toBe("")
+  expect(within(form).getByRole<HTMLTextAreaElement>("textbox", { name: "Notes" }).value).toBe("")
 })
