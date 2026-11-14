@@ -17,12 +17,12 @@ import {
   Deferred,
   Effect,
   Fiber,
-  FiberMap,
   Layer,
   Option,
   Predicate,
   PubSub,
   Queue,
+  Result,
   Schedule,
   Schema,
   Scope,
@@ -46,7 +46,7 @@ import {
   shutDownHost,
   waitForHost,
 } from "./sandboxCalls"
-import { reconnecting } from "./reconnecting"
+import { missedConnection, type Recovery, recoveryReach } from "./reconnecting"
 import { isSandboxGone, SandboxGone } from "./sandboxFailures"
 import { ServerConfig } from "./ServerConfig"
 import { Transcripts } from "./Transcripts"
@@ -92,15 +92,30 @@ const goneFailure = (reach: GoneReach) => new AgentError({ message: goneExplanat
 const storageFailure = () =>
   new AgentError({ message: "Couldn't save the Agent's Sandbox. Try again." })
 
-interface KnownSandbox {
-  readonly record: SandboxRecord | null
-  readonly reach: Exclude<SandboxReach, GoneReach>
+interface Following {
+  readonly recovery: Recovery<HostClient>
+  readonly opened: Deferred.Deferred<HostClient, AgentError | SandboxGone>
+  readonly fiber: Fiber.Fiber<void>
 }
 
-const unknown: KnownSandbox = { record: null, reach: "connecting" }
+interface KnownSandbox {
+  readonly record: SandboxRecord | null
+  readonly following: Following | null
+}
 
-const reachOf = ({ record, reach }: KnownSandbox): SandboxReach =>
-  Predicate.isTagged(record, "Gone") ? record.reason : reach
+const unknown: KnownSandbox = { record: null, following: null }
+
+const reachOf = ({ record, following }: KnownSandbox): SandboxReach =>
+  Predicate.isTagged(record, "Gone")
+    ? record.reason
+    : following === null
+      ? "connecting"
+      : recoveryReach(following.recovery)
+
+const clientOf = ({ record, following }: KnownSandbox) =>
+  !Predicate.isTagged(record, "Gone") && following?.recovery.phase === "reachable"
+    ? Option.some(following.recovery.client)
+    : Option.none()
 
 const expiresAtOf = (record: SandboxRecord | null) =>
   record === null || Predicate.isTagged(record, "Building") ? undefined : record.expiresAt
@@ -123,15 +138,15 @@ const goneRecord = (record: typeof Building.Type | typeof Ready.Type, now: DateT
   })
 
 interface HostLink {
-  connection: HostClient | null
   readonly position: JournalPosition
   readonly connectLock: Semaphore.Semaphore
+  readonly recordLock: Semaphore.Semaphore
 }
 
 const newLink = (saved: number): HostLink => ({
-  connection: null,
   position: { saved },
   connectLock: Semaphore.makeUnsafe(1),
+  recordLock: Semaphore.makeUnsafe(1),
 })
 
 const EXTEND_RETRY_SPACING = "1 minute"
@@ -207,7 +222,6 @@ export class Sandboxes extends Context.Service<
       const { sandboxProviders } = yield* Plugins
       const github = yield* GitHubClient
       const scope = yield* Scope.Scope
-      const sandboxFibers = yield* FiberMap.make<string>()
       const lost = yield* PubSub.unbounded<LostAgentIds>()
 
       const stored = yield* sql`
@@ -216,7 +230,7 @@ export class Sandboxes extends Context.Service<
       `.pipe(Effect.flatMap(decodeStored), Effect.orDie)
 
       const known = yield* SubscriptionRef.make<ReadonlyMap<string, KnownSandbox>>(
-        new Map(stored.map(({ id, sandbox }) => [id, { record: sandbox, reach: "connecting" }])),
+        new Map(stored.map(({ id, sandbox }) => [id, { record: sandbox, following: null }])),
       )
 
       const links = new Map(stored.map(({ id, journalSaved }) => [id, newLink(journalSaved)]))
@@ -252,8 +266,19 @@ export class Sandboxes extends Context.Service<
           ),
         )
 
-      const setReach = (agentId: string, reach: KnownSandbox["reach"]) =>
-        change(agentId, (before) => (before.reach === reach ? before : { ...before, reach }))
+      const recover = (
+        agentId: string,
+        opened: Following["opened"],
+        update: (before: Recovery<HostClient>) => Recovery<HostClient>,
+      ) =>
+        change(agentId, (before) =>
+          before.following?.opened === opened && !Predicate.isTagged(before.record, "Gone")
+            ? {
+                ...before,
+                following: { ...before.following, recovery: update(before.following.recovery) },
+              }
+            : before,
+        )
 
       const setRecord = (agentId: string, record: SandboxRecord | null) =>
         change(agentId, (before) => ({ ...before, record }))
@@ -269,7 +294,15 @@ export class Sandboxes extends Context.Service<
         )
 
       const save = (agentId: string, record: SandboxRecord | null) =>
-        persist(agentId, record).pipe(Effect.andThen(setRecord(agentId, record)))
+        linkOf(agentId).recordLock.withPermits(1)(
+          Effect.gen(function* () {
+            if (record !== null && Predicate.isTagged((yield* knownOf(agentId)).record, "Gone"))
+              return
+
+            yield* persist(agentId, record)
+            yield* setRecord(agentId, record)
+          }).pipe(Effect.uninterruptible),
+        )
 
       const becomeGone = (agentId: string) =>
         Effect.gen(function* () {
@@ -282,7 +315,7 @@ export class Sandboxes extends Context.Service<
           yield* Effect.logWarning(`An Agent's Sandbox was ${gone.reason}`, agentId)
           yield* persist(agentId, gone).pipe(Effect.ignore)
           yield* setRecord(agentId, gone)
-        })
+        }).pipe(linkOf(agentId).recordLock.withPermits(1), Effect.uninterruptible)
 
       const refuseIfGone = (agentId: string) =>
         knownOf(agentId).pipe(
@@ -366,8 +399,6 @@ export class Sandboxes extends Context.Service<
 
         const extendAhead = (agentId: string, extend: (state: SandboxState) => Promise<Date>) =>
           Effect.gen(function* () {
-            let last = expiresAtOf((yield* knownOf(agentId)).record)
-
             for (;;) {
               const { record } = yield* knownOf(agentId)
 
@@ -375,14 +406,17 @@ export class Sandboxes extends Context.Service<
 
               const expiresAt = yield* extendSandbox(provider, extend, record.state)
 
-              if (last !== undefined && !DateTime.isGreaterThan(expiresAt, last)) return
+              if (
+                record.expiresAt !== undefined &&
+                !DateTime.isGreaterThan(expiresAt, record.expiresAt)
+              )
+                return
 
               const { record: current } = yield* knownOf(agentId)
 
-              if (Predicate.isTagged(current, "Ready"))
-                yield* save(agentId, { ...current, expiresAt })
+              if (!Predicate.isTagged(current, "Ready")) return
 
-              last = expiresAt
+              yield* save(agentId, { ...current, expiresAt })
 
               const left =
                 DateTime.toEpochMillis(expiresAt) - DateTime.toEpochMillis(yield* DateTime.now)
@@ -416,38 +450,59 @@ export class Sandboxes extends Context.Service<
             if (provider.extend !== undefined)
               yield* extendAhead(agentId, provider.extend).pipe(Effect.forkChild)
 
-            return yield* reconnecting(
-              (connected) =>
-                Effect.gen(function* () {
-                  const client = yield* connectToHost(provider, record.state, record.token).pipe(
-                    Effect.provideService(Socket.WebSocketConstructor, webSocketConstructor),
-                  )
+            for (;;) {
+              const ended = yield* Effect.gen(function* () {
+                const client = yield* connectToHost(provider, record.state, record.token).pipe(
+                  Effect.provideService(Socket.WebSocketConstructor, webSocketConstructor),
+                )
 
-                  // Effect's socket client connects in the background; a first call shows the host
-                  // answered.
-                  yield* client.Acknowledge({ through: link.position.saved })
-                  yield* connected
+                // Effect's socket client connects in the background; a first call shows the host
+                // answered.
+                yield* client.Acknowledge({ through: link.position.saved })
+                yield* refuseIfGone(agentId)
+                yield* Effect.acquireRelease(
+                  recover(agentId, opened, () => ({ phase: "reachable", client })),
+                  () =>
+                    recover(agentId, opened, (before) =>
+                      before.phase === "reachable" && before.client === client
+                        ? { phase: "connecting", reach: "reachable" }
+                        : before,
+                    ),
+                )
+                yield* Deferred.succeed(opened, client)
+                yield* followJournal(transcripts.save, client, link.position)
+              }).pipe(Effect.scoped, Effect.result)
 
-                  yield* Effect.acquireRelease(
-                    Effect.sync(() => {
-                      link.connection = client
-                    }),
-                    () =>
-                      Effect.sync(() => {
-                        if (link.connection === client) link.connection = null
-                      }),
-                  )
-                  yield* setReach(agentId, "reachable")
-                  yield* Deferred.succeed(opened, client)
-                  yield* followJournal(transcripts.save, client, link.position)
-                }).pipe(Effect.scoped),
-              (error) =>
-                Effect.logWarning("Lost a Sandbox's agent host", error).pipe(
-                  Effect.andThen(Deferred.fail(opened, unreachable())),
-                  Effect.andThen(setReach(agentId, "unreachable")),
-                ),
-            )
+              if (Result.isSuccess(ended)) return yield* Effect.void
+
+              if (isSandboxGone(ended.failure)) return yield* Effect.fail(ended.failure)
+
+              const following = (yield* knownOf(agentId)).following
+
+              if (following?.opened !== opened) return yield* Effect.fail(ended.failure)
+
+              const next = missedConnection(following.recovery)
+
+              if (next.phase === "unreachable" && following.recovery.phase !== "unreachable") {
+                yield* Effect.logWarning("Lost a Sandbox's agent host", ended.failure)
+                yield* Deferred.fail(opened, unreachable())
+              }
+
+              yield* recover(agentId, opened, () => next)
+
+              if (next.phase !== "retrying" && next.phase !== "unreachable")
+                return yield* Effect.fail(ended.failure)
+
+              yield* Effect.sleep(next.delay)
+            }
           }).pipe(
+            Effect.raceFirst(
+              SubscriptionRef.changes(known).pipe(
+                Stream.filter((all) => Predicate.isTagged(all.get(agentId)?.record, "Gone")),
+                Stream.runHead,
+                Effect.andThen(Effect.fail(new SandboxGone())),
+              ),
+            ),
             Effect.catch((error) =>
               isSandboxGone(error)
                 ? becomeGone(agentId).pipe(Effect.andThen(Deferred.fail(opened, error)))
@@ -457,23 +512,51 @@ export class Sandboxes extends Context.Service<
                   ),
             ),
             Effect.ensuring(Deferred.fail(opened, unreachable())),
+            Effect.asVoid,
           )
 
         const connect = (agentId: string, placed: PlacedAgent | null) => {
           const link = linkOf(agentId)
 
           return link.connectLock.withPermits(1)(
-            Effect.gen(function* () {
-              if (link.connection !== null) return link.connection
+            Effect.uninterruptibleMask((restore) =>
+              Effect.gen(function* () {
+                const found = yield* knownOf(agentId)
+                const client = clientOf(found)
 
-              if (Predicate.isTagged((yield* knownOf(agentId)).record, "Gone"))
-                return yield* new SandboxGone()
+                if (Option.isSome(client)) return client.value
 
-              const opened = yield* Deferred.make<HostClient, AgentError | SandboxGone>()
-              yield* FiberMap.run(sandboxFibers, agentId, follow(agentId, placed, opened))
+                if (Predicate.isTagged(found.record, "Gone")) return yield* new SandboxGone()
 
-              return yield* Deferred.await(opened)
-            }),
+                if (found.following !== null) yield* Fiber.interrupt(found.following.fiber)
+
+                const opened = yield* Deferred.make<HostClient, AgentError | SandboxGone>()
+                const ready = yield* Deferred.make<void>()
+
+                const fiber = yield* Deferred.await(ready).pipe(
+                  Effect.andThen(follow(agentId, placed, opened)),
+                  Effect.forkIn(scope, { uninterruptible: false }),
+                )
+
+                yield* change(agentId, (before) => ({
+                  ...before,
+                  following: {
+                    recovery: {
+                      phase: "connecting",
+                      reach:
+                        before.following === null
+                          ? "connecting"
+                          : recoveryReach(before.following.recovery),
+                    },
+                    opened,
+                    fiber,
+                  },
+                }))
+                yield* Deferred.succeed(ready, undefined)
+
+                return yield* restore(Deferred.await(opened))
+              }),
+            ),
           )
         }
 
@@ -525,8 +608,7 @@ export class Sandboxes extends Context.Service<
                 refuseIfGone(placed.agent.id).pipe(Effect.andThen(Effect.fail(unreachable()))),
               ),
             ),
-          runningHost: ({ agent }) =>
-            Effect.sync(() => Option.fromNullishOr(links.get(agent.id)?.connection)),
+          runningHost: ({ agent }) => knownOf(agent.id).pipe(Effect.map(clientOf)),
           hostOnceMade: ({ agent }) =>
             knownOf(agent.id).pipe(
               Effect.flatMap(({ record }) =>
@@ -541,7 +623,9 @@ export class Sandboxes extends Context.Service<
           baseRef: ({ agent }) => Effect.succeed(`refs/remotes/origin/${agent.baseBranch}`),
           remove: ({ agent }) =>
             Effect.gen(function* () {
-              yield* FiberMap.remove(sandboxFibers, agent.id)
+              const { following } = yield* knownOf(agent.id)
+
+              if (following !== null) yield* Fiber.interrupt(following.fiber)
 
               const { record } = yield* knownOf(agent.id)
 

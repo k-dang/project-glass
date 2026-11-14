@@ -1,65 +1,75 @@
 import { assert, it } from "@effect/vitest"
-import { Clock, Effect, Exit, Fiber } from "effect"
-import { TestClock } from "effect/testing"
-import { reconnecting } from "./reconnecting"
-import { SandboxGone } from "./sandboxFailures"
+import { Duration } from "effect"
+import { missedConnection, type Recovery, recoveryReach } from "./reconnecting"
 
-const minutes = (millis: number) => millis / 60_000
+it("reports loss on the fourth miss, after three quick retries", () => {
+  let state: Recovery<string> = { phase: "connecting", reach: "connecting" }
 
-it.effect("tries a lost Sandbox ever less often, and gives up after 15 minutes", () =>
-  Effect.gen(function* () {
-    const tries: Array<number> = []
-    let lost = 0
+  for (let miss = 1; miss <= 3; miss += 1) {
+    state = missedConnection(state)
+    assert.equal(state.phase, "retrying")
+    assert.equal(recoveryReach(state), "connecting")
 
-    const running = yield* reconnecting(
-      () =>
-        Clock.currentTimeMillis.pipe(
-          Effect.flatMap((now) => Effect.fail(`refused ${tries.push(now)}`)),
-        ),
-      () =>
-        Effect.sync(() => {
-          lost += 1
-        }),
-    ).pipe(Effect.forkChild)
+    if (state.phase === "retrying") {
+      assert.equal(state.misses, miss)
+      assert.equal(Duration.toMillis(state.delay), 500)
+    }
+  }
 
-    yield* TestClock.adjust("1 hour")
+  state = missedConnection(state)
+  assert.equal(state.phase, "unreachable")
+  assert.equal(recoveryReach(state), "unreachable")
 
-    assert.isTrue(Exit.isFailure(yield* Fiber.await(running)))
-    assert.equal(lost, 1)
+  if (state.phase === "unreachable") {
+    assert.equal(state.misses, 4)
+    assert.equal(Duration.toSeconds(state.delay), 5)
+  }
+})
 
-    const gaps = tries.slice(1).map((at, index) => at - tries[index]!)
-    assert.deepStrictEqual(gaps.slice(0, 5), [500, 500, 500, 5_000, 10_000])
-    assert.isAtMost(Math.max(...gaps), 5 * 60_000)
+it("backs off to five-minute retries and abandons recovery after its retry budget", () => {
+  let state: Recovery<string> = { phase: "connecting", reach: "connecting" }
+  const delays: Array<number> = []
 
-    const lostAt = tries[3]!
-    const lastTry = tries.at(-1)!
-    assert.isAtLeast(minutes(lastTry - lostAt), 15)
-    assert.isBelow(minutes(lastTry - lostAt), 20)
-  }),
-)
+  for (let miss = 0; miss < 20 && state.phase !== "abandoned"; miss += 1) {
+    state = missedConnection(state)
 
-it.effect("keeps trying a Sandbox that answers each time, and stops once it's gone", () =>
-  Effect.gen(function* () {
-    let tries = 0
-    let lost = 0
+    if (state.phase === "retrying" || state.phase === "unreachable")
+      delays.push(Duration.toMillis(state.delay))
+  }
 
-    const running = yield* reconnecting(
-      (connected) =>
-        connected.pipe(
-          Effect.andThen(
-            Effect.suspend(() => Effect.fail(++tries > 1000 ? new SandboxGone() : "dropped")),
-          ),
-        ),
-      () =>
-        Effect.sync(() => {
-          lost += 1
-        }),
-    ).pipe(Effect.forkChild)
+  assert.deepStrictEqual(
+    delays,
+    [500, 500, 500, 5_000, 10_000, 20_000, 40_000, 80_000, 160_000, 300_000, 300_000],
+  )
+  assert.equal(state.phase, "abandoned")
+  assert.equal(recoveryReach(state), "unreachable")
+  assert.strictEqual(missedConnection(state), state)
+})
 
-    yield* TestClock.adjust("1 day")
+it("a successful connection starts a fresh retry budget, keeping reach until the fourth miss", () => {
+  let state: Recovery<string> = { phase: "connecting", reach: "connecting" }
 
-    assert.instanceOf(yield* Fiber.join(running).pipe(Effect.flip), SandboxGone)
-    assert.equal(lost, 0)
-    assert.equal(tries, 1001)
-  }),
-)
+  for (let miss = 0; miss < 9; miss += 1) state = missedConnection(state)
+  assert.equal(state.phase, "unreachable")
+
+  state = { phase: "reachable", client: "host" }
+
+  for (let miss = 1; miss <= 3; miss += 1) {
+    state = missedConnection(state)
+    assert.equal(state.phase, "retrying")
+    assert.equal(recoveryReach(state), "reachable")
+
+    if (state.phase === "retrying") {
+      assert.equal(state.misses, miss)
+      assert.equal(Duration.toMillis(state.delay), 500)
+    }
+  }
+
+  state = missedConnection(state)
+  assert.equal(state.phase, "unreachable")
+
+  if (state.phase === "unreachable") {
+    assert.equal(state.misses, 4)
+    assert.equal(Duration.toSeconds(state.lostFor), 5)
+  }
+})
