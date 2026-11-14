@@ -97,7 +97,10 @@ export function AgentsLayout() {
         hidden={!panelOpen}
         className="flex w-64 shrink-0 flex-col gap-4 border-r px-3 py-4"
       >
-        <h1 className="flex h-7 items-center pl-2 text-sm font-semibold">Agents</h1>
+        <div className="flex items-center justify-between pl-2">
+          <h1 className="text-sm font-semibold">Agents</h1>
+          <NewAgentLink />
+        </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
           <AgentList />
         </div>
@@ -138,7 +141,7 @@ export function AgentsPanelToggle() {
   )
 }
 
-export function NewAgentLink() {
+function NewAgentLink() {
   return (
     <TooltipHint
       content={
