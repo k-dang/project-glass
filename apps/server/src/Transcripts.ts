@@ -159,7 +159,7 @@ const decodePositions = Schema.decodeUnknownEffect(
 interface Published {
   readonly agentId: string
   readonly update: TranscriptUpdate
-  readonly reported?: true
+  readonly reported?: boolean
 }
 
 export interface WaitingRequest {
@@ -541,7 +541,7 @@ export class Transcripts extends Context.Service<
         lockFor(agentId).withPermits(1)(
           Effect.gen(function* () {
             const [decided, decidedUpdates, reported = []] = yield* sql.withTransaction(effect)
-            const updates = [...reported, ...decidedUpdates]
+            const updates: ReadonlyArray<TranscriptUpdate> = [...reported, ...decidedUpdates]
 
             if (updates.some(changesRequest))
               yield* markWaiting(
@@ -551,10 +551,14 @@ export class Transcripts extends Context.Service<
 
             if (updates.some(startsOrEndsTurn)) yield* refreshUnseen(agentId)
 
-            yield* PubSub.publishAll(published, [
-              ...reported.map((update) => ({ agentId, update, reported: true as const })),
-              ...decidedUpdates.map((update) => ({ agentId, update })),
-            ])
+            yield* PubSub.publishAll(
+              published,
+              updates.map((update, index) => ({
+                agentId,
+                update,
+                reported: index < reported.length,
+              })),
+            )
 
             return decided
           }),
@@ -831,7 +835,7 @@ export class Transcripts extends Context.Service<
           Effect.map((live) =>
             Stream.fromSubscription(live).pipe(
               Stream.flatMap(({ agentId, update, reported }) =>
-                Predicate.isTagged(update, "TurnStarted") && reported === undefined
+                Predicate.isTagged(update, "TurnStarted") && !reported
                   ? Stream.succeed({ ...update, agentId })
                   : Stream.empty,
               ),

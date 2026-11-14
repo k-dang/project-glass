@@ -246,15 +246,9 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
   Input.$match(input, {
     Event: ({ event }) => {
       if (state === null && event.type === "agent_start") {
-        state = beginTurn(randomUUID(), { message: "", images: [], context: null }, now)
-        events.push(
-          TurnStarted.make({
-            turnId: state.turn.id,
-            ...withContextOf(state.turn),
-            feedback: [],
-            sentAt: now,
-          }),
-        )
+        const unprompted = { message: "", images: [], context: null }
+        state = beginTurn(randomUUID(), unprompted, now)
+        emit(TurnStarted.make({ turnId: state.turn.id, ...unprompted, feedback: [], sentAt: now }))
       }
 
       if (event.type === "extension_ui_request" && dialogMethods.has(event.method)) {
