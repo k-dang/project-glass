@@ -45,12 +45,10 @@ interface LiveAgent {
 export class OutsideAgents extends Context.Service<
   OutsideAgents,
   {
-    /** Approves an app under `name` for `OUTSIDE_AGENT_TTL` and returns its bearer. */
     readonly issue: (name: string) => Effect.Effect<Redacted.Redacted>
     readonly authenticate: (
       bearer: Redacted.Redacted,
     ) => Effect.Effect<Option.Option<McpCredential>>
-    /** The connected outside agents, again whenever one connects or is disconnected. */
     readonly watch: () => Stream.Stream<ReadonlyArray<OutsideAgent>>
     readonly revoke: (id: string) => Effect.Effect<void, OutsideAgentNotFound>
   }

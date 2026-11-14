@@ -22,7 +22,6 @@ import {
 } from "effect"
 import { randomUUID } from "node:crypto"
 
-/** The default wait, and the longest a caller may ask Glass to wait. */
 export const ASK_TIMEOUT_SECONDS = 10 * 60
 
 /**
@@ -38,11 +37,9 @@ export class OutsideQuestionAlreadyWaiting extends Schema.TaggedError<OutsideQue
 
 interface Pending {
   readonly question: OutsideQuestion
-  /** The MCP session that asked. It may have one question waiting at a time. */
   readonly session: string
   readonly slot: Deferred.Deferred<AskUserResult>
-  /** Completes once `ask` has a result, so shutdown can finish the response before the server closes. */
-  readonly finished: Deferred.Deferred<void>
+  readonly settled: Deferred.Deferred<void>
 }
 
 const timedOut = AskUserTimedOut.make({})
@@ -67,7 +64,6 @@ export class OutsideQuestions extends Context.Service<
       answer: OutsideQuestionAnswer,
     ) => Effect.Effect<void, OutsideQuestionNotWaiting>
     readonly watch: () => Stream.Stream<ReadonlyArray<OutsideQuestion>>
-    /** Answers every waiting caller with Cancelled and waits until each call has its result. */
     readonly cancelAll: () => Effect.Effect<void>
   }
 >()("@glass/server/OutsideQuestions") {
@@ -100,7 +96,7 @@ export class OutsideQuestions extends Context.Service<
           discard: true,
           concurrency: "unbounded",
         })
-        yield* Effect.forEach(items, (item) => Deferred.await(item.finished), {
+        yield* Effect.forEach(items, (item) => Deferred.await(item.settled), {
           discard: true,
           concurrency: "unbounded",
         })
@@ -116,7 +112,7 @@ export class OutsideQuestions extends Context.Service<
         Effect.scoped(
           Effect.gen(function* () {
             const slot = yield* Deferred.make<AskUserResult>()
-            const finished = yield* Deferred.make<void>()
+            const settled = yield* Deferred.make<void>()
 
             const question = OutsideQuestion.make({
               id: randomUUID(),
@@ -131,7 +127,7 @@ export class OutsideQuestions extends Context.Service<
                 ? ([false, items] as const)
                 : ([
                     true,
-                    [...items, { question, session: input.session, slot, finished }],
+                    [...items, { question, session: input.session, slot, settled }],
                   ] as const),
             )
 
@@ -143,7 +139,7 @@ export class OutsideQuestions extends Context.Service<
 
             return yield* Deferred.await(slot).pipe(
               Effect.onInterrupt(() => settle(question.id, cancelled)),
-              Effect.ensuring(Deferred.succeed(finished, undefined).pipe(Effect.ignore)),
+              Effect.ensuring(Deferred.succeed(settled, undefined).pipe(Effect.ignore)),
             )
           }),
         )

@@ -290,7 +290,6 @@ export const piAdapter = (command: string) =>
           ),
         )
 
-        // One inbox keeps pi's events ahead of the answers to requests pi wrote after them.
         const inbox = yield* Queue.unbounded<Input, Cause.Done>()
         const dialogs = new Map<string, { readonly method: string; readonly part: RequestPart }>()
 

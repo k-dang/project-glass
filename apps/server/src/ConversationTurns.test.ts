@@ -31,7 +31,7 @@ const decodeLine = Schema.decodeUnknownSync(Schema.fromJsonString(UnitLine))
 
 const sent = (message: string) => ({ message, images: [], context: null })
 
-const harness = (start: Conversation["start"]) =>
+const harness = (ensureStarted: Conversation["ensureStarted"]) =>
   Effect.gen(function* () {
     const turns = yield* ConversationTurns
     const transcripts = yield* Transcripts
@@ -42,7 +42,7 @@ const harness = (start: Conversation["start"]) =>
 
     const conversation: Conversation = {
       id: "agent-1",
-      start,
+      ensureStarted,
       settings: { model: null, effort: null, permissionMode: null },
       host: Effect.succeed(client),
       runningHost: Effect.succeedNone,

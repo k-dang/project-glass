@@ -349,7 +349,6 @@ const minWidth = 320
 
 const widthStep = 32
 
-/** The width the user last dragged the Agent review panel to, kept across PR workspaces. */
 const panelWidthAtom = Atom.make(480).pipe(Atom.keepAlive)
 
 const maxWidth = () => Math.max(minWidth, Math.round(window.innerWidth * 0.6))
@@ -399,10 +398,6 @@ function ResizeHandle(props: { width: number; onResize: (width: number) => void 
   )
 }
 
-/**
- * The Agent review beside the diff, on its right, at a width the user can drag. Its content comes
- * in as `children`, so a drag re-renders only the frame, not the transcript and composer.
- */
 export function AgentReviewSidePanel(props: { onClose: () => void; children: ReactNode }) {
   const [stored, setWidth] = useAtom(panelWidthAtom)
   const width = clampWidth(stored)

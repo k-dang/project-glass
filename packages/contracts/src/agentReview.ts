@@ -34,7 +34,6 @@ export const acceptedSuggestedDraftOf = (call: typeof ToolCallPart.Type): Sugges
     ? Option.getOrNull(decodeSuggestedDraft(call.input))
     : null
 
-/** Saved Agent reviews hold these kinds, so removing or renaming one needs a data migration. */
 export const RiskKind = Schema.Literals([
   "data-access",
   "migration",
@@ -67,9 +66,7 @@ export const AgentReview = Schema.Struct({
   hotspots: Schema.Array(Hotspot),
   lowAttention: Schema.Array(LowAttentionFile),
   agentId: Schema.NullOr(Schema.String),
-  /** The user marked it done in the Inbox; writing it again clears this. */
   done: Schema.Boolean,
-  /** The Global conversation reported it to the user; writing it again clears this. */
   reported: Schema.Boolean,
 })
 

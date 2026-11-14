@@ -395,7 +395,7 @@ export class Agents extends Context.Service<
 
         return {
           id,
-          start: (client) =>
+          ensureStarted: (client) =>
             Effect.all([role, skillsOf(row.agent)], { concurrency: "unbounded" }).pipe(
               Effect.flatMap(([started, skills]) =>
                 client.StartAgent({

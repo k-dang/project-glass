@@ -23,7 +23,6 @@ export const Reaction = Schema.Literals([
 
 export type Reaction = typeof Reaction.Type
 
-/** One Reaction on a comment that at least one person gave. */
 export class ReactionGroup extends Schema.Class<ReactionGroup>("ReactionGroup")({
   reaction: Reaction,
   count: Schema.Int,

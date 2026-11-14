@@ -8,15 +8,10 @@ export type WriteFeedback<Input> =
   | { readonly type: "failed"; readonly input: Input; readonly problem: Problem }
 
 export interface WriteView<Input, Value> {
-  /** What GitHub last answered, until the workspace reloads with fresher data. */
   readonly confirmed: Value | undefined
   readonly feedback: WriteFeedback<Input> | null
 }
 
-/**
- * Writes that publish to GitHub right away, one at a time per id (a Discussion or a comment).
- * Reload locks them and waits for those in flight, so the fresh workspace includes them.
- */
 export const createKeyedWrites = <Input, Value, E extends BackendError>(
   registry: AtomRegistry.AtomRegistry,
   write: (id: string, input: Input) => Effect.Effect<Value, E, Backend>,

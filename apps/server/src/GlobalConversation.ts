@@ -143,8 +143,6 @@ export class GlobalConversation extends Context.Service<
 
       yield* fs.makeDirectory(folder, { recursive: true }).pipe(Effect.orDie)
 
-      // Each start of pi gets a fresh credential, revoked when it is replaced, when Start fresh
-      // stops pi, and with the host's lifetime when the host stops.
       const starting = yield* Semaphore.make(1)
       let runningCredential: Scope.Closeable | null = null
 
@@ -180,7 +178,7 @@ export class GlobalConversation extends Context.Service<
               .StartAgent({ agentId: sessionId, engine: "pi", folder, role, skills: [] })
               .pipe(Effect.onError(() => revoke))
 
-            yield* started ? replaceRunning(credential) : revoke
+            yield* started === "started" ? replaceRunning(credential) : revoke
           }),
         )
 
@@ -206,7 +204,7 @@ export class GlobalConversation extends Context.Service<
         SubscriptionRef.get(model).pipe(
           Effect.map((choice): Conversation => ({
             id: sessionId,
-            start: start(sessionId),
+            ensureStarted: start(sessionId),
             settings: { ...choice, permissionMode: null },
             host: host.client,
             runningHost: host.running,

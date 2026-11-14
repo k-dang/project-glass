@@ -142,10 +142,7 @@ export class Checkouts extends Context.Service<
         )
       })
 
-      // `files` becomes a repository of its own: HEAD is the Revision's head, its objects come
-      // from the shared clone, and the clone already holds every blob `git diff base...HEAD`
-      // reads, so an agent can explore the change with git without a token or the network.
-      const fill = Effect.fnUntraced(function* (
+      const checkoutFromSharedClone = Effect.fnUntraced(function* (
         pr: PullRequestRef,
         revision: Revision,
         files: string,
@@ -197,8 +194,13 @@ export class Checkouts extends Context.Service<
               GIT_INDEX_FILE: join(gitDirectory, "index"),
             },
           )
-          // Only for its side effect: fetches the base blobs the diff reads, in one batch.
-          yield* git(["--git-dir", clone, "diff", "--numstat", `${revision.base}...${head}`], env)
+
+          const prefetchDiffBlobs = git(
+            ["--git-dir", clone, "diff", "--numstat", `${revision.base}...${head}`],
+            env,
+          )
+
+          yield* prefetchDiffBlobs
 
           return yield* git(
             ["--git-dir", gitDirectory, "update-ref", "--no-deref", "HEAD", head],
@@ -220,7 +222,7 @@ export class Checkouts extends Context.Service<
         const directory = yield* fs.makeTempDirectoryScoped({ prefix: "glass-checkout-" })
         const files = join(directory, pr.repo)
 
-        yield* fill(pr, revision, files)
+        yield* checkoutFromSharedClone(pr, revision, files)
 
         return files
       }, storageFailure)
@@ -231,7 +233,7 @@ export class Checkouts extends Context.Service<
         folder: string,
       ) {
         yield* fs.makeDirectory(dirname(folder), { recursive: true })
-        yield* fill(pr, revision, folder).pipe(
+        yield* checkoutFromSharedClone(pr, revision, folder).pipe(
           Effect.onError(() =>
             fs.remove(folder, { recursive: true, force: true }).pipe(Effect.ignore),
           ),

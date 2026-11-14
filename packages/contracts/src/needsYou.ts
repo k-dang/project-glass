@@ -19,18 +19,12 @@ export type AgentReason = typeof AgentReason.Type
 
 export const AgentReviewFinished = Schema.TaggedStruct("AgentReviewFinished", {
   writtenAt: Schema.DateTimeUtcFromString,
-  /** The review's opening paragraph, as Markdown: its main risk, then what the change does. */
   lead: Schema.String,
 })
 
 export const ChangesRequested = Schema.TaggedStruct("ChangesRequested", {})
 
 export const ChecksFailing = Schema.TaggedStruct("ChecksFailing", {
-  /**
-   * The head commit's failed checks. The reason itself follows the checks' overall state, read on
-   * every PR list sync, while these come from the separate read of what the user's PRs wait on, so
-   * they can be empty or a sync behind.
-   */
   failing: Schema.Array(Check),
 })
 
@@ -64,19 +58,16 @@ export const PullRequestNeedsYou = Schema.TaggedStruct("PullRequest", {
 
 export type PullRequestNeedsYou = typeof PullRequestNeedsYou.Type
 
-/** One question from an agent outside Glass. It is one Needs you row until the user answers, or the wait ends. */
 export const OutsideQuestion = Schema.TaggedStruct("OutsideQuestion", {
   id: Schema.String,
   question: Schema.String,
   choices: Schema.Array(Schema.String),
-  /** The name the user approved the outside agent under, such as Claude Code. */
   askedBy: Schema.String,
   since: Schema.DateTimeUtcFromString,
 })
 
 export type OutsideQuestion = typeof OutsideQuestion.Type
 
-/** The Global conversation waiting on the user's answer, which they give in the conversation. */
 export const GlobalConversationNeedsYou = Schema.TaggedStruct("GlobalConversation", {
   requests: WaitingRequestParts,
   since: Schema.DateTimeUtcFromString,
@@ -125,7 +116,6 @@ export type NeedsYouItem = typeof NeedsYouItem.Type
 
 export const NeedsYou = Schema.Array(NeedsYouItem)
 
-/** Why an item waits, as the Inbox groups it, in the order the Inbox shows the groups. */
 export const needsYouGroups = ["stopped", "reviews", "mine", "finished"] as const
 
 export type NeedsYouGroup = (typeof needsYouGroups)[number]

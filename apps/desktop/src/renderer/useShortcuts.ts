@@ -6,7 +6,6 @@ interface Shortcut {
   readonly allowShift?: boolean
   readonly allowInEditable?: boolean
   readonly allowInDialog?: boolean
-  /** Runs again while the key is held, for keys that step through something. */
   readonly allowRepeat?: boolean
   readonly run: () => void
 }

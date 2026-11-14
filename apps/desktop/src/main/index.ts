@@ -135,10 +135,8 @@ const glassHome = process.env["GLASS_HOME"] || homedir()
 
 const logFile = join(glassHome, ".glass", "logs", "backend.log")
 
-// The backend keeps its data here; main passes it as GLASS_DATA_DIRECTORY.
 const dataDirectory = join(glassHome, ".project-glass")
 
-// Dogfood reports live beside Glass's data, never in a repository.
 const dogfoodReports = dogfoodReportWriter(join(dataDirectory, "dogfood-reports"))
 
 const glassCommit = () =>

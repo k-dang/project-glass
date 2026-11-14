@@ -3,7 +3,7 @@ import { createServer } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vite-plus/test"
-import { choosePort } from "./backendPort"
+import { lastBoundPortOrFree } from "./backendPort"
 
 const hold = (port: number) =>
   new Promise<ReturnType<typeof createServer>>((resolve, reject) => {
@@ -13,13 +13,13 @@ const hold = (port: number) =>
     server.listen(port, "127.0.0.1", () => resolve(server))
   })
 
-describe("choosePort", () => {
+describe("lastBoundPortOrFree", () => {
   it("reuses the port it wrote", async () => {
     const directory = await mkdtemp(join(tmpdir(), "glass-port-"))
 
     try {
-      const first = await choosePort(directory)
-      const second = await choosePort(directory)
+      const first = await lastBoundPortOrFree(directory)
+      const second = await lastBoundPortOrFree(directory)
 
       expect(second).toBe(first)
     } finally {
@@ -29,11 +29,11 @@ describe("choosePort", () => {
 
   it("picks another port when the remembered one is taken", async () => {
     const directory = await mkdtemp(join(tmpdir(), "glass-port-"))
-    const first = await choosePort(directory)
+    const first = await lastBoundPortOrFree(directory)
     const taken = await hold(first)
 
     try {
-      const second = await choosePort(directory)
+      const second = await lastBoundPortOrFree(directory)
 
       expect(second).not.toBe(first)
     } finally {

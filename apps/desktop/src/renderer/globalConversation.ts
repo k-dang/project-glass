@@ -49,7 +49,6 @@ export const startGlobalFreshAtom = backendRuntime.fn((_: void, get) =>
   ),
 )
 
-/** The PR workspace or Agent the current route shows, which the router keeps up to date. */
 export type Viewed = Data.TaggedEnum<{
   PullRequest: { readonly ref: PullRequestRef }
   Agent: { readonly agentId: string }
@@ -59,7 +58,6 @@ export const Viewed = Data.taggedEnum<Viewed>()
 
 export const viewedAtom = Atom.make<Viewed | null>(null).pipe(Atom.keepAlive)
 
-/** What a message sent now carries: the PR at the Revision on screen, or the Agent on screen. */
 export const capturedContextAtom = Atom.make((get): CapturedContext | null => {
   const viewed = get(viewedAtom)
 

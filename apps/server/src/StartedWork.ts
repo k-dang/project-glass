@@ -149,16 +149,15 @@ const saved = (what: string) => (statement: Effect.Effect<unknown, unknown>) =>
 export class StartedWork extends Context.Service<
   StartedWork,
   {
-    /** `since` is when the conversation acted, so only outcomes from then on are reported. */
     readonly linkAgent: (
       caller: ConversationIds,
       agentId: string,
-      since: DateTime.Utc,
+      actedAt: DateTime.Utc,
     ) => Effect.Effect<void, AgentError>
     readonly startedAgentReview: (
       caller: ConversationIds,
       pullRequest: PullRequestRef,
-      since: DateTime.Utc,
+      actedAt: DateTime.Utc,
     ) => Effect.Effect<void, AgentError>
     readonly list: (
       conversationId: string,
@@ -226,10 +225,10 @@ export class StartedWork extends Context.Service<
       const changedRows = SubscriptionRef.update(recorded, (count) => count + 1)
 
       return StartedWork.of({
-        linkAgent: ({ conversationId, sessionId }, agentId, since) =>
+        linkAgent: ({ conversationId, sessionId }, agentId, actedAt) =>
           Effect.gen(function* () {
             const askedWith = yield* transcripts.runningMessage(sessionId)
-            const startedAt = DateTime.formatIso(since)
+            const startedAt = DateTime.formatIso(actedAt)
 
             yield* sql`
               INSERT INTO conversation_agent (conversation_id, agent_id, asked_with, started_at)
@@ -238,10 +237,10 @@ export class StartedWork extends Context.Service<
             `.pipe(saved("a started Agent"))
             yield* changedRows
           }),
-        startedAgentReview: ({ conversationId, sessionId }, { owner, repo, number }, since) =>
+        startedAgentReview: ({ conversationId, sessionId }, { owner, repo, number }, actedAt) =>
           Effect.gen(function* () {
             const askedWith = yield* transcripts.runningMessage(sessionId)
-            const startedAt = DateTime.formatIso(since)
+            const startedAt = DateTime.formatIso(actedAt)
 
             yield* sql`
               INSERT INTO conversation_agent_review

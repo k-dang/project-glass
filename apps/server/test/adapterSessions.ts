@@ -177,10 +177,6 @@ const WaitForRelease = Tool.make("wait_for_release", {
 
 const ReleaseTools = Toolkit.make(WaitForRelease)
 
-/**
- * A backend serving Glass's tools, with one To-do and one PR, beside a tool that waits until the
- * test stops the Turn calling it. Its endpoint and credential reach recordings only by placeholder.
- */
 export const glassToolsBackend = Effect.fnUntraced(function* (sessionId: string) {
   const github = yield* startFakeGitHub()
 
@@ -220,7 +216,6 @@ export const glassToolsBackend = Effect.fnUntraced(function* (sessionId: string)
     ),
   )
 
-  // The backend's home would hide the user's own logins from a session that records.
   const homes = ["HOME", "USERPROFILE", "PI_CODING_AGENT_DIR"].map(
     (name) => [name, process.env[name]] as const,
   )

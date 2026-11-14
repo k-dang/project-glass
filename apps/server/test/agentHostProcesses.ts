@@ -27,6 +27,5 @@ export const childProcesses = (parent: number, command: string) =>
     .filter((child) => child.ppid === parent && child.command.includes(command))
     .map((child) => child.pid)
 
-/** The scripted agent host the backend started since `before` was listed. */
 export const startedHost = (before: ReadonlyArray<number>) =>
   childProcesses(process.pid, "scriptedAgentHost.mjs").find((pid) => !before.includes(pid))

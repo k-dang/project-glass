@@ -14,6 +14,7 @@ import { writeSentSkills } from "./sentSkills"
 import {
   type AgentRole,
   type ConversationStart,
+  type StartOutcome,
   HostAgentError,
   type SkillSource,
   type SteersNotTakenIn,
@@ -43,7 +44,7 @@ export class HostAgents extends Context.Service<
       folder: string,
       skills: ReadonlyArray<SkillSource>,
     ) => Effect.Effect<ReadonlyArray<AgentCommand>, HostAgentError>
-    readonly start: (start: ConversationStart) => Effect.Effect<boolean, HostAgentError>
+    readonly start: (start: ConversationStart) => Effect.Effect<StartOutcome, HostAgentError>
     readonly startTurn: (
       agentId: string,
       turnId: string,
@@ -82,7 +83,8 @@ export class HostAgents extends Context.Service<
             const { agentId, folder } = starting
             const current = running.get(agentId)
 
-            if (current !== undefined && !(yield* current.session.stopped)) return false
+            if (current !== undefined && !(yield* current.session.stopped))
+              return "alreadyRunning" as const
 
             const scope = yield* Scope.fork(hostScope)
             const report = (event: AgentEvent) => journal.append(agentId, event)
@@ -132,7 +134,7 @@ export class HostAgents extends Context.Service<
               Effect.forkIn(scope),
             )
 
-            return true
+            return "started" as const
           },
           (effect) => lock.withPermits(1)(effect),
         )

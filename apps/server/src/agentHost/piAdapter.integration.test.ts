@@ -542,7 +542,6 @@ it.live(
 const toolContent = ({ content }: FakeModelRequest["messages"][number]) =>
   Predicate.isString(content) ? content : (content ?? []).map(({ text }) => text ?? "").join("")
 
-/** Calls the tool a message names, then repeats what the tool returned. */
 const globalReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
   const last = input.messages.at(-1)
 
@@ -637,7 +636,6 @@ it.live("stops the Global conversation's Turn while a Glass tool runs, cancellin
 
     yield* agent.send("Wait for release.")
 
-    // Replayed, pi calls no endpoint, so only its own report shows the call.
     if (recordingSessions) yield* glass.waitStarted
     else yield* f.until(runningTool("wait_for_release"))
 

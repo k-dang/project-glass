@@ -85,7 +85,6 @@ const endingOf = (result: SDKResultMessage): TurnEnding => {
         "Claude Code couldn't sign in. Run claude in a terminal to sign in, then send your message again.",
     })
 
-  // A Sandbox's agent host logs where the user can't read, so the Turn carries Claude Code's words.
   const words = said.trim()
 
   return TurnFailed.make({
