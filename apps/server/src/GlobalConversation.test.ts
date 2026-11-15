@@ -30,12 +30,14 @@ import {
   Scope,
   Stream,
 } from "effect"
+import { RpcTest } from "effect/rpc"
 import { SqlClient } from "effect/sql"
 import { TestClock } from "effect/testing"
 import { existsSync, mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { watchDeadlines } from "../test/deadlines"
+import { AgentHostRpcs } from "./agentHost/protocol"
 import type { HostClient } from "./Placement"
 import { ConversationTurns } from "./ConversationTurns"
 import { GlobalConversation } from "./GlobalConversation"
@@ -292,13 +294,42 @@ const holdHost = (entered: Deferred.Deferred<void>, release: Deferred.Deferred<v
     yield* Deferred.await(release)
   })
 
-const openGlobal = (client: HostClient) => {
+const stallableHost = (calls: {
+  readonly startTurn: () => Effect.Effect<void>
+  readonly stopTurn: () => Effect.Effect<null>
+}) =>
+  RpcTest.makeClient(AgentHostRpcs).pipe(
+    Effect.provide(
+      AgentHostRpcs.toLayer(
+        Effect.succeed(
+          AgentHostRpcs.of({
+            ListModels: () => Effect.die("This test does not call ListModels"),
+            ListCommands: () => Effect.die("This test does not call ListCommands"),
+            StartAgent: () => Effect.succeed("started" as const),
+            StartTurn: () => calls.startTurn(),
+            AnswerRequest: () => Effect.die("This test does not call AnswerRequest"),
+            Steer: () => Effect.die("This test does not call Steer"),
+            StopTurn: () => calls.stopTurn(),
+            StopAgent: () => Effect.void,
+            GetChanges: () => Effect.die("This test does not call GetChanges"),
+            HasUncommittedChanges: () =>
+              Effect.die("This test does not call HasUncommittedChanges"),
+            ListFiles: () => Effect.die("This test does not call ListFiles"),
+            WatchJournal: () => Stream.die("This test does not call WatchJournal"),
+            Acknowledge: () => Effect.die("This test does not call Acknowledge"),
+          }),
+        ),
+      ),
+    ),
+  )
+
+const openGlobal = (client: HostClient, scope: Scope.Scope) => {
   const home = mkdtempSync(join(tmpdir(), "glass-host-"))
 
   const host = LocalAgentHost.of({
     client: Effect.succeed(client),
     running: Effect.succeed(Option.some(client)),
-    lifetimeOf: () => Scope.Scope.pipe(Effect.map((scope) => Option.some(scope))),
+    lifetimeOf: () => Effect.succeed(Option.some(scope)),
     subscribeStopped: Effect.succeed(Stream.empty),
   })
 
@@ -335,67 +366,60 @@ const openGlobal = (client: HostClient) => {
     Layer.provideMerge(SqliteClient.layer({ filename: ":memory:" })),
   )
 
-  return { home, layer }
+  return layer
 }
 
-it.effect(
-  "lets Start fresh and mark-seen finish once a stalled StopTurn times out",
-  () =>
-    Effect.gen(function* () {
-      const { watched, deadlineSet } = yield* watchDeadlines(
-        Duration.toMillis(HOST_CONTROL_DEADLINE),
+it.effect("lets Start fresh and mark-seen finish once a stalled StopTurn times out", () =>
+  Effect.gen(function* () {
+    const { watched, deadlineSet } = yield* watchDeadlines(Duration.toMillis(HOST_CONTROL_DEADLINE))
+    const started = yield* Deferred.make<void>()
+    const entered = yield* Deferred.make<void>()
+    const release = yield* Deferred.make<void>()
+
+    const client = yield* stallableHost({
+      startTurn: () => Deferred.succeed(started, undefined).pipe(Effect.asVoid),
+      stopTurn: () => holdHost(entered, release).pipe(Effect.as(null)),
+    })
+
+    const layer = openGlobal(client, yield* Scope.Scope)
+
+    yield* Effect.gen(function* () {
+      const global = yield* GlobalConversation
+      const transcripts = yield* Transcripts
+      const sql = yield* SqlClient.SqlClient
+
+      yield* Effect.forkChild(global.send(message("Hello")))
+      yield* Deferred.await(started)
+
+      const [session] = yield* sql`SELECT session_id AS sessionId FROM global_conversation`.pipe(
+        Effect.flatMap(decodeSession),
+        Effect.orDie,
       )
-      const started = yield* Deferred.make<void>()
-      const entered = yield* Deferred.make<void>()
-      const release = yield* Deferred.make<void>()
 
-      const client = {
-        StartAgent: () => Effect.succeed("started" as const),
-        StartTurn: () => Deferred.succeed(started, undefined),
-        StopTurn: () => holdHost(entered, release).pipe(Effect.as(null)),
-        StopAgent: () => Effect.void,
-        AnswerRequest: () => Effect.die("This test does not call AnswerRequest"),
-        Steer: () => Effect.die("This test does not call Steer"),
-      } as HostClient
+      assert.isDefined(session)
 
-      const { layer } = openGlobal(client)
+      const stopping = yield* Effect.forkChild(global.stop)
+      yield* Deferred.await(entered)
+      yield* deadlineSet
+      assert.isUndefined(stopping.pollUnsafe())
 
-      yield* Effect.gen(function* () {
-        const global = yield* GlobalConversation
-        const transcripts = yield* Transcripts
-        const sql = yield* SqlClient.SqlClient
+      const seenAt = yield* DateTime.now
+      const fresh = yield* Effect.forkChild(global.startFresh)
+      const seen = yield* Effect.forkChild(global.markSeen(seenAt))
+      assert.isUndefined(fresh.pollUnsafe())
+      assert.isUndefined(seen.pollUnsafe())
 
-        yield* Effect.forkChild(global.send(message("Hello")))
-        yield* Deferred.await(started)
+      yield* TestClock.adjust(HOST_CONTROL_DEADLINE)
+      assert.isDefined(fresh.pollUnsafe())
+      assert.isDefined(seen.pollUnsafe())
+      yield* Fiber.join(stopping)
+      yield* Fiber.join(fresh)
+      yield* Fiber.join(seen)
 
-        const [session] = yield* sql`SELECT session_id AS sessionId FROM global_conversation`.pipe(
-          Effect.flatMap(decodeSession),
-          Effect.orDie,
-        )
-        assert.isDefined(session)
-
-        const stopping = yield* Effect.forkChild(global.stop)
-        yield* Deferred.await(entered)
-        yield* deadlineSet
-        assert.isUndefined(stopping.pollUnsafe())
-
-        const seenAt = yield* DateTime.now
-        const fresh = yield* Effect.forkChild(global.startFresh)
-        const seen = yield* Effect.forkChild(global.markSeen(seenAt))
-        assert.isUndefined(fresh.pollUnsafe())
-        assert.isUndefined(seen.pollUnsafe())
-
-        yield* TestClock.adjust(HOST_CONTROL_DEADLINE)
-        assert.isDefined(fresh.pollUnsafe())
-        assert.isDefined(seen.pollUnsafe())
-        yield* Fiber.join(stopping)
-        yield* Fiber.join(fresh)
-        yield* Fiber.join(seen)
-
-        const { turns } = yield* transcripts.read(session.sessionId)
-        assert.deepStrictEqual(turns[0]?.ended?.ending, TurnStopped.make({}))
-      }).pipe(Effect.provide(layer), Effect.provideService(Clock.Clock, watched))
-    }),
+      const { turns } = yield* transcripts.read(session.sessionId)
+      assert.deepStrictEqual(turns[0]?.ended?.ending, TurnStopped.make({}))
+    }).pipe(Effect.provide(layer), Effect.provideService(Clock.Clock, watched))
+  }),
 )
 
 it.effect(
@@ -405,19 +429,16 @@ it.effect(
       const { watched, deadlineSet } = yield* watchDeadlines(
         Duration.toMillis(HOST_CONTROL_DEADLINE),
       )
+
       const entered = yield* Deferred.make<void>()
       const release = yield* Deferred.make<void>()
 
-      const client = {
-        StartAgent: () => Effect.succeed("started" as const),
-        StartTurn: () => holdHost(entered, release),
-        StopTurn: () => Effect.succeed(null),
-        StopAgent: () => Effect.void,
-        AnswerRequest: () => Effect.die("This test does not call AnswerRequest"),
-        Steer: () => Effect.die("This test does not call Steer"),
-      } as HostClient
+      const client = yield* stallableHost({
+        startTurn: () => holdHost(entered, release),
+        stopTurn: () => Effect.succeed(null),
+      })
 
-      const { layer } = openGlobal(client)
+      const layer = openGlobal(client, yield* Scope.Scope)
 
       yield* Effect.gen(function* () {
         const global = yield* GlobalConversation
@@ -430,8 +451,11 @@ it.effect(
 
         const refused = yield* global.startFresh.pipe(
           Effect.flip,
-          Effect.map((error) => (Predicate.isTagged(error, "StartFreshRefused") ? error.reason : error)),
+          Effect.map((error) =>
+            Predicate.isTagged(error, "StartFreshRefused") ? error.reason : error,
+          ),
         )
+
         assert.strictEqual(refused, "running")
         yield* global.markSeen(yield* DateTime.now)
         assert.equal(yield* Fiber.join(sending), undefined)
@@ -442,16 +466,22 @@ it.effect(
           Effect.flatMap(decodeSession),
           Effect.orDie,
         )
+
         assert.isDefined(session)
 
         const { turns } = yield* transcripts.read(session.sessionId)
-        assert.deepStrictEqual(turns[0]?.ended?.ending, TurnFailed.make({ reason: HOST_DIDNT_ANSWER }))
+        assert.deepStrictEqual(
+          turns[0]?.ended?.ending,
+          TurnFailed.make({ reason: HOST_DIDNT_ANSWER }),
+        )
 
         yield* global.startFresh
+
         const [next] = yield* sql`SELECT session_id AS sessionId FROM global_conversation`.pipe(
           Effect.flatMap(decodeSession),
           Effect.orDie,
         )
+
         assert.isDefined(next)
         assert.notStrictEqual(next.sessionId, session.sessionId)
       }).pipe(Effect.provide(layer), Effect.provideService(Clock.Clock, watched))

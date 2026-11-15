@@ -674,13 +674,13 @@ it.effect(
         const entered = yield* Deferred.make<void>()
         const release = yield* Deferred.make<void>()
         const secondAccepted = yield* Deferred.make<void>()
+        const transcripts = yield* Transcripts
         let calls = 0
 
         const desk = yield* scripted({
           "agent-a": {
             startTurn: () =>
               Effect.gen(function* () {
-                const transcripts = yield* Transcripts
                 calls += 1
 
                 if (calls === 1) {
@@ -689,7 +689,7 @@ it.effect(
                   return
                 }
 
-                const { turns } = yield* transcripts.read("agent-a")
+                const { turns } = yield* transcripts.read("agent-a").pipe(Effect.orDie)
                 assert.deepStrictEqual(turns[0]?.ended?.ending, failedToAnswer)
                 yield* Deferred.succeed(secondAccepted, undefined)
               }),
@@ -727,20 +727,21 @@ it.effect("stops a Turn when StopTurn never answers, then accepts the next messa
     Effect.gen(function* () {
       const entered = yield* Deferred.make<void>()
       const release = yield* Deferred.make<void>()
-      let calls = 0
+      const nextAccepted = yield* Deferred.make<void>()
+      const transcripts = yield* Transcripts
 
       const desk = yield* scripted({
         "agent-a": {
           running: true,
           startTurn: () =>
             Effect.gen(function* () {
-              const transcripts = yield* Transcripts
-              calls += 1
+              const { turns } = yield* transcripts.read("agent-a").pipe(Effect.orDie)
+              const latest = turns.at(-1)
 
-              if (calls === 1) return
+              if (latest?.ended !== null || turns.length < 2) return
 
-              const { turns } = yield* transcripts.read("agent-a")
               assert.deepStrictEqual(turns[0]?.ended?.ending, TurnStopped.make({}))
+              yield* Deferred.succeed(nextAccepted, undefined)
             }),
           stopTurn: () => hold(entered, release)().pipe(Effect.as(null)),
         },
@@ -760,12 +761,12 @@ it.effect("stops a Turn when StopTurn never answers, then accepts the next messa
 
       const next = yield* desk.turns.send("agent-a", sent("After"))
       assert.equal(next, "started")
+      yield* Deferred.await(nextAccepted)
 
       const { turns } = yield* desk.transcripts.read("agent-a")
       assert.deepStrictEqual(turns[0]?.ended?.ending, TurnStopped.make({}))
       assert.equal(turns[1]?.message, "After")
       assert.equal(turns[1]?.ended, null)
-      assert.lengthOf(desk.started("agent-a"), 2)
     }),
   ).pipe(Effect.provide(layer)),
 )

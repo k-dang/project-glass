@@ -36,6 +36,7 @@ import {
 import { SqlClient } from "effect/sql"
 import type { DeliveredTurn } from "./agentHost/deliveredMessage"
 import type { TurnSettings } from "./agentHost/protocol"
+import { HOST_CONTROL_DEADLINE, HOST_DIDNT_ANSWER } from "./hostControl"
 import { type HostCallError, type HostClient, hostFailure } from "./Placement"
 import { prompt } from "./prompt"
 import { ToDos } from "./ToDos"
@@ -85,6 +86,16 @@ const decodeUnsent = Schema.decodeUnknownEffect(Schema.Array(StoredMessage))
 
 const unsentFailure = () =>
   new AgentError({ message: "Couldn't read or save your unsent message. Try again." })
+
+const hostDidntAnswer = () => new AgentError({ message: HOST_DIDNT_ANSWER })
+
+const boundHostCall = <A, E, R>(call: Effect.Effect<A, E, R>) =>
+  call.pipe(
+    Effect.timeoutOrElse({
+      duration: HOST_CONTROL_DEADLINE,
+      orElse: () => Effect.fail(hostDidntAnswer()),
+    }),
+  )
 
 export class ConversationTurns extends Context.Service<
   ConversationTurns,
@@ -199,6 +210,28 @@ export class ConversationTurns extends Context.Service<
           return { client, message } satisfies Prepared
         })
 
+      const failTurn = (conversationId: string, turnId: string, reason: string) =>
+        Effect.gen(function* () {
+          const ended = { at: yield* DateTime.now, ending: TurnFailed.make({ reason }) }
+
+          yield* transcripts.save(conversationId, [TurnEnded.make({ turnId, ended })])
+        }).pipe(
+          Effect.catch((cause) => Effect.logWarning("Couldn't fail an undelivered Turn", cause)),
+          Effect.as("failed" as const satisfies Delivery),
+        )
+
+      const settleUndelivered = (
+        conversation: Conversation,
+        turnId: string,
+        context: StartedMessage["context"],
+        error: HostCallError,
+      ) =>
+        Predicate.isTagged(context, "GlobalConversationUpdate")
+          ? transcripts
+              .setStatus(conversation.id, hostFailure(error))
+              .pipe(Effect.as("pending" as const satisfies Delivery))
+          : failTurn(conversation.id, turnId, hostFailure(error))
+
       const dispatch = (
         conversation: Conversation,
         turnId: string,
@@ -212,32 +245,22 @@ export class ConversationTurns extends Context.Service<
             if ((yield* transcripts.runningTurn(agentId)) !== turnId)
               return "superseded" as const satisfies Delivery
 
-            yield* client.StartTurn({ agentId, turnId, ...message, ...conversation.settings })
+            yield* boundHostCall(
+              client.StartTurn({ agentId, turnId, ...message, ...conversation.settings }),
+            )
 
             return "dispatched" as const satisfies Delivery
-          }),
-        )
-
-      const failTurn = (conversationId: string, turnId: string, reason: string) =>
-        Effect.gen(function* () {
-          const ended = { at: yield* DateTime.now, ending: TurnFailed.make({ reason }) }
-
-          yield* transcripts.save(conversationId, [TurnEnded.make({ turnId, ended })])
-        }).pipe(
-          Effect.catch((cause) => Effect.logWarning("Couldn't fail an undelivered Turn", cause)),
-          Effect.as("failed" as const satisfies Delivery),
+          }).pipe(
+            Effect.catch((error) =>
+              settleUndelivered(conversation, turnId, message.context, error),
+            ),
+          ),
         )
 
       const deliver = (conversation: Conversation, turnId: string, sent: StartedMessage) =>
         prepare(conversation, sent).pipe(
           Effect.flatMap((prepared) => dispatch(conversation, turnId, prepared)),
-          Effect.catch((error) =>
-            Predicate.isTagged(sent.context, "GlobalConversationUpdate")
-              ? transcripts
-                  .setStatus(conversation.id, hostFailure(error))
-                  .pipe(Effect.as("pending" as const satisfies Delivery))
-              : failTurn(conversation.id, turnId, hostFailure(error)),
-          ),
+          Effect.catch((error) => settleUndelivered(conversation, turnId, sent.context, error)),
           Effect.tap((delivery) =>
             annotateUnit({ agent_id: conversation.id, turn_id: turnId, delivery }),
           ),
@@ -325,7 +348,7 @@ export class ConversationTurns extends Context.Service<
 
             const left = Option.isNone(running)
               ? null
-              : yield* running.value.StopTurn({ agentId }).pipe(
+              : yield* boundHostCall(running.value.StopTurn({ agentId })).pipe(
                   Effect.tapError((cause) => Effect.logWarning("Couldn't stop a Turn", cause)),
                   Effect.orElseSucceed(() => null),
                 )
