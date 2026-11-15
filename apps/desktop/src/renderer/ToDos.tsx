@@ -6,6 +6,7 @@ import { Effect, Exit, Option } from "effect"
 import { Pencil, Trash2, X } from "lucide-react"
 import {
   type ClipboardEvent,
+  type FormEvent,
   type KeyboardEvent,
   type ReactNode,
   useCallback,
@@ -34,6 +35,7 @@ import {
   toDoThumbnailAtom,
   toDosAtom,
 } from "./toDoList"
+import { linkLabel, newestFirst, noteParts } from "./toDoOrder"
 
 interface ToDoFields {
   readonly title: string
@@ -217,27 +219,33 @@ export function ToDos() {
 
 function ToDoList(props: { toDos: ReadonlyArray<ToDo> }) {
   const { pending, problem } = useToDoChanges()
-  const open = props.toDos.filter((toDo) => !toDo.done)
+  const open = newestFirst(props.toDos.filter((toDo) => !toDo.done))
   const done = props.toDos.filter((toDo) => toDo.done)
 
   return (
     <section aria-label="To-dos" aria-busy={pending} className="flex flex-col gap-4">
+      <AddToDo />
+      {problem !== null && <ProblemAlert problem={problem} />}
       {open.length === 0 ? (
         <p className="text-sm text-muted-foreground">Nothing to do.</p>
       ) : (
         <ToDoItems label="Open to-dos" toDos={open} />
       )}
-      <AddToDo />
-      {problem !== null && <ProblemAlert problem={problem} />}
-      {done.length > 0 && (
-        <details>
-          <summary className="cursor-pointer text-sm text-muted-foreground select-none">
-            Done ({done.length})
-          </summary>
-          <ToDoItems label="Done to-dos" toDos={done} className="mt-2" />
-        </details>
-      )}
+      <DoneToDos toDos={done} />
     </section>
+  )
+}
+
+function DoneToDos(props: { toDos: ReadonlyArray<ToDo> }) {
+  if (props.toDos.length === 0) return null
+
+  return (
+    <details>
+      <summary className="cursor-pointer text-sm text-muted-foreground select-none">
+        Done ({props.toDos.length})
+      </summary>
+      <ToDoItems label="Done to-dos" toDos={props.toDos} className="mt-2" />
+    </details>
   )
 }
 
@@ -287,48 +295,103 @@ function AddToDo() {
     onSome: (toDos) => toDos.map((toDo) => toDo.id),
   })
 
+  const onPaste = (event: ClipboardEvent<HTMLFormElement>) =>
+    takePastedImages(event, (pasted) =>
+      setDraft((current) => ({ ...current, images: [...current.images, ...pasted] })),
+    )
+
+  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    if (savedId === null && trimmed === "") return
+
+    const submitted = draft
+    add(
+      { ...submitted, title: trimmed, notes: notes.trimEnd() },
+      knownIds,
+      (remaining, createdId) => {
+        const sent = new Set(
+          submitted.images
+            .filter((image) => !remaining.some((failed) => failed.key === image.key))
+            .map((image) => image.key),
+        )
+
+        setDraft((current) => {
+          const imagesLeft = current.images.filter((image) => !sent.has(image.key))
+
+          if (imagesLeft.length === 0) {
+            return current.title === submitted.title && current.notes === submitted.notes
+              ? emptyToDo
+              : { title: current.title, notes: current.notes, images: [], savedId: null }
+          }
+
+          return { ...current, images: imagesLeft, savedId: createdId }
+        })
+      },
+    )
+  }
+
+  const attachments = (
+    <>
+      {savedId !== null && (
+        <p role="alert" className="text-sm text-destructive">
+          Couldn't save every image. Try again.
+        </p>
+      )}
+      {images.length > 0 && (
+        <ImageStrip label="Images">
+          {images.map((image, index) => (
+            <li key={image.key} className="flex items-start gap-0.5">
+              <button
+                type="button"
+                aria-label={`Open image ${index + 1}`}
+                className="rounded-md"
+                onClick={(event) =>
+                  setOpened({
+                    image: {
+                      src: imageSrc(image.mediaType, image.data),
+                      name: `Image ${index + 1}`,
+                    },
+                    opener: event.currentTarget,
+                  })
+                }
+              >
+                <img
+                  src={imageSrc(image.thumbnailMediaType, image.thumbnail)}
+                  alt=""
+                  className="size-14 rounded-md border object-cover"
+                />
+              </button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                aria-label={`Remove image ${index + 1}`}
+                onClick={() => {
+                  const imagesLeft = images.filter((kept) => kept.key !== image.key)
+
+                  setDraft(
+                    imagesLeft.length === 0 && savedId !== null
+                      ? emptyToDo
+                      : { title, notes, images: imagesLeft, savedId },
+                  )
+                }}
+              >
+                <X aria-hidden />
+              </Button>
+            </li>
+          ))}
+        </ImageStrip>
+      )}
+    </>
+  )
+
+  const submitLabel = savedId === null ? "Add" : "Try again"
+  const submitDisabled = pending || (savedId === null ? trimmed === "" : images.length === 0)
+
   return (
     <Card
-      render={
-        <form
-          aria-label="Add a to-do"
-          onPaste={(event) =>
-            takePastedImages(event, (pasted) =>
-              setDraft((current) => ({ ...current, images: [...current.images, ...pasted] })),
-            )
-          }
-          onSubmit={(event) => {
-            event.preventDefault()
-
-            if (savedId === null && trimmed === "") return
-
-            const submitted = draft
-            add(
-              { ...submitted, title: trimmed, notes: notes.trimEnd() },
-              knownIds,
-              (remaining, createdId) => {
-                const sent = new Set(
-                  submitted.images
-                    .filter((image) => !remaining.some((failed) => failed.key === image.key))
-                    .map((image) => image.key),
-                )
-
-                setDraft((current) => {
-                  const imagesLeft = current.images.filter((image) => !sent.has(image.key))
-
-                  if (imagesLeft.length === 0) {
-                    return current.title === submitted.title && current.notes === submitted.notes
-                      ? emptyToDo
-                      : { title: current.title, notes: current.notes, images: [], savedId: null }
-                  }
-
-                  return { ...current, images: imagesLeft, savedId: createdId }
-                })
-              },
-            )
-          }}
-        />
-      }
+      render={<form aria-label="Add a to-do" onPaste={onPaste} onSubmit={onSubmit} />}
       className="focus-within:ring-3 focus-within:ring-ring/50"
     >
       <CardContent className="flex flex-col gap-1">
@@ -349,67 +412,14 @@ function AddToDo() {
           onKeyDown={submitOnShortcut}
           className="min-h-10 resize-none border-0 bg-transparent px-0 py-0 text-sm shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
         />
-        {savedId !== null && (
-          <p role="alert" className="text-sm text-destructive">
-            Couldn't save every image. Try again.
-          </p>
-        )}
-        {images.length > 0 && (
-          <ImageStrip label="Images">
-            {images.map((image, index) => (
-              <li key={image.key} className="flex items-start gap-0.5">
-                <button
-                  type="button"
-                  aria-label={`Open image ${index + 1}`}
-                  className="rounded-md"
-                  onClick={(event) =>
-                    setOpened({
-                      image: {
-                        src: imageSrc(image.mediaType, image.data),
-                        name: `Image ${index + 1}`,
-                      },
-                      opener: event.currentTarget,
-                    })
-                  }
-                >
-                  <img
-                    src={imageSrc(image.thumbnailMediaType, image.thumbnail)}
-                    alt=""
-                    className="size-14 rounded-md border object-cover"
-                  />
-                </button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-xs"
-                  aria-label={`Remove image ${index + 1}`}
-                  onClick={() => {
-                    const imagesLeft = images.filter((kept) => kept.key !== image.key)
-
-                    setDraft(
-                      imagesLeft.length === 0 && savedId !== null
-                        ? emptyToDo
-                        : { title, notes, images: imagesLeft, savedId },
-                    )
-                  }}
-                >
-                  <X aria-hidden />
-                </Button>
-              </li>
-            ))}
-          </ImageStrip>
-        )}
+        {attachments}
       </CardContent>
       <CardFooter className="justify-end gap-2">
         <span className="text-xs text-muted-foreground" aria-hidden>
           {shortcutLabel("↵")}
         </span>
-        <Button
-          type="submit"
-          size="sm"
-          disabled={pending || (savedId === null ? trimmed === "" : images.length === 0)}
-        >
-          {savedId === null ? "Add" : "Try again"}
+        <Button type="submit" size="sm" disabled={submitDisabled}>
+          {submitLabel}
         </Button>
       </CardFooter>
       <LargeImage opened={opened} onClose={() => setOpened(null)} />
@@ -442,6 +452,50 @@ function UnsentStrip(props: { toDo: ToDo }) {
         <Button type="button" size="sm" className="mt-2" onClick={() => setHeld(false)}>
           Try again
         </Button>
+      )}
+    </div>
+  )
+}
+
+function CompactNotes(props: { readonly notes: string }) {
+  const parts = noteParts(props.notes)
+
+  const text = parts
+    .flatMap((part) => (part.kind === "text" ? [part.value] : []))
+    .join("")
+    .replaceAll(/[ \t]+\n/g, "\n")
+    .replaceAll(/[ \t]{2,}/g, " ")
+    .trim()
+
+  const links = parts.flatMap((part, index) =>
+    part.kind === "link" ? [{ url: part.value, key: index }] : [],
+  )
+
+  if (text === "" && links.length === 0) return null
+
+  return (
+    <div className="mt-1 flex flex-col gap-1">
+      {text !== "" && (
+        <p className="line-clamp-2 text-sm break-words whitespace-pre-wrap text-muted-foreground">
+          {text}
+        </p>
+      )}
+      {links.length > 0 && (
+        <ul aria-label="Links" className="flex flex-wrap gap-x-3 gap-y-1">
+          {links.map((link) => (
+            <li key={link.key}>
+              <a
+                href={link.url}
+                target="_blank"
+                rel="noreferrer"
+                title={link.url}
+                className="text-xs break-all text-muted-foreground underline underline-offset-4 hover:text-foreground"
+              >
+                {linkLabel(link.url)}
+              </a>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   )
@@ -518,11 +572,7 @@ function ToDoRow(props: { toDo: ToDo }) {
         <p className={cn("text-sm break-words", checked && "text-muted-foreground line-through")}>
           {toDo.title}
         </p>
-        {toDo.notes !== "" && (
-          <p className="mt-1 text-sm break-words whitespace-pre-wrap text-muted-foreground">
-            {toDo.notes}
-          </p>
-        )}
+        {toDo.notes !== "" && <CompactNotes notes={toDo.notes} />}
         <SavedImages toDo={toDo} />
         <UnsentStrip toDo={toDo} />
       </div>
@@ -591,7 +641,7 @@ function ToDoEditor(props: {
         onKeyDown={cancelOnEscape}
       />
       <Textarea
-        aria-label="Notes"
+        aria-label={`Notes for ${props.toDo.title}`}
         placeholder="Notes"
         value={notes}
         onChange={(event) => setEdit({ title, notes: event.target.value })}

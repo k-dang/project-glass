@@ -2,6 +2,7 @@ import type { ToDo } from "@glass/contracts"
 import { Effect, Option } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
 import { Backend, type BackendError, backendRuntime } from "./backend"
+import { newestFirst } from "./toDoOrder"
 
 export interface ToDoChange {
   readonly save: Effect.Effect<ReadonlyArray<ToDo>, BackendError, Backend>
@@ -43,7 +44,7 @@ export const toDosAtom = Atom.make((get) =>
 )
 
 export const openToDosAtom = Atom.make((get) =>
-  AsyncResult.map(get(toDosAtom), (toDos) => toDos.filter((toDo) => !toDo.done)),
+  AsyncResult.map(get(toDosAtom), (toDos) => newestFirst(toDos.filter((toDo) => !toDo.done))),
 )
 
 export const toDoThumbnailAtom = Atom.family((id: number) =>

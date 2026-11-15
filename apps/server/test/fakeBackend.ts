@@ -17,6 +17,7 @@ import { DEMO_GATEWAY_REPOSITORY, DEMO_REPOSITORY, seedDemoPullRequests } from "
 import { startFakeGitHub } from "./fakeGitHub"
 import { VIEWER } from "./fakePullRequest"
 import { fakeAgentRunners } from "./fakeAgentRunners"
+import { seedDemoToDos } from "./demoToDos"
 import { seedTourOverviewPullRequests } from "./demoTourOverviews"
 import { FAKE_PI_MODEL } from "./fakeModelProvider"
 import { installFakeSandboxProvider } from "./fakeSandboxProvider"
@@ -116,6 +117,10 @@ const main = Effect.gen(function* () {
       timeout: Duration.seconds(ASK_TIMEOUT_SECONDS),
     })
     .pipe(Effect.forkScoped)
+
+  yield* seedDemoToDos(config.port, Redacted.value(config.token)).pipe(
+    Effect.catchCause((cause) => Effect.logWarning("Couldn't seed the demo to-dos", cause)),
+  )
 
   yield* seedDemoAgents(
     config.port,

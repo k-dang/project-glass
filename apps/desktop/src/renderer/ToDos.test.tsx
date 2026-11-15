@@ -188,7 +188,10 @@ it("adds, edits, completes, reopens, and deletes to-dos", async () => {
   await user.click(within(open).getByRole("button", { name: "Edit Follow up on #42" }))
   const editor = within(page).getByRole("form", { name: "Edit Follow up on #42" })
   expect(document.activeElement).toBe(within(editor).getByRole("textbox", { name: "Title" }))
-  await user.type(within(editor).getByRole("textbox", { name: "Notes" }), "After CI passes")
+  await user.type(
+    within(editor).getByRole("textbox", { name: "Notes for Follow up on #42" }),
+    "After CI passes",
+  )
   await user.click(within(editor).getByRole("button", { name: "Save" }))
   expect(await within(open).findByText("After CI passes")).toBeTruthy()
 
@@ -263,7 +266,7 @@ it("keeps an unfinished edit across areas and text typed while it saves", async 
 
   const notes = () =>
     within(screen.getByRole("form", { name: formName })).getByRole<HTMLTextAreaElement>("textbox", {
-      name: "Notes",
+      name: "Notes for Rebase the branch",
     })
 
   await user.type(notes(), "Onto main")
@@ -509,6 +512,71 @@ it("keeps a paste made while another to-do change is saving", async () => {
   const attach = await next(attaches)
   expect(attach.payload.id).toBe(toDo.id)
   expect(attach.payload.images).toHaveLength(1)
+})
+
+it("puts the newest open to-do directly under the composer", async () => {
+  const user = mount(fakeToDos())
+  const page = await screen.findByRole("main", { name: "To-dos" })
+
+  const form = () => within(page).getByRole("form", { name: "Add a to-do" })
+
+  const openTitles = () =>
+    within(page)
+      .getAllByRole("checkbox")
+      .map((box) => box.getAttribute("aria-label"))
+
+  await user.type(within(form()).getByRole("textbox", { name: "New to-do" }), "Older errand{Enter}")
+  await within(page).findByText("Older errand")
+
+  await user.type(
+    within(form()).getByRole("textbox", { name: "Notes" }),
+    "See https://capy.ai/ before deciding",
+  )
+  await user.type(within(form()).getByRole("textbox", { name: "New to-do" }), "Newer errand{Enter}")
+
+  const open = await within(page).findByRole("list", { name: "Open to-dos" })
+  expect(form().compareDocumentPosition(open) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(openTitles()).toEqual(["Newer errand", "Older errand"])
+  expect(within(open).getByText("See before deciding").classList.contains("line-clamp-2")).toBe(
+    true,
+  )
+  expect(within(open).getByRole("link", { name: "capy.ai" }).getAttribute("href")).toBe(
+    "https://capy.ai/",
+  )
+  expect(open.textContent?.includes("https://capy.ai/")).toBe(false)
+})
+
+it("keeps finished to-dos collapsed and in the order the server sent", async () => {
+  const user = mount({
+    ListToDos: () =>
+      Effect.succeed([
+        new ToDo({ id: 1, title: "Older errand", notes: "", done: false }),
+        new ToDo({ id: 2, title: "Newer errand", notes: "", done: false }),
+        new ToDo({
+          id: 4,
+          title: "Finished just now",
+          notes: "https://vercel.com/docs/sandbox",
+          done: true,
+        }),
+        new ToDo({ id: 3, title: "Finished earlier", notes: "", done: true }),
+      ]),
+  })
+
+  const page = await screen.findByRole("main", { name: "To-dos" })
+  const done = within(page).getByText("Done (2)").closest("details")
+  expect(done instanceof HTMLDetailsElement && done.open).toBe(false)
+  expect(
+    within(page)
+      .getAllByRole("checkbox")
+      .map((box) => box.getAttribute("aria-label")),
+  ).toEqual(["Newer errand", "Older errand", "Finished just now", "Finished earlier"])
+
+  await user.click(within(page).getByText("Done (2)"))
+  expect(done instanceof HTMLDetailsElement && done.open).toBe(true)
+  const finished = within(page).getByRole("list", { name: "Done to-dos" })
+  expect(
+    within(finished).getByRole("link", { name: "vercel.com/docs/sandbox" }).getAttribute("href"),
+  ).toBe("https://vercel.com/docs/sandbox")
 })
 
 it("pastes an image onto an existing to-do, opens it, and removes it", async () => {
