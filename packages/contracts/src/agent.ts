@@ -413,11 +413,19 @@ export const Transcript = Schema.Struct({
   turns: Schema.Array(Turn),
   queued: Schema.Array(QueuedMessage),
   status: Schema.NullOr(Schema.String),
+  extensionStatuses: Schema.Array(Schema.String).pipe(
+    Schema.withConstructorDefault(Effect.succeed([])),
+  ),
 })
 
 export type Transcript = typeof Transcript.Type
 
-export const emptyTranscript: Transcript = { turns: [], queued: [], status: null }
+export const emptyTranscript: Transcript = {
+  turns: [],
+  queued: [],
+  status: null,
+  extensionStatuses: [],
+}
 
 export const TranscriptSnapshot = Schema.TaggedStruct("Snapshot", Transcript.fields)
 
@@ -429,10 +437,15 @@ export const StatusChanged = Schema.TaggedStruct("StatusChanged", {
   status: Transcript.fields.status,
 })
 
+export const ExtensionStatusesChanged = Schema.TaggedStruct("ExtensionStatusesChanged", {
+  extensionStatuses: Transcript.fields.extensionStatuses,
+})
+
 export const TranscriptUpdate = Schema.Union([
   TranscriptSnapshot,
   QueuedMessagesChanged,
   StatusChanged,
+  ExtensionStatusesChanged,
   ...AgentEvent.members,
 ])
 
@@ -500,9 +513,18 @@ export const applyTranscriptUpdate = (
   update: TranscriptUpdate,
 ): Transcript =>
   Match.value(update).pipe(
-    Match.tag("Snapshot", ({ turns, queued, status }) => ({ turns, queued, status })),
+    Match.tag("Snapshot", ({ turns, queued, status, extensionStatuses }) => ({
+      turns,
+      queued,
+      status,
+      extensionStatuses,
+    })),
     Match.tag("QueuedMessagesChanged", ({ queued }) => ({ ...transcript, queued })),
     Match.tag("StatusChanged", ({ status }) => ({ ...transcript, status })),
+    Match.tag("ExtensionStatusesChanged", ({ extensionStatuses }) => ({
+      ...transcript,
+      extensionStatuses,
+    })),
     Match.orElse((event) => ({ ...transcript, turns: applyAgentEvent(transcript.turns, event) })),
   )
 

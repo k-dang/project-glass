@@ -1,5 +1,6 @@
-import type { AgentError, AgentEvent } from "@glass/contracts"
+import type { AgentError } from "@glass/contracts"
 import { Effect, Stream } from "effect"
+import type { HostEvent } from "./agentHost/protocol"
 import type { HostClient } from "./Placement"
 
 export interface JournalPosition {
@@ -9,7 +10,7 @@ export interface JournalPosition {
 export const followJournal = (
   save: (
     agentId: string,
-    events: ReadonlyArray<AgentEvent>,
+    events: ReadonlyArray<HostEvent>,
     throughJournalEntry: number,
   ) => Effect.Effect<void, AgentError>,
   client: HostClient,

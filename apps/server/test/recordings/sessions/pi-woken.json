@@ -1,0 +1,1125 @@
+{
+  "scenario": "pi-woken",
+  "program": "@earendil-works/pi-coding-agent 1.3.0",
+  "processes": [
+    {
+      "args": [
+        "--mode",
+        "rpc",
+        "--session-id",
+        "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
+        "--extension",
+        "<folder>.pi/draw-diagram.mjs",
+        "--extension",
+        "<folder>.pi/subagent-status.js"
+      ],
+      "cwd": "<folder>",
+      "frames": [
+        {
+          "out": {
+            "type": "get_state",
+            "id": "glass-1"
+          }
+        },
+        {
+          "in": {
+            "id": "glass-1",
+            "type": "response",
+            "command": "get_state",
+            "success": true,
+            "data": {
+              "model": {
+                "id": "gpt-test",
+                "name": "gpt-test",
+                "api": "<pi-provider>-completions",
+                "provider": "glass-test",
+                "baseUrl": "<redacted>",
+                "reasoning": false,
+                "input": ["text", "image"],
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0
+                },
+                "contextWindow": 128000,
+                "maxTokens": 4096
+              },
+              "thinkingLevel": "off",
+              "isStreaming": false,
+              "isCompacting": false,
+              "steeringMode": "one-at-a-time",
+              "followUpMode": "one-at-a-time",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-15T01-04-28-293Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
+              "autoCompactionEnabled": true,
+              "messageCount": 0,
+              "pendingMessageCount": 0
+            }
+          }
+        },
+        {
+          "out": {
+            "type": "prompt",
+            "message": "Start the background task",
+            "images": [],
+            "id": "glass-2"
+          }
+        },
+        {
+          "in": {
+            "id": "glass-2",
+            "type": "response",
+            "command": "prompt",
+            "success": true,
+            "data": {
+              "disposition": "started"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "in": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "in": {
+            "type": "message_start",
+            "message": {
+              "role": "system",
+              "content": "",
+              "sections": "<redacted>",
+              "timestamp": 1794704668493,
+              "toolsAdded": [
+                {
+                  "name": "read",
+                  "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+                  "parameters": {
+                    "type": "object",
+                    "required": ["path"],
+                    "properties": {
+                      "path": {
+                        "type": "string",
+                        "description": "Path to the file to read (relative or absolute)"
+                      },
+                      "offset": {
+                        "type": "number",
+                        "description": "Line number to start reading from (1-indexed)"
+                      },
+                      "limit": {
+                        "type": "number",
+                        "description": "Maximum number of lines to read"
+                      }
+                    }
+                  },
+                  "constrainedSampling": {
+                    "type": "json_schema",
+                    "strict": "prefer"
+                  }
+                },
+                {
+                  "name": "bash",
+                  "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+                  "parameters": {
+                    "type": "object",
+                    "required": ["command"],
+                    "properties": {
+                      "command": {
+                        "type": "string",
+                        "description": "Shell command to execute"
+                      },
+                      "timeout": {
+                        "type": "number",
+                        "description": "Timeout in seconds (optional, no default timeout)"
+                      }
+                    }
+                  },
+                  "constrainedSampling": {
+                    "type": "json_schema",
+                    "strict": "prefer"
+                  }
+                },
+                {
+                  "name": "edit",
+                  "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+                  "parameters": {
+                    "type": "object",
+                    "required": ["path", "edits"],
+                    "properties": {
+                      "path": {
+                        "type": "string",
+                        "description": "Path to the file to edit (relative or absolute)"
+                      },
+                      "edits": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "required": ["oldText", "newText"],
+                          "properties": {
+                            "oldText": {
+                              "type": "string",
+                              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+                            },
+                            "newText": {
+                              "type": "string",
+                              "description": "Replacement text for this targeted edit."
+                            }
+                          }
+                        },
+                        "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+                      }
+                    }
+                  },
+                  "constrainedSampling": {
+                    "type": "json_schema",
+                    "strict": "prefer"
+                  }
+                },
+                {
+                  "name": "write",
+                  "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+                  "parameters": {
+                    "type": "object",
+                    "required": ["path", "content"],
+                    "properties": {
+                      "path": {
+                        "type": "string",
+                        "description": "Path to the file to write (relative or absolute)"
+                      },
+                      "content": {
+                        "type": "string",
+                        "description": "Content to write to the file"
+                      }
+                    }
+                  },
+                  "constrainedSampling": {
+                    "type": "json_schema",
+                    "strict": "prefer"
+                  }
+                },
+                {
+                  "name": "draw_diagram",
+                  "description": "Draw a Diagram beside the conversation in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string",
+                        "description": "A short name for the Diagram, shown above it. The same title redraws that Diagram."
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": ["existing", "proposed", "uncertain"],
+                        "description": "What the Diagram shows: \"existing\" for how things work now, \"proposed\" for a design that doesn't exist yet, or \"uncertain\" when it rests on inferences you couldn't confirm."
+                      },
+                      "mermaid": {
+                        "type": "string",
+                        "description": "The diagram in Mermaid syntax, such as a flowchart or sequence diagram. Glass draws no links or images."
+                      }
+                    },
+                    "required": ["title", "kind", "mermaid"],
+                    "additionalProperties": false
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_end",
+            "message": {
+              "role": "system",
+              "content": "",
+              "sections": "<redacted>",
+              "timestamp": 1794704668493,
+              "toolsAdded": [
+                {
+                  "name": "read",
+                  "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+                  "parameters": {
+                    "type": "object",
+                    "required": ["path"],
+                    "properties": {
+                      "path": {
+                        "type": "string",
+                        "description": "Path to the file to read (relative or absolute)"
+                      },
+                      "offset": {
+                        "type": "number",
+                        "description": "Line number to start reading from (1-indexed)"
+                      },
+                      "limit": {
+                        "type": "number",
+                        "description": "Maximum number of lines to read"
+                      }
+                    }
+                  },
+                  "constrainedSampling": {
+                    "type": "json_schema",
+                    "strict": "prefer"
+                  }
+                },
+                {
+                  "name": "bash",
+                  "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+                  "parameters": {
+                    "type": "object",
+                    "required": ["command"],
+                    "properties": {
+                      "command": {
+                        "type": "string",
+                        "description": "Shell command to execute"
+                      },
+                      "timeout": {
+                        "type": "number",
+                        "description": "Timeout in seconds (optional, no default timeout)"
+                      }
+                    }
+                  },
+                  "constrainedSampling": {
+                    "type": "json_schema",
+                    "strict": "prefer"
+                  }
+                },
+                {
+                  "name": "edit",
+                  "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+                  "parameters": {
+                    "type": "object",
+                    "required": ["path", "edits"],
+                    "properties": {
+                      "path": {
+                        "type": "string",
+                        "description": "Path to the file to edit (relative or absolute)"
+                      },
+                      "edits": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "required": ["oldText", "newText"],
+                          "properties": {
+                            "oldText": {
+                              "type": "string",
+                              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+                            },
+                            "newText": {
+                              "type": "string",
+                              "description": "Replacement text for this targeted edit."
+                            }
+                          }
+                        },
+                        "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+                      }
+                    }
+                  },
+                  "constrainedSampling": {
+                    "type": "json_schema",
+                    "strict": "prefer"
+                  }
+                },
+                {
+                  "name": "write",
+                  "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+                  "parameters": {
+                    "type": "object",
+                    "required": ["path", "content"],
+                    "properties": {
+                      "path": {
+                        "type": "string",
+                        "description": "Path to the file to write (relative or absolute)"
+                      },
+                      "content": {
+                        "type": "string",
+                        "description": "Content to write to the file"
+                      }
+                    }
+                  },
+                  "constrainedSampling": {
+                    "type": "json_schema",
+                    "strict": "prefer"
+                  }
+                },
+                {
+                  "name": "draw_diagram",
+                  "description": "Draw a Diagram beside the conversation in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string",
+                        "description": "A short name for the Diagram, shown above it. The same title redraws that Diagram."
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": ["existing", "proposed", "uncertain"],
+                        "description": "What the Diagram shows: \"existing\" for how things work now, \"proposed\" for a design that doesn't exist yet, or \"uncertain\" when it rests on inferences you couldn't confirm."
+                      },
+                      "mermaid": {
+                        "type": "string",
+                        "description": "The diagram in Mermaid syntax, such as a flowchart or sequence diagram. Glass draws no links or images."
+                      }
+                    },
+                    "required": ["title", "kind", "mermaid"],
+                    "additionalProperties": false
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_start",
+            "message": {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Start the background task"
+                }
+              ],
+              "timestamp": 1794704668491
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_end",
+            "message": {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Start the background task"
+                }
+              ],
+              "timestamp": 1794704668491
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": [],
+              "api": "<pi-provider>-completions",
+              "provider": "glass-test",
+              "model": "gpt-test",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1794704668522
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "assistantMessageEvent": {
+              "type": "text_start",
+              "contentIndex": 0
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "Here is the diagram."
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "assistantMessageEvent": {
+              "type": "text_end",
+              "contentIndex": 0,
+              "content": "Here is the diagram."
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is the diagram."
+                }
+              ],
+              "api": "<pi-provider>-completions",
+              "provider": "glass-test",
+              "model": "gpt-test",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 1794704668522,
+              "responseId": "test-completion",
+              "rawStopReason": "stop",
+              "durationMs": 18,
+              "thinkingLevel": "off"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "turn_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is the diagram."
+                }
+              ],
+              "api": "<pi-provider>-completions",
+              "provider": "glass-test",
+              "model": "gpt-test",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 1794704668522,
+              "responseId": "test-completion",
+              "rawStopReason": "stop",
+              "durationMs": 18,
+              "thinkingLevel": "off"
+            },
+            "toolResults": []
+          }
+        },
+        {
+          "in": {
+            "type": "agent_end",
+            "messages": [
+              {
+                "role": "system",
+                "content": "",
+                "sections": "<redacted>",
+                "timestamp": 1794704668493,
+                "toolsAdded": [
+                  {
+                    "name": "read",
+                    "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+                    "parameters": {
+                      "type": "object",
+                      "required": ["path"],
+                      "properties": {
+                        "path": {
+                          "type": "string",
+                          "description": "Path to the file to read (relative or absolute)"
+                        },
+                        "offset": {
+                          "type": "number",
+                          "description": "Line number to start reading from (1-indexed)"
+                        },
+                        "limit": {
+                          "type": "number",
+                          "description": "Maximum number of lines to read"
+                        }
+                      }
+                    },
+                    "constrainedSampling": {
+                      "type": "json_schema",
+                      "strict": "prefer"
+                    }
+                  },
+                  {
+                    "name": "bash",
+                    "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+                    "parameters": {
+                      "type": "object",
+                      "required": ["command"],
+                      "properties": {
+                        "command": {
+                          "type": "string",
+                          "description": "Shell command to execute"
+                        },
+                        "timeout": {
+                          "type": "number",
+                          "description": "Timeout in seconds (optional, no default timeout)"
+                        }
+                      }
+                    },
+                    "constrainedSampling": {
+                      "type": "json_schema",
+                      "strict": "prefer"
+                    }
+                  },
+                  {
+                    "name": "edit",
+                    "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+                    "parameters": {
+                      "type": "object",
+                      "required": ["path", "edits"],
+                      "properties": {
+                        "path": {
+                          "type": "string",
+                          "description": "Path to the file to edit (relative or absolute)"
+                        },
+                        "edits": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": ["oldText", "newText"],
+                            "properties": {
+                              "oldText": {
+                                "type": "string",
+                                "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+                              },
+                              "newText": {
+                                "type": "string",
+                                "description": "Replacement text for this targeted edit."
+                              }
+                            }
+                          },
+                          "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+                        }
+                      }
+                    },
+                    "constrainedSampling": {
+                      "type": "json_schema",
+                      "strict": "prefer"
+                    }
+                  },
+                  {
+                    "name": "write",
+                    "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+                    "parameters": {
+                      "type": "object",
+                      "required": ["path", "content"],
+                      "properties": {
+                        "path": {
+                          "type": "string",
+                          "description": "Path to the file to write (relative or absolute)"
+                        },
+                        "content": {
+                          "type": "string",
+                          "description": "Content to write to the file"
+                        }
+                      }
+                    },
+                    "constrainedSampling": {
+                      "type": "json_schema",
+                      "strict": "prefer"
+                    }
+                  },
+                  {
+                    "name": "draw_diagram",
+                    "description": "Draw a Diagram beside the conversation in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
+                    "parameters": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string",
+                          "description": "A short name for the Diagram, shown above it. The same title redraws that Diagram."
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": ["existing", "proposed", "uncertain"],
+                          "description": "What the Diagram shows: \"existing\" for how things work now, \"proposed\" for a design that doesn't exist yet, or \"uncertain\" when it rests on inferences you couldn't confirm."
+                        },
+                        "mermaid": {
+                          "type": "string",
+                          "description": "The diagram in Mermaid syntax, such as a flowchart or sequence diagram. Glass draws no links or images."
+                        }
+                      },
+                      "required": ["title", "kind", "mermaid"],
+                      "additionalProperties": false
+                    }
+                  }
+                ]
+              },
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Start the background task"
+                  }
+                ],
+                "timestamp": 1794704668491
+              },
+              {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is the diagram."
+                  }
+                ],
+                "api": "<pi-provider>-completions",
+                "provider": "glass-test",
+                "model": "gpt-test",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "stop",
+                "timestamp": 1794704668522,
+                "responseId": "test-completion",
+                "rawStopReason": "stop",
+                "durationMs": 18,
+                "thinkingLevel": "off"
+              }
+            ],
+            "willRetry": false
+          }
+        },
+        {
+          "in": {
+            "type": "agent_settled",
+            "aborted": false
+          }
+        },
+        {
+          "out": {
+            "type": "get_state",
+            "id": "glass-3"
+          }
+        },
+        {
+          "in": {
+            "id": "glass-3",
+            "type": "response",
+            "command": "get_state",
+            "success": true,
+            "data": {
+              "model": {
+                "id": "gpt-test",
+                "name": "gpt-test",
+                "api": "<pi-provider>-completions",
+                "provider": "glass-test",
+                "baseUrl": "<redacted>",
+                "reasoning": false,
+                "input": ["text", "image"],
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0
+                },
+                "contextWindow": 128000,
+                "maxTokens": 4096
+              },
+              "thinkingLevel": "off",
+              "isStreaming": false,
+              "isCompacting": false,
+              "steeringMode": "one-at-a-time",
+              "followUpMode": "one-at-a-time",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-15T01-04-28-293Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
+              "autoCompactionEnabled": true,
+              "messageCount": 3,
+              "pendingMessageCount": 0
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "agent_start"
+          }
+        },
+        {
+          "in": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "in": {
+            "type": "message_start",
+            "message": {
+              "role": "custom",
+              "customType": "report",
+              "content": "The background task finished.",
+              "display": true,
+              "timestamp": 1794704668544
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_end",
+            "message": {
+              "role": "custom",
+              "customType": "report",
+              "content": "The background task finished.",
+              "display": true,
+              "timestamp": 1794704668544
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": [],
+              "api": "<pi-provider>-completions",
+              "provider": "glass-test",
+              "model": "gpt-test",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1794704668546
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "assistantMessageEvent": {
+              "type": "text_start",
+              "contentIndex": 0
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "Here is the diagram."
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "assistantMessageEvent": {
+              "type": "text_end",
+              "contentIndex": 0,
+              "content": "Here is the diagram."
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is the diagram."
+                }
+              ],
+              "api": "<pi-provider>-completions",
+              "provider": "glass-test",
+              "model": "gpt-test",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 1794704668546,
+              "responseId": "test-completion",
+              "rawStopReason": "stop",
+              "durationMs": 2,
+              "thinkingLevel": "off"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "turn_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Here is the diagram."
+                }
+              ],
+              "api": "<pi-provider>-completions",
+              "provider": "glass-test",
+              "model": "gpt-test",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 1794704668546,
+              "responseId": "test-completion",
+              "rawStopReason": "stop",
+              "durationMs": 2,
+              "thinkingLevel": "off"
+            },
+            "toolResults": []
+          }
+        },
+        {
+          "in": {
+            "type": "agent_end",
+            "messages": [
+              {
+                "role": "custom",
+                "customType": "report",
+                "content": "The background task finished.",
+                "display": true,
+                "timestamp": 1794704668544
+              },
+              {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Here is the diagram."
+                  }
+                ],
+                "api": "<pi-provider>-completions",
+                "provider": "glass-test",
+                "model": "gpt-test",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "stop",
+                "timestamp": 1794704668546,
+                "responseId": "test-completion",
+                "rawStopReason": "stop",
+                "durationMs": 2,
+                "thinkingLevel": "off"
+              }
+            ],
+            "willRetry": false
+          }
+        },
+        {
+          "in": {
+            "type": "agent_settled",
+            "aborted": false
+          }
+        },
+        {
+          "out": {
+            "type": "get_state",
+            "id": "glass-4"
+          }
+        },
+        {
+          "in": {
+            "id": "glass-4",
+            "type": "response",
+            "command": "get_state",
+            "success": true,
+            "data": {
+              "model": {
+                "id": "gpt-test",
+                "name": "gpt-test",
+                "api": "<pi-provider>-completions",
+                "provider": "glass-test",
+                "baseUrl": "<redacted>",
+                "reasoning": false,
+                "input": ["text", "image"],
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0
+                },
+                "contextWindow": 128000,
+                "maxTokens": 4096
+              },
+              "thinkingLevel": "off",
+              "isStreaming": false,
+              "isCompacting": false,
+              "steeringMode": "one-at-a-time",
+              "followUpMode": "one-at-a-time",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-15T01-04-28-293Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
+              "autoCompactionEnabled": true,
+              "messageCount": 5,
+              "pendingMessageCount": 0
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "calls": []
+}

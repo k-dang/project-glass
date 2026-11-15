@@ -283,10 +283,17 @@ always have them; a Sandbox Agent has them only if the user picks them when crea
 _Avoid_: My skills, user skills
 
 **Turn**:
-One message to an Agent and its whole response. It ends done, failed, stopped by the user, cut off
+One message to an Agent and its whole response, or work a pi Agent starts on its own, such as
+when an extension's background task reports back. It ends done, failed, stopped by the user, cut off
 when Glass loses the Agent, or interrupted when Glass quits; a Sandbox Agent's Turn carries on
 while Glass is closed.
 _Avoid_: Run, execution, exchange
+
+**Extension status**:
+A short line one of a pi Agent's extensions shows about itself, such as a mode it is in or work it
+runs in the background. Glass shows it on the Agent whether or not a Turn is running, until the
+extension clears it or Glass loses the Agent.
+_Avoid_: Widget, banner
 
 **Diagram**:
 A named Mermaid picture an Agent draws beside its conversation when the user asks for one, labeled

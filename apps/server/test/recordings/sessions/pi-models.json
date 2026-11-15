@@ -22,17 +22,12 @@
               "models": [
                 {
                   "id": "<pi-model>",
-                  "name": "Claude Haiku 5.5",
-                  "api": "anthropic-messages",
-                  "baseUrl": "<redacted>",
+                  "name": "GPT-6 Luna",
+                  "api": "<pi-provider>-responses",
                   "provider": "<pi-provider>",
+                  "baseUrl": "<redacted>",
                   "reasoning": true,
                   "input": ["text", "image"],
-                  "compat": {
-                    "allowEmptySignature": true,
-                    "forceAdaptiveThinking": true,
-                    "supportsTemperature": false
-                  },
                   "cost": {
                     "input": 0.1,
                     "output": 0.5,
@@ -40,22 +35,38 @@
                     "cacheWrite": 0.125,
                     "tiers": [
                       {
-                        "inputTokensAbove": 100000,
-                        "input": 0.5,
-                        "output": 2.5,
-                        "cacheRead": 0.05,
-                        "cacheWrite": 0.625
+                        "inputTokensAbove": 272000,
+                        "input": 0.2,
+                        "output": 0.75,
+                        "cacheRead": 0.02,
+                        "cacheWrite": 0.25
                       }
                     ]
                   },
-                  "contextWindow": 1000000,
+                  "contextWindow": 272000,
                   "maxTokens": 128000,
                   "thinkingLevelMap": {
+                    "off": "none",
+                    "minimal": null,
+                    "low": "low",
+                    "medium": "medium",
+                    "high": "high",
                     "xhigh": "xhigh",
                     "max": "max"
                   },
+                  "compat": {
+                    "supportsStrictMode": true,
+                    "supportsOpenAIGrammarTools": true,
+                    "supportsAdditionalTools": true,
+                    "supportsToolSearch": true,
+                    "supportsMidConvoSystemMessages": true,
+                    "supportsExplicitPromptCacheMode": true,
+                    "supportsMidConvoEffort": true
+                  },
                   "inputLimits": {
+                    "maxRequestBytes": 536870912,
                     "images": {
+                      "maxPerRequest": 1500,
                       "resize": {
                         "maxWidth": 2000,
                         "maxHeight": 2000,
@@ -85,17 +96,12 @@
             "data": {
               "model": {
                 "id": "<pi-model>",
-                "name": "Claude Haiku 5.5",
-                "api": "anthropic-messages",
-                "baseUrl": "<redacted>",
+                "name": "GPT-6 Luna",
+                "api": "<pi-provider>-responses",
                 "provider": "<pi-provider>",
+                "baseUrl": "<redacted>",
                 "reasoning": true,
                 "input": ["text", "image"],
-                "compat": {
-                  "allowEmptySignature": true,
-                  "forceAdaptiveThinking": true,
-                  "supportsTemperature": false
-                },
                 "cost": {
                   "input": 0.1,
                   "output": 0.5,
@@ -103,22 +109,38 @@
                   "cacheWrite": 0.125,
                   "tiers": [
                     {
-                      "inputTokensAbove": 100000,
-                      "input": 0.5,
-                      "output": 2.5,
-                      "cacheRead": 0.05,
-                      "cacheWrite": 0.625
+                      "inputTokensAbove": 272000,
+                      "input": 0.2,
+                      "output": 0.75,
+                      "cacheRead": 0.02,
+                      "cacheWrite": 0.25
                     }
                   ]
                 },
-                "contextWindow": 1000000,
+                "contextWindow": 272000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
+                  "off": "none",
+                  "minimal": null,
+                  "low": "low",
+                  "medium": "medium",
+                  "high": "high",
                   "xhigh": "xhigh",
                   "max": "max"
                 },
+                "compat": {
+                  "supportsStrictMode": true,
+                  "supportsOpenAIGrammarTools": true,
+                  "supportsAdditionalTools": true,
+                  "supportsToolSearch": true,
+                  "supportsMidConvoSystemMessages": true,
+                  "supportsExplicitPromptCacheMode": true,
+                  "supportsMidConvoEffort": true
+                },
                 "inputLimits": {
+                  "maxRequestBytes": 536870912,
                   "images": {
+                    "maxPerRequest": 1500,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -134,8 +156,8 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<pi-home>--/2026-11-14T20-34-35-078Z_01a1dbc4-dfc6-7280-8d3e-249d854189fb.jsonl",
-              "sessionId": "01a1dbc4-dfc6-7280-8d3e-249d854189fb",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<pi-home>--/2026-11-15T01-04-52-249Z_01a1dcbc-5419-77ee-a462-a71212eed7f2.jsonl",
+              "sessionId": "01a1dcbc-5419-77ee-a462-a71212eed7f2",
               "autoCompactionEnabled": true,
               "messageCount": 0,
               "pendingMessageCount": 0

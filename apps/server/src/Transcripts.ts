@@ -3,6 +3,7 @@ import {
   AgentError,
   type AgentEvent,
   endTurnEvents,
+  ExtensionStatusesChanged,
   FeedbackNote,
   isRequestPart,
   isWaiting,
@@ -57,6 +58,7 @@ import {
   type ConversationWrite,
   stepConversation,
 } from "./conversationState"
+import type { HostEvent } from "./agentHost/protocol"
 import { recordUnit } from "./wideEvents"
 
 const encodePart = Schema.encodeSync(Schema.fromJsonString(TurnPart))
@@ -159,6 +161,7 @@ const decodePositions = Schema.decodeUnknownEffect(
 interface Published {
   readonly agentId: string
   readonly update: TranscriptUpdate
+  readonly reported?: boolean
 }
 
 export interface WaitingRequest {
@@ -224,7 +227,7 @@ export class Transcripts extends Context.Service<
   {
     readonly save: (
       agentId: string,
-      events: ReadonlyArray<AgentEvent>,
+      events: ReadonlyArray<HostEvent>,
       throughJournalEntry?: number,
     ) => Effect.Effect<void, AgentError>
     readonly watch: (agentId: string) => Stream.Stream<TranscriptUpdate, AgentError>
@@ -284,6 +287,22 @@ export class Transcripts extends Context.Service<
       const published = yield* PubSub.unbounded<Published>()
       const locks = new Map<string, Semaphore.Semaphore>()
       const statuses = new Map<string, string>()
+      const extensionStatuses = new Map<string, ReadonlyArray<string>>()
+
+      const setExtensionStatuses = (agentId: string, shown: ReadonlyArray<string>) =>
+        lockFor(agentId).withPermits(1)(
+          Effect.suspend(() => {
+            if (shown.length === 0 && !extensionStatuses.has(agentId)) return Effect.void
+
+            if (shown.length === 0) extensionStatuses.delete(agentId)
+            else extensionStatuses.set(agentId, shown)
+
+            return PubSub.publish(published, {
+              agentId,
+              update: ExtensionStatusesChanged.make({ extensionStatuses: shown }),
+            })
+          }),
+        )
 
       const waitingParts = (agentId?: string) =>
         sql`
@@ -536,11 +555,16 @@ export class Transcripts extends Context.Service<
 
       const changeWith = <A, E, R>(
         agentId: string,
-        effect: Effect.Effect<readonly [A, ReadonlyArray<TranscriptUpdate>], E, R>,
+        effect: Effect.Effect<
+          readonly [A, ReadonlyArray<TranscriptUpdate>, ReadonlyArray<AgentEvent>?],
+          E,
+          R
+        >,
       ) =>
         lockFor(agentId).withPermits(1)(
           Effect.gen(function* () {
-            const [decided, updates] = yield* sql.withTransaction(effect)
+            const [decided, decidedUpdates, reported = []] = yield* sql.withTransaction(effect)
+            const updates: ReadonlyArray<TranscriptUpdate> = [...reported, ...decidedUpdates]
 
             if (updates.some(changesRequest))
               yield* markWaiting(
@@ -552,7 +576,11 @@ export class Transcripts extends Context.Service<
 
             yield* PubSub.publishAll(
               published,
-              updates.map((update) => ({ agentId, update })),
+              updates.map((update, index) => ({
+                agentId,
+                update,
+                reported: index < reported.length,
+              })),
             )
 
             return decided
@@ -607,10 +635,18 @@ export class Transcripts extends Context.Service<
 
       const save = (
         agentId: string,
-        events: ReadonlyArray<AgentEvent>,
+        hostEvents: ReadonlyArray<HostEvent>,
         throughJournalEntry?: number,
-      ) =>
-        changeWith(
+      ) => {
+        const events = hostEvents.filter(
+          (event): event is AgentEvent => !Predicate.isTagged(event, "ExtensionStatusesChanged"),
+        )
+
+        const shown = hostEvents.findLast((event) =>
+          Predicate.isTagged(event, "ExtensionStatusesChanged"),
+        )
+
+        return changeWith(
           agentId,
           Effect.gen(function* () {
             if (throughJournalEntry !== undefined)
@@ -626,7 +662,7 @@ export class Transcripts extends Context.Service<
               step(agentId, { type: "turnEnded", ending }),
             )
 
-            return [ended, [...written, ...next.flatMap(({ updates }) => updates)]] as const
+            return [ended, next.flatMap(({ updates }) => updates), written] as const
           }),
         ).pipe(
           Effect.tapError((cause) => Effect.logWarning("Couldn't save a transcript", cause)),
@@ -636,7 +672,13 @@ export class Transcripts extends Context.Service<
               Effect.catch((cause) => Effect.logWarning("Couldn't describe an ended Turn", cause)),
             ),
           ),
+          Effect.andThen(
+            shown === undefined
+              ? Effect.void
+              : setExtensionStatuses(agentId, shown.extensionStatuses),
+          ),
         )
+      }
 
       const snapshot = Effect.fnUntraced(function* (agentId: string) {
         const turns = yield* decodeTurns(
@@ -663,6 +705,7 @@ export class Transcripts extends Context.Service<
           })),
           queued: yield* queued(agentId),
           status: statuses.get(agentId) ?? null,
+          extensionStatuses: extensionStatuses.get(agentId) ?? [],
         })
       })
 
@@ -701,6 +744,10 @@ export class Transcripts extends Context.Service<
 
           yield* save(runningAgent, events.flat())
         }
+
+        yield* Effect.forEach(agentIds, (agentId) => setExtensionStatuses(agentId, []), {
+          discard: true,
+        })
       })
 
       const withStorageFailure = <A, E, R>(name: string, effect: Effect.Effect<A, E, R>) =>
@@ -881,8 +928,8 @@ export class Transcripts extends Context.Service<
         subscribeStarted: PubSub.subscribe(published).pipe(
           Effect.map((live) =>
             Stream.fromSubscription(live).pipe(
-              Stream.flatMap(({ agentId, update }) =>
-                Predicate.isTagged(update, "TurnStarted")
+              Stream.flatMap(({ agentId, update, reported }) =>
+                Predicate.isTagged(update, "TurnStarted") && !reported
                   ? Stream.succeed({ ...update, agentId })
                   : Stream.empty,
               ),
@@ -958,6 +1005,7 @@ export class Transcripts extends Context.Service<
           )
           locks.delete(agentId)
           statuses.delete(agentId)
+          extensionStatuses.delete(agentId)
           yield* markWaiting(agentId, [])
           yield* setUnseen(agentId, undefined)
         }, Effect.mapError(storageFailure)),

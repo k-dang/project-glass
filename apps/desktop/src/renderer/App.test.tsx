@@ -533,6 +533,7 @@ it("starts the Global conversation fresh once confirmed and reads a past one", a
         ],
         queued: [],
         status: null,
+        extensionStatuses: [],
       }),
   })
 

@@ -3,12 +3,14 @@ import { assert, it } from "@effect/vitest"
 import {
   applyTranscriptUpdate,
   emptyTranscript,
+  ExtensionStatusesChanged,
   PartSet,
   ToolCallPart,
   TurnCutOff,
   TurnDone,
   TurnEnded,
   TurnFailed,
+  TurnStarted,
   TurnStopped,
 } from "@glass/contracts"
 import { DateTime, Effect, Layer, Option, Schema, Stream } from "effect"
@@ -56,6 +58,52 @@ it.live(
         ["Then docs"],
       )
     }).pipe(Effect.provide(transcriptsLayer)),
+)
+
+it.live("hands its program only the Turns Glass started, not one the Agent started itself", () =>
+  Effect.gen(function* () {
+    const transcripts = yield* Transcripts
+    const started = yield* transcripts.subscribeStarted
+    const at = yield* DateTime.now
+
+    yield* transcripts.save("agent-1", [
+      TurnStarted.make({
+        turnId: "woke",
+        message: "",
+        images: [],
+        context: null,
+        feedback: [],
+        sentAt: at,
+      }),
+    ])
+    yield* transcripts.startOrQueue("agent-1", { message: "Next", images: [], context: null })
+    yield* transcripts.save("agent-1", [
+      TurnEnded.make({ turnId: "woke", ended: { at, ending: TurnDone.make({}) } }),
+    ])
+
+    const first = Option.getOrThrow(yield* Stream.runHead(started))
+    assert.equal(first.message, "Next")
+
+    const { turns } = yield* transcripts.read("agent-1")
+    assert.deepStrictEqual(
+      turns.map(({ message }) => message),
+      ["", "Next"],
+    )
+  }).pipe(Effect.scoped, Effect.provide(transcriptsLayer)),
+)
+
+it.live("shows an Agent's extension statuses until Glass loses the Agent", () =>
+  Effect.gen(function* () {
+    const transcripts = yield* Transcripts
+
+    yield* transcripts.save("agent-1", [
+      ExtensionStatusesChanged.make({ extensionStatuses: ["Plan mode"] }),
+    ])
+    assert.deepStrictEqual((yield* transcripts.read("agent-1")).extensionStatuses, ["Plan mode"])
+
+    yield* transcripts.endRunning(TurnCutOff.make({}), ["agent-1"])
+    assert.deepStrictEqual((yield* transcripts.read("agent-1")).extensionStatuses, [])
+  }).pipe(Effect.provide(transcriptsLayer)),
 )
 
 const TurnUnit = Schema.Struct({

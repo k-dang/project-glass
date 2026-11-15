@@ -5,6 +5,7 @@ import {
   AgentChanges,
   AnswerQuestion,
   DenyRequest,
+  ExtensionStatusesChanged,
   PermissionRequestPart,
   QuestionPart,
   type RequestAnswer,
@@ -144,6 +145,38 @@ it("marks the finished Turn seen once Glass is focused on the Agent's Chat", asy
     expect(seen).toEqual([{ agentId: agent.id, endedAt: DateTime.formatIso(endedAt) }]),
   )
   focused.mockRestore()
+})
+
+it("shows the statuses the Agent's extensions set while no Turn runs, until they clear", async () => {
+  const cleared = Deferred.makeUnsafe<void>()
+
+  mount({
+    WatchTranscript: () =>
+      Stream.make(
+        TranscriptSnapshot.make({
+          turns: [],
+          queued: [],
+          status: null,
+          extensionStatuses: ["Explore: Trace composer to harness"],
+        }),
+      ).pipe(
+        Stream.concat(
+          Stream.fromEffect(
+            Deferred.await(cleared).pipe(
+              Effect.as(ExtensionStatusesChanged.make({ extensionStatuses: [] })),
+            ),
+          ),
+        ),
+      ),
+  })
+
+  const statuses = await screen.findByRole("status", { name: "Extension statuses" })
+  expect(within(statuses).getByText("Explore: Trace composer to harness")).toBeTruthy()
+
+  Deferred.doneUnsafe(cleared, Exit.void)
+  await waitFor(() =>
+    expect(screen.queryByRole("status", { name: "Extension statuses" })).toBeNull(),
+  )
 })
 
 it("sends a message with Enter and clears the composer", async () => {

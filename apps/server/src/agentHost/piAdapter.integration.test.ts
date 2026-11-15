@@ -11,6 +11,7 @@ import {
   TurnStopped,
 } from "@glass/contracts"
 import { Effect, Predicate, Schema } from "effect"
+import { mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import {
   writeGreetPack,
@@ -124,6 +125,86 @@ it.live("ends a Turn when pi settles after retrying, not at the first agent_end"
 
     assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
     assert.deepInclude(turn?.parts ?? [], TextPart.make({ text: "Recovered." }))
+  }).pipe(Effect.scoped),
+)
+
+it.live("opens a Turn for work a pi extension starts after the last Turn ended", () =>
+  Effect.gen(function* () {
+    const f = yield* piSession("pi-woken", { fake: { output: "Here is the diagram." } })
+    const signals = join(f.home, "signals")
+    mkdirSync(signals)
+    yield* f.extension(
+      "report.js",
+      `import { watch } from "node:fs"
+export default (pi) => {
+  const watcher = watch(${JSON.stringify(signals)}, () => {
+    watcher.close()
+    pi.sendMessage(
+      { customType: "report", content: "The background task finished.", display: true },
+      { triggerTurn: true },
+    )
+  })
+}`,
+    )
+    const agent = yield* f.open(conversation)
+
+    yield* agent.send("Start the background task")
+    yield* f.until(settled(1))
+    writeFileSync(join(signals, "finished"), "")
+    const [, woken] = yield* f.until(settled(2))
+
+    assert.equal(woken?.message, "")
+    assert.deepStrictEqual(woken?.ended?.ending, TurnDone.make({}))
+    assert.deepStrictEqual(lastText(woken), TextPart.make({ text: "Here is the diagram." }))
+  }).pipe(Effect.scoped),
+)
+
+it.live("reports a pi extension's statuses as plain text, outside any Turn", () =>
+  Effect.gen(function* () {
+    const f = yield* piSession("pi-extension-statuses", { fake: { output: "Done." } })
+    yield* f.extension(
+      "mode.js",
+      `export default (pi) => {
+  pi.on("session_start", (_event, ctx) => ctx.ui.setStatus("mode", "\\u001b[33mPlan mode\\u001b[39m"))
+  pi.registerCommand("leave", { handler: async (_args, ctx) => ctx.ui.setStatus("mode", undefined) })
+}`,
+    )
+    const agent = yield* f.open(conversation)
+
+    yield* f.untilStatuses((statuses) => statuses.length > 0)
+    assert.deepStrictEqual(yield* f.statuses, ["Plan mode"])
+
+    yield* agent.send("/leave")
+    yield* f.untilStatuses((statuses) => statuses.length === 0)
+  }).pipe(Effect.scoped),
+)
+
+it.live("shows the subagents pi-subagents runs as a status until they finish", () =>
+  Effect.gen(function* () {
+    const f = yield* piSession("pi-subagent-status", { fake: { output: "Done." } })
+    yield* f.extension(
+      "fake-subagents.js",
+      `export default (pi) => {
+  pi.registerCommand("spawn", {
+    handler: async () =>
+      pi.events.emit("subagents:started", { id: "a1", type: "Explore", description: "Trace composer to harness" }),
+  })
+  pi.registerCommand("finish", {
+    handler: async () => pi.events.emit("subagents:completed", { id: "a1" }),
+  })
+}`,
+    )
+    const agent = yield* f.open(conversation)
+
+    yield* agent.send("/spawn")
+    yield* f.untilStatuses((statuses) => statuses.length > 0)
+    assert.deepStrictEqual(yield* f.statuses, [
+      "Running a subagent: Explore: Trace composer to harness",
+    ])
+
+    yield* f.until(settled(1))
+    yield* agent.send("/finish")
+    yield* f.untilStatuses((statuses) => statuses.length === 0)
   }).pipe(Effect.scoped),
 )
 

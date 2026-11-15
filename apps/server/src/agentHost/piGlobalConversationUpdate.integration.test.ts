@@ -1,7 +1,7 @@
 import { SessionManager } from "@earendil-works/pi-coding-agent"
 import { NodeServices } from "@effect/platform-node"
 import { assert, it } from "@effect/vitest"
-import { AgentOutcome, type AgentEvent, TextPart, GlobalConversationUpdate } from "@glass/contracts"
+import { AgentOutcome, TextPart, GlobalConversationUpdate } from "@glass/contracts"
 import { Deferred, Effect, Exit, Predicate, Scope } from "effect"
 import { randomUUID } from "node:crypto"
 import { writeFileSync } from "node:fs"
@@ -12,7 +12,7 @@ import { fakeModelProvider, lastUserText } from "../../test/fakeModelProvider"
 import { isolatedHome, stubHome } from "../../test/harness"
 import { piAdapter } from "./piAdapter"
 import { globalConversationUpdateDelivery } from "./piGlobalConversationUpdate"
-import { WorkRole } from "./protocol"
+import { type HostEvent, WorkRole } from "./protocol"
 
 const sent = {
   message: "",
@@ -43,7 +43,7 @@ const fixture = Effect.gen(function* () {
       const scope = yield* Scope.make()
       yield* Effect.addFinalizer(() => Scope.close(scope, Exit.void))
       const ended = yield* Deferred.make<void>()
-      const events: Array<AgentEvent> = []
+      const events: Array<HostEvent> = []
 
       const session = yield* adapter
         .start({
@@ -201,7 +201,7 @@ it.live(
     `,
       )
       const adapter = yield* piAdapter(command)
-      const events: Array<AgentEvent> = []
+      const events: Array<HostEvent> = []
 
       const session = yield* adapter.start({
         folder: home,

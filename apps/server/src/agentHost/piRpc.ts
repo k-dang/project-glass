@@ -68,6 +68,8 @@ const PiEvent = Schema.Union([
     title: Schema.optional(Schema.String),
     message: Schema.optional(Schema.String),
     options: Schema.optional(Schema.Array(Schema.String)),
+    statusKey: Schema.optional(Schema.String),
+    statusText: Schema.optional(Schema.String),
     /** Milliseconds until pi stops waiting for an answer. */
     timeout: Schema.optional(Schema.Number),
   }),

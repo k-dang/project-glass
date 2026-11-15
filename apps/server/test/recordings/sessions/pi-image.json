@@ -9,7 +9,9 @@
         "--session-id",
         "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
         "--extension",
-        "<folder>.pi/draw-diagram.mjs"
+        "<folder>.pi/draw-diagram.mjs",
+        "--extension",
+        "<folder>.pi/subagent-status.js"
       ],
       "cwd": "<folder>",
       "frames": [
@@ -28,17 +30,12 @@
             "data": {
               "model": {
                 "id": "<pi-model>",
-                "name": "Claude Haiku 5.5",
-                "api": "anthropic-messages",
-                "baseUrl": "<redacted>",
+                "name": "GPT-6 Luna",
+                "api": "<pi-provider>-responses",
                 "provider": "<pi-provider>",
+                "baseUrl": "<redacted>",
                 "reasoning": true,
                 "input": ["text", "image"],
-                "compat": {
-                  "allowEmptySignature": true,
-                  "forceAdaptiveThinking": true,
-                  "supportsTemperature": false
-                },
                 "cost": {
                   "input": 0.1,
                   "output": 0.5,
@@ -46,22 +43,38 @@
                   "cacheWrite": 0.125,
                   "tiers": [
                     {
-                      "inputTokensAbove": 100000,
-                      "input": 0.5,
-                      "output": 2.5,
-                      "cacheRead": 0.05,
-                      "cacheWrite": 0.625
+                      "inputTokensAbove": 272000,
+                      "input": 0.2,
+                      "output": 0.75,
+                      "cacheRead": 0.02,
+                      "cacheWrite": 0.25
                     }
                   ]
                 },
-                "contextWindow": 1000000,
+                "contextWindow": 272000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
+                  "off": "none",
+                  "minimal": null,
+                  "low": "low",
+                  "medium": "medium",
+                  "high": "high",
                   "xhigh": "xhigh",
                   "max": "max"
                 },
+                "compat": {
+                  "supportsStrictMode": true,
+                  "supportsOpenAIGrammarTools": true,
+                  "supportsAdditionalTools": true,
+                  "supportsToolSearch": true,
+                  "supportsMidConvoSystemMessages": true,
+                  "supportsExplicitPromptCacheMode": true,
+                  "supportsMidConvoEffort": true
+                },
                 "inputLimits": {
+                  "maxRequestBytes": 536870912,
                   "images": {
+                    "maxPerRequest": 1500,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -77,7 +90,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-14T20-34-32-044Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-15T01-04-49-661Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -127,7 +140,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794688472262,
+              "timestamp": 1794704689943,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -270,7 +283,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794688472262,
+              "timestamp": 1794704689943,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -422,7 +435,7 @@
                   "mimeType": "image/png"
                 }
               ],
-              "timestamp": 1794688472260
+              "timestamp": 1794704689941
             }
           }
         },
@@ -442,7 +455,7 @@
                   "mimeType": "image/png"
                 }
               ],
-              "timestamp": 1794688472260
+              "timestamp": 1794704689941
             }
           }
         },
@@ -452,7 +465,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-responses",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -470,7 +483,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794688472280
+              "timestamp": 1794704689971
             }
           }
         },
@@ -489,11 +502,10 @@
                 "cacheRead": 0,
                 "cacheWrite": 0,
                 "total": 0
-              },
-              "cacheWrite1h": 0
+              }
             },
             "assistantMessageEvent": {
-              "type": "thinking_start",
+              "type": "text_start",
               "contentIndex": 0
             }
           }
@@ -513,512 +525,12 @@
                 "cacheRead": 0,
                 "cacheWrite": 0,
                 "total": 0
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": "The image is very"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": " small and"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": " bl"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": "urry, m"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": "ostly a pale green field with"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": " no"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": " clear details I can make out."
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": " I'll"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": " answ"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": "er in"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": " one short sentence and"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": " be"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": " up"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": "front that"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": " it"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": "'s hard to see."
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": "\n\n"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": ""
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_end",
-              "contentIndex": 0,
-              "content": "The image is very small and blurry, mostly a pale green field with no clear details I can make out. I'll answer in one short sentence and be upfront that it's hard to see.\n\n"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "text_start",
-              "contentIndex": 1
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              },
-              "cacheWrite1h": 0
+              }
             },
             "assistantMessageEvent": {
               "type": "text_delta",
-              "contentIndex": 1,
-              "delta": "It"
+              "contentIndex": 0,
+              "delta": "A"
             }
           }
         },
@@ -1037,13 +549,12 @@
                 "cacheRead": 0,
                 "cacheWrite": 0,
                 "total": 0
-              },
-              "cacheWrite1h": 0
+              }
             },
             "assistantMessageEvent": {
               "type": "text_delta",
-              "contentIndex": 1,
-              "delta": "'s a t"
+              "contentIndex": 0,
+              "delta": " blurry"
             }
           }
         },
@@ -1062,13 +573,12 @@
                 "cacheRead": 0,
                 "cacheWrite": 0,
                 "total": 0
-              },
-              "cacheWrite1h": 0
+              }
             },
             "assistantMessageEvent": {
               "type": "text_delta",
-              "contentIndex": 1,
-              "delta": "iny, bl"
+              "contentIndex": 0,
+              "delta": " outdoor"
             }
           }
         },
@@ -1087,13 +597,12 @@
                 "cacheRead": 0,
                 "cacheWrite": 0,
                 "total": 0
-              },
-              "cacheWrite1h": 0
+              }
             },
             "assistantMessageEvent": {
               "type": "text_delta",
-              "contentIndex": 1,
-              "delta": "urry image that"
+              "contentIndex": 0,
+              "delta": " scene"
             }
           }
         },
@@ -1112,13 +621,12 @@
                 "cacheRead": 0,
                 "cacheWrite": 0,
                 "total": 0
-              },
-              "cacheWrite1h": 0
+              }
             },
             "assistantMessageEvent": {
               "type": "text_delta",
-              "contentIndex": 1,
-              "delta": " looks mostly like a p"
+              "contentIndex": 0,
+              "delta": " shows"
             }
           }
         },
@@ -1137,13 +645,12 @@
                 "cacheRead": 0,
                 "cacheWrite": 0,
                 "total": 0
-              },
-              "cacheWrite1h": 0
+              }
             },
             "assistantMessageEvent": {
               "type": "text_delta",
-              "contentIndex": 1,
-              "delta": "ale green gradient, with no"
+              "contentIndex": 0,
+              "delta": " a"
             }
           }
         },
@@ -1162,13 +669,12 @@
                 "cacheRead": 0,
                 "cacheWrite": 0,
                 "total": 0
-              },
-              "cacheWrite1h": 0
+              }
             },
             "assistantMessageEvent": {
               "type": "text_delta",
-              "contentIndex": 1,
-              "delta": " clear details I"
+              "contentIndex": 0,
+              "delta": " person"
             }
           }
         },
@@ -1187,13 +693,12 @@
                 "cacheRead": 0,
                 "cacheWrite": 0,
                 "total": 0
-              },
-              "cacheWrite1h": 0
+              }
             },
             "assistantMessageEvent": {
               "type": "text_delta",
-              "contentIndex": 1,
-              "delta": " can make out."
+              "contentIndex": 0,
+              "delta": " standing"
             }
           }
         },
@@ -1212,13 +717,180 @@
                 "cacheRead": 0,
                 "cacheWrite": 0,
                 "total": 0
-              },
-              "cacheWrite1h": 0
+              }
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": " near"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": " a"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": " fence"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": " and"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": " some"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": " trees"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "."
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
             },
             "assistantMessageEvent": {
               "type": "text_end",
-              "contentIndex": 1,
-              "content": "It's a tiny, blurry image that looks mostly like a pale green gradient, with no clear details I can make out."
+              "contentIndex": 0,
+              "content": "A blurry outdoor scene shows a person standing near a fence and some trees."
             }
           }
         },
@@ -1229,16 +901,12 @@
               "role": "assistant",
               "content": [
                 {
-                  "type": "thinking",
-                  "thinking": "The image is very small and blurry, mostly a pale green field with no clear details I can make out. I'll answer in one short sentence and be upfront that it's hard to see.\n\n",
-                  "thinkingSignature": "CAQSlwcKEAgTGAI4AUIIdGhpbmtpbmcSDOVa2aN1emrI+Oq1ThoMcKMX82v+MzKXepRRIjBJFxiJdbO4dxczMKiaKR9J6ysAprpWjo3uk5yYhMEYalk53wzj65tSsmxwIGJJeBEqtAZzwIem7aI0jlfO/F1q63Nb/1M/EhIXN85tNHfpIoqz+N+kH8NDzB2j8+kr6H+nCUFptA3oCf9qhQvz0/rkxCb0QOOVZ2NNWElXeAThEDdCsGpvQ3JTjOdlXz8jvX5wrYiiXjkm/NCgziuz/Rt2E8Cmc4qs9hH2DflBMwn+n2GmklnGEte/qeRZhkqnJiDaCuWQV1LAzdBX1zpMKGdagojPPO75GwPm7jVFZA4oOiTA31mchn6vqaTg72fE7NwG8a2RkaqbEMzGNjnYFSBTaiYUzv9Ldc9sQYEoOlix8w10VU2GeAE4t2o7fQKK72pSpfT7qKWF3dVhZcwhAnFACXCFttfbQSHMU7f+A6hS8aqFgmlXjA3hJfb1UDXhZIpHS9ljebEWBEDm2n21+HZIVC+pJdKFt+ortHPC1uo3uytJVQkLMSZ/TYHfQbUZ5xVFrc/sTN7w9UxmOdfvUSFA1afiHZJ6TdbAwFszBqlaAZSjzpssoplXaSK8/8GDYvDysB28ddQW/2KV6wVP5Cirj4V8gM5ZUBOABtQXPfno/uoIhNPHL73nGRW6Ge3mpkOQ/qteVs0wcLx4dxVBr8zZFbvXFR7++Cj4D6BmItiGgBJsFIcz05yB48sRsx7hNOwolH+dOK9b2KKS/IK7gF6nIn7qOeU9gaA4iPbezia4ENoxd4GKhDjC79Fx3rgSII39fdatz7/gJMzrbjJfJqofZ1kCTYGacOjONQNGgB9LXLmKupgd12BYWtd2arD7lKsreCy0CBHR/0dKgFSvgr9q+j2esM/+9paNrB0UKL99VLmQjNTUZFWcAfu6oO4mQQJI++n2scDUbEZKv5Jq0tZVDNW52vxKixdSU0G94U8QwrrlZMU+tEXdqAZelovpeTM5UwGXyLs2SUs5Xg8J80GRRPWWPseGeZVPdD6yWVw5W1cL4PduA4kZiGquP2eKlRkTskzKQa8R+HcWmio4Bcd93aj4LVZM02NSYLMSObCO6k2IADTOGiRX9Dnnpy9Z9DxWy5V99QH7pPEkjE22U2dBhQuMIbhos2XfnTJcOpSqTnrXfv350RzbQHeZoE47iVQYa8XC9Vb0GAE="
-                },
-                {
                   "type": "text",
-                  "text": "It's a tiny, blurry image that looks mostly like a pale green gradient, with no clear details I can make out."
+                  "text": "A blurry outdoor scene shows a person standing near a fence and some trees.",
+                  "textSignature": "{\"v\":1,\"id\":\"msg_04cf6cab823bcbe1016af90533445487d2b1c8d542e396dfa7\",\"phase\":\"final_answer\"}"
                 }
               ],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-responses",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -1246,6 +914,7 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
+                "reasoning": 0,
                 "totalTokens": 0,
                 "cost": {
                   "input": 0,
@@ -1253,14 +922,13 @@
                   "cacheRead": 0,
                   "cacheWrite": 0,
                   "total": 0
-                },
-                "cacheWrite1h": 0
+                }
               },
               "stopReason": "stop",
-              "timestamp": 1794688472280,
-              "responseId": "gen_01M7DW9N97K06FDTQBM98JYDQF",
-              "rawStopReason": "end_turn",
-              "durationMs": 1948,
+              "timestamp": 1794704689971,
+              "responseId": "resp_04cf6cab823bcbe1016af905328c2087d29b7c29a8e1cde88d",
+              "rawStopReason": "completed",
+              "durationMs": 1653,
               "thinkingLevel": "medium"
             }
           }
@@ -1272,16 +940,12 @@
               "role": "assistant",
               "content": [
                 {
-                  "type": "thinking",
-                  "thinking": "The image is very small and blurry, mostly a pale green field with no clear details I can make out. I'll answer in one short sentence and be upfront that it's hard to see.\n\n",
-                  "thinkingSignature": "CAQSlwcKEAgTGAI4AUIIdGhpbmtpbmcSDOVa2aN1emrI+Oq1ThoMcKMX82v+MzKXepRRIjBJFxiJdbO4dxczMKiaKR9J6ysAprpWjo3uk5yYhMEYalk53wzj65tSsmxwIGJJeBEqtAZzwIem7aI0jlfO/F1q63Nb/1M/EhIXN85tNHfpIoqz+N+kH8NDzB2j8+kr6H+nCUFptA3oCf9qhQvz0/rkxCb0QOOVZ2NNWElXeAThEDdCsGpvQ3JTjOdlXz8jvX5wrYiiXjkm/NCgziuz/Rt2E8Cmc4qs9hH2DflBMwn+n2GmklnGEte/qeRZhkqnJiDaCuWQV1LAzdBX1zpMKGdagojPPO75GwPm7jVFZA4oOiTA31mchn6vqaTg72fE7NwG8a2RkaqbEMzGNjnYFSBTaiYUzv9Ldc9sQYEoOlix8w10VU2GeAE4t2o7fQKK72pSpfT7qKWF3dVhZcwhAnFACXCFttfbQSHMU7f+A6hS8aqFgmlXjA3hJfb1UDXhZIpHS9ljebEWBEDm2n21+HZIVC+pJdKFt+ortHPC1uo3uytJVQkLMSZ/TYHfQbUZ5xVFrc/sTN7w9UxmOdfvUSFA1afiHZJ6TdbAwFszBqlaAZSjzpssoplXaSK8/8GDYvDysB28ddQW/2KV6wVP5Cirj4V8gM5ZUBOABtQXPfno/uoIhNPHL73nGRW6Ge3mpkOQ/qteVs0wcLx4dxVBr8zZFbvXFR7++Cj4D6BmItiGgBJsFIcz05yB48sRsx7hNOwolH+dOK9b2KKS/IK7gF6nIn7qOeU9gaA4iPbezia4ENoxd4GKhDjC79Fx3rgSII39fdatz7/gJMzrbjJfJqofZ1kCTYGacOjONQNGgB9LXLmKupgd12BYWtd2arD7lKsreCy0CBHR/0dKgFSvgr9q+j2esM/+9paNrB0UKL99VLmQjNTUZFWcAfu6oO4mQQJI++n2scDUbEZKv5Jq0tZVDNW52vxKixdSU0G94U8QwrrlZMU+tEXdqAZelovpeTM5UwGXyLs2SUs5Xg8J80GRRPWWPseGeZVPdD6yWVw5W1cL4PduA4kZiGquP2eKlRkTskzKQa8R+HcWmio4Bcd93aj4LVZM02NSYLMSObCO6k2IADTOGiRX9Dnnpy9Z9DxWy5V99QH7pPEkjE22U2dBhQuMIbhos2XfnTJcOpSqTnrXfv350RzbQHeZoE47iVQYa8XC9Vb0GAE="
-                },
-                {
                   "type": "text",
-                  "text": "It's a tiny, blurry image that looks mostly like a pale green gradient, with no clear details I can make out."
+                  "text": "A blurry outdoor scene shows a person standing near a fence and some trees.",
+                  "textSignature": "{\"v\":1,\"id\":\"msg_04cf6cab823bcbe1016af90533445487d2b1c8d542e396dfa7\",\"phase\":\"final_answer\"}"
                 }
               ],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-responses",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -1289,6 +953,7 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
+                "reasoning": 0,
                 "totalTokens": 0,
                 "cost": {
                   "input": 0,
@@ -1296,14 +961,13 @@
                   "cacheRead": 0,
                   "cacheWrite": 0,
                   "total": 0
-                },
-                "cacheWrite1h": 0
+                }
               },
               "stopReason": "stop",
-              "timestamp": 1794688472280,
-              "responseId": "gen_01M7DW9N97K06FDTQBM98JYDQF",
-              "rawStopReason": "end_turn",
-              "durationMs": 1948,
+              "timestamp": 1794704689971,
+              "responseId": "resp_04cf6cab823bcbe1016af905328c2087d29b7c29a8e1cde88d",
+              "rawStopReason": "completed",
+              "durationMs": 1653,
               "thinkingLevel": "medium"
             },
             "toolResults": []
@@ -1317,7 +981,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1794688472262,
+                "timestamp": 1794704689943,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -1464,22 +1128,18 @@
                     "mimeType": "image/png"
                   }
                 ],
-                "timestamp": 1794688472260
+                "timestamp": 1794704689941
               },
               {
                 "role": "assistant",
                 "content": [
                   {
-                    "type": "thinking",
-                    "thinking": "The image is very small and blurry, mostly a pale green field with no clear details I can make out. I'll answer in one short sentence and be upfront that it's hard to see.\n\n",
-                    "thinkingSignature": "CAQSlwcKEAgTGAI4AUIIdGhpbmtpbmcSDOVa2aN1emrI+Oq1ThoMcKMX82v+MzKXepRRIjBJFxiJdbO4dxczMKiaKR9J6ysAprpWjo3uk5yYhMEYalk53wzj65tSsmxwIGJJeBEqtAZzwIem7aI0jlfO/F1q63Nb/1M/EhIXN85tNHfpIoqz+N+kH8NDzB2j8+kr6H+nCUFptA3oCf9qhQvz0/rkxCb0QOOVZ2NNWElXeAThEDdCsGpvQ3JTjOdlXz8jvX5wrYiiXjkm/NCgziuz/Rt2E8Cmc4qs9hH2DflBMwn+n2GmklnGEte/qeRZhkqnJiDaCuWQV1LAzdBX1zpMKGdagojPPO75GwPm7jVFZA4oOiTA31mchn6vqaTg72fE7NwG8a2RkaqbEMzGNjnYFSBTaiYUzv9Ldc9sQYEoOlix8w10VU2GeAE4t2o7fQKK72pSpfT7qKWF3dVhZcwhAnFACXCFttfbQSHMU7f+A6hS8aqFgmlXjA3hJfb1UDXhZIpHS9ljebEWBEDm2n21+HZIVC+pJdKFt+ortHPC1uo3uytJVQkLMSZ/TYHfQbUZ5xVFrc/sTN7w9UxmOdfvUSFA1afiHZJ6TdbAwFszBqlaAZSjzpssoplXaSK8/8GDYvDysB28ddQW/2KV6wVP5Cirj4V8gM5ZUBOABtQXPfno/uoIhNPHL73nGRW6Ge3mpkOQ/qteVs0wcLx4dxVBr8zZFbvXFR7++Cj4D6BmItiGgBJsFIcz05yB48sRsx7hNOwolH+dOK9b2KKS/IK7gF6nIn7qOeU9gaA4iPbezia4ENoxd4GKhDjC79Fx3rgSII39fdatz7/gJMzrbjJfJqofZ1kCTYGacOjONQNGgB9LXLmKupgd12BYWtd2arD7lKsreCy0CBHR/0dKgFSvgr9q+j2esM/+9paNrB0UKL99VLmQjNTUZFWcAfu6oO4mQQJI++n2scDUbEZKv5Jq0tZVDNW52vxKixdSU0G94U8QwrrlZMU+tEXdqAZelovpeTM5UwGXyLs2SUs5Xg8J80GRRPWWPseGeZVPdD6yWVw5W1cL4PduA4kZiGquP2eKlRkTskzKQa8R+HcWmio4Bcd93aj4LVZM02NSYLMSObCO6k2IADTOGiRX9Dnnpy9Z9DxWy5V99QH7pPEkjE22U2dBhQuMIbhos2XfnTJcOpSqTnrXfv350RzbQHeZoE47iVQYa8XC9Vb0GAE="
-                  },
-                  {
                     "type": "text",
-                    "text": "It's a tiny, blurry image that looks mostly like a pale green gradient, with no clear details I can make out."
+                    "text": "A blurry outdoor scene shows a person standing near a fence and some trees.",
+                    "textSignature": "{\"v\":1,\"id\":\"msg_04cf6cab823bcbe1016af90533445487d2b1c8d542e396dfa7\",\"phase\":\"final_answer\"}"
                   }
                 ],
-                "api": "anthropic-messages",
+                "api": "<pi-provider>-responses",
                 "provider": "<pi-provider>",
                 "model": "<pi-model>",
                 "usage": {
@@ -1487,6 +1147,7 @@
                   "output": 0,
                   "cacheRead": 0,
                   "cacheWrite": 0,
+                  "reasoning": 0,
                   "totalTokens": 0,
                   "cost": {
                     "input": 0,
@@ -1494,14 +1155,13 @@
                     "cacheRead": 0,
                     "cacheWrite": 0,
                     "total": 0
-                  },
-                  "cacheWrite1h": 0
+                  }
                 },
                 "stopReason": "stop",
-                "timestamp": 1794688472280,
-                "responseId": "gen_01M7DW9N97K06FDTQBM98JYDQF",
-                "rawStopReason": "end_turn",
-                "durationMs": 1948,
+                "timestamp": 1794704689971,
+                "responseId": "resp_04cf6cab823bcbe1016af905328c2087d29b7c29a8e1cde88d",
+                "rawStopReason": "completed",
+                "durationMs": 1653,
                 "thinkingLevel": "medium"
               }
             ],
@@ -1529,17 +1189,12 @@
             "data": {
               "model": {
                 "id": "<pi-model>",
-                "name": "Claude Haiku 5.5",
-                "api": "anthropic-messages",
-                "baseUrl": "<redacted>",
+                "name": "GPT-6 Luna",
+                "api": "<pi-provider>-responses",
                 "provider": "<pi-provider>",
+                "baseUrl": "<redacted>",
                 "reasoning": true,
                 "input": ["text", "image"],
-                "compat": {
-                  "allowEmptySignature": true,
-                  "forceAdaptiveThinking": true,
-                  "supportsTemperature": false
-                },
                 "cost": {
                   "input": 0.1,
                   "output": 0.5,
@@ -1547,22 +1202,38 @@
                   "cacheWrite": 0.125,
                   "tiers": [
                     {
-                      "inputTokensAbove": 100000,
-                      "input": 0.5,
-                      "output": 2.5,
-                      "cacheRead": 0.05,
-                      "cacheWrite": 0.625
+                      "inputTokensAbove": 272000,
+                      "input": 0.2,
+                      "output": 0.75,
+                      "cacheRead": 0.02,
+                      "cacheWrite": 0.25
                     }
                   ]
                 },
-                "contextWindow": 1000000,
+                "contextWindow": 272000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
+                  "off": "none",
+                  "minimal": null,
+                  "low": "low",
+                  "medium": "medium",
+                  "high": "high",
                   "xhigh": "xhigh",
                   "max": "max"
                 },
+                "compat": {
+                  "supportsStrictMode": true,
+                  "supportsOpenAIGrammarTools": true,
+                  "supportsAdditionalTools": true,
+                  "supportsToolSearch": true,
+                  "supportsMidConvoSystemMessages": true,
+                  "supportsExplicitPromptCacheMode": true,
+                  "supportsMidConvoEffort": true
+                },
                 "inputLimits": {
+                  "maxRequestBytes": 536870912,
                   "images": {
+                    "maxPerRequest": 1500,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -1578,7 +1249,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-14T20-34-32-044Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-15T01-04-49-661Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 3,

@@ -5,6 +5,7 @@ import {
   AgentEvent,
   AgentModels,
   ChangedFile,
+  ExtensionStatusesChanged,
   MessageWithContext,
   ModelChoice,
   RequestAnswer,
@@ -16,10 +17,14 @@ import { resolve } from "node:path"
 import { Rpc, RpcGroup } from "effect/rpc"
 import { DeliveredMessage, DeliveredTurn } from "./deliveredMessage"
 
+export const HostEvent = Schema.Union([...AgentEvent.members, ExtensionStatusesChanged])
+
+export type HostEvent = typeof HostEvent.Type
+
 export const JournalEntry = Schema.Struct({
   sequence: Schema.Int,
   agentId: Schema.String,
-  event: AgentEvent,
+  event: HostEvent,
 })
 
 export type JournalEntry = typeof JournalEntry.Type

@@ -1,13 +1,13 @@
-import type {
-  AgentCommand,
-  AgentEvent,
-  AgentModels,
-  RequestAnswer,
-  RequestNotWaiting,
-} from "@glass/contracts"
+import type { AgentCommand, AgentModels, RequestAnswer, RequestNotWaiting } from "@glass/contracts"
 import type { Effect, Scope } from "effect"
 import type { DeliveredMessage, DeliveredTurn } from "./deliveredMessage"
-import type { ConversationRole, HostAgentError, SteersNotTakenIn, TurnSettings } from "./protocol"
+import type {
+  ConversationRole,
+  HostAgentError,
+  HostEvent,
+  SteersNotTakenIn,
+  TurnSettings,
+} from "./protocol"
 import type { WrittenSkills } from "./sentSkills"
 
 export interface AgentSession {
@@ -37,6 +37,6 @@ export interface AgentAdapter<Role extends ConversationRole = ConversationRole> 
     readonly conversation: string
     readonly role: Role
     readonly skills: ReadonlyArray<WrittenSkills>
-    readonly report: (event: AgentEvent) => Effect.Effect<void>
+    readonly report: (event: HostEvent) => Effect.Effect<void>
   }) => Effect.Effect<AgentSession, HostAgentError, Scope.Scope>
 }
