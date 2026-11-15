@@ -268,10 +268,13 @@ export const piAdapter = (command: string) =>
       models: Effect.gen(function* () {
         const rpc = yield* startPi(homedir())
 
-        const [available, state] = yield* Effect.all([
-          rpc.request({ type: "get_available_models" }, AvailableModels),
-          rpc.request({ type: "get_state" }, SessionState),
-        ]).pipe(
+        const [available, state] = yield* Effect.all(
+          [
+            rpc.request({ type: "get_available_models" }, AvailableModels),
+            rpc.request({ type: "get_state" }, SessionState),
+          ],
+          { concurrency: "unbounded" },
+        ).pipe(
           Effect.tapError((error) => Effect.logWarning("pi didn't list its models", error)),
           Effect.mapError(
             () => new HostAgentError({ message: "pi didn't list its models. Try again." }),
