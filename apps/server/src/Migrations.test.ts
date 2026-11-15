@@ -75,6 +75,7 @@ it.live("upgrades main's schema directly, preserving completed and unfinished up
 
     assert.deepStrictEqual(yield* SqliteMigrator.run({ loader: migrationLoader }), [
       [9, "global_conversation_updates"],
+      [10, "to_do_images"],
     ])
     const transcripts = yield* Transcripts
     const { turns } = yield* transcripts.read("global")
@@ -138,6 +139,7 @@ it.live("creates the schema once and reads Activity through its indexes after re
         [7, "work_reports"],
         [8, "past_global_conversations"],
         [9, "global_conversation_updates"],
+        [10, "to_do_images"],
       ],
       [],
     ] as const) {
@@ -335,6 +337,45 @@ it.live("keeps the Global conversation's pi session, started at its first Turn",
         yield* sql`SELECT session_id, session_started_at FROM global_conversation`,
         [{ session_id: "global", session_started_at: "2026-11-11T01:00:00.000Z" }],
       )
+    }).pipe(Effect.provide(SqliteClient.layer({ filename: join(home, "glass.db") })), Effect.scoped)
+  }),
+)
+
+it.live("adds to-do images without touching to-dos written before them", () =>
+  Effect.gen(function* () {
+    const home = yield* isolatedHome
+
+    yield* Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient
+
+      yield* SqliteMigrator.run({
+        loader: SqliteMigrator.fromRecord({
+          "0001_baseline": baseline,
+          "0002_agent_review_hotspots": agentReviewHotspots,
+          "0003_agent_review_done": agentReviewDone,
+          "0004_outside_agent": outsideAgent,
+          "0005_conversation_started_work": conversationStartedWork,
+          "0006_turn_seen": turnSeen,
+          "0007_work_reports": workReports,
+          "0008_past_global_conversations": pastGlobalConversations,
+        }),
+      })
+
+      yield* sql`INSERT INTO to_do (title, notes, created_at)
+        VALUES ('Ship it', 'Before images', '2026-11-11T00:00:00.000Z')`
+
+      yield* SqliteMigrator.run({ loader: migrationLoader })
+
+      assert.deepStrictEqual(yield* sql`SELECT id, title, notes FROM to_do`, [
+        { id: 1, title: "Ship it", notes: "Before images" },
+      ])
+      assert.deepStrictEqual(
+        yield* sql`SELECT name FROM sqlite_schema WHERE type = 'table' AND name = 'to_do_image'`,
+        [{ name: "to_do_image" }],
+      )
+      assert.deepStrictEqual(yield* sql`SELECT COUNT(*) AS images FROM to_do_image`, [
+        { images: 0 },
+      ])
     }).pipe(Effect.provide(SqliteClient.layer({ filename: join(home, "glass.db") })), Effect.scoped)
   }),
 )

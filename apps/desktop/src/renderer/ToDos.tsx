@@ -1,16 +1,27 @@
 import { useAtom, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
-import type { ToDo } from "@glass/contracts"
+import { ToDoError, type ToDo, type ToDoImage, type ToDoImageUpload } from "@glass/contracts"
 import { cn } from "cn"
 import { AsyncResult, Atom } from "effect/reactivity"
-import { Pencil, Trash2 } from "lucide-react"
-import type { KeyboardEvent } from "react"
+import { Effect, Exit, Option } from "effect"
+import { Pencil, Trash2, X } from "lucide-react"
+import {
+  type ClipboardEvent,
+  type KeyboardEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/components/ui/toast"
-import { Backend } from "./backend"
+import { Backend, useBackendRuntime } from "./backend"
+import { ImageViewer, type PreviewImage } from "./ImageViewer"
+import { imageFiles, imageSrc, maxToDoImageBytes, readToDoImages } from "./pastedImages"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf, settledProblem } from "./problems"
 import { shortcutLabel } from "./shortcutLabel"
@@ -20,6 +31,7 @@ import {
   pendingToggleAtom,
   savedToDosAtom,
   type ToDoChange,
+  toDoThumbnailAtom,
   toDosAtom,
 } from "./toDoList"
 
@@ -28,13 +40,40 @@ interface ToDoFields {
   readonly notes: string
 }
 
-const emptyToDo: ToDoFields = { title: "", notes: "" }
+interface DraftImage extends ToDoImageUpload {
+  readonly key: number
+}
 
-const newToDoAtom = Atom.make<ToDoFields>(emptyToDo).pipe(Atom.keepAlive)
+interface NewToDo extends ToDoFields {
+  readonly images: ReadonlyArray<DraftImage>
+  readonly savedId: number | null
+}
+
+const emptyToDo: NewToDo = { title: "", notes: "", images: [], savedId: null }
+
+const unsentAtom = Atom.family((_id: number) => Atom.make<ReadonlyArray<DraftImage>>([]))
+
+const unsentHeldAtom = Atom.family((_id: number) => Atom.make(false))
+
+let nextDraftImage = 0
+
+const newToDoAtom = Atom.make<NewToDo>(emptyToDo).pipe(Atom.keepAlive)
 
 const editAtom = Atom.family((_id: number) =>
   Atom.make<ToDoFields | null>(null).pipe(Atom.keepAlive),
 )
+
+const uploadOf = ({
+  mediaType,
+  data,
+  thumbnail,
+  thumbnailMediaType,
+}: DraftImage): ToDoImageUpload => ({
+  mediaType,
+  data,
+  thumbnail,
+  thumbnailMediaType,
+})
 
 function useToDoChanges() {
   const change = useAtomValue(changeAtom)
@@ -42,14 +81,68 @@ function useToDoChanges() {
   const pending = change.waiting
 
   const run = (next: ToDoChange) => {
-    if (!pending) save(next)
+    if (pending) return false
+
+    save(next)
+
+    return true
   }
 
   return {
     pending,
     problem: settledProblem(change),
-    add: (title: string, notes: string, onSaved: () => void) =>
-      run({ save: Backend.use((backend) => backend.AddToDo({ title, notes })), onSaved }),
+    add: (
+      draft: NewToDo,
+      knownIds: ReadonlyArray<number>,
+      onFinished: (remaining: ReadonlyArray<DraftImage>, savedId: number) => void,
+    ) => {
+      let remaining = draft.images
+      let savedId = draft.savedId
+
+      return run({
+        save: Effect.gen(function* () {
+          const backend = yield* Backend
+          const known = new Set(knownIds)
+
+          let list =
+            draft.savedId === null
+              ? yield* backend.AddToDo({ title: draft.title, notes: draft.notes })
+              : yield* backend.ListToDos()
+
+          const id = draft.savedId ?? list.find((toDo) => !known.has(toDo.id))?.id
+
+          if (id === undefined) {
+            return yield* Effect.fail(
+              new ToDoError({ message: "Couldn't save your to-do. Try again." }),
+            )
+          }
+
+          const failed: Array<DraftImage> = []
+
+          for (const [index, image] of draft.images.entries()) {
+            const exit = yield* Effect.exit(
+              backend.AttachToDoImages({ id, images: [uploadOf(image)] }),
+            )
+
+            if (Exit.isFailure(exit)) {
+              failed.push(...draft.images.slice(index))
+
+              break
+            }
+
+            list = exit.value
+          }
+
+          remaining = failed
+          savedId = id
+
+          return list
+        }),
+        onSaved: () => {
+          if (savedId !== null) onFinished(remaining, savedId)
+        },
+      })
+    },
     edit: (id: number, title: string, notes: string, onSaved: () => void) =>
       run({ save: Backend.use((backend) => backend.EditToDo({ id, title, notes })), onSaved }),
     setDone: (toDo: ToDo, done: boolean) =>
@@ -66,7 +159,42 @@ function useToDoChanges() {
         },
       }),
     remove: (id: number) => run({ save: Backend.use((backend) => backend.DeleteToDo({ id })) }),
+    sendImage: (id: number, image: DraftImage, onSaved: () => void, onFailed: () => void) =>
+      run({
+        save: Backend.use((backend) =>
+          backend
+            .AttachToDoImages({ id, images: [uploadOf(image)] })
+            .pipe(Effect.tapError(() => Effect.sync(onFailed))),
+        ),
+        onSaved,
+      }),
+    removeImage: (id: number) =>
+      run({ save: Backend.use((backend) => backend.RemoveToDoImage({ id })) }),
   }
+}
+
+const largestImage = `${maxToDoImageBytes / 1024 ** 2} MB`
+
+const takePastedImages = (
+  event: ClipboardEvent,
+  add: (images: ReadonlyArray<DraftImage>) => void,
+) => {
+  const files = imageFiles(event.clipboardData)
+
+  if (files.length === 0) return
+
+  event.preventDefault()
+  void readToDoImages(files).then(({ images, rejected }) => {
+    for (const name of rejected) {
+      toast.add({
+        type: "error",
+        title: `${name} is too big to attach`,
+        description: `The largest image is ${largestImage}.`,
+      })
+    }
+
+    if (images.length > 0) add(images.map((image) => ({ ...image, key: ++nextDraftImage })))
+  })
 }
 
 export function ToDos() {
@@ -123,25 +251,80 @@ function ToDoItems(props: { label: string; toDos: ReadonlyArray<ToDo>; className
   )
 }
 
+interface OpenedImage {
+  readonly image: PreviewImage
+  readonly opener: HTMLElement
+}
+
+function LargeImage(props: { opened: OpenedImage | null; onClose: () => void }) {
+  const opened = props.opened
+
+  if (opened === null) return null
+
+  return (
+    <ImageViewer images={[opened.image]} index={0} opener={opened.opener} onClose={props.onClose} />
+  )
+}
+
+function ImageStrip(props: { label: string; children: ReactNode }) {
+  return (
+    <ul aria-label={props.label} className="flex flex-wrap gap-2 pt-2">
+      {props.children}
+    </ul>
+  )
+}
+
 function AddToDo() {
   const [draft, setDraft] = useAtom(newToDoAtom)
+  const listed = useAtomValue(toDosAtom)
   const { pending, add } = useToDoChanges()
-  const { title, notes } = draft
+  const { title, notes, images, savedId } = draft
   const trimmed = title.trim()
+  const [opened, setOpened] = useState<OpenedImage | null>(null)
+
+  const knownIds = Option.match(AsyncResult.value(listed), {
+    onNone: () => [],
+    onSome: (toDos) => toDos.map((toDo) => toDo.id),
+  })
 
   return (
     <Card
       render={
         <form
           aria-label="Add a to-do"
+          onPaste={(event) =>
+            takePastedImages(event, (pasted) =>
+              setDraft((current) => ({ ...current, images: [...current.images, ...pasted] })),
+            )
+          }
           onSubmit={(event) => {
             event.preventDefault()
 
-            if (trimmed === "") return
+            if (savedId === null && trimmed === "") return
 
             const submitted = draft
-            add(trimmed, notes.trimEnd(), () =>
-              setDraft((typed) => (typed === submitted ? emptyToDo : typed)),
+            add(
+              { ...submitted, title: trimmed, notes: notes.trimEnd() },
+              knownIds,
+              (remaining, createdId) => {
+                const sent = new Set(
+                  submitted.images
+                    .filter((image) => !remaining.some((failed) => failed.key === image.key))
+                    .map((image) => image.key),
+                )
+
+                setDraft((current) => {
+                  const imagesLeft = current.images.filter((image) => !sent.has(image.key))
+
+                  if (imagesLeft.length === 0) {
+                    return current.title === submitted.title && current.notes === submitted.notes
+                      ? emptyToDo
+                      : { title: current.title, notes: current.notes, images: [], savedId: null }
+                  }
+
+                  return { ...current, images: imagesLeft, savedId: createdId }
+                })
+              },
             )
           }}
         />
@@ -153,41 +336,161 @@ function AddToDo() {
           aria-label="New to-do"
           placeholder="Add a to-do"
           value={title}
-          onChange={(event) => setDraft({ title: event.target.value, notes })}
+          onChange={(event) => setDraft({ title: event.target.value, notes, images, savedId })}
+          disabled={savedId !== null}
           className="h-8 border-0 bg-transparent px-0 font-medium shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
         />
         <Textarea
           aria-label="Notes"
           placeholder="Notes"
           value={notes}
-          onChange={(event) => setDraft({ title, notes: event.target.value })}
+          onChange={(event) => setDraft({ title, notes: event.target.value, images, savedId })}
+          disabled={savedId !== null}
           onKeyDown={submitOnShortcut}
           className="min-h-10 resize-none border-0 bg-transparent px-0 py-0 text-sm shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
         />
+        {savedId !== null && (
+          <p role="alert" className="text-sm text-destructive">
+            Couldn't save every image. Try again.
+          </p>
+        )}
+        {images.length > 0 && (
+          <ImageStrip label="Images">
+            {images.map((image, index) => (
+              <li key={image.key} className="flex items-start gap-0.5">
+                <button
+                  type="button"
+                  aria-label={`Open image ${index + 1}`}
+                  className="rounded-md"
+                  onClick={(event) =>
+                    setOpened({
+                      image: {
+                        src: imageSrc(image.mediaType, image.data),
+                        name: `Image ${index + 1}`,
+                      },
+                      opener: event.currentTarget,
+                    })
+                  }
+                >
+                  <img
+                    src={imageSrc(image.thumbnailMediaType, image.thumbnail)}
+                    alt=""
+                    className="size-14 rounded-md border object-cover"
+                  />
+                </button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label={`Remove image ${index + 1}`}
+                  onClick={() => {
+                    const imagesLeft = images.filter((kept) => kept.key !== image.key)
+
+                    setDraft(
+                      imagesLeft.length === 0 && savedId !== null
+                        ? emptyToDo
+                        : { title, notes, images: imagesLeft, savedId },
+                    )
+                  }}
+                >
+                  <X aria-hidden />
+                </Button>
+              </li>
+            ))}
+          </ImageStrip>
+        )}
       </CardContent>
       <CardFooter className="justify-end gap-2">
         <span className="text-xs text-muted-foreground" aria-hidden>
           {shortcutLabel("↵")}
         </span>
-        <Button type="submit" size="sm" disabled={pending || trimmed === ""}>
-          Add
+        <Button
+          type="submit"
+          size="sm"
+          disabled={pending || (savedId === null ? trimmed === "" : images.length === 0)}
+        >
+          {savedId === null ? "Add" : "Try again"}
         </Button>
       </CardFooter>
+      <LargeImage opened={opened} onClose={() => setOpened(null)} />
     </Card>
+  )
+}
+
+function UnsentStrip(props: { toDo: ToDo }) {
+  const unsent = useAtomValue(unsentAtom(props.toDo.id))
+  const held = useAtomValue(unsentHeldAtom(props.toDo.id))
+  const setHeld = useAtomSet(unsentHeldAtom(props.toDo.id))
+
+  if (unsent.length === 0) return null
+
+  return (
+    <div className="mt-2">
+      <ImageStrip label={`Images to save on ${props.toDo.title}`}>
+        {unsent.map((image, index) => (
+          <li key={image.key}>
+            <img
+              src={imageSrc(image.thumbnailMediaType, image.thumbnail)}
+              alt=""
+              className="size-14 rounded-md border object-cover"
+            />
+            <span className="sr-only">Image {index + 1} not saved</span>
+          </li>
+        ))}
+      </ImageStrip>
+      {held && (
+        <Button type="button" size="sm" className="mt-2" onClick={() => setHeld(false)}>
+          Try again
+        </Button>
+      )}
+    </div>
   )
 }
 
 function ToDoRow(props: { toDo: ToDo }) {
   const { toDo } = props
-  const { pending, setDone, remove } = useToDoChanges()
+  const { pending, setDone, remove, sendImage } = useToDoChanges()
   const [edit, setEdit] = useAtom(editAtom(toDo.id))
+  const [unsent, setUnsent] = useAtom(unsentAtom(toDo.id))
+  const [held, setHeld] = useAtom(unsentHeldAtom(toDo.id))
+  const started = useRef<number | null>(null)
   const toggle = useAtomValue(pendingToggleAtom)
   const checked = toggle?.id === toDo.id ? toggle.done : toDo.done
+
+  useEffect(() => {
+    const next = unsent[0]
+
+    if (pending || held || next === undefined || started.current === next.key) return
+
+    const key = next.key
+    started.current = key
+
+    const began = sendImage(
+      toDo.id,
+      next,
+      () => {
+        started.current = null
+        setUnsent((current) => current.filter((image) => image.key !== key))
+      },
+      () => {
+        started.current = null
+        setHeld(true)
+      },
+    )
+
+    if (!began) started.current = null
+  }, [held, pending, sendImage, setHeld, setUnsent, toDo.id, unsent])
+
+  const paste = (event: ClipboardEvent) =>
+    takePastedImages(event, (images) => {
+      setHeld(false)
+      setUnsent((current) => [...current, ...images])
+    })
 
   if (edit !== null) {
     return (
       <li className="px-3 py-2">
-        <ToDoEditor toDo={toDo} edit={edit} />
+        <ToDoEditor toDo={toDo} edit={edit} onPaste={paste} />
       </li>
     )
   }
@@ -201,7 +504,17 @@ function ToDoRow(props: { toDo: ToDo }) {
         disabled={pending}
         onCheckedChange={(nextChecked) => setDone(toDo, nextChecked)}
       />
-      <div className="min-w-0 flex-1 py-0.5">
+      {/* oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- The row takes a pasted image once it has focus. */}
+      <div
+        // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- The row takes a pasted image once it has focus.
+        tabIndex={0}
+        className="min-w-0 flex-1 py-0.5 outline-none"
+        onMouseDown={(event) => {
+          if (event.target instanceof Element && event.target.closest("button")) return
+          event.currentTarget.focus()
+        }}
+        onPaste={paste}
+      >
         <p className={cn("text-sm break-words", checked && "text-muted-foreground line-through")}>
           {toDo.title}
         </p>
@@ -210,6 +523,8 @@ function ToDoRow(props: { toDo: ToDo }) {
             {toDo.notes}
           </p>
         )}
+        <SavedImages toDo={toDo} />
+        <UnsentStrip toDo={toDo} />
       </div>
       <Button
         variant="ghost"
@@ -237,7 +552,11 @@ function ToDoRow(props: { toDo: ToDo }) {
 
 const focusOnMount = (element: HTMLInputElement | null) => element?.focus()
 
-function ToDoEditor(props: { toDo: ToDo; edit: ToDoFields }) {
+function ToDoEditor(props: {
+  toDo: ToDo
+  edit: ToDoFields
+  onPaste: (event: ClipboardEvent) => void
+}) {
   const { pending, edit } = useToDoChanges()
   const setEdit = useAtomSet(editAtom(props.toDo.id))
   const { title, notes } = props.edit
@@ -252,6 +571,7 @@ function ToDoEditor(props: { toDo: ToDo; edit: ToDoFields }) {
     <form
       aria-label={`Edit ${props.toDo.title}`}
       className="flex flex-col gap-2"
+      onPaste={props.onPaste}
       onSubmit={(event) => {
         event.preventDefault()
 
@@ -277,6 +597,8 @@ function ToDoEditor(props: { toDo: ToDo; edit: ToDoFields }) {
         onChange={(event) => setEdit({ title, notes: event.target.value })}
         onKeyDown={cancelOnEscape}
       />
+      <SavedImages toDo={props.toDo} />
+      <UnsentStrip toDo={props.toDo} />
       <div className="flex gap-2">
         <Button type="submit" size="sm" disabled={pending || trimmed === ""}>
           Save
@@ -287,4 +609,130 @@ function ToDoEditor(props: { toDo: ToDo; edit: ToDoFields }) {
       </div>
     </form>
   )
+}
+
+function useWhenVisible() {
+  const [visible, setVisible] = useState(globalThis.IntersectionObserver === undefined)
+
+  const setElement = useCallback(
+    (element: HTMLElement | null) => {
+      if (element === null || visible || globalThis.IntersectionObserver === undefined) {
+        return undefined
+      }
+
+      const observer = new IntersectionObserver((entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) setVisible(true)
+      })
+
+      observer.observe(element)
+
+      return () => observer.disconnect()
+    },
+    [visible],
+  )
+
+  return { setElement, visible }
+}
+
+function SavedImages(props: { toDo: ToDo }) {
+  const { removeImage, pending } = useToDoChanges()
+
+  if (props.toDo.images.length === 0) return null
+
+  return (
+    <ImageStrip label={`Images of ${props.toDo.title}`}>
+      {props.toDo.images.map((image, index) => (
+        <SavedImage
+          key={image.id}
+          image={image}
+          title={props.toDo.title}
+          index={index}
+          pending={pending}
+          onRemove={() => removeImage(image.id)}
+        />
+      ))}
+    </ImageStrip>
+  )
+}
+
+function SavedImage(props: {
+  image: ToDoImage
+  title: string
+  index: number
+  pending: boolean
+  onRemove: () => void
+}) {
+  const { setElement, visible } = useWhenVisible()
+  const runtime = useBackendRuntime()
+  const [opened, setOpened] = useState<OpenedImage | null>(null)
+  const number = props.index + 1
+
+  const open = (opener: HTMLButtonElement) => {
+    void runtime
+      .runPromiseExit(
+        Backend.use((backend) => backend.ReadToDoImage({ id: props.image.id, size: "full" })),
+      )
+      .then((exit) => {
+        if (Exit.isSuccess(exit)) {
+          setOpened({
+            image: {
+              src: imageSrc(exit.value.mediaType, exit.value.data),
+              name: `Image ${number}`,
+            },
+            opener,
+          })
+
+          return
+        }
+
+        toast.add({ type: "error", title: "Couldn't open that image" })
+      })
+  }
+
+  return (
+    <li className="flex items-start gap-0.5">
+      <button
+        type="button"
+        ref={setElement}
+        aria-label={`Open image ${number} of ${props.title}`}
+        className="rounded-md"
+        onClick={(event) => open(event.currentTarget)}
+      >
+        {visible ? (
+          <ToDoThumbnail id={props.image.id} />
+        ) : (
+          <span className="block size-14 rounded-md border bg-muted" />
+        )}
+      </button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-xs"
+        aria-label={`Remove image ${number} of ${props.title}`}
+        disabled={props.pending}
+        onClick={props.onRemove}
+      >
+        <X aria-hidden />
+      </Button>
+      <LargeImage opened={opened} onClose={() => setOpened(null)} />
+    </li>
+  )
+}
+
+function ToDoThumbnail(props: { id: number }) {
+  const result = useAtomValue(toDoThumbnailAtom(props.id))
+
+  return AsyncResult.builder(result)
+    .onInitialOrWaiting(() => <span className="block size-14 rounded-md border bg-muted" />)
+    .onFailure(() => <span className="block size-14 rounded-md border bg-muted" />)
+    .onSuccess((image) => (
+      <img
+        src={imageSrc(image.mediaType, image.data)}
+        alt=""
+        loading="lazy"
+        decoding="async"
+        className="size-14 rounded-md border object-cover"
+      />
+    ))
+    .render()
 }

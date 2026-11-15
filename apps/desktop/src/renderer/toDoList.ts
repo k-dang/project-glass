@@ -45,3 +45,7 @@ export const toDosAtom = Atom.make((get) =>
 export const openToDosAtom = Atom.make((get) =>
   AsyncResult.map(get(toDosAtom), (toDos) => toDos.filter((toDo) => !toDo.done)),
 )
+
+export const toDoThumbnailAtom = Atom.family((id: number) =>
+  backendRuntime.atom(Backend.use((backend) => backend.ReadToDoImage({ id, size: "thumbnail" }))),
+)

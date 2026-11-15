@@ -19,6 +19,7 @@ import {
   AgentModels,
   AgentPlace,
   AgentNotFound,
+  Image,
   InvalidLocalCheckout,
   LocalCheckout,
   MessageInput,
@@ -80,7 +81,7 @@ import {
   SkillPackUpdate,
 } from "./skillPack"
 import { StorageError, StorageItem } from "./storage"
-import { ToDo, ToDoError, ToDoTitle } from "./toDo"
+import { ToDo, ToDoError, ToDoImageSize, ToDoImageUploads, ToDoTitle } from "./toDo"
 import { TourFailure, TourState } from "./tour"
 
 export const RPC_PATH = "/rpc"
@@ -334,13 +335,26 @@ export class GlassRpcs extends RpcGroup.make(
     error: Schema.Union([ConnectionError, ActivityLogError]),
   }),
   Rpc.make("ListToDos", toDoList),
-  Rpc.make("AddToDo", { payload: { title: ToDoTitle, notes: Schema.String }, ...toDoList }),
+  Rpc.make("AddToDo", {
+    payload: { title: ToDoTitle, notes: Schema.String, images: ToDoImageUploads },
+    ...toDoList,
+  }),
   Rpc.make("EditToDo", {
     payload: { id: Schema.Int, title: ToDoTitle, notes: Schema.String },
     ...toDoList,
   }),
   Rpc.make("SetToDoDone", { payload: { id: Schema.Int, done: Schema.Boolean }, ...toDoList }),
   Rpc.make("DeleteToDo", { payload: { id: Schema.Int }, ...toDoList }),
+  Rpc.make("AttachToDoImages", {
+    payload: { id: Schema.Int, images: ToDoImageUploads },
+    ...toDoList,
+  }),
+  Rpc.make("RemoveToDoImage", { payload: { id: Schema.Int }, ...toDoList }),
+  Rpc.make("ReadToDoImage", {
+    payload: { id: Schema.Int, size: ToDoImageSize },
+    success: Image,
+    error: ToDoError,
+  }),
   Rpc.make("WatchAgents", { success: Schema.Array(Agent), error: AgentError, stream: true }),
   Rpc.make("WatchWaitingAgents", {
     success: Schema.Array(Schema.String),
