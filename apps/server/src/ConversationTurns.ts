@@ -42,12 +42,24 @@ import { ToDos } from "./ToDos"
 import { encodeImages, StoredMessage, Transcripts } from "./Transcripts"
 import { annotateUnit } from "./wideEvents"
 
+type HostCall<Name extends keyof HostClient> = (
+  input: Parameters<HostClient[Name]>[0],
+) => ReturnType<HostClient[Name]>
+
+export interface ConversationHost {
+  readonly StartAgent: HostCall<"StartAgent">
+  readonly StartTurn: HostCall<"StartTurn">
+  readonly AnswerRequest: HostCall<"AnswerRequest">
+  readonly Steer: HostCall<"Steer">
+  readonly StopTurn: HostCall<"StopTurn">
+}
+
 export interface Conversation {
   readonly id: string
-  readonly ensureStarted: (client: HostClient) => Effect.Effect<void, HostCallError>
+  readonly ensureStarted: (client: ConversationHost) => Effect.Effect<void, HostCallError>
   readonly settings: TurnSettings
-  readonly host: Effect.Effect<HostClient, AgentError>
-  readonly runningHost: Effect.Effect<Option.Option<HostClient>>
+  readonly host: Effect.Effect<ConversationHost, AgentError>
+  readonly runningHost: Effect.Effect<Option.Option<ConversationHost>>
 }
 
 export type ClaimConversation = (
@@ -65,7 +77,7 @@ export type Delivery = "dispatched" | "superseded" | "failed" | "pending"
 type StartedMessage = Pick<Turn, "message" | "images" | "context" | "feedback">
 
 interface Prepared {
-  readonly client: HostClient
+  readonly client: ConversationHost
   readonly message: DeliveredTurn
 }
 

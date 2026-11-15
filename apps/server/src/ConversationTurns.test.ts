@@ -24,9 +24,8 @@ import {
   Stream,
 } from "effect"
 import { eventually } from "../test/eventually"
-import { type Conversation, ConversationTurns } from "./ConversationTurns"
+import { type Conversation, type ConversationHost, ConversationTurns } from "./ConversationTurns"
 import { migrationLoader } from "./Migrations"
-import type { HostClient } from "./Placement"
 import { ToDos } from "./ToDos"
 import { Transcripts } from "./Transcripts"
 import { wideEvents } from "./wideEvents"
@@ -39,25 +38,31 @@ interface Script {
   readonly running?: boolean
 }
 
-// SAFETY: a delivery calls only `StartTurn` on its host.
-/* oxlint-disable typescript/no-unsafe-type-assertion, anti-slop/no-chained-type-assertions -- See SAFETY above. */
-const hostThatStarts = (record: (turnId: string) => Effect.Effect<void, HostAgentError>) =>
-  ({
-    StartTurn: ({ turnId }: { turnId: string }) => record(turnId),
-  }) as unknown as HostClient
-/* oxlint-enable typescript/no-unsafe-type-assertion, anti-slop/no-chained-type-assertions */
+const unused = (method: string) => () => Effect.die(`This test does not call ${method}`)
 
-// SAFETY: these tests call only `StartTurn` and `StopTurn` on the host.
-/* oxlint-disable typescript/no-unsafe-type-assertion, anti-slop/no-chained-type-assertions -- See SAFETY above. */
-const scriptedHost = (script: Script, dispatched: Array<{ agentId: string; turnId: string }>) =>
-  ({
-    StartTurn: ({ agentId, turnId }: { agentId: string; turnId: string }) =>
-      (script.startTurn?.(turnId) ?? Effect.void).pipe(
-        Effect.tap(() => Effect.sync(() => dispatched.push({ agentId, turnId }))),
-      ),
-    StopTurn: () => script.stopTurn?.() ?? Effect.succeed(null),
-  }) as unknown as HostClient
-/* oxlint-enable typescript/no-unsafe-type-assertion, anti-slop/no-chained-type-assertions */
+const hostThatStarts = (
+  record: (turnId: string) => Effect.Effect<void, HostAgentError>,
+): ConversationHost => ({
+  StartAgent: unused("StartAgent"),
+  StartTurn: ({ turnId }) => record(turnId),
+  AnswerRequest: unused("AnswerRequest"),
+  Steer: unused("Steer"),
+  StopTurn: unused("StopTurn"),
+})
+
+const scriptedHost = (
+  script: Script,
+  dispatched: Array<{ agentId: string; turnId: string }>,
+): ConversationHost => ({
+  StartAgent: unused("StartAgent"),
+  StartTurn: ({ agentId, turnId }) =>
+    (script.startTurn?.(turnId) ?? Effect.void).pipe(
+      Effect.tap(() => Effect.sync(() => dispatched.push({ agentId, turnId }))),
+    ),
+  AnswerRequest: unused("AnswerRequest"),
+  Steer: unused("Steer"),
+  StopTurn: () => script.stopTurn?.() ?? Effect.succeed(null),
+})
 
 const layer = ConversationTurns.layer.pipe(
   Layer.provideMerge(Transcripts.layer),

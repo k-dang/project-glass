@@ -34,10 +34,9 @@ import { SqlClient } from "effect/sql"
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 import { GlobalRole } from "./agentHost/protocol"
-import { type Conversation, ConversationTurns } from "./ConversationTurns"
 import { LocalAgentHost } from "./LocalAgentHost"
 import { McpCredentials } from "./mcp/McpCredentials"
-import type { HostClient } from "./Placement"
+import { type Conversation, type ConversationHost, ConversationTurns } from "./ConversationTurns"
 import { ServerConfig } from "./ServerConfig"
 import { Transcripts, type WaitingRequest } from "./Transcripts"
 import { annotateUnit } from "./wideEvents"
@@ -157,7 +156,7 @@ export class GlobalConversation extends Context.Service<
           return ending === null ? Effect.void : Scope.close(ending, Exit.void)
         })
 
-      const start = (sessionId: string) => (client: HostClient) =>
+      const start = (sessionId: string) => (client: ConversationHost) =>
         starting.withPermits(1)(
           Effect.gen(function* () {
             const lifetime = yield* host.lifetimeOf(client).pipe(
