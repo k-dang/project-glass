@@ -393,7 +393,7 @@ export class ConversationTurns extends Context.Service<
       ) =>
         withConversation(conversationId, transcripts.startOrQueue(conversationId, sent, feedback))
 
-      return ConversationTurns.of({
+      const turns = ConversationTurns.of({
         serve,
         whileIdle: (conversationId, effect) =>
           withConversation(
@@ -442,6 +442,22 @@ export class ConversationTurns extends Context.Service<
             Effect.mapError(unsentFailure),
           ),
       })
+
+      coordination.set(turns, locks)
+
+      return turns
     }),
   )
 }
+
+interface TurnOwner {
+  readonly removeUnsent: (conversationId: string) => Effect.Effect<void, AgentError>
+}
+
+const coordination = new WeakMap<
+  TurnOwner,
+  Map<string, { semaphore: Semaphore.Semaphore; holders: number }>
+>()
+
+export const conversationLock = (owner: TurnOwner, conversationId: string): object | undefined =>
+  coordination.get(owner)?.get(conversationId)
