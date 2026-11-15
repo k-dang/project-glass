@@ -42,7 +42,7 @@
               "model": {
                 "id": "gpt-test",
                 "name": "gpt-test",
-                "api": "openai-completions",
+                "api": "<pi-provider>-completions",
                 "provider": "glass-test",
                 "baseUrl": "<redacted>",
                 "reasoning": false,
@@ -61,7 +61,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-14T20-34-54-730Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-15T01-05-12-433Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -105,7 +105,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794688494912,
+              "timestamp": 1794704712590,
               "toolsAdded": [
                 {
                   "name": "ask_user",
@@ -620,7 +620,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794688494912,
+              "timestamp": 1794704712590,
               "toolsAdded": [
                 {
                   "name": "ask_user",
@@ -1139,7 +1139,7 @@
                   "text": "Wait for release."
                 }
               ],
-              "timestamp": 1794688494911
+              "timestamp": 1794704712589
             }
           }
         },
@@ -1154,7 +1154,7 @@
                   "text": "Wait for release."
                 }
               ],
-              "timestamp": 1794688494911
+              "timestamp": 1794704712589
             }
           }
         },
@@ -1164,7 +1164,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "openai-completions",
+              "api": "<pi-provider>-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -1182,7 +1182,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794688494933
+              "timestamp": 1794704712622
             }
           }
         },
@@ -1277,7 +1277,7 @@
                   "arguments": {}
                 }
               ],
-              "api": "openai-completions",
+              "api": "<pi-provider>-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -1295,10 +1295,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794688494933,
+              "timestamp": 1794704712622,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 9,
+              "durationMs": 12,
               "thinkingLevel": "off"
             }
           }
@@ -1357,7 +1357,7 @@
               "details": {}
             },
             "isError": true,
-            "durationMs": 4
+            "durationMs": 6
           }
         },
         {
@@ -1375,8 +1375,8 @@
               ],
               "details": {},
               "isError": true,
-              "durationMs": 4,
-              "timestamp": 1794688494949
+              "durationMs": 6,
+              "timestamp": 1794704712642
             }
           }
         },
@@ -1395,8 +1395,8 @@
               ],
               "details": {},
               "isError": true,
-              "durationMs": 4,
-              "timestamp": 1794688494949
+              "durationMs": 6,
+              "timestamp": 1794704712642
             }
           }
         },
@@ -1413,7 +1413,7 @@
                   "arguments": {}
                 }
               ],
-              "api": "openai-completions",
+              "api": "<pi-provider>-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -1431,10 +1431,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794688494933,
+              "timestamp": 1794704712622,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 9,
+              "durationMs": 12,
               "thinkingLevel": "off"
             },
             "toolResults": [
@@ -1450,8 +1450,8 @@
                 ],
                 "details": {},
                 "isError": true,
-                "durationMs": 4,
-                "timestamp": 1794688494949
+                "durationMs": 6,
+                "timestamp": 1794704712642
               }
             ]
           }
@@ -1467,7 +1467,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "openai-completions",
+              "api": "<pi-provider>-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -1486,7 +1486,7 @@
               },
               "stopReason": "error",
               "errorMessage": "This operation was aborted",
-              "timestamp": 1794688494951,
+              "timestamp": 1794704712645,
               "durationMs": 0,
               "thinkingLevel": "off"
             }
@@ -1498,7 +1498,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "openai-completions",
+              "api": "<pi-provider>-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -1517,7 +1517,7 @@
               },
               "stopReason": "error",
               "errorMessage": "This operation was aborted",
-              "timestamp": 1794688494951,
+              "timestamp": 1794704712645,
               "durationMs": 0,
               "thinkingLevel": "off"
             }
@@ -1529,7 +1529,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "openai-completions",
+              "api": "<pi-provider>-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -1548,7 +1548,7 @@
               },
               "stopReason": "error",
               "errorMessage": "This operation was aborted",
-              "timestamp": 1794688494951,
+              "timestamp": 1794704712645,
               "durationMs": 0,
               "thinkingLevel": "off"
             },
@@ -1563,7 +1563,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1794688494912,
+                "timestamp": 1794704712590,
                 "toolsAdded": [
                   {
                     "name": "ask_user",
@@ -2077,7 +2077,7 @@
                     "text": "Wait for release."
                   }
                 ],
-                "timestamp": 1794688494911
+                "timestamp": 1794704712589
               },
               {
                 "role": "assistant",
@@ -2089,7 +2089,7 @@
                     "arguments": {}
                   }
                 ],
-                "api": "openai-completions",
+                "api": "<pi-provider>-completions",
                 "provider": "glass-test",
                 "model": "gpt-test",
                 "usage": {
@@ -2107,10 +2107,10 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1794688494933,
+                "timestamp": 1794704712622,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
-                "durationMs": 9,
+                "durationMs": 12,
                 "thinkingLevel": "off"
               },
               {
@@ -2125,13 +2125,13 @@
                 ],
                 "details": {},
                 "isError": true,
-                "durationMs": 4,
-                "timestamp": 1794688494949
+                "durationMs": 6,
+                "timestamp": 1794704712642
               },
               {
                 "role": "assistant",
                 "content": [],
-                "api": "openai-completions",
+                "api": "<pi-provider>-completions",
                 "provider": "glass-test",
                 "model": "gpt-test",
                 "usage": {
@@ -2150,7 +2150,7 @@
                 },
                 "stopReason": "error",
                 "errorMessage": "This operation was aborted",
-                "timestamp": 1794688494951,
+                "timestamp": 1794704712645,
                 "durationMs": 0,
                 "thinkingLevel": "off"
               }
@@ -2188,7 +2188,7 @@
               "model": {
                 "id": "gpt-test",
                 "name": "gpt-test",
-                "api": "openai-completions",
+                "api": "<pi-provider>-completions",
                 "provider": "glass-test",
                 "baseUrl": "<redacted>",
                 "reasoning": false,
@@ -2207,7 +2207,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-14T20-34-54-730Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-15T01-05-12-433Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 5,

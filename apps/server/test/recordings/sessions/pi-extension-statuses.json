@@ -9,7 +9,9 @@
         "--session-id",
         "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
         "--extension",
-        "<folder>.pi/draw-diagram.mjs"
+        "<folder>.pi/draw-diagram.mjs",
+        "--extension",
+        "<folder>.pi/subagent-status.js"
       ],
       "cwd": "<folder>",
       "frames": [
@@ -22,7 +24,7 @@
         {
           "in": {
             "type": "extension_ui_request",
-            "id": "f55f7f3c-061a-4dcc-937f-34886602936d",
+            "id": "8c4a0feb-6833-4a72-a93a-c3f91af0be17",
             "method": "setStatus",
             "statusKey": "mode",
             "statusText": "\u001b[33mPlan mode\u001b[39m"
@@ -38,7 +40,7 @@
               "model": {
                 "id": "gpt-test",
                 "name": "gpt-test",
-                "api": "openai-completions",
+                "api": "<pi-provider>-completions",
                 "provider": "glass-test",
                 "baseUrl": "<redacted>",
                 "reasoning": false,
@@ -57,7 +59,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-14T22-00-32-904Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-15T01-04-29-154Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -76,7 +78,7 @@
         {
           "in": {
             "type": "extension_ui_request",
-            "id": "bc38f43d-4fd5-4000-8fd3-cf83d12a7dd4",
+            "id": "46be5818-be52-4582-9afb-912acd5b9617",
             "method": "setStatus",
             "statusKey": "mode"
           }

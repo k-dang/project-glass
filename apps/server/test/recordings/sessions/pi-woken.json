@@ -9,7 +9,9 @@
         "--session-id",
         "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
         "--extension",
-        "<folder>.pi/draw-diagram.mjs"
+        "<folder>.pi/draw-diagram.mjs",
+        "--extension",
+        "<folder>.pi/subagent-status.js"
       ],
       "cwd": "<folder>",
       "frames": [
@@ -29,7 +31,7 @@
               "model": {
                 "id": "gpt-test",
                 "name": "gpt-test",
-                "api": "openai-completions",
+                "api": "<pi-provider>-completions",
                 "provider": "glass-test",
                 "baseUrl": "<redacted>",
                 "reasoning": false,
@@ -48,7 +50,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-14T21-30-56-322Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-15T01-04-28-293Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -92,7 +94,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794691856539,
+              "timestamp": 1794704668493,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -235,7 +237,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794691856539,
+              "timestamp": 1794704668493,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -382,7 +384,7 @@
                   "text": "Start the background task"
                 }
               ],
-              "timestamp": 1794691856538
+              "timestamp": 1794704668491
             }
           }
         },
@@ -397,7 +399,7 @@
                   "text": "Start the background task"
                 }
               ],
-              "timestamp": 1794691856538
+              "timestamp": 1794704668491
             }
           }
         },
@@ -407,7 +409,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "openai-completions",
+              "api": "<pi-provider>-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -425,7 +427,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794691856560
+              "timestamp": 1794704668522
             }
           }
         },
@@ -511,7 +513,7 @@
                   "text": "Here is the diagram."
                 }
               ],
-              "api": "openai-completions",
+              "api": "<pi-provider>-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -529,10 +531,10 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794691856560,
+              "timestamp": 1794704668522,
               "responseId": "test-completion",
               "rawStopReason": "stop",
-              "durationMs": 20,
+              "durationMs": 18,
               "thinkingLevel": "off"
             }
           }
@@ -548,7 +550,7 @@
                   "text": "Here is the diagram."
                 }
               ],
-              "api": "openai-completions",
+              "api": "<pi-provider>-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -566,10 +568,10 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794691856560,
+              "timestamp": 1794704668522,
               "responseId": "test-completion",
               "rawStopReason": "stop",
-              "durationMs": 20,
+              "durationMs": 18,
               "thinkingLevel": "off"
             },
             "toolResults": []
@@ -583,7 +585,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1794691856539,
+                "timestamp": 1794704668493,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -725,7 +727,7 @@
                     "text": "Start the background task"
                   }
                 ],
-                "timestamp": 1794691856538
+                "timestamp": 1794704668491
               },
               {
                 "role": "assistant",
@@ -735,7 +737,7 @@
                     "text": "Here is the diagram."
                   }
                 ],
-                "api": "openai-completions",
+                "api": "<pi-provider>-completions",
                 "provider": "glass-test",
                 "model": "gpt-test",
                 "usage": {
@@ -753,10 +755,10 @@
                   }
                 },
                 "stopReason": "stop",
-                "timestamp": 1794691856560,
+                "timestamp": 1794704668522,
                 "responseId": "test-completion",
                 "rawStopReason": "stop",
-                "durationMs": 20,
+                "durationMs": 18,
                 "thinkingLevel": "off"
               }
             ],
@@ -785,7 +787,7 @@
               "model": {
                 "id": "gpt-test",
                 "name": "gpt-test",
-                "api": "openai-completions",
+                "api": "<pi-provider>-completions",
                 "provider": "glass-test",
                 "baseUrl": "<redacted>",
                 "reasoning": false,
@@ -804,7 +806,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-14T21-30-56-322Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-15T01-04-28-293Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 3,
@@ -830,7 +832,7 @@
               "customType": "report",
               "content": "The background task finished.",
               "display": true,
-              "timestamp": 1794691856585
+              "timestamp": 1794704668544
             }
           }
         },
@@ -842,7 +844,7 @@
               "customType": "report",
               "content": "The background task finished.",
               "display": true,
-              "timestamp": 1794691856585
+              "timestamp": 1794704668544
             }
           }
         },
@@ -852,7 +854,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "openai-completions",
+              "api": "<pi-provider>-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -870,7 +872,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794691856588
+              "timestamp": 1794704668546
             }
           }
         },
@@ -956,7 +958,7 @@
                   "text": "Here is the diagram."
                 }
               ],
-              "api": "openai-completions",
+              "api": "<pi-provider>-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -974,7 +976,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794691856588,
+              "timestamp": 1794704668546,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -993,7 +995,7 @@
                   "text": "Here is the diagram."
                 }
               ],
-              "api": "openai-completions",
+              "api": "<pi-provider>-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -1011,7 +1013,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794691856588,
+              "timestamp": 1794704668546,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -1029,7 +1031,7 @@
                 "customType": "report",
                 "content": "The background task finished.",
                 "display": true,
-                "timestamp": 1794691856585
+                "timestamp": 1794704668544
               },
               {
                 "role": "assistant",
@@ -1039,7 +1041,7 @@
                     "text": "Here is the diagram."
                   }
                 ],
-                "api": "openai-completions",
+                "api": "<pi-provider>-completions",
                 "provider": "glass-test",
                 "model": "gpt-test",
                 "usage": {
@@ -1057,7 +1059,7 @@
                   }
                 },
                 "stopReason": "stop",
-                "timestamp": 1794691856588,
+                "timestamp": 1794704668546,
                 "responseId": "test-completion",
                 "rawStopReason": "stop",
                 "durationMs": 2,
@@ -1089,7 +1091,7 @@
               "model": {
                 "id": "gpt-test",
                 "name": "gpt-test",
-                "api": "openai-completions",
+                "api": "<pi-provider>-completions",
                 "provider": "glass-test",
                 "baseUrl": "<redacted>",
                 "reasoning": false,
@@ -1108,7 +1110,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-14T21-30-56-322Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-15T01-04-28-293Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 5,

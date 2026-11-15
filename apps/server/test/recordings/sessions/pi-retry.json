@@ -9,7 +9,9 @@
         "--session-id",
         "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
         "--extension",
-        "<folder>.pi/draw-diagram.mjs"
+        "<folder>.pi/draw-diagram.mjs",
+        "--extension",
+        "<folder>.pi/subagent-status.js"
       ],
       "cwd": "<folder>",
       "frames": [
@@ -29,7 +31,7 @@
               "model": {
                 "id": "gpt-test",
                 "name": "gpt-test",
-                "api": "openai-completions",
+                "api": "<pi-provider>-completions",
                 "provider": "glass-test",
                 "baseUrl": "<redacted>",
                 "reasoning": false,
@@ -48,7 +50,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-14T20-34-16-707Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-15T01-04-27-328Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -92,7 +94,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794688456827,
+              "timestamp": 1794704667517,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -235,7 +237,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794688456827,
+              "timestamp": 1794704667517,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -382,7 +384,7 @@
                   "text": "Say hello"
                 }
               ],
-              "timestamp": 1794688456826
+              "timestamp": 1794704667515
             }
           }
         },
@@ -397,7 +399,7 @@
                   "text": "Say hello"
                 }
               ],
-              "timestamp": 1794688456826
+              "timestamp": 1794704667515
             }
           }
         },
@@ -407,7 +409,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "openai-completions",
+              "api": "<pi-provider>-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -425,9 +427,9 @@
                 }
               },
               "stopReason": "error",
-              "timestamp": 1794688456859,
+              "timestamp": 1794704667562,
               "errorMessage": "500: {\"message\":\"overloaded\"}",
-              "durationMs": 20,
+              "durationMs": 19,
               "thinkingLevel": "off"
             }
           }
@@ -438,7 +440,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "openai-completions",
+              "api": "<pi-provider>-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -456,9 +458,9 @@
                 }
               },
               "stopReason": "error",
-              "timestamp": 1794688456859,
+              "timestamp": 1794704667562,
               "errorMessage": "500: {\"message\":\"overloaded\"}",
-              "durationMs": 20,
+              "durationMs": 19,
               "thinkingLevel": "off"
             }
           }
@@ -469,7 +471,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "openai-completions",
+              "api": "<pi-provider>-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -487,9 +489,9 @@
                 }
               },
               "stopReason": "error",
-              "timestamp": 1794688456859,
+              "timestamp": 1794704667562,
               "errorMessage": "500: {\"message\":\"overloaded\"}",
-              "durationMs": 20,
+              "durationMs": 19,
               "thinkingLevel": "off"
             },
             "toolResults": []
@@ -503,7 +505,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1794688456827,
+                "timestamp": 1794704667517,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -645,12 +647,12 @@
                     "text": "Say hello"
                   }
                 ],
-                "timestamp": 1794688456826
+                "timestamp": 1794704667515
               },
               {
                 "role": "assistant",
                 "content": [],
-                "api": "openai-completions",
+                "api": "<pi-provider>-completions",
                 "provider": "glass-test",
                 "model": "gpt-test",
                 "usage": {
@@ -668,9 +670,9 @@
                   }
                 },
                 "stopReason": "error",
-                "timestamp": 1794688456859,
+                "timestamp": 1794704667562,
                 "errorMessage": "500: {\"message\":\"overloaded\"}",
-                "durationMs": 20,
+                "durationMs": 19,
                 "thinkingLevel": "off"
               }
             ],
@@ -691,10 +693,10 @@
             "type": "entry_appended",
             "entry": {
               "type": "context_edit",
-              "id": "11b0fe35",
-              "parentId": "e64ec791",
-              "timestamp": "2026-11-14T20:34:16.881Z",
-              "targetId": "e64ec791",
+              "id": "2a280902",
+              "parentId": "8813cbe8",
+              "timestamp": "2026-11-15T01:04:27.584Z",
+              "targetId": "8813cbe8",
               "replacement": null
             }
           }
@@ -715,7 +717,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "openai-completions",
+              "api": "<pi-provider>-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -733,7 +735,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794688456934
+              "timestamp": 1794704667643
             }
           }
         },
@@ -819,7 +821,7 @@
                   "text": "Recovered."
                 }
               ],
-              "api": "openai-completions",
+              "api": "<pi-provider>-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -837,10 +839,10 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794688456934,
+              "timestamp": 1794704667643,
               "responseId": "test-completion",
               "rawStopReason": "stop",
-              "durationMs": 4,
+              "durationMs": 5,
               "thinkingLevel": "off"
             }
           }
@@ -863,7 +865,7 @@
                   "text": "Recovered."
                 }
               ],
-              "api": "openai-completions",
+              "api": "<pi-provider>-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -881,10 +883,10 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794688456934,
+              "timestamp": 1794704667643,
               "responseId": "test-completion",
               "rawStopReason": "stop",
-              "durationMs": 4,
+              "durationMs": 5,
               "thinkingLevel": "off"
             },
             "toolResults": []
@@ -902,7 +904,7 @@
                     "text": "Recovered."
                   }
                 ],
-                "api": "openai-completions",
+                "api": "<pi-provider>-completions",
                 "provider": "glass-test",
                 "model": "gpt-test",
                 "usage": {
@@ -920,10 +922,10 @@
                   }
                 },
                 "stopReason": "stop",
-                "timestamp": 1794688456934,
+                "timestamp": 1794704667643,
                 "responseId": "test-completion",
                 "rawStopReason": "stop",
-                "durationMs": 4,
+                "durationMs": 5,
                 "thinkingLevel": "off"
               }
             ],
@@ -952,7 +954,7 @@
               "model": {
                 "id": "gpt-test",
                 "name": "gpt-test",
-                "api": "openai-completions",
+                "api": "<pi-provider>-completions",
                 "provider": "glass-test",
                 "baseUrl": "<redacted>",
                 "reasoning": false,
@@ -971,7 +973,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-14T20-34-16-707Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-15T01-04-27-328Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 3,
