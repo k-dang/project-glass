@@ -407,7 +407,7 @@ function AddToDo() {
           onChange={(event) => setDraft({ title, notes: event.target.value, images, savedId })}
           disabled={savedId !== null}
           onKeyDown={submitOnShortcut}
-          className="min-h-10 resize-none border-0 bg-transparent px-0 py-0 text-sm shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
+          className="min-h-10 resize-none border-0 bg-transparent px-0 py-1 text-sm shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
         />
         {attachments}
       </CardContent>
