@@ -19,6 +19,7 @@ import { Socket } from "effect/socket"
 import { RPC_PATH } from "@glass/contracts"
 import { AgentHostRpcs, HOST_TOKEN_HEADER, HostReady, newHostToken } from "./agentHost/protocol"
 import { followJournal } from "./hostJournal"
+import type { ConversationHost } from "./ConversationTurns"
 import type { HostClient } from "./Placement"
 import { launchCommand } from "./processes"
 import { connectRpcClient } from "./rpcSocket"
@@ -42,7 +43,7 @@ export class LocalAgentHost extends Context.Service<
   {
     readonly client: Effect.Effect<HostClient, AgentError>
     readonly running: Effect.Effect<Option.Option<HostClient>>
-    readonly lifetimeOf: (client: HostClient) => Effect.Effect<Option.Option<Scope.Scope>>
+    readonly lifetimeOf: (client: ConversationHost) => Effect.Effect<Option.Option<Scope.Scope>>
     readonly subscribeStopped: Effect.Effect<Stream.Stream<void>, never, Scope.Scope>
   }
 >()("@glass/server/LocalAgentHost") {
