@@ -2,14 +2,15 @@ import {
   Agent,
   AgentError,
   type AgentReviewFailure,
-  AgentReported,
+  AgentOutcome,
   type AgentReviewState,
-  AgentReviewReported,
+  AgentReviewOutcome,
   finishedReview,
   PullRequestRef,
-  type ReportedWork,
+  type WorkOutcome,
   TurnEnd,
   type TurnEnding,
+  GlobalConversationUpdate,
 } from "@glass/contracts"
 import {
   Array as Arr,
@@ -53,13 +54,16 @@ const StartedAgentReview = Schema.TaggedStruct("AgentReview", {
 
 export const StartedItem = Schema.Union([StartedAgent, StartedAgentReview])
 
-const reported_at = Schema.NullOr(Schema.DateTimeUtcFromString)
+const globalConversationUpdateFields = {
+  global_conversation_update_outcome_at: Schema.NullOr(Schema.DateTimeUtcFromString),
+  globalConversationUpdate: Schema.NullOr(Schema.fromJsonString(GlobalConversationUpdate)),
+}
 
 const AgentRow = Schema.Struct({
   agent_id: Schema.String,
   asked_with: Schema.NullOr(Schema.String),
   started_at: Schema.DateTimeUtcFromString,
-  reported_at,
+  ...globalConversationUpdateFields,
 })
 
 type AgentRow = typeof AgentRow.Type
@@ -70,7 +74,7 @@ const ReviewRow = Schema.Struct({
   number: Schema.Int,
   asked_with: Schema.NullOr(Schema.String),
   started_at: Schema.DateTimeUtcFromString,
-  reported_at,
+  ...globalConversationUpdateFields,
 })
 
 type ReviewRow = typeof ReviewRow.Type
@@ -87,8 +91,8 @@ interface ConversationIds {
   readonly sessionId: string
 }
 
-export interface Unreported {
-  readonly work: ReportedWork
+export interface PendingOutcome {
+  readonly work: WorkOutcome
   readonly at: DateTime.Utc
 }
 
@@ -106,10 +110,11 @@ const endingReason = (ending: TurnEnding) =>
 const ifNew = (
   row: AgentRow | ReviewRow,
   at: DateTime.Utc,
-  work: ReportedWork,
-): ReadonlyArray<Unreported> =>
+  work: WorkOutcome,
+): ReadonlyArray<PendingOutcome> =>
   DateTime.isGreaterThanOrEqualTo(at, row.started_at) &&
-  (row.reported_at === null || DateTime.isGreaterThan(at, row.reported_at))
+  (row.global_conversation_update_outcome_at === null ||
+    DateTime.isGreaterThan(at, row.global_conversation_update_outcome_at))
     ? [{ work, at }]
     : []
 
@@ -162,12 +167,17 @@ export class StartedWork extends Context.Service<
     readonly list: (
       conversationId: string,
     ) => Effect.Effect<ReadonlyArray<typeof StartedItem.Type>, AgentError | AgentReviewFailure>
-    readonly unreported: (
+    readonly pendingOutcomes: (
       conversationId: string,
-    ) => Effect.Effect<ReadonlyArray<Unreported>, AgentError | AgentReviewFailure>
-    readonly markReported: (
+    ) => Effect.Effect<ReadonlyArray<PendingOutcome>, AgentError | AgentReviewFailure>
+    /** Links pending outcomes to their saved Global conversation update before delivery. */
+    readonly recordGlobalConversationUpdate: (
       conversationId: string,
-      reported: ReadonlyArray<Unreported>,
+      turnId: string,
+      outcomes: ReadonlyArray<PendingOutcome>,
+    ) => Effect.Effect<void, AgentError>
+    readonly reconcileGlobalConversationUpdates: (
+      conversationId: string,
     ) => Effect.Effect<void, AgentError | AgentReviewFailure>
     readonly changes: (conversationId: string) => Stream.Stream<void>
   }
@@ -185,13 +195,16 @@ export class StartedWork extends Context.Service<
         Effect.all(
           {
             agentRows: sql`
-              SELECT agent_id, asked_with, started_at, reported_at FROM conversation_agent
-              WHERE conversation_id = ${conversationId}
+              SELECT c.agent_id, c.asked_with, c.started_at, c.global_conversation_update_outcome_at,
+                t.context AS globalConversationUpdate
+              FROM conversation_agent c LEFT JOIN agent_turn t ON t.id = c.global_conversation_update_turn_id
+              WHERE c.conversation_id = ${conversationId}
             `.pipe(Effect.flatMap(decodeAgentRows)),
             reviewRows: sql`
-              SELECT owner, repo, number, asked_with, started_at, reported_at
-              FROM conversation_agent_review
-              WHERE conversation_id = ${conversationId}
+              SELECT c.owner, c.repo, c.number, c.asked_with, c.started_at, c.global_conversation_update_outcome_at,
+                t.context AS globalConversationUpdate
+              FROM conversation_agent_review c LEFT JOIN agent_turn t ON t.id = c.global_conversation_update_turn_id
+              WHERE c.conversation_id = ${conversationId}
             `.pipe(Effect.flatMap(decodeReviewRows)),
           },
           { concurrency: "unbounded" },
@@ -248,7 +261,7 @@ export class StartedWork extends Context.Service<
               VALUES (${conversationId}, ${owner}, ${repo}, ${number}, ${askedWith}, ${startedAt})
               ON CONFLICT DO UPDATE
                 SET asked_with = excluded.asked_with, started_at = excluded.started_at,
-                  reported_at = NULL
+                  global_conversation_update_outcome_at = NULL, global_conversation_update_turn_id = NULL
             `.pipe(saved("a started Agent review"))
             yield* changedRows
           }),
@@ -286,12 +299,12 @@ export class StartedWork extends Context.Service<
               DateTime.Order(a.startedAt, b.startedAt),
             )
           }),
-        unreported: (conversationId) =>
+        pendingOutcomes: (conversationId) =>
           Effect.gen(function* () {
             const { agentRows, reviewRows } = yield* rows(conversationId)
             const { started, ends, waiting } = yield* agentsOf(agentRows)
 
-            const fromAgents = started.flatMap(({ row, agent }): ReadonlyArray<Unreported> => {
+            const fromAgents = started.flatMap(({ row, agent }): ReadonlyArray<PendingOutcome> => {
               const subject = { agentId: agent.id, name: agent.name, askedWith: row.asked_with }
               const requests = waiting.get(agent.id)
 
@@ -304,7 +317,7 @@ export class StartedWork extends Context.Service<
                 return ifNew(
                   row,
                   latest,
-                  AgentReported.make({ ...subject, outcome: "waiting", reason: null }),
+                  AgentOutcome.make({ ...subject, outcome: "waiting", reason: null }),
                 )
               }
 
@@ -315,7 +328,7 @@ export class StartedWork extends Context.Service<
               return ifNew(
                 row,
                 ended.at,
-                AgentReported.make({
+                AgentOutcome.make({
                   ...subject,
                   outcome: endingState(ended.ending) === "failed" ? "failed" : "finished",
                   reason: endingReason(ended.ending),
@@ -327,7 +340,7 @@ export class StartedWork extends Context.Service<
               reviewRows,
               (row) =>
                 reviewNow(row).pipe(
-                  Effect.map((state): ReadonlyArray<Unreported> => {
+                  Effect.map((state): ReadonlyArray<PendingOutcome> => {
                     const subject = { pullRequest: pullRequestOf(row), askedWith: row.asked_with }
                     const written = finishedReview(state)
                     const { job } = state
@@ -336,14 +349,14 @@ export class StartedWork extends Context.Service<
                       return ifNew(
                         row,
                         written.writtenAt,
-                        AgentReviewReported.make({ ...subject, outcome: "finished", reason: null }),
+                        AgentReviewOutcome.make({ ...subject, outcome: "finished", reason: null }),
                       )
 
                     return job.status === "failed"
                       ? ifNew(
                           row,
                           row.started_at,
-                          AgentReviewReported.make({
+                          AgentReviewOutcome.make({
                             ...subject,
                             outcome: "failed",
                             reason: job.reason.message,
@@ -357,42 +370,66 @@ export class StartedWork extends Context.Service<
 
             return [...fromAgents, ...fromReviews.flat()]
           }),
-        markReported: (conversationId, reported) =>
+        recordGlobalConversationUpdate: (conversationId, turnId, outcomes) =>
           Effect.forEach(
-            reported,
+            outcomes,
             ({ work, at }) => {
-              const reportedAt = DateTime.formatIso(at)
+              const outcomeAt = DateTime.formatIso(at)
 
               return Match.value(work).pipe(
                 Match.tagsExhaustive({
-                  Agent: ({ agentId, outcome }) =>
+                  Agent: ({ agentId }) =>
                     sql`
-                      UPDATE conversation_agent SET reported_at = ${reportedAt}
+                      UPDATE conversation_agent SET global_conversation_update_outcome_at = ${outcomeAt}, global_conversation_update_turn_id = ${turnId}
                       WHERE conversation_id = ${conversationId} AND agent_id = ${agentId}
-                    `.pipe(
-                      saved("what the Global conversation reported"),
-                      Effect.andThen(
-                        outcome === "waiting" ? Effect.void : agents.markTurnSeen(agentId, at),
-                      ),
-                    ),
-                  AgentReview: ({ pullRequest, outcome }) =>
+                    `.pipe(saved("a Global conversation update's covered outcomes")),
+                  AgentReview: ({ pullRequest }) =>
                     sql`
-                      UPDATE conversation_agent_review SET reported_at = ${reportedAt}
+                      UPDATE conversation_agent_review SET global_conversation_update_outcome_at = ${outcomeAt}, global_conversation_update_turn_id = ${turnId}
                       WHERE conversation_id = ${conversationId} AND owner = ${pullRequest.owner}
                         AND repo = ${pullRequest.repo} AND number = ${pullRequest.number}
-                    `.pipe(
-                      saved("what the Global conversation reported"),
-                      Effect.andThen(
-                        outcome === "finished"
-                          ? agentReviews.markReported(pullRequest, at)
-                          : Effect.void,
-                      ),
-                    ),
+                    `.pipe(saved("a Global conversation update's covered outcomes")),
                 }),
               )
             },
             { discard: true },
           ),
+        reconcileGlobalConversationUpdates: Effect.fn(
+          "StartedWork.reconcileGlobalConversationUpdates",
+        )(function* (conversationId) {
+          const { agentRows, reviewRows } = yield* rows(conversationId)
+
+          for (const row of [...agentRows, ...reviewRows]) {
+            const context = row.globalConversationUpdate
+
+            if (context === null || row.global_conversation_update_outcome_at === null) continue
+
+            if ("agent_id" in row) {
+              const matched = context.work.find(
+                (work) => Predicate.isTagged(work, "Agent") && work.agentId === row.agent_id,
+              )
+
+              if (matched !== undefined && matched.outcome !== "waiting")
+                yield* agents.markTurnSeen(row.agent_id, row.global_conversation_update_outcome_at)
+            } else {
+              const pr = pullRequestOf(row)
+
+              const matched = context.work.find(
+                (work) =>
+                  Predicate.isTagged(work, "AgentReview") &&
+                  work.pullRequest.owner === pr.owner &&
+                  work.pullRequest.repo === pr.repo &&
+                  work.pullRequest.number === pr.number,
+              )
+
+              if (matched?.outcome === "finished")
+                yield* agentReviews.markIncludedInGlobalConversationUpdate(
+                  pr,
+                  row.global_conversation_update_outcome_at,
+                )
+            }
+          }
+        }),
         changes: (conversationId) =>
           SubscriptionRef.changes(recorded).pipe(
             Stream.switchMap(() =>

@@ -82,7 +82,7 @@ describe("Glass tools over MCP", () => {
       const result = yield* call("list_to_dos")
 
       assert.deepStrictEqual(result.structuredContent, {
-        toDos: [{ id: 1, title: "Reply to Sam", notes: "", done: false }],
+        toDos: [{ id: 1, title: "Reply to Sam", notes: "", done: false, images: [] }],
       })
     }),
   )

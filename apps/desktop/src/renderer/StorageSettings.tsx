@@ -165,8 +165,8 @@ function StorageDetails({ items }: { items: ReadonlyArray<StorageItem> }) {
         ))}
       </div>
       <p className="text-xs text-muted-foreground">
-        Sizes include indexes. SQLite overhead is space SQLite keeps for recent writes, plus free
-        space it will reuse.
+        Sizes include indexes and To-do image files. SQLite overhead is space SQLite keeps for
+        recent writes, plus free space it will reuse.
       </p>
     </div>
   )

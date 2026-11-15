@@ -170,34 +170,38 @@ export const MessageWithContext = Schema.Struct({
 
 export type MessageWithContext = typeof MessageWithContext.Type
 
-const reportedFields = {
+const outcomeFields = {
   outcome: Schema.Literals(["finished", "failed", "waiting"]),
   reason: Schema.NullOr(Schema.String),
   askedWith: Schema.NullOr(Schema.String),
 }
 
-export const AgentReported = Schema.TaggedStruct("Agent", {
+export const AgentOutcome = Schema.TaggedStruct("Agent", {
   agentId: Schema.String,
   name: Schema.String,
-  ...reportedFields,
+  ...outcomeFields,
 })
 
-export const AgentReviewReported = Schema.TaggedStruct("AgentReview", {
+export const AgentReviewOutcome = Schema.TaggedStruct("AgentReview", {
   pullRequest: PullRequestRef,
-  ...reportedFields,
+  ...outcomeFields,
 })
 
-export const ReportedWork = Schema.Union([AgentReported, AgentReviewReported])
+export const WorkOutcome = Schema.Union([AgentOutcome, AgentReviewOutcome])
 
-export type ReportedWork = typeof ReportedWork.Type
+export type WorkOutcome = typeof WorkOutcome.Type
 
-export const WorkReport = Schema.TaggedStruct("Report", {
-  work: Schema.NonEmptyArray(ReportedWork),
+export const GlobalConversationUpdate = Schema.TaggedStruct("GlobalConversationUpdate", {
+  work: Schema.NonEmptyArray(WorkOutcome),
 })
 
-export type WorkReport = typeof WorkReport.Type
+export type GlobalConversationUpdate = typeof GlobalConversationUpdate.Type
 
-export const TurnContext = Schema.Union([PullRequestContext, AgentContext, WorkReport])
+export const TurnContext = Schema.Union([
+  PullRequestContext,
+  AgentContext,
+  GlobalConversationUpdate,
+])
 
 export type TurnContext = typeof TurnContext.Type
 

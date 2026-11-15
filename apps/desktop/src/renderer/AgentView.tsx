@@ -10,7 +10,7 @@ import {
   emptyTranscript,
   asksPermission,
   type CapturedContext,
-  type ReportedWork,
+  type WorkOutcome,
   type FeedbackNote,
   type Image,
   isNothingUnsent,
@@ -395,13 +395,13 @@ export const contextLabel = (context: CapturedContext) =>
 const sentFrom = (context: CapturedContext | null) =>
   context === null ? undefined : `From ${contextLabel(context)}`
 
-const outcomeText: Record<ReportedWork["outcome"], string> = {
+const outcomeText: Record<WorkOutcome["outcome"], string> = {
   finished: "finished",
   failed: "failed",
   waiting: "is waiting on you",
 }
 
-const reportedText = (work: ReportedWork) => {
+const workOutcomeText = (work: WorkOutcome) => {
   const subject = Match.valueTags(work, {
     Agent: ({ name }) => name,
     AgentReview: ({ pullRequest }) => `Agent review on ${referenceText(pullRequest)}`,
@@ -410,14 +410,16 @@ const reportedText = (work: ReportedWork) => {
   return `${subject} ${outcomeText[work.outcome]}`
 }
 
-function ReportMessage(props: { work: ReadonlyArray<ReportedWork> }) {
+function GlobalConversationUpdateMessage(props: { work: ReadonlyArray<WorkOutcome> }) {
   return (
     <Message align="end">
       <MessageContent>
-        <span className="self-end text-xs text-muted-foreground">Report from Glass</span>
+        <span className="self-end text-xs text-muted-foreground">
+          Global conversation update from Glass
+        </span>
         <ul className="flex flex-col gap-1 self-end text-sm text-muted-foreground">
           {props.work.map((work, index) => (
-            <li key={index}>{reportedText(work)}</li>
+            <li key={index}>{workOutcomeText(work)}</li>
           ))}
         </ul>
       </MessageContent>
@@ -465,8 +467,8 @@ const TurnView = memo(function TurnView(props: {
   return (
     <MessageScrollerItem messageId={turn.id} scrollAnchor exactHeight={props.latest}>
       <MessageGroup className="gap-4">
-        {Predicate.isTagged(turn.context, "Report") ? (
-          <ReportMessage work={turn.context.work} />
+        {Predicate.isTagged(turn.context, "GlobalConversationUpdate") ? (
+          <GlobalConversationUpdateMessage work={turn.context.work} />
         ) : (
           <UserMessage
             message={turn.message}

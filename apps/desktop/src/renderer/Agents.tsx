@@ -141,7 +141,7 @@ export function AgentsPanelToggle() {
   )
 }
 
-export function NewAgentLink() {
+function NewAgentLink() {
   return (
     <TooltipHint
       content={

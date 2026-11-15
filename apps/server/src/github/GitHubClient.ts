@@ -50,7 +50,12 @@ import {
   Schema,
   Semaphore,
 } from "effect"
-import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http"
+import {
+  FetchHttpClient,
+  HttpClient,
+  HttpClientRequest,
+  type HttpClientResponse,
+} from "effect/http"
 import { createHash } from "node:crypto"
 import { ServerConfig } from "../ServerConfig"
 import { GitHubChangedFile, toChangedFile } from "./changedFiles"
@@ -145,8 +150,6 @@ import {
   RepositoryDefaultBranchResponse,
   COMMIT_AT_REVISION_QUERY,
   CommitAtRevisionResponse,
-  TREE_AT_EXPRESSION_QUERY,
-  TreeAtExpressionResponse,
 } from "./queries"
 
 const GitHubUser = Schema.Struct({ login: Schema.String })
@@ -168,24 +171,9 @@ export interface ReviewInput extends TourInput {
 }
 
 const GitTree = Schema.Struct({
-  tree: Schema.Array(
-    Schema.Struct({
-      path: Schema.String,
-      mode: Schema.String,
-      type: Schema.String,
-      sha: Schema.String,
-    }),
-  ),
+  tree: Schema.Array(Schema.Struct({ path: Schema.String, type: Schema.String })),
   truncated: Schema.Boolean,
 })
-
-const GitBlob = Schema.Struct({ content: Schema.String, encoding: Schema.Literal("base64") })
-
-export interface TreeBlob {
-  readonly path: string
-  readonly sha: string
-  readonly executable: boolean
-}
 
 type RepositoryName = Pick<FollowedRepository, "owner" | "repo">
 
@@ -331,21 +319,9 @@ export class GitHubClient extends Context.Service<
       repository: RepositoryName,
       revision: string | null,
     ) => Effect.Effect<string | null, RepositoryMissing | ConnectionError>
-    readonly folderTree: (
+    readonly tarball: (
       repository: RepositoryName,
       commit: string,
-      path: string,
-    ) => Effect.Effect<string | null, RepositoryMissing | ConnectionError>
-    readonly treeBlobs: (
-      repository: RepositoryName,
-      tree: string,
-    ) => Effect.Effect<
-      { readonly blobs: ReadonlyArray<TreeBlob>; readonly truncated: boolean },
-      ConnectionError
-    >
-    readonly blob: (
-      repository: RepositoryName,
-      sha: string,
     ) => Effect.Effect<Uint8Array, ConnectionError>
     readonly setFileViewed: (
       pullRequestId: string,
@@ -411,7 +387,15 @@ export class GitHubClient extends Context.Service<
       const send = Effect.fnUntraced(function* <A extends Schema.Top>(
         request: HttpClientRequest.HttpClientRequest,
         schema: A,
-        readKey?: string,
+        {
+          readKey,
+          read = (response) => response.json,
+        }: {
+          readonly readKey?: string | undefined
+          readonly read?: (
+            response: HttpClientResponse.HttpClientResponse,
+          ) => Effect.Effect<unknown, { readonly message: string }>
+        } = {},
       ) {
         const { token, source } = yield* auth.resolveToken
         const credential = createHash("sha256").update(Redacted.value(token)).digest("hex")
@@ -441,15 +425,16 @@ export class GitHubClient extends Context.Service<
                 return yield* new TokenRejected({ tokenSource: source })
               }
 
-              const body = yield* response.json.pipe(
-                Effect.catch((error) =>
-                  response.status === 200
-                    ? unavailable(
-                        "GitHub sent a response Glass couldn't read. Try again in a moment.",
-                      )(error)
-                    : Effect.succeed(null),
-                ),
-              )
+              const body =
+                response.status === 200
+                  ? yield* read(response).pipe(
+                      Effect.catch(
+                        unavailable(
+                          "GitHub sent a response Glass couldn't read. Try again in a moment.",
+                        ),
+                      ),
+                    )
+                  : yield* response.json.pipe(Effect.orElseSucceed(() => null))
 
               yield* policy.observe(
                 credential,
@@ -533,9 +518,11 @@ export class GitHubClient extends Context.Service<
             }),
           ),
           operation.response,
-          /^\s*mutation\b/.test(operation.query)
-            ? undefined
-            : JSON.stringify([operation.query, operation.variables]),
+          {
+            readKey: /^\s*mutation\b/.test(operation.query)
+              ? undefined
+              : JSON.stringify([operation.query, operation.variables]),
+          },
         )
 
         for (const error of body.errors ?? []) {
@@ -912,7 +899,7 @@ export class GitHubClient extends Context.Service<
             }),
           ),
           QueuedPullRequestsResponse,
-          JSON.stringify(["QueuedPullRequests", refs]),
+          { readKey: JSON.stringify(["QueuedPullRequests", refs]) },
         )
 
         return yield* Result.match(toLookedUpBatch(refs.length, body), {
@@ -1011,32 +998,21 @@ export class GitHubClient extends Context.Service<
         return TextFile.make({ text: object.text })
       })
 
-      const treeBlobs = Effect.fn("GitHubClient.treeBlobs")(function* (
+      const repositoryFiles = Effect.fn("GitHubClient.repositoryFiles")(function* (
         { owner, repo }: RepositoryName,
-        tree: string,
+        ref: string,
       ) {
         const { body } = yield* send(
           HttpClientRequest.get(
-            `/repos/${owner}/${repo}/git/trees/${encodeURIComponent(tree)}`,
+            `/repos/${owner}/${repo}/git/trees/${encodeURIComponent(ref)}`,
           ).pipe(HttpClientRequest.setUrlParams({ recursive: 1 })),
           GitTree,
         )
 
-        return {
-          blobs: body.tree.flatMap(({ path, mode, type, sha }) =>
-            type === "blob" ? [{ path, sha, executable: mode === "100755" }] : [],
-          ),
+        return new RepositoryFiles({
+          paths: body.tree.flatMap(({ path, type }) => (type === "blob" ? [path] : [])),
           truncated: body.truncated,
-        }
-      })
-
-      const repositoryFiles = Effect.fn("GitHubClient.repositoryFiles")(function* (
-        repository: RepositoryName,
-        ref: string,
-      ) {
-        const { blobs, truncated } = yield* treeBlobs(repository, ref)
-
-        return new RepositoryFiles({ paths: blobs.map(({ path }) => path), truncated })
+        })
       })
 
       const repositoryDefaultBranch = (repository: FollowedRepository) => {
@@ -1099,36 +1075,17 @@ export class GitHubClient extends Context.Service<
         return "target" in object && "oid" in object.target ? object.target.oid : null
       })
 
-      const folderTree = Effect.fn("GitHubClient.folderTree")(function* (
+      const tarball = Effect.fn("GitHubClient.tarball")(function* (
         { owner, repo }: RepositoryName,
         commit: string,
-        path: string,
-      ) {
-        const { object } = yield* graphql({
-          name: "TreeAtExpression",
-          query: TREE_AT_EXPRESSION_QUERY,
-          variables: { owner, name: repo, expression: path === "" ? commit : `${commit}:${path}` },
-          response: TreeAtExpressionResponse,
-          domainError: missingRepository,
-        }).pipe(Effect.flatMap(foundRepository))
-
-        if (object === null) return null
-
-        if ("oid" in object) return object.oid
-
-        return "tree" in object ? object.tree.oid : null
-      })
-
-      const blob = Effect.fn("GitHubClient.blob")(function* (
-        { owner, repo }: RepositoryName,
-        sha: string,
       ) {
         const { body } = yield* send(
-          HttpClientRequest.get(`/repos/${owner}/${repo}/git/blobs/${sha}`),
-          GitBlob,
+          HttpClientRequest.get(`/repos/${owner}/${repo}/tarball/${commit}`),
+          Schema.instanceOf(ArrayBuffer),
+          { read: (response) => response.arrayBuffer },
         )
 
-        return Buffer.from(body.content, "base64")
+        return new Uint8Array(body)
       })
 
       /** GitHub places new Drafts on the current head; this mutation has no commit precondition. */
@@ -1357,9 +1314,7 @@ export class GitHubClient extends Context.Service<
         repositoryBranches,
         repositoryDefaultBranch,
         commitOf,
-        folderTree,
-        treeBlobs,
-        blob,
+        tarball,
         setFileViewed,
         createDraft,
         updateDraft,

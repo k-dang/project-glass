@@ -1,7 +1,23 @@
-import { type Activity, ActivityToDo, ToDo, ToDoAdded, ToDoDone, ToDoError } from "@glass/contracts"
-import { Context, DateTime, Effect, Layer, Schema } from "effect"
+import {
+  type Activity,
+  ActivityToDo,
+  type Image,
+  ImageMediaType,
+  type ToDoImageSize,
+  type ToDoImageUpload,
+  ToDo,
+  ToDoAdded,
+  ToDoDone,
+  ToDoError,
+  ToDoImage,
+} from "@glass/contracts"
+import { Context, DateTime, Effect, FileSystem, Layer, Result, Schema } from "effect"
+import { Base64 } from "effect/encoding"
 import { SqlClient } from "effect/sql"
+import { randomUUID } from "node:crypto"
+import { join } from "node:path"
 import { ActivityLog } from "./ActivityLog"
+import { ServerConfig } from "./ServerConfig"
 
 const decodeRows = Schema.decodeUnknownEffect(
   Schema.Array(
@@ -10,6 +26,7 @@ const decodeRows = Schema.decodeUnknownEffect(
       title: Schema.String,
       notes: Schema.String,
       done: Schema.BooleanFromBit,
+      images: Schema.fromJsonString(Schema.Array(ToDoImage)),
     }),
   ),
 )
@@ -18,9 +35,50 @@ const decodeChanged = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ id: Schema.Int, title: Schema.String })),
 )
 
+const decodeNames = Schema.decodeUnknownEffect(
+  Schema.Array(Schema.Struct({ file_name: Schema.String })),
+)
+
+const decodeInserted = Schema.decodeUnknownEffect(Schema.Struct({ id: Schema.Int }))
+
+const decodeImageRow = Schema.decodeUnknownEffect(
+  Schema.Struct({
+    file_name: Schema.String,
+    media_type: Schema.String,
+    thumbnail_type: Schema.String,
+  }),
+)
+
+const decodeMediaType = Schema.decodeUnknownEffect(ImageMediaType)
+
 const saveFailed = () => new ToDoError({ message: "Couldn't save your to-do. Try again." })
 
 const loadFailed = () => new ToDoError({ message: "Couldn't load your to-dos. Try again." })
+
+const openFailed = () => new ToDoError({ message: "Couldn't open that image. Try again." })
+
+interface StoredImage {
+  readonly mediaType: ImageMediaType
+  readonly bytes: Uint8Array
+  readonly thumbnail: Uint8Array
+  readonly thumbnailMediaType: ImageMediaType
+}
+
+const decodeBytes = (encoded: string) => {
+  const decoded = Base64.decode(encoded)
+
+  return Result.isFailure(decoded) ? Effect.fail(saveFailed()) : Effect.succeed(decoded.success)
+}
+
+const decodeUploads = (images: ReadonlyArray<ToDoImageUpload>) =>
+  Effect.forEach(images, (image) =>
+    Effect.all({
+      mediaType: Effect.succeed(image.mediaType),
+      bytes: decodeBytes(image.data),
+      thumbnail: decodeBytes(image.thumbnail),
+      thumbnailMediaType: Effect.succeed(image.thumbnailMediaType),
+    }),
+  )
 
 type ToDoList = Effect.Effect<ReadonlyArray<ToDo>, ToDoError>
 
@@ -28,10 +86,13 @@ export class ToDos extends Context.Service<
   ToDos,
   {
     readonly list: () => ToDoList
-    readonly add: (title: string, notes: string) => ToDoList
+    readonly add: (title: string, notes: string, images: ReadonlyArray<ToDoImageUpload>) => ToDoList
     readonly edit: (id: number, title: string, notes: string) => ToDoList
     readonly setDone: (id: number, done: boolean) => ToDoList
     readonly remove: (id: number) => ToDoList
+    readonly attach: (id: number, images: ReadonlyArray<ToDoImageUpload>) => ToDoList
+    readonly removeImage: (id: number) => ToDoList
+    readonly readImage: (id: number, size: ToDoImageSize) => Effect.Effect<Image, ToDoError>
   }
 >()("@glass/server/ToDos") {
   static readonly layer = Layer.effect(
@@ -39,11 +100,34 @@ export class ToDos extends Context.Service<
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
       const activityLog = yield* ActivityLog
+      const fs = yield* FileSystem.FileSystem
+      const { dataDirectory } = yield* ServerConfig
+      const directory = join(dataDirectory, "to-do-images")
       const now = DateTime.now.pipe(Effect.map(DateTime.formatIso))
+      const imagePath = (fileName: string) => join(directory, fileName)
+      const thumbnailPath = (fileName: string) => join(directory, `${fileName}.thumb`)
 
       const read = Effect.gen(function* () {
         const rows = yield* sql`
-          SELECT id, title, notes, completed_at IS NOT NULL AS done
+          SELECT
+            id,
+            title,
+            notes,
+            completed_at IS NOT NULL AS done,
+            COALESCE(
+              (
+                SELECT json_group_array(
+                  json_object('id', image.id, 'mediaType', image.media_type)
+                )
+                FROM (
+                  SELECT id, media_type
+                  FROM to_do_image
+                  WHERE to_do_id = to_do.id
+                  ORDER BY id
+                ) AS image
+              ),
+              '[]'
+            ) AS images
           FROM to_do
           ORDER BY done, completed_at DESC, id
         `
@@ -77,16 +161,114 @@ export class ToDos extends Context.Service<
           Effect.andThen(list),
         )
 
+      const deletePaths = (paths: ReadonlyArray<string>) =>
+        Effect.forEach(paths, (path) => fs.remove(path, { force: true }).pipe(Effect.ignore), {
+          discard: true,
+        })
+
+      const writeBytes = (path: string, bytes: Uint8Array, written: Array<string>) =>
+        Effect.gen(function* () {
+          yield* fs.makeDirectory(directory, { recursive: true })
+          const temporary = `${path}.${randomUUID()}.tmp`
+          written.push(temporary)
+          yield* fs.writeFile(temporary, bytes, { mode: 0o600 })
+          yield* fs.rename(temporary, path)
+          written.push(path)
+        })
+
+      interface PreparedImage {
+        readonly fileName: string
+        readonly mediaType: ImageMediaType
+        readonly thumbnailMediaType: ImageMediaType
+      }
+
+      const prepareImages = (images: ReadonlyArray<StoredImage>) => {
+        const written: Array<string> = []
+
+        return Effect.forEach(images, (image) =>
+          Effect.gen(function* () {
+            const fileName = randomUUID()
+
+            yield* writeBytes(imagePath(fileName), image.bytes, written)
+            yield* writeBytes(thumbnailPath(fileName), image.thumbnail, written)
+
+            return {
+              fileName,
+              mediaType: image.mediaType,
+              thumbnailMediaType: image.thumbnailMediaType,
+            } satisfies PreparedImage
+          }),
+        ).pipe(Effect.tapError(() => deletePaths(written)))
+      }
+
+      const insertImages = (toDoId: number, images: ReadonlyArray<PreparedImage>) =>
+        Effect.gen(function* () {
+          const createdAt = yield* now
+
+          yield* Effect.forEach(
+            images,
+            (image) =>
+              sql`
+              INSERT INTO to_do_image ${sql.insert({
+                to_do_id: toDoId,
+                file_name: image.fileName,
+                media_type: image.mediaType,
+                thumbnail_type: image.thumbnailMediaType,
+                created_at: createdAt,
+              })}
+            `,
+          )
+        })
+
+      const forgetImages = (names: ReadonlyArray<string>) =>
+        deletePaths(names.flatMap((name) => [imagePath(name), thumbnailPath(name)]))
+
+      const sweepImages = fs.readDirectory(directory).pipe(
+        Effect.orElseSucceed(() => []),
+        Effect.flatMap((names) =>
+          Effect.gen(function* () {
+            const rows = yield* decodeNames(yield* sql`SELECT file_name FROM to_do_image`)
+            const live = new Set(rows.flatMap(({ file_name }) => [file_name, `${file_name}.thumb`]))
+
+            yield* deletePaths(
+              names.filter((name) => !live.has(name)).map((name) => imagePath(name)),
+            )
+          }),
+        ),
+        Effect.ignore,
+      )
+
+      yield* sweepImages
+
       return ToDos.of({
         list: Effect.fn("ToDos.list")(() => list),
-        add: Effect.fn("ToDos.add")(function* (title, notes) {
+        add: Effect.fn("ToDos.add")(function* (title, notes, images) {
+          const stored = yield* decodeUploads(images)
+
+          const prepared = yield* prepareImages(stored).pipe(
+            Effect.tapError((cause) => Effect.logWarning("Couldn't save a to-do image", cause)),
+            Effect.mapError(() => saveFailed()),
+          )
+
           const createdAt = yield* now
 
           return yield* changeAndRecord(
-            sql`
-              INSERT INTO to_do ${sql.insert({ title, notes, created_at: createdAt })}
-              RETURNING id, title
-            `,
+            sql
+              .withTransaction(
+                Effect.gen(function* () {
+                  const created = yield* sql`
+                    INSERT INTO to_do ${sql.insert({ title, notes, created_at: createdAt })}
+                    RETURNING id, title
+                  `
+
+                  const inserted = yield* decodeInserted(created[0])
+
+                  yield* insertImages(inserted.id, prepared)
+
+                  return created
+                }),
+              )
+              .pipe(Effect.tapError(() => forgetImages(prepared.map(({ fileName }) => fileName)))),
             (toDo) => ToDoAdded.make({ toDo }),
           )
         }),
@@ -108,7 +290,99 @@ export class ToDos extends Context.Service<
             (toDo) => ToDoDone.make({ toDo }),
           )
         }),
-        remove: Effect.fn("ToDos.remove")((id) => change(sql`DELETE FROM to_do WHERE id = ${id}`)),
+        remove: Effect.fn("ToDos.remove")((id) =>
+          change(
+            Effect.gen(function* () {
+              const names = yield* sql.withTransaction(
+                Effect.gen(function* () {
+                  const rows = yield* decodeNames(
+                    yield* sql`SELECT file_name FROM to_do_image WHERE to_do_id = ${id}`,
+                  )
+
+                  yield* sql`DELETE FROM to_do_image WHERE to_do_id = ${id}`
+                  yield* sql`DELETE FROM to_do WHERE id = ${id}`
+
+                  return rows
+                }),
+              )
+
+              yield* forgetImages(names.map(({ file_name }) => file_name))
+            }),
+          ),
+        ),
+        attach: Effect.fn("ToDos.attach")(function* (id, images) {
+          const stored = yield* decodeUploads(images)
+
+          if (stored.length === 0) return yield* list
+
+          const prepared = yield* prepareImages(stored).pipe(
+            Effect.tapError((cause) => Effect.logWarning("Couldn't save a to-do image", cause)),
+            Effect.mapError(() => saveFailed()),
+          )
+
+          return yield* change(
+            sql
+              .withTransaction(
+                Effect.gen(function* () {
+                  const found = yield* sql`SELECT id FROM to_do WHERE id = ${id}`
+
+                  if (found.length === 0) return yield* Effect.fail(saveFailed())
+
+                  return yield* insertImages(id, prepared)
+                }),
+              )
+              .pipe(Effect.tapError(() => forgetImages(prepared.map(({ fileName }) => fileName)))),
+          )
+        }),
+        removeImage: Effect.fn("ToDos.removeImage")((id) =>
+          change(
+            Effect.gen(function* () {
+              const names = yield* sql.withTransaction(
+                Effect.gen(function* () {
+                  const rows = yield* decodeNames(
+                    yield* sql`SELECT file_name FROM to_do_image WHERE id = ${id}`,
+                  )
+
+                  yield* sql`DELETE FROM to_do_image WHERE id = ${id}`
+
+                  return rows
+                }),
+              )
+
+              yield* forgetImages(names.map(({ file_name }) => file_name))
+            }),
+          ),
+        ),
+        readImage: Effect.fn("ToDos.readImage")(function* (id, size) {
+          const rows = yield* sql<{
+            file_name: string
+            media_type: string
+            thumbnail_type: string
+          }>`
+            SELECT file_name, media_type, thumbnail_type FROM to_do_image WHERE id = ${id}
+          `.pipe(
+            Effect.tapError((cause) => Effect.logWarning("Couldn't open a to-do image", cause)),
+            Effect.mapError(openFailed),
+          )
+
+          const row = rows[0]
+
+          if (row === undefined) return yield* Effect.fail(openFailed())
+
+          const image = yield* decodeImageRow(row).pipe(Effect.mapError(openFailed))
+          const path = size === "full" ? imagePath(image.file_name) : thumbnailPath(image.file_name)
+
+          const bytes = yield* fs.readFile(path).pipe(
+            Effect.tapError((cause) => Effect.logWarning("Couldn't open a to-do image", cause)),
+            Effect.mapError(openFailed),
+          )
+
+          const mediaType = yield* decodeMediaType(
+            size === "full" ? image.media_type : image.thumbnail_type,
+          ).pipe(Effect.mapError(openFailed))
+
+          return { mediaType, data: Base64.encode(bytes) }
+        }),
       })
     }),
   )

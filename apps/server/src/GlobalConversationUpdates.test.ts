@@ -7,8 +7,8 @@ import {
   globalTurns,
   holding,
   lastSettled,
-  reported,
-  reportedAgents,
+  outcomesInGlobalConversationUpdates,
+  agentOutcomesInGlobalConversationUpdates,
   repository,
   sendGlobal,
   settled,
@@ -29,11 +29,11 @@ const createAgent = (message: string) =>
     }),
   )}`
 
-const reports = (turns: ReadonlyArray<Turn>) =>
-  turns.filter(({ context }) => Predicate.isTagged(context, "Report"))
+const globalConversationUpdates = (turns: ReadonlyArray<Turn>) =>
+  turns.filter(({ context }) => Predicate.isTagged(context, "GlobalConversationUpdate"))
 
 it.live(
-  "reports the Agents it started that finished during its own Turn in one Report Turn after it, marking them seen",
+  "sends one Global conversation update for Agents that finished during its own Turn, marking them seen",
   () =>
     Effect.gen(function* () {
       const f = yield* agentsFixture
@@ -59,10 +59,10 @@ it.live(
       yield* f.release("global")
       const turns = yield* globalTurns(f.client, settled(4))
 
-      assert.lengthOf(reports(turns), 1)
+      assert.lengthOf(globalConversationUpdates(turns), 1)
       assert.strictEqual(turns[3]?.message, "")
       assert.sameDeepMembers(
-        reported(turns).map((work) => [
+        outcomesInGlobalConversationUpdates(turns).map((work) => [
           Predicate.isTagged(work, "Agent") && work.agentId,
           work.outcome,
           work.askedWith,
@@ -83,33 +83,43 @@ it.live(
     }),
 )
 
-it.live("reports an Agent it started that waits on a Question, and not again until it ends", () =>
-  Effect.gen(function* () {
-    const f = yield* agentsFixture
-    yield* f.client.LinkLocalCheckout({ path: f.clone.checkout })
+it.live(
+  "sends a Global conversation update for an Agent waiting on a Question, and another when it ends",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* agentsFixture
+      yield* f.client.LinkLocalCheckout({ path: f.clone.checkout })
 
-    yield* sendGlobal(f.client, createAgent("Please ask a question"))
-    yield* globalTurns(f.client, settled(1))
-    const [agent] = yield* f.agents
-    assert.isDefined(agent)
+      yield* sendGlobal(f.client, createAgent("Please ask a question"))
+      yield* globalTurns(f.client, settled(1))
+      const [agent] = yield* f.agents
+      assert.isDefined(agent)
 
-    const waiting = yield* globalTurns(
-      f.client,
-      (all) => reportedAgents(all).length === 1 && all.every(({ ended }) => ended !== null),
-    )
+      const waiting = yield* globalTurns(
+        f.client,
+        (all) =>
+          agentOutcomesInGlobalConversationUpdates(all).length === 1 &&
+          all.every(({ ended }) => ended !== null),
+      )
 
-    assert.deepStrictEqual(reportedAgents(waiting), [[agent.id, "waiting"]])
+      assert.deepStrictEqual(agentOutcomesInGlobalConversationUpdates(waiting), [
+        [agent.id, "waiting"],
+      ])
 
-    yield* f.answering(agent.id, settled(1), () =>
-      AnswerQuestion.make({ answers: [{ chosen: [], text: "Only source files" }] }),
-    )
+      yield* f.answering(agent.id, settled(1), () =>
+        AnswerQuestion.make({ answers: [{ chosen: [], text: "Only source files" }] }),
+      )
 
-    const turns = yield* globalTurns(f.client, (all) => reportedAgents(all).length === 2)
-    assert.deepStrictEqual(reportedAgents(turns), [
-      [agent.id, "waiting"],
-      [agent.id, "finished"],
-    ])
-  }),
+      const turns = yield* globalTurns(
+        f.client,
+        (all) => agentOutcomesInGlobalConversationUpdates(all).length === 2,
+      )
+
+      assert.deepStrictEqual(agentOutcomesInGlobalConversationUpdates(turns), [
+        [agent.id, "waiting"],
+        [agent.id, "finished"],
+      ])
+    }),
 )
 
 it.live("leaves out an Agent it started that the user stopped", () =>
@@ -129,12 +139,42 @@ it.live("leaves out an Agent it started that the user stopped", () =>
 
     const turns = yield* globalTurns(f.client, lastSettled("After"))
 
-    assert.deepStrictEqual(reported(turns), [])
+    assert.deepStrictEqual(outcomesInGlobalConversationUpdates(turns), [])
   }),
 )
 
 it.live(
-  "reports work started before Start fresh into the new conversation, which still lists it as started",
+  "keeps a sent Global conversation update after restart without repeating the same outcome",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* agentsFixture
+      yield* f.client.LinkLocalCheckout({ path: f.clone.checkout })
+      yield* sendGlobal(f.client, createAgent("Finish this"))
+
+      const before = yield* globalTurns(
+        f.client,
+        (all) =>
+          globalConversationUpdates(all).length === 1 && all.every(({ ended }) => ended !== null),
+      )
+
+      const globalConversationUpdateId = globalConversationUpdates(before)[0]?.id
+      const restarted = yield* f.restart
+      yield* sendGlobal(restarted, "After restart")
+      const after = yield* globalTurns(restarted, lastSettled("After restart"))
+
+      assert.deepStrictEqual(
+        globalConversationUpdates(after).map(({ id }) => id),
+        [globalConversationUpdateId],
+      )
+      assert.deepStrictEqual(
+        agentOutcomesInGlobalConversationUpdates(after),
+        agentOutcomesInGlobalConversationUpdates(before),
+      )
+    }),
+)
+
+it.live(
+  "sends a Global conversation update in the new conversation for work started before Start fresh",
   () =>
     Effect.gen(function* () {
       const f = yield* agentsFixture
@@ -149,10 +189,12 @@ it.live(
       yield* f.client.StartGlobalConversationFresh()
       yield* f.release("first")
 
-      const [report] = yield* globalTurns(f.client, settled(1))
+      const [globalConversationUpdate] = yield* globalTurns(f.client, settled(1))
 
       assert.deepStrictEqual(
-        reported(report === undefined ? [] : [report]).map((work) => [
+        outcomesInGlobalConversationUpdates(
+          globalConversationUpdate === undefined ? [] : [globalConversationUpdate],
+        ).map((work) => [
           Predicate.isTagged(work, "Agent") && work.agentId,
           work.outcome,
           work.askedWith,
