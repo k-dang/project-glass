@@ -511,6 +511,58 @@ it("keeps a paste made while another to-do change is saving", async () => {
   expect(attach.payload.images).toHaveLength(1)
 })
 
+it("switches dev layouts between newest first, manual order, and sections", async () => {
+  const user = mount(fakeToDos())
+  const page = await screen.findByRole("main", { name: "To-dos" })
+
+  const labels = () =>
+    within(page)
+      .getAllByRole("checkbox")
+      .map((box) => box.getAttribute("aria-label"))
+
+  expect(within(page).getByRole("button", { name: "Current" }).getAttribute("aria-pressed")).toBe(
+    "true",
+  )
+
+  const add = async (title: string, notes = "") => {
+    const form = within(page).getByRole("form", { name: "Add a to-do" })
+
+    if (notes !== "") {
+      await user.type(within(form).getByRole("textbox", { name: "Notes" }), notes)
+    }
+
+    await user.type(within(form).getByRole("textbox", { name: "New to-do" }), `${title}{Enter}`)
+    await within(page).findByText(title)
+  }
+
+  await add("Older errand")
+  await add("Read the notes", "See https://capy.ai/ before deciding")
+  await add("Newer errand")
+  expect(labels()).toEqual(["Older errand", "Read the notes", "Newer errand"])
+
+  await user.click(within(page).getByRole("button", { name: "Newest" }))
+  expect(within(page).getByText("New to-dos land at the top.")).toBeTruthy()
+  expect(labels()).toEqual(["Newer errand", "Read the notes", "Older errand"])
+  expect(within(page).getByRole("link", { name: "capy.ai" })).toBeTruthy()
+
+  await user.click(within(page).getByRole("button", { name: "Reorder" }))
+  expect(labels()).toEqual(["Older errand", "Read the notes", "Newer errand"])
+  await user.click(within(page).getByRole("button", { name: "Reorder Older errand" }))
+  await user.keyboard("{ArrowDown}")
+  expect(labels()).toEqual(["Read the notes", "Older errand", "Newer errand"])
+
+  await user.click(within(page).getByRole("button", { name: "Sections" }))
+  const checklist = within(page).getByRole("list", { name: "Checklist" })
+  const noted = within(page).getByRole("list", { name: "With notes" })
+  expect(
+    within(checklist)
+      .getAllByRole("checkbox")
+      .map((box) => box.getAttribute("aria-label")),
+  ).toEqual(["Older errand", "Newer errand"])
+  expect(within(noted).getByRole("checkbox", { name: "Read the notes" })).toBeTruthy()
+  expect(within(noted).getByRole("link", { name: "capy.ai" })).toBeTruthy()
+})
+
 it("pastes an image onto an existing to-do, opens it, and removes it", async () => {
   const user = mount(fakeToDos())
   const page = await screen.findByRole("main", { name: "To-dos" })
