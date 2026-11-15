@@ -11,7 +11,7 @@ import {
   TurnStopped,
   GlobalConversationUpdate,
 } from "@glass/contracts"
-import { DateTime, Deferred, Effect, Exit, Layer, Option, Schema, Scope, Stream } from "effect"
+import { DateTime, Deferred, Effect, Exit, Fiber, Layer, Option, Schema, Scope, Stream } from "effect"
 import { eventually } from "../test/eventually"
 import { type Conversation, ConversationTurns } from "./ConversationTurns"
 import { migrationLoader } from "./Migrations"
@@ -21,11 +21,30 @@ import { Transcripts } from "./Transcripts"
 import { wideEvents } from "./wideEvents"
 import { HostAgentError } from "./agentHost/protocol"
 
-// SAFETY: a delivery calls only `StartTurn` on its host.
+interface Script {
+  readonly ensureStarted?: Conversation["ensureStarted"]
+  readonly startTurn?: (turnId: string) => Effect.Effect<void, HostAgentError>
+  readonly stopTurn?: () => Effect.Effect<null>
+  readonly running?: boolean
+}
+
+// SAFETY: these tests call only `StartTurn` and `StopTurn` on the host.
 /* oxlint-disable typescript/no-unsafe-type-assertion, anti-slop/no-chained-type-assertions -- See SAFETY above. */
 const hostThatStarts = (record: (turnId: string) => Effect.Effect<void, HostAgentError>) =>
   ({
     StartTurn: ({ turnId }: { turnId: string }) => record(turnId),
+  }) as unknown as HostClient
+
+const scriptedHost = (
+  script: Script,
+  dispatched: Array<{ agentId: string; turnId: string }>,
+) =>
+  ({
+    StartTurn: ({ agentId, turnId }: { agentId: string; turnId: string }) =>
+      (script.startTurn?.(turnId) ?? Effect.void).pipe(
+        Effect.tap(() => Effect.sync(() => dispatched.push({ agentId, turnId }))),
+      ),
+    StopTurn: () => script.stopTurn?.() ?? Effect.succeed(null),
   }) as unknown as HostClient
 /* oxlint-enable typescript/no-unsafe-type-assertion, anti-slop/no-chained-type-assertions */
 
@@ -99,6 +118,56 @@ const harness = (
 
     return { turns, conversation, dispatched, transcript, delivered }
   })
+
+const scripted = (scripts: { readonly [id: string]: Script }) =>
+  Effect.gen(function* () {
+    const turns = yield* ConversationTurns
+    const transcripts = yield* Transcripts
+    const dispatched: Array<{ agentId: string; turnId: string }> = []
+    const conversations = new Map<string, Conversation>()
+
+    for (const [id, script] of Object.entries(scripts)) {
+      const client = scriptedHost(script, dispatched)
+
+      conversations.set(id, {
+        id,
+        ensureStarted: script.ensureStarted ?? (() => Effect.void),
+        settings: { model: null, effort: null, permissionMode: null },
+        host: Effect.succeed(client),
+        runningHost: script.running ? Effect.succeed(Option.some(client)) : Effect.succeedNone,
+      })
+    }
+
+    yield* turns
+      .serve({
+        claim: (id) =>
+          Effect.sync(() => {
+            const conversation = conversations.get(id)
+
+            return conversation === undefined ? Option.none() : Option.some(conversation)
+          }),
+        lost: Stream.empty,
+        interrupted: Effect.succeed(Object.keys(scripts)),
+      })
+      .pipe(
+        Effect.provide(
+          wideEvents("backend", (line) => {
+            decodeLine(line)
+          }),
+        ),
+      )
+
+    const started = (agentId: string) => dispatched.filter((call) => call.agentId === agentId)
+
+    return { turns, transcripts, conversations, started }
+  })
+
+const hold =
+  (entered: Deferred.Deferred<void>, release: Deferred.Deferred<void>) => () =>
+    Effect.gen(function* () {
+      yield* Deferred.succeed(entered, undefined)
+      yield* Deferred.await(release)
+    })
 
 it.live("ends a Turn stopped before its program starts without ever dispatching it", () =>
   Effect.gen(function* () {
@@ -217,4 +286,207 @@ it.live(
       assert.lengthOf(recovered.turns, 1)
       assert.equal(recovered.turns[0]?.id, savedId)
     }).pipe(Effect.provide(layer)),
+)
+
+const forkSend = <A, E, R>(sending: Effect.Effect<A, E, R>) =>
+  Effect.gen(function* () {
+    let delivery: A | undefined
+
+    const fiber = yield* Effect.forkChild(
+      sending.pipe(
+        Effect.tap((result) =>
+          Effect.sync(() => {
+            delivery = result
+          }),
+        ),
+      ),
+    )
+
+    return { fiber, delivery: () => delivery }
+  })
+
+it.live("accepts and dispatches another Agent's message while StartTurn is still unanswered", () =>
+  Effect.gen(function* () {
+    const entered = yield* Deferred.make<void>()
+    const release = yield* Deferred.make<void>()
+    const desk = yield* scripted({
+      "agent-a": { startTurn: hold(entered, release) },
+      "agent-b": {},
+    })
+
+    yield* Effect.forkChild(desk.turns.send("agent-a", sent("Hold the host")))
+    yield* Deferred.await(entered)
+    const other = yield* forkSend(desk.turns.send("agent-b", sent("Hello from B")))
+    yield* eventually(
+      Effect.sync(() => {
+        assert.equal(other.delivery(), "started")
+        assert.lengthOf(desk.started("agent-b"), 1)
+        assert.lengthOf(desk.started("agent-a"), 0)
+      }),
+    )
+    yield* Deferred.succeed(release, undefined)
+    yield* Fiber.join(other.fiber)
+    yield* eventually(Effect.sync(() => assert.lengthOf(desk.started("agent-a"), 1)))
+  }).pipe(Effect.provide(layer)),
+)
+
+it.live("accepts and dispatches another Agent's message while StopTurn is still unanswered", () =>
+  Effect.gen(function* () {
+    const entered = yield* Deferred.make<void>()
+    const release = yield* Deferred.make<void>()
+    const desk = yield* scripted({
+      "agent-a": {
+        running: true,
+        stopTurn: () => hold(entered, release)().pipe(Effect.as(null)),
+      },
+      "agent-b": {},
+    })
+    const agent = desk.conversations.get("agent-a")
+    assert.isDefined(agent)
+
+    yield* desk.turns.send("agent-a", sent("Working"))
+    yield* eventually(Effect.sync(() => assert.lengthOf(desk.started("agent-a"), 1)))
+
+    const stopping = yield* Effect.forkChild(desk.turns.stop(agent))
+    yield* Deferred.await(entered)
+
+    const other = yield* forkSend(desk.turns.send("agent-b", sent("Hello from B")))
+    yield* eventually(
+      Effect.sync(() => {
+        assert.equal(other.delivery(), "started")
+        assert.lengthOf(desk.started("agent-b"), 1)
+      }),
+    )
+    yield* Deferred.succeed(release, undefined)
+    yield* Fiber.join(stopping)
+    yield* Fiber.join(other.fiber)
+  }).pipe(Effect.provide(layer)),
+)
+
+it.live(
+  "accepts and dispatches the Global conversation while an Agent's StartTurn is still unanswered",
+  () =>
+    Effect.gen(function* () {
+      const entered = yield* Deferred.make<void>()
+      const release = yield* Deferred.make<void>()
+      const desk = yield* scripted({
+        "agent-a": { startTurn: hold(entered, release) },
+        "global-session": {},
+      })
+
+      yield* Effect.forkChild(desk.turns.send("agent-a", sent("Hold the host")))
+      yield* Deferred.await(entered)
+      const separate = yield* forkSend(desk.turns.send("global-session", sent("Ask from anywhere")))
+      yield* eventually(
+        Effect.sync(() => {
+          assert.equal(separate.delivery(), "started")
+          assert.lengthOf(desk.started("global-session"), 1)
+          assert.lengthOf(desk.started("agent-a"), 0)
+        }),
+      )
+      yield* Deferred.succeed(release, undefined)
+      yield* Fiber.join(separate.fiber)
+      yield* eventually(Effect.sync(() => assert.lengthOf(desk.started("agent-a"), 1)))
+    }).pipe(Effect.provide(layer)),
+)
+
+it.live(
+  "runs idle work and a queued send for other conversations while StartTurn is still unanswered",
+  () =>
+    Effect.gen(function* () {
+      const entered = yield* Deferred.make<void>()
+      const release = yield* Deferred.make<void>()
+      let idle = false
+      let update = false
+      let sentQueued = false
+      const desk = yield* scripted({
+        "agent-a": { startTurn: hold(entered, release) },
+        "agent-c": {},
+        "global-session": {},
+      })
+
+      yield* Effect.forkChild(desk.turns.send("agent-a", sent("Hold the host")))
+      yield* Deferred.await(entered)
+      yield* Effect.forkChild(
+        desk.turns.whileIdle(
+          "agent-c",
+          Effect.sync(() => {
+            idle = true
+          }),
+        ),
+      )
+      yield* Effect.forkChild(
+        desk.turns.whenIdle("global-session", () =>
+          Effect.sync(() => {
+            update = true
+          }),
+        ),
+      )
+      yield* Effect.forkChild(
+        desk.turns.sendQueued("agent-c", "absent").pipe(
+          Effect.tap(() =>
+            Effect.sync(() => {
+              sentQueued = true
+            }),
+          ),
+        ),
+      )
+      yield* eventually(
+        Effect.sync(() => {
+          assert.isTrue(idle)
+          assert.isTrue(update)
+          assert.isTrue(sentQueued)
+          assert.lengthOf(desk.started("agent-a"), 0)
+        }),
+      )
+      yield* Deferred.succeed(release, undefined)
+    }).pipe(Effect.provide(layer)),
+)
+
+it.live("dispatches a Queued message sent after the running Turn stops", () =>
+  Effect.gen(function* () {
+    const h = yield* harness(() => Effect.void)
+
+    yield* h.turns.send("agent-1", sent("First"))
+    assert.deepStrictEqual(yield* h.delivered(1), ["dispatched"])
+    yield* h.turns.send("agent-1", sent("Second"))
+
+    const queued = (yield* h.transcript).queued[0]
+    assert.isDefined(queued)
+    yield* h.turns.stop(h.conversation)
+
+    const stopped = yield* h.transcript
+    assert.deepStrictEqual(stopped.turns[0]?.ended?.ending, TurnStopped.make({}))
+    assert.lengthOf(stopped.queued, 1)
+    yield* h.turns.sendQueued("agent-1", queued.id)
+    assert.deepStrictEqual(yield* h.delivered(2), ["dispatched", "dispatched"])
+    assert.lengthOf((yield* h.transcript).queued, 0)
+    assert.equal((yield* h.transcript).turns[1]?.id, h.dispatched[1])
+  }).pipe(Effect.provide(layer)),
+)
+
+it.live("starts an idle update only while that conversation has nothing running or Queued", () =>
+  Effect.gen(function* () {
+    const h = yield* harness(() => Effect.void)
+    let started = 0
+
+    yield* h.turns.whenIdle("agent-1", (start) =>
+      start(globalConversationUpdate, () =>
+        Effect.sync(() => {
+          started += 1
+        }),
+      ),
+    )
+    assert.equal(started, 1)
+    yield* h.delivered(1)
+
+    let again = false
+    yield* h.turns.whenIdle("agent-1", () =>
+      Effect.sync(() => {
+        again = true
+      }),
+    )
+    assert.isFalse(again)
+    assert.equal((yield* h.transcript).turns[0]?.context?._tag, "GlobalConversationUpdate")
+  }).pipe(Effect.provide(layer)),
 )
