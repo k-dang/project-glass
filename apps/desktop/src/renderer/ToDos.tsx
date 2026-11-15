@@ -390,10 +390,7 @@ function AddToDo() {
   const submitDisabled = pending || (savedId === null ? trimmed === "" : images.length === 0)
 
   return (
-    <Card
-      render={<form aria-label="Add a to-do" onPaste={onPaste} onSubmit={onSubmit} />}
-      className="focus-within:ring-3 focus-within:ring-ring/50"
-    >
+    <Card render={<form aria-label="Add a to-do" onPaste={onPaste} onSubmit={onSubmit} />}>
       <CardContent className="flex flex-col gap-1">
         <Input
           aria-label="New to-do"

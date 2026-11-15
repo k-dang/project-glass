@@ -14,7 +14,7 @@ The To-dos rail area holds the user's own to-do list, kept on this device and ne
 ## How to get to it (user POV)
 
 - Choose To-dos in the left icon rail.
-- The add card is at the top. Type in "Add a to-do" and press Enter, or choose Add in the card footer. Notes under the title are optional. Enter there starts a new line, and the footer shows ⌘ or Ctrl+Enter, which adds the to-do. The card takes one focus ring while either field is focused. The new row appears directly under the card.
+- The add card is at the top. Type in "Add a to-do" and press Enter, or choose Add in the card footer. Notes under the title are optional. Enter there starts a new line, and the footer shows ⌘ or Ctrl+Enter, which adds the to-do. Focusing a field does not change the card's border. The new row appears directly under the card.
 - Choose the pencil (Edit) or trash (Delete) on a row, or tick its checkbox.
 - Expand "Done (n)" to see completed to-dos.
 
