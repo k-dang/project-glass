@@ -2,9 +2,9 @@ import { NodeFileSystem } from "@effect/platform-node"
 import { assert, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Queue } from "effect"
 import type { AgentAdapter, AgentSession } from "./adapter"
-import { HostAgents } from "./HostAgents"
+import { HostAgents, agentLock } from "./HostAgents"
 import { Journal } from "./Journal"
-import { HostAgentError, WorkRole, type ConversationStart } from "./protocol"
+import { HostAgentError, WorkRole, type ConversationStart, type StartOutcome } from "./protocol"
 
 const stall = 5_000
 
@@ -22,13 +22,14 @@ interface Handshake {
 
 const handshake = (failure?: HostAgentError) =>
   Effect.gen(function* () {
-    return {
-      entered: yield* Deferred.make<void>(),
-      release: yield* Deferred.make<void>(),
-      closed: yield* Deferred.make<void>(),
-      exit: yield* Deferred.make<void>(),
-      failure,
-    } satisfies Handshake
+    const entered = yield* Deferred.make<void>()
+    const release = yield* Deferred.make<void>()
+    const closed = yield* Deferred.make<void>()
+    const exit = yield* Deferred.make<void>()
+
+    if (failure === undefined) return { entered, release, closed, exit } satisfies Handshake
+
+    return { entered, release, closed, exit, failure } satisfies Handshake
   })
 
 const request = (agentId: string): ConversationStart => ({
@@ -90,6 +91,7 @@ const hosted = Effect.gen(function* () {
       Layer.provide(NodeFileSystem.layer),
     ),
   )
+
   const agents = yield* HostAgents.pipe(Effect.provideContext(context))
 
   return {
@@ -111,16 +113,20 @@ it.live(
       const other = yield* handshake()
 
       yield* host.offer(held)
+
       const starting = yield* Effect.forkChild(host.agents.start(request("a")), {
         startImmediately: true,
       })
+
       yield* Deferred.await(held.entered)
 
       yield* host.offer(other)
       yield* release(other)
+
       const otherStart = yield* Effect.forkChild(host.agents.start(request("b")), {
         startImmediately: true,
       })
+
       yield* Deferred.await(other.entered)
       assert.equal(yield* Fiber.join(otherStart), "started")
       assert.equal(host.peak(), 2)
@@ -145,9 +151,11 @@ it.live(
       assert.equal(yield* host.agents.start(request("b")), "started")
 
       yield* host.offer(held)
+
       const starting = yield* Effect.forkChild(host.agents.start(request("a")), {
         startImmediately: true,
       })
+
       yield* Deferred.await(held.entered)
 
       const stopping = yield* Effect.forkChild(host.agents.stop("b"), { startImmediately: true })
@@ -173,9 +181,11 @@ it.live(
       assert.equal(yield* host.agents.start(request("b")), "started")
 
       yield* host.offer(held)
+
       const starting = yield* Effect.forkChild(host.agents.start(request("a")), {
         startImmediately: true,
       })
+
       yield* Deferred.await(held.entered)
 
       yield* Deferred.succeed(running.exit, undefined)
@@ -202,15 +212,19 @@ it.live(
       const second = yield* handshake()
 
       yield* host.offer(first)
+
       const starting = yield* Effect.forkChild(host.agents.start(request("a")), {
         startImmediately: true,
       })
+
       yield* Deferred.await(first.entered)
 
       yield* host.offer(second)
+
       const again = yield* Effect.forkChild(host.agents.start(request("a")), {
         startImmediately: true,
       })
+
       yield* Effect.yieldNow
       assert.equal(host.opened(), 1)
       assert.isFalse(yield* Deferred.isDone(second.entered))
@@ -233,9 +247,11 @@ it.live(
       const first = yield* handshake()
 
       yield* host.offer(first)
+
       const starting = yield* Effect.forkChild(host.agents.start(request("a")), {
         startImmediately: true,
       })
+
       yield* Deferred.await(first.entered)
 
       const stopping = yield* Effect.forkChild(host.agents.stop("a"), { startImmediately: true })
@@ -287,9 +303,11 @@ it.live(
       const other = yield* handshake()
 
       yield* host.offer(failing)
+
       const starting = yield* Effect.forkChild(host.agents.start(request("a")), {
         startImmediately: true,
       })
+
       yield* Deferred.await(failing.entered)
 
       yield* host.offer(other)
@@ -314,9 +332,11 @@ it.live(
       const again = yield* handshake()
 
       yield* host.offer(held)
+
       const starting = yield* Effect.forkChild(host.agents.start(request("a")), {
         startImmediately: true,
       })
+
       yield* Deferred.await(held.entered)
       yield* Fiber.interrupt(starting)
 
@@ -324,6 +344,122 @@ it.live(
       yield* release(again)
       assert.equal(yield* host.agents.start(request("a")), "started")
       assert.equal(host.opened(), 2)
+    }),
+  stall,
+)
+
+it.live(
+  "drops one Agent's lock while another's program is still starting",
+  () =>
+    Effect.gen(function* () {
+      const host = yield* hosted
+      const held = yield* handshake()
+      const other = yield* handshake()
+
+      yield* host.offer(held)
+
+      const starting = yield* Effect.forkChild(host.agents.start(request("a")), {
+        startImmediately: true,
+      })
+
+      yield* Deferred.await(held.entered)
+      assert.isDefined(agentLock(host.agents, "a"))
+
+      yield* host.offer(other)
+      yield* release(other)
+      assert.equal(yield* host.agents.start(request("b")), "started")
+      assert.isUndefined(agentLock(host.agents, "b"))
+      assert.isDefined(agentLock(host.agents, "a"))
+
+      yield* release(held)
+      assert.equal(yield* Fiber.join(starting), "started")
+      assert.isUndefined(agentLock(host.agents, "a"))
+    }),
+  stall,
+)
+
+const queuedStart = (
+  failure: HostAgentError | undefined,
+  leave: (
+    starting: Fiber.Fiber<StartOutcome, HostAgentError>,
+    gate: Handshake,
+  ) => Effect.Effect<void, HostAgentError | StartOutcome>,
+) =>
+  Effect.gen(function* () {
+    const host = yield* hosted
+    const held = yield* handshake(failure)
+    const waiter = yield* handshake()
+
+    yield* host.offer(held)
+
+    const starting = yield* Effect.forkChild(host.agents.start(request("a")), {
+      startImmediately: true,
+    })
+
+    yield* Deferred.await(held.entered)
+
+    yield* host.offer(waiter)
+
+    const waiting = yield* Effect.forkChild(host.agents.start(request("a")), {
+      startImmediately: true,
+    })
+
+    yield* Effect.yieldNow
+    const entry = agentLock(host.agents, "a")
+    assert.isDefined(entry)
+
+    yield* leave(starting, held)
+    yield* Deferred.await(waiter.entered)
+    assert.strictEqual(agentLock(host.agents, "a"), entry)
+
+    yield* release(waiter)
+    assert.equal(yield* Fiber.join(waiting), "started")
+    assert.isUndefined(agentLock(host.agents, "a"))
+  })
+
+it.live(
+  "keeps the same lock until a startup queued behind a failure finishes",
+  () =>
+    queuedStart(startupFailed, (starting, gate) =>
+      release(gate).pipe(
+        Effect.andThen(Fiber.join(starting).pipe(Effect.flip)),
+        Effect.tap((error) => Effect.sync(() => assert.strictEqual(error, startupFailed))),
+        Effect.asVoid,
+      ),
+    ),
+  stall,
+)
+
+it.live(
+  "keeps the same lock until a startup queued behind an interrupt finishes",
+  () => queuedStart(undefined, (starting) => Fiber.interrupt(starting)),
+  stall,
+)
+
+it.live(
+  "drops an Agent's lock after startup and a queued removal both finish",
+  () =>
+    Effect.gen(function* () {
+      const host = yield* hosted
+      const held = yield* handshake()
+
+      yield* host.offer(held)
+
+      const starting = yield* Effect.forkChild(host.agents.start(request("a")), {
+        startImmediately: true,
+      })
+
+      yield* Deferred.await(held.entered)
+
+      const stopping = yield* Effect.forkChild(host.agents.stop("a"), { startImmediately: true })
+      yield* Effect.yieldNow
+      assert.isDefined(agentLock(host.agents, "a"))
+
+      yield* release(held)
+      assert.equal(yield* Fiber.join(starting), "started")
+      yield* Fiber.join(stopping)
+      yield* Deferred.await(held.closed)
+      assert.isUndefined(agentLock(host.agents, "a"))
     }),
   stall,
 )
