@@ -390,10 +390,7 @@ function AddToDo() {
   const submitDisabled = pending || (savedId === null ? trimmed === "" : images.length === 0)
 
   return (
-    <Card
-      render={<form aria-label="Add a to-do" onPaste={onPaste} onSubmit={onSubmit} />}
-      className="focus-within:ring-3 focus-within:ring-ring/50"
-    >
+    <Card render={<form aria-label="Add a to-do" onPaste={onPaste} onSubmit={onSubmit} />}>
       <CardContent className="flex flex-col gap-1">
         <Input
           aria-label="New to-do"
@@ -410,7 +407,7 @@ function AddToDo() {
           onChange={(event) => setDraft({ title, notes: event.target.value, images, savedId })}
           disabled={savedId !== null}
           onKeyDown={submitOnShortcut}
-          className="min-h-10 resize-none border-0 bg-transparent px-0 py-0 text-sm shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
+          className="min-h-10 resize-none border-0 bg-transparent px-0 py-1 text-sm shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
         />
         {attachments}
       </CardContent>
