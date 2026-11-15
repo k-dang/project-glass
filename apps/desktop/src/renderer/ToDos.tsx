@@ -20,32 +20,22 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/components/ui/toast"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Backend, useBackendRuntime } from "./backend"
 import { ImageViewer, type PreviewImage } from "./ImageViewer"
 import { imageFiles, imageSrc, maxToDoImageBytes, readToDoImages } from "./pastedImages"
 import { ProblemAlert } from "./ProblemAlert"
-import { type Problem, problemOf, settledProblem } from "./problems"
+import { problemOf, settledProblem } from "./problems"
 import { shortcutLabel } from "./shortcutLabel"
 import { submitOnShortcut } from "./submitShortcut"
-import { NewestToDos, ReorderToDos, SectionToDos } from "./toDoLayouts"
 import {
   changeAtom,
   pendingToggleAtom,
   savedToDosAtom,
   type ToDoChange,
-  toDoLayoutAtom,
   toDoThumbnailAtom,
   toDosAtom,
 } from "./toDoList"
-import {
-  isToDoLayout,
-  linkLabel,
-  noteParts,
-  toDoLayoutLabel,
-  toDoLayouts,
-  type ToDoLayout,
-} from "./toDoOrder"
+import { linkLabel, newestFirst, noteParts } from "./toDoOrder"
 
 interface ToDoFields {
   readonly title: string
@@ -87,7 +77,7 @@ const uploadOf = ({
   thumbnailMediaType,
 })
 
-export function useToDoChanges() {
+function useToDoChanges() {
   const change = useAtomValue(changeAtom)
   const save = useAtomSet(changeAtom)
   const pending = change.waiting
@@ -215,10 +205,7 @@ export function ToDos() {
 
   return (
     <div className="page-content flex flex-col gap-6 py-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">To-dos</h1>
-        {import.meta.env.DEV && <LayoutPicker />}
-      </div>
+      <h1 className="text-2xl font-semibold tracking-tight">To-dos</h1>
       {AsyncResult.builder(toDos)
         .onInitialOrWaiting(() => <output>Loading to-dos…</output>)
         .onFailure((cause) => (
@@ -230,85 +217,26 @@ export function ToDos() {
   )
 }
 
-function LayoutPicker() {
-  const [layout, setLayout] = useAtom(toDoLayoutAtom)
-
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-xs text-muted-foreground">Dev layout</span>
-      <ToggleGroup
-        aria-label="To-do layout"
-        variant="outline"
-        size="sm"
-        spacing={0}
-        value={[layout]}
-        onValueChange={([chosen]) => {
-          if (chosen !== undefined && isToDoLayout(chosen)) setLayout(chosen)
-        }}
-      >
-        {toDoLayouts.map((id) => (
-          <ToggleGroupItem key={id} value={id}>
-            {toDoLayoutLabel[id]}
-          </ToggleGroupItem>
-        ))}
-      </ToggleGroup>
-    </div>
-  )
-}
-
 function ToDoList(props: { toDos: ReadonlyArray<ToDo> }) {
   const { pending, problem } = useToDoChanges()
-  const layout = useAtomValue(toDoLayoutAtom)
-  const chosen: ToDoLayout = import.meta.env.DEV ? layout : "current"
-
-  return (
-    <section aria-label="To-dos" aria-busy={pending} data-layout={chosen}>
-      <ToDoLayoutView toDos={props.toDos} problem={problem} layout={chosen} />
-    </section>
-  )
-}
-
-function ToDoLayoutView(props: {
-  toDos: ReadonlyArray<ToDo>
-  problem: Problem | null
-  layout: ToDoLayout
-}) {
-  switch (props.layout) {
-    case "current":
-      return <CurrentToDos toDos={props.toDos} problem={props.problem} />
-    case "newest":
-      return <NewestToDos toDos={props.toDos} problem={props.problem} />
-    case "reorder":
-      return <ReorderToDos toDos={props.toDos} problem={props.problem} />
-    case "sections":
-      return <SectionToDos toDos={props.toDos} problem={props.problem} />
-    default: {
-      const unreachable: never = props.layout
-
-      return unreachable
-    }
-  }
-}
-
-function CurrentToDos(props: { toDos: ReadonlyArray<ToDo>; problem: Problem | null }) {
-  const open = props.toDos.filter((toDo) => !toDo.done)
+  const open = newestFirst(props.toDos.filter((toDo) => !toDo.done))
   const done = props.toDos.filter((toDo) => toDo.done)
 
   return (
-    <div className="flex flex-col gap-4">
+    <section aria-label="To-dos" aria-busy={pending} className="flex flex-col gap-4">
+      <AddToDo />
+      {problem !== null && <ProblemAlert problem={problem} />}
       {open.length === 0 ? (
         <p className="text-sm text-muted-foreground">Nothing to do.</p>
       ) : (
         <ToDoItems label="Open to-dos" toDos={open} />
       )}
-      <AddToDo />
-      {props.problem !== null && <ProblemAlert problem={props.problem} />}
       <DoneToDos toDos={done} />
-    </div>
+    </section>
   )
 }
 
-export function DoneToDos(props: { toDos: ReadonlyArray<ToDo>; notes?: "full" | "compact" }) {
+function DoneToDos(props: { toDos: ReadonlyArray<ToDo> }) {
   if (props.toDos.length === 0) return null
 
   return (
@@ -316,26 +244,16 @@ export function DoneToDos(props: { toDos: ReadonlyArray<ToDo>; notes?: "full" | 
       <summary className="cursor-pointer text-sm text-muted-foreground select-none">
         Done ({props.toDos.length})
       </summary>
-      <ToDoItems
-        label="Done to-dos"
-        toDos={props.toDos}
-        notes={props.notes ?? "full"}
-        className="mt-2"
-      />
+      <ToDoItems label="Done to-dos" toDos={props.toDos} className="mt-2" />
     </details>
   )
 }
 
-export function ToDoItems(props: {
-  label: string
-  toDos: ReadonlyArray<ToDo>
-  className?: string
-  notes?: "full" | "compact"
-}) {
+function ToDoItems(props: { label: string; toDos: ReadonlyArray<ToDo>; className?: string }) {
   return (
     <ul aria-label={props.label} className={cn("divide-y rounded-md border", props.className)}>
       {props.toDos.map((toDo) => (
-        <ToDoRow key={toDo.id} toDo={toDo} notes={props.notes ?? "full"} />
+        <ToDoRow key={toDo.id} toDo={toDo} />
       ))}
     </ul>
   )
@@ -364,8 +282,7 @@ function ImageStrip(props: { label: string; children: ReactNode }) {
   )
 }
 
-export function AddToDo(props: { readonly variant?: "card" | "bar" }) {
-  const variant = props.variant ?? "card"
+function AddToDo() {
   const [draft, setDraft] = useAtom(newToDoAtom)
   const listed = useAtomValue(toDosAtom)
   const { pending, add } = useToDoChanges()
@@ -471,44 +388,6 @@ export function AddToDo(props: { readonly variant?: "card" | "bar" }) {
 
   const submitLabel = savedId === null ? "Add" : "Try again"
   const submitDisabled = pending || (savedId === null ? trimmed === "" : images.length === 0)
-
-  if (variant === "bar") {
-    return (
-      <form
-        aria-label="Add a to-do"
-        onPaste={onPaste}
-        onSubmit={onSubmit}
-        className="rounded-md border px-3 py-1.5 focus-within:ring-3 focus-within:ring-ring/50"
-      >
-        <div className="flex items-center gap-2">
-          <Input
-            aria-label="New to-do"
-            placeholder="Add a to-do"
-            value={title}
-            onChange={(event) => setDraft({ title: event.target.value, notes, images, savedId })}
-            disabled={savedId !== null}
-            className="h-8 min-w-0 flex-1 border-0 bg-transparent px-0 font-medium shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
-          />
-          <Input
-            aria-label="Notes"
-            placeholder="Notes"
-            value={notes}
-            onChange={(event) => setDraft({ title, notes: event.target.value, images, savedId })}
-            disabled={savedId !== null}
-            className="h-8 min-w-0 flex-1 border-0 bg-transparent px-0 text-sm shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
-          />
-          <span className="text-xs text-muted-foreground" aria-hidden>
-            {shortcutLabel("↵")}
-          </span>
-          <Button type="submit" size="sm" disabled={submitDisabled}>
-            {submitLabel}
-          </Button>
-        </div>
-        {attachments}
-        <LargeImage opened={opened} onClose={() => setOpened(null)} />
-      </form>
-    )
-  }
 
   return (
     <Card
@@ -622,13 +501,7 @@ function CompactNotes(props: { readonly notes: string }) {
   )
 }
 
-export function ToDoRow(props: {
-  toDo: ToDo
-  notes?: "full" | "compact"
-  leading?: ReactNode
-  className?: string
-  reorderId?: number
-}) {
+function ToDoRow(props: { toDo: ToDo }) {
   const { toDo } = props
   const { pending, setDone, remove, sendImage } = useToDoChanges()
   const [edit, setEdit] = useAtom(editAtom(toDo.id))
@@ -670,18 +543,14 @@ export function ToDoRow(props: {
 
   if (edit !== null) {
     return (
-      <li className={cn("px-3 py-2", props.className)}>
+      <li className="px-3 py-2">
         <ToDoEditor toDo={toDo} edit={edit} onPaste={paste} />
       </li>
     )
   }
 
   return (
-    <li
-      className={cn("flex items-start gap-3 px-3 py-2", props.className)}
-      data-reorder-id={props.reorderId}
-    >
-      {props.leading}
+    <li className="flex items-start gap-3 px-3 py-2">
       <Checkbox
         aria-label={toDo.title}
         className="mt-1"
@@ -703,14 +572,7 @@ export function ToDoRow(props: {
         <p className={cn("text-sm break-words", checked && "text-muted-foreground line-through")}>
           {toDo.title}
         </p>
-        {toDo.notes !== "" &&
-          (props.notes === "compact" ? (
-            <CompactNotes notes={toDo.notes} />
-          ) : (
-            <p className="mt-1 text-sm break-words whitespace-pre-wrap text-muted-foreground">
-              {toDo.notes}
-            </p>
-          ))}
+        {toDo.notes !== "" && <CompactNotes notes={toDo.notes} />}
         <SavedImages toDo={toDo} />
         <UnsentStrip toDo={toDo} />
       </div>
@@ -779,7 +641,7 @@ function ToDoEditor(props: {
         onKeyDown={cancelOnEscape}
       />
       <Textarea
-        aria-label="Notes"
+        aria-label={`Notes for ${props.toDo.title}`}
         placeholder="Notes"
         value={notes}
         onChange={(event) => setEdit({ title, notes: event.target.value })}

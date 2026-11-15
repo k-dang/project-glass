@@ -60,7 +60,8 @@ it("lists the Queue and the open To-dos", async () => {
     ListToDos: () =>
       Effect.succeed([
         new ToDo({ id: 1, title: "Reply to Mona", notes: "", done: false }),
-        new ToDo({ id: 2, title: "Rebase the branch", notes: "", done: true }),
+        new ToDo({ id: 3, title: "Rebase the branch", notes: "", done: false }),
+        new ToDo({ id: 2, title: "Ship the flag", notes: "", done: true }),
       ]),
   })
 
@@ -76,7 +77,7 @@ it("lists the Queue and the open To-dos", async () => {
     within(toDos)
       .getAllByRole("listitem")
       .map((item) => item.textContent),
-  ).toEqual(["Reply to Mona"])
+  ).toEqual(["Rebase the branch", "Reply to Mona"])
 })
 
 it("shows the first five queued PRs", async () => {
