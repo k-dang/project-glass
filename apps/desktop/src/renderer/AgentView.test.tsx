@@ -29,6 +29,7 @@ import {
   TurnCutOff,
   TurnDone,
   TurnEnded,
+  TurnFailed,
   TurnStarted,
   TurnStopped,
   QueuedMessageStarted,
@@ -104,6 +105,38 @@ it("shows the Agent under Local and its Turn's parts as they stream", async () =
   await user.click(tool)
   expect(await within(transcript).findByText("hi")).toBeTruthy()
   expect(within(transcript).getByText("Done in 3s")).toBeTruthy()
+})
+
+it("shows a failed Turn's reason", async () => {
+  const reason = "The process that runs Agents took too long to answer. Try again."
+
+  mount({
+    WatchTranscript: () =>
+      Stream.make(
+        TranscriptSnapshot.make({
+          turns: [
+            {
+              id: "turn-1",
+              message: "Build it",
+              images: [],
+              context: null,
+              feedback: [],
+              sentAt,
+              parts: [],
+              ended: {
+                at: DateTime.add(sentAt, { seconds: 3 }),
+                ending: TurnFailed.make({ reason }),
+              },
+            },
+          ],
+          queued: [],
+          status: null,
+        }),
+      ),
+  })
+
+  const failed = await screen.findByRole("alert")
+  expect(failed.textContent).toBe(`Failed after 3s: ${reason}`)
 })
 
 it("marks the finished Turn seen once Glass is focused on the Agent's Chat", async () => {

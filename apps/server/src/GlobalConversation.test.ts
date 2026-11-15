@@ -1,4 +1,6 @@
 import { assert, it } from "@effect/vitest"
+import { SqliteClient, SqliteMigrator } from "@effect/sql-sqlite-node"
+import { NodeFileSystem } from "@effect/platform-node"
 import {
   AgentContext,
   AnswerQuestion,
@@ -8,13 +10,42 @@ import {
   TextPart,
   localPlace,
   TurnDone,
+  TurnFailed,
   TurnInterrupted,
   TurnStopped,
   type Turn,
 } from "@glass/contracts"
-import { Effect, Predicate } from "effect"
-import { existsSync } from "node:fs"
+import {
+  Clock,
+  DateTime,
+  Deferred,
+  Duration,
+  Effect,
+  Fiber,
+  Layer,
+  Option,
+  Predicate,
+  Redacted,
+  Schema,
+  Scope,
+  Stream,
+} from "effect"
+import { SqlClient } from "effect/sql"
+import { TestClock } from "effect/testing"
+import { existsSync, mkdtempSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { watchDeadlines } from "../test/deadlines"
+import type { HostClient } from "./Placement"
+import { ConversationTurns } from "./ConversationTurns"
+import { GlobalConversation } from "./GlobalConversation"
+import { HOST_CONTROL_DEADLINE, HOST_DIDNT_ANSWER } from "./hostControl"
+import { LocalAgentHost } from "./LocalAgentHost"
+import { McpCredentials } from "./mcp/McpCredentials"
+import { migrationLoader } from "./Migrations"
+import { ServerConfig } from "./ServerConfig"
+import { ToDos } from "./ToDos"
+import { Transcripts } from "./Transcripts"
 import {
   agentsFixture,
   glassCalls,
@@ -246,5 +277,183 @@ it.live(
       assert.strictEqual(yield* refusal, "queued")
 
       assert.deepStrictEqual(yield* f.client.ListPastGlobalConversations(), [])
+    }),
+)
+
+const decodeSession = Schema.decodeUnknownEffect(
+  Schema.Array(Schema.Struct({ sessionId: Schema.String })),
+)
+
+const message = (text: string) => ({ message: text, images: [], context: null })
+
+const holdHost = (entered: Deferred.Deferred<void>, release: Deferred.Deferred<void>) =>
+  Effect.gen(function* () {
+    yield* Deferred.succeed(entered, undefined)
+    yield* Deferred.await(release)
+  })
+
+const openGlobal = (client: HostClient) => {
+  const home = mkdtempSync(join(tmpdir(), "glass-host-"))
+
+  const host = LocalAgentHost.of({
+    client: Effect.succeed(client),
+    running: Effect.succeed(Option.some(client)),
+    lifetimeOf: () => Scope.Scope.pipe(Effect.map((scope) => Option.some(scope))),
+    subscribeStopped: Effect.succeed(Stream.empty),
+  })
+
+  const layer = GlobalConversation.layer.pipe(
+    Layer.provide(Layer.succeed(LocalAgentHost, host)),
+    Layer.provide(
+      Layer.succeed(
+        McpCredentials,
+        McpCredentials.of({
+          issue: () => Effect.succeed(Redacted.make("bearer")),
+          authenticate: () => Option.none(),
+          endpoint: Effect.succeed("http://127.0.0.1:9"),
+          listening: () => Effect.void,
+        }),
+      ),
+    ),
+    Layer.provide(
+      Layer.succeed(ServerConfig, {
+        port: 0,
+        token: Redacted.make("test-launch-token"),
+        allowedOrigins: new Set<string>(),
+        githubApiUrl: "http://127.0.0.1",
+        agentHostBundle: "agentHost.mjs",
+        gitRemote: "https://github.com",
+        dataDirectory: home,
+        homeDirectory: home,
+      }),
+    ),
+    Layer.provide(NodeFileSystem.layer),
+    Layer.provide(ConversationTurns.layer),
+    Layer.provideMerge(Transcripts.layer),
+    Layer.provideMerge(Layer.mock(ToDos)({})),
+    Layer.provideMerge(SqliteMigrator.layer({ loader: migrationLoader })),
+    Layer.provideMerge(SqliteClient.layer({ filename: ":memory:" })),
+  )
+
+  return { home, layer }
+}
+
+it.effect(
+  "lets Start fresh and mark-seen finish once a stalled StopTurn times out",
+  () =>
+    Effect.gen(function* () {
+      const { watched, deadlineSet } = yield* watchDeadlines(
+        Duration.toMillis(HOST_CONTROL_DEADLINE),
+      )
+      const started = yield* Deferred.make<void>()
+      const entered = yield* Deferred.make<void>()
+      const release = yield* Deferred.make<void>()
+
+      const client = {
+        StartAgent: () => Effect.succeed("started" as const),
+        StartTurn: () => Deferred.succeed(started, undefined),
+        StopTurn: () => holdHost(entered, release).pipe(Effect.as(null)),
+        StopAgent: () => Effect.void,
+        AnswerRequest: () => Effect.die("This test does not call AnswerRequest"),
+        Steer: () => Effect.die("This test does not call Steer"),
+      } as HostClient
+
+      const { layer } = openGlobal(client)
+
+      yield* Effect.gen(function* () {
+        const global = yield* GlobalConversation
+        const transcripts = yield* Transcripts
+        const sql = yield* SqlClient.SqlClient
+
+        yield* Effect.forkChild(global.send(message("Hello")))
+        yield* Deferred.await(started)
+
+        const [session] = yield* sql`SELECT session_id AS sessionId FROM global_conversation`.pipe(
+          Effect.flatMap(decodeSession),
+          Effect.orDie,
+        )
+        assert.isDefined(session)
+
+        const stopping = yield* Effect.forkChild(global.stop)
+        yield* Deferred.await(entered)
+        yield* deadlineSet
+        assert.isUndefined(stopping.pollUnsafe())
+
+        const seenAt = yield* DateTime.now
+        const fresh = yield* Effect.forkChild(global.startFresh)
+        const seen = yield* Effect.forkChild(global.markSeen(seenAt))
+        assert.isUndefined(fresh.pollUnsafe())
+        assert.isUndefined(seen.pollUnsafe())
+
+        yield* TestClock.adjust(HOST_CONTROL_DEADLINE)
+        assert.isDefined(fresh.pollUnsafe())
+        assert.isDefined(seen.pollUnsafe())
+        yield* Fiber.join(stopping)
+        yield* Fiber.join(fresh)
+        yield* Fiber.join(seen)
+
+        const { turns } = yield* transcripts.read(session.sessionId)
+        assert.deepStrictEqual(turns[0]?.ended?.ending, TurnStopped.make({}))
+      }).pipe(Effect.provide(layer), Effect.provideService(Clock.Clock, watched))
+    }),
+)
+
+it.effect(
+  "refuses Start fresh while StartTurn is stalled, then starts once that Turn has failed",
+  () =>
+    Effect.gen(function* () {
+      const { watched, deadlineSet } = yield* watchDeadlines(
+        Duration.toMillis(HOST_CONTROL_DEADLINE),
+      )
+      const entered = yield* Deferred.make<void>()
+      const release = yield* Deferred.make<void>()
+
+      const client = {
+        StartAgent: () => Effect.succeed("started" as const),
+        StartTurn: () => holdHost(entered, release),
+        StopTurn: () => Effect.succeed(null),
+        StopAgent: () => Effect.void,
+        AnswerRequest: () => Effect.die("This test does not call AnswerRequest"),
+        Steer: () => Effect.die("This test does not call Steer"),
+      } as HostClient
+
+      const { layer } = openGlobal(client)
+
+      yield* Effect.gen(function* () {
+        const global = yield* GlobalConversation
+        const transcripts = yield* Transcripts
+        const sql = yield* SqlClient.SqlClient
+
+        const sending = yield* Effect.forkChild(global.send(message("Hello")))
+        yield* Deferred.await(entered)
+        yield* deadlineSet
+
+        const refused = yield* global.startFresh.pipe(
+          Effect.flip,
+          Effect.map((error) => (Predicate.isTagged(error, "StartFreshRefused") ? error.reason : error)),
+        )
+        assert.strictEqual(refused, "running")
+        yield* global.markSeen(yield* DateTime.now)
+        assert.equal(yield* Fiber.join(sending), undefined)
+
+        yield* TestClock.adjust(HOST_CONTROL_DEADLINE)
+
+        const [session] = yield* sql`SELECT session_id AS sessionId FROM global_conversation`.pipe(
+          Effect.flatMap(decodeSession),
+          Effect.orDie,
+        )
+        assert.isDefined(session)
+
+        const { turns } = yield* transcripts.read(session.sessionId)
+        assert.deepStrictEqual(turns[0]?.ended?.ending, TurnFailed.make({ reason: HOST_DIDNT_ANSWER }))
+
+        yield* global.startFresh
+        const [next] = yield* sql`SELECT session_id AS sessionId FROM global_conversation`.pipe(
+          Effect.flatMap(decodeSession),
+          Effect.orDie,
+        )
+        assert.isDefined(next)
+        assert.notStrictEqual(next.sessionId, session.sessionId)
+      }).pipe(Effect.provide(layer), Effect.provideService(Clock.Clock, watched))
     }),
 )
