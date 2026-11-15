@@ -11,7 +11,18 @@ import {
   TurnStopped,
   GlobalConversationUpdate,
 } from "@glass/contracts"
-import { DateTime, Deferred, Effect, Exit, Fiber, Layer, Option, Schema, Scope, Stream } from "effect"
+import {
+  DateTime,
+  Deferred,
+  Effect,
+  Exit,
+  Fiber,
+  Layer,
+  Option,
+  Schema,
+  Scope,
+  Stream,
+} from "effect"
 import { eventually } from "../test/eventually"
 import { type Conversation, ConversationTurns } from "./ConversationTurns"
 import { migrationLoader } from "./Migrations"
@@ -28,17 +39,17 @@ interface Script {
   readonly running?: boolean
 }
 
-// SAFETY: these tests call only `StartTurn` and `StopTurn` on the host.
+// SAFETY: a delivery calls only `StartTurn` on its host.
 /* oxlint-disable typescript/no-unsafe-type-assertion, anti-slop/no-chained-type-assertions -- See SAFETY above. */
 const hostThatStarts = (record: (turnId: string) => Effect.Effect<void, HostAgentError>) =>
   ({
     StartTurn: ({ turnId }: { turnId: string }) => record(turnId),
   }) as unknown as HostClient
+/* oxlint-enable typescript/no-unsafe-type-assertion, anti-slop/no-chained-type-assertions */
 
-const scriptedHost = (
-  script: Script,
-  dispatched: Array<{ agentId: string; turnId: string }>,
-) =>
+// SAFETY: these tests call only `StartTurn` and `StopTurn` on the host.
+/* oxlint-disable typescript/no-unsafe-type-assertion, anti-slop/no-chained-type-assertions -- See SAFETY above. */
+const scriptedHost = (script: Script, dispatched: Array<{ agentId: string; turnId: string }>) =>
   ({
     StartTurn: ({ agentId, turnId }: { agentId: string; turnId: string }) =>
       (script.startTurn?.(turnId) ?? Effect.void).pipe(
@@ -162,12 +173,11 @@ const scripted = (scripts: { readonly [id: string]: Script }) =>
     return { turns, transcripts, conversations, started }
   })
 
-const hold =
-  (entered: Deferred.Deferred<void>, release: Deferred.Deferred<void>) => () =>
-    Effect.gen(function* () {
-      yield* Deferred.succeed(entered, undefined)
-      yield* Deferred.await(release)
-    })
+const hold = (entered: Deferred.Deferred<void>, release: Deferred.Deferred<void>) => () =>
+  Effect.gen(function* () {
+    yield* Deferred.succeed(entered, undefined)
+    yield* Deferred.await(release)
+  })
 
 it.live("ends a Turn stopped before its program starts without ever dispatching it", () =>
   Effect.gen(function* () {
@@ -309,6 +319,7 @@ it.live("accepts and dispatches another Agent's message while StartTurn is still
   Effect.gen(function* () {
     const entered = yield* Deferred.make<void>()
     const release = yield* Deferred.make<void>()
+
     const desk = yield* scripted({
       "agent-a": { startTurn: hold(entered, release) },
       "agent-b": {},
@@ -334,6 +345,7 @@ it.live("accepts and dispatches another Agent's message while StopTurn is still 
   Effect.gen(function* () {
     const entered = yield* Deferred.make<void>()
     const release = yield* Deferred.make<void>()
+
     const desk = yield* scripted({
       "agent-a": {
         running: true,
@@ -341,6 +353,7 @@ it.live("accepts and dispatches another Agent's message while StopTurn is still 
       },
       "agent-b": {},
     })
+
     const agent = desk.conversations.get("agent-a")
     assert.isDefined(agent)
 
@@ -369,6 +382,7 @@ it.live(
     Effect.gen(function* () {
       const entered = yield* Deferred.make<void>()
       const release = yield* Deferred.make<void>()
+
       const desk = yield* scripted({
         "agent-a": { startTurn: hold(entered, release) },
         "global-session": {},
@@ -399,6 +413,7 @@ it.live(
       let idle = false
       let update = false
       let sentQueued = false
+
       const desk = yield* scripted({
         "agent-a": { startTurn: hold(entered, release) },
         "agent-c": {},

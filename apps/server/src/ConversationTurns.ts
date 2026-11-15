@@ -124,8 +124,32 @@ export class ConversationTurns extends Context.Service<
       const sql = yield* SqlClient.SqlClient
       const transcripts = yield* Transcripts
       const toDos = yield* ToDos
-      const turnLock = yield* Semaphore.make(1)
       const scope = yield* Scope.Scope
+      const locks = new Map<string, { semaphore: Semaphore.Semaphore; holders: number }>()
+
+      const withConversation = <A, E, R>(conversationId: string, effect: Effect.Effect<A, E, R>) =>
+        Effect.suspend(() => {
+          const lock = locks.get(conversationId) ?? {
+            semaphore: Semaphore.makeUnsafe(1),
+            holders: 0,
+          }
+
+          lock.holders += 1
+          locks.set(conversationId, lock)
+
+          return lock.semaphore
+            .withPermits(1)(effect)
+            .pipe(
+              Effect.ensuring(
+                Effect.sync(() => {
+                  lock.holders -= 1
+
+                  if (lock.holders === 0 && locks.get(conversationId) === lock)
+                    locks.delete(conversationId)
+                }),
+              ),
+            )
+        })
 
       const delivered = Effect.fnUntraced(function* <Context extends TurnContext>(
         sent: SentMessage & { readonly context: Context | null },
@@ -168,7 +192,8 @@ export class ConversationTurns extends Context.Service<
         turnId: string,
         { client, message }: Prepared,
       ) =>
-        turnLock.withPermits(1)(
+        withConversation(
+          conversation.id,
           Effect.gen(function* () {
             const agentId = conversation.id
 
@@ -279,7 +304,8 @@ export class ConversationTurns extends Context.Service<
       const stop = Effect.fn("ConversationTurns.stop")(function* (conversation: Conversation) {
         const agentId = conversation.id
 
-        yield* turnLock.withPermits(1)(
+        yield* withConversation(
+          agentId,
           Effect.gen(function* () {
             if ((yield* transcripts.runningTurn(agentId)) === null) return
 
@@ -352,12 +378,14 @@ export class ConversationTurns extends Context.Service<
         conversationId: string,
         sent: MessageWithContext,
         feedback?: Effect.Effect<ReadonlyArray<FeedbackNote>, AgentError>,
-      ) => turnLock.withPermits(1)(transcripts.startOrQueue(conversationId, sent, feedback))
+      ) =>
+        withConversation(conversationId, transcripts.startOrQueue(conversationId, sent, feedback))
 
       return ConversationTurns.of({
         serve,
         whileIdle: (conversationId, effect) =>
-          turnLock.withPermits(1)(
+          withConversation(
+            conversationId,
             Effect.gen(function* () {
               if ((yield* transcripts.runningTurn(conversationId)) !== null)
                 return yield* new AgentBusy()
@@ -376,7 +404,8 @@ export class ConversationTurns extends Context.Service<
           if (!(yield* trySteer(conversation, sent))) yield* startOrQueue(conversation.id, sent)
         }),
         whenIdle: (conversationId, effect) =>
-          turnLock.withPermits(1)(
+          withConversation(
+            conversationId,
             Effect.gen(function* () {
               if (!(yield* transcripts.idle(conversationId))) return
 
@@ -390,7 +419,7 @@ export class ConversationTurns extends Context.Service<
             }),
           ),
         sendQueued: (conversationId, queuedId) =>
-          turnLock.withPermits(1)(transcripts.startQueued(conversationId, queuedId)),
+          withConversation(conversationId, transcripts.startQueued(conversationId, queuedId)),
         stop,
         answer,
         unsent,
