@@ -1,5 +1,5 @@
 import { Effect } from "effect"
-import { AgentHostRpcs } from "./protocol"
+import { AgentHostRpcs, HOST_PROTOCOL } from "./protocol"
 import { Changes } from "./Changes"
 import { HostConversations } from "./HostConversations"
 import { Journal } from "./Journal"
@@ -11,6 +11,7 @@ export const AgentHostHandlers = AgentHostRpcs.toLayer(
     const changes = yield* Changes
 
     return AgentHostRpcs.of({
+      Hello: () => Effect.succeed({ host: journal.host, protocol: HOST_PROTOCOL }),
       ListModels: ({ harness }) => conversations.models(harness),
       ListCommands: ({ harness, folder, skills }) =>
         conversations.commands(harness, folder, skills),
@@ -25,8 +26,8 @@ export const AgentHostHandlers = AgentHostRpcs.toLayer(
       GetChanges: ({ folder, baseRef }) => changes.since(folder, baseRef),
       HasUncommittedChanges: ({ folder }) => changes.uncommitted(folder),
       ListFiles: ({ folder }) => changes.files(folder),
-      WatchJournal: ({ after }) => journal.watch(after),
-      Acknowledge: ({ through }) => journal.acknowledge(through),
+      WatchJournal: ({ host, after }) => journal.watch(host, after),
+      Acknowledge: ({ host, through }) => journal.acknowledge(host, through),
     })
   }),
 )

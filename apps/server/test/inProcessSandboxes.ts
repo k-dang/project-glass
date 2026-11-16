@@ -13,12 +13,15 @@ import {
   Scope,
 } from "effect"
 import { NodeHttpServer } from "@effect/platform-node"
-import { HttpServer } from "effect/http"
+import { HttpRouter, HttpServer } from "effect/http"
+import { Rpc, RpcGroup, RpcSerialization, RpcServer } from "effect/rpc"
+import { RPC_PATH } from "@glass/contracts"
 import { createServer } from "node:http"
 import type { Socket } from "node:net"
 import type { Changes } from "../src/agentHost/Changes"
 import type { HostConversations } from "../src/agentHost/HostConversations"
 import type { Journal } from "../src/agentHost/Journal"
+import { Hello } from "../src/agentHost/protocol"
 import { hostServer } from "../src/agentHost/server"
 import { MissingLogin, NoCapacity, SandboxGone } from "../src/sandboxFailures"
 
@@ -41,6 +44,36 @@ const SandboxId = Schema.Struct({ conversationId: Schema.String })
 const conversationIdOf = (state: SandboxState) =>
   Schema.decodeUnknownSync(SandboxId)(state).conversationId
 
+const VersionedHost = RpcGroup.make(Hello)
+
+const UnversionedHost = RpcGroup.make(Rpc.make("Acknowledge"))
+
+const serveRpcs = <Rpcs extends Rpc.Any>(
+  group: RpcGroup.RpcGroup<Rpcs>,
+  handlers: Layer.Layer<Rpc.ToHandler<Rpcs>>,
+) =>
+  HttpRouter.serve(RpcServer.layerHttp({ group, path: RPC_PATH, protocol: "websocket" }), {
+    disableLogger: true,
+    disableListenLog: true,
+  }).pipe(Layer.provide(handlers), Layer.provide(RpcSerialization.layerJson))
+
+export type HostKind =
+  | { readonly kind: "current" }
+  | { readonly kind: "unversioned" }
+  | { readonly kind: "versioned"; readonly protocol: number }
+
+const current: HostKind = { kind: "current" }
+
+const otherHost = (kind: Exclude<HostKind, { readonly kind: "current" }>) =>
+  kind.kind === "unversioned"
+    ? serveRpcs(UnversionedHost, UnversionedHost.toLayer({ Acknowledge: () => Effect.void }))
+    : serveRpcs(
+        VersionedHost,
+        VersionedHost.toLayer({
+          Hello: () => Effect.succeed({ host: "other", protocol: kind.protocol }),
+        }),
+      )
+
 export const inProcessSandboxes = Effect.fnUntraced(function* (
   host: () => Layer.Layer<HostConversations | Journal | Changes>,
 ) {
@@ -58,7 +91,11 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
 
   const hosts = new Map<
     string,
-    { readonly scope: Scope.Closeable; readonly sockets: ReadonlySet<Socket> }
+    {
+      readonly scope: Scope.Closeable
+      readonly sockets: ReadonlySet<Socket>
+      readonly token: string
+    }
   >()
 
   const shutDowns = new Map<string, Deferred.Deferred<void>>()
@@ -99,7 +136,7 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
       return Scope.close(running.scope, Exit.void)
     })
 
-  const startHost = async (conversationId: string, token: string) => {
+  const startHost = async (conversationId: string, token: string, kind: HostKind) => {
     const scope = Scope.makeUnsafe()
     const shutDown = Deferred.makeUnsafe<void>()
     const server = createServer()
@@ -112,15 +149,17 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
 
     const services = await runPromise(
       Layer.buildWithScope(
-        hostServer({ token: Redacted.make(token), shutDown }).pipe(
+        (kind.kind === "current"
+          ? hostServer({ token: Redacted.make(token), shutDown }).pipe(Layer.provide(host()))
+          : otherHost(kind)
+        ).pipe(
           Layer.provideMerge(NodeHttpServer.layer(() => server, { port: 0, host: "127.0.0.1" })),
-          Layer.provide(host()),
         ),
         scope,
       ),
     )
 
-    hosts.set(conversationId, { scope, sockets })
+    hosts.set(conversationId, { scope, sockets, token })
     shutDowns.set(conversationId, shutDown)
     urls.set(
       conversationId,
@@ -155,7 +194,11 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
         if (settings.failAt === step) throw new Error(`The fake Sandbox failed at ${step}`)
       }
 
-      await startHost(request.conversationId, request.host.environment["GLASS_HOST_TOKEN"] ?? "")
+      await startHost(
+        request.conversationId,
+        request.host.environment["GLASS_HOST_TOKEN"] ?? "",
+        current,
+      )
     },
     target: async (state) => {
       const conversationId = conversationIdOf(state)
@@ -234,6 +277,20 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
       for (const check of waiting.splice(0)) check()
     },
     stopHost: stop,
+    dropConnections: (conversationId: string) =>
+      Effect.sync(() => {
+        for (const socket of hosts.get(conversationId)?.sockets ?? []) socket.destroy()
+      }),
+    restartHost: (conversationId: string, kind: HostKind = current) =>
+      Effect.suspend(() => {
+        const running = hosts.get(conversationId)
+
+        if (running === undefined) return Effect.die(`No running host for ${conversationId}`)
+
+        return stop(conversationId).pipe(
+          Effect.andThen(Effect.promise(() => startHost(conversationId, running.token, kind))),
+        )
+      }),
     reclaim,
     setGone: (conversationId: string, isGone: boolean) => {
       if (isGone) gone.add(conversationId)

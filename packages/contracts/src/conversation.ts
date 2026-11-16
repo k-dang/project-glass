@@ -93,6 +93,7 @@ export const SandboxReach = Schema.Literals([
   "connecting",
   "reachable",
   "unreachable",
+  "incompatible",
   ...GoneReach.literals,
 ])
 
@@ -100,10 +101,17 @@ export type SandboxReach = typeof SandboxReach.Type
 
 export const isGone = Schema.is(GoneReach)
 
-export const isOutOfReach = (reach: SandboxReach) => reach === "unreachable" || isGone(reach)
+export const isOutOfReach = (reach: SandboxReach) =>
+  reach === "unreachable" || reach === "incompatible" || isGone(reach)
 
 export const goneExplanation = (reach: GoneReach) =>
   `This Conversation's Sandbox ${reach === "expired" ? "expired" : "was deleted"}, so it can't take messages. Its transcript stays until you remove the Conversation.`
+
+export const incompatibleExplanation =
+  "This Conversation's Sandbox runs a different version of Glass, so it can't take messages. Its transcript stays until you remove the Conversation."
+
+export const readOnlyExplanation = (reach: SandboxReach | undefined) =>
+  isGone(reach) ? goneExplanation(reach) : reach === "incompatible" ? incompatibleExplanation : null
 
 export class SandboxStatus extends Schema.Class<SandboxStatus>("SandboxStatus")({
   expiresAt: Schema.NullOr(Schema.DateTimeUtcFromString),

@@ -4,10 +4,12 @@ import {
   AgentModels,
   GoneReach,
   goneExplanation,
+  incompatibleExplanation,
   isOutOfReach,
   SandboxProviderInfo,
   type SandboxReach,
   SandboxStatus,
+  TurnCutOff,
 } from "@glass/contracts"
 import type { SandboxProvider, SandboxRequest, SandboxState } from "@glass/plugin"
 import {
@@ -35,7 +37,7 @@ import { Socket } from "effect/socket"
 import { newHostToken } from "./agentHost/protocol"
 import { uniqueConversationName } from "./conversationNames"
 import { GitHubClient } from "./github/GitHubClient"
-import { followJournal, type JournalPosition } from "./hostJournal"
+import { followJournal, greet, type JournalPosition } from "./hostJournal"
 import type {
   HostClient,
   LostConversationIds,
@@ -83,12 +85,15 @@ const decodeStored = Schema.decodeUnknownEffect(
       id: Schema.String,
       provider: Schema.String,
       sandbox: RecordJson,
+      journalHost: Schema.NullOr(Schema.String),
       journalSaved: Schema.Int,
     }),
   ),
 )
 
 const decodeModels = Schema.decodeUnknownEffect(AgentModels)
+
+const incompatible = () => new ConversationError({ message: incompatibleExplanation })
 
 const unreachable = () =>
   new ConversationError({ message: "Glass couldn't reach the Conversation's Sandbox. Try again." })
@@ -144,13 +149,15 @@ const goneRecord = (record: typeof Building.Type | typeof Ready.Type, now: DateT
   })
 
 interface HostLink {
-  readonly position: JournalPosition
+  position: JournalPosition | null
+  turnOnLostHost: string | null
   readonly connectLock: Semaphore.Semaphore
   readonly recordLock: Semaphore.Semaphore
 }
 
-const newLink = (saved: number): HostLink => ({
-  position: { saved },
+const newLink = (position: JournalPosition | null, turnOnLostHost: string | null): HostLink => ({
+  position,
+  turnOnLostHost,
   connectLock: Semaphore.makeUnsafe(1),
   recordLock: Semaphore.makeUnsafe(1),
 })
@@ -232,7 +239,8 @@ export class Sandboxes extends Context.Service<
       const lost = yield* PubSub.unbounded<LostConversationIds>()
 
       const stored = yield* sql`
-        SELECT id, sandbox_provider AS provider, sandbox, journal_saved AS journalSaved
+        SELECT id, sandbox_provider AS provider, sandbox, journal_host AS journalHost,
+          journal_saved AS journalSaved
         FROM conversation WHERE sandbox IS NOT NULL
       `.pipe(Effect.flatMap(decodeStored), Effect.orDie)
 
@@ -240,14 +248,26 @@ export class Sandboxes extends Context.Service<
         new Map(stored.map(({ id, sandbox }) => [id, { record: sandbox, following: null }])),
       )
 
-      const links = new Map(stored.map(({ id, journalSaved }) => [id, newLink(journalSaved)]))
+      const runningTurn = (conversationId: string) =>
+        transcripts.runningTurn(conversationId).pipe(Effect.orElseSucceed(() => null))
+
+      const links = new Map<string, HostLink>()
+
+      for (const { id, journalHost, journalSaved } of stored)
+        links.set(
+          id,
+          newLink(
+            journalHost === null ? null : { host: journalHost, saved: journalSaved },
+            yield* runningTurn(id),
+          ),
+        )
 
       const linkOf = (conversationId: string) => {
         const found = links.get(conversationId)
 
         if (found !== undefined) return found
 
-        const link = newLink(0)
+        const link = newLink(null, null)
         links.set(conversationId, link)
 
         return link
@@ -326,6 +346,32 @@ export class Sandboxes extends Context.Service<
           yield* persist(conversationId, gone).pipe(Effect.ignore)
           yield* setRecord(conversationId, gone)
         }).pipe(linkOf(conversationId).recordLock.withPermits(1), Effect.uninterruptible)
+
+      const followFrom = (conversationId: string, host: string) =>
+        Effect.gen(function* () {
+          const link = linkOf(conversationId)
+
+          if (link.position?.host === host) return link.position
+
+          if (link.position !== null && link.turnOnLostHost !== null) {
+            yield* Effect.logWarning(
+              "A Conversation's Sandbox has a new agent host",
+              conversationId,
+            )
+            yield* transcripts.endTurn(TurnCutOff.make({}), conversationId, link.turnOnLostHost)
+          }
+
+          yield* sql`
+            UPDATE conversation SET journal_host = ${host}, journal_saved = 0
+            WHERE id = ${conversationId}
+          `.pipe(
+            Effect.tapError((cause) => Effect.logWarning("Couldn't save a Sandbox", cause)),
+            Effect.mapError(storageFailure),
+          )
+          link.position = { host, saved: 0 }
+
+          return link.position
+        }).pipe(Effect.uninterruptible)
 
       const refuseIfGone = (conversationId: string) =>
         knownOf(conversationId).pipe(
@@ -475,26 +521,45 @@ export class Sandboxes extends Context.Service<
                   Effect.provideService(Socket.WebSocketConstructor, webSocketConstructor),
                 )
 
-                // Effect's socket client connects in the background; a first call shows the host
-                // answered.
-                yield* client.Acknowledge({ through: link.position.saved })
+                // Effect's socket client connects in the background, and connects again to
+                // whichever host answers, so the journal's calls name the host they mean.
+                const host = yield* greet(client)
                 yield* refuseIfGone(conversationId)
+                const position = yield* followFrom(conversationId, host)
                 yield* Effect.acquireRelease(
                   recover(conversationId, opened, () => ({ phase: "reachable", client })),
                   () =>
-                    recover(conversationId, opened, (before) =>
-                      before.phase === "reachable" && before.client === client
-                        ? { phase: "connecting", reach: "reachable" }
-                        : before,
+                    runningTurn(conversationId).pipe(
+                      Effect.map((running) => {
+                        link.turnOnLostHost = running
+                      }),
+                      Effect.andThen(
+                        recover(conversationId, opened, (before) =>
+                          before.phase === "reachable" && before.client === client
+                            ? { phase: "connecting", reach: "reachable" }
+                            : before,
+                        ),
+                      ),
                     ),
                 )
                 yield* Deferred.succeed(opened, client)
-                yield* followJournal(transcripts.save, client, link.position)
+                yield* followJournal(transcripts.save, client, position)
               }).pipe(Effect.scoped, Effect.result)
 
               if (Result.isSuccess(ended)) return yield* Effect.void
 
               if (isSandboxGone(ended.failure)) return yield* Effect.fail(ended.failure)
+
+              if (Predicate.isTagged(ended.failure, "IncompatibleHost")) {
+                yield* Effect.logWarning(
+                  "A Conversation's Sandbox runs another agent host protocol",
+                  conversationId,
+                  ended.failure.protocol,
+                )
+                yield* recover(conversationId, opened, () => ({ phase: "incompatible" }))
+
+                return yield* Effect.fail(incompatible())
+              }
 
               const following = (yield* knownOf(conversationId)).following
 

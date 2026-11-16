@@ -17,8 +17,13 @@ record of the Conversation and providers need no storage of their own. Because G
 state, it can delete a half-built Sandbox even after a crash mid-provisioning.
 
 A Sandbox outlives Glass, so its Turns keep running while Glass is closed, and Glass reconnects to
-its host at launch from the last journal position it saved. Calls to a provider stay bounded: Glass
-stops retrying a Sandbox it can't reach until the user or a relaunch starts over.
+its host at launch from the last journal position it saved. That position belongs to one host
+instance, so each connection starts with a handshake naming the host's instance and protocol
+version: a replaced host's journal is followed from its start, and its Conversation's running Turn
+is cut off; a host of another protocol, which a Sandbox keeps across Glass upgrades, leaves the
+Conversation read-only while that host answers, and Glass checks again on its next connection. Calls
+to a provider stay bounded: Glass stops retrying a Sandbox it can't reach until the user or a
+relaunch starts over.
 
 This device is the same seam's built-in placement, so the Conversations service only calls
 placements and local and Sandbox Conversations differ only in where their host runs.

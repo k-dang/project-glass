@@ -8,6 +8,7 @@ import {
 import {
   type Conversation,
   isGone,
+  readOnlyExplanation,
   isOutOfReach,
   type PlaceTag,
   repositoryKey,
@@ -49,6 +50,8 @@ const expiryFormat = new Intl.DateTimeFormat(undefined, {
 
 const sandboxLine = ({ reach, expiresAt }: SandboxStatus) => {
   if (isGone(reach)) return `Sandbox ${reach}`
+
+  if (reach === "incompatible") return "Sandbox on another Glass version"
 
   const expiry =
     expiresAt === null ? null : `Expires ${expiryFormat.format(DateTime.toDateUtc(expiresAt))}`
@@ -293,7 +296,7 @@ function ConversationRow(props: { conversation: Conversation }) {
             id={sandboxId}
             className={cn(
               "truncate text-xs text-muted-foreground",
-              isGone(sandbox?.reach) && "text-destructive",
+              readOnlyExplanation(sandbox?.reach) !== null && "text-destructive",
             )}
           >
             {sandboxText}
