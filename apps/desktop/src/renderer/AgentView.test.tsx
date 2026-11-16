@@ -1000,9 +1000,7 @@ it("dims a Sandbox Agent Glass can't reach, and makes one whose Sandbox expired 
     ),
   ).toBeTruthy()
   expect(screen.queryByRole("textbox", { name: "Message" })).toBeNull()
-  expect(
-    screen.getByRole("link", { description: /Sandbox runs another Glass version/ }),
-  ).toBeTruthy()
+  expect(screen.getByRole("link", { description: /Sandbox on another Glass version/ })).toBeTruthy()
 })
 
 const flaky = new ToDo({ id: 3, title: "Fix the flaky test", notes: "", done: false })

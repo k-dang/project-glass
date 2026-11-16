@@ -244,22 +244,16 @@ export class Sandboxes extends Context.Service<
       const runningTurn = (agentId: string) =>
         transcripts.runningTurn(agentId).pipe(Effect.orElseSucceed(() => null))
 
-      const links = new Map(
-        yield* Effect.forEach(stored, ({ id, journalHost, journalSaved }) =>
-          runningTurn(id).pipe(
-            Effect.map(
-              (running) =>
-                [
-                  id,
-                  newLink(
-                    journalHost === null ? null : { host: journalHost, saved: journalSaved },
-                    running,
-                  ),
-                ] as const,
-            ),
+      const links = new Map<string, HostLink>()
+
+      for (const { id, journalHost, journalSaved } of stored)
+        links.set(
+          id,
+          newLink(
+            journalHost === null ? null : { host: journalHost, saved: journalSaved },
+            yield* runningTurn(id),
           ),
-        ),
-      )
+        )
 
       const linkOf = (agentId: string) => {
         const found = links.get(agentId)

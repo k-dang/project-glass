@@ -51,7 +51,7 @@ const expiryFormat = new Intl.DateTimeFormat(undefined, {
 const sandboxLine = ({ reach, expiresAt }: SandboxStatus) => {
   if (isGone(reach)) return `Sandbox ${reach}`
 
-  if (reach === "incompatible") return "Sandbox runs another Glass version"
+  if (reach === "incompatible") return "Sandbox on another Glass version"
 
   const expiry =
     expiresAt === null ? null : `Expires ${expiryFormat.format(DateTime.toDateUtc(expiresAt))}`
