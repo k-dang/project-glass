@@ -229,6 +229,8 @@ export class ConversationTurns extends Context.Service<
         error: HostCallError,
       ) =>
         Effect.gen(function* () {
+          yield* Effect.yieldNow
+
           if (Predicate.isTagged(context, "GlobalConversationUpdate"))
             return yield* transcripts
               .setStatus(conversation.id, hostFailure(error))
@@ -382,6 +384,8 @@ export class ConversationTurns extends Context.Service<
             const runningId = yield* transcripts.runningTurn(agentId)
 
             if (runningId === null) return
+
+            yield* transcripts.askedToStop(runningId)
 
             const left = yield* stopHost(conversation, runningId)
 

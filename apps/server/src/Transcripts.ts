@@ -236,6 +236,7 @@ export class Transcripts extends Context.Service<
       ending: TurnEnding,
       agentIds: ReadonlyArray<string>,
     ) => Effect.Effect<void, AgentError>
+    readonly askedToStop: (turnId: string) => Effect.Effect<void>
     readonly runningTurn: (agentId: string) => Effect.Effect<string | null, AgentError>
     readonly idle: (agentId: string) => Effect.Effect<boolean, AgentError>
     /** Records the covered outcomes in the Turn's transaction, before publishing TurnStarted. */
@@ -418,19 +419,25 @@ export class Transcripts extends Context.Service<
         return lock
       }
 
-      const settledAlready = (turnId: string) =>
+      const askedStops = new Set<string>()
+
+      const askedToStop = (turnId: string) =>
+        Effect.sync(() => {
+          askedStops.add(turnId)
+        })
+
+      const failedAlready = (turnId: string) =>
         sql`
           SELECT id FROM agent_turn
-          WHERE id = ${turnId}
-            AND json_extract(ended, '$.ending._tag') IN ('Failed', 'Stopped')
+          WHERE id = ${turnId} AND json_extract(ended, '$.ending._tag') = 'Failed'
         `.pipe(Effect.map((rows) => rows.length > 0))
 
-      const unlessSettled = <E, R>(turnId: string, write: Effect.Effect<boolean, E, R>) =>
-        settledAlready(turnId).pipe(
-          Effect.flatMap((settled) => (settled ? Effect.succeed(false) : write)),
+      const unlessFailed = <E, R>(turnId: string, write: Effect.Effect<boolean, E, R>) =>
+        failedAlready(turnId).pipe(
+          Effect.flatMap((failed) => (failed ? Effect.succeed(false) : write)),
         )
 
-      const writeApplied = (agentId: string, event: AgentEvent, closeStoppedUpdates: boolean) =>
+      const writeApplied = (agentId: string, event: AgentEvent) =>
         Match.value(event).pipe(
           Match.tagsExhaustive({
             TurnStarted: ({ turnId, message, images, context, feedback, sentAt }) =>
@@ -444,7 +451,7 @@ export class Transcripts extends Context.Service<
                 sent_at: DateTime.formatIso(sentAt),
               })}`.pipe(Effect.as(true)),
             PartSet: ({ turnId, index, part }) =>
-              unlessSettled(
+              unlessFailed(
                 turnId,
                 sql`
                   INSERT INTO agent_turn_part ${sql.insert({ turn_id: turnId, position: index, part: encodePart(part) })}
@@ -452,7 +459,7 @@ export class Transcripts extends Context.Service<
                 `.pipe(Effect.as(true)),
               ),
             PartAppended: ({ turnId, index, text }) =>
-              unlessSettled(
+              unlessFailed(
                 turnId,
                 sql`
                   UPDATE agent_turn_part
@@ -466,7 +473,7 @@ export class Transcripts extends Context.Service<
                 sql`(ended IS NULL OR json_extract(ended, '$.ending._tag') = 'CutOff')`,
               ]
 
-              if (!closeStoppedUpdates && Predicate.isTagged(ended.ending, "Stopped"))
+              if (Predicate.isTagged(ended.ending, "Stopped") && !askedStops.has(turnId))
                 conditions.push(
                   sql`COALESCE(json_extract(context, '$._tag'), '') != 'GlobalConversationUpdate'`,
                 )
@@ -535,7 +542,7 @@ export class Transcripts extends Context.Service<
                 sentAt: yield* DateTime.now,
               })
 
-              yield* writeApplied(agentId, event, false)
+              yield* writeApplied(agentId, event)
               started.push(event)
               break
             }
@@ -665,7 +672,6 @@ export class Transcripts extends Context.Service<
         agentId: string,
         hostEvents: ReadonlyArray<HostEvent>,
         throughJournalEntry?: number,
-        closeStoppedUpdates = false,
       ) => {
         const events = hostEvents.filter(
           (event): event is AgentEvent => !Predicate.isTagged(event, "ExtensionStatusesChanged"),
@@ -682,7 +688,7 @@ export class Transcripts extends Context.Service<
               yield* sql`UPDATE agent SET journal_saved = ${throughJournalEntry} WHERE id = ${agentId}`
 
             const written = yield* Effect.filter(joinConsecutiveAppends(events), (event) =>
-              writeApplied(agentId, event, closeStoppedUpdates),
+              writeApplied(agentId, event),
             )
 
             const ended = written.filter((event) => Predicate.isTagged(event, "TurnEnded"))
@@ -771,7 +777,7 @@ export class Transcripts extends Context.Service<
               ),
           )
 
-          yield* save(runningAgent, events.flat(), undefined, true)
+          yield* save(runningAgent, events.flat())
         }
 
         yield* Effect.forEach(agentIds, (agentId) => setExtensionStatuses(agentId, []), {
@@ -787,6 +793,7 @@ export class Transcripts extends Context.Service<
       return Transcripts.of({
         save,
         endRunning,
+        askedToStop,
         watch: (agentId) =>
           Stream.unwrap(
             lockFor(agentId).withPermits(1)(
