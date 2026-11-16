@@ -36,7 +36,7 @@ import {
 import { SqlClient } from "effect/sql"
 import type { DeliveredTurn } from "./agentHost/deliveredMessage"
 import type { TurnSettings } from "./agentHost/protocol"
-import { HOST_CONTROL_DEADLINE, HOST_DIDNT_ANSWER } from "./hostControl"
+import { boundHostCall } from "./hostControl"
 import { type HostCallError, type HostClient, hostFailure } from "./Placement"
 import { prompt } from "./prompt"
 import { ToDos } from "./ToDos"
@@ -87,14 +87,16 @@ const decodeUnsent = Schema.decodeUnknownEffect(Schema.Array(StoredMessage))
 const unsentFailure = () =>
   new AgentError({ message: "Couldn't read or save your unsent message. Try again." })
 
-const hostDidntAnswer = () => new AgentError({ message: HOST_DIDNT_ANSWER })
-
-const boundHostCall = <A, E, R>(call: Effect.Effect<A, E, R>) =>
-  call.pipe(
-    Effect.timeoutOrElse({
-      duration: HOST_CONTROL_DEADLINE,
-      orElse: () => Effect.fail(hostDidntAnswer()),
-    }),
+const stopHost = (conversation: Conversation) =>
+  conversation.runningHost.pipe(
+    Effect.flatMap((running) =>
+      Option.isNone(running)
+        ? Effect.succeed(null)
+        : boundHostCall(running.value.StopTurn({ agentId: conversation.id })).pipe(
+            Effect.tapError((cause) => Effect.logWarning("Couldn't stop a Turn", cause)),
+            Effect.orElseSucceed(() => null),
+          ),
+    ),
   )
 
 export class ConversationTurns extends Context.Service<
@@ -226,36 +228,71 @@ export class ConversationTurns extends Context.Service<
         context: StartedMessage["context"],
         error: HostCallError,
       ) =>
-        Predicate.isTagged(context, "GlobalConversationUpdate")
-          ? transcripts
+        Effect.gen(function* () {
+          yield* Effect.yieldNow
+
+          if (Predicate.isTagged(context, "GlobalConversationUpdate"))
+            return yield* transcripts
               .setStatus(conversation.id, hostFailure(error))
               .pipe(Effect.as("pending" as const satisfies Delivery))
-          : failTurn(conversation.id, turnId, hostFailure(error))
+
+          return yield* failTurn(conversation.id, turnId, hostFailure(error))
+        })
 
       const dispatch = (
         conversation: Conversation,
         turnId: string,
         { client, message }: Prepared,
       ) =>
-        withConversation(
-          conversation.id,
-          Effect.gen(function* () {
-            const agentId = conversation.id
+        Effect.gen(function* () {
+          const agentId = conversation.id
 
-            if ((yield* transcripts.runningTurn(agentId)) !== turnId)
-              return "superseded" as const satisfies Delivery
+          const ownsTurn = yield* withConversation(
+            agentId,
+            transcripts.runningTurn(agentId).pipe(Effect.map((running) => running === turnId)),
+          )
 
-            yield* boundHostCall(
-              client.StartTurn({ agentId, turnId, ...message, ...conversation.settings }),
-            )
+          if (!ownsTurn) return "superseded" as const satisfies Delivery
 
-            return "dispatched" as const satisfies Delivery
-          }).pipe(
-            Effect.catch((error) =>
-              settleUndelivered(conversation, turnId, message.context, error),
-            ),
-          ),
-        )
+          const started = yield* boundHostCall(
+            client.StartTurn({ agentId, turnId, ...message, ...conversation.settings }),
+          ).pipe(
+            Effect.as("accepted" as const),
+            Effect.catch((error) => Effect.succeed(error)),
+          )
+
+          return yield* withConversation(
+            agentId,
+            Effect.gen(function* () {
+              const still = (yield* transcripts.runningTurn(agentId)) === turnId
+
+              if (started === "accepted") {
+                if (!still) yield* stopHost(conversation)
+
+                return still
+                  ? ("dispatched" as const satisfies Delivery)
+                  : ("superseded" as const satisfies Delivery)
+              }
+
+              if (!still) {
+                yield* stopHost(conversation)
+
+                return "superseded" as const satisfies Delivery
+              }
+
+              const settled = yield* settleUndelivered(
+                conversation,
+                turnId,
+                message.context,
+                started,
+              )
+
+              yield* stopHost(conversation)
+
+              return settled
+            }),
+          )
+        })
 
       const deliver = (conversation: Conversation, turnId: string, sent: StartedMessage) =>
         prepare(conversation, sent).pipe(
@@ -329,7 +366,7 @@ export class ConversationTurns extends Context.Service<
 
           const message = yield* delivered(sent)
 
-          return yield* running.value.Steer({ agentId, ...message }).pipe(
+          return yield* boundHostCall(running.value.Steer({ agentId, ...message })).pipe(
             Effect.as(true),
             Effect.tapError((cause) => Effect.logWarning("Couldn't Steer a Turn", cause)),
             Effect.orElseSucceed(() => false),
@@ -342,16 +379,10 @@ export class ConversationTurns extends Context.Service<
         yield* withConversation(
           agentId,
           Effect.gen(function* () {
-            if ((yield* transcripts.runningTurn(agentId)) === null) return
+            const runningId = yield* transcripts.runningTurn(agentId)
+            const left = yield* stopHost(conversation)
 
-            const running = yield* conversation.runningHost
-
-            const left = Option.isNone(running)
-              ? null
-              : yield* boundHostCall(running.value.StopTurn({ agentId })).pipe(
-                  Effect.tapError((cause) => Effect.logWarning("Couldn't stop a Turn", cause)),
-                  Effect.orElseSucceed(() => null),
-                )
+            if (runningId === null) return
 
             if (left === null) yield* transcripts.endRunning(TurnStopped.make({}), [agentId])
             else if (left.length > 0) yield* transcripts.prependQueued(agentId, left)
@@ -366,7 +397,9 @@ export class ConversationTurns extends Context.Service<
       ) {
         return yield* conversation.host.pipe(
           Effect.flatMap((client) =>
-            client.AnswerRequest({ agentId: conversation.id, requestId, answer: given }),
+            boundHostCall(
+              client.AnswerRequest({ agentId: conversation.id, requestId, answer: given }),
+            ),
           ),
           Effect.mapError((error) =>
             Predicate.isTagged(error, "RequestNotWaiting")

@@ -656,9 +656,9 @@ it.effect("fails a Turn the host never accepts, so Stop can return", () =>
       yield* Deferred.await(entered)
       yield* deadlineSet
       assert.equal(yield* Fiber.join(sending), "started")
+      yield* TestClock.adjust(Duration.millis(30_000))
 
-      const stopping = yield* Effect.forkChild(desk.turns.stop(agent))
-      yield* TestClock.adjust(HOST_CONTROL_DEADLINE)
+      const stopping = yield* Effect.forkChild(desk.turns.stop(agent), { startImmediately: true })
       yield* Fiber.join(stopping)
 
       const { turns } = yield* desk.transcripts.read("agent-a")
@@ -703,10 +703,13 @@ it.effect(
         yield* deadlineSet
         assert.equal(yield* Fiber.join(first), "started")
 
-        const second = yield* Effect.forkChild(desk.turns.send("agent-a", sent("Second")))
+        const second = yield* Effect.forkChild(desk.turns.send("agent-a", sent("Second")), {
+          startImmediately: true,
+        })
+
+        assert.equal(yield* Fiber.join(second), "queued")
         yield* TestClock.adjust(HOST_CONTROL_DEADLINE)
         yield* Deferred.await(secondAccepted)
-        assert.equal(yield* Fiber.join(second), "started")
 
         const { turns } = yield* desk.transcripts.read("agent-a")
         assert.deepStrictEqual(
@@ -829,52 +832,95 @@ it.effect("fails the Turn at 30 seconds, and not a millisecond sooner", () =>
   }).pipe(Effect.provide(layer)),
 )
 
-it.effect(
-  "queues a message sent during a stalled StartTurn, and Stop stops that Turn",
-  () =>
-    withHostClock((deadlineSet) =>
-      Effect.gen(function* () {
-        const entered = yield* Deferred.make<void>()
-        const release = yield* Deferred.make<void>()
+it.effect("fails a timed-out Turn before a waiting Stop can end it as Stopped", () =>
+  withHostClock((deadlineSet) =>
+    Effect.gen(function* () {
+      const entered = yield* Deferred.make<void>()
+      const release = yield* Deferred.make<void>()
+      let stopRan = false
+      let askStop: Effect.Effect<void> = Effect.void
 
-        const desk = yield* scripted({
-          "agent-a": {
-            running: true,
-            startTurn: hold(entered, release),
-            stopTurn: () => Effect.succeed(null),
-          },
-        })
+      const desk = yield* scripted({
+        "agent-a": {
+          running: true,
+          startTurn: () => hold(entered, release)().pipe(Effect.onInterrupt(() => askStop)),
+          stopTurn: () => Effect.succeed(null),
+        },
+      })
 
-        const agent = desk.conversations.get("agent-a")
-        assert.isDefined(agent)
+      const agent = desk.conversations.get("agent-a")
+      assert.isDefined(agent)
 
-        const first = yield* Effect.forkChild(desk.turns.send("agent-a", sent("First")), {
-          startImmediately: true,
-        })
-        yield* Deferred.await(entered)
-        yield* deadlineSet
-        assert.equal(yield* Fiber.join(first), "started")
+      askStop = Effect.forkDetach(
+        desk.turns.stop(agent).pipe(
+          Effect.tap(() =>
+            Effect.sync(() => {
+              stopRan = true
+            }),
+          ),
+        ),
+        { startImmediately: false },
+      ).pipe(Effect.asVoid)
 
-        const second = yield* Effect.forkChild(desk.turns.send("agent-a", sent("Second")), {
-          startImmediately: true,
-        })
-        const queued = second.pollUnsafe()
-        assert.isDefined(queued)
-        assert.equal(Exit.isSuccess(queued) ? queued.value : undefined, "queued")
+      yield* Effect.forkChild(desk.turns.send("agent-a", sent("Build it")))
+      yield* Deferred.await(entered)
+      yield* deadlineSet
+      yield* TestClock.adjust(Duration.millis(30_000))
 
-        yield* desk.turns.stop(agent)
+      assert.isTrue(stopRan)
 
-        const { turns, queued: waiting } = yield* desk.transcripts.read("agent-a")
-        assert.deepStrictEqual(
-          turns.map(({ message, ended }) => ({ message, ending: ended?.ending ?? null })),
-          [{ message: "First", ending: TurnStopped.make({}) }],
-        )
-        assert.deepStrictEqual(
-          waiting.map(({ message }) => message),
-          ["Second"],
-        )
-      }),
-    ).pipe(Effect.provide(layer)),
+      const { turns } = yield* desk.transcripts.read("agent-a")
+      assert.deepStrictEqual(turns[0]?.ended?.ending, failedToAnswer)
+    }),
+  ).pipe(Effect.provide(layer)),
+)
+
+it.effect("queues a message sent during a stalled StartTurn, and Stop stops that Turn", () =>
+  withHostClock((deadlineSet) =>
+    Effect.gen(function* () {
+      const entered = yield* Deferred.make<void>()
+      const release = yield* Deferred.make<void>()
+
+      const desk = yield* scripted({
+        "agent-a": {
+          running: true,
+          startTurn: hold(entered, release),
+          stopTurn: () => Effect.succeed(null),
+        },
+      })
+
+      const agent = desk.conversations.get("agent-a")
+      assert.isDefined(agent)
+
+      const first = yield* Effect.forkChild(desk.turns.send("agent-a", sent("First")), {
+        startImmediately: true,
+      })
+
+      yield* Deferred.await(entered)
+      yield* deadlineSet
+      assert.equal(yield* Fiber.join(first), "started")
+
+      const second = yield* Effect.forkChild(desk.turns.send("agent-a", sent("Second")), {
+        startImmediately: true,
+      })
+
+      const queued = second.pollUnsafe()
+      assert.isDefined(queued)
+      assert.equal(Exit.isSuccess(queued) ? queued.value : undefined, "queued")
+
+      yield* desk.turns.stop(agent)
+
+      const { turns, queued: waiting } = yield* desk.transcripts.read("agent-a")
+      assert.deepStrictEqual(
+        turns.map(({ message, ended }) => ({ message, ending: ended?.ending ?? null })),
+        [{ message: "First", ending: TurnStopped.make({}) }],
+      )
+      assert.deepStrictEqual(
+        waiting.map(({ message }) => message),
+        ["Second"],
+      )
+    }),
+  ).pipe(Effect.provide(layer)),
 )
 
 it.effect("tells the host to stop when StartTurn times out so the next message can start", () =>
@@ -902,7 +948,7 @@ it.effect("tells the host to stop when StartTurn times out so the next message c
               yield* Deferred.succeed(outcome, stopped ? "accepted" : "working")
 
               if (!stopped)
-                return yield* new HostAgentError({
+                yield* new HostAgentError({
                   message: "The Agent is still working on a Turn.",
                 })
             }),

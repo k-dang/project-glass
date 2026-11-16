@@ -418,6 +418,17 @@ export class Transcripts extends Context.Service<
         return lock
       }
 
+      const failedAlready = (turnId: string) =>
+        sql`
+          SELECT id FROM agent_turn
+          WHERE id = ${turnId} AND json_extract(ended, '$.ending._tag') = 'Failed'
+        `.pipe(Effect.map((rows) => rows.length > 0))
+
+      const unlessFailed = <E, R>(turnId: string, write: Effect.Effect<boolean, E, R>) =>
+        failedAlready(turnId).pipe(
+          Effect.flatMap((failed) => (failed ? Effect.succeed(false) : write)),
+        )
+
       const writeApplied = (agentId: string, event: AgentEvent) =>
         Match.value(event).pipe(
           Match.tagsExhaustive({
@@ -432,16 +443,22 @@ export class Transcripts extends Context.Service<
                 sent_at: DateTime.formatIso(sentAt),
               })}`.pipe(Effect.as(true)),
             PartSet: ({ turnId, index, part }) =>
-              sql`
-                INSERT INTO agent_turn_part ${sql.insert({ turn_id: turnId, position: index, part: encodePart(part) })}
-                ON CONFLICT (turn_id, position) DO UPDATE SET part = excluded.part
-              `.pipe(Effect.as(true)),
+              unlessFailed(
+                turnId,
+                sql`
+                  INSERT INTO agent_turn_part ${sql.insert({ turn_id: turnId, position: index, part: encodePart(part) })}
+                  ON CONFLICT (turn_id, position) DO UPDATE SET part = excluded.part
+                `.pipe(Effect.as(true)),
+              ),
             PartAppended: ({ turnId, index, text }) =>
-              sql`
-                UPDATE agent_turn_part
-                SET part = json_set(part, '$.text', json_extract(part, '$.text') || ${text})
-                WHERE turn_id = ${turnId} AND position = ${index}
-              `.pipe(Effect.as(true)),
+              unlessFailed(
+                turnId,
+                sql`
+                  UPDATE agent_turn_part
+                  SET part = json_set(part, '$.text', json_extract(part, '$.text') || ${text})
+                  WHERE turn_id = ${turnId} AND position = ${index}
+                `.pipe(Effect.as(true)),
+              ),
             TurnEnded: ({ turnId, ended }) =>
               sql`
                 UPDATE agent_turn SET ended = ${encodeEnd(ended)}
