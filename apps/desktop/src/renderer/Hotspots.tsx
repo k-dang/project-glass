@@ -281,7 +281,7 @@ export function ChapterHotspots(props: {
 
 export function LowAttentionMark(props: { className?: string }) {
   return (
-    <span className={cn("flex items-center gap-1 text-muted-foreground", props.className)}>
+    <span className={cn("flex items-center gap-1 text-sky-600 dark:text-sky-400", props.className)}>
       <EyeOff aria-hidden className="size-3" />
       Low attention
     </span>
