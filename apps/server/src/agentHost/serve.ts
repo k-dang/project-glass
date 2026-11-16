@@ -4,7 +4,7 @@ import { HttpServer } from "effect/http"
 import { closeSync, writeSync } from "node:fs"
 import { createServer } from "node:http"
 import { Changes } from "./Changes"
-import { HostAgents, type Harnesses } from "./HostAgents"
+import { HostConversations, type Harnesses } from "./HostConversations"
 import { Journal } from "./Journal"
 import { Git } from "../git"
 import { HostReady } from "./protocol"
@@ -47,7 +47,7 @@ export const serveAgentHost = <E, R>(harnesses: Effect.Effect<Harnesses, E, R>) 
             host: address,
           }),
         ),
-        Layer.provide(HostAgents.make(adapters)),
+        Layer.provide(HostConversations.make(adapters)),
         Layer.provide(Journal.layer),
         Layer.provide(Changes.layer),
         Layer.provide(Git.layer),

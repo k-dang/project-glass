@@ -45,9 +45,9 @@ import type { HarnessAdapter } from "./adapter"
 import { Input, isFailure, machine } from "./claudeTurn"
 import type { DeliveredMessage, DeliveredTurn } from "./deliveredMessage"
 import {
-  type AgentRole,
+  type RepositoryRole,
   couldNotSwitch,
-  HostAgentError,
+  HostConversationError,
   notRunning,
   type ReviewBrief,
 } from "./protocol"
@@ -92,7 +92,7 @@ export interface ClaudeSdk {
 const liveSdk: ClaudeSdk = { query, getSessionInfo }
 
 const startFailure = (cause: unknown) =>
-  new HostAgentError({
+  new HostConversationError({
     message: /ENOENT|not found/i.test(String(cause))
       ? "Claude Code isn't installed. Install it, or set claudeCommand in Glass's settings.json to its path and restart Glass."
       : "Claude Code could not start. Check its installation.",
@@ -137,7 +137,7 @@ const workOptions = (): Options => ({
   },
 })
 
-const roleOptions = (role: AgentRole): Options =>
+const roleOptions = (role: RepositoryRole): Options =>
   Match.value(role).pipe(
     Match.tagsExhaustive({
       Work: workOptions,
@@ -168,7 +168,7 @@ const startClaude = (
     readonly session: ClaudeQuery
     readonly initialized: Pick<SDKControlInitializeResponse, "models" | "commands">
   },
-  HostAgentError,
+  HostConversationError,
   Scope.Scope
 > =>
   Effect.gen(function* () {
@@ -351,7 +351,7 @@ const handshake = (sdk: ClaudeSdk, command: string, folder: string, extra: Optio
 export const claudeAdapter = (
   command: string,
   sdk: ClaudeSdk = liveSdk,
-): HarnessAdapter<AgentRole> => ({
+): HarnessAdapter<RepositoryRole> => ({
   models: Effect.gen(function* () {
     const initialized = yield* handshake(sdk, command, homedir())
 
@@ -410,8 +410,9 @@ export const claudeAdapter = (
       ),
       Effect.mapError(
         () =>
-          new HostAgentError({
-            message: "Glass couldn't look up this Agent's Claude Code conversation. Try again.",
+          new HostConversationError({
+            message:
+              "Glass couldn't look up this Conversation's Claude Code conversation. Try again.",
           }),
       ),
     )

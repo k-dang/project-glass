@@ -61,7 +61,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-15T01-05-12-433Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-16T05-34-10-599Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -105,7 +105,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794704712590,
+              "timestamp": 1794807250782,
               "toolsAdded": [
                 {
                   "name": "ask_user",
@@ -147,7 +147,7 @@
                 },
                 {
                   "name": "mcp__glass__list_to_dos",
-                  "description": "Lists the user's To-dos in Glass, done or not, with their notes.",
+                  "description": "Lists the user's To-dos in Glass, done or not, with their notes. An image is an id and a media type; its file stays on this device.",
                   "parameters": {
                     "type": "object",
                     "additionalProperties": false
@@ -171,8 +171,8 @@
                   }
                 },
                 {
-                  "name": "mcp__glass__list_agents",
-                  "description": "Lists the user's Agents: the named coding conversations working in a repository, with each one's repository, base branch, program, and whether it waits for the user's answer.",
+                  "name": "mcp__glass__list_conversations",
+                  "description": "Lists the user's Conversations: the named coding conversations working in a repository, with each one's repository, base branch, harness, and whether it waits for the user's answer.",
                   "parameters": {
                     "type": "object",
                     "additionalProperties": false
@@ -180,7 +180,7 @@
                 },
                 {
                   "name": "mcp__glass__list_needs_you",
-                  "description": "Lists what waits on the user in Glass now: Agents with a Permission request or Question waiting, questions from an agent outside Glass, queued PRs whose Agent review is finished, and the user's own PRs with changes requested, failing checks, review threads awaiting their reply, or ready to merge. Agents and outside questions come first, then the longest waiting.",
+                  "description": "Lists what waits on the user in Glass now: Conversations with a Permission request or Question waiting, questions from an agent outside Glass, queued PRs whose Agent review is finished, and the user's own PRs with changes requested, failing checks, review threads awaiting their reply, or ready to merge. Conversations and outside questions come first, then the longest waiting.",
                   "parameters": {
                     "type": "object",
                     "additionalProperties": false
@@ -188,21 +188,21 @@
                 },
                 {
                   "name": "mcp__glass__list_started_work",
-                  "description": "Lists the Agents and Agent reviews this conversation started, or Agents it messaged, oldest first: each with its state now and the user's message that asked for it. Answer how the work you started is going from this, not from the chat. Agents and reviews the user started themselves, and deleted Agents, aren't listed.",
+                  "description": "Lists the Conversations and Agent reviews this conversation started, or Conversations it messaged, oldest first: each with its state now and the user's message that asked for it. Answer how the work you started is going from this, not from the chat. Conversations and reviews the user started themselves, and deleted Conversations, aren't listed.",
                   "parameters": {
                     "type": "object",
                     "additionalProperties": false
                   }
                 },
                 {
-                  "name": "mcp__glass__read_agent_transcript",
-                  "description": "Reads an Agent's most recent Turns: each message the user sent, what the Agent wrote and which tools it used, and how the Turn ended. Includes Queued messages not yet delivered.",
+                  "name": "mcp__glass__read_conversation_transcript",
+                  "description": "Reads a Conversation's most recent Turns: each message the user sent, what its agent wrote and which tools it used, and how the Turn ended. Includes Queued messages not yet delivered.",
                   "parameters": {
                     "type": "object",
                     "properties": {
-                      "agentId": {
+                      "conversationId": {
                         "type": "string",
-                        "description": "The Agent's id, from list_agents."
+                        "description": "The Conversation's id, from list_conversations."
                       },
                       "turns": {
                         "type": "integer",
@@ -211,7 +211,7 @@
                         "description": "How many of the latest Turns to read, at most 20."
                       }
                     },
-                    "required": ["agentId", "turns"],
+                    "required": ["conversationId", "turns"],
                     "additionalProperties": true
                   }
                 },
@@ -357,16 +357,16 @@
                   }
                 },
                 {
-                  "name": "mcp__glass__list_agent_places",
-                  "description": "Lists where the user can start an Agent. An Agent on this device works in a copy of a Local checkout, so its repository must be one of localCheckouts. An Agent in a Sandbox works in any followed repository, in a Sandbox from one of sandboxProviders. Each place runs only the Agent programs listed with it.",
+                  "name": "mcp__glass__list_conversation_places",
+                  "description": "Lists where the user can start a Conversation. A Conversation on this device works in a copy of a Local checkout, so its repository must be one of localCheckouts. A Conversation in a Sandbox works in any followed repository, in a Sandbox from one of sandboxProviders. Each place runs only the Agent harnesses listed with it.",
                   "parameters": {
                     "type": "object",
                     "additionalProperties": false
                   }
                 },
                 {
-                  "name": "mcp__glass__list_agent_options",
-                  "description": "Lists the base branches and models an Agent can start with, for a repository, place, and Agent program from list_agent_places.",
+                  "name": "mcp__glass__list_conversation_options",
+                  "description": "Lists the base branches and models a Conversation can start with, for a repository, place, and Agent harness from list_conversation_places.",
                   "parameters": {
                     "type": "object",
                     "properties": {
@@ -427,8 +427,8 @@
                   }
                 },
                 {
-                  "name": "mcp__glass__create_agent",
-                  "description": "Creates an Agent: a named coding conversation working on a branch of its own, made from a base branch of a repository. It starts its first Turn with the message, and appears in the user's Agents. This returns once Glass created the Agent, not when it finishes its Turn: read_agent_transcript shows its progress. Choose the place, program, base branch, and model from list_agent_places and list_agent_options, never from guesses. If this call fails without saying why, or is cut off, call list_agents before trying again rather than creating a second Agent.",
+                  "name": "mcp__glass__create_conversation",
+                  "description": "Creates a Conversation: a named coding conversation working on a branch of its own, made from a base branch of a repository. It starts its first Turn with the message, and appears in the user's Conversations. This returns once Glass created the Conversation, not when it finishes its Turn: read_conversation_transcript shows its progress. Choose the place, harness, base branch, and model from list_conversation_places and list_conversation_options, never from guesses. If this call fails without saying why, or is cut off, call list_conversations before trying again rather than creating a second Conversation.",
                   "parameters": {
                     "type": "object",
                     "properties": {
@@ -437,7 +437,7 @@
                       },
                       "baseBranch": {
                         "type": "string",
-                        "description": "The branch the Agent's branch starts from."
+                        "description": "The branch the Conversation's branch starts from."
                       },
                       "place": {
                         "anyOf": [
@@ -467,12 +467,12 @@
                             "additionalProperties": true
                           }
                         ],
-                        "description": "Where the Agent works: on this device, or in a Sandbox from a provider."
+                        "description": "Where the Conversation works: on this device, or in a Sandbox from a provider."
                       },
                       "engine": {
                         "type": "string",
                         "enum": ["claude-code", "pi"],
-                        "description": "The Agent program that runs the Agent."
+                        "description": "The Agent harness that runs the Conversation."
                       },
                       "model": {
                         "anyOf": [
@@ -483,7 +483,7 @@
                             "type": "null"
                           }
                         ],
-                        "description": "A model id from list_agent_options, or null for the program's default."
+                        "description": "A model id from list_conversation_options, or null for the harness's default."
                       },
                       "effort": {
                         "anyOf": [
@@ -500,7 +500,7 @@
                         "type": "string",
                         "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
                         "minLength": 1,
-                        "description": "The Agent's first message: its task."
+                        "description": "The Conversation's first message: its task."
                       }
                     },
                     "required": [
@@ -531,14 +531,14 @@
                   }
                 },
                 {
-                  "name": "mcp__glass__send_agent_message",
-                  "description": "Sends a message to one of the user's Agents, as the user would from the Agent. An idle Agent starts a Turn with it; a busy Agent keeps it as a Queued message and starts on it after its running Turn. This returns once Glass accepted the message, not when the Agent answers: read_agent_transcript shows its progress. If this call fails without saying why, or is cut off, read the Agent's transcript before sending again rather than sending it twice.",
+                  "name": "mcp__glass__send_conversation_message",
+                  "description": "Sends a message to one of the user's Conversations, as the user would from the Conversation. An idle Conversation starts a Turn with it; a busy Conversation keeps it as a Queued message and starts on it after its running Turn. This returns once Glass accepted the message, not when its agent answers: read_conversation_transcript shows its progress. If this call fails without saying why, or is cut off, read the Conversation's transcript before sending again rather than sending it twice.",
                   "parameters": {
                     "type": "object",
                     "properties": {
-                      "agentId": {
+                      "conversationId": {
                         "type": "string",
-                        "description": "The Agent's id, from list_agents."
+                        "description": "The Conversation's id, from list_conversations."
                       },
                       "message": {
                         "type": "string",
@@ -546,13 +546,13 @@
                         "minLength": 1
                       }
                     },
-                    "required": ["agentId", "message"],
+                    "required": ["conversationId", "message"],
                     "additionalProperties": true
                   }
                 },
                 {
                   "name": "mcp__glass__ask_user",
-                  "description": "For an agent outside Glass: asks the user a question and waits for their answer in the Glass Inbox, in Stopped on you, under the name the user approved. An Agent Glass launched asks with its own Question tool instead. Waits 10 minutes unless timeoutSeconds is set. timeoutSeconds is a whole number of seconds from 1 to 600. Glass sends a progress notification immediately and every 15 seconds while it waits, so a client that resets its timeout when progress arrives is not cut off before Glass's own limit. Pass a progress token on the call. The result is Answered with the user's answer (by is choice or text), TimedOut when they do not answer in time, or Cancelled when Glass shuts down. A timed out or cancelled question leaves the Inbox. choices are optional. The user can pick one or type their own answer. Each MCP session may have one question waiting.",
+                  "description": "For an agent outside Glass: asks the user a question and waits for their answer in the Glass Inbox, in Stopped on you, under the name the user approved. A Conversation Glass launched asks with its own Question tool instead. Waits 10 minutes unless timeoutSeconds is set. timeoutSeconds is a whole number of seconds from 1 to 600. Glass sends a progress notification immediately and every 15 seconds while it waits, so a client that resets its timeout when progress arrives is not cut off before Glass's own limit. Pass a progress token on the call. The result is Answered with the user's answer (by is choice or text), TimedOut when they do not answer in time, or Cancelled when Glass shuts down. A timed out or cancelled question leaves the Inbox. choices are optional. The user can pick one or type their own answer. Each MCP session may have one question waiting.",
                   "parameters": {
                     "type": "object",
                     "properties": {
@@ -620,7 +620,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794704712590,
+              "timestamp": 1794807250782,
               "toolsAdded": [
                 {
                   "name": "ask_user",
@@ -662,7 +662,7 @@
                 },
                 {
                   "name": "mcp__glass__list_to_dos",
-                  "description": "Lists the user's To-dos in Glass, done or not, with their notes.",
+                  "description": "Lists the user's To-dos in Glass, done or not, with their notes. An image is an id and a media type; its file stays on this device.",
                   "parameters": {
                     "type": "object",
                     "additionalProperties": false
@@ -686,8 +686,8 @@
                   }
                 },
                 {
-                  "name": "mcp__glass__list_agents",
-                  "description": "Lists the user's Agents: the named coding conversations working in a repository, with each one's repository, base branch, program, and whether it waits for the user's answer.",
+                  "name": "mcp__glass__list_conversations",
+                  "description": "Lists the user's Conversations: the named coding conversations working in a repository, with each one's repository, base branch, harness, and whether it waits for the user's answer.",
                   "parameters": {
                     "type": "object",
                     "additionalProperties": false
@@ -695,7 +695,7 @@
                 },
                 {
                   "name": "mcp__glass__list_needs_you",
-                  "description": "Lists what waits on the user in Glass now: Agents with a Permission request or Question waiting, questions from an agent outside Glass, queued PRs whose Agent review is finished, and the user's own PRs with changes requested, failing checks, review threads awaiting their reply, or ready to merge. Agents and outside questions come first, then the longest waiting.",
+                  "description": "Lists what waits on the user in Glass now: Conversations with a Permission request or Question waiting, questions from an agent outside Glass, queued PRs whose Agent review is finished, and the user's own PRs with changes requested, failing checks, review threads awaiting their reply, or ready to merge. Conversations and outside questions come first, then the longest waiting.",
                   "parameters": {
                     "type": "object",
                     "additionalProperties": false
@@ -703,21 +703,21 @@
                 },
                 {
                   "name": "mcp__glass__list_started_work",
-                  "description": "Lists the Agents and Agent reviews this conversation started, or Agents it messaged, oldest first: each with its state now and the user's message that asked for it. Answer how the work you started is going from this, not from the chat. Agents and reviews the user started themselves, and deleted Agents, aren't listed.",
+                  "description": "Lists the Conversations and Agent reviews this conversation started, or Conversations it messaged, oldest first: each with its state now and the user's message that asked for it. Answer how the work you started is going from this, not from the chat. Conversations and reviews the user started themselves, and deleted Conversations, aren't listed.",
                   "parameters": {
                     "type": "object",
                     "additionalProperties": false
                   }
                 },
                 {
-                  "name": "mcp__glass__read_agent_transcript",
-                  "description": "Reads an Agent's most recent Turns: each message the user sent, what the Agent wrote and which tools it used, and how the Turn ended. Includes Queued messages not yet delivered.",
+                  "name": "mcp__glass__read_conversation_transcript",
+                  "description": "Reads a Conversation's most recent Turns: each message the user sent, what its agent wrote and which tools it used, and how the Turn ended. Includes Queued messages not yet delivered.",
                   "parameters": {
                     "type": "object",
                     "properties": {
-                      "agentId": {
+                      "conversationId": {
                         "type": "string",
-                        "description": "The Agent's id, from list_agents."
+                        "description": "The Conversation's id, from list_conversations."
                       },
                       "turns": {
                         "type": "integer",
@@ -726,7 +726,7 @@
                         "description": "How many of the latest Turns to read, at most 20."
                       }
                     },
-                    "required": ["agentId", "turns"],
+                    "required": ["conversationId", "turns"],
                     "additionalProperties": true
                   }
                 },
@@ -872,16 +872,16 @@
                   }
                 },
                 {
-                  "name": "mcp__glass__list_agent_places",
-                  "description": "Lists where the user can start an Agent. An Agent on this device works in a copy of a Local checkout, so its repository must be one of localCheckouts. An Agent in a Sandbox works in any followed repository, in a Sandbox from one of sandboxProviders. Each place runs only the Agent programs listed with it.",
+                  "name": "mcp__glass__list_conversation_places",
+                  "description": "Lists where the user can start a Conversation. A Conversation on this device works in a copy of a Local checkout, so its repository must be one of localCheckouts. A Conversation in a Sandbox works in any followed repository, in a Sandbox from one of sandboxProviders. Each place runs only the Agent harnesses listed with it.",
                   "parameters": {
                     "type": "object",
                     "additionalProperties": false
                   }
                 },
                 {
-                  "name": "mcp__glass__list_agent_options",
-                  "description": "Lists the base branches and models an Agent can start with, for a repository, place, and Agent program from list_agent_places.",
+                  "name": "mcp__glass__list_conversation_options",
+                  "description": "Lists the base branches and models a Conversation can start with, for a repository, place, and Agent harness from list_conversation_places.",
                   "parameters": {
                     "type": "object",
                     "properties": {
@@ -942,8 +942,8 @@
                   }
                 },
                 {
-                  "name": "mcp__glass__create_agent",
-                  "description": "Creates an Agent: a named coding conversation working on a branch of its own, made from a base branch of a repository. It starts its first Turn with the message, and appears in the user's Agents. This returns once Glass created the Agent, not when it finishes its Turn: read_agent_transcript shows its progress. Choose the place, program, base branch, and model from list_agent_places and list_agent_options, never from guesses. If this call fails without saying why, or is cut off, call list_agents before trying again rather than creating a second Agent.",
+                  "name": "mcp__glass__create_conversation",
+                  "description": "Creates a Conversation: a named coding conversation working on a branch of its own, made from a base branch of a repository. It starts its first Turn with the message, and appears in the user's Conversations. This returns once Glass created the Conversation, not when it finishes its Turn: read_conversation_transcript shows its progress. Choose the place, harness, base branch, and model from list_conversation_places and list_conversation_options, never from guesses. If this call fails without saying why, or is cut off, call list_conversations before trying again rather than creating a second Conversation.",
                   "parameters": {
                     "type": "object",
                     "properties": {
@@ -952,7 +952,7 @@
                       },
                       "baseBranch": {
                         "type": "string",
-                        "description": "The branch the Agent's branch starts from."
+                        "description": "The branch the Conversation's branch starts from."
                       },
                       "place": {
                         "anyOf": [
@@ -982,12 +982,12 @@
                             "additionalProperties": true
                           }
                         ],
-                        "description": "Where the Agent works: on this device, or in a Sandbox from a provider."
+                        "description": "Where the Conversation works: on this device, or in a Sandbox from a provider."
                       },
                       "engine": {
                         "type": "string",
                         "enum": ["claude-code", "pi"],
-                        "description": "The Agent program that runs the Agent."
+                        "description": "The Agent harness that runs the Conversation."
                       },
                       "model": {
                         "anyOf": [
@@ -998,7 +998,7 @@
                             "type": "null"
                           }
                         ],
-                        "description": "A model id from list_agent_options, or null for the program's default."
+                        "description": "A model id from list_conversation_options, or null for the harness's default."
                       },
                       "effort": {
                         "anyOf": [
@@ -1015,7 +1015,7 @@
                         "type": "string",
                         "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
                         "minLength": 1,
-                        "description": "The Agent's first message: its task."
+                        "description": "The Conversation's first message: its task."
                       }
                     },
                     "required": [
@@ -1046,14 +1046,14 @@
                   }
                 },
                 {
-                  "name": "mcp__glass__send_agent_message",
-                  "description": "Sends a message to one of the user's Agents, as the user would from the Agent. An idle Agent starts a Turn with it; a busy Agent keeps it as a Queued message and starts on it after its running Turn. This returns once Glass accepted the message, not when the Agent answers: read_agent_transcript shows its progress. If this call fails without saying why, or is cut off, read the Agent's transcript before sending again rather than sending it twice.",
+                  "name": "mcp__glass__send_conversation_message",
+                  "description": "Sends a message to one of the user's Conversations, as the user would from the Conversation. An idle Conversation starts a Turn with it; a busy Conversation keeps it as a Queued message and starts on it after its running Turn. This returns once Glass accepted the message, not when its agent answers: read_conversation_transcript shows its progress. If this call fails without saying why, or is cut off, read the Conversation's transcript before sending again rather than sending it twice.",
                   "parameters": {
                     "type": "object",
                     "properties": {
-                      "agentId": {
+                      "conversationId": {
                         "type": "string",
-                        "description": "The Agent's id, from list_agents."
+                        "description": "The Conversation's id, from list_conversations."
                       },
                       "message": {
                         "type": "string",
@@ -1061,13 +1061,13 @@
                         "minLength": 1
                       }
                     },
-                    "required": ["agentId", "message"],
+                    "required": ["conversationId", "message"],
                     "additionalProperties": true
                   }
                 },
                 {
                   "name": "mcp__glass__ask_user",
-                  "description": "For an agent outside Glass: asks the user a question and waits for their answer in the Glass Inbox, in Stopped on you, under the name the user approved. An Agent Glass launched asks with its own Question tool instead. Waits 10 minutes unless timeoutSeconds is set. timeoutSeconds is a whole number of seconds from 1 to 600. Glass sends a progress notification immediately and every 15 seconds while it waits, so a client that resets its timeout when progress arrives is not cut off before Glass's own limit. Pass a progress token on the call. The result is Answered with the user's answer (by is choice or text), TimedOut when they do not answer in time, or Cancelled when Glass shuts down. A timed out or cancelled question leaves the Inbox. choices are optional. The user can pick one or type their own answer. Each MCP session may have one question waiting.",
+                  "description": "For an agent outside Glass: asks the user a question and waits for their answer in the Glass Inbox, in Stopped on you, under the name the user approved. A Conversation Glass launched asks with its own Question tool instead. Waits 10 minutes unless timeoutSeconds is set. timeoutSeconds is a whole number of seconds from 1 to 600. Glass sends a progress notification immediately and every 15 seconds while it waits, so a client that resets its timeout when progress arrives is not cut off before Glass's own limit. Pass a progress token on the call. The result is Answered with the user's answer (by is choice or text), TimedOut when they do not answer in time, or Cancelled when Glass shuts down. A timed out or cancelled question leaves the Inbox. choices are optional. The user can pick one or type their own answer. Each MCP session may have one question waiting.",
                   "parameters": {
                     "type": "object",
                     "properties": {
@@ -1139,7 +1139,7 @@
                   "text": "Wait for release."
                 }
               ],
-              "timestamp": 1794704712589
+              "timestamp": 1794807250781
             }
           }
         },
@@ -1154,7 +1154,7 @@
                   "text": "Wait for release."
                 }
               ],
-              "timestamp": 1794704712589
+              "timestamp": 1794807250781
             }
           }
         },
@@ -1182,7 +1182,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794704712622
+              "timestamp": 1794807250813
             }
           }
         },
@@ -1295,10 +1295,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794704712622,
+              "timestamp": 1794807250813,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 12,
+              "durationMs": 9,
               "thinkingLevel": "off"
             }
           }
@@ -1357,7 +1357,7 @@
               "details": {}
             },
             "isError": true,
-            "durationMs": 6
+            "durationMs": 5
           }
         },
         {
@@ -1375,8 +1375,8 @@
               ],
               "details": {},
               "isError": true,
-              "durationMs": 6,
-              "timestamp": 1794704712642
+              "durationMs": 5,
+              "timestamp": 1794807250828
             }
           }
         },
@@ -1395,8 +1395,8 @@
               ],
               "details": {},
               "isError": true,
-              "durationMs": 6,
-              "timestamp": 1794704712642
+              "durationMs": 5,
+              "timestamp": 1794807250828
             }
           }
         },
@@ -1431,10 +1431,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794704712622,
+              "timestamp": 1794807250813,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 12,
+              "durationMs": 9,
               "thinkingLevel": "off"
             },
             "toolResults": [
@@ -1450,8 +1450,8 @@
                 ],
                 "details": {},
                 "isError": true,
-                "durationMs": 6,
-                "timestamp": 1794704712642
+                "durationMs": 5,
+                "timestamp": 1794807250828
               }
             ]
           }
@@ -1486,7 +1486,7 @@
               },
               "stopReason": "error",
               "errorMessage": "This operation was aborted",
-              "timestamp": 1794704712645,
+              "timestamp": 1794807250831,
               "durationMs": 0,
               "thinkingLevel": "off"
             }
@@ -1517,7 +1517,7 @@
               },
               "stopReason": "error",
               "errorMessage": "This operation was aborted",
-              "timestamp": 1794704712645,
+              "timestamp": 1794807250831,
               "durationMs": 0,
               "thinkingLevel": "off"
             }
@@ -1548,7 +1548,7 @@
               },
               "stopReason": "error",
               "errorMessage": "This operation was aborted",
-              "timestamp": 1794704712645,
+              "timestamp": 1794807250831,
               "durationMs": 0,
               "thinkingLevel": "off"
             },
@@ -1563,7 +1563,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1794704712590,
+                "timestamp": 1794807250782,
                 "toolsAdded": [
                   {
                     "name": "ask_user",
@@ -1605,7 +1605,7 @@
                   },
                   {
                     "name": "mcp__glass__list_to_dos",
-                    "description": "Lists the user's To-dos in Glass, done or not, with their notes.",
+                    "description": "Lists the user's To-dos in Glass, done or not, with their notes. An image is an id and a media type; its file stays on this device.",
                     "parameters": {
                       "type": "object",
                       "additionalProperties": false
@@ -1629,8 +1629,8 @@
                     }
                   },
                   {
-                    "name": "mcp__glass__list_agents",
-                    "description": "Lists the user's Agents: the named coding conversations working in a repository, with each one's repository, base branch, program, and whether it waits for the user's answer.",
+                    "name": "mcp__glass__list_conversations",
+                    "description": "Lists the user's Conversations: the named coding conversations working in a repository, with each one's repository, base branch, harness, and whether it waits for the user's answer.",
                     "parameters": {
                       "type": "object",
                       "additionalProperties": false
@@ -1638,7 +1638,7 @@
                   },
                   {
                     "name": "mcp__glass__list_needs_you",
-                    "description": "Lists what waits on the user in Glass now: Agents with a Permission request or Question waiting, questions from an agent outside Glass, queued PRs whose Agent review is finished, and the user's own PRs with changes requested, failing checks, review threads awaiting their reply, or ready to merge. Agents and outside questions come first, then the longest waiting.",
+                    "description": "Lists what waits on the user in Glass now: Conversations with a Permission request or Question waiting, questions from an agent outside Glass, queued PRs whose Agent review is finished, and the user's own PRs with changes requested, failing checks, review threads awaiting their reply, or ready to merge. Conversations and outside questions come first, then the longest waiting.",
                     "parameters": {
                       "type": "object",
                       "additionalProperties": false
@@ -1646,21 +1646,21 @@
                   },
                   {
                     "name": "mcp__glass__list_started_work",
-                    "description": "Lists the Agents and Agent reviews this conversation started, or Agents it messaged, oldest first: each with its state now and the user's message that asked for it. Answer how the work you started is going from this, not from the chat. Agents and reviews the user started themselves, and deleted Agents, aren't listed.",
+                    "description": "Lists the Conversations and Agent reviews this conversation started, or Conversations it messaged, oldest first: each with its state now and the user's message that asked for it. Answer how the work you started is going from this, not from the chat. Conversations and reviews the user started themselves, and deleted Conversations, aren't listed.",
                     "parameters": {
                       "type": "object",
                       "additionalProperties": false
                     }
                   },
                   {
-                    "name": "mcp__glass__read_agent_transcript",
-                    "description": "Reads an Agent's most recent Turns: each message the user sent, what the Agent wrote and which tools it used, and how the Turn ended. Includes Queued messages not yet delivered.",
+                    "name": "mcp__glass__read_conversation_transcript",
+                    "description": "Reads a Conversation's most recent Turns: each message the user sent, what its agent wrote and which tools it used, and how the Turn ended. Includes Queued messages not yet delivered.",
                     "parameters": {
                       "type": "object",
                       "properties": {
-                        "agentId": {
+                        "conversationId": {
                           "type": "string",
-                          "description": "The Agent's id, from list_agents."
+                          "description": "The Conversation's id, from list_conversations."
                         },
                         "turns": {
                           "type": "integer",
@@ -1669,7 +1669,7 @@
                           "description": "How many of the latest Turns to read, at most 20."
                         }
                       },
-                      "required": ["agentId", "turns"],
+                      "required": ["conversationId", "turns"],
                       "additionalProperties": true
                     }
                   },
@@ -1815,16 +1815,16 @@
                     }
                   },
                   {
-                    "name": "mcp__glass__list_agent_places",
-                    "description": "Lists where the user can start an Agent. An Agent on this device works in a copy of a Local checkout, so its repository must be one of localCheckouts. An Agent in a Sandbox works in any followed repository, in a Sandbox from one of sandboxProviders. Each place runs only the Agent programs listed with it.",
+                    "name": "mcp__glass__list_conversation_places",
+                    "description": "Lists where the user can start a Conversation. A Conversation on this device works in a copy of a Local checkout, so its repository must be one of localCheckouts. A Conversation in a Sandbox works in any followed repository, in a Sandbox from one of sandboxProviders. Each place runs only the Agent harnesses listed with it.",
                     "parameters": {
                       "type": "object",
                       "additionalProperties": false
                     }
                   },
                   {
-                    "name": "mcp__glass__list_agent_options",
-                    "description": "Lists the base branches and models an Agent can start with, for a repository, place, and Agent program from list_agent_places.",
+                    "name": "mcp__glass__list_conversation_options",
+                    "description": "Lists the base branches and models a Conversation can start with, for a repository, place, and Agent harness from list_conversation_places.",
                     "parameters": {
                       "type": "object",
                       "properties": {
@@ -1885,8 +1885,8 @@
                     }
                   },
                   {
-                    "name": "mcp__glass__create_agent",
-                    "description": "Creates an Agent: a named coding conversation working on a branch of its own, made from a base branch of a repository. It starts its first Turn with the message, and appears in the user's Agents. This returns once Glass created the Agent, not when it finishes its Turn: read_agent_transcript shows its progress. Choose the place, program, base branch, and model from list_agent_places and list_agent_options, never from guesses. If this call fails without saying why, or is cut off, call list_agents before trying again rather than creating a second Agent.",
+                    "name": "mcp__glass__create_conversation",
+                    "description": "Creates a Conversation: a named coding conversation working on a branch of its own, made from a base branch of a repository. It starts its first Turn with the message, and appears in the user's Conversations. This returns once Glass created the Conversation, not when it finishes its Turn: read_conversation_transcript shows its progress. Choose the place, harness, base branch, and model from list_conversation_places and list_conversation_options, never from guesses. If this call fails without saying why, or is cut off, call list_conversations before trying again rather than creating a second Conversation.",
                     "parameters": {
                       "type": "object",
                       "properties": {
@@ -1895,7 +1895,7 @@
                         },
                         "baseBranch": {
                           "type": "string",
-                          "description": "The branch the Agent's branch starts from."
+                          "description": "The branch the Conversation's branch starts from."
                         },
                         "place": {
                           "anyOf": [
@@ -1925,12 +1925,12 @@
                               "additionalProperties": true
                             }
                           ],
-                          "description": "Where the Agent works: on this device, or in a Sandbox from a provider."
+                          "description": "Where the Conversation works: on this device, or in a Sandbox from a provider."
                         },
                         "engine": {
                           "type": "string",
                           "enum": ["claude-code", "pi"],
-                          "description": "The Agent program that runs the Agent."
+                          "description": "The Agent harness that runs the Conversation."
                         },
                         "model": {
                           "anyOf": [
@@ -1941,7 +1941,7 @@
                               "type": "null"
                             }
                           ],
-                          "description": "A model id from list_agent_options, or null for the program's default."
+                          "description": "A model id from list_conversation_options, or null for the harness's default."
                         },
                         "effort": {
                           "anyOf": [
@@ -1958,7 +1958,7 @@
                           "type": "string",
                           "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
                           "minLength": 1,
-                          "description": "The Agent's first message: its task."
+                          "description": "The Conversation's first message: its task."
                         }
                       },
                       "required": [
@@ -1989,14 +1989,14 @@
                     }
                   },
                   {
-                    "name": "mcp__glass__send_agent_message",
-                    "description": "Sends a message to one of the user's Agents, as the user would from the Agent. An idle Agent starts a Turn with it; a busy Agent keeps it as a Queued message and starts on it after its running Turn. This returns once Glass accepted the message, not when the Agent answers: read_agent_transcript shows its progress. If this call fails without saying why, or is cut off, read the Agent's transcript before sending again rather than sending it twice.",
+                    "name": "mcp__glass__send_conversation_message",
+                    "description": "Sends a message to one of the user's Conversations, as the user would from the Conversation. An idle Conversation starts a Turn with it; a busy Conversation keeps it as a Queued message and starts on it after its running Turn. This returns once Glass accepted the message, not when its agent answers: read_conversation_transcript shows its progress. If this call fails without saying why, or is cut off, read the Conversation's transcript before sending again rather than sending it twice.",
                     "parameters": {
                       "type": "object",
                       "properties": {
-                        "agentId": {
+                        "conversationId": {
                           "type": "string",
-                          "description": "The Agent's id, from list_agents."
+                          "description": "The Conversation's id, from list_conversations."
                         },
                         "message": {
                           "type": "string",
@@ -2004,13 +2004,13 @@
                           "minLength": 1
                         }
                       },
-                      "required": ["agentId", "message"],
+                      "required": ["conversationId", "message"],
                       "additionalProperties": true
                     }
                   },
                   {
                     "name": "mcp__glass__ask_user",
-                    "description": "For an agent outside Glass: asks the user a question and waits for their answer in the Glass Inbox, in Stopped on you, under the name the user approved. An Agent Glass launched asks with its own Question tool instead. Waits 10 minutes unless timeoutSeconds is set. timeoutSeconds is a whole number of seconds from 1 to 600. Glass sends a progress notification immediately and every 15 seconds while it waits, so a client that resets its timeout when progress arrives is not cut off before Glass's own limit. Pass a progress token on the call. The result is Answered with the user's answer (by is choice or text), TimedOut when they do not answer in time, or Cancelled when Glass shuts down. A timed out or cancelled question leaves the Inbox. choices are optional. The user can pick one or type their own answer. Each MCP session may have one question waiting.",
+                    "description": "For an agent outside Glass: asks the user a question and waits for their answer in the Glass Inbox, in Stopped on you, under the name the user approved. A Conversation Glass launched asks with its own Question tool instead. Waits 10 minutes unless timeoutSeconds is set. timeoutSeconds is a whole number of seconds from 1 to 600. Glass sends a progress notification immediately and every 15 seconds while it waits, so a client that resets its timeout when progress arrives is not cut off before Glass's own limit. Pass a progress token on the call. The result is Answered with the user's answer (by is choice or text), TimedOut when they do not answer in time, or Cancelled when Glass shuts down. A timed out or cancelled question leaves the Inbox. choices are optional. The user can pick one or type their own answer. Each MCP session may have one question waiting.",
                     "parameters": {
                       "type": "object",
                       "properties": {
@@ -2077,7 +2077,7 @@
                     "text": "Wait for release."
                   }
                 ],
-                "timestamp": 1794704712589
+                "timestamp": 1794807250781
               },
               {
                 "role": "assistant",
@@ -2107,10 +2107,10 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1794704712622,
+                "timestamp": 1794807250813,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
-                "durationMs": 12,
+                "durationMs": 9,
                 "thinkingLevel": "off"
               },
               {
@@ -2125,8 +2125,8 @@
                 ],
                 "details": {},
                 "isError": true,
-                "durationMs": 6,
-                "timestamp": 1794704712642
+                "durationMs": 5,
+                "timestamp": 1794807250828
               },
               {
                 "role": "assistant",
@@ -2150,7 +2150,7 @@
                 },
                 "stopReason": "error",
                 "errorMessage": "This operation was aborted",
-                "timestamp": 1794704712645,
+                "timestamp": 1794807250831,
                 "durationMs": 0,
                 "thinkingLevel": "off"
               }
@@ -2207,7 +2207,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-15T01-05-12-433Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-16T05-34-10-599Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 5,

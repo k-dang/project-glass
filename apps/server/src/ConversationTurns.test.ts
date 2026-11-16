@@ -1,8 +1,8 @@
 import { SqliteClient, SqliteMigrator } from "@effect/sql-sqlite-node"
 import { assert, it } from "@effect/vitest"
 import {
-  AgentError,
-  AgentOutcome,
+  ConversationError,
+  ConversationOutcome,
   TurnDone,
   TurnCutOff,
   TurnInterrupted,
@@ -25,7 +25,7 @@ import {
 } from "effect"
 import { eventually } from "../test/eventually"
 import {
-  type Conversation,
+  type ClaimedConversation,
   type ConversationHost,
   ConversationTurns,
   conversationLock,
@@ -34,11 +34,11 @@ import { migrationLoader } from "./Migrations"
 import { ToDos } from "./ToDos"
 import { Transcripts } from "./Transcripts"
 import { wideEvents } from "./wideEvents"
-import { HostAgentError } from "./agentHost/protocol"
+import { HostConversationError } from "./agentHost/protocol"
 
 interface Script {
-  readonly ensureStarted?: Conversation["ensureStarted"]
-  readonly startTurn?: (turnId: string) => Effect.Effect<void, HostAgentError>
+  readonly ensureStarted?: ClaimedConversation["ensureStarted"]
+  readonly startTurn?: (turnId: string) => Effect.Effect<void, HostConversationError>
   readonly stopTurn?: () => Effect.Effect<null>
   readonly running?: boolean
   readonly started?: Deferred.Deferred<void>
@@ -47,9 +47,9 @@ interface Script {
 const unused = (method: string) => () => Effect.die(`This test does not call ${method}`)
 
 const hostThatStarts = (
-  record: (turnId: string) => Effect.Effect<void, HostAgentError>,
+  record: (turnId: string) => Effect.Effect<void, HostConversationError>,
 ): ConversationHost => ({
-  StartAgent: unused("StartAgent"),
+  StartConversation: unused("StartConversation"),
   StartTurn: ({ turnId }) => record(turnId),
   AnswerRequest: unused("AnswerRequest"),
   Steer: unused("Steer"),
@@ -58,14 +58,14 @@ const hostThatStarts = (
 
 const scriptedHost = (
   script: Script,
-  dispatched: Array<{ agentId: string; turnId: string }>,
+  dispatched: Array<{ conversationId: string; turnId: string }>,
 ): ConversationHost => ({
-  StartAgent: unused("StartAgent"),
-  StartTurn: ({ agentId, turnId }) =>
+  StartConversation: unused("StartConversation"),
+  StartTurn: ({ conversationId, turnId }) =>
     (script.startTurn?.(turnId) ?? Effect.void).pipe(
       Effect.tap(() =>
         Effect.sync(() => {
-          dispatched.push({ agentId, turnId })
+          dispatched.push({ conversationId, turnId })
         }).pipe(
           Effect.andThen(
             script.started === undefined
@@ -95,8 +95,8 @@ const sent = (message: string) => ({ message, images: [], context: null })
 
 const globalConversationUpdate = GlobalConversationUpdate.make({
   work: [
-    AgentOutcome.make({
-      agentId: "started",
+    ConversationOutcome.make({
+      conversationId: "started",
       name: "Started",
       askedWith: "Build it",
       outcome: "finished",
@@ -106,8 +106,8 @@ const globalConversationUpdate = GlobalConversationUpdate.make({
 })
 
 const harness = (
-  ensureStarted: Conversation["ensureStarted"],
-  startTurn: (turnId: string) => Effect.Effect<void, HostAgentError> = () => Effect.void,
+  ensureStarted: ClaimedConversation["ensureStarted"],
+  startTurn: (turnId: string) => Effect.Effect<void, HostConversationError> = () => Effect.void,
 ) =>
   Effect.gen(function* () {
     const turns = yield* ConversationTurns
@@ -119,7 +119,7 @@ const harness = (
       startTurn(turnId).pipe(Effect.tap(() => Effect.sync(() => dispatched.push(turnId)))),
     )
 
-    const conversation: Conversation = {
+    const conversation: ClaimedConversation = {
       id: "agent-1",
       ensureStarted,
       settings: { model: null, effort: null, permissionMode: null },
@@ -155,8 +155,8 @@ const scripted = (scripts: { readonly [id: string]: Script }) =>
   Effect.gen(function* () {
     const turns = yield* ConversationTurns
     const transcripts = yield* Transcripts
-    const dispatched: Array<{ agentId: string; turnId: string }> = []
-    const conversations = new Map<string, Conversation>()
+    const dispatched: Array<{ conversationId: string; turnId: string }> = []
+    const conversations = new Map<string, ClaimedConversation>()
 
     for (const [id, script] of Object.entries(scripts)) {
       const client = scriptedHost(script, dispatched)
@@ -189,7 +189,8 @@ const scripted = (scripts: { readonly [id: string]: Script }) =>
         ),
       )
 
-    const started = (agentId: string) => dispatched.filter((call) => call.agentId === agentId)
+    const started = (conversationId: string) =>
+      dispatched.filter((call) => call.conversationId === conversationId)
 
     return { turns, transcripts, conversations, started }
   })
@@ -224,7 +225,9 @@ it.live("fails a Turn whose harness won't start, then starts the next queued mes
     let starts = 0
 
     const h = yield* harness(() =>
-      ++starts === 1 ? Effect.fail(new AgentError({ message: "No such folder" })) : Effect.void,
+      ++starts === 1
+        ? Effect.fail(new ConversationError({ message: "No such folder" }))
+        : Effect.void,
     )
 
     yield* h.turns.send("agent-1", sent("First"))
@@ -299,7 +302,7 @@ it.live(
 
       const first = yield* harness(
         () => Effect.void,
-        () => Effect.fail(new HostAgentError({ message: reason })),
+        () => Effect.fail(new HostConversationError({ message: reason })),
       ).pipe(Scope.provide(firstScope))
 
       assert.deepStrictEqual(yield* first.delivered(1), ["pending"])
@@ -346,13 +349,13 @@ const acceptsWhileStartIsHeld = (otherId: string) =>
   }).pipe(Effect.provide(layer))
 
 it.live(
-  "accepts and dispatches another Agent's message while StartTurn is still unanswered",
+  "accepts and dispatches another Conversation's message while StartTurn is still unanswered",
   () => acceptsWhileStartIsHeld("agent-b"),
   hostStall,
 )
 
 it.live(
-  "accepts and dispatches another Agent's message while StopTurn is still unanswered",
+  "accepts and dispatches another Conversation's message while StopTurn is still unanswered",
   () =>
     Effect.gen(function* () {
       const entered = yield* Deferred.make<void>()
@@ -370,13 +373,13 @@ it.live(
         "agent-b": { started: otherStarted },
       })
 
-      const agent = desk.conversations.get("agent-a")
-      assert.isDefined(agent)
+      const conversation = desk.conversations.get("agent-a")
+      assert.isDefined(conversation)
 
       assert.equal(yield* desk.turns.send("agent-a", sent("Working")), "started")
       yield* Deferred.await(heldStarted)
 
-      const stopping = yield* Effect.forkChild(desk.turns.stop(agent))
+      const stopping = yield* Effect.forkChild(desk.turns.stop(conversation))
       yield* Deferred.await(entered)
 
       const other = yield* Effect.forkChild(desk.turns.send("agent-b", sent("Hello from B")))
@@ -390,7 +393,7 @@ it.live(
 )
 
 it.live(
-  "accepts and dispatches the Global conversation while an Agent's StartTurn is still unanswered",
+  "accepts and dispatches the Global conversation while a Conversation's StartTurn is still unanswered",
   () => acceptsWhileStartIsHeld("global-session"),
   hostStall,
 )

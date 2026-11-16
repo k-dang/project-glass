@@ -1,13 +1,13 @@
 import { useAtom, useAtomValue } from "@effect/atom-react"
-import { type AgentHarness, type AgentPlace, LOCAL_SKILLS_NAMESPACE } from "@glass/contracts"
+import { type AgentHarness, type ConversationPlace, LOCAL_SKILLS_NAMESPACE } from "@glass/contracts"
 import { Option, Predicate, Schema } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
 import { Backend, backendRuntime } from "./backend"
 import { skillPacksAtom } from "./SkillPacks"
 
-const storageKey = "glass.newAgent.skillPacks"
+const storageKey = "glass.newConversation.skillPacks"
 
-const localSkillsKey = "glass.newAgent.localSkills"
+const localSkillsKey = "glass.newConversation.localSkills"
 
 export const LOCAL_SKILLS_LABEL = "Local skills"
 
@@ -56,25 +56,27 @@ const sharedSkillNames = (engine: AgentHarness, sources: ReadonlyArray<ChosenSou
     const where = `${name} is in ${listed.format(having.map(({ label }) => label))}.`
 
     return engine === "pi"
-      ? [`${where} The Agent uses the one in ${having[0]!.label}.`]
+      ? [`${where} The Conversation uses the one in ${having[0]!.label}.`]
       : [
-          `${where} The Agent has each, as ${listed.format(having.map(({ claudeCodePrefix }) => `/${claudeCodePrefix}${name}`))}.`,
+          `${where} The Conversation has each, as ${listed.format(having.map(({ claudeCodePrefix }) => `/${claudeCodePrefix}${name}`))}.`,
         ]
   })
 }
 
-export const useSkillChoice = (place: AgentPlace, engine: AgentHarness) => {
+export const useSkillChoice = (place: ConversationPlace, engine: AgentHarness) => {
   const listedPacks = useAtomValue(skillPacksAtom)
   const packs = Option.getOrElse(AsyncResult.value(listedPacks), () => [])
   const [lastChosen, setChosen] = useAtom(lastChosenAtom)
   const [lastLocalSkills, setLocalSkills] = useAtom(lastLocalSkillsAtom)
   const offersLocalSkills = Predicate.isTagged(place, "sandbox")
   const sendsLocalSkills = offersLocalSkills && lastLocalSkills
-  const agentHasLocalSkills = !offersLocalSkills || lastLocalSkills
+  const conversationHasLocalSkills = !offersLocalSkills || lastLocalSkills
   const chosenPacks = packs.filter(({ name }) => lastChosen.includes(name))
 
   const localNamesListed = useAtomValue(
-    agentHasLocalSkills && chosenPacks.length > 0 ? localSkillNamesAtom(engine) : noLocalSkills,
+    conversationHasLocalSkills && chosenPacks.length > 0
+      ? localSkillNamesAtom(engine)
+      : noLocalSkills,
   )
 
   const localNames = Option.getOrElse(AsyncResult.value(localNamesListed), () => [])
@@ -89,7 +91,7 @@ export const useSkillChoice = (place: AgentPlace, engine: AgentHarness) => {
     sendsLocalSkills,
     setLocalSkills,
     shared: sharedSkillNames(engine, [
-      ...(agentHasLocalSkills
+      ...(conversationHasLocalSkills
         ? [
             {
               label: LOCAL_SKILLS_LABEL,

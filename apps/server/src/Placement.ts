@@ -1,8 +1,8 @@
 import {
-  type Agent,
+  type Conversation,
   type AgentCommand,
   type AgentHarness,
-  AgentError,
+  ConversationError,
   AgentModels,
   type ConnectionError,
   FollowedRepository,
@@ -10,26 +10,31 @@ import {
 } from "@glass/contracts"
 import { type Effect, type Option, Predicate, type Scope, type Stream } from "effect"
 import type { RpcClient, RpcClientError } from "effect/rpc"
-import type { AgentHostRpcs, HostAgentError } from "./agentHost/protocol"
+import type { AgentHostRpcs, HostConversationError } from "./agentHost/protocol"
 
 export type HostClient = RpcClient.FromGroup<typeof AgentHostRpcs, RpcClientError.RpcClientError>
 
-export const hostFailure = (error: RpcClientError.RpcClientError | HostAgentError | AgentError) =>
+export const hostFailure = (
+  error: RpcClientError.RpcClientError | HostConversationError | ConversationError,
+) =>
   Predicate.isTagged(error, "RpcClientError")
-    ? "Glass lost the process that runs Agents. Try again."
+    ? "Glass lost the process that runs Conversations. Try again."
     : error.message
 
-export type HostCallError = RpcClientError.RpcClientError | HostAgentError | AgentError
+export type HostCallError =
+  | RpcClientError.RpcClientError
+  | HostConversationError
+  | ConversationError
 
-export const asAgentError = (error: HostCallError) =>
-  new AgentError({ message: hostFailure(error) })
+export const asConversationError = (error: HostCallError) =>
+  new ConversationError({ message: hostFailure(error) })
 
-export type LostAgentIds = ReadonlyArray<string>
+export type LostConversationIds = ReadonlyArray<string>
 
-export type SubscribeLost = Effect.Effect<Stream.Stream<LostAgentIds>, never, Scope.Scope>
+export type SubscribeLost = Effect.Effect<Stream.Stream<LostConversationIds>, never, Scope.Scope>
 
-export interface PlacedAgent {
-  readonly agent: Agent
+export interface PlacedConversation {
+  readonly conversation: Conversation
   readonly folder: string
   readonly forReview: boolean
 }
@@ -42,30 +47,33 @@ export interface Placed {
 
 export interface Placement {
   readonly engines: ReadonlyArray<AgentHarness>
-  readonly models: (engine: AgentHarness) => Effect.Effect<AgentModels, AgentError>
+  readonly models: (engine: AgentHarness) => Effect.Effect<AgentModels, ConversationError>
   readonly commands: (
     engine: AgentHarness,
     repository: FollowedRepository,
-  ) => Effect.Effect<ReadonlyArray<AgentCommand>, InvalidLocalCheckout | AgentError>
+  ) => Effect.Effect<ReadonlyArray<AgentCommand>, InvalidLocalCheckout | ConversationError>
   readonly defaultBranch: (
     repository: FollowedRepository,
-  ) => Effect.Effect<string | null, InvalidLocalCheckout | ConnectionError | AgentError>
+  ) => Effect.Effect<string | null, InvalidLocalCheckout | ConnectionError | ConversationError>
   readonly branches: (
     repository: FollowedRepository,
-  ) => Effect.Effect<ReadonlyArray<string>, InvalidLocalCheckout | ConnectionError | AgentError>
+  ) => Effect.Effect<
+    ReadonlyArray<string>,
+    InvalidLocalCheckout | ConnectionError | ConversationError
+  >
   readonly files: (
     repository: FollowedRepository,
     baseBranch: string,
-  ) => Effect.Effect<ReadonlyArray<string>, InvalidLocalCheckout | AgentError>
+  ) => Effect.Effect<ReadonlyArray<string>, InvalidLocalCheckout | ConversationError>
   readonly place: (
     repository: FollowedRepository,
     baseBranch: string,
-  ) => Effect.Effect<Placed, InvalidLocalCheckout | AgentError>
-  readonly host: (placed: PlacedAgent) => Effect.Effect<HostClient, AgentError>
-  readonly runningHost: (placed: PlacedAgent) => Effect.Effect<Option.Option<HostClient>>
+  ) => Effect.Effect<Placed, InvalidLocalCheckout | ConversationError>
+  readonly host: (placed: PlacedConversation) => Effect.Effect<HostClient, ConversationError>
+  readonly runningHost: (placed: PlacedConversation) => Effect.Effect<Option.Option<HostClient>>
   readonly hostOnceMade: (
-    placed: PlacedAgent,
-  ) => Effect.Effect<Option.Option<HostClient>, AgentError>
-  readonly baseRef: (placed: PlacedAgent) => Effect.Effect<string, AgentError>
-  readonly remove: (placed: PlacedAgent) => Effect.Effect<void, AgentError>
+    placed: PlacedConversation,
+  ) => Effect.Effect<Option.Option<HostClient>, ConversationError>
+  readonly baseRef: (placed: PlacedConversation) => Effect.Effect<string, ConversationError>
+  readonly remove: (placed: PlacedConversation) => Effect.Effect<void, ConversationError>
 }

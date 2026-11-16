@@ -34,7 +34,7 @@ it.live("reports a failed SDK handshake as a host error and closes the query", (
       })
       .pipe(Effect.scoped, Effect.flip)
 
-    assert.equal(failed._tag, "HostAgentError")
+    assert.equal(failed._tag, "HostConversationError")
     assert.isTrue(closed)
   }),
 )

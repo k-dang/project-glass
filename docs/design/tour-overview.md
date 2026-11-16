@@ -26,7 +26,7 @@ The standalone Chapter preview uses clearly labeled illustrative outlines, not f
 
 ## In-app examples
 
-The fake backend also includes three PRs named **Tour example: add OpenCode for ordinary Agents**, **Tour example: validate before saving**, and **Tour example: group rate-limit settings**. Run `pnpm dev:fake`, open one in Reviews, select Tour, and choose Write Tour, then Start reading.
+The fake backend also includes three PRs named **Tour example: add OpenCode for ordinary Conversations**, **Tour example: validate before saving**, and **Tour example: group rate-limit settings**. Run `pnpm dev:fake`, open one in Reviews, select Tour, and choose Write Tour, then Start reading.
 
 These examples use small synthetic source files and real patches. They exercise saved Tour decoding, code-target validation, Dagre layout, Chapter references, and navigation to selected lines on either side of the diff. The OpenCode example is still an illustration of Kevin's supplied screenshot, not the actual OpenCode implementation.
 

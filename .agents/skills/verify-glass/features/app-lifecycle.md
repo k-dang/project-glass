@@ -25,7 +25,7 @@ Preconditions:
 
 - No live run with the same ID (`node $V list`).
 
-- **Open (`life-open`, `life-backend`).** `node $V launch`, then `node $V doctor`. Every line is `OK`, including "Window shows the built renderer" and "Backend health". `node $V snapshot opened` shows `navigation "App areas"`, links for Reviews, Agents, and Settings, `main "Dashboard"`, and `heading "Dashboard"`.
+- **Open (`life-open`, `life-backend`).** `node $V launch`, then `node $V doctor`. Every line is `OK`, including "Window shows the built renderer" and "Backend health". `node $V snapshot opened` shows `navigation "App areas"`, links for Reviews, Conversations, and Settings, `main "Dashboard"`, and `heading "Dashboard"`.
 - **Logs (`life-logs`).** The run's `GLASS_HOME` is `.verify/<id>/state/home`, so the log is `.verify/<id>/state/home/.glass/logs/backend.log` and contains `[glass <time>] Starting backend` followed by `Listening on http://127.0.0.1:<port>` matching the backend URL `launch` printed. Rotation to `backend.previous.log` needs 5 MB of output; the main-process test covers it.
 - **Quit (`life-quit`).** `node $V stop`. It requests app shutdown and prints `Backend port <port>: closed`. "Electron did not quit; killing its process tree" means the app did not quit by itself, which is a failure.
 - **Start error (`life-start-error`).** `node $V launch --github fake --fail-backend-start`. `node $V wait --text "didn't start"`, then `snapshot`/`screenshot`: `heading "Glass's backend didn't start"`, the log path, and `button "Relaunch Glass"`. `backend.log` shows four `Starting backend` notes, restarts after 500ms, 1s, and 2s, and `giving up`. A relaunch fails the same way in this mode.

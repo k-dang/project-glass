@@ -219,7 +219,7 @@ export const fakeSandboxProvider =
         const settings = readSettings(settingsPath)
 
         progress("Creating the Sandbox")
-        const folder = join(settings.root, request.agentId)
+        const folder = join(settings.root, request.conversationId)
         mkdirSync(folder, { recursive: true })
         record({ folder })
 
@@ -312,28 +312,28 @@ export const installFakeSandboxProvider = (
       `export default fakeSandboxProvider(${JSON.stringify(settingsPath)})\n`,
   )
 
-  const sandboxFolder = (agentId: string) => join(settings.root, agentId)
-  const hostFile = (agentId: string) => join(sandboxFolder(agentId), "host.json")
+  const sandboxFolder = (conversationId: string) => join(settings.root, conversationId)
+  const hostFile = (conversationId: string) => join(sandboxFolder(conversationId), "host.json")
 
-  const host = (agentId: string) =>
-    Schema.decodeUnknownSync(HostFile)(readFileSync(hostFile(agentId), "utf8"))
+  const host = (conversationId: string) =>
+    Schema.decodeUnknownSync(HostFile)(readFileSync(hostFile(conversationId), "utf8"))
 
   return {
-    dropConnections: (agentId: string) => {
-      const folder = sandboxFolder(agentId)
+    dropConnections: (conversationId: string) => {
+      const folder = sandboxFolder(conversationId)
       writeFileSync(join(folder, "dropped"), "")
 
       return whenExists(droppedAll(folder))
     },
-    reconnect: (agentId: string) => {
-      rmSync(join(sandboxFolder(agentId), "dropped"))
-      rmSync(droppedAll(sandboxFolder(agentId)), { force: true })
+    reconnect: (conversationId: string) => {
+      rmSync(join(sandboxFolder(conversationId), "dropped"))
+      rmSync(droppedAll(sandboxFolder(conversationId)), { force: true })
     },
     host,
-    killHost: (agentId: string) => killTree(host(agentId).pid),
+    killHost: (conversationId: string) => killTree(host(conversationId).pid),
     stopHosts: async () => {
-      for (const agentId of readdirSync(settings.root))
-        if (existsSync(hostFile(agentId))) await killTree(host(agentId).pid)
+      for (const conversationId of readdirSync(settings.root))
+        if (existsSync(hostFile(conversationId))) await killTree(host(conversationId).pid)
     },
   }
 }

@@ -38,7 +38,7 @@ describe("settings file", () => {
     }),
   )
 
-  it.live("gives Agents the commands saved in the settings file", () =>
+  it.live("gives Conversations the commands saved in the settings file", () =>
     Effect.gen(function* () {
       const home = yield* isolatedHome
       yield* Effect.promise(() => mkdir(join(home, ".project-glass")))

@@ -8,7 +8,7 @@ export * from "./ask"
 
 export * from "./checkoutRun"
 
-export * from "./agent"
+export * from "./conversation"
 
 export * from "./connection"
 

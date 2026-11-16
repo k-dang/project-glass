@@ -22,7 +22,7 @@ import { afterEach, expect, it, vi } from "vite-plus/test"
 import { App } from "./App"
 import { backendLayerAtom } from "./backend"
 import { rememberPlace, savedDestinationsAtom } from "./savedPlace"
-import { agent } from "../../test/agent"
+import { conversation } from "../../test/conversation"
 import {
   type Handlers,
   type Held,
@@ -148,11 +148,14 @@ it("continues from Dashboard after visiting Settings and Activity, without savin
   expect(writes).toHaveLength(count)
 })
 
-it("continues the last PR alongside the last Agent opened after it", async () => {
+it("continues the last PR alongside the last Conversation opened after it", async () => {
   mount({
     GetSavedPlaces: () =>
-      Effect.succeed([savedPlace({ area: "agents", agentId: agent.id }), savedPlace()]),
-    WatchAgents: () => Stream.make([agent]),
+      Effect.succeed([
+        savedPlace({ area: "conversations", conversationId: conversation.id }),
+        savedPlace(),
+      ]),
+    WatchConversations: () => Stream.make([conversation]),
   })
 
   await screen.findByRole("link", { name: "Continue agent/swift-otter" })
@@ -170,7 +173,10 @@ it("invites the user into each area without a Saved place, without creating one"
 
   const user = mount({ GetSavedPlaces: () => Effect.succeed([]), SavePlace: save })
 
-  await screen.findByRole("link", { name: "Start an Agent", description: "No Agent yet" })
+  await screen.findByRole("link", {
+    name: "Start a Conversation",
+    description: "No Conversation yet",
+  })
   await user.click(
     screen.getByRole("link", { name: "Browse pull requests", description: "No pull request yet" }),
   )
@@ -530,7 +536,7 @@ it("serializes saves and skips intermediate positions while an earlier save is i
 it("keeps one destination per area, newest first", async () => {
   const registry = testRegistry({})
   const release = registry.mount(savedDestinationsAtom)
-  const opened: ResumableDestination = { area: "agents", agentId: agent.id }
+  const opened: ResumableDestination = { area: "conversations", conversationId: conversation.id }
 
   const later: ResumableDestination = {
     ...destination,

@@ -16,10 +16,10 @@ import { type ReactNode, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { placeKey } from "./agentsArea"
-import { AgentComposer, contextLabel, Transcript } from "./AgentView"
+import { placeKey } from "./conversationsArea"
+import { ConversationComposer, contextLabel, Transcript } from "./ConversationView"
 import { ConfirmationDialog } from "./ConfirmationDialog"
-import { ConversationContext } from "./conversation"
+import { ConversationAtomsContext } from "./conversation"
 import {
   capturedContextAtom,
   changeGlobalModelAtom,
@@ -78,9 +78,9 @@ export function GlobalConversationDialog() {
         showCloseButton={false}
         className="flex h-[min(48rem,calc(100vh-4rem))] flex-col gap-0 p-0 sm:max-w-2xl"
       >
-        <ConversationContext value={globalConversation}>
+        <ConversationAtomsContext value={globalConversation}>
           <Shown showing={showing} show={setShowing} />
-        </ConversationContext>
+        </ConversationAtomsContext>
       </DialogContent>
     </Dialog>
   )
@@ -234,9 +234,9 @@ function GlobalConversation(props: { onShowPast: () => void }) {
       {startProblem !== null && <PaddedProblem problem={startProblem} />}
       <Transcript turns={turns} status={status} />
       <p className="truncate px-6 pb-1 text-xs text-muted-foreground">
-        {context === null ? "No PR or Agent in view" : `Sends with ${contextLabel(context)}`}
+        {context === null ? "No PR or Conversation in view" : `Sends with ${contextLabel(context)}`}
       </p>
-      <AgentComposer
+      <ConversationComposer
         turns={turns}
         queued={queued}
         idlePlaceholder="Ask Glass about your work"

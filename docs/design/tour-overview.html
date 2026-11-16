@@ -591,10 +591,10 @@
     <script>
       const examples = {
         opencode: {
-          title: "Add native OpenCode support for ordinary Agents",
+          title: "Add native OpenCode support for ordinary Conversations",
           counts: "3 preview Chapters · 59 changed files",
           intent:
-            "Run ordinary Glass Agents with OpenCode as well as Claude Code or pi. OpenCode runs as an authenticated service, and its native events and history become Glass Agent Turns.",
+            "Run ordinary Glass Conversations with OpenCode as well as Claude Code or pi. OpenCode runs as an authenticated service, and its native events and history become Glass Conversation Turns.",
           mapTitle: "A new harness path, the same Glass Turns",
           caption:
             "The two existing paths stay in place. The new OpenCode path translates native events and history into the Turns Glass displays. Select a node to read its Chapter.",
@@ -604,10 +604,10 @@
           chapters: [
             {
               title: "Start the selected harness",
-              file: "HostAgents.ts",
-              copy: "The Agent host starts the adapter for the selected harness. Claude Code and pi keep their existing paths; OpenCode becomes another choice for ordinary Agents.",
+              file: "HostConversations.ts",
+              copy: "The Agent host starts the adapter for the selected harness. Claude Code and pi keep their existing paths; OpenCode becomes another choice for ordinary Conversations.",
               lines: [
-                "start an ordinary Glass Agent",
+                "start an ordinary Glass Conversation",
                 "read its selected harness",
                 "start that program’s adapter",
               ],
@@ -626,10 +626,10 @@
             {
               title: "Turn native history into Glass Turns",
               file: "openCodeTurn.ts",
-              copy: "OpenCode’s native events and history become Glass Agent Turns. This is where the new harness path meets the conversation model that Glass already displays.",
+              copy: "OpenCode’s native events and history become Glass Conversation Turns. This is where the new harness path meets the conversation model that Glass already displays.",
               lines: [
                 "read OpenCode’s native events and history",
-                "translate them into Glass Agent Turns",
+                "translate them into Glass Conversation Turns",
                 "display the conversation in Glass",
               ],
               first: "translate",
@@ -638,7 +638,7 @@
           nodes: [
             {
               id: "start",
-              label: "Start an Agent",
+              label: "Start a Conversation",
               kind: "Existing entry",
               chapter: 0,
               line: 0,
@@ -695,7 +695,7 @@
             },
             {
               id: "turns",
-              label: "Glass Agent Turns",
+              label: "Glass Conversation Turns",
               kind: "Existing interface",
               chapter: 2,
               line: 2,

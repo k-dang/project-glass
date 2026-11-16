@@ -1,7 +1,7 @@
 import { Effect, FileSystem, type Scope } from "effect"
 import { randomUUID } from "node:crypto"
 import { dirname, isAbsolute, join, relative } from "node:path"
-import { HostAgentError, type SkillSource } from "./protocol"
+import { HostConversationError, type SkillSource } from "./protocol"
 import { scopedFolder } from "./scopedFolder"
 
 export interface WrittenSkills {
@@ -9,8 +9,8 @@ export interface WrittenSkills {
   readonly skills: ReadonlyArray<string>
 }
 
-const couldNotWrite = new HostAgentError({
-  message: "Glass couldn't write the Agent's skills. Try again.",
+const couldNotWrite = new HostConversationError({
+  message: "Glass couldn't write the Conversation's skills. Try again.",
 })
 
 const inside = (folder: string, path: string) => {
@@ -27,7 +27,7 @@ export const writeSentSkills = (
   sources: ReadonlyArray<SkillSource>,
 ): Effect.Effect<
   ReadonlyArray<WrittenSkills>,
-  HostAgentError,
+  HostConversationError,
   FileSystem.FileSystem | Scope.Scope
 > =>
   Effect.gen(function* () {
@@ -68,7 +68,7 @@ export const writeSentSkills = (
     )
   }).pipe(
     Effect.catchTag("PlatformError", (cause) =>
-      Effect.logWarning("Couldn't write an Agent's skills", cause).pipe(
+      Effect.logWarning("Couldn't write a Conversation's skills", cause).pipe(
         Effect.andThen(Effect.fail(couldNotWrite)),
       ),
     ),

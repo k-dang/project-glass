@@ -24,7 +24,7 @@ import type { Delivery } from "./ConversationTurns"
 export interface UnitFields {
   readonly pr?: string
   readonly head?: string
-  readonly agent_id?: string
+  readonly conversation_id?: string
   readonly turn_id?: string
   readonly engine?: string | null
   readonly model?: string | null

@@ -24,7 +24,7 @@ const target = (path: string, startLine = 1, side: "old" | "new" = "new") => ({
   endLine: startLine,
 })
 
-const host = "HostAgents.ts"
+const host = "HostConversations.ts"
 
 const runtime = "openCodeRuntime.ts"
 
@@ -32,12 +32,12 @@ const turns = "openCodeTurn.ts"
 
 export const tourOverviewExamples: ReadonlyArray<TourOverviewExample> = [
   {
-    title: "Tour example: add OpenCode for ordinary Agents",
+    title: "Tour example: add OpenCode for ordinary Conversations",
     files: [
       {
         path: host,
         base: [
-          "export const startAgent = (harness, adapters) => {",
+          "export const startConversation = (harness, adapters) => {",
           '  if (harness === "pi") return adapters.pi.start()',
           '  return adapters["claude-code"].start()',
           "}",
@@ -45,7 +45,7 @@ export const tourOverviewExamples: ReadonlyArray<TourOverviewExample> = [
         head: [
           'import { openCodeAdapter } from "./openCodeRuntime"',
           "",
-          "export const startAgent = (harness, adapters, openCode) => {",
+          "export const startConversation = (harness, adapters, openCode) => {",
           "  const harnesses = { ...adapters, opencode: openCodeAdapter(openCode) }",
           "  return harnesses[harness].start()",
           "}",
@@ -79,7 +79,12 @@ export const tourOverviewExamples: ReadonlyArray<TourOverviewExample> = [
         "Add an OpenCode harness path alongside Claude Code and pi, translating native events and history into Glass Turns. This hand-authored synthetic example illustrates the supplied OpenCode Tour; its small source files are demonstration code.",
       diagram: {
         nodes: [
-          { id: "start", label: "Start an Agent", change: "unchanged", target: target(host, 3) },
+          {
+            id: "start",
+            label: "Start a Conversation",
+            change: "unchanged",
+            target: target(host, 3),
+          },
           {
             id: "claude",
             label: "Claude Code",
@@ -101,7 +106,7 @@ export const tourOverviewExamples: ReadonlyArray<TourOverviewExample> = [
           },
           {
             id: "turns",
-            label: "Glass Agent Turns",
+            label: "Glass Conversation Turns",
             change: "unchanged",
             target: target(turns, 2),
           },

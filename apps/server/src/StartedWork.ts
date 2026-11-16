@@ -1,8 +1,8 @@
 import {
-  Agent,
-  AgentError,
+  Conversation,
+  ConversationError,
   type AgentReviewFailure,
-  AgentOutcome,
+  ConversationOutcome,
   type AgentReviewState,
   AgentReviewOutcome,
   finishedReview,
@@ -27,7 +27,7 @@ import {
 } from "effect"
 import { SqlClient } from "effect/sql"
 import { AgentReviews } from "./AgentReviews"
-import { Agents } from "./Agents"
+import { Conversations } from "./Conversations"
 import { Transcripts } from "./Transcripts"
 
 const StartedState = Schema.Literals(["running", "waiting", "finished", "failed"]).annotate({
@@ -45,28 +45,31 @@ const startedFields = {
   startedAt: Schema.DateTimeUtcFromString,
 }
 
-const StartedAgent = Schema.TaggedStruct("Agent", { agent: Agent, ...startedFields })
+const StartedConversation = Schema.TaggedStruct("Conversation", {
+  conversation: Conversation,
+  ...startedFields,
+})
 
 const StartedAgentReview = Schema.TaggedStruct("AgentReview", {
   pullRequest: PullRequestRef,
   ...startedFields,
 })
 
-export const StartedItem = Schema.Union([StartedAgent, StartedAgentReview])
+export const StartedItem = Schema.Union([StartedConversation, StartedAgentReview])
 
 const globalConversationUpdateFields = {
   global_conversation_update_outcome_at: Schema.NullOr(Schema.DateTimeUtcFromString),
   globalConversationUpdate: Schema.NullOr(Schema.fromJsonString(GlobalConversationUpdate)),
 }
 
-const AgentRow = Schema.Struct({
-  agent_id: Schema.String,
+const ConversationRow = Schema.Struct({
+  conversation_id: Schema.String,
   asked_with: Schema.NullOr(Schema.String),
   started_at: Schema.DateTimeUtcFromString,
   ...globalConversationUpdateFields,
 })
 
-type AgentRow = typeof AgentRow.Type
+type ConversationRow = typeof ConversationRow.Type
 
 const ReviewRow = Schema.Struct({
   owner: Schema.String,
@@ -79,15 +82,15 @@ const ReviewRow = Schema.Struct({
 
 type ReviewRow = typeof ReviewRow.Type
 
-const decodeAgentRows = Schema.decodeUnknownEffect(Schema.Array(AgentRow))
+const decodeConversationRows = Schema.decodeUnknownEffect(Schema.Array(ConversationRow))
 
 const decodeReviewRows = Schema.decodeUnknownEffect(Schema.Array(ReviewRow))
 
 const pullRequestOf = ({ owner, repo, number }: ReviewRow) =>
   new PullRequestRef({ owner, repo, number })
 
-interface ConversationIds {
-  readonly conversationId: string
+interface GlobalConversationIds {
+  readonly globalConversationId: string
   readonly sessionId: string
 }
 
@@ -102,13 +105,13 @@ const endingReason = (ending: TurnEnding) =>
       Done: () => null,
       Stopped: () => null,
       Failed: ({ reason }) => reason,
-      CutOff: () => "Glass lost the Agent while it worked.",
+      CutOff: () => "Glass lost the Conversation while it worked.",
       Interrupted: () => "Glass quit while it worked.",
     }),
   )
 
 const ifNew = (
-  row: AgentRow | ReviewRow,
+  row: ConversationRow | ReviewRow,
   at: DateTime.Utc,
   work: WorkOutcome,
 ): ReadonlyArray<PendingOutcome> =>
@@ -119,7 +122,7 @@ const ifNew = (
     : []
 
 const storageFailure = () =>
-  new AgentError({ message: "Couldn't read or save what the Global conversation started." })
+  new ConversationError({ message: "Couldn't read or save what the Global conversation started." })
 
 const endingState = (ending: TurnEnding): StartedState =>
   Match.value(ending).pipe(
@@ -132,7 +135,7 @@ const endingState = (ending: TurnEnding): StartedState =>
     }),
   )
 
-const agentState = (ended: TurnEnd | undefined, waiting: boolean): StartedState => {
+const conversationState = (ended: TurnEnd | undefined, waiting: boolean): StartedState => {
   if (waiting) return "waiting"
 
   return ended === undefined ? "running" : endingState(ended.ending)
@@ -154,79 +157,82 @@ const saved = (what: string) => (statement: Effect.Effect<unknown, unknown>) =>
 export class StartedWork extends Context.Service<
   StartedWork,
   {
-    readonly linkAgent: (
-      caller: ConversationIds,
-      agentId: string,
+    readonly linkConversation: (
+      caller: GlobalConversationIds,
+      conversationId: string,
       actedAt: DateTime.Utc,
-    ) => Effect.Effect<void, AgentError>
+    ) => Effect.Effect<void, ConversationError>
     readonly startedAgentReview: (
-      caller: ConversationIds,
+      caller: GlobalConversationIds,
       pullRequest: PullRequestRef,
       actedAt: DateTime.Utc,
-    ) => Effect.Effect<void, AgentError>
+    ) => Effect.Effect<void, ConversationError>
     readonly list: (
-      conversationId: string,
-    ) => Effect.Effect<ReadonlyArray<typeof StartedItem.Type>, AgentError | AgentReviewFailure>
+      globalConversationId: string,
+    ) => Effect.Effect<
+      ReadonlyArray<typeof StartedItem.Type>,
+      ConversationError | AgentReviewFailure
+    >
     readonly pendingOutcomes: (
-      conversationId: string,
-    ) => Effect.Effect<ReadonlyArray<PendingOutcome>, AgentError | AgentReviewFailure>
+      globalConversationId: string,
+    ) => Effect.Effect<ReadonlyArray<PendingOutcome>, ConversationError | AgentReviewFailure>
     /** Links pending outcomes to their saved Global conversation update before delivery. */
     readonly recordGlobalConversationUpdate: (
-      conversationId: string,
+      globalConversationId: string,
       turnId: string,
       outcomes: ReadonlyArray<PendingOutcome>,
-    ) => Effect.Effect<void, AgentError>
+    ) => Effect.Effect<void, ConversationError>
     readonly reconcileGlobalConversationUpdates: (
-      conversationId: string,
-    ) => Effect.Effect<void, AgentError | AgentReviewFailure>
-    readonly changes: (conversationId: string) => Stream.Stream<void>
+      globalConversationId: string,
+    ) => Effect.Effect<void, ConversationError | AgentReviewFailure>
+    readonly changes: (globalConversationId: string) => Stream.Stream<void>
   }
 >()("@glass/server/StartedWork") {
   static readonly layer = Layer.effect(
     StartedWork,
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
-      const agents = yield* Agents
+      const conversations = yield* Conversations
       const agentReviews = yield* AgentReviews
       const transcripts = yield* Transcripts
       const recorded = yield* SubscriptionRef.make(0)
 
-      const rows = (conversationId: string) =>
+      const rows = (globalConversationId: string) =>
         Effect.all(
           {
-            agentRows: sql`
-              SELECT c.agent_id, c.asked_with, c.started_at, c.global_conversation_update_outcome_at,
+            conversationRows: sql`
+              SELECT c.conversation_id, c.asked_with, c.started_at, c.global_conversation_update_outcome_at,
                 t.context AS globalConversationUpdate
-              FROM conversation_agent c LEFT JOIN agent_turn t ON t.id = c.global_conversation_update_turn_id
-              WHERE c.conversation_id = ${conversationId}
-            `.pipe(Effect.flatMap(decodeAgentRows)),
+              FROM global_started_conversation c LEFT JOIN conversation_turn t ON t.id = c.global_conversation_update_turn_id
+              WHERE c.global_conversation_id = ${globalConversationId}
+            `.pipe(Effect.flatMap(decodeConversationRows)),
             reviewRows: sql`
               SELECT c.owner, c.repo, c.number, c.asked_with, c.started_at, c.global_conversation_update_outcome_at,
                 t.context AS globalConversationUpdate
-              FROM conversation_agent_review c LEFT JOIN agent_turn t ON t.id = c.global_conversation_update_turn_id
-              WHERE c.conversation_id = ${conversationId}
+              FROM global_started_agent_review c LEFT JOIN conversation_turn t ON t.id = c.global_conversation_update_turn_id
+              WHERE c.global_conversation_id = ${globalConversationId}
             `.pipe(Effect.flatMap(decodeReviewRows)),
           },
           { concurrency: "unbounded" },
         ).pipe(Effect.mapError(storageFailure))
 
-      const agentsOf = (agentRows: ReadonlyArray<AgentRow>) =>
+      const conversationsOf = (conversationRows: ReadonlyArray<ConversationRow>) =>
         Effect.gen(function* () {
           const [listed, ends, waiting] = yield* Effect.all(
             [
-              agents.watch().pipe(Stream.runHead, Effect.map(Option.getOrThrow)),
-              transcripts.lastEnds(agentRows.map(({ agent_id }) => agent_id)),
+              conversations.watch().pipe(Stream.runHead, Effect.map(Option.getOrThrow)),
+              transcripts.lastEnds(conversationRows.map(({ conversation_id }) => conversation_id)),
               transcripts.waitingNow,
             ],
             { concurrency: "unbounded" },
           )
 
-          const byId = new Map(listed.map((agent) => [agent.id, agent]))
+          const byId = new Map(listed.map((conversation) => [conversation.id, conversation]))
 
-          const started = agentRows.flatMap((row) => {
-            const agent = byId.get(row.agent_id)
+          const started = conversationRows.flatMap((row) => {
+            const conversation = byId.get(row.conversation_id)
 
-            return agent === undefined ? [] : [{ row, agent }]
+            return conversation === undefined ? [] : [{ row, conversation }]
           })
 
           return { started, ends, waiting }
@@ -238,37 +244,41 @@ export class StartedWork extends Context.Service<
       const changedRows = SubscriptionRef.update(recorded, (count) => count + 1)
 
       return StartedWork.of({
-        linkAgent: ({ conversationId, sessionId }, agentId, actedAt) =>
+        linkConversation: ({ globalConversationId, sessionId }, conversationId, actedAt) =>
           Effect.gen(function* () {
             const askedWith = yield* transcripts.runningMessage(sessionId)
             const startedAt = DateTime.formatIso(actedAt)
 
             yield* sql`
-              INSERT INTO conversation_agent (conversation_id, agent_id, asked_with, started_at)
-              VALUES (${conversationId}, ${agentId}, ${askedWith}, ${startedAt})
+              INSERT INTO global_started_conversation (global_conversation_id, conversation_id, asked_with, started_at)
+              VALUES (${globalConversationId}, ${conversationId}, ${askedWith}, ${startedAt})
               ON CONFLICT DO NOTHING
-            `.pipe(saved("a started Agent"))
+            `.pipe(saved("a started Conversation"))
             yield* changedRows
           }),
-        startedAgentReview: ({ conversationId, sessionId }, { owner, repo, number }, actedAt) =>
+        startedAgentReview: (
+          { globalConversationId, sessionId },
+          { owner, repo, number },
+          actedAt,
+        ) =>
           Effect.gen(function* () {
             const askedWith = yield* transcripts.runningMessage(sessionId)
             const startedAt = DateTime.formatIso(actedAt)
 
             yield* sql`
-              INSERT INTO conversation_agent_review
-                (conversation_id, owner, repo, number, asked_with, started_at)
-              VALUES (${conversationId}, ${owner}, ${repo}, ${number}, ${askedWith}, ${startedAt})
+              INSERT INTO global_started_agent_review
+                (global_conversation_id, owner, repo, number, asked_with, started_at)
+              VALUES (${globalConversationId}, ${owner}, ${repo}, ${number}, ${askedWith}, ${startedAt})
               ON CONFLICT DO UPDATE
                 SET asked_with = excluded.asked_with, started_at = excluded.started_at,
                   global_conversation_update_outcome_at = NULL, global_conversation_update_turn_id = NULL
             `.pipe(saved("a started Agent review"))
             yield* changedRows
           }),
-        list: (conversationId) =>
+        list: (globalConversationId) =>
           Effect.gen(function* () {
-            const { agentRows, reviewRows } = yield* rows(conversationId)
-            const { started, ends, waiting } = yield* agentsOf(agentRows)
+            const { conversationRows, reviewRows } = yield* rows(globalConversationId)
+            const { started, ends, waiting } = yield* conversationsOf(conversationRows)
 
             const reviews = yield* Effect.forEach(
               reviewRows,
@@ -286,55 +296,62 @@ export class StartedWork extends Context.Service<
               { concurrency: "unbounded" },
             )
 
-            const agentItems = started.map(({ row, agent }) =>
-              StartedAgent.make({
-                agent,
-                state: agentState(ends.get(agent.id), waiting.has(agent.id)),
+            const conversationItems = started.map(({ row, conversation }) =>
+              StartedConversation.make({
+                conversation,
+                state: conversationState(ends.get(conversation.id), waiting.has(conversation.id)),
                 askedWith: row.asked_with,
                 startedAt: row.started_at,
               }),
             )
 
-            return [...agentItems, ...reviews].toSorted((a, b) =>
+            return [...conversationItems, ...reviews].toSorted((a, b) =>
               DateTime.Order(a.startedAt, b.startedAt),
             )
           }),
-        pendingOutcomes: (conversationId) =>
+        pendingOutcomes: (globalConversationId) =>
           Effect.gen(function* () {
-            const { agentRows, reviewRows } = yield* rows(conversationId)
-            const { started, ends, waiting } = yield* agentsOf(agentRows)
+            const { conversationRows, reviewRows } = yield* rows(globalConversationId)
+            const { started, ends, waiting } = yield* conversationsOf(conversationRows)
 
-            const fromAgents = started.flatMap(({ row, agent }): ReadonlyArray<PendingOutcome> => {
-              const subject = { agentId: agent.id, name: agent.name, askedWith: row.asked_with }
-              const requests = waiting.get(agent.id)
+            const fromConversations = started.flatMap(
+              ({ row, conversation }): ReadonlyArray<PendingOutcome> => {
+                const subject = {
+                  conversationId: conversation.id,
+                  name: conversation.name,
+                  askedWith: row.asked_with,
+                }
 
-              if (requests !== undefined) {
-                const latest = Arr.max(
-                  Arr.map(requests, ({ since }) => since),
-                  DateTime.Order,
-                )
+                const requests = waiting.get(conversation.id)
+
+                if (requests !== undefined) {
+                  const latest = Arr.max(
+                    Arr.map(requests, ({ since }) => since),
+                    DateTime.Order,
+                  )
+
+                  return ifNew(
+                    row,
+                    latest,
+                    ConversationOutcome.make({ ...subject, outcome: "waiting", reason: null }),
+                  )
+                }
+
+                const ended = ends.get(conversation.id)
+
+                if (ended === undefined || Predicate.isTagged(ended.ending, "Stopped")) return []
 
                 return ifNew(
                   row,
-                  latest,
-                  AgentOutcome.make({ ...subject, outcome: "waiting", reason: null }),
+                  ended.at,
+                  ConversationOutcome.make({
+                    ...subject,
+                    outcome: endingState(ended.ending) === "failed" ? "failed" : "finished",
+                    reason: endingReason(ended.ending),
+                  }),
                 )
-              }
-
-              const ended = ends.get(agent.id)
-
-              if (ended === undefined || Predicate.isTagged(ended.ending, "Stopped")) return []
-
-              return ifNew(
-                row,
-                ended.at,
-                AgentOutcome.make({
-                  ...subject,
-                  outcome: endingState(ended.ending) === "failed" ? "failed" : "finished",
-                  reason: endingReason(ended.ending),
-                }),
-              )
-            })
+              },
+            )
 
             const fromReviews = yield* Effect.forEach(
               reviewRows,
@@ -368,9 +385,9 @@ export class StartedWork extends Context.Service<
               { concurrency: "unbounded" },
             )
 
-            return [...fromAgents, ...fromReviews.flat()]
+            return [...fromConversations, ...fromReviews.flat()]
           }),
-        recordGlobalConversationUpdate: (conversationId, turnId, outcomes) =>
+        recordGlobalConversationUpdate: (globalConversationId, turnId, outcomes) =>
           Effect.forEach(
             outcomes,
             ({ work, at }) => {
@@ -378,15 +395,15 @@ export class StartedWork extends Context.Service<
 
               return Match.value(work).pipe(
                 Match.tagsExhaustive({
-                  Agent: ({ agentId }) =>
+                  Conversation: ({ conversationId }) =>
                     sql`
-                      UPDATE conversation_agent SET global_conversation_update_outcome_at = ${outcomeAt}, global_conversation_update_turn_id = ${turnId}
-                      WHERE conversation_id = ${conversationId} AND agent_id = ${agentId}
+                      UPDATE global_started_conversation SET global_conversation_update_outcome_at = ${outcomeAt}, global_conversation_update_turn_id = ${turnId}
+                      WHERE global_conversation_id = ${globalConversationId} AND conversation_id = ${conversationId}
                     `.pipe(saved("a Global conversation update's covered outcomes")),
                   AgentReview: ({ pullRequest }) =>
                     sql`
-                      UPDATE conversation_agent_review SET global_conversation_update_outcome_at = ${outcomeAt}, global_conversation_update_turn_id = ${turnId}
-                      WHERE conversation_id = ${conversationId} AND owner = ${pullRequest.owner}
+                      UPDATE global_started_agent_review SET global_conversation_update_outcome_at = ${outcomeAt}, global_conversation_update_turn_id = ${turnId}
+                      WHERE global_conversation_id = ${globalConversationId} AND owner = ${pullRequest.owner}
                         AND repo = ${pullRequest.repo} AND number = ${pullRequest.number}
                     `.pipe(saved("a Global conversation update's covered outcomes")),
                 }),
@@ -396,21 +413,26 @@ export class StartedWork extends Context.Service<
           ),
         reconcileGlobalConversationUpdates: Effect.fn(
           "StartedWork.reconcileGlobalConversationUpdates",
-        )(function* (conversationId) {
-          const { agentRows, reviewRows } = yield* rows(conversationId)
+        )(function* (globalConversationId) {
+          const { conversationRows, reviewRows } = yield* rows(globalConversationId)
 
-          for (const row of [...agentRows, ...reviewRows]) {
+          for (const row of [...conversationRows, ...reviewRows]) {
             const context = row.globalConversationUpdate
 
             if (context === null || row.global_conversation_update_outcome_at === null) continue
 
-            if ("agent_id" in row) {
+            if ("conversation_id" in row) {
               const matched = context.work.find(
-                (work) => Predicate.isTagged(work, "Agent") && work.agentId === row.agent_id,
+                (work) =>
+                  Predicate.isTagged(work, "Conversation") &&
+                  work.conversationId === row.conversation_id,
               )
 
               if (matched !== undefined && matched.outcome !== "waiting")
-                yield* agents.markTurnSeen(row.agent_id, row.global_conversation_update_outcome_at)
+                yield* conversations.markTurnSeen(
+                  row.conversation_id,
+                  row.global_conversation_update_outcome_at,
+                )
             } else {
               const pr = pullRequestOf(row)
 
@@ -430,20 +452,27 @@ export class StartedWork extends Context.Service<
             }
           }
         }),
-        changes: (conversationId) =>
+        changes: (globalConversationId) =>
           SubscriptionRef.changes(recorded).pipe(
             Stream.switchMap(() =>
               Stream.unwrap(
                 Effect.gen(function* () {
                   const ended = yield* transcripts.subscribeEnded
-                  const { agentRows, reviewRows } = yield* rows(conversationId)
-                  const agentIds = agentRows.map(({ agent_id }) => agent_id)
+                  const { conversationRows, reviewRows } = yield* rows(globalConversationId)
+
+                  const conversationIds = conversationRows.map(
+                    ({ conversation_id }) => conversation_id,
+                  )
 
                   return Stream.mergeAll(
                     [
-                      ended.pipe(Stream.filter((agentId) => agentIds.includes(agentId))),
+                      ended.pipe(
+                        Stream.filter((conversationId) => conversationIds.includes(conversationId)),
+                      ),
                       transcripts.waiting.pipe(
-                        Stream.map((waiting) => agentIds.map((agentId) => waiting.get(agentId))),
+                        Stream.map((waiting) =>
+                          conversationIds.map((conversationId) => waiting.get(conversationId)),
+                        ),
                         Stream.changesWith(Arr.makeEquivalence((a, b) => a === b)),
                       ),
                       ...reviewRows.map((row) =>

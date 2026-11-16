@@ -93,7 +93,11 @@ const McpAccess = HttpRouter.middleware(
 
         const calling =
           Predicate.isTagged(caller, "OutsideAgent") && session !== undefined
-            ? new OutsideAgentCaller({ agentId: caller.agentId, name: caller.name, session })
+            ? new OutsideAgentCaller({
+                agentId: caller.agentId,
+                name: caller.name,
+                session,
+              })
             : caller
 
         const response = yield* Effect.raceFirst(

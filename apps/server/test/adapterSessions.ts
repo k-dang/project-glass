@@ -1,7 +1,7 @@
 import { getSessionInfo, query } from "@anthropic-ai/claude-agent-sdk"
 import {
   type AgentEvent,
-  applyAgentEvent,
+  applyConversationEvent,
   type Image,
   isWaiting,
   type RequestAnswer,
@@ -41,7 +41,7 @@ import {
   type TurnSettings,
   WorkRole,
 } from "../src/agentHost/protocol"
-import { bundledPi, bundledPiProgram } from "./demoAgent"
+import { bundledPi, bundledPiProgram } from "./demoConversation"
 import { type FakeModelSettings, fakeModelProvider } from "./fakeModelProvider"
 import { startFakeGitHub } from "./fakeGitHub"
 import { VIEWER } from "./fakePullRequest"
@@ -90,7 +90,7 @@ const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
       ? SubscriptionRef.set(statuses, event.extensionStatuses)
       : Effect.sync(() => events.push(event)).pipe(
           Effect.andThen(
-            SubscriptionRef.update(turns, (current) => applyAgentEvent(current, event)),
+            SubscriptionRef.update(turns, (current) => applyConversationEvent(current, event)),
           ),
         )
 
@@ -256,7 +256,11 @@ export const glassToolsBackend = Effect.fnUntraced(function* (sessionId: string)
   yield* client.AddToDo({ title: "Reply to Sam", notes: "" })
 
   const url = yield* mcpCredentials.endpoint
-  const bearer = yield* mcpCredentials.issue({ conversationId: "global-conversation", sessionId })
+
+  const bearer = yield* mcpCredentials.issue({
+    globalConversationId: "global-conversation",
+    sessionId,
+  })
 
   return {
     role: GlobalRole.make({ tools: { url, bearer } }),

@@ -59,6 +59,6 @@ it.live("refuses a file that would land outside its skill's folder", () =>
       },
     ]).pipe(Effect.scoped, Effect.provide(NodeFileSystem.layer), Effect.flip)
 
-    assert.strictEqual(refused._tag, "HostAgentError")
+    assert.strictEqual(refused._tag, "HostConversationError")
   }),
 )

@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process"
 
-const USAGE = `Records the Agent session recordings that the adapter integration tests replay.
+const USAGE = `Records the Agent harness session recordings that the adapter integration tests replay.
 
   pnpm --filter @glass/server record:sessions [claude|pi] [--pi-model <provider/model>] [vitest options, such as -t <test name>]
 

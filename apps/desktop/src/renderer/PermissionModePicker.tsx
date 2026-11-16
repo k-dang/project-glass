@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { permissionModeNames } from "./agentsArea"
+import { permissionModeNames } from "./conversationsArea"
 import { chip } from "./chips"
 
 const icons: Record<PermissionMode, LucideIcon> = {

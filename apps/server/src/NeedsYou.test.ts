@@ -14,7 +14,7 @@ import { mkdirSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { vi } from "vite-plus/test"
-import { agentsFixture, holding, settled } from "../test/agentsFixture"
+import { conversationsFixture, holding, settled } from "../test/conversationsFixture"
 import { watchDeadlines } from "../test/deadlines"
 import { startFakeGitHub } from "../test/fakeGitHub"
 import { type FakePullRequest, type FakePullRequestSeed, VIEWER } from "../test/fakePullRequest"
@@ -32,14 +32,14 @@ const needsYou = (client: Client, until: (items: NeedsYou) => boolean) =>
 
 const current = (client: Client) => needsYou(client, () => true)
 
-const agentItems = (items: NeedsYou) =>
-  items.flatMap((item) => (Predicate.isTagged(item, "Agent") ? [item] : []))
+const conversationItems = (items: NeedsYou) =>
+  items.flatMap((item) => (Predicate.isTagged(item, "Conversation") ? [item] : []))
 
 const pullRequestItems = (items: NeedsYou) =>
   items.flatMap((item) => (Predicate.isTagged(item, "PullRequest") ? [item] : []))
 
-const agentItem = (items: NeedsYou, agentId: string) =>
-  agentItems(items).find(({ agent }) => agent.id === agentId)
+const conversationItem = (items: NeedsYou, conversationId: string) =>
+  conversationItems(items).find(({ conversation }) => conversation.id === conversationId)
 
 const titles = (items: NeedsYou) =>
   pullRequestItems(items).map(({ pullRequest }) => pullRequest.title)
@@ -58,18 +58,18 @@ const sinceOf = (items: NeedsYou, pr: FakePullRequest) => {
   return found === undefined ? undefined : DateTime.formatIso(found.since)
 }
 
-const requestsOf = (items: NeedsYou, agentId: string) =>
-  agentItem(items, agentId)?.reasons.flatMap((reason) =>
+const requestsOf = (items: NeedsYou, conversationId: string) =>
+  conversationItem(items, conversationId)?.reasons.flatMap((reason) =>
     Predicate.isTagged(reason, "WaitingRequests") ? reason.requests : [],
   ) ?? []
 
-const finishedOf = (items: NeedsYou, agentId: string) =>
-  agentItem(items, agentId)?.reasons.flatMap((reason) =>
+const finishedOf = (items: NeedsYou, conversationId: string) =>
+  conversationItem(items, conversationId)?.reasons.flatMap((reason) =>
     Predicate.isTagged(reason, "TurnFinished") ? [reason] : [],
   )[0]
 
-const onlyFinished = (agentId: string) => (items: NeedsYou) =>
-  agentItem(items, agentId)
+const onlyFinished = (conversationId: string) => (items: NeedsYou) =>
+  conversationItem(items, conversationId)
     ?.reasons.map(({ _tag }) => _tag)
     .join() === "TurnFinished"
 
@@ -135,142 +135,154 @@ const reviewsFixture = Effect.fnUntraced(function* (
 })
 
 it.live(
-  "lists an Agent while its Permission request waits, until the user answers it and it finishes",
+  "lists a Conversation while its Permission request waits, until the user answers it and it finishes",
   () =>
     Effect.gen(function* () {
-      const f = yield* agentsFixture
-      const agent = yield* f.start("Please ask permission")
+      const f = yield* conversationsFixture
+      const conversation = yield* f.start("Please ask permission")
 
-      const [turn] = yield* f.transcript(agent.id, (turns) =>
+      const [turn] = yield* f.transcript(conversation.id, (turns) =>
         turns.some(({ parts }) => parts.some(isWaiting)),
       )
 
-      const listed = yield* needsYou(f.client, (items) => agentItem(items, agent.id) !== undefined)
+      const listed = yield* needsYou(
+        f.client,
+        (items) => conversationItem(items, conversation.id) !== undefined,
+      )
 
-      assert.strictEqual(agentItem(listed, agent.id)?.agent.name, agent.name)
-      assert.deepStrictEqual(requestsOf(listed, agent.id), turn?.parts.filter(isWaiting))
-      const [request] = requestsOf(listed, agent.id)
+      assert.strictEqual(
+        conversationItem(listed, conversation.id)?.conversation.name,
+        conversation.name,
+      )
+      assert.deepStrictEqual(requestsOf(listed, conversation.id), turn?.parts.filter(isWaiting))
+      const [request] = requestsOf(listed, conversation.id)
       assert.strictEqual(request?._tag, "PermissionRequest")
 
       yield* f.client.AnswerRequest({
-        agentId: agent.id,
+        conversationId: conversation.id,
         requestId: request?.requestId ?? "",
         answer: AllowRequest.make({}),
       })
 
-      yield* needsYou(f.client, onlyFinished(agent.id))
+      yield* needsYou(f.client, onlyFinished(conversation.id))
     }),
 )
 
-it.live("lists an Agent while its Question waits, until the user answers it and it finishes", () =>
+it.live(
+  "lists a Conversation while its Question waits, until the user answers it and it finishes",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* conversationsFixture
+      const conversation = yield* f.start("Please ask a question")
+
+      const listed = yield* needsYou(
+        f.client,
+        (items) => conversationItem(items, conversation.id) !== undefined,
+      )
+
+      const [question] = requestsOf(listed, conversation.id)
+      assert.strictEqual(question?._tag, "Question")
+
+      yield* f.client.AnswerRequest({
+        conversationId: conversation.id,
+        requestId: question?.requestId ?? "",
+        answer: AnswerQuestion.make({ answers: [{ chosen: [], text: "Only source files" }] }),
+      })
+
+      yield* needsYou(f.client, onlyFinished(conversation.id))
+    }),
+)
+
+it.live("drops a waiting Conversation once it is removed", () =>
   Effect.gen(function* () {
-    const f = yield* agentsFixture
-    const agent = yield* f.start("Please ask a question")
+    const f = yield* conversationsFixture
+    const conversation = yield* f.start("Please ask permission")
+    yield* needsYou(f.client, (items) => conversationItem(items, conversation.id) !== undefined)
 
-    const listed = yield* needsYou(f.client, (items) => agentItem(items, agent.id) !== undefined)
-    const [question] = requestsOf(listed, agent.id)
-    assert.strictEqual(question?._tag, "Question")
+    yield* f.client.RemoveConversation({ conversationId: conversation.id })
 
-    yield* f.client.AnswerRequest({
-      agentId: agent.id,
-      requestId: question?.requestId ?? "",
-      answer: AnswerQuestion.make({ answers: [{ chosen: [], text: "Only source files" }] }),
-    })
-
-    yield* needsYou(f.client, onlyFinished(agent.id))
+    yield* needsYou(f.client, (items) => conversationItem(items, conversation.id) === undefined)
   }),
 )
 
-it.live("drops a waiting Agent once it is removed", () =>
+it.live("lists a Conversation whose Turn finished unseen, until the user sees that Turn", () =>
   Effect.gen(function* () {
-    const f = yield* agentsFixture
-    const agent = yield* f.start("Please ask permission")
-    yield* needsYou(f.client, (items) => agentItem(items, agent.id) !== undefined)
-
-    yield* f.client.RemoveAgent({ agentId: agent.id })
-
-    yield* needsYou(f.client, (items) => agentItem(items, agent.id) === undefined)
-  }),
-)
-
-it.live("lists an Agent whose Turn finished unseen, until the user sees that Turn", () =>
-  Effect.gen(function* () {
-    const f = yield* agentsFixture
-    const agent = yield* f.start()
-    const [turn] = yield* f.transcript(agent.id, settled(1))
+    const f = yield* conversationsFixture
+    const conversation = yield* f.start()
+    const [turn] = yield* f.transcript(conversation.id, settled(1))
     const ended = turn!.ended!
 
-    const listed = yield* needsYou(f.client, onlyFinished(agent.id))
+    const listed = yield* needsYou(f.client, onlyFinished(conversation.id))
 
-    assert.deepStrictEqual(finishedOf(listed, agent.id)?.ended, ended)
-    assert.isTrue(DateTime.Equivalence(agentItem(listed, agent.id)!.since, ended.at))
+    assert.deepStrictEqual(finishedOf(listed, conversation.id)?.ended, ended)
+    assert.isTrue(DateTime.Equivalence(conversationItem(listed, conversation.id)!.since, ended.at))
 
-    yield* f.client.MarkTurnSeen({ agentId: agent.id, endedAt: ended.at })
+    yield* f.client.MarkTurnSeen({ conversationId: conversation.id, endedAt: ended.at })
 
-    yield* needsYou(f.client, (items) => agentItem(items, agent.id) === undefined)
+    yield* needsYou(f.client, (items) => conversationItem(items, conversation.id) === undefined)
   }),
 )
 
 it.live(
-  "lists the Agent again when a later Turn finishes, even if the earlier one is seen after it",
+  "lists the Conversation again when a later Turn finishes, even if the earlier one is seen after it",
   () =>
     Effect.gen(function* () {
-      const f = yield* agentsFixture
-      const agent = yield* f.start()
-      const [first] = yield* f.transcript(agent.id, settled(1))
-      yield* f.client.MarkTurnSeen({ agentId: agent.id, endedAt: first!.ended!.at })
-      yield* needsYou(f.client, (items) => agentItem(items, agent.id) === undefined)
+      const f = yield* conversationsFixture
+      const conversation = yield* f.start()
+      const [first] = yield* f.transcript(conversation.id, settled(1))
+      yield* f.client.MarkTurnSeen({ conversationId: conversation.id, endedAt: first!.ended!.at })
+      yield* needsYou(f.client, (items) => conversationItem(items, conversation.id) === undefined)
 
-      yield* f.send(agent.id, "Say hello again")
-      const turns = yield* f.transcript(agent.id, settled(2))
-      yield* f.client.MarkTurnSeen({ agentId: agent.id, endedAt: first!.ended!.at })
+      yield* f.send(conversation.id, "Say hello again")
+      const turns = yield* f.transcript(conversation.id, settled(2))
+      yield* f.client.MarkTurnSeen({ conversationId: conversation.id, endedAt: first!.ended!.at })
 
-      const listed = yield* needsYou(f.client, onlyFinished(agent.id))
-      assert.deepStrictEqual(finishedOf(listed, agent.id)?.ended, turns[1]?.ended)
+      const listed = yield* needsYou(f.client, onlyFinished(conversation.id))
+      assert.deepStrictEqual(finishedOf(listed, conversation.id)?.ended, turns[1]?.ended)
     }),
 )
 
 it.live("leaves out a Turn the user stopped", () =>
   Effect.gen(function* () {
-    const f = yield* agentsFixture
-    const agent = yield* f.start("hold:never")
-    yield* f.transcript(agent.id, holding)
+    const f = yield* conversationsFixture
+    const conversation = yield* f.start("hold:never")
+    yield* f.transcript(conversation.id, holding)
 
-    yield* f.client.StopTurn({ agentId: agent.id })
-    yield* f.transcript(agent.id, settled(1))
+    yield* f.client.StopTurn({ conversationId: conversation.id })
+    yield* f.transcript(conversation.id, settled(1))
 
-    assert.isUndefined(agentItem(yield* current(f.client), agent.id))
+    assert.isUndefined(conversationItem(yield* current(f.client), conversation.id))
   }),
 )
 
 it.live("keeps which finished Turns the user has seen when Glass opens again", () =>
   Effect.gen(function* () {
-    const f = yield* agentsFixture
+    const f = yield* conversationsFixture
     const seen = yield* f.start()
     const unseen = yield* f.start("Say goodbye")
     const [turn] = yield* f.transcript(seen.id, settled(1))
     yield* f.transcript(unseen.id, settled(1))
-    yield* f.client.MarkTurnSeen({ agentId: seen.id, endedAt: turn!.ended!.at })
-    yield* needsYou(f.client, (items) => agentItem(items, seen.id) === undefined)
+    yield* f.client.MarkTurnSeen({ conversationId: seen.id, endedAt: turn!.ended!.at })
+    yield* needsYou(f.client, (items) => conversationItem(items, seen.id) === undefined)
 
     yield* f.quit
     const relaunched = yield* f.launch
 
     const listed = yield* needsYou(relaunched, onlyFinished(unseen.id))
-    assert.isUndefined(agentItem(listed, seen.id))
+    assert.isUndefined(conversationItem(listed, seen.id))
   }),
 )
 
-it.live("lists a Sandbox Agent still waiting when Glass opens again", () =>
+it.live("lists a Sandbox Conversation still waiting when Glass opens again", () =>
   Effect.gen(function* () {
-    const f = yield* agentsFixture
-    const agent = yield* f.startSandbox("Please ask permission")
-    yield* needsYou(f.client, (items) => agentItem(items, agent.id) !== undefined)
+    const f = yield* conversationsFixture
+    const conversation = yield* f.startSandbox("Please ask permission")
+    yield* needsYou(f.client, (items) => conversationItem(items, conversation.id) !== undefined)
 
     yield* f.quit
     const relaunched = yield* f.launch
 
-    assert.strictEqual(requestsOf(yield* current(relaunched), agent.id).length, 1)
+    assert.strictEqual(requestsOf(yield* current(relaunched), conversation.id).length, 1)
   }),
 )
 
@@ -373,7 +385,7 @@ it.live("lists a queued draft with a finished Agent review, but not a closed or 
   }),
 )
 
-it.live("lists a waiting Agent before a PR that has waited longer", () =>
+it.live("lists a waiting Conversation before a PR that has waited longer", () =>
   Effect.gen(function* () {
     const f = yield* reviewsFixture()
     const pr = f.seed("Greet")
@@ -390,13 +402,13 @@ it.live("lists a waiting Agent before a PR that has waited longer", () =>
 
     assert.deepStrictEqual(
       listed.map(({ _tag }) => _tag),
-      ["Agent", "PullRequest"],
+      ["Conversation", "PullRequest"],
     )
     assert.isTrue(DateTime.isLessThan(listed[1]!.since, listed[0]!.since))
   }),
 )
 
-it.live("lists an Agent review's Follow-up Agent while its request waits", () =>
+it.live("lists an Agent review's Follow-up Conversation while its request waits", () =>
   Effect.gen(function* () {
     const f = yield* reviewsFixture()
     const pr = f.seed("Greet")
@@ -407,14 +419,21 @@ it.live("lists an Agent review's Follow-up Agent while its request waits", () =>
       revision: revisionOf(pr),
       message: "Please ask permission",
     })
-    const { review } = yield* f.reviewState(pr, (state) => state.review?.agentId != null)
-    const agentId = review?.agentId ?? ""
+    const { review } = yield* f.reviewState(pr, (state) => state.review?.conversationId != null)
+    const conversationId = review?.conversationId ?? ""
 
-    const listed = yield* needsYou(f.client, (items) => agentItem(items, agentId) !== undefined)
+    const listed = yield* needsYou(
+      f.client,
+      (items) => conversationItem(items, conversationId) !== undefined,
+    )
 
-    assert.strictEqual(requestsOf(listed, agentId)[0]?._tag, "PermissionRequest")
-    const agents = yield* f.client.WatchAgents().pipe(Stream.runHead, Effect.map(Option.getOrThrow))
-    assert.isTrue(agents.some(({ id, forReview }) => id === agentId && forReview))
+    assert.strictEqual(requestsOf(listed, conversationId)[0]?._tag, "PermissionRequest")
+
+    const conversations = yield* f.client
+      .WatchConversations()
+      .pipe(Stream.runHead, Effect.map(Option.getOrThrow))
+
+    assert.isTrue(conversations.some(({ id, forReview }) => id === conversationId && forReview))
   }),
 )
 
@@ -588,7 +607,7 @@ it.live(
   "lists the Global conversation while its own Question waits, until the user answers it",
   () =>
     Effect.gen(function* () {
-      const f = yield* agentsFixture
+      const f = yield* conversationsFixture
       yield* f.client.SendGlobalMessage({
         message: "Please ask a question",
         images: [],

@@ -1,0 +1,587 @@
+import { useAtom, useAtomSet, useAtomValue } from "@effect/atom-react"
+import {
+  type Conversation,
+  AgentHarness,
+  type ConversationPlace,
+  asksPermission,
+  defaultPermissionMode,
+  type FollowedRepository,
+  type LocalCheckout,
+  type MessageInput,
+  nothingUnsent,
+  type ModelChoice,
+  type PermissionMode,
+  repositoryKey,
+  SandboxPlace,
+  type SandboxProviderInfo,
+  localPlace,
+} from "@glass/contracts"
+import { useNavigate } from "@tanstack/react-router"
+import { Exit, Option, Predicate } from "effect"
+import { AsyncResult, Atom } from "effect/reactivity"
+import { FolderGit2, FolderPlus, GitBranch, LoaderCircle } from "lucide-react"
+import { useCallback, useMemo, useState } from "react"
+import { flushSync } from "react-dom"
+import { MessageGroup } from "@/components/ui/message"
+import { Trace, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace"
+import {
+  conversationsAtom,
+  agentModelsAtom,
+  writtenAtom,
+  createConversationAtom,
+  linkCheckoutAtom,
+  localCheckoutsAtom,
+  newConversationBranchesAtom,
+  newConversationCommandsAtom,
+  newConversationDefaultBranchAtom,
+  newConversationFilesAtom,
+  noCommands,
+  noFiles,
+  placeNames,
+  sandboxProvidersAtom,
+  placeIcons,
+  placeKey,
+  placeOfKey,
+} from "./conversationsArea"
+import { ConversationHeader } from "./ConversationHeader"
+import { UserMessage } from "./ConversationView"
+import type { BackendError } from "./backend"
+import { ChipSelect } from "./chips"
+import { repositoriesAtom } from "./FollowedRepositories"
+import { MessageBox } from "./MessageBox"
+import { ModelPicker } from "./ModelPicker"
+import { PermissionModePicker } from "./PermissionModePicker"
+import { ProblemAlert } from "./ProblemAlert"
+import { problemOf, settledProblem } from "./problems"
+import { useSkillChoice } from "./skillChoice"
+import { LocalSkillsToggle, SharedSkillNames, SkillPackPicker } from "./SkillPackPicker"
+
+const NEW_AGENT_TEXT = "new"
+
+type Harness = {
+  readonly engine: AgentHarness
+  readonly permissionMode: PermissionMode | null
+} & ModelChoice
+
+interface Choosable {
+  readonly repository: FollowedRepository
+  readonly title?: string | undefined
+}
+
+interface PlaceOptions {
+  readonly place: ConversationPlace
+  readonly describe: (key: string | undefined) => string
+  readonly starting: (key: string, baseBranch: string) => string
+  readonly choosesFolder: boolean
+  readonly engines: readonly [AgentHarness, ...Array<AgentHarness>]
+}
+
+const localOptions: PlaceOptions = {
+  place: localPlace,
+  describe: (key) =>
+    key === undefined
+      ? "Choose a folder you cloned a GitHub repository into."
+      : "The Conversation works on a branch of its own.",
+  starting: (key, baseBranch) => `Making the Conversation's copy of ${key} from ${baseBranch}…`,
+  choosesFolder: true,
+  engines: AgentHarness.literals,
+}
+
+const inSandboxOf = ({ id, name, engines }: SandboxProviderInfo): PlaceOptions => ({
+  place: SandboxPlace.make({ providerId: id }),
+  describe: (key) =>
+    key === undefined
+      ? "Follow a repository in Settings to get started."
+      : "The Conversation works on a branch of its own.",
+  starting: () => `Starting the Conversation in a Sandbox from ${name}…`,
+  choosesFolder: false,
+  engines,
+})
+
+export const defaultPlace = (
+  newest: Conversation | undefined,
+  providers: ReadonlyArray<SandboxProviderInfo>,
+  hasCheckouts: boolean,
+): ConversationPlace => {
+  const available = (place: ConversationPlace) =>
+    Predicate.isTagged(place, "sandbox")
+      ? providers.some(({ id }) => id === place.providerId)
+      : hasCheckouts
+
+  if (newest !== undefined && available(newest.place)) return newest.place
+
+  const first = providers[0]
+
+  return hasCheckouts || first === undefined
+    ? localPlace
+    : SandboxPlace.make({ providerId: first.id })
+}
+
+const unlisted = Atom.make(noCommands)
+
+const unlistedFiles = Atom.make(noFiles)
+
+const noDefaultBranch: Atom.Atom<AsyncResult.AsyncResult<string | null, BackendError>> = Atom.make(
+  AsyncResult.success(null),
+)
+
+const unlistedBranches: Atom.Atom<AsyncResult.AsyncResult<ReadonlyArray<string>, BackendError>> =
+  Atom.make(AsyncResult.initial())
+
+export function NewConversation(props: { repository: string | undefined }) {
+  const checkouts = useAtomValue(localCheckoutsAtom)
+
+  const providers = Option.getOrElse(
+    AsyncResult.value(useAtomValue(sandboxProvidersAtom)),
+    (): ReadonlyArray<SandboxProviderInfo> => [],
+  )
+
+  const conversations = Option.getOrElse(
+    AsyncResult.value(useAtomValue(conversationsAtom)),
+    () => [],
+  )
+
+  return AsyncResult.builder(checkouts)
+    .onInitial(() => null)
+    .onFailure((cause) => (
+      <div className="p-6">
+        <ProblemAlert problem={problemOf(cause)} />
+      </div>
+    ))
+    .onSuccess((linked) => (
+      <ChoosePlace
+        checkouts={linked}
+        providers={providers}
+        repository={props.repository}
+        newest={conversations.findLast((conversation) => !conversation.forReview)}
+      />
+    ))
+    .render()
+}
+
+const useChooseFolder = () => {
+  const navigate = useNavigate()
+  const linked = useAtomValue(linkCheckoutAtom)
+  const link = useAtomSet(linkCheckoutAtom, { mode: "promiseExit" })
+
+  const choose = async () => {
+    const path = await window.glass.chooseFolder()
+
+    if (path === null) return
+
+    const exit = await link(path)
+
+    if (Exit.isSuccess(exit))
+      void navigate({
+        to: "/conversations/new",
+        search: { repository: repositoryKey(exit.value.repository) },
+      })
+  }
+
+  return { choose, waiting: linked.waiting, problem: settledProblem(linked) }
+}
+
+interface DraftChoices {
+  readonly providers: ReadonlyArray<SandboxProviderInfo>
+  readonly where: PlaceOptions
+  readonly onPlaceChange: (place: ConversationPlace) => void
+  readonly harness: Harness
+  readonly setHarness: (harness: Harness) => void
+  readonly repository: string | undefined
+  readonly newest: Conversation | undefined
+  readonly bases: Readonly<Record<string, string>>
+  readonly setBase: (context: string, branch: string) => void
+}
+
+function ChoosePlace(props: {
+  checkouts: ReadonlyArray<LocalCheckout>
+  providers: ReadonlyArray<SandboxProviderInfo>
+  repository: string | undefined
+  newest: Conversation | undefined
+}) {
+  const { newest, providers } = props
+  const [chosenPlace, setChosenPlace] = useState<ConversationPlace | null>(null)
+  const [engines, setEngines] = useState<Readonly<Record<string, AgentHarness>>>({})
+  const [harnesses, setHarnesses] = useState<Readonly<Record<string, Harness>>>({})
+  const [bases, setBases] = useState<Readonly<Record<string, string>>>({})
+  const place = chosenPlace ?? defaultPlace(newest, providers, props.checkouts.length > 0)
+
+  const provider = Predicate.isTagged(place, "sandbox")
+    ? providers.find(({ id }) => id === place.providerId)
+    : undefined
+
+  const where = provider === undefined ? localOptions : inSandboxOf(provider)
+
+  const placeContext = placeKey(where.place)
+  const preferredEngine = engines[placeContext] ?? newest?.engine ?? "claude-code"
+  const engine = where.engines.includes(preferredEngine) ? preferredEngine : where.engines[0]
+  const harnessContext = JSON.stringify([placeContext, engine])
+  const inherits = newest?.engine === engine && placeKey(newest.place) === placeContext
+
+  const harness: Harness = harnesses[harnessContext] ?? {
+    engine,
+    model: inherits ? newest.model : null,
+    effort: inherits ? newest.effort : null,
+    permissionMode: null,
+  }
+
+  const choices: DraftChoices = {
+    providers,
+    where,
+    onPlaceChange: setChosenPlace,
+    harness,
+    setHarness: (chosen) => {
+      setEngines((current) => ({ ...current, [placeContext]: chosen.engine }))
+
+      if (chosen.engine === engine)
+        setHarnesses((current) => ({ ...current, [harnessContext]: chosen }))
+    },
+    bases,
+    setBase: (context, branch) => setBases((current) => ({ ...current, [context]: branch })),
+    repository: props.repository,
+    newest,
+  }
+
+  return provider === undefined ? (
+    <>
+      {props.checkouts.map((linked) => (
+        <PrefetchBranches key={repositoryKey(linked.repository)} checkout={linked} />
+      ))}
+      <Draft
+        {...choices}
+        repositories={props.checkouts.map(({ repository, path }) => ({
+          repository,
+          title: path,
+        }))}
+      />
+    </>
+  ) : (
+    <InSandbox {...choices} />
+  )
+}
+
+function InSandbox(props: DraftChoices) {
+  const followed = useAtomValue(repositoriesAtom)
+
+  return AsyncResult.builder(followed)
+    .onInitial(() => null)
+    .onFailure((cause) => (
+      <div className="p-6">
+        <ProblemAlert problem={problemOf(cause)} />
+      </div>
+    ))
+    .onSuccess((repositories) => (
+      <Draft {...props} repositories={repositories.map((repository) => ({ repository }))} />
+    ))
+    .render()
+}
+
+function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> }) {
+  const { where, setHarness, newest } = props
+  const navigate = useNavigate()
+  const folder = useChooseFolder()
+  const PlaceIcon = placeIcons[where.place._tag]
+  const [written, setWritten] = useAtom(writtenAtom(NEW_AGENT_TEXT))
+  const composed = written ?? nothingUnsent
+
+  const find = (key: string | undefined) =>
+    props.repositories.find(({ repository }) => repositoryKey(repository) === key)?.repository
+
+  const repository =
+    find(props.repository) ??
+    find(newest === undefined ? undefined : repositoryKey(newest.repository)) ??
+    props.repositories[0]?.repository
+
+  const key = repository === undefined ? undefined : repositoryKey(repository)
+  const branchContext = JSON.stringify([placeKey(where.place), key])
+  const [browsed, setBrowsed] = useState<string | null>(null)
+
+  const defaults = useAtomValue(
+    repository === undefined
+      ? noDefaultBranch
+      : newConversationDefaultBranchAtom(placeKey(where.place), repository),
+  )
+
+  const chosenBase = props.bases[branchContext]
+  const readsBranchList = chosenBase !== undefined || browsed === branchContext
+
+  const branches = useAtomValue(
+    repository === undefined || !readsBranchList
+      ? unlistedBranches
+      : newConversationBranchesAtom(placeKey(where.place), repository),
+  )
+
+  const skills = useSkillChoice(where.place, props.harness.engine)
+  const created = useAtomValue(createConversationAtom)
+  const create = useAtomSet(createConversationAtom, { mode: "promiseExit" })
+  const defaultBranch = AsyncResult.value(defaults)
+  const listed = Option.getOrNull(AsyncResult.value(branches))
+
+  const baseBranch = pickBase(chosenBase, listed, Option.getOrNull(defaultBranch))
+
+  const offered = useAtomValue(agentModelsAtom(props.harness.engine, placeKey(where.place)))
+
+  const commands = useAtomValue(
+    repository === undefined
+      ? unlisted
+      : newConversationCommandsAtom(props.harness.engine, placeKey(where.place), repository),
+  )
+
+  const files = useAtomValue(
+    repository === undefined || baseBranch === null
+      ? unlistedFiles
+      : newConversationFilesAtom(placeKey(where.place), repository, baseBranch),
+  )
+
+  const models = Option.getOrNull(AsyncResult.value(offered))
+
+  const model =
+    props.harness.model === null
+      ? models?.defaultModel
+      : models?.models.find(({ id }) => id === props.harness.model)
+
+  const harness: Harness =
+    models === null
+      ? props.harness
+      : {
+          ...props.harness,
+          model: model === undefined ? null : props.harness.model,
+          effort: model?.efforts.includes(props.harness.effort ?? "") ? props.harness.effort : null,
+        }
+
+  const awaitingModels = models === null && (harness.model !== null || harness.effort !== null)
+
+  const chooseModel = useCallback(
+    (choice: ModelChoice) =>
+      setHarness({ engine: harness.engine, permissionMode: harness.permissionMode, ...choice }),
+    [setHarness, harness.engine, harness.permissionMode],
+  )
+
+  const choosePermissionMode = useCallback(
+    (chosen: PermissionMode) =>
+      setHarness({
+        engine: harness.engine,
+        model: harness.model,
+        effort: harness.effort,
+        permissionMode: chosen,
+      }),
+    [setHarness, harness.engine, harness.model, harness.effort],
+  )
+
+  const chooseEngine = useCallback(
+    (engine: AgentHarness) =>
+      setHarness({ engine, model: null, effort: null, permissionMode: null }),
+    [setHarness],
+  )
+
+  const harnesses = useMemo(
+    () => ({ engines: where.engines, onChange: chooseEngine }),
+    [where.engines, chooseEngine],
+  )
+
+  const [starting, setStarting] = useState<
+    (MessageInput & { readonly key: string; readonly baseBranch: string }) | null
+  >(null)
+
+  const send = async (message: MessageInput) => {
+    if (repository === undefined || key === undefined || baseBranch === null || awaitingModels)
+      return false
+
+    await document.startViewTransition({
+      types: ["start-conversation"],
+      update: () => flushSync(() => setStarting({ ...message, key, baseBranch })),
+    }).updateCallbackDone
+
+    const exit = await create({
+      repository,
+      baseBranch,
+      place: where.place,
+      skillPacks: skills.chosen,
+      localSkills: skills.sendsLocalSkills,
+      ...harness,
+      ...message,
+    })
+
+    if (Exit.isSuccess(exit))
+      void navigate({
+        to: "/conversations/$conversationId",
+        params: { conversationId: exit.value.id },
+      })
+    else setStarting(null)
+
+    return Exit.isSuccess(exit)
+  }
+
+  return (
+    <section
+      aria-label="New Conversation"
+      className="flex min-h-0 flex-1 flex-col [&_[data-slot=input-group]]:[view-transition-name:new-conversation-composer]"
+    >
+      <ConversationHeader
+        heading={
+          <h1 className="truncate font-medium">
+            {starting === null ? "New Conversation" : "Starting Conversation…"}
+          </h1>
+        }
+        place={where.place}
+        repository={key}
+        baseBranch={baseBranch}
+      />
+      {starting === null ? (
+        <div className="flex flex-1 flex-col items-center justify-end gap-2 px-6 pb-4 text-center">
+          <h2 className="text-2xl font-semibold tracking-tight">What should we work on?</h2>
+          <p className="max-w-md text-sm text-muted-foreground">{where.describe(key)}</p>
+        </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          <MessageGroup className="mx-auto max-w-3xl gap-4 [view-transition-name:new-conversation-start]">
+            <UserMessage message={starting.message} images={starting.images} />
+            <Trace>
+              <TraceLine status="running">
+                <TraceIcon>
+                  <LoaderCircle className="animate-spin" />
+                </TraceIcon>
+                <TraceTitle>{where.starting(starting.key, starting.baseBranch)}</TraceTitle>
+              </TraceLine>
+            </Trace>
+          </MessageGroup>
+        </div>
+      )}
+      <MessageBox
+        composed={composed}
+        setComposed={(update) => setWritten(update(composed))}
+        label="Message"
+        placeholder="What should the Conversation do?"
+        blocked={
+          created.waiting ||
+          baseBranch === null ||
+          awaitingModels ||
+          !AsyncResult.isSuccess(skills.listed)
+        }
+        problem={
+          settledProblem(created) ??
+          settledProblem(skills.listed) ??
+          settledProblem(skills.localNamesListed) ??
+          settledProblem(defaults) ??
+          settledProblem(branches) ??
+          folder.problem
+        }
+        send={send}
+        steer={null}
+        recall={null}
+        onStop={null}
+        commands={commands}
+        files={files}
+        pickers={
+          <>
+            <ModelPicker
+              engine={harness.engine}
+              placeKey={placeKey(where.place)}
+              model={harness.model}
+              effort={harness.effort}
+              onChange={chooseModel}
+              harnesses={harnesses}
+            />
+            {asksPermission(where.place) && (
+              <PermissionModePicker
+                engine={harness.engine}
+                permissionMode={harness.permissionMode ?? defaultPermissionMode}
+                onChange={choosePermissionMode}
+              />
+            )}
+          </>
+        }
+      >
+        {starting === null && (
+          <div className="flex min-w-0 flex-wrap items-center gap-1 [view-transition-name:new-conversation-options] [&>button]:min-w-0">
+            {props.providers.length > 0 && (
+              <ChipSelect
+                label="Where the Conversation runs"
+                icon={<PlaceIcon aria-hidden />}
+                value={placeKey(where.place)}
+                items={[
+                  { value: placeKey(localPlace), label: placeNames["local"] },
+                  ...props.providers.map((provider) => ({
+                    value: placeKey(SandboxPlace.make({ providerId: provider.id })),
+                    label: provider.name,
+                  })),
+                ]}
+                onValueChange={(chosen) => props.onPlaceChange(placeOfKey(chosen))}
+              />
+            )}
+            <ChipSelect
+              label="Repository"
+              icon={<FolderGit2 aria-hidden />}
+              value={key ?? null}
+              items={props.repositories.map((choosable) => ({
+                value: repositoryKey(choosable.repository),
+                label: repositoryKey(choosable.repository),
+                title: choosable.title,
+              }))}
+              onValueChange={(chosen) =>
+                void navigate({ to: "/conversations/new", search: { repository: chosen } })
+              }
+              placeholder="No repositories"
+              action={
+                where.choosesFolder
+                  ? {
+                      label: "Choose folder…",
+                      icon: <FolderPlus aria-hidden />,
+                      onSelect: () => void folder.choose(),
+                      disabled: folder.waiting,
+                    }
+                  : undefined
+              }
+            />
+            <ChipSelect
+              key={branchContext}
+              label="Base branch"
+              icon={<GitBranch aria-hidden />}
+              value={baseBranch}
+              items={(listed ?? (baseBranch === null ? [] : [baseBranch])).map((branch) => ({
+                value: branch,
+                label: branch,
+              }))}
+              onOpenChange={(open) => open && setBrowsed(branchContext)}
+              onValueChange={(branch) => key !== undefined && props.setBase(branchContext, branch)}
+              placeholder={key === undefined ? "No branches" : "Loading branches…"}
+              disabled={Option.isNone(defaultBranch) || key === undefined}
+            />
+            <SkillPackPicker
+              names={skills.names}
+              chosen={skills.chosen}
+              onChange={skills.setChosen}
+            />
+            {skills.offersLocalSkills && (
+              <LocalSkillsToggle
+                checked={skills.sendsLocalSkills}
+                onCheckedChange={skills.setLocalSkills}
+              />
+            )}
+            <SharedSkillNames shared={skills.shared} />
+          </div>
+        )}
+      </MessageBox>
+      {starting === null && <div className="flex-1" />}
+    </section>
+  )
+}
+
+const pickBase = (
+  chosen: string | undefined,
+  listed: ReadonlyArray<string> | null,
+  defaultBranch: string | null,
+) => {
+  if (chosen === undefined) return defaultBranch
+
+  if (listed === null) return null
+
+  return listed.includes(chosen) ? chosen : defaultBranch
+}
+
+function PrefetchBranches(props: { checkout: LocalCheckout }) {
+  useAtomValue(newConversationDefaultBranchAtom(placeKey(localPlace), props.checkout.repository))
+  useAtomValue(newConversationBranchesAtom(placeKey(localPlace), props.checkout.repository))
+
+  return null
+}

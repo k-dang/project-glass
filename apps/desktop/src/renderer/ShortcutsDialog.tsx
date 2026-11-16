@@ -45,7 +45,7 @@ const groups: ReadonlyArray<ShortcutGroup> = [
       { label: "Inbox", keys: ["Mod", "2"] },
       { label: "Reviews", keys: ["Mod", "3"] },
       { label: "To-dos", keys: ["Mod", "4"] },
-      { label: "Agents", keys: ["Mod", "5"] },
+      { label: "Conversations", keys: ["Mod", "5"] },
       { label: "Activity", keys: ["Mod", "6"] },
       { label: "Settings", keys: ["Mod", "7"] },
       { label: "Back", keys: ["Mod", "←"] },
@@ -73,9 +73,9 @@ const groups: ReadonlyArray<ShortcutGroup> = [
     shortcuts: [{ label: "Open a PR", keys: ["Mod", "L"] }],
   },
   {
-    title: "Agents",
+    title: "Conversations",
     icon: Bot,
-    note: "In an open Agent.",
+    note: "In an open Conversation.",
     shortcuts: [{ label: "Switch between Chat and Changes", keys: ["Mod", "D"] }],
   },
   {
