@@ -1,4 +1,4 @@
-import { ChangeType, Chapter, Tour, TourDiagram, type ChangedFile } from "@glass/contracts"
+import { ChangeType, Chapter, Tour, type ChangedFile } from "@glass/contracts"
 import { Option, Predicate, Schema } from "effect"
 import type { TourInput } from "./github/GitHubClient"
 import { dropMalformed } from "./lenientDecoding"
@@ -8,21 +8,16 @@ const optionalVisual = <S extends Schema.Constraint>(
 ): Schema.middlewareDecoding<S, S["DecodingServices"]> =>
   Schema.catchDecoding<S>(dropMalformed("Tour visual", Option.none()))(schema)
 
-const diagramAnswer = Schema.Struct({
-  ...TourDiagram.fields,
-  steps: optionalVisual(TourDiagram.fields.steps),
-})
-
 const chapterAnswer = Schema.Struct({
   ...Chapter.fields,
-  diagram: optionalVisual(Schema.optionalKey(Schema.NullOr(diagramAnswer))),
+  diagram: optionalVisual(Chapter.fields.diagram),
   beforeAfter: optionalVisual(Chapter.fields.beforeAfter),
   callouts: optionalVisual(Chapter.fields.callouts),
 })
 
 export const TourAnswer = Schema.Struct({
   intent: Schema.String,
-  diagram: optionalVisual(Schema.optionalKey(Schema.NullOr(diagramAnswer))),
+  diagram: optionalVisual(Tour.fields.diagram),
   beforeAfter: optionalVisual(Tour.fields.beforeAfter),
   chapters: Schema.Array(chapterAnswer),
   unplacedFiles: Schema.Array(Schema.String),
@@ -39,7 +34,7 @@ Ground every claim in the PR material or the checkout. Do not invent surrounding
 
 Return an intent of one or two sentences explaining why the PR exists. Use the description, inferring from the diff when it is empty. Do not invent motivation.
 Return one overview map when the PR changes behavior or structure, so the reader understands the main change before the first Chapter. Choose the top-level diagram for a flow, branching, a changed route, or a sequence of work, including one that crosses files and Chapters. Choose the top-level beforeAfter for nesting, ownership, or a hierarchy that reads more clearly as an indented outline. Return only the chosen map; omit the other or set it to null. For a trivial PR or a change with no useful behavior or structure to explain, omit both or set them to null. Do not force a graph onto a configuration hierarchy or produce a map that merely lists the changed files.
-The overview map explains the main change across the PR, not every implementation detail or the entire architecture. Include just enough unchanged context to make the difference understandable. Show the previous and new routes together: for a newly inserted check, for example, keep the entry and destination as unchanged nodes, remove their old direct edge, and add the path through the check. Use a separate removed node only when that step itself was removed. Do not describe the same preserved step as removed and added merely because its source line moved.
+The overview map explains the main change across the PR, not every implementation detail or the entire architecture. Include just enough unchanged context to make the difference understandable. Show the previous and new routes together: for a newly inserted check, for example, keep the entry and destination as unchanged nodes, draw their old direct connection as removed, and add the path through the check. Use a separate removed node only when that step itself was removed. Do not describe the same preserved step as removed and added merely because its source line moved.
 A beforeAfter has a short title naming what changed and two to twenty-four lines: a small plain-language pseudocode outline, read top to bottom, showing what happened before and what happens now. Each line has depth (zero-based indent, six at most), text (a short phrase, not real code), change (unchanged, added, or removed), and target. Explain the nesting in phrases, without copying JSON syntax, braces, or punctuation-only lines. Put each removed line next to the added lines that replace it. Keep only enough unchanged lines to give the changed ones their place. At least one line must be added or removed.
 Organize changed files into ordered Chapters, starting with the part that matters most and ending with glue. A reader stopping after any Chapter should have seen what matters most.
 Each Chapter explains one coherent change with a title that names it. Split independently understandable changes. Never group solely by directory or technical layer.
@@ -49,12 +44,11 @@ Keep relevant tests with the change they exercise. Explain what changed tests co
 Give each file a one-line summary of its contribution. Cover every supplied changed path exactly once, either in a Chapter or in unplacedFiles. Never invent a path.
 Files listed without a diff still belong in the Tour. Read them in the checkout when that helps explain them, but no visual may target them.
 Each Chapter may include one optional visual map: a diagram or a beforeAfter, never both. Include one only when a localized flow or hierarchy adds understanding beyond the overview map and explanation. Do not repeat the overview map in a Chapter or force visuals into every Chapter.
-A diagram has two to six nodes in reading order and one to eight directed edges. Use short, plain-language node labels naming behavior rather than files. An edge may have a short label of at most forty characters naming its condition or relationship, such as "valid input" or "OpenCode"; omit labels that add nothing to the arrows. Chapter references are derived from targets by Glass; do not put Chapter numbers in labels. Every node must connect to the graph; ids are unique, edges reference those ids, and duplicate edges and self-edges are not allowed.
-Mark each node and edge as unchanged, added, or removed relative to the supplied base and head. Show the old and new paths together when that explains the change. Do not invent calls, dependencies, surrounding architecture, or runtime behavior that the PR material and checkout do not establish.
-Every node has a target with path, side (old or new), startLine, and endLine. Use a small, inclusive range of actual file line numbers from that side of a supplied diff, counting from its hunk headers. The entire range must appear in the supplied patch. The overview diagram may target any supplied changed file; a Chapter diagram may target only files belonging to that Chapter. Added nodes target new lines; removed nodes target old lines. Context nodes may target either side. Never target a binary file, a missing patch, or lines between hunks. Code read outside a diff may inform the explanation but cannot serve as a visual target. Omit the diagram if these references cannot be established; use an outline only if its own target rules can be satisfied.
-For a change whose order matters (such as retries, cancellation, or state changes), a diagram may include two to twelve steps. Omit steps for a static map; when present, steps is an array, never null. Each step has a short caption explaining what happens, nodes listing its active node ids, edges listing its active zero-based edge indices, and stateChanges listing only state changes established by the diff as label, before, and after. The first active node opens the code for that step. Reference only declared nodes and edges. These are explanatory steps, not an execution trace; never invent observed outcomes or claim the code ran.
-The same beforeAfter fields apply at Tour and Chapter level. Every added or removed beforeAfter line must have a target satisfying the diagram target rules: the overview may target any supplied changed file, and a Chapter outline may target only that Chapter's files. Unchanged lines may have a target in the same way, or a null target when their code is outside the diff. Omit the beforeAfter if these references cannot be established.
-A Chapter may include up to six callouts: short explanatory labels with targets using the same path, side, startLine, and endLine fields. Use these to connect important statements directly to the lines that establish them. Every target must satisfy the diagram target rules. Omit unsupported callouts.
+A diagram is a string of Mermaid source: a flowchart (flowchart LR or flowchart TD) with two to eight nodes. Use short, plain-language node labels naming behavior rather than files, quoted when they contain punctuation. An edge may have a short label naming its condition or relationship, such as "valid input" or "OpenCode"; omit labels that add nothing to the arrows. Do not put Chapter numbers in labels. Every node must connect to the graph.
+Mark what the PR adds or removes relative to the supplied base and head: give an added node the added class and a removed node the removed class, as in B[Validate input]:::added, and leave unchanged nodes unmarked. Draw a removed connection as a dotted arrow (A -.-> C) and every other connection as a solid one. Glass colors the diagram, so write no classDef, style, linkStyle, click, or theme lines. Do not invent calls, dependencies, surrounding architecture, or runtime behavior that the PR material and checkout do not establish. Glass omits a diagram it cannot draw.
+A target links a beforeAfter line or a callout to code: path, side (old or new), startLine, and endLine. Diagrams take no targets. Use a small, inclusive range of actual file line numbers from that side of a supplied diff, counting from its hunk headers. The entire range must appear in the supplied patch. The overview beforeAfter may target any supplied changed file; a Chapter beforeAfter or callout may target only files belonging to that Chapter. Added lines target new lines; removed lines target old lines. Never target a binary file, a missing patch, or lines between hunks. Code read outside a diff may inform the explanation but cannot serve as a target.
+The same beforeAfter fields apply at Tour and Chapter level. Every added or removed beforeAfter line must have a target. Unchanged lines may have a target, or a null target when their code is outside the diff. Omit the beforeAfter if these targets cannot be established.
+A Chapter may include up to six callouts: short explanatory labels with targets using the same path, side, startLine, and endLine fields. Use these to connect important statements directly to the lines that establish them. Omit callouts whose targets cannot be established.
 Intent and explanations may use backticks for inline code and at most one bold clause each. Use no other Markdown, em-dashes, or emoji.
 Return only the JSON answer matching the supplied schema, without a code fence or surrounding prose.`
 

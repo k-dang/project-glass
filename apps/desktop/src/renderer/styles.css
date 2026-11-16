@@ -626,3 +626,17 @@
   --pele-error: var(--destructive);
   --pele-radius: calc(var(--radius) * 0.6);
 }
+
+/* Mermaid nodes marked :::added or :::removed, as Tour diagrams mark what their PR changes. */
+.pele-node.added :is(rect, path, polygon, circle, ellipse) {
+  stroke: var(--added);
+}
+
+.pele-node.removed :is(rect, path, polygon, circle, ellipse) {
+  stroke: var(--deleted);
+  stroke-dasharray: 4 3;
+}
+
+.pele-node.removed .pele-label {
+  fill: var(--muted-foreground);
+}

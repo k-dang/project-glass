@@ -82,7 +82,7 @@ const seedTourPullRequest = (github: FakeGitHub) =>
     ],
   })
 
-test("follows an overview diagram into other Chapters and both sides of the diff", async ({
+test("draws the overview diagram at wide and narrow widths and after a relaunch", async ({
   github,
   claude,
   window,
@@ -96,39 +96,13 @@ test("follows an overview diagram into other Chapters and both sides of the diff
   const changes = window.getByRole("tabpanel", { name: "Changes" })
   const overview = changes.getByRole("region", { name: "Tour overview", exact: true })
   await expect(overview.getByRole("heading", { name: "Tour overview" })).toBeInViewport()
-  await expect(overview.getByText("+ OpenCode", { exact: true })).toBeVisible()
+  const diagram = overview.getByRole("region", { name: "Tour overview diagram" })
+  await expect(diagram.locator(".pele-node")).toHaveCount(6)
+  await expect(diagram.locator(".pele-node.added")).toHaveText([
+    "OpenCode service",
+    "Translate events and history",
+  ])
   await window.screenshot({ path: testInfo.outputPath("overview-branching.png") })
-
-  const runtime = changes.getByRole("region", { name: "Run the OpenCode service", exact: true })
-  await runtime.getByRole("checkbox", { name: "Chapter viewed: Run the OpenCode service" }).click()
-  await expect(runtime.getByRole("button", { name: /Run the OpenCode service/ })).toBeVisible()
-  await overview.getByRole("button", { name: /^OpenCode service,/ }).click()
-  await expect(
-    runtime.locator("[data-selected-line]").filter({ hasText: "createService({ token" }),
-  ).toBeInViewport()
-  await expect(
-    runtime.getByRole("checkbox", { name: "Viewed: openCodeRuntime.ts", exact: true }),
-  ).toBeChecked()
-
-  await overview.getByRole("button", { name: /^Claude Code,/ }).click()
-  const host = changes.getByRole("region", { name: "Start the selected harness", exact: true })
-  await expect(
-    host.locator("[data-selected-line]").filter({ hasText: 'adapters["claude-code"]' }),
-  ).toBeInViewport()
-
-  const translate = overview.getByRole("button", { name: /^Translate events and history,/ })
-  await translate.focus()
-  await window.keyboard.press("Enter")
-
-  const turns = changes.getByRole("region", {
-    name: "Turn native history into Glass Turns",
-    exact: true,
-  })
-
-  await expect(
-    turns.locator("[data-selected-line]").filter({ hasText: "export const openCodeTurn" }),
-  ).toBeInViewport()
-  await window.screenshot({ path: testInfo.outputPath("overview-node-code.png") })
 
   await window.setViewportSize({ width: 800, height: 1000 })
   await overview.getByRole("heading", { name: "Tour overview" }).scrollIntoViewIfNeeded()
@@ -139,18 +113,12 @@ test("follows an overview diagram into other Chapters and both sides of the diff
 
   const reopened = await relaunch()
   await openPullRequest(reopened, pr!)
-  const savedOverview = reopened.getByRole("region", { name: "Tour overview", exact: true })
-  await expect(savedOverview.getByRole("figure").locator("[data-diagram-node]")).toHaveCount(6)
-  await savedOverview.getByRole("button", { name: /^OpenCode service,/ }).click()
   await expect(
-    reopened
-      .getByRole("region", { name: "Run the OpenCode service", exact: true })
-      .locator("[data-selected-line]")
-      .filter({ hasText: "createService({ token" }),
-  ).toBeInViewport()
+    reopened.getByRole("region", { name: "Tour overview diagram" }).locator(".pele-node"),
+  ).toHaveCount(6)
 })
 
-test("reads linked visuals and steps through flows without changing viewed progress", async ({
+test("reads linked visuals without changing viewed progress", async ({
   github,
   claude,
   window,
@@ -217,59 +185,12 @@ test("reads linked visuals and steps through flows without changing viewed progr
             target: { path: "handler.ts", side: "new", startLine: 2, endLine: 3 },
           },
         ],
-        diagram: {
-          nodes: [
-            {
-              id: "receive",
-              label: "Receive request",
-              change: "unchanged",
-              target: { path: "handler.ts", side: "new", startLine: 1, endLine: 1 },
-            },
-            {
-              id: "direct",
-              label: "Write immediately",
-              change: "removed",
-              target: { path: "handler.ts", side: "old", startLine: 2, endLine: 2 },
-            },
-            {
-              id: "validate",
-              label: "Check input",
-              change: "added",
-              target: { path: "validate.ts", side: "new", startLine: 1, endLine: 3 },
-            },
-            {
-              id: "save",
-              label: "Save valid input",
-              change: "unchanged",
-              target: { path: "handler.ts", side: "new", startLine: 4, endLine: 4 },
-            },
-          ],
-          edges: [
-            { from: "receive", to: "direct", change: "removed" },
-            { from: "receive", to: "validate", change: "added" },
-            { from: "validate", to: "save", change: "added" },
-          ],
-          steps: [
-            {
-              caption: "The handler receives input.",
-              nodes: ["receive"],
-              edges: [],
-              stateChanges: [],
-            },
-            {
-              caption: "Validation checks the name before storage.",
-              nodes: ["validate"],
-              edges: [1],
-              stateChanges: [{ label: "Input", before: "unchecked", after: "validated" }],
-            },
-            {
-              caption: "Only valid input reaches the write.",
-              nodes: ["save"],
-              edges: [2],
-              stateChanges: [],
-            },
-          ],
-        },
+        diagram: [
+          "flowchart LR",
+          "  receive[Receive request] -.-> direct[Write immediately]:::removed",
+          "  receive --> validate[Check input]:::added",
+          "  validate --> save[Save valid input]",
+        ].join("\n"),
       },
       {
         title: "Store valid input",
@@ -302,12 +223,9 @@ test("reads linked visuals and steps through flows without changing viewed progr
   await writeTour(window)
   const chapter = window.getByRole("region", { name: "Validate before writing", exact: true })
 
-  const diagram = chapter.getByRole("figure", {
-    name: "Change diagram for Validate before writing",
-  })
-
-  await expect(diagram).toBeVisible()
-  await window.screenshot({ path: testInfo.outputPath("diagram-before.png") })
+  const diagram = chapter.getByRole("region", { name: "Diagram: Validate before writing" })
+  await expect(diagram.locator(".pele-node.removed")).toHaveText("Write immediately")
+  await window.screenshot({ path: testInfo.outputPath("diagram.png") })
 
   const callouts = chapter.getByRole("navigation", {
     name: "Code callouts for Validate before writing",
@@ -317,69 +235,18 @@ test("reads linked visuals and steps through flows without changing viewed progr
   await expect(
     chapter.locator("[data-selected-line]").filter({ hasText: "if (problem)" }),
   ).toBeVisible()
-
-  const flow = diagram.getByRole("group", { name: "Flow steps" })
-  await flow.getByRole("button", { name: "Next flow step" }).click()
-  await expect(flow).toContainText("The handler receives input.")
-  await flow.getByRole("button", { name: "Next flow step" }).click()
-  await expect(flow).toContainText("Validation checks the name before storage.")
-  await expect(flow).toContainText("unchecked → validated")
+  await expect(chapter).toContainText("0/2 viewed")
 
   const rail = () =>
     chapter.evaluate((element) => {
       const diff = element.querySelector("aside")!.nextElementSibling!
-      const figure = diff.querySelector("figure")!.getBoundingClientRect()
+      const map = diff.querySelector("section")!.getBoundingClientRect()
       const code = diff.lastElementChild!.getBoundingClientRect()
 
-      const nodes = [...element.querySelectorAll("[data-diagram-node]")].map((node) =>
-        node.getBoundingClientRect(),
-      )
-
-      return {
-        aboveCode: figure.bottom <= code.top,
-        nonOverlapping: nodes.every((node, index) =>
-          nodes
-            .slice(index + 1)
-            .every(
-              (other) =>
-                node.right <= other.left ||
-                other.right <= node.left ||
-                node.bottom <= other.top ||
-                other.bottom <= node.top,
-            ),
-        ),
-        fits: element.scrollWidth <= element.clientWidth,
-      }
+      return { aboveCode: map.bottom <= code.top, fits: element.scrollWidth <= element.clientWidth }
     })
 
-  await expect.poll(rail).toEqual({ aboveCode: true, nonOverlapping: true, fits: true })
-  await flow.getByRole("button", { name: "Next flow step" }).click()
-  await expect(flow.getByRole("button", { name: "Next flow step" })).toBeDisabled()
-  await flow.getByRole("button", { name: "Previous flow step" }).click()
-  await expect(flow).toContainText("Validation checks the name before storage.")
-
-  await diagram.getByRole("button", { name: /^Write immediately,/ }).click()
-  await expect(
-    chapter.locator("[data-selected-line]").filter({ hasText: "return save(input)" }),
-  ).toBeVisible()
-  const check = diagram.getByRole("button", { name: /^Check input,/ })
-  await check.focus()
-  await window.keyboard.press("Enter")
-  await expect(
-    chapter.locator("[data-selected-line]").filter({ hasText: "export function validate(input)" }),
-  ).toBeVisible()
-  await expect(
-    chapter.locator("[data-selected-line]").filter({ hasText: "Name required" }),
-  ).toBeVisible()
-  await expect(check).toHaveAttribute("aria-pressed", "true")
-  await expect(chapter).toContainText("0/2 viewed")
-  await window.screenshot({ path: testInfo.outputPath("diagram-selected.png") })
-
-  await chapter.getByRole("checkbox", { name: "Viewed: validate.ts", exact: true }).click()
-  await expect(chapter.getByRole("button", { name: "Show validate.ts", exact: true })).toBeVisible()
-  await check.click()
-  await expect(chapter.getByRole("button", { name: "Hide validate.ts", exact: true })).toBeVisible()
-  await expect(chapter).toContainText("1/2 viewed")
+  await expect.poll(rail).toEqual({ aboveCode: true, fits: true })
 
   const storing = window.getByRole("region", { name: "Store valid input", exact: true })
   const beforeAfter = storing.getByRole("region", { name: "Before / after: How input is saved" })
@@ -392,7 +259,7 @@ test("reads linked visuals and steps through flows without changing viewed progr
   await window.setViewportSize({ width: 800, height: 1000 })
   await expect(diagram).toBeVisible()
 
-  await expect.poll(rail).toEqual({ aboveCode: true, nonOverlapping: true, fits: true })
+  await expect.poll(rail).toEqual({ aboveCode: true, fits: true })
   await window.screenshot({ path: testInfo.outputPath("diagram-narrow.png") })
 })
 

@@ -3,7 +3,6 @@ import {
   type AgentHarness,
   PullRequestRef,
   Revision,
-  type TourDiagram,
   TOKEN_PARAM,
   type TourState,
 } from "@glass/contracts"
@@ -199,38 +198,19 @@ it.live("persists generated Before / afters and callouts across a restart", () =
 )
 
 it.live(
-  "saves linked diagrams across a restart and drops invalid diagrams without losing Chapters",
+  "saves diagrams across a restart and drops ones Pele can't draw without losing Chapters",
   () =>
     Effect.gen(function* () {
-      const diagram: TourDiagram = {
-        nodes: [
-          {
-            id: "old",
-            label: "Original greeting",
-            change: "removed",
-            target: { path: "greet.ts", side: "old", startLine: 1, endLine: 1 },
-          },
-          {
-            id: "new",
-            label: "Named greeting",
-            change: "added",
-            target: { path: "greet.ts", side: "new", startLine: 1, endLine: 1 },
-          },
-        ],
-        edges: [{ from: "old", to: "new", change: "added", label: "use the name" }],
-      }
+      const diagram =
+        "flowchart LR\n  old[Original greeting]:::removed -.-> new[Named greeting]:::added"
 
+      const undrawable = "flowchart LR\n  A -->> [["
       const valid = { ...answer, diagram, chapters: [{ ...answer.chapters[0]!, diagram }] }
 
       const invalid = {
         ...valid,
-        diagram: { ...diagram, edges: [{ from: "old", to: "missing", change: "added" }] },
-        chapters: [
-          {
-            ...valid.chapters[0]!,
-            diagram: { ...diagram, edges: [{ from: "old", to: "missing", change: "added" }] },
-          },
-        ],
+        diagram: undrawable,
+        chapters: [{ ...valid.chapters[0]!, diagram: undrawable }],
       }
 
       const f = yield* fixture({ reply: { answer: invalid } })

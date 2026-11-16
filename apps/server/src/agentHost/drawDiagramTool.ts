@@ -1,5 +1,5 @@
 import { Diagram, DRAW_DIAGRAM_TOOL } from "@glass/contracts"
-import { render } from "pele"
+import { drawWithPele } from "../mermaid"
 import { replyTo, toolParameters } from "./hostTool"
 
 export const drawDiagramDescription =
@@ -25,20 +25,10 @@ const DIAGRAM_DRAWN = "Glass shows this Diagram beside the conversation."
 const refusal = (reason: string) =>
   `Glass couldn't draw this Diagram:\n${reason}\nFix it and call ${DRAW_DIAGRAM_TOOL} again.`
 
-const pelesVerdict = (mermaid: string) => {
-  try {
-    render(mermaid)
-
-    return null
-  } catch (error) {
-    return error instanceof Error ? error.message : String(error)
-  }
-}
-
 export const drawDiagram = replyTo(Diagram, ({ mermaid }) => {
-  const reason = pelesVerdict(mermaid)
+  const drawn = drawWithPele(mermaid)
 
-  return reason === null
-    ? { accepted: true, text: DIAGRAM_DRAWN }
-    : { accepted: false, text: refusal(reason) }
+  return "problem" in drawn
+    ? { accepted: false, text: refusal(drawn.problem) }
+    : { accepted: true, text: DIAGRAM_DRAWN }
 })

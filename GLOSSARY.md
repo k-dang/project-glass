@@ -99,15 +99,15 @@ Chapter may carry one for its own part.
 _Avoid_: Show me, summary diagram
 
 **Tour overview**:
-The card that opens a Tour: why the change exists beside one map, either a diagram or a Before /
-after, when available, above the first Chapter. A diagram links its parts to Chapters and the code
-behind them.
+The card that opens a Tour: why the change exists beside one map, either a diagram or a Before / after,
+when available, above the first Chapter. A diagram is a Mermaid flowchart marking what the PR adds and
+removes.
 _Avoid_: Overview (the PR's Overview tab is a different place)
 
 **Chapter**:
 One step of a Tour: a group of changed files that belong together, with an explanation of what
-they do and why. A Chapter may include one map, either a diagram (optionally with a flow the reader
-can step through) or a Before / after, plus callouts linked to diff lines.
+they do and why. A Chapter may include one map, either a diagram or a Before / after, plus callouts
+linked to diff lines.
 _Avoid_: Section, stop, step
 
 **Tour engine**:

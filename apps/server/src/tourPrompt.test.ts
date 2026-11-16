@@ -1,4 +1,4 @@
-import { Chapter, Tour, type TourDiagram } from "@glass/contracts"
+import { Chapter, Tour } from "@glass/contracts"
 import { Effect, Logger, Schema } from "effect"
 import { expect, it } from "vite-plus/test"
 import { TourAnswer } from "./tourPrompt"
@@ -17,16 +17,8 @@ const answer = { intent: "Greet people by name.", chapters: [chapter], unplacedF
 
 const decode = Schema.decodeUnknownSync(TourAnswer)
 
-const diagram: TourDiagram = {
-  nodes: [
-    { id: "receive", label: "Receive name", change: "unchanged", target },
-    { id: "greet", label: "Build greeting", change: "added", target },
-  ],
-  edges: [{ from: "receive", to: "greet", change: "added" }],
-}
-
 it.each([
-  ["empty diagram", { diagram: { nodes: [], edges: [] } }],
+  ["empty diagram", { diagram: "" }],
   ["malformed Before / after", { beforeAfter: "not an outline" }],
 ] as const)("omits %s without discarding prose or valid sibling visuals", (_, invalid) => {
   const result = decode({ ...answer, chapters: [{ ...chapter, callouts, ...invalid }] })
@@ -52,14 +44,6 @@ it("accepts null callouts quietly and warns readably about malformed ones", () =
   expect(logged).toEqual([["Dropped a malformed Tour visual", "Expected array | null"]])
 })
 
-it.each([null, [], [{ caption: "Receive", nodes: null }]])(
-  "preserves a static diagram when playback steps are malformed: %j",
-  (steps) => {
-    const result = decode({ ...answer, chapters: [{ ...chapter, diagram: { ...diagram, steps } }] })
-    expect(result.chapters[0]?.diagram).toEqual(diagram)
-  },
-)
-
 it("still rejects malformed required Chapter content", () => {
   expect(() =>
     decode({ ...answer, chapters: [{ ...chapter, explanation: null, diagram: {} }] }),
@@ -70,9 +54,9 @@ it("omits a malformed Tour Before / after without discarding its Chapters", () =
   expect(decode({ ...answer, beforeAfter: { title: "Empty", lines: [] } })).toEqual(answer)
 })
 
-it("accepts an overview diagram and preserves it when only playback is malformed", () => {
-  const labeled = { ...diagram, edges: [{ ...diagram.edges[0]!, label: "use the name" }] }
-  expect(decode({ ...answer, diagram: { ...labeled, steps: [] } }).diagram).toEqual(labeled)
+it("accepts an overview diagram and omits one that isn't Mermaid source", () => {
+  const diagram = "flowchart LR\n  A[Receive name] --> B[Build greeting]:::added"
+  expect(decode({ ...answer, diagram }).diagram).toEqual(diagram)
   expect(decode({ ...answer, diagram: { nodes: [], edges: [] } })).toEqual(answer)
 })
 
