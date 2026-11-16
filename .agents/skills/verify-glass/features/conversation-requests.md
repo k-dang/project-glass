@@ -1,6 +1,6 @@
 # Permission requests and Questions
 
-A local Claude Code Conversation has a Permission mode (Default, Accept edits, Auto, Bypass), chosen in New Conversation and changeable from the composer. When the Conversation wants to run something its mode doesn't allow, an "Allow <tool>?" card shows the tool and its input, to Allow, or Deny with an optional reason. A Question card shows the Conversation's question with options and a box for the user's own words. While a card waits, the Conversations list marks the Conversation "Waiting on you" and the composer reads "Answer the Permission request above first". Stop ends the Turn "Stopped after …" and the card reads "No longer answerable: its Turn ended."
+A local Claude Code Conversation has a Permission mode (Default, Accept edits, Auto, Bypass), chosen in New Conversation and changeable from the composer. When the agent wants to run something its mode doesn't allow, an "Allow <tool>?" card shows the tool and its input, to Allow, or Deny with an optional reason. A Question card shows the agent's question with options and a box for the user's own words. While a card waits, the Conversations list marks the Conversation "Waiting on you" and the composer reads "Answer the Permission request above first". Stop ends the Turn "Stopped after …" and the card reads "No longer answerable: its Turn ended."
 
 ## Sub-features
 

@@ -61,7 +61,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-16T13-58-24-423Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-16T15-18-08-182Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -105,7 +105,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794837504583,
+              "timestamp": 1794842288343,
               "toolsAdded": [
                 {
                   "name": "ask_user",
@@ -467,7 +467,7 @@
                             "additionalProperties": true
                           }
                         ],
-                        "description": "Where the Conversation works: on this device, or in a Sandbox from a provider."
+                        "description": "Where the Conversation's agent works: on this device, or in a Sandbox from a provider."
                       },
                       "harness": {
                         "type": "string",
@@ -620,7 +620,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794837504583,
+              "timestamp": 1794842288343,
               "toolsAdded": [
                 {
                   "name": "ask_user",
@@ -982,7 +982,7 @@
                             "additionalProperties": true
                           }
                         ],
-                        "description": "Where the Conversation works: on this device, or in a Sandbox from a provider."
+                        "description": "Where the Conversation's agent works: on this device, or in a Sandbox from a provider."
                       },
                       "harness": {
                         "type": "string",
@@ -1139,7 +1139,7 @@
                   "text": "What are my To-dos?"
                 }
               ],
-              "timestamp": 1794837504582
+              "timestamp": 1794842288342
             }
           }
         },
@@ -1154,7 +1154,7 @@
                   "text": "What are my To-dos?"
                 }
               ],
-              "timestamp": 1794837504582
+              "timestamp": 1794842288342
             }
           }
         },
@@ -1182,7 +1182,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794837504613
+              "timestamp": 1794842288373
             }
           }
         },
@@ -1295,10 +1295,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794837504613,
+              "timestamp": 1794842288373,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 8,
+              "durationMs": 9,
               "thinkingLevel": "off"
             }
           }
@@ -1325,7 +1325,7 @@
               ]
             },
             "isError": false,
-            "durationMs": 4
+            "durationMs": 5
           }
         },
         {
@@ -1342,8 +1342,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 4,
-              "timestamp": 1794837504627
+              "durationMs": 5,
+              "timestamp": 1794842288388
             }
           }
         },
@@ -1361,8 +1361,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 4,
-              "timestamp": 1794837504627
+              "durationMs": 5,
+              "timestamp": 1794842288388
             }
           }
         },
@@ -1397,10 +1397,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794837504613,
+              "timestamp": 1794842288373,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 8,
+              "durationMs": 9,
               "thinkingLevel": "off"
             },
             "toolResults": [
@@ -1415,8 +1415,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 4,
-                "timestamp": 1794837504627
+                "durationMs": 5,
+                "timestamp": 1794842288388
               }
             ]
           }
@@ -1450,7 +1450,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794837504629
+              "timestamp": 1794842288391
             }
           }
         },
@@ -1554,7 +1554,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794837504629,
+              "timestamp": 1794842288391,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -1591,7 +1591,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794837504629,
+              "timestamp": 1794842288391,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -1608,7 +1608,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1794837504583,
+                "timestamp": 1794842288343,
                 "toolsAdded": [
                   {
                     "name": "ask_user",
@@ -1970,7 +1970,7 @@
                               "additionalProperties": true
                             }
                           ],
-                          "description": "Where the Conversation works: on this device, or in a Sandbox from a provider."
+                          "description": "Where the Conversation's agent works: on this device, or in a Sandbox from a provider."
                         },
                         "harness": {
                           "type": "string",
@@ -2122,7 +2122,7 @@
                     "text": "What are my To-dos?"
                   }
                 ],
-                "timestamp": 1794837504582
+                "timestamp": 1794842288342
               },
               {
                 "role": "assistant",
@@ -2152,10 +2152,10 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1794837504613,
+                "timestamp": 1794842288373,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
-                "durationMs": 8,
+                "durationMs": 9,
                 "thinkingLevel": "off"
               },
               {
@@ -2169,8 +2169,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 4,
-                "timestamp": 1794837504627
+                "durationMs": 5,
+                "timestamp": 1794842288388
               },
               {
                 "role": "assistant",
@@ -2198,7 +2198,7 @@
                   }
                 },
                 "stopReason": "stop",
-                "timestamp": 1794837504629,
+                "timestamp": 1794842288391,
                 "responseId": "test-completion",
                 "rawStopReason": "stop",
                 "durationMs": 2,
@@ -2249,7 +2249,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-16T13-58-24-423Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-16T15-18-08-182Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 5,
@@ -2297,7 +2297,7 @@
                   "text": "Read acme/api#42 at a stale Revision."
                 }
               ],
-              "timestamp": 1794837504634
+              "timestamp": 1794842288396
             }
           }
         },
@@ -2312,7 +2312,7 @@
                   "text": "Read acme/api#42 at a stale Revision."
                 }
               ],
-              "timestamp": 1794837504634
+              "timestamp": 1794842288396
             }
           }
         },
@@ -2340,7 +2340,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794837504637
+              "timestamp": 1794842288398
             }
           }
         },
@@ -2473,7 +2473,7 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794837504637,
+              "timestamp": 1794842288398,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
               "durationMs": 2,
@@ -2514,7 +2514,7 @@
               "details": {}
             },
             "isError": true,
-            "durationMs": 19
+            "durationMs": 24
           }
         },
         {
@@ -2532,8 +2532,8 @@
               ],
               "details": {},
               "isError": true,
-              "durationMs": 19,
-              "timestamp": 1794837504659
+              "durationMs": 24,
+              "timestamp": 1794842288425
             }
           }
         },
@@ -2552,8 +2552,8 @@
               ],
               "details": {},
               "isError": true,
-              "durationMs": 19,
-              "timestamp": 1794837504659
+              "durationMs": 24,
+              "timestamp": 1794842288425
             }
           }
         },
@@ -2598,7 +2598,7 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794837504637,
+              "timestamp": 1794842288398,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
               "durationMs": 2,
@@ -2617,8 +2617,8 @@
                 ],
                 "details": {},
                 "isError": true,
-                "durationMs": 19,
-                "timestamp": 1794837504659
+                "durationMs": 24,
+                "timestamp": 1794842288425
               }
             ]
           }
@@ -2652,7 +2652,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794837504661
+              "timestamp": 1794842288427
             }
           }
         },
@@ -2756,7 +2756,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794837504661,
+              "timestamp": 1794842288427,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -2793,7 +2793,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794837504661,
+              "timestamp": 1794842288427,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -2814,7 +2814,7 @@
                     "text": "Read acme/api#42 at a stale Revision."
                   }
                 ],
-                "timestamp": 1794837504634
+                "timestamp": 1794842288396
               },
               {
                 "role": "assistant",
@@ -2854,7 +2854,7 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1794837504637,
+                "timestamp": 1794842288398,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
                 "durationMs": 2,
@@ -2872,8 +2872,8 @@
                 ],
                 "details": {},
                 "isError": true,
-                "durationMs": 19,
-                "timestamp": 1794837504659
+                "durationMs": 24,
+                "timestamp": 1794842288425
               },
               {
                 "role": "assistant",
@@ -2901,7 +2901,7 @@
                   }
                 },
                 "stopReason": "stop",
-                "timestamp": 1794837504661,
+                "timestamp": 1794842288427,
                 "responseId": "test-completion",
                 "rawStopReason": "stop",
                 "durationMs": 2,
@@ -2952,7 +2952,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-16T13-58-24-423Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-16T15-18-08-182Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 9,

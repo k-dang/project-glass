@@ -155,7 +155,7 @@ export const describeError = (error: BackendError): Problem =>
         detail: "Wait for its Turn to end, then send your message.",
       }),
       RequestWaiting: () => ({
-        title: "The Conversation is waiting on you",
+        title: "The agent is waiting on you",
         detail: "Answer its Permission request or Question, then send your message.",
       }),
       QueuedMessageStarted: () => ({

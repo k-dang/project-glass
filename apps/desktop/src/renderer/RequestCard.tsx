@@ -106,7 +106,7 @@ function Permission(props: {
             </Label>
             <Input
               id={reasonId}
-              placeholder="Why not? Tells the Conversation what to do instead (optional)"
+              placeholder="Why not? Tells the agent what to do instead (optional)"
               value={reason}
               onChange={(event) => setReason(event.target.value)}
             />

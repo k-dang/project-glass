@@ -870,7 +870,7 @@ const composerPlaceholder = (
 ) => {
   if (waiting !== undefined) return `Answer the ${waitingNames[waiting._tag]} above first`
 
-  return running ? "Queue a message, or Steer the Conversation with ⌘Enter" : idle
+  return running ? "Queue a message, or Steer the agent with ⌘Enter" : idle
 }
 
 function WaitingNotice(props: { waiting: RequestPart }) {

@@ -769,7 +769,7 @@ it("starts a Sandbox Conversation on the default branch, listing other branches 
     ).toBeTruthy(),
   )
   expect(
-    within(newConversationDraft()).getByText("The Conversation works on a branch of its own."),
+    within(newConversationDraft()).getByText("The agent works on a branch of its own."),
   ).toBeTruthy()
   expect(
     within(newConversationDraft()).queryByRole("combobox", { name: "Permission mode" }),

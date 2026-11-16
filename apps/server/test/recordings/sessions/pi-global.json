@@ -61,7 +61,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-16T13-58-23-775Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-16T15-18-07-524Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -105,7 +105,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794837503941,
+              "timestamp": 1794842287692,
               "toolsAdded": [
                 {
                   "name": "ask_user",
@@ -467,7 +467,7 @@
                             "additionalProperties": true
                           }
                         ],
-                        "description": "Where the Conversation works: on this device, or in a Sandbox from a provider."
+                        "description": "Where the Conversation's agent works: on this device, or in a Sandbox from a provider."
                       },
                       "harness": {
                         "type": "string",
@@ -620,7 +620,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794837503941,
+              "timestamp": 1794842287692,
               "toolsAdded": [
                 {
                   "name": "ask_user",
@@ -982,7 +982,7 @@
                             "additionalProperties": true
                           }
                         ],
-                        "description": "Where the Conversation works: on this device, or in a Sandbox from a provider."
+                        "description": "Where the Conversation's agent works: on this device, or in a Sandbox from a provider."
                       },
                       "harness": {
                         "type": "string",
@@ -1139,7 +1139,7 @@
                   "text": "Ask me which greeting I prefer."
                 }
               ],
-              "timestamp": 1794837503940
+              "timestamp": 1794842287690
             }
           }
         },
@@ -1154,7 +1154,7 @@
                   "text": "Ask me which greeting I prefer."
                 }
               ],
-              "timestamp": 1794837503940
+              "timestamp": 1794842287690
             }
           }
         },
@@ -1182,7 +1182,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794837503971
+              "timestamp": 1794842287722
             }
           }
         },
@@ -1301,7 +1301,7 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794837503971,
+              "timestamp": 1794842287722,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
               "durationMs": 9,
@@ -1323,7 +1323,7 @@
         {
           "in": {
             "type": "extension_ui_request",
-            "id": "52141652-ff2c-40e6-b943-22ef9b95f319",
+            "id": "79b82dcb-a343-44e6-b01c-c0364b624abf",
             "method": "select",
             "title": "Which greeting?",
             "options": ["Hi", "Hello"]
@@ -1332,7 +1332,7 @@
         {
           "out": {
             "type": "extension_ui_response",
-            "id": "52141652-ff2c-40e6-b943-22ef9b95f319",
+            "id": "79b82dcb-a343-44e6-b01c-c0364b624abf",
             "value": "Hello"
           }
         },
@@ -1368,7 +1368,7 @@
               ],
               "isError": false,
               "durationMs": 2,
-              "timestamp": 1794837503983
+              "timestamp": 1794842287734
             }
           }
         },
@@ -1387,7 +1387,7 @@
               ],
               "isError": false,
               "durationMs": 2,
-              "timestamp": 1794837503983
+              "timestamp": 1794842287734
             }
           }
         },
@@ -1425,7 +1425,7 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794837503971,
+              "timestamp": 1794842287722,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
               "durationMs": 9,
@@ -1444,7 +1444,7 @@
                 ],
                 "isError": false,
                 "durationMs": 2,
-                "timestamp": 1794837503983
+                "timestamp": 1794842287734
               }
             ]
           }
@@ -1478,7 +1478,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794837503986
+              "timestamp": 1794842287737
             }
           }
         },
@@ -1582,7 +1582,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794837503986,
+              "timestamp": 1794842287737,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -1619,7 +1619,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794837503986,
+              "timestamp": 1794842287737,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -1636,7 +1636,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1794837503941,
+                "timestamp": 1794842287692,
                 "toolsAdded": [
                   {
                     "name": "ask_user",
@@ -1998,7 +1998,7 @@
                               "additionalProperties": true
                             }
                           ],
-                          "description": "Where the Conversation works: on this device, or in a Sandbox from a provider."
+                          "description": "Where the Conversation's agent works: on this device, or in a Sandbox from a provider."
                         },
                         "harness": {
                           "type": "string",
@@ -2150,7 +2150,7 @@
                     "text": "Ask me which greeting I prefer."
                   }
                 ],
-                "timestamp": 1794837503940
+                "timestamp": 1794842287690
               },
               {
                 "role": "assistant",
@@ -2183,7 +2183,7 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1794837503971,
+                "timestamp": 1794842287722,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
                 "durationMs": 9,
@@ -2201,7 +2201,7 @@
                 ],
                 "isError": false,
                 "durationMs": 2,
-                "timestamp": 1794837503983
+                "timestamp": 1794842287734
               },
               {
                 "role": "assistant",
@@ -2229,7 +2229,7 @@
                   }
                 },
                 "stopReason": "stop",
-                "timestamp": 1794837503986,
+                "timestamp": 1794842287737,
                 "responseId": "test-completion",
                 "rawStopReason": "stop",
                 "durationMs": 2,
@@ -2280,7 +2280,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-16T13-58-23-775Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-16T15-18-07-524Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 5,

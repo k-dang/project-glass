@@ -81,7 +81,7 @@ const localOptions: PlaceOptions = {
   describe: (key) =>
     key === undefined
       ? "Choose a folder you cloned a GitHub repository into."
-      : "The Conversation works on a branch of its own.",
+      : "The agent works on a branch of its own.",
   starting: (key, baseBranch) => `Making the Conversation's copy of ${key} from ${baseBranch}…`,
   choosesFolder: true,
   harnesses: AgentHarness.literals,
@@ -92,7 +92,7 @@ const inSandboxOf = ({ id, name, harnesses }: SandboxProviderInfo): PlaceOptions
   describe: (key) =>
     key === undefined
       ? "Follow a repository in Settings to get started."
-      : "The Conversation works on a branch of its own.",
+      : "The agent works on a branch of its own.",
   starting: () => `Starting the Conversation in a Sandbox from ${name}…`,
   choosesFolder: false,
   harnesses,
@@ -451,7 +451,7 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
         composed={composed}
         setComposed={(update) => setWritten(update(composed))}
         label="Message"
-        placeholder="What should the Conversation do?"
+        placeholder="What should the agent do?"
         blocked={
           created.waiting ||
           baseBranch === null ||

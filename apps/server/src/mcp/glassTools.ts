@@ -120,7 +120,7 @@ const ListedConversation = Schema.Struct({
   conversation: Conversation,
   waiting: Schema.Boolean.annotate({
     description:
-      "Whether the Conversation is waiting for the user to answer a Question or Permission request.",
+      "Whether the Conversation's agent is waiting for the user to answer a Question or Permission request.",
   }),
 })
 
@@ -236,7 +236,8 @@ const CreateConversation = Tool.make("create_conversation", {
       description: "The branch the Conversation's branch starts from.",
     }),
     place: ConversationPlace.annotate({
-      description: "Where the Conversation works: on this device, or in a Sandbox from a provider.",
+      description:
+        "Where the Conversation's agent works: on this device, or in a Sandbox from a provider.",
     }),
     harness: AgentHarness.annotate({
       description: "The Agent harness that runs the Conversation.",
@@ -376,7 +377,7 @@ const explained = (error: ServiceFailure) =>
         ConversationError: ({ message }) => message,
         AgentReviewFailure: ({ message }) => message,
         RequestWaiting: () =>
-          "The Conversation is waiting for the user to answer its Question or Permission request, so it took no message. The user answers it in the Conversation.",
+          "The Conversation's agent is waiting for the user to answer its Question or Permission request, so it took no message. The user answers it in the Conversation.",
         QueueError: ({ message }) => message,
         SettingsError: ({ message }) => message,
         ToDoError: ({ message }) => message,

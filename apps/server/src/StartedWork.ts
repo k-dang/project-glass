@@ -105,7 +105,7 @@ const endingReason = (ending: TurnEnding) =>
       Done: () => null,
       Stopped: () => null,
       Failed: ({ reason }) => reason,
-      CutOff: () => "Glass lost the Conversation while it worked.",
+      CutOff: () => "Glass lost the agent while it worked.",
       Interrupted: () => "Glass quit while it worked.",
     }),
   )
