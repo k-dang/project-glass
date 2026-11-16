@@ -43,13 +43,19 @@ import { Transcripts } from "./Transcripts"
 import { wideEvents } from "./wideEvents"
 import { HostAgentError } from "./agentHost/protocol"
 
+type StopRequest = Parameters<ConversationHost["StopTurn"]>[0]
+
 interface Script {
   readonly ensureStarted?: Conversation["ensureStarted"]
   readonly startTurn?: (turnId: string) => Effect.Effect<void, HostAgentError>
-  readonly stopTurn?: (request: object) => Effect.Effect<null>
+  readonly stopTurn?: (request: StopRequest) => Effect.Effect<null, AgentError>
   readonly steer?: () => Effect.Effect<void, HostAgentError>
   readonly running?: boolean
   readonly started?: Deferred.Deferred<void>
+}
+
+class OpenTurn {
+  id: string | null = null
 }
 
 const unused = (method: string) => () => Effect.die(`This test does not call ${method}`)
@@ -85,7 +91,7 @@ const scriptedHost = (
     ),
   AnswerRequest: unused("AnswerRequest"),
   Steer: () => (script.steer ?? unused("Steer"))(),
-  StopTurn: (request) => script.stopTurn?.(request) ?? Effect.succeed(null),
+  StopTurn: (request) => (script.stopTurn?.(request) ?? Effect.succeed(null)).pipe(Effect.orDie),
 })
 
 const layer = ConversationTurns.layer.pipe(
@@ -204,21 +210,15 @@ const scripted = (scripts: { readonly [id: string]: Script }) =>
 
 const hostStall = 5_000
 
-const askedTurn = (request: object) => {
-  if (!Object.hasOwn(request, "turnId")) return null
-
-  const value = Reflect.get(request, "turnId")
-
-  return typeof value === "string" ? value : null
-}
-
-const stopRunningTurn = (agentId: string, running: { id: string | null }, request: object) =>
+const stopRunningTurn = (
+  agentId: string,
+  running: OpenTurn,
+  request: StopRequest,
+  transcripts: Transcripts["Service"],
+) =>
   Effect.gen(function* () {
-    const asked = askedTurn(request)
+    if (running.id === null || request.turnId !== running.id) return null
 
-    if (running.id === null || (asked !== null && asked !== running.id)) return null
-
-    const transcripts = yield* Transcripts
     const turnId = running.id
     running.id = null
 
@@ -810,6 +810,7 @@ it.effect("leaves a Global conversation update pending when StartTurn never answ
     Effect.gen(function* () {
       const entered = yield* Deferred.make<void>()
       const release = yield* Deferred.make<void>()
+      const transcripts = yield* Transcripts
 
       const desk = yield* scripted({
         "agent-1": {
@@ -817,7 +818,6 @@ it.effect("leaves a Global conversation update pending when StartTurn never answ
           startTurn: hold(entered, release),
           stopTurn: () =>
             Effect.gen(function* () {
-              const transcripts = yield* Transcripts
               const { turns } = yield* transcripts.read("agent-1")
               const open = turns.find((turn) => turn.ended === null)
 
@@ -1061,7 +1061,8 @@ it.effect("does not stop the next Turn when an earlier StartTurn answers late", 
     const gate = yield* Deferred.make<void>()
     const secondBegun = yield* Deferred.make<void>()
     const cleaned = yield* Deferred.make<void>()
-    const running: { id: string | null } = { id: null }
+    const running = new OpenTurn()
+    const transcripts = yield* Transcripts
     let calls = 0
     let stops = 0
 
@@ -1085,7 +1086,7 @@ it.effect("does not stop the next Turn when an earlier StartTurn answers late", 
           }),
         stopTurn: (request) =>
           Effect.gen(function* () {
-            const left = yield* stopRunningTurn("agent-a", running, request)
+            const left = yield* stopRunningTurn("agent-a", running, request, transcripts)
             stops += 1
 
             if (stops === 2) yield* Deferred.succeed(cleaned, undefined)
@@ -1123,7 +1124,8 @@ it.effect("does not stop the next Turn when an earlier StartTurn times out", () 
       const entered = yield* Deferred.make<void>()
       const secondBegun = yield* Deferred.make<void>()
       const cleaned = yield* Deferred.make<void>()
-      const running: { id: string | null } = { id: null }
+      const running = new OpenTurn()
+      const transcripts = yield* Transcripts
       let calls = 0
       let stops = 0
 
@@ -1144,7 +1146,7 @@ it.effect("does not stop the next Turn when an earlier StartTurn times out", () 
             }),
           stopTurn: (request) =>
             Effect.gen(function* () {
-              const left = yield* stopRunningTurn("agent-a", running, request)
+              const left = yield* stopRunningTurn("agent-a", running, request, transcripts)
               stops += 1
 
               if (stops === 2) yield* Deferred.succeed(cleaned, undefined)

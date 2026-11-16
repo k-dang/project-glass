@@ -87,12 +87,12 @@ const decodeUnsent = Schema.decodeUnknownEffect(Schema.Array(StoredMessage))
 const unsentFailure = () =>
   new AgentError({ message: "Couldn't read or save your unsent message. Try again." })
 
-const stopHost = (conversation: Conversation) =>
+const stopHost = (conversation: Conversation, turnId: string) =>
   conversation.runningHost.pipe(
     Effect.flatMap((running) =>
       Option.isNone(running)
         ? Effect.succeed(null)
-        : boundHostCall(running.value.StopTurn({ agentId: conversation.id })).pipe(
+        : boundHostCall(running.value.StopTurn({ agentId: conversation.id, turnId })).pipe(
             Effect.tapError((cause) => Effect.logWarning("Couldn't stop a Turn", cause)),
             Effect.orElseSucceed(() => null),
           ),
@@ -229,8 +229,6 @@ export class ConversationTurns extends Context.Service<
         error: HostCallError,
       ) =>
         Effect.gen(function* () {
-          yield* Effect.yieldNow
-
           if (Predicate.isTagged(context, "GlobalConversationUpdate"))
             return yield* transcripts
               .setStatus(conversation.id, hostFailure(error))
@@ -267,7 +265,7 @@ export class ConversationTurns extends Context.Service<
               const still = (yield* transcripts.runningTurn(agentId)) === turnId
 
               if (started === "accepted") {
-                if (!still) yield* stopHost(conversation)
+                if (!still) yield* stopHost(conversation, turnId)
 
                 return still
                   ? ("dispatched" as const satisfies Delivery)
@@ -275,7 +273,7 @@ export class ConversationTurns extends Context.Service<
               }
 
               if (!still) {
-                yield* stopHost(conversation)
+                yield* stopHost(conversation, turnId)
 
                 return "superseded" as const satisfies Delivery
               }
@@ -287,7 +285,7 @@ export class ConversationTurns extends Context.Service<
                 started,
               )
 
-              yield* stopHost(conversation)
+              yield* stopHost(conversation, turnId)
 
               return settled
             }),
@@ -369,7 +367,9 @@ export class ConversationTurns extends Context.Service<
           return yield* boundHostCall(running.value.Steer({ agentId, ...message })).pipe(
             Effect.as(true),
             Effect.tapError((cause) => Effect.logWarning("Couldn't Steer a Turn", cause)),
-            Effect.orElseSucceed(() => false),
+            Effect.catch((error) =>
+              Predicate.isTagged(error, "AgentError") ? Effect.fail(error) : Effect.succeed(false),
+            ),
           )
         })
 
@@ -380,9 +380,10 @@ export class ConversationTurns extends Context.Service<
           agentId,
           Effect.gen(function* () {
             const runningId = yield* transcripts.runningTurn(agentId)
-            const left = yield* stopHost(conversation)
 
             if (runningId === null) return
+
+            const left = yield* stopHost(conversation, runningId)
 
             if (left === null) yield* transcripts.endRunning(TurnStopped.make({}), [agentId])
             else if (left.length > 0) yield* transcripts.prependQueued(agentId, left)
