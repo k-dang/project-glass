@@ -40,7 +40,7 @@ type BackendClient = Effect.Success<ReturnType<typeof startBackend>>["client"]
 
 const fixture = Effect.fnUntraced(function* (
   settings: ScriptedSettings = { reply: { answer } },
-  engine: AgentHarness = "pi",
+  harness: AgentHarness = "pi",
 ) {
   const runners = yield* scriptedAgentRunners(settings)
 
@@ -114,7 +114,7 @@ const fixture = Effect.fnUntraced(function* (
   const engineSettings = yield* client.GetEngineSettings({ feature: "agentReviews" })
   yield* client.SetEngineSettings({
     feature: "agentReviews",
-    engineSettings: { ...engineSettings, engine },
+    engineSettings: { ...engineSettings, harness },
   })
 
   const state = (predicate: (state: AgentReviewState) => boolean) =>
@@ -231,7 +231,7 @@ it.live(
       const { review } = yield* f.state(reviewed)
 
       const [run] = f.runners.runs
-      assert.strictEqual(run?.engine, "pi")
+      assert.strictEqual(run?.harness, "pi")
       assert.deepStrictEqual(run?.files, ["greet.ts", "main.ts", "src/name.ts"])
       assert.include(run?.task.instructions, defaultReviewPrompt)
       assert.include(run?.task.prompt, "Use the person's name.")
@@ -391,7 +391,7 @@ it.effect("fails as timed out when the agent passes its limit", () =>
 
     const failure = yield* f.failed
     assert.strictEqual(failure.reason, "timeout")
-    assert.strictEqual(failure.runner?.engine, "pi")
+    assert.strictEqual(failure.runner?.harness, "pi")
   }),
 )
 

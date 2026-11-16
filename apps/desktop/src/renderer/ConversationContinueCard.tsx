@@ -48,7 +48,7 @@ function LastConversation(props: { destination: ConversationDestination }) {
           }}
           name={conversation.name}
           icon={Sparkles}
-          subtitle={`Conversations · ${repositoryKey(conversation.repository)} · ${harnessNames[conversation.engine]} · ${placeNames[conversation.place._tag]}`}
+          subtitle={`Conversations · ${repositoryKey(conversation.repository)} · ${harnessNames[conversation.harness]} · ${placeNames[conversation.place._tag]}`}
         />
       )
     })

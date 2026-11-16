@@ -26,11 +26,11 @@ const descriptions: Record<PermissionMode, string> = {
 }
 
 export function PermissionModePicker(props: {
-  engine: AgentHarness
+  harness: AgentHarness
   permissionMode: PermissionMode | null
   onChange: (permissionMode: PermissionMode) => void
 }) {
-  const modes = harnessCapabilities[props.engine].permissionModes
+  const modes = harnessCapabilities[props.harness].permissionModes
 
   if (modes.length === 0) return null
 

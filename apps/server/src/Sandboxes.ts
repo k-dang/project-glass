@@ -187,7 +187,7 @@ const notInstalled = (providerId: string): Placement => {
   )
 
   return {
-    engines: AgentHarness.literals,
+    harnesses: AgentHarness.literals,
     models: () => failure,
     commands: () => Effect.succeed([]),
     defaultBranch: () => failure,
@@ -355,7 +355,7 @@ export class Sandboxes extends Context.Service<
 
             const request: SandboxRequest = {
               conversationId: conversation.id,
-              engine: conversation.engine,
+              harness: conversation.harness,
               repository: {
                 owner: conversation.repository.owner,
                 repo: conversation.repository.repo,
@@ -580,9 +580,9 @@ export class Sandboxes extends Context.Service<
         }
 
         const placement: Placement = {
-          engines: provider.engines,
-          models: (engine) =>
-            call(provider, "list what its Sandboxes offer", () => provider.models(engine)).pipe(
+          harnesses: provider.harnesses,
+          models: (harness) =>
+            call(provider, "list what its Sandboxes offer", () => provider.models(harness)).pipe(
               Effect.flatMap((models) =>
                 decodeModels(models).pipe(
                   Effect.tapError((cause) =>
@@ -707,7 +707,7 @@ export class Sandboxes extends Context.Service<
       return Sandboxes.of({
         providers: Array.from(
           sandboxProviders,
-          ([id, { name, engines }]) => new SandboxProviderInfo({ id, name, engines }),
+          ([id, { name, harnesses }]) => new SandboxProviderInfo({ id, name, harnesses }),
         ),
         placement: (providerId) => placed.get(providerId)?.placement ?? notInstalled(providerId),
         subscribeLost: PubSub.subscribe(lost).pipe(Effect.map(Stream.fromSubscription)),

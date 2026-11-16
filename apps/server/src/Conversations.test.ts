@@ -103,7 +103,7 @@ it.live("starts a Conversation in a worktree, on a new branch it names from its 
         name: conversation.name,
         repository,
         machine: "local",
-        engine: "pi",
+        harness: "pi",
         message: "Say hello",
       }),
     )

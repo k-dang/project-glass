@@ -26,7 +26,7 @@ it("writes only on request", async () => {
     job: {
       status: "writing",
       startedAt: f.startedAt,
-      runner: { engine: "pi", model: "openai/gpt-test" },
+      runner: { harness: "pi", model: "openai/gpt-test" },
     },
   })
   expect(await screen.findByText("Writing Tour…")).toBeDefined()

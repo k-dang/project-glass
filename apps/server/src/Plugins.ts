@@ -58,7 +58,7 @@ const entryOf = Effect.fnUntraced(function* (
 
 const validProviderId = /^[a-z0-9][a-z0-9-]*$/
 
-const listsEngines = Schema.is(Schema.Struct({ engines: Schema.NonEmptyArray(AgentHarness) }))
+const listsHarnesses = Schema.is(Schema.Struct({ harnesses: Schema.NonEmptyArray(AgentHarness) }))
 
 const loadPlugin = (
   fs: FileSystem.FileSystem,
@@ -128,7 +128,7 @@ export class Plugins extends Context.Service<
                 id,
                 path,
               )
-            } else if (!listsEngines(provider)) {
+            } else if (!listsHarnesses(provider)) {
               yield* Effect.logWarning(
                 "Skipped a Sandbox provider that doesn't list the Agent harnesses it runs",
                 id,

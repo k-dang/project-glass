@@ -22,8 +22,8 @@ export const claudeModels = new AgentModels({
   models: [{ id: "sonnet", name: "Sonnet 5.5", efforts: ["low", "high"] }],
 })
 
-export const listModels = ({ engine }: { engine: AgentHarness }) =>
-  Effect.succeed(engine === "pi" ? piModels : claudeModels)
+export const listModels = ({ harness }: { harness: AgentHarness }) =>
+  Effect.succeed(harness === "pi" ? piModels : claudeModels)
 
 export const mount = (
   handlers: Parameters<typeof testLayer>[0],

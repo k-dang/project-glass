@@ -58,8 +58,8 @@ import { LocalSkillsToggle, SharedSkillNames, SkillPackPicker } from "./SkillPac
 
 const NEW_AGENT_TEXT = "new"
 
-type Harness = {
-  readonly engine: AgentHarness
+type HarnessChoice = {
+  readonly harness: AgentHarness
   readonly permissionMode: PermissionMode | null
 } & ModelChoice
 
@@ -73,7 +73,7 @@ interface PlaceOptions {
   readonly describe: (key: string | undefined) => string
   readonly starting: (key: string, baseBranch: string) => string
   readonly choosesFolder: boolean
-  readonly engines: readonly [AgentHarness, ...Array<AgentHarness>]
+  readonly harnesses: readonly [AgentHarness, ...Array<AgentHarness>]
 }
 
 const localOptions: PlaceOptions = {
@@ -84,10 +84,10 @@ const localOptions: PlaceOptions = {
       : "The Conversation works on a branch of its own.",
   starting: (key, baseBranch) => `Making the Conversation's copy of ${key} from ${baseBranch}…`,
   choosesFolder: true,
-  engines: AgentHarness.literals,
+  harnesses: AgentHarness.literals,
 }
 
-const inSandboxOf = ({ id, name, engines }: SandboxProviderInfo): PlaceOptions => ({
+const inSandboxOf = ({ id, name, harnesses }: SandboxProviderInfo): PlaceOptions => ({
   place: SandboxPlace.make({ providerId: id }),
   describe: (key) =>
     key === undefined
@@ -95,7 +95,7 @@ const inSandboxOf = ({ id, name, engines }: SandboxProviderInfo): PlaceOptions =
       : "The Conversation works on a branch of its own.",
   starting: () => `Starting the Conversation in a Sandbox from ${name}…`,
   choosesFolder: false,
-  engines,
+  harnesses,
 })
 
 export const defaultPlace = (
@@ -185,8 +185,8 @@ interface DraftChoices {
   readonly providers: ReadonlyArray<SandboxProviderInfo>
   readonly where: PlaceOptions
   readonly onPlaceChange: (place: ConversationPlace) => void
-  readonly harness: Harness
-  readonly setHarness: (harness: Harness) => void
+  readonly choice: HarnessChoice
+  readonly setChoice: (choice: HarnessChoice) => void
   readonly repository: string | undefined
   readonly newest: Conversation | undefined
   readonly bases: Readonly<Record<string, string>>
@@ -201,8 +201,8 @@ function ChoosePlace(props: {
 }) {
   const { newest, providers } = props
   const [chosenPlace, setChosenPlace] = useState<ConversationPlace | null>(null)
-  const [engines, setEngines] = useState<Readonly<Record<string, AgentHarness>>>({})
-  const [harnesses, setHarnesses] = useState<Readonly<Record<string, Harness>>>({})
+  const [harnesses, setHarnesses] = useState<Readonly<Record<string, AgentHarness>>>({})
+  const [harnessChoices, setHarnessChoices] = useState<Readonly<Record<string, HarnessChoice>>>({})
   const [bases, setBases] = useState<Readonly<Record<string, string>>>({})
   const place = chosenPlace ?? defaultPlace(newest, providers, props.checkouts.length > 0)
 
@@ -213,13 +213,13 @@ function ChoosePlace(props: {
   const where = provider === undefined ? localOptions : inSandboxOf(provider)
 
   const placeContext = placeKey(where.place)
-  const preferredEngine = engines[placeContext] ?? newest?.engine ?? "claude-code"
-  const engine = where.engines.includes(preferredEngine) ? preferredEngine : where.engines[0]
-  const harnessContext = JSON.stringify([placeContext, engine])
-  const inherits = newest?.engine === engine && placeKey(newest.place) === placeContext
+  const preferredHarness = harnesses[placeContext] ?? newest?.harness ?? "claude-code"
+  const harness = where.harnesses.includes(preferredHarness) ? preferredHarness : where.harnesses[0]
+  const harnessContext = JSON.stringify([placeContext, harness])
+  const inherits = newest?.harness === harness && placeKey(newest.place) === placeContext
 
-  const harness: Harness = harnesses[harnessContext] ?? {
-    engine,
+  const choice: HarnessChoice = harnessChoices[harnessContext] ?? {
+    harness,
     model: inherits ? newest.model : null,
     effort: inherits ? newest.effort : null,
     permissionMode: null,
@@ -229,12 +229,12 @@ function ChoosePlace(props: {
     providers,
     where,
     onPlaceChange: setChosenPlace,
-    harness,
-    setHarness: (chosen) => {
-      setEngines((current) => ({ ...current, [placeContext]: chosen.engine }))
+    choice,
+    setChoice: (chosen) => {
+      setHarnesses((current) => ({ ...current, [placeContext]: chosen.harness }))
 
-      if (chosen.engine === engine)
-        setHarnesses((current) => ({ ...current, [harnessContext]: chosen }))
+      if (chosen.harness === harness)
+        setHarnessChoices((current) => ({ ...current, [harnessContext]: chosen }))
     },
     bases,
     setBase: (context, branch) => setBases((current) => ({ ...current, [context]: branch })),
@@ -277,7 +277,7 @@ function InSandbox(props: DraftChoices) {
 }
 
 function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> }) {
-  const { where, setHarness, newest } = props
+  const { where, setChoice, newest } = props
   const navigate = useNavigate()
   const folder = useChooseFolder()
   const PlaceIcon = placeIcons[where.place._tag]
@@ -311,7 +311,7 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
       : newConversationBranchesAtom(placeKey(where.place), repository),
   )
 
-  const skills = useSkillChoice(where.place, props.harness.engine)
+  const skills = useSkillChoice(where.place, props.choice.harness)
   const created = useAtomValue(createConversationAtom)
   const create = useAtomSet(createConversationAtom, { mode: "promiseExit" })
   const defaultBranch = AsyncResult.value(defaults)
@@ -319,12 +319,12 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
 
   const baseBranch = pickBase(chosenBase, listed, Option.getOrNull(defaultBranch))
 
-  const offered = useAtomValue(agentModelsAtom(props.harness.engine, placeKey(where.place)))
+  const offered = useAtomValue(agentModelsAtom(props.choice.harness, placeKey(where.place)))
 
   const commands = useAtomValue(
     repository === undefined
       ? unlisted
-      : newConversationCommandsAtom(props.harness.engine, placeKey(where.place), repository),
+      : newConversationCommandsAtom(props.choice.harness, placeKey(where.place), repository),
   )
 
   const files = useAtomValue(
@@ -336,47 +336,47 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
   const models = Option.getOrNull(AsyncResult.value(offered))
 
   const model =
-    props.harness.model === null
+    props.choice.model === null
       ? models?.defaultModel
-      : models?.models.find(({ id }) => id === props.harness.model)
+      : models?.models.find(({ id }) => id === props.choice.model)
 
-  const harness: Harness =
+  const choice: HarnessChoice =
     models === null
-      ? props.harness
+      ? props.choice
       : {
-          ...props.harness,
-          model: model === undefined ? null : props.harness.model,
-          effort: model?.efforts.includes(props.harness.effort ?? "") ? props.harness.effort : null,
+          ...props.choice,
+          model: model === undefined ? null : props.choice.model,
+          effort: model?.efforts.includes(props.choice.effort ?? "") ? props.choice.effort : null,
         }
 
-  const awaitingModels = models === null && (harness.model !== null || harness.effort !== null)
+  const awaitingModels = models === null && (choice.model !== null || choice.effort !== null)
 
   const chooseModel = useCallback(
-    (choice: ModelChoice) =>
-      setHarness({ engine: harness.engine, permissionMode: harness.permissionMode, ...choice }),
-    [setHarness, harness.engine, harness.permissionMode],
+    (picked: ModelChoice) =>
+      setChoice({ harness: choice.harness, permissionMode: choice.permissionMode, ...picked }),
+    [setChoice, choice.harness, choice.permissionMode],
   )
 
   const choosePermissionMode = useCallback(
     (chosen: PermissionMode) =>
-      setHarness({
-        engine: harness.engine,
-        model: harness.model,
-        effort: harness.effort,
+      setChoice({
+        harness: choice.harness,
+        model: choice.model,
+        effort: choice.effort,
         permissionMode: chosen,
       }),
-    [setHarness, harness.engine, harness.model, harness.effort],
+    [setChoice, choice.harness, choice.model, choice.effort],
   )
 
-  const chooseEngine = useCallback(
-    (engine: AgentHarness) =>
-      setHarness({ engine, model: null, effort: null, permissionMode: null }),
-    [setHarness],
+  const chooseHarness = useCallback(
+    (harness: AgentHarness) =>
+      setChoice({ harness, model: null, effort: null, permissionMode: null }),
+    [setChoice],
   )
 
-  const harnesses = useMemo(
-    () => ({ engines: where.engines, onChange: chooseEngine }),
-    [where.engines, chooseEngine],
+  const harnessChoice = useMemo(
+    () => ({ options: where.harnesses, onChange: chooseHarness }),
+    [where.harnesses, chooseHarness],
   )
 
   const [starting, setStarting] = useState<
@@ -398,7 +398,7 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
       place: where.place,
       skillPacks: skills.chosen,
       localSkills: skills.sendsLocalSkills,
-      ...harness,
+      ...choice,
       ...message,
     })
 
@@ -475,17 +475,17 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
         pickers={
           <>
             <ModelPicker
-              engine={harness.engine}
+              harness={choice.harness}
               placeKey={placeKey(where.place)}
-              model={harness.model}
-              effort={harness.effort}
+              model={choice.model}
+              effort={choice.effort}
               onChange={chooseModel}
-              harnesses={harnesses}
+              harnessChoice={harnessChoice}
             />
             {asksPermission(where.place) && (
               <PermissionModePicker
-                engine={harness.engine}
-                permissionMode={harness.permissionMode ?? defaultPermissionMode}
+                harness={choice.harness}
+                permissionMode={choice.permissionMode ?? defaultPermissionMode}
                 onChange={choosePermissionMode}
               />
             )}

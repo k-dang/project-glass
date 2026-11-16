@@ -4,13 +4,13 @@ import { useId } from "react"
 import { Input } from "@/components/ui/input"
 import { harnessNames } from "./harnesses"
 
-const hasModel = (engine: AgentHarness, models: EngineSettings["models"]) =>
-  engine === "claude-code"
+const hasModel = (harness: AgentHarness, models: EngineSettings["models"]) =>
+  harness === "claude-code"
     ? models["claude-code"] !== ""
-    : models[engine].provider !== "" && models[engine].modelId !== ""
+    : models[harness].provider !== "" && models[harness].modelId !== ""
 
 export const missingModel = (settings: EngineSettings) =>
-  AgentHarness.literals.find((engine) => !hasModel(engine, settings.models))
+  AgentHarness.literals.find((harness) => !hasModel(harness, settings.models))
 
 export function EnginePicker(props: {
   legend: string
@@ -20,7 +20,7 @@ export function EnginePicker(props: {
   onCommit: (value: EngineSettings) => void
 }) {
   const id = useId()
-  const { engine, models } = props.value
+  const { harness, models } = props.value
 
   const setModels = (changed: Partial<EngineSettings["models"]>) =>
     props.onChange({ ...props.value, models: { ...models, ...changed } })
@@ -38,9 +38,9 @@ export function EnginePicker(props: {
               type="radio"
               name={id}
               value={option}
-              checked={engine === option}
+              checked={harness === option}
               onChange={() => {
-                const next = { ...props.value, engine: option }
+                const next = { ...props.value, harness: option }
                 props.onChange(next)
                 props.onCommit(next)
               }}
@@ -64,10 +64,10 @@ export function EnginePicker(props: {
         onBlur={() => props.onCommit(props.value)}
         className={cn(
           "grid gap-2.5 rounded-lg border bg-card p-3",
-          engine !== "claude-code" && "grid-cols-[minmax(6rem,10rem)_1fr] max-sm:grid-cols-1",
+          harness !== "claude-code" && "grid-cols-[minmax(6rem,10rem)_1fr] max-sm:grid-cols-1",
         )}
       >
-        {engine === "claude-code" ? (
+        {harness === "claude-code" ? (
           <ModelInput
             label="Model"
             name="Claude Code model"

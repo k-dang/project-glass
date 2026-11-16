@@ -113,7 +113,7 @@ describe("settings file", () => {
         const home = yield* isolatedHome
 
         const tourSettings = {
-          engine: "claude-code" as const,
+          harness: "claude-code" as const,
           models: {
             "claude-code": "claude-opus-5-5",
             pi: { provider: "litellm", modelId: "gpt-test" },
@@ -121,7 +121,7 @@ describe("settings file", () => {
         }
 
         const agentReviewSettings = {
-          engine: "pi" as const,
+          harness: "pi" as const,
           models: { ...defaultModels, pi: { provider: "litellm", modelId: "deepseek-test" } },
         }
 
@@ -129,11 +129,11 @@ describe("settings file", () => {
           Effect.gen(function* () {
             const { client } = yield* startBackend({}, home)
             assert.deepStrictEqual(yield* client.GetEngineSettings({ feature: "tours" }), {
-              engine: "claude-code",
+              harness: "claude-code",
               models: defaultModels,
             })
             assert.deepStrictEqual(yield* client.GetEngineSettings({ feature: "agentReviews" }), {
-              engine: "pi",
+              harness: "pi",
               models: defaultModels,
             })
             assert.deepStrictEqual(

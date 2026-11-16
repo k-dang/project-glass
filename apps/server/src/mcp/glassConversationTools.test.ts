@@ -31,7 +31,7 @@ const onThisDevice = (message: string) => ({
   repository: { owner: repository.owner, repo: repository.repo },
   baseBranch: "main",
   place: localPlace,
-  engine: "pi",
+  harness: "pi",
   model: null,
   effort: null,
   message,
@@ -89,17 +89,19 @@ describe("Glass's Conversation tools over MCP", () => {
       const options = yield* f.call("list_conversation_options", {
         place: localPlace,
         repository: { owner: repository.owner, repo: repository.repo },
-        engine: "pi",
+        harness: "pi",
       })
 
       assert.deepStrictEqual(places.structuredContent, {
         local: {
-          engines: ["claude-code", "pi"],
+          harnesses: ["claude-code", "pi"],
           localCheckouts: [
             { repository: { owner: "glass-demo", repo: "greeter" }, path: f.clone.checkout },
           ],
         },
-        sandboxProviders: [{ id: "fake", name: "Fake Sandboxes", engines: ["claude-code", "pi"] }],
+        sandboxProviders: [
+          { id: "fake", name: "Fake Sandboxes", harnesses: ["claude-code", "pi"] },
+        ],
         followedRepositories: [],
       })
       assert.deepStrictEqual(options.structuredContent, {

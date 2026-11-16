@@ -336,7 +336,7 @@ export class AgentReviews extends Context.Service<
                 name: `Follow-ups on ${pr.owner}/${pr.repo}#${pr.number}`,
                 repository: new FollowedRepository({ owner: pr.owner, repo: pr.repo }),
                 revision: review.revision,
-                engine: runner.engine,
+                harness: runner.harness,
                 model,
                 checkout: folder,
                 review: {

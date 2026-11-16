@@ -117,7 +117,7 @@ const TurnUnit = Schema.Struct({
   conversation_id: Schema.String,
   turn_id: Schema.String,
   ending: Schema.String,
-  engine: Schema.Null,
+  harness: Schema.Null,
   tool_calls: Schema.Number,
   failed_tool_calls: Schema.Number,
 })
@@ -168,7 +168,7 @@ it.effect("records a Turn as a unit of work when it ends", () =>
         conversation_id: "agent-1",
         turn_id: turnId,
         ending: "Failed",
-        engine: null,
+        harness: null,
         tool_calls: 2,
         failed_tool_calls: 1,
       },

@@ -104,7 +104,7 @@ it("continues from Dashboard after visiting Settings and Activity, without savin
     },
     GetEngineSettings: () =>
       Effect.succeed({
-        engine: "claude-code",
+        harness: "claude-code",
         models: {
           "claude-code": "claude",
           pi: { provider: "test", modelId: "test" },

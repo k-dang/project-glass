@@ -38,9 +38,9 @@ const sameSettings = (a: TurnSettings, b: TurnSettings) =>
 export class HostConversations extends Context.Service<
   HostConversations,
   {
-    readonly models: (engine: AgentHarness) => Effect.Effect<AgentModels, HostConversationError>
+    readonly models: (harness: AgentHarness) => Effect.Effect<AgentModels, HostConversationError>
     readonly commands: (
-      engine: AgentHarness,
+      harness: AgentHarness,
       folder: string,
       skills: ReadonlyArray<SkillSource>,
     ) => Effect.Effect<ReadonlyArray<AgentCommand>, HostConversationError>
@@ -92,7 +92,7 @@ export class HostConversations extends Context.Service<
             const started = Effect.gen(function* () {
               const skills = yield* written(folder, starting.skills)
 
-              return yield* starting.engine === "pi"
+              return yield* starting.harness === "pi"
                 ? adapters.pi.start({
                     folder,
                     conversation: conversationId,
@@ -153,10 +153,10 @@ export class HostConversations extends Context.Service<
           })
 
         return HostConversations.of({
-          models: (engine) => adapters[engine].models,
-          commands: (engine, folder, skills) =>
+          models: (harness) => adapters[harness].models,
+          commands: (harness, folder, skills) =>
             written(folder, skills).pipe(
-              Effect.flatMap((paths) => adapters[engine].commands(folder, paths)),
+              Effect.flatMap((paths) => adapters[harness].commands(folder, paths)),
               Effect.scoped,
             ),
           start,

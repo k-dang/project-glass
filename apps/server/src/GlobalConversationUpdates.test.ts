@@ -22,7 +22,7 @@ const createConversation = (message: string) =>
       repository: { owner: repository.owner, repo: repository.repo },
       baseBranch: "main",
       place: localPlace,
-      engine: "pi",
+      harness: "pi",
       model: null,
       effort: null,
       message,

@@ -120,7 +120,7 @@ export class Conversation extends Schema.Class<Conversation>("Conversation")({
   place: ConversationPlace,
   repository: FollowedRepository,
   baseBranch: Schema.String,
-  engine: AgentHarness,
+  harness: AgentHarness,
   ...ModelChoice.fields,
   permissionMode: Schema.NullOr(PermissionMode),
   skillPacks: Schema.Array(ConversationSkillPack),
@@ -574,7 +574,7 @@ export type MessageDelivery = typeof MessageDelivery.Type
 export const NewConversation = Schema.Struct({
   repository: FollowedRepository,
   baseBranch: Schema.String,
-  engine: AgentHarness,
+  harness: AgentHarness,
   ...ModelChoice.fields,
   permissionMode: Schema.NullOr(PermissionMode),
   place: ConversationPlace,
@@ -588,7 +588,7 @@ export type NewConversation = typeof NewConversation.Type
 export class SandboxProviderInfo extends Schema.Class<SandboxProviderInfo>("SandboxProviderInfo")({
   id: Schema.String,
   name: Schema.String,
-  engines: Schema.NonEmptyArray(AgentHarness),
+  harnesses: Schema.NonEmptyArray(AgentHarness),
 }) {}
 
 export class ConversationChanges extends Schema.Class<ConversationChanges>("ConversationChanges")({

@@ -96,9 +96,11 @@ const reading = <A>(effect: Effect.Effect<A, PlatformError.PlatformError>) =>
 export class LocalSkills extends Context.Service<
   LocalSkills,
   {
-    readonly names: (engine: AgentHarness) => Effect.Effect<ReadonlyArray<string>, LocalSkillsError>
+    readonly names: (
+      harness: AgentHarness,
+    ) => Effect.Effect<ReadonlyArray<string>, LocalSkillsError>
     readonly source: (
-      engine: AgentHarness,
+      harness: AgentHarness,
     ) => Effect.Effect<Option.Option<SkillSource>, LocalSkillsError>
   }
 >()("@glass/server/LocalSkills") {
@@ -144,8 +146,8 @@ export class LocalSkills extends Context.Service<
           return nested.flat()
         })
 
-      const found = (engine: AgentHarness) => {
-        const { folders, readsNestedSkills } = skillFolders[engine]
+      const found = (harness: AgentHarness) => {
+        const { folders, readsNestedSkills } = skillFolders[harness]
 
         const loads = (directory: string) =>
           directory !== "" && (readsNestedSkills || !directory.includes("/"))
@@ -201,14 +203,14 @@ export class LocalSkills extends Context.Service<
         )
 
       return LocalSkills.of({
-        names: (engine) =>
-          found(engine).pipe(
+        names: (harness) =>
+          found(harness).pipe(
             Effect.map((skills) => skills.map(({ skill }) => skill.name).toSorted()),
             reading,
             Effect.withSpan("LocalSkills.names"),
           ),
-        source: (engine) =>
-          found(engine).pipe(
+        source: (harness) =>
+          found(harness).pipe(
             Effect.flatMap((skills) => {
               const taken = new Set<string>()
 

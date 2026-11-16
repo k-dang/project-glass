@@ -25,7 +25,7 @@ type EngineSettingsSave = Held<
 type PromptSave = Held<{ prompt: string }, string, SettingsError>
 
 const tourSettings: EngineSettings = {
-  engine: "claude-code",
+  harness: "claude-code",
   models: {
     "claude-code": "claude-sonnet-5-5",
     pi: { provider: "anthropic", modelId: "claude-sonnet-5-5" },
@@ -44,7 +44,7 @@ const mount = (handlers: Partial<Handlers> = {}) => {
 
   const backend = testLayer({
     GetEngineSettings: ({ feature }) =>
-      Effect.succeed(feature === "tours" ? tourSettings : { ...tourSettings, engine: "pi" }),
+      Effect.succeed(feature === "tours" ? tourSettings : { ...tourSettings, harness: "pi" }),
     SetEngineSettings: setEngine,
     GetReviewPrompt: () => Effect.succeed(defaultReviewPrompt),
     SetReviewPrompt: setPrompt,
@@ -77,7 +77,7 @@ it("saves engine choices immediately and model edits on blur, without saving oth
   const saving = await next(saves)
   expect(saving.payload).toEqual({
     feature: "tours",
-    engineSettings: { ...tourSettings, engine: "pi" },
+    engineSettings: { ...tourSettings, harness: "pi" },
   })
   const model = tours.getByRole("textbox", { name: "pi model" })
   expect(model.closest("[aria-busy]")?.getAttribute("aria-busy")).toBe("true")
@@ -174,14 +174,14 @@ it("keeps a visible engine selection made while the previous model saves", async
   expect(tours.getByRole<HTMLInputElement>("radio", { name: "pi" }).checked).toBe(true)
 
   const previous = await next(saves)
-  expect(previous.payload.engineSettings.engine).toBe("claude-code")
+  expect(previous.payload.engineSettings.harness).toBe("claude-code")
   expect(saves).toHaveLength(0)
   previous.answer(Effect.succeed(previous.payload.engineSettings))
 
   const latest = await next(saves)
   expect(latest.payload.engineSettings).toEqual({
     ...tourSettings,
-    engine: "pi",
+    harness: "pi",
     models: { ...tourSettings.models, "claude-code": "claude-sonnet-5-5-updated" },
   })
   latest.answer(Effect.succeed(latest.payload.engineSettings))

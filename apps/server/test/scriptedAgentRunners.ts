@@ -16,7 +16,7 @@ export interface ScriptedSettings {
 }
 
 interface ScriptedRun {
-  readonly engine: AgentHarness
+  readonly harness: AgentHarness
   readonly task: AgentTask<unknown>
   readonly files: ReadonlyArray<string>
 }
@@ -53,7 +53,7 @@ export const scriptedAgentRunners = Effect.fnUntraced(function* (initial: Script
       select: (engineSettings) =>
         Effect.gen(function* () {
           const ready = settings.ready ?? "ready"
-          selections.push(engineSettings.engine)
+          selections.push(engineSettings.harness)
           selecting.add()
 
           if (ready === "hang") return yield* Effect.never
@@ -70,7 +70,7 @@ export const scriptedAgentRunners = Effect.fnUntraced(function* (initial: Script
                 // returns, so the reply and any hold are fixed first.
                 const answering = answer(task)
                 runs.push({
-                  engine: engineSettings.engine,
+                  harness: engineSettings.harness,
                   task,
                   files: filesIn(task.checkout),
                 })

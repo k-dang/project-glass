@@ -219,7 +219,7 @@ export class CheckoutRuns extends Context.Service<
             .pipe(Effect.mapError(checkoutError(identity)), recordDuration("checkout_ms"))
 
           yield* annotateUnit({
-            engine: identity.engine,
+            harness: identity.harness,
             model: identity.model,
             head: revision.head,
           })

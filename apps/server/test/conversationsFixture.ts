@@ -108,9 +108,9 @@ export const conversationsFixture = Effect.gen(function* () {
 
   const start = (
     message = "Say hello",
-    harness: Pick<NewConversation, "engine" | "model" | "effort"> &
+    harness: Pick<NewConversation, "harness" | "model" | "effort"> &
       Partial<Pick<NewConversation, "permissionMode" | "skillPacks" | "localSkills">> = {
-      engine: "pi",
+      harness: "pi",
       model: null,
       effort: null,
     },
@@ -134,9 +134,9 @@ export const conversationsFixture = Effect.gen(function* () {
 
   const startSandbox = (
     message = "Say hello",
-    harness: Pick<NewConversation, "engine" | "model" | "effort"> &
+    harness: Pick<NewConversation, "harness" | "model" | "effort"> &
       Partial<Pick<NewConversation, "skillPacks" | "localSkills">> = {
-      engine: "pi",
+      harness: "pi",
       model: null,
       effort: null,
     },
@@ -215,7 +215,7 @@ export const settled = (count: number) => (turns: ReadonlyArray<Turn>) =>
   turns.length === count && turns.every((turn) => turn.ended !== null)
 
 export const claudeCode = {
-  engine: "claude-code",
+  harness: "claude-code",
   model: null,
   effort: null,
   permissionMode: "bypassPermissions",

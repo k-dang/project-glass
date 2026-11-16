@@ -214,7 +214,7 @@ export const fakeSandboxProvider =
   (glass) => {
     glass.registerSandboxProvider("fake", {
       name: "Fake Sandboxes",
-      engines: ["claude-code", "pi"],
+      harnesses: ["claude-code", "pi"],
       create: async (request, { progress, record }) => {
         const settings = readSettings(settingsPath)
 
@@ -292,7 +292,7 @@ export const fakeSandboxProvider =
 
         rmSync(folder, { recursive: true, force: true })
       },
-      models: async (engine) => sandboxModels[engine],
+      models: async (harness) => sandboxModels[harness],
     })
   }
 

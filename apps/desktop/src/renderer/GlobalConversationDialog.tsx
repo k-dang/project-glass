@@ -42,7 +42,7 @@ function GlobalModelPicker(props: { choice: ModelChoice }) {
 
   return (
     <ModelPicker
-      engine="pi"
+      harness="pi"
       placeKey={placeKey(localPlace)}
       model={props.choice.model}
       effort={props.choice.effort}

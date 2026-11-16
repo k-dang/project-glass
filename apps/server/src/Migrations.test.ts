@@ -1,6 +1,13 @@
 import { SqliteClient, SqliteMigrator } from "@effect/sql-sqlite-node"
 import { assert, it } from "@effect/vitest"
-import { ConversationOutcome, TurnDone, TurnEnd, GlobalConversationUpdate } from "@glass/contracts"
+import {
+  ConversationContext,
+  ConversationOutcome,
+  GlobalConversationUpdate,
+  SteerPart,
+  TurnDone,
+  TurnEnd,
+} from "@glass/contracts"
 import { DateTime, Effect, Schema } from "effect"
 import { SqlClient } from "effect/sql"
 import { join } from "node:path"
@@ -383,83 +390,93 @@ it.live("adds to-do images without touching to-dos written before them", () =>
   }),
 )
 
-it.live("renames Agents to Conversations, keeping their context, Activity, and Saved place", () =>
-  Effect.gen(function* () {
-    const home = yield* isolatedHome
+it.live(
+  "renames Agents to Conversations, keeping their context, Steers, Activity, and Saved place",
+  () =>
+    Effect.gen(function* () {
+      const home = yield* isolatedHome
 
-    yield* Effect.gen(function* () {
-      const sql = yield* SqlClient.SqlClient
-      const at = "2026-11-11T00:00:00.000Z"
+      yield* Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient
+        const at = "2026-11-11T00:00:00.000Z"
 
-      yield* SqliteMigrator.run({
-        loader: SqliteMigrator.fromRecord({
-          "0001_baseline": baseline,
-          "0002_agent_review_hotspots": agentReviewHotspots,
-          "0003_agent_review_done": agentReviewDone,
-          "0004_outside_agent": outsideAgent,
-          "0005_conversation_started_work": conversationStartedWork,
-          "0006_turn_seen": turnSeen,
-          "0007_work_reports": workReports,
-          "0008_past_global_conversations": pastGlobalConversations,
-          "0009_global_conversation_updates": globalConversationUpdates,
-          "0010_to_do_images": toDoImages,
-        }),
-      })
+        yield* SqliteMigrator.run({
+          loader: SqliteMigrator.fromRecord({
+            "0001_baseline": baseline,
+            "0002_agent_review_hotspots": agentReviewHotspots,
+            "0003_agent_review_done": agentReviewDone,
+            "0004_outside_agent": outsideAgent,
+            "0005_conversation_started_work": conversationStartedWork,
+            "0006_turn_seen": turnSeen,
+            "0007_work_reports": workReports,
+            "0008_past_global_conversations": pastGlobalConversations,
+            "0009_global_conversation_updates": globalConversationUpdates,
+            "0010_to_do_images": toDoImages,
+          }),
+        })
 
-      const viewing = '{"_tag":"Agent","agentId":"otter","name":"agent/swift-otter"}'
+        const viewing = '{"_tag":"Agent","agentId":"otter","name":"agent/swift-otter"}'
 
-      yield* sql`INSERT INTO agent (id, name, owner, repo, base_branch, engine, folder, created_at)
+        yield* sql`INSERT INTO agent (id, name, owner, repo, base_branch, engine, folder, created_at)
         VALUES ('otter', 'agent/swift-otter', 'glass-demo', 'greeter', 'main', 'pi', 'otter', ${at})`
-      yield* sql`INSERT INTO agent_turn (id, agent_id, message, sent_at, context)
+        yield* sql`INSERT INTO agent_turn (id, agent_id, message, sent_at, context)
         VALUES ('asked', 'global', 'How is it going?', ${at}, ${viewing})`
-      yield* sql`INSERT INTO agent_queued_message (id, agent_id, position, message, images, context)
+        yield* sql`INSERT INTO agent_turn_part (turn_id, position, part)
+        VALUES ('asked', 0, ${'{"_tag":"Steer","message":"Also this","images":[],"context":' + viewing + "}"})`
+        yield* sql`INSERT INTO agent_queued_message (id, agent_id, position, message, images, context)
         VALUES ('next', 'global', 0, 'And now?', '[]', ${viewing})`
-      yield* sql`INSERT INTO conversation_agent (conversation_id, agent_id, started_at)
+        yield* sql`INSERT INTO conversation_agent (conversation_id, agent_id, started_at)
         VALUES ('global', 'otter', ${at})`
-      yield* sql`INSERT INTO activity (kind, payload, occurred_at, login)
-        VALUES ('AgentStarted', '{"_tag":"AgentStarted","agentId":"otter"}', ${at}, 'kevin')`
-      yield* sql`INSERT INTO saved_place (area, destination, saved_at)
+        yield* sql`INSERT INTO activity (kind, payload, occurred_at, login)
+        VALUES ('AgentStarted', '{"_tag":"AgentStarted","agentId":"otter","engine":"pi"}', ${at}, 'kevin')`
+        yield* sql`INSERT INTO saved_place (area, destination, saved_at)
         VALUES ('agents', '{"area":"agents","agentId":"otter"}', ${at})`
 
-      yield* SqliteMigrator.run({ loader: migrationLoader })
+        yield* SqliteMigrator.run({ loader: migrationLoader })
 
-      const renamed = { tag: "Conversation", conversationId: "otter", agentId: null }
+        const renamed = ConversationContext.make({
+          conversationId: "otter",
+          name: "agent/swift-otter",
+        })
 
-      assert.deepStrictEqual(yield* sql`SELECT id FROM conversation`, [{ id: "otter" }])
-      assert.deepStrictEqual(
-        yield* sql`
-          SELECT conversation_id AS conversationId FROM conversation_turn
-          UNION ALL SELECT conversation_id FROM conversation_queued_message
-        `,
-        [{ conversationId: "global" }, { conversationId: "global" }],
+        const { turns, queued } = yield* (yield* Transcripts).read("global")
+
+        assert.deepStrictEqual(yield* sql`SELECT id, harness FROM conversation`, [
+          { id: "otter", harness: "pi" },
+        ])
+        assert.deepStrictEqual(
+          turns.map(({ context, parts }) => ({ context, parts })),
+          [
+            {
+              context: renamed,
+              parts: [SteerPart.make({ message: "Also this", images: [], context: renamed })],
+            },
+          ],
+        )
+        assert.deepStrictEqual(
+          queued.map(({ context }) => context),
+          [renamed],
+        )
+        assert.deepStrictEqual(
+          yield* sql`SELECT global_conversation_id, conversation_id FROM global_started_conversation`,
+          [{ global_conversation_id: "global", conversation_id: "otter" }],
+        )
+        assert.deepStrictEqual(yield* sql`SELECT kind, payload FROM activity`, [
+          {
+            kind: "ConversationStarted",
+            payload: '{"_tag":"ConversationStarted","conversationId":"otter","harness":"pi"}',
+          },
+        ])
+        assert.deepStrictEqual(yield* sql`SELECT area, destination FROM saved_place`, [
+          {
+            area: "conversations",
+            destination: '{"area":"conversations","conversationId":"otter"}',
+          },
+        ])
+      }).pipe(
+        Effect.provide(Transcripts.layer),
+        Effect.provide(SqliteClient.layer({ filename: join(home, "glass.db") })),
+        Effect.scoped,
       )
-      assert.deepStrictEqual(
-        yield* sql`
-          SELECT json_extract(context, '$._tag') AS tag,
-            json_extract(context, '$.conversationId') AS conversationId,
-            json_extract(context, '$.agentId') AS agentId
-          FROM conversation_turn
-          UNION ALL SELECT json_extract(context, '$._tag'), json_extract(context, '$.conversationId'),
-            json_extract(context, '$.agentId')
-          FROM conversation_queued_message
-        `,
-        [renamed, renamed],
-      )
-      assert.deepStrictEqual(
-        yield* sql`SELECT global_conversation_id, conversation_id FROM global_started_conversation`,
-        [{ global_conversation_id: "global", conversation_id: "otter" }],
-      )
-      assert.deepStrictEqual(
-        yield* sql`
-          SELECT kind, json_extract(payload, '$._tag') AS tag,
-            json_extract(payload, '$.conversationId') AS conversationId
-          FROM activity
-        `,
-        [{ kind: "ConversationStarted", tag: "ConversationStarted", conversationId: "otter" }],
-      )
-      assert.deepStrictEqual(yield* sql`SELECT area, destination FROM saved_place`, [
-        { area: "conversations", destination: '{"area":"conversations","conversationId":"otter"}' },
-      ])
-    }).pipe(Effect.provide(SqliteClient.layer({ filename: join(home, "glass.db") })), Effect.scoped)
-  }),
+    }),
 )

@@ -107,14 +107,14 @@ export type StartOutcome = typeof StartOutcome.Type
 export const ConversationStart = Schema.Union([
   Schema.Struct({
     conversationId: Schema.String,
-    engine: AgentHarness,
+    harness: AgentHarness,
     folder: HostFolder,
     role: RepositoryRole,
     skills: Schema.Array(SkillSource),
   }),
   Schema.Struct({
     conversationId: Schema.String,
-    engine: Schema.Literal("pi"),
+    harness: Schema.Literal("pi"),
     folder: HostFolder,
     role: GlobalRole,
     skills: Schema.Array(SkillSource),
@@ -136,12 +136,12 @@ export type SteersNotTakenIn = typeof SteersNotTakenIn.Type
 
 export class AgentHostRpcs extends RpcGroup.make(
   Rpc.make("ListModels", {
-    payload: { engine: AgentHarness },
+    payload: { harness: AgentHarness },
     success: AgentModels,
     error: HostConversationError,
   }),
   Rpc.make("ListCommands", {
-    payload: { engine: AgentHarness, folder: HostFolder, skills: Schema.Array(SkillSource) },
+    payload: { harness: AgentHarness, folder: HostFolder, skills: Schema.Array(SkillSource) },
     success: Schema.Array(AgentCommand),
     error: HostConversationError,
   }),

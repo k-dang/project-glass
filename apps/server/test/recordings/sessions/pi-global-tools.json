@@ -61,7 +61,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-16T05-34-09-894Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-16T13-58-24-423Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -105,7 +105,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794807250063,
+              "timestamp": 1794837504583,
               "toolsAdded": [
                 {
                   "name": "ask_user",
@@ -402,12 +402,12 @@
                       "repository": {
                         "$ref": "#/$defs/FollowedRepositoryEncoded"
                       },
-                      "engine": {
+                      "harness": {
                         "type": "string",
                         "enum": ["claude-code", "pi"]
                       }
                     },
-                    "required": ["place", "repository", "engine"],
+                    "required": ["place", "repository", "harness"],
                     "additionalProperties": true,
                     "$defs": {
                       "FollowedRepositoryEncoded": {
@@ -469,7 +469,7 @@
                         ],
                         "description": "Where the Conversation works: on this device, or in a Sandbox from a provider."
                       },
-                      "engine": {
+                      "harness": {
                         "type": "string",
                         "enum": ["claude-code", "pi"],
                         "description": "The Agent harness that runs the Conversation."
@@ -507,7 +507,7 @@
                       "repository",
                       "baseBranch",
                       "place",
-                      "engine",
+                      "harness",
                       "model",
                       "effort",
                       "message"
@@ -620,7 +620,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794807250063,
+              "timestamp": 1794837504583,
               "toolsAdded": [
                 {
                   "name": "ask_user",
@@ -917,12 +917,12 @@
                       "repository": {
                         "$ref": "#/$defs/FollowedRepositoryEncoded"
                       },
-                      "engine": {
+                      "harness": {
                         "type": "string",
                         "enum": ["claude-code", "pi"]
                       }
                     },
-                    "required": ["place", "repository", "engine"],
+                    "required": ["place", "repository", "harness"],
                     "additionalProperties": true,
                     "$defs": {
                       "FollowedRepositoryEncoded": {
@@ -984,7 +984,7 @@
                         ],
                         "description": "Where the Conversation works: on this device, or in a Sandbox from a provider."
                       },
-                      "engine": {
+                      "harness": {
                         "type": "string",
                         "enum": ["claude-code", "pi"],
                         "description": "The Agent harness that runs the Conversation."
@@ -1022,7 +1022,7 @@
                       "repository",
                       "baseBranch",
                       "place",
-                      "engine",
+                      "harness",
                       "model",
                       "effort",
                       "message"
@@ -1139,7 +1139,7 @@
                   "text": "What are my To-dos?"
                 }
               ],
-              "timestamp": 1794807250061
+              "timestamp": 1794837504582
             }
           }
         },
@@ -1154,7 +1154,7 @@
                   "text": "What are my To-dos?"
                 }
               ],
-              "timestamp": 1794807250061
+              "timestamp": 1794837504582
             }
           }
         },
@@ -1182,7 +1182,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794807250083
+              "timestamp": 1794837504613
             }
           }
         },
@@ -1295,10 +1295,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794807250083,
+              "timestamp": 1794837504613,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 9,
+              "durationMs": 8,
               "thinkingLevel": "off"
             }
           }
@@ -1325,7 +1325,7 @@
               ]
             },
             "isError": false,
-            "durationMs": 6
+            "durationMs": 4
           }
         },
         {
@@ -1342,8 +1342,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 6,
-              "timestamp": 1794807250100
+              "durationMs": 4,
+              "timestamp": 1794837504627
             }
           }
         },
@@ -1361,8 +1361,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 6,
-              "timestamp": 1794807250100
+              "durationMs": 4,
+              "timestamp": 1794837504627
             }
           }
         },
@@ -1397,10 +1397,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794807250083,
+              "timestamp": 1794837504613,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 9,
+              "durationMs": 8,
               "thinkingLevel": "off"
             },
             "toolResults": [
@@ -1415,8 +1415,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 6,
-                "timestamp": 1794807250100
+                "durationMs": 4,
+                "timestamp": 1794837504627
               }
             ]
           }
@@ -1450,7 +1450,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794807250102
+              "timestamp": 1794837504629
             }
           }
         },
@@ -1554,7 +1554,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794807250102,
+              "timestamp": 1794837504629,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -1591,7 +1591,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794807250102,
+              "timestamp": 1794837504629,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -1608,7 +1608,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1794807250063,
+                "timestamp": 1794837504583,
                 "toolsAdded": [
                   {
                     "name": "ask_user",
@@ -1905,12 +1905,12 @@
                         "repository": {
                           "$ref": "#/$defs/FollowedRepositoryEncoded"
                         },
-                        "engine": {
+                        "harness": {
                           "type": "string",
                           "enum": ["claude-code", "pi"]
                         }
                       },
-                      "required": ["place", "repository", "engine"],
+                      "required": ["place", "repository", "harness"],
                       "additionalProperties": true,
                       "$defs": {
                         "FollowedRepositoryEncoded": {
@@ -1972,7 +1972,7 @@
                           ],
                           "description": "Where the Conversation works: on this device, or in a Sandbox from a provider."
                         },
-                        "engine": {
+                        "harness": {
                           "type": "string",
                           "enum": ["claude-code", "pi"],
                           "description": "The Agent harness that runs the Conversation."
@@ -2010,7 +2010,7 @@
                         "repository",
                         "baseBranch",
                         "place",
-                        "engine",
+                        "harness",
                         "model",
                         "effort",
                         "message"
@@ -2122,7 +2122,7 @@
                     "text": "What are my To-dos?"
                   }
                 ],
-                "timestamp": 1794807250061
+                "timestamp": 1794837504582
               },
               {
                 "role": "assistant",
@@ -2152,10 +2152,10 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1794807250083,
+                "timestamp": 1794837504613,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
-                "durationMs": 9,
+                "durationMs": 8,
                 "thinkingLevel": "off"
               },
               {
@@ -2169,8 +2169,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 6,
-                "timestamp": 1794807250100
+                "durationMs": 4,
+                "timestamp": 1794837504627
               },
               {
                 "role": "assistant",
@@ -2198,7 +2198,7 @@
                   }
                 },
                 "stopReason": "stop",
-                "timestamp": 1794807250102,
+                "timestamp": 1794837504629,
                 "responseId": "test-completion",
                 "rawStopReason": "stop",
                 "durationMs": 2,
@@ -2249,7 +2249,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-16T05-34-09-894Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-16T13-58-24-423Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 5,
@@ -2297,7 +2297,7 @@
                   "text": "Read acme/api#42 at a stale Revision."
                 }
               ],
-              "timestamp": 1794807250108
+              "timestamp": 1794837504634
             }
           }
         },
@@ -2312,7 +2312,7 @@
                   "text": "Read acme/api#42 at a stale Revision."
                 }
               ],
-              "timestamp": 1794807250108
+              "timestamp": 1794837504634
             }
           }
         },
@@ -2340,7 +2340,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794807250110
+              "timestamp": 1794837504637
             }
           }
         },
@@ -2473,7 +2473,7 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794807250110,
+              "timestamp": 1794837504637,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
               "durationMs": 2,
@@ -2514,7 +2514,7 @@
               "details": {}
             },
             "isError": true,
-            "durationMs": 25
+            "durationMs": 19
           }
         },
         {
@@ -2532,8 +2532,8 @@
               ],
               "details": {},
               "isError": true,
-              "durationMs": 25,
-              "timestamp": 1794807250138
+              "durationMs": 19,
+              "timestamp": 1794837504659
             }
           }
         },
@@ -2552,8 +2552,8 @@
               ],
               "details": {},
               "isError": true,
-              "durationMs": 25,
-              "timestamp": 1794807250138
+              "durationMs": 19,
+              "timestamp": 1794837504659
             }
           }
         },
@@ -2598,7 +2598,7 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794807250110,
+              "timestamp": 1794837504637,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
               "durationMs": 2,
@@ -2617,8 +2617,8 @@
                 ],
                 "details": {},
                 "isError": true,
-                "durationMs": 25,
-                "timestamp": 1794807250138
+                "durationMs": 19,
+                "timestamp": 1794837504659
               }
             ]
           }
@@ -2652,7 +2652,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794807250141
+              "timestamp": 1794837504661
             }
           }
         },
@@ -2756,7 +2756,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794807250141,
+              "timestamp": 1794837504661,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -2793,7 +2793,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794807250141,
+              "timestamp": 1794837504661,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -2814,7 +2814,7 @@
                     "text": "Read acme/api#42 at a stale Revision."
                   }
                 ],
-                "timestamp": 1794807250108
+                "timestamp": 1794837504634
               },
               {
                 "role": "assistant",
@@ -2854,7 +2854,7 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1794807250110,
+                "timestamp": 1794837504637,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
                 "durationMs": 2,
@@ -2872,8 +2872,8 @@
                 ],
                 "details": {},
                 "isError": true,
-                "durationMs": 25,
-                "timestamp": 1794807250138
+                "durationMs": 19,
+                "timestamp": 1794837504659
               },
               {
                 "role": "assistant",
@@ -2901,7 +2901,7 @@
                   }
                 },
                 "stopReason": "stop",
-                "timestamp": 1794807250141,
+                "timestamp": 1794837504661,
                 "responseId": "test-completion",
                 "rawStopReason": "stop",
                 "durationMs": 2,
@@ -2952,7 +2952,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-16T05-34-09-894Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-16T13-58-24-423Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 9,

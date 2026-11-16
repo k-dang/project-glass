@@ -23,7 +23,7 @@ import { hostServer } from "../src/agentHost/server"
 import { MissingLogin, NoCapacity, SandboxGone } from "../src/sandboxFailures"
 
 export interface InProcessSandboxSettings {
-  readonly engines?: readonly [AgentHarness, ...Array<AgentHarness>]
+  readonly harnesses?: readonly [AgentHarness, ...Array<AgentHarness>]
   readonly holdAt?: string
   readonly failAt?: string
   readonly missingLogin?: { readonly login: string; readonly fix: string }
@@ -137,8 +137,8 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
 
   const provider: SandboxProvider = {
     name: "Fake Sandboxes",
-    get engines() {
-      return settings.engines ?? ["claude-code", "pi"]
+    get harnesses() {
+      return settings.harnesses ?? ["claude-code", "pi"]
     },
     create: async (request, { progress, record, signal }) => {
       refuseLogin()

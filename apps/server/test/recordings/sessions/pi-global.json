@@ -61,7 +61,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-16T05-34-09-209Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-16T13-58-23-775Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -105,7 +105,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794807249391,
+              "timestamp": 1794837503941,
               "toolsAdded": [
                 {
                   "name": "ask_user",
@@ -402,12 +402,12 @@
                       "repository": {
                         "$ref": "#/$defs/FollowedRepositoryEncoded"
                       },
-                      "engine": {
+                      "harness": {
                         "type": "string",
                         "enum": ["claude-code", "pi"]
                       }
                     },
-                    "required": ["place", "repository", "engine"],
+                    "required": ["place", "repository", "harness"],
                     "additionalProperties": true,
                     "$defs": {
                       "FollowedRepositoryEncoded": {
@@ -469,7 +469,7 @@
                         ],
                         "description": "Where the Conversation works: on this device, or in a Sandbox from a provider."
                       },
-                      "engine": {
+                      "harness": {
                         "type": "string",
                         "enum": ["claude-code", "pi"],
                         "description": "The Agent harness that runs the Conversation."
@@ -507,7 +507,7 @@
                       "repository",
                       "baseBranch",
                       "place",
-                      "engine",
+                      "harness",
                       "model",
                       "effort",
                       "message"
@@ -620,7 +620,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794807249391,
+              "timestamp": 1794837503941,
               "toolsAdded": [
                 {
                   "name": "ask_user",
@@ -917,12 +917,12 @@
                       "repository": {
                         "$ref": "#/$defs/FollowedRepositoryEncoded"
                       },
-                      "engine": {
+                      "harness": {
                         "type": "string",
                         "enum": ["claude-code", "pi"]
                       }
                     },
-                    "required": ["place", "repository", "engine"],
+                    "required": ["place", "repository", "harness"],
                     "additionalProperties": true,
                     "$defs": {
                       "FollowedRepositoryEncoded": {
@@ -984,7 +984,7 @@
                         ],
                         "description": "Where the Conversation works: on this device, or in a Sandbox from a provider."
                       },
-                      "engine": {
+                      "harness": {
                         "type": "string",
                         "enum": ["claude-code", "pi"],
                         "description": "The Agent harness that runs the Conversation."
@@ -1022,7 +1022,7 @@
                       "repository",
                       "baseBranch",
                       "place",
-                      "engine",
+                      "harness",
                       "model",
                       "effort",
                       "message"
@@ -1139,7 +1139,7 @@
                   "text": "Ask me which greeting I prefer."
                 }
               ],
-              "timestamp": 1794807249389
+              "timestamp": 1794837503940
             }
           }
         },
@@ -1154,7 +1154,7 @@
                   "text": "Ask me which greeting I prefer."
                 }
               ],
-              "timestamp": 1794807249389
+              "timestamp": 1794837503940
             }
           }
         },
@@ -1182,7 +1182,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794807249412
+              "timestamp": 1794837503971
             }
           }
         },
@@ -1301,7 +1301,7 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794807249412,
+              "timestamp": 1794837503971,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
               "durationMs": 9,
@@ -1323,7 +1323,7 @@
         {
           "in": {
             "type": "extension_ui_request",
-            "id": "15791a38-4f38-466d-a597-49836be74b30",
+            "id": "52141652-ff2c-40e6-b943-22ef9b95f319",
             "method": "select",
             "title": "Which greeting?",
             "options": ["Hi", "Hello"]
@@ -1332,7 +1332,7 @@
         {
           "out": {
             "type": "extension_ui_response",
-            "id": "15791a38-4f38-466d-a597-49836be74b30",
+            "id": "52141652-ff2c-40e6-b943-22ef9b95f319",
             "value": "Hello"
           }
         },
@@ -1368,7 +1368,7 @@
               ],
               "isError": false,
               "durationMs": 2,
-              "timestamp": 1794807249425
+              "timestamp": 1794837503983
             }
           }
         },
@@ -1387,7 +1387,7 @@
               ],
               "isError": false,
               "durationMs": 2,
-              "timestamp": 1794807249425
+              "timestamp": 1794837503983
             }
           }
         },
@@ -1425,7 +1425,7 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794807249412,
+              "timestamp": 1794837503971,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
               "durationMs": 9,
@@ -1444,7 +1444,7 @@
                 ],
                 "isError": false,
                 "durationMs": 2,
-                "timestamp": 1794807249425
+                "timestamp": 1794837503983
               }
             ]
           }
@@ -1478,7 +1478,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794807249428
+              "timestamp": 1794837503986
             }
           }
         },
@@ -1582,7 +1582,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794807249428,
+              "timestamp": 1794837503986,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -1619,7 +1619,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794807249428,
+              "timestamp": 1794837503986,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -1636,7 +1636,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1794807249391,
+                "timestamp": 1794837503941,
                 "toolsAdded": [
                   {
                     "name": "ask_user",
@@ -1933,12 +1933,12 @@
                         "repository": {
                           "$ref": "#/$defs/FollowedRepositoryEncoded"
                         },
-                        "engine": {
+                        "harness": {
                           "type": "string",
                           "enum": ["claude-code", "pi"]
                         }
                       },
-                      "required": ["place", "repository", "engine"],
+                      "required": ["place", "repository", "harness"],
                       "additionalProperties": true,
                       "$defs": {
                         "FollowedRepositoryEncoded": {
@@ -2000,7 +2000,7 @@
                           ],
                           "description": "Where the Conversation works: on this device, or in a Sandbox from a provider."
                         },
-                        "engine": {
+                        "harness": {
                           "type": "string",
                           "enum": ["claude-code", "pi"],
                           "description": "The Agent harness that runs the Conversation."
@@ -2038,7 +2038,7 @@
                         "repository",
                         "baseBranch",
                         "place",
-                        "engine",
+                        "harness",
                         "model",
                         "effort",
                         "message"
@@ -2150,7 +2150,7 @@
                     "text": "Ask me which greeting I prefer."
                   }
                 ],
-                "timestamp": 1794807249389
+                "timestamp": 1794837503940
               },
               {
                 "role": "assistant",
@@ -2183,7 +2183,7 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1794807249412,
+                "timestamp": 1794837503971,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
                 "durationMs": 9,
@@ -2201,7 +2201,7 @@
                 ],
                 "isError": false,
                 "durationMs": 2,
-                "timestamp": 1794807249425
+                "timestamp": 1794837503983
               },
               {
                 "role": "assistant",
@@ -2229,7 +2229,7 @@
                   }
                 },
                 "stopReason": "stop",
-                "timestamp": 1794807249428,
+                "timestamp": 1794837503986,
                 "responseId": "test-completion",
                 "rawStopReason": "stop",
                 "durationMs": 2,
@@ -2280,7 +2280,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-16T05-34-09-209Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-16T13-58-23-775Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 5,

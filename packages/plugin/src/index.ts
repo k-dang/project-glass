@@ -6,7 +6,7 @@ export interface SandboxProvider {
    * The Agent harnesses its Sandboxes can run. Glass offers only these for this kind of Sandbox, and
    * asks `create` and `models` about no other.
    */
-  readonly engines: readonly [AgentHarness, ...Array<AgentHarness>]
+  readonly harnesses: readonly [AgentHarness, ...Array<AgentHarness>]
   /**
    * Makes the Sandbox, sets up the user's logins, clones the repository onto the Conversation's branch,
    * and starts the agent host in it. Calls `record` as soon as the Sandbox exists, so Glass can
@@ -33,7 +33,7 @@ export interface SandboxProvider {
    */
   readonly remove: (state: SandboxState) => Promise<void>
   /** What an Agent harness offers in this provider's Sandboxes, before one exists. */
-  readonly models: (engine: AgentHarness) => Promise<AgentModels>
+  readonly models: (harness: AgentHarness) => Promise<AgentModels>
 }
 
 export const agentHarnesses = ["claude-code", "pi"] as const
@@ -67,7 +67,7 @@ export type SandboxState = Json
 
 export interface SandboxRequest {
   readonly conversationId: string
-  readonly engine: AgentHarness
+  readonly harness: AgentHarness
   readonly repository: { readonly owner: string; readonly repo: string }
   /** The Conversation's own branch, made from `baseBranch`. */
   readonly branch: string

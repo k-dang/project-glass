@@ -90,7 +90,7 @@ const StoredConversation = Schema.Struct({
   owner: FollowedRepository.fields.owner,
   repo: FollowedRepository.fields.repo,
   baseBranch: Conversation.fields.baseBranch,
-  engine: Conversation.fields.engine,
+  harness: Conversation.fields.harness,
   model: Conversation.fields.model,
   effort: Conversation.fields.effort,
   permissionMode: Conversation.fields.permissionMode,
@@ -139,8 +139,8 @@ const conversationWith = (conversation: Conversation, change: Partial<typeof Con
 const sandboxProviderOf = (place: ConversationPlace) =>
   Predicate.isTagged(place, "sandbox") ? place.providerId : null
 
-const annotateConversation = ({ id, engine, model, place }: Conversation) =>
-  annotateUnit({ conversation_id: id, engine, model, sandbox_provider: sandboxProviderOf(place) })
+const annotateConversation = ({ id, harness, model, place }: Conversation) =>
+  annotateUnit({ conversation_id: id, harness, model, sandbox_provider: sandboxProviderOf(place) })
 
 const storageFailure = () =>
   new ConversationError({ message: "Couldn't read or save your Conversations. Try again." })
@@ -161,7 +161,7 @@ export interface NewReviewConversation {
   readonly name: string
   readonly repository: FollowedRepository
   readonly revision: Revision
-  readonly engine: AgentHarness
+  readonly harness: AgentHarness
   readonly model: string | null
   readonly checkout: string
   readonly review: ReviewBrief
@@ -194,13 +194,13 @@ export class Conversations extends Context.Service<
     readonly transcript: (
       conversationId: string,
     ) => Stream.Stream<TranscriptUpdate, ConversationNotFound | ConversationError>
-    readonly engines: (place: ConversationPlace) => ReadonlyArray<AgentHarness>
+    readonly harnesses: (place: ConversationPlace) => ReadonlyArray<AgentHarness>
     readonly models: (
-      engine: AgentHarness,
+      harness: AgentHarness,
       place: ConversationPlace,
     ) => Effect.Effect<AgentModels, ConversationError>
     readonly newConversationCommands: (
-      engine: AgentHarness,
+      harness: AgentHarness,
       place: ConversationPlace,
       repository: FollowedRepository,
     ) => Effect.Effect<ReadonlyArray<AgentCommand>, InvalidLocalCheckout | ConversationError>
@@ -320,7 +320,7 @@ export class Conversations extends Context.Service<
 
       const stored = yield* sql`
         SELECT id, name, sandbox_provider AS sandboxProvider, owner, repo, base_branch AS baseBranch,
-          engine, model, effort, permission_mode AS permissionMode, local_skills AS localSkills, folder,
+          harness, model, effort, permission_mode AS permissionMode, local_skills AS localSkills, folder,
           created_at AS createdAt,
           review_brief IS NOT NULL AS forReview
         FROM conversation ORDER BY created_at
@@ -353,11 +353,11 @@ export class Conversations extends Context.Service<
 
       const placementRunning = (
         place: ConversationPlace,
-        engine: AgentHarness,
+        harness: AgentHarness,
       ): Effect.Effect<Placement, ConversationError> => {
         const placement = placementFor(place)
 
-        return placement.engines.includes(engine)
+        return placement.harnesses.includes(harness)
           ? Effect.succeed(placement)
           : Effect.fail(
               new ConversationError({
@@ -406,7 +406,7 @@ export class Conversations extends Context.Service<
         Effect.all(
           [
             conversation.localSkills
-              ? localSkills.source(conversation.engine).pipe(
+              ? localSkills.source(conversation.harness).pipe(
                   Effect.map(Option.toArray),
                   Effect.mapError(({ message }) => new ConversationError({ message })),
                 )
@@ -420,7 +420,7 @@ export class Conversations extends Context.Service<
 
       const conversationOf = (row: PlacedConversation): ClaimedConversation => {
         const placement = placementOf(row)
-        const { id, engine, model, effort, permissionMode } = row.conversation
+        const { id, harness, model, effort, permissionMode } = row.conversation
 
         const role: Effect.Effect<RepositoryRole, ConversationError> = row.forReview
           ? reviewBrief(row).pipe(Effect.map((brief) => ReviewRole.make({ brief })))
@@ -433,7 +433,7 @@ export class Conversations extends Context.Service<
               Effect.flatMap(([started, skills]) =>
                 client.StartConversation({
                   conversationId: id,
-                  engine,
+                  harness,
                   folder: row.folder,
                   role: started,
                   skills,
@@ -486,7 +486,7 @@ export class Conversations extends Context.Service<
                 owner: repository.owner,
                 repo: repository.repo,
                 base_branch: conversation.baseBranch,
-                engine: conversation.engine,
+                harness: conversation.harness,
                 model: conversation.model,
                 effort: conversation.effort,
                 permission_mode: conversation.permissionMode,
@@ -532,7 +532,7 @@ export class Conversations extends Context.Service<
           place: localPlace,
           repository: input.repository,
           baseBranch: input.revision.base,
-          engine: input.engine,
+          harness: input.harness,
           model: input.model,
           effort: null,
           permissionMode: null,
@@ -551,12 +551,12 @@ export class Conversations extends Context.Service<
       })
 
       const create = Effect.fn("Conversations.create")(function* (input: NewConversation) {
-        const { repository, baseBranch, engine, model, effort, place } = input
+        const { repository, baseBranch, harness, model, effort, place } = input
         const { message, images } = input
-        const placement = yield* placementRunning(place, engine)
+        const placement = yield* placementRunning(place, harness)
 
         const permissionMode =
-          harnessCapabilities[engine].permissionModes.length === 0
+          harnessCapabilities[harness].permissionModes.length === 0
             ? null
             : asksPermission(place)
               ? (input.permissionMode ?? defaultPermissionMode)
@@ -570,7 +570,7 @@ export class Conversations extends Context.Service<
           place,
           repository,
           baseBranch,
-          engine,
+          harness,
           model,
           effort,
           permissionMode,
@@ -592,7 +592,7 @@ export class Conversations extends Context.Service<
             name,
             repository,
             machine: place._tag,
-            engine: conversation.engine,
+            harness: conversation.harness,
             message,
           }),
         )
@@ -685,7 +685,7 @@ export class Conversations extends Context.Service<
         listedByHost(conversationId, (host, row) =>
           skillsOf(row.conversation).pipe(
             Effect.flatMap((skills) =>
-              host.ListCommands({ engine: row.conversation.engine, folder: row.folder, skills }),
+              host.ListCommands({ harness: row.conversation.harness, folder: row.folder, skills }),
             ),
           ),
         ).pipe(Effect.withSpan("Conversations.commands"))
@@ -832,14 +832,14 @@ export class Conversations extends Context.Service<
           Stream.unwrap(find(conversationId).pipe(Effect.as(transcripts.watch(conversationId)))),
         readTranscript: (conversationId) =>
           find(conversationId).pipe(Effect.andThen(transcripts.read(conversationId))),
-        engines: (place) => placementFor(place).engines,
-        models: (engine, place) =>
-          placementRunning(place, engine).pipe(
-            Effect.flatMap((placement) => placement.models(engine)),
+        harnesses: (place) => placementFor(place).harnesses,
+        models: (harness, place) =>
+          placementRunning(place, harness).pipe(
+            Effect.flatMap((placement) => placement.models(harness)),
           ),
-        newConversationCommands: (engine, place, repository) =>
-          placementRunning(place, engine).pipe(
-            Effect.flatMap((placement) => placement.commands(engine, repository)),
+        newConversationCommands: (harness, place, repository) =>
+          placementRunning(place, harness).pipe(
+            Effect.flatMap((placement) => placement.commands(harness, repository)),
           ),
         newConversationDefaultBranch: (place, repository) =>
           placementFor(place).defaultBranch(repository),

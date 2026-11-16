@@ -11,7 +11,7 @@ const acmeSkills = { owner: "acme", repo: "skills" }
 
 const teamUrl = "https://github.com/acme/skills/tree/main/skills/team"
 
-const pi = { engine: "pi", model: null, effort: null, skillPacks: ["team"] } as const
+const pi = { harness: "pi", model: null, effort: null, skillPacks: ["team"] } as const
 
 const storedPins = (home: string) => {
   const database = new DatabaseSync(join(home, ".project-glass", "glass.db"), { readOnly: true })

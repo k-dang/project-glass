@@ -169,10 +169,10 @@ export const conversationServicesFixture = Effect.gen(function* () {
       )
 
       const placement = LocalPlacement.of({
-        engines: AgentHarness.literals,
+        harnesses: AgentHarness.literals,
         models: () => models,
-        commands: (engine) =>
-          client.ListCommands({ engine, folder: "checkout", skills: [] }).pipe(Effect.orDie),
+        commands: (harness) =>
+          client.ListCommands({ harness, folder: "checkout", skills: [] }).pipe(Effect.orDie),
         defaultBranch: () => Effect.succeed(null),
         branches: () => Effect.succeed([]),
         files: () => Effect.succeed([]),
@@ -314,7 +314,7 @@ export const conversationServicesFixture = Effect.gen(function* () {
     transcript,
     create: (
       permissionMode: TurnSettings["permissionMode"] = null,
-      engine: "claude-code" | "pi" = "claude-code",
+      harness: "claude-code" | "pi" = "claude-code",
       place: ConversationPlace = localPlace,
     ) =>
       running.conversations.create({
@@ -324,7 +324,7 @@ export const conversationServicesFixture = Effect.gen(function* () {
         images: [],
         skillPacks: [],
         localSkills: false,
-        engine,
+        harness,
         model: null,
         effort: null,
         permissionMode,

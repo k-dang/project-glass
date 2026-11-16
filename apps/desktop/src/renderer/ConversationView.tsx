@@ -954,7 +954,7 @@ function Composer(props: {
       pickers={
         <>
           <ModelPicker
-            engine={conversation.engine}
+            harness={conversation.harness}
             placeKey={placeKey(conversation.place)}
             model={conversation.model}
             effort={conversation.effort}
@@ -962,7 +962,7 @@ function Composer(props: {
           />
           {asksPermission(conversation.place) && (
             <PermissionModePicker
-              engine={conversation.engine}
+              harness={conversation.harness}
               permissionMode={conversation.permissionMode}
               onChange={changePermissionMode}
             />

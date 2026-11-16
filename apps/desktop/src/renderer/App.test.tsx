@@ -80,7 +80,7 @@ const workspace = new PullRequestWorkspace({
 })
 
 const tourSettings: EngineSettings = {
-  engine: "claude-code",
+  harness: "claude-code",
   models: {
     "claude-code": "claude-sonnet-5-5",
     pi: { provider: "anthropic", modelId: "claude-sonnet-5-5" },
@@ -93,7 +93,7 @@ const mount = (handlers: Parameters<typeof testLayer>[0]) => {
       Effect.succeed(new GitHubConnection({ login: "kevin", tokenSource: "gh" })),
     ListFollowedRepositories: () => Effect.succeed([]),
     GetEngineSettings: ({ feature }) =>
-      Effect.succeed(feature === "tours" ? tourSettings : { ...tourSettings, engine: "pi" }),
+      Effect.succeed(feature === "tours" ? tourSettings : { ...tourSettings, harness: "pi" }),
     GetReviewPrompt: () => Effect.succeed(defaultReviewPrompt),
     ...handlers,
   })

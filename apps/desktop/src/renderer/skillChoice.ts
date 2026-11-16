@@ -30,8 +30,8 @@ const lastLocalSkillsAtom = Atom.writable(
   },
 ).pipe(Atom.keepAlive)
 
-const localSkillNamesAtom = Atom.family((engine: AgentHarness) =>
-  backendRuntime.atom(Backend.use((backend) => backend.ListLocalSkills({ engine }))),
+const localSkillNamesAtom = Atom.family((harness: AgentHarness) =>
+  backendRuntime.atom(Backend.use((backend) => backend.ListLocalSkills({ harness }))),
 )
 
 const noLocalSkills = Atom.make(AsyncResult.success<ReadonlyArray<string>>([]))
@@ -45,7 +45,7 @@ interface ChosenSource {
 const listed = new Intl.ListFormat("en", { type: "conjunction" })
 
 /** pi keeps the first skill of a name, and Local skills come first (`skillsOf` in the server). */
-const sharedSkillNames = (engine: AgentHarness, sources: ReadonlyArray<ChosenSource>) => {
+const sharedSkillNames = (harness: AgentHarness, sources: ReadonlyArray<ChosenSource>) => {
   const names = [...new Set(sources.flatMap(({ skills }) => skills))].toSorted()
 
   return names.flatMap((name) => {
@@ -55,7 +55,7 @@ const sharedSkillNames = (engine: AgentHarness, sources: ReadonlyArray<ChosenSou
 
     const where = `${name} is in ${listed.format(having.map(({ label }) => label))}.`
 
-    return engine === "pi"
+    return harness === "pi"
       ? [`${where} The Conversation uses the one in ${having[0]!.label}.`]
       : [
           `${where} The Conversation has each, as ${listed.format(having.map(({ claudeCodePrefix }) => `/${claudeCodePrefix}${name}`))}.`,
@@ -63,7 +63,7 @@ const sharedSkillNames = (engine: AgentHarness, sources: ReadonlyArray<ChosenSou
   })
 }
 
-export const useSkillChoice = (place: ConversationPlace, engine: AgentHarness) => {
+export const useSkillChoice = (place: ConversationPlace, harness: AgentHarness) => {
   const listedPacks = useAtomValue(skillPacksAtom)
   const packs = Option.getOrElse(AsyncResult.value(listedPacks), () => [])
   const [lastChosen, setChosen] = useAtom(lastChosenAtom)
@@ -75,7 +75,7 @@ export const useSkillChoice = (place: ConversationPlace, engine: AgentHarness) =
 
   const localNamesListed = useAtomValue(
     conversationHasLocalSkills && chosenPacks.length > 0
-      ? localSkillNamesAtom(engine)
+      ? localSkillNamesAtom(harness)
       : noLocalSkills,
   )
 
@@ -90,7 +90,7 @@ export const useSkillChoice = (place: ConversationPlace, engine: AgentHarness) =
     offersLocalSkills,
     sendsLocalSkills,
     setLocalSkills,
-    shared: sharedSkillNames(engine, [
+    shared: sharedSkillNames(harness, [
       ...(conversationHasLocalSkills
         ? [
             {

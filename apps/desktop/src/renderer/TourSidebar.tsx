@@ -225,7 +225,7 @@ export function TourSidebar(props: {
           </div>
           {job.runner !== null && (
             <p className="space-y-1 text-xs text-muted-foreground">
-              <span className="block">{harnessNames[job.runner.engine]}</span>
+              <span className="block">{harnessNames[job.runner.harness]}</span>
               <span className="block break-all font-mono">{job.runner.model}</span>
             </p>
           )}

@@ -89,7 +89,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       PreviewSkillPackUpdate: ({ name }) => skillPacks.previewUpdate(name),
       UpdateSkillPack: ({ name, commit }) => skillPacks.update(name, commit),
       RemoveSkillPack: ({ name }) => skillPacks.remove(name),
-      ListLocalSkills: ({ engine }) => localSkills.names(engine),
+      ListLocalSkills: ({ harness }) => localSkills.names(harness),
       ListPullRequests: () =>
         lists.list().pipe(Effect.provideService(BackgroundGitHubRequest, true)),
       WatchPullRequests: () => lists.watch(),
@@ -153,9 +153,9 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
         conversations.newConversationDefaultBranch(place, repository),
       ListNewConversationBranches: ({ place, repository }) =>
         conversations.newConversationBranches(place, repository),
-      ListAgentModels: ({ engine, place }) => conversations.models(engine, place),
-      ListNewConversationCommands: ({ engine, place, repository }) =>
-        conversations.newConversationCommands(engine, place, repository),
+      ListAgentModels: ({ harness, place }) => conversations.models(harness, place),
+      ListNewConversationCommands: ({ harness, place, repository }) =>
+        conversations.newConversationCommands(harness, place, repository),
       ListConversationCommands: ({ conversationId }) => conversations.commands(conversationId),
       ListNewConversationFiles: ({ place, repository, baseBranch }) =>
         conversations.newConversationFiles(place, repository, baseBranch),

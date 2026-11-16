@@ -121,7 +121,7 @@ it("starts a Conversation from its first message, on the repository's default br
     {
       repository: conversation.repository,
       baseBranch: "main",
-      engine: "claude-code",
+      harness: "claude-code",
       model: null,
       effort: null,
       permissionMode: null,
@@ -211,7 +211,7 @@ it("gives a Sandbox Conversation the Local skills when picked, warning which ski
     ...newConversationHandlers(created, []),
     ListSandboxProviders: () =>
       Effect.succeed([
-        new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes", engines: ["claude-code"] }),
+        new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes", harnesses: ["claude-code"] }),
       ]),
     ListSkillPacks: () =>
       Effect.succeed([pack("team", "ae5650fbbbb", ["architect", "grilling", "tdd"])]),
@@ -306,7 +306,11 @@ it("shows when the Local skills can't be read, and still starts the Sandbox Conv
       ...newConversationHandlers(created, []),
       ListSandboxProviders: () =>
         Effect.succeed([
-          new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes", engines: ["claude-code"] }),
+          new SandboxProviderInfo({
+            id: "fake",
+            name: "Fake Sandboxes",
+            harnesses: ["claude-code"],
+          }),
         ]),
       ListFollowedRepositories: () => Effect.succeed([conversation.repository]),
       ListSkillPacks: () => Effect.succeed([pack("team", "ae5650fbbbb", ["architect"])]),
@@ -377,10 +381,14 @@ it("keeps local branch, harness, model, effort, and unsent work when exploring a
       }),
       ListSandboxProviders: () =>
         Effect.succeed([
-          new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes", engines: ["claude-code"] }),
+          new SandboxProviderInfo({
+            id: "fake",
+            name: "Fake Sandboxes",
+            harnesses: ["claude-code"],
+          }),
         ]),
       ListFollowedRepositories: () => Effect.succeed([conversation.repository]),
-      ListAgentModels: ({ engine, place }) =>
+      ListAgentModels: ({ harness, place }) =>
         Predicate.isTagged(place, "sandbox")
           ? Effect.succeed(
               new AgentModels({
@@ -388,7 +396,7 @@ it("keeps local branch, harness, model, effort, and unsent work when exploring a
                 models: [],
               }),
             )
-          : listModels({ engine }),
+          : listModels({ harness }),
     },
     "/conversations/new",
   )
@@ -460,7 +468,7 @@ it("keeps local branch, harness, model, effort, and unsent work when exploring a
     {
       place: localPlace,
       baseBranch: "develop",
-      engine: "pi",
+      harness: "pi",
       model: "glass-test/thinker",
       effort: "high",
       permissionMode: null,
@@ -477,7 +485,11 @@ it("restores each harness's choices and keeps local Permission mode separate fro
       ...newConversationHandlers(created, []),
       ListSandboxProviders: () =>
         Effect.succeed([
-          new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes", engines: ["claude-code"] }),
+          new SandboxProviderInfo({
+            id: "fake",
+            name: "Fake Sandboxes",
+            harnesses: ["claude-code"],
+          }),
         ]),
       ListFollowedRepositories: () => Effect.succeed([conversation.repository]),
       ...branchesAt({ sandbox: { defaultBranch: "main" } }),
@@ -532,7 +544,7 @@ it("restores each harness's choices and keeps local Permission mode separate fro
     "Fix it{Enter}",
   )
   expect(created).toMatchObject([
-    { engine: "claude-code", model: "sonnet", effort: "high", permissionMode: "acceptEdits" },
+    { harness: "claude-code", model: "sonnet", effort: "high", permissionMode: "acceptEdits" },
   ])
 })
 
@@ -556,7 +568,11 @@ it("keeps branches per repository and falls back when a remembered branch disapp
       }),
       ListSandboxProviders: () =>
         Effect.succeed([
-          new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes", engines: ["claude-code"] }),
+          new SandboxProviderInfo({
+            id: "fake",
+            name: "Fake Sandboxes",
+            harnesses: ["claude-code"],
+          }),
         ]),
       ListFollowedRepositories: () => Effect.succeed([]),
     },
@@ -625,7 +641,7 @@ it.each([
 
     const user = mount(
       newConversationHandlers(created, [
-        new Conversation({ ...conversationFields, engine: "claude-code", model, effort }),
+        new Conversation({ ...conversationFields, harness: "claude-code", model, effort }),
       ]),
       "/conversations/new",
     )
@@ -655,7 +671,7 @@ it("keeps an unlinked Local place blocked and never inherits Sandbox bypass perm
           new Conversation({
             ...conversationFields,
             place: sandbox,
-            engine: "claude-code",
+            harness: "claude-code",
             permissionMode: "bypassPermissions",
           }),
         ],
@@ -663,7 +679,11 @@ it("keeps an unlinked Local place blocked and never inherits Sandbox bypass perm
       ListLocalCheckouts: () => Effect.succeed([]),
       ListSandboxProviders: () =>
         Effect.succeed([
-          new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes", engines: ["claude-code"] }),
+          new SandboxProviderInfo({
+            id: "fake",
+            name: "Fake Sandboxes",
+            harnesses: ["claude-code"],
+          }),
         ]),
       ListFollowedRepositories: () => Effect.succeed([conversation.repository]),
       ...branchesAt({ sandbox: { defaultBranch: "main" } }),
@@ -712,7 +732,7 @@ it("starts a Sandbox Conversation on the default branch, listing other branches 
           new SandboxProviderInfo({
             id: "fake",
             name: "Fake Sandboxes",
-            engines: ["claude-code", "pi"],
+            harnesses: ["claude-code", "pi"],
           }),
         ]),
       ListFollowedRepositories: () => Effect.succeed([followed]),
@@ -784,7 +804,7 @@ it("lists every Agent harness's models before one is chosen", async () => {
     {
       ...newConversationHandlers([], []),
       ListAgentModels: (payload) => {
-        listed.push(payload.engine)
+        listed.push(payload.harness)
 
         return listModels(payload)
       },
@@ -803,7 +823,7 @@ it("offers only the Agent harnesses a Sandbox provider runs", async () => {
       ...newConversationHandlers([], []),
       ListSandboxProviders: () =>
         Effect.succeed([
-          new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes", engines: ["pi"] }),
+          new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes", harnesses: ["pi"] }),
         ]),
       ListFollowedRepositories: () =>
         Effect.succeed([new FollowedRepository({ owner: "glass-demo", repo: "lamp" })]),
@@ -839,7 +859,7 @@ it("starts a Conversation with the last one's harness, model, and effort, in the
 
   const last = new Conversation({
     ...conversationFields,
-    engine: "claude-code",
+    harness: "claude-code",
     model: "sonnet",
     effort: "high",
     permissionMode: "bypassPermissions",
@@ -857,7 +877,7 @@ it("starts a Conversation with the last one's harness, model, and effort, in the
   await user.type(within(draft).getByRole("textbox", { name: "Message" }), "Fix the bug{Enter}")
 
   expect(created).toMatchObject([
-    { engine: "claude-code", model: "sonnet", effort: "high", permissionMode: null },
+    { harness: "claude-code", model: "sonnet", effort: "high", permissionMode: null },
   ])
   await waitFor(() => expect(window.location.hash).toBe(`#/conversations/${conversation.id}`))
 })
@@ -888,7 +908,7 @@ it("offers the chosen Agent harness's own models, and efforts only for models th
   await user.type(within(draft).getByRole("textbox", { name: "Message" }), "Fix the bug{Enter}")
 
   expect(created).toMatchObject([
-    { engine: "pi", model: "glass-test/thinker", effort: "low", permissionMode: null },
+    { harness: "pi", model: "glass-test/thinker", effort: "low", permissionMode: null },
   ])
   await waitFor(() => expect(window.location.hash).toBe(`#/conversations/${conversation.id}`))
 })

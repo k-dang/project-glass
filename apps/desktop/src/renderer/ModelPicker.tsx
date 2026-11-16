@@ -26,22 +26,22 @@ const find = (listed: AgentModels, id: string | null) =>
   id === null ? listed.defaultModel : listed.models.find((m) => m.id === id)
 
 export const ModelPicker = memo(function ModelPicker(props: {
-  engine: AgentHarness
+  harness: AgentHarness
   placeKey: string
   model: string | null
   effort: string | null
   onChange: (choice: ModelChoice) => void
-  harnesses?: {
-    readonly engines: ReadonlyArray<AgentHarness>
-    readonly onChange: (engine: AgentHarness) => void
+  harnessChoice?: {
+    readonly options: ReadonlyArray<AgentHarness>
+    readonly onChange: (harness: AgentHarness) => void
   }
 }) {
-  const offered = agentModelsAtom(props.engine, props.placeKey)
+  const offered = agentModelsAtom(props.harness, props.placeKey)
 
   const listed = useAtomValue(offered)
   const retry = useAtomRefresh(offered)
   const [open, setOpen] = useState(false)
-  const { model, effort, harnesses } = props
+  const { model, effort, harnessChoice } = props
 
   const { summary, body, efforts } = AsyncResult.builder(listed)
     .onInitial(() => ({
@@ -80,10 +80,10 @@ export const ModelPicker = memo(function ModelPicker(props: {
 
   return (
     <>
-      {harnesses?.engines
-        .filter((engine) => engine !== props.engine)
-        .map((engine) => (
-          <PrefetchModels key={engine} engine={engine} placeKey={props.placeKey} />
+      {harnessChoice?.options
+        .filter((harness) => harness !== props.harness)
+        .map((harness) => (
+          <PrefetchModels key={harness} harness={harness} placeKey={props.placeKey} />
         ))}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger
@@ -93,12 +93,12 @@ export const ModelPicker = memo(function ModelPicker(props: {
               variant="ghost"
               size="sm"
               className={cn(chip, "text-foreground")}
-              aria-label={`${harnessNames[props.engine]}: ${summary}`}
+              aria-label={`${harnessNames[props.harness]}: ${summary}`}
               title={summary}
             />
           }
         >
-          <AgentHarnessIcon engine={props.engine} />
+          <AgentHarnessIcon harness={props.harness} />
           <span className="min-w-0 truncate font-semibold">{summary}</span>
         </PopoverTrigger>
         <PopoverContent
@@ -106,18 +106,18 @@ export const ModelPicker = memo(function ModelPicker(props: {
           align="end"
           className="h-96 max-h-(--available-height) w-80 max-w-(--available-width) gap-1 overflow-hidden p-1"
         >
-          {harnesses !== undefined && (
+          {harnessChoice !== undefined && (
             <div className="shrink-0">
               <RequiredChoice
                 label="Agent harness"
-                value={props.engine}
-                onChange={harnesses.onChange}
-                items={harnesses.engines.map((engine) => ({
-                  value: engine,
+                value={props.harness}
+                onChange={harnessChoice.onChange}
+                items={harnessChoice.options.map((harness) => ({
+                  value: harness,
                   label: (
                     <>
-                      <AgentHarnessIcon engine={engine} />
-                      {harnessNames[engine]}
+                      <AgentHarnessIcon harness={harness} />
+                      {harnessNames[harness]}
                     </>
                   ),
                 }))}
@@ -125,7 +125,7 @@ export const ModelPicker = memo(function ModelPicker(props: {
             </div>
           )}
           <div
-            key={props.engine}
+            key={props.harness}
             className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]"
           >
             {body}
@@ -150,8 +150,8 @@ export const ModelPicker = memo(function ModelPicker(props: {
   )
 })
 
-function PrefetchModels(props: { engine: AgentHarness; placeKey: string }) {
-  useAtomValue(agentModelsAtom(props.engine, props.placeKey))
+function PrefetchModels(props: { harness: AgentHarness; placeKey: string }) {
+  useAtomValue(agentModelsAtom(props.harness, props.placeKey))
 
   return null
 }

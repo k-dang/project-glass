@@ -368,7 +368,7 @@ it("lists a Sandbox Conversation under Sandboxes, and shows the step its Sandbox
     id: "agent-2",
     name: "agent/calm-heron",
     place: SandboxPlace.make({ providerId: "fake" }),
-    engine: "claude-code",
+    harness: "claude-code",
     permissionMode: "bypassPermissions",
   })
 
@@ -720,7 +720,7 @@ it("changes a Claude Code Conversation's Permission mode from the composer, and 
 
   const claudeConversation = new Conversation({
     ...conversationFields,
-    engine: "claude-code",
+    harness: "claude-code",
     permissionMode: "default",
   })
 
@@ -731,7 +731,7 @@ it("changes a Claude Code Conversation's Permission mode from the composer, and 
     ChangePermissionMode: ({ permissionMode }) =>
       Effect.sync(() => changes.push(permissionMode)).pipe(
         Effect.as(
-          new Conversation({ ...conversationFields, engine: "claude-code", permissionMode }),
+          new Conversation({ ...conversationFields, harness: "claude-code", permissionMode }),
         ),
       ),
   })
@@ -959,7 +959,7 @@ const inSandboxWith = (reach: SandboxReach) =>
   new Conversation({
     ...conversationFields,
     place: SandboxPlace.make({ providerId: "fake" }),
-    engine: "claude-code",
+    harness: "claude-code",
     permissionMode: "bypassPermissions",
     sandbox: new SandboxStatus({ expiresAt: DateTime.makeUnsafe("2026-10-28T12:00:00Z"), reach }),
   })

@@ -5,6 +5,7 @@ export default Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
 
   yield* sql`ALTER TABLE agent RENAME TO conversation`
+  yield* sql`ALTER TABLE conversation RENAME COLUMN engine TO harness`
 
   for (const table of [
     "feedback_note",
@@ -68,9 +69,18 @@ export default Effect.gen(function* () {
   }
 
   yield* sql`
+    UPDATE conversation_turn_part SET part = json_set(part, '$.context', json_set(
+      json_remove(json_set(json_extract(part, '$.context'), '$._tag', 'Conversation'), '$.agentId'),
+      '$.conversationId', json_extract(part, '$.context.agentId')
+    ))
+    WHERE json_extract(part, '$._tag') = 'Steer' AND json_extract(part, '$.context._tag') = 'Agent'
+  `
+
+  yield* sql`
     UPDATE activity SET kind = 'ConversationStarted', payload = json_set(
-      json_remove(json_set(payload, '$._tag', 'ConversationStarted'), '$.agentId'),
-      '$.conversationId', json_extract(payload, '$.agentId')
+      json_remove(json_set(payload, '$._tag', 'ConversationStarted'), '$.agentId', '$.engine'),
+      '$.conversationId', json_extract(payload, '$.agentId'),
+      '$.harness', json_extract(payload, '$.engine')
     )
     WHERE kind = 'AgentStarted'
   `

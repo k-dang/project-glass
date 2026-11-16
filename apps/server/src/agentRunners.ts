@@ -242,7 +242,7 @@ const runnerStrategies = Effect.gen(function* () {
         "Claude Code's required execution restrictions could not be verified. Update Claude Code and try again.",
       )
 
-    const identity = runnerIdentity({ engine: "claude-code", models })
+    const identity = runnerIdentity({ harness: "claude-code", models })
 
     return { identity, run: runClaudeCode(model, identity) } satisfies AgentRunner
   })
@@ -356,7 +356,7 @@ const runnerStrategies = Effect.gen(function* () {
   const piCliRunner = Effect.fnUntraced(function* (models: EngineModels) {
     const cwd = yield* workingDirectory
     const selection = models.pi
-    const identity = runnerIdentity({ engine: "pi", models })
+    const identity = runnerIdentity({ harness: "pi", models })
     const { model } = identity
 
     const listed = yield* execute(
@@ -394,8 +394,8 @@ const runnerStrategies = Effect.gen(function* () {
     pi: piCliRunner,
   }
 
-  return Effect.fn("selectAgentRunner")(({ engine, models }: EngineSettings) =>
-    runners[engine](models).pipe(
+  return Effect.fn("selectAgentRunner")(({ harness, models }: EngineSettings) =>
+    runners[harness](models).pipe(
       Effect.timeoutOrElse({
         duration: "30 seconds",
         orElse: () =>

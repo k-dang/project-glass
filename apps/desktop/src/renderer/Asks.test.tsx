@@ -14,7 +14,7 @@ type Asked = Held<Parameters<Handlers["Ask"]>[0], AskAnswer, AskFailure>
 
 const answer: AskAnswer = {
   answer: "`main.ts` calls `greet` without a name.",
-  runner: { engine: "claude-code", model: "anthropic/claude-sonnet-5-5" },
+  runner: { harness: "claude-code", model: "anthropic/claude-sonnet-5-5" },
 }
 
 const registries: Array<ReturnType<typeof testRegistry>> = []

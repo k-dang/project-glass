@@ -156,7 +156,7 @@ export const linkCheckoutAtom = backendRuntime.fn((path: string, get) =>
 )
 
 class HarnessPlace extends Data.Class<{
-  readonly engine: AgentHarness
+  readonly harness: AgentHarness
   readonly placeKey: string
 }> {}
 
@@ -164,17 +164,17 @@ const harnessModelsAtom = Atom.family((harness: HarnessPlace) =>
   backendRuntime
     .atom(
       Backend.use((backend) =>
-        backend.ListAgentModels({ engine: harness.engine, place: placeOfKey(harness.placeKey) }),
+        backend.ListAgentModels({ harness: harness.harness, place: placeOfKey(harness.placeKey) }),
       ),
     )
     .pipe(Atom.keepAlive),
 )
 
-export const agentModelsAtom = (engine: AgentHarness, key: string) =>
-  harnessModelsAtom(new HarnessPlace({ engine, placeKey: key }))
+export const agentModelsAtom = (harness: AgentHarness, key: string) =>
+  harnessModelsAtom(new HarnessPlace({ harness, placeKey: key }))
 
 class NewConversationOf extends Data.Class<{
-  readonly engine: AgentHarness
+  readonly harness: AgentHarness
   readonly place: string
   readonly repository: FollowedRepository
 }> {}
@@ -196,7 +196,7 @@ const newConversationCommandsFamily = Atom.family((newConversation: NewConversat
       .atom(
         Backend.use((backend) =>
           backend.ListNewConversationCommands({
-            engine: newConversation.engine,
+            harness: newConversation.harness,
             place: placeOfKey(newConversation.place),
             repository: newConversation.repository,
           }),
@@ -208,10 +208,10 @@ const newConversationCommandsFamily = Atom.family((newConversation: NewConversat
 )
 
 export const newConversationCommandsAtom = (
-  engine: AgentHarness,
+  harness: AgentHarness,
   place: string,
   repository: FollowedRepository,
-) => newConversationCommandsFamily(new NewConversationOf({ engine, place, repository }))
+) => newConversationCommandsFamily(new NewConversationOf({ harness, place, repository }))
 
 const sandboxReachableAtom = Atom.family((conversationId: string) =>
   Atom.make((get) =>

@@ -138,7 +138,7 @@ const decodeEndedTurn = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({
       sentAt: Turn.fields.sentAt,
-      engine: Schema.NullOr(Conversation.fields.engine),
+      harness: Schema.NullOr(Conversation.fields.harness),
       model: Schema.NullOr(Conversation.fields.model),
       effort: Schema.NullOr(Conversation.fields.effort),
       sandboxProvider: Schema.NullOr(Schema.String),
@@ -618,7 +618,7 @@ export class Transcripts extends Context.Service<
       ) {
         const [turn] = yield* sql`
           SELECT
-            t.sent_at AS sentAt, a.engine, a.model, a.effort, a.sandbox_provider AS sandboxProvider,
+            t.sent_at AS sentAt, a.harness, a.model, a.effort, a.sandbox_provider AS sandboxProvider,
             COUNT(p.turn_id) AS toolCalls,
             COUNT(CASE json_extract(p.part, '$.status') WHEN 'failed' THEN 1 END) AS failedToolCalls
           FROM conversation_turn t
@@ -639,7 +639,7 @@ export class Transcripts extends Context.Service<
             conversation_id: conversationId,
             turn_id: turnId,
             ending: ending._tag,
-            engine: turn.engine,
+            harness: turn.harness,
             model: turn.model,
             effort: turn.effort,
             sandbox_provider: turn.sandboxProvider,

@@ -11,7 +11,7 @@ const write = (path: string, contents: string) => {
   writeFileSync(path, contents)
 }
 
-const pi = { engine: "pi", model: null, effort: null } as const
+const pi = { harness: "pi", model: null, effort: null } as const
 
 it.live(
   "gives a Sandbox Conversation the Local skills its harness reads, as they are when it starts",
@@ -47,11 +47,11 @@ it.live(
         )
       }
 
-      assert.deepStrictEqual(yield* f.client.ListLocalSkills({ engine: "pi" }), [
+      assert.deepStrictEqual(yield* f.client.ListLocalSkills({ harness: "pi" }), [
         "grilling",
         "notes",
       ])
-      assert.deepStrictEqual(yield* f.client.ListLocalSkills({ engine: "claude-code" }), ["tidy"])
+      assert.deepStrictEqual(yield* f.client.ListLocalSkills({ harness: "claude-code" }), ["tidy"])
 
       const commandsOf = (conversation: Conversation) =>
         f.client

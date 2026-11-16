@@ -183,14 +183,14 @@ export const seedDemoConversations = Effect.fnUntraced(function* (
 
   const linked = yield* client.LinkLocalCheckout({ path: checkout })
 
-  const conversation = (engine: NewConversation["engine"], message: string) =>
+  const conversation = (harness: NewConversation["harness"], message: string) =>
     client.CreateConversation({
       repository: linked.repository,
       baseBranch: "main",
-      engine,
+      harness,
       model: null,
       effort: null,
-      permissionMode: engine === "claude-code" ? "default" : null,
+      permissionMode: harness === "claude-code" ? "default" : null,
       place: localPlace,
       message,
       images: [],

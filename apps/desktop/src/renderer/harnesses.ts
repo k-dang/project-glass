@@ -5,5 +5,5 @@ export const harnessNames: Record<AgentHarness, string> = {
   pi: "pi",
 }
 
-export const runnerLabel = ({ engine, model }: AgentRunnerIdentity) =>
-  `${harnessNames[engine]} · ${model}`
+export const runnerLabel = ({ harness, model }: AgentRunnerIdentity) =>
+  `${harnessNames[harness]} · ${model}`

@@ -187,7 +187,7 @@ export class GlobalConversation extends Context.Service<
             const started = yield* client
               .StartConversation({
                 conversationId: sessionId,
-                engine: "pi",
+                harness: "pi",
                 folder,
                 role,
                 skills: [],

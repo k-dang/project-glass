@@ -52,7 +52,7 @@ export const ConversationStarted = Schema.TaggedStruct("ConversationStarted", {
   name: Schema.String,
   repository: FollowedRepository,
   machine: PlaceTag,
-  engine: AgentHarness,
+  harness: AgentHarness,
   message: Schema.String,
 })
 

@@ -2,7 +2,7 @@ import { Schema } from "effect"
 import { AgentHarness } from "./conversation"
 
 export const AgentRunnerIdentity = Schema.Struct({
-  engine: AgentHarness,
+  harness: AgentHarness,
   model: Schema.String,
 })
 
@@ -21,20 +21,20 @@ export const EngineModels = Schema.Struct({
 
 export type EngineModels = typeof EngineModels.Type
 
-export const EngineSettings = Schema.Struct({ engine: AgentHarness, models: EngineModels })
+export const EngineSettings = Schema.Struct({ harness: AgentHarness, models: EngineModels })
 
 export type EngineSettings = typeof EngineSettings.Type
 
-export const runnerIdentity = ({ engine, models }: EngineSettings): AgentRunnerIdentity => {
-  if (engine === "claude-code") return { engine, model: `anthropic/${models["claude-code"]}` }
+export const runnerIdentity = ({ harness, models }: EngineSettings): AgentRunnerIdentity => {
+  if (harness === "claude-code") return { harness, model: `anthropic/${models["claude-code"]}` }
 
-  const { provider, modelId } = models[engine]
+  const { provider, modelId } = models[harness]
 
-  return { engine, model: `${provider}/${modelId}` }
+  return { harness, model: `${provider}/${modelId}` }
 }
 
 export const agentModelOf = (settings: EngineSettings) =>
-  settings.engine === "claude-code"
+  settings.harness === "claude-code"
     ? settings.models["claude-code"]
     : runnerIdentity(settings).model
 

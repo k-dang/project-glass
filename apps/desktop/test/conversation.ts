@@ -7,7 +7,7 @@ export const conversationFields = {
   place: localPlace,
   repository: new FollowedRepository({ owner: "glass-demo", repo: "greeter" }),
   baseBranch: "main",
-  engine: "pi",
+  harness: "pi",
   model: null,
   effort: null,
   permissionMode: null,

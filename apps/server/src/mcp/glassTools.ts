@@ -197,7 +197,7 @@ const ListConversationPlaces = Tool.make("list_conversation_places", {
     "Lists where the user can start a Conversation. A Conversation on this device works in a copy of a Local checkout, so its repository must be one of localCheckouts. A Conversation in a Sandbox works in any followed repository, in a Sandbox from one of sandboxProviders. Each place runs only the Agent harnesses listed with it.",
   success: Schema.Struct({
     local: Schema.Struct({
-      engines: Schema.Array(AgentHarness),
+      harnesses: Schema.Array(AgentHarness),
       localCheckouts: Schema.Array(LocalCheckout),
     }),
     sandboxProviders: Schema.Array(SandboxProviderInfo),
@@ -212,7 +212,7 @@ const ListConversationOptions = Tool.make("list_conversation_options", {
   parameters: Schema.Struct({
     place: ConversationPlace,
     repository: FollowedRepository,
-    engine: AgentHarness,
+    harness: AgentHarness,
   }),
   success: Schema.Struct({
     ...Branches.fields,
@@ -238,7 +238,9 @@ const CreateConversation = Tool.make("create_conversation", {
     place: ConversationPlace.annotate({
       description: "Where the Conversation works: on this device, or in a Sandbox from a provider.",
     }),
-    engine: AgentHarness.annotate({ description: "The Agent harness that runs the Conversation." }),
+    harness: AgentHarness.annotate({
+      description: "The Agent harness that runs the Conversation.",
+    }),
     model: Schema.NullOr(Schema.String).annotate({
       description: "A model id from list_conversation_options, or null for the harness's default.",
     }),
@@ -468,12 +470,12 @@ export const GlassToolHandlers = GlassTools.toLayer(
     const startedWork = yield* StartedWork
 
     const refuseUnofferedModel = Effect.fnUntraced(function* ({
-      engine,
+      harness,
       place,
       model,
       effort,
     }: Tool.Parameters<typeof CreateConversation>) {
-      const { defaultModel, models } = yield* conversations.models(engine, place)
+      const { defaultModel, models } = yield* conversations.models(harness, place)
       const chosen = model === null ? defaultModel : models.find(({ id }) => id === model)
 
       if (model !== null && chosen === undefined)
@@ -567,19 +569,19 @@ export const GlassToolHandlers = GlassTools.toLayer(
         Effect.gen(function* () {
           return {
             local: {
-              engines: conversations.engines(localPlace),
+              harnesses: conversations.harnesses(localPlace),
               localCheckouts: yield* checkouts.list(),
             },
             sandboxProviders: sandboxes.providers,
             followedRepositories: yield* followed.list(),
           }
         }).pipe(Effect.mapError(explained)),
-      list_conversation_options: ({ place, repository, engine }) =>
+      list_conversation_options: ({ place, repository, harness }) =>
         Effect.all(
           {
             defaultBranch: conversations.newConversationDefaultBranch(place, repository),
             branches: conversations.newConversationBranches(place, repository),
-            models: conversations.models(engine, place),
+            models: conversations.models(harness, place),
           },
           { concurrency: "unbounded" },
         ).pipe(Effect.mapError(explained)),

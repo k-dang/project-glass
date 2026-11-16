@@ -124,17 +124,17 @@ export class LocalPlacement extends Context.Service<
       })
 
       return LocalPlacement.of({
-        engines: AgentHarness.literals,
-        models: (engine) =>
+        harnesses: AgentHarness.literals,
+        models: (harness) =>
           host.client.pipe(
-            Effect.flatMap((client) => client.ListModels({ engine })),
+            Effect.flatMap((client) => client.ListModels({ harness })),
             Effect.mapError(asConversationError),
           ),
-        commands: Effect.fnUntraced(function* (engine, repository) {
+        commands: Effect.fnUntraced(function* (harness, repository) {
           const { path } = yield* checkouts.get(repository)
 
           return yield* host.client.pipe(
-            Effect.flatMap((client) => client.ListCommands({ engine, folder: path, skills: [] })),
+            Effect.flatMap((client) => client.ListCommands({ harness, folder: path, skills: [] })),
             Effect.mapError(asConversationError),
           )
         }),

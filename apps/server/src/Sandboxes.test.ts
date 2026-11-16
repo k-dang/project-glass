@@ -59,7 +59,7 @@ it.live("shows each step of making a Sandbox, then runs the first message in it"
       new SandboxProviderInfo({
         id: "fake",
         name: "Fake Sandboxes",
-        engines: ["claude-code", "pi"],
+        harnesses: ["claude-code", "pi"],
       }),
     ])
 
@@ -86,11 +86,11 @@ it.live("shows each step of making a Sandbox, then runs the first message in it"
 it.live("offers a Sandbox only the Agent harnesses its provider runs", () =>
   Effect.gen(function* () {
     const f = yield* conversationServicesFixture
-    f.sandboxes.configure({ engines: ["pi"] })
+    f.sandboxes.configure({ harnesses: ["pi"] })
     const { conversations, sandboxProviders } = yield* f.restart
 
     assert.deepStrictEqual(sandboxProviders, [
-      new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes", engines: ["pi"] }),
+      new SandboxProviderInfo({ id: "fake", name: "Fake Sandboxes", harnesses: ["pi"] }),
     ])
 
     const refused = yield* conversations
@@ -99,7 +99,7 @@ it.live("offers a Sandbox only the Agent harnesses its provider runs", () =>
         baseBranch: "main",
         message: "Start",
         images: [],
-        engine: "claude-code",
+        harness: "claude-code",
         model: null,
         effort: null,
         permissionMode: null,

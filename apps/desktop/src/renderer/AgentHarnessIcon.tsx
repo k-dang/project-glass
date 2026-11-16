@@ -1,8 +1,8 @@
 import type { AgentHarness } from "@glass/contracts"
 import { cn } from "cn"
 
-export function AgentHarnessIcon(props: { engine: AgentHarness; className?: string }) {
-  return props.engine === "claude-code" ? (
+export function AgentHarnessIcon(props: { harness: AgentHarness; className?: string }) {
+  return props.harness === "claude-code" ? (
     <svg
       aria-hidden
       focusable="false"

@@ -11,8 +11,9 @@ export const AgentHostHandlers = AgentHostRpcs.toLayer(
     const changes = yield* Changes
 
     return AgentHostRpcs.of({
-      ListModels: ({ engine }) => conversations.models(engine),
-      ListCommands: ({ engine, folder, skills }) => conversations.commands(engine, folder, skills),
+      ListModels: ({ harness }) => conversations.models(harness),
+      ListCommands: ({ harness, folder, skills }) =>
+        conversations.commands(harness, folder, skills),
       StartConversation: (start) => conversations.start(start),
       StartTurn: ({ conversationId, turnId, model, effort, permissionMode, ...message }) =>
         conversations.startTurn(conversationId, turnId, message, { model, effort, permissionMode }),

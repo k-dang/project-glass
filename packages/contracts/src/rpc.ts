@@ -218,7 +218,7 @@ export class GlassRpcs extends RpcGroup.make(
   }),
   Rpc.make("RemoveSkillPack", { payload: { name: Schema.String }, ...skillPackList }),
   Rpc.make("ListLocalSkills", {
-    payload: { engine: AgentHarness },
+    payload: { harness: AgentHarness },
     success: Schema.Array(Schema.String),
     error: LocalSkillsError,
   }),
@@ -406,12 +406,12 @@ export class GlassRpcs extends RpcGroup.make(
     error: Schema.Union([InvalidLocalCheckout, ConnectionError, ConversationError]),
   }),
   Rpc.make("ListAgentModels", {
-    payload: { engine: AgentHarness, place: ConversationPlace },
+    payload: { harness: AgentHarness, place: ConversationPlace },
     success: AgentModels,
     error: ConversationError,
   }),
   Rpc.make("ListNewConversationCommands", {
-    payload: { engine: AgentHarness, place: ConversationPlace, repository: FollowedRepository },
+    payload: { harness: AgentHarness, place: ConversationPlace, repository: FollowedRepository },
     success: Schema.Array(AgentCommand),
     error: Schema.Union([InvalidLocalCheckout, ConversationError]),
   }),

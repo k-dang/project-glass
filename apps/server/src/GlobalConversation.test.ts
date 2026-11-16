@@ -141,7 +141,7 @@ it.live("leaves a Conversation it created running when its own Turn stops", () =
       repository: { owner: repository.owner, repo: repository.repo },
       baseBranch: "main",
       place: localPlace,
-      engine: "pi",
+      harness: "pi",
       model: null,
       effort: null,
       message: "hold:agent",

@@ -53,7 +53,7 @@ export const globalConversationReply = (input: FakeModelRequest): ReadonlyArray<
       repository: { owner, repo },
       baseBranch,
       place: localPlace,
-      engine: "claude-code",
+      harness: "claude-code",
       model: null,
       effort: null,
       message,

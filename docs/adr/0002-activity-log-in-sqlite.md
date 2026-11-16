@@ -1,8 +1,8 @@
 # The Activity log is the backend's first store, in SQLite
 
-Agents and later features will search what the user did, so the backend keeps an Activity log in
-a SQLite database through `effect/sql` and `@effect/sql-sqlite-node`, which uses Node's built-in
-`node:sqlite` and so needs no native module rebuilt for Electron.
+Later features, agents among them, will search what the user did, so the backend keeps an Activity
+log in a SQLite database through `effect/sql` and `@effect/sql-sqlite-node`, which uses Node's
+built-in `node:sqlite` and so needs no native module rebuilt for Electron.
 Everything later features will search is kept here; the settings that only need loading, such as
 the followed repositories, stay in `settings.json` beside it. Each Activity is a typed Schema in
 `packages/contracts`, stored as its kind and a JSON payload, so a new kind needs no migration. Each

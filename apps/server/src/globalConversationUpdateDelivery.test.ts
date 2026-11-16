@@ -12,7 +12,7 @@ import { Transcripts } from "./Transcripts"
 const layer = StartedWork.layer.pipe(
   Layer.provideMerge(Transcripts.layer),
   Layer.provide(
-    Layer.mock(Conversations)({ engines: () => ["pi"], markTurnSeen: () => Effect.void }),
+    Layer.mock(Conversations)({ harnesses: () => ["pi"], markTurnSeen: () => Effect.void }),
   ),
   Layer.provide(Layer.mock(AgentReviews)({})),
   Layer.provideMerge(SqliteMigrator.layer({ loader: migrationLoader })),

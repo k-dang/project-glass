@@ -252,7 +252,7 @@ _Avoid_: Notification, event, wake-up
 **Agent harness**:
 Claude Code or pi, the harness that runs a Conversation's agent. It decides which models and efforts
 the user can pick, and leaving either to it runs its own default.
-_Avoid_: Engine (in UI copy), provider
+_Avoid_: Engine, provider
 
 **Effort**:
 How hard a Conversation's model works on each Turn, from the levels its Agent harness offers for
