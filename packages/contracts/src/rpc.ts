@@ -10,23 +10,22 @@ import {
 } from "./agentReview"
 import { AskAnswer, AskFailure, AskPlace, AskQuestion } from "./ask"
 import {
-  Agent,
-  AgentBusy,
-  AgentChanges,
+  Conversation,
+  ConversationBusy,
+  ConversationChanges,
   AgentCommand,
-  AgentEngine,
-  AgentError,
+  AgentHarness,
+  ConversationError,
   AgentModels,
-  AgentPlace,
-  AgentNotFound,
-  EarlierTurns,
+  ConversationPlace,
+  ConversationNotFound,
   Image,
   InvalidLocalCheckout,
   LocalCheckout,
   MessageInput,
   MessageInputWithContext,
   ModelChoice,
-  NewAgent,
+  NewConversation,
   NoPermissionModes,
   PastConversation,
   PastConversationNotFound,
@@ -37,13 +36,12 @@ import {
   RequestNotWaiting,
   RequestWaiting,
   SandboxProviderInfo,
-  SendAgentMessage,
+  SendConversationMessage,
   SentMessage,
   StartFreshRefused,
-  Transcript,
   TranscriptUpdate,
   TurnEnd,
-} from "./agent"
+} from "./conversation"
 import { ConnectionError, GitHubConnection } from "./connection"
 import {
   DiffSide,
@@ -219,7 +217,7 @@ export class GlassRpcs extends RpcGroup.make(
   }),
   Rpc.make("RemoveSkillPack", { payload: { name: Schema.String }, ...skillPackList }),
   Rpc.make("ListLocalSkills", {
-    payload: { engine: AgentEngine },
+    payload: { harness: AgentHarness },
     success: Schema.Array(Schema.String),
     error: LocalSkillsError,
   }),
@@ -356,16 +354,20 @@ export class GlassRpcs extends RpcGroup.make(
     success: Image,
     error: ToDoError,
   }),
-  Rpc.make("WatchAgents", { success: Schema.Array(Agent), error: AgentError, stream: true }),
-  Rpc.make("WatchWaitingAgents", {
+  Rpc.make("WatchConversations", {
+    success: Schema.Array(Conversation),
+    error: ConversationError,
+    stream: true,
+  }),
+  Rpc.make("WatchWaitingConversations", {
     success: Schema.Array(Schema.String),
-    error: AgentError,
+    error: ConversationError,
     stream: true,
   }),
   Rpc.make("WatchNeedsYou", { success: NeedsYou, stream: true }),
   Rpc.make("MarkTurnSeen", {
-    payload: { agentId: Schema.String, endedAt: Schema.DateTimeUtcFromString },
-    error: AgentError,
+    payload: { conversationId: Schema.String, endedAt: Schema.DateTimeUtcFromString },
+    error: ConversationError,
   }),
   Rpc.make("AnswerOutsideQuestion", {
     payload: { id: Schema.String, answer: OutsideQuestionAnswer },
@@ -378,198 +380,212 @@ export class GlassRpcs extends RpcGroup.make(
     error: OutsideAgentNotFound,
   }),
   Rpc.make("WatchTranscript", {
-    payload: { agentId: Schema.String },
+    payload: { conversationId: Schema.String },
     success: TranscriptUpdate,
-    error: Schema.Union([AgentNotFound, AgentError]),
+    error: Schema.Union([ConversationNotFound, ConversationError]),
     stream: true,
   }),
   Rpc.make("LoadEarlierTurns", {
-    payload: { agentId: Schema.String, before: Schema.String },
-    error: Schema.Union([AgentNotFound, AgentError]),
+    payload: { conversationId: Schema.String, before: Schema.String },
+    error: Schema.Union([ConversationNotFound, ConversationError]),
   }),
-  Rpc.make("ListLocalCheckouts", { success: Schema.Array(LocalCheckout), error: AgentError }),
+  Rpc.make("ListLocalCheckouts", {
+    success: Schema.Array(LocalCheckout),
+    error: ConversationError,
+  }),
   Rpc.make("LinkLocalCheckout", {
     payload: { path: Schema.String },
     success: LocalCheckout,
-    error: Schema.Union([InvalidLocalCheckout, AgentError]),
+    error: Schema.Union([InvalidLocalCheckout, ConversationError]),
   }),
-  Rpc.make("GetNewAgentDefaultBranch", {
-    payload: { place: AgentPlace, repository: FollowedRepository },
+  Rpc.make("GetNewConversationDefaultBranch", {
+    payload: { place: ConversationPlace, repository: FollowedRepository },
     success: Schema.NullOr(Schema.String),
-    error: Schema.Union([InvalidLocalCheckout, ConnectionError, AgentError]),
+    error: Schema.Union([InvalidLocalCheckout, ConnectionError, ConversationError]),
   }),
-  Rpc.make("ListNewAgentBranches", {
-    payload: { place: AgentPlace, repository: FollowedRepository },
+  Rpc.make("ListNewConversationBranches", {
+    payload: { place: ConversationPlace, repository: FollowedRepository },
     success: Schema.Array(Schema.String),
-    error: Schema.Union([InvalidLocalCheckout, ConnectionError, AgentError]),
+    error: Schema.Union([InvalidLocalCheckout, ConnectionError, ConversationError]),
   }),
   Rpc.make("ListAgentModels", {
-    payload: { engine: AgentEngine, place: AgentPlace },
+    payload: { harness: AgentHarness, place: ConversationPlace },
     success: AgentModels,
-    error: AgentError,
+    error: ConversationError,
   }),
-  Rpc.make("ListNewAgentCommands", {
-    payload: { engine: AgentEngine, place: AgentPlace, repository: FollowedRepository },
+  Rpc.make("ListNewConversationCommands", {
+    payload: { harness: AgentHarness, place: ConversationPlace, repository: FollowedRepository },
     success: Schema.Array(AgentCommand),
-    error: Schema.Union([InvalidLocalCheckout, AgentError]),
+    error: Schema.Union([InvalidLocalCheckout, ConversationError]),
   }),
-  Rpc.make("ListAgentCommands", {
-    payload: { agentId: Schema.String },
+  Rpc.make("ListConversationCommands", {
+    payload: { conversationId: Schema.String },
     success: Schema.Array(AgentCommand),
-    error: Schema.Union([AgentNotFound, AgentError]),
+    error: Schema.Union([ConversationNotFound, ConversationError]),
   }),
-  Rpc.make("ListNewAgentFiles", {
-    payload: { place: AgentPlace, repository: FollowedRepository, baseBranch: Schema.String },
+  Rpc.make("ListNewConversationFiles", {
+    payload: {
+      place: ConversationPlace,
+      repository: FollowedRepository,
+      baseBranch: Schema.String,
+    },
     success: Schema.Array(Schema.String),
-    error: Schema.Union([InvalidLocalCheckout, AgentError]),
+    error: Schema.Union([InvalidLocalCheckout, ConversationError]),
   }),
-  Rpc.make("ListAgentFiles", {
-    payload: { agentId: Schema.String },
+  Rpc.make("ListConversationFiles", {
+    payload: { conversationId: Schema.String },
     success: Schema.Array(Schema.String),
-    error: Schema.Union([AgentNotFound, AgentError]),
+    error: Schema.Union([ConversationNotFound, ConversationError]),
   }),
   Rpc.make("ListSandboxProviders", { success: Schema.Array(SandboxProviderInfo) }),
-  Rpc.make("CreateAgent", {
-    payload: NewAgent,
-    success: Agent,
-    error: Schema.Union([InvalidLocalCheckout, AgentError]),
+  Rpc.make("CreateConversation", {
+    payload: NewConversation,
+    success: Conversation,
+    error: Schema.Union([InvalidLocalCheckout, ConversationError]),
   }),
   Rpc.make("SendMessage", {
-    payload: SendAgentMessage,
-    error: Schema.Union([AgentNotFound, RequestWaiting, AgentError]),
+    payload: SendConversationMessage,
+    error: Schema.Union([ConversationNotFound, RequestWaiting, ConversationError]),
   }),
   Rpc.make("Steer", {
-    payload: { agentId: Schema.String, ...MessageInput.fields },
-    error: Schema.Union([AgentNotFound, RequestWaiting, AgentError]),
+    payload: { conversationId: Schema.String, ...MessageInput.fields },
+    error: Schema.Union([ConversationNotFound, RequestWaiting, ConversationError]),
   }),
   Rpc.make("CancelQueuedMessage", {
-    payload: { agentId: Schema.String, queuedMessageId: Schema.String },
+    payload: { conversationId: Schema.String, queuedMessageId: Schema.String },
     success: UnsentFeedback,
-    error: Schema.Union([AgentNotFound, QueuedMessageStarted, AgentError]),
+    error: Schema.Union([ConversationNotFound, QueuedMessageStarted, ConversationError]),
   }),
   Rpc.make("SendQueuedMessage", {
-    payload: { agentId: Schema.String, queuedMessageId: Schema.String },
-    error: Schema.Union([AgentNotFound, AgentBusy, AgentError]),
+    payload: { conversationId: Schema.String, queuedMessageId: Schema.String },
+    error: Schema.Union([ConversationNotFound, ConversationBusy, ConversationError]),
   }),
   Rpc.make("StopTurn", {
-    payload: { agentId: Schema.String },
-    error: Schema.Union([AgentNotFound, AgentError]),
+    payload: { conversationId: Schema.String },
+    error: Schema.Union([ConversationNotFound, ConversationError]),
   }),
   Rpc.make("ReachSandbox", {
-    payload: { agentId: Schema.String },
-    error: Schema.Union([AgentNotFound, AgentError]),
+    payload: { conversationId: Schema.String },
+    error: Schema.Union([ConversationNotFound, ConversationError]),
   }),
   Rpc.make("GetUnsentMessage", {
-    payload: { agentId: Schema.String },
+    payload: { conversationId: Schema.String },
     success: SentMessage,
-    error: Schema.Union([AgentNotFound, AgentError]),
+    error: Schema.Union([ConversationNotFound, ConversationError]),
   }),
   Rpc.make("SaveUnsentMessage", {
-    payload: { agentId: Schema.String, ...SentMessage.fields },
-    error: Schema.Union([AgentNotFound, AgentError]),
+    payload: { conversationId: Schema.String, ...SentMessage.fields },
+    error: Schema.Union([ConversationNotFound, ConversationError]),
   }),
-  Rpc.make("ChangeAgentModel", {
-    payload: { agentId: Schema.String, ...ModelChoice.fields },
-    success: Agent,
-    error: Schema.Union([AgentNotFound, AgentError]),
+  Rpc.make("ChangeConversationModel", {
+    payload: { conversationId: Schema.String, ...ModelChoice.fields },
+    success: Conversation,
+    error: Schema.Union([ConversationNotFound, ConversationError]),
   }),
   Rpc.make("ChangePermissionMode", {
-    payload: { agentId: Schema.String, permissionMode: PermissionMode },
-    success: Agent,
-    error: Schema.Union([AgentNotFound, NoPermissionModes, AgentError]),
+    payload: { conversationId: Schema.String, permissionMode: PermissionMode },
+    success: Conversation,
+    error: Schema.Union([ConversationNotFound, NoPermissionModes, ConversationError]),
   }),
   Rpc.make("AnswerRequest", {
-    payload: { agentId: Schema.String, requestId: Schema.String, answer: RequestAnswer },
-    error: Schema.Union([AgentNotFound, RequestNotWaiting, AgentError]),
+    payload: { conversationId: Schema.String, requestId: Schema.String, answer: RequestAnswer },
+    error: Schema.Union([ConversationNotFound, RequestNotWaiting, ConversationError]),
   }),
   Rpc.make("GetRemovalWarnings", {
-    payload: { agentId: Schema.String },
+    payload: { conversationId: Schema.String },
     success: RemovalWarnings,
-    error: Schema.Union([AgentNotFound, AgentError]),
+    error: Schema.Union([ConversationNotFound, ConversationError]),
   }),
-  Rpc.make("GetAgentChanges", {
-    payload: { agentId: Schema.String },
-    success: AgentChanges,
-    error: Schema.Union([AgentNotFound, AgentError]),
+  Rpc.make("GetConversationChanges", {
+    payload: { conversationId: Schema.String },
+    success: ConversationChanges,
+    error: Schema.Union([ConversationNotFound, ConversationError]),
   }),
   Rpc.make("ListFeedbackNotes", {
-    payload: { agentId: Schema.String },
+    payload: { conversationId: Schema.String },
     success: UnsentFeedback,
-    error: Schema.Union([AgentNotFound, AgentError]),
+    error: Schema.Union([ConversationNotFound, ConversationError]),
   }),
   Rpc.make("StageFeedbackNotes", {
-    payload: { agentId: Schema.String },
+    payload: { conversationId: Schema.String },
     success: UnsentFeedback,
-    error: Schema.Union([AgentNotFound, AgentError]),
+    error: Schema.Union([ConversationNotFound, ConversationError]),
   }),
   Rpc.make("SaveFeedbackNote", {
-    payload: { agentId: Schema.String, note: FeedbackNote },
+    payload: { conversationId: Schema.String, note: FeedbackNote },
     success: UnsentFeedback,
-    error: Schema.Union([AgentNotFound, AgentError]),
+    error: Schema.Union([ConversationNotFound, ConversationError]),
   }),
   Rpc.make("RemoveFeedbackNote", {
-    payload: { agentId: Schema.String, noteId: Schema.String },
+    payload: { conversationId: Schema.String, noteId: Schema.String },
     success: UnsentFeedback,
-    error: Schema.Union([AgentNotFound, AgentError]),
+    error: Schema.Union([ConversationNotFound, ConversationError]),
   }),
-  Rpc.make("RemoveAgent", {
-    payload: { agentId: Schema.String },
-    error: Schema.Union([AgentNotFound, AgentError]),
+  Rpc.make("RemoveConversation", {
+    payload: { conversationId: Schema.String },
+    error: Schema.Union([ConversationNotFound, ConversationError]),
   }),
   Rpc.make("GetGlobalConversationModel", {
     success: ModelChoice,
-    error: AgentError,
+    error: ConversationError,
   }),
   Rpc.make("ChangeGlobalConversationModel", {
     payload: ModelChoice.fields,
-    error: AgentError,
+    error: ConversationError,
   }),
-  Rpc.make("WatchGlobalTranscript", { success: TranscriptUpdate, error: AgentError, stream: true }),
-  Rpc.make("LoadEarlierGlobalTurns", { payload: { before: Schema.String }, error: AgentError }),
+  Rpc.make("WatchGlobalTranscript", {
+    success: TranscriptUpdate,
+    error: ConversationError,
+    stream: true,
+  }),
+  Rpc.make("LoadEarlierGlobalTurns", {
+    payload: { before: Schema.String },
+    error: ConversationError,
+  }),
   Rpc.make("SendGlobalMessage", {
     payload: MessageInputWithContext,
-    error: Schema.Union([RequestWaiting, AgentError]),
+    error: Schema.Union([RequestWaiting, ConversationError]),
   }),
   Rpc.make("SteerGlobal", {
     payload: MessageInputWithContext,
-    error: Schema.Union([RequestWaiting, AgentError]),
+    error: Schema.Union([RequestWaiting, ConversationError]),
   }),
   Rpc.make("CancelGlobalQueuedMessage", {
     payload: { queuedMessageId: Schema.String },
-    error: Schema.Union([QueuedMessageStarted, AgentError]),
+    error: Schema.Union([QueuedMessageStarted, ConversationError]),
   }),
   Rpc.make("SendGlobalQueuedMessage", {
     payload: { queuedMessageId: Schema.String },
-    error: Schema.Union([AgentBusy, AgentError]),
+    error: Schema.Union([ConversationBusy, ConversationError]),
   }),
-  Rpc.make("StopGlobalTurn", { error: AgentError }),
+  Rpc.make("StopGlobalTurn", { error: ConversationError }),
   Rpc.make("AnswerGlobalRequest", {
     payload: { requestId: Schema.String, answer: RequestAnswer },
-    error: Schema.Union([RequestNotWaiting, AgentError]),
+    error: Schema.Union([RequestNotWaiting, ConversationError]),
   }),
-  Rpc.make("GetGlobalUnsentMessage", { success: SentMessage, error: AgentError }),
-  Rpc.make("SaveGlobalUnsentMessage", { payload: SentMessage, error: AgentError }),
+  Rpc.make("GetGlobalUnsentMessage", { success: SentMessage, error: ConversationError }),
+  Rpc.make("SaveGlobalUnsentMessage", { payload: SentMessage, error: ConversationError }),
   Rpc.make("WatchGlobalUnseen", { success: Schema.NullOr(TurnEnd), stream: true }),
   Rpc.make("MarkGlobalTurnSeen", {
     payload: { endedAt: Schema.DateTimeUtcFromString },
-    error: AgentError,
+    error: ConversationError,
   }),
   Rpc.make("StartGlobalConversationFresh", {
-    error: Schema.Union([StartFreshRefused, AgentError]),
+    error: Schema.Union([StartFreshRefused, ConversationError]),
   }),
   Rpc.make("ListPastGlobalConversations", {
     success: Schema.Array(PastConversation),
-    error: AgentError,
+    error: ConversationError,
   }),
-  Rpc.make("ReadPastGlobalConversation", {
+  Rpc.make("WatchPastGlobalConversation", {
     payload: { id: Schema.String },
-    success: Transcript,
-    error: Schema.Union([PastConversationNotFound, AgentError]),
+    success: TranscriptUpdate,
+    error: Schema.Union([PastConversationNotFound, ConversationError]),
+    stream: true,
   }),
-  Rpc.make("ReadEarlierPastGlobalTurns", {
+  Rpc.make("LoadEarlierPastGlobalTurns", {
     payload: { id: Schema.String, before: Schema.String },
-    success: EarlierTurns,
-    error: Schema.Union([PastConversationNotFound, AgentError]),
+    error: Schema.Union([PastConversationNotFound, ConversationError]),
   }),
 ) {}
 

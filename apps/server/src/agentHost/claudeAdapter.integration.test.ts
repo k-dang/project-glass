@@ -22,10 +22,10 @@ import {
   writeGreeter,
   writeGreetSkill,
 } from "../../test/adapterSessions"
-import { settled } from "../../test/agentsFixture"
+import { settled } from "../../test/conversationsFixture"
 import { ReviewRole } from "./protocol"
 
-const conversation = "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
+const conversationId = "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
 
 const lastText = (turn: Turn | undefined) =>
   turn?.parts.findLast((part) => Predicate.isTagged(part, "Text"))
@@ -38,25 +38,25 @@ const pixel = Image.make({
 it.live("answers Claude Code's Permission requests and Questions through Glass", () =>
   Effect.gen(function* () {
     const f = yield* claudeSession("claude-requests")
-    const agent = yield* f.open(conversation)
-    yield* agent.configure({ permissionMode: "default" })
+    const session = yield* f.open(conversationId)
+    yield* session.configure({ permissionMode: "default" })
 
-    yield* agent.send(run("Bash", "touch compatible.txt", "DONE"))
+    yield* session.send(run("Bash", "touch compatible.txt", "DONE"))
     const permission = yield* f.request
     assert.ok(Predicate.isTagged(permission, "PermissionRequest"))
     assert.equal(permission.toolName, "Bash")
-    yield* agent.answer(permission.requestId, AllowRequest.make({}))
+    yield* session.answer(permission.requestId, AllowRequest.make({}))
     const allowed = yield* f.until(settled(1))
     assert.deepStrictEqual(allowed[0]?.ended?.ending, TurnDone.make({}))
 
-    yield* agent.send(
+    yield* session.send(
       "Use the AskUserQuestion tool once to ask me which files to read, offering exactly two options labelled Only the README and Everything. After I answer, reply with exactly the label I chose.",
     )
 
     const question = yield* f.request
 
     assert.ok(Predicate.isTagged(question, "Question"))
-    yield* agent.answer(
+    yield* session.answer(
       question.requestId,
       AnswerQuestion.make({ answers: [{ chosen: ["Only the README"], text: null }] }),
     )
@@ -85,10 +85,10 @@ it.live("lists a sent Skill pack's skills as `/pack:skill`", () =>
 it.live("streams a long reply in small pieces to its end", () =>
   Effect.gen(function* () {
     const f = yield* claudeSession("claude-long-reply")
-    const agent = yield* f.open(conversation)
+    const session = yield* f.open(conversationId)
     const long = "Every word of this reply streams in its own small piece. ".repeat(8).trim()
 
-    yield* agent.send(`Reply with exactly this text and nothing else: ${long}`)
+    yield* session.send(`Reply with exactly this text and nothing else: ${long}`)
     const [turn] = yield* f.until(settled(1))
 
     assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
@@ -106,9 +106,9 @@ it.live("streams a long reply in small pieces to its end", () =>
 it.live("sends a message's images to Claude Code", () =>
   Effect.gen(function* () {
     const f = yield* claudeSession("claude-image")
-    const agent = yield* f.open(conversation)
+    const session = yield* f.open(conversationId)
 
-    yield* agent.send(
+    yield* session.send(
       "What's in this image? Answer in one short sentence without using any tools.",
       [pixel],
     )
@@ -151,14 +151,14 @@ it.live("lists the folder's skills among what Claude Code runs as `/name`", () =
 it.live("starts on the chosen model and effort, and changes the effort for the next Turn", () =>
   Effect.gen(function* () {
     const f = yield* claudeSession("claude-model-change")
-    const agent = yield* f.open(conversation)
+    const session = yield* f.open(conversationId)
 
-    yield* agent.configure({ model: "haiku", effort: "high" })
-    yield* agent.send("Reply with exactly: FIRST")
+    yield* session.configure({ model: "haiku", effort: "high" })
+    yield* session.send("Reply with exactly: FIRST")
     yield* f.until(settled(1))
 
-    yield* agent.configure({ effort: "low" })
-    yield* agent.send("Reply with exactly: SECOND")
+    yield* session.configure({ effort: "low" })
+    yield* session.send("Reply with exactly: SECOND")
     const turns = yield* f.until(settled(2))
 
     assert.deepStrictEqual(
@@ -171,13 +171,13 @@ it.live("starts on the chosen model and effort, and changes the effort for the n
 it.live("Steers a running Turn, showing the Steer where Claude Code takes it in", () =>
   Effect.gen(function* () {
     const f = yield* claudeSession("claude-steer")
-    const agent = yield* f.open(conversation)
-    yield* agent.configure({ permissionMode: "default" })
+    const session = yield* f.open(conversationId)
+    yield* session.configure({ permissionMode: "default" })
 
-    yield* agent.send(run("Bash", "touch steer.txt", "FIRST"))
+    yield* session.send(run("Bash", "touch steer.txt", "FIRST"))
     const request = yield* f.request
-    yield* agent.steer("Change course: reply with exactly STEERED instead.")
-    yield* agent.answer(request.requestId, AllowRequest.make({}))
+    yield* session.steer("Change course: reply with exactly STEERED instead.")
+    yield* session.answer(request.requestId, AllowRequest.make({}))
 
     const [turn] = yield* f.until(settled(1))
     assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
@@ -199,13 +199,13 @@ it.live("continues a conversation when Claude Code starts again", () =>
 
     yield* Effect.scoped(
       Effect.gen(function* () {
-        const agent = yield* f.open(conversation)
-        yield* agent.send("Remember the word lantern. Reply with exactly: Noted.")
+        const session = yield* f.open(conversationId)
+        yield* session.send("Remember the word lantern. Reply with exactly: Noted.")
         yield* f.until(settled(1))
       }),
     )
 
-    const again = yield* f.open(conversation)
+    const again = yield* f.open(conversationId)
     yield* again.send(
       "Which word did I ask you to remember? Reply with only that word, in lowercase.",
     )
@@ -220,22 +220,22 @@ it.live(
   () =>
     Effect.gen(function* () {
       const f = yield* claudeSession("claude-deny")
-      const agent = yield* f.open(conversation)
-      yield* agent.configure({ permissionMode: "default" })
+      const session = yield* f.open(conversationId)
+      yield* session.configure({ permissionMode: "default" })
 
-      yield* agent.send(run("Bash", "touch notes.txt", "DONE"))
+      yield* session.send(run("Bash", "touch notes.txt", "DONE"))
       const request = yield* f.request
 
-      const refused = yield* agent
+      const refused = yield* session
         .answer(
           request.requestId,
           AnswerQuestion.make({ answers: [{ chosen: ["README"], text: null }] }),
         )
         .pipe(Effect.flip)
 
-      assert.equal(refused._tag, "HostAgentError")
+      assert.equal(refused._tag, "HostConversationError")
 
-      yield* agent.answer(
+      yield* session.answer(
         request.requestId,
         DenyRequest.make({ reason: "Leave the checkout alone" }),
       )
@@ -245,7 +245,7 @@ it.live(
       const toolCall = turn?.parts.find((part) => Predicate.isTagged(part, "ToolCall"))
       assert.include(toolCall?.output, "Leave the checkout alone")
 
-      const late = yield* agent.answer(request.requestId, AllowRequest.make({})).pipe(Effect.flip)
+      const late = yield* session.answer(request.requestId, AllowRequest.make({})).pipe(Effect.flip)
 
       assert.equal(late._tag, "RequestNotWaiting")
     }).pipe(Effect.scoped),
@@ -256,18 +256,18 @@ it.live(
   () =>
     Effect.gen(function* () {
       const f = yield* claudeSession("claude-stop-in-request")
-      const agent = yield* f.open(conversation)
-      yield* agent.configure({ permissionMode: "default" })
+      const session = yield* f.open(conversationId)
+      yield* session.configure({ permissionMode: "default" })
 
-      yield* agent.send(run("Bash", "touch notes.txt", "DONE"))
+      const turnId = yield* session.send(run("Bash", "touch notes.txt", "DONE"))
       const request = yield* f.request
-      yield* agent.session.stopTurn(TurnStopped.make({}))
+      yield* session.session.stopTurn(turnId, TurnStopped.make({}))
 
       const [turn] = yield* f.until(settled(1))
       assert.deepStrictEqual(turn?.ended?.ending, TurnStopped.make({}))
       assert.equal(turn?.parts.find(isRequestPart)?.status, "expired")
 
-      const late = yield* agent.answer(request.requestId, AllowRequest.make({})).pipe(Effect.flip)
+      const late = yield* session.answer(request.requestId, AllowRequest.make({})).pipe(Effect.flip)
 
       assert.equal(late._tag, "RequestNotWaiting")
     }).pipe(Effect.scoped),
@@ -276,16 +276,16 @@ it.live(
 it.live("runs the next Turn in a newly chosen Permission mode", () =>
   Effect.gen(function* () {
     const f = yield* claudeSession("claude-permission-mode-change")
-    const agent = yield* f.open(conversation)
-    yield* agent.configure({ permissionMode: "default" })
+    const session = yield* f.open(conversationId)
+    yield* session.configure({ permissionMode: "default" })
 
-    yield* agent.send(run("Bash", "touch first.txt", "DONE"))
+    yield* session.send(run("Bash", "touch first.txt", "DONE"))
     const request = yield* f.request
-    yield* agent.answer(request.requestId, AllowRequest.make({}))
+    yield* session.answer(request.requestId, AllowRequest.make({}))
     yield* f.until(settled(1))
 
-    yield* agent.configure({ permissionMode: "bypassPermissions" })
-    yield* agent.send(run("Bash", "touch second.txt", "DONE"))
+    yield* session.configure({ permissionMode: "bypassPermissions" })
+    yield* session.send(run("Bash", "touch second.txt", "DONE"))
     const [, second] = yield* f.until(settled(2))
 
     assert.deepStrictEqual(second?.ended?.ending, TurnDone.make({}))
@@ -294,14 +294,14 @@ it.live("runs the next Turn in a newly chosen Permission mode", () =>
 )
 
 it.live(
-  "runs commands in its checkout and proposes Suggested drafts as an Agent review's Agent",
+  "runs commands in its checkout and proposes Suggested drafts as an Agent review's Conversation",
   () =>
     Effect.gen(function* () {
       const f = yield* claudeSession("claude-review")
       yield* writeGreeter(f.folder)
-      const agent = yield* f.open(conversation, ReviewRole.make({ brief: reviewBrief }))
+      const session = yield* f.open(conversationId, ReviewRole.make({ brief: reviewBrief }))
 
-      yield* agent.send(
+      yield* session.send(
         'Run `cat greet.ts` with the Bash tool. Then call the suggest_draft tool exactly twice, one call after the other: first with path greet.ts, side new, line 2, and body "Keep the name."; then with path greet.ts, side new, line 40, and body "Off the diff.". Then reply with exactly: DONE',
       )
       const [turn] = yield* f.until(settled(1))

@@ -3,7 +3,7 @@ import type { Effect, Scope } from "effect"
 import type { DeliveredMessage, DeliveredTurn } from "./deliveredMessage"
 import type {
   ConversationRole,
-  HostAgentError,
+  HostConversationError,
   HostEvent,
   SteersNotTakenIn,
   TurnSettings,
@@ -11,33 +11,33 @@ import type {
 import type { WrittenSkills } from "./sentSkills"
 import type { StopEnding } from "./turnLoop"
 
-export interface AgentSession {
-  readonly configure: (settings: TurnSettings) => Effect.Effect<void, HostAgentError>
+export interface HarnessSession {
+  readonly configure: (settings: TurnSettings) => Effect.Effect<void, HostConversationError>
   readonly startTurn: (
     turnId: string,
     message: DeliveredTurn,
-  ) => Effect.Effect<void, HostAgentError>
-  readonly steer: (message: DeliveredMessage) => Effect.Effect<void, HostAgentError>
-  readonly stopTurn: (ending: StopEnding) => Effect.Effect<SteersNotTakenIn | null>
+  ) => Effect.Effect<void, HostConversationError>
+  readonly steer: (message: DeliveredMessage) => Effect.Effect<void, HostConversationError>
+  readonly stopTurn: (turnId: string, ending: StopEnding) => Effect.Effect<SteersNotTakenIn | null>
   readonly answer: (
     requestId: string,
     answer: RequestAnswer,
-  ) => Effect.Effect<void, RequestNotWaiting | HostAgentError>
+  ) => Effect.Effect<void, RequestNotWaiting | HostConversationError>
   readonly closed: Effect.Effect<void>
   readonly stopped: Effect.Effect<boolean>
 }
 
-export interface AgentAdapter<Role extends ConversationRole = ConversationRole> {
-  readonly models: Effect.Effect<AgentModels, HostAgentError>
+export interface HarnessAdapter<Role extends ConversationRole = ConversationRole> {
+  readonly models: Effect.Effect<AgentModels, HostConversationError>
   readonly commands: (
     folder: string,
     skills: ReadonlyArray<WrittenSkills>,
-  ) => Effect.Effect<ReadonlyArray<AgentCommand>, HostAgentError>
+  ) => Effect.Effect<ReadonlyArray<AgentCommand>, HostConversationError>
   readonly start: (options: {
     readonly folder: string
     readonly conversation: string
     readonly role: Role
     readonly skills: ReadonlyArray<WrittenSkills>
     readonly report: (event: HostEvent) => Effect.Effect<void>
-  }) => Effect.Effect<AgentSession, HostAgentError, Scope.Scope>
+  }) => Effect.Effect<HarnessSession, HostConversationError, Scope.Scope>
 }

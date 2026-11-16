@@ -6,6 +6,7 @@ import {
   PullRequestContext,
   TextPart,
   TranscriptSnapshot,
+  type TranscriptUpdate,
   EarlierTurns,
   TurnDone,
   GlobalConversationUpdate,
@@ -38,7 +39,7 @@ import {
 import { RegistryProvider } from "@effect/atom-react"
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { DateTime, Effect, Stream } from "effect"
+import { DateTime, Effect, Queue, Stream } from "effect"
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test"
 import { ACTIVITY_PAGE_SIZE } from "./ActivityLogPage"
 import { App } from "./App"
@@ -81,7 +82,7 @@ const workspace = new PullRequestWorkspace({
 })
 
 const tourSettings: EngineSettings = {
-  engine: "claude-code",
+  harness: "claude-code",
   models: {
     "claude-code": "claude-sonnet-5-5",
     pi: { provider: "anthropic", modelId: "claude-sonnet-5-5" },
@@ -94,7 +95,7 @@ const mount = (handlers: Parameters<typeof testLayer>[0]) => {
       Effect.succeed(new GitHubConnection({ login: "kevin", tokenSource: "gh" })),
     ListFollowedRepositories: () => Effect.succeed([]),
     GetEngineSettings: ({ feature }) =>
-      Effect.succeed(feature === "tours" ? tourSettings : { ...tourSettings, engine: "pi" }),
+      Effect.succeed(feature === "tours" ? tourSettings : { ...tourSettings, harness: "pi" }),
     GetReviewPrompt: () => Effect.succeed(defaultReviewPrompt),
     ...handlers,
   })
@@ -128,7 +129,11 @@ it("breaks storage down by table in Settings, and retries a failed measurement",
       return measurements === 1
         ? Effect.fail(new StorageError())
         : Effect.succeed([
-            new StorageItem({ name: "agent_turn", group: "agents", bytes: 2.5 * 1024 ** 2 }),
+            new StorageItem({
+              name: "conversation_turn",
+              group: "conversations",
+              bytes: 2.5 * 1024 ** 2,
+            }),
             new StorageItem({ name: "tours", group: "reviews", bytes: 512 * 1024 }),
             new StorageItem({ name: "Write-ahead log", group: "overhead", bytes: 508 * 1024 }),
             new StorageItem({ name: "Free space", group: "overhead", bytes: 4096 }),
@@ -140,8 +145,10 @@ it("breaks storage down by table in Settings, and retries a failed measurement",
   const storage = within(await screen.findByRole("region", { name: "Storage" }))
   await user.click(await storage.findByRole("button", { name: "Try again" }))
 
-  expect((await storage.findByText("3.5 MB on disk")).textContent).toContain("largest is Agents")
-  expect(storage.getByText("agent_turn")).toBeTruthy()
+  expect((await storage.findByText("3.5 MB on disk")).textContent).toContain(
+    "largest is Conversations",
+  )
+  expect(storage.getByText("conversation_turn")).toBeTruthy()
   expect(storage.queryByText("tours")).toBeNull()
 
   await user.click(storage.getByRole("button", { name: /Reviews/ }))
@@ -302,7 +309,7 @@ it("opens the keyboard shortcuts from any area, not only a PR workspace", async 
   await user.click(await screen.findByRole("link", { name: "To-dos" }))
   await user.keyboard("?")
   const dialog = await screen.findByRole("dialog", { name: "Keyboard shortcuts" })
-  expect(within(dialog).getByRole("heading", { name: "Agents" })).toBeTruthy()
+  expect(within(dialog).getByRole("heading", { name: "Conversations" })).toBeTruthy()
 })
 
 it("preserves a pending follow and its failure when leaving and returning to Settings", async () => {
@@ -512,6 +519,7 @@ it("opens the Global conversation over the current area, labelling each message 
 it("starts the Global conversation fresh once confirmed and reads a past one", async () => {
   const at = DateTime.makeUnsafe("2026-11-05T12:00:00Z")
   let started = 0
+  const earlierPages = Effect.runSync(Queue.unbounded<TranscriptUpdate>())
 
   const pastTurn = (id: string, reply: string) => ({
     id,
@@ -529,18 +537,21 @@ it("starts the Global conversation fresh once confirmed and reads a past one", a
     StartGlobalConversationFresh: () => Effect.sync(() => void started++),
     ListPastGlobalConversations: () =>
       Effect.succeed([{ id: "past-1", startedAt: at, endedAt: at }]),
-    ReadPastGlobalConversation: () =>
-      Effect.succeed({
-        turns: [pastTurn("turn-2", "Old reply")],
-        earlierTurns: 1,
-        queued: [],
-        status: null,
-        extensionStatuses: [],
-      }),
-    ReadEarlierPastGlobalTurns: ({ before }) =>
-      Effect.succeed(
+    WatchPastGlobalConversation: () =>
+      Stream.make(
+        TranscriptSnapshot.make({
+          turns: [pastTurn("turn-2", "Old reply")],
+          earlierTurns: 1,
+          queued: [],
+          status: null,
+          extensionStatuses: [],
+        }),
+      ).pipe(Stream.concat(Stream.fromQueue(earlierPages))),
+    LoadEarlierPastGlobalTurns: ({ before }) =>
+      Queue.offer(
+        earlierPages,
         EarlierTurns.make({ before, turns: [pastTurn("turn-1", "Older reply")], earlierTurns: 0 }),
-      ),
+      ).pipe(Effect.asVoid),
   })
 
   await user.click(await screen.findByRole("button", { name: "Global conversation" }))

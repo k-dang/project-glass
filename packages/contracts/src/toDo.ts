@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect"
-import { ImageMediaType } from "./agent"
+import { ImageMediaType } from "./conversation"
 
 export const ToDoTitle = Schema.Trimmed.check(Schema.isNonEmpty())
 

@@ -36,7 +36,7 @@ const fixture = Effect.fnUntraced(function* (
 
   const run = Effect.gen(function* () {
     const runner = yield* (yield* AgentRunners).select({
-      engine: scenario.engine,
+      harness: scenario.harness,
       models: recording.models,
     })
 
@@ -189,10 +189,10 @@ it.live("refuses a Claude Code that can't restrict its tools", () =>
 
 it.live("reports a runner whose executable is missing as not installed", () =>
   Effect.gen(function* () {
-    const failures = yield* Effect.forEach(["claude-code", "pi"] as const, (engine) =>
+    const failures = yield* Effect.forEach(["claude-code", "pi"] as const, (harness) =>
       Effect.gen(function* () {
         const runner = yield* (yield* AgentRunners).select({
-          engine,
+          harness,
           models: {
             "claude-code": "claude-haiku",
             pi: { provider: "glass-test", modelId: "gpt-test" },

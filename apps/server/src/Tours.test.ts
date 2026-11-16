@@ -1,9 +1,8 @@
 import { assert, it } from "@effect/vitest"
 import {
-  type AgentEngine,
+  type AgentHarness,
   PullRequestRef,
   Revision,
-  type TourDiagram,
   TOKEN_PARAM,
   type TourState,
 } from "@glass/contracts"
@@ -100,12 +99,12 @@ const fixture = Effect.fnUntraced(function* (settings: ScriptedSettings = { repl
         .pipe(Stream.runHead, Effect.map(Option.getOrThrow))
     }),
     write: client.WriteTour({ pullRequest: ref, revision }),
-    useEngine: (engine: AgentEngine) =>
+    useHarness: (harness: AgentHarness) =>
       client
         .GetEngineSettings({ feature: "tours" })
         .pipe(
           Effect.flatMap((current) =>
-            client.SetEngineSettings({ feature: "tours", engineSettings: { ...current, engine } }),
+            client.SetEngineSettings({ feature: "tours", engineSettings: { ...current, harness } }),
           ),
         ),
   }
@@ -199,38 +198,19 @@ it.live("persists generated Before / afters and callouts across a restart", () =
 )
 
 it.live(
-  "saves linked diagrams across a restart and drops invalid diagrams without losing Chapters",
+  "saves diagrams across a restart and drops ones Pele can't draw without losing Chapters",
   () =>
     Effect.gen(function* () {
-      const diagram: TourDiagram = {
-        nodes: [
-          {
-            id: "old",
-            label: "Original greeting",
-            change: "removed",
-            target: { path: "greet.ts", side: "old", startLine: 1, endLine: 1 },
-          },
-          {
-            id: "new",
-            label: "Named greeting",
-            change: "added",
-            target: { path: "greet.ts", side: "new", startLine: 1, endLine: 1 },
-          },
-        ],
-        edges: [{ from: "old", to: "new", change: "added", label: "use the name" }],
-      }
+      const diagram =
+        "flowchart LR\n  old[Original greeting]:::removed -.-> new[Named greeting]:::added"
 
+      const undrawable = "flowchart LR\n  A -->> [["
       const valid = { ...answer, diagram, chapters: [{ ...answer.chapters[0]!, diagram }] }
 
       const invalid = {
         ...valid,
-        diagram: { ...diagram, edges: [{ from: "old", to: "missing", change: "added" }] },
-        chapters: [
-          {
-            ...valid.chapters[0]!,
-            diagram: { ...diagram, edges: [{ from: "old", to: "missing", change: "added" }] },
-          },
-        ],
+        diagram: undrawable,
+        chapters: [{ ...valid.chapters[0]!, diagram: undrawable }],
       }
 
       const f = yield* fixture({ reply: { answer: invalid } })
@@ -347,7 +327,7 @@ const TourUnit = Schema.Struct({
   error: Schema.Struct({ tag: Schema.String, message: Schema.String }),
   pr: Schema.String,
   head: Schema.String,
-  engine: Schema.String,
+  harness: Schema.String,
   clone: Schema.String,
   checkout_ms: Schema.Number,
   agent_ms: Schema.Number,
@@ -373,7 +353,7 @@ it.live("records a failed Tour as one unit of work, without the launch token", (
       outcome: "failure",
       head: revision.head,
       clone: "new",
-      engine: "claude-code",
+      harness: "claude-code",
     })
     assert.strictEqual(tour.error.tag, "TourFailure")
     assert.isTrue(lines.some((line) => line.includes(`${TOKEN_PARAM}=REDACTED`)))
@@ -471,25 +451,25 @@ it.live(
 it.live("uses the selected runner and never falls back after failure", () =>
   Effect.gen(function* () {
     const f = yield* fixture()
-    yield* f.useEngine("pi")
+    yield* f.useHarness("pi")
     yield* f.write
     assert.equal((yield* f.state(completed)).tour?.intent, answer.intent)
 
     yield* f.runners.configure({ reply: { answer }, ready: "not-ready" })
-    yield* f.useEngine("claude-code")
+    yield* f.useHarness("claude-code")
     yield* f.write
     const rejected = yield* f.state(completed)
     assert.equal(rejected.job.status === "failed" && rejected.job.reason.reason, "not-ready")
 
     yield* f.runners.configure({ reply: { fail: "unusable-output" } })
-    yield* f.useEngine("pi")
+    yield* f.useHarness("pi")
     yield* f.write
     const invalid = yield* f.state(completed)
     assert.equal(invalid.job.status === "failed" && invalid.job.reason.reason, "unusable-output")
 
     assert.deepStrictEqual(f.runners.selections, ["pi", "claude-code", "pi"])
     assert.deepStrictEqual(
-      f.runners.runs.map((run) => run.engine),
+      f.runners.runs.map((run) => run.harness),
       ["pi", "pi"],
     )
   }),

@@ -1,13 +1,13 @@
 import { SessionManager } from "@earendil-works/pi-coding-agent"
 import { NodeServices } from "@effect/platform-node"
 import { assert, it } from "@effect/vitest"
-import { AgentOutcome, TextPart, GlobalConversationUpdate } from "@glass/contracts"
+import { ConversationOutcome, TextPart, GlobalConversationUpdate } from "@glass/contracts"
 import { Deferred, Effect, Exit, Predicate, Scope } from "effect"
 import { randomUUID } from "node:crypto"
 import { writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { vi } from "vite-plus/test"
-import { bundledPi } from "../../test/demoAgent"
+import { bundledPi } from "../../test/demoConversation"
 import { fakeModelProvider, lastUserText } from "../../test/fakeModelProvider"
 import { isolatedHome, stubHome } from "../../test/harness"
 import { piAdapter } from "./piAdapter"
@@ -20,8 +20,8 @@ const sent = {
   prompt: "Global conversation update the completed work.",
   context: GlobalConversationUpdate.make({
     work: [
-      AgentOutcome.make({
-        agentId: "started",
+      ConversationOutcome.make({
+        conversationId: "started",
         name: "Started",
         outcome: "finished",
         reason: null,

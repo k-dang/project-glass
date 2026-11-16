@@ -16,7 +16,7 @@ export class Journal extends Context.Service<
   Journal,
   {
     /** Keeps every entry, and says whether the unacknowledged ones are now over the budget. */
-    readonly append: (agentId: string, event: HostEvent) => Effect.Effect<boolean>
+    readonly append: (conversationId: string, event: HostEvent) => Effect.Effect<boolean>
     readonly watch: (after: number) => Stream.Stream<JournalEntry>
     readonly acknowledge: (through: number) => Effect.Effect<void>
   }
@@ -31,9 +31,9 @@ export class Journal extends Context.Service<
       let sequence = 0
 
       return Journal.of({
-        append: (agentId, event) =>
+        append: (conversationId, event) =>
           Effect.suspend(() => {
-            const entry = { sequence: ++sequence, agentId, event }
+            const entry = { sequence: ++sequence, conversationId, event }
             const chars = JSON.stringify(event).length
             kept.push({ entry, chars })
             keptChars += chars

@@ -31,7 +31,7 @@ const transcriptsLayer = Transcripts.layer.pipe(
 )
 
 it.live(
-  "keeps a stopped Turn stopped, and its Queued messages waiting, when its program ends it late",
+  "keeps a stopped Turn stopped, and its Queued messages waiting, when its harness ends it late",
   () =>
     Effect.gen(function* () {
       const transcripts = yield* Transcripts
@@ -64,39 +64,41 @@ it.live(
     }).pipe(Effect.provide(transcriptsLayer)),
 )
 
-it.live("hands its program only the Turns Glass started, not one the Agent started itself", () =>
-  Effect.gen(function* () {
-    const transcripts = yield* Transcripts
-    const started = yield* transcripts.subscribeStarted
-    const at = yield* DateTime.now
+it.live(
+  "hands its harness only the Turns Glass started, not one the Conversation started itself",
+  () =>
+    Effect.gen(function* () {
+      const transcripts = yield* Transcripts
+      const started = yield* transcripts.subscribeStarted
+      const at = yield* DateTime.now
 
-    yield* transcripts.save("agent-1", [
-      TurnStarted.make({
-        turnId: "woke",
-        message: "",
-        images: [],
-        context: null,
-        feedback: [],
-        sentAt: at,
-      }),
-    ])
-    yield* transcripts.startOrQueue("agent-1", { message: "Next", images: [], context: null })
-    yield* transcripts.save("agent-1", [
-      TurnEnded.make({ turnId: "woke", ended: { at, ending: TurnDone.make({}) } }),
-    ])
+      yield* transcripts.save("agent-1", [
+        TurnStarted.make({
+          turnId: "woke",
+          message: "",
+          images: [],
+          context: null,
+          feedback: [],
+          sentAt: at,
+        }),
+      ])
+      yield* transcripts.startOrQueue("agent-1", { message: "Next", images: [], context: null })
+      yield* transcripts.save("agent-1", [
+        TurnEnded.make({ turnId: "woke", ended: { at, ending: TurnDone.make({}) } }),
+      ])
 
-    const first = Option.getOrThrow(yield* Stream.runHead(started))
-    assert.equal(first.message, "Next")
+      const first = Option.getOrThrow(yield* Stream.runHead(started))
+      assert.equal(first.message, "Next")
 
-    const { turns } = yield* transcripts.read("agent-1")
-    assert.deepStrictEqual(
-      turns.map(({ message }) => message),
-      ["", "Next"],
-    )
-  }).pipe(Effect.scoped, Effect.provide(transcriptsLayer)),
+      const { turns } = yield* transcripts.read("agent-1")
+      assert.deepStrictEqual(
+        turns.map(({ message }) => message),
+        ["", "Next"],
+      )
+    }).pipe(Effect.scoped, Effect.provide(transcriptsLayer)),
 )
 
-it.live("shows an Agent's extension statuses until Glass loses the Agent", () =>
+it.live("shows a Conversation's extension statuses until Glass loses the Conversation", () =>
   Effect.gen(function* () {
     const transcripts = yield* Transcripts
 
@@ -116,10 +118,10 @@ const TurnUnit = Schema.Struct({
   outcome: Schema.String,
   error: Schema.optional(Schema.Struct({ tag: Schema.String, message: Schema.String })),
   duration_ms: Schema.Number,
-  agent_id: Schema.String,
+  conversation_id: Schema.String,
   turn_id: Schema.String,
   ending: Schema.String,
-  engine: Schema.Null,
+  harness: Schema.Null,
   tool_calls: Schema.Number,
   failed_tool_calls: Schema.Number,
 })
@@ -167,10 +169,10 @@ it.effect("records a Turn as a unit of work when it ends", () =>
         outcome: "failure",
         error: { tag: "TurnFailure", message: "pi exited" },
         duration_ms: 3000,
-        agent_id: "agent-1",
+        conversation_id: "agent-1",
         turn_id: turnId,
         ending: "Failed",
-        engine: null,
+        harness: null,
         tool_calls: 2,
         failed_tool_calls: 1,
       },
@@ -230,33 +232,37 @@ it.effect(
       const transcripts = yield* Transcripts
       yield* addEndedTurns("agent-1", turnIds(1, 45))
 
-      const latest = yield* transcripts.read("agent-1")
+      const pull = yield* Stream.toPull(transcripts.watch("agent-1"))
+      let transcript = (yield* pull).reduce(applyTranscriptUpdate, emptyTranscript)
+
       assert.deepStrictEqual(
-        latest.turns.map(({ id }) => id),
+        transcript.turns.map(({ id }) => id),
         turnIds(46 - RECENT_TURNS, 45),
       )
-      assert.equal(latest.earlierTurns, 45 - RECENT_TURNS)
+      assert.equal(transcript.earlierTurns, 45 - RECENT_TURNS)
 
       yield* addEndedTurns("agent-1", turnIds(46, 47))
 
-      const pages = [latest.turns]
-      let earlier = latest.earlierTurns
+      while (transcript.earlierTurns > 0) {
+        const before = transcript.turns[0]?.id ?? ""
+        yield* transcripts.loadEarlier("agent-1", before)
 
-      while (earlier > 0) {
-        const page = yield* transcripts.readEarlier("agent-1", pages[0]?.[0]?.id ?? "")
-        pages.unshift(page.turns)
-        earlier = page.earlierTurns
+        while (transcript.turns[0]?.id === before)
+          transcript = (yield* pull).reduce(applyTranscriptUpdate, transcript)
       }
 
+      while (transcript.turns.at(-1)?.ended === null || transcript.turns.at(-1)?.id !== "turn-47")
+        transcript = (yield* pull).reduce(applyTranscriptUpdate, transcript)
+
       assert.deepStrictEqual(
-        pages.flat().map(({ id }) => id),
-        turnIds(1, 45),
+        transcript.turns.map(({ id }) => id),
+        turnIds(1, 47),
       )
       assert.deepStrictEqual(
         (yield* transcripts.read("agent-1", 3)).turns.map(({ id }) => id),
         turnIds(45, 47),
       )
-    }).pipe(Effect.provide(transcriptsLayer)),
+    }).pipe(Effect.scoped, Effect.provide(transcriptsLayer)),
 )
 
 const textOf = (transcript: Transcript, turnId: string) =>

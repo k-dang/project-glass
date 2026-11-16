@@ -48,8 +48,8 @@ other way out, so Glass accepts this.
   limit. Keeps reviews read-only, but Glass still decides what the agent reads, and the dropped
   files are the ones a large PR's review most needs.
 - **A read-only git tool for reviews**: only `diff`, `log`, `show`, and `blame`, run by Glass with
-  no shell. Keeps reviews confined, but every engine needs a custom tool, and the agent can't reach
-  for anything else.
+  no shell. Keeps reviews confined, but every Agent harness needs a custom tool, and the agent
+  can't reach for anything else.
 - **A sandboxed shell**: no network and no writes outside the checkout, through macOS
   `sandbox-exec`. Glass would own a sandbox profile per platform, and pi has no sandbox of its own.
 

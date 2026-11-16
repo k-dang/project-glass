@@ -19,9 +19,8 @@ import { DateTime, Deferred, Effect, Fiber, Predicate, Schema, Scope } from "eff
 import { randomUUID } from "node:crypto"
 import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs"
 import { basename, dirname, join } from "node:path"
-import type { AgentAdapter, AgentSession } from "../src/agentHost/adapter"
+import type { HarnessAdapter, HarnessSession } from "../src/agentHost/adapter"
 import type { DeliveredTurn } from "../src/agentHost/deliveredMessage"
-import type { StopEnding } from "../src/agentHost/turnLoop"
 import { GlassToolsAccess, notRunning } from "../src/agentHost/protocol"
 import type { WrittenSkills } from "../src/agentHost/sentSkills"
 import { MCP_PATH } from "../src/mcp/server"
@@ -67,7 +66,7 @@ const skillCommands = (written: ReadonlyArray<WrittenSkills>) =>
     skills.map((skill) => ({ name: `${basename(plugin)}:${basename(skill)}`, description: "" })),
   )
 
-export const scriptedAdapter = (gates: string): AgentAdapter => {
+export const scriptedAdapter = (gates: string): HarnessAdapter => {
   const currentStart = join(gates, "global-start.json")
   const previousStart = join(gates, "previous-global-start.json")
 
@@ -254,16 +253,17 @@ export const scriptedAdapter = (gates: string): AgentAdapter => {
             }),
           steer: (message) =>
             turn === null ? notRunning : Effect.sync(() => void turn!.steers.push(message)),
-          stopTurn: Effect.fnUntraced(function* (ending: StopEnding) {
-            if (turn === null) return null
+          stopTurn: (turnId, ending) =>
+            Effect.gen(function* () {
+              if (turn === null || turn.id !== turnId) return null
 
-            const { id, fiber, steers } = turn
+              const { id, fiber, steers } = turn
 
-            yield* Fiber.interrupt(fiber)
-            yield* end(id, ending)
+              yield* Fiber.interrupt(fiber)
+              yield* end(id, ending)
 
-            return steers
-          }),
+              return steers
+            }),
           answer: (requestId, answer) =>
             Effect.gen(function* () {
               const waiting = turn?.waiting
@@ -280,7 +280,7 @@ export const scriptedAdapter = (gates: string): AgentAdapter => {
             }),
           closed: Effect.never,
           stopped: Effect.succeed(false),
-        } satisfies AgentSession
+        } satisfies HarnessSession
       }),
   }
 }

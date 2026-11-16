@@ -1,13 +1,13 @@
 import { useAtom, useAtomValue } from "@effect/atom-react"
-import { type AgentEngine, type AgentPlace, LOCAL_SKILLS_NAMESPACE } from "@glass/contracts"
+import { type AgentHarness, type ConversationPlace, LOCAL_SKILLS_NAMESPACE } from "@glass/contracts"
 import { Option, Predicate, Schema } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
 import { Backend, backendRuntime } from "./backend"
 import { skillPacksAtom } from "./SkillPacks"
 
-const storageKey = "glass.newAgent.skillPacks"
+const storageKey = "glass.newConversation.skillPacks"
 
-const localSkillsKey = "glass.newAgent.localSkills"
+const localSkillsKey = "glass.newConversation.localSkills"
 
 export const LOCAL_SKILLS_LABEL = "Local skills"
 
@@ -30,8 +30,8 @@ const lastLocalSkillsAtom = Atom.writable(
   },
 ).pipe(Atom.keepAlive)
 
-const localSkillNamesAtom = Atom.family((engine: AgentEngine) =>
-  backendRuntime.atom(Backend.use((backend) => backend.ListLocalSkills({ engine }))),
+const localSkillNamesAtom = Atom.family((harness: AgentHarness) =>
+  backendRuntime.atom(Backend.use((backend) => backend.ListLocalSkills({ harness }))),
 )
 
 const noLocalSkills = Atom.make(AsyncResult.success<ReadonlyArray<string>>([]))
@@ -45,7 +45,7 @@ interface ChosenSource {
 const listed = new Intl.ListFormat("en", { type: "conjunction" })
 
 /** pi keeps the first skill of a name, and Local skills come first (`skillsOf` in the server). */
-const sharedSkillNames = (engine: AgentEngine, sources: ReadonlyArray<ChosenSource>) => {
+const sharedSkillNames = (harness: AgentHarness, sources: ReadonlyArray<ChosenSource>) => {
   const names = [...new Set(sources.flatMap(({ skills }) => skills))].toSorted()
 
   return names.flatMap((name) => {
@@ -55,26 +55,28 @@ const sharedSkillNames = (engine: AgentEngine, sources: ReadonlyArray<ChosenSour
 
     const where = `${name} is in ${listed.format(having.map(({ label }) => label))}.`
 
-    return engine === "pi"
-      ? [`${where} The Agent uses the one in ${having[0]!.label}.`]
+    return harness === "pi"
+      ? [`${where} The Conversation uses the one in ${having[0]!.label}.`]
       : [
-          `${where} The Agent has each, as ${listed.format(having.map(({ claudeCodePrefix }) => `/${claudeCodePrefix}${name}`))}.`,
+          `${where} The Conversation has each, as ${listed.format(having.map(({ claudeCodePrefix }) => `/${claudeCodePrefix}${name}`))}.`,
         ]
   })
 }
 
-export const useSkillChoice = (place: AgentPlace, engine: AgentEngine) => {
+export const useSkillChoice = (place: ConversationPlace, harness: AgentHarness) => {
   const listedPacks = useAtomValue(skillPacksAtom)
   const packs = Option.getOrElse(AsyncResult.value(listedPacks), () => [])
   const [lastChosen, setChosen] = useAtom(lastChosenAtom)
   const [lastLocalSkills, setLocalSkills] = useAtom(lastLocalSkillsAtom)
   const offersLocalSkills = Predicate.isTagged(place, "sandbox")
   const sendsLocalSkills = offersLocalSkills && lastLocalSkills
-  const agentHasLocalSkills = !offersLocalSkills || lastLocalSkills
+  const conversationHasLocalSkills = !offersLocalSkills || lastLocalSkills
   const chosenPacks = packs.filter(({ name }) => lastChosen.includes(name))
 
   const localNamesListed = useAtomValue(
-    agentHasLocalSkills && chosenPacks.length > 0 ? localSkillNamesAtom(engine) : noLocalSkills,
+    conversationHasLocalSkills && chosenPacks.length > 0
+      ? localSkillNamesAtom(harness)
+      : noLocalSkills,
   )
 
   const localNames = Option.getOrElse(AsyncResult.value(localNamesListed), () => [])
@@ -88,8 +90,8 @@ export const useSkillChoice = (place: AgentPlace, engine: AgentEngine) => {
     offersLocalSkills,
     sendsLocalSkills,
     setLocalSkills,
-    shared: sharedSkillNames(engine, [
-      ...(agentHasLocalSkills
+    shared: sharedSkillNames(harness, [
+      ...(conversationHasLocalSkills
         ? [
             {
               label: LOCAL_SKILLS_LABEL,

@@ -4,7 +4,7 @@ import { HttpServer } from "effect/http"
 import { closeSync, writeSync } from "node:fs"
 import { createServer } from "node:http"
 import { Changes } from "./Changes"
-import { HostAgents, type Programs } from "./HostAgents"
+import { HostConversations, type Harnesses } from "./HostConversations"
 import { Journal } from "./Journal"
 import { Git } from "../git"
 import { HostReady } from "./protocol"
@@ -23,7 +23,7 @@ const reportReady = (address: Parameters<typeof HttpServer.formatAddress>[0]) =>
     closeSync(3)
   })
 
-export const serveAgentHost = <E, R>(programs: Effect.Effect<Programs, E, R>) =>
+export const serveAgentHost = <E, R>(harnesses: Effect.Effect<Harnesses, E, R>) =>
   Effect.gen(function* () {
     const token = yield* Config.Redacted("GLASS_HOST_TOKEN")
 
@@ -35,7 +35,7 @@ export const serveAgentHost = <E, R>(programs: Effect.Effect<Programs, E, R>) =>
     const standalone = Option.isSome(port)
     const address = yield* Config.String("GLASS_HOST_ADDRESS").pipe(Config.withDefault("127.0.0.1"))
 
-    const adapters = yield* programs
+    const adapters = yield* harnesses
 
     const shutDown = yield* Deferred.make<void>()
 
@@ -47,7 +47,7 @@ export const serveAgentHost = <E, R>(programs: Effect.Effect<Programs, E, R>) =>
             host: address,
           }),
         ),
-        Layer.provide(HostAgents.make(adapters)),
+        Layer.provide(HostConversations.make(adapters)),
         Layer.provide(Journal.layer),
         Layer.provide(Changes.layer),
         Layer.provide(Git.layer),

@@ -26,7 +26,7 @@ import { plural } from "./plural"
 import { allViewed, twoDigits } from "./tourProgress"
 import { hasOverview, type TourChapter, type TourReading } from "./tourReading"
 import { TourText } from "./TourText"
-import { TourDiagram } from "./TourDiagram"
+import { MermaidDiagram } from "./MermaidDiagram"
 import { TourBeforeAfter } from "./TourBeforeAfter"
 import { StartReading } from "./TourSidebar"
 import { AttentionMark, ChapterHotspots, TourHotspots } from "./Hotspots"
@@ -487,27 +487,12 @@ function TourOverview(props: {
       {(diagram !== null || beforeAfter !== null) && (
         <div className="min-w-0 border-l p-4.5 @max-[850px]/tour:p-3.5 @max-[700px]/tour:border-t @max-[700px]/tour:border-l-0">
           {diagram !== null ? (
-            <section aria-label="Before / after: Tour overview">
+            <section aria-label="Tour overview diagram">
               <header className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b pb-3">
-                <h3 className="text-xs font-medium">Before / after</h3>
-                <div
-                  className="flex gap-3 text-[10px] text-muted-foreground"
-                  aria-label="Change legend"
-                >
-                  <span>Unchanged</span>
-                  <span className="text-added">+ Added</span>
-                  <span className="text-deleted">− Removed</span>
-                </div>
+                <h3 className="text-xs font-medium">Diagram</h3>
+                <DiagramLegend />
               </header>
-              <TourDiagram
-                diagram={diagram}
-                chapterTitle="Tour overview"
-                chapterOf={props.reading.chapterOf}
-                onSelect={(node) => props.onShowTarget(node.target)}
-              />
-              <p className="mt-4 border-t pt-3 text-[11px] text-muted-foreground">
-                Select a node to read its Chapter and the code behind it.
-              </p>
+              <MermaidDiagram source={diagram} />
             </section>
           ) : (
             beforeAfter !== null && (
@@ -517,6 +502,17 @@ function TourOverview(props: {
         </div>
       )}
     </section>
+  )
+}
+
+function DiagramLegend() {
+  return (
+    <div className="flex gap-3 text-[10px] text-muted-foreground" aria-label="Change legend">
+      <span>Unchanged</span>
+      <span className="text-added">+ Added</span>
+      <span className="text-deleted">− Removed</span>
+      <span>┄ Removed connection</span>
+    </div>
   )
 }
 
@@ -686,12 +682,13 @@ function ChapterCard(props: {
               />
             )}
             {chapter?.diagram != null && (
-              <TourDiagram
-                diagram={chapter.diagram}
-                chapterTitle={title}
-                className="mb-3 max-h-[45%] border-b pb-3"
-                onSelect={(node) => props.onShowTarget(node.target)}
-              />
+              <section
+                aria-label={`Diagram: ${title}`}
+                className="mb-3 max-h-[45%] min-h-0 overflow-auto border-b pb-3"
+              >
+                <DiagramLegend />
+                <MermaidDiagram source={chapter.diagram} className="mt-2" />
+              </section>
             )}
             {files.length === 0 ? (
               <p className="p-4 text-sm text-muted-foreground">No files remain in this Chapter.</p>

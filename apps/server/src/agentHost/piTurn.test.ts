@@ -1,6 +1,6 @@
 import { assert, it } from "@effect/vitest"
 import {
-  AgentOutcome,
+  ConversationOutcome,
   GlobalConversationUpdate,
   PartAppended,
   SteerPart,
@@ -26,8 +26,8 @@ const updating = beginTurn(
     images: [],
     context: GlobalConversationUpdate.make({
       work: [
-        AgentOutcome.make({
-          agentId: "started",
+        ConversationOutcome.make({
+          conversationId: "started",
           name: "Started",
           askedWith: "Build it",
           outcome: "finished",

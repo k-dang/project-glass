@@ -8,20 +8,20 @@ its journal, and the backend as the transcript of record (ADR 0007) are the same
 provider.
 
 The seam is coarse: Glass hands a provider what the agent host needs, and the provider does
-everything specific to its platform, including logins, cloning, and starting the host. `@glass/plugin`
-is the contract. It uses Promises and `AbortSignal`, so a plugin needs no Effect.
+everything specific to its platform, including logins, cloning, and starting the host.
+`@glass/plugin` is the contract. It uses Promises and `AbortSignal`, so a plugin needs no Effect.
 
 Plugins install as files in a folder and run in the backend process, as pi extensions do. Glass
-keeps each provider's state as opaque JSON on the Agent's row, so that row stays the one record of
-the Agent and providers need no storage of their own. Because Glass holds that state, it can delete
-a half-built Sandbox even after a crash mid-provisioning.
+keeps each provider's state as opaque JSON on the Conversation's row, so that row stays the one
+record of the Conversation and providers need no storage of their own. Because Glass holds that
+state, it can delete a half-built Sandbox even after a crash mid-provisioning.
 
 A Sandbox outlives Glass, so its Turns keep running while Glass is closed, and Glass reconnects to
 its host at launch from the last journal position it saved. Calls to a provider stay bounded: Glass
 stops retrying a Sandbox it can't reach until the user or a relaunch starts over.
 
-This device is the same seam's built-in placement, so the Agents service only calls placements and
-local and Sandbox Agents differ only in where their host runs.
+This device is the same seam's built-in placement, so the Conversations service only calls
+placements and local and Sandbox Conversations differ only in where their host runs.
 
 ## Considered options
 
@@ -40,8 +40,8 @@ local and Sandbox Agents differ only in where their host runs.
   do their work through async calls, so the backend process is enough.
 - **Plugins listed in Glass's settings, with options, as opencode does**: explicit, but a folder
   is how pi extensions install, and a provider that keeps its own values needs no options.
-- **Providers keep their own state**: Glass would need a storage API for plugins, and removing an
-  Agent would span two stores.
+- **Providers keep their own state**: Glass would need a storage API for plugins, and removing a
+  Conversation would span two stores.
 
 ## Revisit when
 

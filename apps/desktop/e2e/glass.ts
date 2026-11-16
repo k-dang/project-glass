@@ -13,7 +13,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { TourAnswer } from "../../server/src/tourPrompt"
 import { writeAgentCommands } from "../../server/test/agentCommands"
-import { bundledPi } from "../../server/test/demoAgent"
+import { bundledPi } from "../../server/test/demoConversation"
 import { startFakeAnthropic } from "../../server/test/fakeAnthropic"
 import { type FakeModelSettings, fakeModelProvider } from "../../server/test/fakeModelProvider"
 import { type FakeGitHub, startFakeGitHub } from "../../server/test/fakeGitHub"
@@ -86,7 +86,7 @@ export const test = base.extend<Glass>({
     const home = await mkdtemp(join(tmpdir(), "glass-e2e-"))
 
     await use(home)
-    // Claude Code programs outlive Glass by a moment and write their session files as they exit,
+    // Claude Code processes outlive Glass by a moment and write their session files as they exit,
     // so retry while `.claude` refills under the removal (ENOTEMPTY).
     await rm(home, { recursive: true, force: true, maxRetries: 10 })
   },

@@ -1,5 +1,5 @@
 import { Match, Predicate, Schema } from "effect"
-import { Agent, PermissionRequestPart, QuestionPart, TurnEnd } from "./agent"
+import { Conversation, PermissionRequestPart, QuestionPart, TurnEnd } from "./conversation"
 import { Check } from "./pullRequest"
 import { PullRequestSummary } from "./pullRequestList"
 
@@ -13,9 +13,9 @@ export const WaitingRequests = Schema.TaggedStruct("WaitingRequests", {
 
 export const TurnFinished = Schema.TaggedStruct("TurnFinished", { ended: TurnEnd })
 
-export const AgentReason = Schema.Union([WaitingRequests, TurnFinished])
+export const ConversationReason = Schema.Union([WaitingRequests, TurnFinished])
 
-export type AgentReason = typeof AgentReason.Type
+export type ConversationReason = typeof ConversationReason.Type
 
 export const AgentReviewFinished = Schema.TaggedStruct("AgentReviewFinished", {
   writtenAt: Schema.DateTimeUtcFromString,
@@ -42,13 +42,13 @@ export const PullRequestReason = Schema.Union([
 
 export type PullRequestReason = typeof PullRequestReason.Type
 
-export const AgentNeedsYou = Schema.TaggedStruct("Agent", {
-  agent: Agent,
-  reasons: Schema.NonEmptyArray(AgentReason),
+export const ConversationNeedsYou = Schema.TaggedStruct("Conversation", {
+  conversation: Conversation,
+  reasons: Schema.NonEmptyArray(ConversationReason),
   since: Schema.DateTimeUtcFromString,
 })
 
-export type AgentNeedsYou = typeof AgentNeedsYou.Type
+export type ConversationNeedsYou = typeof ConversationNeedsYou.Type
 
 export const PullRequestNeedsYou = Schema.TaggedStruct("PullRequest", {
   pullRequest: PullRequestSummary,
@@ -106,7 +106,7 @@ export const AskUserResult = Schema.Union([AskUserAnswered, AskUserTimedOut, Ask
 export type AskUserResult = typeof AskUserResult.Type
 
 export const NeedsYouItem = Schema.Union([
-  AgentNeedsYou,
+  ConversationNeedsYou,
   PullRequestNeedsYou,
   OutsideQuestion,
   GlobalConversationNeedsYou,
@@ -124,7 +124,7 @@ export const needsYouGroupOf = (item: NeedsYouItem): NeedsYouGroup =>
   Match.valueTags(item, {
     OutsideQuestion: () => "stopped" as const,
     GlobalConversation: () => "stopped" as const,
-    Agent: ({ reasons }) =>
+    Conversation: ({ reasons }) =>
       reasons.some(Predicate.isTagged("WaitingRequests"))
         ? ("stopped" as const)
         : ("finished" as const),

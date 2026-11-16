@@ -142,17 +142,20 @@ export const describeError = (error: BackendError): Problem =>
         detail:
           "It would hold the Reply until your Review is submitted. Submit or delete your Drafts, then retry.",
       }),
-      AgentError: ({ message }) => ({ title: "Couldn't reach your Agents", detail: message }),
-      AgentNotFound: () => ({
-        title: "This Agent is gone",
-        detail: "It was removed. Pick another Agent or start a new one.",
+      ConversationError: ({ message }) => ({
+        title: "Couldn't reach your Conversations",
+        detail: message,
       }),
-      AgentBusy: () => ({
-        title: "The Agent is still working",
+      ConversationNotFound: () => ({
+        title: "This Conversation is gone",
+        detail: "It was removed. Pick another Conversation or start a new one.",
+      }),
+      ConversationBusy: () => ({
+        title: "The Conversation is still working",
         detail: "Wait for its Turn to end, then send your message.",
       }),
       RequestWaiting: () => ({
-        title: "The Agent is waiting on you",
+        title: "The agent is waiting on you",
         detail: "Answer its Permission request or Question, then send your message.",
       }),
       QueuedMessageStarted: () => ({
@@ -185,7 +188,7 @@ export const describeError = (error: BackendError): Problem =>
       }),
       NoPermissionModes: () => ({
         title: "No Permission modes",
-        detail: "This Agent's program doesn't take a Permission mode.",
+        detail: "This Conversation's harness doesn't take a Permission mode.",
       }),
       InvalidLocalCheckout: ({ message }) => ({
         title: "Glass can't use that folder",

@@ -24,7 +24,7 @@ node $V launch --real-agents                    # your Claude Code and pi; may i
 node $V launch --github fake --fake-mode 401    # fake GitHub: ok | 401 | 500 | down | busy-500
 node $V launch --no-credentials                 # no token env vars, gh hidden from PATH
 node $V launch --github fake --fail-backend-start  # the backend exits as it starts
-node $V launch --backend fake                   # pnpm dev:fake's backend, with demo PRs and Agents;
+node $V launch --backend fake                   # pnpm dev:fake's backend, with demo PRs and Conversations;
                                                 # Claude Code runs the pinned claude on a fake Anthropic API
 ```
 
@@ -32,7 +32,7 @@ node $V launch --backend fake                   # pnpm dev:fake's backend, with 
 
 Each run is isolated under `.verify/<id>/` (gitignored): its own Electron profile, its own `GLASS_HOME` (so backend logs and data files go to the run, not `~/.glass/logs` and `~/.project-glass`), its own ports. Several runs can live side by side; then every command needs `--run <id>`.
 
-GitHub defaults to fake. Explicit `--github real` selects live GitHub. With fake GitHub, the backend's `GLASS_GITHUB_API_URL` points at the shared fake in `apps/server/test/fakeGitHub.ts`. It answers `GET /user` as `octocat` (`ok`), HTTP 401, HTTP 500, or a dropped connection (`down`), and `GH_TOKEN` is a dummy. In `ok` mode it also answers the PR list reads (the full read of open PRs, the catch-up search, and checks) with four Needs review PRs (Passing, Failing, Running, and Unavailable checks), two My PRs (one a draft), and one Reviewing PR per followed repository; a repository named `quiet` has none and one named `busy` supplies 134 Needs review PRs alongside My PRs and Reviewing. `busy-500` answers like `ok` except that every PR list read of the `busy` repository fails with HTTP 500. Listed PRs open into a PR workspace with a one-file diff; `octo-org/glass#101` is the exception, 150 generated files for scroll and memory runs. Drafts, Reviews, and Tours use the shared fake too. That env var is the backend's real GitHub boundary, so everything from the renderer to the HTTP call is production code. Change its answer mid-run with `node $V fake-github <mode>`.
+GitHub defaults to fake. Explicit `--github real` selects live GitHub. With fake GitHub, the backend's `GLASS_GITHUB_API_URL` points at the shared fake in `apps/server/test/fakeGitHub.ts`. It answers `GET /user` as `octocat` (`ok`), HTTP 401, HTTP 500, or a dropped connection (`down`), and `GH_TOKEN` is a dummy. In `ok` mode it also answers the PR list reads (the full read of open PRs, the catch-up search, and checks) with five Needs review PRs (#97–#101, with Passing, Failing, Running, and Unavailable checks), two My PRs (one a draft), and one Reviewing PR per followed repository; a repository named `quiet` has none and one named `busy` supplies 134 Needs review PRs alongside My PRs and Reviewing. `busy-500` answers like `ok` except that every PR list read of the `busy` repository fails with HTTP 500. Listed PRs open into a PR workspace with a one-file diff; `octo-org/glass#101` is the exception, 150 generated files for scroll and memory runs. The Reviewing PR (#94) carries one saved Draft, and the user's own PR #95 has a Discussion, so Drafts, Replies, and submitting a Review run without real GitHub writes. Tours use the shared fake too. That env var is the backend's real GitHub boundary, so everything from the renderer to the HTTP call is production code. Change its answer mid-run with `node $V fake-github <mode>`.
 
 Verify Tours and Agent reviews with `--backend fake`: they read a checkout, and only that backend's fake GitHub has a git remote. Otherwise Claude Code and pi are off, to prevent accidental paid calls. See [Tours](features/tours.md) for the recipe. Choose `--real-agents` explicitly to use your normal Pi configuration and Claude Code installation; this may incur model charges.
 
@@ -79,7 +79,7 @@ Each line holds the renderer's V8 heap, Blink counters and DOM counts, every wor
 
 `--gc` collects garbage before each sample. Without it, `DOM nodes` counts nodes the collector has not reached yet, so leaving a page can look like it kept its DOM; with it, the count is what is actually retained. Prefer `--gc` when comparing areas or judging whether a view released anything.
 
-`--sweep` walks the rail: Dashboard, Reviews, To-dos, Agents, Activity, Settings, then Dashboard again. It settles for two seconds after each click, takes `--dwell` samples labelled with the area, and prints one row per area:
+`--sweep` walks the rail: Dashboard, Reviews, To-dos, Conversations, Activity, Settings, then Dashboard again. It settles for two seconds after each click, takes `--dwell` samples labelled with the area, and prints one row per area:
 
 ```sh
 node $V memory --sweep --dwell 4 --gc --out areas

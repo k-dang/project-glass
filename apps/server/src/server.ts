@@ -11,7 +11,7 @@ import { AgentReviews } from "./AgentReviews"
 import { Asks } from "./Asks"
 import { CheckoutRuns } from "./CheckoutRuns"
 import { Checkouts } from "./Checkouts"
-import { Agents } from "./Agents"
+import { Conversations } from "./Conversations"
 import { ConversationTurns } from "./ConversationTurns"
 import { FeedbackNotes } from "./FeedbackNotes"
 import { DatabaseLive } from "./Database"
@@ -69,7 +69,7 @@ type AgentRunnersLayer = Layer.Layer<
   SettingsStore | AgentCommands | ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem
 >
 
-const AgentsLive = Layer.merge(Agents.layer, GlobalConversation.layer).pipe(
+const ConversationsLive = Layer.merge(Conversations.layer, GlobalConversation.layer).pipe(
   Layer.provide(LocalPlacement.layer),
   Layer.provideMerge(Sandboxes.layer),
   Layer.provide(ConversationTurns.layer),
@@ -102,7 +102,7 @@ const services = (
       Layer.provide(Tours.layer),
       Layer.provide(AgentReviews.layer),
       Layer.provide(Asks.layer),
-      Layer.provide(AgentsLive),
+      Layer.provide(ConversationsLive),
       Layer.provideMerge(SkillPacks.layer),
       Layer.provideMerge(LocalSkills.layer),
       Layer.provide(Plugins.layer),

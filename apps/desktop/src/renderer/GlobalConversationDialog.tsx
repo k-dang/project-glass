@@ -1,6 +1,5 @@
 import { useAtom, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
 import {
-  applyTranscriptUpdate,
   emptyTranscript,
   isWaiting,
   localPlace,
@@ -13,18 +12,17 @@ import {
 import { Cause, Data, DateTime, Option, Predicate } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import { ArrowLeft, History, SquarePen, X } from "lucide-react"
-import { type ReactNode, useEffect, useMemo, useState } from "react"
+import { type ReactNode, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { placeKey } from "./agentsArea"
-import { AgentComposer, contextLabel, Transcript } from "./AgentView"
+import { placeKey } from "./conversationsArea"
+import { ConversationComposer, contextLabel, Transcript } from "./ConversationView"
 import { ConfirmationDialog } from "./ConfirmationDialog"
-import { ConversationContext } from "./conversation"
+import { ConversationAtomsContext } from "./conversation"
 import {
   capturedContextAtom,
   loadEarlierPastTurnsAtom,
-  pastEarlierTurnsAtom,
   changeGlobalModelAtom,
   globalConversation,
   globalConversationOpenAtom,
@@ -45,7 +43,7 @@ function GlobalModelPicker(props: { choice: ModelChoice }) {
 
   return (
     <ModelPicker
-      engine="pi"
+      harness="pi"
       placeKey={placeKey(localPlace)}
       model={props.choice.model}
       effort={props.choice.effort}
@@ -81,9 +79,9 @@ export function GlobalConversationDialog() {
         showCloseButton={false}
         className="flex h-[min(48rem,calc(100vh-4rem))] flex-col gap-0 p-0 sm:max-w-2xl"
       >
-        <ConversationContext value={globalConversation}>
+        <ConversationAtomsContext value={globalConversation}>
           <Shown showing={showing} show={setShowing} />
-        </ConversationContext>
+        </ConversationAtomsContext>
       </DialogContent>
     </Dialog>
   )
@@ -243,9 +241,9 @@ function GlobalConversation(props: { onShowPast: () => void }) {
         status={status}
       />
       <p className="truncate px-6 pb-1 text-xs text-muted-foreground">
-        {context === null ? "No PR or Agent in view" : `Sends with ${contextLabel(context)}`}
+        {context === null ? "No PR or Conversation in view" : `Sends with ${contextLabel(context)}`}
       </p>
-      <AgentComposer
+      <ConversationComposer
         turns={turns}
         queued={queued}
         idlePlaceholder="Ask Glass about your work"
@@ -317,23 +315,19 @@ function PastConversations(props: {
 
 function PastTranscript(props: { conversation: PastConversation; onBack: () => void }) {
   const read = useAtomValue(pastGlobalTranscriptAtom(props.conversation.id))
-  const pages = useAtomValue(pastEarlierTurnsAtom(props.conversation.id))
-  const [loaded, loadEarlier] = useAtom(loadEarlierPastTurnsAtom(props.conversation.id))
-  const problem = settledProblem(read) ?? settledProblem(loaded)
+  const loadEarlier = useAtomSet(loadEarlierPastTurnsAtom(props.conversation.id))
 
-  const { turns, earlierTurns, status } = useMemo(
-    () =>
-      pages.reduce(
-        applyTranscriptUpdate,
-        Option.getOrElse(AsyncResult.value(read), () => emptyTranscript),
-      ),
-    [read, pages],
+  const { turns, earlierTurns, status } = Option.getOrElse(
+    AsyncResult.value(read),
+    () => emptyTranscript,
   )
 
   return (
     <>
       <Header title={spanOf(props.conversation)} onBack={props.onBack} />
-      {problem !== null && <PaddedProblem problem={problem} />}
+      {AsyncResult.isFailure(read) && !read.waiting && (
+        <PaddedProblem problem={streamProblem(read.cause)} />
+      )}
       <Transcript
         turns={turns}
         earlierTurns={earlierTurns}

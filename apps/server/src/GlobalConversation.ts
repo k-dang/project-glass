@@ -1,7 +1,7 @@
 import {
-  type AgentBusy,
+  type ConversationBusy,
   type QueuedMessageStarted,
-  AgentError,
+  ConversationError,
   type MessageInputWithContext,
   ModelChoice,
   PastConversation,
@@ -11,8 +11,6 @@ import {
   type RequestWaiting,
   type SentMessage,
   StartFreshRefused,
-  type EarlierTurns,
-  type Transcript,
   type TranscriptUpdate,
   TurnEnd,
   type GlobalConversationUpdate,
@@ -37,7 +35,12 @@ import { join } from "node:path"
 import { GlobalRole } from "./agentHost/protocol"
 import { LocalAgentHost } from "./LocalAgentHost"
 import { McpCredentials } from "./mcp/McpCredentials"
-import { type Conversation, type ConversationHost, ConversationTurns } from "./ConversationTurns"
+import {
+  type ClaimedConversation,
+  type ConversationHost,
+  ConversationTurns,
+} from "./ConversationTurns"
+import { boundHostCall } from "./hostControl"
 import { ServerConfig } from "./ServerConfig"
 import { Transcripts, type WaitingRequest } from "./Transcripts"
 import { annotateUnit } from "./wideEvents"
@@ -54,10 +57,12 @@ const decodeIds = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ id: Sc
 
 const decodePast = Schema.decodeUnknownEffect(Schema.Array(PastConversation))
 
-const hostGone = new AgentError({ message: "Glass lost the process that runs Agents. Try again." })
+const hostGone = new ConversationError({
+  message: "Glass lost the process that runs Conversations. Try again.",
+})
 
 const storageFailure = () =>
-  new AgentError({ message: "Couldn't read or save the Global conversation. Try again." })
+  new ConversationError({ message: "Couldn't read or save the Global conversation. Try again." })
 
 const stored = <A, E, R>(what: string, effect: Effect.Effect<A, E, R>) =>
   effect.pipe(
@@ -69,47 +74,49 @@ export class GlobalConversation extends Context.Service<
   GlobalConversation,
   {
     readonly model: Effect.Effect<ModelChoice>
-    readonly changeModel: (choice: ModelChoice) => Effect.Effect<void, AgentError>
-    readonly transcript: Stream.Stream<TranscriptUpdate, AgentError>
+    readonly changeModel: (choice: ModelChoice) => Effect.Effect<void, ConversationError>
+    readonly transcript: Stream.Stream<TranscriptUpdate, ConversationError>
     readonly send: (
       input: MessageInputWithContext,
-    ) => Effect.Effect<void, RequestWaiting | AgentError>
+    ) => Effect.Effect<void, RequestWaiting | ConversationError>
     readonly steer: (
       input: MessageInputWithContext,
-    ) => Effect.Effect<void, RequestWaiting | AgentError>
+    ) => Effect.Effect<void, RequestWaiting | ConversationError>
     readonly cancelQueued: (
       queuedId: string,
-    ) => Effect.Effect<void, QueuedMessageStarted | AgentError>
-    readonly sendQueued: (queuedId: string) => Effect.Effect<void, AgentBusy | AgentError>
-    readonly stop: Effect.Effect<void, AgentError>
+    ) => Effect.Effect<void, QueuedMessageStarted | ConversationError>
+    readonly sendQueued: (
+      queuedId: string,
+    ) => Effect.Effect<void, ConversationBusy | ConversationError>
+    readonly stop: Effect.Effect<void, ConversationError>
     readonly answer: (
       requestId: string,
       answer: RequestAnswer,
-    ) => Effect.Effect<void, RequestNotWaiting | AgentError>
-    readonly unsent: Effect.Effect<SentMessage, AgentError>
-    readonly saveUnsent: (unsent: SentMessage) => Effect.Effect<void, AgentError>
+    ) => Effect.Effect<void, RequestNotWaiting | ConversationError>
+    readonly unsent: Effect.Effect<SentMessage, ConversationError>
+    readonly saveUnsent: (unsent: SentMessage) => Effect.Effect<void, ConversationError>
     readonly id: string
-    readonly startFresh: Effect.Effect<void, StartFreshRefused | AgentError>
-    readonly past: Effect.Effect<ReadonlyArray<PastConversation>, AgentError>
-    readonly loadEarlier: (before: string) => Effect.Effect<void, AgentError>
-    readonly readPast: (
+    readonly startFresh: Effect.Effect<void, StartFreshRefused | ConversationError>
+    readonly past: Effect.Effect<ReadonlyArray<PastConversation>, ConversationError>
+    readonly loadEarlier: (before: string) => Effect.Effect<void, ConversationError>
+    readonly watchPast: (
       sessionId: string,
-    ) => Effect.Effect<Transcript, PastConversationNotFound | AgentError>
-    readonly readEarlierPast: (
+    ) => Stream.Stream<TranscriptUpdate, PastConversationNotFound | ConversationError>
+    readonly loadEarlierPast: (
       sessionId: string,
       before: string,
-    ) => Effect.Effect<EarlierTurns, PastConversationNotFound | AgentError>
+    ) => Effect.Effect<void, PastConversationNotFound | ConversationError>
     readonly waiting: Stream.Stream<ReadonlyArray<WaitingRequest>>
     readonly unseen: Stream.Stream<TurnEnd | null>
-    readonly markSeen: (endedAt: DateTime.Utc) => Effect.Effect<void, AgentError>
+    readonly markSeen: (endedAt: DateTime.Utc) => Effect.Effect<void, ConversationError>
     readonly whenIdle: <E>(
       effect: (
         globalConversationUpdate: (
           globalConversationUpdate: GlobalConversationUpdate,
-          record: (turnId: string) => Effect.Effect<void, AgentError>,
-        ) => Effect.Effect<void, AgentError>,
+          record: (turnId: string) => Effect.Effect<void, ConversationError>,
+        ) => Effect.Effect<void, ConversationError>,
       ) => Effect.Effect<void, E>,
-    ) => Effect.Effect<void, E | AgentError>
+    ) => Effect.Effect<void, E | ConversationError>
   }
 >()("@glass/server/GlobalConversation") {
   static readonly layer = Layer.effect(
@@ -177,13 +184,19 @@ export class GlobalConversation extends Context.Service<
               tools: {
                 url: yield* credentials.endpoint,
                 bearer: yield* credentials
-                  .issue({ conversationId: id, sessionId })
+                  .issue({ globalConversationId: id, sessionId })
                   .pipe(Scope.provide(credential)),
               },
             })
 
             const started = yield* client
-              .StartAgent({ agentId: sessionId, engine: "pi", folder, role, skills: [] })
+              .StartConversation({
+                conversationId: sessionId,
+                harness: "pi",
+                folder,
+                role,
+                skills: [],
+              })
               .pipe(Effect.onError(() => revoke))
 
             yield* started === "started" ? replaceRunning(credential) : revoke
@@ -196,13 +209,13 @@ export class GlobalConversation extends Context.Service<
             const running = yield* host.running
 
             if (Option.isSome(running))
-              yield* running.value
-                .StopAgent({ agentId: sessionId })
-                .pipe(
-                  Effect.catch((cause) =>
-                    Effect.logWarning("Couldn't stop pi for the ended Global conversation", cause),
-                  ),
-                )
+              yield* boundHostCall(
+                running.value.StopConversation({ conversationId: sessionId }),
+              ).pipe(
+                Effect.catch((cause) =>
+                  Effect.logWarning("Couldn't stop pi for the ended Global conversation", cause),
+                ),
+              )
 
             yield* replaceRunning(null)
           }),
@@ -210,7 +223,7 @@ export class GlobalConversation extends Context.Service<
 
       const conversationOf = (sessionId: string) =>
         SubscriptionRef.get(model).pipe(
-          Effect.map((choice): Conversation => ({
+          Effect.map((choice): ClaimedConversation => ({
             id: sessionId,
             ensureStarted: start(sessionId),
             settings: { ...choice, permissionMode: null },
@@ -228,8 +241,9 @@ export class GlobalConversation extends Context.Service<
       const inSession = <A, E>(effect: (sessionId: string) => Effect.Effect<A, E>) =>
         sessionLock.withPermits(1)(currentSession.pipe(Effect.flatMap(effect)))
 
-      const inConversation = <A, E>(effect: (current: Conversation) => Effect.Effect<A, E>) =>
-        inSession((sessionId) => conversationOf(sessionId).pipe(Effect.flatMap(effect)))
+      const inConversation = <A, E>(
+        effect: (current: ClaimedConversation) => Effect.Effect<A, E>,
+      ) => inSession((sessionId) => conversationOf(sessionId).pipe(Effect.flatMap(effect)))
 
       const followSession = <A, E>(stream: (sessionId: string) => Stream.Stream<A, E>) =>
         SubscriptionRef.changes(session).pipe(Stream.switchMap(stream))
@@ -299,7 +313,7 @@ export class GlobalConversation extends Context.Service<
             ),
           )
           yield* SubscriptionRef.set(session, next)
-          yield* annotateUnit({ agent_id: next })
+          yield* annotateUnit({ conversation_id: next })
         }),
       ).pipe(Effect.withSpan("GlobalConversation.startFresh"))
 
@@ -322,21 +336,6 @@ export class GlobalConversation extends Context.Service<
         if (ended === undefined) yield* new PastConversationNotFound({ id: sessionId })
       })
 
-      const readPast = Effect.fn("GlobalConversation.readPast")(function* (sessionId: string) {
-        yield* findPast(sessionId)
-
-        return yield* transcripts.read(sessionId)
-      })
-
-      const readEarlierPast = Effect.fn("GlobalConversation.readEarlierPast")(function* (
-        sessionId: string,
-        before: string,
-      ) {
-        yield* findPast(sessionId)
-
-        return yield* transcripts.readEarlier(sessionId, before)
-      })
-
       return GlobalConversation.of({
         model: SubscriptionRef.get(model),
         changeModel,
@@ -356,8 +355,10 @@ export class GlobalConversation extends Context.Service<
         id,
         startFresh,
         past,
-        readPast,
-        readEarlierPast,
+        watchPast: (sessionId) =>
+          Stream.unwrap(findPast(sessionId).pipe(Effect.as(transcripts.watch(sessionId)))),
+        loadEarlierPast: (sessionId, before) =>
+          findPast(sessionId).pipe(Effect.andThen(transcripts.loadEarlier(sessionId, before))),
         waiting: followSession((sessionId) =>
           transcripts.waiting.pipe(Stream.map((waiting) => waiting.get(sessionId) ?? [])),
         ),

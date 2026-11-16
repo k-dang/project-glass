@@ -1,8 +1,7 @@
 import {
-  AgentContext,
-  type AgentMessageInput,
+  ConversationContext,
+  type ConversationMessageInput,
   type CapturedContext,
-  type EarlierTurns,
   type MessageInput,
   type ModelChoice,
   PullRequestContext,
@@ -11,9 +10,15 @@ import {
 } from "@glass/contracts"
 import { Data, type DateTime, Effect, Option, Stream } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
-import { agentsAtom, noCommands, noFiles, TRANSCRIPT_IDLE_TTL, transcriptOf } from "./agentsArea"
+import {
+  conversationsAtom,
+  noCommands,
+  noFiles,
+  TRANSCRIPT_IDLE_TTL,
+  transcriptOf,
+} from "./conversationsArea"
 import { Backend, backendRuntime, backendRuntimeOf } from "./backend"
-import type { Conversation } from "./conversation"
+import type { ConversationAtoms } from "./conversation"
 import { openWorkspaceAtom, sameRef } from "./reviewsArea"
 
 export const globalConversationOpenAtom = Atom.make(false).pipe(Atom.keepAlive)
@@ -41,22 +46,16 @@ export const pastGlobalConversationsAtom = backendRuntime.atom(
 )
 
 export const pastGlobalTranscriptAtom = Atom.family((id: string) =>
-  backendRuntime.atom(Backend.use((backend) => backend.ReadPastGlobalConversation({ id }))),
-)
-
-export const pastEarlierTurnsAtom = Atom.family((_id: string) =>
-  Atom.make<ReadonlyArray<EarlierTurns>>([]),
+  backendRuntime.atom(
+    transcriptOf(
+      Stream.unwrap(Backend.useSync((backend) => backend.WatchPastGlobalConversation({ id }))),
+    ),
+  ),
 )
 
 export const loadEarlierPastTurnsAtom = Atom.family((id: string) =>
-  backendRuntime.fn((before: string, get) =>
-    Backend.use((backend) => backend.ReadEarlierPastGlobalTurns({ id, before })).pipe(
-      Effect.tap((page) =>
-        Effect.sync(() =>
-          get.set(pastEarlierTurnsAtom(id), [...get(pastEarlierTurnsAtom(id)), page]),
-        ),
-      ),
-    ),
+  backendRuntime.fn((before: string) =>
+    Backend.use((backend) => backend.LoadEarlierPastGlobalTurns({ id, before })),
   ),
 )
 
@@ -68,7 +67,7 @@ export const startGlobalFreshAtom = backendRuntime.fn((_: void, get) =>
 
 export type Viewed = Data.TaggedEnum<{
   PullRequest: { readonly ref: PullRequestRef }
-  Agent: { readonly agentId: string }
+  Conversation: { readonly conversationId: string }
 }>
 
 export const Viewed = Data.taggedEnum<Viewed>()
@@ -91,12 +90,14 @@ export const capturedContextAtom = Atom.make((get): CapturedContext | null => {
             revision: workspace.revision,
           })
     },
-    Agent: ({ agentId }) => {
-      const agent = Option.getOrNull(AsyncResult.value(get(agentsAtom)))?.find(
-        ({ id }) => id === agentId,
+    Conversation: ({ conversationId }) => {
+      const conversation = Option.getOrNull(AsyncResult.value(get(conversationsAtom)))?.find(
+        ({ id }) => id === conversationId,
       )
 
-      return agent === undefined ? null : AgentContext.make({ agentId: agent.id, name: agent.name })
+      return conversation === undefined
+        ? null
+        : ConversationContext.make({ conversationId: conversation.id, name: conversation.name })
     },
   })
 })
@@ -107,7 +108,7 @@ const sending = ({ message, images }: MessageInput, get: Atom.FnContext) => ({
   context: get(capturedContextAtom),
 })
 
-export const globalConversation: Conversation = {
+export const globalConversation: ConversationAtoms = {
   composerKey: "global-conversation",
   transcript: backendRuntime
     .atom(
@@ -117,7 +118,7 @@ export const globalConversation: Conversation = {
   loadEarlier: backendRuntime.fn((before: string) =>
     Backend.use((backend) => backend.LoadEarlierGlobalTurns({ before })),
   ),
-  send: backendRuntime.fn((sent: AgentMessageInput, get) =>
+  send: backendRuntime.fn((sent: ConversationMessageInput, get) =>
     Backend.use((backend) => backend.SendGlobalMessage(sending(sent, get))),
   ),
   steer: backendRuntime.fn((sent: MessageInput, get) =>

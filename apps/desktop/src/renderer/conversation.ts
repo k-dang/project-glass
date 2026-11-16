@@ -1,6 +1,6 @@
 import type {
   AgentCommand,
-  AgentMessageInput,
+  ConversationMessageInput,
   MessageInput,
   RequestAnswer,
   SentMessage,
@@ -10,9 +10,9 @@ import type { Cause } from "effect"
 import type { Atom, AsyncResult, AtomRegistry } from "effect/reactivity"
 import { createContext, useContext } from "react"
 import {
-  AgentRequest,
-  agentCommandsAtom,
-  agentFilesAtom,
+  ConversationRequest,
+  conversationCommandsAtom,
+  conversationFilesAtom,
   answerRequestAtom,
   cancelQueuedAtom,
   saveUnsent,
@@ -23,16 +23,16 @@ import {
   stopTurnAtom,
   transcriptAtom,
   unsentMessageAtom,
-} from "./agentsArea"
+} from "./conversationsArea"
 import type { BackendError } from "./backend"
 
-export interface Conversation {
+export interface ConversationAtoms {
   readonly composerKey: string
   readonly transcript: Atom.Atom<
     AsyncResult.AsyncResult<Transcript, BackendError | Cause.NoSuchElementError>
   >
   readonly loadEarlier: Atom.AtomResultFn<string, void, BackendError>
-  readonly send: Atom.AtomResultFn<AgentMessageInput, void, BackendError>
+  readonly send: Atom.AtomResultFn<ConversationMessageInput, void, BackendError>
   readonly steer: Atom.AtomResultFn<MessageInput, void, BackendError>
   readonly stop: Atom.AtomResultFn<void, void, BackendError>
   readonly cancelQueued: Atom.AtomResultFn<string, void, BackendError>
@@ -44,28 +44,28 @@ export interface Conversation {
   readonly files: Atom.Atom<ReadonlyArray<string>>
 }
 
-export const agentConversation = (agentId: string): Conversation => ({
-  composerKey: agentId,
-  transcript: transcriptAtom(agentId),
-  loadEarlier: loadEarlierTurnsAtom(agentId),
-  send: sendMessageAtom(agentId),
-  steer: steerAtom(agentId),
-  stop: stopTurnAtom(agentId),
-  cancelQueued: cancelQueuedAtom(agentId),
-  sendQueued: sendQueuedAtom(agentId),
-  answer: (requestId) => answerRequestAtom(new AgentRequest({ agentId, requestId })),
-  unsent: unsentMessageAtom(agentId),
-  saveUnsent: (registry, composed) => saveUnsent(registry, agentId, composed),
-  commands: agentCommandsAtom(agentId),
-  files: agentFilesAtom(agentId),
+export const conversationAtoms = (conversationId: string): ConversationAtoms => ({
+  composerKey: conversationId,
+  transcript: transcriptAtom(conversationId),
+  loadEarlier: loadEarlierTurnsAtom(conversationId),
+  send: sendMessageAtom(conversationId),
+  steer: steerAtom(conversationId),
+  stop: stopTurnAtom(conversationId),
+  cancelQueued: cancelQueuedAtom(conversationId),
+  sendQueued: sendQueuedAtom(conversationId),
+  answer: (requestId) => answerRequestAtom(new ConversationRequest({ conversationId, requestId })),
+  unsent: unsentMessageAtom(conversationId),
+  saveUnsent: (registry, composed) => saveUnsent(registry, conversationId, composed),
+  commands: conversationCommandsAtom(conversationId),
+  files: conversationFilesAtom(conversationId),
 })
 
-export const ConversationContext = createContext<Conversation | null>(null)
+export const ConversationAtomsContext = createContext<ConversationAtoms | null>(null)
 
-export const useConversation = () => {
-  const conversation = useContext(ConversationContext)
+export const useConversationAtoms = () => {
+  const atoms = useContext(ConversationAtomsContext)
 
-  if (conversation === null) throw new Error("A transcript needs a ConversationContext above it")
+  if (atoms === null) throw new Error("A transcript needs a ConversationAtomsContext above it")
 
-  return conversation
+  return atoms
 }
