@@ -1,42 +1,13 @@
 import { assert, describe, it } from "@effect/vitest"
 import { GitHubUnavailable } from "@glass/contracts"
-import { Context, Deferred, Effect, Fiber, Layer, Redacted, Schema } from "effect"
-import { FetchHttpClient } from "effect/http"
+import { Deferred, Effect, Fiber, Redacted, Schema } from "effect"
 import { TestClock } from "effect/testing"
-import { ServerConfig } from "../ServerConfig"
+import { clientWith } from "../../test/gitHubClient"
 import { GitHubAuth } from "./GitHubAuth"
-import { GitHubClient } from "./GitHubClient"
 
 const Operation = Schema.Struct({
   operationName: Schema.String,
   variables: Schema.Struct({ id: Schema.String }),
-})
-
-const clientWith = Effect.fnUntraced(function* (
-  fetch: typeof globalThis.fetch,
-  auth: GitHubAuth["Service"] = {
-    resolveToken: Effect.succeed({ token: Redacted.make("test-token"), source: "gh" as const }),
-  },
-) {
-  const services = yield* Layer.build(
-    GitHubClient.layer.pipe(
-      Layer.provide(Layer.succeed(GitHubAuth, auth)),
-      Layer.provide(
-        Layer.succeed(ServerConfig, {
-          port: 0,
-          token: Redacted.make("test-launch-token"),
-          allowedOrigins: new Set<string>(),
-          githubApiUrl: "http://127.0.0.1",
-          agentHostBundle: "agentHost.mjs",
-          gitRemote: "https://github.com",
-          dataDirectory: "",
-          homeDirectory: "",
-        }),
-      ),
-    ),
-  ).pipe(Effect.provideService(FetchHttpClient.Fetch, fetch))
-
-  return Context.get(services, GitHubClient)
 })
 
 describe("GitHub request deadlines", () => {

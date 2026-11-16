@@ -62,6 +62,24 @@ export const PULL_REQUEST_REVISION_QUERY = `query PullRequestRevision($id: ID!) 
   }
 }`
 
+export const CURRENT_REVISION_QUERY = `query CurrentRevision($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) { baseRefOid headRefOid }
+  }
+}`
+
+export const CurrentRevisionResponse = GraphQLResponse(
+  Schema.Struct({
+    repository: Schema.NullOr(
+      Schema.Struct({
+        pullRequest: Schema.NullOr(
+          Schema.Struct({ baseRefOid: Schema.String, headRefOid: Schema.String }),
+        ),
+      }),
+    ),
+  }),
+)
+
 export const TOUR_INPUT_QUERY = `query TourInput($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) { id title body baseRefOid headRefOid }

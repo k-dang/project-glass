@@ -543,7 +543,7 @@ export const GlassToolHandlers = GlassTools.toLayer(
         ),
       read_pull_request: ({ pullRequest, revision }) =>
         Effect.gen(function* () {
-          const read = revision ?? (yield* github.pullRequest(pullRequest)).revision
+          const read = revision ?? (yield* github.pullRequestRevision(pullRequest))
 
           const material = pullRequestMaterial(yield* github.reviewInput(pullRequest, read))
 

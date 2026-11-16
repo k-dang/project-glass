@@ -135,7 +135,7 @@ const unresolvedRepository = (owner: string, name: string) => ({
 
 const GraphQLRequest = Schema.Union([
   Schema.Struct({
-    operationName: Schema.Literals(["PullRequest", "TourInput"]),
+    operationName: Schema.Literals(["PullRequest", "CurrentRevision", "TourInput"]),
     variables: PullRequestVariables,
   }),
   Schema.Struct({
@@ -802,6 +802,7 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
   const answerGraphQL = (request: typeof GraphQLRequest.Type) => {
     switch (request.operationName) {
       case "PullRequest":
+      case "CurrentRevision":
       case "TourInput":
         return pullRequestQuery(request.variables)
       case "PullRequestReviewThreads":

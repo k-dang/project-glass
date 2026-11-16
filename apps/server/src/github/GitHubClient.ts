@@ -124,6 +124,8 @@ import {
   type GraphQLBody,
   type GraphQLError,
   ConnectionPageResponse,
+  CURRENT_REVISION_QUERY,
+  CurrentRevisionResponse,
   PULL_REQUEST_QUERY,
   PULL_REQUEST_REVISION_QUERY,
   TOUR_INPUT_QUERY,
@@ -224,6 +226,16 @@ const missingPullRequest = (operation: string) =>
     message: `GraphQL ${operation} couldn't resolve the pull request it just read`,
   })
 
+const inaccessible =
+  (ref: PullRequestRef) =>
+  ({ type, message }: GraphQLError) => {
+    if (type === "NOT_FOUND") return new PullRequestNotFound({ ref })
+
+    if (type === "FORBIDDEN") return new PullRequestAccessDenied({ ref, message })
+
+    return undefined
+  }
+
 const allPages = <A, E>(
   page: (after: string | null) => Effect.Effect<
     {
@@ -261,6 +273,9 @@ export class GitHubClient extends Context.Service<
       PullRequestWorkspace,
       PullRequestNotFound | PullRequestAccessDenied | ConnectionError
     >
+    readonly pullRequestRevision: (
+      ref: PullRequestRef,
+    ) => Effect.Effect<Revision, PullRequestNotFound | PullRequestAccessDenied | ConnectionError>
     readonly tourInput: (
       ref: PullRequestRef,
       revision: Revision,
@@ -573,19 +588,31 @@ export class GitHubClient extends Context.Service<
         }
       })
 
+      const pullRequestRevision = Effect.fn("GitHubClient.pullRequestRevision")(function* (
+        ref: PullRequestRef,
+      ) {
+        const data = yield* graphql({
+          name: "CurrentRevision",
+          query: CURRENT_REVISION_QUERY,
+          variables: { owner: ref.owner, name: ref.repo, number: ref.number },
+          response: CurrentRevisionResponse,
+          domainError: inaccessible(ref),
+        })
+
+        const pr = data.repository?.pullRequest
+
+        if (pr == null) return yield* new PullRequestNotFound({ ref })
+
+        return new Revision({ base: pr.baseRefOid, head: pr.headRefOid })
+      })
+
       const readPullRequest = Effect.fnUntraced(function* (ref: PullRequestRef) {
         const data = yield* graphql({
           name: "PullRequest",
           query: PULL_REQUEST_QUERY,
           variables: { owner: ref.owner, name: ref.repo, number: ref.number },
           response: PullRequestResponse,
-          domainError: ({ type, message }) => {
-            if (type === "NOT_FOUND") return new PullRequestNotFound({ ref })
-
-            if (type === "FORBIDDEN") return new PullRequestAccessDenied({ ref, message })
-
-            return undefined
-          },
+          domainError: inaccessible(ref),
         })
 
         const pr = data.repository?.pullRequest
@@ -760,32 +787,42 @@ export class GitHubClient extends Context.Service<
         return pr
       })
 
+      const alongsideChangedFiles = Effect.fnUntraced(function* <A, E>(
+        ref: PullRequestRef,
+        metadata: Effect.Effect<A, E>,
+      ) {
+        const [read, files] = yield* Effect.all([metadata, Effect.exit(changedFiles(ref))], {
+          concurrency: "unbounded",
+        })
+
+        return [read, (yield* files).map(toChangedFile)] as const
+      })
+
       const tourInput = Effect.fn("GitHubClient.tourInput")(function* (
         ref: PullRequestRef,
         revision: Revision,
       ) {
-        const pr = yield* pinnedPullRequest(ref, revision)
-        const files = yield* changedFiles(ref)
+        const [pr, files] = yield* alongsideChangedFiles(ref, pinnedPullRequest(ref, revision))
 
         if (!(yield* isCurrent(pr.id, revision))) return yield* new StaleRevision()
 
-        return { title: pr.title, body: pr.body, files: files.map(toChangedFile) }
+        return { title: pr.title, body: pr.body, files }
       })
 
       const reviewInput = Effect.fn("GitHubClient.reviewInput")(function* (
         ref: PullRequestRef,
         revision: Revision,
       ) {
-        const pr = yield* pinnedPullRequest(ref, revision)
-
-        const [gitHubFiles, [threads, comments, reviews]] = yield* Effect.all(
-          [changedFiles(ref), discussionNodes(pr.id)],
-          { concurrency: "unbounded" },
+        const [[pr, [threads, comments, reviews]], files] = yield* alongsideChangedFiles(
+          ref,
+          pinnedPullRequest(ref, revision).pipe(
+            Effect.flatMap((pinned) =>
+              Effect.map(discussionNodes(pinned.id), (nodes) => [pinned, nodes] as const),
+            ),
+          ),
         )
 
         if (!(yield* isCurrent(pr.id, revision))) return yield* new StaleRevision()
-
-        const files = gitHubFiles.map(toChangedFile)
 
         return {
           title: pr.title,
@@ -1299,6 +1336,7 @@ export class GitHubClient extends Context.Service<
         viewer,
         knownViewer,
         pullRequest,
+        pullRequestRevision,
         tourInput,
         reviewInput,
         hasChanged,

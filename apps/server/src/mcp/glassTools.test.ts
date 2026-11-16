@@ -1,13 +1,21 @@
 import { assert, describe, it } from "@effect/vitest"
 import { PullRequestRef, Revision } from "@glass/contracts"
 import { Effect, Schema } from "effect"
-import { startFakeGitHub } from "../../test/fakeGitHub"
+import { type FakeGitHubRequest, startFakeGitHub } from "../../test/fakeGitHub"
 import { VIEWER } from "../../test/fakePullRequest"
 import { isolatedHome, startBackend } from "../../test/harness"
 import { connectMcp, listedTools, toolText } from "../../test/mcpClient"
 
 const startGlass = Effect.gen(function* () {
-  const github = yield* startFakeGitHub()
+  const requests: Array<FakeGitHubRequest> = []
+
+  const github = yield* startFakeGitHub({
+    beforeRequest: (request) => {
+      requests.push(request)
+
+      return undefined
+    },
+  })
 
   const pr = github.seedPullRequest({
     owner: "acme",
@@ -40,8 +48,19 @@ const startGlass = Effect.gen(function* () {
     }),
   )
 
-  return { ...backend, github, pr, mcp, call: mcp.call }
+  return { ...backend, github, requests, pr, mcp, call: mcp.call }
 })
+
+const countByKind = (requests: ReadonlyArray<FakeGitHubRequest>) => {
+  const counts: Record<string, number> = {}
+
+  for (const { graphql, method, path } of requests) {
+    const kind = graphql?.operationName ?? `${method} ${path}`
+    counts[kind] = (counts[kind] ?? 0) + 1
+  }
+
+  return counts
+}
 
 describe("Glass tools over MCP", () => {
   it.live("lists Glass's tools, marking which only read", () =>
@@ -123,6 +142,55 @@ describe("Glass tools over MCP", () => {
         Schema.decodeUnknownSync(Schema.Struct({ revision: Revision }))(result.structuredContent),
         { revision: new Revision({ base: "b0", head: "h2" }) },
       )
+    }),
+  )
+
+  it.live("reads the PR as it is now fetching its files and discussions once", () =>
+    Effect.gen(function* () {
+      const { requests, call } = yield* startGlass
+      requests.length = 0
+
+      const result = yield* call("read_pull_request", {
+        pullRequest: { owner: "acme", repo: "api", number: 42 },
+      })
+
+      assert.isFalse(result.isError)
+      assert.deepStrictEqual(countByKind(requests), {
+        CurrentRevision: 1,
+        TourInput: 1,
+        "GET /repos/acme/api/pulls/42/files": 1,
+        PullRequestReviewThreads: 1,
+        PullRequestComments: 1,
+        PullRequestReviews: 1,
+        PullRequestRevision: 1,
+      })
+    }),
+  )
+
+  it.live("explains a PR GitHub can't find as a tool failure", () =>
+    Effect.gen(function* () {
+      const { call } = yield* startGlass
+
+      const result = yield* call("read_pull_request", {
+        pullRequest: { owner: "acme", repo: "api", number: 99 },
+      })
+
+      assert.isTrue(result.isError)
+      assert.include(toolText(result), "GitHub has no such PR")
+    }),
+  )
+
+  it.live("explains a PR the user's login may not read as a tool failure", () =>
+    Effect.gen(function* () {
+      const { github, call } = yield* startGlass
+      github.failNextGraphQL({ type: "FORBIDDEN", message: "Resource protected by SAML." })
+
+      const result = yield* call("read_pull_request", {
+        pullRequest: { owner: "acme", repo: "api", number: 42 },
+      })
+
+      assert.isTrue(result.isError)
+      assert.include(toolText(result), "Resource protected by SAML.")
     }),
   )
 
