@@ -36,7 +36,12 @@ export const diagramsOf = (turns: ReadonlyArray<Turn>) => {
 
   const diagrams = new Map(drawings.map(({ diagram }) => [diagram.title, diagram] as const))
 
-  return { diagrams, latestDrawing: drawings.at(-1) ?? null }
+  const latestTurn = turns.at(-1)
+
+  return {
+    diagrams,
+    latestDrawing: latestTurn === undefined ? null : (drawingsIn(latestTurn).at(-1) ?? null),
+  }
 }
 
 const cardStatus = (call: typeof ToolCallPart.Type, diagram: Diagram | null) => {

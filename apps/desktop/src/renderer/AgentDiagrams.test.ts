@@ -74,3 +74,13 @@ it("opens a Diagram drawn while the Agent is on screen, once its transcript has 
 
   expect(result.current.opened).toEqual(queued)
 })
+
+it("leaves a Diagram from earlier Turns closed when those Turns load", () => {
+  const { result, rerender } = renderHook(({ turns, loaded }) => useDiagrams(turns, loaded), {
+    initialProps: { turns: [turn("turn-2", [])], loaded: true },
+  })
+
+  rerender({ turns: [turn("turn-1", [drawing("draw-1", flow)]), turn("turn-2", [])], loaded: true })
+
+  expect(result.current.opened).toBeNull()
+})

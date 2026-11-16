@@ -745,6 +745,20 @@ export class Transcripts extends Context.Service<
         }
       })
 
+      const earlierPage = <A>(
+        agentId: string,
+        before: string,
+        use: (page: typeof EarlierTurns.Type) => Effect.Effect<A>,
+      ) =>
+        withStorageFailure(
+          "read earlier Turns",
+          lockFor(agentId).withPermits(1)(
+            turnPage(agentId, RECENT_TURNS, before).pipe(
+              Effect.flatMap((page) => use(EarlierTurns.make({ before, ...page }))),
+            ),
+          ),
+        )
+
       const snapshot = Effect.fnUntraced(function* (agentId: string, turns = RECENT_TURNS) {
         return TranscriptSnapshot.make({
           ...(yield* turnPage(agentId, turns)),
@@ -830,28 +844,8 @@ export class Transcripts extends Context.Service<
             lockFor(agentId).withPermits(1)(snapshot(agentId, turns)),
           ),
         loadEarlier: (agentId, before) =>
-          withStorageFailure(
-            "read earlier Turns",
-            lockFor(agentId).withPermits(1)(
-              turnPage(agentId, RECENT_TURNS, before).pipe(
-                Effect.flatMap((page) =>
-                  PubSub.publish(published, {
-                    agentId,
-                    update: EarlierTurns.make({ before, ...page }),
-                  }),
-                ),
-              ),
-            ),
-          ),
-        readEarlier: (agentId, before) =>
-          withStorageFailure(
-            "read earlier Turns",
-            lockFor(agentId).withPermits(1)(
-              turnPage(agentId, RECENT_TURNS, before).pipe(
-                Effect.map((page) => EarlierTurns.make({ before, ...page })),
-              ),
-            ),
-          ),
+          earlierPage(agentId, before, (update) => PubSub.publish(published, { agentId, update })),
+        readEarlier: (agentId, before) => earlierPage(agentId, before, Effect.succeed),
         runningTurn: (agentId) => withStorageFailure("read a running Turn", runningTurn(agentId)),
         idle: (agentId) =>
           withStorageFailure(

@@ -332,24 +332,26 @@ export function Transcript(props: {
   status: string | null
   lead?: ReactNode
 }) {
-  const first = props.turns[0]
+  const before = props.turns[0]?.id
   const { onShowEarlier } = props
-  const showEarlier = first === undefined ? undefined : () => onShowEarlier(first.id)
+
+  const showEarlier = useCallback(() => {
+    if (before !== undefined) onShowEarlier(before)
+  }, [before, onShowEarlier])
 
   const showEarlierWhenSeen = useCallback(
     (element: HTMLButtonElement | null) => {
-      if (element === null || first === undefined || globalThis.IntersectionObserver === undefined)
-        return undefined
+      if (element === null || globalThis.IntersectionObserver === undefined) return undefined
 
       const observer = new IntersectionObserver(([entry]) => {
-        if (entry?.isIntersecting) onShowEarlier(first.id)
+        if (entry?.isIntersecting) showEarlier()
       })
 
       observer.observe(element)
 
       return () => observer.disconnect()
     },
-    [first, onShowEarlier],
+    [showEarlier],
   )
 
   return (
