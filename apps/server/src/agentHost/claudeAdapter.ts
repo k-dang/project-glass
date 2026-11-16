@@ -25,7 +25,6 @@ import {
   DRAW_DIAGRAM_TOOL,
   SUGGEST_DRAFT_TOOL,
   withContextOf,
-  type TurnEnding,
 } from "@glass/contracts"
 import {
   Deferred,
@@ -58,7 +57,7 @@ import { claudeToolInput, type ToolReply } from "./hostTool"
 import { suggestDraft, suggestDraftDescription, suggestDraftParameters } from "./suggestDraftTool"
 import { drawDiagram, drawDiagramDescription, drawDiagramParameters } from "./drawDiagramTool"
 import { GLASS_MCP_PREFIX, GLASS_MCP_SERVER, permissionRequest, ToolInput } from "./toolCalls"
-import { runTurns } from "./turnLoop"
+import { runTurns, type StopEnding } from "./turnLoop"
 
 const QUESTION_TOOL = "AskUserQuestion"
 
@@ -484,7 +483,7 @@ export const claudeAdapter = (
           Effect.asVoid,
         )
       }),
-      stopTurn: Effect.fnUntraced(function* (ending: TurnEnding) {
+      stopTurn: Effect.fnUntraced(function* (ending: StopEnding) {
         const steers = yield* turns.stop(ending)
 
         if (steers === null) return null

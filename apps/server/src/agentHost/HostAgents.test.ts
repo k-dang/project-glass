@@ -1,15 +1,9 @@
 import { NodeFileSystem } from "@effect/platform-node"
 import { assert, it } from "@effect/vitest"
-import {
-  PartSet,
-  TextPart,
-  TurnDone,
-  TurnEnded,
-  TurnStarted,
-  type TurnEnding,
-} from "@glass/contracts"
+import { PartSet, TextPart, TurnDone, TurnEnded, TurnStarted } from "@glass/contracts"
 import { DateTime, Deferred, Effect, Layer, Stream } from "effect"
 import type { AgentAdapter } from "./adapter"
+import type { StopEnding } from "./turnLoop"
 import { HostAgents, overBudget } from "./HostAgents"
 import { Journal, JournalBudget } from "./Journal"
 import { type HostEvent, WorkRole } from "./protocol"
@@ -37,7 +31,7 @@ it.effect("stops a Turn once the journal passes its budget, keeping everything i
             configure: () => Effect.void,
             startTurn: () => Effect.void,
             steer: () => Effect.void,
-            stopTurn: Effect.fnUntraced(function* (ending: TurnEnding) {
+            stopTurn: Effect.fnUntraced(function* (ending: StopEnding) {
               stops++
               yield* report(TurnEnded.make({ turnId: "turn-1", ended: { at, ending } }))
 

@@ -14,7 +14,6 @@ import {
   type RequestPart,
   SUGGEST_DRAFT_TOOL,
   withContextOf,
-  type TurnEnding,
 } from "@glass/contracts"
 import {
   type Cause,
@@ -70,7 +69,7 @@ import type { WrittenSkills } from "./sentSkills"
 import { piLoadsNothing, piTools } from "../agentTools"
 import { piSubagentStatusExtension } from "./piSubagentStatus"
 import { piSuggestDraftExtension } from "./suggestDraftTool"
-import { runTurns } from "./turnLoop"
+import { runTurns, type StopEnding } from "./turnLoop"
 import { globalConversationUpdateDelivery } from "./piGlobalConversationUpdate"
 import piDrawDiagramSource from "virtual:pi-draw-diagram"
 
@@ -579,7 +578,7 @@ export const piAdapter = (command: string) =>
             return yield* new HostAgentError({ message: "pi didn't take the message in." })
           }),
           // pi's abort runs whatever it still holds, so the queue is cleared first (pi docs/rpc-commands.md).
-          stopTurn: Effect.fnUntraced(function* (ending: TurnEnding) {
+          stopTurn: Effect.fnUntraced(function* (ending: StopEnding) {
             const steers = yield* turns.stop(ending)
 
             if (steers === null) return null

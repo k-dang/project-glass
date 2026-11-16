@@ -1,10 +1,4 @@
-import type {
-  AgentCommand,
-  AgentModels,
-  RequestAnswer,
-  RequestNotWaiting,
-  TurnEnding,
-} from "@glass/contracts"
+import type { AgentCommand, AgentModels, RequestAnswer, RequestNotWaiting } from "@glass/contracts"
 import type { Effect, Scope } from "effect"
 import type { DeliveredMessage, DeliveredTurn } from "./deliveredMessage"
 import type {
@@ -15,6 +9,7 @@ import type {
   TurnSettings,
 } from "./protocol"
 import type { WrittenSkills } from "./sentSkills"
+import type { StopEnding } from "./turnLoop"
 
 export interface AgentSession {
   readonly configure: (settings: TurnSettings) => Effect.Effect<void, HostAgentError>
@@ -23,7 +18,7 @@ export interface AgentSession {
     message: DeliveredTurn,
   ) => Effect.Effect<void, HostAgentError>
   readonly steer: (message: DeliveredMessage) => Effect.Effect<void, HostAgentError>
-  readonly stopTurn: (ending: TurnEnding) => Effect.Effect<SteersNotTakenIn | null>
+  readonly stopTurn: (ending: StopEnding) => Effect.Effect<SteersNotTakenIn | null>
   readonly answer: (
     requestId: string,
     answer: RequestAnswer,

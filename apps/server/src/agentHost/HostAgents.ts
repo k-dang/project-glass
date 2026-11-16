@@ -99,27 +99,22 @@ export class HostAgents extends Context.Service<
             const scope = yield* Scope.fork(hostScope)
             let stoppingOverBudget = false
 
-            const stopIfOverBudget = Effect.gen(function* () {
+            const report = Effect.fnUntraced(function* (event: HostEvent) {
+              const full = yield* journal.append(agentId, event)
+
+              if (startsOrEndsTurn(event)) {
+                stoppingOverBudget = false
+
+                return
+              }
+
               const session = running.get(agentId)?.session
 
-              if (stoppingOverBudget || session === undefined || !(yield* journal.full)) return
+              if (!full || stoppingOverBudget || session === undefined) return
 
               stoppingOverBudget = true
               yield* session.stopTurn(overBudget).pipe(Effect.forkIn(scope))
             })
-
-            const report = (event: HostEvent) =>
-              journal.append(agentId, event).pipe(
-                Effect.andThen(
-                  Effect.suspend(() => {
-                    if (!startsOrEndsTurn(event)) return stopIfOverBudget
-
-                    stoppingOverBudget = false
-
-                    return Effect.void
-                  }),
-                ),
-              )
 
             const started = Effect.gen(function* () {
               const skills = yield* written(folder, starting.skills)

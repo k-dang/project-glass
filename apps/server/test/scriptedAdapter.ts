@@ -21,6 +21,7 @@ import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from
 import { basename, dirname, join } from "node:path"
 import type { AgentAdapter, AgentSession } from "../src/agentHost/adapter"
 import type { DeliveredTurn } from "../src/agentHost/deliveredMessage"
+import type { StopEnding } from "../src/agentHost/turnLoop"
 import { GlassToolsAccess, notRunning } from "../src/agentHost/protocol"
 import type { WrittenSkills } from "../src/agentHost/sentSkills"
 import { MCP_PATH } from "../src/mcp/server"
@@ -253,7 +254,7 @@ export const scriptedAdapter = (gates: string): AgentAdapter => {
             }),
           steer: (message) =>
             turn === null ? notRunning : Effect.sync(() => void turn!.steers.push(message)),
-          stopTurn: Effect.fnUntraced(function* (ending: TurnEnding) {
+          stopTurn: Effect.fnUntraced(function* (ending: StopEnding) {
             if (turn === null) return null
 
             const { id, fiber, steers } = turn
