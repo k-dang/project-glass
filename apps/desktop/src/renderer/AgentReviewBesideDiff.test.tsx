@@ -106,7 +106,7 @@ it("marks an outdated Agent review and still reads it", async () => {
 
 const followedUp = (reviewRevision: Revision) => ({
   ...reviewOf(reviewRevision),
-  agentId: "review-agent",
+  conversationId: "review-agent",
 })
 
 const suggestion = (input: SuggestedDraft, status: "done" | "failed") =>
@@ -233,7 +233,7 @@ it("prevents Retry and Send from overlapping while a retry is being accepted", a
     agentReview: {
       review: reviewOf(revision),
       job: {
-        status: "agent-start-failed",
+        status: "conversation-start-failed",
         message: "Why?",
         reason: new AgentReviewFailure({ reason: "runner", message: "Try again.", runner: null }),
       },
@@ -270,11 +270,11 @@ it("sends a suggestion's prompt as the first Follow-up", async () => {
   expect(f.followUp.mock.calls[0]?.[0]).toMatchObject({ revision, message: draftPrComments })
 })
 
-it("sends a suggestion's prompt to the review's Agent", async () => {
+it("sends a suggestion's prompt to the review's Conversation", async () => {
   const f = mountTourWorkspace({
     files,
     agentReview: { review: followedUp(revision), job: { status: "idle" } },
-    reviewAgentTurns: followUps,
+    reviewConversationTurns: followUps,
   })
 
   await readBesideTheDiff(f)
@@ -282,16 +282,16 @@ it("sends a suggestion's prompt to the review's Agent", async () => {
 
   await waitFor(() => expect(f.sendMessage).toHaveBeenCalledOnce())
   expect(f.sendMessage.mock.calls[0]?.[0]).toMatchObject({
-    agentId: "review-agent",
+    conversationId: "review-agent",
     message: draftPrComments,
   })
 })
 
-it("sends later Follow-ups to the review's Agent", async () => {
+it("sends later Follow-ups to the review's Conversation", async () => {
   const f = mountTourWorkspace({
     files,
     agentReview: { review: followedUp(revision), job: { status: "idle" } },
-    reviewAgentTurns: followUps,
+    reviewConversationTurns: followUps,
   })
 
   await readBesideTheDiff(f)
@@ -302,7 +302,7 @@ it("sends later Follow-ups to the review's Agent", async () => {
 
   await waitFor(() => expect(f.sendMessage).toHaveBeenCalledOnce())
   expect(f.sendMessage.mock.calls[0]?.[0]).toMatchObject({
-    agentId: "review-agent",
+    conversationId: "review-agent",
     message: "And the other caller?",
   })
   expect(f.followUp).not.toHaveBeenCalled()
@@ -312,7 +312,7 @@ it("adds a suggested Draft as the user edited it", async () => {
   const f = mountTourWorkspace({
     files,
     agentReview: { review: followedUp(revision), job: { status: "idle" } },
-    reviewAgentTurns: followUps,
+    reviewConversationTurns: followUps,
   })
 
   await readBesideTheDiff(f)
@@ -346,7 +346,7 @@ it("only reads the Follow-ups of an outdated Agent review", async () => {
       review: followedUp(new Revision({ base: "b0", head: "0123456789abcdef" })),
       job: { status: "idle" },
     },
-    reviewAgentTurns: followUps,
+    reviewConversationTurns: followUps,
   })
 
   await readBesideTheDiff(f)

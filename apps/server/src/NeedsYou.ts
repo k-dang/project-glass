@@ -1,5 +1,5 @@
 import {
-  AgentNeedsYou,
+  ConversationNeedsYou,
   AgentReviewFinished,
   AwaitingReply,
   ChangesRequested,
@@ -34,7 +34,7 @@ import {
   Stream,
 } from "effect"
 import { AgentReviews } from "./AgentReviews"
-import { Agents, type FinishedAgent, type WaitingAgent } from "./Agents"
+import { Conversations, type FinishedConversation, type WaitingConversation } from "./Conversations"
 import { GlobalConversation } from "./GlobalConversation"
 import { OutsideQuestions } from "./OutsideQuestions"
 import {
@@ -67,11 +67,11 @@ const waitingOn = (requests: Arr.NonEmptyReadonlyArray<WaitingRequest>) => ({
   ),
 })
 
-const waitingItem = ({ agent, requests }: WaitingAgent) => {
+const waitingItem = ({ conversation, requests }: WaitingConversation) => {
   const { requests: parts, since } = waitingOn(requests)
 
-  return AgentNeedsYou.make({
-    agent,
+  return ConversationNeedsYou.make({
+    conversation,
     reasons: [WaitingRequests.make({ requests: parts })],
     since,
   })
@@ -82,8 +82,12 @@ const globalItem = (requests: ReadonlyArray<WaitingRequest>) =>
     ? [GlobalConversationNeedsYou.make(waitingOn(requests))]
     : []
 
-const finishedItem = ({ agent, ended }: FinishedAgent) =>
-  AgentNeedsYou.make({ agent, reasons: [TurnFinished.make({ ended })], since: ended.at })
+const finishedItem = ({ conversation, ended }: FinishedConversation) =>
+  ConversationNeedsYou.make({
+    conversation,
+    reasons: [TurnFinished.make({ ended })],
+    since: ended.at,
+  })
 
 const pullRequestItems = (waiting: ReadonlyArray<WaitingPullRequest>) =>
   Object.values(Arr.groupBy(waiting, ({ pullRequest }) => referenceKey(pullRequest.ref))).map(
@@ -99,8 +103,8 @@ const pullRequestItems = (waiting: ReadonlyArray<WaitingPullRequest>) =>
   )
 
 const needsYouOf = (
-  waiting: ReadonlyArray<WaitingAgent>,
-  finished: ReadonlyArray<FinishedAgent>,
+  waiting: ReadonlyArray<WaitingConversation>,
+  finished: ReadonlyArray<FinishedConversation>,
   pullRequests: ReadonlyArray<WaitingPullRequest>,
   outside: ReadonlyArray<OutsideQuestion>,
   global: ReadonlyArray<WaitingRequest>,
@@ -177,7 +181,7 @@ export class NeedsYou extends Context.Service<
   static readonly layer = Layer.effect(
     NeedsYou,
     Effect.gen(function* () {
-      const agents = yield* Agents
+      const conversations = yield* Conversations
       const queue = yield* Queue
       const agentReviews = yield* AgentReviews
       const questions = yield* OutsideQuestions
@@ -240,8 +244,8 @@ export class NeedsYou extends Context.Service<
       return NeedsYou.of({
         watch: () =>
           Stream.zipLatestAll(
-            agents.watchWaiting(),
-            agents.watchFinished(),
+            conversations.watchWaiting(),
+            conversations.watchFinished(),
             waitingPullRequests,
             questions.watch(),
             conversation.waiting,

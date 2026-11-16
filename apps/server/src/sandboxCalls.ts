@@ -1,4 +1,4 @@
-import { AgentError, RPC_PATH } from "@glass/contracts"
+import { ConversationError, RPC_PATH } from "@glass/contracts"
 import type { SandboxProvider, SandboxState, SandboxTarget } from "@glass/plugin"
 import { DateTime, Effect, Schedule } from "effect"
 import { AgentHostRpcs, HEALTH_PATH, HOST_TOKEN_HEADER, SHUTDOWN_PATH } from "./agentHost/protocol"
@@ -33,20 +33,20 @@ const providerFailure =
   ({ rejected }: { readonly rejected: unknown }) => {
     if (rejected instanceof MissingLogin)
       return Effect.fail(
-        new AgentError({
+        new ConversationError({
           message: `${provider.name} needs your ${rejected.login} login. Run ${rejected.fix}, then try again.`,
         }),
       )
 
     if (rejected instanceof NoCapacity)
       return Effect.fail(
-        new AgentError({ message: `${rejected.message} Try again in a little while.` }),
+        new ConversationError({ message: `${rejected.message} Try again in a little while.` }),
       )
 
     return Effect.logWarning(`${provider.name} couldn't ${action}`, rejected).pipe(
       Effect.andThen(
         Effect.fail(
-          new AgentError({
+          new ConversationError({
             message: `Couldn't ${action}. Try again; Glass's backend log has the details.`,
           }),
         ),
@@ -69,7 +69,7 @@ const hostUrl = (target: SandboxTarget, path: string) => {
 
 const callAbout = <A>(provider: SandboxProvider, action: string, run: () => Promise<A>) =>
   fromProvider(run).pipe(
-    Effect.catch(({ rejected }): Effect.Effect<never, AgentError | SandboxGone> =>
+    Effect.catch(({ rejected }): Effect.Effect<never, ConversationError | SandboxGone> =>
       rejected instanceof SandboxGone
         ? Effect.fail(rejected)
         : providerFailure(provider, action)({ rejected }),
@@ -94,14 +94,16 @@ export const extendSandbox = (
       Effect.fromOption(DateTime.make(date)).pipe(
         Effect.mapError(
           () =>
-            new AgentError({ message: `${provider.name} answered an expiry Glass can't read.` }),
+            new ConversationError({
+              message: `${provider.name} answered an expiry Glass can't read.`,
+            }),
         ),
       ),
     ),
   )
 
 const didntStart = () =>
-  new AgentError({ message: "The agent in the Sandbox didn't start. Try again." })
+  new ConversationError({ message: "The agent in the Sandbox didn't start. Try again." })
 
 export const waitForHost = (provider: SandboxProvider, state: SandboxState) =>
   targetOf(provider, state).pipe(

@@ -26,10 +26,10 @@ The standalone Chapter preview uses clearly labeled illustrative outlines, not f
 
 ## In-app examples
 
-The fake backend also includes three PRs named **Tour example: add OpenCode for ordinary Agents**, **Tour example: validate before saving**, and **Tour example: group rate-limit settings**. Run `pnpm dev:fake`, open one in Reviews, select Tour, and choose Write Tour, then Start reading.
+The fake backend also includes three PRs named **Tour example: add OpenCode for ordinary Conversations**, **Tour example: validate before saving**, and **Tour example: group rate-limit settings**. Run `pnpm dev:fake`, open one in Reviews, select Tour, and choose Write Tour, then Start reading.
 
 These examples use small synthetic source files and real patches. They exercise saved Tour decoding, Mermaid diagrams drawn by Pele, code-target validation for outlines, and navigation to selected lines on either side of the diff. The OpenCode example is still an illustration of Kevin's supplied screenshot, not the actual OpenCode implementation.
 
-When writing a Tour, the engine chooses one overview map: a diagram for flows, branches, and changed routes, or a plain-language outline for nesting and hierarchy. Overview targets can cross files and Chapters; Chapter visuals stay local and add detail beyond that map. Trivial changes can omit the map. A diagram is a Mermaid flowchart whose nodes carry the `added` or `removed` class; Glass colors them and draws removed connections dotted. Labels describe behavior and relationships.
+When writing a Tour, the Tour engine chooses one overview map: a diagram for flows, branches, and changed routes, or a plain-language outline for nesting and hierarchy. Overview targets can cross files and Chapters; Chapter visuals stay local and add detail beyond that map. Trivial changes can omit the map. A diagram is a Mermaid flowchart whose nodes carry the `added` or `removed` class; Glass colors them and draws removed connections dotted. Labels describe behavior and relationships.
 
 Diagrams Pele cannot draw are omitted, retaining a valid outline when supplied. Outdated Tours hide their visuals.

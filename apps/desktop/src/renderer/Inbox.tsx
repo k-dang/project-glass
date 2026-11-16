@@ -11,7 +11,7 @@ import { Option, Predicate } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
 import { ChevronDown, Inbox as InboxIcon } from "lucide-react"
 import { type ReactNode, useEffect, useRef, useState } from "react"
-import { AgentRequest, answerRequestAtom } from "./agentsArea"
+import { ConversationRequest, answerRequestAtom } from "./conversationsArea"
 import { InboxDetail } from "./InboxDetail"
 import {
   contextOf,
@@ -236,8 +236,8 @@ function useInboxActions(selected: NeedsYouItem | null): ReadonlyArray<InboxActi
 
   const allow = useAtomSet(
     answerRequestAtom(
-      new AgentRequest({
-        agentId: permission?.agentId ?? "",
+      new ConversationRequest({
+        conversationId: permission?.conversationId ?? "",
         requestId: permission?.requestId ?? "",
       }),
     ),

@@ -31,7 +31,7 @@ export const needsYouCount = (result: NeedsYouResult): Option.Option<number> =>
 
 export const needsYouKey = (item: NeedsYouItem): string =>
   Match.valueTags(item, {
-    Agent: ({ agent }) => `agent:${agent.id}`,
+    Conversation: ({ conversation }) => `conversation:${conversation.id}`,
     OutsideQuestion: ({ id }) => `ask:${id}`,
     PullRequest: ({ pullRequest }) => `pr:${referenceKey(pullRequest.ref)}`,
     GlobalConversation: () => "global",
@@ -56,6 +56,6 @@ export const markDoneAtom = backendRuntime.fn((review: AgentReviewDone) =>
 )
 
 export const markTurnSeenAtom = backendRuntime.fn(
-  (seen: { readonly agentId: string; readonly endedAt: DateTime.Utc }) =>
+  (seen: { readonly conversationId: string; readonly endedAt: DateTime.Utc }) =>
     Backend.use((backend) => backend.MarkTurnSeen(seen)),
 )

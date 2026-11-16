@@ -9,10 +9,10 @@ import { isolatedHome } from "../test/harness"
 import { eventually } from "../test/eventually"
 import { Plugins } from "./Plugins"
 
-const providerPlugin = (id: string, engines: ReadonlyArray<string> = ["pi"]) => `
+const providerPlugin = (id: string, harnesses: ReadonlyArray<string> = ["pi"]) => `
 export default (glass) => {
   glass.registerSandboxProvider(${JSON.stringify(id)}, {
-    engines: ${JSON.stringify(engines)},
+    harnesses: ${JSON.stringify(harnesses)},
     create: async () => {},
     target: async () => ({ url: "http://sandbox", headers: {} }),
     remove: async () => {},
@@ -44,7 +44,7 @@ describe("Plugins", () => {
     }),
   )
 
-  it.live("skips a Sandbox provider that doesn't list Agent programs Glass knows", () =>
+  it.live("skips a Sandbox provider that doesn't list Agent harnesses Glass knows", () =>
     Effect.gen(function* () {
       const plugins = yield* isolatedHome
       yield* write(join(plugins, "empty.js"), providerPlugin("empty", []))
@@ -73,7 +73,7 @@ describe("Plugins", () => {
         `import { id } from "provider-id"
 type Glass = { registerSandboxProvider: (id: string, provider: unknown) => void }
 export default (glass: Glass): void => {
-  glass.registerSandboxProvider(id, { engines: ["pi"] } as unknown)
+  glass.registerSandboxProvider(id, { harnesses: ["pi"] } as unknown)
 }
 `,
       )

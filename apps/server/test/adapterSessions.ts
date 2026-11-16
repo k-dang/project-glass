@@ -1,7 +1,7 @@
 import { getSessionInfo, query } from "@anthropic-ai/claude-agent-sdk"
 import {
   type AgentEvent,
-  applyAgentEvent,
+  applyConversationEvent,
   type Image,
   isWaiting,
   type RequestAnswer,
@@ -27,7 +27,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { vi } from "vite-plus/test"
-import type { AgentAdapter, AgentSession } from "../src/agentHost/adapter"
+import type { HarnessAdapter, HarnessSession } from "../src/agentHost/adapter"
 import { claudeAdapter, type ClaudeSdk } from "../src/agentHost/claudeAdapter"
 import { piAdapter } from "../src/agentHost/piAdapter"
 import { AgentRunners } from "../src/agentRunners"
@@ -41,7 +41,7 @@ import {
   type TurnSettings,
   WorkRole,
 } from "../src/agentHost/protocol"
-import { bundledPi, bundledPiProgram } from "./demoAgent"
+import { bundledPi, bundledPiProgram } from "./demoConversation"
 import { type FakeModelSettings, fakeModelProvider } from "./fakeModelProvider"
 import { startFakeGitHub } from "./fakeGitHub"
 import { VIEWER } from "./fakePullRequest"
@@ -74,7 +74,7 @@ export const waiting = (turns: ReadonlyArray<Turn>) =>
 type Work = typeof WorkRole.Type
 
 const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
-  adapter: AgentAdapter<Role | Work>,
+  adapter: HarnessAdapter<Role | Work>,
   tape: ReturnType<typeof sessionTape>,
   folder: string,
   defaults: Partial<TurnSettings> = {},
@@ -90,7 +90,7 @@ const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
       ? SubscriptionRef.set(statuses, event.extensionStatuses)
       : Effect.sync(() => events.push(event)).pipe(
           Effect.andThen(
-            SubscriptionRef.update(turns, (current) => applyAgentEvent(current, event)),
+            SubscriptionRef.update(turns, (current) => applyConversationEvent(current, event)),
           ),
         )
 
@@ -116,7 +116,7 @@ const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
 
   const open = (conversation: string, role: Role | Work = WorkRole.make({})) =>
     adapter.start({ folder, conversation, role, skills: [], report }).pipe(
-      Effect.map((session: AgentSession) => ({
+      Effect.map((session: HarnessSession) => ({
         session,
         configure: (settings: Partial<TurnSettings>) =>
           session.configure({
@@ -256,7 +256,11 @@ export const glassToolsBackend = Effect.fnUntraced(function* (sessionId: string)
   yield* client.AddToDo({ title: "Reply to Sam", notes: "" })
 
   const url = yield* mcpCredentials.endpoint
-  const bearer = yield* mcpCredentials.issue({ conversationId: "global-conversation", sessionId })
+
+  const bearer = yield* mcpCredentials.issue({
+    globalConversationId: "global-conversation",
+    sessionId,
+  })
 
   return {
     role: GlobalRole.make({ tools: { url, bearer } }),

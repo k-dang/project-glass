@@ -1,4 +1,4 @@
-import { type AgentEngine, engineCapabilities, type PermissionMode } from "@glass/contracts"
+import { type AgentHarness, harnessCapabilities, type PermissionMode } from "@glass/contracts"
 import { cn } from "cn"
 import { Lock, type LucideIcon, PencilLine, ShieldOff, Sparkles } from "lucide-react"
 import {
@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { permissionModeNames } from "./agentsArea"
+import { permissionModeNames } from "./conversationsArea"
 import { chip } from "./chips"
 
 const icons: Record<PermissionMode, LucideIcon> = {
@@ -26,11 +26,11 @@ const descriptions: Record<PermissionMode, string> = {
 }
 
 export function PermissionModePicker(props: {
-  engine: AgentEngine
+  harness: AgentHarness
   permissionMode: PermissionMode | null
   onChange: (permissionMode: PermissionMode) => void
 }) {
-  const modes = engineCapabilities[props.engine].permissionModes
+  const modes = harnessCapabilities[props.harness].permissionModes
 
   if (modes.length === 0) return null
 

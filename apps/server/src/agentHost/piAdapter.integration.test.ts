@@ -25,7 +25,7 @@ import {
   lastTextOf,
   runningTool,
 } from "../../test/adapterSessions"
-import { settled } from "../../test/agentsFixture"
+import { settled } from "../../test/conversationsFixture"
 import {
   type FakeModelDelta,
   type FakeModelRequest,
@@ -35,7 +35,7 @@ import { recordingSessions } from "../../test/sessionTape"
 import { PI_MODEL_ID } from "../../test/piLogin"
 import { ReviewRole } from "./protocol"
 
-const conversation = "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d"
+const conversationId = "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d"
 
 const pixel: Image = {
   mediaType: "image/png",
@@ -74,10 +74,10 @@ const yes = AnswerQuestion.make({ answers: [{ chosen: ["Yes"], text: null }] })
 it.live("streams thinking, tool calls, and text into a Turn that ends done once pi settles", () =>
   Effect.gen(function* () {
     const f = yield* piSession("pi-streams")
-    const agent = yield* f.open(conversation)
-    yield* agent.configure({ effort: "high" })
+    const session = yield* f.open(conversationId)
+    yield* session.configure({ effort: "high" })
 
-    yield* agent.send(
+    yield* session.send(
       `Think it through step by step first. ${run("bash", "echo hi", "It says hi.")}`,
     )
     const [turn] = yield* f.until(settled(1))
@@ -118,9 +118,9 @@ it.live("ends a Turn when pi settles after retrying, not at the first agent_end"
       piSettings: { retry: { enabled: true, maxRetries: 1, baseDelayMs: 50 } },
     })
 
-    const agent = yield* f.open(conversation)
+    const session = yield* f.open(conversationId)
 
-    yield* agent.send("Say hello")
+    yield* session.send("Say hello")
     const [turn] = yield* f.until(settled(1))
 
     assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
@@ -146,9 +146,9 @@ export default (pi) => {
   })
 }`,
     )
-    const agent = yield* f.open(conversation)
+    const session = yield* f.open(conversationId)
 
-    yield* agent.send("Start the background task")
+    yield* session.send("Start the background task")
     yield* f.until(settled(1))
     writeFileSync(join(signals, "finished"), "")
     const [, woken] = yield* f.until(settled(2))
@@ -169,12 +169,12 @@ it.live("reports a pi extension's statuses as plain text, outside any Turn", () 
   pi.registerCommand("leave", { handler: async (_args, ctx) => ctx.ui.setStatus("mode", undefined) })
 }`,
     )
-    const agent = yield* f.open(conversation)
+    const session = yield* f.open(conversationId)
 
     yield* f.untilStatuses((statuses) => statuses.length > 0)
     assert.deepStrictEqual(yield* f.statuses, ["Plan mode"])
 
-    yield* agent.send("/leave")
+    yield* session.send("/leave")
     yield* f.untilStatuses((statuses) => statuses.length === 0)
   }).pipe(Effect.scoped),
 )
@@ -194,16 +194,16 @@ it.live("shows the subagents pi-subagents runs as a status until they finish", (
   })
 }`,
     )
-    const agent = yield* f.open(conversation)
+    const session = yield* f.open(conversationId)
 
-    yield* agent.send("/spawn")
+    yield* session.send("/spawn")
     yield* f.untilStatuses((statuses) => statuses.length > 0)
     assert.deepStrictEqual(yield* f.statuses, [
       "Running a subagent: Explore: Trace composer to harness",
     ])
 
     yield* f.until(settled(1))
-    yield* agent.send("/finish")
+    yield* session.send("/finish")
     yield* f.untilStatuses((statuses) => statuses.length === 0)
   }).pipe(Effect.scoped),
 )
@@ -211,9 +211,9 @@ it.live("shows the subagents pi-subagents runs as a status until they finish", (
 it.live("fails a Turn with a reason that leaves out the provider's own words", () =>
   Effect.gen(function* () {
     const f = yield* piSession("pi-rejected", { apiKey: "glass-rejected-key" })
-    const agent = yield* f.open(conversation)
+    const session = yield* f.open(conversationId)
 
-    yield* agent.send("Say hello")
+    yield* session.send("Say hello")
     const [turn] = yield* f.until(settled(1))
 
     const ending = turn?.ended?.ending
@@ -226,11 +226,11 @@ it.live("fails a Turn with a reason that leaves out the provider's own words", (
 it.live("continues the same conversation in later Turns", () =>
   Effect.gen(function* () {
     const f = yield* piSession("pi-conversation")
-    const agent = yield* f.open(conversation)
+    const session = yield* f.open(conversationId)
 
-    yield* agent.send("Remember the word lantern. Reply with exactly: Noted.")
+    yield* session.send("Remember the word lantern. Reply with exactly: Noted.")
     yield* f.until(settled(1))
-    yield* agent.send(
+    yield* session.send(
       "Which word did I ask you to remember? Reply with only that word, in lowercase.",
     )
     const turns = yield* f.until(settled(2))
@@ -243,13 +243,13 @@ it.live("Steers a pi Turn, which takes the message in before it ends", () =>
   Effect.gen(function* () {
     const f = yield* piSession("pi-steer")
     yield* f.extension("confirm.js", confirmExtension)
-    const agent = yield* f.open(conversation)
+    const session = yield* f.open(conversationId)
     const steer = "Change course: reply with exactly STEERED instead."
 
-    yield* agent.send(run("bash", "echo hi", "FIRST"))
+    yield* session.send(run("bash", "echo hi", "FIRST"))
     const request = yield* f.request
-    yield* agent.steer(steer)
-    yield* agent.answer(request.requestId, yes)
+    yield* session.steer(steer)
+    yield* session.answer(request.requestId, yes)
 
     const [turn] = yield* f.until(settled(1))
     assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
@@ -261,12 +261,12 @@ it.live("stops a pi Turn, handing back a Steer pi hadn't taken in", () =>
   Effect.gen(function* () {
     const f = yield* piSession("pi-stop")
     yield* f.extension("confirm.js", confirmExtension)
-    const agent = yield* f.open(conversation)
+    const session = yield* f.open(conversationId)
 
-    const turnId = yield* agent.send(run("bash", "echo hi", "DONE"))
+    const turnId = yield* session.send(run("bash", "echo hi", "DONE"))
     yield* f.request
-    yield* agent.steer("Now, please")
-    const handedBack = yield* agent.session.stopTurn(turnId)
+    yield* session.steer("Now, please")
+    const handedBack = yield* session.session.stopTurn(turnId)
 
     const [turn] = yield* f.until(settled(1))
     assert.deepStrictEqual(turn?.ended?.ending, TurnStopped.make({}))
@@ -279,12 +279,12 @@ it.live("shows a Steer a pi extension handles itself", () =>
     const f = yield* piSession("pi-handled-steer")
     yield* f.extension("input.js", inputExtension)
     yield* f.extension("confirm.js", confirmExtension)
-    const agent = yield* f.open(conversation)
+    const session = yield* f.open(conversationId)
 
-    yield* agent.send(run("bash", "echo hi", "DONE"))
+    yield* session.send(run("bash", "echo hi", "DONE"))
     const request = yield* f.request
-    yield* agent.steer("ping")
-    yield* agent.answer(request.requestId, yes)
+    yield* session.steer("ping")
+    yield* session.answer(request.requestId, yes)
 
     const [turn] = yield* f.until(settled(1))
     assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
@@ -301,9 +301,9 @@ it.live("shows the notice a pi extension's command answers with", () =>
         handler: async (_args, ctx) => ctx.ui.notify("All systems go", "info"),
       })`,
     )
-    const agent = yield* f.open(conversation)
+    const session = yield* f.open(conversationId)
 
-    yield* agent.send("/status")
+    yield* session.send("/status")
 
     const [turn] = yield* f.until(settled(1))
     assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
@@ -316,13 +316,13 @@ it.live("hands back what pi held when the Turn stops: Steers as written, then pi
     const f = yield* piSession("pi-held-steers")
     yield* f.extension("input.js", inputExtension)
     yield* f.extension("confirm.js", confirmExtension)
-    const agent = yield* f.open(conversation)
+    const session = yield* f.open(conversationId)
 
-    const turnId = yield* agent.send(run("bash", "echo hi", "DONE"))
+    const turnId = yield* session.send(run("bash", "echo hi", "DONE"))
     yield* f.request
-    yield* agent.steer("?quick tabs or spaces?", [pixel])
-    yield* agent.steer("remind me")
-    const handedBack = yield* agent.session.stopTurn(turnId)
+    yield* session.steer("?quick tabs or spaces?", [pixel])
+    yield* session.steer("remind me")
+    const handedBack = yield* session.session.stopTurn(turnId)
 
     assert.deepStrictEqual(handedBack, [
       { message: "?quick tabs or spaces?", images: [pixel], context: null },
@@ -334,9 +334,9 @@ it.live("hands back what pi held when the Turn stops: Steers as written, then pi
 it.live("sends a message's images to pi", () =>
   Effect.gen(function* () {
     const f = yield* piSession("pi-image")
-    const agent = yield* f.open(conversation)
+    const session = yield* f.open(conversationId)
 
-    yield* agent.send(
+    yield* session.send(
       "What's in this image? Answer in one short sentence without using any tools.",
       [pixel],
     )
@@ -428,17 +428,17 @@ it.live(
 )
 
 it.live(
-  "starts a pi Agent on the chosen model and effort, and clears the effort for the next Turn",
+  "starts a pi Conversation on the chosen model and effort, and clears the effort for the next Turn",
   () =>
     Effect.gen(function* () {
       const f = yield* piSession("pi-model-change")
-      const agent = yield* f.open(conversation)
+      const session = yield* f.open(conversationId)
 
-      yield* agent.configure({ model: PI_MODEL_ID, effort: "high" })
-      yield* agent.send("Reply with exactly: FIRST")
+      yield* session.configure({ model: PI_MODEL_ID, effort: "high" })
+      yield* session.send("Reply with exactly: FIRST")
       yield* f.until(settled(1))
-      yield* agent.configure({})
-      yield* agent.send("Reply with exactly: SECOND")
+      yield* session.configure({})
+      yield* session.send("Reply with exactly: SECOND")
       const turns = yield* f.until(settled(2))
 
       assert.deepStrictEqual(
@@ -448,23 +448,25 @@ it.live(
     }).pipe(Effect.scoped),
 )
 
-it.live("runs a pi Agent's next Turn on pi's own thinking level once its effort is cleared", () =>
-  Effect.gen(function* () {
-    const f = yield* piSession("pi-thinking-level")
-    const agent = yield* f.open(conversation)
+it.live(
+  "runs a pi Conversation's next Turn on pi's own thinking level once its effort is cleared",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* piSession("pi-thinking-level")
+      const session = yield* f.open(conversationId)
 
-    yield* agent.configure({ model: PI_MODEL_ID, effort: "high" })
-    yield* agent.send("Reply with exactly: FIRST")
-    yield* f.until(settled(1))
-    yield* agent.configure({ model: PI_MODEL_ID })
-    yield* agent.send("Reply with exactly: SECOND")
-    const turns = yield* f.until(settled(2))
+      yield* session.configure({ model: PI_MODEL_ID, effort: "high" })
+      yield* session.send("Reply with exactly: FIRST")
+      yield* f.until(settled(1))
+      yield* session.configure({ model: PI_MODEL_ID })
+      yield* session.send("Reply with exactly: SECOND")
+      const turns = yield* f.until(settled(2))
 
-    assert.deepStrictEqual(
-      turns.map(({ ended }) => ended?.ending),
-      [TurnDone.make({}), TurnDone.make({})],
-    )
-  }).pipe(Effect.scoped),
+      assert.deepStrictEqual(
+        turns.map(({ ended }) => ended?.ending),
+        [TurnDone.make({}), TurnDone.make({})],
+      )
+    }).pipe(Effect.scoped),
 )
 
 const firstQuestion = (part: RequestPart) =>
@@ -483,7 +485,7 @@ it.live("asks pi's extension dialogs as Questions, answered with an option or te
         return { block: true, reason: greeting + " " + name + " " + sure }
       })`,
     )
-    const agent = yield* f.open(conversation)
+    const session = yield* f.open(conversationId)
 
     const replies = new Map([
       ["Which greeting?", { chosen: ["Hello"], text: null }],
@@ -491,7 +493,7 @@ it.live("asks pi's extension dialogs as Questions, answered with an option or te
       ["Greet them?", { chosen: ["Yes"], text: null }],
     ])
 
-    yield* agent.send(
+    yield* session.send(
       "Use the bash tool to run exactly `echo hi` once. If it is blocked, don't try again; reply with exactly: Blocked.",
     )
 
@@ -504,7 +506,7 @@ it.live("asks pi's extension dialogs as Questions, answered with an option or te
         }),
       )!
 
-      yield* agent.answer(
+      yield* session.answer(
         question.requestId,
         AnswerQuestion.make({ answers: [replies.get(asked)!] }),
       )
@@ -546,17 +548,17 @@ it.live("stops a pi Turn while its extension's dialog waits", () =>
   Effect.gen(function* () {
     const f = yield* piSession("pi-stop-in-dialog")
     yield* f.extension("confirm.js", confirmExtension)
-    const agent = yield* f.open(conversation)
+    const session = yield* f.open(conversationId)
 
-    const turnId = yield* agent.send(run("bash", "echo hi", "DONE"))
+    const turnId = yield* session.send(run("bash", "echo hi", "DONE"))
     const request = yield* f.request
-    yield* agent.session.stopTurn(turnId)
+    yield* session.session.stopTurn(turnId)
 
     const [turn] = yield* f.until(settled(1))
     assert.deepStrictEqual(turn?.ended?.ending, TurnStopped.make({}))
     assert.equal(turn?.parts.find(isRequestPart)?.status, "expired")
 
-    const refused = yield* agent
+    const refused = yield* session
       .answer(request.requestId, AnswerQuestion.make({ answers: [] }))
       .pipe(Effect.flip)
 
@@ -580,7 +582,7 @@ const reviewReplies = [
 ]
 
 it.live(
-  "runs commands in its checkout and proposes Suggested drafts as an Agent review's Agent",
+  "runs commands in its checkout and proposes Suggested drafts as an Agent review's Conversation",
   () =>
     Effect.gen(function* () {
       const f = yield* piSession("pi-review", {
@@ -594,9 +596,9 @@ it.live(
       })
 
       yield* writeGreeter(f.folder)
-      const agent = yield* f.open(conversation, ReviewRole.make({ brief: reviewBrief }))
+      const session = yield* f.open(conversationId, ReviewRole.make({ brief: reviewBrief }))
 
-      yield* agent.send("Draft comments on greet.ts.")
+      yield* session.send("Draft comments on greet.ts.")
       const [turn] = yield* f.until(settled(1))
       assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
 
@@ -650,12 +652,12 @@ const globalReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => 
 
 it.live("asks a Question as the Global conversation", () =>
   Effect.gen(function* () {
-    const glass = yield* glassToolsBackend(conversation)
+    const glass = yield* glassToolsBackend(conversationId)
     const f = yield* piSession("pi-global", { fake: { reply: globalReply }, places: glass.places })
 
-    const agent = yield* f.open(conversation, glass.role)
+    const session = yield* f.open(conversationId, glass.role)
 
-    yield* agent.send("Ask me which greeting I prefer.")
+    yield* session.send("Ask me which greeting I prefer.")
     const question = yield* f.request
     assert.ok(Predicate.isTagged(question, "Question"))
     assert.deepStrictEqual(question.questions[0]?.question, "Which greeting?")
@@ -664,7 +666,7 @@ it.live("asks a Question as the Global conversation", () =>
       ["Hi", "Hello"],
     )
 
-    yield* agent.answer(
+    yield* session.answer(
       question.requestId,
       AnswerQuestion.make({ answers: [{ chosen: ["Hello"], text: null }] }),
     )
@@ -677,16 +679,16 @@ it.live("asks a Question as the Global conversation", () =>
 
 it.live("reads Glass through its tools as the Global conversation, explaining a failed read", () =>
   Effect.gen(function* () {
-    const glass = yield* glassToolsBackend(conversation)
+    const glass = yield* glassToolsBackend(conversationId)
 
     const f = yield* piSession("pi-global-tools", {
       fake: { reply: globalReply },
       places: glass.places,
     })
 
-    const agent = yield* f.open(conversation, glass.role)
+    const session = yield* f.open(conversationId, glass.role)
 
-    yield* agent.send("What are my To-dos?")
+    yield* session.send("What are my To-dos?")
     const [read] = yield* f.until(settled(1))
     const listed = read?.parts.find((part) => Predicate.isTagged(part, "ToolCall"))
 
@@ -695,7 +697,7 @@ it.live("reads Glass through its tools as the Global conversation, explaining a 
     assert.include(listed?.output, "Reply to Sam")
     assert.include(lastTextOf(read), "Reply to Sam")
 
-    yield* agent.send("Read acme/api#42 at a stale Revision.")
+    yield* session.send("Read acme/api#42 at a stale Revision.")
     const [, failed] = yield* f.until(settled(2))
     const stale = failed?.parts.find((part) => Predicate.isTagged(part, "ToolCall"))
 
@@ -706,21 +708,21 @@ it.live("reads Glass through its tools as the Global conversation, explaining a 
 
 it.live("stops the Global conversation's Turn while a Glass tool runs, cancelling the call", () =>
   Effect.gen(function* () {
-    const glass = yield* glassToolsBackend(conversation)
+    const glass = yield* glassToolsBackend(conversationId)
 
     const f = yield* piSession("pi-global-tool-stop", {
       fake: { reply: globalReply },
       places: glass.places,
     })
 
-    const agent = yield* f.open(conversation, glass.role)
+    const session = yield* f.open(conversationId, glass.role)
 
-    const turnId = yield* agent.send("Wait for release.")
+    const turnId = yield* session.send("Wait for release.")
 
     if (recordingSessions) yield* glass.waitStarted
     else yield* f.until(runningTool("wait_for_release"))
 
-    yield* agent.session.stopTurn(turnId)
+    yield* session.session.stopTurn(turnId)
     const [turn] = yield* f.until(settled(1))
 
     assert.deepStrictEqual(turn?.ended?.ending, TurnStopped.make({}))

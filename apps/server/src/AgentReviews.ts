@@ -31,7 +31,7 @@ import {
 import { SqlClient } from "effect/sql"
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
-import { Agents } from "./Agents"
+import { Conversations } from "./Conversations"
 import {
   AgentReviewAnswer,
   agentReviewInstructions,
@@ -50,9 +50,9 @@ const BACKGROUND_SLOTS = 1
 
 type Status = AgentReviewState["job"]
 
-type Progress = Extract<Status, { status: "reviewing" | "starting-agent" }>
+type Progress = Extract<Status, { status: "reviewing" | "starting-conversation" }>
 
-type Failed = Extract<Status, { status: "failed" | "agent-start-failed" }>
+type Failed = Extract<Status, { status: "failed" | "conversation-start-failed" }>
 
 type Job = PullRequestJob<AgentReview, Progress, Failed>
 
@@ -76,7 +76,7 @@ const stored = Schema.Array(
     markdown: Schema.String,
     hotspots: HotspotsJson,
     low_attention: LowAttentionJson,
-    agent_id: Schema.NullOr(Schema.String),
+    conversation_id: Schema.NullOr(Schema.String),
     done: Schema.BooleanFromBit,
     included_in_global_conversation_update: Schema.BooleanFromBit,
   }),
@@ -173,7 +173,7 @@ export class AgentReviews extends Context.Service<
       const config = yield* ServerConfig
       const deadlines = yield* Deadlines
       const settings = yield* SettingsStore
-      const agents = yield* Agents
+      const conversations = yield* Conversations
       const fs = yield* FileSystem.FileSystem
       const scope = yield* Scope.Scope
 
@@ -183,7 +183,7 @@ export class AgentReviews extends Context.Service<
       const load = Effect.fnUntraced(
         function* (pr: PullRequestRef) {
           const rows =
-            yield* sql`SELECT base, head, written_at, markdown, hotspots, low_attention, agent_id, done, included_in_global_conversation_update FROM agent_reviews WHERE ${where(pr)}`.pipe(
+            yield* sql`SELECT base, head, written_at, markdown, hotspots, low_attention, conversation_id, done, included_in_global_conversation_update FROM agent_reviews WHERE ${where(pr)}`.pipe(
               Effect.flatMap(Schema.decodeUnknownEffect(stored)),
             )
 
@@ -198,7 +198,7 @@ export class AgentReviews extends Context.Service<
                   markdown: row.markdown,
                   hotspots: row.hotspots,
                   lowAttention: row.low_attention,
-                  agentId: row.agent_id,
+                  conversationId: row.conversation_id,
                   done: row.done,
                   includedInGlobalConversationUpdate: row.included_in_global_conversation_update,
                 })
@@ -211,32 +211,32 @@ export class AgentReviews extends Context.Service<
 
       const jobs = yield* pullRequestJobs({ load, toState, backgroundSlots: BACKGROUND_SLOTS })
 
-      const removeAgent = (agentId: string | null) =>
-        agentId === null
+      const removeConversation = (conversationId: string | null) =>
+        conversationId === null
           ? Effect.void
-          : agents.remove(agentId).pipe(
-              Effect.catchTag("AgentNotFound", () => Effect.void),
+          : conversations.remove(conversationId).pipe(
+              Effect.catchTag("ConversationNotFound", () => Effect.void),
               Effect.catch((cause) =>
-                Effect.logWarning("Couldn't remove an Agent review's Agent", cause),
+                Effect.logWarning("Couldn't remove an Agent review's Conversation", cause),
               ),
             )
 
       const save = (job: Job, pr: PullRequestRef, review: AgentReview) =>
         Effect.gen(function* () {
-          const replaced = (yield* SubscriptionRef.get(job.state)).output?.agentId ?? null
+          const replaced = (yield* SubscriptionRef.get(job.state)).output?.conversationId ?? null
 
           yield* jobs.commit(
             job,
-            sql`INSERT INTO agent_reviews (owner, repo, number, base, head, written_at, markdown, hotspots, low_attention, agent_id, done, included_in_global_conversation_update)
+            sql`INSERT INTO agent_reviews (owner, repo, number, base, head, written_at, markdown, hotspots, low_attention, conversation_id, done, included_in_global_conversation_update)
               VALUES (${pr.owner}, ${pr.repo}, ${pr.number}, ${review.revision.base}, ${review.revision.head}, ${DateTime.formatIso(review.writtenAt)}, ${review.markdown}, ${encodeHotspots(review.hotspots)}, ${encodeLowAttention(review.lowAttention)}, NULL, 0, 0)
-              ON CONFLICT (owner, repo, number) DO UPDATE SET base = excluded.base, head = excluded.head, written_at = excluded.written_at, markdown = excluded.markdown, hotspots = excluded.hotspots, low_attention = excluded.low_attention, agent_id = NULL, done = 0, included_in_global_conversation_update = 0`.pipe(
+              ON CONFLICT (owner, repo, number) DO UPDATE SET base = excluded.base, head = excluded.head, written_at = excluded.written_at, markdown = excluded.markdown, hotspots = excluded.hotspots, low_attention = excluded.low_attention, conversation_id = NULL, done = 0, included_in_global_conversation_update = 0`.pipe(
               logStorageFailure,
               Effect.mapError(storageFailure),
             ),
             () => review,
           )
 
-          yield* removeAgent(replaced).pipe(Effect.forkIn(scope))
+          yield* removeConversation(replaced).pipe(Effect.forkIn(scope))
         })
 
       const reviewPrompt = settings.read().pipe(
@@ -280,7 +280,7 @@ export class AgentReviews extends Context.Service<
             writtenAt: yield* DateTime.now,
             markdown: answer.markdown,
             ...fitToDiff(answer, input.files),
-            agentId: null,
+            conversationId: null,
             done: false,
             includedInGlobalConversationUpdate: false,
           })
@@ -297,7 +297,7 @@ export class AgentReviews extends Context.Service<
           ),
         )
 
-      const startAgent = (
+      const startConversation = (
         job: Job,
         pr: PullRequestRef,
         review: AgentReview,
@@ -331,12 +331,12 @@ export class AgentReviews extends Context.Service<
                 .pipe(Effect.mapError(fromCheckoutRunFailure)),
             ).pipe(removeFolder)
 
-            const agent = yield* agents
+            const conversation = yield* conversations
               .createForReview({
                 name: `Follow-ups on ${pr.owner}/${pr.repo}#${pr.number}`,
                 repository: new FollowedRepository({ owner: pr.owner, repo: pr.repo }),
                 revision: review.revision,
-                engine: runner.engine,
+                harness: runner.harness,
                 model,
                 checkout: folder,
                 review: {
@@ -356,20 +356,20 @@ export class AgentReviews extends Context.Service<
             yield* jobs
               .commit(
                 job,
-                sql`UPDATE agent_reviews SET agent_id = ${agent.id} WHERE ${where(pr)}`.pipe(
+                sql`UPDATE agent_reviews SET conversation_id = ${conversation.id} WHERE ${where(pr)}`.pipe(
                   logStorageFailure,
                   Effect.mapError(storageFailure),
                 ),
-                (current) => ({ ...(current ?? review), agentId: agent.id }),
+                (current) => ({ ...(current ?? review), conversationId: conversation.id }),
               )
-              .pipe(Effect.onError(() => removeAgent(agent.id)))
+              .pipe(Effect.onError(() => removeConversation(conversation.id)))
           }),
         ).pipe(
           jobs.settle(
             job,
-            "AgentReview.startAgent",
+            "AgentReview.startConversation",
             (error: Option.Option<AgentReviewFailure>): Failed => ({
-              status: "agent-start-failed",
+              status: "conversation-start-failed",
               message,
               reason: Option.getOrElse(error, () => stoppedRunner(runner)),
             }),
@@ -401,11 +401,11 @@ export class AgentReviews extends Context.Service<
       ) {
         const job = yield* jobs.jobFor(pr)
 
-        const agentId = yield* jobs.begin(job, (replace) =>
+        const conversationId = yield* jobs.begin(job, (replace) =>
           Effect.gen(function* () {
             const { output: review, run } = yield* SubscriptionRef.get(job.state)
 
-            if (run.status === "running" && run.progress.status === "starting-agent")
+            if (run.status === "running" && run.progress.status === "starting-conversation")
               return yield* failure("not-ready", "Wait for the agent to start.")
 
             if (run.status === "waiting" || run.status === "running")
@@ -417,7 +417,7 @@ export class AgentReviews extends Context.Service<
                 "This Agent review was written for another Revision. Review again to follow up.",
               )
 
-            if (review.agentId !== null) return review.agentId
+            if (review.conversationId !== null) return review.conversationId
 
             const saved = yield* settings
               .read()
@@ -428,8 +428,8 @@ export class AgentReviews extends Context.Service<
 
             const startedAt = yield* Clock.currentTimeMillis
             yield* replace(
-              { status: "starting-agent", message, startedAt, runner },
-              startAgent(job, pr, review, message, {
+              { status: "starting-conversation", message, startedAt, runner },
+              startConversation(job, pr, review, message, {
                 runner,
                 model: agentModelOf(engineSettings),
                 reviewPrompt: saved.reviewPrompt,
@@ -440,18 +440,18 @@ export class AgentReviews extends Context.Service<
           }),
         )
 
-        if (agentId === null) return
+        if (conversationId === null) return
 
-        yield* agents
-          .send(agentId, { message, images: [] })
+        yield* conversations
+          .send(conversationId, { message, images: [] })
           .pipe(
             Effect.mapError((error) =>
               Predicate.isTagged(error, "RequestWaiting")
                 ? failure("not-ready", "Answer the agent's request first.")
                 : failure(
                     "runner",
-                    Predicate.isTagged(error, "AgentNotFound")
-                      ? "This Agent review's Agent is gone. Review again to follow up."
+                    Predicate.isTagged(error, "ConversationNotFound")
+                      ? "This Agent review's Conversation is gone. Review again to follow up."
                       : error.message,
                   ),
             ),

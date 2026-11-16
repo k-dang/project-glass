@@ -1,7 +1,7 @@
 import {
-  Agent,
+  Conversation,
   AgentCommand,
-  AgentEngine,
+  AgentHarness,
   AgentEvent,
   AgentModels,
   ChangedFile,
@@ -23,7 +23,7 @@ export type HostEvent = typeof HostEvent.Type
 
 export const JournalEntry = Schema.Struct({
   sequence: Schema.Int,
-  agentId: Schema.String,
+  conversationId: Schema.String,
   event: HostEvent,
 })
 
@@ -51,7 +51,7 @@ export const HostReady = Schema.fromJsonString(Schema.Struct({ port: Schema.Int 
 
 export const TurnSettings = Schema.Struct({
   ...ModelChoice.fields,
-  permissionMode: Agent.fields.permissionMode,
+  permissionMode: Conversation.fields.permissionMode,
 })
 
 export type TurnSettings = typeof TurnSettings.Type
@@ -94,11 +94,11 @@ export type GlassToolsAccess = typeof GlassToolsAccess.Type
 
 export const GlobalRole = Schema.TaggedStruct("Global", { tools: GlassToolsAccess })
 
-export const AgentRole = Schema.Union([WorkRole, ReviewRole])
+export const RepositoryRole = Schema.Union([WorkRole, ReviewRole])
 
-export type AgentRole = typeof AgentRole.Type
+export type RepositoryRole = typeof RepositoryRole.Type
 
-export type ConversationRole = AgentRole | typeof GlobalRole.Type
+export type ConversationRole = RepositoryRole | typeof GlobalRole.Type
 
 export const StartOutcome = Schema.Literals(["started", "alreadyRunning"])
 
@@ -106,15 +106,15 @@ export type StartOutcome = typeof StartOutcome.Type
 
 export const ConversationStart = Schema.Union([
   Schema.Struct({
-    agentId: Schema.String,
-    engine: AgentEngine,
+    conversationId: Schema.String,
+    harness: AgentHarness,
     folder: HostFolder,
-    role: AgentRole,
+    role: RepositoryRole,
     skills: Schema.Array(SkillSource),
   }),
   Schema.Struct({
-    agentId: Schema.String,
-    engine: Schema.Literal("pi"),
+    conversationId: Schema.String,
+    harness: Schema.Literal("pi"),
     folder: HostFolder,
     role: GlobalRole,
     skills: Schema.Array(SkillSource),
@@ -123,9 +123,12 @@ export const ConversationStart = Schema.Union([
 
 export type ConversationStart = typeof ConversationStart.Type
 
-export class HostAgentError extends Schema.TaggedError<HostAgentError>()("HostAgentError", {
-  message: Schema.String,
-}) {}
+export class HostConversationError extends Schema.TaggedError<HostConversationError>()(
+  "HostConversationError",
+  {
+    message: Schema.String,
+  },
+) {}
 
 export const SteersNotTakenIn = Schema.Array(MessageWithContext)
 
@@ -133,56 +136,56 @@ export type SteersNotTakenIn = typeof SteersNotTakenIn.Type
 
 export class AgentHostRpcs extends RpcGroup.make(
   Rpc.make("ListModels", {
-    payload: { engine: AgentEngine },
+    payload: { harness: AgentHarness },
     success: AgentModels,
-    error: HostAgentError,
+    error: HostConversationError,
   }),
   Rpc.make("ListCommands", {
-    payload: { engine: AgentEngine, folder: HostFolder, skills: Schema.Array(SkillSource) },
+    payload: { harness: AgentHarness, folder: HostFolder, skills: Schema.Array(SkillSource) },
     success: Schema.Array(AgentCommand),
-    error: HostAgentError,
+    error: HostConversationError,
   }),
-  Rpc.make("StartAgent", {
+  Rpc.make("StartConversation", {
     payload: ConversationStart,
     success: StartOutcome,
-    error: HostAgentError,
+    error: HostConversationError,
   }),
   Rpc.make("StartTurn", {
     payload: {
-      agentId: Schema.String,
+      conversationId: Schema.String,
       turnId: Schema.String,
       ...DeliveredTurn.fields,
       ...TurnSettings.fields,
     },
-    error: HostAgentError,
+    error: HostConversationError,
   }),
   Rpc.make("AnswerRequest", {
-    payload: { agentId: Schema.String, requestId: Schema.String, answer: RequestAnswer },
-    error: Schema.Union([RequestNotWaiting, HostAgentError]),
+    payload: { conversationId: Schema.String, requestId: Schema.String, answer: RequestAnswer },
+    error: Schema.Union([RequestNotWaiting, HostConversationError]),
   }),
   Rpc.make("Steer", {
-    payload: { agentId: Schema.String, ...DeliveredMessage.fields },
-    error: HostAgentError,
+    payload: { conversationId: Schema.String, ...DeliveredMessage.fields },
+    error: HostConversationError,
   }),
   Rpc.make("StopTurn", {
-    payload: { agentId: Schema.String, turnId: Schema.String },
+    payload: { conversationId: Schema.String, turnId: Schema.String },
     success: Schema.NullOr(SteersNotTakenIn),
   }),
-  Rpc.make("StopAgent", { payload: { agentId: Schema.String } }),
+  Rpc.make("StopConversation", { payload: { conversationId: Schema.String } }),
   Rpc.make("GetChanges", {
     payload: { folder: HostFolder, baseRef: Schema.String },
     success: Schema.Array(ChangedFile),
-    error: HostAgentError,
+    error: HostConversationError,
   }),
   Rpc.make("ListFiles", {
     payload: { folder: HostFolder },
     success: Schema.Array(Schema.String),
-    error: HostAgentError,
+    error: HostConversationError,
   }),
   Rpc.make("HasUncommittedChanges", {
     payload: { folder: HostFolder },
     success: Schema.Boolean,
-    error: HostAgentError,
+    error: HostConversationError,
   }),
   Rpc.make("WatchJournal", {
     payload: { after: Schema.Int },
@@ -192,9 +195,11 @@ export class AgentHostRpcs extends RpcGroup.make(
   Rpc.make("Acknowledge", { payload: { through: Schema.Int } }),
 ) {}
 
-export const couldNotSwitch = (program: string, what: "model" | "effort" | "Permission mode") =>
-  new HostAgentError({
-    message: `${program} couldn't switch to that ${what}. Pick another, then send your message again.`,
+export const couldNotSwitch = (harness: string, what: "model" | "effort" | "Permission mode") =>
+  new HostConversationError({
+    message: `${harness} couldn't switch to that ${what}. Pick another, then send your message again.`,
   })
 
-export const notRunning = new HostAgentError({ message: "The Agent isn't working on a Turn." })
+export const notRunning = new HostConversationError({
+  message: "The Conversation isn't working on a Turn.",
+})

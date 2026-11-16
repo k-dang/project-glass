@@ -1,4 +1,4 @@
-import { AgentError, FeedbackNote, UnsentFeedback } from "@glass/contracts"
+import { ConversationError, FeedbackNote, UnsentFeedback } from "@glass/contracts"
 import { Context, Effect, Layer, Schema } from "effect"
 import { SqlClient } from "effect/sql"
 
@@ -8,9 +8,9 @@ const decodeStaged = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ id: Schema.String, staged: Schema.BooleanFromBit })),
 )
 
-const row = (agentId: string, note: FeedbackNote) => ({
+const row = (conversationId: string, note: FeedbackNote) => ({
   id: note.id,
-  agent_id: agentId,
+  conversation_id: conversationId,
   path: note.path,
   side: note.side,
   start_line: note.start,
@@ -26,29 +26,33 @@ const guarded =
     effect.pipe(
       Effect.tapError((cause) => Effect.logWarning(`Couldn't ${doing} Feedback notes`, cause)),
       Effect.mapError(
-        () => new AgentError({ message: `Couldn't ${doing} your Feedback notes. Try again.` }),
+        () =>
+          new ConversationError({ message: `Couldn't ${doing} your Feedback notes. Try again.` }),
       ),
     )
 
 export class FeedbackNotes extends Context.Service<
   FeedbackNotes,
   {
-    readonly list: (agentId: string) => Effect.Effect<UnsentFeedback, AgentError>
+    readonly list: (conversationId: string) => Effect.Effect<UnsentFeedback, ConversationError>
     readonly save: (
-      agentId: string,
+      conversationId: string,
       note: FeedbackNote,
-    ) => Effect.Effect<UnsentFeedback, AgentError>
-    readonly remove: (agentId: string, noteId: string) => Effect.Effect<UnsentFeedback, AgentError>
-    readonly stage: (agentId: string) => Effect.Effect<UnsentFeedback, AgentError>
+    ) => Effect.Effect<UnsentFeedback, ConversationError>
+    readonly remove: (
+      conversationId: string,
+      noteId: string,
+    ) => Effect.Effect<UnsentFeedback, ConversationError>
+    readonly stage: (conversationId: string) => Effect.Effect<UnsentFeedback, ConversationError>
     readonly take: (
-      agentId: string,
+      conversationId: string,
       noteIds: ReadonlyArray<string>,
-    ) => Effect.Effect<ReadonlyArray<FeedbackNote>, AgentError>
+    ) => Effect.Effect<ReadonlyArray<FeedbackNote>, ConversationError>
     readonly restore: (
-      agentId: string,
+      conversationId: string,
       notes: ReadonlyArray<FeedbackNote>,
-    ) => Effect.Effect<void, AgentError>
-    readonly removeAll: (agentId: string) => Effect.Effect<void, AgentError>
+    ) => Effect.Effect<void, ConversationError>
+    readonly removeAll: (conversationId: string) => Effect.Effect<void, ConversationError>
   }
 >()("@glass/server/FeedbackNotes") {
   static readonly layer = Layer.effect(
@@ -60,10 +64,10 @@ export class FeedbackNotes extends Context.Service<
         id, path, side, start_line AS start, end_line AS end, code, changes_id AS changesId, text
       `
 
-      const list = Effect.fn("FeedbackNotes.list")((agentId: string) =>
+      const list = Effect.fn("FeedbackNotes.list")((conversationId: string) =>
         sql`
-            SELECT ${columns}, staged FROM agent_feedback_note
-            WHERE agent_id = ${agentId} ORDER BY rowid
+            SELECT ${columns}, staged FROM conversation_feedback_note
+            WHERE conversation_id = ${conversationId} ORDER BY rowid
           `.pipe(
           Effect.flatMap((rows) =>
             Effect.all({
@@ -80,30 +84,30 @@ export class FeedbackNotes extends Context.Service<
 
       return FeedbackNotes.of({
         list,
-        save: Effect.fn("FeedbackNotes.save")((agentId, note) =>
+        save: Effect.fn("FeedbackNotes.save")((conversationId, note) =>
           sql`
-            INSERT INTO agent_feedback_note ${sql.insert(row(agentId, note))}
-            ON CONFLICT (agent_id, id) DO UPDATE SET text = excluded.text
-          `.pipe(guarded("save"), Effect.andThen(list(agentId))),
+            INSERT INTO conversation_feedback_note ${sql.insert(row(conversationId, note))}
+            ON CONFLICT (conversation_id, id) DO UPDATE SET text = excluded.text
+          `.pipe(guarded("save"), Effect.andThen(list(conversationId))),
         ),
-        remove: Effect.fn("FeedbackNotes.remove")((agentId, noteId) =>
+        remove: Effect.fn("FeedbackNotes.remove")((conversationId, noteId) =>
           sql`
-            DELETE FROM agent_feedback_note WHERE id = ${noteId} AND agent_id = ${agentId}
-          `.pipe(guarded("remove"), Effect.andThen(list(agentId))),
+            DELETE FROM conversation_feedback_note WHERE id = ${noteId} AND conversation_id = ${conversationId}
+          `.pipe(guarded("remove"), Effect.andThen(list(conversationId))),
         ),
-        stage: Effect.fn("FeedbackNotes.stage")((agentId) =>
-          sql`UPDATE agent_feedback_note SET staged = 1 WHERE agent_id = ${agentId}`.pipe(
+        stage: Effect.fn("FeedbackNotes.stage")((conversationId) =>
+          sql`UPDATE conversation_feedback_note SET staged = 1 WHERE conversation_id = ${conversationId}`.pipe(
             guarded("stage"),
-            Effect.andThen(list(agentId)),
+            Effect.andThen(list(conversationId)),
           ),
         ),
-        take: Effect.fn("FeedbackNotes.take")(function* (agentId, noteIds) {
+        take: Effect.fn("FeedbackNotes.take")(function* (conversationId, noteIds) {
           if (noteIds.length === 0) return []
 
           const ids = Array.from(new Set(noteIds))
 
           const taken = yield* sql`
-            DELETE FROM agent_feedback_note WHERE agent_id = ${agentId} AND staged = 1 AND ${sql.in("id", noteIds)}
+            DELETE FROM conversation_feedback_note WHERE conversation_id = ${conversationId} AND staged = 1 AND ${sql.in("id", noteIds)}
             RETURNING ${columns}
           `.pipe(
             Effect.flatMap(decodeNotes),
@@ -112,23 +116,23 @@ export class FeedbackNotes extends Context.Service<
           )
 
           if (taken.length !== ids.length)
-            return yield* new AgentError({
+            return yield* new ConversationError({
               message:
                 "Some of these Feedback notes were already sent or removed. Review your feedback again.",
             })
 
           return taken
         }),
-        restore: Effect.fn("FeedbackNotes.restore")((agentId, notes) =>
+        restore: Effect.fn("FeedbackNotes.restore")((conversationId, notes) =>
           notes.length === 0
             ? Effect.void
             : sql`
-                INSERT INTO agent_feedback_note ${sql.insert(notes.map((note) => row(agentId, note)))}
-                ON CONFLICT (agent_id, id) DO NOTHING
+                INSERT INTO conversation_feedback_note ${sql.insert(notes.map((note) => row(conversationId, note)))}
+                ON CONFLICT (conversation_id, id) DO NOTHING
               `.pipe(Effect.asVoid, guarded("restore")),
         ),
-        removeAll: Effect.fn("FeedbackNotes.removeAll")((agentId) =>
-          sql`DELETE FROM agent_feedback_note WHERE agent_id = ${agentId}`.pipe(
+        removeAll: Effect.fn("FeedbackNotes.removeAll")((conversationId) =>
+          sql`DELETE FROM conversation_feedback_note WHERE conversation_id = ${conversationId}`.pipe(
             Effect.asVoid,
             guarded("remove"),
           ),

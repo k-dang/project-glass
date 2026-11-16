@@ -24,7 +24,7 @@ node $V launch --real-agents                    # your Claude Code and pi; may i
 node $V launch --github fake --fake-mode 401    # fake GitHub: ok | 401 | 500 | down | busy-500
 node $V launch --no-credentials                 # no token env vars, gh hidden from PATH
 node $V launch --github fake --fail-backend-start  # the backend exits as it starts
-node $V launch --backend fake                   # pnpm dev:fake's backend, with demo PRs and Agents;
+node $V launch --backend fake                   # pnpm dev:fake's backend, with demo PRs and Conversations;
                                                 # Claude Code runs the pinned claude on a fake Anthropic API
 ```
 
@@ -79,7 +79,7 @@ Each line holds the renderer's V8 heap, Blink counters and DOM counts, every wor
 
 `--gc` collects garbage before each sample. Without it, `DOM nodes` counts nodes the collector has not reached yet, so leaving a page can look like it kept its DOM; with it, the count is what is actually retained. Prefer `--gc` when comparing areas or judging whether a view released anything.
 
-`--sweep` walks the rail: Dashboard, Reviews, To-dos, Agents, Activity, Settings, then Dashboard again. It settles for two seconds after each click, takes `--dwell` samples labelled with the area, and prints one row per area:
+`--sweep` walks the rail: Dashboard, Reviews, To-dos, Conversations, Activity, Settings, then Dashboard again. It settles for two seconds after each click, takes `--dwell` samples labelled with the area, and prints one row per area:
 
 ```sh
 node $V memory --sweep --dwell 4 --gc --out areas

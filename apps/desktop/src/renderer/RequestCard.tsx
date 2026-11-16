@@ -23,13 +23,13 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { useConversation } from "./conversation"
+import { useConversationAtoms } from "./conversation"
 import { settledProblem } from "./problems"
 
 export const requestElementId = (requestId: string) => `request-${requestId}`
 
 const useAnswer = (requestId: string) => {
-  const answering = useConversation().answer(requestId)
+  const answering = useConversationAtoms().answer(requestId)
   const answered = useAtomValue(answering)
   const answer = useAtomSet(answering)
   const problem = settledProblem(answered)
@@ -106,7 +106,7 @@ function Permission(props: {
             </Label>
             <Input
               id={reasonId}
-              placeholder="Why not? Tells the Agent what to do instead (optional)"
+              placeholder="Why not? Tells the agent what to do instead (optional)"
               value={reason}
               onChange={(event) => setReason(event.target.value)}
             />
@@ -177,7 +177,9 @@ function Questions(props: { question: Extract<RequestPart, { readonly _tag: "Que
     <Confirmation aria-labelledby={titleId}>
       <ConfirmationTitle id={titleId}>
         <CircleHelp aria-hidden />
-        {question.questions.length === 1 ? "The Agent asks" : "The Agent asks you a few things"}
+        {question.questions.length === 1
+          ? "The Conversation asks"
+          : "The Conversation asks you a few things"}
       </ConfirmationTitle>
       {question.questions.map((asked, index) => (
         <QuestionView

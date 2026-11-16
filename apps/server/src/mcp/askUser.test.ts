@@ -259,12 +259,12 @@ describe("ask_user", () => {
 
       yield* needsYou(backend.client, (items) => outside(items).length === 1)
 
-      const [agent] = yield* backend.client
+      const [conversation] = yield* backend.client
         .WatchOutsideAgents()
         .pipe(Stream.runHead, Effect.map(Option.getOrThrow))
 
-      assert.ok(agent !== undefined)
-      yield* backend.client.RevokeOutsideAgent({ id: agent.id })
+      assert.ok(conversation !== undefined)
+      yield* backend.client.RevokeOutsideAgent({ id: conversation.id })
 
       yield* needsYou(backend.client, (items) => outside(items).length === 0)
 
@@ -332,7 +332,7 @@ describe("ask_user", () => {
       const { baseUrl, client, mcpCredentials } = yield* startBackend({})
 
       const bearer = yield* mcpCredentials.issue({
-        conversationId: "conversation-1",
+        globalConversationId: "conversation-1",
         sessionId: "session-1",
       })
 

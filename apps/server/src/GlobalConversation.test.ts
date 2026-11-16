@@ -2,7 +2,7 @@ import { assert, it } from "@effect/vitest"
 import { SqliteClient, SqliteMigrator } from "@effect/sql-sqlite-node"
 import { NodeFileSystem } from "@effect/platform-node"
 import {
-  AgentContext,
+  ConversationContext,
   AnswerQuestion,
   PullRequestContext,
   PullRequestRef,
@@ -49,7 +49,7 @@ import { ServerConfig } from "./ServerConfig"
 import { ToDos } from "./ToDos"
 import { Transcripts } from "./Transcripts"
 import {
-  agentsFixture,
+  conversationsFixture,
   glassCalls,
   globalTurns,
   holding,
@@ -58,7 +58,7 @@ import {
   sendGlobal,
   settled,
   watchGlobal,
-} from "../test/agentsFixture"
+} from "../test/conversationsFixture"
 import { childProcesses, startedHost } from "../test/agentHostProcesses"
 
 const onPullRequest = PullRequestContext.make({
@@ -68,7 +68,7 @@ const onPullRequest = PullRequestContext.make({
 
 it.live("answers a message with no Local checkout, making no worktree or branch", () =>
   Effect.gen(function* () {
-    const f = yield* agentsFixture
+    const f = yield* conversationsFixture
 
     yield* sendGlobal(f.client, "Say hello")
     const turns = yield* globalTurns(f.client, settled(1))
@@ -76,28 +76,32 @@ it.live("answers a message with no Local checkout, making no worktree or branch"
     assert.deepStrictEqual(turns[0]?.ended?.ending, TurnDone.make({}))
     assert.deepStrictEqual(lastText(turns[0]), TextPart.make({ text: "Reply to: Say hello" }))
     assert.isFalse(existsSync(join(f.home, ".project-glass", "worktrees")))
-    assert.deepStrictEqual(yield* f.agents, [])
+    assert.deepStrictEqual(yield* f.conversations, [])
   }),
 )
 
 it.live("keeps each message's captured context with its Turn, including once it was queued", () =>
   Effect.gen(function* () {
-    const f = yield* agentsFixture
-    const onAgent = AgentContext.make({ agentId: "agent-1", name: "agent/swift-otter" })
+    const f = yield* conversationsFixture
+
+    const onConversation = ConversationContext.make({
+      conversationId: "agent-1",
+      name: "agent/swift-otter",
+    })
 
     yield* sendGlobal(f.client, "hold:first", onPullRequest)
     yield* globalTurns(f.client, holding)
-    yield* sendGlobal(f.client, "Next", onAgent)
+    yield* sendGlobal(f.client, "Next", onConversation)
     const { queued } = yield* watchGlobal(f.client, (transcript) => transcript.queued.length === 1)
 
-    assert.deepStrictEqual(queued[0]?.context, onAgent)
+    assert.deepStrictEqual(queued[0]?.context, onConversation)
 
     yield* f.release("first")
     const turns = yield* globalTurns(f.client, settled(2))
 
     assert.deepStrictEqual(
       turns.map(({ context }) => context),
-      [onPullRequest, onAgent],
+      [onPullRequest, onConversation],
     )
   }),
 )
@@ -106,7 +110,7 @@ it.live(
   "restores the transcript, Unsent message, and model after a relaunch, with the running Turn interrupted",
   () =>
     Effect.gen(function* () {
-      const f = yield* agentsFixture
+      const f = yield* conversationsFixture
       const model = { model: "scripted", effort: null }
       const unsent = { message: "Still writing", images: [] }
 
@@ -136,7 +140,7 @@ it.live(
   "gives each start of pi a fresh credential, revoking the last when the agent host stops",
   () =>
     Effect.gen(function* () {
-      const f = yield* agentsFixture
+      const f = yield* conversationsFixture
       const earlierHosts = childProcesses(process.pid, "scriptedAgentHost.mjs")
       yield* f.client.AddToDo({ title: "Reply to Sam", notes: "" })
 
@@ -161,24 +165,27 @@ it.live(
     }),
 )
 
-it.live("leaves an Agent it created running when its own Turn stops", () =>
+it.live("leaves a Conversation it created running when its own Turn stops", () =>
   Effect.gen(function* () {
-    const f = yield* agentsFixture
+    const f = yield* conversationsFixture
     yield* f.client.LinkLocalCheckout({ path: f.clone.checkout })
 
-    const newAgent = {
+    const newConversation = {
       repository: { owner: repository.owner, repo: repository.repo },
       baseBranch: "main",
       place: localPlace,
-      engine: "pi",
+      harness: "pi",
       model: null,
       effort: null,
       message: "hold:agent",
     }
 
-    yield* sendGlobal(f.client, `call:create_agent ${JSON.stringify(newAgent)}\nhold:never`)
+    yield* sendGlobal(
+      f.client,
+      `call:create_conversation ${JSON.stringify(newConversation)}\nhold:never`,
+    )
     yield* globalTurns(f.client, holding)
-    const [created] = yield* f.agents
+    const [created] = yield* f.conversations
     assert.isDefined(created)
     yield* f.transcript(created.id, holding)
 
@@ -208,7 +215,7 @@ it.live(
   "starts fresh in a new pi session, carrying over the model and Unsent message and keeping the old transcript readable",
   () =>
     Effect.gen(function* () {
-      const f = yield* agentsFixture
+      const f = yield* conversationsFixture
       const model = { model: "scripted", effort: null }
       const unsent = { message: "Still writing", images: [] }
 
@@ -242,7 +249,7 @@ it.live(
   "refuses to start fresh while it waits on the user, runs a Turn, or has a Queued message",
   () =>
     Effect.gen(function* () {
-      const f = yield* agentsFixture
+      const f = yield* conversationsFixture
 
       const refusal = f.client.StartGlobalConversationFresh().pipe(
         Effect.flip,
@@ -301,7 +308,7 @@ const holdHost = (entered: Deferred.Deferred<void>, release: Deferred.Deferred<v
 const stallableHost = (calls: {
   readonly startTurn: () => Effect.Effect<void>
   readonly stopTurn: () => Effect.Effect<null>
-  readonly stopAgent?: () => Effect.Effect<void>
+  readonly stopConversation?: () => Effect.Effect<void>
 }) =>
   RpcTest.makeClient(AgentHostRpcs).pipe(
     Effect.provide(
@@ -310,12 +317,12 @@ const stallableHost = (calls: {
           AgentHostRpcs.of({
             ListModels: () => Effect.die("This test does not call ListModels"),
             ListCommands: () => Effect.die("This test does not call ListCommands"),
-            StartAgent: () => Effect.succeed("started" as const),
+            StartConversation: () => Effect.succeed("started" as const),
             StartTurn: () => calls.startTurn(),
             AnswerRequest: () => Effect.die("This test does not call AnswerRequest"),
             Steer: () => Effect.die("This test does not call Steer"),
             StopTurn: () => calls.stopTurn(),
-            StopAgent: () => calls.stopAgent?.() ?? Effect.void,
+            StopConversation: () => calls.stopConversation?.() ?? Effect.void,
             GetChanges: () => Effect.die("This test does not call GetChanges"),
             HasUncommittedChanges: () =>
               Effect.die("This test does not call HasUncommittedChanges"),
@@ -500,7 +507,7 @@ it.effect(
     }),
 )
 
-it.effect("finishes Start fresh, mark-seen, and Stop when StopAgent never answers", () =>
+it.effect("finishes Start fresh, mark-seen, and Stop when StopConversation never answers", () =>
   Effect.gen(function* () {
     const { watched, deadlineSet } = yield* watchDeadlines(30_000)
     const started = yield* Deferred.make<void>()
@@ -511,7 +518,7 @@ it.effect("finishes Start fresh, mark-seen, and Stop when StopAgent never answer
     const client = yield* stallableHost({
       startTurn: () => holdHost(started, startRelease),
       stopTurn: () => Effect.succeed(null),
-      stopAgent: () => holdHost(stopEntered, stopRelease),
+      stopConversation: () => holdHost(stopEntered, stopRelease),
     })
 
     const layer = openGlobal(client, yield* Scope.Scope)

@@ -12,7 +12,7 @@ import { serve } from "../src/server"
 import { ServerConfig } from "../src/ServerConfig"
 import { runMain, wideEventsToStdoutAndOtlp } from "../src/wideEvents"
 import { writeAgentCommands } from "./agentCommands"
-import { bundledPi, seedDemoAgents, startDemoClaude, startDemoPi } from "./demoAgent"
+import { bundledPi, seedDemoConversations, startDemoClaude, startDemoPi } from "./demoConversation"
 import { DEMO_GATEWAY_REPOSITORY, DEMO_REPOSITORY, seedDemoPullRequests } from "./demoPullRequests"
 import { startFakeGitHub } from "./fakeGitHub"
 import { VIEWER } from "./fakePullRequest"
@@ -122,12 +122,14 @@ const main = Effect.gen(function* () {
     Effect.catchCause((cause) => Effect.logWarning("Couldn't seed the demo to-dos", cause)),
   )
 
-  yield* seedDemoAgents(
+  yield* seedDemoConversations(
     config.port,
     Redacted.value(config.token),
     join(demo, "repositories"),
     reviewed,
-  ).pipe(Effect.catchCause((cause) => Effect.logWarning("Couldn't start the demo Agents", cause)))
+  ).pipe(
+    Effect.catchCause((cause) => Effect.logWarning("Couldn't start the demo Conversations", cause)),
+  )
 
   return yield* Effect.never
 })
