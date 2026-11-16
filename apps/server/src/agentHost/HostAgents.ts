@@ -113,7 +113,14 @@ export class HostAgents extends Context.Service<
               if (!full || stoppingOverBudget || session === undefined) return
 
               stoppingOverBudget = true
-              yield* session.stopTurn(overBudget).pipe(Effect.forkIn(scope))
+              yield* session.stopTurn(overBudget).pipe(
+                Effect.tap((left) =>
+                  Effect.sync(() => {
+                    if (left === null) stoppingOverBudget = false
+                  }),
+                ),
+                Effect.forkIn(scope),
+              )
             })
 
             const started = Effect.gen(function* () {
