@@ -232,6 +232,7 @@ export const agentServicesFixture = Effect.gen(function* () {
 
       const transcripts = Context.get(services, Transcripts)
       yield* followJournal((agentId, events) => transcripts.save(agentId, events), client, {
+        host: (yield* client.Hello()).host,
         saved: 0,
       }).pipe(Effect.forkScoped)
 

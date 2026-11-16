@@ -17,8 +17,14 @@ import { ChildProcessSpawner } from "effect/process"
 import type { RpcClientError } from "effect/rpc"
 import { Socket } from "effect/socket"
 import { RPC_PATH } from "@glass/contracts"
-import { AgentHostRpcs, HOST_TOKEN_HEADER, HostReady, newHostToken } from "./agentHost/protocol"
-import { followJournal } from "./hostJournal"
+import {
+  AgentHostRpcs,
+  HOST_TOKEN_HEADER,
+  HostReady,
+  type HostReplaced,
+  newHostToken,
+} from "./agentHost/protocol"
+import { followJournal, greet } from "./hostJournal"
 import type { ConversationHost } from "./ConversationTurns"
 import type { HostClient } from "./Placement"
 import { launchCommand } from "./processes"
@@ -29,7 +35,7 @@ import { Transcripts } from "./Transcripts"
 
 const FORCE_KILL_AFTER = "2 seconds"
 
-const lostConnection = (error: RpcClientError.RpcClientError | AgentError) =>
+const lostConnection = (error: RpcClientError.RpcClientError | AgentError | HostReplaced) =>
   Predicate.isTagged(error, "RpcClientError")
 
 const unavailable = () =>
@@ -102,7 +108,10 @@ export class LocalAgentHost extends Context.Service<
             Scope.provide(connectionScope),
           )
 
+          const host = yield* greet(client)
+
           yield* followJournal((agentId, events) => transcripts.save(agentId, events), client, {
+            host,
             saved: 0,
           }).pipe(
             Effect.tapCause((cause) => Effect.logWarning("Lost the agent host's journal", cause)),

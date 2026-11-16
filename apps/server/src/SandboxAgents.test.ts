@@ -21,7 +21,7 @@ it.live(
         [HOST_TOKEN_HEADER]: token,
       }).pipe(Effect.provide(NodeSocket.layerWebSocketConstructor))
 
-      yield* witness.WatchJournal({ after: 0 }).pipe(
+      yield* witness.WatchJournal({ host: (yield* witness.Hello()).host, after: 0 }).pipe(
         Stream.filter(({ event }) => Predicate.isTagged(event, "TurnEnded")),
         Stream.runHead,
       )

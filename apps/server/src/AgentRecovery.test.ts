@@ -194,7 +194,7 @@ it.live(
       yield* f.release("second")
 
       const witness = yield* connections.witness
-      yield* witness.WatchJournal({ after: 0 }).pipe(
+      yield* witness.WatchJournal({ host: (yield* witness.Hello()).host, after: 0 }).pipe(
         Stream.filter(
           ({ agentId, event }) =>
             agentId === agent.id &&

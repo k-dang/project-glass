@@ -8,6 +8,7 @@ import {
   SandboxProviderInfo,
   type SandboxReach,
   SandboxStatus,
+  TurnCutOff,
 } from "@glass/contracts"
 import type { SandboxProvider, SandboxRequest, SandboxState } from "@glass/plugin"
 import {
@@ -35,7 +36,7 @@ import { Socket } from "effect/socket"
 import { newHostToken } from "./agentHost/protocol"
 import { uniqueAgentName } from "./agentNames"
 import { GitHubClient } from "./github/GitHubClient"
-import { followJournal, type JournalPosition } from "./hostJournal"
+import { followJournal, greet, type JournalPosition } from "./hostJournal"
 import type { HostClient, LostAgentIds, PlacedAgent, Placement, SubscribeLost } from "./Placement"
 import { Plugins } from "./Plugins"
 import {
@@ -59,7 +60,7 @@ const leaseFields = { ...sandboxFields, expiresAt: Schema.optional(Schema.DateTi
 
 const Building = Schema.TaggedStruct("Building", sandboxFields)
 
-const Ready = Schema.TaggedStruct("Ready", leaseFields)
+const Ready = Schema.TaggedStruct("Ready", { ...leaseFields, host: Schema.optional(Schema.String) })
 
 const Gone = Schema.TaggedStruct("Gone", { ...leaseFields, reason: GoneReach })
 
@@ -129,12 +130,16 @@ const expiredBy = (record: SandboxRecord, now: DateTime.Utc) => {
   return expiresAt !== undefined && DateTime.isLessThanOrEqualTo(expiresAt, now)
 }
 
-const goneRecord = (record: typeof Building.Type | typeof Ready.Type, now: DateTime.Utc) =>
+const goneRecord = (
+  record: typeof Building.Type | typeof Ready.Type,
+  now: DateTime.Utc,
+  incompatible: boolean,
+) =>
   Gone.make({
     state: record.state,
     token: record.token,
     expiresAt: expiresAtOf(record),
-    reason: expiredBy(record, now) ? "expired" : "deleted",
+    reason: incompatible ? "incompatible" : expiredBy(record, now) ? "expired" : "deleted",
   })
 
 interface HostLink {
@@ -144,7 +149,7 @@ interface HostLink {
 }
 
 const newLink = (saved: number): HostLink => ({
-  position: { saved },
+  position: { host: "", saved },
   connectLock: Semaphore.makeUnsafe(1),
   recordLock: Semaphore.makeUnsafe(1),
 })
@@ -304,17 +309,43 @@ export class Sandboxes extends Context.Service<
           }).pipe(Effect.uninterruptible),
         )
 
-      const becomeGone = (agentId: string) =>
+      const becomeGone = (agentId: string, incompatible = false) =>
         Effect.gen(function* () {
           const { record } = yield* knownOf(agentId)
 
           if (record === null || Predicate.isTagged(record, "Gone")) return
 
-          const gone = goneRecord(record, yield* DateTime.now)
+          const gone = goneRecord(record, yield* DateTime.now, incompatible)
 
-          yield* Effect.logWarning(`An Agent's Sandbox was ${gone.reason}`, agentId)
+          yield* Effect.logWarning("Gave up on an Agent's Sandbox", agentId, gone.reason)
           yield* persist(agentId, gone).pipe(Effect.ignore)
           yield* setRecord(agentId, gone)
+        }).pipe(linkOf(agentId).recordLock.withPermits(1), Effect.uninterruptible)
+
+      const adoptHost = (agentId: string, host: string) =>
+        Effect.gen(function* () {
+          const link = linkOf(agentId)
+          const { record } = yield* knownOf(agentId)
+          link.position.host = host
+
+          if (!Predicate.isTagged(record, "Ready") || record.host === host) return
+
+          if (record.host !== undefined) {
+            yield* Effect.logWarning("An Agent's Sandbox has a new agent host", agentId)
+            yield* transcripts.endRunning(TurnCutOff.make({}), [agentId])
+          }
+
+          const adopted = Ready.make({ ...record, host })
+
+          yield* sql`
+            UPDATE agent SET sandbox = ${encodeRecord(adopted)}, journal_saved = 0
+            WHERE id = ${agentId}
+          `.pipe(
+            Effect.tapError((cause) => Effect.logWarning("Couldn't save a Sandbox", cause)),
+            Effect.mapError(storageFailure),
+          )
+          yield* setRecord(agentId, adopted)
+          link.position.saved = 0
         }).pipe(linkOf(agentId).recordLock.withPermits(1), Effect.uninterruptible)
 
       const refuseIfGone = (agentId: string) =>
@@ -456,10 +487,12 @@ export class Sandboxes extends Context.Service<
                   Effect.provideService(Socket.WebSocketConstructor, webSocketConstructor),
                 )
 
-                // Effect's socket client connects in the background; a first call shows the host
-                // answered.
-                yield* client.Acknowledge({ through: link.position.saved })
+                // Effect's socket client connects in the background, and connects again to
+                // whichever host answers, so the journal's calls name the host they mean.
+                const host = yield* greet(client)
                 yield* refuseIfGone(agentId)
+                yield* adoptHost(agentId, host)
+                yield* client.Acknowledge({ host, through: link.position.saved })
                 yield* Effect.acquireRelease(
                   recover(agentId, opened, () => ({ phase: "reachable", client })),
                   () =>
@@ -476,6 +509,17 @@ export class Sandboxes extends Context.Service<
               if (Result.isSuccess(ended)) return yield* Effect.void
 
               if (isSandboxGone(ended.failure)) return yield* Effect.fail(ended.failure)
+
+              if (Predicate.isTagged(ended.failure, "IncompatibleHost")) {
+                yield* Effect.logWarning(
+                  "An Agent's Sandbox speaks another agent host protocol",
+                  agentId,
+                  ended.failure.protocol,
+                )
+                yield* becomeGone(agentId, true)
+
+                return yield* Effect.fail(new SandboxGone())
+              }
 
               const following = (yield* knownOf(agentId)).following
 
@@ -630,7 +674,7 @@ export class Sandboxes extends Context.Service<
               const { record } = yield* knownOf(agent.id)
 
               if (record !== null) {
-                if (!Predicate.isTagged(record, "Gone"))
+                if (!Predicate.isTagged(record, "Gone") || record.reason === "incompatible")
                   yield* deleteSandbox(provider, record, "delete the Sandbox")
 
                 yield* save(agent.id, null)

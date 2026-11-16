@@ -1,22 +1,26 @@
 import { Context, Effect, Layer, PubSub, Stream } from "effect"
-import type { HostEvent, JournalEntry } from "./protocol"
+import { randomUUID } from "node:crypto"
+import { type HostEvent, HostReplaced, type JournalEntry } from "./protocol"
 
 export class Journal extends Context.Service<
   Journal,
   {
+    readonly host: string
     readonly append: (agentId: string, event: HostEvent) => Effect.Effect<void>
-    readonly watch: (after: number) => Stream.Stream<JournalEntry>
-    readonly acknowledge: (through: number) => Effect.Effect<void>
+    readonly watch: (host: string, after: number) => Stream.Stream<JournalEntry, HostReplaced>
+    readonly acknowledge: (host: string, through: number) => Effect.Effect<void>
   }
 >()("@glass/server/agentHost/Journal") {
   static readonly layer = Layer.effect(
     Journal,
     Effect.gen(function* () {
+      const host = randomUUID()
       const published = yield* PubSub.unbounded<JournalEntry>()
       let kept: Array<JournalEntry> = []
       let sequence = 0
 
       return Journal.of({
+        host,
         append: (agentId, event) =>
           Effect.suspend(() => {
             const entry = { sequence: ++sequence, agentId, event }
@@ -24,22 +28,26 @@ export class Journal extends Context.Service<
 
             return PubSub.publish(published, entry)
           }),
-        watch: (after) =>
-          Stream.unwrap(
-            Effect.gen(function* () {
-              const live = yield* PubSub.subscribe(published)
-              const missed = kept.filter((entry) => entry.sequence > after)
-              const last = missed.at(-1)?.sequence ?? after
+        watch: (watched, after) =>
+          watched !== host
+            ? Stream.fail(new HostReplaced())
+            : Stream.unwrap(
+                Effect.gen(function* () {
+                  const live = yield* PubSub.subscribe(published)
+                  const missed = kept.filter((entry) => entry.sequence > after)
+                  const last = missed.at(-1)?.sequence ?? after
 
-              return Stream.concat(
-                Stream.fromIterable(missed),
-                Stream.fromSubscription(live).pipe(Stream.filter((entry) => entry.sequence > last)),
-              )
-            }),
-          ),
-        acknowledge: (through) =>
+                  return Stream.concat(
+                    Stream.fromIterable(missed),
+                    Stream.fromSubscription(live).pipe(
+                      Stream.filter((entry) => entry.sequence > last),
+                    ),
+                  )
+                }),
+              ),
+        acknowledge: (acknowledged, through) =>
           Effect.sync(() => {
-            kept = kept.filter((entry) => entry.sequence > through)
+            if (acknowledged === host) kept = kept.filter((entry) => entry.sequence > through)
           }),
       })
     }),

@@ -3,11 +3,15 @@ import {
   ChangedFile,
   FeedbackNote,
   FollowedRepository,
+  PartSet,
   SandboxPlace,
   SandboxProviderInfo,
   type SandboxStatus,
+  TextPart,
   TextPatch,
   type Transcript,
+  type Turn,
+  TurnCutOff,
   TurnDone,
   type TurnEnding,
   TurnEnded,
@@ -17,6 +21,7 @@ import { DateTime, Effect, Option, Predicate, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { resolve } from "node:path"
 import { agentServicesFixture } from "../test/agentServicesFixture"
+import { HOST_PROTOCOL } from "./agentHost/protocol"
 import { eventually } from "../test/eventually"
 import { steps } from "../test/inProcessSandboxes"
 
@@ -43,6 +48,25 @@ const failedReason = ({ turns }: Transcript) => {
 
   return Predicate.isTagged(ending, "Failed") ? ending.reason : ending?._tag
 }
+
+const texts = (turn: Turn | undefined) =>
+  turn?.parts.flatMap((part) => (Predicate.isTagged(part, "Text") ? [part.text] : [])) ?? []
+
+const reply = (turn: Effect.Success<Fixture["started"]>, said: ReadonlyArray<string>) =>
+  Effect.forEach(said, (text, index) =>
+    turn.emit(PartSet.make({ turnId: turn.turnId, index, part: TextPart.make({ text }) })),
+  )
+
+const afterRetries = (f: Fixture, agentId: string, until: (transcript: Transcript) => boolean) =>
+  eventually(
+    Effect.gen(function* () {
+      yield* TestClock.adjust("1 second")
+      const transcript = yield* f.transcript(agentId, ({ turns }) => turns.length > 0)
+      assert.isTrue(until(transcript))
+
+      return transcript
+    }),
+  )
 
 const say = (message: string) => ({ message, images: [] })
 
@@ -403,3 +427,92 @@ it.effect("keeps an Agent's Sandbox gone, though its host still answers", () =>
     assert.include(refused.message, "deleted")
   }),
 )
+
+it.effect(
+  "follows a Sandbox's host again after a dropped connection, missing and repeating nothing",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* agentServicesFixture
+      const agent = yield* createSandboxed(f)
+      const turn = yield* f.started
+      yield* reply(turn, ["one"])
+      yield* f.transcript(agent.id, ({ turns }) => texts(turns[0]).length === 1)
+
+      yield* f.sandboxes.dropConnections(agent.id)
+      yield* turn.emit(
+        PartSet.make({ turnId: turn.turnId, index: 1, part: TextPart.make({ text: "two" }) }),
+      )
+      yield* end(turn)
+
+      const [done] = (yield* afterRetries(f, agent.id, settled(1))).turns
+      assert.deepStrictEqual(texts(done), ["one", "two"])
+      assert.deepStrictEqual(done?.ended?.ending, TurnDone.make({}))
+    }),
+)
+
+it.effect(
+  "cuts off a Sandbox's running Turn when its host restarts, keeping its transcript, then follows the new host from its start",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* agentServicesFixture
+      const agent = yield* createSandboxed(f)
+      const said = ["one", "two", "three", "four", "five"]
+      yield* reply(yield* f.started, said)
+      yield* f.transcript(agent.id, ({ turns }) => texts(turns[0]).length === said.length)
+
+      yield* f.sandboxes.restartHost(agent.id)
+
+      const [cutOff] = (yield* afterRetries(f, agent.id, ({ turns }) => turns[0]?.ended !== null))
+        .turns
+
+      assert.deepStrictEqual(cutOff?.ended?.ending, TurnCutOff.make({}))
+      assert.deepStrictEqual(texts(cutOff), said)
+
+      yield* f.agents.send(agent.id, say("Again"))
+      const second = yield* f.started
+      yield* reply(second, ["six"])
+      yield* end(second)
+
+      const [, done] = (yield* f.transcript(agent.id, settled(2))).turns
+      assert.deepStrictEqual(texts(done), ["six"])
+    }),
+)
+
+for (const [older, protocol] of [
+  ["a later protocol", HOST_PROTOCOL + 1],
+  ["no protocol", null],
+] as const)
+  it.effect(
+    `makes an Agent read-only once its Sandbox's host speaks ${older}, cutting off its Turn and deleting the Sandbox on removal`,
+    () =>
+      Effect.gen(function* () {
+        const f = yield* agentServicesFixture
+        const agent = yield* createSandboxed(f)
+        yield* reply(yield* f.started, ["one"])
+        yield* f.transcript(agent.id, ({ turns }) => texts(turns[0]).length === 1)
+
+        yield* f.sandboxes.replaceHostWithOlder(agent.id, protocol)
+
+        const [cutOff] = (yield* afterRetries(f, agent.id, ({ turns }) => turns[0]?.ended !== null))
+          .turns
+
+        assert.deepStrictEqual(cutOff?.ended?.ending, TurnCutOff.make({}))
+        assert.deepStrictEqual(texts(cutOff), ["one"])
+
+        const status = yield* sandboxOf(f.agents, agent.id).pipe(
+          Stream.runHead,
+          Effect.map(Option.getOrThrow),
+        )
+
+        assert.equal(status.reach, "incompatible")
+
+        const refused = yield* f.agents.send(agent.id, say("Still there?")).pipe(Effect.flip)
+        assert.equal(
+          refused.message,
+          "This Agent's Sandbox runs a different version of Glass, so it can't take messages. Its transcript stays until you remove the Agent.",
+        )
+
+        yield* f.agents.remove(agent.id)
+        yield* removed(f, agent.id)
+      }),
+  )

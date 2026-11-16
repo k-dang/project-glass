@@ -13,12 +13,15 @@ import {
   Scope,
 } from "effect"
 import { NodeHttpServer } from "@effect/platform-node"
-import { HttpServer } from "effect/http"
+import { HttpRouter, HttpServer } from "effect/http"
+import { Rpc, RpcGroup, RpcSerialization, RpcServer } from "effect/rpc"
+import { RPC_PATH } from "@glass/contracts"
 import { createServer } from "node:http"
 import type { Socket } from "node:net"
 import type { Changes } from "../src/agentHost/Changes"
 import type { HostAgents } from "../src/agentHost/HostAgents"
 import type { Journal } from "../src/agentHost/Journal"
+import { Hello } from "../src/agentHost/protocol"
 import { hostServer } from "../src/agentHost/server"
 import { MissingLogin, NoCapacity, SandboxGone } from "../src/sandboxFailures"
 
@@ -39,6 +42,27 @@ export const steps = ["Creating the Sandbox", "Starting the agent"] as const
 const SandboxId = Schema.Struct({ agentId: Schema.String })
 
 const agentIdOf = (state: SandboxState) => Schema.decodeUnknownSync(SandboxId)(state).agentId
+
+const VersionedHost = RpcGroup.make(Hello)
+
+const UnversionedHost = RpcGroup.make(Rpc.make("Acknowledge"))
+
+const serveRpcs = <Rpcs extends Rpc.Any>(
+  group: RpcGroup.RpcGroup<Rpcs>,
+  handlers: Layer.Layer<Rpc.ToHandler<Rpcs>>,
+) =>
+  HttpRouter.serve(RpcServer.layerHttp({ group, path: RPC_PATH, protocol: "websocket" }), {
+    disableLogger: true,
+    disableListenLog: true,
+  }).pipe(Layer.provide(handlers), Layer.provide(RpcSerialization.layerJson))
+
+const olderHost = (protocol: number | null) =>
+  protocol === null
+    ? serveRpcs(UnversionedHost, UnversionedHost.toLayer({ Acknowledge: () => Effect.void }))
+    : serveRpcs(
+        VersionedHost,
+        VersionedHost.toLayer({ Hello: () => Effect.succeed({ host: "older", protocol }) }),
+      )
 
 export const inProcessSandboxes = Effect.fnUntraced(function* (
   host: () => Layer.Layer<HostAgents | Journal | Changes>,
@@ -61,6 +85,7 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
   >()
 
   const shutDowns = new Map<string, Deferred.Deferred<void>>()
+  const tokens = new Map<string, string>()
   const events: Array<string> = []
 
   const noteEnded = (agentId: string) => {
@@ -98,7 +123,7 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
       return Scope.close(running.scope, Exit.void)
     })
 
-  const startHost = async (agentId: string, token: string) => {
+  const startHost = async (agentId: string, token: string, protocol?: number | null) => {
     const scope = Scope.makeUnsafe()
     const shutDown = Deferred.makeUnsafe<void>()
     const server = createServer()
@@ -111,15 +136,18 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
 
     const services = await runPromise(
       Layer.buildWithScope(
-        hostServer({ token: Redacted.make(token), shutDown }).pipe(
+        (protocol === undefined
+          ? hostServer({ token: Redacted.make(token), shutDown }).pipe(Layer.provide(host()))
+          : olderHost(protocol)
+        ).pipe(
           Layer.provideMerge(NodeHttpServer.layer(() => server, { port: 0, host: "127.0.0.1" })),
-          Layer.provide(host()),
         ),
         scope,
       ),
     )
 
     hosts.set(agentId, { scope, sockets })
+    tokens.set(agentId, token)
     shutDowns.set(agentId, shutDown)
     urls.set(
       agentId,
@@ -233,6 +261,20 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
       for (const check of waiting.splice(0)) check()
     },
     stopHost: stop,
+    dropConnections: (agentId: string) =>
+      Effect.sync(() => {
+        for (const socket of hosts.get(agentId)?.sockets ?? []) socket.destroy()
+      }),
+    restartHost: (agentId: string) =>
+      stop(agentId).pipe(
+        Effect.andThen(Effect.promise(() => startHost(agentId, tokens.get(agentId) ?? ""))),
+      ),
+    replaceHostWithOlder: (agentId: string, protocol: number | null) =>
+      stop(agentId).pipe(
+        Effect.andThen(
+          Effect.promise(() => startHost(agentId, tokens.get(agentId) ?? "", protocol)),
+        ),
+      ),
     reclaim,
     setGone: (agentId: string, isGone: boolean) => {
       if (isGone) gone.add(agentId)
