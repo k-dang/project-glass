@@ -9,36 +9,20 @@ const files = layOut(["a.ts", "b.ts", "c.ts", "d.ts"].map((path) => changedFile(
 const paths = (reading: ReturnType<typeof readTour>) => reading.files.map(({ file }) => file.path)
 
 describe("readTour", () => {
-  it("keeps visuals with their Chapters and removes code links when a target file disappears", () => {
-    const diagram = {
-      nodes: [
-        {
-          id: "a",
-          label: "A",
-          change: "unchanged",
-          target: { path: "a.ts", side: "old", startLine: 2, endLine: 2 },
-        },
-        {
-          id: "b",
-          label: "B",
-          change: "added",
-          target: { path: "b.ts", side: "new", startLine: 2, endLine: 2 },
-        },
-      ],
-      edges: [{ from: "a", to: "b", change: "added" }],
-    } as const
+  it("keeps visuals with their Chapters, hiding them when outdated and code links when a target file disappears", () => {
+    const diagram = "flowchart LR\n  a[A] --> b[B]:::added"
+    const a = { path: "a.ts", side: "old", startLine: 2, endLine: 2 } as const
+    const b = { path: "b.ts", side: "new", startLine: 2, endLine: 2 } as const
 
     const beforeAfter = {
       title: "A and B",
-      lines: diagram.nodes.map(({ label, change, target }) => ({
-        depth: 0,
-        text: label,
-        change,
-        target,
-      })),
-    }
+      lines: [
+        { depth: 0, text: "A", change: "unchanged", target: a },
+        { depth: 0, text: "B", change: "added", target: b },
+      ],
+    } as const
 
-    const callouts = [{ label: "Inspect B", target: diagram.nodes[1].target }]
+    const callouts = [{ label: "Inspect B", target: b }]
 
     const tour = {
       ...savedTour([{ ...tourChapter("One", ["a.ts", "b.ts"]), diagram, beforeAfter, callouts }]),
@@ -63,7 +47,7 @@ describe("readTour", () => {
         revision,
         null,
       ).diagram,
-    ).toBeNull()
+    ).toEqual(diagram)
 
     const current = readTour(files, tour, revision, null).chapters[0]!
     expect(current.diagram).toEqual(diagram)
@@ -90,7 +74,7 @@ describe("readTour", () => {
 
     expect(missing.beforeAfter).toBeNull()
     expect(missing.callouts).toEqual([])
-    expect(missing.diagram).toBeNull()
+    expect(missing.diagram).toEqual(diagram)
   })
 
   it("shows a Tour's Before / after only for its current Revision, with its files present", () => {

@@ -77,50 +77,21 @@ export const tourOverviewExamples: ReadonlyArray<TourOverviewExample> = [
     tour: {
       intent:
         "Add an OpenCode program path alongside Claude Code and pi, translating native events and history into Glass Turns. This hand-authored synthetic example illustrates the supplied OpenCode Tour; its small source files are demonstration code.",
-      diagram: {
-        nodes: [
-          { id: "start", label: "Start an Agent", change: "unchanged", target: target(host, 3) },
-          {
-            id: "claude",
-            label: "Claude Code",
-            change: "unchanged",
-            target: target(host, 3, "old"),
-          },
-          { id: "pi", label: "pi", change: "unchanged", target: target(host, 2, "old") },
-          {
-            id: "opencode",
-            label: "OpenCode service",
-            change: "added",
-            target: target(runtime, 5),
-          },
-          {
-            id: "translate",
-            label: "Translate events and history",
-            change: "added",
-            target: target(turns),
-          },
-          {
-            id: "turns",
-            label: "Glass Agent Turns",
-            change: "unchanged",
-            target: target(turns, 2),
-          },
-        ],
-        edges: [
-          { from: "start", to: "claude", change: "unchanged", label: "Claude Code" },
-          { from: "start", to: "pi", change: "unchanged", label: "pi" },
-          { from: "start", to: "opencode", change: "added", label: "OpenCode" },
-          { from: "claude", to: "turns", change: "unchanged" },
-          { from: "pi", to: "turns", change: "unchanged" },
-          { from: "opencode", to: "translate", change: "added", label: "native events" },
-          { from: "translate", to: "turns", change: "added" },
-        ],
-      },
+      diagram: [
+        "flowchart LR",
+        "  start[Start an Agent] -->|Claude Code| claude[Claude Code]",
+        "  start -->|pi| pi[pi]",
+        "  start -->|OpenCode| opencode[OpenCode service]:::added",
+        "  claude --> turns[Glass Agent Turns]",
+        "  pi --> turns",
+        "  opencode -->|native events| translate[Translate events and history]:::added",
+        "  translate --> turns",
+      ].join("\n"),
       chapters: [
         {
           title: "Start the selected program",
           explanation:
-            "The demonstration host dispatches through the selected adapter. Claude Code and pi remain choices, and OpenCode joins them. The nodes for the existing programs open the old side of this diff.",
+            "The demonstration host dispatches through the selected adapter. Claude Code and pi remain choices, and OpenCode joins them.",
           files: [{ path: host, summary: "Dispatches through the selected program adapter." }],
         },
         {
@@ -132,7 +103,7 @@ export const tourOverviewExamples: ReadonlyArray<TourOverviewExample> = [
         {
           title: "Turn native history into Glass Turns",
           explanation:
-            "The demonstration adapter passes native events and history to the existing Turn conversion interface. Its overview node links directly to that conversion call.",
+            "The demonstration adapter passes native events and history to the existing Turn conversion interface.",
           files: [{ path: turns, summary: "Connects native events and history to Turns." }],
         },
       ],
@@ -160,34 +131,13 @@ export const tourOverviewExamples: ReadonlyArray<TourOverviewExample> = [
     ],
     tour: {
       intent:
-        "Validate submitted input before it reaches the existing save function. This is a hand-authored synthetic Tour of a linear change; the map shows the successful path.",
-      diagram: {
-        nodes: [
-          {
-            id: "receive",
-            label: "Receive fields",
-            change: "unchanged",
-            target: target("submit.ts"),
-          },
-          {
-            id: "validate",
-            label: "Validate input",
-            change: "added",
-            target: target("submit.ts", 2),
-          },
-          {
-            id: "save",
-            label: "Save the record",
-            change: "unchanged",
-            target: target("storage.ts"),
-          },
-        ],
-        edges: [
-          { from: "receive", to: "validate", change: "added" },
-          { from: "validate", to: "save", change: "added" },
-          { from: "receive", to: "save", change: "removed", label: "before: save directly" },
-        ],
-      },
+        "Validate submitted input before it reaches the existing save function. This is a hand-authored synthetic Tour of a linear change.",
+      diagram: [
+        "flowchart LR",
+        "  receive[Receive fields] --> validate[Validate input]:::added",
+        "  validate --> save[Save the record]",
+        "  receive -.->|before: save directly| save",
+      ].join("\n"),
       chapters: [
         {
           title: "Check input before saving",

@@ -4,8 +4,6 @@ import { CheckoutRunReason } from "./checkoutRun"
 import { DiffSide } from "./discussion"
 import { Revision } from "./revision"
 
-const DiagramChange = Schema.Literals(["unchanged", "added", "removed"])
-
 export const TourCodeTarget = Schema.Struct({
   path: Schema.NonEmptyString,
   side: DiffSide,
@@ -15,44 +13,8 @@ export const TourCodeTarget = Schema.Struct({
 
 export type TourCodeTarget = typeof TourCodeTarget.Type
 
-export const TourDiagramNode = Schema.Struct({
-  id: Schema.NonEmptyString.check(Schema.isMaxLength(40)),
-  label: Schema.NonEmptyString.check(Schema.isMaxLength(80)),
-  change: DiagramChange,
-  target: TourCodeTarget,
-})
-
-export type TourDiagramNode = typeof TourDiagramNode.Type
-
-const FlowStep = Schema.Struct({
-  caption: Schema.NonEmptyString.check(Schema.isMaxLength(240)),
-  nodes: Schema.Array(Schema.NonEmptyString).check(Schema.isMinLength(1), Schema.isMaxLength(6)),
-  edges: Schema.Array(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))).check(
-    Schema.isMaxLength(8),
-  ),
-  stateChanges: Schema.Array(
-    Schema.Struct({
-      label: Schema.NonEmptyString.check(Schema.isMaxLength(80)),
-      before: Schema.String.check(Schema.isMaxLength(160)),
-      after: Schema.String.check(Schema.isMaxLength(160)),
-    }),
-  ).check(Schema.isMaxLength(4)),
-})
-
-export const TourDiagram = Schema.Struct({
-  nodes: Schema.Array(TourDiagramNode).check(Schema.isMinLength(2), Schema.isMaxLength(6)),
-  edges: Schema.Array(
-    Schema.Struct({
-      from: Schema.NonEmptyString,
-      to: Schema.NonEmptyString,
-      change: DiagramChange,
-      label: Schema.optionalKey(Schema.NonEmptyString.check(Schema.isMaxLength(40))),
-    }),
-  ).check(Schema.isMinLength(1), Schema.isMaxLength(8)),
-  steps: Schema.optionalKey(
-    Schema.Array(FlowStep).check(Schema.isMinLength(2), Schema.isMaxLength(12)),
-  ),
-})
+/** A Mermaid flowchart. Nodes carry the `added` or `removed` class when the change adds or removes them. */
+export const TourDiagram = Schema.NonEmptyString.check(Schema.isMaxLength(4000))
 
 export type TourDiagram = typeof TourDiagram.Type
 
@@ -62,7 +24,7 @@ export const TourBeforeAfter = Schema.Struct({
     Schema.Struct({
       depth: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 6 })),
       text: Schema.NonEmptyString.check(Schema.isMaxLength(120)),
-      change: DiagramChange,
+      change: Schema.Literals(["unchanged", "added", "removed"]),
       target: Schema.NullOr(TourCodeTarget),
     }),
   ).check(Schema.isMinLength(2), Schema.isMaxLength(24)),
