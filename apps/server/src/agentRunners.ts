@@ -1,5 +1,5 @@
 import {
-  type AgentEngine,
+  type AgentHarness,
   type AgentRunnerIdentity,
   type EngineModels,
   type EngineSettings,
@@ -387,7 +387,7 @@ const runnerStrategies = Effect.gen(function* () {
   })
 
   const runners: Record<
-    AgentEngine,
+    AgentHarness,
     (models: EngineModels) => Effect.Effect<AgentRunner, AgentFailure, Scope.Scope>
   > = {
     "claude-code": claudeRunner,

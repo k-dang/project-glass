@@ -42,7 +42,7 @@ user, project, and local settings sources, since the SDK otherwise starts `claud
 
 ## Revisit when
 
-- An Agent program offers its own remote protocol that covers Permission requests, Steer, and
-  reconnecting, which could replace the host for that program.
+- An Agent harness offers its own remote protocol that covers Permission requests, Steer, and
+  reconnecting, which could replace the host for that harness.
 - The SDK falls behind the CLI, or hides something Glass needs from the control protocol.
 - Agents need to run without the user linking a clone.

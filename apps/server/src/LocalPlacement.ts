@@ -1,4 +1,4 @@
-import { AgentEngine, AgentError, type FollowedRepository } from "@glass/contracts"
+import { AgentHarness, AgentError, type FollowedRepository } from "@glass/contracts"
 import { Context, Effect, Exit, FileSystem, Layer, Option, Stream } from "effect"
 import { join } from "node:path"
 import { shortAgentNames, uniqueAgentName } from "./agentNames"
@@ -117,7 +117,7 @@ export class LocalPlacement extends Context.Service<
       })
 
       return LocalPlacement.of({
-        engines: AgentEngine.literals,
+        engines: AgentHarness.literals,
         models: (engine) =>
           host.client.pipe(
             Effect.flatMap((client) => client.ListModels({ engine })),

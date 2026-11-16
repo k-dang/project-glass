@@ -33,7 +33,7 @@ import { randomUUID } from "node:crypto"
 import { stripVTControlCharacters } from "node:util"
 import { homedir } from "node:os"
 import { join } from "node:path"
-import type { AgentAdapter } from "./adapter"
+import type { HarnessAdapter } from "./adapter"
 import type { DeliveredMessage, DeliveredTurn } from "./deliveredMessage"
 import {
   AvailableCommands,
@@ -397,7 +397,7 @@ export const piAdapter = (command: string) =>
         )).model
 
         const turns = yield* runTurns({
-          program: "pi",
+          harness: "pi",
           machine,
           events: Stream.fromQueue(inbox),
           report,
@@ -607,5 +607,5 @@ export const piAdapter = (command: string) =>
           }),
         }
       }),
-    } satisfies AgentAdapter
+    } satisfies HarnessAdapter
   })

@@ -2,7 +2,7 @@ import {
   Agent,
   AgentBusy,
   type AgentSkillPack,
-  type AgentEngine,
+  type AgentHarness,
   AgentError,
   type AgentCommand,
   AgentModels,
@@ -20,7 +20,7 @@ import {
   type MessageInput,
   type ModelChoice,
   defaultPermissionMode,
-  engineCapabilities,
+  harnessCapabilities,
   type NewAgent,
   type PermissionMode,
   RemovalWarnings,
@@ -154,7 +154,7 @@ export interface NewReviewAgent {
   readonly name: string
   readonly repository: FollowedRepository
   readonly revision: Revision
-  readonly engine: AgentEngine
+  readonly engine: AgentHarness
   readonly model: string | null
   readonly checkout: string
   readonly review: ReviewBrief
@@ -187,13 +187,13 @@ export class Agents extends Context.Service<
     readonly transcript: (
       agentId: string,
     ) => Stream.Stream<TranscriptUpdate, AgentNotFound | AgentError>
-    readonly engines: (place: AgentPlace) => ReadonlyArray<AgentEngine>
+    readonly engines: (place: AgentPlace) => ReadonlyArray<AgentHarness>
     readonly models: (
-      engine: AgentEngine,
+      engine: AgentHarness,
       place: AgentPlace,
     ) => Effect.Effect<AgentModels, AgentError>
     readonly newAgentCommands: (
-      engine: AgentEngine,
+      engine: AgentHarness,
       place: AgentPlace,
       repository: FollowedRepository,
     ) => Effect.Effect<ReadonlyArray<AgentCommand>, InvalidLocalCheckout | AgentError>
@@ -322,7 +322,7 @@ export class Agents extends Context.Service<
 
       const placementRunning = (
         place: AgentPlace,
-        engine: AgentEngine,
+        engine: AgentHarness,
       ): Effect.Effect<Placement, AgentError> => {
         const placement = placementFor(place)
 
@@ -330,7 +330,7 @@ export class Agents extends Context.Service<
           ? Effect.succeed(placement)
           : Effect.fail(
               new AgentError({
-                message: "This place doesn't run that Agent program. Pick another.",
+                message: "This place doesn't run that Agent harness. Pick another.",
               }),
             )
       }
@@ -520,7 +520,7 @@ export class Agents extends Context.Service<
         const placement = yield* placementRunning(place, engine)
 
         const permissionMode =
-          engineCapabilities[engine].permissionModes.length === 0
+          harnessCapabilities[engine].permissionModes.length === 0
             ? null
             : asksPermission(place)
               ? (input.permissionMode ?? defaultPermissionMode)

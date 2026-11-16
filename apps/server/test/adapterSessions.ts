@@ -27,7 +27,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { vi } from "vite-plus/test"
-import type { AgentAdapter, AgentSession } from "../src/agentHost/adapter"
+import type { HarnessAdapter, HarnessSession } from "../src/agentHost/adapter"
 import { claudeAdapter, type ClaudeSdk } from "../src/agentHost/claudeAdapter"
 import { piAdapter } from "../src/agentHost/piAdapter"
 import { AgentRunners } from "../src/agentRunners"
@@ -74,7 +74,7 @@ export const waiting = (turns: ReadonlyArray<Turn>) =>
 type Work = typeof WorkRole.Type
 
 const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
-  adapter: AgentAdapter<Role | Work>,
+  adapter: HarnessAdapter<Role | Work>,
   tape: ReturnType<typeof sessionTape>,
   folder: string,
   defaults: Partial<TurnSettings> = {},
@@ -116,7 +116,7 @@ const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
 
   const open = (conversation: string, role: Role | Work = WorkRole.make({})) =>
     adapter.start({ folder, conversation, role, skills: [], report }).pipe(
-      Effect.map((session: AgentSession) => ({
+      Effect.map((session: HarnessSession) => ({
         session,
         configure: (settings: Partial<TurnSettings>) =>
           session.configure({

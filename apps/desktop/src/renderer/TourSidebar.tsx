@@ -21,7 +21,7 @@ import { warningTone } from "./PullRequestRow"
 import type { TourChapter, TourReading } from "./tourReading"
 import { twoDigits, useProgress } from "./tourProgress"
 import { plural } from "./plural"
-import { engineNames, runnerLabel } from "./engines"
+import { harnessNames, runnerLabel } from "./harnesses"
 import { TourText } from "./TourText"
 import type { ViewedFilesStore } from "./useViewedFiles"
 import type { useTour } from "./useTour"
@@ -225,7 +225,7 @@ export function TourSidebar(props: {
           </div>
           {job.runner !== null && (
             <p className="space-y-1 text-xs text-muted-foreground">
-              <span className="block">{engineNames[job.runner.engine]}</span>
+              <span className="block">{harnessNames[job.runner.engine]}</span>
               <span className="block break-all font-mono">{job.runner.model}</span>
             </p>
           )}

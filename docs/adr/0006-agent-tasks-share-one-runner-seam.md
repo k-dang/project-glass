@@ -2,9 +2,9 @@
 
 Tours, Agent reviews, and Ask ask an agent the same thing: follow these instructions over this PR
 material in this checkout, and return an answer matching this schema. So all three go through one
-`AgentRunners` seam, with a strategy per program (Claude Code, the pi CLI), instead of a runner set
+`AgentRunners` seam, with a strategy per Agent harness (Claude Code, the pi CLI), instead of a runner set
 each. Runners know nothing of git, GitHub, or settings: the features prepare the checkout (ADR 0005)
-and choose the engine and model, and translate the runners' shared failure into their own.
+and choose the Agent harness and model, and translate the runners' shared failure into their own.
 
 A strategy that can't honour a task's read-only access refuses to run it rather than run without
 restrictions. So a Claude Code without restricted mode, which confines read tools to the checkout

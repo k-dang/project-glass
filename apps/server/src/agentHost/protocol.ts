@@ -1,7 +1,7 @@
 import {
   Agent,
   AgentCommand,
-  AgentEngine,
+  AgentHarness,
   AgentEvent,
   AgentModels,
   ChangedFile,
@@ -107,7 +107,7 @@ export type StartOutcome = typeof StartOutcome.Type
 export const ConversationStart = Schema.Union([
   Schema.Struct({
     agentId: Schema.String,
-    engine: AgentEngine,
+    engine: AgentHarness,
     folder: HostFolder,
     role: AgentRole,
     skills: Schema.Array(SkillSource),
@@ -133,12 +133,12 @@ export type SteersNotTakenIn = typeof SteersNotTakenIn.Type
 
 export class AgentHostRpcs extends RpcGroup.make(
   Rpc.make("ListModels", {
-    payload: { engine: AgentEngine },
+    payload: { engine: AgentHarness },
     success: AgentModels,
     error: HostAgentError,
   }),
   Rpc.make("ListCommands", {
-    payload: { engine: AgentEngine, folder: HostFolder, skills: Schema.Array(SkillSource) },
+    payload: { engine: AgentHarness, folder: HostFolder, skills: Schema.Array(SkillSource) },
     success: Schema.Array(AgentCommand),
     error: HostAgentError,
   }),
@@ -192,9 +192,9 @@ export class AgentHostRpcs extends RpcGroup.make(
   Rpc.make("Acknowledge", { payload: { through: Schema.Int } }),
 ) {}
 
-export const couldNotSwitch = (program: string, what: "model" | "effort" | "Permission mode") =>
+export const couldNotSwitch = (harness: string, what: "model" | "effort" | "Permission mode") =>
   new HostAgentError({
-    message: `${program} couldn't switch to that ${what}. Pick another, then send your message again.`,
+    message: `${harness} couldn't switch to that ${what}. Pick another, then send your message again.`,
   })
 
 export const notRunning = new HostAgentError({ message: "The Agent isn't working on a Turn." })

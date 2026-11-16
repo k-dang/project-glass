@@ -37,17 +37,17 @@ export const tourOverviewExamples: ReadonlyArray<TourOverviewExample> = [
       {
         path: host,
         base: [
-          "export const startAgent = (program, adapters) => {",
-          '  if (program === "pi") return adapters.pi.start()',
+          "export const startAgent = (harness, adapters) => {",
+          '  if (harness === "pi") return adapters.pi.start()',
           '  return adapters["claude-code"].start()',
           "}",
         ],
         head: [
           'import { openCodeAdapter } from "./openCodeRuntime"',
           "",
-          "export const startAgent = (program, adapters, openCode) => {",
-          "  const programs = { ...adapters, opencode: openCodeAdapter(openCode) }",
-          "  return programs[program].start()",
+          "export const startAgent = (harness, adapters, openCode) => {",
+          "  const harnesses = { ...adapters, opencode: openCodeAdapter(openCode) }",
+          "  return harnesses[harness].start()",
           "}",
         ],
       },
@@ -76,7 +76,7 @@ export const tourOverviewExamples: ReadonlyArray<TourOverviewExample> = [
     ],
     tour: {
       intent:
-        "Add an OpenCode program path alongside Claude Code and pi, translating native events and history into Glass Turns. This hand-authored synthetic example illustrates the supplied OpenCode Tour; its small source files are demonstration code.",
+        "Add an OpenCode harness path alongside Claude Code and pi, translating native events and history into Glass Turns. This hand-authored synthetic example illustrates the supplied OpenCode Tour; its small source files are demonstration code.",
       diagram: {
         nodes: [
           { id: "start", label: "Start an Agent", change: "unchanged", target: target(host, 3) },
@@ -118,15 +118,15 @@ export const tourOverviewExamples: ReadonlyArray<TourOverviewExample> = [
       },
       chapters: [
         {
-          title: "Start the selected program",
+          title: "Start the selected harness",
           explanation:
-            "The demonstration host dispatches through the selected adapter. Claude Code and pi remain choices, and OpenCode joins them. The nodes for the existing programs open the old side of this diff.",
-          files: [{ path: host, summary: "Dispatches through the selected program adapter." }],
+            "The demonstration host dispatches through the selected adapter. Claude Code and pi remain choices, and OpenCode joins them. The nodes for the existing harnesses open the old side of this diff.",
+          files: [{ path: host, summary: "Dispatches through the selected harness adapter." }],
         },
         {
           title: "Run the OpenCode service",
           explanation:
-            "The demonstration OpenCode runtime creates a local service with an authentication token. This is the added program path shown on the overview map.",
+            "The demonstration OpenCode runtime creates a local service with an authentication token. This is the added harness path shown on the overview map.",
           files: [{ path: runtime, summary: "Starts the demonstration OpenCode service." }],
         },
         {

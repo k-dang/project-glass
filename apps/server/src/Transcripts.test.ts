@@ -27,7 +27,7 @@ const transcriptsLayer = Transcripts.layer.pipe(
 )
 
 it.live(
-  "keeps a stopped Turn stopped, and its Queued messages waiting, when its program ends it late",
+  "keeps a stopped Turn stopped, and its Queued messages waiting, when its harness ends it late",
   () =>
     Effect.gen(function* () {
       const transcripts = yield* Transcripts
@@ -60,7 +60,7 @@ it.live(
     }).pipe(Effect.provide(transcriptsLayer)),
 )
 
-it.live("hands its program only the Turns Glass started, not one the Agent started itself", () =>
+it.live("hands its harness only the Turns Glass started, not one the Agent started itself", () =>
   Effect.gen(function* () {
     const transcripts = yield* Transcripts
     const started = yield* transcripts.subscribeStarted

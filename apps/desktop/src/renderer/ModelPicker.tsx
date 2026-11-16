@@ -1,5 +1,5 @@
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
-import type { AgentEngine, AgentModels, ModelChoice } from "@glass/contracts"
+import type { AgentHarness, AgentModels, ModelChoice } from "@glass/contracts"
 import { AsyncResult } from "effect/reactivity"
 import { cn } from "cn"
 import { LoaderCircle } from "lucide-react"
@@ -8,8 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { agentModelsAtom } from "./agentsArea"
-import { AgentProgramIcon } from "./AgentProgramIcon"
-import { engineNames } from "./engines"
+import { AgentHarnessIcon } from "./AgentHarnessIcon"
+import { harnessNames } from "./harnesses"
 import { chip, ChipSelect } from "./chips"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf } from "./problems"
@@ -26,14 +26,14 @@ const find = (listed: AgentModels, id: string | null) =>
   id === null ? listed.defaultModel : listed.models.find((m) => m.id === id)
 
 export const ModelPicker = memo(function ModelPicker(props: {
-  engine: AgentEngine
+  engine: AgentHarness
   placeKey: string
   model: string | null
   effort: string | null
   onChange: (choice: ModelChoice) => void
-  programs?: {
-    readonly engines: ReadonlyArray<AgentEngine>
-    readonly onChange: (engine: AgentEngine) => void
+  harnesses?: {
+    readonly engines: ReadonlyArray<AgentHarness>
+    readonly onChange: (engine: AgentHarness) => void
   }
 }) {
   const offered = agentModelsAtom(props.engine, props.placeKey)
@@ -41,7 +41,7 @@ export const ModelPicker = memo(function ModelPicker(props: {
   const listed = useAtomValue(offered)
   const retry = useAtomRefresh(offered)
   const [open, setOpen] = useState(false)
-  const { model, effort, programs } = props
+  const { model, effort, harnesses } = props
 
   const { summary, body, efforts } = AsyncResult.builder(listed)
     .onInitial(() => ({
@@ -80,7 +80,7 @@ export const ModelPicker = memo(function ModelPicker(props: {
 
   return (
     <>
-      {programs?.engines
+      {harnesses?.engines
         .filter((engine) => engine !== props.engine)
         .map((engine) => (
           <PrefetchModels key={engine} engine={engine} placeKey={props.placeKey} />
@@ -93,12 +93,12 @@ export const ModelPicker = memo(function ModelPicker(props: {
               variant="ghost"
               size="sm"
               className={cn(chip, "text-foreground")}
-              aria-label={`${engineNames[props.engine]}: ${summary}`}
+              aria-label={`${harnessNames[props.engine]}: ${summary}`}
               title={summary}
             />
           }
         >
-          <AgentProgramIcon engine={props.engine} />
+          <AgentHarnessIcon engine={props.engine} />
           <span className="min-w-0 truncate font-semibold">{summary}</span>
         </PopoverTrigger>
         <PopoverContent
@@ -106,18 +106,18 @@ export const ModelPicker = memo(function ModelPicker(props: {
           align="end"
           className="h-96 max-h-(--available-height) w-80 max-w-(--available-width) gap-1 overflow-hidden p-1"
         >
-          {programs !== undefined && (
+          {harnesses !== undefined && (
             <div className="shrink-0">
               <RequiredChoice
-                label="Agent program"
+                label="Agent harness"
                 value={props.engine}
-                onChange={programs.onChange}
-                items={programs.engines.map((engine) => ({
+                onChange={harnesses.onChange}
+                items={harnesses.engines.map((engine) => ({
                   value: engine,
                   label: (
                     <>
-                      <AgentProgramIcon engine={engine} />
-                      {engineNames[engine]}
+                      <AgentHarnessIcon engine={engine} />
+                      {harnessNames[engine]}
                     </>
                   ),
                 }))}
@@ -150,7 +150,7 @@ export const ModelPicker = memo(function ModelPicker(props: {
   )
 })
 
-function PrefetchModels(props: { engine: AgentEngine; placeKey: string }) {
+function PrefetchModels(props: { engine: AgentHarness; placeKey: string }) {
   useAtomValue(agentModelsAtom(props.engine, props.placeKey))
 
   return null

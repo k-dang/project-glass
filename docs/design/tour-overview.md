@@ -30,7 +30,7 @@ The fake backend also includes three PRs named **Tour example: add OpenCode for 
 
 These examples use small synthetic source files and real patches. They exercise saved Tour decoding, code-target validation, Dagre layout, Chapter references, and navigation to selected lines on either side of the diff. The OpenCode example is still an illustration of Kevin's supplied screenshot, not the actual OpenCode implementation.
 
-When writing a Tour, the engine chooses one overview map: a diagram for flows, branches, and changed routes, or a plain-language outline for nesting and hierarchy. Overview targets can cross files and Chapters; Chapter visuals stay local and add detail beyond that map. Trivial changes can omit the map. Labels describe behavior and relationships; Glass derives Chapter references from the code targets.
+When writing a Tour, the Tour engine chooses one overview map: a diagram for flows, branches, and changed routes, or a plain-language outline for nesting and hierarchy. Overview targets can cross files and Chapters; Chapter visuals stay local and add detail beyond that map. Trivial changes can omit the map. Labels describe behavior and relationships; Glass derives Chapter references from the code targets.
 
 Invalid diagrams are omitted, retaining a valid outline when supplied. Outdated Tours hide their code-linked visuals. Existing saved Tours keep their content until rewritten.
 

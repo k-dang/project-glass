@@ -14,7 +14,7 @@ const write = (path: string, contents: string) => {
 const pi = { engine: "pi", model: null, effort: null } as const
 
 it.live(
-  "gives a Sandbox Agent the Local skills its program reads, as they are when it starts",
+  "gives a Sandbox Agent the Local skills its harness reads, as they are when it starts",
   () =>
     Effect.gen(function* () {
       const f = yield* agentsFixture

@@ -1,13 +1,13 @@
-import { agentEngines } from "@glass/plugin"
+import { agentHarnesses } from "@glass/plugin"
 import { Effect, Match, Predicate, Schema } from "effect"
 import { FeedbackNote } from "./feedbackNote"
 import { FollowedRepository } from "./followedRepository"
 import { ChangedFile, PullRequestRef } from "./pullRequest"
 import { Revision } from "./revision"
 
-export const AgentEngine = Schema.Literals(agentEngines)
+export const AgentHarness = Schema.Literals(agentHarnesses)
 
-export type AgentEngine = typeof AgentEngine.Type
+export type AgentHarness = typeof AgentHarness.Type
 
 export const LocalPlace = Schema.TaggedStruct("local", {})
 
@@ -61,7 +61,7 @@ export interface AgentCapabilities {
   readonly permissionModes: ReadonlyArray<PermissionMode>
 }
 
-export const engineCapabilities: Record<AgentEngine, AgentCapabilities> = {
+export const harnessCapabilities: Record<AgentHarness, AgentCapabilities> = {
   "claude-code": { permissionModes: PermissionMode.literals },
   pi: { permissionModes: [] },
 }
@@ -120,7 +120,7 @@ export class Agent extends Schema.Class<Agent>("Agent")({
   place: AgentPlace,
   repository: FollowedRepository,
   baseBranch: Schema.String,
-  engine: AgentEngine,
+  engine: AgentHarness,
   ...ModelChoice.fields,
   permissionMode: Schema.NullOr(PermissionMode),
   skillPacks: Schema.Array(AgentSkillPack),
@@ -571,7 +571,7 @@ export type MessageDelivery = typeof MessageDelivery.Type
 export const NewAgent = Schema.Struct({
   repository: FollowedRepository,
   baseBranch: Schema.String,
-  engine: AgentEngine,
+  engine: AgentHarness,
   ...ModelChoice.fields,
   permissionMode: Schema.NullOr(PermissionMode),
   place: AgentPlace,
@@ -585,7 +585,7 @@ export type NewAgent = typeof NewAgent.Type
 export class SandboxProviderInfo extends Schema.Class<SandboxProviderInfo>("SandboxProviderInfo")({
   id: Schema.String,
   name: Schema.String,
-  engines: Schema.NonEmptyArray(AgentEngine),
+  engines: Schema.NonEmptyArray(AgentHarness),
 }) {}
 
 export class AgentChanges extends Schema.Class<AgentChanges>("AgentChanges")({

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import {
   Agent,
-  type AgentEngine,
+  type AgentHarness,
   AgentModels,
   type AgentPlace,
   FollowedRepository,
@@ -335,7 +335,7 @@ it("shows the first message at once while the Agent starts", async () => {
   await waitFor(() => expect(window.location.hash).toBe(`#/agents/${agent.id}`))
 })
 
-it("keeps local branch, program, model, effort, and unsent work when exploring a Sandbox", async () => {
+it("keeps local branch, harness, model, effort, and unsent work when exploring a Sandbox", async () => {
   const created: Array<NewAgent> = []
 
   const user = mount(
@@ -377,7 +377,7 @@ it("keeps local branch, program, model, effort, and unsent work when exploring a
   await user.click(
     await within(newAgentDraft()).findByRole("button", { name: "Claude Code: Opus 5.5" }),
   )
-  await user.click(choice(await screen.findByRole("dialog"), "Agent program", "pi"))
+  await user.click(choice(await screen.findByRole("dialog"), "Agent harness", "pi"))
   await within(newAgentDraft()).findByRole("button", { name: "pi: gpt-test" })
   await user.click(choice(await screen.findByRole("dialog"), "Model", "Thinker"))
   await select("Effort", "High")
@@ -432,7 +432,7 @@ it("keeps local branch, program, model, effort, and unsent work when exploring a
   ])
 })
 
-it("restores each program's choices and keeps local Permission mode separate from a Sandbox", async () => {
+it("restores each harness's choices and keeps local Permission mode separate from a Sandbox", async () => {
   const created: Array<NewAgent> = []
 
   const user = mount(
@@ -467,10 +467,10 @@ it("restores each program's choices and keeps local Permission mode separate fro
   await select("Effort", "High")
   await select("Permission mode", "Accept edits")
   await user.click(within(newAgentDraft()).getByRole("button", { name: "Claude Code: Sonnet 5.5" }))
-  await user.click(choice(await screen.findByRole("dialog"), "Agent program", "pi"))
+  await user.click(choice(await screen.findByRole("dialog"), "Agent harness", "pi"))
   await within(newAgentDraft()).findByRole("button", { name: "pi: gpt-test" })
   expect(within(newAgentDraft()).queryByRole("combobox", { name: "Effort" })).toBeNull()
-  await user.click(choice(await screen.findByRole("dialog"), "Agent program", "Claude Code"))
+  await user.click(choice(await screen.findByRole("dialog"), "Agent harness", "Claude Code"))
   await user.keyboard("{Escape}")
   await within(newAgentDraft()).findByRole("button", { name: "Claude Code: Sonnet 5.5" })
   await select("Where the Agent runs", "Fake Sandboxes")
@@ -721,8 +721,8 @@ it("starts a Sandbox Agent on the default branch, listing other branches only wh
   await waitFor(() => expect(window.location.hash).toBe(`#/agents/${agent.id}`))
 })
 
-it("lists every Agent program's models before one is chosen", async () => {
-  const listed: Array<AgentEngine> = []
+it("lists every Agent harness's models before one is chosen", async () => {
+  const listed: Array<AgentHarness> = []
 
   mount(
     {
@@ -741,7 +741,7 @@ it("lists every Agent program's models before one is chosen", async () => {
   expect(listed).toContain("claude-code")
 })
 
-it("offers only the Agent programs a Sandbox provider runs", async () => {
+it("offers only the Agent harnesses a Sandbox provider runs", async () => {
   const user = mount(
     {
       ...newAgentHandlers([], []),
@@ -763,18 +763,18 @@ it("offers only the Agent programs a Sandbox provider runs", async () => {
 
   await user.click(await within(newAgentDraft()).findByRole("button", { name: "pi: gpt-test" }))
 
-  const programs = within(await screen.findByRole("dialog")).getByRole("group", {
-    name: "Agent program",
+  const harnesses = within(await screen.findByRole("dialog")).getByRole("group", {
+    name: "Agent harness",
   })
 
   expect(
-    within(programs)
+    within(harnesses)
       .getAllByRole("button")
       .map((button) => button.textContent),
   ).toEqual(["pi"])
 })
 
-it("starts an Agent with the last one's program, model, and effort, in the Default Permission mode", async () => {
+it("starts an Agent with the last one's harness, model, and effort, in the Default Permission mode", async () => {
   const created: Array<NewAgent> = []
 
   const last = new Agent({
@@ -802,14 +802,14 @@ it("starts an Agent with the last one's program, model, and effort, in the Defau
   await waitFor(() => expect(window.location.hash).toBe(`#/agents/${agent.id}`))
 })
 
-it("offers the chosen agent program's own models, and efforts only for models that take one", async () => {
+it("offers the chosen Agent harness's own models, and efforts only for models that take one", async () => {
   const created: Array<NewAgent> = []
   const user = mount(newAgentHandlers(created, []), "/agents/new")
 
   const draft = await screen.findByRole("region", { name: "New Agent" })
   await user.click(await within(draft).findByRole("button", { name: "Claude Code: Opus 5.5" }))
   const picker = await screen.findByRole("dialog")
-  await user.click(choice(picker, "Agent program", "pi"))
+  await user.click(choice(picker, "Agent harness", "pi"))
 
   await within(draft).findByRole("button", { name: "pi: gpt-test" })
   expect(within(draft).queryByRole("combobox", { name: "Effort" })).toBeNull()

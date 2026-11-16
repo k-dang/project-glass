@@ -3,7 +3,7 @@ import { type AgentDestination, repositoryKey } from "@glass/contracts"
 import { AsyncResult } from "effect/reactivity"
 import { Sparkles } from "lucide-react"
 import { agentsAtom, placeNames } from "./agentsArea"
-import { engineNames } from "./engines"
+import { harnessNames } from "./harnesses"
 import { ContinueCard, ContinueCardLoading, ContinueInvitation } from "./ContinueCard"
 import { ProblemAlert } from "./ProblemAlert"
 import { streamProblem } from "./problems"
@@ -43,7 +43,7 @@ function LastAgent(props: { destination: AgentDestination }) {
           link={{ to: "/agents/$agentId", params: { agentId: agent.id } }}
           name={agent.name}
           icon={Sparkles}
-          subtitle={`Agents · ${repositoryKey(agent.repository)} · ${engineNames[agent.engine]} · ${placeNames[agent.place._tag]}`}
+          subtitle={`Agents · ${repositoryKey(agent.repository)} · ${harnessNames[agent.engine]} · ${placeNames[agent.place._tag]}`}
         />
       )
     })

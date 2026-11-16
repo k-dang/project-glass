@@ -1,4 +1,4 @@
-import { AgentEngine } from "@glass/contracts"
+import { AgentHarness } from "@glass/contracts"
 import type { Glass, Plugin, SandboxProvider } from "@glass/plugin"
 import { Context, Effect, FileSystem, Layer, Option, Predicate, Result, Schema } from "effect"
 // The static entry imports jiti's TypeScript transform, so it lands in the backend's bundle.
@@ -58,7 +58,7 @@ const entryOf = Effect.fnUntraced(function* (
 
 const validProviderId = /^[a-z0-9][a-z0-9-]*$/
 
-const listsEngines = Schema.is(Schema.Struct({ engines: Schema.NonEmptyArray(AgentEngine) }))
+const listsEngines = Schema.is(Schema.Struct({ engines: Schema.NonEmptyArray(AgentHarness) }))
 
 const loadPlugin = (
   fs: FileSystem.FileSystem,
@@ -130,7 +130,7 @@ export class Plugins extends Context.Service<
               )
             } else if (!listsEngines(provider)) {
               yield* Effect.logWarning(
-                "Skipped a Sandbox provider that doesn't list the Agent programs it runs",
+                "Skipped a Sandbox provider that doesn't list the Agent harnesses it runs",
                 id,
                 path,
               )

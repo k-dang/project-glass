@@ -95,7 +95,7 @@ it.live(
 )
 
 it.live(
-  "stops a Turn, putting the Steers the program hadn't taken in before the Queued messages",
+  "stops a Turn, putting the Steers the harness hadn't taken in before the Queued messages",
   () =>
     Effect.gen(function* () {
       const f = yield* agentServicesFixture
@@ -119,7 +119,7 @@ it.live(
     }),
 )
 
-it.live("stops a Turn whose program is still starting, which never gets the message", () =>
+it.live("stops a Turn whose harness is still starting, which never gets the message", () =>
   Effect.gen(function* () {
     const f = yield* agentServicesFixture
     yield* f.holdStart
@@ -158,12 +158,12 @@ it.live("keeps an Agent's unsent message across a relaunch until it is cleared",
   }),
 )
 
-it.live("starts an Agent's program again for the next message after it exits", () =>
+it.live("starts an Agent's harness again for the next message after it exits", () =>
   Effect.gen(function* () {
     const f = yield* agentServicesFixture
     const agent = yield* f.create()
     const turn = yield* f.started
-    yield* end(turn, TurnFailed.make({ reason: "The program stopped" }))
+    yield* end(turn, TurnFailed.make({ reason: "The harness stopped" }))
     yield* f.exit(agent.id)
     yield* f.transcript(agent.id, settled(1))
 
@@ -173,7 +173,7 @@ it.live("starts an Agent's program again for the next message after it exits", (
   }),
 )
 
-it.live("lists what an Agent's program runs as `/name` in the Agent's own folder", () =>
+it.live("lists what an Agent's harness runs as `/name` in the Agent's own folder", () =>
   Effect.gen(function* () {
     const f = yield* agentServicesFixture
     const agent = yield* f.create()

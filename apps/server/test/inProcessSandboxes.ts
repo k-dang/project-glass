@@ -1,4 +1,4 @@
-import type { AgentEngine, SandboxProvider, SandboxState } from "@glass/plugin"
+import type { AgentHarness, SandboxProvider, SandboxState } from "@glass/plugin"
 import {
   Clock,
   Context,
@@ -23,7 +23,7 @@ import { hostServer } from "../src/agentHost/server"
 import { MissingLogin, NoCapacity, SandboxGone } from "../src/sandboxFailures"
 
 export interface InProcessSandboxSettings {
-  readonly engines?: readonly [AgentEngine, ...Array<AgentEngine>]
+  readonly engines?: readonly [AgentHarness, ...Array<AgentHarness>]
   readonly holdAt?: string
   readonly failAt?: string
   readonly missingLogin?: { readonly login: string; readonly fix: string }

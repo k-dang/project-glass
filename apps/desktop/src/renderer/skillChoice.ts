@@ -1,5 +1,5 @@
 import { useAtom, useAtomValue } from "@effect/atom-react"
-import { type AgentEngine, type AgentPlace, LOCAL_SKILLS_NAMESPACE } from "@glass/contracts"
+import { type AgentHarness, type AgentPlace, LOCAL_SKILLS_NAMESPACE } from "@glass/contracts"
 import { Option, Predicate, Schema } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
 import { Backend, backendRuntime } from "./backend"
@@ -30,7 +30,7 @@ const lastLocalSkillsAtom = Atom.writable(
   },
 ).pipe(Atom.keepAlive)
 
-const localSkillNamesAtom = Atom.family((engine: AgentEngine) =>
+const localSkillNamesAtom = Atom.family((engine: AgentHarness) =>
   backendRuntime.atom(Backend.use((backend) => backend.ListLocalSkills({ engine }))),
 )
 
@@ -45,7 +45,7 @@ interface ChosenSource {
 const listed = new Intl.ListFormat("en", { type: "conjunction" })
 
 /** pi keeps the first skill of a name, and Local skills come first (`skillsOf` in the server). */
-const sharedSkillNames = (engine: AgentEngine, sources: ReadonlyArray<ChosenSource>) => {
+const sharedSkillNames = (engine: AgentHarness, sources: ReadonlyArray<ChosenSource>) => {
   const names = [...new Set(sources.flatMap(({ skills }) => skills))].toSorted()
 
   return names.flatMap((name) => {
@@ -63,7 +63,7 @@ const sharedSkillNames = (engine: AgentEngine, sources: ReadonlyArray<ChosenSour
   })
 }
 
-export const useSkillChoice = (place: AgentPlace, engine: AgentEngine) => {
+export const useSkillChoice = (place: AgentPlace, engine: AgentHarness) => {
   const listedPacks = useAtomValue(skillPacksAtom)
   const packs = Option.getOrElse(AsyncResult.value(listedPacks), () => [])
   const [lastChosen, setChosen] = useAtom(lastChosenAtom)

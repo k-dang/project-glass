@@ -41,7 +41,7 @@ import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
 import { sdkExecutable } from "../processes"
 import { claudeTools } from "../agentTools"
-import type { AgentAdapter } from "./adapter"
+import type { HarnessAdapter } from "./adapter"
 import { Input, isFailure, machine } from "./claudeTurn"
 import type { DeliveredMessage, DeliveredTurn } from "./deliveredMessage"
 import {
@@ -351,7 +351,7 @@ const handshake = (sdk: ClaudeSdk, command: string, folder: string, extra: Optio
 export const claudeAdapter = (
   command: string,
   sdk: ClaudeSdk = liveSdk,
-): AgentAdapter<AgentRole> => ({
+): HarnessAdapter<AgentRole> => ({
   models: Effect.gen(function* () {
     const initialized = yield* handshake(sdk, command, homedir())
 
@@ -438,7 +438,7 @@ export const claudeAdapter = (
     )
 
     const turns = yield* runTurns({
-      program: "Claude Code",
+      harness: "Claude Code",
       machine,
       events: Stream.fromAsyncIterable(session, (cause) => cause).pipe(
         Stream.tap((message) =>

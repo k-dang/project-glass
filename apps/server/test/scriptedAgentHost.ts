@@ -3,7 +3,7 @@ import { Config, Effect } from "effect"
 import { serveAgentHost } from "../src/agentHost/serve"
 import { scriptedAdapter } from "./scriptedAdapter"
 
-const programs = Config.String("GLASS_SCRIPTED_GATES").pipe(
+const harnesses = Config.String("GLASS_SCRIPTED_GATES").pipe(
   Effect.map((gates) => {
     const adapter = scriptedAdapter(gates)
 
@@ -11,7 +11,7 @@ const programs = Config.String("GLASS_SCRIPTED_GATES").pipe(
   }),
 )
 
-serveAgentHost(programs).pipe(
+serveAgentHost(harnesses).pipe(
   Effect.scoped,
   Effect.provide(NodeServices.layer),
   NodeRuntime.runMain,

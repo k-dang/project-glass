@@ -185,7 +185,7 @@ export const describeError = (error: BackendError): Problem =>
       }),
       NoPermissionModes: () => ({
         title: "No Permission modes",
-        detail: "This Agent's program doesn't take a Permission mode.",
+        detail: "This Agent's harness doesn't take a Permission mode.",
       }),
       InvalidLocalCheckout: ({ message }) => ({
         title: "Glass can't use that folder",

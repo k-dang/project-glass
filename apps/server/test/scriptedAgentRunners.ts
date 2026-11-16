@@ -1,4 +1,4 @@
-import { type AgentEngine, runnerIdentity } from "@glass/contracts"
+import { type AgentHarness, runnerIdentity } from "@glass/contracts"
 import { Deferred, Effect, Layer, Schema } from "effect"
 import { agentFailure, type AgentFailure } from "../src/agentFailure"
 import { type AgentTask, AgentRunners } from "../src/agentRunners"
@@ -16,7 +16,7 @@ export interface ScriptedSettings {
 }
 
 interface ScriptedRun {
-  readonly engine: AgentEngine
+  readonly engine: AgentHarness
   readonly task: AgentTask<unknown>
   readonly files: ReadonlyArray<string>
 }
@@ -24,7 +24,7 @@ interface ScriptedRun {
 export const scriptedAgentRunners = Effect.fnUntraced(function* (initial: ScriptedSettings) {
   let settings = initial
   let held = yield* Deferred.make<void>()
-  const selections: Array<AgentEngine> = []
+  const selections: Array<AgentHarness> = []
   const runs: Array<ScriptedRun> = []
   const selecting = counter()
   const started = counter()

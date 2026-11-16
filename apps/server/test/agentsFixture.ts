@@ -99,7 +99,7 @@ export const agentsFixture = Effect.gen(function* () {
 
   const start = (
     message = "Say hello",
-    program: Pick<NewAgent, "engine" | "model" | "effort"> &
+    harness: Pick<NewAgent, "engine" | "model" | "effort"> &
       Partial<Pick<NewAgent, "permissionMode" | "skillPacks" | "localSkills">> = {
       engine: "pi",
       model: null,
@@ -118,14 +118,14 @@ export const agentsFixture = Effect.gen(function* () {
           place: localPlace,
           skillPacks: [],
           localSkills: false,
-          ...program,
+          ...harness,
         }),
       ),
     )
 
   const startSandbox = (
     message = "Say hello",
-    program: Pick<NewAgent, "engine" | "model" | "effort"> &
+    harness: Pick<NewAgent, "engine" | "model" | "effort"> &
       Partial<Pick<NewAgent, "skillPacks" | "localSkills">> = {
       engine: "pi",
       model: null,
@@ -141,7 +141,7 @@ export const agentsFixture = Effect.gen(function* () {
       place: SandboxPlace.make({ providerId: "fake" }),
       skillPacks: [],
       localSkills: false,
-      ...program,
+      ...harness,
     })
 
   const answering = (

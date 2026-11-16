@@ -1,7 +1,7 @@
 import {
   type Agent,
   type AgentCommand,
-  type AgentEngine,
+  type AgentHarness,
   type AgentMessageInput,
   type AgentPlace,
   applyTranscriptUpdate,
@@ -150,26 +150,26 @@ export const linkCheckoutAtom = backendRuntime.fn((path: string, get) =>
   ),
 )
 
-class ProgramPlace extends Data.Class<{
-  readonly engine: AgentEngine
+class HarnessPlace extends Data.Class<{
+  readonly engine: AgentHarness
   readonly placeKey: string
 }> {}
 
-const programModelsAtom = Atom.family((program: ProgramPlace) =>
+const harnessModelsAtom = Atom.family((harness: HarnessPlace) =>
   backendRuntime
     .atom(
       Backend.use((backend) =>
-        backend.ListAgentModels({ engine: program.engine, place: placeOfKey(program.placeKey) }),
+        backend.ListAgentModels({ engine: harness.engine, place: placeOfKey(harness.placeKey) }),
       ),
     )
     .pipe(Atom.keepAlive),
 )
 
-export const agentModelsAtom = (engine: AgentEngine, key: string) =>
-  programModelsAtom(new ProgramPlace({ engine, placeKey: key }))
+export const agentModelsAtom = (engine: AgentHarness, key: string) =>
+  harnessModelsAtom(new HarnessPlace({ engine, placeKey: key }))
 
 class NewAgentOf extends Data.Class<{
-  readonly engine: AgentEngine
+  readonly engine: AgentHarness
   readonly place: string
   readonly repository: FollowedRepository
 }> {}
@@ -185,15 +185,15 @@ const listedOr = <A>(
   none: ReadonlyArray<A>,
 ) => Atom.map(listing, (listed) => Option.getOrElse(AsyncResult.value(listed), () => none))
 
-const newAgentCommandsFamily = Atom.family((program: NewAgentOf) =>
+const newAgentCommandsFamily = Atom.family((newAgent: NewAgentOf) =>
   listedOr(
     backendRuntime
       .atom(
         Backend.use((backend) =>
           backend.ListNewAgentCommands({
-            engine: program.engine,
-            place: placeOfKey(program.place),
-            repository: program.repository,
+            engine: newAgent.engine,
+            place: placeOfKey(newAgent.place),
+            repository: newAgent.repository,
           }),
         ),
       )
@@ -203,7 +203,7 @@ const newAgentCommandsFamily = Atom.family((program: NewAgentOf) =>
 )
 
 export const newAgentCommandsAtom = (
-  engine: AgentEngine,
+  engine: AgentHarness,
   place: string,
   repository: FollowedRepository,
 ) => newAgentCommandsFamily(new NewAgentOf({ engine, place, repository }))

@@ -1,6 +1,6 @@
-# Tests replay recordings of the real Agent programs
+# Tests replay recordings of the real Agent harnesses
 
-Glass's use of Claude Code and pi is tested by replaying recordings of the real programs, matched
+Glass's use of Claude Code and pi is tested by replaying recordings of the real harnesses, matched
 launch by launch and message by message, so a change in what Glass sends fails until it is recorded
 again. Glass's own rules are tested at seams Glass owns. Recordings also capture model behaviour a
 hand-written fake can't.
@@ -13,7 +13,7 @@ since users run whichever `claude` and `pi` they have.
 
 - **A hand-written fake `claude`**: free to run and needs no login, but Glass built this first and it
   encoded wrong beliefs about the CLI, such as its model list and asking before read-only commands,
-  while its tests passed. Fakes remain only for failures a real program won't produce on demand.
+  while its tests passed. Fakes remain only for failures a real harness won't produce on demand.
 
 ## Consequences
 
@@ -23,4 +23,4 @@ model cost.
 ## Revisit when
 
 - Recording again becomes costly or flaky enough that people avoid changes to avoid it.
-- An Agent program publishes a test harness or protocol conformance suite of its own.
+- An Agent harness publishes a test kit or protocol conformance suite of its own.

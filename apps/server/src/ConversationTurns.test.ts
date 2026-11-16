@@ -202,7 +202,7 @@ const hold = (entered: Deferred.Deferred<void>, release: Deferred.Deferred<void>
     yield* Deferred.await(release)
   })
 
-it.live("ends a Turn stopped before its program starts without ever dispatching it", () =>
+it.live("ends a Turn stopped before its harness starts without ever dispatching it", () =>
   Effect.gen(function* () {
     const gate = yield* Deferred.make<void>()
     const h = yield* harness(() => Deferred.await(gate))
@@ -219,7 +219,7 @@ it.live("ends a Turn stopped before its program starts without ever dispatching 
   }).pipe(Effect.provide(layer)),
 )
 
-it.live("fails a Turn whose program won't start, then starts the next queued message", () =>
+it.live("fails a Turn whose harness won't start, then starts the next queued message", () =>
   Effect.gen(function* () {
     let starts = 0
 

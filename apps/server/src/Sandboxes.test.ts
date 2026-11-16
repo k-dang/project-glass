@@ -83,7 +83,7 @@ it.live("shows each step of making a Sandbox, then runs the first message in it"
   }),
 )
 
-it.live("offers a Sandbox only the Agent programs its provider runs", () =>
+it.live("offers a Sandbox only the Agent harnesses its provider runs", () =>
   Effect.gen(function* () {
     const f = yield* agentServicesFixture
     f.sandboxes.configure({ engines: ["pi"] })
@@ -109,7 +109,7 @@ it.live("offers a Sandbox only the Agent programs its provider runs", () =>
       })
       .pipe(Effect.flip)
 
-    assert.equal(refused.message, "This place doesn't run that Agent program. Pick another.")
+    assert.equal(refused.message, "This place doesn't run that Agent harness. Pick another.")
   }),
 )
 

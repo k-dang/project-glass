@@ -10,7 +10,7 @@ import type {
 } from "./protocol"
 import type { WrittenSkills } from "./sentSkills"
 
-export interface AgentSession {
+export interface HarnessSession {
   readonly configure: (settings: TurnSettings) => Effect.Effect<void, HostAgentError>
   readonly startTurn: (
     turnId: string,
@@ -26,7 +26,7 @@ export interface AgentSession {
   readonly stopped: Effect.Effect<boolean>
 }
 
-export interface AgentAdapter<Role extends ConversationRole = ConversationRole> {
+export interface HarnessAdapter<Role extends ConversationRole = ConversationRole> {
   readonly models: Effect.Effect<AgentModels, HostAgentError>
   readonly commands: (
     folder: string,
@@ -38,5 +38,5 @@ export interface AgentAdapter<Role extends ConversationRole = ConversationRole> 
     readonly role: Role
     readonly skills: ReadonlyArray<WrittenSkills>
     readonly report: (event: HostEvent) => Effect.Effect<void>
-  }) => Effect.Effect<AgentSession, HostAgentError, Scope.Scope>
+  }) => Effect.Effect<HarnessSession, HostAgentError, Scope.Scope>
 }

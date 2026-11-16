@@ -1,12 +1,12 @@
 import {
   type AgentCommand,
-  type AgentEngine,
+  type AgentHarness,
   type AgentModels,
   type RequestAnswer,
   RequestNotWaiting,
 } from "@glass/contracts"
 import { Context, Effect, Exit, FileSystem, Layer, Scope, Semaphore } from "effect"
-import type { AgentAdapter, AgentSession } from "./adapter"
+import type { HarnessAdapter, HarnessSession } from "./adapter"
 import type { DeliveredMessage, DeliveredTurn } from "./deliveredMessage"
 import { Journal } from "./Journal"
 import { writeSentSkills } from "./sentSkills"
@@ -21,14 +21,14 @@ import {
   type TurnSettings,
 } from "./protocol"
 
-export interface Programs {
-  readonly "claude-code": AgentAdapter<AgentRole>
-  readonly pi: AgentAdapter
+export interface Harnesses {
+  readonly "claude-code": HarnessAdapter<AgentRole>
+  readonly pi: HarnessAdapter
 }
 
 interface Running {
   readonly scope: Scope.Closeable
-  readonly session: AgentSession
+  readonly session: HarnessSession
   applied: TurnSettings
 }
 
@@ -38,9 +38,9 @@ const sameSettings = (a: TurnSettings, b: TurnSettings) =>
 export class HostAgents extends Context.Service<
   HostAgents,
   {
-    readonly models: (engine: AgentEngine) => Effect.Effect<AgentModels, HostAgentError>
+    readonly models: (engine: AgentHarness) => Effect.Effect<AgentModels, HostAgentError>
     readonly commands: (
-      engine: AgentEngine,
+      engine: AgentHarness,
       folder: string,
       skills: ReadonlyArray<SkillSource>,
     ) => Effect.Effect<ReadonlyArray<AgentCommand>, HostAgentError>
@@ -64,7 +64,7 @@ export class HostAgents extends Context.Service<
     readonly stop: (agentId: string) => Effect.Effect<void>
   }
 >()("@glass/server/agentHost/HostAgents") {
-  static readonly make = (adapters: Programs) =>
+  static readonly make = (adapters: Harnesses) =>
     Layer.effect(
       HostAgents,
       Effect.gen(function* () {
@@ -144,7 +144,7 @@ export class HostAgents extends Context.Service<
             const agent = running.get(agentId)
 
             return agent === undefined
-              ? Effect.fail(new HostAgentError({ message: "The Agent's program isn't running." }))
+              ? Effect.fail(new HostAgentError({ message: "The Agent's harness isn't running." }))
               : Effect.succeed(agent)
           })
 

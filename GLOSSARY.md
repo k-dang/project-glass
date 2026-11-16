@@ -115,7 +115,7 @@ _Avoid_: Default engine, runner (in UI copy), generator, provider
 
 **Agent review engine**:
 The agent that runs every Agent review, chosen in Settings apart from the Tour engine and with its
-own model for each engine. It starts as pi.
+own model for each Agent harness. It starts as pi.
 _Avoid_: Default engine, runner (in UI copy), reviewer
 
 **Agent review**:
@@ -243,13 +243,13 @@ It offers a next step without acting until the user says so, and clears complete
 without marking an Agent review done; an Agent the user stopped is excluded.
 _Avoid_: Work update, Report, notification, event, wake-up
 
-**Agent program**:
-Claude Code or pi, the program an Agent runs. It decides which models and efforts the user can pick,
+**Agent harness**:
+Claude Code or pi, the harness an Agent runs. It decides which models and efforts the user can pick,
 and leaving either to it runs its own default.
-_Avoid_: Engine (in UI copy), harness, provider
+_Avoid_: Engine (in UI copy), program, provider
 
 **Effort**:
-How hard an Agent's model works on each Turn, from the levels its Agent program offers for that model.
+How hard an Agent's model works on each Turn, from the levels its Agent harness offers for that model.
 _Avoid_: Thinking level, reasoning budget
 
 **Local checkout**:
@@ -278,7 +278,7 @@ and picks for an Agent when creating it. An Agent keeps the packs and commits it
 _Avoid_: Skill set, registry, bundle, plugin
 
 **Local skills**:
-The skills in the user's skill folders on this device that the Agent program reads. Local Agents
+The skills in the user's skill folders on this device that the Agent harness reads. Local Agents
 always have them; a Sandbox Agent has them only if the user picks them when creating it.
 _Avoid_: My skills, user skills
 
@@ -315,8 +315,8 @@ this device, or GitHub's for a Sandbox.
 _Avoid_: Reference, attachment, tag, chip
 
 **Command**:
-A skill, prompt template, or command the Agent program runs when a message starts with `/` and its
-name, as the program lists them for the Agent's folder. Glass offers them after a leading `/`; a
+A skill, prompt template, or command the Agent harness runs when a message starts with `/` and its
+name, as the harness lists them for the Agent's folder. Glass offers them after a leading `/`; a
 Sandbox Agent has none until its Sandbox is up.
 _Avoid_: Slash command (in UI copy), skill (for the whole list)
 

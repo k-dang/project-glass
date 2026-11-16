@@ -44,7 +44,7 @@ describe("Plugins", () => {
     }),
   )
 
-  it.live("skips a Sandbox provider that doesn't list Agent programs Glass knows", () =>
+  it.live("skips a Sandbox provider that doesn't list Agent harnesses Glass knows", () =>
     Effect.gen(function* () {
       const plugins = yield* isolatedHome
       yield* write(join(plugins, "empty.js"), providerPlugin("empty", []))

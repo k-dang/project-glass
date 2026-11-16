@@ -111,7 +111,7 @@ test("follows an overview diagram into other Chapters and both sides of the diff
   ).toBeChecked()
 
   await overview.getByRole("button", { name: /^Claude Code,/ }).click()
-  const host = changes.getByRole("region", { name: "Start the selected program", exact: true })
+  const host = changes.getByRole("region", { name: "Start the selected harness", exact: true })
   await expect(
     host.locator("[data-selected-line]").filter({ hasText: 'adapters["claude-code"]' }),
   ).toBeInViewport()

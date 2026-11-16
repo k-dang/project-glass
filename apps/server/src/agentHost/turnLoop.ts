@@ -33,7 +33,7 @@ export const runTurns = Effect.fnUntraced(function* <
   Command,
   E,
 >(options: {
-  readonly program: string
+  readonly harness: string
   readonly machine: TurnMachine<State, Input, Command>
   readonly events: Stream.Stream<Input, E>
   readonly report: (event: AgentEvent) => Effect.Effect<void>
@@ -64,7 +64,7 @@ export const runTurns = Effect.fnUntraced(function* <
 
   yield* options.events.pipe(
     Stream.runForEach((input) => Queue.offer(inputs, input)),
-    Effect.catchCause((cause) => Effect.logWarning(`${options.program} stopped`, cause)),
+    Effect.catchCause((cause) => Effect.logWarning(`${options.harness} stopped`, cause)),
     Effect.andThen(
       Effect.sync(() => {
         exited = true

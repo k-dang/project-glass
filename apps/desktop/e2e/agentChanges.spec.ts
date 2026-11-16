@@ -30,7 +30,7 @@ test("reviews a local Agent's changes on its Changes tab, held still until moved
   await expect(window.getByRole("combobox", { name: "Base branch" })).toContainText("main")
   await window.getByRole("button", { name: /^Claude Code:/ }).click()
   await window
-    .getByRole("group", { name: "Agent program" })
+    .getByRole("group", { name: "Agent harness" })
     .getByRole("button", { name: "pi" })
     .click()
   await window.keyboard.press("Escape")

@@ -1,7 +1,7 @@
 import { NodeFileSystem, NodeSocket } from "@effect/platform-node"
 import { SqliteClient, SqliteMigrator } from "@effect/sql-sqlite-node"
 import {
-  AgentEngine,
+  AgentHarness,
   AgentModels,
   type AgentPlace,
   applyTranscriptUpdate,
@@ -28,7 +28,7 @@ import {
   Stream,
 } from "effect"
 import { RpcTest } from "effect/rpc"
-import type { AgentAdapter, AgentSession } from "../src/agentHost/adapter"
+import type { HarnessAdapter, HarnessSession } from "../src/agentHost/adapter"
 import type { DeliveredTurn } from "../src/agentHost/deliveredMessage"
 import { Changes } from "../src/agentHost/Changes"
 import { AgentHostHandlers } from "../src/agentHost/handlers"
@@ -82,7 +82,7 @@ export const agentServicesFixture = Effect.gen(function* () {
   let nextName = 0
   const models = Effect.succeed(new AgentModels({ defaultModel: null, models: [] }))
 
-  const adapter: AgentAdapter = {
+  const adapter: HarnessAdapter = {
     models,
     commands: (folder) => Effect.succeed([{ name: "greet", description: folder }]),
     start: ({ conversation, report }) =>
@@ -125,7 +125,7 @@ export const agentServicesFixture = Effect.gen(function* () {
             }),
           closed: Deferred.await(exited),
           stopped: Deferred.isDone(exited),
-        } satisfies AgentSession
+        } satisfies HarnessSession
       }),
   }
 
@@ -165,7 +165,7 @@ export const agentServicesFixture = Effect.gen(function* () {
       )
 
       const placement = LocalPlacement.of({
-        engines: AgentEngine.literals,
+        engines: AgentHarness.literals,
         models: () => models,
         commands: (engine) =>
           client.ListCommands({ engine, folder: "checkout", skills: [] }).pipe(Effect.orDie),

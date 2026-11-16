@@ -1,5 +1,5 @@
 import {
-  AgentEngine,
+  AgentHarness,
   AgentError,
   AgentModels,
   GoneReach,
@@ -180,7 +180,7 @@ const notInstalled = (providerId: string): Placement => {
   )
 
   return {
-    engines: AgentEngine.literals,
+    engines: AgentHarness.literals,
     models: () => failure,
     commands: () => Effect.succeed([]),
     defaultBranch: () => failure,

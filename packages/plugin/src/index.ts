@@ -3,10 +3,10 @@ export interface SandboxProvider {
   /** What the user sees for this kind of Sandbox, a plural such as "Acme Sandboxes". */
   readonly name: string
   /**
-   * The Agent programs its Sandboxes can run. Glass offers only these for this kind of Sandbox, and
+   * The Agent harnesses its Sandboxes can run. Glass offers only these for this kind of Sandbox, and
    * asks `create` and `models` about no other.
    */
-  readonly engines: readonly [AgentEngine, ...Array<AgentEngine>]
+  readonly engines: readonly [AgentHarness, ...Array<AgentHarness>]
   /**
    * Makes the Sandbox, sets up the user's logins, clones the repository onto the Agent's branch,
    * and starts the agent host in it. Calls `record` as soon as the Sandbox exists, so Glass can
@@ -32,15 +32,15 @@ export interface SandboxProvider {
    * done.
    */
   readonly remove: (state: SandboxState) => Promise<void>
-  /** What an Agent program offers in this provider's Sandboxes, before one exists. */
-  readonly models: (engine: AgentEngine) => Promise<AgentModels>
+  /** What an Agent harness offers in this provider's Sandboxes, before one exists. */
+  readonly models: (engine: AgentHarness) => Promise<AgentModels>
 }
 
-export const agentEngines = ["claude-code", "pi"] as const
+export const agentHarnesses = ["claude-code", "pi"] as const
 
-export type AgentEngine = (typeof agentEngines)[number]
+export type AgentHarness = (typeof agentHarnesses)[number]
 
-/** A model an Agent program offers, with the efforts it takes, from lowest to highest. */
+/** A model an Agent harness offers, with the efforts it takes, from lowest to highest. */
 export interface AgentModel {
   readonly id: string
   readonly name: string
@@ -48,7 +48,7 @@ export interface AgentModel {
 }
 
 export interface AgentModels {
-  /** What a `null` model runs: the program's own default, if it has one. */
+  /** What a `null` model runs: the harness's own default, if it has one. */
   readonly defaultModel: AgentModel | null
   readonly models: ReadonlyArray<AgentModel>
 }
@@ -67,7 +67,7 @@ export type SandboxState = Json
 
 export interface SandboxRequest {
   readonly agentId: string
-  readonly engine: AgentEngine
+  readonly engine: AgentHarness
   readonly repository: { readonly owner: string; readonly repo: string }
   /** The Agent's own branch, made from `baseBranch`. */
   readonly branch: string

@@ -60,7 +60,7 @@ test("starts a Sandbox Agent, and fills in what it missed while its connection w
   await expect(window.getByRole("combobox", { name: "Base branch" })).toContainText("main")
   await window.getByRole("button", { name: /^Claude Code:/ }).click()
   await window
-    .getByRole("group", { name: "Agent program" })
+    .getByRole("group", { name: "Agent harness" })
     .getByRole("button", { name: "pi" })
     .click()
   await window.keyboard.press("Escape")
@@ -125,7 +125,7 @@ test("gives a Sandbox Agent a Skill pack and the Local skills, and shows both", 
   await expect(window.getByRole("combobox", { name: "Base branch" })).toContainText("main")
   await window.getByRole("button", { name: /^Claude Code:/ }).click()
   await window
-    .getByRole("group", { name: "Agent program" })
+    .getByRole("group", { name: "Agent harness" })
     .getByRole("button", { name: "pi" })
     .click()
   await window.keyboard.press("Escape")

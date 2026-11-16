@@ -1,5 +1,5 @@
 import {
-  AgentEngine,
+  AgentHarness,
   defaultReviewPrompt,
   type EngineFeature,
   EngineModels,
@@ -29,10 +29,10 @@ const Settings = Schema.Struct({
     Schema.withDecodingDefaultKey(Effect.succeed([])),
   ),
   tourModels: SavedModels,
-  tourEngine: AgentEngine.pipe(Schema.withDecodingDefaultKey(Effect.succeed("claude-code"))),
+  tourEngine: AgentHarness.pipe(Schema.withDecodingDefaultKey(Effect.succeed("claude-code"))),
   queueTours: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
   agentReviewModels: SavedModels,
-  agentReviewEngine: AgentEngine.pipe(Schema.withDecodingDefaultKey(Effect.succeed("pi"))),
+  agentReviewEngine: AgentHarness.pipe(Schema.withDecodingDefaultKey(Effect.succeed("pi"))),
   queueAgentReviews: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
   reviewPrompt: ReviewPrompt.pipe(
     Schema.withDecodingDefaultKey(Effect.succeed(defaultReviewPrompt)),

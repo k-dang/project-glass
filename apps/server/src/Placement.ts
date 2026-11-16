@@ -1,7 +1,7 @@
 import {
   type Agent,
   type AgentCommand,
-  type AgentEngine,
+  type AgentHarness,
   AgentError,
   AgentModels,
   type ConnectionError,
@@ -41,10 +41,10 @@ export interface Placed {
 }
 
 export interface Placement {
-  readonly engines: ReadonlyArray<AgentEngine>
-  readonly models: (engine: AgentEngine) => Effect.Effect<AgentModels, AgentError>
+  readonly engines: ReadonlyArray<AgentHarness>
+  readonly models: (engine: AgentHarness) => Effect.Effect<AgentModels, AgentError>
   readonly commands: (
-    engine: AgentEngine,
+    engine: AgentHarness,
     repository: FollowedRepository,
   ) => Effect.Effect<ReadonlyArray<AgentCommand>, InvalidLocalCheckout | AgentError>
   readonly defaultBranch: (

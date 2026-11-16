@@ -3,7 +3,7 @@ import {
   type ActivityLogError,
   ActivityPage,
   Agent,
-  AgentEngine,
+  AgentHarness,
   AgentError,
   AgentModels,
   type AgentReviewFailure,
@@ -126,7 +126,7 @@ const ListedAgent = Schema.Struct({
 
 const ListAgents = Tool.make("list_agents", {
   description:
-    "Lists the user's Agents: the named coding conversations working in a repository, with each one's repository, base branch, program, and whether it waits for the user's answer.",
+    "Lists the user's Agents: the named coding conversations working in a repository, with each one's repository, base branch, harness, and whether it waits for the user's answer.",
   success: Schema.Struct({ agents: Schema.Array(ListedAgent) }),
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)
@@ -192,10 +192,10 @@ const ReadPullRequest = Tool.make("read_pull_request", {
 
 const ListAgentPlaces = Tool.make("list_agent_places", {
   description:
-    "Lists where the user can start an Agent. An Agent on this device works in a copy of a Local checkout, so its repository must be one of localCheckouts. An Agent in a Sandbox works in any followed repository, in a Sandbox from one of sandboxProviders. Each place runs only the Agent programs listed with it.",
+    "Lists where the user can start an Agent. An Agent on this device works in a copy of a Local checkout, so its repository must be one of localCheckouts. An Agent in a Sandbox works in any followed repository, in a Sandbox from one of sandboxProviders. Each place runs only the Agent harnesses listed with it.",
   success: Schema.Struct({
     local: Schema.Struct({
-      engines: Schema.Array(AgentEngine),
+      engines: Schema.Array(AgentHarness),
       localCheckouts: Schema.Array(LocalCheckout),
     }),
     sandboxProviders: Schema.Array(SandboxProviderInfo),
@@ -206,11 +206,11 @@ const ListAgentPlaces = Tool.make("list_agent_places", {
 
 const ListAgentOptions = Tool.make("list_agent_options", {
   description:
-    "Lists the base branches and models an Agent can start with, for a repository, place, and Agent program from list_agent_places.",
+    "Lists the base branches and models an Agent can start with, for a repository, place, and Agent harness from list_agent_places.",
   parameters: Schema.Struct({
     place: AgentPlace,
     repository: FollowedRepository,
-    engine: AgentEngine,
+    engine: AgentHarness,
   }),
   success: Schema.Struct({
     ...Branches.fields,
@@ -227,7 +227,7 @@ const action = Context.make(Tool.Readonly, false).pipe(
 
 const CreateAgent = Tool.make("create_agent", {
   description:
-    "Creates an Agent: a named coding conversation working on a branch of its own, made from a base branch of a repository. It starts its first Turn with the message, and appears in the user's Agents. This returns once Glass created the Agent, not when it finishes its Turn: read_agent_transcript shows its progress. Choose the place, program, base branch, and model from list_agent_places and list_agent_options, never from guesses. If this call fails without saying why, or is cut off, call list_agents before trying again rather than creating a second Agent.",
+    "Creates an Agent: a named coding conversation working on a branch of its own, made from a base branch of a repository. It starts its first Turn with the message, and appears in the user's Agents. This returns once Glass created the Agent, not when it finishes its Turn: read_agent_transcript shows its progress. Choose the place, harness, base branch, and model from list_agent_places and list_agent_options, never from guesses. If this call fails without saying why, or is cut off, call list_agents before trying again rather than creating a second Agent.",
   parameters: Schema.Struct({
     repository: FollowedRepository,
     baseBranch: Schema.String.annotate({
@@ -236,9 +236,9 @@ const CreateAgent = Tool.make("create_agent", {
     place: AgentPlace.annotate({
       description: "Where the Agent works: on this device, or in a Sandbox from a provider.",
     }),
-    engine: AgentEngine.annotate({ description: "The Agent program that runs the Agent." }),
+    engine: AgentHarness.annotate({ description: "The Agent harness that runs the Agent." }),
     model: Schema.NullOr(Schema.String).annotate({
-      description: "A model id from list_agent_options, or null for the program's default.",
+      description: "A model id from list_agent_options, or null for the harness's default.",
     }),
     effort: Schema.NullOr(Schema.String).annotate({
       description: "One of the model's Efforts, or null for its default.",

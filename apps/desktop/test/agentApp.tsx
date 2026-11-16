@@ -1,5 +1,5 @@
 import { RegistryProvider } from "@effect/atom-react"
-import { type AgentEngine, AgentModels, GitHubConnection } from "@glass/contracts"
+import { type AgentHarness, AgentModels, GitHubConnection } from "@glass/contracts"
 import { cleanup, render, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { Effect, Stream } from "effect"
@@ -22,7 +22,7 @@ export const claudeModels = new AgentModels({
   models: [{ id: "sonnet", name: "Sonnet 5.5", efforts: ["low", "high"] }],
 })
 
-export const listModels = ({ engine }: { engine: AgentEngine }) =>
+export const listModels = ({ engine }: { engine: AgentHarness }) =>
   Effect.succeed(engine === "pi" ? piModels : claudeModels)
 
 export const mount = (handlers: Parameters<typeof testLayer>[0], path = `/agents/${agent.id}`) => {

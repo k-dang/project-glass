@@ -595,7 +595,7 @@
           counts: "3 preview Chapters · 59 changed files",
           intent:
             "Run ordinary Glass Agents with OpenCode as well as Claude Code or pi. OpenCode runs as an authenticated service, and its native events and history become Glass Agent Turns.",
-          mapTitle: "A new program path, the same Glass Turns",
+          mapTitle: "A new harness path, the same Glass Turns",
           caption:
             "The two existing paths stay in place. The new OpenCode path translates native events and history into the Turns Glass displays. Select a node to read its Chapter.",
           provenance:
@@ -603,12 +603,12 @@
           height: 472,
           chapters: [
             {
-              title: "Start the selected program",
+              title: "Start the selected harness",
               file: "HostAgents.ts",
-              copy: "The Agent host starts the adapter for the selected program. Claude Code and pi keep their existing paths; OpenCode becomes another choice for ordinary Agents.",
+              copy: "The Agent host starts the adapter for the selected harness. Claude Code and pi keep their existing paths; OpenCode becomes another choice for ordinary Agents.",
               lines: [
                 "start an ordinary Glass Agent",
-                "read its selected program",
+                "read its selected harness",
                 "start that program’s adapter",
               ],
               first: "start",
@@ -626,7 +626,7 @@
             {
               title: "Turn native history into Glass Turns",
               file: "openCodeTurn.ts",
-              copy: "OpenCode’s native events and history become Glass Agent Turns. This is where the new program path meets the conversation model that Glass already displays.",
+              copy: "OpenCode’s native events and history become Glass Agent Turns. This is where the new harness path meets the conversation model that Glass already displays.",
               lines: [
                 "read OpenCode’s native events and history",
                 "translate them into Glass Agent Turns",
@@ -650,7 +650,7 @@
             {
               id: "claude",
               label: "Claude Code",
-              kind: "Existing program",
+              kind: "Existing harness",
               chapter: 0,
               line: 2,
               x: 6,
@@ -661,7 +661,7 @@
             {
               id: "pi",
               label: "pi",
-              kind: "Existing program",
+              kind: "Existing harness",
               chapter: 0,
               line: 2,
               x: 192,
@@ -672,7 +672,7 @@
             {
               id: "opencode",
               label: "OpenCode service",
-              kind: "+ New program",
+              kind: "+ New harness",
               change: "added",
               chapter: 1,
               line: 0,

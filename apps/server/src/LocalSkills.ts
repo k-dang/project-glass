@@ -1,4 +1,9 @@
-import { type AgentEngine, LOCAL_SKILLS_NAMESPACE, LocalSkillsError, Skill } from "@glass/contracts"
+import {
+  type AgentHarness,
+  LOCAL_SKILLS_NAMESPACE,
+  LocalSkillsError,
+  Skill,
+} from "@glass/contracts"
 import { Context, Effect, FileSystem, Layer, Option, type PlatformError, Predicate } from "effect"
 import { join } from "node:path"
 import type { SentSkill, SkillSource } from "./agentHost/protocol"
@@ -16,7 +21,7 @@ interface SkillFolders {
   readonly readsNestedSkills: boolean
 }
 
-const foldersOf = (home: string): Record<AgentEngine, SkillFolders> => ({
+const foldersOf = (home: string): Record<AgentHarness, SkillFolders> => ({
   "claude-code": { folders: [join(home, ".claude", "skills")], readsNestedSkills: false },
   pi: {
     folders: [join(home, ".pi", "agent", "skills"), join(home, ".agents", "skills")],
@@ -91,9 +96,9 @@ const reading = <A>(effect: Effect.Effect<A, PlatformError.PlatformError>) =>
 export class LocalSkills extends Context.Service<
   LocalSkills,
   {
-    readonly names: (engine: AgentEngine) => Effect.Effect<ReadonlyArray<string>, LocalSkillsError>
+    readonly names: (engine: AgentHarness) => Effect.Effect<ReadonlyArray<string>, LocalSkillsError>
     readonly source: (
-      engine: AgentEngine,
+      engine: AgentHarness,
     ) => Effect.Effect<Option.Option<SkillSource>, LocalSkillsError>
   }
 >()("@glass/server/LocalSkills") {
@@ -139,7 +144,7 @@ export class LocalSkills extends Context.Service<
           return nested.flat()
         })
 
-      const found = (engine: AgentEngine) => {
+      const found = (engine: AgentHarness) => {
         const { folders, readsNestedSkills } = skillFolders[engine]
 
         const loads = (directory: string) =>

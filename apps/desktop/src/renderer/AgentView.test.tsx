@@ -1082,7 +1082,7 @@ it("keeps the To-do choices closed after Escape, so Enter sends the @ as written
   expect(sent).toEqual(["Ping @f"])
 })
 
-it("offers the program's commands after a leading /, and only there", async () => {
+it("offers the harness's commands after a leading /, and only there", async () => {
   const sent: Array<string> = []
 
   const user = mount({

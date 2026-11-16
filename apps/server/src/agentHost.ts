@@ -5,7 +5,7 @@ import { piAdapter } from "./agentHost/piAdapter"
 import { serveAgentHost } from "./agentHost/serve"
 import { jsonLogsToStdout, runMain } from "./wideEvents"
 
-const programs = Effect.gen(function* () {
+const harnesses = Effect.gen(function* () {
   const piCommand = yield* Config.String("GLASS_PI_COMMAND").pipe(Config.withDefault("pi"))
 
   const claudeCommand = yield* Config.String("GLASS_CLAUDE_COMMAND").pipe(
@@ -18,7 +18,7 @@ const programs = Effect.gen(function* () {
   }
 })
 
-serveAgentHost(programs).pipe(
+serveAgentHost(harnesses).pipe(
   Effect.scoped,
   Effect.provide(NodeServices.layer),
   runMain(jsonLogsToStdout("agent-host")),

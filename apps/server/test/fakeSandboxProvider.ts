@@ -1,4 +1,4 @@
-import { AgentEngine } from "@glass/contracts"
+import { AgentHarness } from "@glass/contracts"
 import { Schema } from "effect"
 import { execFile, execFileSync, spawn } from "node:child_process"
 import {
@@ -162,7 +162,7 @@ const killTree = async (pid: number) => {
     return
   }
 
-  // Effect gives agent programs their own process groups, outside the host's group.
+  // Effect gives Agent harness processes their own process groups, outside the host's group.
   const { stdout } = await execFileAsync("ps", ["-A", "-o", "pid=,ppid="])
 
   const processes = stdout
@@ -186,7 +186,7 @@ const claudeEfforts = ["low", "medium", "high", "xhigh", "max"]
 
 const piModel = { id: "glass-test/gpt-test", name: "gpt-test", efforts: [] }
 
-const sandboxModels: Record<AgentEngine, AgentModels> = {
+const sandboxModels: Record<AgentHarness, AgentModels> = {
   "claude-code": {
     defaultModel: { id: "default", name: "Opus", efforts: claudeEfforts },
     models: [

@@ -8,7 +8,7 @@ import { writeSentSkills } from "./sentSkills"
 
 const text = (value: string) => new TextEncoder().encode(value)
 
-it.live("writes each source's skills where the program reads them, and removes them after", () =>
+it.live("writes each source's skills where the harness reads them, and removes them after", () =>
   Effect.gen(function* () {
     const folder = join(yield* isolatedHome, "checkout")
     const scope = yield* Scope.make()

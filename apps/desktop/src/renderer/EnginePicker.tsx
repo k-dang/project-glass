@@ -1,16 +1,16 @@
-import { AgentEngine, type EngineSettings, type PiModel } from "@glass/contracts"
+import { AgentHarness, type EngineSettings, type PiModel } from "@glass/contracts"
 import { cn } from "cn"
 import { useId } from "react"
 import { Input } from "@/components/ui/input"
-import { engineNames } from "./engines"
+import { harnessNames } from "./harnesses"
 
-const hasModel = (engine: AgentEngine, models: EngineSettings["models"]) =>
+const hasModel = (engine: AgentHarness, models: EngineSettings["models"]) =>
   engine === "claude-code"
     ? models["claude-code"] !== ""
     : models[engine].provider !== "" && models[engine].modelId !== ""
 
 export const missingModel = (settings: EngineSettings) =>
-  AgentEngine.literals.find((engine) => !hasModel(engine, settings.models))
+  AgentHarness.literals.find((engine) => !hasModel(engine, settings.models))
 
 export function EnginePicker(props: {
   legend: string
@@ -32,7 +32,7 @@ export function EnginePicker(props: {
         {props.description}
       </p>
       <div className="flex w-fit flex-wrap gap-0.5 rounded-lg border bg-muted p-0.5">
-        {AgentEngine.literals.map((option) => (
+        {AgentHarness.literals.map((option) => (
           <label key={option} className="relative">
             <input
               type="radio"
@@ -47,7 +47,7 @@ export function EnginePicker(props: {
               className="peer sr-only"
             />
             <span className="block cursor-pointer rounded-md px-3.5 py-1 text-sm font-medium text-muted-foreground peer-checked:bg-card peer-checked:text-foreground peer-checked:shadow-sm peer-checked:ring-1 peer-checked:ring-border peer-focus-visible:outline-2 peer-focus-visible:outline-offset-1 peer-focus-visible:outline-ring">
-              {engineNames[option]}
+              {harnessNames[option]}
               {!hasModel(option, models) && (
                 <>
                   <span aria-hidden className="ml-1 text-destructive">
@@ -83,7 +83,7 @@ export function EnginePicker(props: {
 }
 
 function PiModelInputs(props: { value: PiModel; onChange: (value: PiModel) => void }) {
-  const label = engineNames.pi
+  const label = harnessNames.pi
 
   return (
     <>

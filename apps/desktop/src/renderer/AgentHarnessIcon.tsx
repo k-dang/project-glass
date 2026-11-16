@@ -1,7 +1,7 @@
-import type { AgentEngine } from "@glass/contracts"
+import type { AgentHarness } from "@glass/contracts"
 import { cn } from "cn"
 
-export function AgentProgramIcon(props: { engine: AgentEngine; className?: string }) {
+export function AgentHarnessIcon(props: { engine: AgentHarness; className?: string }) {
   return props.engine === "claude-code" ? (
     <svg
       aria-hidden

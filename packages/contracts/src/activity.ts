@@ -1,5 +1,5 @@
 import { Schema } from "effect"
-import { AgentEngine, PlaceTag } from "./agent"
+import { AgentHarness, PlaceTag } from "./agent"
 import { Draft } from "./draft"
 import { FollowedRepository } from "./followedRepository"
 import { PullRequestRef } from "./pullRequest"
@@ -52,7 +52,7 @@ export const AgentStarted = Schema.TaggedStruct("AgentStarted", {
   name: Schema.String,
   repository: FollowedRepository,
   machine: PlaceTag,
-  engine: AgentEngine,
+  engine: AgentHarness,
   message: Schema.String,
 })
 

@@ -1,8 +1,8 @@
 import { Schema } from "effect"
-import { AgentEngine } from "./agent"
+import { AgentHarness } from "./agent"
 
 export const AgentRunnerIdentity = Schema.Struct({
-  engine: AgentEngine,
+  engine: AgentHarness,
   model: Schema.String,
 })
 
@@ -21,7 +21,7 @@ export const EngineModels = Schema.Struct({
 
 export type EngineModels = typeof EngineModels.Type
 
-export const EngineSettings = Schema.Struct({ engine: AgentEngine, models: EngineModels })
+export const EngineSettings = Schema.Struct({ engine: AgentHarness, models: EngineModels })
 
 export type EngineSettings = typeof EngineSettings.Type
 
