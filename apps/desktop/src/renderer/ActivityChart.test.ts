@@ -15,17 +15,17 @@ it("counts each kind on the local day it happened, for the days ending today", (
       stamp("ReplySent", new Date(2026, 10, 2, 0, 0)),
       stamp("ReviewSubmitted", new Date(2026, 10, 2, 0, 0)),
       stamp("ToDoDone", new Date(2026, 10, 4, 15, 0)),
-      stamp("AgentStarted", new Date(2026, 9, 31, 12, 0)),
+      stamp("ConversationStarted", new Date(2026, 9, 31, 12, 0)),
     ],
     4,
     now,
   )
 
   expect(
-    days.map(({ ReviewSubmitted, ReplySent, AgentStarted, ToDoDone }) => [
+    days.map(({ ReviewSubmitted, ReplySent, ConversationStarted, ToDoDone }) => [
       ReviewSubmitted,
       ReplySent,
-      AgentStarted,
+      ConversationStarted,
       ToDoDone,
     ]),
   ).toEqual([

@@ -1,14 +1,14 @@
-/** What a Plugin adds to Glass: a kind of Sandbox to start Agents in (ADR 0010). */
+/** What a Plugin adds to Glass: a kind of Sandbox to start Conversations in (ADR 0010). */
 export interface SandboxProvider {
   /** What the user sees for this kind of Sandbox, a plural such as "Acme Sandboxes". */
   readonly name: string
   /**
-   * The Agent programs its Sandboxes can run. Glass offers only these for this kind of Sandbox, and
+   * The Agent harnesses its Sandboxes can run. Glass offers only these for this kind of Sandbox, and
    * asks `create` and `models` about no other.
    */
-  readonly engines: readonly [AgentEngine, ...Array<AgentEngine>]
+  readonly harnesses: readonly [AgentHarness, ...Array<AgentHarness>]
   /**
-   * Makes the Sandbox, sets up the user's logins, clones the repository onto the Agent's branch,
+   * Makes the Sandbox, sets up the user's logins, clones the repository onto the Conversation's branch,
    * and starts the agent host in it. Calls `record` as soon as the Sandbox exists, so Glass can
    * delete a half-built one, and `progress` for each step the user should see. Glass waits for
    * the host's health check once this resolves.
@@ -21,7 +21,7 @@ export interface SandboxProvider {
   readonly target: (state: SandboxState) => Promise<SandboxTarget>
   /**
    * Pushes the Sandbox's expiry as late as the platform allows, answering when it now expires.
-   * Glass calls it while the Agent exists and Glass runs, again before each expiry it was given,
+   * Glass calls it while the Conversation exists and Glass runs, again before each expiry it was given,
    * until the expiry stops moving. Throws `glass.sandboxGone()` once the Sandbox no longer exists.
    * A provider whose Sandboxes don't expire leaves it out.
    */
@@ -32,15 +32,15 @@ export interface SandboxProvider {
    * done.
    */
   readonly remove: (state: SandboxState) => Promise<void>
-  /** What an Agent program offers in this provider's Sandboxes, before one exists. */
-  readonly models: (engine: AgentEngine) => Promise<AgentModels>
+  /** What an Agent harness offers in this provider's Sandboxes, before one exists. */
+  readonly models: (harness: AgentHarness) => Promise<AgentModels>
 }
 
-export const agentEngines = ["claude-code", "pi"] as const
+export const agentHarnesses = ["claude-code", "pi"] as const
 
-export type AgentEngine = (typeof agentEngines)[number]
+export type AgentHarness = (typeof agentHarnesses)[number]
 
-/** A model an Agent program offers, with the efforts it takes, from lowest to highest. */
+/** A model an Agent harness offers, with the efforts it takes, from lowest to highest. */
 export interface AgentModel {
   readonly id: string
   readonly name: string
@@ -48,7 +48,7 @@ export interface AgentModel {
 }
 
 export interface AgentModels {
-  /** What a `null` model runs: the program's own default, if it has one. */
+  /** What a `null` model runs: the harness's own default, if it has one. */
   readonly defaultModel: AgentModel | null
   readonly models: ReadonlyArray<AgentModel>
 }
@@ -60,16 +60,16 @@ export interface JsonObject {
 }
 
 /**
- * Whatever a provider recorded about one Sandbox. Glass keeps it on the Agent and hands it back;
+ * Whatever a provider recorded about one Sandbox. Glass keeps it on the Conversation and hands it back;
  * providers must read state their earlier versions wrote.
  */
 export type SandboxState = Json
 
 export interface SandboxRequest {
-  readonly agentId: string
-  readonly engine: AgentEngine
+  readonly conversationId: string
+  readonly harness: AgentHarness
   readonly repository: { readonly owner: string; readonly repo: string }
-  /** The Agent's own branch, made from `baseBranch`. */
+  /** The Conversation's own branch, made from `baseBranch`. */
   readonly branch: string
   /** The clone's `origin` remote must have it, as Review changes diffs against it. */
   readonly baseBranch: string
@@ -107,7 +107,7 @@ export interface Glass {
   readonly missingLogin: (login: string, fix: string) => Error
   /** The platform has no room for another Sandbox right now; trying again later may work. */
   readonly noCapacity: (message: string) => Error
-  /** The Sandbox no longer exists, with everything in it, so its Agent can only be removed. */
+  /** The Sandbox no longer exists, with everything in it, so its Conversation can only be removed. */
   readonly sandboxGone: () => Error
 }
 

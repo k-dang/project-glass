@@ -92,19 +92,12 @@ export const readTour = (
       return [path]
     })
 
-    const diagram = chapter.diagram ?? null
-
     return {
       index,
       title: chapter.title,
       explanation: chapter.explanation,
       paths,
-      diagram:
-        current &&
-        diagram !== null &&
-        diagram.nodes.every((node) => paths.includes(node.target.path))
-          ? diagram
-          : null,
+      diagram: current ? (chapter.diagram ?? null) : null,
       beforeAfter: shownBeforeAfter(chapter.beforeAfter, (path) => paths.includes(path)),
       callouts: current
         ? (chapter.callouts ?? []).filter((callout) => paths.includes(callout.target.path))
@@ -138,12 +131,7 @@ export const readTour = (
   return {
     writtenAt: tour.writtenAt,
     intent: tour.intent,
-    diagram:
-      current &&
-      tour.diagram != null &&
-      tour.diagram.nodes.every((node) => byPath.has(node.target.path))
-        ? tour.diagram
-        : null,
+    diagram: current ? (tour.diagram ?? null) : null,
     beforeAfter: shownBeforeAfter(tour.beforeAfter, (path) => byPath.has(path)),
     hotspots,
     chapters,

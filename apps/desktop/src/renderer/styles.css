@@ -459,43 +459,45 @@
   animation-timing-function: --theme(--ease-out);
 }
 
-:active-view-transition-type(start-agent)::view-transition-old(root),
-:active-view-transition-type(start-agent)::view-transition-new(root),
-:active-view-transition-type(start-agent)::view-transition-old(new-agent-options),
-:active-view-transition-type(start-agent)::view-transition-old(new-agent-composer) {
+:active-view-transition-type(start-conversation)::view-transition-old(root),
+:active-view-transition-type(start-conversation)::view-transition-new(root),
+:active-view-transition-type(start-conversation)::view-transition-old(new-conversation-options),
+:active-view-transition-type(start-conversation)::view-transition-old(new-conversation-composer) {
   animation-duration: 120ms;
   animation-timing-function: --theme(--ease-out);
 }
 
-:active-view-transition-type(start-agent)::view-transition-group(new-agent-composer) {
+:active-view-transition-type(start-conversation)::view-transition-group(new-conversation-composer) {
   animation-duration: 250ms;
   animation-timing-function: --theme(--ease-in-out);
 }
 
-:active-view-transition-type(start-agent)::view-transition-new(new-agent-start) {
-  animation: start-agent-message 200ms --theme(--ease-out) 50ms both;
+:active-view-transition-type(start-conversation)::view-transition-new(new-conversation-start) {
+  animation: start-conversation-message 200ms --theme(--ease-out) 50ms both;
 }
 
-@keyframes start-agent-message {
+@keyframes start-conversation-message {
   from {
     opacity: 0;
     translate: 0 0.5rem;
   }
 }
 
-@keyframes start-agent-message-fade {
+@keyframes start-conversation-message-fade {
   from {
     opacity: 0;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :active-view-transition-type(start-agent)::view-transition-group(new-agent-composer) {
+  :active-view-transition-type(
+    start-conversation
+  )::view-transition-group(new-conversation-composer) {
     animation: none;
   }
 
-  :active-view-transition-type(start-agent)::view-transition-new(new-agent-start) {
-    animation-name: start-agent-message-fade;
+  :active-view-transition-type(start-conversation)::view-transition-new(new-conversation-start) {
+    animation-name: start-conversation-message-fade;
   }
 }
 
@@ -623,4 +625,18 @@
   --pele-accent: var(--primary);
   --pele-error: var(--destructive);
   --pele-radius: calc(var(--radius) * 0.6);
+}
+
+/* Mermaid nodes marked :::added or :::removed, as Tour diagrams mark what their PR changes. */
+.pele-node.added :is(rect, path, polygon, circle, ellipse) {
+  stroke: var(--added);
+}
+
+.pele-node.removed :is(rect, path, polygon, circle, ellipse) {
+  stroke: var(--deleted);
+  stroke-dasharray: 4 3;
+}
+
+.pele-node.removed .pele-label {
+  fill: var(--muted-foreground);
 }

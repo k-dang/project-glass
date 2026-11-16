@@ -1,6 +1,6 @@
 # Glass
 
-A desktop work hub for reviewing GitHub pull requests and working with coding Agents.
+A desktop work hub for reviewing GitHub pull requests and working with coding agents.
 
 - **Domain words** come from [`GLOSSARY.md`](GLOSSARY.md); use them in code, UI copy, and specs.
 

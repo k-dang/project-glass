@@ -217,7 +217,13 @@ it("streams thinking, text, and tool calls, nesting a subagent's under its paren
   assert.isNull(ending)
   assert.deepStrictEqual(state?.turn.parts.map(shown), [
     ThinkingPart.make({ text: "I'll delegate the listing." }),
-    { name: "Agent", summary: "List files", output: "README.md", status: "done", parent: null },
+    {
+      name: "Agent",
+      summary: "List files",
+      output: "README.md",
+      status: "done",
+      parent: null,
+    },
     { name: "Bash", summary: "ls", output: "README.md", status: "done", parent: "task-1" },
     { name: "Bash", summary: "false", output: "exit 1", status: "failed", parent: null },
     TextPart.make({ text: "There's a **README**." }),

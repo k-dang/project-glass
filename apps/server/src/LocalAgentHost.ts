@@ -1,4 +1,4 @@
-import { AgentError } from "@glass/contracts"
+import { ConversationError } from "@glass/contracts"
 import {
   Context,
   Effect,
@@ -35,19 +35,19 @@ import { Transcripts } from "./Transcripts"
 
 const FORCE_KILL_AFTER = "2 seconds"
 
-const lostConnection = (error: RpcClientError.RpcClientError | AgentError | HostReplaced) =>
+const lostConnection = (error: RpcClientError.RpcClientError | ConversationError | HostReplaced) =>
   Predicate.isTagged(error, "RpcClientError")
 
 const unavailable = () =>
-  new AgentError({
+  new ConversationError({
     message:
-      "Glass couldn't start the process that runs Agents. Try again; Glass's backend log has the details.",
+      "Glass couldn't start the process that runs Conversations. Try again; Glass's backend log has the details.",
   })
 
 export class LocalAgentHost extends Context.Service<
   LocalAgentHost,
   {
-    readonly client: Effect.Effect<HostClient, AgentError>
+    readonly client: Effect.Effect<HostClient, ConversationError>
     readonly running: Effect.Effect<Option.Option<HostClient>>
     readonly lifetimeOf: (client: ConversationHost) => Effect.Effect<Option.Option<Scope.Scope>>
     readonly subscribeStopped: Effect.Effect<Stream.Stream<void>, never, Scope.Scope>
@@ -83,8 +83,8 @@ export class LocalAgentHost extends Context.Service<
               stderr: "inherit",
               additionalFds: { fd3: { type: "output" } },
               forceKillAfter: FORCE_KILL_AFTER,
-              // Signal only the host, so it closes its programs itself: killing its process group
-              // would end them under it, which it logs as crashes.
+              // Signal only the host, so it closes its Agent harnesses itself: killing its process
+              // group would end them under it, which it logs as crashes.
               detached: false,
             }),
           )
@@ -110,10 +110,11 @@ export class LocalAgentHost extends Context.Service<
 
           const host = yield* greet(client)
 
-          yield* followJournal((agentId, events) => transcripts.save(agentId, events), client, {
-            host,
-            saved: 0,
-          }).pipe(
+          yield* followJournal(
+            (conversationId, events) => transcripts.save(conversationId, events),
+            client,
+            { host, saved: 0 },
+          ).pipe(
             Effect.tapCause((cause) => Effect.logWarning("Lost the agent host's journal", cause)),
             Effect.retry({
               while: lostConnection,

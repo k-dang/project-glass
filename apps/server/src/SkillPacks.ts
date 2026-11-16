@@ -1,5 +1,5 @@
 import {
-  type AgentSkillPack,
+  type ConversationSkillPack,
   type ConnectionError,
   InvalidSkillPackName,
   InvalidSkillPackUrl,
@@ -80,13 +80,17 @@ const decodeFiles = Schema.decodeUnknownEffect(
 
 const decodeId = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ id: Schema.Int })))
 
-const decodeAgentPins = Schema.decodeUnknownEffect(
+const decodeConversationPins = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ name: Schema.String, pin_id: Schema.Int })),
 )
 
-const decodeAgentPacks = Schema.decodeUnknownEffect(
+const decodeConversationPacks = Schema.decodeUnknownEffect(
   Schema.Array(
-    Schema.Struct({ agent_id: Schema.String, name: Schema.String, commit_sha: Schema.String }),
+    Schema.Struct({
+      conversation_id: Schema.String,
+      name: Schema.String,
+      commit_sha: Schema.String,
+    }),
   ),
 )
 
@@ -164,17 +168,17 @@ export class SkillPacks extends Context.Service<
       commit: string,
     ) => Reading<ReadonlyArray<SkillPack>, SkillPackNotFound>
     readonly remove: (name: string) => SkillPackList
-    readonly pinForAgent: (
-      agentId: string,
+    readonly pinForConversation: (
+      conversationId: string,
       names: ReadonlyArray<string>,
-    ) => Effect.Effect<ReadonlyArray<AgentSkillPack>, SkillPackNotFound | SkillPackError>
-    readonly releaseAgent: (agentId: string) => Effect.Effect<void, SkillPackError>
-    readonly agentPacks: Effect.Effect<
-      ReadonlyMap<string, ReadonlyArray<AgentSkillPack>>,
+    ) => Effect.Effect<ReadonlyArray<ConversationSkillPack>, SkillPackNotFound | SkillPackError>
+    readonly releaseConversation: (conversationId: string) => Effect.Effect<void, SkillPackError>
+    readonly conversationPacks: Effect.Effect<
+      ReadonlyMap<string, ReadonlyArray<ConversationSkillPack>>,
       SkillPackError
     >
-    readonly agentSkills: (
-      agentId: string,
+    readonly conversationSkills: (
+      conversationId: string,
     ) => Effect.Effect<ReadonlyArray<SkillSource>, SkillPackError>
   }
 >()("@glass/server/SkillPacks") {
@@ -372,7 +376,7 @@ export class SkillPacks extends Context.Service<
       })
 
       const releaseUnusedPins = Effect.gen(function* () {
-        const used = sql`SELECT pin_id FROM skill_pack UNION SELECT pin_id FROM agent_skill_pack`
+        const used = sql`SELECT pin_id FROM skill_pack UNION SELECT pin_id FROM conversation_skill_pack`
 
         yield* sql`DELETE FROM skill_pack_skill WHERE pin_id NOT IN (${used})`
         yield* sql`DELETE FROM skill_pack_file WHERE pin_id NOT IN (${used})`
@@ -542,57 +546,61 @@ export class SkillPacks extends Context.Service<
           return yield* list
         }),
 
-        pinForAgent: Effect.fn("SkillPacks.pinForAgent")(function* (agentId, names) {
-          if (names.length === 0) return []
+        pinForConversation: Effect.fn("SkillPacks.pinForConversation")(
+          function* (conversationId, names) {
+            if (names.length === 0) return []
 
-          const rows = yield* packRows
-          const chosen = rows.filter(({ pack }) => names.includes(pack.name))
-          const missing = names.find((name) => !chosen.some(({ pack }) => pack.name === name))
+            const rows = yield* packRows
+            const chosen = rows.filter(({ pack }) => names.includes(pack.name))
+            const missing = names.find((name) => !chosen.some(({ pack }) => pack.name === name))
 
-          if (missing !== undefined) return yield* new SkillPackNotFound({ name: missing })
+            if (missing !== undefined) return yield* new SkillPackNotFound({ name: missing })
 
-          yield* sql`
-            INSERT INTO agent_skill_pack ${sql.insert(
+            yield* sql`
+            INSERT INTO conversation_skill_pack ${sql.insert(
               chosen.map(({ pack, pinId }) => ({
-                agent_id: agentId,
+                conversation_id: conversationId,
                 name: pack.name,
                 pin_id: pinId,
               })),
             )}
           `.pipe(Effect.catch(storageFailure))
 
-          return chosen.map(({ pack }) => ({ name: pack.name, commit: pack.commit }))
-        }),
+            return chosen.map(({ pack }) => ({ name: pack.name, commit: pack.commit }))
+          },
+        ),
 
-        releaseAgent: (agentId) =>
+        releaseConversation: (conversationId) =>
           Effect.gen(function* () {
-            yield* sql`DELETE FROM agent_skill_pack WHERE agent_id = ${agentId}`
+            yield* sql`DELETE FROM conversation_skill_pack WHERE conversation_id = ${conversationId}`
             yield* releaseUnusedPins
           }).pipe(Effect.catch(storageFailure)),
 
-        agentPacks: sql`
-            SELECT assigned.agent_id, assigned.name, pin.commit_sha
-            FROM agent_skill_pack AS assigned JOIN skill_pack_pin AS pin ON pin.id = assigned.pin_id
+        conversationPacks: sql`
+            SELECT assigned.conversation_id, assigned.name, pin.commit_sha
+            FROM conversation_skill_pack AS assigned JOIN skill_pack_pin AS pin ON pin.id = assigned.pin_id
             ORDER BY assigned.name
           `.pipe(
-          Effect.flatMap(decodeAgentPacks),
+          Effect.flatMap(decodeConversationPacks),
           Effect.map(
             (rows) =>
               new Map(
-                [...Map.groupBy(rows, ({ agent_id }) => agent_id)].map(([agentId, packs]) => [
-                  agentId,
-                  packs.map(({ name, commit_sha }) => ({ name, commit: commit_sha })),
-                ]),
+                [...Map.groupBy(rows, ({ conversation_id }) => conversation_id)].map(
+                  ([conversationId, packs]) => [
+                    conversationId,
+                    packs.map(({ name, commit_sha }) => ({ name, commit: commit_sha })),
+                  ],
+                ),
               ),
           ),
           Effect.catch(storageFailure),
         ),
 
-        agentSkills: Effect.fn("SkillPacks.agentSkills")(function* (agentId) {
+        conversationSkills: Effect.fn("SkillPacks.conversationSkills")(function* (conversationId) {
           return yield* sql`
-            SELECT name, pin_id FROM agent_skill_pack WHERE agent_id = ${agentId} ORDER BY name
+            SELECT name, pin_id FROM conversation_skill_pack WHERE conversation_id = ${conversationId} ORDER BY name
           `.pipe(
-            Effect.flatMap(decodeAgentPins),
+            Effect.flatMap(decodeConversationPins),
             Effect.flatMap((pins) =>
               Effect.forEach(pins, ({ name, pin_id }) => sentSkills(name, pin_id)),
             ),

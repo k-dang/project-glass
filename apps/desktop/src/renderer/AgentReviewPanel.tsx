@@ -18,8 +18,8 @@ import { Streamdown } from "streamdown"
 import { Button } from "@/components/ui/button"
 import { Marker, MarkerContent } from "@/components/ui/marker"
 import { Textarea } from "@/components/ui/textarea"
-import { agentConversation, ConversationContext } from "./conversation"
-import { AgentComposer, ToolCallView, Transcript, UserMessage } from "./AgentView"
+import { conversationAtoms, ConversationAtomsContext } from "./conversation"
+import { ConversationComposer, ToolCallView, Transcript, UserMessage } from "./ConversationView"
 import type { ShowNote } from "./changesView"
 import { LineLocation, pathLineName } from "./Discussions"
 import { Elapsed } from "./Elapsed"
@@ -166,14 +166,15 @@ function FollowUpsMarker() {
 function FirstFollowUp(props: { controls: AgentReviewControls }) {
   const { job } = props.controls
 
-  if (job?.status !== "starting-agent" && job?.status !== "agent-start-failed") return null
+  if (job?.status !== "starting-conversation" && job?.status !== "conversation-start-failed")
+    return null
 
   return (
     <>
       <FollowUpsMarker />
       <div className="flex flex-col gap-3 enter-motion">
         <UserMessage message={job.message} images={[]} />
-        {job.status === "starting-agent" ? (
+        {job.status === "starting-conversation" ? (
           <output className="flex items-center gap-2 text-sm text-muted-foreground">
             <LoaderCircle
               aria-hidden
@@ -210,13 +211,13 @@ function FirstFollowUpComposer(props: { controls: AgentReviewControls; reviewing
       textOnly
       holdUntilAccepted
       blocked={
-        props.controls.followUpPending || props.reviewing || job?.status === "starting-agent"
+        props.controls.followUpPending || props.reviewing || job?.status === "starting-conversation"
       }
       problem={props.controls.followUpProblem}
       send={({ message }) => props.controls.followUp(message)}
       steer={null}
       recall={null}
-      onStop={job?.status === "starting-agent" ? props.controls.cancel : null}
+      onStop={job?.status === "starting-conversation" ? props.controls.cancel : null}
       suggestions={followUpSuggestions}
     />
   )
@@ -230,17 +231,17 @@ function OutdatedNote() {
   )
 }
 
-function ReviewAgent(props: {
-  agentId: string
+function ReviewConversation(props: {
+  conversationId: string
   lead: ReactNode
   outdated: boolean
   drafts: DraftStore
   show: ShowNote
 }) {
-  const { agentId, drafts, show, outdated } = props
-  const conversation = useMemo(() => agentConversation(agentId), [agentId])
-  const transcript = useAtomValue(conversation.transcript)
-  const reconnect = useAtomRefresh(conversation.transcript)
+  const { conversationId, drafts, show, outdated } = props
+  const atoms = useMemo(() => conversationAtoms(conversationId), [conversationId])
+  const transcript = useAtomValue(atoms.transcript)
+  const reconnect = useAtomRefresh(atoms.transcript)
 
   const { turns, queued, status } = Option.getOrElse(
     AsyncResult.value(transcript),
@@ -259,7 +260,7 @@ function ReviewAgent(props: {
   )
 
   return (
-    <ConversationContext value={conversation}>
+    <ConversationAtomsContext value={atoms}>
       <ToolCallView value={suggestedDraftView}>
         {AsyncResult.isFailure(transcript) && !transcript.waiting && (
           <div className="px-5 pt-4">
@@ -282,7 +283,7 @@ function ReviewAgent(props: {
         {outdated ? (
           <OutdatedNote />
         ) : (
-          <AgentComposer
+          <ConversationComposer
             turns={turns}
             queued={queued}
             label="Follow up"
@@ -292,7 +293,7 @@ function ReviewAgent(props: {
           />
         )}
       </ToolCallView>
-    </ConversationContext>
+    </ConversationAtomsContext>
   )
 }
 
@@ -307,11 +308,11 @@ export function AgentReviewPanel(props: {
   const { job, outdated } = props.controls
   const markdown = <ReviewBody review={review} links={props.hotspotLinks} outdated={outdated} />
 
-  if (review.agentId !== null)
+  if (review.conversationId !== null)
     return (
-      <ReviewAgent
-        key={review.agentId}
-        agentId={review.agentId}
+      <ReviewConversation
+        key={review.conversationId}
+        conversationId={review.conversationId}
         lead={markdown}
         outdated={outdated}
         drafts={props.drafts}

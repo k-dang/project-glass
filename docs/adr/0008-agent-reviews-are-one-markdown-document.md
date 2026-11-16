@@ -23,15 +23,15 @@ Markdown.
 
 ## Considered options
 
-- **Keep Findings with a flatter placement**: optional `path`, `line`, and `side` halved the
-  schema, but kept the validation, the inline rendering, and the failures a stray path causes.
+- **Keep Findings with a flatter placement**: optional `path`, `line`, and `side` halved the schema,
+  but kept the validation, the inline rendering, and the failures a stray path causes.
 - **Plain text that Glass parses into Findings**: no schema at all, but Glass would own a parser
   that any heading in a body could break.
-- **The review as the start of an Agent conversation**: follow-up questions help, but it needs an
-  Agent and its checkout for every review. Instead, a review gets an Agent only when the user sends
-  a Follow-up (ADR 0009).
+- **The review as the start of a Conversation**: follow-up questions help, but it needs a
+  Conversation and its checkout for every review. Instead, a review gets a Conversation only when
+  the user sends a Follow-up (ADR 0009).
 - **Markdown only, with no Hotspots**: the simplest answer, but the reviewer can't jump to the risky
   lines, the diff can't collapse the plumbing, and the Tour can't say where to look first.
-- **Hotspots written by the Tour**: the Tour already places code, but it guides a first reading
-  and is told not to review, so the risks would come from the wrong agent. The two stay
-  independent jobs, and the Tour shows Hotspots only when an Agent review exists for its Revision.
+- **Hotspots written by the Tour**: the Tour already places code, but it guides a first reading and
+  is told not to review, so the risks would come from the wrong agent. The two stay independent
+  jobs, and the Tour shows Hotspots only when an Agent review exists for its Revision.

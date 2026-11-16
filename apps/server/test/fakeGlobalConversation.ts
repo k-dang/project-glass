@@ -25,7 +25,7 @@ export const globalConversationReply = (input: FakeModelRequest): ReadonlyArray<
   const words = lastUserText(input)
 
   if (words.startsWith("<glass_global_conversation_update>"))
-    return [{ text: "The Agent you started is done. Want me to look at what it changed?" }]
+    return [{ text: "The Conversation you started is done. Want me to look at what it changed?" }]
 
   const call = (name: string, args: Schema.JsonObject): ReadonlyArray<FakeModelDelta> => [
     { toolCall: { id: `call-${input.messages.length}`, name, arguments: args } },
@@ -44,16 +44,16 @@ export const globalConversationReply = (input: FakeModelRequest): ReadonlyArray<
     })
   }
 
-  const delegated = /^Start an Agent in ([\w-]+)\/([\w.-]+) from (\S+): (.+)$/m.exec(words)
+  const delegated = /^Start a Conversation in ([\w-]+)\/([\w.-]+) from (\S+): (.+)$/m.exec(words)
 
   if (delegated !== null) {
     const [, owner = "", repo = "", baseBranch = "", message = ""] = delegated
 
-    return call("mcp__glass__create_agent", {
+    return call("mcp__glass__create_conversation", {
       repository: { owner, repo },
       baseBranch,
       place: localPlace,
-      engine: "claude-code",
+      harness: "claude-code",
       model: null,
       effort: null,
       message,

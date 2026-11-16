@@ -1,9 +1,9 @@
 import { SqliteClient, SqliteMigrator } from "@effect/sql-sqlite-node"
 import { assert, it } from "@effect/vitest"
-import { AgentError, AgentOutcome, GlobalConversationUpdate } from "@glass/contracts"
+import { ConversationError, ConversationOutcome, GlobalConversationUpdate } from "@glass/contracts"
 import { DateTime, Effect, Layer, Stream } from "effect"
 import { SqlClient } from "effect/sql"
-import { Agents } from "./Agents"
+import { Conversations } from "./Conversations"
 import { AgentReviews } from "./AgentReviews"
 import { migrationLoader } from "./Migrations"
 import { StartedWork } from "./StartedWork"
@@ -11,7 +11,9 @@ import { Transcripts } from "./Transcripts"
 
 const layer = StartedWork.layer.pipe(
   Layer.provideMerge(Transcripts.layer),
-  Layer.provide(Layer.mock(Agents)({ engines: () => ["pi"], markTurnSeen: () => Effect.void })),
+  Layer.provide(
+    Layer.mock(Conversations)({ harnesses: () => ["pi"], markTurnSeen: () => Effect.void }),
+  ),
   Layer.provide(Layer.mock(AgentReviews)({})),
   Layer.provideMerge(SqliteMigrator.layer({ loader: migrationLoader })),
   Layer.provideMerge(SqliteClient.layer({ filename: ":memory:" })),
@@ -21,8 +23,8 @@ const at = DateTime.makeUnsafe("2026-11-14T12:00:00Z")
 
 const globalConversationUpdate = GlobalConversationUpdate.make({
   work: [
-    AgentOutcome.make({
-      agentId: "started",
+    ConversationOutcome.make({
+      conversationId: "started",
       name: "Started",
       askedWith: "Build it",
       outcome: "finished",
@@ -38,7 +40,7 @@ it.live(
       const sql = yield* SqlClient.SqlClient
       const transcripts = yield* Transcripts
       const started = yield* StartedWork
-      yield* sql`INSERT INTO conversation_agent (conversation_id, agent_id, started_at)
+      yield* sql`INSERT INTO global_started_conversation (global_conversation_id, conversation_id, started_at)
       VALUES ('global', 'started', ${DateTime.formatIso(at)})`
       const published = yield* transcripts.subscribeStarted
 
@@ -49,13 +51,15 @@ it.live(
 
       const failed = yield* Effect.exit(
         transcripts.startGlobalConversationUpdate("session", globalConversationUpdate, (turnId) =>
-          record(turnId).pipe(Effect.andThen(new AgentError({ message: "Crash before commit" }))),
+          record(turnId).pipe(
+            Effect.andThen(new ConversationError({ message: "Crash before commit" })),
+          ),
         ),
       )
 
       assert.equal(failed._tag, "Failure")
       assert.deepStrictEqual(
-        yield* sql`SELECT global_conversation_update_outcome_at, global_conversation_update_turn_id FROM conversation_agent`,
+        yield* sql`SELECT global_conversation_update_outcome_at, global_conversation_update_turn_id FROM global_started_conversation`,
         [{ global_conversation_update_outcome_at: null, global_conversation_update_turn_id: null }],
       )
       assert.deepStrictEqual((yield* transcripts.read("session")).turns, [])
@@ -66,7 +70,7 @@ it.live(
       const [turn] = (yield* transcripts.read("session")).turns
       assert.isDefined(turn)
       assert.deepStrictEqual(
-        yield* sql`SELECT global_conversation_update_outcome_at, global_conversation_update_turn_id FROM conversation_agent`,
+        yield* sql`SELECT global_conversation_update_outcome_at, global_conversation_update_turn_id FROM global_started_conversation`,
         [
           {
             global_conversation_update_outcome_at: DateTime.formatIso(at),

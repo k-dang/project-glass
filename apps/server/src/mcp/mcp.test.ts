@@ -30,7 +30,7 @@ const startMcpBackend = Effect.gen(function* () {
         describe_target: ({ conversationId }) =>
           Effect.map(McpCaller.current, (caller) => ({
             caller: Match.valueTags(caller, {
-              Conversation: (conversation) => conversation.conversationId,
+              GlobalConversation: (global) => global.globalConversationId,
               OutsideAgent: ({ agentId }) => agentId,
             }),
             target: conversationId,
@@ -50,7 +50,7 @@ const startMcpBackend = Effect.gen(function* () {
   return { ...backend, started, released, interrupted }
 })
 
-const GLOBAL = { conversationId: "global-conversation", sessionId: "global-session" }
+const GLOBAL = { globalConversationId: "global-conversation", sessionId: "global-session" }
 
 describe("MCP endpoint", () => {
   it.live("discovers and calls tools with the runtime's credential", () =>
@@ -85,7 +85,7 @@ describe("MCP endpoint", () => {
       const mcp = yield* connectMcp(baseUrl, yield* mcpCredentials.issue(GLOBAL))
 
       const other = yield* mcpCredentials.issue({
-        conversationId: "other-runtime",
+        globalConversationId: "other-runtime",
         sessionId: "other-runtime",
       })
 

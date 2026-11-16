@@ -30,7 +30,7 @@ export const mountTourWorkspace = (
     readonly viewedPaths?: ReadonlyArray<string>
     readonly initial?: TourState
     readonly agentReview?: AgentReviewState
-    readonly reviewAgentTurns?: ReadonlyArray<Turn>
+    readonly reviewConversationTurns?: ReadonlyArray<Turn>
   } = {},
 ) => {
   // happy-dom lays nothing out; give each diff scroller a viewport so its files render.
@@ -92,7 +92,7 @@ export const mountTourWorkspace = (
     WatchTranscript: () =>
       Stream.make(
         TranscriptSnapshot.make({
-          turns: options.reviewAgentTurns ?? [],
+          turns: options.reviewConversationTurns ?? [],
           queued: [],
           status: null,
         }),

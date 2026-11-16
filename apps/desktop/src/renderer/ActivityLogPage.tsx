@@ -27,7 +27,7 @@ import { Button } from "@/components/ui/button"
 import { Backend, backendRuntime } from "./backend"
 import { Empty, LoadMore } from "./Lists"
 import { plural } from "./plural"
-import { placeNames } from "./agentsArea"
+import { placeNames } from "./conversationsArea"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf } from "./problems"
 import { dayOf } from "./recency"
@@ -113,8 +113,8 @@ const describe = (activity: Activity): Described =>
       tone: "text-added",
       subject: toDo.title,
     }),
-    AgentStarted: ({ name, repository, machine, message }) => ({
-      verb: "Started Agent",
+    ConversationStarted: ({ name, repository, machine, message }) => ({
+      verb: "Started Conversation",
       icon: Sparkles,
       subject: name,
       where: `${repositoryKey(repository)} on ${placeNames[machine]}`,

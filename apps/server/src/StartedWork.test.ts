@@ -2,15 +2,15 @@ import { assert, it } from "@effect/vitest"
 import { localPlace, type Turn } from "@glass/contracts"
 import { Effect, Predicate, Schema } from "effect"
 import {
-  agentsFixture,
+  conversationsFixture,
   glassCalls,
   globalTurns,
   lastSettled,
-  agentOutcomesInGlobalConversationUpdates,
+  conversationOutcomesInGlobalConversationUpdates,
   repository,
   sendGlobal,
   settled,
-} from "../test/agentsFixture"
+} from "../test/conversationsFixture"
 import { StartedItem } from "./StartedWork"
 
 const decodeListed = Schema.decodeUnknownSync(
@@ -31,38 +31,44 @@ const listedBy = (turn: Turn | undefined) => {
 }
 
 it.live(
-  "lists the Agents the Global conversation created or messaged, with the message that asked, after a restart",
+  "lists the Conversations the Global conversation created or messaged, with the message that asked, after a restart",
   () =>
     Effect.gen(function* () {
-      const f = yield* agentsFixture
+      const f = yield* conversationsFixture
       const fromUi = yield* f.start("Say hello")
       const messaged = yield* f.start("Say hi")
       yield* f.transcript(fromUi.id, settled(1))
       yield* f.transcript(messaged.id, settled(1))
 
-      const create = `call:create_agent ${JSON.stringify({
+      const create = `call:create_conversation ${JSON.stringify({
         repository: { owner: repository.owner, repo: repository.repo },
         baseBranch: "main",
         place: localPlace,
-        engine: "pi",
+        harness: "pi",
         model: null,
         effort: null,
         message: "Investigate",
       })}`
 
-      const message = `call:send_agent_message ${JSON.stringify({ agentId: messaged.id, message: "Again" })}`
+      const message = `call:send_conversation_message ${JSON.stringify({ conversationId: messaged.id, message: "Again" })}`
 
       yield* sendGlobal(f.client, create)
       yield* sendGlobal(f.client, message)
       yield* globalTurns(f.client, settled(2))
-      const created = (yield* f.agents).find(({ id }) => id !== fromUi.id && id !== messaged.id)
+
+      const created = (yield* f.conversations).find(
+        ({ id }) => id !== fromUi.id && id !== messaged.id,
+      )
+
       assert.isDefined(created)
       yield* f.transcript(created.id, settled(1))
       yield* f.transcript(messaged.id, settled(2))
 
       yield* globalTurns(f.client, (turns) =>
         [created.id, messaged.id].every((id) =>
-          agentOutcomesInGlobalConversationUpdates(turns).some(([agentId]) => agentId === id),
+          conversationOutcomesInGlobalConversationUpdates(turns).some(
+            ([conversationId]) => conversationId === id,
+          ),
         ),
       )
 
@@ -72,7 +78,7 @@ it.live(
 
       assert.deepStrictEqual(
         listedBy(turns.at(-1)).map((item) => [
-          Predicate.isTagged(item, "Agent") && item.agent.id,
+          Predicate.isTagged(item, "Conversation") && item.conversation.id,
           item.state,
           item.askedWith,
         ]),

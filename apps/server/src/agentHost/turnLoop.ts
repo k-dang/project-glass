@@ -1,7 +1,7 @@
 import type { AgentEvent, TurnMessage } from "@glass/contracts"
 import type { DeliveredMessage } from "./deliveredMessage"
 import { type Cause, DateTime, Deferred, Effect, Queue, Scope, Stream } from "effect"
-import { HostAgentError } from "./protocol"
+import { HostConversationError } from "./protocol"
 
 export interface Steer extends DeliveredMessage {
   readonly id: string
@@ -34,7 +34,7 @@ export const runTurns = Effect.fnUntraced(function* <
   Command,
   E,
 >(options: {
-  readonly program: string
+  readonly harness: string
   readonly machine: TurnMachine<State, Input, Command>
   readonly events: Stream.Stream<Input, E>
   readonly report: (event: AgentEvent) => Effect.Effect<void>
@@ -65,7 +65,7 @@ export const runTurns = Effect.fnUntraced(function* <
 
   yield* options.events.pipe(
     Stream.runForEach((input) => Queue.offer(inputs, input)),
-    Effect.catchCause((cause) => Effect.logWarning(`${options.program} stopped`, cause)),
+    Effect.catchCause((cause) => Effect.logWarning(`${options.harness} stopped`, cause)),
     Effect.andThen(
       Effect.sync(() => {
         exited = true
@@ -109,10 +109,12 @@ export const runTurns = Effect.fnUntraced(function* <
     begin: Effect.fnUntraced(function* (turnId: string, message: TurnMessage) {
       const at = yield* DateTime.now
 
-      if (exited) return yield* new HostAgentError({ message: machine.stoppedReason })
+      if (exited) return yield* new HostConversationError({ message: machine.stoppedReason })
 
       if (state !== null)
-        return yield* new HostAgentError({ message: "The Agent is still working on a Turn." })
+        return yield* new HostConversationError({
+          message: "The Conversation is still working on a Turn.",
+        })
 
       state = machine.begin(turnId, message, at)
 

@@ -222,7 +222,7 @@ export function FeedbackEditor(props: {
         value={draft}
         ref={focusOnMount}
         aria-label="Feedback on selected code"
-        placeholder="What should the Agent change here?"
+        placeholder="What should the agent change here?"
         className="bg-background"
         onChange={(event) => props.onDraftChange(event.target.value)}
         onKeyDown={(event) => {

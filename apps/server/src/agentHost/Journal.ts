@@ -6,7 +6,7 @@ export class Journal extends Context.Service<
   Journal,
   {
     readonly host: string
-    readonly append: (agentId: string, event: HostEvent) => Effect.Effect<void>
+    readonly append: (conversationId: string, event: HostEvent) => Effect.Effect<void>
     readonly watch: (host: string, after: number) => Stream.Stream<JournalEntry, HostReplaced>
     readonly acknowledge: (host: string, through: number) => Effect.Effect<void>
   }
@@ -21,9 +21,9 @@ export class Journal extends Context.Service<
 
       return Journal.of({
         host,
-        append: (agentId, event) =>
+        append: (conversationId, event) =>
           Effect.suspend(() => {
-            const entry = { sequence: ++sequence, agentId, event }
+            const entry = { sequence: ++sequence, conversationId, event }
             kept.push(entry)
 
             return PubSub.publish(published, entry)

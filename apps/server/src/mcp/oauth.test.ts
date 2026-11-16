@@ -13,8 +13,9 @@ const outside = (items: NeedsYou) =>
 
 const askResult = Schema.decodeUnknownSync(AskUserResult)
 
-const connectedAgents = (client: Effect.Success<ReturnType<typeof startBackend>>["client"]) =>
-  client.WatchOutsideAgents().pipe(Stream.runHead, Effect.map(Option.getOrThrow))
+const connectedConversations = (
+  client: Effect.Success<ReturnType<typeof startBackend>>["client"],
+) => client.WatchOutsideAgents().pipe(Stream.runHead, Effect.map(Option.getOrThrow))
 
 const TokenResponse = Schema.Struct({
   access_token: Schema.String,
@@ -233,7 +234,7 @@ describe("MCP OAuth", () => {
       const { baseUrl, client } = yield* start
 
       const shownInSettings = yield* client.WatchOutsideAgents().pipe(
-        Stream.filter((agents) => agents.length > 0),
+        Stream.filter((conversations) => conversations.length > 0),
         Stream.runHead,
         Effect.map(Option.getOrThrow),
         Effect.forkChild,
@@ -268,7 +269,7 @@ describe("MCP OAuth", () => {
       assert.ok(question !== undefined)
       assert.strictEqual(question.askedBy, "Claude Code")
       assert.deepStrictEqual(
-        listed.map((agent) => agent.name),
+        listed.map((conversation) => conversation.name),
         ["Claude Code"],
       )
 
@@ -449,15 +450,15 @@ describe("MCP OAuth", () => {
       const { baseUrl, client, home } = yield* start
       const { token } = yield* signIn(baseUrl, "Claude Code")
       const mcp = yield* connectMcp(baseUrl, token)
-      const [agent] = yield* connectedAgents(client)
+      const [conversation] = yield* connectedConversations(client)
 
-      assert.ok(agent !== undefined)
+      assert.ok(conversation !== undefined)
       assert.strictEqual((yield* mcp.request("tools/list", {}).response).status, 200)
 
-      yield* client.RevokeOutsideAgent({ id: agent.id })
+      yield* client.RevokeOutsideAgent({ id: conversation.id })
 
       assert.strictEqual((yield* mcp.request("tools/list", {}).response).status, 401)
-      assert.deepStrictEqual(yield* connectedAgents(client), [])
+      assert.deepStrictEqual(yield* connectedConversations(client), [])
 
       const again = yield* signIn(baseUrl, "Claude Code")
 
@@ -666,7 +667,7 @@ describe("MCP OAuth", () => {
       )
 
       const conversation = yield* mcpCredentials.issue({
-        conversationId: "rebind",
+        globalConversationId: "rebind",
         sessionId: "rebind",
       })
 
@@ -701,14 +702,14 @@ describe("MCP OAuth", () => {
       const { baseUrl, client, mcpCredentials } = yield* start
 
       const bearer = yield* mcpCredentials.issue({
-        conversationId: "claude-code",
+        globalConversationId: "claude-code",
         sessionId: "claude-code",
       })
 
       const mcp = yield* connectMcp(baseUrl, bearer)
 
       assert.strictEqual((yield* mcp.request("tools/list", {}).response).status, 200)
-      assert.deepStrictEqual(yield* connectedAgents(client), [])
+      assert.deepStrictEqual(yield* connectedConversations(client), [])
     }),
   )
 })

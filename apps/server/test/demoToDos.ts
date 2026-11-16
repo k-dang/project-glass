@@ -29,7 +29,7 @@ const openDemoToDos: ReadonlyArray<DemoToDo> = [
   {
     title: "Decide where sandbox logs belong",
     notes:
-      "The provider boots a sandbox, runs one command, and streams logs back into the Agent. The lifecycle is written up at https://vercel.com/docs/sandbox and the open question is whether those logs sit beside the local checkout or in their own plugin.",
+      "The provider boots a sandbox, runs one command, and streams logs back into the Conversation. The lifecycle is written up at https://vercel.com/docs/sandbox and the open question is whether those logs sit beside the local checkout or in their own plugin.",
   },
   {
     title: "Reply to the sidebar thread",

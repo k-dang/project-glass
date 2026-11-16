@@ -1,5 +1,5 @@
 import { Option, Schema } from "effect"
-import type { ToolCallPart } from "./agent"
+import type { ToolCallPart } from "./conversation"
 import { Revision } from "./revision"
 import { CheckoutRunReason } from "./checkoutRun"
 import { DiffSide } from "./discussion"
@@ -65,7 +65,7 @@ export const AgentReview = Schema.Struct({
   markdown: Schema.String,
   hotspots: Schema.Array(Hotspot),
   lowAttention: Schema.Array(LowAttentionFile),
-  agentId: Schema.NullOr(Schema.String),
+  conversationId: Schema.NullOr(Schema.String),
   done: Schema.Boolean,
   includedInGlobalConversationUpdate: Schema.Boolean,
 })
@@ -97,13 +97,13 @@ export const AgentReviewState = Schema.Struct({
     }),
     Schema.Struct({ status: Schema.Literal("failed"), reason: AgentReviewFailure }),
     Schema.Struct({
-      status: Schema.Literal("starting-agent"),
+      status: Schema.Literal("starting-conversation"),
       message: FollowUpMessage,
       startedAt: Schema.Number,
       runner: AgentRunnerIdentity,
     }),
     Schema.Struct({
-      status: Schema.Literal("agent-start-failed"),
+      status: Schema.Literal("conversation-start-failed"),
       message: FollowUpMessage,
       reason: AgentReviewFailure,
     }),
@@ -114,8 +114,8 @@ export type AgentReviewState = typeof AgentReviewState.Type
 
 const finishedWhile: Record<AgentReviewState["job"]["status"], boolean> = {
   idle: true,
-  "starting-agent": true,
-  "agent-start-failed": true,
+  "starting-conversation": true,
+  "conversation-start-failed": true,
   waiting: false,
   reviewing: false,
   failed: false,

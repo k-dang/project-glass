@@ -6,7 +6,7 @@ import type { ReactNode } from "react"
 import { autosaveSetting } from "./autosaveSetting"
 import { Backend } from "./backend"
 import { EnginePicker, missingModel } from "./EnginePicker"
-import { engineNames } from "./engines"
+import { harnessNames } from "./harnesses"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf, streamProblem } from "./problems"
 import { QueueWorkSetting } from "./QueueWorkSetting"
@@ -93,7 +93,7 @@ function EngineEditor(props: { feature: EngineFeature; saved: EngineSettings }) 
   const setting = useSetting(engineAtoms(props.feature), props.saved)
   const name = props.feature === "tours" ? "Tour engine" : "Agent review engine"
   const missing = missingModel(setting.value)
-  const invalid = missing ? `The ${engineNames[missing]} ${name} needs a model.` : null
+  const invalid = missing ? `The ${harnessNames[missing]} ${name} needs a model.` : null
 
   const commit = (value: EngineSettings) => {
     if (!missingModel(value)) setting.commit(value)

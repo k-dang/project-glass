@@ -15,7 +15,7 @@ const shown = (message: string) => {
   return span === null ? null : doc.textBetween(span.from, span.to)
 }
 
-it("shows a command only where the message starts with one the program offers", () => {
+it("shows a command only where the message starts with one the harness offers", () => {
   expect(shown("/greet Ada")).toBe("/greet")
   expect(shown("/skill:pdf report.pdf")).toBe("/skill:pdf")
   expect(shown("\n  /greet")).toBe("/greet")

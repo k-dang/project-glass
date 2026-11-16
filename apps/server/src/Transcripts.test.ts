@@ -27,7 +27,7 @@ const transcriptsLayer = Transcripts.layer.pipe(
 )
 
 it.live(
-  "keeps a stopped Turn stopped, and its Queued messages waiting, when its program ends it late",
+  "keeps a stopped Turn stopped, and its Queued messages waiting, when its harness ends it late",
   () =>
     Effect.gen(function* () {
       const transcripts = yield* Transcripts
@@ -60,39 +60,41 @@ it.live(
     }).pipe(Effect.provide(transcriptsLayer)),
 )
 
-it.live("hands its program only the Turns Glass started, not one the Agent started itself", () =>
-  Effect.gen(function* () {
-    const transcripts = yield* Transcripts
-    const started = yield* transcripts.subscribeStarted
-    const at = yield* DateTime.now
+it.live(
+  "hands its harness only the Turns Glass started, not one the Conversation started itself",
+  () =>
+    Effect.gen(function* () {
+      const transcripts = yield* Transcripts
+      const started = yield* transcripts.subscribeStarted
+      const at = yield* DateTime.now
 
-    yield* transcripts.save("agent-1", [
-      TurnStarted.make({
-        turnId: "woke",
-        message: "",
-        images: [],
-        context: null,
-        feedback: [],
-        sentAt: at,
-      }),
-    ])
-    yield* transcripts.startOrQueue("agent-1", { message: "Next", images: [], context: null })
-    yield* transcripts.save("agent-1", [
-      TurnEnded.make({ turnId: "woke", ended: { at, ending: TurnDone.make({}) } }),
-    ])
+      yield* transcripts.save("agent-1", [
+        TurnStarted.make({
+          turnId: "woke",
+          message: "",
+          images: [],
+          context: null,
+          feedback: [],
+          sentAt: at,
+        }),
+      ])
+      yield* transcripts.startOrQueue("agent-1", { message: "Next", images: [], context: null })
+      yield* transcripts.save("agent-1", [
+        TurnEnded.make({ turnId: "woke", ended: { at, ending: TurnDone.make({}) } }),
+      ])
 
-    const first = Option.getOrThrow(yield* Stream.runHead(started))
-    assert.equal(first.message, "Next")
+      const first = Option.getOrThrow(yield* Stream.runHead(started))
+      assert.equal(first.message, "Next")
 
-    const { turns } = yield* transcripts.read("agent-1")
-    assert.deepStrictEqual(
-      turns.map(({ message }) => message),
-      ["", "Next"],
-    )
-  }).pipe(Effect.scoped, Effect.provide(transcriptsLayer)),
+      const { turns } = yield* transcripts.read("agent-1")
+      assert.deepStrictEqual(
+        turns.map(({ message }) => message),
+        ["", "Next"],
+      )
+    }).pipe(Effect.scoped, Effect.provide(transcriptsLayer)),
 )
 
-it.live("shows an Agent's extension statuses until Glass loses the Agent", () =>
+it.live("shows a Conversation's extension statuses until Glass loses the Conversation", () =>
   Effect.gen(function* () {
     const transcripts = yield* Transcripts
 
@@ -112,10 +114,10 @@ const TurnUnit = Schema.Struct({
   outcome: Schema.String,
   error: Schema.optional(Schema.Struct({ tag: Schema.String, message: Schema.String })),
   duration_ms: Schema.Number,
-  agent_id: Schema.String,
+  conversation_id: Schema.String,
   turn_id: Schema.String,
   ending: Schema.String,
-  engine: Schema.Null,
+  harness: Schema.Null,
   tool_calls: Schema.Number,
   failed_tool_calls: Schema.Number,
 })
@@ -163,10 +165,10 @@ it.effect("records a Turn as a unit of work when it ends", () =>
         outcome: "failure",
         error: { tag: "TurnFailure", message: "pi exited" },
         duration_ms: 3000,
-        agent_id: "agent-1",
+        conversation_id: "agent-1",
         turn_id: turnId,
         ending: "Failed",
-        engine: null,
+        harness: null,
         tool_calls: 2,
         failed_tool_calls: 1,
       },

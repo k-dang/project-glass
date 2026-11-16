@@ -1,10 +1,13 @@
 import { Context, Deferred, Effect, Layer, Option, Redacted, Schema, type Scope } from "effect"
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto"
 
-export class ConversationCaller extends Schema.TaggedClass<ConversationCaller>()("Conversation", {
-  conversationId: Schema.String,
-  sessionId: Schema.String,
-}) {}
+export class GlobalConversationCaller extends Schema.TaggedClass<GlobalConversationCaller>()(
+  "GlobalConversation",
+  {
+    globalConversationId: Schema.String,
+    sessionId: Schema.String,
+  },
+) {}
 
 export class OutsideAgentCaller extends Schema.TaggedClass<OutsideAgentCaller>()("OutsideAgent", {
   agentId: Schema.String,
@@ -12,7 +15,7 @@ export class OutsideAgentCaller extends Schema.TaggedClass<OutsideAgentCaller>()
   session: Schema.String,
 }) {}
 
-export type McpCallerIdentity = ConversationCaller | OutsideAgentCaller
+export type McpCallerIdentity = GlobalConversationCaller | OutsideAgentCaller
 
 export class McpCaller extends Context.Service<McpCaller, McpCallerIdentity>()(
   "@glass/server/McpCaller",
@@ -50,7 +53,7 @@ export class McpCredentials extends Context.Service<
   McpCredentials,
   {
     readonly issue: (caller: {
-      readonly conversationId: string
+      readonly globalConversationId: string
       readonly sessionId: string
     }) => Effect.Effect<Redacted.Redacted, never, Scope.Scope>
     readonly authenticate: (bearer: Redacted.Redacted) => Option.Option<McpCredential>
@@ -73,7 +76,7 @@ export class McpCredentials extends Context.Service<
               const revoked = yield* Deferred.make<void>()
 
               credentialsByDigest.set(key, {
-                caller: ConversationCaller.make(caller),
+                caller: GlobalConversationCaller.make(caller),
                 ownedSessions: new Set(),
                 revoked: Deferred.await(revoked),
               })

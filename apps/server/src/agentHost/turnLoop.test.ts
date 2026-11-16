@@ -5,7 +5,7 @@ import { Input, machine } from "./piTurn"
 import { runTurns } from "./turnLoop"
 
 it.live(
-  "ends a Turn stopped when Stop comes after the program's ending but before Glass takes it",
+  "ends a Turn stopped when Stop comes after the harness's ending but before Glass takes it",
   () =>
     Effect.gen(function* () {
       const busy = yield* Deferred.make<void>()
@@ -13,7 +13,7 @@ it.live(
       const ended = yield* Deferred.make<TurnEnd>()
 
       const turns = yield* runTurns({
-        program: "pi",
+        harness: "pi",
         machine,
         events: Stream.never,
         report: (event) =>
@@ -41,7 +41,7 @@ it.live(
 it.effect("stops only the Turn it names", () =>
   Effect.gen(function* () {
     const turns = yield* runTurns({
-      program: "pi",
+      harness: "pi",
       machine,
       events: Stream.never,
       report: () => Effect.void,

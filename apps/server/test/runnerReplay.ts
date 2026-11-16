@@ -25,7 +25,7 @@ const Summary = Schema.Struct({ summary: Schema.String })
 
 export interface RunnerScenario {
   readonly name: string
-  readonly engine: "claude-code" | "pi"
+  readonly harness: "claude-code" | "pi"
   readonly instructions: string
   readonly tools?: AgentTools
   readonly recordEnv?: Readonly<Record<string, string | undefined>>
@@ -67,23 +67,23 @@ const readGreeting =
 export const runnerScenarios: ReadonlyArray<RunnerScenario> = [
   {
     name: "claude-answer",
-    engine: "claude-code",
+    harness: "claude-code",
     instructions: replyFine,
   },
   {
     name: "claude-read-only",
-    engine: "claude-code",
+    harness: "claude-code",
     instructions: readGreeting,
   },
   {
     name: "claude-signed-out",
-    engine: "claude-code",
+    harness: "claude-code",
     instructions: replyFine,
     recordEnv: signedOut,
   },
   {
     name: "claude-rejected-key",
-    engine: "claude-code",
+    harness: "claude-code",
     instructions: replyFine,
     recordEnv: {
       ...signedOut,
@@ -93,25 +93,25 @@ export const runnerScenarios: ReadonlyArray<RunnerScenario> = [
   },
   {
     name: "claude-shell",
-    engine: "claude-code",
+    harness: "claude-code",
     instructions: runGreeting,
     tools: "shell",
   },
-  { name: "pi-answer", engine: "pi", instructions: replyFine },
+  { name: "pi-answer", harness: "pi", instructions: replyFine },
   {
     name: "pi-read-only",
-    engine: "pi",
+    harness: "pi",
     instructions: readGreeting,
   },
   {
     name: "pi-shell",
-    engine: "pi",
+    harness: "pi",
     instructions: runGreeting,
     tools: "shell",
   },
   {
     name: "pi-unlisted-model",
-    engine: "pi",
+    harness: "pi",
     instructions: replyFine,
     piModelId: "glass-no-such-model",
   },

@@ -1,4 +1,4 @@
-import type { AgentEngine, SandboxProvider, SandboxState } from "@glass/plugin"
+import type { AgentHarness, SandboxProvider, SandboxState } from "@glass/plugin"
 import {
   Clock,
   Context,
@@ -19,14 +19,14 @@ import { RPC_PATH } from "@glass/contracts"
 import { createServer } from "node:http"
 import type { Socket } from "node:net"
 import type { Changes } from "../src/agentHost/Changes"
-import type { HostAgents } from "../src/agentHost/HostAgents"
+import type { HostConversations } from "../src/agentHost/HostConversations"
 import type { Journal } from "../src/agentHost/Journal"
 import { Hello } from "../src/agentHost/protocol"
 import { hostServer } from "../src/agentHost/server"
 import { MissingLogin, NoCapacity, SandboxGone } from "../src/sandboxFailures"
 
 export interface InProcessSandboxSettings {
-  readonly engines?: readonly [AgentEngine, ...Array<AgentEngine>]
+  readonly harnesses?: readonly [AgentHarness, ...Array<AgentHarness>]
   readonly holdAt?: string
   readonly failAt?: string
   readonly missingLogin?: { readonly login: string; readonly fix: string }
@@ -39,9 +39,10 @@ const TWO_DAYS = Duration.toMillis(Duration.days(2))
 
 export const steps = ["Creating the Sandbox", "Starting the agent"] as const
 
-const SandboxId = Schema.Struct({ agentId: Schema.String })
+const SandboxId = Schema.Struct({ conversationId: Schema.String })
 
-const agentIdOf = (state: SandboxState) => Schema.decodeUnknownSync(SandboxId)(state).agentId
+const conversationIdOf = (state: SandboxState) =>
+  Schema.decodeUnknownSync(SandboxId)(state).conversationId
 
 const VersionedHost = RpcGroup.make(Hello)
 
@@ -74,7 +75,7 @@ const otherHost = (kind: Exclude<HostKind, { readonly kind: "current" }>) =>
       )
 
 export const inProcessSandboxes = Effect.fnUntraced(function* (
-  host: () => Layer.Layer<HostAgents | Journal | Changes>,
+  host: () => Layer.Layer<HostConversations | Journal | Changes>,
 ) {
   const clock = yield* Clock.Clock
   const context = yield* Effect.context()
@@ -100,8 +101,8 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
   const shutDowns = new Map<string, Deferred.Deferred<void>>()
   const events: Array<string> = []
 
-  const noteEnded = (agentId: string) => {
-    if (!events.includes(`ended ${agentId}`)) events.push(`ended ${agentId}`)
+  const noteEnded = (conversationId: string) => {
+    if (!events.includes(`ended ${conversationId}`)) events.push(`ended ${conversationId}`)
   }
 
   const refuseLogin = () => {
@@ -123,10 +124,10 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
       check()
     })
 
-  const stop = (agentId: string) =>
+  const stop = (conversationId: string) =>
     Effect.suspend(() => {
-      const running = hosts.get(agentId)
-      hosts.delete(agentId)
+      const running = hosts.get(conversationId)
+      hosts.delete(conversationId)
 
       if (running === undefined) return Effect.void
 
@@ -135,7 +136,7 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
       return Scope.close(running.scope, Exit.void)
     })
 
-  const startHost = async (agentId: string, token: string, kind: HostKind) => {
+  const startHost = async (conversationId: string, token: string, kind: HostKind) => {
     const scope = Scope.makeUnsafe()
     const shutDown = Deferred.makeUnsafe<void>()
     const server = createServer()
@@ -158,33 +159,33 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
       ),
     )
 
-    hosts.set(agentId, { scope, sockets, token })
-    shutDowns.set(agentId, shutDown)
+    hosts.set(conversationId, { scope, sockets, token })
+    shutDowns.set(conversationId, shutDown)
     urls.set(
-      agentId,
+      conversationId,
       HttpServer.formatAddress(Context.get(services, HttpServer.HttpServer).address),
     )
 
     runFork(
       Deferred.await(shutDown).pipe(
-        Effect.andThen(Effect.sync(() => noteEnded(agentId))),
-        Effect.andThen(stop(agentId)),
+        Effect.andThen(Effect.sync(() => noteEnded(conversationId))),
+        Effect.andThen(stop(conversationId)),
       ),
     )
   }
 
   const provider: SandboxProvider = {
     name: "Fake Sandboxes",
-    get engines() {
-      return settings.engines ?? ["claude-code", "pi"]
+    get harnesses() {
+      return settings.harnesses ?? ["claude-code", "pi"]
     },
     create: async (request, { progress, record, signal }) => {
       refuseLogin()
 
       if (settings.noCapacity !== undefined) throw new NoCapacity(settings.noCapacity)
 
-      record({ agentId: request.agentId })
-      createdAt.set(request.agentId, clock.currentTimeMillisUnsafe())
+      record({ conversationId: request.conversationId })
+      createdAt.set(request.conversationId, clock.currentTimeMillisUnsafe())
 
       for (const step of steps) {
         progress(step)
@@ -193,70 +194,74 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
         if (settings.failAt === step) throw new Error(`The fake Sandbox failed at ${step}`)
       }
 
-      await startHost(request.agentId, request.host.environment["GLASS_HOST_TOKEN"] ?? "", current)
+      await startHost(
+        request.conversationId,
+        request.host.environment["GLASS_HOST_TOKEN"] ?? "",
+        current,
+      )
     },
     target: async (state) => {
-      const agentId = agentIdOf(state)
+      const conversationId = conversationIdOf(state)
 
-      if (gone.has(agentId)) throw new SandboxGone()
+      if (gone.has(conversationId)) throw new SandboxGone()
 
-      const url = urls.get(agentId)
+      const url = urls.get(conversationId)
 
       if (url === undefined) throw new Error("No such fake Sandbox")
 
       return { url, headers: {} }
     },
     extend: async (state) => {
-      const agentId = agentIdOf(state)
+      const conversationId = conversationIdOf(state)
 
-      if (gone.has(agentId)) throw new SandboxGone()
+      if (gone.has(conversationId)) throw new SandboxGone()
 
       const expiresAt = Math.min(
         clock.currentTimeMillisUnsafe() + (settings.extensionMillis ?? TWO_DAYS),
-        (createdAt.get(agentId) ?? clock.currentTimeMillisUnsafe()) +
+        (createdAt.get(conversationId) ?? clock.currentTimeMillisUnsafe()) +
           (settings.maxLifetimeMillis ?? TWO_DAYS),
       )
 
-      reclaimAt(agentId, expiresAt)
+      reclaimAt(conversationId, expiresAt)
 
       return new Date(expiresAt)
     },
     remove: async (state) => {
       refuseLogin()
 
-      const agentId = agentIdOf(state)
-      const shutDown = shutDowns.get(agentId)
+      const conversationId = conversationIdOf(state)
+      const shutDown = shutDowns.get(conversationId)
 
-      if (shutDown !== undefined && Deferred.isDoneUnsafe(shutDown)) noteEnded(agentId)
+      if (shutDown !== undefined && Deferred.isDoneUnsafe(shutDown)) noteEnded(conversationId)
 
-      await runPromise(stop(agentId))
-      urls.delete(agentId)
-      events.push(`removed ${agentId}`)
+      await runPromise(stop(conversationId))
+      urls.delete(conversationId)
+      events.push(`removed ${conversationId}`)
     },
     models: async () => ({ defaultModel: null, models: [] }),
   }
 
-  const reclaim = (agentId: string) =>
-    stop(agentId).pipe(
+  const reclaim = (conversationId: string) =>
+    stop(conversationId).pipe(
       Effect.andThen(
         Effect.sync(() => {
-          expiries.get(agentId)?.interruptUnsafe()
-          expiries.delete(agentId)
-          gone.add(agentId)
+          expiries.get(conversationId)?.interruptUnsafe()
+          expiries.delete(conversationId)
+          gone.add(conversationId)
         }),
       ),
     )
 
-  const reclaimAt = (agentId: string, expiresAt: number) => {
-    expiries.get(agentId)?.interruptUnsafe()
+  const reclaimAt = (conversationId: string, expiresAt: number) => {
+    expiries.get(conversationId)?.interruptUnsafe()
     expiries.set(
-      agentId,
+      conversationId,
       runFork(
         clock.sleep(Duration.millis(expiresAt - clock.currentTimeMillisUnsafe())).pipe(
           Effect.andThen(() => {
-            expiries.delete(agentId)
+            expiries.delete(conversationId)
 
-            return reclaim(agentId)
+            return reclaim(conversationId)
           }),
         ),
       ),
@@ -272,24 +277,24 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
       for (const check of waiting.splice(0)) check()
     },
     stopHost: stop,
-    dropConnections: (agentId: string) =>
+    dropConnections: (conversationId: string) =>
       Effect.sync(() => {
-        for (const socket of hosts.get(agentId)?.sockets ?? []) socket.destroy()
+        for (const socket of hosts.get(conversationId)?.sockets ?? []) socket.destroy()
       }),
-    restartHost: (agentId: string, kind: HostKind = current) =>
+    restartHost: (conversationId: string, kind: HostKind = current) =>
       Effect.suspend(() => {
-        const running = hosts.get(agentId)
+        const running = hosts.get(conversationId)
 
-        if (running === undefined) return Effect.die(`No running host for ${agentId}`)
+        if (running === undefined) return Effect.die(`No running host for ${conversationId}`)
 
-        return stop(agentId).pipe(
-          Effect.andThen(Effect.promise(() => startHost(agentId, running.token, kind))),
+        return stop(conversationId).pipe(
+          Effect.andThen(Effect.promise(() => startHost(conversationId, running.token, kind))),
         )
       }),
     reclaim,
-    setGone: (agentId: string, isGone: boolean) => {
-      if (isGone) gone.add(agentId)
-      else gone.delete(agentId)
+    setGone: (conversationId: string, isGone: boolean) => {
+      if (isGone) gone.add(conversationId)
+      else gone.delete(conversationId)
     },
     closeAll: Effect.suspend(() => {
       return Effect.forEach(expiries.values(), Fiber.interrupt, { discard: true }).pipe(

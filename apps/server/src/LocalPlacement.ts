@@ -1,11 +1,16 @@
-import { AgentEngine, AgentError, type FollowedRepository } from "@glass/contracts"
+import { AgentHarness, ConversationError, type FollowedRepository } from "@glass/contracts"
 import { Context, Effect, Exit, FileSystem, Layer, Option, Stream } from "effect"
 import { join } from "node:path"
-import { shortAgentNames, uniqueAgentName } from "./agentNames"
+import { shortConversationNames, uniqueConversationName } from "./conversationNames"
 import { Git, type GitFailed } from "./git"
 import { LocalAgentHost } from "./LocalAgentHost"
 import { LocalCheckouts } from "./LocalCheckouts"
-import { asAgentError, type Placement, type PlacedAgent, type SubscribeLost } from "./Placement"
+import {
+  asConversationError,
+  type Placement,
+  type PlacedConversation,
+  type SubscribeLost,
+} from "./Placement"
 import { ServerConfig } from "./ServerConfig"
 
 const gitFailure =
@@ -13,7 +18,7 @@ const gitFailure =
   <A, R>(effect: Effect.Effect<A, GitFailed, R>) =>
     effect.pipe(
       Effect.tapError((cause) => Effect.logWarning(message, cause)),
-      Effect.mapError(() => new AgentError({ message })),
+      Effect.mapError(() => new ConversationError({ message })),
     )
 
 const succeeds = <E, R>(effect: Effect.Effect<unknown, E, R>) =>
@@ -46,8 +51,8 @@ export class LocalPlacement extends Context.Service<
           ).pipe(Effect.map(Option.isNone))
 
         const name = Option.getOrElse(
-          yield* Effect.findFirst(shortAgentNames(), free),
-          uniqueAgentName,
+          yield* Effect.findFirst(shortConversationNames(), free),
+          uniqueConversationName,
         )
 
         yield* git
@@ -85,24 +90,26 @@ export class LocalPlacement extends Context.Service<
         return { name, folder, discard }
       })
 
-      const baseRef = Effect.fn("LocalPlacement.baseRef")(function* ({ agent }: PlacedAgent) {
+      const baseRef = Effect.fn("LocalPlacement.baseRef")(function* ({
+        conversation,
+      }: PlacedConversation) {
         const checkout = yield* checkouts
-          .get(agent.repository)
+          .get(conversation.repository)
           .pipe(
             Effect.catchTag("InvalidLocalCheckout", ({ message }) =>
-              Effect.fail(new AgentError({ message })),
+              Effect.fail(new ConversationError({ message })),
             ),
           )
 
-        return `refs/remotes/${checkout.remote}/${agent.baseBranch}`
+        return `refs/remotes/${checkout.remote}/${conversation.baseBranch}`
       })
 
-      const worktreeExists = ({ folder }: PlacedAgent) =>
+      const worktreeExists = ({ folder }: PlacedConversation) =>
         fs.exists(folder).pipe(Effect.orElseSucceed(() => false))
 
-      const remove = Effect.fn("LocalPlacement.remove")(function* (placed: PlacedAgent) {
-        hosted.delete(placed.agent.id)
-        const checkout = yield* checkouts.get(placed.agent.repository).pipe(Effect.option)
+      const remove = Effect.fn("LocalPlacement.remove")(function* (placed: PlacedConversation) {
+        hosted.delete(placed.conversation.id)
+        const checkout = yield* checkouts.get(placed.conversation.repository).pipe(Effect.option)
 
         const cwd = Option.match(checkout, {
           onSome: ({ path }) => path,
@@ -113,22 +120,22 @@ export class LocalPlacement extends Context.Service<
           (yield* worktreeExists(placed))
             ? git.run(cwd, ["worktree", "remove", "--force", placed.folder])
             : git.run(cwd, ["worktree", "prune"]).pipe(Effect.ignore)
-        ).pipe(gitFailure(`Couldn't remove ${placed.agent.name}'s worktree. Try again.`))
+        ).pipe(gitFailure(`Couldn't remove ${placed.conversation.name}'s worktree. Try again.`))
       })
 
       return LocalPlacement.of({
-        engines: AgentEngine.literals,
-        models: (engine) =>
+        harnesses: AgentHarness.literals,
+        models: (harness) =>
           host.client.pipe(
-            Effect.flatMap((client) => client.ListModels({ engine })),
-            Effect.mapError(asAgentError),
+            Effect.flatMap((client) => client.ListModels({ harness })),
+            Effect.mapError(asConversationError),
           ),
-        commands: Effect.fnUntraced(function* (engine, repository) {
+        commands: Effect.fnUntraced(function* (harness, repository) {
           const { path } = yield* checkouts.get(repository)
 
           return yield* host.client.pipe(
-            Effect.flatMap((client) => client.ListCommands({ engine, folder: path, skills: [] })),
-            Effect.mapError(asAgentError),
+            Effect.flatMap((client) => client.ListCommands({ harness, folder: path, skills: [] })),
+            Effect.mapError(asConversationError),
           )
         }),
         defaultBranch: (repository) =>
@@ -145,8 +152,8 @@ export class LocalPlacement extends Context.Service<
           return listed.split("\0").filter((file) => file !== "")
         }),
         place,
-        host: ({ agent }) =>
-          host.client.pipe(Effect.tap(() => Effect.sync(() => void hosted.add(agent.id)))),
+        host: ({ conversation }) =>
+          host.client.pipe(Effect.tap(() => Effect.sync(() => void hosted.add(conversation.id)))),
         runningHost: () => host.running,
         hostOnceMade: (placed) =>
           worktreeExists(placed).pipe(
