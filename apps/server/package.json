@@ -5,6 +5,7 @@
   "scripts": {
     "build": "vp pack",
     "dev": "vp pack --watch",
+    "measure:journal": "node --expose-gc --import jiti/register test/measureJournal.ts",
     "record:runners": "jiti test/recordRunnerReplays.ts",
     "record:sessions": "jiti test/recordSessions.ts",
     "test": "vp test run"

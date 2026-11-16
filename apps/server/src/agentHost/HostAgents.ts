@@ -1,11 +1,13 @@
 import {
   type AgentCommand,
+  TurnEnded,
+  TurnFailed,
   type AgentEngine,
   type AgentModels,
   type RequestAnswer,
   RequestNotWaiting,
 } from "@glass/contracts"
-import { Context, Effect, Exit, FileSystem, Layer, Scope, Semaphore } from "effect"
+import { Context, Effect, Exit, FileSystem, Layer, Predicate, Scope, Semaphore } from "effect"
 import type { AgentAdapter, AgentSession } from "./adapter"
 import type { DeliveredMessage, DeliveredTurn } from "./deliveredMessage"
 import { Journal } from "./Journal"
@@ -31,6 +33,9 @@ interface Running {
   readonly session: AgentSession
   applied: TurnSettings
 }
+
+export const overBudgetReason =
+  "The Agent wrote more than its host can keep while Glass is away, so the host stopped this Turn. Everything it wrote up to here is kept."
 
 const sameSettings = (a: TurnSettings, b: TurnSettings) =>
   a.model === b.model && a.effort === b.effort && a.permissionMode === b.permissionMode
@@ -87,7 +92,53 @@ export class HostAgents extends Context.Service<
               return "alreadyRunning" as const
 
             const scope = yield* Scope.fork(hostScope)
-            const report = (event: HostEvent) => journal.append(agentId, event)
+            let stoppingOverBudget = false
+
+            const stopOverBudget = Effect.suspend(() => {
+              const session = running.get(agentId)?.session
+
+              if (stoppingOverBudget || session === undefined) return Effect.void
+              stoppingOverBudget = true
+
+              return session.stopTurn.pipe(
+                Effect.tap((left) =>
+                  Effect.sync(() => {
+                    if (left === null) stoppingOverBudget = false
+                  }),
+                ),
+                Effect.forkIn(scope),
+                Effect.asVoid,
+              )
+            })
+
+            const report = (event: HostEvent) =>
+              Effect.gen(function* () {
+                if (!Predicate.isTagged(event, "TurnEnded")) {
+                  yield* journal.append(agentId, event)
+
+                  if (yield* journal.full) yield* stopOverBudget
+
+                  return
+                }
+
+                const overBudget =
+                  stoppingOverBudget && Predicate.isTagged(event.ended.ending, "Stopped")
+
+                stoppingOverBudget = false
+
+                yield* journal.append(
+                  agentId,
+                  overBudget
+                    ? TurnEnded.make({
+                        turnId: event.turnId,
+                        ended: {
+                          ...event.ended,
+                          ending: TurnFailed.make({ reason: overBudgetReason }),
+                        },
+                      })
+                    : event,
+                )
+              })
 
             const started = Effect.gen(function* () {
               const skills = yield* written(folder, starting.skills)

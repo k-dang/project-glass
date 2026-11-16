@@ -1,0 +1,106 @@
+import { NodeFileSystem } from "@effect/platform-node"
+import { assert, it } from "@effect/vitest"
+import {
+  PartSet,
+  TextPart,
+  TurnDone,
+  TurnEnded,
+  TurnFailed,
+  TurnStarted,
+  TurnStopped,
+} from "@glass/contracts"
+import { DateTime, Deferred, Effect, Layer, Stream } from "effect"
+import type { AgentAdapter } from "./adapter"
+import { HostAgents, overBudgetReason } from "./HostAgents"
+import { Journal, JournalBudget } from "./Journal"
+import { type HostEvent, WorkRole } from "./protocol"
+
+const BUDGET = 1_000
+
+const wrote = (turnId: string, chars: number) =>
+  PartSet.make({ turnId, index: 0, part: TextPart.make({ text: "a".repeat(chars) }) })
+
+it.effect("stops a Turn once the journal passes its budget, keeping everything it wrote", () =>
+  Effect.gen(function* () {
+    const reporting = yield* Deferred.make<(event: HostEvent) => Effect.Effect<void>>()
+    const at = yield* DateTime.now
+    let stops = 0
+
+    const ended = (turnId: string, ending: typeof TurnDone.Type | typeof TurnStopped.Type) =>
+      TurnEnded.make({ turnId, ended: { at, ending } })
+
+    const adapter: AgentAdapter = {
+      models: Effect.die("unused"),
+      commands: () => Effect.die("unused"),
+      start: ({ report }) =>
+        Deferred.succeed(reporting, report).pipe(
+          Effect.as({
+            configure: () => Effect.void,
+            startTurn: () => Effect.void,
+            steer: () => Effect.void,
+            stopTurn: Effect.gen(function* () {
+              stops++
+              yield* report(ended("turn-1", TurnStopped.make({})))
+
+              return []
+            }),
+            answer: () => Effect.void,
+            closed: Effect.never,
+            stopped: Effect.succeed(false),
+          }),
+        ),
+    }
+
+    const started = (turnId: string) =>
+      TurnStarted.make({ turnId, message: "", images: [], context: null, feedback: [], sentAt: at })
+
+    yield* Effect.gen(function* () {
+      const agents = yield* HostAgents
+      const journal = yield* Journal
+
+      yield* agents.start({
+        agentId: "agent-1",
+        engine: "pi",
+        folder: ".",
+        role: WorkRole.make({}),
+        skills: [],
+      })
+      const report = yield* Deferred.await(reporting)
+
+      yield* report(started("turn-1"))
+      yield* report(wrote("turn-1", BUDGET * 2))
+
+      const kept = yield* journal.watch(0).pipe(Stream.take(3), Stream.runCollect)
+
+      assert.deepStrictEqual(
+        kept.map(({ event }) => event),
+        [
+          started("turn-1"),
+          wrote("turn-1", BUDGET * 2),
+          TurnEnded.make({
+            turnId: "turn-1",
+            ended: { at, ending: TurnFailed.make({ reason: overBudgetReason }) },
+          }),
+        ],
+      )
+
+      yield* journal.acknowledge(3)
+      yield* report(started("turn-2"))
+      yield* report(wrote("turn-2", BUDGET / 2))
+      yield* report(ended("turn-2", TurnDone.make({})))
+
+      const next = yield* journal.watch(3).pipe(Stream.take(3), Stream.runCollect)
+
+      assert.deepStrictEqual(next.at(-1)?.event, ended("turn-2", TurnDone.make({})))
+      assert.equal(stops, 1)
+    }).pipe(
+      Effect.provide(
+        HostAgents.make({ "claude-code": adapter, pi: adapter }).pipe(
+          Layer.provideMerge(Journal.layer),
+          Layer.provide(NodeFileSystem.layer),
+          Layer.provide(Layer.succeed(JournalBudget, BUDGET)),
+        ),
+      ),
+    )
+  }),
+)
