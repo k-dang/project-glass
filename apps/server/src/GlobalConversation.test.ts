@@ -286,6 +286,10 @@ const decodeSession = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ sessionId: Schema.String })),
 )
 
+const decodeSeen = Schema.decodeUnknownEffect(
+  Schema.Array(Schema.Struct({ turnSeenAt: Schema.NullOr(Schema.String) })),
+)
+
 const message = (text: string) => ({ message: text, images: [], context: null })
 
 const holdHost = (entered: Deferred.Deferred<void>, release: Deferred.Deferred<void>) =>
@@ -297,6 +301,7 @@ const holdHost = (entered: Deferred.Deferred<void>, release: Deferred.Deferred<v
 const stallableHost = (calls: {
   readonly startTurn: () => Effect.Effect<void>
   readonly stopTurn: () => Effect.Effect<null>
+  readonly stopAgent?: () => Effect.Effect<void>
 }) =>
   RpcTest.makeClient(AgentHostRpcs).pipe(
     Effect.provide(
@@ -310,7 +315,7 @@ const stallableHost = (calls: {
             AnswerRequest: () => Effect.die("This test does not call AnswerRequest"),
             Steer: () => Effect.die("This test does not call Steer"),
             StopTurn: () => calls.stopTurn(),
-            StopAgent: () => Effect.void,
+            StopAgent: () => calls.stopAgent?.() ?? Effect.void,
             GetChanges: () => Effect.die("This test does not call GetChanges"),
             HasUncommittedChanges: () =>
               Effect.die("This test does not call HasUncommittedChanges"),
@@ -404,10 +409,16 @@ it.effect("lets Start fresh and mark-seen finish once a stalled StopTurn times o
       assert.isUndefined(stopping.pollUnsafe())
 
       const seenAt = yield* DateTime.now
-      const fresh = yield* Effect.forkChild(global.startFresh)
-      const seen = yield* Effect.forkChild(global.markSeen(seenAt))
+      const fresh = yield* Effect.forkChild(global.startFresh, { startImmediately: true })
+      const seen = yield* Effect.forkChild(global.markSeen(seenAt), { startImmediately: true })
       assert.isUndefined(fresh.pollUnsafe())
       assert.isUndefined(seen.pollUnsafe())
+
+      const [unseen] = yield* sql`SELECT turn_seen_at AS turnSeenAt FROM global_conversation`.pipe(
+        Effect.flatMap(decodeSeen),
+        Effect.orDie,
+      )
+      assert.equal(unseen?.turnSeenAt, null)
 
       yield* TestClock.adjust(HOST_CONTROL_DEADLINE)
       assert.isDefined(fresh.pollUnsafe())
@@ -484,6 +495,67 @@ it.effect(
 
         assert.isDefined(next)
         assert.notStrictEqual(next.sessionId, session.sessionId)
+      }).pipe(Effect.provide(layer), Effect.provideService(Clock.Clock, watched))
+    }),
+)
+
+it.effect(
+  "finishes Start fresh, mark-seen, and Stop when StopAgent never answers",
+  () =>
+    Effect.gen(function* () {
+      const { watched, deadlineSet } = yield* watchDeadlines(30_000)
+      const started = yield* Deferred.make<void>()
+      const startRelease = yield* Deferred.make<void>()
+      const stopEntered = yield* Deferred.make<void>()
+      const stopRelease = yield* Deferred.make<void>()
+
+      const client = yield* stallableHost({
+        startTurn: () => holdHost(started, startRelease),
+        stopTurn: () => Effect.succeed(null),
+        stopAgent: () => holdHost(stopEntered, stopRelease),
+      })
+
+      const layer = openGlobal(client, yield* Scope.Scope)
+
+      yield* Effect.gen(function* () {
+        const global = yield* GlobalConversation
+        const sql = yield* SqlClient.SqlClient
+
+        const sending = yield* Effect.forkChild(global.send(message("Hello")))
+        yield* Deferred.await(started)
+        yield* deadlineSet
+        yield* TestClock.adjust(Duration.millis(30_000))
+        yield* Fiber.join(sending)
+
+        const fresh = yield* Effect.forkChild(global.startFresh, { startImmediately: true })
+        yield* Deferred.await(stopEntered)
+        yield* deadlineSet
+
+        const seenAt = yield* DateTime.now
+        const seen = yield* Effect.forkChild(global.markSeen(seenAt), { startImmediately: true })
+        const stopping = yield* Effect.forkChild(global.stop, { startImmediately: true })
+        assert.isUndefined(fresh.pollUnsafe())
+        assert.isUndefined(seen.pollUnsafe())
+        assert.isUndefined(stopping.pollUnsafe())
+
+        const [unseen] = yield* sql`SELECT turn_seen_at AS turnSeenAt FROM global_conversation`.pipe(
+          Effect.flatMap(decodeSeen),
+          Effect.orDie,
+        )
+        assert.equal(unseen?.turnSeenAt, null)
+
+        yield* TestClock.adjust(Duration.millis(29_999))
+        assert.isUndefined(fresh.pollUnsafe())
+        assert.isUndefined(seen.pollUnsafe())
+        assert.isUndefined(stopping.pollUnsafe())
+
+        yield* TestClock.adjust(Duration.millis(1))
+        assert.isDefined(fresh.pollUnsafe())
+        assert.isDefined(seen.pollUnsafe())
+        assert.isDefined(stopping.pollUnsafe())
+        yield* Fiber.join(fresh)
+        yield* Fiber.join(seen)
+        yield* Fiber.join(stopping)
       }).pipe(Effect.provide(layer), Effect.provideService(Clock.Clock, watched))
     }),
 )
