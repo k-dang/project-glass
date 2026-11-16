@@ -15,10 +15,10 @@ Open an Agent, choose Details, then Changes. Details also offers Back to Chat.
 
 ## Driving it with glass-verify
 
-1. `node $V launch --backend fake`, doctor, and snapshot. Choose the Agents rail link, then the seeded Agent link under Local from the snapshot (its generated name varies). `wait --text README`.
+1. `node $V launch --backend fake`, doctor, and snapshot. Choose the Agents rail link, then the seeded pi Agent whose transcript starts "Show me around this repository." (its generated name varies). `wait --text README`.
 2. Snapshot and screenshot `chat-before`. `type --role textbox --name Message --text "Write a note"`, `press --key Enter`, then `wait --text "hello from the Agent"`. Snapshot the transcript and confirm the latest bash tool is marked Done before opening Changes. This exact demo message makes the real pi CLI write notes.txt using the shared E2E command fixture, with no model call.
-3. `click --role button --name Details`, `click --role button --name Changes`, `wait --text "hello from the Agent"`. Snapshot and screenshot `agent-changes`.
-4. Choose Details then Back to Chat. Send `Write another` in Message. `wait --text "a second note"`, snapshot and confirm the latest bash tool is Done, then Details and Changes.
+3. `click --role button --name Details`, `click --role button --name "Changes Ctrl+D"` (the item's name includes its shortcut, `⌘D` on macOS), `wait --text "hello from the Agent"`. Snapshot and screenshot `agent-changes`.
+4. Choose Details then `Back to Chat Ctrl+D`. Send `Write another` in Message. `wait --text "a second note"`, snapshot and confirm the latest bash tool is Done, then Details and `Changes Ctrl+D`.
 5. `wait --text "worked since you opened these changes"`. Snapshot and screenshot `held-changes`: more.txt is absent. `click --role button --name "Show latest"`, `wait --text "a second note"`, then snapshot and screenshot `latest-changes`. Both files appear. Stop.
 
 Feedback notes, from step 3's Changes:
@@ -31,12 +31,12 @@ Feedback notes, from step 3's Changes:
 Sending feedback, from a note added in Changes:
 
 1. Click `Review feedback`. Chat opens; `wait --text "attached to this message"`. Type an instruction in Message, screenshot, and click `Send`. `wait --text "1 Feedback note"`: the demo Agent's reply quotes the `<glass_feedback>` block it received, with the note's code, and the note is gone from Changes.
-2. Send `Please work slowly` (about 9s of reply), then at once add another note in Changes, click `Review feedback` and `Send`. `wait --text "Starts when the Agent finishes"` and screenshot the Queued message. `wait --text "All done"`, then the queued feedback starts its own Turn.
+2. Send `Please work slowly` (about 17s of reply), then at once add another note in Changes, click `Review feedback` and `Send`. `wait --text "Starts when the Agent finishes"` and screenshot the Queued message. `wait --text "All done"`, then the queued feedback starts its own Turn.
 3. To cancel it in time, queue it behind two slow messages: send `Please work slowly`, then `Please work slowly again`, then add a note, click `Review feedback` and `Send`. Type something in Message and click `Cancel: Feedback on the Agent's changes`: the typed text stays. In Changes the note is back under its line; `Edit` it, `Review feedback`, and `Send`. The reply quotes the edited note.
 
 ## Gotchas
 
-- The two exact messages reuse `runCommands` from `apps/server/test/fakeModelProvider.ts`, as in `apps/desktop/e2e/agentChanges.spec.ts`. Other demo messages do not write files.
+- The demo backend writes files only for the two exact messages, in `demoReply` (`apps/server/test/demoAgent.ts`), as in `apps/desktop/e2e/agentChanges.spec.ts`. Other demo messages do not write files.
 - Capture snapshots before selecting Details menu items; target their accessible roles and names.
 - The first Changes view is deliberately pinned; returning to Chat does not refresh it.
 - Line numbers aren't buttons in the accessibility tree, so select lines with `press --shift` from a clicked code line rather than by clicking a number.
