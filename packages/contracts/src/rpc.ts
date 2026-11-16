@@ -19,7 +19,6 @@ import {
   AgentModels,
   AgentPlace,
   AgentNotFound,
-  EarlierTurns,
   Image,
   InvalidLocalCheckout,
   LocalCheckout,
@@ -40,7 +39,6 @@ import {
   SendAgentMessage,
   SentMessage,
   StartFreshRefused,
-  Transcript,
   TranscriptUpdate,
   TurnEnd,
 } from "./agent"
@@ -561,14 +559,14 @@ export class GlassRpcs extends RpcGroup.make(
     success: Schema.Array(PastConversation),
     error: AgentError,
   }),
-  Rpc.make("ReadPastGlobalConversation", {
+  Rpc.make("WatchPastGlobalConversation", {
     payload: { id: Schema.String },
-    success: Transcript,
+    success: TranscriptUpdate,
     error: Schema.Union([PastConversationNotFound, AgentError]),
+    stream: true,
   }),
-  Rpc.make("ReadEarlierPastGlobalTurns", {
+  Rpc.make("LoadEarlierPastGlobalTurns", {
     payload: { id: Schema.String, before: Schema.String },
-    success: EarlierTurns,
     error: Schema.Union([PastConversationNotFound, AgentError]),
   }),
 ) {}

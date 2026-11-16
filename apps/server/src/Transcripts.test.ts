@@ -230,33 +230,37 @@ it.effect(
       const transcripts = yield* Transcripts
       yield* addEndedTurns("agent-1", turnIds(1, 45))
 
-      const latest = yield* transcripts.read("agent-1")
+      const pull = yield* Stream.toPull(transcripts.watch("agent-1"))
+      let transcript = (yield* pull).reduce(applyTranscriptUpdate, emptyTranscript)
+
       assert.deepStrictEqual(
-        latest.turns.map(({ id }) => id),
+        transcript.turns.map(({ id }) => id),
         turnIds(46 - RECENT_TURNS, 45),
       )
-      assert.equal(latest.earlierTurns, 45 - RECENT_TURNS)
+      assert.equal(transcript.earlierTurns, 45 - RECENT_TURNS)
 
       yield* addEndedTurns("agent-1", turnIds(46, 47))
 
-      const pages = [latest.turns]
-      let earlier = latest.earlierTurns
+      while (transcript.earlierTurns > 0) {
+        const before = transcript.turns[0]?.id ?? ""
+        yield* transcripts.loadEarlier("agent-1", before)
 
-      while (earlier > 0) {
-        const page = yield* transcripts.readEarlier("agent-1", pages[0]?.[0]?.id ?? "")
-        pages.unshift(page.turns)
-        earlier = page.earlierTurns
+        while (transcript.turns[0]?.id === before)
+          transcript = (yield* pull).reduce(applyTranscriptUpdate, transcript)
       }
 
+      while (transcript.turns.at(-1)?.ended === null || transcript.turns.at(-1)?.id !== "turn-47")
+        transcript = (yield* pull).reduce(applyTranscriptUpdate, transcript)
+
       assert.deepStrictEqual(
-        pages.flat().map(({ id }) => id),
-        turnIds(1, 45),
+        transcript.turns.map(({ id }) => id),
+        turnIds(1, 47),
       )
       assert.deepStrictEqual(
         (yield* transcripts.read("agent-1", 3)).turns.map(({ id }) => id),
         turnIds(45, 47),
       )
-    }).pipe(Effect.provide(transcriptsLayer)),
+    }).pipe(Effect.scoped, Effect.provide(transcriptsLayer)),
 )
 
 const textOf = (transcript: Transcript, turnId: string) =>

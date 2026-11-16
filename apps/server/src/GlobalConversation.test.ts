@@ -11,8 +11,10 @@ import {
   TurnInterrupted,
   TurnStopped,
   type Turn,
+  applyTranscriptUpdate,
+  emptyTranscript,
 } from "@glass/contracts"
-import { Effect, Predicate } from "effect"
+import { Effect, Option, Predicate, Stream } from "effect"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 import {
@@ -199,7 +201,8 @@ it.live(
       assert.strictEqual(shownSession(before), past.id)
       assert.notStrictEqual(shownSession(after), past.id)
 
-      const { turns } = yield* f.client.ReadPastGlobalConversation({ id: past.id })
+      const read = yield* Stream.runHead(f.client.WatchPastGlobalConversation({ id: past.id }))
+      const { turns } = applyTranscriptUpdate(emptyTranscript, Option.getOrThrow(read))
 
       assert.deepStrictEqual(turns, before === undefined ? [] : [before])
     }),

@@ -1,6 +1,5 @@
 import { useAtom, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
 import {
-  applyTranscriptUpdate,
   emptyTranscript,
   isWaiting,
   localPlace,
@@ -13,7 +12,7 @@ import {
 import { Cause, Data, DateTime, Option, Predicate } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import { ArrowLeft, History, SquarePen, X } from "lucide-react"
-import { type ReactNode, useEffect, useMemo, useState } from "react"
+import { type ReactNode, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog"
@@ -24,7 +23,6 @@ import { ConversationContext } from "./conversation"
 import {
   capturedContextAtom,
   loadEarlierPastTurnsAtom,
-  pastEarlierTurnsAtom,
   changeGlobalModelAtom,
   globalConversation,
   globalConversationOpenAtom,
@@ -317,23 +315,19 @@ function PastConversations(props: {
 
 function PastTranscript(props: { conversation: PastConversation; onBack: () => void }) {
   const read = useAtomValue(pastGlobalTranscriptAtom(props.conversation.id))
-  const pages = useAtomValue(pastEarlierTurnsAtom(props.conversation.id))
-  const [loaded, loadEarlier] = useAtom(loadEarlierPastTurnsAtom(props.conversation.id))
-  const problem = settledProblem(read) ?? settledProblem(loaded)
+  const loadEarlier = useAtomSet(loadEarlierPastTurnsAtom(props.conversation.id))
 
-  const { turns, earlierTurns, status } = useMemo(
-    () =>
-      pages.reduce(
-        applyTranscriptUpdate,
-        Option.getOrElse(AsyncResult.value(read), () => emptyTranscript),
-      ),
-    [read, pages],
+  const { turns, earlierTurns, status } = Option.getOrElse(
+    AsyncResult.value(read),
+    () => emptyTranscript,
   )
 
   return (
     <>
       <Header title={spanOf(props.conversation)} onBack={props.onBack} />
-      {problem !== null && <PaddedProblem problem={problem} />}
+      {AsyncResult.isFailure(read) && !read.waiting && (
+        <PaddedProblem problem={streamProblem(read.cause)} />
+      )}
       <Transcript
         turns={turns}
         earlierTurns={earlierTurns}

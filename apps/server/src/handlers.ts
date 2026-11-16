@@ -212,9 +212,9 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       MarkGlobalTurnSeen: ({ endedAt }) => globalConversation.markSeen(endedAt),
       StartGlobalConversationFresh: () => globalConversation.startFresh,
       ListPastGlobalConversations: () => globalConversation.past,
-      ReadPastGlobalConversation: ({ id }) => globalConversation.readPast(id),
-      ReadEarlierPastGlobalTurns: ({ id, before }) =>
-        globalConversation.readEarlierPast(id, before),
+      WatchPastGlobalConversation: ({ id }) => globalConversation.watchPast(id),
+      LoadEarlierPastGlobalTurns: ({ id, before }) =>
+        globalConversation.loadEarlierPast(id, before),
     })
   }),
 )

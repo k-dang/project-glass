@@ -2,7 +2,6 @@ import {
   AgentContext,
   type AgentMessageInput,
   type CapturedContext,
-  type EarlierTurns,
   type MessageInput,
   type ModelChoice,
   PullRequestContext,
@@ -41,22 +40,16 @@ export const pastGlobalConversationsAtom = backendRuntime.atom(
 )
 
 export const pastGlobalTranscriptAtom = Atom.family((id: string) =>
-  backendRuntime.atom(Backend.use((backend) => backend.ReadPastGlobalConversation({ id }))),
-)
-
-export const pastEarlierTurnsAtom = Atom.family((_id: string) =>
-  Atom.make<ReadonlyArray<EarlierTurns>>([]),
+  backendRuntime.atom(
+    transcriptOf(
+      Stream.unwrap(Backend.useSync((backend) => backend.WatchPastGlobalConversation({ id }))),
+    ),
+  ),
 )
 
 export const loadEarlierPastTurnsAtom = Atom.family((id: string) =>
-  backendRuntime.fn((before: string, get) =>
-    Backend.use((backend) => backend.ReadEarlierPastGlobalTurns({ id, before })).pipe(
-      Effect.tap((page) =>
-        Effect.sync(() =>
-          get.set(pastEarlierTurnsAtom(id), [...get(pastEarlierTurnsAtom(id)), page]),
-        ),
-      ),
-    ),
+  backendRuntime.fn((before: string) =>
+    Backend.use((backend) => backend.LoadEarlierPastGlobalTurns({ id, before })),
   ),
 )
 

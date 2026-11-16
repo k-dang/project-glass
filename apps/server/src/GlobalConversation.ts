@@ -11,8 +11,6 @@ import {
   type RequestWaiting,
   type SentMessage,
   StartFreshRefused,
-  type EarlierTurns,
-  type Transcript,
   type TranscriptUpdate,
   TurnEnd,
   type GlobalConversationUpdate,
@@ -92,13 +90,13 @@ export class GlobalConversation extends Context.Service<
     readonly startFresh: Effect.Effect<void, StartFreshRefused | AgentError>
     readonly past: Effect.Effect<ReadonlyArray<PastConversation>, AgentError>
     readonly loadEarlier: (before: string) => Effect.Effect<void, AgentError>
-    readonly readPast: (
+    readonly watchPast: (
       sessionId: string,
-    ) => Effect.Effect<Transcript, PastConversationNotFound | AgentError>
-    readonly readEarlierPast: (
+    ) => Stream.Stream<TranscriptUpdate, PastConversationNotFound | AgentError>
+    readonly loadEarlierPast: (
       sessionId: string,
       before: string,
-    ) => Effect.Effect<EarlierTurns, PastConversationNotFound | AgentError>
+    ) => Effect.Effect<void, PastConversationNotFound | AgentError>
     readonly waiting: Stream.Stream<ReadonlyArray<WaitingRequest>>
     readonly unseen: Stream.Stream<TurnEnd | null>
     readonly markSeen: (endedAt: DateTime.Utc) => Effect.Effect<void, AgentError>
@@ -322,21 +320,6 @@ export class GlobalConversation extends Context.Service<
         if (ended === undefined) yield* new PastConversationNotFound({ id: sessionId })
       })
 
-      const readPast = Effect.fn("GlobalConversation.readPast")(function* (sessionId: string) {
-        yield* findPast(sessionId)
-
-        return yield* transcripts.read(sessionId)
-      })
-
-      const readEarlierPast = Effect.fn("GlobalConversation.readEarlierPast")(function* (
-        sessionId: string,
-        before: string,
-      ) {
-        yield* findPast(sessionId)
-
-        return yield* transcripts.readEarlier(sessionId, before)
-      })
-
       return GlobalConversation.of({
         model: SubscriptionRef.get(model),
         changeModel,
@@ -356,8 +339,10 @@ export class GlobalConversation extends Context.Service<
         id,
         startFresh,
         past,
-        readPast,
-        readEarlierPast,
+        watchPast: (sessionId) =>
+          Stream.unwrap(findPast(sessionId).pipe(Effect.as(transcripts.watch(sessionId)))),
+        loadEarlierPast: (sessionId, before) =>
+          findPast(sessionId).pipe(Effect.andThen(transcripts.loadEarlier(sessionId, before))),
         waiting: followSession((sessionId) =>
           transcripts.waiting.pipe(Stream.map((waiting) => waiting.get(sessionId) ?? [])),
         ),
