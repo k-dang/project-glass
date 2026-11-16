@@ -13,6 +13,8 @@ import conversationStartedWork from "./migrations/0005_conversation_started_work
 import turnSeen from "./migrations/0006_turn_seen"
 import workReports from "./migrations/0007_work_reports"
 import pastGlobalConversations from "./migrations/0008_past_global_conversations"
+import globalConversationUpdates from "./migrations/0009_global_conversation_updates"
+import toDoImages from "./migrations/0010_to_do_images"
 import { migrationLoader } from "./Migrations"
 import { Transcripts } from "./Transcripts"
 
@@ -76,6 +78,7 @@ it.live("upgrades main's schema directly, preserving completed and unfinished up
     assert.deepStrictEqual(yield* SqliteMigrator.run({ loader: migrationLoader }), [
       [9, "global_conversation_updates"],
       [10, "to_do_images"],
+      [11, "mermaid_tour_diagrams"],
     ])
     const transcripts = yield* Transcripts
     const { turns } = yield* transcripts.read("global")
@@ -140,6 +143,7 @@ it.live("creates the schema once and reads Activity through its indexes after re
         [8, "past_global_conversations"],
         [9, "global_conversation_updates"],
         [10, "to_do_images"],
+        [11, "mermaid_tour_diagrams"],
       ],
       [],
     ] as const) {
@@ -376,6 +380,46 @@ it.live("adds to-do images without touching to-dos written before them", () =>
       assert.deepStrictEqual(yield* sql`SELECT COUNT(*) AS images FROM to_do_image`, [
         { images: 0 },
       ])
+    }).pipe(Effect.provide(SqliteClient.layer({ filename: join(home, "glass.db") })), Effect.scoped)
+  }),
+)
+
+it.live("drops node-and-edge Tour diagrams, keeping the rest of each saved Tour", () =>
+  Effect.gen(function* () {
+    const home = yield* isolatedHome
+
+    yield* Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient
+
+      yield* SqliteMigrator.run({
+        loader: SqliteMigrator.fromRecord({
+          "0001_baseline": baseline,
+          "0002_agent_review_hotspots": agentReviewHotspots,
+          "0003_agent_review_done": agentReviewDone,
+          "0004_outside_agent": outsideAgent,
+          "0005_conversation_started_work": conversationStartedWork,
+          "0006_turn_seen": turnSeen,
+          "0007_work_reports": workReports,
+          "0008_past_global_conversations": pastGlobalConversations,
+          "0009_global_conversation_updates": globalConversationUpdates,
+          "0010_to_do_images": toDoImages,
+        }),
+      })
+
+      const diagram = { nodes: [{ id: "a" }], edges: [] }
+      const callouts = [{ label: "Here", target: { path: "a.ts" } }]
+      const plain = { title: "Two", explanation: "", files: [] }
+      const chapter = { title: "One", explanation: "", files: [], callouts }
+      const tour = { intent: "Greet by name.", beforeAfter: null, everythingElse: [] }
+      const content = { ...tour, diagram, chapters: [{ ...chapter, diagram }, plain] }
+
+      yield* sql`INSERT INTO tours (owner, repo, number, base, head, written_at, content)
+        VALUES ('glass-demo', 'greeter', 7, 'b', 'h', '2026-11-14T12:00:00.000Z', ${JSON.stringify(content)})`
+
+      yield* SqliteMigrator.run({ loader: migrationLoader })
+
+      const [row] = yield* sql<{ content: string }>`SELECT content FROM tours`
+      assert.deepStrictEqual(JSON.parse(row!.content), { ...tour, chapters: [chapter, plain] })
     }).pipe(Effect.provide(SqliteClient.layer({ filename: join(home, "glass.db") })), Effect.scoped)
   }),
 )
