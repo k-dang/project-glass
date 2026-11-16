@@ -111,7 +111,7 @@ export function HotspotPoints(props: {
   if (props.hotspots.length === 0) return null
 
   return (
-    <ol aria-label="Hotspots" className="my-5 space-y-5">
+    <ol aria-label="Hotspots" className="my-5 space-y-5 wrap-anywhere">
       {props.hotspots.map(({ rank, hotspot }) => {
         const chapter = links.chapterOf(rank)
         const { place } = hotspot
