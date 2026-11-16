@@ -144,12 +144,14 @@ const goneRecord = (record: typeof Building.Type | typeof Ready.Type, now: DateT
 
 interface HostLink {
   position: JournalPosition | null
+  turnOnLostHost: string | null
   readonly connectLock: Semaphore.Semaphore
   readonly recordLock: Semaphore.Semaphore
 }
 
-const newLink = (position: JournalPosition | null): HostLink => ({
+const newLink = (position: JournalPosition | null, turnOnLostHost: string | null): HostLink => ({
   position,
+  turnOnLostHost,
   connectLock: Semaphore.makeUnsafe(1),
   recordLock: Semaphore.makeUnsafe(1),
 })
@@ -239,11 +241,24 @@ export class Sandboxes extends Context.Service<
         new Map(stored.map(({ id, sandbox }) => [id, { record: sandbox, following: null }])),
       )
 
+      const runningTurn = (agentId: string) =>
+        transcripts.runningTurn(agentId).pipe(Effect.orElseSucceed(() => null))
+
       const links = new Map(
-        stored.map(({ id, journalHost, journalSaved }) => [
-          id,
-          newLink(journalHost === null ? null : { host: journalHost, saved: journalSaved }),
-        ]),
+        yield* Effect.forEach(stored, ({ id, journalHost, journalSaved }) =>
+          runningTurn(id).pipe(
+            Effect.map(
+              (running) =>
+                [
+                  id,
+                  newLink(
+                    journalHost === null ? null : { host: journalHost, saved: journalSaved },
+                    running,
+                  ),
+                ] as const,
+            ),
+          ),
+        ),
       )
 
       const linkOf = (agentId: string) => {
@@ -251,7 +266,7 @@ export class Sandboxes extends Context.Service<
 
         if (found !== undefined) return found
 
-        const link = newLink(null)
+        const link = newLink(null, null)
         links.set(agentId, link)
 
         return link
@@ -334,9 +349,9 @@ export class Sandboxes extends Context.Service<
 
           if (link.position?.host === host) return link.position
 
-          if (link.position !== null) {
+          if (link.position !== null && link.turnOnLostHost !== null) {
             yield* Effect.logWarning("An Agent's Sandbox has a new agent host", agentId)
-            yield* transcripts.endRunning(TurnCutOff.make({}), [agentId])
+            yield* transcripts.endTurn(TurnCutOff.make({}), agentId, link.turnOnLostHost)
           }
 
           yield* sql`
@@ -478,6 +493,8 @@ export class Sandboxes extends Context.Service<
 
             if (!Predicate.isTagged(record, "Ready")) return yield* unreachable()
 
+            const link = linkOf(agentId)
+
             if (provider.extend !== undefined)
               yield* extendAhead(agentId, provider.extend).pipe(Effect.forkChild)
 
@@ -495,10 +512,17 @@ export class Sandboxes extends Context.Service<
                 yield* Effect.acquireRelease(
                   recover(agentId, opened, () => ({ phase: "reachable", client })),
                   () =>
-                    recover(agentId, opened, (before) =>
-                      before.phase === "reachable" && before.client === client
-                        ? { phase: "connecting", reach: "reachable" }
-                        : before,
+                    runningTurn(agentId).pipe(
+                      Effect.map((running) => {
+                        link.turnOnLostHost = running
+                      }),
+                      Effect.andThen(
+                        recover(agentId, opened, (before) =>
+                          before.phase === "reachable" && before.client === client
+                            ? { phase: "connecting", reach: "reachable" }
+                            : before,
+                        ),
+                      ),
                     ),
                 )
                 yield* Deferred.succeed(opened, client)

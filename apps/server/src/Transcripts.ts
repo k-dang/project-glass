@@ -236,6 +236,11 @@ export class Transcripts extends Context.Service<
       ending: TurnEnding,
       agentIds: ReadonlyArray<string>,
     ) => Effect.Effect<void, AgentError>
+    readonly endTurn: (
+      ending: TurnEnding,
+      agentId: string,
+      turnId: string,
+    ) => Effect.Effect<void, AgentError>
     readonly runningTurn: (agentId: string) => Effect.Effect<string | null, AgentError>
     readonly idle: (agentId: string) => Effect.Effect<boolean, AgentError>
     /** Records the covered outcomes in the Turn's transaction, before publishing TurnStarted. */
@@ -709,13 +714,16 @@ export class Transcripts extends Context.Service<
         })
       })
 
-      const endRunning = Effect.fn("Transcripts.endRunning")(function* (
+      const endUnfinished = Effect.fnUntraced(function* (
         ending: TurnEnding,
         agentIds: ReadonlyArray<string>,
+        onlyTurnId: string | null,
       ) {
         if (agentIds.length === 0) return
 
         const conditions = [sql`t.ended IS NULL`, sql.in("t.agent_id", agentIds)]
+
+        if (onlyTurnId !== null) conditions.push(sql`t.id = ${onlyTurnId}`)
 
         if (Predicate.isTagged(ending, "CutOff") || Predicate.isTagged(ending, "Interrupted"))
           conditions.push(
@@ -750,6 +758,16 @@ export class Transcripts extends Context.Service<
         })
       })
 
+      const endRunning = Effect.fn("Transcripts.endRunning")(
+        (ending: TurnEnding, agentIds: ReadonlyArray<string>) =>
+          endUnfinished(ending, agentIds, null),
+      )
+
+      const endTurn = Effect.fn("Transcripts.endTurn")(
+        (ending: TurnEnding, agentId: string, endedTurnId: string) =>
+          endUnfinished(ending, [agentId], endedTurnId),
+      )
+
       const withStorageFailure = <A, E, R>(name: string, effect: Effect.Effect<A, E, R>) =>
         Effect.catchIf(effect, isStorageError, (cause) =>
           Effect.logWarning(`Couldn't ${name}`, cause).pipe(Effect.andThen(storageFailure())),
@@ -758,6 +776,7 @@ export class Transcripts extends Context.Service<
       return Transcripts.of({
         save,
         endRunning,
+        endTurn,
         watch: (agentId) =>
           Stream.unwrap(
             lockFor(agentId).withPermits(1)(

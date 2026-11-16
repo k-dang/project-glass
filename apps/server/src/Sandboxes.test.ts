@@ -5,6 +5,7 @@ import {
   FollowedRepository,
   incompatibleExplanation,
   PartSet,
+  PermissionRequestPart,
   SandboxPlace,
   SandboxProviderInfo,
   type SandboxStatus,
@@ -59,6 +60,15 @@ const reply = (turn: Effect.Success<Fixture["started"]>, said: ReadonlyArray<str
       PartSet.make({ turnId: turn.turnId, index: from + index, part: TextPart.make({ text }) }),
     ),
   )
+
+const waitingPermission = PermissionRequestPart.make({
+  requestId: "request-1",
+  toolName: "Bash",
+  inputSummary: "A tool request",
+  input: "{}",
+  status: "waiting",
+  reason: null,
+})
 
 const afterRetries = (f: Fixture, agentId: string, until: (transcript: Transcript) => boolean) =>
   eventually(
@@ -458,8 +468,12 @@ it.effect(
       const f = yield* agentServicesFixture
       const agent = yield* createSandboxed(f)
       const said = ["one", "two", "three", "four", "five"]
-      yield* reply(yield* f.started, said)
-      yield* f.transcript(agent.id, ({ turns }) => texts(turns[0]).length === said.length)
+      const first = yield* f.started
+      yield* reply(first, said)
+      yield* first.emit(
+        PartSet.make({ turnId: first.turnId, index: said.length, part: waitingPermission }),
+      )
+      yield* f.transcript(agent.id, ({ turns }) => turns[0]?.parts.length === said.length + 1)
 
       yield* f.sandboxes.restartHost(agent.id)
 
@@ -514,9 +528,24 @@ for (const [spoken, kind] of [
         )
 
         yield* f.sandboxes.restartHost(agent.id)
-        yield* f.agents.changes(agent.id)
         yield* f.agents.send(agent.id, say("Back?"))
         yield* end(yield* f.started)
         assert.equal(failedReason(yield* f.transcript(agent.id, settled(3))), "Done")
       }),
   )
+
+it.effect("runs a message sent after Glass relaunches on its Sandbox's replacement host", () =>
+  Effect.gen(function* () {
+    const f = yield* agentServicesFixture
+    const agent = yield* createSandboxed(f)
+    yield* end(yield* f.started)
+    yield* f.transcript(agent.id, settled(1))
+
+    yield* f.sandboxes.restartHost(agent.id)
+    const { agents } = yield* f.restart
+    yield* agents.send(agent.id, say("Again"))
+    yield* end(yield* f.started)
+
+    assert.equal(failedReason(yield* f.transcript(agent.id, settled(2), agents)), "Done")
+  }),
+)
