@@ -2,7 +2,7 @@ import { assert, it } from "@effect/vitest"
 import { ToDo, ToDoError, type ToDoImageUpload } from "@glass/contracts"
 import { Effect, Result } from "effect"
 import { Base64 } from "effect/encoding"
-import { chmod, mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises"
+import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { DatabaseSync } from "node:sqlite"
 import { isolatedHome, startBackend } from "../test/harness"
@@ -248,11 +248,14 @@ it.live("still deletes a to-do when an image file cannot be removed", () =>
 
     if (fileName === undefined) throw new Error("missing image file")
 
-    yield* Effect.promise(() => chmod(imageDir(home), 0o555))
+    const blocked = join(imageDir(home), fileName)
+    yield* Effect.promise(async () => {
+      await rm(blocked)
+      await mkdir(blocked)
+      await writeFile(join(blocked, "kept"), "")
+    })
 
-    const removed = yield* client
-      .DeleteToDo({ id: 1 })
-      .pipe(Effect.ensuring(Effect.promise(() => chmod(imageDir(home), 0o755))))
+    const removed = yield* client.DeleteToDo({ id: 1 })
 
     assert.deepStrictEqual(removed, [])
     assert.deepStrictEqual(yield* imageRows(home), [])
