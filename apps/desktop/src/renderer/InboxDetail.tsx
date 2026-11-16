@@ -1,6 +1,6 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import {
-  type AgentNeedsYou,
+  type ConversationNeedsYou,
   type GlobalConversationNeedsYou,
   type NeedsYouItem,
   OutsideChoice,
@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { AgentReviewMarkdown } from "./AgentReviewPanel"
 import { Backend, backendRuntime } from "./backend"
-import { agentConversation, ConversationContext } from "./conversation"
+import { conversationAtoms, ConversationAtomsContext } from "./conversation"
 import { globalConversation, globalConversationOpenAtom } from "./globalConversation"
 import {
   contextOf,
@@ -51,7 +51,7 @@ export function InboxDetail(
   const { now, actions } = props
 
   return Match.valueTags(props.item, {
-    Agent: (item) => <AgentDetail item={item} now={now} actions={actions} />,
+    Conversation: (item) => <ConversationDetail item={item} now={now} actions={actions} />,
     OutsideQuestion: (item) => (
       <OutsideQuestionDetail key={item.id} item={item} now={now} actions={actions} />
     ),
@@ -202,25 +202,29 @@ function OutsideQuestionDetail(props: DetailProps<OutsideQuestion>) {
   )
 }
 
-function AgentDetail(props: DetailProps<AgentNeedsYou>) {
-  const { agent } = props.item
-  const conversation = useMemo(() => agentConversation(agent.id), [agent.id])
+function ConversationDetail(props: DetailProps<ConversationNeedsYou>) {
+  const { conversation } = props.item
+  const atoms = useMemo(() => conversationAtoms(conversation.id), [conversation.id])
 
   return (
     <DetailShell
       actions={props.actions}
       buttons={
-        <Link to="/agents/$agentId" params={{ agentId: agent.id }} className={buttonVariants()}>
-          Open the Agent
+        <Link
+          to="/conversations/$conversationId"
+          params={{ conversationId: conversation.id }}
+          className={buttonVariants()}
+        >
+          Open the Conversation
         </Link>
       }
     >
       <DetailHeader item={props.item} now={props.now} />
-      <ConversationContext value={conversation}>
+      <ConversationAtomsContext value={atoms}>
         {requestsOf(props.item).map((part) => (
           <RequestCard key={part.requestId} part={part} />
         ))}
-      </ConversationContext>
+      </ConversationAtomsContext>
     </DetailShell>
   )
 }
@@ -234,11 +238,11 @@ function GlobalConversationDetail(props: DetailProps<GlobalConversationNeedsYou>
       buttons={<Button onClick={() => open(true)}>Open the Global conversation</Button>}
     >
       <DetailHeader item={props.item} now={props.now} />
-      <ConversationContext value={globalConversation}>
+      <ConversationAtomsContext value={globalConversation}>
         {props.item.requests.map((part) => (
           <RequestCard key={part.requestId} part={part} />
         ))}
-      </ConversationContext>
+      </ConversationAtomsContext>
     </DetailShell>
   )
 }

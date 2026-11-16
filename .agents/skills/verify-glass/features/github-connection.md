@@ -21,13 +21,14 @@ When Glass opens, the avatar at the bottom of the app icon rail carries a status
 Preconditions:
 
 - A fresh run in the GitHub mode each step names; `node $V doctor` passes.
+- Glass opens on Dashboard, whose Activity card shows only a short alert with Retry. `click --role link --name Reviews` first: the alerts below replace the Reviews area.
 - For `conn-gh`, `gh auth status` succeeds and neither `GH_TOKEN` nor `GITHUB_TOKEN` is set in your shell.
 
-- **Real sign-in (`conn-gh`/`conn-env`).** `node $V launch`, then `node $V snapshot connected-real`. The rail avatar is `status "@<login> · via <source>"`, with `@<login>` matching `gh api user --jq .login`, followed by the source label for whichever credential your shell provides.
+- **Real sign-in (`conn-gh`/`conn-env`).** `node $V launch --github real`, then `node $V snapshot connected-real`. The rail avatar is `status "@<login> · via <source>"`, with `@<login>` matching `gh api user --jq .login`, followed by the source label for whichever credential your shell provides.
 - **No credentials (`conn-none`).** `node $V launch --no-build --no-credentials`, then `node $V wait --text "No GitHub credentials found"`. The `alert` contains the detail "Run `gh auth login`, then try again. Glass reads GH_TOKEN and GITHUB_TOKEN only when it starts, so relaunch after setting one.", `button "Copy gh auth login"`, and `button "Try again"`.
 - **Rejected token (`conn-rejected`).** `node $V launch --no-build --github fake --fake-mode 401`, then `node $V wait --text "GitHub rejected your token"`. Detail reads "The token from GH_TOKEN is invalid or expired. Replace it, then relaunch Glass.", with no copy button.
 - **GitHub error (`conn-unavailable`).** `--fake-mode 500` shows "Couldn't reach GitHub" / "GitHub had a problem answering (HTTP 500). Try again in a moment.". `node $V fake-github down` then Try again shows "Check your internet connection, then try again.", and after `stop`, `evidence/backend.log` has a `GitHub request failed` warning with the technical cause. The detail never shows raw transport errors or URLs.
-- **Retry (`conn-retry`).** From the rejected state: `node $V snapshot rejected`, `node $V screenshot rejected`, `node $V fake-github ok`, `node $V click --role button --name "Try again"`, `node $V snapshot connected`, `node $V screenshot connected`. The rail avatar is `status "@octocat · via GH_TOKEN"` with a green dot, and the alert is gone.
+- **Retry (`conn-retry`).** From the rejected state: `node $V snapshot rejected`, `node $V screenshot rejected`, `node $V fake-github ok`, `node $V click --role button --name "Try again"`, `node $V snapshot connected`, `node $V screenshot connected`. The rail avatar is `status "@octocat · via GH_TOKEN"` with a green dot, and the alert gives way to the PR list ("No followed repositories").
 - **Proof.** After `node $V stop`, `evidence/fake-github.log` has one `GET /user -> <mode>` line per check, in order (e.g. `-> 401` then `-> ok`), alongside the before/after snapshots and screenshots.
 
 ## Gotchas

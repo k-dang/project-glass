@@ -2,14 +2,14 @@ import {
   AskUserResult,
   type ActivityLogError,
   ActivityPage,
-  Agent,
-  AgentEngine,
-  AgentError,
+  Conversation,
+  AgentHarness,
+  ConversationError,
   AgentModels,
   type AgentReviewFailure,
   AgentReviewState,
   Branches,
-  type AgentNotFound,
+  type ConversationNotFound,
   type ConnectionError,
   FollowedRepository,
   type InvalidLocalCheckout,
@@ -32,7 +32,7 @@ import {
   ToDo,
   type Turn,
   TurnEnding,
-  AgentPlace,
+  ConversationPlace,
   localPlace,
 } from "@glass/contracts"
 import {
@@ -51,13 +51,13 @@ import { ActivityLog } from "../ActivityLog"
 import { AgentReviews } from "../AgentReviews"
 import { PullRequestMaterial, pullRequestMaterial } from "../agentReviewPrompt"
 import type { FileMaterial } from "../tourPrompt"
-import { Agents } from "../Agents"
+import { Conversations } from "../Conversations"
 import { GitHubClient } from "../github/GitHubClient"
 import { BackgroundGitHubRequest } from "../github/GitHubRequestPolicy"
 import { FollowedRepositories } from "../FollowedRepositories"
 import { LocalCheckouts } from "../LocalCheckouts"
 import { AskProgress } from "./AskProgress"
-import { type ConversationCaller, McpCaller } from "./McpCredentials"
+import { type GlobalConversationCaller, McpCaller } from "./McpCredentials"
 import { NeedsYou } from "../NeedsYou"
 import { ASK_PROGRESS_SECONDS, ASK_TIMEOUT_SECONDS, OutsideQuestions } from "../OutsideQuestions"
 import { Sandboxes } from "../Sandboxes"
@@ -116,31 +116,31 @@ const ListRecentActivity = Tool.make("list_recent_activity", {
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)
 
-const ListedAgent = Schema.Struct({
-  agent: Agent,
+const ListedConversation = Schema.Struct({
+  conversation: Conversation,
   waiting: Schema.Boolean.annotate({
     description:
-      "Whether the Agent is waiting for the user to answer a Question or Permission request.",
+      "Whether the Conversation's agent is waiting for the user to answer a Question or Permission request.",
   }),
 })
 
-const ListAgents = Tool.make("list_agents", {
+const ListConversations = Tool.make("list_conversations", {
   description:
-    "Lists the user's Agents: the named coding conversations working in a repository, with each one's repository, base branch, program, and whether it waits for the user's answer.",
-  success: Schema.Struct({ agents: Schema.Array(ListedAgent) }),
+    "Lists the user's Conversations: the named coding conversations working in a repository, with each one's repository, base branch, harness, and whether it waits for the user's answer.",
+  success: Schema.Struct({ conversations: Schema.Array(ListedConversation) }),
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)
 
 const ListNeedsYou = Tool.make("list_needs_you", {
   description:
-    "Lists what waits on the user in Glass now: Agents with a Permission request or Question waiting, questions from an agent outside Glass, queued PRs whose Agent review is finished, and the user's own PRs with changes requested, failing checks, review threads awaiting their reply, or ready to merge. Agents and outside questions come first, then the longest waiting.",
+    "Lists what waits on the user in Glass now: Conversations with a Permission request or Question waiting, questions from an agent outside Glass, queued PRs whose Agent review is finished, and the user's own PRs with changes requested, failing checks, review threads awaiting their reply, or ready to merge. Conversations and outside questions come first, then the longest waiting.",
   success: Schema.Struct({ items: Schema.Array(NeedsYouItem) }),
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)
 
 const ListStartedWork = Tool.make("list_started_work", {
   description:
-    "Lists the Agents and Agent reviews this conversation started, or Agents it messaged, oldest first: each with its state now and the user's message that asked for it. Answer how the work you started is going from this, not from the chat. Agents and reviews the user started themselves, and deleted Agents, aren't listed.",
+    "Lists the Conversations and Agent reviews this conversation started, or Conversations it messaged, oldest first: each with its state now and the user's message that asked for it. Answer how the work you started is going from this, not from the chat. Conversations and reviews the user started themselves, and deleted Conversations, aren't listed.",
   success: Schema.Struct({ items: Schema.Array(StartedItem) }),
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)
@@ -152,15 +152,17 @@ const TurnSummary = Schema.Struct({
     description: "How the Turn ended, or null while it runs.",
   }),
   activity: Schema.Array(Schema.String).annotate({
-    description: "What the Agent wrote and did in the Turn, in order, with long text cut short.",
+    description: "What its agent wrote and did in the Turn, in order, with long text cut short.",
   }),
 })
 
-const ReadAgentTranscript = Tool.make("read_agent_transcript", {
+const ReadConversationTranscript = Tool.make("read_conversation_transcript", {
   description:
-    "Reads an Agent's most recent Turns: each message the user sent, what the Agent wrote and which tools it used, and how the Turn ended. Includes Queued messages not yet delivered.",
+    "Reads a Conversation's most recent Turns: each message the user sent, what its agent wrote and which tools it used, and how the Turn ended. Includes Queued messages not yet delivered.",
   parameters: Schema.Struct({
-    agentId: Schema.String.annotate({ description: "The Agent's id, from list_agents." }),
+    conversationId: Schema.String.annotate({
+      description: "The Conversation's id, from list_conversations.",
+    }),
     turns: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: MAX_TURNS })).annotate({
       description: `How many of the latest Turns to read, at most ${MAX_TURNS}.`,
     }),
@@ -190,12 +192,12 @@ const ReadPullRequest = Tool.make("read_pull_request", {
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)
 
-const ListAgentPlaces = Tool.make("list_agent_places", {
+const ListConversationPlaces = Tool.make("list_conversation_places", {
   description:
-    "Lists where the user can start an Agent. An Agent on this device works in a copy of a Local checkout, so its repository must be one of localCheckouts. An Agent in a Sandbox works in any followed repository, in a Sandbox from one of sandboxProviders. Each place runs only the Agent programs listed with it.",
+    "Lists where the user can start a Conversation. A Conversation on this device works in a copy of a Local checkout, so its repository must be one of localCheckouts. A Conversation in a Sandbox works in any followed repository, in a Sandbox from one of sandboxProviders. Each place runs only the Agent harnesses listed with it.",
   success: Schema.Struct({
     local: Schema.Struct({
-      engines: Schema.Array(AgentEngine),
+      harnesses: Schema.Array(AgentHarness),
       localCheckouts: Schema.Array(LocalCheckout),
     }),
     sandboxProviders: Schema.Array(SandboxProviderInfo),
@@ -204,13 +206,13 @@ const ListAgentPlaces = Tool.make("list_agent_places", {
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)
 
-const ListAgentOptions = Tool.make("list_agent_options", {
+const ListConversationOptions = Tool.make("list_conversation_options", {
   description:
-    "Lists the base branches and models an Agent can start with, for a repository, place, and Agent program from list_agent_places.",
+    "Lists the base branches and models a Conversation can start with, for a repository, place, and Agent harness from list_conversation_places.",
   parameters: Schema.Struct({
-    place: AgentPlace,
+    place: ConversationPlace,
     repository: FollowedRepository,
-    engine: AgentEngine,
+    harness: AgentHarness,
   }),
   success: Schema.Struct({
     ...Branches.fields,
@@ -225,41 +227,46 @@ const action = Context.make(Tool.Readonly, false).pipe(
   Context.add(Tool.OpenWorld, false),
 )
 
-const CreateAgent = Tool.make("create_agent", {
+const CreateConversation = Tool.make("create_conversation", {
   description:
-    "Creates an Agent: a named coding conversation working on a branch of its own, made from a base branch of a repository. It starts its first Turn with the message, and appears in the user's Agents. This returns once Glass created the Agent, not when it finishes its Turn: read_agent_transcript shows its progress. Choose the place, program, base branch, and model from list_agent_places and list_agent_options, never from guesses. If this call fails without saying why, or is cut off, call list_agents before trying again rather than creating a second Agent.",
+    "Creates a Conversation: a named coding conversation working on a branch of its own, made from a base branch of a repository. It starts its first Turn with the message, and appears in the user's Conversations. This returns once Glass created the Conversation, not when it finishes its Turn: read_conversation_transcript shows its progress. Choose the place, harness, base branch, and model from list_conversation_places and list_conversation_options, never from guesses. If this call fails without saying why, or is cut off, call list_conversations before trying again rather than creating a second Conversation.",
   parameters: Schema.Struct({
     repository: FollowedRepository,
     baseBranch: Schema.String.annotate({
-      description: "The branch the Agent's branch starts from.",
+      description: "The branch the Conversation's branch starts from.",
     }),
-    place: AgentPlace.annotate({
-      description: "Where the Agent works: on this device, or in a Sandbox from a provider.",
+    place: ConversationPlace.annotate({
+      description:
+        "Where the Conversation's agent works: on this device, or in a Sandbox from a provider.",
     }),
-    engine: AgentEngine.annotate({ description: "The Agent program that runs the Agent." }),
+    harness: AgentHarness.annotate({
+      description: "The Agent harness that runs the Conversation.",
+    }),
     model: Schema.NullOr(Schema.String).annotate({
-      description: "A model id from list_agent_options, or null for the program's default.",
+      description: "A model id from list_conversation_options, or null for the harness's default.",
     }),
     effort: Schema.NullOr(Schema.String).annotate({
       description: "One of the model's Efforts, or null for its default.",
     }),
-    message: MessageText.annotate({ description: "The Agent's first message: its task." }),
+    message: MessageText.annotate({ description: "The Conversation's first message: its task." }),
   }),
-  success: Schema.Struct({ agent: Agent }),
+  success: Schema.Struct({ conversation: Conversation }),
   failure: GlassToolFailure,
 }).annotateMerge(action)
 
-const SendAgentMessage = Tool.make("send_agent_message", {
+const SendConversationMessage = Tool.make("send_conversation_message", {
   description:
-    "Sends a message to one of the user's Agents, as the user would from the Agent. An idle Agent starts a Turn with it; a busy Agent keeps it as a Queued message and starts on it after its running Turn. This returns once Glass accepted the message, not when the Agent answers: read_agent_transcript shows its progress. If this call fails without saying why, or is cut off, read the Agent's transcript before sending again rather than sending it twice.",
+    "Sends a message to one of the user's Conversations, as the user would from the Conversation. An idle Conversation starts a Turn with it; a busy Conversation keeps it as a Queued message and starts on it after its running Turn. This returns once Glass accepted the message, not when its agent answers: read_conversation_transcript shows its progress. If this call fails without saying why, or is cut off, read the Conversation's transcript before sending again rather than sending it twice.",
   parameters: Schema.Struct({
-    agentId: Schema.String.annotate({ description: "The Agent's id, from list_agents." }),
+    conversationId: Schema.String.annotate({
+      description: "The Conversation's id, from list_conversations.",
+    }),
     message: MessageText,
   }),
   success: Schema.Struct({
     delivery: MessageDelivery.annotate({
       description:
-        "started: the Agent started a Turn with it. queued: it waits behind the running Turn.",
+        "started: the Conversation started a Turn with it. queued: it waits behind the running Turn.",
     }),
   }),
   failure: GlassToolFailure,
@@ -276,7 +283,7 @@ const ReadAgentReview = Tool.make("read_agent_review", {
 const AskUser = Tool.make("ask_user", {
   description:
     `For an agent outside Glass: asks the user a question and waits for their answer in the Glass Inbox, in Stopped on you, under the name the user approved. ` +
-    `An Agent Glass launched asks with its own Question tool instead. ` +
+    `A Conversation Glass launched asks with its own Question tool instead. ` +
     `Waits ${ASK_TIMEOUT_SECONDS / 60} minutes unless timeoutSeconds is set. timeoutSeconds is a whole number of seconds from 1 to ${ASK_TIMEOUT_SECONDS}. ` +
     `Glass sends a progress notification immediately and every ${ASK_PROGRESS_SECONDS} seconds while it waits, so a client that resets its timeout when progress arrives is not cut off before Glass's own limit. ` +
     `Pass a progress token on the call. The result is Answered with the user's answer (by is choice or text), TimedOut when they do not answer in time, or Cancelled when Glass shuts down. ` +
@@ -321,25 +328,25 @@ export const GlassTools = Toolkit.make(
   ListQueue,
   ListToDos,
   ListRecentActivity,
-  ListAgents,
+  ListConversations,
   ListNeedsYou,
   ListStartedWork,
-  ReadAgentTranscript,
+  ReadConversationTranscript,
   ReadPullRequest,
   ReadAgentReview,
   StartAgentReview,
-  ListAgentPlaces,
-  ListAgentOptions,
-  CreateAgent,
-  SendAgentMessage,
+  ListConversationPlaces,
+  ListConversationOptions,
+  CreateConversation,
+  SendConversationMessage,
   AskUser,
 )
 
 type ServiceFailure =
   | ActivityLogError
-  | AgentError
+  | ConversationError
   | AgentReviewFailure
-  | AgentNotFound
+  | ConversationNotFound
   | ConnectionError
   | InvalidLocalCheckout
   | PullRequestAccessDenied
@@ -360,17 +367,17 @@ const explained = (error: ServiceFailure) =>
           "GitHub has no such PR, or the user's GitHub login can't see it.",
         NoCredentials: () => "Glass isn't signed in to GitHub.",
         TokenRejected: () => "GitHub rejected Glass's GitHub login.",
-        AgentNotFound: () =>
-          "There's no Agent with that id. list_agents names the Agents there are.",
+        ConversationNotFound: () =>
+          "There's no Conversation with that id. list_conversations names the Conversations there are.",
         InvalidLocalCheckout: ({ message }) =>
-          `${message} The user links one from New Agent in Agents; an Agent in a Sandbox needs none.`,
+          `${message} The user links one from New Conversation in Conversations; a Conversation in a Sandbox needs none.`,
         PullRequestAccessDenied: ({ message }) => message,
         GitHubUnavailable: ({ message }) => message,
         ActivityLogError: ({ message }) => message,
-        AgentError: ({ message }) => message,
+        ConversationError: ({ message }) => message,
         AgentReviewFailure: ({ message }) => message,
         RequestWaiting: () =>
-          "The Agent is waiting for the user to answer its Question or Permission request, so it took no message. The user answers it in the Agent.",
+          "The Conversation's agent is waiting for the user to answer its Question or Permission request, so it took no message. The user answers it in the Conversation.",
         QueueError: ({ message }) => message,
         SettingsError: ({ message }) => message,
         ToDoError: ({ message }) => message,
@@ -419,14 +426,18 @@ const first = <A, E, R>(stream: Stream.Stream<A, E, R>) =>
 
 const recordedFor = <A, E, R, E2>(
   work: Effect.Effect<A, E, R>,
-  record: (caller: ConversationCaller, since: DateTime.Utc, done: A) => Effect.Effect<void, E2>,
+  record: (
+    caller: GlobalConversationCaller,
+    since: DateTime.Utc,
+    done: A,
+  ) => Effect.Effect<void, E2>,
 ) =>
   Effect.gen(function* () {
     const since = yield* DateTime.now
     const done = yield* work
     const caller = yield* McpCaller.current
 
-    if (Predicate.isTagged(caller, "Conversation"))
+    if (Predicate.isTagged(caller, "GlobalConversation"))
       yield* record(caller, since, done).pipe(Effect.ignore)
 
     return done
@@ -450,7 +461,7 @@ export const GlassToolHandlers = GlassTools.toLayer(
     const toDos = yield* ToDos
     const activityLog = yield* ActivityLog
     const github = yield* GitHubClient
-    const agents = yield* Agents
+    const conversations = yield* Conversations
     const followed = yield* FollowedRepositories
     const checkouts = yield* LocalCheckouts
     const sandboxes = yield* Sandboxes
@@ -460,22 +471,22 @@ export const GlassToolHandlers = GlassTools.toLayer(
     const startedWork = yield* StartedWork
 
     const refuseUnofferedModel = Effect.fnUntraced(function* ({
-      engine,
+      harness,
       place,
       model,
       effort,
-    }: Tool.Parameters<typeof CreateAgent>) {
-      const { defaultModel, models } = yield* agents.models(engine, place)
+    }: Tool.Parameters<typeof CreateConversation>) {
+      const { defaultModel, models } = yield* conversations.models(harness, place)
       const chosen = model === null ? defaultModel : models.find(({ id }) => id === model)
 
       if (model !== null && chosen === undefined)
-        yield* new AgentError({
-          message: `That place has no model "${model}". list_agent_options lists the models a place offers.`,
+        yield* new ConversationError({
+          message: `That place has no model "${model}". list_conversation_options lists the models a place offers.`,
         })
 
       if (effort !== null && !(chosen?.efforts.includes(effort) ?? false))
-        yield* new AgentError({
-          message: `That model has no Effort "${effort}". list_agent_options lists each model's Efforts.`,
+        yield* new ConversationError({
+          message: `That model has no Effort "${effort}". list_conversation_options lists each model's Efforts.`,
         })
     })
 
@@ -499,12 +510,12 @@ export const GlassToolHandlers = GlassTools.toLayer(
           Effect.flatMap(({ login }) => activityLog.list(login, limit)),
           Effect.mapError(explained),
         ),
-      list_agents: () =>
-        Effect.all([first(agents.watch()), first(agents.watchWaiting())]).pipe(
+      list_conversations: () =>
+        Effect.all([first(conversations.watch()), first(conversations.watchWaiting())]).pipe(
           Effect.map(([listed, waiting]) => ({
-            agents: listed.map((agent) => ({
-              agent,
-              waiting: waiting.some((found) => found.agent.id === agent.id),
+            conversations: listed.map((conversation) => ({
+              conversation,
+              waiting: waiting.some((found) => found.conversation.id === conversation.id),
             })),
           })),
           Effect.mapError(explained),
@@ -514,10 +525,10 @@ export const GlassToolHandlers = GlassTools.toLayer(
         Effect.gen(function* () {
           const caller = yield* McpCaller.current
 
-          if (!Predicate.isTagged(caller, "Conversation")) return { items: [] }
+          if (!Predicate.isTagged(caller, "GlobalConversation")) return { items: [] }
 
           const items = yield* startedWork
-            .list(caller.conversationId)
+            .list(caller.globalConversationId)
             .pipe(Effect.mapError(explained))
 
           return {
@@ -527,8 +538,8 @@ export const GlassToolHandlers = GlassTools.toLayer(
             })),
           }
         }),
-      read_agent_transcript: ({ agentId, turns }) =>
-        agents.readTranscript(agentId, turns).pipe(
+      read_conversation_transcript: ({ conversationId, turns }) =>
+        conversations.readTranscript(conversationId, turns).pipe(
           Effect.map((transcript) => ({
             turns: transcript.turns.map((turn) => ({
               message: textOf(turn.message),
@@ -555,43 +566,46 @@ export const GlassToolHandlers = GlassTools.toLayer(
         recordedFor(agentReviews.start(pullRequest, revision), (caller, since) =>
           startedWork.startedAgentReview(caller, pullRequest, since),
         ).pipe(Effect.andThen(first(agentReviews.watch(pullRequest))), Effect.mapError(explained)),
-      list_agent_places: () =>
+      list_conversation_places: () =>
         Effect.gen(function* () {
           return {
-            local: { engines: agents.engines(localPlace), localCheckouts: yield* checkouts.list() },
+            local: {
+              harnesses: conversations.harnesses(localPlace),
+              localCheckouts: yield* checkouts.list(),
+            },
             sandboxProviders: sandboxes.providers,
             followedRepositories: yield* followed.list(),
           }
         }).pipe(Effect.mapError(explained)),
-      list_agent_options: ({ place, repository, engine }) =>
+      list_conversation_options: ({ place, repository, harness }) =>
         Effect.all(
           {
-            defaultBranch: agents.newAgentDefaultBranch(place, repository),
-            branches: agents.newAgentBranches(place, repository),
-            models: agents.models(engine, place),
+            defaultBranch: conversations.newConversationDefaultBranch(place, repository),
+            branches: conversations.newConversationBranches(place, repository),
+            models: conversations.models(harness, place),
           },
           { concurrency: "unbounded" },
         ).pipe(Effect.mapError(explained)),
-      create_agent: (input) =>
+      create_conversation: (input) =>
         Effect.gen(function* () {
           yield* refuseUnofferedModel(input)
 
-          const agent = yield* recordedFor(
-            agents.create({
+          const conversation = yield* recordedFor(
+            conversations.create({
               ...input,
               permissionMode: null,
               skillPacks: [],
               localSkills: false,
               images: [],
             }),
-            (caller, since, { id }) => startedWork.linkAgent(caller, id, since),
+            (caller, since, { id }) => startedWork.linkConversation(caller, id, since),
           )
 
-          return { agent }
+          return { conversation }
         }).pipe(Effect.mapError(explained)),
-      send_agent_message: ({ agentId, message }) =>
-        recordedFor(agents.send(agentId, { message, images: [] }), (caller, since) =>
-          startedWork.linkAgent(caller, agentId, since),
+      send_conversation_message: ({ conversationId, message }) =>
+        recordedFor(conversations.send(conversationId, { message, images: [] }), (caller, since) =>
+          startedWork.linkConversation(caller, conversationId, since),
         ).pipe(
           Effect.map((delivery) => ({ delivery })),
           Effect.mapError(explained),
@@ -603,7 +617,7 @@ export const GlassToolHandlers = GlassTools.toLayer(
 
             if (!Predicate.isTagged(caller, "OutsideAgent")) {
               return yield* new GlassToolFailure({
-                message: "An Agent Glass launched asks the user with its own Question tool.",
+                message: "A Conversation Glass launched asks the user with its own Question tool.",
               })
             }
 

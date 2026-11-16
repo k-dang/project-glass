@@ -9,7 +9,7 @@ import { createInterface } from "node:readline"
 import { installFakeSandboxProvider } from "./fakeSandboxProvider"
 import { isolatedHome } from "./harness"
 
-it.live("kills a Sandbox host's programs even when they have their own process groups", () =>
+it.live("kills a Sandbox host's Agent harnesses even when they have their own process groups", () =>
   Effect.gen(function* () {
     const home = yield* isolatedHome
     const root = join(home, "sandboxes")

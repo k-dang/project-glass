@@ -78,7 +78,7 @@ const record = async (scenario: RunnerScenario) => {
   const pi = { provider: provider!, modelId: scenario.piModelId ?? modelId.join("/") }
 
   const models: EngineModels =
-    scenario.engine === "pi"
+    scenario.harness === "pi"
       ? { "claude-code": "unused", pi }
       : { "claude-code": values["claude-model"], pi: { provider: "unused", modelId: "unused" } }
 
@@ -89,7 +89,7 @@ const record = async (scenario: RunnerScenario) => {
   const outcome = await withEnv(scenario.recordEnv ?? {}, () =>
     Effect.runPromise(
       Effect.gen(function* () {
-        const runner = yield* (yield* AgentRunners).select({ engine: scenario.engine, models })
+        const runner = yield* (yield* AgentRunners).select({ harness: scenario.harness, models })
 
         return yield* runner.run(scenarioTask(scenario, checkout))
       }).pipe(
@@ -115,7 +115,7 @@ const record = async (scenario: RunnerScenario) => {
 
   const recording = Schema.encodeSync(Recording)({
     scenario: scenario.name,
-    program: version(commands[scenario.engine]),
+    program: version(commands[scenario.harness]),
     models,
     outcome,
     spawns: recorder.spawns,

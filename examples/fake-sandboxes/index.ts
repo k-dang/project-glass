@@ -53,10 +53,10 @@ const freePort = () =>
 const plugin: Plugin = (glass) => {
   glass.registerSandboxProvider("fake", {
     name: "Fake Sandboxes",
-    engines: ["claude-code"],
+    harnesses: ["claude-code"],
     create: async (request, { progress, record, signal }) => {
       progress("Creating the Sandbox")
-      const folder = join(SANDBOXES, request.agentId)
+      const folder = join(SANDBOXES, request.conversationId)
       await mkdir(folder, { recursive: true })
       const port = await freePort()
       record({ folder, port })

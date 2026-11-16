@@ -1,9 +1,9 @@
 import { assert, it } from "@effect/vitest"
-import { type Agent, TextPart } from "@glass/contracts"
+import { type Conversation, TextPart } from "@glass/contracts"
 import { Effect, Predicate } from "effect"
 import { chmodSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
-import { agentsFixture, settled } from "../test/agentsFixture"
+import { conversationsFixture, settled } from "../test/conversationsFixture"
 import { skillFile } from "../test/skillFiles"
 
 const write = (path: string, contents: string) => {
@@ -11,13 +11,13 @@ const write = (path: string, contents: string) => {
   writeFileSync(path, contents)
 }
 
-const pi = { engine: "pi", model: null, effort: null } as const
+const pi = { harness: "pi", model: null, effort: null } as const
 
 it.live(
-  "gives a Sandbox Agent the Local skills its program reads, as they are when it starts",
+  "gives a Sandbox Conversation the Local skills its harness reads, as they are when it starts",
   () =>
     Effect.gen(function* () {
-      const f = yield* agentsFixture
+      const f = yield* conversationsFixture
       const dotfiles = join(f.home, "dotfiles", "skills")
 
       write(join(dotfiles, "grilling", "SKILL.md"), skillFile("grilling", "Ask hard questions."))
@@ -47,15 +47,15 @@ it.live(
         )
       }
 
-      assert.deepStrictEqual(yield* f.client.ListLocalSkills({ engine: "pi" }), [
+      assert.deepStrictEqual(yield* f.client.ListLocalSkills({ harness: "pi" }), [
         "grilling",
         "notes",
       ])
-      assert.deepStrictEqual(yield* f.client.ListLocalSkills({ engine: "claude-code" }), ["tidy"])
+      assert.deepStrictEqual(yield* f.client.ListLocalSkills({ harness: "claude-code" }), ["tidy"])
 
-      const commandsOf = (agent: Agent) =>
+      const commandsOf = (conversation: Conversation) =>
         f.client
-          .ListAgentCommands({ agentId: agent.id })
+          .ListConversationCommands({ conversationId: conversation.id })
           .pipe(Effect.map((commands) => commands.map(({ name }) => name)))
 
       const sandboxed = yield* f.startSandbox("Say hello", { ...pi, localSkills: true })
@@ -67,7 +67,8 @@ it.live(
         [true, false, false],
       )
 
-      for (const agent of [sandboxed, without, local]) yield* f.transcript(agent.id, settled(1))
+      for (const conversation of [sandboxed, without, local])
+        yield* f.transcript(conversation.id, settled(1))
 
       assert.deepStrictEqual(yield* commandsOf(sandboxed), ["local:deep", "local:grilling"])
       assert.deepStrictEqual(yield* commandsOf(without), [])
@@ -88,7 +89,7 @@ it.live(
   "sends each Local skill name once, from the folder pi reads first, with every file its symlinks share",
   () =>
     Effect.gen(function* () {
-      const f = yield* agentsFixture
+      const f = yield* conversationsFixture
       const shared = join(f.home, "dotfiles", "scripts")
       const twin = skillFile("twin", "A shared skill.")
 
@@ -119,8 +120,8 @@ it.live(
         join(f.home, ".agents", "skills", "alias"),
       )
 
-      const agent = yield* f.startSandbox("show the skills", { ...pi, localSkills: true })
-      const [turn] = yield* f.transcript(agent.id, settled(1))
+      const conversation = yield* f.startSandbox("show the skills", { ...pi, localSkills: true })
+      const [turn] = yield* f.transcript(conversation.id, settled(1))
 
       assert.deepStrictEqual(
         turn?.parts.find((part) => Predicate.isTagged(part, "Text")),

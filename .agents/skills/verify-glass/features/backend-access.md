@@ -19,7 +19,7 @@ Preconditions:
 
 - `pnpm build` is current. Port 4917 is free (pick another if not).
 
-- **Start.** `mkdir -p .verify/backend/evidence && (GLASS_PORT=4917 GLASS_TOKEN=verify-secret GLASS_ALLOWED_ORIGINS=glass://app node apps/server/dist/bin.mjs > .verify/backend/evidence/backend.log 2>&1 & echo $! > .verify/backend/pid)`. The log shows `Listening on http://127.0.0.1:4917`.
+- **Start.** `mkdir -p .verify/backend/evidence && (GLASS_HOME=$PWD/.verify/backend/home GLASS_PORT=4917 GLASS_TOKEN=verify-secret GLASS_ALLOWED_ORIGINS=glass://app node apps/server/dist/bin.mjs > .verify/backend/evidence/backend.log 2>&1 & echo $! > .verify/backend/pid)`. The log's first JSON line has `"message":"Listening on http://127.0.0.1:4917"`. `GLASS_HOME` keeps its data out of `~/.project-glass`.
 - **Token.** `curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:4917/health` prints `401`; with `?token=wrong`, `401`; with `?token=verify-secret`, `204`.
 - **Origin.** Add `-H 'Origin: https://evil.example'` to the good-token request: `403`. With `-H 'Origin: glass://app'`: `204`.
 - **Stop.** `kill $(cat .verify/backend/pid)`; the same curl now prints `000`. Remove `.verify/backend/pid` and keep `.verify/backend/evidence/`.
@@ -27,6 +27,6 @@ Preconditions:
 
 ## Gotchas
 
-- Request logging is disabled on purpose because the secret is a query parameter; the log has only the `Listening on` line. A request line appearing in the log is a regression.
+- Request logging is disabled on purpose because the secret is a query parameter, but each request is still a unit of work: `backend.log` gets one JSON line per request with `url.full` stripped of the query. `grep -c verify-secret` on the log must print 0; the secret appearing there is a regression.
 - `access-rpc` from a script needs an Effect RPC client; `apps/server/test/harness.ts` shows the shape. The desktop recipe in [GitHub connection](./github-connection.md) exercises it through the real renderer.
 - Kill the PID you started, never `node` by name.

@@ -21,7 +21,7 @@ export const PI_MODEL = recordedModel.join("/")
 
 export const PI_MODEL_ID = `${PI_PROVIDER}/${PI_MODEL}`
 
-const agentDirectory = (home: string) => {
+const conversationDirectory = (home: string) => {
   const directory = join(home, ".pi", "agent")
   mkdirSync(directory, { recursive: true })
 
@@ -35,12 +35,12 @@ export const writePiSettings = (
   settings: PiSettings,
 ) =>
   writeFileSync(
-    join(agentDirectory(home), "settings.json"),
+    join(conversationDirectory(home), "settings.json"),
     JSON.stringify({ defaultProvider: provider, defaultModel: model, ...settings }),
   )
 
 export const writePiLogin = (home: string, provider: string, key: string) =>
   writeFileSync(
-    join(agentDirectory(home), "auth.json"),
+    join(conversationDirectory(home), "auth.json"),
     JSON.stringify({ [provider]: { type: "api_key", key } }),
   )

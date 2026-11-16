@@ -9,6 +9,8 @@ import workReports from "./migrations/0007_work_reports"
 import pastGlobalConversations from "./migrations/0008_past_global_conversations"
 import globalConversationUpdates from "./migrations/0009_global_conversation_updates"
 import toDoImages from "./migrations/0010_to_do_images"
+import mermaidTourDiagrams from "./migrations/0011_mermaid_tour_diagrams"
+import conversations from "./migrations/0012_conversations"
 
 export const migrationLoader = SqliteMigrator.fromRecord({
   "0001_baseline": baseline,
@@ -21,4 +23,6 @@ export const migrationLoader = SqliteMigrator.fromRecord({
   "0008_past_global_conversations": pastGlobalConversations,
   "0009_global_conversation_updates": globalConversationUpdates,
   "0010_to_do_images": toDoImages,
+  "0011_mermaid_tour_diagrams": mermaidTourDiagrams,
+  "0012_conversations": conversations,
 })

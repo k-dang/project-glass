@@ -1,4 +1,4 @@
-import { AgentEngine } from "@glass/contracts"
+import { AgentHarness } from "@glass/contracts"
 import { Schema } from "effect"
 import { execFile, execFileSync, spawn } from "node:child_process"
 import {
@@ -162,7 +162,7 @@ const killTree = async (pid: number) => {
     return
   }
 
-  // Effect gives agent programs their own process groups, outside the host's group.
+  // Effect gives Agent harness processes their own process groups, outside the host's group.
   const { stdout } = await execFileAsync("ps", ["-A", "-o", "pid=,ppid="])
 
   const processes = stdout
@@ -186,7 +186,7 @@ const claudeEfforts = ["low", "medium", "high", "xhigh", "max"]
 
 const piModel = { id: "glass-test/gpt-test", name: "gpt-test", efforts: [] }
 
-const sandboxModels: Record<AgentEngine, AgentModels> = {
+const sandboxModels: Record<AgentHarness, AgentModels> = {
   "claude-code": {
     defaultModel: { id: "default", name: "Opus", efforts: claudeEfforts },
     models: [
@@ -214,12 +214,12 @@ export const fakeSandboxProvider =
   (glass) => {
     glass.registerSandboxProvider("fake", {
       name: "Fake Sandboxes",
-      engines: ["claude-code", "pi"],
+      harnesses: ["claude-code", "pi"],
       create: async (request, { progress, record }) => {
         const settings = readSettings(settingsPath)
 
         progress("Creating the Sandbox")
-        const folder = join(settings.root, request.agentId)
+        const folder = join(settings.root, request.conversationId)
         mkdirSync(folder, { recursive: true })
         record({ folder })
 
@@ -292,7 +292,7 @@ export const fakeSandboxProvider =
 
         rmSync(folder, { recursive: true, force: true })
       },
-      models: async (engine) => sandboxModels[engine],
+      models: async (harness) => sandboxModels[harness],
     })
   }
 
@@ -312,28 +312,28 @@ export const installFakeSandboxProvider = (
       `export default fakeSandboxProvider(${JSON.stringify(settingsPath)})\n`,
   )
 
-  const sandboxFolder = (agentId: string) => join(settings.root, agentId)
-  const hostFile = (agentId: string) => join(sandboxFolder(agentId), "host.json")
+  const sandboxFolder = (conversationId: string) => join(settings.root, conversationId)
+  const hostFile = (conversationId: string) => join(sandboxFolder(conversationId), "host.json")
 
-  const host = (agentId: string) =>
-    Schema.decodeUnknownSync(HostFile)(readFileSync(hostFile(agentId), "utf8"))
+  const host = (conversationId: string) =>
+    Schema.decodeUnknownSync(HostFile)(readFileSync(hostFile(conversationId), "utf8"))
 
   return {
-    dropConnections: (agentId: string) => {
-      const folder = sandboxFolder(agentId)
+    dropConnections: (conversationId: string) => {
+      const folder = sandboxFolder(conversationId)
       writeFileSync(join(folder, "dropped"), "")
 
       return whenExists(droppedAll(folder))
     },
-    reconnect: (agentId: string) => {
-      rmSync(join(sandboxFolder(agentId), "dropped"))
-      rmSync(droppedAll(sandboxFolder(agentId)), { force: true })
+    reconnect: (conversationId: string) => {
+      rmSync(join(sandboxFolder(conversationId), "dropped"))
+      rmSync(droppedAll(sandboxFolder(conversationId)), { force: true })
     },
     host,
-    killHost: (agentId: string) => killTree(host(agentId).pid),
+    killHost: (conversationId: string) => killTree(host(conversationId).pid),
     stopHosts: async () => {
-      for (const agentId of readdirSync(settings.root))
-        if (existsSync(hostFile(agentId))) await killTree(host(agentId).pid)
+      for (const conversationId of readdirSync(settings.root))
+        if (existsSync(hostFile(conversationId))) await killTree(host(conversationId).pid)
     },
   }
 }

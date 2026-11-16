@@ -74,9 +74,9 @@ const syntheticReview = (prompt: string): AgentReviewAnswer => {
 export const fakeAgentRunners = Layer.succeed(
   AgentRunners,
   AgentRunners.of({
-    select: ({ engine }) =>
+    select: ({ harness }) =>
       Effect.succeed({
-        identity: { engine, model: "fake/synthetic" },
+        identity: { harness, model: "fake/synthetic" },
         run: (task) =>
           Schema.decodeUnknownEffect(task.answer)(
             Object.is(task.answer, AgentReviewAnswer)

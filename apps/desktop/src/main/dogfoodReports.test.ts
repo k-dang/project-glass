@@ -23,7 +23,7 @@ const context = Schema.encodeSync(CapturedContext)(
   }),
 )
 
-const noSubject = { route: "/agents/new", context: null, tour: null, agentReview: null }
+const noSubject = { route: "/conversations/new", context: null, tour: null, agentReview: null }
 
 const record = async () => {
   await writeFile(join(home, "backend.log"), '{"unit":"tour"}\n')
@@ -58,7 +58,7 @@ it("keeps the logs as they were when captured, and names the report after its no
         markdown: "# Main risk",
         hotspots: [],
         lowAttention: [],
-        agentId: null,
+        conversationId: null,
         done: false,
         includedInGlobalConversationUpdate: false,
       },
@@ -84,7 +84,7 @@ it("keeps the logs as they were when captured, and names the report after its no
       writtenAt: "2026-11-09T14:00:00.000Z",
       hotspots: [],
       lowAttention: [],
-      agentId: null,
+      conversationId: null,
       done: false,
       includedInGlobalConversationUpdate: false,
     },

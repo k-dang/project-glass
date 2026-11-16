@@ -17,13 +17,14 @@ In Changes, the collapsed context above, between, and below a file's hunks can b
 
 Preconditions: a real-GitHub run (`node $V launch --github real`). `k-dang/project-glass` PR #8 has long files with collapsed context; `k-dang/glass-api-probe` PR #2 has a binary `image.bin`.
 
-- **Expand (`context-expand`).** Open PR #8, choose `Changes`, screenshot. The separator chevrons and tree rows have no accessible name: `node $V doctor` prints the CDP port, then dispatch `Input.dispatchMouseEvent` (moved, pressed, released) at the chevron's position from the screenshot. Screenshot again: README.md's lines 1–31 show above its hunk.
-- **Browse (`files-browse`).** `click --role tab --name Repository`, `wait --text "Choose a file"`, screenshot: the tree shows the head's files with changed ones marked. Click a row (by CDP, as above), then screenshot: the file shows with line numbers under its path.
+- **Expand (`context-expand`).** Open PR #8, choose `Changes`, screenshot. The separator chevrons have no accessible name: `node $V doctor` prints the CDP port, then dispatch `Input.dispatchMouseEvent` (moved, pressed, released) at the chevron's position from the screenshot. Screenshot again: README.md's lines 1–31 show above its hunk.
+- **Browse (`files-browse`).** Works on fake GitHub too (`octo-org/glass#101`). `click --role tab --name Repository`, `wait --text "Choose a file to read it at the head"`, screenshot: the tree shows the head's files with changed ones marked. Rows are `treeitem`s named by their file or folder name: click folders to open them (`src`, then `feature-001`), then `click --role treeitem --name index.ts` and `wait --text "src/feature-001/index.ts"`. Screenshot: the file shows with line numbers under its path.
 - **Placeholders (`files-placeholders`).** Open probe PR #2, choose `Repository`, click `image.bin`, `wait --text "Binary file not shown"`.
 - **Proof.** Screenshots of a separator before and after expanding, the repository tree, an open file, and the binary placeholder.
 
 ## Gotchas
 
-- `text` and snapshots include neither diff lines nor the repository tree, so judge both from screenshots.
+- `text` and snapshots don't include diff lines, so judge them from screenshots.
+- The fake-GitHub and demo PRs have no collapsed context between hunks; their trailing "More unchanged context may be available" separators load nothing. Use real GitHub for `context-expand`.
 - A screenshot taken right after an expand can show the diff before its lines render; take another.
 - Repository lists the repository once first opened; Reload lists it again at the new head.

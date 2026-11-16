@@ -27,7 +27,7 @@ export const groupLooks: Record<NeedsYouGroup, { readonly label: string; readonl
     stopped: { label: "Stopped on you", tone: warningTone },
     reviews: { label: "Agent reviews to read", tone: "text-muted-foreground" },
     mine: { label: "Your pull requests", tone: "text-muted-foreground" },
-    finished: { label: "Agents that finished", tone: "text-muted-foreground" },
+    finished: { label: "Conversations that finished", tone: "text-muted-foreground" },
   }
 
 export interface InboxAction {
@@ -71,7 +71,7 @@ const pullRequestReason = (reason: PullRequestReason): Reason =>
 const reasonsOf = (item: NeedsYouItem): ReadonlyArray<Reason> =>
   Arr.dedupeWith(
     Match.valueTags(item, {
-      Agent: ({ reasons }) =>
+      Conversation: ({ reasons }) =>
         reasons.flatMap((reason) =>
           Match.valueTags(reason, {
             WaitingRequests: ({ requests }) => requests.map(requestReason),
@@ -99,7 +99,7 @@ export function Reasons(props: { item: NeedsYouItem }) {
 
 export function ItemIcon(props: { item: NeedsYouItem; className: string }) {
   return Match.valueTags(props.item, {
-    Agent: () => <Sparkles className={props.className} aria-hidden />,
+    Conversation: () => <Sparkles className={props.className} aria-hidden />,
     OutsideQuestion: () => <CircleHelp className={props.className} aria-hidden />,
     PullRequest: () => <GitPullRequest className={props.className} aria-hidden />,
     GlobalConversation: () => <MessagesSquare className={props.className} aria-hidden />,
@@ -108,7 +108,7 @@ export function ItemIcon(props: { item: NeedsYouItem; className: string }) {
 
 export const requestsOf = (item: NeedsYouItem): ReadonlyArray<RequestPart> =>
   Match.valueTags(item, {
-    Agent: ({ reasons }) =>
+    Conversation: ({ reasons }) =>
       reasons.flatMap((reason) =>
         Match.valueTags(reason, {
           WaitingRequests: ({ requests }) => requests,
@@ -122,12 +122,14 @@ export const requestsOf = (item: NeedsYouItem): ReadonlyArray<RequestPart> =>
 
 export const firstPermission = (item: NeedsYouItem) =>
   Match.valueTags(item, {
-    Agent: (agent) => {
-      const part = requestsOf(agent).find((request) =>
+    Conversation: (waiting) => {
+      const part = requestsOf(waiting).find((request) =>
         Predicate.isTagged(request, "PermissionRequest"),
       )
 
-      return part === undefined ? null : { agentId: agent.agent.id, requestId: part.requestId }
+      return part === undefined
+        ? null
+        : { conversationId: waiting.conversation.id, requestId: part.requestId }
     },
     OutsideQuestion: () => null,
     PullRequest: () => null,
@@ -136,7 +138,7 @@ export const firstPermission = (item: NeedsYouItem) =>
 
 export const titleOf = (item: NeedsYouItem) =>
   Match.valueTags(item, {
-    Agent: ({ agent }) => agent.name,
+    Conversation: ({ conversation }) => conversation.name,
     OutsideQuestion: ({ question }) => question,
     PullRequest: ({ pullRequest }) => pullRequest.title,
     GlobalConversation: () => "Global conversation",
@@ -144,7 +146,8 @@ export const titleOf = (item: NeedsYouItem) =>
 
 export const contextOf = (item: NeedsYouItem) =>
   Match.valueTags(item, {
-    Agent: ({ agent }) => `${agent.repository.owner}/${agent.repository.repo}`,
+    Conversation: ({ conversation }) =>
+      `${conversation.repository.owner}/${conversation.repository.repo}`,
     OutsideQuestion: ({ askedBy }) => `Asked by ${askedBy}`,
     GlobalConversation: () => "",
     PullRequest: ({ pullRequest }) =>

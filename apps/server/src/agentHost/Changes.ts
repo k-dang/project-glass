@@ -11,7 +11,7 @@ import {
 import { Context, Effect, FileSystem, Layer } from "effect"
 import { join } from "node:path"
 import { Git } from "../git"
-import { HostAgentError } from "./protocol"
+import { HostConversationError } from "./protocol"
 
 const MAX_PATCH_CHARS = 500_000
 
@@ -96,7 +96,7 @@ const failure =
   <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
       Effect.tapError((cause) => Effect.logWarning(message, cause)),
-      Effect.mapError(() => new HostAgentError({ message })),
+      Effect.mapError(() => new HostConversationError({ message })),
     )
 
 export class Changes extends Context.Service<
@@ -105,9 +105,9 @@ export class Changes extends Context.Service<
     readonly since: (
       folder: string,
       baseRef: string,
-    ) => Effect.Effect<ReadonlyArray<ChangedFile>, HostAgentError>
-    readonly uncommitted: (folder: string) => Effect.Effect<boolean, HostAgentError>
-    readonly files: (folder: string) => Effect.Effect<ReadonlyArray<string>, HostAgentError>
+    ) => Effect.Effect<ReadonlyArray<ChangedFile>, HostConversationError>
+    readonly uncommitted: (folder: string) => Effect.Effect<boolean, HostConversationError>
+    readonly files: (folder: string) => Effect.Effect<ReadonlyArray<string>, HostConversationError>
   }
 >()("@glass/server/agentHost/Changes") {
   static readonly layer = Layer.effect(
@@ -175,11 +175,11 @@ export class Changes extends Context.Service<
                   patch: filePatch(file, patches[index]!),
                 }),
             )
-          }).pipe(Effect.scoped, failure("Couldn't read the Agent's changes.")),
+          }).pipe(Effect.scoped, failure("Couldn't read the Conversation's changes.")),
         uncommitted: (folder) =>
           git.run(folder, ["status", "--porcelain"]).pipe(
             Effect.map((status) => status !== ""),
-            failure("Couldn't check the Agent's folder for changes."),
+            failure("Couldn't check the Conversation's folder for changes."),
           ),
         files: (folder) =>
           git
@@ -188,7 +188,7 @@ export class Changes extends Context.Service<
               Effect.map((listed) => [
                 ...new Set(listed.split("\0").filter((path) => path !== "")),
               ]),
-              failure("Couldn't list the files in the Agent's folder."),
+              failure("Couldn't list the files in the Conversation's folder."),
             ),
       })
     }),

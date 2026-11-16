@@ -74,7 +74,7 @@ it.live("answers from a read-only checkout, starting from the asked line", () =>
     const result = yield* f.ask(helloName)
 
     assert.strictEqual(result.answer, "`main.ts` calls `greet` without a name.")
-    assert.deepStrictEqual(result.runner, { engine: "pi", model: "anthropic/claude-sonnet-5-5" })
+    assert.deepStrictEqual(result.runner, { harness: "pi", model: "anthropic/claude-sonnet-5-5" })
 
     const [run] = f.runners.runs
     assert.deepStrictEqual(run?.files, ["greet.ts", "main.ts"])

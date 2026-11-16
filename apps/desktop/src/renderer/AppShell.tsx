@@ -47,7 +47,7 @@ function useAreas(): ReadonlyArray<Area> {
     { label: "Inbox", icon: Inbox, link: { to: "/inbox" } },
     { label: "Reviews", icon: GitPullRequest, link: reviewsLink },
     { label: "To-dos", icon: ListTodo, link: { to: "/to-dos" } },
-    { label: "Agents", icon: Sparkles, link: { to: "/agents" } },
+    { label: "Conversations", icon: Sparkles, link: { to: "/conversations" } },
     { label: "Activity", icon: History, link: { to: "/activity" } },
     { label: "Settings", icon: Settings, link: { to: "/settings" } },
   ]

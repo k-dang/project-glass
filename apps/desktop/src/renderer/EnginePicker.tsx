@@ -1,16 +1,16 @@
-import { AgentEngine, type EngineSettings, type PiModel } from "@glass/contracts"
+import { AgentHarness, type EngineSettings, type PiModel } from "@glass/contracts"
 import { cn } from "cn"
 import { useId } from "react"
 import { Input } from "@/components/ui/input"
-import { engineNames } from "./engines"
+import { harnessNames } from "./harnesses"
 
-const hasModel = (engine: AgentEngine, models: EngineSettings["models"]) =>
-  engine === "claude-code"
+const hasModel = (harness: AgentHarness, models: EngineSettings["models"]) =>
+  harness === "claude-code"
     ? models["claude-code"] !== ""
-    : models[engine].provider !== "" && models[engine].modelId !== ""
+    : models[harness].provider !== "" && models[harness].modelId !== ""
 
 export const missingModel = (settings: EngineSettings) =>
-  AgentEngine.literals.find((engine) => !hasModel(engine, settings.models))
+  AgentHarness.literals.find((harness) => !hasModel(harness, settings.models))
 
 export function EnginePicker(props: {
   legend: string
@@ -20,7 +20,7 @@ export function EnginePicker(props: {
   onCommit: (value: EngineSettings) => void
 }) {
   const id = useId()
-  const { engine, models } = props.value
+  const { harness, models } = props.value
 
   const setModels = (changed: Partial<EngineSettings["models"]>) =>
     props.onChange({ ...props.value, models: { ...models, ...changed } })
@@ -32,22 +32,22 @@ export function EnginePicker(props: {
         {props.description}
       </p>
       <div className="flex w-fit flex-wrap gap-0.5 rounded-lg border bg-muted p-0.5">
-        {AgentEngine.literals.map((option) => (
+        {AgentHarness.literals.map((option) => (
           <label key={option} className="relative">
             <input
               type="radio"
               name={id}
               value={option}
-              checked={engine === option}
+              checked={harness === option}
               onChange={() => {
-                const next = { ...props.value, engine: option }
+                const next = { ...props.value, harness: option }
                 props.onChange(next)
                 props.onCommit(next)
               }}
               className="peer sr-only"
             />
             <span className="block cursor-pointer rounded-md px-3.5 py-1 text-sm font-medium text-muted-foreground peer-checked:bg-card peer-checked:text-foreground peer-checked:shadow-sm peer-checked:ring-1 peer-checked:ring-border peer-focus-visible:outline-2 peer-focus-visible:outline-offset-1 peer-focus-visible:outline-ring">
-              {engineNames[option]}
+              {harnessNames[option]}
               {!hasModel(option, models) && (
                 <>
                   <span aria-hidden className="ml-1 text-destructive">
@@ -64,10 +64,10 @@ export function EnginePicker(props: {
         onBlur={() => props.onCommit(props.value)}
         className={cn(
           "grid gap-2.5 rounded-lg border bg-card p-3",
-          engine !== "claude-code" && "grid-cols-[minmax(6rem,10rem)_1fr] max-sm:grid-cols-1",
+          harness !== "claude-code" && "grid-cols-[minmax(6rem,10rem)_1fr] max-sm:grid-cols-1",
         )}
       >
-        {engine === "claude-code" ? (
+        {harness === "claude-code" ? (
           <ModelInput
             label="Model"
             name="Claude Code model"
@@ -83,7 +83,7 @@ export function EnginePicker(props: {
 }
 
 function PiModelInputs(props: { value: PiModel; onChange: (value: PiModel) => void }) {
-  const label = engineNames.pi
+  const label = harnessNames.pi
 
   return (
     <>

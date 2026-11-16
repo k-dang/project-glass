@@ -15,13 +15,12 @@ The Activity icon in the rail opens the Activity log: everything the signed-in u
 
 ## Driving it with glass-verify
 
-- **List (`activity-list`).** `node $V launch`, choose Activity, and `wait --text "No Activity yet"`. Choose Reviews, `type --role textbox --name "Open a PR" --text "k-dang/glass-api-probe#3"`, choose Open, then the Changes tab and `click --role treeitem --name long.txt`. Wait about three seconds with a `wait` for text that never appears and a `--timeout 3500`, then choose Activity and `wait --text "Viewed"`. The snapshot has `region "Today"` with read-only list items showing "Viewed long.txt Drafts probe k-dang/glass-api-probe#3 …" above "Opened Drafts probe …". Capture both states.
+- **List (`activity-list`).** `node $V launch --github fake`, choose Activity, and `wait --text "No Activity yet"`. Choose Reviews, `type --role textbox --name "Open a PR" --text "octo-org/glass#100"`, `press --key Enter`, then the Changes tab and `click --role treeitem --name greet.ts`. Wait about three seconds with a `wait` for text that never appears and a `--timeout 3500`, then choose Activity and `wait --text "Viewed"`. The snapshot has `region "Today"` with read-only list items showing "Viewed greet.ts Retry Draft saves after a dropped connection octo-org/glass#100 …" above "Opened Retry Draft saves after a dropped connection …". Capture both states.
 - **To-dos (`activity-to-dos`).** `node $V launch --github fake`. Add "Write the release notes" in To-dos as in [`to-dos.md`](to-dos.md), tick its checkbox, and `wait --text "Done (1)"`. Choose Activity and `wait --text "Marked done"`: `region "Today"` lists "Marked done Write the release notes …" above "Added to-do Write the release notes …".
 - **Load more (`activity-more`).** Needs more than 100 logged Activities for the Connection; the renderer test covers it. Report it unreached otherwise.
 
 ## Gotchas
 
-- Opening a PR needs real GitHub, so a `--github fake` run can only show to-do Activity.
 - To-do Activity is logged under the signed-in Connection; with no Connection it isn't logged.
 - A file counts as viewed after staying on screen for two seconds; leaving Changes sooner records nothing.
 - The log is per run: each run has its own home, so earlier runs' Activity doesn't show.

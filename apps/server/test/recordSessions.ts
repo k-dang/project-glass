@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process"
 
-const USAGE = `Records the Agent session recordings that the adapter integration tests replay.
+const USAGE = `Records the Agent harness session recordings that the adapter integration tests replay.
 
   pnpm --filter @glass/server record:sessions [claude|pi] [--pi-model <provider/model>] [vitest options, such as -t <test name>]
 
@@ -23,14 +23,14 @@ const piModel = piModelFlag === -1 ? undefined : given[piModelFlag + 1]
 
 const options = piModelFlag === -1 ? given : given.toSpliced(piModelFlag, 2)
 
-const [engine, ...rest] = options
+const [harness, ...rest] = options
 
-if (engine === "--help") {
+if (harness === "--help") {
   console.log(USAGE)
   process.exit(0)
 }
 
-if (!pnpmPath || (engine !== "claude" && !piModel?.includes("/"))) {
+if (!pnpmPath || (harness !== "claude" && !piModel?.includes("/"))) {
   console.log(USAGE)
   process.exit(1)
 }
@@ -42,8 +42,8 @@ const vp = (...args: Array<string>) =>
   }).status
 
 const tests =
-  engine === "claude" || engine === "pi"
-    ? vp("test", "run", `${engine}Adapter.integration`, ...rest)
+  harness === "claude" || harness === "pi"
+    ? vp("test", "run", `${harness}Adapter.integration`, ...rest)
     : vp("test", "run", "Adapter.integration", ...options)
 
 const format = vp("fmt", "test/recordings/sessions")

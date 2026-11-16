@@ -2,7 +2,7 @@ import { Deferred, Effect, Option, Predicate, Queue, Schema, Scope, Stream } fro
 import { ChildProcessSpawner } from "effect/process"
 import { launchCommand } from "../processes"
 import { piGlassToolsEnvironment } from "./piGlassTools"
-import { type GlassToolsAccess, HostAgentError } from "./protocol"
+import { type GlassToolsAccess, HostConversationError } from "./protocol"
 import { ToolInput } from "./toolCalls"
 
 // Longer than the 30 seconds pi waits on a lock a crashed pi left behind.
@@ -202,11 +202,11 @@ export const startPiRpc = Effect.fnUntraced(function* (
       Effect.tapError((cause) => Effect.logWarning("pi could not start", cause)),
       Effect.mapError((error) =>
         Predicate.isTagged(error.reason, "NotFound")
-          ? new HostAgentError({
+          ? new HostConversationError({
               message:
                 "pi isn't installed. Install it, or set piCommand in Glass's settings.json to its path and restart Glass.",
             })
-          : new HostAgentError({ message: "pi could not start. Check its installation." }),
+          : new HostConversationError({ message: "pi could not start. Check its installation." }),
       ),
     )
 

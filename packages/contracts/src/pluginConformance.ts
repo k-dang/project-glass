@@ -1,5 +1,5 @@
 import type * as Plugin from "@glass/plugin"
-import type { AgentModel, AgentModels } from "./agent"
+import type { AgentModel, AgentModels } from "./conversation"
 
 type Assert<T extends true> = T
 

@@ -1,4 +1,9 @@
-import { type AgentEngine, LOCAL_SKILLS_NAMESPACE, LocalSkillsError, Skill } from "@glass/contracts"
+import {
+  type AgentHarness,
+  LOCAL_SKILLS_NAMESPACE,
+  LocalSkillsError,
+  Skill,
+} from "@glass/contracts"
 import { Context, Effect, FileSystem, Layer, Option, type PlatformError, Predicate } from "effect"
 import { join } from "node:path"
 import type { SentSkill, SkillSource } from "./agentHost/protocol"
@@ -16,7 +21,7 @@ interface SkillFolders {
   readonly readsNestedSkills: boolean
 }
 
-const foldersOf = (home: string): Record<AgentEngine, SkillFolders> => ({
+const foldersOf = (home: string): Record<AgentHarness, SkillFolders> => ({
   "claude-code": { folders: [join(home, ".claude", "skills")], readsNestedSkills: false },
   pi: {
     folders: [join(home, ".pi", "agent", "skills"), join(home, ".agents", "skills")],
@@ -91,9 +96,11 @@ const reading = <A>(effect: Effect.Effect<A, PlatformError.PlatformError>) =>
 export class LocalSkills extends Context.Service<
   LocalSkills,
   {
-    readonly names: (engine: AgentEngine) => Effect.Effect<ReadonlyArray<string>, LocalSkillsError>
+    readonly names: (
+      harness: AgentHarness,
+    ) => Effect.Effect<ReadonlyArray<string>, LocalSkillsError>
     readonly source: (
-      engine: AgentEngine,
+      harness: AgentHarness,
     ) => Effect.Effect<Option.Option<SkillSource>, LocalSkillsError>
   }
 >()("@glass/server/LocalSkills") {
@@ -139,8 +146,8 @@ export class LocalSkills extends Context.Service<
           return nested.flat()
         })
 
-      const found = (engine: AgentEngine) => {
-        const { folders, readsNestedSkills } = skillFolders[engine]
+      const found = (harness: AgentHarness) => {
+        const { folders, readsNestedSkills } = skillFolders[harness]
 
         const loads = (directory: string) =>
           directory !== "" && (readsNestedSkills || !directory.includes("/"))
@@ -196,14 +203,14 @@ export class LocalSkills extends Context.Service<
         )
 
       return LocalSkills.of({
-        names: (engine) =>
-          found(engine).pipe(
+        names: (harness) =>
+          found(harness).pipe(
             Effect.map((skills) => skills.map(({ skill }) => skill.name).toSorted()),
             reading,
             Effect.withSpan("LocalSkills.names"),
           ),
-        source: (engine) =>
-          found(engine).pipe(
+        source: (harness) =>
+          found(harness).pipe(
             Effect.flatMap((skills) => {
               const taken = new Set<string>()
 

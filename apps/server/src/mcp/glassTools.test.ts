@@ -35,7 +35,7 @@ const startGlass = Effect.gen(function* () {
   const mcp = yield* connectMcp(
     backend.baseUrl,
     yield* backend.mcpCredentials.issue({
-      conversationId: "global-conversation",
+      globalConversationId: "global-conversation",
       sessionId: "global-session",
     }),
   )
@@ -57,17 +57,17 @@ describe("Glass tools over MCP", () => {
           ["list_queue", true],
           ["list_to_dos", true],
           ["list_recent_activity", true],
-          ["list_agents", true],
+          ["list_conversations", true],
           ["list_needs_you", true],
           ["list_started_work", true],
-          ["read_agent_transcript", true],
+          ["read_conversation_transcript", true],
           ["read_pull_request", true],
           ["read_agent_review", true],
           ["start_agent_review", false],
-          ["list_agent_places", true],
-          ["list_agent_options", true],
-          ["create_agent", false],
-          ["send_agent_message", false],
+          ["list_conversation_places", true],
+          ["list_conversation_options", true],
+          ["create_conversation", false],
+          ["send_conversation_message", false],
           ["ask_user", false],
         ],
       )
@@ -141,14 +141,17 @@ describe("Glass tools over MCP", () => {
     }),
   )
 
-  it.live("explains an Agent that doesn't exist as a tool failure", () =>
+  it.live("explains a Conversation that doesn't exist as a tool failure", () =>
     Effect.gen(function* () {
       const { call } = yield* startGlass
 
-      const result = yield* call("read_agent_transcript", { agentId: "no-such-agent", turns: 3 })
+      const result = yield* call("read_conversation_transcript", {
+        conversationId: "no-such-agent",
+        turns: 3,
+      })
 
       assert.isTrue(result.isError)
-      assert.include(toolText(result), "no Agent with that id")
+      assert.include(toolText(result), "no Conversation with that id")
     }),
   )
 })

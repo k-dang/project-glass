@@ -1,7 +1,7 @@
 import {
   type Turn,
-  AgentBusy,
-  AgentError,
+  ConversationBusy,
+  ConversationError,
   type FeedbackNote,
   isNothingUnsent,
   mentionedToDoIds,
@@ -36,6 +36,7 @@ import {
 import { SqlClient } from "effect/sql"
 import type { DeliveredTurn } from "./agentHost/deliveredMessage"
 import type { TurnSettings } from "./agentHost/protocol"
+import { boundHostCall } from "./hostControl"
 import { type HostCallError, type HostClient, hostFailure } from "./Placement"
 import { prompt } from "./prompt"
 import { ToDos } from "./ToDos"
@@ -47,24 +48,24 @@ type HostCall<Name extends keyof HostClient> = (
 ) => ReturnType<HostClient[Name]>
 
 export interface ConversationHost {
-  readonly StartAgent: HostCall<"StartAgent">
+  readonly StartConversation: HostCall<"StartConversation">
   readonly StartTurn: HostCall<"StartTurn">
   readonly AnswerRequest: HostCall<"AnswerRequest">
   readonly Steer: HostCall<"Steer">
   readonly StopTurn: HostCall<"StopTurn">
 }
 
-export interface Conversation {
+export interface ClaimedConversation {
   readonly id: string
   readonly ensureStarted: (client: ConversationHost) => Effect.Effect<void, HostCallError>
   readonly settings: TurnSettings
-  readonly host: Effect.Effect<ConversationHost, AgentError>
+  readonly host: Effect.Effect<ConversationHost, ConversationError>
   readonly runningHost: Effect.Effect<Option.Option<ConversationHost>>
 }
 
 export type ClaimConversation = (
   conversationId: string,
-) => Effect.Effect<Option.Option<Conversation>, AgentError>
+) => Effect.Effect<Option.Option<ClaimedConversation>, ConversationError>
 
 export interface Served {
   readonly claim: ClaimConversation
@@ -84,7 +85,19 @@ interface Prepared {
 const decodeUnsent = Schema.decodeUnknownEffect(Schema.Array(StoredMessage))
 
 const unsentFailure = () =>
-  new AgentError({ message: "Couldn't read or save your unsent message. Try again." })
+  new ConversationError({ message: "Couldn't read or save your unsent message. Try again." })
+
+const stopHost = (conversation: ClaimedConversation, turnId: string) =>
+  conversation.runningHost.pipe(
+    Effect.flatMap((running) =>
+      Option.isNone(running)
+        ? Effect.succeed(null)
+        : boundHostCall(running.value.StopTurn({ conversationId: conversation.id, turnId })).pipe(
+            Effect.tapError((cause) => Effect.logWarning("Couldn't stop a Turn", cause)),
+            Effect.orElseSucceed(() => null),
+          ),
+    ),
+  )
 
 export class ConversationTurns extends Context.Service<
   ConversationTurns,
@@ -93,41 +106,41 @@ export class ConversationTurns extends Context.Service<
     readonly whileIdle: <A, E>(
       conversationId: string,
       effect: Effect.Effect<A, E>,
-    ) => Effect.Effect<A, E | AgentBusy | AgentError>
+    ) => Effect.Effect<A, E | ConversationBusy | ConversationError>
     readonly send: (
       conversationId: string,
       message: MessageWithContext,
-      feedback?: Effect.Effect<ReadonlyArray<FeedbackNote>, AgentError>,
-    ) => Effect.Effect<MessageDelivery, RequestWaiting | AgentError>
+      feedback?: Effect.Effect<ReadonlyArray<FeedbackNote>, ConversationError>,
+    ) => Effect.Effect<MessageDelivery, RequestWaiting | ConversationError>
     readonly steer: (
-      conversation: Conversation,
+      conversation: ClaimedConversation,
       message: MessageWithContext,
-    ) => Effect.Effect<void, RequestWaiting | AgentError>
+    ) => Effect.Effect<void, RequestWaiting | ConversationError>
     readonly whenIdle: <E>(
       conversationId: string,
       effect: (
         start: (
           globalConversationUpdate: GlobalConversationUpdate,
-          record: (turnId: string) => Effect.Effect<void, AgentError>,
-        ) => Effect.Effect<void, AgentError>,
+          record: (turnId: string) => Effect.Effect<void, ConversationError>,
+        ) => Effect.Effect<void, ConversationError>,
       ) => Effect.Effect<void, E>,
-    ) => Effect.Effect<void, E | AgentError>
+    ) => Effect.Effect<void, E | ConversationError>
     readonly sendQueued: (
       conversationId: string,
       queuedId: string,
-    ) => Effect.Effect<void, AgentBusy | AgentError>
-    readonly stop: (conversation: Conversation) => Effect.Effect<void, AgentError>
+    ) => Effect.Effect<void, ConversationBusy | ConversationError>
+    readonly stop: (conversation: ClaimedConversation) => Effect.Effect<void, ConversationError>
     readonly answer: (
-      conversation: Conversation,
+      conversation: ClaimedConversation,
       requestId: string,
       answer: RequestAnswer,
-    ) => Effect.Effect<void, RequestNotWaiting | AgentError>
-    readonly unsent: (conversationId: string) => Effect.Effect<SentMessage, AgentError>
+    ) => Effect.Effect<void, RequestNotWaiting | ConversationError>
+    readonly unsent: (conversationId: string) => Effect.Effect<SentMessage, ConversationError>
     readonly saveUnsent: (
       conversationId: string,
       unsent: SentMessage,
-    ) => Effect.Effect<void, AgentError>
-    readonly removeUnsent: (conversationId: string) => Effect.Effect<void, AgentError>
+    ) => Effect.Effect<void, ConversationError>
+    readonly removeUnsent: (conversationId: string) => Effect.Effect<void, ConversationError>
   }
 >()("@glass/server/ConversationTurns") {
   static readonly layer = Layer.effect(
@@ -187,7 +200,7 @@ export class ConversationTurns extends Context.Service<
         }
       })
 
-      const prepare = (conversation: Conversation, sent: StartedMessage) =>
+      const prepare = (conversation: ClaimedConversation, sent: StartedMessage) =>
         Effect.gen(function* () {
           const client = yield* conversation.host
 
@@ -199,25 +212,6 @@ export class ConversationTurns extends Context.Service<
           return { client, message } satisfies Prepared
         })
 
-      const dispatch = (
-        conversation: Conversation,
-        turnId: string,
-        { client, message }: Prepared,
-      ) =>
-        withConversation(
-          conversation.id,
-          Effect.gen(function* () {
-            const agentId = conversation.id
-
-            if ((yield* transcripts.runningTurn(agentId)) !== turnId)
-              return "superseded" as const satisfies Delivery
-
-            yield* client.StartTurn({ agentId, turnId, ...message, ...conversation.settings })
-
-            return "dispatched" as const satisfies Delivery
-          }),
-        )
-
       const failTurn = (conversationId: string, turnId: string, reason: string) =>
         Effect.gen(function* () {
           const ended = { at: yield* DateTime.now, ending: TurnFailed.make({ reason }) }
@@ -228,18 +222,86 @@ export class ConversationTurns extends Context.Service<
           Effect.as("failed" as const satisfies Delivery),
         )
 
-      const deliver = (conversation: Conversation, turnId: string, sent: StartedMessage) =>
+      const settleUndelivered = (
+        conversation: ClaimedConversation,
+        turnId: string,
+        context: StartedMessage["context"],
+        error: HostCallError,
+      ) =>
+        Effect.gen(function* () {
+          yield* Effect.yieldNow
+
+          if (Predicate.isTagged(context, "GlobalConversationUpdate"))
+            return yield* transcripts
+              .setStatus(conversation.id, hostFailure(error))
+              .pipe(Effect.as("pending" as const satisfies Delivery))
+
+          return yield* failTurn(conversation.id, turnId, hostFailure(error))
+        })
+
+      const dispatch = (
+        conversation: ClaimedConversation,
+        turnId: string,
+        { client, message }: Prepared,
+      ) =>
+        Effect.gen(function* () {
+          const conversationId = conversation.id
+
+          const ownsTurn = yield* withConversation(
+            conversationId,
+            transcripts
+              .runningTurn(conversationId)
+              .pipe(Effect.map((running) => running === turnId)),
+          )
+
+          if (!ownsTurn) return "superseded" as const satisfies Delivery
+
+          const started = yield* boundHostCall(
+            client.StartTurn({ conversationId, turnId, ...message, ...conversation.settings }),
+          ).pipe(
+            Effect.as("accepted" as const),
+            Effect.catch((error) => Effect.succeed(error)),
+          )
+
+          return yield* withConversation(
+            conversationId,
+            Effect.gen(function* () {
+              const still = (yield* transcripts.runningTurn(conversationId)) === turnId
+
+              if (started === "accepted") {
+                if (!still) yield* stopHost(conversation, turnId)
+
+                return still
+                  ? ("dispatched" as const satisfies Delivery)
+                  : ("superseded" as const satisfies Delivery)
+              }
+
+              if (!still) {
+                yield* stopHost(conversation, turnId)
+
+                return "superseded" as const satisfies Delivery
+              }
+
+              const settled = yield* settleUndelivered(
+                conversation,
+                turnId,
+                message.context,
+                started,
+              )
+
+              yield* stopHost(conversation, turnId)
+
+              return settled
+            }),
+          )
+        })
+
+      const deliver = (conversation: ClaimedConversation, turnId: string, sent: StartedMessage) =>
         prepare(conversation, sent).pipe(
           Effect.flatMap((prepared) => dispatch(conversation, turnId, prepared)),
-          Effect.catch((error) =>
-            Predicate.isTagged(sent.context, "GlobalConversationUpdate")
-              ? transcripts
-                  .setStatus(conversation.id, hostFailure(error))
-                  .pipe(Effect.as("pending" as const satisfies Delivery))
-              : failTurn(conversation.id, turnId, hostFailure(error)),
-          ),
+          Effect.catch((error) => settleUndelivered(conversation, turnId, sent.context, error)),
           Effect.tap((delivery) =>
-            annotateUnit({ agent_id: conversation.id, turn_id: turnId, delivery }),
+            annotateUnit({ conversation_id: conversation.id, turn_id: turnId, delivery }),
           ),
           Effect.withSpan("ConversationTurns.deliver", { root: true }),
         )
@@ -263,8 +325,8 @@ export class ConversationTurns extends Context.Service<
           .pipe(Effect.orDie)
 
         yield* Stream.merge(Stream.fromIterable(recovered), started).pipe(
-          Stream.runForEach(({ agentId, turnId, message, images, context, feedback }) =>
-            claim(agentId).pipe(
+          Stream.runForEach(({ conversationId, turnId, message, images, context, feedback }) =>
+            claim(conversationId).pipe(
               Effect.flatMap(
                 Option.match({
                   onNone: () => Effect.void,
@@ -275,7 +337,7 @@ export class ConversationTurns extends Context.Service<
                     ),
                 }),
               ),
-              Effect.catch((error) => failTurn(agentId, turnId, error.message)),
+              Effect.catch((error) => failTurn(conversationId, turnId, error.message)),
             ),
           ),
           Effect.forkIn(scope),
@@ -284,7 +346,9 @@ export class ConversationTurns extends Context.Service<
         yield* transcripts
           .endRunning(
             TurnInterrupted.make({}),
-            interruptedIds.filter((id) => !recovered.some(({ agentId }) => agentId === id)),
+            interruptedIds.filter(
+              (id) => !recovered.some(({ conversationId }) => conversationId === id),
+            ),
           )
           .pipe(Effect.orDie)
       })
@@ -294,11 +358,11 @@ export class ConversationTurns extends Context.Service<
           .isWaiting(conversationId)
           .pipe(Effect.flatMap((waiting) => (waiting ? new RequestWaiting() : Effect.void)))
 
-      const trySteer = (conversation: Conversation, sent: MessageWithContext) =>
+      const trySteer = (conversation: ClaimedConversation, sent: MessageWithContext) =>
         Effect.gen(function* () {
-          const agentId = conversation.id
+          const conversationId = conversation.id
 
-          if ((yield* transcripts.runningTurn(agentId)) === null) return false
+          if ((yield* transcripts.runningTurn(conversationId)) === null) return false
 
           const running = yield* conversation.runningHost
 
@@ -306,56 +370,61 @@ export class ConversationTurns extends Context.Service<
 
           const message = yield* delivered(sent)
 
-          return yield* running.value.Steer({ agentId, ...message }).pipe(
+          return yield* boundHostCall(running.value.Steer({ conversationId, ...message })).pipe(
             Effect.as(true),
             Effect.tapError((cause) => Effect.logWarning("Couldn't Steer a Turn", cause)),
-            Effect.orElseSucceed(() => false),
+            Effect.catch((error) =>
+              Predicate.isTagged(error, "ConversationError")
+                ? Effect.fail(error)
+                : Effect.succeed(false),
+            ),
           )
         })
 
-      const stop = Effect.fn("ConversationTurns.stop")(function* (conversation: Conversation) {
-        const agentId = conversation.id
+      const stop = Effect.fn("ConversationTurns.stop")(function* (
+        conversation: ClaimedConversation,
+      ) {
+        const conversationId = conversation.id
 
         yield* withConversation(
-          agentId,
+          conversationId,
           Effect.gen(function* () {
-            if ((yield* transcripts.runningTurn(agentId)) === null) return
+            const runningId = yield* transcripts.runningTurn(conversationId)
 
-            const running = yield* conversation.runningHost
+            if (runningId === null) return
 
-            const left = Option.isNone(running)
-              ? null
-              : yield* running.value.StopTurn({ agentId }).pipe(
-                  Effect.tapError((cause) => Effect.logWarning("Couldn't stop a Turn", cause)),
-                  Effect.orElseSucceed(() => null),
-                )
+            yield* transcripts.askedToStop(runningId)
 
-            if (left === null) yield* transcripts.endRunning(TurnStopped.make({}), [agentId])
-            else if (left.length > 0) yield* transcripts.prependQueued(agentId, left)
+            const left = yield* stopHost(conversation, runningId)
+
+            if (left === null) yield* transcripts.endRunning(TurnStopped.make({}), [conversationId])
+            else if (left.length > 0) yield* transcripts.prependQueued(conversationId, left)
           }),
         )
       })
 
       const answer = Effect.fn("ConversationTurns.answer")(function* (
-        conversation: Conversation,
+        conversation: ClaimedConversation,
         requestId: string,
         given: RequestAnswer,
       ) {
         return yield* conversation.host.pipe(
           Effect.flatMap((client) =>
-            client.AnswerRequest({ agentId: conversation.id, requestId, answer: given }),
+            boundHostCall(
+              client.AnswerRequest({ conversationId: conversation.id, requestId, answer: given }),
+            ),
           ),
           Effect.mapError((error) =>
             Predicate.isTagged(error, "RequestNotWaiting")
               ? error
-              : new AgentError({ message: hostFailure(error) }),
+              : new ConversationError({ message: hostFailure(error) }),
           ),
         )
       })
 
       const unsent = Effect.fn("ConversationTurns.unsent")(function* (conversationId: string) {
         const [saved] = yield* sql`
-          SELECT message, images FROM agent_unsent_message WHERE agent_id = ${conversationId}
+          SELECT message, images FROM conversation_unsent_message WHERE conversation_id = ${conversationId}
         `.pipe(
           Effect.flatMap(decodeUnsent),
           Effect.tapError((cause) => Effect.logWarning("Couldn't read an unsent message", cause)),
@@ -371,14 +440,14 @@ export class ConversationTurns extends Context.Service<
       ) {
         yield* (
           isNothingUnsent({ message, images })
-            ? sql`DELETE FROM agent_unsent_message WHERE agent_id = ${conversationId}`
+            ? sql`DELETE FROM conversation_unsent_message WHERE conversation_id = ${conversationId}`
             : sql`
-                INSERT INTO agent_unsent_message ${sql.insert({
-                  agent_id: conversationId,
+                INSERT INTO conversation_unsent_message ${sql.insert({
+                  conversation_id: conversationId,
                   message,
                   images: encodeImages(images),
                 })}
-                ON CONFLICT (agent_id) DO UPDATE SET message = excluded.message, images = excluded.images
+                ON CONFLICT (conversation_id) DO UPDATE SET message = excluded.message, images = excluded.images
               `
         ).pipe(
           Effect.tapError((cause) => Effect.logWarning("Couldn't save an unsent message", cause)),
@@ -389,7 +458,7 @@ export class ConversationTurns extends Context.Service<
       const startOrQueue = (
         conversationId: string,
         sent: MessageWithContext,
-        feedback?: Effect.Effect<ReadonlyArray<FeedbackNote>, AgentError>,
+        feedback?: Effect.Effect<ReadonlyArray<FeedbackNote>, ConversationError>,
       ) =>
         withConversation(conversationId, transcripts.startOrQueue(conversationId, sent, feedback))
 
@@ -400,7 +469,7 @@ export class ConversationTurns extends Context.Service<
             conversationId,
             Effect.gen(function* () {
               if ((yield* transcripts.runningTurn(conversationId)) !== null)
-                return yield* new AgentBusy()
+                return yield* new ConversationBusy()
 
               return yield* effect
             }),
@@ -437,7 +506,7 @@ export class ConversationTurns extends Context.Service<
         unsent,
         saveUnsent,
         removeUnsent: (conversationId) =>
-          sql`DELETE FROM agent_unsent_message WHERE agent_id = ${conversationId}`.pipe(
+          sql`DELETE FROM conversation_unsent_message WHERE conversation_id = ${conversationId}`.pipe(
             Effect.asVoid,
             Effect.mapError(unsentFailure),
           ),
@@ -451,7 +520,7 @@ export class ConversationTurns extends Context.Service<
 }
 
 interface TurnOwner {
-  readonly removeUnsent: (conversationId: string) => Effect.Effect<void, AgentError>
+  readonly removeUnsent: (conversationId: string) => Effect.Effect<void, ConversationError>
 }
 
 const coordination = new WeakMap<

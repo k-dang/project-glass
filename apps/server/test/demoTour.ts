@@ -53,7 +53,7 @@ export const demoTour: TourAnswer = {
     {
       title: "Gate requests before the handler",
       explanation:
-        "Previously, middleware only logged requests. When rate limiting is enabled, it now looks up a bucket by API key or IP address and takes a token before calling the handler. An empty bucket returns 429 with a retry-after header. This is the closest read: the new gate decides whether the handler runs. Step through the diagram for an illustrative last-token example, or click a node to read its code.",
+        "Previously, middleware only logged requests. When rate limiting is enabled, it now looks up a bucket by API key or IP address and takes a token before calling the handler. An empty bucket returns 429 with a retry-after header. This is the closest read: the new gate decides whether the handler runs.",
       files: [
         { path: middleware, summary: "Adds a per-client gate inside the request logger." },
         {
@@ -61,75 +61,15 @@ export const demoTour: TourAnswer = {
           summary: "Exercises rejection and the disabled limiter.",
         },
       ],
-      diagram: {
-        nodes: [
-          {
-            id: "old",
-            label: "Log and forward directly",
-            change: "removed",
-            target: target(middleware, "export const middleware", "old"),
-          },
-          {
-            id: "gate",
-            label: "Enable the request gate",
-            change: "added",
-            target: target(middleware, "logRequests(config.enabled"),
-          },
-          {
-            id: "lookup",
-            label: "Find the client's bucket",
-            change: "added",
-            target: target(middleware, "buckets.get(key)"),
-          },
-          {
-            id: "take",
-            label: "Try to take one token",
-            change: "added",
-            target: target(middleware, "if (!take(bucket, now))"),
-          },
-          {
-            id: "reject",
-            label: "Return 429 and retry-after",
-            change: "added",
-            target: target(middleware, "status: 429"),
-          },
-          {
-            id: "forward",
-            label: "Call the request handler",
-            change: "added",
-            target: target(middleware, "return next(request)"),
-          },
-        ],
-        edges: [
-          { from: "old", to: "forward", change: "removed" },
-          { from: "gate", to: "lookup", change: "added" },
-          { from: "lookup", to: "take", change: "added" },
-          { from: "take", to: "forward", change: "added" },
-          { from: "take", to: "reject", change: "added" },
-        ],
-        steps: [
-          {
-            caption:
-              "Example: with the limiter enabled, find a client's bucket with one token left.",
-            nodes: ["lookup", "gate"],
-            edges: [1],
-            stateChanges: [],
-          },
-          {
-            caption: "The last token allows this request to reach the handler.",
-            nodes: ["take", "forward"],
-            edges: [2, 3],
-            stateChanges: [{ label: "Client tokens", before: "1", after: "0" }],
-          },
-          {
-            caption:
-              "Another request before a token refills returns 429 without calling the handler.",
-            nodes: ["reject", "take"],
-            edges: [4],
-            stateChanges: [],
-          },
-        ],
-      },
+      diagram: [
+        "flowchart LR",
+        "  request[Request arrives] --> gate[Enable the request gate]:::added",
+        "  request -.-> forward[Call the request handler]",
+        "  gate --> lookup[Find the client's bucket]:::added",
+        "  lookup --> take[Try to take one token]:::added",
+        "  take -->|token taken| forward",
+        "  take -->|no token left| reject[Return 429 and retry-after]:::added",
+      ].join("\n"),
       callouts: [
         {
           label: "An API key identifies the client; requests without one use their IP address.",

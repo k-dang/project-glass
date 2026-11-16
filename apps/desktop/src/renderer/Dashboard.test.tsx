@@ -121,14 +121,14 @@ it("totals what the user got done over the chosen days", async () => {
     within(totals)
       .getAllByRole("listitem")
       .map((item) => item.textContent),
-  ).toEqual(["Reviews 0", "Replies 2", "Agents started 0", "To-dos done 1"])
+  ).toEqual(["Reviews 0", "Replies 2", "Conversations started 0", "To-dos done 1"])
 
   await userEvent.setup().click(screen.getByRole("button", { name: "7 days" }))
   expect(
     within(screen.getByRole("list", { name: "Activity totals" }))
       .getAllByRole("listitem")
       .map((item) => item.textContent),
-  ).toEqual(["Reviews 0", "Replies 1", "Agents started 0", "To-dos done 1"])
+  ).toEqual(["Reviews 0", "Replies 1", "Conversations started 0", "To-dos done 1"])
 })
 
 it("keeps the Activity chart visible while refreshing on a return to the Dashboard", async () => {
@@ -146,10 +146,10 @@ it("keeps the Activity chart visible while refreshing on a return to the Dashboa
   mount({ ListActivityStamps: hold(reads) })
   const first = await next(reads)
   expect(screen.getByText("Loading your Activity…")).toBeTruthy()
-  first.answer(Effect.succeed([stamp("AgentStarted", now)]))
-  await screen.findByText("Agents started", { exact: false })
+  first.answer(Effect.succeed([stamp("ConversationStarted", now)]))
+  await screen.findByText("Conversations started", { exact: false })
   expect(screen.getByRole("list", { name: "Activity totals" }).textContent).toContain(
-    "Agents started 1",
+    "Conversations started 1",
   )
 
   await user.click(screen.getByRole("link", { name: "Go to Activity" }))
@@ -159,13 +159,15 @@ it("keeps the Activity chart visible while refreshing on a return to the Dashboa
 
   expect(screen.queryByText("Loading your Activity…")).toBeNull()
   expect(screen.getByRole("list", { name: "Activity totals" }).textContent).toContain(
-    "Agents started 1",
+    "Conversations started 1",
   )
 
-  refresh.answer(Effect.succeed([stamp("AgentStarted", now), stamp("AgentStarted", now)]))
+  refresh.answer(
+    Effect.succeed([stamp("ConversationStarted", now), stamp("ConversationStarted", now)]),
+  )
   await waitFor(() =>
     expect(screen.getByRole("list", { name: "Activity totals" }).textContent).toContain(
-      "Agents started 2",
+      "Conversations started 2",
     ),
   )
 })

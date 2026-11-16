@@ -3,7 +3,7 @@ import { Schema } from "effect"
 export class StorageError extends Schema.TaggedError<StorageError>()("StorageError", {}) {}
 
 export const StorageGroup = Schema.Literals([
-  "agents",
+  "conversations",
   "reviews",
   "activity",
   "toDos",

@@ -1,4 +1,4 @@
-import type { AgentError } from "@glass/contracts"
+import type { ConversationError } from "@glass/contracts"
 import { Effect, Stream } from "effect"
 import type { HostEvent } from "./agentHost/protocol"
 import type { HostClient } from "./Placement"
@@ -9,10 +9,10 @@ export interface JournalPosition {
 
 export const followJournal = (
   save: (
-    agentId: string,
+    conversationId: string,
     events: ReadonlyArray<HostEvent>,
     throughJournalEntry: number,
-  ) => Effect.Effect<void, AgentError>,
+  ) => Effect.Effect<void, ConversationError>,
   client: HostClient,
   position: JournalPosition,
 ) =>
@@ -20,9 +20,12 @@ export const followJournal = (
     yield* Stream.suspend(() => client.WatchJournal({ after: position.saved })).pipe(
       Stream.runForEachArray((entries) =>
         Effect.gen(function* () {
-          for (const [agentId, saved] of Map.groupBy(entries, (entry) => entry.agentId))
+          for (const [conversationId, saved] of Map.groupBy(
+            entries,
+            (entry) => entry.conversationId,
+          ))
             yield* save(
-              agentId,
+              conversationId,
               saved.map(({ event }) => event),
               saved.at(-1)!.sequence,
             )

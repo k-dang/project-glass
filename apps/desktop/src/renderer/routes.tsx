@@ -14,16 +14,16 @@ import { Option, Schema } from "effect"
 import { AsyncResult, type AtomRegistry } from "effect/reactivity"
 import type { ReactNode } from "react"
 import { ActivityLogPage } from "./ActivityLogPage"
-import { AgentsLayout } from "./Agents"
-import { AgentSearch } from "./agentsArea"
-import { AgentView } from "./AgentView"
+import { ConversationsLayout } from "./Conversations"
+import { ConversationSearch } from "./conversationsArea"
+import { ConversationView } from "./ConversationView"
 import { AppShell } from "./AppShell"
 import { Dashboard } from "./Dashboard"
 import { Inbox } from "./Inbox"
 import { Connecting, ConnectionProblem } from "./ConnectionProblem"
 import { useConnection } from "./connection"
 import { Viewed, viewedAtom } from "./globalConversation"
-import { NewAgent } from "./NewAgent"
+import { NewConversation } from "./NewConversation"
 import { PullRequestListPage } from "./PullRequestListPage"
 import { PullRequestPage } from "./PullRequestPage"
 import {
@@ -121,34 +121,34 @@ const dashboardRoute = createRoute({
   ),
 })
 
-const agentsRoute = createRoute({
+const conversationsRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "agents",
-  component: AgentsLayout,
+  path: "conversations",
+  component: ConversationsLayout,
 })
 
-const noAgentRoute = createRoute({
-  getParentRoute: () => agentsRoute,
+const noConversationRoute = createRoute({
+  getParentRoute: () => conversationsRoute,
   path: "/",
   beforeLoad: () => {
-    throw redirect({ to: "/agents/new", replace: true })
+    throw redirect({ to: "/conversations/new", replace: true })
   },
 })
 
-const newAgentRoute = createRoute({
-  getParentRoute: () => agentsRoute,
+const newConversationRoute = createRoute({
+  getParentRoute: () => conversationsRoute,
   path: "new",
   validateSearch: Schema.toStandardSchemaV1(
     Schema.Struct({ repository: Schema.optional(Schema.String) }),
   ),
-  component: NewAgentPage,
+  component: NewConversationPage,
 })
 
-const agentRoute = createRoute({
-  getParentRoute: () => agentsRoute,
-  path: "$agentId",
-  validateSearch: Schema.toStandardSchemaV1(AgentSearch),
-  component: AgentPage,
+const conversationRoute = createRoute({
+  getParentRoute: () => conversationsRoute,
+  path: "$conversationId",
+  validateSearch: Schema.toStandardSchemaV1(ConversationSearch),
+  component: ConversationPage,
 })
 
 const settingsRoute = createRoute({
@@ -164,7 +164,7 @@ const routeTree = rootRoute.addChildren([
   activityRoute,
   inboxRoute,
   dashboardRoute,
-  agentsRoute.addChildren([noAgentRoute, newAgentRoute, agentRoute]),
+  conversationsRoute.addChildren([noConversationRoute, newConversationRoute, conversationRoute]),
   settingsRoute,
 ])
 
@@ -172,7 +172,8 @@ const viewedIn = (router: ReturnType<typeof makeRouter>): Viewed | null => {
   for (const match of router.state.matches) {
     if (match.routeId === pullRequestRoute.id) return Viewed.PullRequest({ ref: match.params })
 
-    if (match.routeId === agentRoute.id) return Viewed.Agent({ agentId: match.params.agentId })
+    if (match.routeId === conversationRoute.id)
+      return Viewed.Conversation({ conversationId: match.params.conversationId })
   }
 
   return null
@@ -230,20 +231,20 @@ function ListPage() {
   )
 }
 
-function NewAgentPage() {
-  const { repository } = newAgentRoute.useSearch()
+function NewConversationPage() {
+  const { repository } = newConversationRoute.useSearch()
 
-  return <NewAgent repository={repository} />
+  return <NewConversation repository={repository} />
 }
 
-function AgentPage() {
-  const { agentId } = agentRoute.useParams()
-  const { view } = agentRoute.useSearch()
-  const navigate = agentRoute.useNavigate()
+function ConversationPage() {
+  const { conversationId } = conversationRoute.useParams()
+  const { view } = conversationRoute.useSearch()
+  const navigate = conversationRoute.useNavigate()
 
   return (
-    <AgentView
-      agentId={agentId}
+    <ConversationView
+      conversationId={conversationId}
       tab={view ?? "chat"}
       onTabChange={(tab) => void navigate({ search: tab === "changes" ? { view: tab } : {} })}
     />

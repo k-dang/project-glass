@@ -1,5 +1,5 @@
 import {
-  AgentEngine,
+  AgentHarness,
   defaultReviewPrompt,
   type EngineFeature,
   EngineModels,
@@ -29,10 +29,10 @@ const Settings = Schema.Struct({
     Schema.withDecodingDefaultKey(Effect.succeed([])),
   ),
   tourModels: SavedModels,
-  tourEngine: AgentEngine.pipe(Schema.withDecodingDefaultKey(Effect.succeed("claude-code"))),
+  tourEngine: AgentHarness.pipe(Schema.withDecodingDefaultKey(Effect.succeed("claude-code"))),
   queueTours: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
   agentReviewModels: SavedModels,
-  agentReviewEngine: AgentEngine.pipe(Schema.withDecodingDefaultKey(Effect.succeed("pi"))),
+  agentReviewEngine: AgentHarness.pipe(Schema.withDecodingDefaultKey(Effect.succeed("pi"))),
   queueAgentReviews: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
   reviewPrompt: ReviewPrompt.pipe(
     Schema.withDecodingDefaultKey(Effect.succeed(defaultReviewPrompt)),
@@ -48,15 +48,15 @@ const Settings = Schema.Struct({
 export type Settings = typeof Settings.Type
 
 const featureKeys = {
-  tours: { engine: "tourEngine", models: "tourModels", queue: "queueTours" },
+  tours: { harness: "tourEngine", models: "tourModels", queue: "queueTours" },
   agentReviews: {
-    engine: "agentReviewEngine",
+    harness: "agentReviewEngine",
     models: "agentReviewModels",
     queue: "queueAgentReviews",
   },
 } as const satisfies Record<
   EngineFeature,
-  { engine: keyof Settings; models: keyof Settings; queue: keyof Settings }
+  { harness: keyof Settings; models: keyof Settings; queue: keyof Settings }
 >
 
 export const queueWorkOf = (settings: Settings, feature: EngineFeature): boolean =>
@@ -71,17 +71,17 @@ export const withQueueWork = (
 export const engineSettingsOf = (settings: Settings, feature: EngineFeature): EngineSettings => {
   const keys = featureKeys[feature]
 
-  return { engine: settings[keys.engine], models: settings[keys.models] }
+  return { harness: settings[keys.harness], models: settings[keys.models] }
 }
 
 export const withEngineSettings = (
   settings: Settings,
   feature: EngineFeature,
-  { engine, models }: EngineSettings,
+  { harness, models }: EngineSettings,
 ): Settings => {
   const keys = featureKeys[feature]
 
-  return { ...settings, [keys.engine]: engine, [keys.models]: models }
+  return { ...settings, [keys.harness]: harness, [keys.models]: models }
 }
 
 const decodeSettings = Schema.decodeUnknownEffect(Schema.fromJsonString(Settings))

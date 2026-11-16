@@ -33,7 +33,7 @@ import { randomUUID } from "node:crypto"
 import { stripVTControlCharacters } from "node:util"
 import { homedir } from "node:os"
 import { join } from "node:path"
-import type { AgentAdapter } from "./adapter"
+import type { HarnessAdapter } from "./adapter"
 import type { DeliveredMessage, DeliveredTurn } from "./deliveredMessage"
 import {
   AvailableCommands,
@@ -60,7 +60,7 @@ import {
   type ConversationRole,
   couldNotSwitch,
   type GlassToolsAccess,
-  HostAgentError,
+  HostConversationError,
   notRunning,
 } from "./protocol"
 import { settleWith } from "./requests"
@@ -87,7 +87,7 @@ const parseModelId = (glassId: string) => {
 
 /**
  * The thinking levels pi offers a model. pi's RPC doesn't report them per model, so this copies
- * `getSupportedThinkingLevels` from pi-ai 1.3.0. Agents run the user's own `pi`, which clamps a
+ * `getSupportedThinkingLevels` from pi-ai 1.3.0. Conversations run the user's own `pi`, which clamps a
  * level its model doesn't take to the nearest one it does, so drift only mislabels a choice.
  */
 const toModel = (model: PiModel): AgentModel => ({
@@ -277,7 +277,7 @@ export const piAdapter = (command: string) =>
         ).pipe(
           Effect.tapError((error) => Effect.logWarning("pi didn't list its models", error)),
           Effect.mapError(
-            () => new HostAgentError({ message: "pi didn't list its models. Try again." }),
+            () => new HostConversationError({ message: "pi didn't list its models. Try again." }),
           ),
         )
 
@@ -297,7 +297,8 @@ export const piAdapter = (command: string) =>
           const { commands } = yield* rpc.request({ type: "get_commands" }, AvailableCommands).pipe(
             Effect.tapError((error) => Effect.logWarning("pi didn't list its commands", error)),
             Effect.mapError(
-              () => new HostAgentError({ message: "pi didn't list its commands. Try again." }),
+              () =>
+                new HostConversationError({ message: "pi didn't list its commands. Try again." }),
             ),
           )
 
@@ -314,7 +315,7 @@ export const piAdapter = (command: string) =>
           Effect.provideService(FileSystem.FileSystem, fs),
           Effect.tapError((error) => Effect.logWarning("Couldn't prepare pi's tools", error)),
           Effect.mapError(
-            () => new HostAgentError({ message: "Couldn't prepare pi's tools. Try again." }),
+            () => new HostConversationError({ message: "Couldn't prepare pi's tools. Try again." }),
           ),
         )
 
@@ -393,11 +394,11 @@ export const piAdapter = (command: string) =>
 
         const startingModel = (yield* rpc.request({ type: "get_state" }, SessionState).pipe(
           Effect.tapError((error) => Effect.logWarning("pi didn't report its state", error)),
-          Effect.mapError(() => new HostAgentError({ message: stoppedReason })),
+          Effect.mapError(() => new HostConversationError({ message: stoppedReason })),
         )).model
 
         const turns = yield* runTurns({
-          program: "pi",
+          harness: "pi",
           machine,
           events: Stream.fromQueue(inbox),
           report,
@@ -470,7 +471,7 @@ export const piAdapter = (command: string) =>
             ),
             Effect.mapError(
               () =>
-                new HostAgentError({
+                new HostConversationError({
                   message:
                     "Couldn't recover pi's Global conversation update. Restart Glass to try again.",
                 }),
@@ -499,7 +500,7 @@ export const piAdapter = (command: string) =>
               ),
               Effect.mapError(
                 () =>
-                  new HostAgentError({
+                  new HostConversationError({
                     message:
                       "Couldn't confirm pi's Global conversation update delivery. Restart Glass to try again.",
                   }),
@@ -575,37 +576,38 @@ export const piAdapter = (command: string) =>
             if (Option.isSome(accepted))
               return yield* Queue.offer(inbox, Input.SteerHandled({ steer }))
 
-            return yield* new HostAgentError({ message: "pi didn't take the message in." })
+            return yield* new HostConversationError({ message: "pi didn't take the message in." })
           }),
           // pi's abort runs whatever it still holds, so the queue is cleared first (pi docs/rpc-commands.md).
-          stopTurn: Effect.gen(function* () {
-            const steers = yield* turns.stop
+          stopTurn: (turnId) =>
+            Effect.gen(function* () {
+              const steers = yield* turns.stop(turnId)
 
-            if (steers === null) return null
+              if (steers === null) return null
 
-            const cleared = yield* rpc.request({ type: "clear_queue" }, ClearedQueue).pipe(
-              Effect.tapError((error) => Effect.logWarning("pi didn't clear its queue", error)),
-              Effect.orElseSucceed(() => ({ steering: [], followUp: [] })),
-            )
+              const cleared = yield* rpc.request({ type: "clear_queue" }, ClearedQueue).pipe(
+                Effect.tapError((error) => Effect.logWarning("pi didn't clear its queue", error)),
+                Effect.orElseSucceed(() => ({ steering: [], followUp: [] })),
+              )
 
-            // An open dialog holds the extension, and with it pi's run, until it's answered.
-            const open = Array.from(dialogs.keys())
-            dialogs.clear()
-            yield* Effect.forEach(
-              open,
-              (id) => rpc.send({ type: "extension_ui_response", id, cancelled: true }),
-              { discard: true },
-            ).pipe(Effect.ignore)
+              // An open dialog holds the extension, and with it pi's run, until it's answered.
+              const open = Array.from(dialogs.keys())
+              dialogs.clear()
+              yield* Effect.forEach(
+                open,
+                (id) => rpc.send({ type: "extension_ui_response", id, cancelled: true }),
+                { discard: true },
+              ).pipe(Effect.ignore)
 
-            yield* rpc.request({ type: "abort" }, Schema.Unknown).pipe(
-              Effect.tapError((error) => Effect.logWarning("pi didn't abort", error)),
-              Effect.ignore,
-              Effect.forkIn(scope),
-            )
+              yield* rpc.request({ type: "abort" }, Schema.Unknown).pipe(
+                Effect.tapError((error) => Effect.logWarning("pi didn't abort", error)),
+                Effect.ignore,
+                Effect.forkIn(scope),
+              )
 
-            return leftover(steers, cleared)
-          }),
+              return leftover(steers, cleared)
+            }),
         }
       }),
-    } satisfies AgentAdapter
+    } satisfies HarnessAdapter
   })
