@@ -177,7 +177,7 @@ export class AgentHostRpcs extends RpcGroup.make(
     error: HostAgentError,
   }),
   Rpc.make("StopTurn", {
-    payload: { agentId: Schema.String },
+    payload: { agentId: Schema.String, turnId: Schema.String },
     success: Schema.NullOr(SteersNotTakenIn),
   }),
   Rpc.make("StopAgent", { payload: { agentId: Schema.String } }),

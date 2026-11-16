@@ -263,10 +263,10 @@ it.live("stops a pi Turn, handing back a Steer pi hadn't taken in", () =>
     yield* f.extension("confirm.js", confirmExtension)
     const agent = yield* f.open(conversation)
 
-    yield* agent.send(run("bash", "echo hi", "DONE"))
+    const turnId = yield* agent.send(run("bash", "echo hi", "DONE"))
     yield* f.request
     yield* agent.steer("Now, please")
-    const handedBack = yield* agent.session.stopTurn
+    const handedBack = yield* agent.session.stopTurn(turnId)
 
     const [turn] = yield* f.until(settled(1))
     assert.deepStrictEqual(turn?.ended?.ending, TurnStopped.make({}))
@@ -318,11 +318,11 @@ it.live("hands back what pi held when the Turn stops: Steers as written, then pi
     yield* f.extension("confirm.js", confirmExtension)
     const agent = yield* f.open(conversation)
 
-    yield* agent.send(run("bash", "echo hi", "DONE"))
+    const turnId = yield* agent.send(run("bash", "echo hi", "DONE"))
     yield* f.request
     yield* agent.steer("?quick tabs or spaces?", [pixel])
     yield* agent.steer("remind me")
-    const handedBack = yield* agent.session.stopTurn
+    const handedBack = yield* agent.session.stopTurn(turnId)
 
     assert.deepStrictEqual(handedBack, [
       { message: "?quick tabs or spaces?", images: [pixel], context: null },
@@ -548,9 +548,9 @@ it.live("stops a pi Turn while its extension's dialog waits", () =>
     yield* f.extension("confirm.js", confirmExtension)
     const agent = yield* f.open(conversation)
 
-    yield* agent.send(run("bash", "echo hi", "DONE"))
+    const turnId = yield* agent.send(run("bash", "echo hi", "DONE"))
     const request = yield* f.request
-    yield* agent.session.stopTurn
+    yield* agent.session.stopTurn(turnId)
 
     const [turn] = yield* f.until(settled(1))
     assert.deepStrictEqual(turn?.ended?.ending, TurnStopped.make({}))
@@ -715,12 +715,12 @@ it.live("stops the Global conversation's Turn while a Glass tool runs, cancellin
 
     const agent = yield* f.open(conversation, glass.role)
 
-    yield* agent.send("Wait for release.")
+    const turnId = yield* agent.send("Wait for release.")
 
     if (recordingSessions) yield* glass.waitStarted
     else yield* f.until(runningTool("wait_for_release"))
 
-    yield* agent.session.stopTurn
+    yield* agent.session.stopTurn(turnId)
     const [turn] = yield* f.until(settled(1))
 
     assert.deepStrictEqual(turn?.ended?.ending, TurnStopped.make({}))

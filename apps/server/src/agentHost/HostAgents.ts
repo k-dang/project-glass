@@ -55,7 +55,7 @@ export class HostAgents extends Context.Service<
       agentId: string,
       message: DeliveredMessage,
     ) => Effect.Effect<void, HostAgentError>
-    readonly stopTurn: (agentId: string) => Effect.Effect<SteersNotTakenIn | null>
+    readonly stopTurn: (agentId: string, turnId: string) => Effect.Effect<SteersNotTakenIn | null>
     readonly answer: (
       agentId: string,
       requestId: string,
@@ -76,7 +76,30 @@ export class HostAgents extends Context.Service<
 
         const hostScope = yield* Scope.Scope
         const running = new Map<string, Running>()
-        const lock = yield* Semaphore.make(1)
+        const locks = new Map<string, { semaphore: Semaphore.Semaphore; holders: number }>()
+
+        const withAgent = <A, E, R>(agentId: string, effect: Effect.Effect<A, E, R>) =>
+          Effect.suspend(() => {
+            const lock = locks.get(agentId) ?? {
+              semaphore: Semaphore.makeUnsafe(1),
+              holders: 0,
+            }
+
+            lock.holders += 1
+            locks.set(agentId, lock)
+
+            return lock.semaphore
+              .withPermits(1)(effect)
+              .pipe(
+                Effect.ensuring(
+                  Effect.sync(() => {
+                    lock.holders -= 1
+
+                    if (lock.holders === 0 && locks.get(agentId) === lock) locks.delete(agentId)
+                  }),
+                ),
+              )
+          })
 
         const start = Effect.fn("HostAgents.start")(
           function* (starting: ConversationStart) {
@@ -124,7 +147,8 @@ export class HostAgents extends Context.Service<
 
             yield* session.closed.pipe(
               Effect.andThen(
-                lock.withPermits(1)(
+                withAgent(
+                  agentId,
                   Effect.sync(() => {
                     if (running.get(agentId) === agent) running.delete(agentId)
                   }),
@@ -136,7 +160,7 @@ export class HostAgents extends Context.Service<
 
             return "started" as const
           },
-          (effect) => lock.withPermits(1)(effect),
+          (effect, starting) => withAgent(starting.agentId, effect),
         )
 
         const find = (agentId: string) =>
@@ -148,7 +172,7 @@ export class HostAgents extends Context.Service<
               : Effect.succeed(agent)
           })
 
-        return HostAgents.of({
+        const agents = HostAgents.of({
           models: (engine) => adapters[engine].models,
           commands: (engine, folder, skills) =>
             written(folder, skills).pipe(
@@ -168,8 +192,10 @@ export class HostAgents extends Context.Service<
           }),
           steer: (agentId, message) =>
             find(agentId).pipe(Effect.flatMap(({ session }) => session.steer(message))),
-          stopTurn: (agentId) =>
-            Effect.suspend(() => running.get(agentId)?.session.stopTurn ?? Effect.succeed(null)),
+          stopTurn: (agentId, turnId) =>
+            Effect.suspend(
+              () => running.get(agentId)?.session.stopTurn(turnId) ?? Effect.succeed(null),
+            ),
           answer: (agentId, requestId, answer) =>
             Effect.suspend(() => {
               const agent = running.get(agentId)
@@ -179,7 +205,8 @@ export class HostAgents extends Context.Service<
                 : agent.session.answer(requestId, answer)
             }),
           stop: Effect.fnUntraced(function* (agentId: string) {
-            const agent = yield* lock.withPermits(1)(
+            const agent = yield* withAgent(
+              agentId,
               Effect.sync(() => {
                 const stopping = running.get(agentId)
                 running.delete(agentId)
@@ -191,6 +218,22 @@ export class HostAgents extends Context.Service<
             if (agent !== undefined) yield* Scope.close(agent.scope, Exit.void)
           }),
         })
+
+        coordination.set(agents, locks)
+
+        return agents
       }),
     )
 }
+
+interface AgentLockOwner {
+  readonly stop: (agentId: string) => Effect.Effect<void>
+}
+
+const coordination = new WeakMap<
+  AgentLockOwner,
+  Map<string, { semaphore: Semaphore.Semaphore; holders: number }>
+>()
+
+export const agentLock = (owner: AgentLockOwner, agentId: string): object | undefined =>
+  coordination.get(owner)?.get(agentId)
