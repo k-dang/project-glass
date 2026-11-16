@@ -29,22 +29,20 @@ export class Journal extends Context.Service<
             return PubSub.publish(published, entry)
           }),
         watch: (watched, after) =>
-          watched !== host
-            ? Stream.fail(new HostReplaced())
-            : Stream.unwrap(
-                Effect.gen(function* () {
-                  const live = yield* PubSub.subscribe(published)
-                  const missed = kept.filter((entry) => entry.sequence > after)
-                  const last = missed.at(-1)?.sequence ?? after
+          Stream.unwrap(
+            Effect.gen(function* () {
+              if (watched !== host) return yield* new HostReplaced()
 
-                  return Stream.concat(
-                    Stream.fromIterable(missed),
-                    Stream.fromSubscription(live).pipe(
-                      Stream.filter((entry) => entry.sequence > last),
-                    ),
-                  )
-                }),
-              ),
+              const live = yield* PubSub.subscribe(published)
+              const missed = kept.filter((entry) => entry.sequence > after)
+              const last = missed.at(-1)?.sequence ?? after
+
+              return Stream.concat(
+                Stream.fromIterable(missed),
+                Stream.fromSubscription(live).pipe(Stream.filter((entry) => entry.sequence > last)),
+              )
+            }),
+          ),
         acknowledge: (acknowledged, through) =>
           Effect.sync(() => {
             if (acknowledged === host) kept = kept.filter((entry) => entry.sequence > through)

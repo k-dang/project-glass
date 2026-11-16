@@ -76,6 +76,7 @@ it.live("upgrades main's schema directly, preserving completed and unfinished up
     assert.deepStrictEqual(yield* SqliteMigrator.run({ loader: migrationLoader }), [
       [9, "global_conversation_updates"],
       [10, "to_do_images"],
+      [11, "journal_host"],
     ])
     const transcripts = yield* Transcripts
     const { turns } = yield* transcripts.read("global")
@@ -140,6 +141,7 @@ it.live("creates the schema once and reads Activity through its indexes after re
         [8, "past_global_conversations"],
         [9, "global_conversation_updates"],
         [10, "to_do_images"],
+        [11, "journal_host"],
       ],
       [],
     ] as const) {

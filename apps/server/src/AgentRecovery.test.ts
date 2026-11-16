@@ -19,6 +19,7 @@ import { agentsFixture, holding, lastText, settled } from "../test/agentsFixture
 import { childProcesses, startedHost } from "../test/agentHostProcesses"
 import { LAUNCH_TOKEN } from "../test/harness"
 import { AgentHostRpcs } from "./agentHost/protocol"
+import { greet } from "./hostJournal"
 import { connectRpcClient } from "./rpcSocket"
 
 const toTestBackend = (url: string | URL) => String(url).includes(`${TOKEN_PARAM}=${LAUNCH_TOKEN}`)
@@ -194,7 +195,7 @@ it.live(
       yield* f.release("second")
 
       const witness = yield* connections.witness
-      yield* witness.WatchJournal({ host: (yield* witness.Hello()).host, after: 0 }).pipe(
+      yield* witness.WatchJournal({ host: yield* greet(witness), after: 0 }).pipe(
         Stream.filter(
           ({ agentId, event }) =>
             agentId === agent.id &&

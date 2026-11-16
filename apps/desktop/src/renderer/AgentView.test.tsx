@@ -987,6 +987,22 @@ it("dims a Sandbox Agent Glass can't reach, and makes one whose Sandbox expired 
   ).toBeTruthy()
   expect(screen.queryByRole("textbox", { name: "Message" })).toBeNull()
   expect(screen.getByRole("link", { description: /Sandbox expired/ })).toBeTruthy()
+
+  cleanup()
+  mount({
+    WatchAgents: () => Stream.make([inSandboxWith("incompatible")]),
+    WatchTranscript: noTranscript,
+  })
+
+  expect(
+    await screen.findByText(
+      "This Agent's Sandbox runs a different version of Glass, so it can't take messages. Its transcript stays until you remove the Agent.",
+    ),
+  ).toBeTruthy()
+  expect(screen.queryByRole("textbox", { name: "Message" })).toBeNull()
+  expect(
+    screen.getByRole("link", { description: /Sandbox runs another Glass version/ }),
+  ).toBeTruthy()
 })
 
 const flaky = new ToDo({ id: 3, title: "Fix the flaky test", notes: "", done: false })

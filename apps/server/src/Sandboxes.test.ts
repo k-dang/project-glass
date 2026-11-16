@@ -3,6 +3,7 @@ import {
   ChangedFile,
   FeedbackNote,
   FollowedRepository,
+  incompatibleExplanation,
   PartSet,
   SandboxPlace,
   SandboxProviderInfo,
@@ -52,9 +53,11 @@ const failedReason = ({ turns }: Transcript) => {
 const texts = (turn: Turn | undefined) =>
   turn?.parts.flatMap((part) => (Predicate.isTagged(part, "Text") ? [part.text] : [])) ?? []
 
-const reply = (turn: Effect.Success<Fixture["started"]>, said: ReadonlyArray<string>) =>
+const reply = (turn: Effect.Success<Fixture["started"]>, said: ReadonlyArray<string>, from = 0) =>
   Effect.forEach(said, (text, index) =>
-    turn.emit(PartSet.make({ turnId: turn.turnId, index, part: TextPart.make({ text }) })),
+    turn.emit(
+      PartSet.make({ turnId: turn.turnId, index: from + index, part: TextPart.make({ text }) }),
+    ),
   )
 
 const afterRetries = (f: Fixture, agentId: string, until: (transcript: Transcript) => boolean) =>
@@ -439,9 +442,7 @@ it.effect(
       yield* f.transcript(agent.id, ({ turns }) => texts(turns[0]).length === 1)
 
       yield* f.sandboxes.dropConnections(agent.id)
-      yield* turn.emit(
-        PartSet.make({ turnId: turn.turnId, index: 1, part: TextPart.make({ text: "two" }) }),
-      )
+      yield* reply(turn, ["two"], 1)
       yield* end(turn)
 
       const [done] = (yield* afterRetries(f, agent.id, settled(1))).turns
@@ -478,12 +479,12 @@ it.effect(
     }),
 )
 
-for (const [older, protocol] of [
-  ["a later protocol", HOST_PROTOCOL + 1],
-  ["no protocol", null],
+for (const [spoken, kind] of [
+  ["a later protocol", { kind: "versioned", protocol: HOST_PROTOCOL + 1 }],
+  ["no protocol", { kind: "unversioned" }],
 ] as const)
   it.effect(
-    `makes an Agent read-only once its Sandbox's host speaks ${older}, cutting off its Turn and deleting the Sandbox on removal`,
+    `keeps an Agent read-only while its Sandbox's host speaks ${spoken}, cutting off its Turn, until a compatible host answers`,
     () =>
       Effect.gen(function* () {
         const f = yield* agentServicesFixture
@@ -491,7 +492,7 @@ for (const [older, protocol] of [
         yield* reply(yield* f.started, ["one"])
         yield* f.transcript(agent.id, ({ turns }) => texts(turns[0]).length === 1)
 
-        yield* f.sandboxes.replaceHostWithOlder(agent.id, protocol)
+        yield* f.sandboxes.restartHost(agent.id, kind)
 
         const [cutOff] = (yield* afterRetries(f, agent.id, ({ turns }) => turns[0]?.ended !== null))
           .turns
@@ -506,13 +507,16 @@ for (const [older, protocol] of [
 
         assert.equal(status.reach, "incompatible")
 
-        const refused = yield* f.agents.send(agent.id, say("Still there?")).pipe(Effect.flip)
+        yield* f.agents.send(agent.id, say("Still there?"))
         assert.equal(
-          refused.message,
-          "This Agent's Sandbox runs a different version of Glass, so it can't take messages. Its transcript stays until you remove the Agent.",
+          failedReason(yield* f.transcript(agent.id, settled(2))),
+          incompatibleExplanation,
         )
 
-        yield* f.agents.remove(agent.id)
-        yield* removed(f, agent.id)
+        yield* f.sandboxes.restartHost(agent.id)
+        yield* f.agents.changes(agent.id)
+        yield* f.agents.send(agent.id, say("Back?"))
+        yield* end(yield* f.started)
+        assert.equal(failedReason(yield* f.transcript(agent.id, settled(3))), "Done")
       }),
   )

@@ -56,12 +56,21 @@ const serveRpcs = <Rpcs extends Rpc.Any>(
     disableListenLog: true,
   }).pipe(Layer.provide(handlers), Layer.provide(RpcSerialization.layerJson))
 
-const olderHost = (protocol: number | null) =>
-  protocol === null
+export type HostKind =
+  | { readonly kind: "current" }
+  | { readonly kind: "unversioned" }
+  | { readonly kind: "versioned"; readonly protocol: number }
+
+const current: HostKind = { kind: "current" }
+
+const otherHost = (kind: Exclude<HostKind, { readonly kind: "current" }>) =>
+  kind.kind === "unversioned"
     ? serveRpcs(UnversionedHost, UnversionedHost.toLayer({ Acknowledge: () => Effect.void }))
     : serveRpcs(
         VersionedHost,
-        VersionedHost.toLayer({ Hello: () => Effect.succeed({ host: "older", protocol }) }),
+        VersionedHost.toLayer({
+          Hello: () => Effect.succeed({ host: "other", protocol: kind.protocol }),
+        }),
       )
 
 export const inProcessSandboxes = Effect.fnUntraced(function* (
@@ -81,11 +90,14 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
 
   const hosts = new Map<
     string,
-    { readonly scope: Scope.Closeable; readonly sockets: ReadonlySet<Socket> }
+    {
+      readonly scope: Scope.Closeable
+      readonly sockets: ReadonlySet<Socket>
+      readonly token: string
+    }
   >()
 
   const shutDowns = new Map<string, Deferred.Deferred<void>>()
-  const tokens = new Map<string, string>()
   const events: Array<string> = []
 
   const noteEnded = (agentId: string) => {
@@ -123,7 +135,7 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
       return Scope.close(running.scope, Exit.void)
     })
 
-  const startHost = async (agentId: string, token: string, protocol?: number | null) => {
+  const startHost = async (agentId: string, token: string, kind: HostKind) => {
     const scope = Scope.makeUnsafe()
     const shutDown = Deferred.makeUnsafe<void>()
     const server = createServer()
@@ -136,9 +148,9 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
 
     const services = await runPromise(
       Layer.buildWithScope(
-        (protocol === undefined
+        (kind.kind === "current"
           ? hostServer({ token: Redacted.make(token), shutDown }).pipe(Layer.provide(host()))
-          : olderHost(protocol)
+          : otherHost(kind)
         ).pipe(
           Layer.provideMerge(NodeHttpServer.layer(() => server, { port: 0, host: "127.0.0.1" })),
         ),
@@ -146,8 +158,7 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
       ),
     )
 
-    hosts.set(agentId, { scope, sockets })
-    tokens.set(agentId, token)
+    hosts.set(agentId, { scope, sockets, token })
     shutDowns.set(agentId, shutDown)
     urls.set(
       agentId,
@@ -182,7 +193,7 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
         if (settings.failAt === step) throw new Error(`The fake Sandbox failed at ${step}`)
       }
 
-      await startHost(request.agentId, request.host.environment["GLASS_HOST_TOKEN"] ?? "")
+      await startHost(request.agentId, request.host.environment["GLASS_HOST_TOKEN"] ?? "", current)
     },
     target: async (state) => {
       const agentId = agentIdOf(state)
@@ -265,16 +276,16 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
       Effect.sync(() => {
         for (const socket of hosts.get(agentId)?.sockets ?? []) socket.destroy()
       }),
-    restartHost: (agentId: string) =>
-      stop(agentId).pipe(
-        Effect.andThen(Effect.promise(() => startHost(agentId, tokens.get(agentId) ?? ""))),
-      ),
-    replaceHostWithOlder: (agentId: string, protocol: number | null) =>
-      stop(agentId).pipe(
-        Effect.andThen(
-          Effect.promise(() => startHost(agentId, tokens.get(agentId) ?? "", protocol)),
-        ),
-      ),
+    restartHost: (agentId: string, kind: HostKind = current) =>
+      Effect.suspend(() => {
+        const running = hosts.get(agentId)
+
+        if (running === undefined) return Effect.die(`No running host for ${agentId}`)
+
+        return stop(agentId).pipe(
+          Effect.andThen(Effect.promise(() => startHost(agentId, running.token, kind))),
+        )
+      }),
     reclaim,
     setGone: (agentId: string, isGone: boolean) => {
       if (isGone) gone.add(agentId)

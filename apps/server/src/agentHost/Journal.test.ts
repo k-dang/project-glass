@@ -4,7 +4,7 @@ import { Effect, Stream } from "effect"
 import { Journal } from "./Journal"
 import { HostReplaced } from "./protocol"
 
-it.effect("refuses to replay or trim its entries for a cursor of another host", () =>
+it.effect("refuses to replay another host's cursor, and ignores its acknowledgements", () =>
   Effect.gen(function* () {
     const journal = yield* Journal
     yield* journal.append(

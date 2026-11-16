@@ -8,20 +8,28 @@ export class IncompatibleHost extends Data.TaggedError("IncompatibleHost")<{
 }> {}
 
 export interface JournalPosition {
-  host: string
+  readonly host: string
   saved: number
 }
 
 export const greet = (client: HostClient) =>
   client.Hello().pipe(
-    // A host from before Hello existed answers it with a defect for an unknown request.
-    Effect.catchDefect(() => Effect.fail(new IncompatibleHost({ protocol: null }))),
+    Effect.catchDefect((defect) =>
+      String(defect).includes("Unknown request tag: Hello")
+        ? Effect.fail(new IncompatibleHost({ protocol: null }))
+        : Effect.die(defect),
+    ),
     Effect.flatMap(({ host, protocol }) =>
       protocol === HOST_PROTOCOL
         ? Effect.succeed(host)
         : Effect.fail(new IncompatibleHost({ protocol })),
     ),
   )
+
+const acknowledge = (client: HostClient, { host }: JournalPosition, through: number) =>
+  // Waiting for the answer would deadlock a fast stream: the answer queues on the same connection
+  // behind journal entries the follower hasn't taken yet.
+  client.Acknowledge({ host, through }).pipe(Effect.ignore, Effect.forkScoped)
 
 export const followJournal = (
   save: (
@@ -33,6 +41,7 @@ export const followJournal = (
   position: JournalPosition,
 ) =>
   Effect.gen(function* () {
+    yield* acknowledge(client, position, position.saved)
     yield* Stream.suspend(() =>
       client.WatchJournal({ host: position.host, after: position.saved }),
     ).pipe(
@@ -50,12 +59,7 @@ export const followJournal = (
           if (last === undefined) return
 
           position.saved = last.sequence
-
-          // Waiting here for the answer would deadlock a fast stream: the answer queues on the
-          // same connection behind journal entries this loop hasn't taken yet.
-          yield* client
-            .Acknowledge({ host: position.host, through: last.sequence })
-            .pipe(Effect.ignore, Effect.forkScoped)
+          yield* acknowledge(client, position, last.sequence)
         }),
       ),
     )

@@ -39,7 +39,7 @@ import { ActivityLog } from "../src/ActivityLog"
 import { Agents } from "../src/Agents"
 import { ConversationTurns } from "../src/ConversationTurns"
 import { FeedbackNotes } from "../src/FeedbackNotes"
-import { followJournal } from "../src/hostJournal"
+import { followJournal, greet } from "../src/hostJournal"
 import { migrationLoader } from "../src/Migrations"
 import { Plugins } from "../src/Plugins"
 import { Sandboxes } from "../src/Sandboxes"
@@ -231,8 +231,9 @@ export const agentServicesFixture = Effect.gen(function* () {
       )
 
       const transcripts = Context.get(services, Transcripts)
+      const host = yield* greet(client)
       yield* followJournal((agentId, events) => transcripts.save(agentId, events), client, {
-        host: (yield* client.Hello()).host,
+        host,
         saved: 0,
       }).pipe(Effect.forkScoped)
 

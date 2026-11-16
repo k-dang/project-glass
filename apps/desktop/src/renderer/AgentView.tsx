@@ -25,8 +25,7 @@ import {
   type Turn,
   type TurnEnd,
   type TurnPart,
-  goneExplanation,
-  isGone,
+  readOnlyExplanation,
   shortSha,
 } from "@glass/contracts"
 import { cn } from "cn"
@@ -218,7 +217,7 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
   ])
 
   const reach = agent.sandbox?.reach
-  const gone = isGone(reach) ? reach : null
+  const readOnly = readOnlyExplanation(reach)
 
   useEffect(() => {
     rememberPlace(registry, { area: "agents", agentId: agent.id })
@@ -290,11 +289,11 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
             </ToolCallView>
             <ExtensionStatuses statuses={extensionStatuses} />
             {reach === "unreachable" && <UnreachableNotice agentId={agent.id} />}
-            {gone === null ? (
+            {readOnly === null ? (
               <Composer agent={agent} turns={turns} queued={queued} />
             ) : (
               <output className="mx-auto block w-full max-w-3xl px-6 py-4 text-sm text-muted-foreground">
-                {goneExplanation(gone)}
+                {readOnly}
               </output>
             )}
           </div>

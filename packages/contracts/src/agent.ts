@@ -85,7 +85,7 @@ export const ModelChoice = Schema.Struct({
 
 export type ModelChoice = typeof ModelChoice.Type
 
-export const GoneReach = Schema.Literals(["expired", "deleted", "incompatible"])
+export const GoneReach = Schema.Literals(["expired", "deleted"])
 
 export type GoneReach = typeof GoneReach.Type
 
@@ -93,6 +93,7 @@ export const SandboxReach = Schema.Literals([
   "connecting",
   "reachable",
   "unreachable",
+  "incompatible",
   ...GoneReach.literals,
 ])
 
@@ -100,16 +101,17 @@ export type SandboxReach = typeof SandboxReach.Type
 
 export const isGone = Schema.is(GoneReach)
 
-export const isOutOfReach = (reach: SandboxReach) => reach === "unreachable" || isGone(reach)
-
-const goneWhy: Record<GoneReach, string> = {
-  expired: "expired",
-  deleted: "was deleted",
-  incompatible: "runs a different version of Glass",
-}
+export const isOutOfReach = (reach: SandboxReach) =>
+  reach === "unreachable" || reach === "incompatible" || isGone(reach)
 
 export const goneExplanation = (reach: GoneReach) =>
-  `This Agent's Sandbox ${goneWhy[reach]}, so it can't take messages. Its transcript stays until you remove the Agent.`
+  `This Agent's Sandbox ${reach === "expired" ? "expired" : "was deleted"}, so it can't take messages. Its transcript stays until you remove the Agent.`
+
+export const incompatibleExplanation =
+  "This Agent's Sandbox runs a different version of Glass, so it can't take messages. Its transcript stays until you remove the Agent."
+
+export const readOnlyExplanation = (reach: SandboxReach | undefined) =>
+  isGone(reach) ? goneExplanation(reach) : reach === "incompatible" ? incompatibleExplanation : null
 
 export class SandboxStatus extends Schema.Class<SandboxStatus>("SandboxStatus")({
   expiresAt: Schema.NullOr(Schema.DateTimeUtcFromString),

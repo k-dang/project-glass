@@ -4,6 +4,7 @@ import { RPC_PATH, TextPart, TurnCutOff, TurnDone } from "@glass/contracts"
 import { Effect, Predicate, Stream } from "effect"
 import { agentsFixture, holding, lastText, settled } from "../test/agentsFixture"
 import { AgentHostRpcs, HOST_TOKEN_HEADER } from "./agentHost/protocol"
+import { greet } from "./hostJournal"
 import { connectRpcClient } from "./rpcSocket"
 
 it.live(
@@ -21,7 +22,7 @@ it.live(
         [HOST_TOKEN_HEADER]: token,
       }).pipe(Effect.provide(NodeSocket.layerWebSocketConstructor))
 
-      yield* witness.WatchJournal({ host: (yield* witness.Hello()).host, after: 0 }).pipe(
+      yield* witness.WatchJournal({ host: yield* greet(witness), after: 0 }).pipe(
         Stream.filter(({ event }) => Predicate.isTagged(event, "TurnEnded")),
         Stream.runHead,
       )
