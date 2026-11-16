@@ -11,6 +11,7 @@ import {
   type RequestWaiting,
   type SentMessage,
   StartFreshRefused,
+  type EarlierTurns,
   type Transcript,
   type TranscriptUpdate,
   TurnEnd,
@@ -90,9 +91,14 @@ export class GlobalConversation extends Context.Service<
     readonly id: string
     readonly startFresh: Effect.Effect<void, StartFreshRefused | AgentError>
     readonly past: Effect.Effect<ReadonlyArray<PastConversation>, AgentError>
+    readonly loadEarlier: (before: string) => Effect.Effect<void, AgentError>
     readonly readPast: (
       sessionId: string,
     ) => Effect.Effect<Transcript, PastConversationNotFound | AgentError>
+    readonly readEarlierPast: (
+      sessionId: string,
+      before: string,
+    ) => Effect.Effect<EarlierTurns, PastConversationNotFound | AgentError>
     readonly waiting: Stream.Stream<ReadonlyArray<WaitingRequest>>
     readonly unseen: Stream.Stream<TurnEnd | null>
     readonly markSeen: (endedAt: DateTime.Utc) => Effect.Effect<void, AgentError>
@@ -305,7 +311,7 @@ export class GlobalConversation extends Context.Service<
         `.pipe(Effect.flatMap(decodePast)),
       )
 
-      const readPast = Effect.fn("GlobalConversation.readPast")(function* (sessionId: string) {
+      const findPast = Effect.fnUntraced(function* (sessionId: string) {
         const [ended] = yield* stored(
           "read a past Global conversation",
           sql`
@@ -313,15 +319,30 @@ export class GlobalConversation extends Context.Service<
           `.pipe(Effect.flatMap(decodeIds)),
         )
 
-        if (ended === undefined) return yield* new PastConversationNotFound({ id: sessionId })
+        if (ended === undefined) yield* new PastConversationNotFound({ id: sessionId })
+      })
+
+      const readPast = Effect.fn("GlobalConversation.readPast")(function* (sessionId: string) {
+        yield* findPast(sessionId)
 
         return yield* transcripts.read(sessionId)
+      })
+
+      const readEarlierPast = Effect.fn("GlobalConversation.readEarlierPast")(function* (
+        sessionId: string,
+        before: string,
+      ) {
+        yield* findPast(sessionId)
+
+        return yield* transcripts.readEarlier(sessionId, before)
       })
 
       return GlobalConversation.of({
         model: SubscriptionRef.get(model),
         changeModel,
         transcript: followSession(transcripts.watch),
+        loadEarlier: (before) =>
+          inSession((sessionId) => transcripts.loadEarlier(sessionId, before)),
         send: (input) => inSession((sessionId) => turns.send(sessionId, input)).pipe(Effect.asVoid),
         steer: (input) => inConversation((current) => turns.steer(current, input)),
         cancelQueued: (queuedId) =>
@@ -336,6 +357,7 @@ export class GlobalConversation extends Context.Service<
         startFresh,
         past,
         readPast,
+        readEarlierPast,
         waiting: followSession((sessionId) =>
           transcripts.waiting.pipe(Stream.map((waiting) => waiting.get(sessionId) ?? [])),
         ),

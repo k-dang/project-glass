@@ -2,6 +2,7 @@ import {
   AgentContext,
   type AgentMessageInput,
   type CapturedContext,
+  type EarlierTurns,
   type MessageInput,
   type ModelChoice,
   PullRequestContext,
@@ -41,6 +42,22 @@ export const pastGlobalConversationsAtom = backendRuntime.atom(
 
 export const pastGlobalTranscriptAtom = Atom.family((id: string) =>
   backendRuntime.atom(Backend.use((backend) => backend.ReadPastGlobalConversation({ id }))),
+)
+
+export const pastEarlierTurnsAtom = Atom.family((_id: string) =>
+  Atom.make<ReadonlyArray<EarlierTurns>>([]),
+)
+
+export const loadEarlierPastTurnsAtom = Atom.family((id: string) =>
+  backendRuntime.fn((before: string, get) =>
+    Backend.use((backend) => backend.ReadEarlierPastGlobalTurns({ id, before })).pipe(
+      Effect.tap((page) =>
+        Effect.sync(() =>
+          get.set(pastEarlierTurnsAtom(id), [...get(pastEarlierTurnsAtom(id)), page]),
+        ),
+      ),
+    ),
+  ),
 )
 
 export const startGlobalFreshAtom = backendRuntime.fn((_: void, get) =>
@@ -97,6 +114,9 @@ export const globalConversation: Conversation = {
       transcriptOf(Stream.unwrap(Backend.useSync((backend) => backend.WatchGlobalTranscript()))),
     )
     .pipe(Atom.setIdleTTL(TRANSCRIPT_IDLE_TTL)),
+  loadEarlier: backendRuntime.fn((before: string) =>
+    Backend.use((backend) => backend.LoadEarlierGlobalTurns({ before })),
+  ),
   send: backendRuntime.fn((sent: AgentMessageInput, get) =>
     Backend.use((backend) => backend.SendGlobalMessage(sending(sent, get))),
   ),

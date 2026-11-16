@@ -147,6 +147,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       ReadToDoImage: ({ id, size }) => toDos.readImage(id, size),
       WatchAgents: () => agents.watch(),
       WatchTranscript: ({ agentId }) => agents.transcript(agentId),
+      LoadEarlierTurns: ({ agentId, before }) => agents.loadEarlierTurns(agentId, before),
       ListLocalCheckouts: () => checkouts.list(),
       LinkLocalCheckout: ({ path }) => checkouts.link(path),
       GetNewAgentDefaultBranch: ({ place, repository }) =>
@@ -196,6 +197,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       GetGlobalConversationModel: () => globalConversation.model,
       ChangeGlobalConversationModel: (choice) => globalConversation.changeModel(choice),
       WatchGlobalTranscript: () => globalConversation.transcript,
+      LoadEarlierGlobalTurns: ({ before }) => globalConversation.loadEarlier(before),
       SendGlobalMessage: (input) => globalConversation.send(input),
       SteerGlobal: (input) => globalConversation.steer(input),
       CancelGlobalQueuedMessage: ({ queuedMessageId }) =>
@@ -211,6 +213,8 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       StartGlobalConversationFresh: () => globalConversation.startFresh,
       ListPastGlobalConversations: () => globalConversation.past,
       ReadPastGlobalConversation: ({ id }) => globalConversation.readPast(id),
+      ReadEarlierPastGlobalTurns: ({ id, before }) =>
+        globalConversation.readEarlierPast(id, before),
     })
   }),
 )

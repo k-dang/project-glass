@@ -19,6 +19,7 @@ import {
   AgentModels,
   AgentPlace,
   AgentNotFound,
+  EarlierTurns,
   Image,
   InvalidLocalCheckout,
   LocalCheckout,
@@ -382,6 +383,10 @@ export class GlassRpcs extends RpcGroup.make(
     error: Schema.Union([AgentNotFound, AgentError]),
     stream: true,
   }),
+  Rpc.make("LoadEarlierTurns", {
+    payload: { agentId: Schema.String, before: Schema.String },
+    error: Schema.Union([AgentNotFound, AgentError]),
+  }),
   Rpc.make("ListLocalCheckouts", { success: Schema.Array(LocalCheckout), error: AgentError }),
   Rpc.make("LinkLocalCheckout", {
     payload: { path: Schema.String },
@@ -520,6 +525,7 @@ export class GlassRpcs extends RpcGroup.make(
     error: AgentError,
   }),
   Rpc.make("WatchGlobalTranscript", { success: TranscriptUpdate, error: AgentError, stream: true }),
+  Rpc.make("LoadEarlierGlobalTurns", { payload: { before: Schema.String }, error: AgentError }),
   Rpc.make("SendGlobalMessage", {
     payload: MessageInputWithContext,
     error: Schema.Union([RequestWaiting, AgentError]),
@@ -558,6 +564,11 @@ export class GlassRpcs extends RpcGroup.make(
   Rpc.make("ReadPastGlobalConversation", {
     payload: { id: Schema.String },
     success: Transcript,
+    error: Schema.Union([PastConversationNotFound, AgentError]),
+  }),
+  Rpc.make("ReadEarlierPastGlobalTurns", {
+    payload: { id: Schema.String, before: Schema.String },
+    success: EarlierTurns,
     error: Schema.Union([PastConversationNotFound, AgentError]),
   }),
 ) {}

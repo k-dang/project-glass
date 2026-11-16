@@ -1,5 +1,6 @@
 import { useAtom, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
 import {
+  applyTranscriptUpdate,
   emptyTranscript,
   isWaiting,
   localPlace,
@@ -12,7 +13,7 @@ import {
 import { Cause, Data, DateTime, Option, Predicate } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import { ArrowLeft, History, SquarePen, X } from "lucide-react"
-import { type ReactNode, useEffect, useState } from "react"
+import { type ReactNode, useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog"
@@ -22,6 +23,8 @@ import { ConfirmationDialog } from "./ConfirmationDialog"
 import { ConversationContext } from "./conversation"
 import {
   capturedContextAtom,
+  loadEarlierPastTurnsAtom,
+  pastEarlierTurnsAtom,
   changeGlobalModelAtom,
   globalConversation,
   globalConversationOpenAtom,
@@ -195,11 +198,12 @@ function GlobalConversation(props: { onShowPast: () => void }) {
   const [started, startFresh] = useAtom(startGlobalFreshAtom)
   const [confirming, setConfirming] = useState(false)
 
-  const { turns, queued, status } = Option.getOrElse(
+  const { turns, earlierTurns, queued, status } = Option.getOrElse(
     AsyncResult.value(transcript),
     () => emptyTranscript,
   )
 
+  const loadEarlier = useAtomSet(globalConversation.loadEarlier)
   const endedAt = turns.at(-1)?.ended?.at
 
   useEffect(() => {
@@ -232,7 +236,12 @@ function GlobalConversation(props: { onShowPast: () => void }) {
         />
       )}
       {startProblem !== null && <PaddedProblem problem={startProblem} />}
-      <Transcript turns={turns} status={status} />
+      <Transcript
+        turns={turns}
+        earlierTurns={earlierTurns}
+        onShowEarlier={loadEarlier}
+        status={status}
+      />
       <p className="truncate px-6 pb-1 text-xs text-muted-foreground">
         {context === null ? "No PR or Agent in view" : `Sends with ${contextLabel(context)}`}
       </p>
@@ -308,14 +317,29 @@ function PastConversations(props: {
 
 function PastTranscript(props: { conversation: PastConversation; onBack: () => void }) {
   const read = useAtomValue(pastGlobalTranscriptAtom(props.conversation.id))
-  const problem = settledProblem(read)
-  const { turns, status } = Option.getOrElse(AsyncResult.value(read), () => emptyTranscript)
+  const pages = useAtomValue(pastEarlierTurnsAtom(props.conversation.id))
+  const [loaded, loadEarlier] = useAtom(loadEarlierPastTurnsAtom(props.conversation.id))
+  const problem = settledProblem(read) ?? settledProblem(loaded)
+
+  const { turns, earlierTurns, status } = useMemo(
+    () =>
+      pages.reduce(
+        applyTranscriptUpdate,
+        Option.getOrElse(AsyncResult.value(read), () => emptyTranscript),
+      ),
+    [read, pages],
+  )
 
   return (
     <>
       <Header title={spanOf(props.conversation)} onBack={props.onBack} />
       {problem !== null && <PaddedProblem problem={problem} />}
-      <Transcript turns={turns} status={status} />
+      <Transcript
+        turns={turns}
+        earlierTurns={earlierTurns}
+        onShowEarlier={loadEarlier}
+        status={status}
+      />
     </>
   )
 }

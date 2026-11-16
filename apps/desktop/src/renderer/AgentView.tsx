@@ -141,8 +141,6 @@ import { markTurnSeenAtom } from "./needsYou"
 import { useShortcuts } from "./useShortcuts"
 import { useWindowFocused } from "./useWindowFocused"
 
-const TURNS_PER_PAGE = 20
-
 interface AgentTabs {
   tab: AgentTab
   onTabChange: (tab: AgentTab) => void
@@ -196,10 +194,12 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
 
   const loaded = AsyncResult.value(transcript)
 
-  const { turns, queued, status, extensionStatuses } = Option.getOrElse(
+  const { turns, earlierTurns, queued, status, extensionStatuses } = Option.getOrElse(
     loaded,
     () => emptyTranscript,
   )
+
+  const loadEarlier = useAtomSet(conversation.loadEarlier)
 
   const [changesOpened, setChangesOpened] = useState(tab === "changes")
   const diagrams = useDiagrams(turns, Option.isSome(loaded))
@@ -286,7 +286,12 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
         <div hidden={tab !== "chat"} className="flex min-h-0 flex-1">
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <ToolCallView value={diagrams.cardOf}>
-              <Transcript turns={turns} status={status} />
+              <Transcript
+                turns={turns}
+                earlierTurns={earlierTurns}
+                onShowEarlier={loadEarlier}
+                status={status}
+              />
             </ToolCallView>
             <ExtensionStatuses statuses={extensionStatuses} />
             {reach === "unreachable" && <UnreachableNotice agentId={agent.id} />}
@@ -322,24 +327,30 @@ function OpenAgent(props: { agent: Agent } & AgentTabs) {
 
 export function Transcript(props: {
   turns: ReadonlyArray<Turn>
+  earlierTurns: number
+  onShowEarlier: (before: string) => void
   status: string | null
   lead?: ReactNode
 }) {
-  const [shown, setShown] = useState(TURNS_PER_PAGE)
-  const hidden = Math.max(0, props.turns.length - shown)
-  const showMore = () => setShown((count) => count + TURNS_PER_PAGE)
+  const first = props.turns[0]
+  const { onShowEarlier } = props
+  const showEarlier = first === undefined ? undefined : () => onShowEarlier(first.id)
 
-  const showMoreWhenSeen = useCallback((element: HTMLButtonElement | null) => {
-    if (element === null) return undefined
+  const showEarlierWhenSeen = useCallback(
+    (element: HTMLButtonElement | null) => {
+      if (element === null || first === undefined || globalThis.IntersectionObserver === undefined)
+        return undefined
 
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry?.isIntersecting) setShown((count) => count + TURNS_PER_PAGE)
-    })
+      const observer = new IntersectionObserver(([entry]) => {
+        if (entry?.isIntersecting) onShowEarlier(first.id)
+      })
 
-    observer.observe(element)
+      observer.observe(element)
 
-    return () => observer.disconnect()
-  }, [])
+      return () => observer.disconnect()
+    },
+    [first, onShowEarlier],
+  )
 
   return (
     <MessageScrollerProvider autoScroll scrollPreviousItemPeek={16}>
@@ -348,14 +359,14 @@ export function Transcript(props: {
           <MessageScrollerViewport className="px-6 py-4">
             <MessageScrollerContent className="mx-auto w-full max-w-3xl">
               {props.lead}
-              {hidden > 0 && (
+              {props.earlierTurns > 0 && (
                 <div className="text-center">
-                  <Button ref={showMoreWhenSeen} variant="ghost" size="sm" onClick={showMore}>
-                    Show {Math.min(hidden, TURNS_PER_PAGE)} earlier Turns
+                  <Button ref={showEarlierWhenSeen} variant="ghost" size="sm" onClick={showEarlier}>
+                    Show earlier Turns
                   </Button>
                 </div>
               )}
-              {props.turns.slice(hidden).map((turn) => (
+              {props.turns.map((turn) => (
                 <TurnView
                   key={turn.id}
                   turn={turn}

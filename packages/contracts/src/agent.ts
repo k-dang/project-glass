@@ -411,6 +411,7 @@ export type QueuedMessage = typeof QueuedMessage.Type
 
 export const Transcript = Schema.Struct({
   turns: Schema.Array(Turn),
+  earlierTurns: Schema.Int.pipe(Schema.withConstructorDefault(Effect.succeed(0))),
   queued: Schema.Array(QueuedMessage),
   status: Schema.NullOr(Schema.String),
   extensionStatuses: Schema.Array(Schema.String).pipe(
@@ -422,6 +423,7 @@ export type Transcript = typeof Transcript.Type
 
 export const emptyTranscript: Transcript = {
   turns: [],
+  earlierTurns: 0,
   queued: [],
   status: null,
   extensionStatuses: [],
@@ -441,8 +443,17 @@ export const ExtensionStatusesChanged = Schema.TaggedStruct("ExtensionStatusesCh
   extensionStatuses: Transcript.fields.extensionStatuses,
 })
 
+export const EarlierTurns = Schema.TaggedStruct("EarlierTurns", {
+  before: Schema.String,
+  turns: Transcript.fields.turns,
+  earlierTurns: Schema.Int,
+})
+
+export type EarlierTurns = typeof EarlierTurns.Type
+
 export const TranscriptUpdate = Schema.Union([
   TranscriptSnapshot,
+  EarlierTurns,
   QueuedMessagesChanged,
   StatusChanged,
   ExtensionStatusesChanged,
@@ -513,12 +524,18 @@ export const applyTranscriptUpdate = (
   update: TranscriptUpdate,
 ): Transcript =>
   Match.value(update).pipe(
-    Match.tag("Snapshot", ({ turns, queued, status, extensionStatuses }) => ({
+    Match.tag("Snapshot", ({ turns, earlierTurns, queued, status, extensionStatuses }) => ({
       turns,
+      earlierTurns,
       queued,
       status,
       extensionStatuses,
     })),
+    Match.tag("EarlierTurns", ({ before, turns, earlierTurns }) =>
+      transcript.turns[0]?.id === before
+        ? { ...transcript, turns: [...turns, ...transcript.turns], earlierTurns }
+        : transcript,
+    ),
     Match.tag("QueuedMessagesChanged", ({ queued }) => ({ ...transcript, queued })),
     Match.tag("StatusChanged", ({ status }) => ({ ...transcript, status })),
     Match.tag("ExtensionStatusesChanged", ({ extensionStatuses }) => ({

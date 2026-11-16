@@ -183,7 +183,12 @@ export class Agents extends Context.Service<
     ) => Effect.Effect<void, AgentError>
     readonly readTranscript: (
       agentId: string,
+      turns: number,
     ) => Effect.Effect<Transcript, AgentNotFound | AgentError>
+    readonly loadEarlierTurns: (
+      agentId: string,
+      before: string,
+    ) => Effect.Effect<void, AgentNotFound | AgentError>
     readonly transcript: (
       agentId: string,
     ) => Stream.Stream<TranscriptUpdate, AgentNotFound | AgentError>
@@ -784,7 +789,10 @@ export class Agents extends Context.Service<
         watch: () => placed.pipe(Stream.map((current) => current.map(({ agent }) => agent))),
         transcript: (agentId) =>
           Stream.unwrap(find(agentId).pipe(Effect.as(transcripts.watch(agentId)))),
-        readTranscript: (agentId) => find(agentId).pipe(Effect.andThen(transcripts.read(agentId))),
+        readTranscript: (agentId, latest) =>
+          find(agentId).pipe(Effect.andThen(transcripts.read(agentId, latest))),
+        loadEarlierTurns: (agentId, before) =>
+          find(agentId).pipe(Effect.andThen(transcripts.loadEarlier(agentId, before))),
         engines: (place) => placementFor(place).engines,
         models: (engine, place) =>
           placementRunning(place, engine).pipe(

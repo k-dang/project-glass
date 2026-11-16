@@ -6,6 +6,7 @@ import {
   PullRequestContext,
   TextPart,
   TranscriptSnapshot,
+  EarlierTurns,
   TurnDone,
   GlobalConversationUpdate,
   type Activity,
@@ -512,6 +513,17 @@ it("starts the Global conversation fresh once confirmed and reads a past one", a
   const at = DateTime.makeUnsafe("2026-11-05T12:00:00Z")
   let started = 0
 
+  const pastTurn = (id: string, reply: string) => ({
+    id,
+    message: "Old question",
+    images: [],
+    context: null,
+    feedback: [],
+    sentAt: at,
+    ended: { at, ending: TurnDone.make({}) },
+    parts: [TextPart.make({ text: reply })],
+  })
+
   const user = mount({
     ListAgentModels: () => Effect.succeed(new AgentModels({ defaultModel: null, models: [] })),
     StartGlobalConversationFresh: () => Effect.sync(() => void started++),
@@ -519,22 +531,16 @@ it("starts the Global conversation fresh once confirmed and reads a past one", a
       Effect.succeed([{ id: "past-1", startedAt: at, endedAt: at }]),
     ReadPastGlobalConversation: () =>
       Effect.succeed({
-        turns: [
-          {
-            id: "turn-1",
-            message: "Old question",
-            images: [],
-            context: null,
-            feedback: [],
-            sentAt: at,
-            ended: { at, ending: TurnDone.make({}) },
-            parts: [TextPart.make({ text: "Old reply" })],
-          },
-        ],
+        turns: [pastTurn("turn-2", "Old reply")],
+        earlierTurns: 1,
         queued: [],
         status: null,
         extensionStatuses: [],
       }),
+    ReadEarlierPastGlobalTurns: ({ before }) =>
+      Effect.succeed(
+        EarlierTurns.make({ before, turns: [pastTurn("turn-1", "Older reply")], earlierTurns: 0 }),
+      ),
   })
 
   await user.click(await screen.findByRole("button", { name: "Global conversation" }))
@@ -551,6 +557,10 @@ it("starts the Global conversation fresh once confirmed and reads a past one", a
 
   await screen.findByText("Old reply")
   expect(screen.queryByRole("textbox")).toBeNull()
+
+  await user.click(screen.getByRole("button", { name: "Show earlier Turns" }))
+  await screen.findByText("Older reply")
+  expect(screen.queryByRole("button", { name: "Show earlier Turns" })).toBeNull()
 })
 
 it("won't start fresh while a Turn runs, and says why", async () => {

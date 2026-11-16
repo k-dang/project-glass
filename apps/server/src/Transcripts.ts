@@ -27,6 +27,7 @@ import {
   type TurnEnding,
   TurnContext,
   CapturedContext,
+  EarlierTurns,
   type MessageWithContext,
   TurnPart,
   TurnStarted,
@@ -146,6 +147,8 @@ const decodeEndedTurn = Schema.decodeUnknownEffect(
   ),
 )
 
+const decodeCount = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ count: Schema.Int })))
+
 const decodeTurnIds = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ id: Schema.String })))
 
 const decodeMessages = Schema.decodeUnknownEffect(
@@ -157,6 +160,8 @@ const decodePositions = Schema.decodeUnknownEffect(
     Schema.Struct({ first: Schema.NullOr(Schema.Int), last: Schema.NullOr(Schema.Int) }),
   ),
 )
+
+export const RECENT_TURNS = 20
 
 interface Published {
   readonly agentId: string
@@ -231,7 +236,13 @@ export class Transcripts extends Context.Service<
       throughJournalEntry?: number,
     ) => Effect.Effect<void, AgentError>
     readonly watch: (agentId: string) => Stream.Stream<TranscriptUpdate, AgentError>
-    readonly read: (agentId: string) => Effect.Effect<Transcript, AgentError>
+    readonly read: (agentId: string, turns?: number) => Effect.Effect<Transcript, AgentError>
+    /** Publishes the Turns before `before` to the conversation's watchers, in order with its events. */
+    readonly loadEarlier: (agentId: string, before: string) => Effect.Effect<void, AgentError>
+    readonly readEarlier: (
+      agentId: string,
+      before: string,
+    ) => Effect.Effect<typeof EarlierTurns.Type, AgentError>
     readonly endRunning: (
       ending: TurnEnding,
       agentIds: ReadonlyArray<string>,
@@ -680,29 +691,63 @@ export class Transcripts extends Context.Service<
         )
       }
 
-      const snapshot = Effect.fnUntraced(function* (agentId: string) {
-        const turns = yield* decodeTurns(
+      const rowOf = (agentId: string, turnId: string) =>
+        sql`(SELECT rowid FROM agent_turn WHERE id = ${turnId} AND agent_id = ${agentId})`
+
+      const turnPage = Effect.fnUntraced(function* (
+        agentId: string,
+        limit: number,
+        before?: string,
+      ) {
+        const latestFirst = yield* decodeTurns(
           yield* sql`
             SELECT id, message, images, context, feedback, sent_at AS sentAt, ended
-            FROM agent_turn WHERE agent_id = ${agentId} ORDER BY rowid
+            FROM agent_turn
+            WHERE ${sql.and([
+              sql`agent_id = ${agentId}`,
+              ...(before === undefined ? [] : [sql`rowid < ${rowOf(agentId, before)}`]),
+            ])}
+            ORDER BY rowid DESC LIMIT ${limit}
           `,
         )
+
+        const turns = latestFirst.toReversed()
+        const first = turns[0]
+
+        if (first === undefined) return { turns: [], earlierTurns: 0 }
 
         const parts = yield* decodeParts(
           yield* sql`
             SELECT turn_id AS turnId, part FROM agent_turn_part
-            WHERE turn_id IN (SELECT id FROM agent_turn WHERE agent_id = ${agentId})
+            WHERE ${sql.in(
+              "turn_id",
+              turns.map(({ id }) => id),
+            )}
             ORDER BY turn_id, position
+          `,
+        )
+
+        const [earlier] = yield* decodeCount(
+          yield* sql`
+            SELECT COUNT(*) AS count FROM agent_turn
+            WHERE agent_id = ${agentId} AND rowid < ${rowOf(agentId, first.id)}
           `,
         )
 
         const byTurn = Map.groupBy(parts, ({ turnId }) => turnId)
 
-        return TranscriptSnapshot.make({
+        return {
           turns: turns.map((turn) => ({
             ...turn,
             parts: (byTurn.get(turn.id) ?? []).map(({ part }) => part),
           })),
+          earlierTurns: earlier?.count ?? 0,
+        }
+      })
+
+      const snapshot = Effect.fnUntraced(function* (agentId: string, turns = RECENT_TURNS) {
+        return TranscriptSnapshot.make({
+          ...(yield* turnPage(agentId, turns)),
           queued: yield* queued(agentId),
           status: statuses.get(agentId) ?? null,
           extensionStatuses: extensionStatuses.get(agentId) ?? [],
@@ -779,10 +824,33 @@ export class Transcripts extends Context.Service<
             Stream.tapError((cause) => Effect.logWarning("Couldn't read a transcript", cause)),
             Stream.mapError(storageFailure),
           ),
-        read: (agentId) =>
+        read: (agentId, turns) =>
           withStorageFailure(
             "read a transcript",
-            lockFor(agentId).withPermits(1)(snapshot(agentId)),
+            lockFor(agentId).withPermits(1)(snapshot(agentId, turns)),
+          ),
+        loadEarlier: (agentId, before) =>
+          withStorageFailure(
+            "read earlier Turns",
+            lockFor(agentId).withPermits(1)(
+              turnPage(agentId, RECENT_TURNS, before).pipe(
+                Effect.flatMap((page) =>
+                  PubSub.publish(published, {
+                    agentId,
+                    update: EarlierTurns.make({ before, ...page }),
+                  }),
+                ),
+              ),
+            ),
+          ),
+        readEarlier: (agentId, before) =>
+          withStorageFailure(
+            "read earlier Turns",
+            lockFor(agentId).withPermits(1)(
+              turnPage(agentId, RECENT_TURNS, before).pipe(
+                Effect.map((page) => EarlierTurns.make({ before, ...page })),
+              ),
+            ),
           ),
         runningTurn: (agentId) => withStorageFailure("read a running Turn", runningTurn(agentId)),
         idle: (agentId) =>
