@@ -46,7 +46,8 @@ import { HostAgentError } from "./agentHost/protocol"
 interface Script {
   readonly ensureStarted?: Conversation["ensureStarted"]
   readonly startTurn?: (turnId: string) => Effect.Effect<void, HostAgentError>
-  readonly stopTurn?: () => Effect.Effect<null>
+  readonly stopTurn?: (request: object) => Effect.Effect<null>
+  readonly steer?: () => Effect.Effect<void, HostAgentError>
   readonly running?: boolean
   readonly started?: Deferred.Deferred<void>
 }
@@ -83,8 +84,8 @@ const scriptedHost = (
       ),
     ),
   AnswerRequest: unused("AnswerRequest"),
-  Steer: unused("Steer"),
-  StopTurn: () => script.stopTurn?.() ?? Effect.succeed(null),
+  Steer: () => (script.steer ?? unused("Steer"))(),
+  StopTurn: (request) => script.stopTurn?.(request) ?? Effect.succeed(null),
 })
 
 const layer = ConversationTurns.layer.pipe(
@@ -202,6 +203,34 @@ const scripted = (scripts: { readonly [id: string]: Script }) =>
   })
 
 const hostStall = 5_000
+
+const askedTurn = (request: object) => {
+  if (!Object.hasOwn(request, "turnId")) return null
+
+  const value = Reflect.get(request, "turnId")
+
+  return typeof value === "string" ? value : null
+}
+
+const stopRunningTurn = (agentId: string, running: { id: string | null }, request: object) =>
+  Effect.gen(function* () {
+    const asked = askedTurn(request)
+
+    if (running.id === null || (asked !== null && asked !== running.id)) return null
+
+    const transcripts = yield* Transcripts
+    const turnId = running.id
+    running.id = null
+
+    yield* transcripts.save(agentId, [
+      TurnEnded.make({
+        turnId,
+        ended: { at: yield* DateTime.now, ending: TurnStopped.make({}) },
+      }),
+    ])
+
+    return null
+  })
 
 const hold = (entered: Deferred.Deferred<void>, release: Deferred.Deferred<void>) => () =>
   Effect.gen(function* () {
@@ -782,25 +811,47 @@ it.effect("leaves a Global conversation update pending when StartTurn never answ
       const entered = yield* Deferred.make<void>()
       const release = yield* Deferred.make<void>()
 
-      const h = yield* harness(
-        () => Effect.void,
-        () => hold(entered, release)(),
-      )
+      const desk = yield* scripted({
+        "agent-1": {
+          running: true,
+          startTurn: hold(entered, release),
+          stopTurn: () =>
+            Effect.gen(function* () {
+              const transcripts = yield* Transcripts
+              const { turns } = yield* transcripts.read("agent-1")
+              const open = turns.find((turn) => turn.ended === null)
 
-      yield* h.turns.whenIdle("agent-1", (start) =>
+              if (open === undefined) return null
+
+              yield* transcripts.save("agent-1", [
+                TurnEnded.make({
+                  turnId: open.id,
+                  ended: { at: yield* DateTime.now, ending: TurnStopped.make({}) },
+                }),
+              ])
+
+              return null
+            }),
+        },
+      })
+
+      yield* desk.turns.whenIdle("agent-1", (start) =>
         start(globalConversationUpdate, () => Effect.void),
       )
       yield* Deferred.await(entered)
       yield* deadlineSet
 
-      const followed = yield* Effect.forkChild(h.turns.whenIdle("agent-1", () => Effect.void))
-      yield* TestClock.adjust(HOST_CONTROL_DEADLINE)
+      const followed = yield* Effect.forkChild(desk.turns.whenIdle("agent-1", () => Effect.void))
+      yield* TestClock.adjust(Duration.millis(30_000))
       yield* Fiber.join(followed)
 
-      const waiting = yield* h.transcript
+      const waiting = yield* desk.transcripts.read("agent-1")
       assert.equal(waiting.turns[0]?.ended, null)
       assert.equal(waiting.status, HOST_DIDNT_ANSWER)
       assert.equal(waiting.turns[0]?.context?._tag, "GlobalConversationUpdate")
+
+      const retryable = yield* desk.transcripts.recoverGlobalConversationUpdates(["agent-1"])
+      assert.lengthOf(retryable, 1)
     }),
   ).pipe(Effect.provide(layer)),
 )
@@ -1002,4 +1053,215 @@ it.effect("drops a late reply on a Turn the host never accepted", () =>
       assert.deepStrictEqual(after.turns[0]?.parts, [])
     }),
   ).pipe(Effect.provide(layer)),
+)
+
+it.effect("does not stop the next Turn when an earlier StartTurn answers late", () =>
+  Effect.gen(function* () {
+    const entered = yield* Deferred.make<void>()
+    const gate = yield* Deferred.make<void>()
+    const secondBegun = yield* Deferred.make<void>()
+    const cleaned = yield* Deferred.make<void>()
+    const running: { id: string | null } = { id: null }
+    let calls = 0
+    let stops = 0
+
+    const desk = yield* scripted({
+      "agent-a": {
+        running: true,
+        startTurn: (turnId) =>
+          Effect.gen(function* () {
+            calls += 1
+
+            if (calls === 1) {
+              yield* Deferred.succeed(entered, undefined)
+              yield* Deferred.await(gate)
+
+              if (running.id !== null)
+                yield* new HostAgentError({ message: "The Agent is still working on a Turn." })
+            }
+
+            running.id = turnId
+            yield* Deferred.succeed(secondBegun, undefined)
+          }),
+        stopTurn: (request) =>
+          Effect.gen(function* () {
+            const left = yield* stopRunningTurn("agent-a", running, request)
+            stops += 1
+
+            if (stops === 2) yield* Deferred.succeed(cleaned, undefined)
+
+            return left
+          }),
+      },
+    })
+
+    const agent = desk.conversations.get("agent-a")
+    assert.isDefined(agent)
+
+    yield* Effect.forkChild(desk.turns.send("agent-a", sent("First")))
+    yield* Deferred.await(entered)
+    yield* desk.turns.stop(agent)
+    yield* desk.turns.send("agent-a", sent("Second"))
+    yield* Deferred.await(secondBegun)
+    yield* Deferred.succeed(gate, undefined)
+    yield* Deferred.await(cleaned)
+
+    const { turns } = yield* desk.transcripts.read("agent-a")
+    assert.deepStrictEqual(
+      turns.map(({ message, ended }) => ({ message, ending: ended?.ending ?? null })),
+      [
+        { message: "First", ending: TurnStopped.make({}) },
+        { message: "Second", ending: null },
+      ],
+    )
+  }).pipe(Effect.provide(layer)),
+)
+
+it.effect("does not stop the next Turn when an earlier StartTurn times out", () =>
+  withHostClock((deadlineSet) =>
+    Effect.gen(function* () {
+      const entered = yield* Deferred.make<void>()
+      const secondBegun = yield* Deferred.make<void>()
+      const cleaned = yield* Deferred.make<void>()
+      const running: { id: string | null } = { id: null }
+      let calls = 0
+      let stops = 0
+
+      const desk = yield* scripted({
+        "agent-a": {
+          running: true,
+          startTurn: (turnId) =>
+            Effect.gen(function* () {
+              calls += 1
+
+              if (calls === 1) {
+                yield* Deferred.succeed(entered, undefined)
+                yield* Effect.never
+              }
+
+              running.id = turnId
+              yield* Deferred.succeed(secondBegun, undefined)
+            }),
+          stopTurn: (request) =>
+            Effect.gen(function* () {
+              const left = yield* stopRunningTurn("agent-a", running, request)
+              stops += 1
+
+              if (stops === 2) yield* Deferred.succeed(cleaned, undefined)
+
+              return left
+            }),
+        },
+      })
+
+      const agent = desk.conversations.get("agent-a")
+      assert.isDefined(agent)
+
+      yield* Effect.forkChild(desk.turns.send("agent-a", sent("First")))
+      yield* Deferred.await(entered)
+      yield* deadlineSet
+      yield* desk.turns.stop(agent)
+      yield* desk.turns.send("agent-a", sent("Second"))
+      yield* Deferred.await(secondBegun)
+      yield* TestClock.adjust(Duration.millis(30_000))
+      yield* Deferred.await(cleaned)
+
+      const { turns } = yield* desk.transcripts.read("agent-a")
+      assert.deepStrictEqual(
+        turns.map(({ message, ended }) => ({ message, ending: ended?.ending ?? null })),
+        [
+          { message: "First", ending: TurnStopped.make({}) },
+          { message: "Second", ending: null },
+        ],
+      )
+    }),
+  ).pipe(Effect.provide(layer)),
+)
+
+it.effect("fails a Steer the host never acknowledges instead of sending it again", () =>
+  withHostClock((deadlineSet) =>
+    Effect.gen(function* () {
+      const begun = yield* Deferred.make<void>()
+      const steerEntered = yield* Deferred.make<void>()
+
+      const desk = yield* scripted({
+        "agent-a": {
+          running: true,
+          startTurn: () => Deferred.succeed(begun, undefined).pipe(Effect.asVoid),
+          steer: () =>
+            Effect.gen(function* () {
+              yield* Deferred.succeed(steerEntered, undefined)
+              yield* Effect.never
+            }),
+        },
+      })
+
+      const agent = desk.conversations.get("agent-a")
+      assert.isDefined(agent)
+
+      yield* desk.turns.send("agent-a", sent("Build it"))
+      yield* Deferred.await(begun)
+
+      const steered = yield* Effect.forkChild(desk.turns.steer(agent, sent("nudge")))
+      yield* Deferred.await(steerEntered)
+      yield* deadlineSet
+      yield* TestClock.adjust(Duration.millis(30_000))
+
+      const { queued } = yield* desk.transcripts.read("agent-a")
+      assert.deepStrictEqual(
+        queued.map(({ message }) => message),
+        [],
+      )
+
+      const error = yield* Fiber.join(steered).pipe(Effect.flip)
+      assert.equal(error.message, HOST_DIDNT_ANSWER)
+    }),
+  ).pipe(Effect.provide(layer)),
+)
+
+it.effect("drops a late reply on a Stopped Turn and keeps one on the next Turn", () =>
+  Effect.gen(function* () {
+    const desk = yield* scripted({
+      "agent-a": {
+        running: true,
+        stopTurn: () => Effect.succeed(null),
+      },
+    })
+
+    const agent = desk.conversations.get("agent-a")
+    assert.isDefined(agent)
+
+    yield* desk.turns.send("agent-a", sent("First"))
+    yield* desk.turns.stop(agent)
+
+    const stopped = yield* desk.transcripts.read("agent-a")
+    const first = stopped.turns[0]
+    assert.isDefined(first)
+    assert.deepStrictEqual(first.ended?.ending, TurnStopped.make({}))
+
+    yield* desk.transcripts.save("agent-a", [
+      PartSet.make({
+        turnId: first.id,
+        index: 0,
+        part: TextPart.make({ text: "late" }),
+      }),
+    ])
+
+    yield* desk.turns.send("agent-a", sent("Second"))
+    const running = yield* desk.transcripts.read("agent-a")
+    const second = running.turns[1]
+    assert.isDefined(second)
+
+    yield* desk.transcripts.save("agent-a", [
+      PartSet.make({
+        turnId: second.id,
+        index: 0,
+        part: TextPart.make({ text: "kept" }),
+      }),
+    ])
+
+    const after = yield* desk.transcripts.read("agent-a")
+    assert.deepStrictEqual(after.turns[0]?.parts, [])
+    assert.deepStrictEqual(after.turns[1]?.parts, [TextPart.make({ text: "kept" })])
+  }).pipe(Effect.provide(layer)),
 )
