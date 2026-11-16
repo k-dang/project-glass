@@ -543,11 +543,10 @@ export const GlassToolHandlers = GlassTools.toLayer(
         ),
       read_pull_request: ({ pullRequest, revision }) =>
         Effect.gen(function* () {
-          const read = revision ?? (yield* github.pullRequestRevision(pullRequest))
+          const input = yield* github.reviewInput(pullRequest, revision)
+          const material = pullRequestMaterial(input)
 
-          const material = pullRequestMaterial(yield* github.reviewInput(pullRequest, read))
-
-          return { revision: read, ...material, ...dropLargestDiffsToFit(material.files) }
+          return { revision: input.revision, ...material, ...dropLargestDiffsToFit(material.files) }
         }).pipe(Effect.mapError(explained)),
       read_agent_review: ({ pullRequest }) =>
         first(agentReviews.watch(pullRequest)).pipe(Effect.mapError(explained)),

@@ -51,17 +51,6 @@ const startGlass = Effect.gen(function* () {
   return { ...backend, github, requests, pr, mcp, call: mcp.call }
 })
 
-const countByKind = (requests: ReadonlyArray<FakeGitHubRequest>) => {
-  const counts: Record<string, number> = {}
-
-  for (const { graphql, method, path } of requests) {
-    const kind = graphql?.operationName ?? `${method} ${path}`
-    counts[kind] = (counts[kind] ?? 0) + 1
-  }
-
-  return counts
-}
-
 describe("Glass tools over MCP", () => {
   it.live("lists Glass's tools, marking which only read", () =>
     Effect.gen(function* () {
@@ -155,15 +144,20 @@ describe("Glass tools over MCP", () => {
       })
 
       assert.isFalse(result.isError)
-      assert.deepStrictEqual(countByKind(requests), {
-        CurrentRevision: 1,
-        TourInput: 1,
-        "GET /repos/acme/api/pulls/42/files": 1,
-        PullRequestReviewThreads: 1,
-        PullRequestComments: 1,
-        PullRequestReviews: 1,
-        PullRequestRevision: 1,
-      })
+      assert.deepStrictEqual(
+        requests
+          .map(({ graphql, method, path }) => graphql?.operationName ?? `${method} ${path}`)
+          .toSorted(),
+        [
+          "TourInput",
+          "TourInput",
+          "GET /repos/acme/api/pulls/42/files",
+          "PullRequestReviewThreads",
+          "PullRequestComments",
+          "PullRequestReviews",
+          "PullRequestRevision",
+        ].toSorted(),
+      )
     }),
   )
 

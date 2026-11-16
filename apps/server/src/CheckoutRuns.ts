@@ -1,7 +1,6 @@
 import {
   type AgentRunnerIdentity,
   type CheckoutRunReason,
-  type ConnectionError,
   type EngineFeature,
   type NoCredentials,
   type PullRequestRef,
@@ -23,6 +22,7 @@ import type { AgentTools } from "./agentTools"
 import { AgentRunners } from "./agentRunners"
 import { type CheckoutFailure, Checkouts } from "./Checkouts"
 import { engineSettingsOf, SettingsStore } from "./SettingsStore"
+import type { InputReadError } from "./github/GitHubClient"
 import { annotateUnit, recordDuration } from "./wideEvents"
 
 export class CheckoutRunFailure extends Data.TaggedError("CheckoutRunFailure")<{
@@ -88,10 +88,7 @@ export interface CheckoutRun<I, A> {
   readonly revision: Revision
   readonly subject: string
   readonly timeout: Duration.Input
-  readonly read: (
-    pr: PullRequestRef,
-    revision: Revision,
-  ) => Effect.Effect<I, StaleRevision | ConnectionError>
+  readonly read: (pr: PullRequestRef, revision: Revision) => Effect.Effect<I, InputReadError>
   readonly task: (input: I) => Effect.Effect<CheckoutTask<A>, CheckoutRunFailure>
 }
 

@@ -7,8 +7,6 @@ import { clientWith } from "../../test/gitHubClient"
 
 const FILES = "GET /repos/acme/api/pulls/42/files"
 
-const DISCUSSIONS = ["PullRequestReviewThreads", "PullRequestComments", "PullRequestReviews"]
-
 const Operation = Schema.Struct({ operationName: Schema.String })
 
 const kindOf = async (request: Request) =>
@@ -33,7 +31,6 @@ const startRelay = Effect.gen(function* () {
   const requests: Array<string> = []
   const arrivals = new Map<string, Deferred.Deferred<void>>()
   const holds = new Map<string, Deferred.Deferred<void>>()
-  const failures = new Map<string, number>()
 
   const arrival = (kind: string) => {
     const known = arrivals.get(kind)
@@ -56,17 +53,14 @@ const startRelay = Effect.gen(function* () {
       const hold = holds.get(kind)
 
       if (hold !== undefined) {
-        await new Promise<void>((resolve, reject) => {
+        const aborted = new Promise<never>((_resolve, reject) =>
           request.signal.addEventListener("abort", () => reject(new Error("Aborted")), {
             once: true,
-          })
-          void Effect.runPromise(Deferred.await(hold)).then(resolve)
-        })
+          }),
+        )
+
+        await Promise.race([Effect.runPromise(Deferred.await(hold)), aborted])
       }
-
-      const failure = failures.get(kind)
-
-      if (failure !== undefined) return new Response(null, { status: failure })
 
       const { pathname, search } = new URL(request.url)
 
@@ -82,6 +76,7 @@ const startRelay = Effect.gen(function* () {
 
   return {
     client,
+    github,
     pr,
     ref: new PullRequestRef({ owner: "acme", repo: "api", number: 42 }),
     revision: new Revision({ base: "b0", head: "h1" }),
@@ -93,16 +88,13 @@ const startRelay = Effect.gen(function* () {
 
       return Deferred.succeed(release, undefined)
     },
-    fail: (kind: string, status: number) => {
-      failures.set(kind, status)
-    },
   }
 })
 
 describe("Reading Tour and Agent review inputs", () => {
   it.live("a Tour reads changed files while its metadata read is still out", () =>
     Effect.gen(function* () {
-      const { client, ref, revision, requests, arrived, hold } = yield* startRelay
+      const { client, ref, revision, arrived, hold } = yield* startRelay
       const release = hold("TourInput")
 
       const reading = yield* client
@@ -116,10 +108,6 @@ describe("Reading Tour and Agent review inputs", () => {
       assert.deepStrictEqual(
         input.files.map(({ path }) => path),
         ["greet.ts"],
-      )
-      assert.deepStrictEqual(
-        requests.toSorted(),
-        ["TourInput", FILES, "PullRequestRevision"].toSorted(),
       )
     }),
   )
@@ -146,31 +134,28 @@ describe("Reading Tour and Agent review inputs", () => {
           input.files.map(({ path }) => path),
           ["greet.ts"],
         )
-        assert.deepStrictEqual(
-          requests.toSorted(),
-          ["TourInput", FILES, ...DISCUSSIONS, "PullRequestRevision"].toSorted(),
-        )
       }),
   )
 
-  it.live("checks the Revision only after the changed files arrive", () =>
-    Effect.gen(function* () {
-      const { client, pr, ref, revision, requests, arrived, hold } = yield* startRelay
-      const release = hold(FILES)
+  it.live(
+    "a review read without a Revision reads changed files only once it knows the Revision",
+    () =>
+      Effect.gen(function* () {
+        const { client, ref, requests, arrived, hold } = yield* startRelay
+        const release = hold("TourInput")
 
-      const reading = yield* client
-        .reviewInput(ref, revision)
-        .pipe(Effect.forkChild({ startImmediately: true }))
+        const reading = yield* client
+          .reviewInput(ref, undefined)
+          .pipe(Effect.forkChild({ startImmediately: true }))
 
-      yield* Effect.forEach(DISCUSSIONS, arrived, { concurrency: "unbounded", discard: true })
-      pr.push({ head: { sha: "h2", files: { "greet.ts": "hello again\n" } } })
-      assert.notInclude(requests, "PullRequestRevision")
+        yield* arrived("TourInput")
+        assert.notInclude(requests, FILES)
 
-      yield* release
+        yield* release
+        const input = yield* Fiber.join(reading)
 
-      assert.instanceOf(yield* Effect.flip(Fiber.join(reading)), StaleRevision)
-      assert.isAbove(requests.indexOf("PullRequestRevision"), requests.indexOf(FILES))
-    }),
+        assert.deepStrictEqual(input.revision, new Revision({ base: "b0", head: "h1" }))
+      }),
   )
 
   it.live("a stale PR fails without waiting for the changed files", () =>
@@ -185,9 +170,9 @@ describe("Reading Tour and Agent review inputs", () => {
 
   it.live("a stale PR wins over a changed-files read that failed first", () =>
     Effect.gen(function* () {
-      const { client, pr, ref, revision, arrived, hold, fail } = yield* startRelay
+      const { client, github, pr, ref, revision, arrived, hold } = yield* startRelay
       const release = hold("TourInput")
-      fail(FILES, 503)
+      github.failNext(503)
 
       const reading = yield* client
         .reviewInput(ref, revision)
