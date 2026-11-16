@@ -25,6 +25,7 @@ import {
   DRAW_DIAGRAM_TOOL,
   SUGGEST_DRAFT_TOOL,
   withContextOf,
+  type TurnEnding,
 } from "@glass/contracts"
 import {
   Deferred,
@@ -483,8 +484,8 @@ export const claudeAdapter = (
           Effect.asVoid,
         )
       }),
-      stopTurn: Effect.gen(function* () {
-        const steers = yield* turns.stop
+      stopTurn: Effect.fnUntraced(function* (ending: TurnEnding) {
+        const steers = yield* turns.stop(ending)
 
         if (steers === null) return null
 

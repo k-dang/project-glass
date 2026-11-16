@@ -1,7 +1,7 @@
 import {
   type AgentCommand,
-  TurnEnded,
   TurnFailed,
+  TurnStopped,
   type AgentEngine,
   type AgentModels,
   type RequestAnswer,
@@ -34,8 +34,13 @@ interface Running {
   applied: TurnSettings
 }
 
-export const overBudgetReason =
-  "The Agent wrote more than its host can keep while Glass is away, so the host stopped this Turn. Everything it wrote up to here is kept."
+export const overBudget = TurnFailed.make({
+  reason:
+    "The Agent wrote more than its host can keep while Glass is away, so the host stopped this Turn. Everything it wrote up to here is kept.",
+})
+
+const startsOrEndsTurn = (event: HostEvent) =>
+  Predicate.isTagged(event, "TurnStarted") || Predicate.isTagged(event, "TurnEnded")
 
 const sameSettings = (a: TurnSettings, b: TurnSettings) =>
   a.model === b.model && a.effort === b.effort && a.permissionMode === b.permissionMode
@@ -94,51 +99,27 @@ export class HostAgents extends Context.Service<
             const scope = yield* Scope.fork(hostScope)
             let stoppingOverBudget = false
 
-            const stopOverBudget = Effect.suspend(() => {
+            const stopIfOverBudget = Effect.gen(function* () {
               const session = running.get(agentId)?.session
 
-              if (stoppingOverBudget || session === undefined) return Effect.void
-              stoppingOverBudget = true
+              if (stoppingOverBudget || session === undefined || !(yield* journal.full)) return
 
-              return session.stopTurn.pipe(
-                Effect.tap((left) =>
-                  Effect.sync(() => {
-                    if (left === null) stoppingOverBudget = false
-                  }),
-                ),
-                Effect.forkIn(scope),
-                Effect.asVoid,
-              )
+              stoppingOverBudget = true
+              yield* session.stopTurn(overBudget).pipe(Effect.forkIn(scope))
             })
 
             const report = (event: HostEvent) =>
-              Effect.gen(function* () {
-                if (!Predicate.isTagged(event, "TurnEnded")) {
-                  yield* journal.append(agentId, event)
+              journal.append(agentId, event).pipe(
+                Effect.andThen(
+                  Effect.suspend(() => {
+                    if (!startsOrEndsTurn(event)) return stopIfOverBudget
 
-                  if (yield* journal.full) yield* stopOverBudget
+                    stoppingOverBudget = false
 
-                  return
-                }
-
-                const overBudget =
-                  stoppingOverBudget && Predicate.isTagged(event.ended.ending, "Stopped")
-
-                stoppingOverBudget = false
-
-                yield* journal.append(
-                  agentId,
-                  overBudget
-                    ? TurnEnded.make({
-                        turnId: event.turnId,
-                        ended: {
-                          ...event.ended,
-                          ending: TurnFailed.make({ reason: overBudgetReason }),
-                        },
-                      })
-                    : event,
-                )
-              })
+                    return Effect.void
+                  }),
+                ),
+              )
 
             const started = Effect.gen(function* () {
               const skills = yield* written(folder, starting.skills)
@@ -220,7 +201,11 @@ export class HostAgents extends Context.Service<
           steer: (agentId, message) =>
             find(agentId).pipe(Effect.flatMap(({ session }) => session.steer(message))),
           stopTurn: (agentId) =>
-            Effect.suspend(() => running.get(agentId)?.session.stopTurn ?? Effect.succeed(null)),
+            Effect.suspend(
+              () =>
+                running.get(agentId)?.session.stopTurn(TurnStopped.make({})) ??
+                Effect.succeed(null),
+            ),
           answer: (agentId, requestId, answer) =>
             Effect.suspend(() => {
               const agent = running.get(agentId)

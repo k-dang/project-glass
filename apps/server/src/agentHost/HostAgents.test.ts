@@ -5,13 +5,12 @@ import {
   TextPart,
   TurnDone,
   TurnEnded,
-  TurnFailed,
   TurnStarted,
-  TurnStopped,
+  type TurnEnding,
 } from "@glass/contracts"
 import { DateTime, Deferred, Effect, Layer, Stream } from "effect"
 import type { AgentAdapter } from "./adapter"
-import { HostAgents, overBudgetReason } from "./HostAgents"
+import { HostAgents, overBudget } from "./HostAgents"
 import { Journal, JournalBudget } from "./Journal"
 import { type HostEvent, WorkRole } from "./protocol"
 
@@ -26,8 +25,8 @@ it.effect("stops a Turn once the journal passes its budget, keeping everything i
     const at = yield* DateTime.now
     let stops = 0
 
-    const ended = (turnId: string, ending: typeof TurnDone.Type | typeof TurnStopped.Type) =>
-      TurnEnded.make({ turnId, ended: { at, ending } })
+    const ended = (turnId: string) =>
+      TurnEnded.make({ turnId, ended: { at, ending: TurnDone.make({}) } })
 
     const adapter: AgentAdapter = {
       models: Effect.die("unused"),
@@ -38,9 +37,9 @@ it.effect("stops a Turn once the journal passes its budget, keeping everything i
             configure: () => Effect.void,
             startTurn: () => Effect.void,
             steer: () => Effect.void,
-            stopTurn: Effect.gen(function* () {
+            stopTurn: Effect.fnUntraced(function* (ending: TurnEnding) {
               stops++
-              yield* report(ended("turn-1", TurnStopped.make({})))
+              yield* report(TurnEnded.make({ turnId: "turn-1", ended: { at, ending } }))
 
               return []
             }),
@@ -77,21 +76,18 @@ it.effect("stops a Turn once the journal passes its budget, keeping everything i
         [
           started("turn-1"),
           wrote("turn-1", BUDGET * 2),
-          TurnEnded.make({
-            turnId: "turn-1",
-            ended: { at, ending: TurnFailed.make({ reason: overBudgetReason }) },
-          }),
+          TurnEnded.make({ turnId: "turn-1", ended: { at, ending: overBudget } }),
         ],
       )
 
       yield* journal.acknowledge(3)
       yield* report(started("turn-2"))
       yield* report(wrote("turn-2", BUDGET / 2))
-      yield* report(ended("turn-2", TurnDone.make({})))
+      yield* report(ended("turn-2"))
 
       const next = yield* journal.watch(3).pipe(Stream.take(3), Stream.runCollect)
 
-      assert.deepStrictEqual(next.at(-1)?.event, ended("turn-2", TurnDone.make({})))
+      assert.deepStrictEqual(next.at(-1)?.event, ended("turn-2"))
       assert.equal(stops, 1)
     }).pipe(
       Effect.provide(

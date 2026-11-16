@@ -9,7 +9,7 @@ import {
   TurnStarted,
 } from "@glass/contracts"
 import { DateTime, Effect } from "effect"
-import { Journal, JournalBudget } from "../src/agentHost/Journal"
+import { eventBytes, Journal, JournalBudget } from "../src/agentHost/Journal"
 import type { HostEvent } from "../src/agentHost/protocol"
 import { toolOutput } from "../src/agentHost/toolCalls"
 
@@ -98,7 +98,7 @@ const program = Effect.gen(function* () {
     for (const event of hourOfWork("agent-1", hours)) {
       yield* journal.append("agent-1", event)
       entries++
-      json += JSON.stringify(event).length
+      json += eventBytes(event)
     }
 
     hours++
@@ -112,7 +112,7 @@ const program = Effect.gen(function* () {
   const retained = heap() - before
 
   const cappedJson = Array.from(hourOfWork("agent-2", 0, cappedOutput)).reduce(
-    (total, event) => total + JSON.stringify(event).length,
+    (total, event) => total + eventBytes(event),
     0,
   )
 

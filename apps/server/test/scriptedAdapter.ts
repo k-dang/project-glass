@@ -13,7 +13,6 @@ import {
   TurnDone,
   TurnEnded,
   type TurnEnding,
-  TurnStopped,
   withContextOf,
 } from "@glass/contracts"
 import { DateTime, Deferred, Effect, Fiber, Predicate, Schema, Scope } from "effect"
@@ -254,13 +253,13 @@ export const scriptedAdapter = (gates: string): AgentAdapter => {
             }),
           steer: (message) =>
             turn === null ? notRunning : Effect.sync(() => void turn!.steers.push(message)),
-          stopTurn: Effect.gen(function* () {
+          stopTurn: Effect.fnUntraced(function* (ending: TurnEnding) {
             if (turn === null) return null
 
             const { id, fiber, steers } = turn
 
             yield* Fiber.interrupt(fiber)
-            yield* end(id, TurnStopped.make({}))
+            yield* end(id, ending)
 
             return steers
           }),

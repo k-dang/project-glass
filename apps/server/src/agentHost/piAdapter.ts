@@ -14,6 +14,7 @@ import {
   type RequestPart,
   SUGGEST_DRAFT_TOOL,
   withContextOf,
+  type TurnEnding,
 } from "@glass/contracts"
 import {
   type Cause,
@@ -578,8 +579,8 @@ export const piAdapter = (command: string) =>
             return yield* new HostAgentError({ message: "pi didn't take the message in." })
           }),
           // pi's abort runs whatever it still holds, so the queue is cleared first (pi docs/rpc-commands.md).
-          stopTurn: Effect.gen(function* () {
-            const steers = yield* turns.stop
+          stopTurn: Effect.fnUntraced(function* (ending: TurnEnding) {
+            const steers = yield* turns.stop(ending)
 
             if (steers === null) return null
 

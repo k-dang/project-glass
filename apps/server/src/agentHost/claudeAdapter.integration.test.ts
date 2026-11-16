@@ -261,7 +261,7 @@ it.live(
 
       yield* agent.send(run("Bash", "touch notes.txt", "DONE"))
       const request = yield* f.request
-      yield* agent.session.stopTurn
+      yield* agent.session.stopTurn(TurnStopped.make({}))
 
       const [turn] = yield* f.until(settled(1))
       assert.deepStrictEqual(turn?.ended?.ending, TurnStopped.make({}))

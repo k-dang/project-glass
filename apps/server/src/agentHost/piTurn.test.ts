@@ -270,7 +270,7 @@ it("goes on with the Steers pi went idle holding, sending each prompt again and 
   const stopping = run([Input.Idle({ idle: true, generation: 1 })], {
     ...holding,
     generation: 1,
-    stopping: true,
+    stopping: TurnStopped.make({}),
   })
 
   assert.deepInclude(stopping.events.at(-1), { ended: { at: now, ending: TurnStopped.make({}) } })

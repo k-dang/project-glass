@@ -31,7 +31,7 @@ it.live(
       yield* Deferred.await(busy)
 
       yield* turns.offer(Input.Accepted({ turnId: "turn-1", handled: true }))
-      assert.deepStrictEqual(yield* turns.stop, [])
+      assert.deepStrictEqual(yield* turns.stop(TurnStopped.make({})), [])
       yield* Deferred.succeed(resume, undefined)
 
       assert.deepStrictEqual((yield* Deferred.await(ended)).ending, TurnStopped.make({}))

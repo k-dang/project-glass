@@ -8,6 +8,7 @@ import {
   type TurnEnding,
   TurnFailed,
   type TurnPart,
+  TurnStopped,
 } from "@glass/contracts"
 import { DateTime, Predicate } from "effect"
 import type { ToolInput } from "./toolCalls"
@@ -121,7 +122,7 @@ it("ends with the run when Claude Code doesn't stamp its replies, showing the St
 
 it("ends a Turn the user stopped as stopped, however Claude Code finishes it", () => {
   assert.equal(
-    tag(run([runStart([]), result(true)], { ...fresh, stopping: true }).ending),
+    tag(run([runStart([]), result(true)], { ...fresh, stopping: TurnStopped.make({}) }).ending),
     "Stopped",
   )
 })

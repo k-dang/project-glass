@@ -10,6 +10,14 @@ export const JournalBudget = Context.Reference<number>("@glass/server/agentHost/
   defaultValue: () => 64 * 1024 * 1024,
 })
 
+export const eventBytes = (event: HostEvent) => JSON.stringify(event).length
+
+const keptAfter = (kept: ReadonlyArray<{ readonly entry: JournalEntry }>, sequence: number) => {
+  const index = kept.findIndex(({ entry }) => entry.sequence > sequence)
+
+  return index === -1 ? kept.length : index
+}
+
 export class Journal extends Context.Service<
   Journal,
   {
@@ -25,7 +33,7 @@ export class Journal extends Context.Service<
     Effect.gen(function* () {
       const budget = yield* JournalBudget
       const published = yield* PubSub.unbounded<JournalEntry>()
-      let kept: Array<{ readonly entry: JournalEntry; readonly bytes: number }> = []
+      const kept: Array<{ readonly entry: JournalEntry; readonly bytes: number }> = []
       let keptBytes = 0
       let sequence = 0
 
@@ -33,7 +41,7 @@ export class Journal extends Context.Service<
         append: (agentId, event) =>
           Effect.suspend(() => {
             const entry = { sequence: ++sequence, agentId, event }
-            const bytes = JSON.stringify(event).length
+            const bytes = eventBytes(event)
             kept.push({ entry, bytes })
             keptBytes += bytes
 
@@ -44,7 +52,7 @@ export class Journal extends Context.Service<
             Effect.gen(function* () {
               const live = yield* PubSub.subscribe(published)
 
-              const missed = kept.flatMap(({ entry }) => (entry.sequence > after ? [entry] : []))
+              const missed = kept.slice(keptAfter(kept, after)).map(({ entry }) => entry)
 
               const last = missed.at(-1)?.sequence ?? after
 
@@ -56,12 +64,8 @@ export class Journal extends Context.Service<
           ),
         acknowledge: (through) =>
           Effect.sync(() => {
-            kept = kept.filter(({ entry, bytes }) => {
-              if (entry.sequence > through) return true
-              keptBytes -= bytes
-
-              return false
-            })
+            const acknowledged = kept.splice(0, keptAfter(kept, through))
+            keptBytes -= acknowledged.reduce((total, { bytes }) => total + bytes, 0)
           }),
         full: Effect.sync(() => keptBytes > budget),
       })

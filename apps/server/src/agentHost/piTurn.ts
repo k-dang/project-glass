@@ -15,7 +15,6 @@ import {
   TurnFailed,
   type TurnPart,
   TurnStarted,
-  TurnStopped,
   type MessageWithContext,
   type TurnMessage,
   withContextOf,
@@ -103,7 +102,7 @@ export const beginTurn = (turnId: string, sent: TurnMessage, at: DateTime.Utc): 
   generation: 0,
   steers: [],
   promptTakenIn: false,
-  stopping: false,
+  stopping: null,
 })
 
 const outputText = (result: ToolResult) =>
@@ -159,12 +158,11 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
     state = null
   }
 
-  const finish = (turn: TurnState, ending: TurnEnding) =>
-    end(turn, turn.stopping ? TurnStopped.make({}) : ending)
+  const finish = (turn: TurnState, ending: TurnEnding) => end(turn, turn.stopping ?? ending)
 
   const loseDelivery = (turn: TurnState, ending: TurnEnding) => {
     // A transport failure cannot consume a durable Global conversation update; the next host recovers its saved input.
-    if (Predicate.isTagged(turn.turn.context, "GlobalConversationUpdate") && !turn.stopping)
+    if (Predicate.isTagged(turn.turn.context, "GlobalConversationUpdate") && turn.stopping === null)
       state = null
     else end(turn, ending)
   }
@@ -280,15 +278,12 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
     },
     Refused: ({ turnId }) => {
       if (state?.turn.id === turnId)
-        loseDelivery(
-          state,
-          state.stopping ? TurnStopped.make({}) : TurnFailed.make({ reason: refusedReason }),
-        )
+        loseDelivery(state, state.stopping ?? TurnFailed.make({ reason: refusedReason }))
     },
     Idle: ({ idle, generation }) => {
       if (state === null || !idle || generation !== state.generation) return
 
-      if (state.steers.length > 0 && !state.stopping) {
+      if (state.steers.length > 0 && state.stopping === null) {
         commands.push(Command.Resume({ turnId: state.turn.id, steers: state.steers }))
 
         return
