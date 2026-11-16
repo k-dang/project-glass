@@ -1,6 +1,6 @@
 # Conversation composer
 
-A Conversation's composer keeps working while its Turn runs. Sending then Queues the message in a list above the composer headed "Starts when the agent finishes"; Queued messages start in order as Turns end. ⌘Enter Steers the running Turn instead: the message shows in the Turn under "Steered" where the program took it in. Stop (the square button) ends the Turn "Stopped after …" and leaves the Queued messages "Waiting until you send them", each with Send now and Cancel; Steers the program hadn't taken in come back first. Images can be pasted or dropped into a message, ↑ in an empty composer recalls the last message, and unsent text survives switching Conversations.
+A Conversation's composer keeps working while its Turn runs. Sending then Queues the message in a list above the composer headed "Starts when the agent finishes"; Queued messages start in order as Turns end. ⌘Enter Steers the running Turn instead: the message shows in the Turn under "Steered" where the agent took it in. Stop (the square button) ends the Turn "Stopped after …" and leaves the Queued messages "Waiting until you send them", each with Send now and Cancel; Steers the agent hadn't taken in come back first. Images can be pasted or dropped into a message, ↑ in an empty composer recalls the last message, and unsent text survives switching Conversations.
 
 ## Sub-features
 

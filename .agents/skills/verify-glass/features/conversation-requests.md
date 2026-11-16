@@ -13,7 +13,7 @@ A local Claude Code Conversation has a Permission mode (Default, Accept edits, A
 ## How to get to it (user POV)
 
 - Choose Conversations in the left icon rail; New Conversation opens with the composer.
-- Open the program chip (it starts as `pi: gpt-test`) and choose Claude Code; the Permission mode chip reads Default.
+- Open the Agent harness chip (it starts as `pi: gpt-test`) and choose Claude Code; the Permission mode chip reads Default.
 - Send a message asking for a command in backticks, such as ``Please run `touch notes.txt` ``, or one containing "ask" for a Question.
 
 ## Driving it with glass-verify

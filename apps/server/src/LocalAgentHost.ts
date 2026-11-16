@@ -77,8 +77,8 @@ export class LocalAgentHost extends Context.Service<
               stderr: "inherit",
               additionalFds: { fd3: { type: "output" } },
               forceKillAfter: FORCE_KILL_AFTER,
-              // Signal only the host, so it closes its programs itself: killing its process group
-              // would end them under it, which it logs as crashes.
+              // Signal only the host, so it closes its Agent harnesses itself: killing its process
+              // group would end them under it, which it logs as crashes.
               detached: false,
             }),
           )
