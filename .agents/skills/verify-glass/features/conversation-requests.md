@@ -22,15 +22,15 @@ Preconditions:
 
 - `node $V launch --backend fake`. `pnpm dev:fake`'s backend runs Claude Code Conversations on the real `claude` the pinned SDK ships, against its own fake Anthropic API and Claude config, so no model is called and nothing is charged.
 
-- **Start a Claude Code Conversation.** `click --role link --name "Conversations"`, `wait --text "Local"`, `click --role button --name "pi: gpt-test"`, `click --role button --name "Claude Code"`, `press --key Escape`.
+- **Start a Claude Code Conversation.** `click --role link --name "Conversations"`, `wait --text "Local"`; New Conversation already picks `button "Claude Code: Opus"`. Its Permission mode starts at Auto, which runs commands without asking: `click --role combobox --name "Permission mode"`, then `click --role option --name Default`.
 - **A waiting Permission request (`request-waiting`).** `type --role textbox --name "Message" --text 'Please run `touch notes.txt`'`, `press --key Enter`, `wait --text "Allow Bash?"`, `wait --text "Waiting on you"`, and capture `card-waiting`.
-- **Allow or Deny (`request-allow`, `request-deny`).** `click --role button --name "Allow"`, then `wait --text "The fake model saw"`; or type a reason into the card's "Why not?" box and `click --role button --name "Deny"`.
-- **A Question (`question-answer`).** Send `Please ask me which files to read`, `wait --text "Which files should I look at?"`, click an option or type into "Or answer in your own words", then `click --role button --name "Answer"`.
-- **Stop while a card waits (`request-stop`).** With a card waiting, `click --role button --name "Stop"`, `wait --text "Stopped after"`, `wait --text "No longer answerable"`, and capture `stopped`; `text` no longer contains "Waiting on you". A next message then runs and ends "Done in …".
+- **Allow or Deny (`request-allow`, `request-deny`).** `click --role button --name "Allow"`, then `wait --text "The fake model saw"`; or type a reason into `textbox "Why not? (optional)"` and `click --role button --name "Deny"`.
+- **A Question (`question-answer`).** Send `Please ask me which files to read`, `wait --text "Which files should I look at?"`, click an option, such as `click --role radio --name "Only the README The quickest overview"` (each radio's name includes its description), or type into "Or answer in your own words", then `click --role button --name "Answer"` and `wait --text "Answered: Only the README"`.
+- **Stop while a card waits (`request-stop`).** With a card waiting, `click --role button --name "Stop"`, `wait --text "Stopped after"`, `wait --text "No longer answerable"`, and capture `stopped`; the Conversation's own row in the Conversations list no longer reads "Waiting on you" (two seeded Conversations always do). A next message then runs and ends "Done in …".
 - **Proof.** A snapshot and screenshot of each state, and `backend.log` in the evidence: one `messages` line per model call, naming the tool the fake asked for, shows the real CLI reached the fake.
 
 ## Gotchas
 
 - The real CLI approves read-only commands such as `ls` itself, even in Default; ask for a command that changes something, such as `touch`, to get a card.
 - The fake model only calls a tool for a command in backticks or a message containing "ask"; anything else gets "Fake reply to: …" and the Turn ends at once.
-- The demo Conversation the fake backend seeds is a pi Conversation; Permission modes and cards need a new Claude Code Conversation.
+- Two seeded Conversations already wait on you; start a new Claude Code Conversation so the cards you drive are your own.

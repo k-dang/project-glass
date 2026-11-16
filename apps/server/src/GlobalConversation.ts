@@ -41,6 +41,7 @@ import {
   type ConversationHost,
   ConversationTurns,
 } from "./ConversationTurns"
+import { boundHostCall } from "./hostControl"
 import { ServerConfig } from "./ServerConfig"
 import { Transcripts, type WaitingRequest } from "./Transcripts"
 import { annotateUnit } from "./wideEvents"
@@ -204,13 +205,13 @@ export class GlobalConversation extends Context.Service<
             const running = yield* host.running
 
             if (Option.isSome(running))
-              yield* running.value
-                .StopConversation({ conversationId: sessionId })
-                .pipe(
-                  Effect.catch((cause) =>
-                    Effect.logWarning("Couldn't stop pi for the ended Global conversation", cause),
-                  ),
-                )
+              yield* boundHostCall(
+                running.value.StopConversation({ conversationId: sessionId }),
+              ).pipe(
+                Effect.catch((cause) =>
+                  Effect.logWarning("Couldn't stop pi for the ended Global conversation", cause),
+                ),
+              )
 
             yield* replaceRunning(null)
           }),

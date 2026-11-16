@@ -55,7 +55,10 @@ export class HostConversations extends Context.Service<
       conversationId: string,
       message: DeliveredMessage,
     ) => Effect.Effect<void, HostConversationError>
-    readonly stopTurn: (conversationId: string) => Effect.Effect<SteersNotTakenIn | null>
+    readonly stopTurn: (
+      conversationId: string,
+      turnId: string,
+    ) => Effect.Effect<SteersNotTakenIn | null>
     readonly answer: (
       conversationId: string,
       requestId: string,
@@ -76,7 +79,34 @@ export class HostConversations extends Context.Service<
 
         const hostScope = yield* Scope.Scope
         const running = new Map<string, Running>()
-        const lock = yield* Semaphore.make(1)
+        const locks = new Map<string, { semaphore: Semaphore.Semaphore; holders: number }>()
+
+        const withConversation = <A, E, R>(
+          conversationId: string,
+          effect: Effect.Effect<A, E, R>,
+        ) =>
+          Effect.suspend(() => {
+            const lock = locks.get(conversationId) ?? {
+              semaphore: Semaphore.makeUnsafe(1),
+              holders: 0,
+            }
+
+            lock.holders += 1
+            locks.set(conversationId, lock)
+
+            return lock.semaphore
+              .withPermits(1)(effect)
+              .pipe(
+                Effect.ensuring(
+                  Effect.sync(() => {
+                    lock.holders -= 1
+
+                    if (lock.holders === 0 && locks.get(conversationId) === lock)
+                      locks.delete(conversationId)
+                  }),
+                ),
+              )
+          })
 
         const start = Effect.fn("HostConversations.start")(
           function* (starting: ConversationStart) {
@@ -124,7 +154,8 @@ export class HostConversations extends Context.Service<
 
             yield* session.closed.pipe(
               Effect.andThen(
-                lock.withPermits(1)(
+                withConversation(
+                  conversationId,
                   Effect.sync(() => {
                     if (running.get(conversationId) === conversation) running.delete(conversationId)
                   }),
@@ -136,7 +167,7 @@ export class HostConversations extends Context.Service<
 
             return "started" as const
           },
-          (effect) => lock.withPermits(1)(effect),
+          (effect, starting) => withConversation(starting.conversationId, effect),
         )
 
         const find = (conversationId: string) =>
@@ -152,7 +183,7 @@ export class HostConversations extends Context.Service<
               : Effect.succeed(conversation)
           })
 
-        return HostConversations.of({
+        const conversations = HostConversations.of({
           models: (harness) => adapters[harness].models,
           commands: (harness, folder, skills) =>
             written(folder, skills).pipe(
@@ -172,9 +203,9 @@ export class HostConversations extends Context.Service<
           }),
           steer: (conversationId, message) =>
             find(conversationId).pipe(Effect.flatMap(({ session }) => session.steer(message))),
-          stopTurn: (conversationId) =>
+          stopTurn: (conversationId, turnId) =>
             Effect.suspend(
-              () => running.get(conversationId)?.session.stopTurn ?? Effect.succeed(null),
+              () => running.get(conversationId)?.session.stopTurn(turnId) ?? Effect.succeed(null),
             ),
           answer: (conversationId, requestId, answer) =>
             Effect.suspend(() => {
@@ -185,7 +216,8 @@ export class HostConversations extends Context.Service<
                 : conversation.session.answer(requestId, answer)
             }),
           stop: Effect.fnUntraced(function* (conversationId: string) {
-            const conversation = yield* lock.withPermits(1)(
+            const conversation = yield* withConversation(
+              conversationId,
               Effect.sync(() => {
                 const stopping = running.get(conversationId)
                 running.delete(conversationId)
@@ -197,6 +229,24 @@ export class HostConversations extends Context.Service<
             if (conversation !== undefined) yield* Scope.close(conversation.scope, Exit.void)
           }),
         })
+
+        coordination.set(conversations, locks)
+
+        return conversations
       }),
     )
 }
+
+interface ConversationLockOwner {
+  readonly stop: (conversationId: string) => Effect.Effect<void>
+}
+
+const coordination = new WeakMap<
+  ConversationLockOwner,
+  Map<string, { semaphore: Semaphore.Semaphore; holders: number }>
+>()
+
+export const conversationLock = (
+  owner: ConversationLockOwner,
+  conversationId: string,
+): object | undefined => coordination.get(owner)?.get(conversationId)

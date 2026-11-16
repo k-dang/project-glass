@@ -263,10 +263,10 @@ it.live("stops a pi Turn, handing back a Steer pi hadn't taken in", () =>
     yield* f.extension("confirm.js", confirmExtension)
     const session = yield* f.open(conversationId)
 
-    yield* session.send(run("bash", "echo hi", "DONE"))
+    const turnId = yield* session.send(run("bash", "echo hi", "DONE"))
     yield* f.request
     yield* session.steer("Now, please")
-    const handedBack = yield* session.session.stopTurn
+    const handedBack = yield* session.session.stopTurn(turnId)
 
     const [turn] = yield* f.until(settled(1))
     assert.deepStrictEqual(turn?.ended?.ending, TurnStopped.make({}))
@@ -318,11 +318,11 @@ it.live("hands back what pi held when the Turn stops: Steers as written, then pi
     yield* f.extension("confirm.js", confirmExtension)
     const session = yield* f.open(conversationId)
 
-    yield* session.send(run("bash", "echo hi", "DONE"))
+    const turnId = yield* session.send(run("bash", "echo hi", "DONE"))
     yield* f.request
     yield* session.steer("?quick tabs or spaces?", [pixel])
     yield* session.steer("remind me")
-    const handedBack = yield* session.session.stopTurn
+    const handedBack = yield* session.session.stopTurn(turnId)
 
     assert.deepStrictEqual(handedBack, [
       { message: "?quick tabs or spaces?", images: [pixel], context: null },
@@ -550,9 +550,9 @@ it.live("stops a pi Turn while its extension's dialog waits", () =>
     yield* f.extension("confirm.js", confirmExtension)
     const session = yield* f.open(conversationId)
 
-    yield* session.send(run("bash", "echo hi", "DONE"))
+    const turnId = yield* session.send(run("bash", "echo hi", "DONE"))
     const request = yield* f.request
-    yield* session.session.stopTurn
+    yield* session.session.stopTurn(turnId)
 
     const [turn] = yield* f.until(settled(1))
     assert.deepStrictEqual(turn?.ended?.ending, TurnStopped.make({}))
@@ -717,12 +717,12 @@ it.live("stops the Global conversation's Turn while a Glass tool runs, cancellin
 
     const session = yield* f.open(conversationId, glass.role)
 
-    yield* session.send("Wait for release.")
+    const turnId = yield* session.send("Wait for release.")
 
     if (recordingSessions) yield* glass.waitStarted
     else yield* f.until(runningTool("wait_for_release"))
 
-    yield* session.session.stopTurn
+    yield* session.session.stopTurn(turnId)
     const [turn] = yield* f.until(settled(1))
 
     assert.deepStrictEqual(turn?.ended?.ending, TurnStopped.make({}))

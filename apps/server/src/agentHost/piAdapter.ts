@@ -579,33 +579,34 @@ export const piAdapter = (command: string) =>
             return yield* new HostConversationError({ message: "pi didn't take the message in." })
           }),
           // pi's abort runs whatever it still holds, so the queue is cleared first (pi docs/rpc-commands.md).
-          stopTurn: Effect.gen(function* () {
-            const steers = yield* turns.stop
+          stopTurn: (turnId) =>
+            Effect.gen(function* () {
+              const steers = yield* turns.stop(turnId)
 
-            if (steers === null) return null
+              if (steers === null) return null
 
-            const cleared = yield* rpc.request({ type: "clear_queue" }, ClearedQueue).pipe(
-              Effect.tapError((error) => Effect.logWarning("pi didn't clear its queue", error)),
-              Effect.orElseSucceed(() => ({ steering: [], followUp: [] })),
-            )
+              const cleared = yield* rpc.request({ type: "clear_queue" }, ClearedQueue).pipe(
+                Effect.tapError((error) => Effect.logWarning("pi didn't clear its queue", error)),
+                Effect.orElseSucceed(() => ({ steering: [], followUp: [] })),
+              )
 
-            // An open dialog holds the extension, and with it pi's run, until it's answered.
-            const open = Array.from(dialogs.keys())
-            dialogs.clear()
-            yield* Effect.forEach(
-              open,
-              (id) => rpc.send({ type: "extension_ui_response", id, cancelled: true }),
-              { discard: true },
-            ).pipe(Effect.ignore)
+              // An open dialog holds the extension, and with it pi's run, until it's answered.
+              const open = Array.from(dialogs.keys())
+              dialogs.clear()
+              yield* Effect.forEach(
+                open,
+                (id) => rpc.send({ type: "extension_ui_response", id, cancelled: true }),
+                { discard: true },
+              ).pipe(Effect.ignore)
 
-            yield* rpc.request({ type: "abort" }, Schema.Unknown).pipe(
-              Effect.tapError((error) => Effect.logWarning("pi didn't abort", error)),
-              Effect.ignore,
-              Effect.forkIn(scope),
-            )
+              yield* rpc.request({ type: "abort" }, Schema.Unknown).pipe(
+                Effect.tapError((error) => Effect.logWarning("pi didn't abort", error)),
+                Effect.ignore,
+                Effect.forkIn(scope),
+              )
 
-            return leftover(steers, cleared)
-          }),
+              return leftover(steers, cleared)
+            }),
         }
       }),
     } satisfies HarnessAdapter

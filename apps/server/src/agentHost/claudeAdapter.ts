@@ -484,15 +484,16 @@ export const claudeAdapter = (
           Effect.asVoid,
         )
       }),
-      stopTurn: Effect.gen(function* () {
-        const steers = yield* turns.stop
+      stopTurn: (turnId) =>
+        Effect.gen(function* () {
+          const steers = yield* turns.stop(turnId)
 
-        if (steers === null) return null
+          if (steers === null) return null
 
-        const cancelled = yield* interruptAll(session)
+          const cancelled = yield* interruptAll(session)
 
-        return steers.filter(({ id }) => cancelled.includes(id)).map(withContextOf)
-      }),
+          return steers.filter(({ id }) => cancelled.includes(id)).map(withContextOf)
+        }),
       answer: Effect.fnUntraced(function* (requestId: string, answer: RequestAnswer) {
         const asked = waiting.get(requestId)
 

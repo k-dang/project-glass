@@ -116,11 +116,12 @@ export const conversationServicesFixture = Effect.gen(function* () {
             Effect.sync(() => {
               steers.push({ conversationId: conversation, message })
             }),
-          stopTurn: Effect.sync(() => {
-            stops.push(conversation)
+          stopTurn: () =>
+            Effect.sync(() => {
+              stops.push(conversation)
 
-            return leftOnStop
-          }),
+              return leftOnStop
+            }),
           answer: (requestId, answer) =>
             Effect.suspend(() => {
               answers.push({ requestId, answer })

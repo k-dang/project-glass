@@ -16,7 +16,7 @@ Open a PR, select the Tour tab, then Write Tour. When the Tour is saved, choose 
 ## Driving it with glass-verify
 
 1. Launch `node $V launch --backend fake` and run `node $V doctor`. This uses the shared demo PRs, a fake git remote for the checkout, and synthetic Tour runners, without model charges.
-2. In Reviews, type `https://github.com/octo-org/hello-world/pull/1` into the Open a PR textbox, choose Open, and wait for Reload. `node $V click --role tab --name "Tour"`, then capture a snapshot and screenshot before writing.
+2. In Reviews, type `https://github.com/octo-org/hello-world/pull/1` into the Open a PR textbox, choose Open, and `wait --text "Rate-limit the public API"`. `node $V click --role tab --name "Tour"`, then capture a snapshot and screenshot before writing.
 3. `node $V click --role button --name "Write Tour"`, then `node $V wait --text "curated synthetic Tour"`. Capture a snapshot and screenshot of the saved Tour.
 4. `node $V click --role button --name "Start reading"`, then `node $V wait --text "What happens to a request"`. Capture the Tour overview: the intent beside the Before / after, above the first Chapter.
 5. Click a changed line, such as `node $V click --role button --name "no token left: return 429 with retry-after, added. Show middleware.ts:28"`. Capture its Chapter with the target line selected.

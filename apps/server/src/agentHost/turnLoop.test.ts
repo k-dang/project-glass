@@ -31,9 +31,25 @@ it.live(
       yield* Deferred.await(busy)
 
       yield* turns.offer(Input.Accepted({ turnId: "turn-1", handled: true }))
-      assert.deepStrictEqual(yield* turns.stop, [])
+      assert.deepStrictEqual(yield* turns.stop("turn-1"), [])
       yield* Deferred.succeed(resume, undefined)
 
       assert.deepStrictEqual((yield* Deferred.await(ended)).ending, TurnStopped.make({}))
     }).pipe(Effect.scoped),
+)
+
+it.effect("stops only the Turn it names", () =>
+  Effect.gen(function* () {
+    const turns = yield* runTurns({
+      harness: "pi",
+      machine,
+      events: Stream.never,
+      report: () => Effect.void,
+    })
+
+    yield* turns.begin("turn-1", { message: "Build it", images: [], context: null })
+
+    assert.equal(yield* turns.stop("turn-2"), null)
+    assert.deepStrictEqual(yield* turns.stop("turn-1"), [])
+  }).pipe(Effect.scoped),
 )

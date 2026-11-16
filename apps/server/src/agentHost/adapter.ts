@@ -17,7 +17,7 @@ export interface HarnessSession {
     message: DeliveredTurn,
   ) => Effect.Effect<void, HostConversationError>
   readonly steer: (message: DeliveredMessage) => Effect.Effect<void, HostConversationError>
-  readonly stopTurn: Effect.Effect<SteersNotTakenIn | null>
+  readonly stopTurn: (turnId: string) => Effect.Effect<SteersNotTakenIn | null>
   readonly answer: (
     requestId: string,
     answer: RequestAnswer,

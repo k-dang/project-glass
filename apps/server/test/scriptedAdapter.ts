@@ -254,16 +254,17 @@ export const scriptedAdapter = (gates: string): HarnessAdapter => {
             }),
           steer: (message) =>
             turn === null ? notRunning : Effect.sync(() => void turn!.steers.push(message)),
-          stopTurn: Effect.gen(function* () {
-            if (turn === null) return null
+          stopTurn: (turnId) =>
+            Effect.gen(function* () {
+              if (turn === null || turn.id !== turnId) return null
 
-            const { id, fiber, steers } = turn
+              const { id, fiber, steers } = turn
 
-            yield* Fiber.interrupt(fiber)
-            yield* end(id, TurnStopped.make({}))
+              yield* Fiber.interrupt(fiber)
+              yield* end(id, TurnStopped.make({}))
 
-            return steers
-          }),
+              return steers
+            }),
           answer: (requestId, answer) =>
             Effect.gen(function* () {
               const waiting = turn?.waiting
