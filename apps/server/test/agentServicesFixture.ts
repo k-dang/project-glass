@@ -143,7 +143,7 @@ export const agentServicesFixture = Effect.gen(function* () {
 
   const hostServices = () =>
     Layer.mergeAll(
-      HostAgents.make({ "claude-code": adapter, pi: adapter }).pipe(
+      HostAgents.make({ "claude-code": adapter, pi: adapter, opencode: adapter }).pipe(
         Layer.provideMerge(Journal.layer),
         Layer.provide(NodeFileSystem.layer),
       ),

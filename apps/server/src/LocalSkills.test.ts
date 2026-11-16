@@ -52,6 +52,21 @@ it.live(
         "notes",
       ])
       assert.deepStrictEqual(yield* f.client.ListLocalSkills({ engine: "claude-code" }), ["tidy"])
+      write(
+        join(f.home, ".config", "opencode", "skills", "current", "SKILL.md"),
+        skillFile("native-current", "Current OpenCode skills."),
+      )
+      write(
+        join(f.home, ".config", "opencode", "skill", "legacy", "SKILL.md"),
+        skillFile("native-legacy", "Native singular skill folder."),
+      )
+      assert.deepStrictEqual(yield* f.client.ListLocalSkills({ engine: "opencode" }), [
+        "grilling",
+        "native-current",
+        "native-legacy",
+        "old",
+        "tidy",
+      ])
 
       const commandsOf = (agent: Agent) =>
         f.client

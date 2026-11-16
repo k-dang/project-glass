@@ -739,6 +739,7 @@ it("lists every Agent program's models before one is chosen", async () => {
   await screen.findByRole("region", { name: "New Agent" })
   await waitFor(() => expect(listed).toContain("pi"))
   expect(listed).toContain("claude-code")
+  expect(listed).toContain("opencode")
 })
 
 it("offers only the Agent programs a Sandbox provider runs", async () => {

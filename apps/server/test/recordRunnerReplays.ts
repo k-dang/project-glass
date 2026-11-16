@@ -103,6 +103,7 @@ const record = async (scenario: RunnerScenario) => {
             {
               claudeCommand: sdkExecutable(commands["claude-code"]),
               piCommand: sdkExecutable(commands.pi),
+              opencodeCommand: "glass-missing-opencode",
             },
             recorder.layer,
           ),

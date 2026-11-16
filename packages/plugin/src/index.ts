@@ -36,7 +36,7 @@ export interface SandboxProvider {
   readonly models: (engine: AgentEngine) => Promise<AgentModels>
 }
 
-export const agentEngines = ["claude-code", "pi"] as const
+export const agentEngines = ["claude-code", "pi", "opencode"] as const
 
 export type AgentEngine = (typeof agentEngines)[number]
 

@@ -2,9 +2,12 @@ import { spawnSync } from "node:child_process"
 
 const USAGE = `Records the Agent session recordings that the adapter integration tests replay.
 
-  pnpm --filter @glass/server record:sessions [claude|pi] [--pi-model <provider/model>] [vitest options, such as -t <test name>]
+  pnpm --filter @glass/server record:sessions [claude|pi|opencode] [--pi-model <provider/model>] [vitest options, such as -t <test name>]
 
-Recording costs a few cents. Claude Code sessions run the pinned claude on Haiku with your own
+OpenCode recordings run OpenCode 1.19.5 from GLASS_OPENCODE_COMMAND (or opencode on PATH),
+against a local model fixture; they need no model login and incur no model charges.
+
+Recording Claude Code or pi costs a few cents. Claude Code sessions run the pinned claude on Haiku with your own
 Claude Code login, from ~/.claude/.credentials.json or, on macOS, the Keychain; set
 CLAUDE_CODE_OAUTH_TOKEN where your login is in neither. pi sessions, which need --pi-model, run
 the bundled pi on the model you name, with whatever login your own pi has for it: its auth.json
@@ -30,7 +33,7 @@ if (engine === "--help") {
   process.exit(0)
 }
 
-if (!pnpmPath || (engine !== "claude" && !piModel?.includes("/"))) {
+if (!pnpmPath || (engine !== "claude" && engine !== "opencode" && !piModel?.includes("/"))) {
   console.log(USAGE)
   process.exit(1)
 }
@@ -42,8 +45,13 @@ const vp = (...args: Array<string>) =>
   }).status
 
 const tests =
-  engine === "claude" || engine === "pi"
-    ? vp("test", "run", `${engine}Adapter.integration`, ...rest)
+  engine === "claude" || engine === "pi" || engine === "opencode"
+    ? vp(
+        "test",
+        "run",
+        `${engine === "opencode" ? "openCode" : engine}Adapter.integration`,
+        ...rest,
+      )
     : vp("test", "run", "Adapter.integration", ...options)
 
 const format = vp("fmt", "test/recordings/sessions")

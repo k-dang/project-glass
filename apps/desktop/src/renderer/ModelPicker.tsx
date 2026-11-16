@@ -169,16 +169,17 @@ function Models(props: {
 
   const modelItems: Array<{ value: string; label: ReactNode }> = []
 
-  if (defaultModel !== null)
-    modelItems.push({
-      value: DEFAULT_KEY,
-      label: (
-        <>
-          Default
+  modelItems.push({
+    value: DEFAULT_KEY,
+    label: (
+      <>
+        Default
+        {defaultModel !== null && (
           <span className="ml-auto text-muted-foreground">{defaultModel.name}</span>
-        </>
-      ),
-    })
+        )}
+      </>
+    ),
+  })
 
   for (const { id, name } of models) modelItems.push({ value: id, label: name })
 

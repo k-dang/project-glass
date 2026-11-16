@@ -24,6 +24,7 @@ import {
 export interface Programs {
   readonly "claude-code": AgentAdapter<AgentRole>
   readonly pi: AgentAdapter
+  readonly opencode: AgentAdapter<AgentRole>
 }
 
 interface Running {
@@ -123,7 +124,7 @@ export class HostAgents extends Context.Service<
                     skills,
                     report,
                   })
-                : adapters["claude-code"].start({
+                : adapters[starting.engine].start({
                     folder,
                     conversation: agentId,
                     role: starting.role,

@@ -2,6 +2,19 @@ import type { AgentEngine } from "@glass/contracts"
 import { cn } from "cn"
 
 export function AgentProgramIcon(props: { engine: AgentEngine; className?: string }) {
+  if (props.engine === "opencode")
+    return (
+      <svg
+        aria-hidden
+        focusable="false"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        className={cn("size-3.5 shrink-0", props.className)}
+      >
+        <path fillRule="evenodd" d="M4 2h16v20H4V2Zm4 4v12h8V6H8Z" />
+      </svg>
+    )
+
   return props.engine === "claude-code" ? (
     <svg
       aria-hidden

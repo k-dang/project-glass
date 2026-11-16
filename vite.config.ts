@@ -19,7 +19,7 @@ export default defineConfig({
   fmt: {
     printWidth: 100,
     semi: false,
-    ignorePatterns,
+    ignorePatterns: [...ignorePatterns, "**/recordings/sessions/opencode-*.ndjson"],
   },
   lint: {
     ignorePatterns,

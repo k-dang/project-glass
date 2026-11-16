@@ -1,6 +1,6 @@
 import { assert, it } from "@effect/vitest"
 import {
-  type AgentEngine,
+  type RunnerEngine,
   PullRequestRef,
   Revision,
   type TourDiagram,
@@ -100,7 +100,7 @@ const fixture = Effect.fnUntraced(function* (settings: ScriptedSettings = { repl
         .pipe(Stream.runHead, Effect.map(Option.getOrThrow))
     }),
     write: client.WriteTour({ pullRequest: ref, revision }),
-    useEngine: (engine: AgentEngine) =>
+    useEngine: (engine: RunnerEngine) =>
       client
         .GetEngineSettings({ feature: "tours" })
         .pipe(

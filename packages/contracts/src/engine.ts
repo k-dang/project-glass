@@ -1,8 +1,11 @@
 import { Schema } from "effect"
-import { AgentEngine } from "./agent"
+
+export const RunnerEngine = Schema.Literals(["claude-code", "pi"])
+
+export type RunnerEngine = typeof RunnerEngine.Type
 
 export const AgentRunnerIdentity = Schema.Struct({
-  engine: AgentEngine,
+  engine: RunnerEngine,
   model: Schema.String,
 })
 
@@ -21,7 +24,7 @@ export const EngineModels = Schema.Struct({
 
 export type EngineModels = typeof EngineModels.Type
 
-export const EngineSettings = Schema.Struct({ engine: AgentEngine, models: EngineModels })
+export const EngineSettings = Schema.Struct({ engine: RunnerEngine, models: EngineModels })
 
 export type EngineSettings = typeof EngineSettings.Type
 

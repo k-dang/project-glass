@@ -1,5 +1,5 @@
 import {
-  AgentEngine,
+  RunnerEngine,
   defaultReviewPrompt,
   type EngineFeature,
   EngineModels,
@@ -13,7 +13,11 @@ import { join } from "node:path"
 import { writeDataFile } from "./dataFiles"
 import { ServerConfig } from "./ServerConfig"
 
-const defaultAgentCommands = { claudeCommand: "claude", piCommand: "pi" }
+const defaultAgentCommands = {
+  claudeCommand: "claude",
+  piCommand: "pi",
+  opencodeCommand: "opencode",
+}
 
 const defaultPiModel = Effect.succeed({ provider: "anthropic", modelId: "claude-sonnet-5-5" })
 
@@ -29,16 +33,19 @@ const Settings = Schema.Struct({
     Schema.withDecodingDefaultKey(Effect.succeed([])),
   ),
   tourModels: SavedModels,
-  tourEngine: AgentEngine.pipe(Schema.withDecodingDefaultKey(Effect.succeed("claude-code"))),
+  tourEngine: RunnerEngine.pipe(Schema.withDecodingDefaultKey(Effect.succeed("claude-code"))),
   queueTours: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
   agentReviewModels: SavedModels,
-  agentReviewEngine: AgentEngine.pipe(Schema.withDecodingDefaultKey(Effect.succeed("pi"))),
+  agentReviewEngine: RunnerEngine.pipe(Schema.withDecodingDefaultKey(Effect.succeed("pi"))),
   queueAgentReviews: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
   reviewPrompt: ReviewPrompt.pipe(
     Schema.withDecodingDefaultKey(Effect.succeed(defaultReviewPrompt)),
   ),
   claudeCommand: Schema.String.pipe(
     Schema.withDecodingDefaultKey(Effect.succeed(defaultAgentCommands.claudeCommand)),
+  ),
+  opencodeCommand: Schema.String.pipe(
+    Schema.withDecodingDefaultKey(Effect.succeed(defaultAgentCommands.opencodeCommand)),
   ),
   piCommand: Schema.String.pipe(
     Schema.withDecodingDefaultKey(Effect.succeed(defaultAgentCommands.piCommand)),
@@ -157,18 +164,18 @@ export class SettingsStore extends Context.Service<
 
 export class AgentCommands extends Context.Service<
   AgentCommands,
-  { readonly claudeCommand: string; readonly piCommand: string }
+  { readonly claudeCommand: string; readonly piCommand: string; readonly opencodeCommand: string }
 >()("@glass/server/AgentCommands") {
   static readonly layer = Layer.effect(
     AgentCommands,
     Effect.gen(function* () {
       const settings = yield* SettingsStore
 
-      const { claudeCommand, piCommand } = yield* settings
+      const { claudeCommand, piCommand, opencodeCommand } = yield* settings
         .read()
         .pipe(Effect.orElseSucceed(() => defaultAgentCommands))
 
-      return AgentCommands.of({ claudeCommand, piCommand })
+      return AgentCommands.of({ claudeCommand, piCommand, opencodeCommand })
     }),
   )
 }
