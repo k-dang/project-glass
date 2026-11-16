@@ -10,6 +10,7 @@ export interface Steer extends DeliveredMessage {
 export interface Steering {
   readonly steers: ReadonlyArray<Steer>
   readonly stopping: boolean
+  readonly turn: { readonly id: string }
 }
 
 export interface TurnMachine<State extends Steering, Input, Command> {
@@ -96,12 +97,14 @@ export const runTurns = Effect.fnUntraced(function* <
         if (state !== null)
           state = { ...state, steers: state.steers.filter((steer) => steer.id !== id) }
       }),
-    stop: Effect.sync(() => {
-      if (state === null) return null
-      state = { ...state, stopping: true }
+    stop: (turnId: string) =>
+      Effect.sync(() => {
+        if (state === null || state.turn.id !== turnId) return null
 
-      return state.steers
-    }),
+        state = { ...state, stopping: true }
+
+        return state.steers
+      }),
     offer,
     begin: Effect.fnUntraced(function* (turnId: string, message: TurnMessage) {
       const at = yield* DateTime.now

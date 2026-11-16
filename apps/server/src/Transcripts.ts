@@ -236,6 +236,7 @@ export class Transcripts extends Context.Service<
       ending: TurnEnding,
       agentIds: ReadonlyArray<string>,
     ) => Effect.Effect<void, AgentError>
+    readonly askedToStop: (turnId: string) => Effect.Effect<void>
     readonly runningTurn: (agentId: string) => Effect.Effect<string | null, AgentError>
     readonly idle: (agentId: string) => Effect.Effect<boolean, AgentError>
     /** Records the covered outcomes in the Turn's transaction, before publishing TurnStarted. */
@@ -418,6 +419,24 @@ export class Transcripts extends Context.Service<
         return lock
       }
 
+      const askedStops = new Set<string>()
+
+      const askedToStop = (turnId: string) =>
+        Effect.sync(() => {
+          askedStops.add(turnId)
+        })
+
+      const failedAlready = (turnId: string) =>
+        sql`
+          SELECT id FROM agent_turn
+          WHERE id = ${turnId} AND json_extract(ended, '$.ending._tag') = 'Failed'
+        `.pipe(Effect.map((rows) => rows.length > 0))
+
+      const unlessFailed = <E, R>(turnId: string, write: Effect.Effect<boolean, E, R>) =>
+        failedAlready(turnId).pipe(
+          Effect.flatMap((failed) => (failed ? Effect.succeed(false) : write)),
+        )
+
       const writeApplied = (agentId: string, event: AgentEvent) =>
         Match.value(event).pipe(
           Match.tagsExhaustive({
@@ -432,23 +451,39 @@ export class Transcripts extends Context.Service<
                 sent_at: DateTime.formatIso(sentAt),
               })}`.pipe(Effect.as(true)),
             PartSet: ({ turnId, index, part }) =>
-              sql`
-                INSERT INTO agent_turn_part ${sql.insert({ turn_id: turnId, position: index, part: encodePart(part) })}
-                ON CONFLICT (turn_id, position) DO UPDATE SET part = excluded.part
-              `.pipe(Effect.as(true)),
+              unlessFailed(
+                turnId,
+                sql`
+                  INSERT INTO agent_turn_part ${sql.insert({ turn_id: turnId, position: index, part: encodePart(part) })}
+                  ON CONFLICT (turn_id, position) DO UPDATE SET part = excluded.part
+                `.pipe(Effect.as(true)),
+              ),
             PartAppended: ({ turnId, index, text }) =>
-              sql`
-                UPDATE agent_turn_part
-                SET part = json_set(part, '$.text', json_extract(part, '$.text') || ${text})
-                WHERE turn_id = ${turnId} AND position = ${index}
-              `.pipe(Effect.as(true)),
-            TurnEnded: ({ turnId, ended }) =>
-              sql`
+              unlessFailed(
+                turnId,
+                sql`
+                  UPDATE agent_turn_part
+                  SET part = json_set(part, '$.text', json_extract(part, '$.text') || ${text})
+                  WHERE turn_id = ${turnId} AND position = ${index}
+                `.pipe(Effect.as(true)),
+              ),
+            TurnEnded: ({ turnId, ended }) => {
+              const conditions = [
+                sql`id = ${turnId}`,
+                sql`(ended IS NULL OR json_extract(ended, '$.ending._tag') = 'CutOff')`,
+              ]
+
+              if (Predicate.isTagged(ended.ending, "Stopped") && !askedStops.has(turnId))
+                conditions.push(
+                  sql`COALESCE(json_extract(context, '$._tag'), '') != 'GlobalConversationUpdate'`,
+                )
+
+              return sql`
                 UPDATE agent_turn SET ended = ${encodeEnd(ended)}
-                WHERE id = ${turnId}
-                  AND (ended IS NULL OR json_extract(ended, '$.ending._tag') = 'CutOff')
+                WHERE ${sql.and(conditions)}
                 RETURNING id
-              `.pipe(Effect.map((rows) => rows.length > 0)),
+              `.pipe(Effect.map((rows) => rows.length > 0))
+            },
           }),
         )
 
@@ -758,6 +793,7 @@ export class Transcripts extends Context.Service<
       return Transcripts.of({
         save,
         endRunning,
+        askedToStop,
         watch: (agentId) =>
           Stream.unwrap(
             lockFor(agentId).withPermits(1)(

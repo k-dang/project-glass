@@ -44,7 +44,7 @@ const session = (exit: Deferred.Deferred<void>): AgentSession => ({
   configure: () => Effect.void,
   startTurn: () => Effect.void,
   steer: () => Effect.void,
-  stopTurn: Effect.succeed(null),
+  stopTurn: () => Effect.succeed(null),
   answer: () => Effect.void,
   closed: Deferred.await(exit),
   stopped: Deferred.isDone(exit),

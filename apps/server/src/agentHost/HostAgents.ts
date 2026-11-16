@@ -55,7 +55,7 @@ export class HostAgents extends Context.Service<
       agentId: string,
       message: DeliveredMessage,
     ) => Effect.Effect<void, HostAgentError>
-    readonly stopTurn: (agentId: string) => Effect.Effect<SteersNotTakenIn | null>
+    readonly stopTurn: (agentId: string, turnId: string) => Effect.Effect<SteersNotTakenIn | null>
     readonly answer: (
       agentId: string,
       requestId: string,
@@ -192,8 +192,10 @@ export class HostAgents extends Context.Service<
           }),
           steer: (agentId, message) =>
             find(agentId).pipe(Effect.flatMap(({ session }) => session.steer(message))),
-          stopTurn: (agentId) =>
-            Effect.suspend(() => running.get(agentId)?.session.stopTurn ?? Effect.succeed(null)),
+          stopTurn: (agentId, turnId) =>
+            Effect.suspend(
+              () => running.get(agentId)?.session.stopTurn(turnId) ?? Effect.succeed(null),
+            ),
           answer: (agentId, requestId, answer) =>
             Effect.suspend(() => {
               const agent = running.get(agentId)
