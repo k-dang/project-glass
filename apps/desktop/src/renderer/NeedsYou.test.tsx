@@ -385,7 +385,7 @@ it("opens a Check-in's changes on their own page and approves them, with the not
   await user.click(pane.getByRole("link", { name: "Read the changes" }))
 
   const page = within(await screen.findByRole("main", { name: "Check-in" }))
-  expect(await page.findByText(/Changes since main/)).toBeTruthy()
+  expect(await page.findByText(/since main/)).toBeTruthy()
   expect(await page.findByText(/1 Feedback note goes back with your answer/)).toBeTruthy()
 
   await user.type(page.getByRole("textbox", { name: "Message to the agent" }), "Ship it")

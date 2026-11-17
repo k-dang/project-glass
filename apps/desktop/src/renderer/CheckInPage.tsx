@@ -4,7 +4,9 @@ import { useNavigate } from "@tanstack/react-router"
 import { Exit, Option, Schema } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import { useId, useState } from "react"
+import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { TooltipHint } from "@/components/ui/tooltip"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Backend, useBackendRuntime } from "./backend"
@@ -15,7 +17,8 @@ import {
   useNoteOpen,
 } from "./ChangesWithFeedback"
 import { useMinuteClock } from "./Inbox"
-import { contextOf, Reasons, summaryParts, titleOf, Waited } from "./inboxItem"
+import { fileName } from "./fileName"
+import { summaryParts, titleOf, Waited } from "./inboxItem"
 import { watchedNeedsYouAtom } from "./needsYou"
 import { plural } from "./plural"
 import { type Problem, problemOf } from "./problems"
@@ -76,32 +79,42 @@ function CheckInReview(props: { checkIn: CheckIn; onBack: () => void }) {
 
   return (
     <>
-      <header className="flex flex-col gap-3 border-b px-6 py-4">
-        <div className="flex items-start gap-3">
-          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <div className="flex items-baseline gap-3">
-              <h1 className="min-w-0 flex-1 text-xl leading-tight font-semibold text-pretty break-words">
-                {titleOf(checkIn)}
-              </h1>
-              <Waited since={checkIn.since} now={now} />
-            </div>
-            <p className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
-              {contextOf(checkIn)}
-              <Reasons item={checkIn} />
-            </p>
-          </div>
-          <BackToInbox onBack={props.onBack} />
-        </div>
-        {details !== "" && (
-          <p className="text-sm whitespace-pre-wrap text-pretty break-words">{details}</p>
-        )}
-        {shown !== null && (
-          <p className="text-sm text-muted-foreground">
-            Changes since {shown.baseRef}, including uncommitted work, as they were when the agent
-            checked in
-          </p>
-        )}
+      <header className="flex h-11 shrink-0 items-center gap-2 border-b px-4 text-sm">
+        <TooltipHint content="Back to Inbox (Esc)">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Back to Inbox"
+            aria-keyshortcuts="Escape"
+            onClick={props.onBack}
+          >
+            <ArrowLeft aria-hidden />
+          </Button>
+        </TooltipHint>
+        <h1 className="min-w-0 truncate font-medium" title={titleOf(checkIn)}>
+          {titleOf(checkIn)}
+        </h1>
+        <p className="flex min-w-0 flex-1 items-center gap-1.5 text-muted-foreground">
+          <span className="truncate" title={checkIn.folder}>
+            {fileName(checkIn.folder)}
+          </span>
+          {shown !== null && (
+            <span
+              className="shrink-0"
+              title="Includes uncommitted work, as it was when the agent checked in"
+            >
+              · since {shown.baseRef}
+            </span>
+          )}
+          <span className="shrink-0">· {checkIn.askedBy} ·</span>
+          <Waited since={checkIn.since} now={now} />
+        </p>
       </header>
+      {details !== "" && (
+        <p className="border-b px-4 py-2 text-sm whitespace-pre-wrap text-pretty break-words">
+          {details}
+        </p>
+      )}
       <LoadProblem result={changes} retry={refresh} />
       <LoadProblem result={notes} retry={store.refresh} />
       {shown !== null && (
