@@ -19,11 +19,11 @@ import {
   TurnEnded,
   TurnStopped,
 } from "@glass/contracts"
-import { Clock, DateTime, Duration, Effect, Fiber, Option, Predicate, Stream } from "effect"
+import { DateTime, Duration, Effect, Fiber, Option, Predicate, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { resolve } from "node:path"
 import { conversationServicesFixture } from "../test/conversationServicesFixture"
-import { watchDeadlines } from "../test/deadlines"
+import { withWatchedClock } from "../test/deadlines"
 import { HOST_PROTOCOL } from "./agentHost/protocol"
 import { eventually } from "../test/eventually"
 import { steps } from "../test/inProcessSandboxes"
@@ -606,16 +606,6 @@ it.effect("runs a message sent after Glass relaunches on its Sandbox's replaceme
   }),
 )
 
-const watchingDeadline = <A, E, R>(
-  deadline: Duration.Duration,
-  test: (deadlineSet: Effect.Effect<void>) => Effect.Effect<A, E, R>,
-) =>
-  Effect.gen(function* () {
-    const { watched, deadlineSet } = yield* watchDeadlines(Duration.toMillis(deadline))
-
-    return yield* test(deadlineSet).pipe(Effect.provideService(Clock.Clock, watched))
-  })
-
 const tookTooLong = (action: string) =>
   `Fake Sandboxes didn't answer in time, so Glass couldn't ${action}. Try again.`
 
@@ -625,7 +615,7 @@ const abandoned = (f: Fixture, call: string) =>
 it.effect(
   "stops waiting for a Sandbox provider's models at 30 seconds, and not a millisecond sooner",
   () =>
-    watchingDeadline(SANDBOX_DEADLINES.models, (deadlineSet) =>
+    withWatchedClock(SANDBOX_DEADLINES.models, (deadlineSet) =>
       Effect.gen(function* () {
         const f = yield* conversationServicesFixture
         f.sandboxes.configure({ stall: ["models"] })
@@ -651,7 +641,7 @@ it.effect(
 it.effect(
   "fails the first message when a new Sandbox's address never comes, deleting the half-built Sandbox",
   () =>
-    watchingDeadline(SANDBOX_DEADLINES.startHost, (deadlineSet) =>
+    withWatchedClock(SANDBOX_DEADLINES.startHost, (deadlineSet) =>
       Effect.gen(function* () {
         const f = yield* conversationServicesFixture
         f.sandboxes.configure({ stall: ["target"] })
@@ -678,7 +668,7 @@ it.effect(
 it.effect(
   "keeps a Conversation whose Sandbox provider never finishes deleting it, so removing it again can finish",
   () =>
-    watchingDeadline(SANDBOX_DEADLINES.remove, (deadlineSet) =>
+    withWatchedClock(SANDBOX_DEADLINES.remove, (deadlineSet) =>
       Effect.gen(function* () {
         const f = yield* conversationServicesFixture
         const conversation = yield* createSandboxed(f)

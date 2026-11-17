@@ -1,5 +1,12 @@
 import { ConversationError, RPC_PATH } from "@glass/contracts"
-import type { AgentHarness, SandboxProvider, SandboxState, SandboxTarget } from "@glass/plugin"
+import type {
+  AgentHarness,
+  SandboxCreation,
+  SandboxProvider,
+  SandboxRequest,
+  SandboxState,
+  SandboxTarget,
+} from "@glass/plugin"
 import { DateTime, Duration, Effect, Schedule } from "effect"
 import { AgentHostRpcs, HEALTH_PATH, HOST_TOKEN_HEADER, SHUTDOWN_PATH } from "./agentHost/protocol"
 import { connectRpcClient } from "./rpcSocket"
@@ -24,7 +31,10 @@ const abortThenAwaitProvider = (controller: AbortController, running: Promise<un
     )
   }).pipe(Effect.timeout("10 seconds"), Effect.ignore)
 
-const fromProvider = <A>(run: (signal: AbortSignal) => Promise<A>, onCancel: "await" | "abandon") =>
+const fromProvider = <A>(
+  run: (signal: AbortSignal) => Promise<A>,
+  { awaitAfterAbort = false }: { readonly awaitAfterAbort?: boolean } = {},
+) =>
   Effect.callback<A, { readonly rejected: unknown }>((resume) => {
     const controller = new AbortController()
     const running = Promise.resolve().then(() => run(controller.signal))
@@ -34,7 +44,7 @@ const fromProvider = <A>(run: (signal: AbortSignal) => Promise<A>, onCancel: "aw
       (rejected) => resume(Effect.fail({ rejected })),
     )
 
-    return onCancel === "await"
+    return awaitAfterAbort
       ? abortThenAwaitProvider(controller, running)
       : Effect.sync(() => controller.abort())
   })
@@ -86,15 +96,21 @@ const boundSandboxCall =
 
 export const createSandbox = (
   provider: SandboxProvider,
-  create: (signal: AbortSignal) => Promise<void>,
+  request: SandboxRequest,
+  context: Omit<SandboxCreation, "signal">,
 ) =>
-  fromProvider(create, "await").pipe(Effect.catch(providerFailure(provider, "create the Sandbox")))
+  fromProvider((signal) => provider.create(request, { ...context, signal }), {
+    awaitAfterAbort: true,
+  }).pipe(Effect.catch(providerFailure(provider, "create the Sandbox")))
 
-export const listModels = (provider: SandboxProvider, harness: AgentHarness) =>
-  fromProvider((signal) => provider.models(harness, signal), "abandon").pipe(
-    Effect.catch(providerFailure(provider, "list what its Sandboxes offer")),
-    boundSandboxCall(provider, "list what its Sandboxes offer", SANDBOX_DEADLINES.models),
+export const listModels = (provider: SandboxProvider, harness: AgentHarness) => {
+  const action = "list what its Sandboxes offer"
+
+  return fromProvider((signal) => provider.models(harness, signal)).pipe(
+    Effect.catch(providerFailure(provider, action)),
+    boundSandboxCall(provider, action, SANDBOX_DEADLINES.models),
   )
+}
 
 const hostUrl = (target: SandboxTarget, path: string) => {
   const url = new URL(target.url)
@@ -108,7 +124,7 @@ const callAbout = <A>(
   action: string,
   run: (signal: AbortSignal) => Promise<A>,
 ) =>
-  fromProvider(run, "abandon").pipe(
+  fromProvider(run).pipe(
     Effect.catch(({ rejected }): Effect.Effect<never, ConversationError | SandboxGone> =>
       rejected instanceof SandboxGone
         ? Effect.fail(rejected)
@@ -119,19 +135,15 @@ const callAbout = <A>(
 const targetOf = (provider: SandboxProvider, state: SandboxState) =>
   callAbout(provider, "reach the Sandbox", (signal) => provider.target(state, signal))
 
-export const removeSandbox = (provider: SandboxProvider, state: SandboxState, action: string) =>
-  callAbout(provider, action, (signal) => provider.remove(state, signal)).pipe(
-    Effect.catchTag("SandboxGone", () => Effect.void),
-    boundSandboxCall(provider, action, SANDBOX_DEADLINES.remove),
-  )
-
 export const extendSandbox = (
   provider: SandboxProvider,
   extend: NonNullable<SandboxProvider["extend"]>,
   state: SandboxState,
-) =>
-  callAbout(provider, "extend the Sandbox", (signal) => extend(state, signal)).pipe(
-    boundSandboxCall(provider, "extend the Sandbox", SANDBOX_DEADLINES.extend),
+) => {
+  const action = "extend the Sandbox"
+
+  return callAbout(provider, action, (signal) => extend(state, signal)).pipe(
+    boundSandboxCall(provider, action, SANDBOX_DEADLINES.extend),
     Effect.flatMap((date) =>
       Effect.fromOption(DateTime.make(date)).pipe(
         Effect.mapError(
@@ -143,6 +155,7 @@ export const extendSandbox = (
       ),
     ),
   )
+}
 
 const didntStart = () =>
   new ConversationError({ message: "The agent in the Sandbox didn't start. Try again." })
@@ -178,7 +191,7 @@ export const connectToHost = (provider: SandboxProvider, state: SandboxState, to
     boundSandboxCall(provider, "reach the Sandbox", SANDBOX_DEADLINES.connect),
   )
 
-export const shutDownHost = (provider: SandboxProvider, state: SandboxState, token: string) =>
+const shutDownHost = (provider: SandboxProvider, state: SandboxState, token: string) =>
   targetOf(provider, state).pipe(
     Effect.flatMap((target) =>
       Effect.tryPromise((signal) =>
@@ -194,4 +207,15 @@ export const shutDownHost = (provider: SandboxProvider, state: SandboxState, tok
       Effect.logWarning(`Couldn't end the agent host in a Sandbox of ${provider.name}`, cause),
     ),
     Effect.ignore,
+  )
+
+export const deleteSandbox = (
+  provider: SandboxProvider,
+  { state, token }: { readonly state: SandboxState; readonly token: string },
+  action: string,
+) =>
+  shutDownHost(provider, state, token).pipe(
+    Effect.andThen(callAbout(provider, action, (signal) => provider.remove(state, signal))),
+    Effect.catchTag("SandboxGone", () => Effect.void),
+    boundSandboxCall(provider, action, SANDBOX_DEADLINES.remove),
   )

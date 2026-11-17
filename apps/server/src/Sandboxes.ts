@@ -49,10 +49,9 @@ import { Plugins } from "./Plugins"
 import {
   connectToHost,
   createSandbox,
+  deleteSandbox,
   extendSandbox,
   listModels,
-  removeSandbox,
-  shutDownHost,
   waitForHost,
 } from "./sandboxCalls"
 import { missedConnection, type Recovery, recoveryReach } from "./reconnecting"
@@ -179,13 +178,6 @@ const orderedReports = Effect.gen(function* () {
     caughtUp: Queue.end(queue).pipe(Effect.andThen(Fiber.join(applying))),
   }
 })
-
-const deleteSandbox = (
-  provider: SandboxProvider,
-  { state, token }: Pick<SandboxRecord, "state" | "token">,
-  action: string,
-) =>
-  shutDownHost(provider, state, token).pipe(Effect.andThen(removeSandbox(provider, state, action)))
 
 const notInstalled = (providerId: string): Placement => {
   const failure = Effect.fail(
@@ -422,16 +414,13 @@ export class Sandboxes extends Context.Service<
             }
 
             yield* Effect.gen(function* () {
-              yield* createSandbox(provider, (signal) =>
-                provider.create(request, {
-                  progress: (step) => reports.offer(transcripts.setStatus(conversation.id, step)),
-                  record: (state) => {
-                    recorded = state
-                    reports.offer(save(conversation.id, Building.make({ state, token })))
-                  },
-                  signal,
-                }),
-              ).pipe(Effect.ensuring(reports.caughtUp))
+              yield* createSandbox(provider, request, {
+                progress: (step) => reports.offer(transcripts.setStatus(conversation.id, step)),
+                record: (state) => {
+                  recorded = state
+                  reports.offer(save(conversation.id, Building.make({ state, token })))
+                },
+              }).pipe(Effect.ensuring(reports.caughtUp))
 
               if (recorded === undefined)
                 return yield* Effect.logWarning(

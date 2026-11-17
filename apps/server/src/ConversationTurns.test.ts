@@ -29,7 +29,7 @@ import {
 } from "effect"
 import { TestClock } from "effect/testing"
 import { eventually } from "../test/eventually"
-import { watchDeadlines } from "../test/deadlines"
+import { watchDeadlines, withWatchedClock } from "../test/deadlines"
 import {
   type ClaimedConversation,
   type ConversationHost,
@@ -664,12 +664,7 @@ it.live("keeps a queued operation holding the conversation after the holder fail
 
 const withHostClock = <A, E, R>(
   effect: (deadlineSet: Effect.Effect<void>) => Effect.Effect<A, E, R>,
-) =>
-  Effect.gen(function* () {
-    const { watched, deadlineSet } = yield* watchDeadlines(Duration.toMillis(HOST_CONTROL_DEADLINE))
-
-    return yield* effect(deadlineSet).pipe(Effect.provideService(Clock.Clock, watched))
-  })
+) => withWatchedClock(HOST_CONTROL_DEADLINE, effect)
 
 const failedToAnswer = TurnFailed.make({ reason: HOST_DIDNT_ANSWER })
 

@@ -127,6 +127,8 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
       )
 
       const check = () => {
+        if (signal.aborted) return
+
         if (holding()) waiting.push(check)
         else resolve()
       }
