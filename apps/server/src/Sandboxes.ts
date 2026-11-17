@@ -382,12 +382,16 @@ export class Sandboxes extends Context.Service<
       ) =>
         deleteSandbox(provider, record, "delete the half-built Sandbox").pipe(
           Effect.andThen(save(conversationId, null)),
-          Effect.ignore,
         )
 
       const makePlacement = (provider: SandboxProvider) => {
         const provision = ({ conversation, folder }: PlacedConversation) =>
           Effect.gen(function* () {
+            const { record: left } = yield* knownOf(conversation.id)
+
+            if (Predicate.isTagged(left, "Building"))
+              yield* discard(provider, conversation.id, left)
+
             const token = newHostToken()
             let recorded: SandboxState | undefined
             const reports = yield* orderedReports
@@ -440,7 +444,9 @@ export class Sandboxes extends Context.Service<
               Effect.onError(() =>
                 recorded === undefined
                   ? Effect.void
-                  : discard(provider, conversation.id, { state: recorded, token }),
+                  : discard(provider, conversation.id, { state: recorded, token }).pipe(
+                      Effect.ignore,
+                    ),
               ),
               Effect.ensuring(transcripts.setStatus(conversation.id, null)),
             )
@@ -737,7 +743,7 @@ export class Sandboxes extends Context.Service<
         const provider = sandboxProviders.get(providerId)
 
         if (Predicate.isTagged(sandbox, "Building") && provider !== undefined)
-          yield* discard(provider, id, sandbox).pipe(Effect.forkIn(scope))
+          yield* discard(provider, id, sandbox).pipe(Effect.ignore, Effect.forkIn(scope))
 
         if (Predicate.isTagged(sandbox, "Ready") && expiredBy(sandbox, launchedAt))
           yield* becomeGone(id)

@@ -696,6 +696,30 @@ it.effect(
 )
 
 it.effect(
+  "deletes a half-built Sandbox whose deletion timed out before making another for the next message",
+  () =>
+    withWatchedClock(SANDBOX_DEADLINES.remove, (deadlineSet) =>
+      Effect.gen(function* () {
+        const f = yield* conversationServicesFixture
+        f.sandboxes.configure({ failAt: steps[0], stall: "remove" })
+        const conversation = yield* createSandboxed(f)
+
+        yield* deadlineSet
+        yield* TestClock.adjust(SANDBOX_DEADLINES.remove)
+        yield* f.transcript(conversation.id, settled(1))
+        assert.include(f.sandboxes.events, "abandoned remove")
+        assert.notInclude(f.sandboxes.events, `removed ${conversation.id}`)
+
+        f.sandboxes.configure({})
+        yield* f.conversations.send(conversation.id, say("Again"))
+        yield* end(yield* f.started)
+        assert.equal(failedReason(yield* f.transcript(conversation.id, settled(2))), "Done")
+        assert.include(f.sandboxes.events, `removed ${conversation.id}`)
+      }),
+    ),
+)
+
+it.effect(
   "gives up a Sandbox renewal its provider never answers, and renews it on a later try",
   () =>
     Effect.gen(function* () {
