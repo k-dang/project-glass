@@ -1,10 +1,24 @@
 import { assert, it } from "@effect/vitest"
 import { type Conversation, TextPart } from "@glass/contracts"
-import { Effect, Predicate } from "effect"
+import {
+  ConfigProvider,
+  Context,
+  Deferred,
+  Effect,
+  type FileSystem,
+  Layer,
+  Option,
+  Predicate,
+} from "effect"
 import { chmodSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { conversationsFixture, settled } from "../test/conversationsFixture"
+import { counter } from "../test/counter"
+import { isolatedHome, LAUNCH_TOKEN } from "../test/harness"
 import { skillFile } from "../test/skillFiles"
+import { wrappedFileSystem } from "../test/wrappedFileSystem"
+import { LocalSkills } from "./LocalSkills"
+import { ServerConfig } from "./ServerConfig"
 
 const write = (path: string, contents: string) => {
   mkdirSync(dirname(path), { recursive: true })
@@ -12,6 +26,29 @@ const write = (path: string, contents: string) => {
 }
 
 const pi = { harness: "pi", model: null, effort: null } as const
+
+const localSkillsIn = Effect.fnUntraced(function* (
+  home: string,
+  wrap: (fs: FileSystem.FileSystem) => Partial<FileSystem.FileSystem>,
+) {
+  const services = yield* Layer.build(
+    LocalSkills.layer.pipe(
+      Layer.provide(ServerConfig.layer),
+      Layer.provide(wrappedFileSystem(wrap)),
+      Layer.provide(
+        ConfigProvider.layer(
+          ConfigProvider.fromEnvRecord({
+            GLASS_PORT: "0",
+            GLASS_TOKEN: LAUNCH_TOKEN,
+            GLASS_HOME: home,
+          }),
+        ),
+      ),
+    ),
+  )
+
+  return Context.get(services, LocalSkills)
+})
 
 it.live(
   "gives a Sandbox Conversation the Local skills its harness reads, as they are when it starts",
@@ -130,4 +167,107 @@ it.live(
         }),
       )
     }),
+)
+
+it.live("scans pi's skill folders together", () =>
+  Effect.gen(function* () {
+    const home = yield* isolatedHome
+    const piSkills = join(home, ".pi", "agent", "skills")
+    const agentsSkills = join(home, ".agents", "skills")
+    const scanning = counter()
+
+    write(join(piSkills, "plan", "SKILL.md"), skillFile("plan", "Plan."))
+    write(join(agentsSkills, "review", "SKILL.md"), skillFile("review", "Review."))
+
+    const local = yield* localSkillsIn(home, (fs) => ({
+      readDirectory: (path, options) =>
+        ([piSkills, agentsSkills].includes(path)
+          ? Effect.sync(scanning.add).pipe(Effect.andThen(scanning.reached(2)))
+          : Effect.void
+        ).pipe(Effect.andThen(fs.readDirectory(path, options))),
+    }))
+
+    assert.deepStrictEqual(yield* local.names("pi"), ["plan", "review"])
+  }),
+)
+
+it.live("reads Local skills together, naming their folders in the order pi reads them", () =>
+  Effect.gen(function* () {
+    const home = yield* isolatedHome
+    const folder = join(home, ".agents", "skills")
+    const laterRead = yield* Deferred.make<void>()
+
+    write(join(folder, "a", "tool", "SKILL.md"), skillFile("alpha", "First."))
+    write(join(folder, "a", "tool", "a.txt"), "a")
+    write(join(folder, "b", "tool", "SKILL.md"), skillFile("beta", "Second."))
+    write(join(folder, "b", "tool", "b.txt"), "b")
+
+    const local = yield* localSkillsIn(home, (fs) => ({
+      readFile: (path) =>
+        path.endsWith("a.txt")
+          ? Deferred.await(laterRead).pipe(Effect.andThen(fs.readFile(path)))
+          : fs
+              .readFile(path)
+              .pipe(
+                Effect.tap(() =>
+                  path.endsWith("b.txt") ? Deferred.succeed(laterRead, undefined) : Effect.void,
+                ),
+              ),
+    }))
+
+    const source = yield* local.source("pi")
+
+    assert.deepStrictEqual(
+      Option.map(source, ({ skills }) =>
+        skills.map(({ name, files }) => [name, files.map(({ path }) => path)]),
+      ),
+      Option.some([
+        ["tool", ["SKILL.md", "a.txt"]],
+        ["tool-2", ["SKILL.md", "b.txt"]],
+      ]),
+    )
+  }),
+)
+
+it.live("reads at most 8 files or folders at once, however deep a skill goes", () =>
+  Effect.gen(function* () {
+    const home = yield* isolatedHome
+    const skill = join(home, ".claude", "skills", "deep")
+    let inFlight = 0
+    let peak = 0
+
+    write(join(skill, "SKILL.md"), skillFile("deep", "Many files."))
+
+    for (const outer of ["1", "2", "3", "4"])
+      for (const inner of ["1", "2", "3", "4"])
+        for (const name of ["1", "2", "3", "4"])
+          write(join(skill, outer, inner, `${name}.txt`), name)
+
+    const counted = <A, E>(effect: Effect.Effect<A, E>) =>
+      Effect.sync(() => {
+        inFlight++
+        peak = Math.max(peak, inFlight)
+      }).pipe(
+        Effect.andThen(Effect.yieldNow),
+        Effect.andThen(effect),
+        Effect.ensuring(Effect.sync(() => inFlight--)),
+      )
+
+    const local = yield* localSkillsIn(home, (fs) => ({
+      stat: (path) => counted(fs.stat(path)),
+      realPath: (path) => counted(fs.realPath(path)),
+      readDirectory: (path, options) => counted(fs.readDirectory(path, options)),
+      readFile: (path) => counted(fs.readFile(path)),
+      readFileString: (path, encoding) => counted(fs.readFileString(path, encoding)),
+    }))
+
+    const source = yield* local.source("claude-code")
+
+    assert.deepStrictEqual(
+      Option.map(source, ({ skills }) => skills.map(({ files }) => files.length)),
+      Option.some([65]),
+    )
+    assert.isAtMost(peak, 8)
+    assert.isAbove(peak, 1)
+  }),
 )

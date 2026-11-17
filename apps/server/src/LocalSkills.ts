@@ -4,7 +4,16 @@ import {
   LocalSkillsError,
   Skill,
 } from "@glass/contracts"
-import { Context, Effect, FileSystem, Layer, Option, type PlatformError, Predicate } from "effect"
+import {
+  Context,
+  Effect,
+  FileSystem,
+  Layer,
+  Option,
+  type PlatformError,
+  Predicate,
+  Semaphore,
+} from "effect"
 import { join } from "node:path"
 import type { SentSkill, SkillSource } from "./agentHost/protocol"
 import { ServerConfig } from "./ServerConfig"
@@ -42,7 +51,9 @@ interface FoundSkill {
   readonly files: ReadonlyArray<FoundFile>
 }
 
-const READS = { concurrency: 8 } as const
+const READS_AT_ONCE = 8
+
+const TOGETHER = { concurrency: "unbounded" } as const
 
 const couldNotRead = new LocalSkillsError({
   message: "Glass couldn't read your Local skills. Try again.",
@@ -107,7 +118,18 @@ export class LocalSkills extends Context.Service<
   static readonly layer = Layer.effect(
     LocalSkills,
     Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem
+      const reads = yield* Semaphore.make(READS_AT_ONCE)
+      const limited = reads.withPermits(1)
+      const fileSystem = yield* FileSystem.FileSystem
+
+      const fs = {
+        realPath: (path: string) => limited(fileSystem.realPath(path)),
+        readDirectory: (path: string) => limited(fileSystem.readDirectory(path)),
+        stat: (path: string) => limited(fileSystem.stat(path)),
+        readFile: (path: string) => limited(fileSystem.readFile(path)),
+        readFileString: (path: string) => limited(fileSystem.readFileString(path)),
+      }
+
       const skillFolders = foldersOf((yield* ServerConfig).homeDirectory)
 
       const filesUnder = (
@@ -140,7 +162,7 @@ export class LocalSkills extends Context.Service<
                   ? [{ path, executable: (info.value.mode & 0o111) !== 0 }]
                   : []
               }),
-            READS,
+            TOGETHER,
           )
 
           return nested.flat()
@@ -152,36 +174,42 @@ export class LocalSkills extends Context.Service<
         const loads = (directory: string) =>
           directory !== "" && (readsNestedSkills || !directory.includes("/"))
 
-        return Effect.forEach(folders, (folder) =>
-          filesUnder(folder, "", new Set()).pipe(
-            Effect.flatMap((files) =>
-              Effect.forEach(
-                [...filesBySkill(files)].filter(([directory]) => loads(directory)),
-                ([directory, owned]) =>
-                  Effect.gen(function* () {
-                    const skillFile = join(folder, skillFilePath(directory))
+        return Effect.forEach(
+          folders,
+          (folder) =>
+            filesUnder(folder, "", new Set()).pipe(
+              Effect.flatMap((files) =>
+                Effect.forEach(
+                  [...filesBySkill(files)].filter(([directory]) => loads(directory)),
+                  ([directory, owned]) =>
+                    Effect.gen(function* () {
+                      const skillFile = join(folder, skillFilePath(directory))
 
-                    const read = yield* orSkipped(
-                      Effect.all([fs.readFileString(skillFile), fs.realPath(skillFile)]),
-                    )
+                      const read = yield* orSkipped(
+                        Effect.all(
+                          [fs.readFileString(skillFile), fs.realPath(skillFile)],
+                          TOGETHER,
+                        ),
+                      )
 
-                    if (Option.isNone(read)) return []
+                      if (Option.isNone(read)) return []
 
-                    const [text, realSkillFile] = read.value
-                    const skill = readSkill(directory, text)
+                      const [text, realSkillFile] = read.value
+                      const skill = readSkill(directory, text)
 
-                    return skill instanceof Skill
-                      ? [{ folder, directory, realSkillFile, skill, files: owned }]
-                      : []
-                  }),
-                READS,
+                      return skill instanceof Skill
+                        ? [{ folder, directory, realSkillFile, skill, files: owned }]
+                        : []
+                    }),
+                  TOGETHER,
+                ),
               ),
             ),
-          ),
+          TOGETHER,
         ).pipe(Effect.map((perFolder) => firstOfEach(perFolder.flat(2))))
       }
 
-      const sent = (taken: Set<string>, { folder, directory, files }: FoundSkill) =>
+      const sent = (name: string, { folder, directory, files }: FoundSkill) =>
         Effect.forEach(
           files,
           ({ path, executable }) =>
@@ -194,13 +222,8 @@ export class LocalSkills extends Context.Service<
                 })),
               ),
             ),
-          READS,
-        ).pipe(
-          Effect.map((read): SentSkill => ({
-            name: claimFolder(taken, lastSegment(directory)),
-            files: read.flatMap(Option.toArray),
-          })),
-        )
+          TOGETHER,
+        ).pipe(Effect.map((read): SentSkill => ({ name, files: read.flatMap(Option.toArray) })))
 
       return LocalSkills.of({
         names: (harness) =>
@@ -214,7 +237,12 @@ export class LocalSkills extends Context.Service<
             Effect.flatMap((skills) => {
               const taken = new Set<string>()
 
-              return Effect.forEach(skills, (skill) => sent(taken, skill))
+              return Effect.all(
+                skills.map((skill) =>
+                  sent(claimFolder(taken, lastSegment(skill.directory)), skill),
+                ),
+                TOGETHER,
+              )
             }),
             Effect.map((skills) =>
               skills.length === 0
