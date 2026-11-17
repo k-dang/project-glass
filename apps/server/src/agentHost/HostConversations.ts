@@ -116,13 +116,23 @@ export class HostConversations extends Context.Service<
               )
           })
 
+        const retire = (conversationId: string, conversation: Running) =>
+          Effect.suspend(() => {
+            running.delete(conversationId)
+
+            return Scope.close(conversation.scope, Exit.void)
+          })
+
         const start = Effect.fn("HostConversations.start")(
           function* (starting: ConversationStart) {
             const { conversationId, folder } = starting
             const current = running.get(conversationId)
 
-            if (current !== undefined && !(yield* current.session.stopped))
-              return "alreadyRunning" as const
+            if (current !== undefined) {
+              if (!(yield* current.session.stopped)) return "alreadyRunning" as const
+
+              yield* retire(conversationId, current)
+            }
 
             const scope = yield* Scope.fork(hostScope)
             let stoppingOverBudget = false
@@ -195,12 +205,13 @@ export class HostConversations extends Context.Service<
               Effect.andThen(
                 withConversation(
                   conversationId,
-                  Effect.sync(() => {
-                    if (running.get(conversationId) === conversation) running.delete(conversationId)
-                  }),
+                  Effect.suspend(() =>
+                    running.get(conversationId) === conversation
+                      ? retire(conversationId, conversation)
+                      : Effect.void,
+                  ),
                 ),
               ),
-              Effect.andThen(Scope.close(scope, Exit.void)),
               Effect.forkIn(scope),
             )
 
@@ -258,19 +269,17 @@ export class HostConversations extends Context.Service<
                 ? Effect.fail(new RequestNotWaiting())
                 : conversation.session.answer(requestId, answer)
             }),
-          stop: Effect.fnUntraced(function* (conversationId: string) {
-            const conversation = yield* withConversation(
+          stop: (conversationId) =>
+            withConversation(
               conversationId,
-              Effect.sync(() => {
-                const stopping = running.get(conversationId)
-                running.delete(conversationId)
+              Effect.suspend(() => {
+                const conversation = running.get(conversationId)
 
-                return stopping
+                return conversation === undefined
+                  ? Effect.void
+                  : retire(conversationId, conversation)
               }),
-            )
-
-            if (conversation !== undefined) yield* Scope.close(conversation.scope, Exit.void)
-          }),
+            ),
         })
 
         coordination.set(conversations, locks)
