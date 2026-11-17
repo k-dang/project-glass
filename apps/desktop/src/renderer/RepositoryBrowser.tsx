@@ -159,7 +159,7 @@ function FileViewer(props: { pullRequest: PullRequestRef; revision: Revision; pa
     .render()
 }
 
-function FileContentsView(props: { path: string; contents: FileContents }) {
+export function FileContentsView(props: { path: string; contents: FileContents }) {
   const { path, contents } = props
 
   return Match.value(contents).pipe(

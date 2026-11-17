@@ -59,28 +59,34 @@ it("keeps each Diagram as last drawn, skipping drawings Glass refused", () => {
 const notLoaded: ReadonlyArray<Turn> = []
 
 it("opens a Diagram drawn while the Conversation is on screen, once its transcript has loaded, however fast its Turn ends", () => {
-  const { result, rerender } = renderHook(({ turns, loaded }) => useDiagrams(turns, loaded), {
+  const opened: Array<string> = []
+  const open = (title: string) => void opened.push(title)
+
+  const { rerender } = renderHook(({ turns, loaded }) => useDiagrams(turns, loaded, open), {
     initialProps: { turns: notLoaded, loaded: false },
   })
 
   rerender({ turns: [turn("turn-1", [drawing("draw-1", flow)])], loaded: true })
 
-  expect(result.current.opened).toBeNull()
+  expect(opened).toEqual([])
 
   rerender({
     turns: [turn("turn-1", [drawing("draw-1", flow)]), turn("turn-2", [drawing("draw-2", queued)])],
     loaded: true,
   })
 
-  expect(result.current.opened).toEqual(queued)
+  expect(opened).toEqual([queued.title])
 })
 
 it("leaves a Diagram from earlier Turns closed when those Turns load", () => {
-  const { result, rerender } = renderHook(({ turns, loaded }) => useDiagrams(turns, loaded), {
+  const opened: Array<string> = []
+  const open = (title: string) => void opened.push(title)
+
+  const { rerender } = renderHook(({ turns, loaded }) => useDiagrams(turns, loaded, open), {
     initialProps: { turns: [turn("turn-2", [])], loaded: true },
   })
 
   rerender({ turns: [turn("turn-1", [drawing("draw-1", flow)]), turn("turn-2", [])], loaded: true })
 
-  expect(result.current.opened).toBeNull()
+  expect(opened).toEqual([])
 })

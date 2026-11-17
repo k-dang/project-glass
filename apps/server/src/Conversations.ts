@@ -4,6 +4,7 @@ import {
   type ConversationSkillPack,
   type AgentHarness,
   ConversationError,
+  type ConversationFile,
   type AgentCommand,
   AgentModels,
   type ConnectionError,
@@ -232,6 +233,14 @@ export class Conversations extends Context.Service<
     readonly files: (
       conversationId: string,
     ) => Effect.Effect<ReadonlyArray<string>, ConversationNotFound | ConversationError>
+    readonly existingFiles: (
+      conversationId: string,
+      paths: ReadonlyArray<string>,
+    ) => Effect.Effect<ReadonlyArray<string>, ConversationNotFound | ConversationError>
+    readonly file: (
+      conversationId: string,
+      path: string,
+    ) => Effect.Effect<ConversationFile, ConversationNotFound | ConversationError>
     readonly create: (
       input: NewConversation,
     ) => Effect.Effect<Conversation, InvalidLocalCheckout | ConversationError>
@@ -672,20 +681,26 @@ export class Conversations extends Context.Service<
           .pipe(Effect.mapError(asConversationError), Effect.map(changesOf))
       })
 
-      const listedByHost = Effect.fnUntraced(function* <A>(
+      const onHost = Effect.fnUntraced(function* <A, E>(
+        conversationId: string,
+        call: (host: HostClient, row: PlacedConversation) => Effect.Effect<A, HostCallError>,
+        absent: Effect.Effect<A, E>,
+      ) {
+        const row = yield* find(conversationId)
+        const host = yield* placementOf(row).hostOnceMade(row)
+
+        if (Option.isNone(host)) return yield* absent
+
+        return yield* call(host.value, row).pipe(Effect.mapError(asConversationError))
+      })
+
+      const listedByHost = <A>(
         conversationId: string,
         list: (
           host: HostClient,
           row: PlacedConversation,
         ) => Effect.Effect<ReadonlyArray<A>, HostCallError>,
-      ) {
-        const row = yield* find(conversationId)
-        const host = yield* placementOf(row).hostOnceMade(row)
-
-        if (Option.isNone(host)) return []
-
-        return yield* list(host.value, row).pipe(Effect.mapError(asConversationError))
-      })
+      ) => onHost(conversationId, list, Effect.succeed<ReadonlyArray<A>>([]))
 
       const commands = (conversationId: string) =>
         listedByHost(conversationId, (host, row) =>
@@ -700,6 +715,20 @@ export class Conversations extends Context.Service<
         listedByHost(conversationId, (host, row) => host.ListFiles({ folder: row.folder })).pipe(
           Effect.withSpan("Conversations.files"),
         )
+
+      const existingFiles = (conversationId: string, paths: ReadonlyArray<string>) =>
+        listedByHost(conversationId, (host, row) =>
+          host.ExistingFiles({ folder: row.folder, paths }),
+        ).pipe(Effect.withSpan("Conversations.existingFiles"))
+
+      const file = (conversationId: string, path: string) =>
+        onHost(
+          conversationId,
+          (host, row) => host.ReadFile({ folder: row.folder, path }),
+          new ConversationError({
+            message: "This Conversation's folder isn't ready yet. Try again once it's up.",
+          }),
+        ).pipe(Effect.withSpan("Conversations.file"))
 
       const update = Effect.fn("Conversations.update")(function* (
         conversationId: string,
@@ -858,6 +887,8 @@ export class Conversations extends Context.Service<
         newConversationFiles: (place, repository, baseBranch) =>
           placementFor(place).files(repository, baseBranch),
         files,
+        existingFiles,
+        file,
         create,
         createForReview,
         send,

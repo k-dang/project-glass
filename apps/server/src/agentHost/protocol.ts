@@ -4,9 +4,11 @@ import {
   AgentHarness,
   AgentModels,
   ChangedFile,
+  ConversationFile,
   ExtensionStatusesChanged,
   MessageWithContext,
   ModelChoice,
+  NamedPaths,
   PartAppended,
   PartSet,
   RequestAnswer,
@@ -14,7 +16,7 @@ import {
   TurnEnded,
   TurnStarted,
 } from "@glass/contracts"
-import { Schema, SchemaTransformation } from "effect"
+import { Effect, Schema, SchemaTransformation } from "effect"
 import { randomBytes } from "node:crypto"
 import { resolve } from "node:path"
 import { Rpc, RpcGroup } from "effect/rpc"
@@ -209,6 +211,16 @@ export class AgentHostRpcs extends RpcGroup.make(
     success: Schema.Array(Schema.String),
     error: HostConversationError,
   }),
+  Rpc.make("ExistingFiles", {
+    payload: { folder: HostFolder, paths: NamedPaths },
+    success: Schema.Array(Schema.String),
+    error: HostConversationError,
+  }),
+  Rpc.make("ReadFile", {
+    payload: { folder: HostFolder, path: Schema.String },
+    success: ConversationFile,
+    error: HostConversationError,
+  }),
   Rpc.make("HasUncommittedChanges", {
     payload: { folder: HostFolder },
     success: Schema.Boolean,
@@ -231,3 +243,11 @@ export const couldNotSwitch = (harness: string, what: "model" | "effort" | "Perm
 export const notRunning = new HostConversationError({
   message: "The Conversation isn't working on a Turn.",
 })
+
+export const failure =
+  (message: string) =>
+  <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+    effect.pipe(
+      Effect.tapError((cause) => Effect.logWarning(message, cause)),
+      Effect.mapError(() => new HostConversationError({ message })),
+    )

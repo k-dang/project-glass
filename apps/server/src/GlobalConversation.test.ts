@@ -331,6 +331,8 @@ const stallableHost = (calls: {
             HasUncommittedChanges: () =>
               Effect.die("This test does not call HasUncommittedChanges"),
             ListFiles: () => Effect.die("This test does not call ListFiles"),
+            ExistingFiles: () => Effect.die("This test does not call ExistingFiles"),
+            ReadFile: () => Effect.die("This test does not call ReadFile"),
             WatchJournal: () => Stream.die("This test does not call WatchJournal"),
             Acknowledge: () => Effect.die("This test does not call Acknowledge"),
           }),

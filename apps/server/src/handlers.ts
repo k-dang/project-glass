@@ -162,6 +162,9 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       ListNewConversationFiles: ({ place, repository, baseBranch }) =>
         conversations.newConversationFiles(place, repository, baseBranch),
       ListConversationFiles: ({ conversationId }) => conversations.files(conversationId),
+      FindConversationFiles: ({ conversationId, paths }) =>
+        conversations.existingFiles(conversationId, paths),
+      GetConversationFile: ({ conversationId, path }) => conversations.file(conversationId, path),
       ListSandboxProviders: () => Effect.succeed(sandboxes.providers),
       CreateConversation: (input) => conversations.create(input),
       WatchWorkingConversations: () => conversations.watchWorking(),

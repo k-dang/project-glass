@@ -304,6 +304,9 @@ importers:
       marked:
         specifier: 'catalog:'
         version: 18.1.2
+      mdast-util-from-markdown:
+        specifier: 2.1.0
+        version: 2.1.0
       pele:
         specifier: 'catalog:'
         version: 1.13.0

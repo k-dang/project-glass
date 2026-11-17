@@ -2,7 +2,8 @@ import { agentHarnesses } from "@glass/plugin"
 import { Effect, Match, Predicate, Schema } from "effect"
 import { FeedbackNote } from "./feedbackNote"
 import { FollowedRepository } from "./followedRepository"
-import { ChangedFile, PullRequestRef } from "./pullRequest"
+import { BinaryFile, ChangedFile, PullRequestRef } from "./pullRequest"
+import { FileTooLarge, TextFile } from "./repository"
 import { Revision } from "./revision"
 
 export const AgentHarness = Schema.Literals(agentHarnesses)
@@ -683,3 +684,19 @@ export class ConversationError extends Schema.TaggedError<ConversationError>()(
     message: Schema.String,
   },
 ) {}
+
+export const ImageFile = Schema.TaggedStruct("ImageFile", {
+  mediaType: Schema.String,
+  /** Base64, as an image's data URL carries it. */
+  data: Schema.String,
+})
+
+/** A file in a Conversation's folder, as the File pane shows it. */
+export const ConversationFile = Schema.Union([TextFile, ImageFile, BinaryFile, FileTooLarge])
+
+export type ConversationFile = typeof ConversationFile.Type
+
+/** How many named paths Glass looks for at once: the most recent ones. */
+export const MAX_FOUND_FILES = 500
+
+export const NamedPaths = Schema.Array(Schema.String).check(Schema.isMaxLength(MAX_FOUND_FILES))

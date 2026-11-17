@@ -19,6 +19,7 @@ import { RPC_PATH } from "@glass/contracts"
 import { createServer } from "node:http"
 import type { Socket } from "node:net"
 import type { Changes } from "../src/agentHost/Changes"
+import type { FolderFiles } from "../src/agentHost/FolderFiles"
 import type { HostConversations } from "../src/agentHost/HostConversations"
 import type { Journal } from "../src/agentHost/Journal"
 import { Hello } from "../src/agentHost/protocol"
@@ -78,7 +79,7 @@ const otherHost = (kind: Exclude<HostKind, { readonly kind: "current" }>) =>
       )
 
 export const inProcessSandboxes = Effect.fnUntraced(function* (
-  host: () => Layer.Layer<HostConversations | Journal | Changes>,
+  host: () => Layer.Layer<HostConversations | Journal | Changes | FolderFiles>,
 ) {
   const clock = yield* Clock.Clock
   const context = yield* Effect.context()

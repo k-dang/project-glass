@@ -136,10 +136,13 @@ import { shortcutLabel } from "./shortcutLabel"
 import { useStagedFeedback } from "./useStagedFeedback"
 import { MermaidDiagram } from "./MermaidDiagram"
 import { DiagramPane, useDiagrams } from "./ConversationDiagrams"
+import { FileLink, FileLinks, FilePane, lastEndedOf, useFileLinks } from "./ConversationFiles"
 import { type FeedbackNotesStore, useFeedbackNotes } from "./useFeedbackNotes"
 import { markTurnSeenAtom } from "./needsYou"
 import { useShortcuts } from "./useShortcuts"
 import { useWindowFocused } from "./useWindowFocused"
+
+type SidePane = { kind: "diagram"; title: string } | { kind: "file"; path: string } | null
 
 interface ConversationTabs {
   tab: ConversationTab
@@ -212,7 +215,14 @@ function OpenConversation(props: { conversation: Conversation } & ConversationTa
   const loadEarlier = useAtomSet(atoms.loadEarlier)
 
   const [changesOpened, setChangesOpened] = useState(tab === "changes")
-  const diagrams = useDiagrams(turns, Option.isSome(loaded))
+  const [pane, setPane] = useState<SidePane>(null)
+  const openDiagram = useCallback((title: string) => setPane({ kind: "diagram", title }), [setPane])
+  const closePane = useCallback(() => setPane(null), [setPane])
+  const diagrams = useDiagrams(turns, Option.isSome(loaded), openDiagram)
+  const openedDiagram = pane?.kind === "diagram" ? diagrams.diagrams.get(pane.title) : undefined
+
+  const openFile = useCallback((path: string) => setPane({ kind: "file", path }), [setPane])
+  const fileLinks = useFileLinks(conversation.id, turns, Option.isSome(loaded), openFile)
 
   if (tab === "changes" && !changesOpened) setChangesOpened(true)
 
@@ -279,7 +289,7 @@ function OpenConversation(props: { conversation: Conversation } & ConversationTa
                 <Kbd className="ml-auto">{shortcutLabel("D")}</Kbd>
               </ConversationHeaderAction>
               {diagrams.titles.map((title) => (
-                <ConversationHeaderAction key={title} onSelect={() => diagrams.open(title)}>
+                <ConversationHeaderAction key={title} onSelect={() => openDiagram(title)}>
                   <Workflow aria-hidden />
                   <span className="truncate">{title}</span>
                 </ConversationHeaderAction>
@@ -304,12 +314,14 @@ function OpenConversation(props: { conversation: Conversation } & ConversationTa
         <div hidden={tab !== "chat"} className="flex min-h-0 flex-1">
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <ToolCallView value={diagrams.cardOf}>
-              <Transcript
-                turns={turns}
-                earlierTurns={earlierTurns}
-                onShowEarlier={loadEarlier}
-                status={status}
-              />
+              <FileLinks value={fileLinks}>
+                <Transcript
+                  turns={turns}
+                  earlierTurns={earlierTurns}
+                  onShowEarlier={loadEarlier}
+                  status={status}
+                />
+              </FileLinks>
             </ToolCallView>
             <ExtensionStatuses statuses={extensionStatuses} />
             {reach === "unreachable" && <UnreachableNotice conversationId={conversation.id} />}
@@ -321,8 +333,16 @@ function OpenConversation(props: { conversation: Conversation } & ConversationTa
               </output>
             )}
           </div>
-          {diagrams.opened !== null && (
-            <DiagramPane diagram={diagrams.opened} onClose={diagrams.close} />
+          {openedDiagram !== undefined && (
+            <DiagramPane diagram={openedDiagram} onClose={closePane} />
+          )}
+          {pane?.kind === "file" && (
+            <FilePane
+              conversationId={conversation.id}
+              path={pane.path}
+              lastEnded={lastEndedOf(turns)}
+              onClose={closePane}
+            />
           )}
         </div>
         <section
@@ -771,8 +791,14 @@ const markdownComponents: Components = {
   code: (props) => {
     const language = /language-(\S+)/.exec(props.className ?? "")?.[1] ?? ""
 
-    if (!("data-block" in props) || !Predicate.isString(props.children))
-      return <defaultComponents.code {...props} />
+    if (!Predicate.isString(props.children)) return <defaultComponents.code {...props} />
+
+    if (!("data-block" in props))
+      return (
+        <FileLink text={props.children}>
+          <defaultComponents.code {...props} />
+        </FileLink>
+      )
 
     return language === "mermaid" ? (
       <MermaidBlock code={props.children} />

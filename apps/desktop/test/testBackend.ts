@@ -103,6 +103,8 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         ListConversationCommands: () => Effect.succeed([]),
         ListNewConversationFiles: () => Effect.succeed([]),
         ListConversationFiles: () => Effect.succeed([]),
+        FindConversationFiles: () => Effect.succeed([]),
+        GetConversationFile: unused,
         ListSandboxProviders: () => Effect.succeed([]),
         CreateConversation: unused,
         SendMessage: unused,
