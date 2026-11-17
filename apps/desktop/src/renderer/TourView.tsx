@@ -18,6 +18,7 @@ import {
 import { flushSync } from "react-dom"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Label } from "@/components/ui/label"
 import { ChangedFilesView, type ChangedFilesViewProps, type ViewHandle } from "./ChangedFilesView"
 import { annotationSides, type ParsedFile } from "./changesView"
@@ -519,38 +520,32 @@ function DiagramLegend() {
 // Sits above the Chapter's diffs, so it hides to give them the card's full height.
 function ChapterDiagram(props: { source: string; title: string }) {
   const [open, setOpen] = useState(true)
-  const body = useId()
 
   return (
-    <section
+    <Collapsible
+      open={open}
+      onOpenChange={setOpen}
+      render={<section />}
       aria-label={`Diagram: ${props.title}`}
       className={cn("mb-3 flex min-h-0 shrink-0 flex-col border-b pb-2", open && "max-h-[45%]")}
     >
       <div className="flex items-center gap-3">
-        <button
-          type="button"
-          aria-expanded={open}
-          aria-controls={body}
-          onClick={() => setOpen(!open)}
-          className="-ml-1 flex cursor-pointer items-center gap-1 rounded-sm px-1 text-xs font-medium hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
+        <CollapsibleTrigger
+          render={<Button variant="ghost" size="xs" />}
+          className="-ml-2 text-muted-foreground aria-expanded:bg-transparent aria-expanded:text-muted-foreground hover:aria-expanded:bg-muted"
         >
           <ChevronRight
             aria-hidden
-            className={cn(
-              "size-3.5 text-muted-foreground transition-transform",
-              open && "rotate-90",
-            )}
+            className="transition-transform duration-200 ease-out group-data-panel-open/button:rotate-90 motion-reduce:transition-none"
           />
           Diagram
-        </button>
+        </CollapsibleTrigger>
         {open && <DiagramLegend />}
       </div>
-      {open && (
-        <div id={body} className="mt-2 min-h-0 overflow-auto">
-          <MermaidDiagram source={props.source} />
-        </div>
-      )}
-    </section>
+      <CollapsibleContent className="mt-2 min-h-0 overflow-auto">
+        <MermaidDiagram source={props.source} />
+      </CollapsibleContent>
+    </Collapsible>
   )
 }
 
