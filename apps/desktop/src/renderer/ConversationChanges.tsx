@@ -72,10 +72,11 @@ export function ConversationChanges(props: {
       )}
       <LoadProblem result={changes} retry={refresh} />
       <LoadProblem result={notes} retry={store.refresh} />
-      {(shown !== null || (AsyncResult.isFailure(changes) && store.ready)) && (
+      {(shown !== null || !AsyncResult.isFailure(changes) || store.ready) && (
         <ChangesWithFeedback
-          key={shown?.id ?? "unavailable"}
+          key={shown?.id ?? (AsyncResult.isFailure(changes) ? "unavailable" : "loading")}
           changes={shown}
+          loading={shown === null && !AsyncResult.isFailure(changes)}
           store={store}
           sidebarTab={sidebarTab}
           setSidebarTab={setSidebarTab}
@@ -88,8 +89,11 @@ export function ConversationChanges(props: {
 
 type SidebarTab = "files" | "feedback"
 
+// While `loading`, the file panel and toolbar show with nothing in them, so the
+// first open keeps its frame and only the contents arrive.
 function ChangesWithFeedback(props: {
   changes: Changes | null
+  loading: boolean
   store: FeedbackNotesStore
   sidebarTab: SidebarTab
   setSidebarTab: (tab: SidebarTab) => void
@@ -171,7 +175,7 @@ function ChangesWithFeedback(props: {
             </FilePanelTabTrigger>
           </FilePanelTabsList>
           <TabsContent value="files" keepMounted className="flex min-h-0 flex-col">
-            {layout.files.length === 0 ? (
+            {props.loading ? null : layout.files.length === 0 ? (
               <p className="px-4 py-6 text-sm text-muted-foreground">
                 {changes === null ? "Glass couldn't read these changes." : "No files changed."}
               </p>
@@ -199,7 +203,7 @@ function ChangesWithFeedback(props: {
               <PanelLeft aria-hidden />
             </Button>
           }
-          fileCount={layout.files.length}
+          fileCount={props.loading ? null : layout.files.length}
           viewedCount={null}
           display={display}
           onDisplayChange={setDisplay}

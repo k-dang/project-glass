@@ -46,7 +46,8 @@ function DisplaySwitch(props: {
 
 export function ChangesToolbar(props: {
   filePanelToggle: ReactNode
-  fileCount: number
+  /** `null` while the changes are still loading. */
+  fileCount: number | null
   viewedCount: number | null
   display: Display
   onDisplayChange: (display: Display) => void
@@ -72,7 +73,11 @@ export function ChangesToolbar(props: {
   return (
     <div className="flex items-center gap-1 px-6 py-2 text-sm text-muted-foreground">
       {props.filePanelToggle}
-      <span>{plural(props.fileCount, "file")} changed</span>
+      <span>
+        {props.fileCount === null
+          ? "Loading changes…"
+          : `${plural(props.fileCount, "file")} changed`}
+      </span>
       <span className="flex-1" />
       {props.agentWork}
       {props.viewedCount !== null && (
