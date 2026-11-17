@@ -3,11 +3,14 @@ import {
   BACKEND_FAILURE_CHANNEL,
   type BackendEndpoint,
   CHOOSE_FOLDER_CHANNEL,
+  CLOSE_HTML_PAGE_CHANNEL,
   type BackendFailure,
   DISCARD_DOGFOOD_REPORT_CHANNEL,
   type DogfoodReportDetails,
   type DogfoodReportRecorded,
   FINISH_DOGFOOD_REPORT_CHANNEL,
+  HTML_PAGE_SCHEME,
+  OPEN_HTML_PAGE_CHANNEL,
   RECORD_DOGFOOD_REPORT_CHANNEL,
   RELAUNCH_CHANNEL,
   RESOURCE_USAGE_CHANNEL,
@@ -34,6 +37,7 @@ import { join, relative } from "node:path"
 import { pathToFileURL } from "node:url"
 import { startBackend } from "./backend"
 import { dogfoodReportWriter } from "./dogfoodReports"
+import { htmlPages } from "./htmlPages"
 import { prependLoginShellPath } from "./loginShellPath"
 import { summarizeResourceUsage } from "./resourceUsage"
 
@@ -66,6 +70,7 @@ const CONTENT_SECURITY_POLICY = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https://github.com https://*.githubusercontent.com",
   "media-src https://github.com https://*.githubusercontent.com",
+  `frame-src ${HTML_PAGE_SCHEME}:`,
   "connect-src ws://127.0.0.1:*",
   "object-src 'none'",
   "base-uri 'none'",
@@ -74,7 +79,10 @@ const CONTENT_SECURITY_POLICY = [
 
 protocol.registerSchemesAsPrivileged([
   { scheme: APP_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true } },
+  { scheme: HTML_PAGE_SCHEME, privileges: { standard: true, secure: true } },
 ])
+
+const pages = htmlPages()
 
 const serveRenderer = () =>
   protocol.handle(APP_SCHEME, async (request) => {
@@ -240,6 +248,9 @@ const createWindow = () => {
 
     return { action: "deny" }
   })
+  // A reload or crash skips the pages' close, so the next document starts with none.
+  window.webContents.on("did-navigate", pages.clear)
+  window.on("closed", pages.clear)
   window.webContents.on("will-navigate", (event) => {
     if (event.url.startsWith(`${rendererOrigin}/`)) return
 
@@ -326,6 +337,9 @@ void app.whenReady().then(() => {
   )
   ipcMain.handle(DISCARD_DOGFOOD_REPORT_CHANNEL, (_event, id: string) => dogfoodReports.discard(id))
 
+  ipcMain.handle(OPEN_HTML_PAGE_CHANNEL, (_event, html: string) => pages.open(html))
+  ipcMain.handle(CLOSE_HTML_PAGE_CHANNEL, (_event, url: string) => pages.close(url))
+  protocol.handle(HTML_PAGE_SCHEME, pages.serve)
   ipcMain.handle(RELAUNCH_CHANNEL, () => {
     app.relaunch()
     app.quit()

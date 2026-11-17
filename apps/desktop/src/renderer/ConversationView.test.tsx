@@ -21,6 +21,7 @@ import {
   type SandboxReach,
   SandboxStatus,
   SavedPlace,
+  TextFile,
   TextPart,
   ThinkingPart,
   ToDo,
@@ -42,11 +43,16 @@ import {
 import { cleanup, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { DateTime, Deferred, Effect, Exit, Stream } from "effect"
-import { expect, it, vi } from "vite-plus/test"
+import { afterEach, expect, it, vi } from "vite-plus/test"
 import { conversation, conversationFields } from "../../test/conversation"
 import { choice, mount, pixel } from "../../test/conversationApp"
 
 const sentAt = DateTime.makeUnsafe("2026-10-26T12:00:00Z")
+
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+})
 
 it("shows the Conversation under Local and its Turn's parts as they stream", async () => {
   const turnId = "turn-1"
@@ -1284,4 +1290,77 @@ it("keeps pasted lines and To-do mentions as written", async () => {
   await user.keyboard("{Enter}")
 
   expect(sent).toEqual([pasted])
+})
+
+it("links the files a Turn named once it ends, and opens HTML beside the Chat as its own sandboxed page", async () => {
+  const ended = Deferred.makeUnsafe<void>()
+  const asked: Array<ReadonlyArray<string>> = []
+  const opened: Array<string> = []
+
+  vi.stubGlobal("glass", {
+    htmlPages: {
+      open: (html: string) => Promise.resolve(`glass-page://page/${opened.push(html)}`),
+      close: () => Promise.resolve(),
+    },
+  })
+
+  const user = mount({
+    FindConversationFiles: ({ paths }) =>
+      Effect.sync(() => {
+        asked.push(paths)
+
+        return paths.filter((path) => path.endsWith(".html"))
+      }),
+    GetConversationFile: ({ path }) => Effect.succeed(TextFile.make({ text: `<h1>${path}</h1>` })),
+    WatchTranscript: () =>
+      Stream.make(
+        TranscriptSnapshot.make({
+          turns: [
+            {
+              ...runningTurn,
+              parts: [TextPart.make({ text: "Built `docs/explainer.html` from `notes.md`." })],
+            },
+          ],
+          queued: [],
+          status: null,
+        }),
+      ).pipe(
+        Stream.concat(
+          Stream.fromEffect(
+            Deferred.await(ended).pipe(
+              Effect.as(
+                TurnEnded.make({
+                  turnId: runningTurn.id,
+                  ended: { at: DateTime.add(sentAt, { seconds: 3 }), ending: TurnDone.make({}) },
+                }),
+              ),
+            ),
+          ),
+        ),
+      ),
+  })
+
+  const transcript = await screen.findByRole("region", { name: "Transcript" })
+  await within(transcript).findByText("docs/explainer.html")
+  expect(within(transcript).queryByRole("button", { name: /docs\/explainer\.html/ })).toBeNull()
+
+  Deferred.doneUnsafe(ended, Exit.void)
+
+  await user.click(await within(transcript).findByRole("button", { name: "docs/explainer.html" }))
+  expect(within(transcript).queryByRole("button", { name: "notes.md" })).toBeNull()
+  expect(asked).toContainEqual(["docs/explainer.html", "notes.md"])
+
+  const pane = await screen.findByRole("complementary", { name: "File" })
+  expect(within(pane).getByRole("heading", { name: "explainer.html" })).toBeTruthy()
+
+  const frame = await waitFor(() => {
+    const found = pane.querySelector("iframe")
+    expect(found).not.toBeNull()
+
+    return found!
+  })
+
+  expect(frame.getAttribute("sandbox")).toBe("allow-scripts allow-forms allow-popups")
+  expect(frame.getAttribute("src")).toBe("glass-page://page/1")
+  expect(opened).toEqual(["<h1>docs/explainer.html</h1>"])
 })

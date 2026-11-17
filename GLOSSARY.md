@@ -311,6 +311,13 @@ redraws it under the same name; a version Glass can't draw leaves the last one i
 Conversation keeps its Diagrams with its Turns.
 _Avoid_: Artifact, chart, whiteboard
 
+**File pane**:
+A file from a Conversation's folder shown beside the Conversation when the user opens it from a
+path the agent named, rereading it whenever a Turn ends. HTML runs as a self-contained page, kept
+from Glass and the folder's other files; Markdown and images are shown as they read, and other text
+as code.
+_Avoid_: Artifact, preview, viewer
+
 **Queued message**:
 A message sent while a Turn runs, waiting to start the next Turn; the user can cancel it before
 then. Canceling one returns its Feedback notes to the Conversation's unsent feedback.

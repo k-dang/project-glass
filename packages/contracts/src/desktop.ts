@@ -40,6 +40,16 @@ export interface DesktopBridge {
   readonly resourceUsage: () => Promise<ResourceUsage>
   readonly chooseFolder: () => Promise<string | null>
   readonly dogfoodReports: DogfoodReportsBridge
+  readonly htmlPages: HtmlPagesBridge
+}
+
+/**
+ * Serves a self-contained HTML page from its own sandboxed origin, apart from Glass's, so its
+ * scripts run without Glass's Content-Security-Policy and can't reach Glass.
+ */
+export interface HtmlPagesBridge {
+  readonly open: (html: string) => Promise<string>
+  readonly close: (url: string) => Promise<void>
 }
 
 export interface DogfoodReportsBridge {
@@ -83,3 +93,15 @@ export const RECORD_DOGFOOD_REPORT_CHANNEL = "glass:record-dogfood-report"
 export const FINISH_DOGFOOD_REPORT_CHANNEL = "glass:finish-dogfood-report"
 
 export const DISCARD_DOGFOOD_REPORT_CHANNEL = "glass:discard-dogfood-report"
+
+export const OPEN_HTML_PAGE_CHANNEL = "glass:open-html-page"
+
+export const CLOSE_HTML_PAGE_CHANNEL = "glass:close-html-page"
+
+export const HTML_PAGE_SCHEME = "glass-page"
+
+/**
+ * What a page may do in its opaque origin, both in its frame and its own policy. Modals stay off
+ * because a page can open without the user clicking anything.
+ */
+export const HTML_PAGE_SANDBOX = "allow-scripts allow-forms allow-popups"

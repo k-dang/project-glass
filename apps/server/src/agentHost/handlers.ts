@@ -1,6 +1,7 @@
 import { Effect } from "effect"
 import { AgentHostRpcs, HOST_PROTOCOL } from "./protocol"
 import { Changes } from "./Changes"
+import { FolderFiles } from "./FolderFiles"
 import { HostConversations } from "./HostConversations"
 import { Journal } from "./Journal"
 
@@ -9,6 +10,7 @@ export const AgentHostHandlers = AgentHostRpcs.toLayer(
     const conversations = yield* HostConversations
     const journal = yield* Journal
     const changes = yield* Changes
+    const folderFiles = yield* FolderFiles
 
     return AgentHostRpcs.of({
       Hello: () => Effect.succeed({ host: journal.host, protocol: HOST_PROTOCOL }),
@@ -26,6 +28,8 @@ export const AgentHostHandlers = AgentHostRpcs.toLayer(
       GetChanges: ({ folder, baseRef }) => changes.since(folder, baseRef),
       HasUncommittedChanges: ({ folder }) => changes.uncommitted(folder),
       ListFiles: ({ folder }) => changes.files(folder),
+      ExistingFiles: ({ folder, paths }) => folderFiles.existing(folder, paths),
+      ReadFile: ({ folder, path }) => folderFiles.read(folder, path),
       WatchJournal: ({ host, after }) => journal.watch(host, after),
       Acknowledge: ({ host, through }) => journal.acknowledge(host, through),
     })

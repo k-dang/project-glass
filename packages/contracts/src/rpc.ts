@@ -41,6 +41,8 @@ import {
   StartFreshRefused,
   TranscriptUpdate,
   TurnEnd,
+  ConversationFile,
+  NamedPaths,
 } from "./conversation"
 import { ConnectionError, GitHubConnection } from "./connection"
 import {
@@ -431,6 +433,17 @@ export class GlassRpcs extends RpcGroup.make(
   Rpc.make("ListConversationFiles", {
     payload: { conversationId: Schema.String },
     success: Schema.Array(Schema.String),
+    error: Schema.Union([ConversationNotFound, ConversationError]),
+  }),
+  /** The paths that name a file in the Conversation's folder, gitignored or not. */
+  Rpc.make("FindConversationFiles", {
+    payload: { conversationId: Schema.String, paths: NamedPaths },
+    success: Schema.Array(Schema.String),
+    error: Schema.Union([ConversationNotFound, ConversationError]),
+  }),
+  Rpc.make("GetConversationFile", {
+    payload: { conversationId: Schema.String, path: Schema.String },
+    success: ConversationFile,
     error: Schema.Union([ConversationNotFound, ConversationError]),
   }),
   Rpc.make("ListSandboxProviders", { success: Schema.Array(SandboxProviderInfo) }),

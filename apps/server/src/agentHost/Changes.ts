@@ -11,7 +11,7 @@ import {
 import { Context, Effect, FileSystem, Layer } from "effect"
 import { join } from "node:path"
 import { Git } from "../git"
-import { HostConversationError } from "./protocol"
+import { failure, type HostConversationError } from "./protocol"
 
 const MAX_PATCH_CHARS = 500_000
 
@@ -90,14 +90,6 @@ const filePatch = (summary: Summary, patch: string): FilePatch => {
 
   return hunks.length > MAX_PATCH_CHARS ? PatchTooLarge.make({}) : TextPatch.make({ hunks })
 }
-
-const failure =
-  (message: string) =>
-  <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-    effect.pipe(
-      Effect.tapError((cause) => Effect.logWarning(message, cause)),
-      Effect.mapError(() => new HostConversationError({ message })),
-    )
 
 export class Changes extends Context.Service<
   Changes,

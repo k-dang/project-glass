@@ -96,9 +96,13 @@ export function DiagramPane(props: { diagram: Diagram; onClose: () => void }) {
   )
 }
 
-export function useDiagrams(turns: ReadonlyArray<Turn>, loaded: boolean) {
+/** Calls `open` with a Diagram drawn while the Conversation is on screen. */
+export function useDiagrams(
+  turns: ReadonlyArray<Turn>,
+  loaded: boolean,
+  open: (title: string) => void,
+) {
   const { diagrams, latestDrawing } = useMemo(() => diagramsOf(turns), [turns])
-  const [open, setOpen] = useState<string | null>(null)
   const [seenDrawing, setSeenDrawing] = useState(latestDrawing?.toolCallId ?? null)
   const [baselined, setBaselined] = useState(loaded)
 
@@ -107,20 +111,14 @@ export function useDiagrams(turns: ReadonlyArray<Turn>, loaded: boolean) {
     setSeenDrawing(latestDrawing?.toolCallId ?? null)
   } else if (baselined && latestDrawing !== null && latestDrawing.toolCallId !== seenDrawing) {
     setSeenDrawing(latestDrawing.toolCallId)
-    setOpen(latestDrawing.diagram.title)
+    open(latestDrawing.diagram.title)
   }
 
   const cardOf = useCallback(
     (call: typeof ToolCallPart.Type) =>
-      call.name === DRAW_DIAGRAM_TOOL ? <DiagramCard call={call} onOpen={setOpen} /> : null,
-    [],
+      call.name === DRAW_DIAGRAM_TOOL ? <DiagramCard call={call} onOpen={open} /> : null,
+    [open],
   )
 
-  return {
-    titles: [...diagrams.keys()],
-    opened: open === null ? null : (diagrams.get(open) ?? null),
-    open: setOpen,
-    close: () => setOpen(null),
-    cardOf,
-  }
+  return { diagrams, titles: [...diagrams.keys()], cardOf }
 }

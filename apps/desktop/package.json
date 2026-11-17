@@ -52,6 +52,7 @@
     "happy-dom": "catalog:",
     "lucide-react": "catalog:",
     "marked": "catalog:",
+    "mdast-util-from-markdown": "2.1.0",
     "pele": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
