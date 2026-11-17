@@ -2,6 +2,7 @@ import {
   type AgentReviewDone,
   AgentReviewFinished,
   ChecksFailing,
+  ConversationNeedsYou,
   type NeedsYouItem,
   type PullRequestNeedsYou,
   referenceKey,
@@ -25,6 +26,18 @@ export const watchedNeedsYouAtom = Atom.make((get): NeedsYouResult => {
 
   return get(needsYouStreamAtom)
 })
+
+export const conversationsNeedingYouAtom = Atom.make(
+  (get): ReadonlyMap<string, ConversationNeedsYou> =>
+    new Map(
+      Option.getOrElse(
+        AsyncResult.value(get(watchedNeedsYouAtom)),
+        (): ReadonlyArray<NeedsYouItem> => [],
+      )
+        .filter(Schema.is(ConversationNeedsYou))
+        .map((item) => [item.conversation.id, item]),
+    ),
+)
 
 export const needsYouCount = (result: NeedsYouResult): Option.Option<number> =>
   AsyncResult.isSuccess(result) ? Option.some(result.value.length) : Option.none()

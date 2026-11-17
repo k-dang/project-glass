@@ -3,6 +3,7 @@ import {
   ActivityPage,
   Conversation,
   ConversationChanges,
+  ConversationNeedsYou,
   DRAW_DIAGRAM_TOOL,
   AnswerQuestion,
   DenyRequest,
@@ -31,10 +32,12 @@ import {
   TurnDone,
   TurnEnded,
   TurnFailed,
+  TurnFinished,
   TurnStarted,
   TurnStopped,
   QueuedMessageStarted,
   UnsentFeedback,
+  WaitingRequests,
 } from "@glass/contracts"
 import { cleanup, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
@@ -181,6 +184,31 @@ it("marks the finished Turn seen once Glass is focused on the Conversation's Cha
     ]),
   )
   focused.mockRestore()
+})
+
+it("says in the Conversations panel how a Turn that finished unseen ended", async () => {
+  const ended = {
+    at: DateTime.add(sentAt, { seconds: 3 }),
+    ending: TurnFailed.make({ reason: "Out of tokens" }),
+  }
+
+  mount(
+    {
+      WatchNeedsYou: () =>
+        Stream.make([
+          ConversationNeedsYou.make({
+            conversation,
+            reasons: [TurnFinished.make({ ended })],
+            since: ended.at,
+          }),
+        ]),
+    },
+    "/conversations",
+  )
+
+  expect(
+    await screen.findByRole("link", { name: conversation.name, description: /Failed/ }),
+  ).toBeTruthy()
 })
 
 it("shows the statuses the Conversation's extensions set while no Turn runs, until they clear", async () => {
@@ -696,7 +724,14 @@ it("marks a Conversation waiting on a Permission request, and denies it with a r
   const answers: Array<{ requestId: string; answer: RequestAnswer }> = []
 
   const user = mount({
-    WatchWaitingConversations: () => Stream.make([conversation.id]),
+    WatchNeedsYou: () =>
+      Stream.make([
+        ConversationNeedsYou.make({
+          conversation,
+          reasons: [WaitingRequests.make({ requests: [bashRequest] })],
+          since: sentAt,
+        }),
+      ]),
     WatchTranscript: () => waitingTurn([bashRequest]),
     AnswerRequest: ({ requestId, answer }) =>
       Effect.sync(() => void answers.push({ requestId, answer })),

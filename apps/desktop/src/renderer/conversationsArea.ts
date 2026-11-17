@@ -56,14 +56,6 @@ export const conversationsAtom = backendRuntime
   .atom(Stream.unwrap(Backend.useSync((backend) => backend.WatchConversations())))
   .pipe(Atom.keepAlive)
 
-export const waitingConversationsAtom = backendRuntime
-  .atom(
-    Stream.unwrap(Backend.useSync((backend) => backend.WatchWaitingConversations())).pipe(
-      Stream.map((ids): ReadonlySet<string> => new Set(ids)),
-    ),
-  )
-  .pipe(Atom.keepAlive)
-
 export const transcriptOf = <E, R>(updates: Stream.Stream<TranscriptUpdate, E, R>) =>
   updates.pipe(
     Stream.groupedWithin(Number.POSITIVE_INFINITY, FRAME),
