@@ -5,6 +5,8 @@ import {
   GitHubConnection,
   RepositoryFiles,
   FileTooLarge,
+  GitHubUnavailable,
+  type LoadPullRequestError,
   PullRequest,
   PullRequestRef,
   PullRequestWorkspace,
@@ -16,11 +18,12 @@ import {
 } from "@glass/contracts"
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { DateTime, Effect, Option, Stream } from "effect"
-import { AsyncResult } from "effect/reactivity"
+import { DateTime, Effect, Exit, Option, Stream } from "effect"
+import { AsyncResult, AtomRegistry } from "effect/reactivity"
 import { afterEach, expect, it, vi } from "vite-plus/test"
 import { App } from "./App"
 import { backendLayerAtom } from "./backend"
+import { openPullRequest, openWorkspaceAtom, workspaceViewAtom } from "./reviewsArea"
 import { rememberPlace, savedDestinationsAtom } from "./savedPlace"
 import { conversation } from "../../test/conversation"
 import {
@@ -555,6 +558,60 @@ it("keeps one destination per area, newest first", async () => {
     )
   } finally {
     release()
+    registry.dispose()
+  }
+})
+
+const openingWhilePlacesLoad = () => {
+  const places: Array<Held<void, ReadonlyArray<SavedPlace>, SavedPlaceError>> = []
+
+  const loads: Array<
+    Held<{ pullRequest: PullRequestRef }, PullRequestWorkspace, LoadPullRequestError>
+  > = []
+
+  const registry = testRegistry({
+    GetConnection: () =>
+      Effect.succeed(new GitHubConnection({ login: pr.viewer.login, tokenSource: "gh" })),
+    GetSavedPlaces: hold(places),
+    LoadPullRequest: hold(loads),
+  })
+
+  openPullRequest(registry, pr.pullRequest.ref)
+
+  return { registry, places, loads }
+}
+
+it("loads the PR workspace alongside its Saved place, then restores the position", async () => {
+  const { registry, places, loads } = openingWhilePlacesLoad()
+
+  try {
+    const load = await next(loads)
+    const place = await next(places)
+
+    load.answer(Effect.succeed(pr))
+    place.answer(Effect.succeed([savedPlace()]))
+    await Effect.runPromise(
+      AtomRegistry.getResult(registry, openWorkspaceAtom, { suspendOnWaiting: true }),
+    )
+    expect(registry.get(workspaceViewAtom)).toMatchObject({ tab: "changes", file: "second.ts" })
+  } finally {
+    registry.dispose()
+  }
+})
+
+it("reports a failed PR load without waiting for the Saved place", async () => {
+  const { registry, places, loads } = openingWhilePlacesLoad()
+
+  try {
+    ;(await next(loads)).answer(Effect.fail(new GitHubUnavailable({ message: "Offline." })))
+
+    const exit = await Effect.runPromiseExit(
+      AtomRegistry.getResult(registry, openWorkspaceAtom, { suspendOnWaiting: true }),
+    )
+
+    expect(Exit.isFailure(exit)).toBe(true)
+    expect(places).toHaveLength(1)
+  } finally {
     registry.dispose()
   }
 })

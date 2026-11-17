@@ -330,12 +330,17 @@ export const createConversationAtom = backendRuntime.fn((input: NewConversation,
   Effect.gen(function* () {
     const created = yield* Backend.use((backend) => backend.CreateConversation(input))
 
-    yield* AtomRegistry.toStreamResult(get.registry, conversationsAtom).pipe(
-      Stream.filter((conversations) => conversations.some(({ id }) => id === created.id)),
-      Stream.runHead,
-      Effect.ignore,
+    yield* Effect.all(
+      [
+        AtomRegistry.toStreamResult(get.registry, conversationsAtom).pipe(
+          Stream.filter((conversations) => conversations.some(({ id }) => id === created.id)),
+          Stream.runHead,
+          Effect.ignore,
+        ),
+        AtomRegistry.getResult(get.registry, transcriptAtom(created.id)).pipe(Effect.ignore),
+      ],
+      { concurrency: "unbounded", discard: true },
     )
-    yield* AtomRegistry.getResult(get.registry, transcriptAtom(created.id)).pipe(Effect.ignore)
 
     return created
   }),
