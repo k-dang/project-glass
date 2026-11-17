@@ -1,7 +1,7 @@
 import { type ConversationPlace, type ConversationSkillPack, shortSha } from "@glass/contracts"
 import { cn } from "cn"
 import { FolderGit2, GitBranch, Package, PanelTop } from "lucide-react"
-import type { ReactNode } from "react"
+import { createContext, type ReactNode, use, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ConversationsPanelToggle } from "./Conversations"
@@ -10,6 +10,8 @@ import { LOCAL_SKILLS_LABEL } from "./skillChoice"
 
 const fact =
   "flex h-7 w-full min-w-0 items-center gap-2 rounded-sm px-2 text-xs [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-muted-foreground"
+
+const CloseInstantly = createContext<() => void>(() => {})
 
 export function ConversationHeader(props: {
   heading: ReactNode
@@ -21,6 +23,7 @@ export function ConversationHeader(props: {
   localSkills?: boolean | undefined
   children?: ReactNode
 }) {
+  const [instant, setInstant] = useState(false)
   const PlaceIcon = props.place === null ? null : placeIcons[props.place._tag]
 
   const skillSources = [
@@ -33,11 +36,14 @@ export function ConversationHeader(props: {
       <ConversationsPanelToggle />
       <div className="flex min-w-0 flex-1 items-center gap-2">{props.heading}</div>
       {PlaceIcon !== null && props.place !== null && (
-        <Popover>
+        <Popover onOpenChange={(open) => open && setInstant(false)}>
           <PopoverTrigger render={<Button variant="ghost" size="icon-sm" aria-label="Details" />}>
             <PanelTop aria-hidden />
           </PopoverTrigger>
-          <PopoverContent align="end" className="w-64 gap-0 p-1">
+          <PopoverContent
+            align="end"
+            className={cn("w-64 gap-0 p-1", instant && "data-ending-style:transition-none")}
+          >
             <div className={fact}>
               <PlaceIcon aria-hidden />
               {placeNames[props.place._tag]}
@@ -64,7 +70,7 @@ export function ConversationHeader(props: {
                 <span className="truncate">{skillSources.join(" · ")}</span>
               </div>
             )}
-            {props.children}
+            <CloseInstantly value={() => setInstant(true)}>{props.children}</CloseInstantly>
           </PopoverContent>
         </Popover>
       )}
@@ -72,10 +78,15 @@ export function ConversationHeader(props: {
   )
 }
 
-export function ConversationHeaderAction(props: { onSelect: () => void; children: ReactNode }) {
+export function ConversationHeaderAction(props: { onNavigate: () => void; children: ReactNode }) {
+  const closeInstantly = use(CloseInstantly)
+
   return (
     <PopoverClose
-      onClick={props.onSelect}
+      onClick={() => {
+        closeInstantly()
+        props.onNavigate()
+      }}
       className={cn(fact, "text-left outline-none hover:bg-accent focus-visible:bg-accent")}
     >
       {props.children}
