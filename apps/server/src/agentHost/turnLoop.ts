@@ -1,4 +1,4 @@
-import type { AgentEvent, TurnMessage } from "@glass/contracts"
+import type { AgentEvent, TurnFailed, TurnMessage, TurnStopped } from "@glass/contracts"
 import type { DeliveredMessage } from "./deliveredMessage"
 import { type Cause, DateTime, Deferred, Effect, Queue, Scope, Stream } from "effect"
 import { HostConversationError } from "./protocol"
@@ -7,9 +7,11 @@ export interface Steer extends DeliveredMessage {
   readonly id: string
 }
 
+export type StopEnding = typeof TurnStopped.Type | typeof TurnFailed.Type
+
 export interface Steering {
   readonly steers: ReadonlyArray<Steer>
-  readonly stopping: boolean
+  readonly stopping: StopEnding | null
   readonly turn: { readonly id: string }
 }
 
@@ -97,11 +99,11 @@ export const runTurns = Effect.fnUntraced(function* <
         if (state !== null)
           state = { ...state, steers: state.steers.filter((steer) => steer.id !== id) }
       }),
-    stop: (turnId: string) =>
+    stop: (turnId: string, ending: StopEnding) =>
       Effect.sync(() => {
         if (state === null || state.turn.id !== turnId) return null
 
-        state = { ...state, stopping: true }
+        state = { ...state, stopping: ending }
 
         return state.steers
       }),

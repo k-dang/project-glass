@@ -4,8 +4,10 @@ import {
   type AgentModels,
   type RequestAnswer,
   RequestNotWaiting,
+  TurnFailed,
+  TurnStopped,
 } from "@glass/contracts"
-import { Context, Effect, Exit, FileSystem, Layer, Scope, Semaphore } from "effect"
+import { Context, Effect, Exit, FileSystem, Layer, Predicate, Scope, Semaphore } from "effect"
 import type { HarnessAdapter, HarnessSession } from "./adapter"
 import type { DeliveredMessage, DeliveredTurn } from "./deliveredMessage"
 import { Journal } from "./Journal"
@@ -30,7 +32,13 @@ interface Running {
   readonly scope: Scope.Closeable
   readonly session: HarnessSession
   applied: TurnSettings
+  turnId: string | null
 }
+
+export const overBudget = TurnFailed.make({
+  reason:
+    "The agent wrote more than its host can keep while Glass is away, so the host stopped this Turn. Everything it wrote up to here is kept.",
+})
 
 const sameSettings = (a: TurnSettings, b: TurnSettings) =>
   a.model === b.model && a.effort === b.effort && a.permissionMode === b.permissionMode
@@ -117,7 +125,37 @@ export class HostConversations extends Context.Service<
               return "alreadyRunning" as const
 
             const scope = yield* Scope.fork(hostScope)
-            const report = (event: HostEvent) => journal.append(conversationId, event)
+            let stoppingOverBudget = false
+
+            const report = Effect.fnUntraced(function* (event: HostEvent) {
+              const full = yield* journal.append(conversationId, event)
+              const conversation = running.get(conversationId)
+
+              if (
+                Predicate.isTagged(event, "TurnStarted") ||
+                Predicate.isTagged(event, "TurnEnded")
+              ) {
+                if (conversation !== undefined)
+                  conversation.turnId = Predicate.isTagged(event, "TurnStarted")
+                    ? event.turnId
+                    : null
+                stoppingOverBudget = false
+
+                return
+              }
+
+              if (!full || stoppingOverBudget || conversation?.turnId == null) return
+
+              stoppingOverBudget = true
+              yield* conversation.session.stopTurn(conversation.turnId, overBudget).pipe(
+                Effect.tap((left) =>
+                  Effect.sync(() => {
+                    if (left === null) stoppingOverBudget = false
+                  }),
+                ),
+                Effect.forkIn(scope),
+              )
+            })
 
             const started = Effect.gen(function* () {
               const skills = yield* written(folder, starting.skills)
@@ -148,6 +186,7 @@ export class HostConversations extends Context.Service<
               scope,
               session,
               applied: { model: null, effort: null, permissionMode: null },
+              turnId: null,
             }
 
             running.set(conversationId, conversation)
@@ -199,13 +238,17 @@ export class HostConversations extends Context.Service<
               conversation.applied = settings
             }
 
+            conversation.turnId = turnId
+
             return yield* conversation.session.startTurn(turnId, message)
           }),
           steer: (conversationId, message) =>
             find(conversationId).pipe(Effect.flatMap(({ session }) => session.steer(message))),
           stopTurn: (conversationId, turnId) =>
             Effect.suspend(
-              () => running.get(conversationId)?.session.stopTurn(turnId) ?? Effect.succeed(null),
+              () =>
+                running.get(conversationId)?.session.stopTurn(turnId, TurnStopped.make({})) ??
+                Effect.succeed(null),
             ),
           answer: (conversationId, requestId, answer) =>
             Effect.suspend(() => {

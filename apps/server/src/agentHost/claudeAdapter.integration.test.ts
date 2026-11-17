@@ -261,7 +261,7 @@ it.live(
 
       const turnId = yield* session.send(run("Bash", "touch notes.txt", "DONE"))
       const request = yield* f.request
-      yield* session.session.stopTurn(turnId)
+      yield* session.session.stopTurn(turnId, TurnStopped.make({}))
 
       const [turn] = yield* f.until(settled(1))
       assert.deepStrictEqual(turn?.ended?.ending, TurnStopped.make({}))

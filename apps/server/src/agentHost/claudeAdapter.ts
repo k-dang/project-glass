@@ -484,9 +484,9 @@ export const claudeAdapter = (
           Effect.asVoid,
         )
       }),
-      stopTurn: (turnId) =>
+      stopTurn: (turnId, ending) =>
         Effect.gen(function* () {
-          const steers = yield* turns.stop(turnId)
+          const steers = yield* turns.stop(turnId, ending)
 
           if (steers === null) return null
 

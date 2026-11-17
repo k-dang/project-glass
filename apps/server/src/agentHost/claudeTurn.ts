@@ -15,7 +15,6 @@ import {
   type TurnEnding,
   TurnFailed,
   type TurnPart,
-  TurnStopped,
   type TurnMessage,
   withContextOf,
 } from "@glass/contracts"
@@ -62,7 +61,7 @@ export const beginTurn = (turnId: string, sent: TurnMessage, at: DateTime.Utc): 
   partByBlock: new Map(),
   toolCalls: new Map(),
   steers: [],
-  stopping: false,
+  stopping: null,
   stamping: "unknown",
   earlierRunFailure: null,
 })
@@ -216,7 +215,7 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
   }
 
   const onResult = (result: SDKResultMessage) => {
-    if (state.stopping) return end(TurnStopped.make({}))
+    if (state.stopping !== null) return end(state.stopping)
 
     const ending = endingOf(result)
     const earlierRunFailure = state.earlierRunFailure ?? (isFailure(result) ? ending : null)

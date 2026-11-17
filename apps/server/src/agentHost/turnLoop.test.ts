@@ -31,7 +31,7 @@ it.live(
       yield* Deferred.await(busy)
 
       yield* turns.offer(Input.Accepted({ turnId: "turn-1", handled: true }))
-      assert.deepStrictEqual(yield* turns.stop("turn-1"), [])
+      assert.deepStrictEqual(yield* turns.stop("turn-1", TurnStopped.make({})), [])
       yield* Deferred.succeed(resume, undefined)
 
       assert.deepStrictEqual((yield* Deferred.await(ended)).ending, TurnStopped.make({}))
@@ -49,7 +49,7 @@ it.effect("stops only the Turn it names", () =>
 
     yield* turns.begin("turn-1", { message: "Build it", images: [], context: null })
 
-    assert.equal(yield* turns.stop("turn-2"), null)
-    assert.deepStrictEqual(yield* turns.stop("turn-1"), [])
+    assert.equal(yield* turns.stop("turn-2", TurnStopped.make({})), null)
+    assert.deepStrictEqual(yield* turns.stop("turn-1", TurnStopped.make({})), [])
   }).pipe(Effect.scoped),
 )

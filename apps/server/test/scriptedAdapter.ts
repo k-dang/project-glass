@@ -13,7 +13,6 @@ import {
   TurnDone,
   TurnEnded,
   type TurnEnding,
-  TurnStopped,
   withContextOf,
 } from "@glass/contracts"
 import { DateTime, Deferred, Effect, Fiber, Predicate, Schema, Scope } from "effect"
@@ -254,14 +253,14 @@ export const scriptedAdapter = (gates: string): HarnessAdapter => {
             }),
           steer: (message) =>
             turn === null ? notRunning : Effect.sync(() => void turn!.steers.push(message)),
-          stopTurn: (turnId) =>
+          stopTurn: (turnId, ending) =>
             Effect.gen(function* () {
               if (turn === null || turn.id !== turnId) return null
 
               const { id, fiber, steers } = turn
 
               yield* Fiber.interrupt(fiber)
-              yield* end(id, TurnStopped.make({}))
+              yield* end(id, ending)
 
               return steers
             }),

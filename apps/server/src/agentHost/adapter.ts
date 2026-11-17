@@ -9,6 +9,7 @@ import type {
   TurnSettings,
 } from "./protocol"
 import type { WrittenSkills } from "./sentSkills"
+import type { StopEnding } from "./turnLoop"
 
 export interface HarnessSession {
   readonly configure: (settings: TurnSettings) => Effect.Effect<void, HostConversationError>
@@ -17,7 +18,7 @@ export interface HarnessSession {
     message: DeliveredTurn,
   ) => Effect.Effect<void, HostConversationError>
   readonly steer: (message: DeliveredMessage) => Effect.Effect<void, HostConversationError>
-  readonly stopTurn: (turnId: string) => Effect.Effect<SteersNotTakenIn | null>
+  readonly stopTurn: (turnId: string, ending: StopEnding) => Effect.Effect<SteersNotTakenIn | null>
   readonly answer: (
     requestId: string,
     answer: RequestAnswer,

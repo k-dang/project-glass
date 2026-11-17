@@ -1,15 +1,26 @@
 import { NodeFileSystem } from "@effect/platform-node"
 import { assert, it } from "@effect/vitest"
-import { Deferred, Effect, Fiber, Layer, Queue } from "effect"
+import {
+  ExtensionStatusesChanged,
+  PartSet,
+  TextPart,
+  TurnDone,
+  TurnEnded,
+  TurnStarted,
+} from "@glass/contracts"
+import { DateTime, Deferred, Effect, Fiber, Layer, Queue, Stream } from "effect"
+import { eventually } from "../../test/eventually"
 import type { HarnessAdapter, HarnessSession } from "./adapter"
-import { HostConversations, conversationLock } from "./HostConversations"
-import { Journal } from "./Journal"
+import { HostConversations, conversationLock, overBudget } from "./HostConversations"
+import { Journal, JournalBudget } from "./Journal"
 import {
   HostConversationError,
   WorkRole,
   type ConversationStart,
+  type HostEvent,
   type StartOutcome,
 } from "./protocol"
+import type { StopEnding } from "./turnLoop"
 
 const stall = 5_000
 
@@ -476,4 +487,114 @@ it.live(
       assert.isUndefined(conversationLock(host.conversations, "a"))
     }),
   stall,
+)
+
+const BUDGET = 1_000
+
+const wrote = (turnId: string, chars: number) =>
+  PartSet.make({ turnId, index: 0, part: TextPart.make({ text: "a".repeat(chars) }) })
+
+const budgeted = (
+  sessionFor: (report: (event: HostEvent) => Effect.Effect<void>) => HarnessSession,
+) =>
+  Effect.gen(function* () {
+    const reporting = yield* Deferred.make<(event: HostEvent) => Effect.Effect<void>>()
+
+    const adapter: HarnessAdapter = {
+      models: Effect.die("This test does not list models"),
+      commands: () => Effect.die("This test does not list commands"),
+      start: ({ report }) =>
+        Deferred.succeed(reporting, report).pipe(Effect.as(sessionFor(report))),
+    }
+
+    const context = yield* Layer.build(
+      HostConversations.make({ "claude-code": adapter, pi: adapter }).pipe(
+        Layer.provideMerge(Journal.layer),
+        Layer.provide(NodeFileSystem.layer),
+        Layer.provide(Layer.succeed(JournalBudget, BUDGET)),
+      ),
+    )
+
+    const conversations = yield* HostConversations.pipe(Effect.provideContext(context))
+    const journal = yield* Journal.pipe(Effect.provideContext(context))
+
+    yield* conversations.start(request("a"))
+
+    return { conversations, journal, report: yield* Deferred.await(reporting) }
+  })
+
+it.effect("stops a Turn once the journal passes its budget, keeping everything it wrote", () =>
+  Effect.gen(function* () {
+    const at = yield* DateTime.now
+    const exit = yield* Deferred.make<void>()
+    let stops = 0
+
+    const ended = (turnId: string) =>
+      TurnEnded.make({ turnId, ended: { at, ending: TurnDone.make({}) } })
+
+    const started = (turnId: string) =>
+      TurnStarted.make({ turnId, message: "", images: [], context: null, feedback: [], sentAt: at })
+
+    const { journal, report } = yield* budgeted((reportTo) => ({
+      ...session(exit),
+      stopTurn: Effect.fnUntraced(function* (turnId: string, ending: StopEnding) {
+        stops++
+        yield* reportTo(TurnEnded.make({ turnId, ended: { at, ending } }))
+
+        return []
+      }),
+    }))
+
+    yield* report(started("turn-1"))
+    yield* report(wrote("turn-1", BUDGET * 2))
+
+    const kept = yield* journal.watch(journal.host, 0).pipe(Stream.take(3), Stream.runCollect)
+
+    assert.deepStrictEqual(
+      kept.map(({ event }) => event),
+      [
+        started("turn-1"),
+        wrote("turn-1", BUDGET * 2),
+        TurnEnded.make({ turnId: "turn-1", ended: { at, ending: overBudget } }),
+      ],
+    )
+
+    yield* journal.acknowledge(journal.host, 3)
+    yield* report(started("turn-2"))
+    yield* report(wrote("turn-2", BUDGET / 2))
+    yield* report(ended("turn-2"))
+
+    const next = yield* journal.watch(journal.host, 3).pipe(Stream.take(3), Stream.runCollect)
+
+    assert.deepStrictEqual(next.at(-1)?.event, ended("turn-2"))
+    assert.equal(stops, 1)
+  }).pipe(Effect.scoped),
+)
+
+it.effect("keeps to the budget for a later Turn after going over it while idle", () =>
+  Effect.gen(function* () {
+    const exit = yield* Deferred.make<void>()
+    const stopped: Array<string> = []
+
+    const { conversations, report } = yield* budgeted(() => ({
+      ...session(exit),
+      stopTurn: (turnId) =>
+        Effect.sync(() => {
+          stopped.push(turnId)
+
+          return []
+        }),
+    }))
+
+    yield* report(ExtensionStatusesChanged.make({ extensionStatuses: ["a".repeat(BUDGET * 2)] }))
+    yield* conversations.startTurn(
+      "a",
+      "turn-1",
+      { message: "Go", images: [], context: null, prompt: "Go" },
+      { model: null, effort: null, permissionMode: null },
+    )
+    yield* report(wrote("turn-1", 1))
+
+    yield* eventually(Effect.sync(() => assert.deepStrictEqual(stopped, ["turn-1"])))
+  }).pipe(Effect.scoped),
 )

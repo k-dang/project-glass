@@ -579,9 +579,9 @@ export const piAdapter = (command: string) =>
             return yield* new HostConversationError({ message: "pi didn't take the message in." })
           }),
           // pi's abort runs whatever it still holds, so the queue is cleared first (pi docs/rpc-commands.md).
-          stopTurn: (turnId) =>
+          stopTurn: (turnId, ending) =>
             Effect.gen(function* () {
-              const steers = yield* turns.stop(turnId)
+              const steers = yield* turns.stop(turnId, ending)
 
               if (steers === null) return null
 
