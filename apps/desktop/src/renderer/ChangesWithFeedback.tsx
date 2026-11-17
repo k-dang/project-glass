@@ -44,7 +44,10 @@ const NoteOpenContext = createContext(false)
 export const useNoteOpen = () => useContext(NoteOpenContext)
 
 export function ChangesWithFeedback(props: {
-  changes: { readonly id: string; readonly files: ReadonlyArray<ChangedFile> } | null
+  changes:
+    | { readonly id: string; readonly files: ReadonlyArray<ChangedFile> }
+    | "loading"
+    | "unavailable"
   store: FeedbackNotesEditor
   sidebarTab: SidebarTab
   setSidebarTab: (tab: SidebarTab) => void
@@ -52,8 +55,9 @@ export function ChangesWithFeedback(props: {
   footer: ReactNode
 }) {
   const { changes, store, sidebarTab, setSidebarTab } = props
-  const changesId = changes?.id ?? null
-  const layout = useMemo(() => layOut(changes?.files ?? []), [changes])
+  const read = changes === "loading" || changes === "unavailable" ? null : changes
+  const changesId = read?.id ?? null
+  const layout = useMemo(() => layOut(read?.files ?? []), [read])
 
   const [filePanelOpen, setFilePanelOpen] = useState(true)
   const filePanelId = useId()
@@ -127,9 +131,11 @@ export function ChangesWithFeedback(props: {
             </FilePanelTabTrigger>
           </FilePanelTabsList>
           <TabsContent value="files" keepMounted className="flex min-h-0 flex-col">
-            {layout.files.length === 0 ? (
+            {changes === "loading" ? null : layout.files.length === 0 ? (
               <p className="px-4 py-6 text-sm text-muted-foreground">
-                {changes === null ? "Glass couldn't read these changes." : "No files changed."}
+                {changes === "unavailable"
+                  ? "Glass couldn't read these changes."
+                  : "No files changed."}
               </p>
             ) : (
               <ChangedFilesTree layout={layout} onSelect={showFile} viewedFiles={null} />
@@ -155,7 +161,7 @@ export function ChangesWithFeedback(props: {
               <PanelLeft aria-hidden />
             </Button>
           }
-          fileCount={layout.files.length}
+          fileCount={changes === "loading" ? "loading" : layout.files.length}
           viewedCount={null}
           display={display}
           onDisplayChange={setDisplay}

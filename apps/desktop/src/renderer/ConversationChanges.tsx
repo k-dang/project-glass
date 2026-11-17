@@ -1,5 +1,5 @@
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
-import type { Conversation, Turn } from "@glass/contracts"
+import { type Conversation, ConversationChanges as Changes, type Turn } from "@glass/contracts"
 import { Option } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import { FileDiff, MessageSquareText } from "lucide-react"
@@ -29,7 +29,12 @@ export function ConversationChanges(props: {
   const notes = useAtomValue(feedbackNotesAtom(conversation.id))
   const lastEnded = props.turns.findLast((turn) => turn.ended !== null)?.id ?? null
   const [lastEndedAtSnapshot, setLastEndedAtSnapshot] = useState(lastEnded)
-  const shown = Option.getOrNull(AsyncResult.value(changes))
+
+  const shown: Changes | "loading" | "unavailable" = Option.getOrElse(
+    AsyncResult.value(changes),
+    () => (AsyncResult.isFailure(changes) ? "unavailable" : "loading"),
+  )
+
   const store = useFeedbackNotes(conversation.id)
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("files")
 
@@ -60,9 +65,9 @@ export function ConversationChanges(props: {
       )}
       <LoadProblem result={changes} retry={refresh} />
       <LoadProblem result={notes} retry={store.refresh} />
-      {(shown !== null || (AsyncResult.isFailure(changes) && store.ready)) && (
+      {(shown !== "unavailable" || store.ready) && (
         <ChangesWithFeedback
-          key={shown?.id ?? "unavailable"}
+          key={shown instanceof Changes ? shown.id : shown}
           changes={shown}
           store={store}
           sidebarTab={sidebarTab}

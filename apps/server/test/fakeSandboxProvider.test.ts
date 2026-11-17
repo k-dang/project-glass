@@ -2,6 +2,7 @@ import { assert, it } from "@effect/vitest"
 import { Effect } from "effect"
 import { spawn } from "node:child_process"
 import { once } from "node:events"
+import { existsSync } from "node:fs"
 import { mkdir, writeFile } from "node:fs/promises"
 import { createConnection } from "node:net"
 import { join } from "node:path"
@@ -9,40 +10,51 @@ import { createInterface } from "node:readline"
 import { installFakeSandboxProvider } from "./fakeSandboxProvider"
 import { isolatedHome } from "./harness"
 
-it.live("kills a Sandbox host's Agent harnesses even when they have their own process groups", () =>
-  Effect.gen(function* () {
-    const home = yield* isolatedHome
-    const root = join(home, "sandboxes")
+const fakeSandboxes = Effect.gen(function* () {
+  const home = yield* isolatedHome
+  const root = join(home, "sandboxes")
 
-    const sandboxes = installFakeSandboxProvider(home, {
-      root,
-      cloneFrom: "unused",
-      piCommand: "unused",
-      claudeCommand: "unused",
-    })
+  const sandboxes = installFakeSandboxProvider(home, {
+    root,
+    cloneFrom: "unused",
+    piCommand: "unused",
+    claudeCommand: "unused",
+  })
+
+  const folder = join(root, "agent")
+  const checkout = join(folder, "checkout")
+  yield* Effect.promise(() => mkdir(checkout, { recursive: true }))
+
+  return { folder, checkout, remove: () => Effect.tryPromise(() => sandboxes.remove("agent")) }
+})
+
+it.live("removes a Sandbox, killing Agent harnesses even in their own process groups", () =>
+  Effect.gen(function* () {
+    const { folder, checkout, remove } = yield* fakeSandboxes
 
     const program = `
-      const server = require("node:net").createServer(socket => {
-        socket.on("data", () => socket.write("still running"))
-      })
-      server.listen(0, "127.0.0.1", () => process.send(server.address().port))
-    `
+        const server = require("node:net").createServer(socket => {
+          socket.on("data", () => socket.write("still running"))
+        })
+        server.listen(0, "127.0.0.1", () => process.send(server.address().port))
+      `
 
     const host = spawn(
       process.execPath,
       [
         "-e",
         `
-          const child = require("node:child_process").spawn(
-            process.execPath, ["-e", ${JSON.stringify(program)}],
-            { detached: true, stdio: ["ignore", "ignore", "inherit", "ipc"] }
-          )
-          child.on("message", port => {
-            process.stdout.write(JSON.stringify({ pid: child.pid, port }) + "\\n")
-          })
-        `,
+            const child = require("node:child_process").spawn(
+              process.execPath, ["-e", ${JSON.stringify(program)}],
+              { cwd: ${JSON.stringify(checkout)}, detached: true, stdio: ["ignore", "ignore", "inherit", "ipc"] }
+            )
+            child.on("message", port => {
+              process.stdout.write(JSON.stringify({ pid: child.pid, port }) + "\\n")
+            })
+          `,
       ],
       {
+        cwd: folder,
         detached: process.platform !== "win32",
         stdio: ["ignore", "pipe", "inherit"],
         windowsHide: true,
@@ -78,16 +90,47 @@ it.live("kills a Sandbox host's Agent harnesses even when they have their own pr
       socket.once("error", () => resolve(null))
     })
 
-    const folder = join(root, "agent")
-    yield* Effect.promise(() => mkdir(folder))
     yield* Effect.promise(() =>
       writeFile(
         join(folder, "host.json"),
         JSON.stringify({ pid: host.pid, port: address.port, token: "test" }),
       ),
     )
-    yield* Effect.promise(() => sandboxes.killHost("agent"))
+    yield* remove()
+    assert.isFalse(existsSync(folder))
     socket.write("probe")
     assert.isNull(yield* Effect.promise(() => reply))
   }),
+)
+
+it.live.runIf(process.platform === "win32")(
+  "reports a Sandbox it can't delete while a process outside its host still works in it",
+  () =>
+    Effect.gen(function* () {
+      const { folder, checkout, remove } = yield* fakeSandboxes
+
+      const stranger = spawn(
+        process.execPath,
+        ["-e", "process.send('ready'); setInterval(() => {}, 1e9)"],
+        {
+          cwd: checkout,
+          stdio: ["ignore", "ignore", "inherit", "ipc"],
+          windowsHide: true,
+        },
+      )
+
+      yield* Effect.addFinalizer(() =>
+        Effect.promise(() => {
+          const exited = once(stranger, "exit")
+          stranger.kill("SIGKILL")
+
+          return exited
+        }),
+      )
+      yield* Effect.promise(() => once(stranger, "message"))
+
+      const failure = yield* remove().pipe(Effect.flip)
+      assert.match(String(failure.cause), /EBUSY|EPERM/)
+      assert.isTrue(existsSync(folder))
+    }),
 )

@@ -330,6 +330,36 @@ it("opens a Follow-up Conversation and keeps it out of the Conversations list", 
   expect(screen.getByRole("link", { name: conversation.name })).toBeTruthy()
 })
 
+it("opens a PR the agent links to in its PR workspace", async () => {
+  const pullRequestUrl = "https://github.com/octo-org/hello-world/pull/7"
+
+  const user = mount({
+    WatchTranscript: () =>
+      Stream.make(
+        TranscriptSnapshot.make({
+          turns: [
+            {
+              id: "turn-1",
+              message: "File the PR",
+              images: [],
+              context: null,
+              feedback: [],
+              sentAt,
+              parts: [TextPart.make({ text: `I filed the PR: ${pullRequestUrl}` })],
+              ended: { at: sentAt, ending: TurnDone.make({}) },
+            },
+          ],
+          queued: [],
+          status: null,
+        }),
+      ),
+  })
+
+  await user.click(await screen.findByRole("link", { name: pullRequestUrl }))
+
+  await waitFor(() => expect(window.location.hash).toBe("#/reviews/octo-org/hello-world/7"))
+})
+
 it("keeps the hidden panel recoverable across Conversation navigation", async () => {
   const user = mount(
     {

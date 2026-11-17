@@ -82,6 +82,31 @@ it("marks the clicked Chapter file as current", async () => {
   expect(link.getAttribute("aria-current")).toBe("location")
 })
 
+it("hides a Chapter diagram to give its diffs the room", async () => {
+  const [first, ...rest] = tour.chapters
+
+  const f = mount({
+    ...tour,
+    chapters: [{ ...first!, diagram: "flowchart LR\n  greet[Greet by name]" }, ...rest],
+  })
+
+  await openTourOrder(f.user)
+
+  const diagram = await waitFor(() =>
+    within(chapter("Greet by name")).getByRole("region", { name: "Diagram: Greet by name" }),
+  )
+
+  await waitFor(() =>
+    expect(diagram.querySelector(".pele-node")?.textContent).toBe("Greet by name"),
+  )
+
+  await f.user.click(within(diagram).getByRole("button", { name: "Diagram" }))
+  expect(diagram.querySelector(".pele-node")).toBeNull()
+  expect(
+    within(diagram).getByRole("button", { name: "Diagram" }).getAttribute("aria-expanded"),
+  ).toBe("false")
+})
+
 it("opens Changes in Path order, and remembers Tour order across workspace tabs", async () => {
   const f = mount()
   await f.user.click(await screen.findByRole("tab", { name: "Changes" }))

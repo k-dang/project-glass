@@ -10,8 +10,10 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs"
+import { rm } from "node:fs/promises"
 import { connect, createServer, type Socket } from "node:net"
 import { join } from "node:path"
+import { setTimeout as sleep } from "node:timers/promises"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
 import { isolatedGitEnv } from "../src/gitEnv.ts"
@@ -182,6 +184,28 @@ const killTree = async (pid: number) => {
   await execFileAsync("kill", ["-KILL", ...pids.toReversed().map(String)]).catch(() => {})
 }
 
+// Electron's rmSync can't delete read-only files, such as git's objects, on Windows; rm can.
+const removeFolder = async (folder: string) => {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await rm(folder, { recursive: true, force: true })
+    } catch (error) {
+      if (attempt === 5) throw error
+      // oxlint-disable-next-line glass/test-waits -- A Sandbox provider backing off, not a test waiting on work.
+      await sleep(100 * attempt)
+    }
+  }
+}
+
+const removeSandbox = async (folder: string) => {
+  const hostPath = join(folder, "host.json")
+
+  if (existsSync(hostPath))
+    await killTree(Schema.decodeUnknownSync(HostFile)(readFileSync(hostPath, "utf8")).pid)
+
+  await removeFolder(folder)
+}
+
 const claudeEfforts = ["low", "medium", "high", "xhigh", "max"]
 
 const piModel = { id: "glass-test/gpt-test", name: "gpt-test", efforts: [] }
@@ -283,14 +307,10 @@ export const fakeSandboxProvider =
       },
       remove: async (state) => {
         const { folder } = decodeSandbox(state)
-        const hostPath = join(folder, "host.json")
 
         if (!existsSync(folder)) throw glass.sandboxGone()
 
-        if (existsSync(hostPath))
-          await killTree(Schema.decodeUnknownSync(HostFile)(readFileSync(hostPath, "utf8")).pid)
-
-        rmSync(folder, { recursive: true, force: true })
+        await removeSandbox(folder)
       },
       models: async (harness) => sandboxModels[harness],
     })
@@ -331,6 +351,7 @@ export const installFakeSandboxProvider = (
     },
     host,
     killHost: (conversationId: string) => killTree(host(conversationId).pid),
+    remove: (conversationId: string) => removeSandbox(sandboxFolder(conversationId)),
     stopHosts: async () => {
       for (const conversationId of readdirSync(settings.root))
         if (existsSync(hostFile(conversationId))) await killTree(host(conversationId).pid)
