@@ -3,11 +3,17 @@ import {
   ChangedFile,
   FeedbackNote,
   FollowedRepository,
+  incompatibleExplanation,
+  PartSet,
+  PermissionRequestPart,
   SandboxPlace,
   SandboxProviderInfo,
   type SandboxStatus,
+  TextPart,
   TextPatch,
   type Transcript,
+  type Turn,
+  TurnCutOff,
   TurnDone,
   type TurnEnding,
   TurnEnded,
@@ -17,6 +23,7 @@ import { DateTime, Effect, Option, Predicate, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { resolve } from "node:path"
 import { conversationServicesFixture } from "../test/conversationServicesFixture"
+import { HOST_PROTOCOL } from "./agentHost/protocol"
 import { eventually } from "../test/eventually"
 import { steps } from "../test/inProcessSandboxes"
 
@@ -43,6 +50,40 @@ const failedReason = ({ turns }: Transcript) => {
 
   return Predicate.isTagged(ending, "Failed") ? ending.reason : ending?._tag
 }
+
+const texts = (turn: Turn | undefined) =>
+  turn?.parts.flatMap((part) => (Predicate.isTagged(part, "Text") ? [part.text] : [])) ?? []
+
+const reply = (turn: Effect.Success<Fixture["started"]>, said: ReadonlyArray<string>, from = 0) =>
+  Effect.forEach(said, (text, index) =>
+    turn.emit(
+      PartSet.make({ turnId: turn.turnId, index: from + index, part: TextPart.make({ text }) }),
+    ),
+  )
+
+const waitingPermission = PermissionRequestPart.make({
+  requestId: "request-1",
+  toolName: "Bash",
+  inputSummary: "A tool request",
+  input: "{}",
+  status: "waiting",
+  reason: null,
+})
+
+const afterRetries = (
+  f: Fixture,
+  conversationId: string,
+  until: (transcript: Transcript) => boolean,
+) =>
+  eventually(
+    Effect.gen(function* () {
+      yield* TestClock.adjust("1 second")
+      const transcript = yield* f.transcript(conversationId, ({ turns }) => turns.length > 0)
+      assert.isTrue(until(transcript))
+
+      return transcript
+    }),
+  )
 
 const say = (message: string) => ({ message, images: [] })
 
@@ -439,5 +480,126 @@ it.effect("keeps a Conversation's Sandbox gone, though its host still answers", 
       .pipe(Effect.flip)
 
     assert.include(refused.message, "deleted")
+  }),
+)
+
+it.effect(
+  "follows a Sandbox's host again after a dropped connection, missing and repeating nothing",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* conversationServicesFixture
+      const conversation = yield* createSandboxed(f)
+      const turn = yield* f.started
+      yield* reply(turn, ["one"])
+      yield* f.transcript(conversation.id, ({ turns }) => texts(turns[0]).length === 1)
+
+      yield* f.sandboxes.dropConnections(conversation.id)
+      yield* reply(turn, ["two"], 1)
+      yield* end(turn)
+
+      const [done] = (yield* afterRetries(f, conversation.id, settled(1))).turns
+      assert.deepStrictEqual(texts(done), ["one", "two"])
+      assert.deepStrictEqual(done?.ended?.ending, TurnDone.make({}))
+    }),
+)
+
+it.effect(
+  "cuts off a Sandbox's running Turn when its host restarts, keeping its transcript, then follows the new host from its start",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* conversationServicesFixture
+      const conversation = yield* createSandboxed(f)
+      const said = ["one", "two", "three", "four", "five"]
+      const first = yield* f.started
+      yield* reply(first, said)
+      yield* first.emit(
+        PartSet.make({ turnId: first.turnId, index: said.length, part: waitingPermission }),
+      )
+      yield* f.transcript(
+        conversation.id,
+        ({ turns }) => turns[0]?.parts.length === said.length + 1,
+      )
+
+      yield* f.sandboxes.restartHost(conversation.id)
+
+      const [cutOff] = (yield* afterRetries(
+        f,
+        conversation.id,
+        ({ turns }) => turns[0]?.ended !== null,
+      )).turns
+
+      assert.deepStrictEqual(cutOff?.ended?.ending, TurnCutOff.make({}))
+      assert.deepStrictEqual(texts(cutOff), said)
+
+      yield* f.conversations.send(conversation.id, say("Again"))
+      const second = yield* f.started
+      yield* reply(second, ["six"])
+      yield* end(second)
+
+      const [, done] = (yield* f.transcript(conversation.id, settled(2))).turns
+      assert.deepStrictEqual(texts(done), ["six"])
+    }),
+)
+
+for (const [spoken, kind] of [
+  ["a later protocol", { kind: "versioned", protocol: HOST_PROTOCOL + 1 }],
+  ["no protocol", { kind: "unversioned" }],
+] as const)
+  it.effect(
+    `keeps a Conversation read-only while its Sandbox's host speaks ${spoken}, cutting off its Turn, until a compatible host answers`,
+    () =>
+      Effect.gen(function* () {
+        const f = yield* conversationServicesFixture
+        const conversation = yield* createSandboxed(f)
+        yield* reply(yield* f.started, ["one"])
+        yield* f.transcript(conversation.id, ({ turns }) => texts(turns[0]).length === 1)
+
+        yield* f.sandboxes.restartHost(conversation.id, kind)
+
+        const [cutOff] = (yield* afterRetries(
+          f,
+          conversation.id,
+          ({ turns }) => turns[0]?.ended !== null,
+        )).turns
+
+        assert.deepStrictEqual(cutOff?.ended?.ending, TurnCutOff.make({}))
+        assert.deepStrictEqual(texts(cutOff), ["one"])
+
+        const status = yield* sandboxOf(f.conversations, conversation.id).pipe(
+          Stream.runHead,
+          Effect.map(Option.getOrThrow),
+        )
+
+        assert.equal(status.reach, "incompatible")
+
+        yield* f.conversations.send(conversation.id, say("Still there?"))
+        assert.equal(
+          failedReason(yield* f.transcript(conversation.id, settled(2))),
+          incompatibleExplanation,
+        )
+
+        yield* f.sandboxes.restartHost(conversation.id)
+        yield* f.conversations.send(conversation.id, say("Back?"))
+        yield* end(yield* f.started)
+        assert.equal(failedReason(yield* f.transcript(conversation.id, settled(3))), "Done")
+      }),
+  )
+
+it.effect("runs a message sent after Glass relaunches on its Sandbox's replacement host", () =>
+  Effect.gen(function* () {
+    const f = yield* conversationServicesFixture
+    const conversation = yield* createSandboxed(f)
+    yield* end(yield* f.started)
+    yield* f.transcript(conversation.id, settled(1))
+
+    yield* f.sandboxes.restartHost(conversation.id)
+    const { conversations } = yield* f.restart
+    yield* conversations.send(conversation.id, say("Again"))
+    yield* end(yield* f.started)
+
+    assert.equal(
+      failedReason(yield* f.transcript(conversation.id, settled(2), conversations)),
+      "Done",
+    )
   }),
 )

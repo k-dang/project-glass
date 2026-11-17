@@ -29,6 +29,17 @@ export const JournalEntry = Schema.Struct({
 
 export type JournalEntry = typeof JournalEntry.Type
 
+// Raise this when a change to AgentHostRpcs would break talking to a host of the previous
+// version, which a Sandbox keeps running across Glass upgrades.
+export const HOST_PROTOCOL = 1
+
+// Glass asks hosts of any version for this, so its shape must never change.
+export const Hello = Rpc.make("Hello", {
+  success: Schema.Struct({ host: Schema.String, protocol: Schema.Int }),
+})
+
+export class HostReplaced extends Schema.TaggedError<HostReplaced>()("HostReplaced", {}) {}
+
 export const HOST_TOKEN_HEADER = "x-glass-host-token"
 
 export const newHostToken = () => randomBytes(32).toString("base64url")
@@ -135,6 +146,7 @@ export const SteersNotTakenIn = Schema.Array(MessageWithContext)
 export type SteersNotTakenIn = typeof SteersNotTakenIn.Type
 
 export class AgentHostRpcs extends RpcGroup.make(
+  Hello,
   Rpc.make("ListModels", {
     payload: { harness: AgentHarness },
     success: AgentModels,
@@ -188,11 +200,12 @@ export class AgentHostRpcs extends RpcGroup.make(
     error: HostConversationError,
   }),
   Rpc.make("WatchJournal", {
-    payload: { after: Schema.Int },
+    payload: { host: Schema.String, after: Schema.Int },
     success: JournalEntry,
+    error: HostReplaced,
     stream: true,
   }),
-  Rpc.make("Acknowledge", { payload: { through: Schema.Int } }),
+  Rpc.make("Acknowledge", { payload: { host: Schema.String, through: Schema.Int } }),
 ) {}
 
 export const couldNotSwitch = (harness: string, what: "model" | "effort" | "Permission mode") =>

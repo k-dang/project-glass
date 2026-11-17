@@ -548,7 +548,7 @@ it.effect("stops a Turn once the journal passes its budget, keeping everything i
     yield* report(started("turn-1"))
     yield* report(wrote("turn-1", BUDGET * 2))
 
-    const kept = yield* journal.watch(0).pipe(Stream.take(3), Stream.runCollect)
+    const kept = yield* journal.watch(journal.host, 0).pipe(Stream.take(3), Stream.runCollect)
 
     assert.deepStrictEqual(
       kept.map(({ event }) => event),
@@ -559,12 +559,12 @@ it.effect("stops a Turn once the journal passes its budget, keeping everything i
       ],
     )
 
-    yield* journal.acknowledge(3)
+    yield* journal.acknowledge(journal.host, 3)
     yield* report(started("turn-2"))
     yield* report(wrote("turn-2", BUDGET / 2))
     yield* report(ended("turn-2"))
 
-    const next = yield* journal.watch(3).pipe(Stream.take(3), Stream.runCollect)
+    const next = yield* journal.watch(journal.host, 3).pipe(Stream.take(3), Stream.runCollect)
 
     assert.deepStrictEqual(next.at(-1)?.event, ended("turn-2"))
     assert.equal(stops, 1)

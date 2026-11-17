@@ -255,6 +255,11 @@ export class Transcripts extends Context.Service<
       ending: TurnEnding,
       conversationIds: ReadonlyArray<string>,
     ) => Effect.Effect<void, ConversationError>
+    readonly endTurn: (
+      ending: TurnEnding,
+      conversationId: string,
+      turnId: string,
+    ) => Effect.Effect<void, ConversationError>
     readonly askedToStop: (turnId: string) => Effect.Effect<void>
     readonly runningTurn: (
       conversationId: string,
@@ -818,13 +823,16 @@ export class Transcripts extends Context.Service<
         })
       })
 
-      const endRunning = Effect.fn("Transcripts.endRunning")(function* (
+      const endUnfinished = Effect.fnUntraced(function* (
         ending: TurnEnding,
         conversationIds: ReadonlyArray<string>,
+        onlyTurnId: string | null,
       ) {
         if (conversationIds.length === 0) return
 
         const conditions = [sql`t.ended IS NULL`, sql.in("t.conversation_id", conversationIds)]
+
+        if (onlyTurnId !== null) conditions.push(sql`t.id = ${onlyTurnId}`)
 
         if (Predicate.isTagged(ending, "CutOff") || Predicate.isTagged(ending, "Interrupted"))
           conditions.push(
@@ -866,6 +874,16 @@ export class Transcripts extends Context.Service<
         )
       })
 
+      const endRunning = Effect.fn("Transcripts.endRunning")(
+        (ending: TurnEnding, conversationIds: ReadonlyArray<string>) =>
+          endUnfinished(ending, conversationIds, null),
+      )
+
+      const endTurn = Effect.fn("Transcripts.endTurn")(
+        (ending: TurnEnding, conversationId: string, endedTurnId: string) =>
+          endUnfinished(ending, [conversationId], endedTurnId),
+      )
+
       const withStorageFailure = <A, E, R>(name: string, effect: Effect.Effect<A, E, R>) =>
         Effect.catchIf(effect, isStorageError, (cause) =>
           Effect.logWarning(`Couldn't ${name}`, cause).pipe(Effect.andThen(storageFailure())),
@@ -874,6 +892,7 @@ export class Transcripts extends Context.Service<
       return Transcripts.of({
         save,
         endRunning,
+        endTurn,
         askedToStop,
         watch: (conversationId) =>
           Stream.unwrap(

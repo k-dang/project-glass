@@ -39,7 +39,7 @@ import { existsSync, mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { watchDeadlines } from "../test/deadlines"
-import { AgentHostRpcs } from "./agentHost/protocol"
+import { AgentHostRpcs, HOST_PROTOCOL } from "./agentHost/protocol"
 import type { HostClient } from "./Placement"
 import { ConversationTurns } from "./ConversationTurns"
 import { GlobalConversation } from "./GlobalConversation"
@@ -318,6 +318,7 @@ const stallableHost = (calls: {
       AgentHostRpcs.toLayer(
         Effect.succeed(
           AgentHostRpcs.of({
+            Hello: () => Effect.succeed({ host: "test-host", protocol: HOST_PROTOCOL }),
             ListModels: () => Effect.die("This test does not call ListModels"),
             ListCommands: () => Effect.die("This test does not call ListCommands"),
             StartConversation: () => Effect.succeed("started" as const),

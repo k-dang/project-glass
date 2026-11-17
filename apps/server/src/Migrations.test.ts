@@ -87,6 +87,7 @@ it.live("upgrades main's schema directly, preserving completed and unfinished up
       [10, "to_do_images"],
       [11, "mermaid_tour_diagrams"],
       [12, "conversations"],
+      [13, "journal_host"],
     ])
     const transcripts = yield* Transcripts
     const { turns } = yield* transcripts.read("global")
@@ -153,6 +154,7 @@ it.live("creates the schema once and reads Activity through its indexes after re
         [10, "to_do_images"],
         [11, "mermaid_tour_diagrams"],
         [12, "conversations"],
+        [13, "journal_host"],
       ],
       [],
     ] as const) {

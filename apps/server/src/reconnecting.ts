@@ -10,7 +10,7 @@ const MAX_LOST_RETRY_SPACING = Duration.minutes(5)
 
 const GIVE_UP_AFTER = Duration.minutes(15)
 
-type Reach = "connecting" | "reachable" | "unreachable"
+type Reach = "connecting" | "reachable" | "unreachable" | "incompatible"
 
 export type Recovery<Client> =
   | { readonly phase: "connecting"; readonly reach: Reach }
@@ -28,6 +28,7 @@ export type Recovery<Client> =
       readonly delay: Duration.Duration
     }
   | { readonly phase: "abandoned" }
+  | { readonly phase: "incompatible" }
 
 export const recoveryReach = <C>(state: Recovery<C>) =>
   Match.value(state).pipe(
@@ -38,6 +39,7 @@ export const recoveryReach = <C>(state: Recovery<C>) =>
       retrying: ({ reach }) => reach,
       unreachable: () => "unreachable",
       abandoned: () => "unreachable",
+      incompatible: () => "incompatible",
     }),
   )
 

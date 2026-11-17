@@ -1034,6 +1034,20 @@ it("dims a Sandbox Conversation Glass can't reach, and makes one whose Sandbox e
   ).toBeTruthy()
   expect(screen.queryByRole("textbox", { name: "Message" })).toBeNull()
   expect(screen.getByRole("link", { description: /Sandbox expired/ })).toBeTruthy()
+
+  cleanup()
+  mount({
+    WatchConversations: () => Stream.make([inSandboxWith("incompatible")]),
+    WatchTranscript: noTranscript,
+  })
+
+  expect(
+    await screen.findByText(
+      "This Conversation's Sandbox runs a different version of Glass, so it can't take messages. Its transcript stays until you remove the Conversation.",
+    ),
+  ).toBeTruthy()
+  expect(screen.queryByRole("textbox", { name: "Message" })).toBeNull()
+  expect(screen.getByRole("link", { description: /Sandbox on another Glass version/ })).toBeTruthy()
 })
 
 const flaky = new ToDo({ id: 3, title: "Fix the flaky test", notes: "", done: false })

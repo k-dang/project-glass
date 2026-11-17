@@ -392,11 +392,14 @@ it.live("rejects a Revision that changes during the GitHub file read", () =>
   Effect.gen(function* () {
     const f = yield* fixture()
     f.github.beforeNext(`/repos/${f.pr.owner}/${f.pr.repo}/pulls/`, () =>
-      f.pr.push({ head: { sha: "h2", files: { "greet.ts": "new" } } }),
+      f.pr.push({
+        head: { sha: "h2", files: { "greet.ts": "new" } },
+        changedFiles: [{ path: "greet.ts", status: "modified" }],
+      }),
     )
     yield* f.write
     const state = yield* f.state(completed)
-    assert.equal(state.job.status === "failed" && state.job.reason.reason, "github")
+    assert.equal(state.job.status === "failed" && state.job.reason.reason, "stale-revision")
     assert.isEmpty(f.runners.runs)
     assert.isNull(state.tour)
   }),

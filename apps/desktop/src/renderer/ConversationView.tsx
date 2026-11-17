@@ -25,8 +25,7 @@ import {
   type Turn,
   type TurnEnd,
   type TurnPart,
-  goneExplanation,
-  isGone,
+  readOnlyExplanation,
   shortSha,
 } from "@glass/contracts"
 import { cn } from "cn"
@@ -228,7 +227,7 @@ function OpenConversation(props: { conversation: Conversation } & ConversationTa
   ])
 
   const reach = conversation.sandbox?.reach
-  const gone = isGone(reach) ? reach : null
+  const readOnly = readOnlyExplanation(reach)
 
   useEffect(() => {
     rememberPlace(registry, { area: "conversations", conversationId: conversation.id })
@@ -305,11 +304,11 @@ function OpenConversation(props: { conversation: Conversation } & ConversationTa
             </ToolCallView>
             <ExtensionStatuses statuses={extensionStatuses} />
             {reach === "unreachable" && <UnreachableNotice conversationId={conversation.id} />}
-            {gone === null ? (
+            {readOnly === null ? (
               <Composer conversation={conversation} turns={turns} queued={queued} />
             ) : (
               <output className="mx-auto block w-full max-w-3xl px-6 py-4 text-sm text-muted-foreground">
-                {goneExplanation(gone)}
+                {readOnly}
               </output>
             )}
           </div>
