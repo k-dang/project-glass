@@ -2,15 +2,17 @@ import {
   Conversation,
   AgentCommand,
   AgentHarness,
-  AgentEvent,
   AgentModels,
   ChangedFile,
   ExtensionStatusesChanged,
   MessageWithContext,
   ModelChoice,
+  PartAppended,
+  PartSet,
   RequestAnswer,
   RequestNotWaiting,
   TurnEnded,
+  TurnStarted,
 } from "@glass/contracts"
 import { Schema, SchemaTransformation } from "effect"
 import { randomBytes } from "node:crypto"
@@ -29,9 +31,9 @@ export const HostTurnEnded = Schema.TaggedStruct("TurnEnded", {
 })
 
 export const HostEvent = Schema.Union([
-  ...AgentEvent.members.filter(
-    (member): member is Exclude<typeof member, typeof TurnEnded> => member !== TurnEnded,
-  ),
+  TurnStarted,
+  PartSet,
+  PartAppended,
   HostTurnEnded,
   ExtensionStatusesChanged,
 ])

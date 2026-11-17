@@ -540,6 +540,7 @@ it.effect("stops a Turn once the journal passes its budget, keeping everything i
   Effect.gen(function* () {
     const at = yield* DateTime.now
     const exit = yield* Deferred.make<void>()
+    const stopping = yield* Deferred.make<StopEnding>()
     let stops = 0
 
     const ended = (turnId: string) =>
@@ -548,18 +549,19 @@ it.effect("stops a Turn once the journal passes its budget, keeping everything i
     const started = (turnId: string) =>
       TurnStarted.make({ turnId, message: "", images: [], context: null, feedback: [], sentAt: at })
 
-    const { journal, report } = yield* budgeted((reportTo) => ({
+    const { journal, report } = yield* budgeted(() => ({
       ...session(exit),
-      stopTurn: Effect.fnUntraced(function* (turnId: string, ending: StopEnding) {
-        stops++
-        yield* reportTo(TurnEnded.make({ turnId, ended: { at, ending } }))
-
-        return []
-      }),
+      stopTurn: (_turnId, ending) =>
+        Effect.sync(() => stops++).pipe(
+          Effect.andThen(Deferred.succeed(stopping, ending)),
+          Effect.as([]),
+        ),
     }))
 
     yield* report(started("turn-1"))
     yield* report(wrote("turn-1", BUDGET * 2))
+    const ending = yield* Deferred.await(stopping)
+    yield* report(TurnEnded.make({ turnId: "turn-1", ended: { at, ending } }))
 
     const kept = yield* journal.watch(journal.host, 0).pipe(Stream.take(3), Stream.runCollect)
 

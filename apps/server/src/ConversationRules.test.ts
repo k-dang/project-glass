@@ -125,12 +125,13 @@ it.live(
 )
 
 it.live(
-  "queues the Steers the harness hadn't taken in when the host stops a Turn over its budget, once",
+  "puts the Steers the harness hadn't taken in before the Queued messages when the host stops a Turn over its budget, once",
   () =>
     Effect.gen(function* () {
       const f = yield* conversationServicesFixture.pipe(Effect.provideService(JournalBudget, 1_000))
       const conversation = yield* f.create()
       const turn = yield* f.started
+      yield* f.conversations.send(conversation.id, say("Later"))
       yield* f.conversations.steer(conversation.id, say("Also this"))
       const left = [{ ...say("Also this"), context: null }]
       yield* f.leaveOnStop(left)
@@ -147,15 +148,15 @@ it.live(
 
       const stopped = yield* f.transcript(
         conversation.id,
-        (transcript) => settled(1)(transcript) && transcript.queued.length === 1,
+        (transcript) => settled(1)(transcript) && transcript.queued.length === 2,
       )
 
-      assert.deepStrictEqual(stopped.turns[0]?.ended?.ending, overBudget)
-      assert.deepStrictEqual(queuedMessages(stopped), ["Also this"])
+      const ended = stopped.turns[0]?.ended
+      assert.deepStrictEqual(ended?.ending, overBudget)
+      assert.deepStrictEqual(queuedMessages(stopped), ["Also this", "Later"])
 
-      const at = stopped.turns[0]?.ended?.at ?? (yield* DateTime.now)
       yield* turn.emit({
-        ...TurnEnded.make({ turnId: turn.turnId, ended: { at, ending: overBudget } }),
+        ...TurnEnded.make({ turnId: turn.turnId, ended: ended! }),
         steersNotTakenIn: left,
       })
       yield* turn.emit(ExtensionStatusesChanged.make({ extensionStatuses: ["Replayed"] }))
@@ -164,7 +165,8 @@ it.live(
         extensionStatuses.includes("Replayed"),
       )
 
-      assert.deepStrictEqual(queuedMessages(replayed), ["Also this"])
+      assert.deepStrictEqual(queuedMessages(replayed), ["Also this", "Later"])
+      assert.equal(replayed.turns.length, 1)
     }),
 )
 

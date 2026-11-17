@@ -23,7 +23,7 @@ import {
   type TranscriptUpdate,
   Turn,
   TurnEnd,
-  type TurnEnded,
+  TurnEnded,
   type TurnEnding,
   TurnContext,
   CapturedContext,
@@ -184,8 +184,8 @@ export type UnseenByConversation = ReadonlyMap<string, TurnEnd>
 
 export type StartedTurn = typeof TurnStarted.Type & { readonly conversationId: string }
 
-const joinConsecutiveAppends = (events: ReadonlyArray<AgentEvent>) => {
-  const joined: Array<AgentEvent> = []
+const joinConsecutiveAppends = (events: ReadonlyArray<SavedEvent>) => {
+  const joined: Array<SavedEvent> = []
 
   for (const event of events) {
     const previous = joined.at(-1)
@@ -233,10 +233,10 @@ const storageFailure = () =>
     message: "Couldn't read or save the Conversation's transcript. Try again.",
   })
 
-const prepend = (inputs: ReadonlyArray<MessageWithContext>): ConversationWrite => ({
-  type: "prepend",
-  messages: inputs.map((input) => ({ ...input, feedback: [], id: randomUUID() })),
-})
+const queuedAgain = (inputs: ReadonlyArray<MessageWithContext>): ReadonlyArray<QueuedMessage> =>
+  inputs.map((input) => ({ ...input, feedback: [], id: randomUUID() }))
+
+type SavedEvent = Exclude<HostEvent, typeof ExtensionStatusesChanged.Type>
 
 export class Transcripts extends Context.Service<
   Transcripts,
@@ -623,14 +623,10 @@ export class Transcripts extends Context.Service<
         } satisfies ConversationState
       })
 
-      const step = Effect.fnUntraced(function* (
-        conversationId: string,
-        event: ConversationEvent,
-        then: ReadonlyArray<ConversationWrite> = [],
-      ) {
+      const step = Effect.fnUntraced(function* (conversationId: string, event: ConversationEvent) {
         const { outcome, writes } = stepConversation(yield* conversation(conversationId), event)
 
-        return { outcome, updates: yield* execute(conversationId, [...writes, ...then]) }
+        return { outcome, updates: yield* execute(conversationId, writes) }
       })
 
       const changeWith = <A, E, R>(
@@ -718,15 +714,9 @@ export class Transcripts extends Context.Service<
         hostEvents: ReadonlyArray<HostEvent>,
         throughJournalEntry?: number,
       ) => {
-        const events: Array<AgentEvent> = []
-        const steersNotTakenIn = new Map<string, ReadonlyArray<MessageWithContext>>()
-
-        for (const event of hostEvents)
-          if (Predicate.isTagged(event, "TurnEnded")) {
-            const { steersNotTakenIn: steers = [], ...ended } = event
-            events.push(ended)
-            steersNotTakenIn.set(ended.turnId, steers)
-          } else if (!Predicate.isTagged(event, "ExtensionStatusesChanged")) events.push(event)
+        const events = hostEvents.filter(
+          (event): event is SavedEvent => !Predicate.isTagged(event, "ExtensionStatusesChanged"),
+        )
 
         const shown = hostEvents.findLast((event) =>
           Predicate.isTagged(event, "ExtensionStatusesChanged"),
@@ -744,17 +734,23 @@ export class Transcripts extends Context.Service<
 
             const ended = written.filter((event) => Predicate.isTagged(event, "TurnEnded"))
 
-            const next = yield* Effect.forEach(ended, ({ turnId, ended: { ending } }) => {
-              const steers = steersNotTakenIn.get(turnId) ?? []
+            const next = yield* Effect.forEach(
+              ended,
+              ({ ended: { ending }, steersNotTakenIn = [] }) =>
+                step(conversationId, {
+                  type: "turnEnded",
+                  ending,
+                  requeued: queuedAgain(steersNotTakenIn),
+                }),
+            )
 
-              return step(
-                conversationId,
-                { type: "turnEnded", ending },
-                steers.length === 0 ? [] : [prepend(steers)],
-              )
-            })
+            const reported = written.map((event) =>
+              Predicate.isTagged(event, "TurnEnded")
+                ? TurnEnded.make({ turnId: event.turnId, ended: event.ended })
+                : event,
+            )
 
-            return [ended, next.flatMap(({ updates }) => updates), written] as const
+            return [ended, next.flatMap(({ updates }) => updates), reported] as const
           }),
         ).pipe(
           Effect.tapError((cause) => Effect.logWarning("Couldn't save a transcript", cause)),
@@ -1050,7 +1046,10 @@ export class Transcripts extends Context.Service<
         prependQueued: (conversationId, inputs) =>
           withStorageFailure(
             "put messages back in front of the Queued ones",
-            change(conversationId, execute(conversationId, [prepend(inputs)])),
+            change(
+              conversationId,
+              execute(conversationId, [{ type: "prepend", messages: queuedAgain(inputs) }]),
+            ),
           ),
         cancelQueued: (conversationId, queuedId, restore = () => Effect.void) =>
           withStorageFailure(

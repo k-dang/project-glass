@@ -40,10 +40,23 @@ it("advances the queue head only after Done and Failed", () => {
 
   for (const [ending, advances] of endings)
     assert.deepStrictEqual(
-      stepConversation(idle, { type: "turnEnded", ending }),
+      stepConversation(idle, { type: "turnEnded", ending, requeued: [] }),
       advances ? startsQueued("a") : unchanged,
       ending._tag,
     )
+})
+
+it("puts the Steers an ended Turn didn't take in at the queue's front, starting nothing", () => {
+  const steer = message("steer")
+
+  assert.deepStrictEqual(
+    stepConversation(idle, {
+      type: "turnEnded",
+      ending: TurnFailed.make({ reason: "Over budget" }),
+      requeued: [steer],
+    }),
+    { outcome: { type: "queued" }, writes: [{ type: "prepend", messages: [steer] }] },
+  )
 })
 
 it("starts a Turn when idle and queues at the back while running", () => {
