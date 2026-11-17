@@ -1,12 +1,18 @@
-<!--
-Open with the problem in plain words, then the fix in a sentence or two.
-Not an inventory of what changed. Use the words in GLOSSARY.md.
-Name the Linear issue (PER-123) or the earlier PR this builds on.
+## Problem
 
+<!--
+What was wrong or missing, in plain words. Use the words in GLOSSARY.md.
+Name the Linear issue (PER-123) or the earlier PR this builds on.
+-->
+
+## Change
+
+<!--
+The fix in a sentence or two, not an inventory of what changed.
 Then the smallest picture of the change that a reviewer would otherwise
 have to rebuild from the diff: pseudocode, a call tree, a component tree,
 a shallow file tree, a Mermaid diagram, or a `diff` block of a changed
-type or contract. Skip it when the opener already says everything.
+type or contract. Skip the picture when the sentence says everything.
 -->
 
 ## Evidence
