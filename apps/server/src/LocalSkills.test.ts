@@ -172,15 +172,16 @@ it.live(
 it.live("scans pi's skill folders together", () =>
   Effect.gen(function* () {
     const home = yield* isolatedHome
-    const folders = [join(home, ".pi", "agent", "skills"), join(home, ".agents", "skills")]
+    const piSkills = join(home, ".pi", "agent", "skills")
+    const agentsSkills = join(home, ".agents", "skills")
     const scanning = counter()
 
-    write(join(folders[0]!, "plan", "SKILL.md"), skillFile("plan", "Plan."))
-    write(join(folders[1]!, "review", "SKILL.md"), skillFile("review", "Review."))
+    write(join(piSkills, "plan", "SKILL.md"), skillFile("plan", "Plan."))
+    write(join(agentsSkills, "review", "SKILL.md"), skillFile("review", "Review."))
 
     const local = yield* localSkillsIn(home, (fs) => ({
       readDirectory: (path, options) =>
-        (folders.includes(path)
+        ([piSkills, agentsSkills].includes(path)
           ? Effect.sync(scanning.add).pipe(Effect.andThen(scanning.reached(2)))
           : Effect.void
         ).pipe(Effect.andThen(fs.readDirectory(path, options))),
