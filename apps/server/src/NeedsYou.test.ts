@@ -291,11 +291,12 @@ it.live(
   () =>
     Effect.gen(function* () {
       const f = yield* reviewsFixture({ reply: "hold" })
-      const [first, second] = [f.seed("Greet"), f.seed("Wave")]
+      const [first, second, third] = [f.seed("Greet"), f.seed("Wave"), f.seed("Fibers")]
       yield* f.client.SetQueueWork({ feature: "agentReviews", enabled: true })
-      yield* f.client.AddToQueue({ references: [ref(first), ref(second)] })
+      yield* f.client.AddToQueue({ references: [ref(first), ref(second), ref(third)] })
       yield* f.reviewState(first, status("reviewing"))
-      yield* f.reviewState(second, status("waiting"))
+      yield* f.reviewState(second, status("reviewing"))
+      yield* f.reviewState(third, status("waiting"))
 
       assert.deepStrictEqual(yield* current(f.client), [])
 
@@ -310,14 +311,15 @@ it.live(
       )
 
       yield* f.reviewState(second, reviewed)
+      yield* f.reviewState(third, reviewed)
       yield* f.runners.configure({ reply: "hold" })
       yield* f.client.StartAgentReview({ pullRequest: ref(first), revision: revisionOf(first) })
       yield* f.reviewState(first, (state) => status("reviewing")(state) && state.review !== null)
-      assert.deepStrictEqual(titles(yield* current(f.client)), ["Wave"])
+      assert.deepStrictEqual(titles(yield* current(f.client)), ["Wave", "Fibers"])
 
       yield* f.runners.release({ fail: "failed" })
       yield* f.reviewState(first, (state) => status("failed")(state) && state.review !== null)
-      assert.deepStrictEqual(titles(yield* current(f.client)), ["Wave"])
+      assert.deepStrictEqual(titles(yield* current(f.client)), ["Wave", "Fibers"])
     }),
 )
 
