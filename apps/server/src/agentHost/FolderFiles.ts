@@ -75,7 +75,8 @@ export class FolderFiles extends Context.Service<
         existing: (folder, paths) =>
           fs.realPath(folder).pipe(
             Effect.flatMap((root) =>
-              Effect.filter(
+              // `Effect.filter` keeps paths in the order their checks finish, so check, then filter.
+              Effect.forEach(
                 paths,
                 (path) =>
                   fileIn(root, path).pipe(
@@ -85,6 +86,7 @@ export class FolderFiles extends Context.Service<
                 { concurrency: 16 },
               ),
             ),
+            Effect.map((found) => paths.filter((_, index) => found[index])),
             failure("Couldn't look for files in the Conversation's folder."),
           ),
         read: (folder, path) =>
