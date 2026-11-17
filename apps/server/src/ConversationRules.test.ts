@@ -152,11 +152,12 @@ it.live(
       )
 
       const ended = stopped.turns[0]?.ended
-      assert.deepStrictEqual(ended?.ending, overBudget)
+      assert.exists(ended)
+      assert.deepStrictEqual(ended.ending, overBudget)
       assert.deepStrictEqual(queuedMessages(stopped), ["Also this", "Later"])
 
       yield* turn.emit({
-        ...TurnEnded.make({ turnId: turn.turnId, ended: ended! }),
+        ...TurnEnded.make({ turnId: turn.turnId, ended }),
         steersNotTakenIn: left,
       })
       yield* turn.emit(ExtensionStatusesChanged.make({ extensionStatuses: ["Replayed"] }))
