@@ -8,7 +8,6 @@ import {
   type ChangedFile,
   emptyTranscript,
   FollowedRepository,
-  type AgentEvent,
   type RequestAnswer,
   type MessageWithContext,
   type Transcript,
@@ -37,6 +36,7 @@ import { Journal } from "../src/agentHost/Journal"
 import {
   AgentHostRpcs,
   type HostConversationError,
+  type HostEvent,
   type TurnSettings,
 } from "../src/agentHost/protocol"
 import { ActivityLog } from "../src/ActivityLog"
@@ -61,7 +61,7 @@ interface Started {
   readonly turnId: string
   readonly input: DeliveredTurn
   readonly settings: TurnSettings
-  readonly emit: (event: AgentEvent) => Effect.Effect<void>
+  readonly emit: (event: HostEvent) => Effect.Effect<void>
 }
 
 export const conversationServicesFixture = Effect.gen(function* () {

@@ -139,8 +139,16 @@ export class HostConversations extends Context.Service<
             const scope = yield* Scope.fork(hostScope)
             let stoppingOverBudget = false
 
+            let leftOverBudget: SteersNotTakenIn = []
+
             const report = Effect.fnUntraced(function* (event: HostEvent) {
-              const full = yield* journal.append(conversationId, event)
+              const full = yield* journal.append(
+                conversationId,
+                Predicate.isTagged(event, "TurnEnded") && leftOverBudget.length > 0
+                  ? { ...event, steersNotTakenIn: leftOverBudget }
+                  : event,
+              )
+
               const conversation = running.get(conversationId)
 
               if (
@@ -152,6 +160,7 @@ export class HostConversations extends Context.Service<
                     ? event.turnId
                     : null
                 stoppingOverBudget = false
+                leftOverBudget = []
 
                 return
               }
@@ -159,14 +168,10 @@ export class HostConversations extends Context.Service<
               if (!full || stoppingOverBudget || conversation?.turnId == null) return
 
               stoppingOverBudget = true
-              yield* conversation.session.stopTurn(conversation.turnId, overBudget).pipe(
-                Effect.tap((left) =>
-                  Effect.sync(() => {
-                    if (left === null) stoppingOverBudget = false
-                  }),
-                ),
-                Effect.forkIn(scope),
-              )
+              const steers = yield* conversation.session.stopTurn(conversation.turnId, overBudget)
+
+              if (steers === null) stoppingOverBudget = false
+              else if (stoppingOverBudget) leftOverBudget = steers
             })
 
             const started = Effect.gen(function* () {
