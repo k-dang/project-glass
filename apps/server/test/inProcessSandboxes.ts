@@ -25,6 +25,8 @@ import { Hello } from "../src/agentHost/protocol"
 import { hostServer } from "../src/agentHost/server"
 import { MissingLogin, NoCapacity, SandboxGone } from "../src/sandboxFailures"
 
+export type ProviderCall = "target" | "extend" | "remove" | "models"
+
 export interface InProcessSandboxSettings {
   readonly harnesses?: readonly [AgentHarness, ...Array<AgentHarness>]
   readonly holdAt?: string
@@ -33,6 +35,7 @@ export interface InProcessSandboxSettings {
   readonly noCapacity?: string
   readonly extensionMillis?: number
   readonly maxLifetimeMillis?: number
+  readonly stall?: ReadonlyArray<ProviderCall>
 }
 
 const TWO_DAYS = Duration.toMillis(Duration.days(2))
@@ -110,19 +113,35 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
       throw new MissingLogin(settings.missingLogin.login, settings.missingLogin.fix)
   }
 
-  const passed = (step: string, signal: AbortSignal) =>
+  const held = (holding: () => boolean, signal: AbortSignal, onAbort = () => {}) =>
     new Promise<void>((resolve, reject) => {
       if (signal.aborted) return reject(signal.reason)
 
-      signal.addEventListener("abort", () => reject(signal.reason), { once: true })
+      signal.addEventListener(
+        "abort",
+        () => {
+          onAbort()
+          reject(signal.reason)
+        },
+        { once: true },
+      )
 
       const check = () => {
-        if (settings.holdAt === step) waiting.push(check)
+        if (holding()) waiting.push(check)
         else resolve()
       }
 
       check()
     })
+
+  const passed = (step: string, signal: AbortSignal) => held(() => settings.holdAt === step, signal)
+
+  const answered = (call: ProviderCall, signal: AbortSignal) =>
+    held(
+      () => settings.stall?.includes(call) ?? false,
+      signal,
+      () => events.push(`abandoned ${call}`),
+    )
 
   const stop = (conversationId: string) =>
     Effect.suspend(() => {
@@ -200,7 +219,8 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
         current,
       )
     },
-    target: async (state) => {
+    target: async (state, signal) => {
+      await answered("target", signal)
       const conversationId = conversationIdOf(state)
 
       if (gone.has(conversationId)) throw new SandboxGone()
@@ -211,7 +231,8 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
 
       return { url, headers: {} }
     },
-    extend: async (state) => {
+    extend: async (state, signal) => {
+      await answered("extend", signal)
       const conversationId = conversationIdOf(state)
 
       if (gone.has(conversationId)) throw new SandboxGone()
@@ -226,7 +247,8 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
 
       return new Date(expiresAt)
     },
-    remove: async (state) => {
+    remove: async (state, signal) => {
+      await answered("remove", signal)
       refuseLogin()
 
       const conversationId = conversationIdOf(state)
@@ -238,7 +260,11 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
       urls.delete(conversationId)
       events.push(`removed ${conversationId}`)
     },
-    models: async () => ({ defaultModel: null, models: [] }),
+    models: async (_harness, signal) => {
+      await answered("models", signal)
+
+      return { defaultModel: null, models: [] }
+    },
   }
 
   const reclaim = (conversationId: string) =>

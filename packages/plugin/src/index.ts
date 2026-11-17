@@ -18,22 +18,22 @@ export interface SandboxProvider {
    * Where the agent host in the Sandbox answers, asked afresh for each connection. Throws
    * `glass.sandboxGone()` once the Sandbox no longer exists, so Glass stops trying to reach it.
    */
-  readonly target: (state: SandboxState) => Promise<SandboxTarget>
+  readonly target: (state: SandboxState, signal: AbortSignal) => Promise<SandboxTarget>
   /**
    * Pushes the Sandbox's expiry as late as the platform allows, answering when it now expires.
    * Glass calls it while the Conversation exists and Glass runs, again before each expiry it was given,
    * until the expiry stops moving. Throws `glass.sandboxGone()` once the Sandbox no longer exists.
    * A provider whose Sandboxes don't expire leaves it out.
    */
-  readonly extend?: (state: SandboxState) => Promise<Date>
+  readonly extend?: (state: SandboxState, signal: AbortSignal) => Promise<Date>
   /**
    * Deletes the Sandbox. Glass has asked its agent host to end first; one it couldn't reach may
    * still run. Throws `glass.sandboxGone()` if the Sandbox is already gone, which Glass takes as
    * done.
    */
-  readonly remove: (state: SandboxState) => Promise<void>
+  readonly remove: (state: SandboxState, signal: AbortSignal) => Promise<void>
   /** What an Agent harness offers in this provider's Sandboxes, before one exists. */
-  readonly models: (harness: AgentHarness) => Promise<AgentModels>
+  readonly models: (harness: AgentHarness, signal: AbortSignal) => Promise<AgentModels>
 }
 
 export const agentHarnesses = ["claude-code", "pi"] as const
@@ -121,5 +121,9 @@ export interface Glass {
  * A provider that throws anything but the errors `Glass` offers shows the user a safe failure, with
  * the cause in the backend log. If `create` fails or is cancelled after `record`, Glass calls
  * `remove` with that state.
+ *
+ * Glass gives every call but `create` a deadline and aborts its `signal` once that passes, then
+ * stops waiting for it. Glass retries what it still needs, such as `remove` and `extend`, so
+ * those must be safe to call again while an earlier call may still run.
  */
 export type Plugin = (glass: Glass) => void | Promise<void>

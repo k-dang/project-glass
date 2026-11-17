@@ -47,9 +47,10 @@ import type {
 } from "./Placement"
 import { Plugins } from "./Plugins"
 import {
-  call,
   connectToHost,
+  createSandbox,
   extendSandbox,
+  listModels,
   removeSandbox,
   shutDownHost,
   waitForHost,
@@ -421,7 +422,7 @@ export class Sandboxes extends Context.Service<
             }
 
             yield* Effect.gen(function* () {
-              yield* call(provider, "create the Sandbox", (signal) =>
+              yield* createSandbox(provider, (signal) =>
                 provider.create(request, {
                   progress: (step) => reports.offer(transcripts.setStatus(conversation.id, step)),
                   record: (state) => {
@@ -458,7 +459,7 @@ export class Sandboxes extends Context.Service<
 
         const extendAhead = (
           conversationId: string,
-          extend: (state: SandboxState) => Promise<Date>,
+          extend: NonNullable<SandboxProvider["extend"]>,
         ) =>
           Effect.gen(function* () {
             for (;;) {
@@ -647,7 +648,7 @@ export class Sandboxes extends Context.Service<
         const placement: Placement = {
           harnesses: provider.harnesses,
           models: (harness) =>
-            call(provider, "list what its Sandboxes offer", () => provider.models(harness)).pipe(
+            listModels(provider, harness).pipe(
               Effect.flatMap((models) =>
                 decodeModels(models).pipe(
                   Effect.tapError((cause) =>
