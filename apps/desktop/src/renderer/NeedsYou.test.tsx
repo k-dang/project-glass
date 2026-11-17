@@ -346,7 +346,7 @@ it("answers an outside question in Stopped on you", async () => {
   expect(screen.queryByRole("button", { name: /Ship the retry change/ })).toBeNull()
 })
 
-it("shows a Check-in's changes and approves them, with the notes left on them", async () => {
+it("opens a Check-in's changes on their own page and approves them, with the notes left on them", async () => {
   const answers: Array<{ checkInId: string; answer: CheckInAnswer }> = []
 
   const checkIn = CheckIn.make({
@@ -382,15 +382,19 @@ it("shows a Check-in's changes and approves them, with the notes left on them", 
 
   const pane = within(articleOf("Retry three times"))
   expect(pane.getByText("The backoff is in greet.ts.")).toBeTruthy()
-  expect(await pane.findByText(/Changes since main/)).toBeTruthy()
-  expect(await pane.findByText(/1 Feedback note goes back with your answer/)).toBeTruthy()
+  await user.click(pane.getByRole("link", { name: "Read the changes" }))
 
-  await user.type(pane.getByRole("textbox", { name: "Message to the agent" }), "Ship it")
-  await user.click(pane.getByRole("button", { name: "Approve" }))
+  const page = within(await screen.findByRole("main", { name: "Check-in" }))
+  expect(await page.findByText(/Changes since main/)).toBeTruthy()
+  expect(await page.findByText(/1 Feedback note goes back with your answer/)).toBeTruthy()
+
+  await user.type(page.getByRole("textbox", { name: "Message to the agent" }), "Ship it")
+  await user.click(page.getByRole("button", { name: "Approve" }))
 
   expect(answers).toEqual([
     { checkInId: "check-1", answer: CheckInApprove.make({ message: "Ship it" }) },
   ])
+  expect(await screen.findByRole("main", { name: "Inbox" })).toBeTruthy()
 })
 
 it("sends a typed answer when an outside question has no choices", async () => {

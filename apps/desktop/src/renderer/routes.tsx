@@ -19,6 +19,7 @@ import { ConversationSearch } from "./conversationsArea"
 import { ConversationView } from "./ConversationView"
 import { AppShell } from "./AppShell"
 import { Dashboard } from "./Dashboard"
+import { CheckInPage } from "./CheckInPage"
 import { Inbox } from "./Inbox"
 import { Connecting, ConnectionProblem } from "./ConnectionProblem"
 import { useConnection } from "./connection"
@@ -111,6 +112,16 @@ const inboxRoute = createRoute({
   ),
 })
 
+const checkInRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "inbox/check-ins/$checkInId",
+  component: function CheckInRoute() {
+    const { checkInId } = checkInRoute.useParams()
+
+    return <CheckInPage key={checkInId} checkInId={checkInId} />
+  },
+})
+
 const dashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "dashboard",
@@ -163,6 +174,7 @@ const routeTree = rootRoute.addChildren([
   toDosRoute,
   activityRoute,
   inboxRoute,
+  checkInRoute,
   dashboardRoute,
   conversationsRoute.addChildren([noConversationRoute, newConversationRoute, conversationRoute]),
   settingsRoute,

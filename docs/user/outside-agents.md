@@ -44,7 +44,8 @@ request. The agent names its folder; Glass reads the changes itself, against whe
 forked from its default branch (or the `baseRef` the agent passes), including uncommitted and
 untracked files. Glass freezes them as they are, so your notes always match the code you read.
 
-In the Inbox, select lines in the diff to leave Feedback notes, then choose **Send feedback** for
+Select the Check-in in the Inbox and choose **Read the changes** to open them on their own page.
+Select lines in the diff to leave Feedback notes, then choose **Send feedback** for
 the agent to change the code, or **Approve** for it to carry on. Notes on an approval go to the
 agent as guidance. The agent waits up to an hour, or the time it asks for, at most two hours. If it
 stops waiting before you answer, your notes stay with the folder and come back on its next

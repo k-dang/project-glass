@@ -65,7 +65,7 @@ const nextRemaining = (
 
 const minute = 60_000
 
-function useMinuteClock() {
+export function useMinuteClock() {
   const [now, setNow] = useState(() => new Date())
 
   useEffect(() => {
