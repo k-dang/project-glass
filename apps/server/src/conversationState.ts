@@ -10,7 +10,11 @@ export type ConversationEvent =
   | { readonly type: "send"; readonly message: QueuedMessage }
   | { readonly type: "globalConversationUpdate"; readonly message: StartingTurn }
   | { readonly type: "sendQueued" | "cancelQueued"; readonly queuedId: string }
-  | { readonly type: "turnEnded"; readonly ending: TurnEnding }
+  | {
+      readonly type: "turnEnded"
+      readonly ending: TurnEnding
+      readonly requeued: ReadonlyArray<QueuedMessage>
+    }
 
 export type StartingTurn = Omit<QueuedMessage, "context"> & Pick<TurnMessage, "context">
 
@@ -71,7 +75,10 @@ export const stepConversation = (
               writes: [{ type: "dequeue", queuedId }],
             }
       },
-      turnEnded: ({ ending }) => {
+      turnEnded: ({ ending, requeued }) => {
+        if (requeued.length > 0)
+          return { outcome: { type: "queued" }, writes: [{ type: "prepend", messages: requeued }] }
+
         const [head] = state.queued
 
         return state.running === null &&

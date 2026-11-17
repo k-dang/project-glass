@@ -1,7 +1,10 @@
 import { assert, it } from "@effect/vitest"
 import {
+  ExtensionStatusesChanged,
   Image,
   nothingUnsent,
+  PartSet,
+  TextPart,
   type Transcript,
   TurnDone,
   type TurnEnding,
@@ -13,6 +16,8 @@ import {
 import { DateTime, Effect } from "effect"
 import { conversationServicesFixture } from "../test/conversationServicesFixture"
 import { eventually } from "../test/eventually"
+import { overBudget } from "./agentHost/HostConversations"
+import { JournalBudget } from "./agentHost/Journal"
 
 type Fixture = Effect.Success<typeof conversationServicesFixture>
 
@@ -116,6 +121,53 @@ it.live(
 
       assert.deepStrictEqual(stopped.turns[0]?.ended?.ending, TurnStopped.make({}))
       assert.deepStrictEqual(queuedMessages(stopped), ["Also this", "Later"])
+    }),
+)
+
+it.live(
+  "puts the Steers the harness hadn't taken in before the Queued messages when the host stops a Turn over its budget, once",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* conversationServicesFixture.pipe(Effect.provideService(JournalBudget, 1_000))
+      const conversation = yield* f.create()
+      const turn = yield* f.started
+      yield* f.conversations.send(conversation.id, say("Later"))
+      yield* f.conversations.steer(conversation.id, say("Also this"))
+      const left = [{ ...say("Also this"), context: null }]
+      yield* f.leaveOnStop(left)
+
+      yield* turn.emit(
+        PartSet.make({
+          turnId: turn.turnId,
+          index: 0,
+          part: TextPart.make({ text: "a".repeat(2_000) }),
+        }),
+      )
+      yield* eventually(Effect.sync(() => assert.deepStrictEqual(f.stops, [conversation.id])))
+      yield* end(turn, overBudget)
+
+      const stopped = yield* f.transcript(
+        conversation.id,
+        (transcript) => settled(1)(transcript) && transcript.queued.length === 2,
+      )
+
+      const ended = stopped.turns[0]?.ended
+      assert.exists(ended)
+      assert.deepStrictEqual(ended.ending, overBudget)
+      assert.deepStrictEqual(queuedMessages(stopped), ["Also this", "Later"])
+
+      yield* turn.emit({
+        ...TurnEnded.make({ turnId: turn.turnId, ended }),
+        steersNotTakenIn: left,
+      })
+      yield* turn.emit(ExtensionStatusesChanged.make({ extensionStatuses: ["Replayed"] }))
+
+      const replayed = yield* f.transcript(conversation.id, ({ extensionStatuses }) =>
+        extensionStatuses.includes("Replayed"),
+      )
+
+      assert.deepStrictEqual(queuedMessages(replayed), ["Also this", "Later"])
+      assert.equal(replayed.turns.length, 1)
     }),
 )
 

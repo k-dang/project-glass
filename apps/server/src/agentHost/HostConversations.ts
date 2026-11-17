@@ -7,7 +7,17 @@ import {
   TurnFailed,
   TurnStopped,
 } from "@glass/contracts"
-import { Context, Effect, Exit, FileSystem, Layer, Predicate, Scope, Semaphore } from "effect"
+import {
+  Context,
+  Deferred,
+  Effect,
+  Exit,
+  FileSystem,
+  Layer,
+  Predicate,
+  Scope,
+  Semaphore,
+} from "effect"
 import type { HarnessAdapter, HarnessSession } from "./adapter"
 import type { DeliveredMessage, DeliveredTurn } from "./deliveredMessage"
 import { Journal } from "./Journal"
@@ -33,6 +43,11 @@ interface Running {
   readonly session: HarnessSession
   applied: TurnSettings
   turnId: string | null
+}
+
+interface OverBudgetStop {
+  readonly turnId: string
+  readonly steers: Deferred.Deferred<SteersNotTakenIn | null>
 }
 
 export const overBudget = TurnFailed.make({
@@ -137,10 +152,23 @@ export class HostConversations extends Context.Service<
             }
 
             const scope = yield* Scope.fork(hostScope)
-            let stoppingOverBudget = false
+            let overBudgetStop: OverBudgetStop | null = null
+
+            const withSteersNotTakenIn = Effect.fnUntraced(function* (event: HostEvent) {
+              const stop = overBudgetStop
+
+              if (!Predicate.isTagged(event, "TurnEnded") || stop?.turnId !== event.turnId)
+                return event
+
+              const steers = yield* Deferred.await(stop.steers)
+
+              return steers === null || steers.length === 0
+                ? event
+                : { ...event, steersNotTakenIn: steers }
+            })
 
             const report = Effect.fnUntraced(function* (event: HostEvent) {
-              const full = yield* journal.append(conversationId, event)
+              const full = yield* journal.append(conversationId, yield* withSteersNotTakenIn(event))
               const conversation = running.get(conversationId)
 
               if (
@@ -151,20 +179,26 @@ export class HostConversations extends Context.Service<
                   conversation.turnId = Predicate.isTagged(event, "TurnStarted")
                     ? event.turnId
                     : null
-                stoppingOverBudget = false
+                overBudgetStop = null
 
                 return
               }
 
-              if (!full || stoppingOverBudget || conversation?.turnId == null) return
+              if (!full || overBudgetStop !== null || conversation?.turnId == null) return
 
-              stoppingOverBudget = true
-              yield* conversation.session.stopTurn(conversation.turnId, overBudget).pipe(
-                Effect.tap((left) =>
+              const stop: OverBudgetStop = {
+                turnId: conversation.turnId,
+                steers: yield* Deferred.make<SteersNotTakenIn | null>(),
+              }
+
+              overBudgetStop = stop
+              yield* conversation.session.stopTurn(stop.turnId, overBudget).pipe(
+                Effect.tap((steers) =>
                   Effect.sync(() => {
-                    if (left === null) stoppingOverBudget = false
+                    if (steers === null && overBudgetStop === stop) overBudgetStop = null
                   }),
                 ),
+                Effect.onExit((exit) => Deferred.done(stop.steers, exit)),
                 Effect.forkIn(scope),
               )
             })

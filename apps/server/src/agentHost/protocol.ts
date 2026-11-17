@@ -2,14 +2,17 @@ import {
   Conversation,
   AgentCommand,
   AgentHarness,
-  AgentEvent,
   AgentModels,
   ChangedFile,
   ExtensionStatusesChanged,
   MessageWithContext,
   ModelChoice,
+  PartAppended,
+  PartSet,
   RequestAnswer,
   RequestNotWaiting,
+  TurnEnded,
+  TurnStarted,
 } from "@glass/contracts"
 import { Schema, SchemaTransformation } from "effect"
 import { randomBytes } from "node:crypto"
@@ -17,7 +20,23 @@ import { resolve } from "node:path"
 import { Rpc, RpcGroup } from "effect/rpc"
 import { DeliveredMessage, DeliveredTurn } from "./deliveredMessage"
 
-export const HostEvent = Schema.Union([...AgentEvent.members, ExtensionStatusesChanged])
+export const SteersNotTakenIn = Schema.Array(MessageWithContext)
+
+export type SteersNotTakenIn = typeof SteersNotTakenIn.Type
+
+// A Turn the host stopped on its own has no StopTurn reply to give its Steers back on.
+export const HostTurnEnded = Schema.TaggedStruct("TurnEnded", {
+  ...TurnEnded.fields,
+  steersNotTakenIn: Schema.optional(SteersNotTakenIn),
+})
+
+export const HostEvent = Schema.Union([
+  TurnStarted,
+  PartSet,
+  PartAppended,
+  HostTurnEnded,
+  ExtensionStatusesChanged,
+])
 
 export type HostEvent = typeof HostEvent.Type
 
@@ -140,10 +159,6 @@ export class HostConversationError extends Schema.TaggedError<HostConversationEr
     message: Schema.String,
   },
 ) {}
-
-export const SteersNotTakenIn = Schema.Array(MessageWithContext)
-
-export type SteersNotTakenIn = typeof SteersNotTakenIn.Type
 
 export class AgentHostRpcs extends RpcGroup.make(
   Hello,

@@ -23,7 +23,7 @@ import {
   type TranscriptUpdate,
   Turn,
   TurnEnd,
-  type TurnEnded,
+  TurnEnded,
   type TurnEnding,
   TurnContext,
   CapturedContext,
@@ -184,8 +184,8 @@ export type UnseenByConversation = ReadonlyMap<string, TurnEnd>
 
 export type StartedTurn = typeof TurnStarted.Type & { readonly conversationId: string }
 
-const joinConsecutiveAppends = (events: ReadonlyArray<AgentEvent>) => {
-  const joined: Array<AgentEvent> = []
+const joinConsecutiveAppends = (events: ReadonlyArray<SavedEvent>) => {
+  const joined: Array<SavedEvent> = []
 
   for (const event of events) {
     const previous = joined.at(-1)
@@ -232,6 +232,11 @@ const storageFailure = () =>
   new ConversationError({
     message: "Couldn't read or save the Conversation's transcript. Try again.",
   })
+
+const queuedAgain = (inputs: ReadonlyArray<MessageWithContext>): ReadonlyArray<QueuedMessage> =>
+  inputs.map((input) => ({ ...input, feedback: [], id: randomUUID() }))
+
+type SavedEvent = Exclude<HostEvent, typeof ExtensionStatusesChanged.Type>
 
 export class Transcripts extends Context.Service<
   Transcripts,
@@ -710,7 +715,7 @@ export class Transcripts extends Context.Service<
         throughJournalEntry?: number,
       ) => {
         const events = hostEvents.filter(
-          (event): event is AgentEvent => !Predicate.isTagged(event, "ExtensionStatusesChanged"),
+          (event): event is SavedEvent => !Predicate.isTagged(event, "ExtensionStatusesChanged"),
         )
 
         const shown = hostEvents.findLast((event) =>
@@ -729,11 +734,23 @@ export class Transcripts extends Context.Service<
 
             const ended = written.filter((event) => Predicate.isTagged(event, "TurnEnded"))
 
-            const next = yield* Effect.forEach(ended, ({ ended: { ending } }) =>
-              step(conversationId, { type: "turnEnded", ending }),
+            const next = yield* Effect.forEach(
+              ended,
+              ({ ended: { ending }, steersNotTakenIn = [] }) =>
+                step(conversationId, {
+                  type: "turnEnded",
+                  ending,
+                  requeued: queuedAgain(steersNotTakenIn),
+                }),
             )
 
-            return [ended, next.flatMap(({ updates }) => updates), written] as const
+            const reported = written.map((event) =>
+              Predicate.isTagged(event, "TurnEnded")
+                ? TurnEnded.make({ turnId: event.turnId, ended: event.ended })
+                : event,
+            )
+
+            return [ended, next.flatMap(({ updates }) => updates), reported] as const
           }),
         ).pipe(
           Effect.tapError((cause) => Effect.logWarning("Couldn't save a transcript", cause)),
@@ -1031,12 +1048,7 @@ export class Transcripts extends Context.Service<
             "put messages back in front of the Queued ones",
             change(
               conversationId,
-              execute(conversationId, [
-                {
-                  type: "prepend",
-                  messages: inputs.map((input) => ({ ...input, feedback: [], id: randomUUID() })),
-                },
-              ]),
+              execute(conversationId, [{ type: "prepend", messages: queuedAgain(inputs) }]),
             ),
           ),
         cancelQueued: (conversationId, queuedId, restore = () => Effect.void) =>
