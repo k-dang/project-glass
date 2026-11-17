@@ -4,6 +4,7 @@ import {
   createRootRouteWithContext,
   createRoute,
   createRouter,
+  lazyRouteComponent,
   Navigate,
   notFound,
   Outlet,
@@ -13,19 +14,12 @@ import {
 import { Option, Schema } from "effect"
 import { AsyncResult, type AtomRegistry } from "effect/reactivity"
 import type { ReactNode } from "react"
-import { ActivityLogPage } from "./ActivityLogPage"
-import { ConversationsLayout } from "./Conversations"
 import { ConversationSearch } from "./conversationsArea"
-import { ConversationView } from "./ConversationView"
 import { AppShell } from "./AppShell"
 import { Dashboard } from "./Dashboard"
-import { Inbox } from "./Inbox"
 import { Connecting, ConnectionProblem } from "./ConnectionProblem"
 import { useConnection } from "./connection"
 import { Viewed, viewedAtom } from "./globalConversation"
-import { NewConversation } from "./NewConversation"
-import { PullRequestListPage } from "./PullRequestListPage"
-import { PullRequestPage } from "./PullRequestPage"
 import {
   closePullRequest,
   decodePullRequestParams,
@@ -34,8 +28,34 @@ import {
   listSearchAtom,
   openPullRequest,
 } from "./reviewsArea"
-import { Settings } from "./Settings"
-import { ToDos } from "./ToDos"
+
+const ActivityLogPage = lazyRouteComponent(() => import("./ActivityLogPage"), "ActivityLogPage")
+
+const ConversationsLayout = lazyRouteComponent(
+  () => import("./Conversations"),
+  "ConversationsLayout",
+)
+
+const ConversationView = lazyRouteComponent(() => import("./ConversationView"), "ConversationView")
+
+const Inbox = lazyRouteComponent(() => import("./Inbox"), "Inbox")
+
+const NewConversation = lazyRouteComponent(() => import("./NewConversation"), "NewConversation")
+
+const PullRequestListPage = lazyRouteComponent(
+  () => import("./PullRequestListPage"),
+  "PullRequestListPage",
+)
+
+const PullRequestPage = lazyRouteComponent(() => import("./PullRequestPage"), "PullRequestPage")
+
+const Settings = lazyRouteComponent(() => import("./Settings"), "Settings")
+
+const ToDos = lazyRouteComponent(() => import("./ToDos"), "ToDos")
+
+// The router loads a lazy `component` before rendering it; a route whose component wraps a lazy
+// page loads that page here instead, so it never falls back to Suspense.
+const loadCode = (page: { preload?: () => Promise<void> | undefined }) => () => page.preload?.()
 
 const parseSearch = (search: string) => Object.fromEntries(new URLSearchParams(search))
 
@@ -69,8 +89,11 @@ const listRoute = createRoute({
   path: "/",
   validateSearch: Schema.toStandardSchemaV1(ListSearch),
   search: { middlewares: [stripSearchParams(defaultListSearch)] },
-  beforeLoad: ({ context: { registry }, search }) => registry.set(listSearchAtom, search),
+  beforeLoad: ({ context: { registry }, search, preload }) => {
+    if (!preload) registry.set(listSearchAtom, search)
+  },
   onEnter: ({ context: { registry } }) => closePullRequest(registry),
+  loader: loadCode(PullRequestListPage),
   component: ListPage,
 })
 
@@ -85,25 +108,30 @@ const pullRequestRoute = createRoute({
       number: String(number),
     }),
   },
-  beforeLoad: ({ context: { registry }, params }) => openPullRequest(registry, params),
+  beforeLoad: ({ context: { registry }, params, preload }) => {
+    if (!preload) openPullRequest(registry, params)
+  },
   component: PullRequestPage,
 })
 
 const toDosRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "to-dos",
+  loader: loadCode(ToDos),
   component: ToDosPage,
 })
 
 const activityRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "activity",
+  loader: loadCode(ActivityLogPage),
   component: ActivityArea,
 })
 
 const inboxRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "inbox",
+  loader: loadCode(Inbox),
   component: () => (
     <main aria-label="Inbox" className="flex min-h-0 flex-1 overflow-hidden">
       <Inbox />
@@ -141,6 +169,7 @@ const newConversationRoute = createRoute({
   validateSearch: Schema.toStandardSchemaV1(
     Schema.Struct({ repository: Schema.optional(Schema.String) }),
   ),
+  loader: loadCode(NewConversation),
   component: NewConversationPage,
 })
 
@@ -148,12 +177,14 @@ const conversationRoute = createRoute({
   getParentRoute: () => conversationsRoute,
   path: "$conversationId",
   validateSearch: Schema.toStandardSchemaV1(ConversationSearch),
+  loader: loadCode(ConversationView),
   component: ConversationPage,
 })
 
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "settings",
+  loader: loadCode(Settings),
   component: SettingsPage,
 })
 
@@ -184,6 +215,8 @@ const makeRouter = (registry: AtomRegistry.AtomRegistry) =>
     routeTree,
     history: createHashHistory(),
     context: { registry },
+    // Hover preloads run beforeLoad too, so hooks that change state skip them.
+    defaultPreload: "intent",
     parseSearch,
     stringifySearch,
   })

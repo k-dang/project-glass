@@ -1,5 +1,6 @@
 import { useAtomSet } from "@effect/atom-react"
 import type { Checks, PullRequestRef, PullRequestState, PullRequestSummary } from "@glass/contracts"
+import { useRouter } from "@tanstack/react-router"
 import { cn } from "cn"
 import { DateTime } from "effect"
 import {
@@ -39,8 +40,14 @@ export function NotRefreshed(props: { problem: Problem; showLabel?: boolean }) {
 const HOVER_INTENT_MS = 100
 
 const usePreloadOnHover = (ref: PullRequestRef) => {
-  const preload = useAtomSet(preloadPullRequestAtom)
+  const preloadData = useAtomSet(preloadPullRequestAtom)
+  const router = useRouter()
   const pending = useRef<ReturnType<typeof setTimeout>>(undefined)
+
+  const preload = () => {
+    preloadData(ref)
+    void router.preloadRoute({ to: "/reviews/$owner/$repo/$number", params: ref })
+  }
 
   const cancel = () => clearTimeout(pending.current)
 
@@ -49,12 +56,12 @@ const usePreloadOnHover = (ref: PullRequestRef) => {
   return {
     onPointerEnter: () => {
       cancel()
-      pending.current = setTimeout(() => preload(ref), HOVER_INTENT_MS)
+      pending.current = setTimeout(preload, HOVER_INTENT_MS)
     },
     onPointerLeave: cancel,
     onPointerDown: () => {
       cancel()
-      preload(ref)
+      preload()
     },
   }
 }
