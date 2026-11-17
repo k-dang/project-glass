@@ -15,7 +15,7 @@ const couldNotWrite = new HostConversationError({
   message: "Glass couldn't write the Conversation's skills. Try again.",
 })
 
-const inside = (folder: string, path: string) => {
+const inside = (folder: string, path: string): Effect.Effect<string, HostConversationError> => {
   const target = join(folder, path)
   const relation = relative(folder, target)
 
@@ -37,35 +37,41 @@ export const writeSentSkills = (
 
     const fs = yield* FileSystem.FileSystem
     const directory = yield* scopedFolder(`${folder}.skills-${randomUUID()}`)
-    const files: Array<{ target: string; contents: Uint8Array; executable: boolean }> = []
 
-    const written = yield* Effect.forEach(sources, ({ name, skills }) =>
+    const planned = yield* Effect.forEach(sources, ({ name, skills }) =>
       Effect.gen(function* () {
         const plugin = yield* inside(directory, name)
 
-        files.push({
-          target: join(plugin, ".claude-plugin", "plugin.json"),
-          contents: new TextEncoder().encode(JSON.stringify({ name })),
-          executable: false,
-        })
-
-        const skillFolders = yield* Effect.forEach(skills, (skill) =>
+        const perSkill = yield* Effect.forEach(skills, (skill) =>
           Effect.gen(function* () {
             const skillFolder = yield* inside(join(plugin, "skills"), skill.name)
 
-            for (const { path, executable, contents } of skill.files)
-              files.push({ target: yield* inside(skillFolder, path), contents, executable })
+            const files = yield* Effect.forEach(skill.files, ({ path, executable, contents }) =>
+              inside(skillFolder, path).pipe(
+                Effect.map((target) => ({ target, contents, executable })),
+              ),
+            )
 
-            return skillFolder
+            return { skillFolder, files }
           }),
         )
 
-        return { plugin, skills: skillFolders }
+        return {
+          written: { plugin, skills: perSkill.map(({ skillFolder }) => skillFolder) },
+          files: [
+            {
+              target: join(plugin, ".claude-plugin", "plugin.json"),
+              contents: new TextEncoder().encode(JSON.stringify({ name })),
+              executable: false,
+            },
+            ...perSkill.flatMap(({ files }) => files),
+          ],
+        }
       }),
     )
 
     yield* Effect.forEach(
-      files,
+      planned.flatMap(({ files }) => files),
       ({ target, contents, executable }) =>
         Effect.gen(function* () {
           yield* fs.makeDirectory(dirname(target), { recursive: true })
@@ -76,7 +82,7 @@ export const writeSentSkills = (
       { concurrency: WRITES_AT_ONCE, discard: true },
     )
 
-    return written
+    return planned.map(({ written }) => written)
   }).pipe(
     Effect.catchTag("PlatformError", (cause) =>
       Effect.logWarning("Couldn't write a Conversation's skills", cause).pipe(

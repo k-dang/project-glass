@@ -120,14 +120,14 @@ export class LocalSkills extends Context.Service<
     Effect.gen(function* () {
       const reads = yield* Semaphore.make(READS_AT_ONCE)
       const limited = reads.withPermits(1)
-      const unbounded = yield* FileSystem.FileSystem
+      const fileSystem = yield* FileSystem.FileSystem
 
       const fs = {
-        realPath: (path: string) => limited(unbounded.realPath(path)),
-        readDirectory: (path: string) => limited(unbounded.readDirectory(path)),
-        stat: (path: string) => limited(unbounded.stat(path)),
-        readFile: (path: string) => limited(unbounded.readFile(path)),
-        readFileString: (path: string) => limited(unbounded.readFileString(path)),
+        realPath: (path: string) => limited(fileSystem.realPath(path)),
+        readDirectory: (path: string) => limited(fileSystem.readDirectory(path)),
+        stat: (path: string) => limited(fileSystem.stat(path)),
+        readFile: (path: string) => limited(fileSystem.readFile(path)),
+        readFileString: (path: string) => limited(fileSystem.readFileString(path)),
       }
 
       const skillFolders = foldersOf((yield* ServerConfig).homeDirectory)

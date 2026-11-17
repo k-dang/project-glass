@@ -71,7 +71,9 @@ it.live("writes independent skills together, returning them in the order they we
     const folder = join(yield* isolatedHome, "checkout")
 
     const written = new Map(
-      ["a.md", "b.md", "c.md"].map((name) => [name, Deferred.makeUnsafe<void>()]),
+      yield* Effect.forEach(["a.md", "b.md", "c.md"], (name) =>
+        Deferred.make<void>().pipe(Effect.map((done) => [name, done] as const)),
+      ),
     )
 
     const finished = (name: string) => Deferred.await(written.get(name)!)
