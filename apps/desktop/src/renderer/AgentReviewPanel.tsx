@@ -1,4 +1,4 @@
-import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
+import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
 import {
   type AgentReview,
   emptyTranscript,
@@ -243,10 +243,12 @@ function ReviewConversation(props: {
   const transcript = useAtomValue(atoms.transcript)
   const reconnect = useAtomRefresh(atoms.transcript)
 
-  const { turns, queued, status } = Option.getOrElse(
+  const { turns, earlierTurns, queued, status } = Option.getOrElse(
     AsyncResult.value(transcript),
     () => emptyTranscript,
   )
+
+  const loadEarlier = useAtomSet(atoms.loadEarlier)
 
   const suggestedDraftView = useCallback(
     (call: typeof ToolCallPart.Type) => {
@@ -272,6 +274,8 @@ function ReviewConversation(props: {
         )}
         <Transcript
           turns={turns}
+          earlierTurns={earlierTurns}
+          onShowEarlier={loadEarlier}
           status={status}
           lead={
             <>

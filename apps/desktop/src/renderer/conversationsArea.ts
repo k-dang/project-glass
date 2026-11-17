@@ -87,6 +87,12 @@ export const transcriptAtom = Atom.family((conversationId: string) =>
     .pipe(Atom.setIdleTTL(TRANSCRIPT_IDLE_TTL)),
 )
 
+export const loadEarlierTurnsAtom = Atom.family((conversationId: string) =>
+  backendRuntime.fn((before: string) =>
+    Backend.use((backend) => backend.LoadEarlierTurns({ conversationId, before })),
+  ),
+)
+
 export const conversationChangesAtom = Atom.family((conversationId: string) =>
   backendRuntime.atom(Backend.use((backend) => backend.GetConversationChanges({ conversationId }))),
 )

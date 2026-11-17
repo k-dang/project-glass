@@ -39,7 +39,6 @@ import {
   SendConversationMessage,
   SentMessage,
   StartFreshRefused,
-  Transcript,
   TranscriptUpdate,
   TurnEnd,
 } from "./conversation"
@@ -386,6 +385,10 @@ export class GlassRpcs extends RpcGroup.make(
     error: Schema.Union([ConversationNotFound, ConversationError]),
     stream: true,
   }),
+  Rpc.make("LoadEarlierTurns", {
+    payload: { conversationId: Schema.String, before: Schema.String },
+    error: Schema.Union([ConversationNotFound, ConversationError]),
+  }),
   Rpc.make("ListLocalCheckouts", {
     success: Schema.Array(LocalCheckout),
     error: ConversationError,
@@ -535,6 +538,10 @@ export class GlassRpcs extends RpcGroup.make(
     error: ConversationError,
     stream: true,
   }),
+  Rpc.make("LoadEarlierGlobalTurns", {
+    payload: { before: Schema.String },
+    error: ConversationError,
+  }),
   Rpc.make("SendGlobalMessage", {
     payload: MessageInputWithContext,
     error: Schema.Union([RequestWaiting, ConversationError]),
@@ -570,9 +577,14 @@ export class GlassRpcs extends RpcGroup.make(
     success: Schema.Array(PastConversation),
     error: ConversationError,
   }),
-  Rpc.make("ReadPastGlobalConversation", {
+  Rpc.make("WatchPastGlobalConversation", {
     payload: { id: Schema.String },
-    success: Transcript,
+    success: TranscriptUpdate,
+    error: Schema.Union([PastConversationNotFound, ConversationError]),
+    stream: true,
+  }),
+  Rpc.make("LoadEarlierPastGlobalTurns", {
+    payload: { id: Schema.String, before: Schema.String },
     error: Schema.Union([PastConversationNotFound, ConversationError]),
   }),
 ) {}

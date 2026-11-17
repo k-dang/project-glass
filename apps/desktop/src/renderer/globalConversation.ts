@@ -46,7 +46,17 @@ export const pastGlobalConversationsAtom = backendRuntime.atom(
 )
 
 export const pastGlobalTranscriptAtom = Atom.family((id: string) =>
-  backendRuntime.atom(Backend.use((backend) => backend.ReadPastGlobalConversation({ id }))),
+  backendRuntime.atom(
+    transcriptOf(
+      Stream.unwrap(Backend.useSync((backend) => backend.WatchPastGlobalConversation({ id }))),
+    ),
+  ),
+)
+
+export const loadEarlierPastTurnsAtom = Atom.family((id: string) =>
+  backendRuntime.fn((before: string) =>
+    Backend.use((backend) => backend.LoadEarlierPastGlobalTurns({ id, before })),
+  ),
 )
 
 export const startGlobalFreshAtom = backendRuntime.fn((_: void, get) =>
@@ -105,6 +115,9 @@ export const globalConversation: ConversationAtoms = {
       transcriptOf(Stream.unwrap(Backend.useSync((backend) => backend.WatchGlobalTranscript()))),
     )
     .pipe(Atom.setIdleTTL(TRANSCRIPT_IDLE_TTL)),
+  loadEarlier: backendRuntime.fn((before: string) =>
+    Backend.use((backend) => backend.LoadEarlierGlobalTurns({ before })),
+  ),
   send: backendRuntime.fn((sent: ConversationMessageInput, get) =>
     Backend.use((backend) => backend.SendGlobalMessage(sending(sent, get))),
   ),

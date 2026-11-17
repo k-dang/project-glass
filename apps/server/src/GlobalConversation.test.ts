@@ -14,6 +14,8 @@ import {
   TurnInterrupted,
   TurnStopped,
   type Turn,
+  applyTranscriptUpdate,
+  emptyTranscript,
 } from "@glass/contracts"
 import {
   Clock,
@@ -239,7 +241,8 @@ it.live(
       assert.strictEqual(shownSession(before), past.id)
       assert.notStrictEqual(shownSession(after), past.id)
 
-      const { turns } = yield* f.client.ReadPastGlobalConversation({ id: past.id })
+      const read = yield* Stream.runHead(f.client.WatchPastGlobalConversation({ id: past.id }))
+      const { turns } = applyTranscriptUpdate(emptyTranscript, Option.getOrThrow(read))
 
       assert.deepStrictEqual(turns, before === undefined ? [] : [before])
     }),

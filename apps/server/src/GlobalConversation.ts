@@ -11,7 +11,6 @@ import {
   type RequestWaiting,
   type SentMessage,
   StartFreshRefused,
-  type Transcript,
   type TranscriptUpdate,
   TurnEnd,
   type GlobalConversationUpdate,
@@ -99,9 +98,14 @@ export class GlobalConversation extends Context.Service<
     readonly id: string
     readonly startFresh: Effect.Effect<void, StartFreshRefused | ConversationError>
     readonly past: Effect.Effect<ReadonlyArray<PastConversation>, ConversationError>
-    readonly readPast: (
+    readonly loadEarlier: (before: string) => Effect.Effect<void, ConversationError>
+    readonly watchPast: (
       sessionId: string,
-    ) => Effect.Effect<Transcript, PastConversationNotFound | ConversationError>
+    ) => Stream.Stream<TranscriptUpdate, PastConversationNotFound | ConversationError>
+    readonly loadEarlierPast: (
+      sessionId: string,
+      before: string,
+    ) => Effect.Effect<void, PastConversationNotFound | ConversationError>
     readonly waiting: Stream.Stream<ReadonlyArray<WaitingRequest>>
     readonly unseen: Stream.Stream<TurnEnd | null>
     readonly markSeen: (endedAt: DateTime.Utc) => Effect.Effect<void, ConversationError>
@@ -321,7 +325,7 @@ export class GlobalConversation extends Context.Service<
         `.pipe(Effect.flatMap(decodePast)),
       )
 
-      const readPast = Effect.fn("GlobalConversation.readPast")(function* (sessionId: string) {
+      const findPast = Effect.fnUntraced(function* (sessionId: string) {
         const [ended] = yield* stored(
           "read a past Global conversation",
           sql`
@@ -329,15 +333,15 @@ export class GlobalConversation extends Context.Service<
           `.pipe(Effect.flatMap(decodeIds)),
         )
 
-        if (ended === undefined) return yield* new PastConversationNotFound({ id: sessionId })
-
-        return yield* transcripts.read(sessionId)
+        if (ended === undefined) yield* new PastConversationNotFound({ id: sessionId })
       })
 
       return GlobalConversation.of({
         model: SubscriptionRef.get(model),
         changeModel,
         transcript: followSession(transcripts.watch),
+        loadEarlier: (before) =>
+          inSession((sessionId) => transcripts.loadEarlier(sessionId, before)),
         send: (input) => inSession((sessionId) => turns.send(sessionId, input)).pipe(Effect.asVoid),
         steer: (input) => inConversation((current) => turns.steer(current, input)),
         cancelQueued: (queuedId) =>
@@ -351,7 +355,10 @@ export class GlobalConversation extends Context.Service<
         id,
         startFresh,
         past,
-        readPast,
+        watchPast: (sessionId) =>
+          Stream.unwrap(findPast(sessionId).pipe(Effect.as(transcripts.watch(sessionId)))),
+        loadEarlierPast: (sessionId, before) =>
+          findPast(sessionId).pipe(Effect.andThen(transcripts.loadEarlier(sessionId, before))),
         waiting: followSession((sessionId) =>
           transcripts.waiting.pipe(Stream.map((waiting) => waiting.get(sessionId) ?? [])),
         ),

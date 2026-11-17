@@ -190,7 +190,12 @@ export class Conversations extends Context.Service<
     ) => Effect.Effect<void, ConversationError>
     readonly readTranscript: (
       conversationId: string,
+      turns: number,
     ) => Effect.Effect<Transcript, ConversationNotFound | ConversationError>
+    readonly loadEarlierTurns: (
+      conversationId: string,
+      before: string,
+    ) => Effect.Effect<void, ConversationNotFound | ConversationError>
     readonly transcript: (
       conversationId: string,
     ) => Stream.Stream<TranscriptUpdate, ConversationNotFound | ConversationError>
@@ -830,8 +835,12 @@ export class Conversations extends Context.Service<
           placed.pipe(Stream.map((current) => current.map(({ conversation }) => conversation))),
         transcript: (conversationId) =>
           Stream.unwrap(find(conversationId).pipe(Effect.as(transcripts.watch(conversationId)))),
-        readTranscript: (conversationId) =>
-          find(conversationId).pipe(Effect.andThen(transcripts.read(conversationId))),
+        readTranscript: (conversationId, latest) =>
+          find(conversationId).pipe(Effect.andThen(transcripts.read(conversationId, latest))),
+        loadEarlierTurns: (conversationId, before) =>
+          find(conversationId).pipe(
+            Effect.andThen(transcripts.loadEarlier(conversationId, before)),
+          ),
         harnesses: (place) => placementFor(place).harnesses,
         models: (harness, place) =>
           placementRunning(place, harness).pipe(

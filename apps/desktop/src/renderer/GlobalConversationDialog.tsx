@@ -22,6 +22,7 @@ import { ConfirmationDialog } from "./ConfirmationDialog"
 import { ConversationAtomsContext } from "./conversation"
 import {
   capturedContextAtom,
+  loadEarlierPastTurnsAtom,
   changeGlobalModelAtom,
   globalConversation,
   globalConversationOpenAtom,
@@ -195,11 +196,12 @@ function GlobalConversation(props: { onShowPast: () => void }) {
   const [started, startFresh] = useAtom(startGlobalFreshAtom)
   const [confirming, setConfirming] = useState(false)
 
-  const { turns, queued, status } = Option.getOrElse(
+  const { turns, earlierTurns, queued, status } = Option.getOrElse(
     AsyncResult.value(transcript),
     () => emptyTranscript,
   )
 
+  const loadEarlier = useAtomSet(globalConversation.loadEarlier)
   const endedAt = turns.at(-1)?.ended?.at
 
   useEffect(() => {
@@ -232,7 +234,12 @@ function GlobalConversation(props: { onShowPast: () => void }) {
         />
       )}
       {startProblem !== null && <PaddedProblem problem={startProblem} />}
-      <Transcript turns={turns} status={status} />
+      <Transcript
+        turns={turns}
+        earlierTurns={earlierTurns}
+        onShowEarlier={loadEarlier}
+        status={status}
+      />
       <p className="truncate px-6 pb-1 text-xs text-muted-foreground">
         {context === null ? "No PR or Conversation in view" : `Sends with ${contextLabel(context)}`}
       </p>
@@ -308,14 +315,25 @@ function PastConversations(props: {
 
 function PastTranscript(props: { conversation: PastConversation; onBack: () => void }) {
   const read = useAtomValue(pastGlobalTranscriptAtom(props.conversation.id))
-  const problem = settledProblem(read)
-  const { turns, status } = Option.getOrElse(AsyncResult.value(read), () => emptyTranscript)
+  const loadEarlier = useAtomSet(loadEarlierPastTurnsAtom(props.conversation.id))
+
+  const { turns, earlierTurns, status } = Option.getOrElse(
+    AsyncResult.value(read),
+    () => emptyTranscript,
+  )
 
   return (
     <>
       <Header title={spanOf(props.conversation)} onBack={props.onBack} />
-      {problem !== null && <PaddedProblem problem={problem} />}
-      <Transcript turns={turns} status={status} />
+      {AsyncResult.isFailure(read) && !read.waiting && (
+        <PaddedProblem problem={streamProblem(read.cause)} />
+      )}
+      <Transcript
+        turns={turns}
+        earlierTurns={earlierTurns}
+        onShowEarlier={loadEarlier}
+        status={status}
+      />
     </>
   )
 }

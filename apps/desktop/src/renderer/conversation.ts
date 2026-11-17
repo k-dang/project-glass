@@ -19,6 +19,7 @@ import {
   sendMessageAtom,
   sendQueuedAtom,
   steerAtom,
+  loadEarlierTurnsAtom,
   stopTurnAtom,
   transcriptAtom,
   unsentMessageAtom,
@@ -30,6 +31,7 @@ export interface ConversationAtoms {
   readonly transcript: Atom.Atom<
     AsyncResult.AsyncResult<Transcript, BackendError | Cause.NoSuchElementError>
   >
+  readonly loadEarlier: Atom.AtomResultFn<string, void, BackendError>
   readonly send: Atom.AtomResultFn<ConversationMessageInput, void, BackendError>
   readonly steer: Atom.AtomResultFn<MessageInput, void, BackendError>
   readonly stop: Atom.AtomResultFn<void, void, BackendError>
@@ -45,6 +47,7 @@ export interface ConversationAtoms {
 export const conversationAtoms = (conversationId: string): ConversationAtoms => ({
   composerKey: conversationId,
   transcript: transcriptAtom(conversationId),
+  loadEarlier: loadEarlierTurnsAtom(conversationId),
   send: sendMessageAtom(conversationId),
   steer: steerAtom(conversationId),
   stop: stopTurnAtom(conversationId),

@@ -539,15 +539,15 @@ export const GlassToolHandlers = GlassTools.toLayer(
           }
         }),
       read_conversation_transcript: ({ conversationId, turns }) =>
-        conversations.readTranscript(conversationId).pipe(
+        conversations.readTranscript(conversationId, turns).pipe(
           Effect.map((transcript) => ({
-            turns: transcript.turns.slice(-turns).map((turn) => ({
+            turns: transcript.turns.map((turn) => ({
               message: textOf(turn.message),
               sentAt: turn.sentAt,
               ending: turn.ended?.ending ?? null,
               activity: activityOf(turn),
             })),
-            earlierTurns: Math.max(0, transcript.turns.length - turns),
+            earlierTurns: transcript.earlierTurns,
             queued: transcript.queued.map(({ message }) => textOf(message)),
           })),
           Effect.mapError(explained),

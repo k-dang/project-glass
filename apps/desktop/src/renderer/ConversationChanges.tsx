@@ -39,14 +39,14 @@ export function ConversationChanges(props: {
   const changes = useAtomValue(conversationChangesAtom(conversation.id))
   const refresh = useAtomRefresh(conversationChangesAtom(conversation.id))
   const notes = useAtomValue(feedbackNotesAtom(conversation.id))
-  const turnsEnded = props.turns.filter((turn) => turn.ended !== null).length
-  const [turnsEndedAtSnapshot, setTurnsEndedAtSnapshot] = useState(turnsEnded)
+  const lastEnded = props.turns.findLast((turn) => turn.ended !== null)?.id ?? null
+  const [lastEndedAtSnapshot, setLastEndedAtSnapshot] = useState(lastEnded)
   const shown = Option.getOrNull(AsyncResult.value(changes))
   const store = useFeedbackNotes(conversation.id)
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("files")
 
   const showLatest = () => {
-    setTurnsEndedAtSnapshot(turnsEnded)
+    setLastEndedAtSnapshot(lastEnded)
     refresh()
   }
 
@@ -55,7 +55,7 @@ export function ConversationChanges(props: {
       <p className="border-b px-6 py-2.5 text-sm text-muted-foreground">
         Changes since {conversation.baseBranch}, including uncommitted work
       </p>
-      {turnsEnded > turnsEndedAtSnapshot && (
+      {lastEnded !== lastEndedAtSnapshot && (
         <div className="border-b px-6 py-3">
           <Alert role="note">
             <FileDiff aria-hidden />

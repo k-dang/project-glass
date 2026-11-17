@@ -6,6 +6,8 @@ import {
   PullRequestContext,
   TextPart,
   TranscriptSnapshot,
+  type TranscriptUpdate,
+  EarlierTurns,
   TurnDone,
   GlobalConversationUpdate,
   type Activity,
@@ -37,7 +39,7 @@ import {
 import { RegistryProvider } from "@effect/atom-react"
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { DateTime, Effect, Stream } from "effect"
+import { DateTime, Effect, Queue, Stream } from "effect"
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test"
 import { ACTIVITY_PAGE_SIZE } from "./ActivityLogPage"
 import { App } from "./App"
@@ -517,30 +519,39 @@ it("opens the Global conversation over the current area, labelling each message 
 it("starts the Global conversation fresh once confirmed and reads a past one", async () => {
   const at = DateTime.makeUnsafe("2026-11-05T12:00:00Z")
   let started = 0
+  const earlierPages = Effect.runSync(Queue.unbounded<TranscriptUpdate>())
+
+  const pastTurn = (id: string, reply: string) => ({
+    id,
+    message: "Old question",
+    images: [],
+    context: null,
+    feedback: [],
+    sentAt: at,
+    ended: { at, ending: TurnDone.make({}) },
+    parts: [TextPart.make({ text: reply })],
+  })
 
   const user = mount({
     ListAgentModels: () => Effect.succeed(new AgentModels({ defaultModel: null, models: [] })),
     StartGlobalConversationFresh: () => Effect.sync(() => void started++),
     ListPastGlobalConversations: () =>
       Effect.succeed([{ id: "past-1", startedAt: at, endedAt: at }]),
-    ReadPastGlobalConversation: () =>
-      Effect.succeed({
-        turns: [
-          {
-            id: "turn-1",
-            message: "Old question",
-            images: [],
-            context: null,
-            feedback: [],
-            sentAt: at,
-            ended: { at, ending: TurnDone.make({}) },
-            parts: [TextPart.make({ text: "Old reply" })],
-          },
-        ],
-        queued: [],
-        status: null,
-        extensionStatuses: [],
-      }),
+    WatchPastGlobalConversation: () =>
+      Stream.make(
+        TranscriptSnapshot.make({
+          turns: [pastTurn("turn-2", "Old reply")],
+          earlierTurns: 1,
+          queued: [],
+          status: null,
+          extensionStatuses: [],
+        }),
+      ).pipe(Stream.concat(Stream.fromQueue(earlierPages))),
+    LoadEarlierPastGlobalTurns: ({ before }) =>
+      Queue.offer(
+        earlierPages,
+        EarlierTurns.make({ before, turns: [pastTurn("turn-1", "Older reply")], earlierTurns: 0 }),
+      ).pipe(Effect.asVoid),
   })
 
   await user.click(await screen.findByRole("button", { name: "Global conversation" }))
@@ -557,6 +568,10 @@ it("starts the Global conversation fresh once confirmed and reads a past one", a
 
   await screen.findByText("Old reply")
   expect(screen.queryByRole("textbox")).toBeNull()
+
+  await user.click(screen.getByRole("button", { name: "Show earlier Turns" }))
+  await screen.findByText("Older reply")
+  expect(screen.queryByRole("button", { name: "Show earlier Turns" })).toBeNull()
 })
 
 it("won't start fresh while a Turn runs, and says why", async () => {
