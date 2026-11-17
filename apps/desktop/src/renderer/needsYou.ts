@@ -46,6 +46,7 @@ export const needsYouKey = (item: NeedsYouItem): string =>
   Match.valueTags(item, {
     Conversation: ({ conversation }) => `conversation:${conversation.id}`,
     OutsideQuestion: ({ id }) => `ask:${id}`,
+    CheckIn: ({ id }) => `check-in:${id}`,
     PullRequest: ({ pullRequest }) => `pr:${referenceKey(pullRequest.ref)}`,
     GlobalConversation: () => "global",
   })

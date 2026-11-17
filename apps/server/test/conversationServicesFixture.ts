@@ -29,7 +29,7 @@ import {
 import { RpcTest } from "effect/rpc"
 import type { HarnessAdapter, HarnessSession } from "../src/agentHost/adapter"
 import type { DeliveredTurn } from "../src/agentHost/deliveredMessage"
-import { Changes } from "../src/agentHost/Changes"
+import { Changes } from "../src/Changes"
 import { FolderFiles } from "../src/agentHost/FolderFiles"
 import { AgentHostHandlers } from "../src/agentHost/handlers"
 import { HostConversations } from "../src/agentHost/HostConversations"

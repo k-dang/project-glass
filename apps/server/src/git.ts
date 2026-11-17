@@ -1,5 +1,6 @@
 import { Context, Effect, Layer, Schema, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
+import { resolve } from "node:path"
 import { isolatedGitEnv } from "./gitEnv"
 
 export class GitFailed extends Schema.TaggedError<GitFailed>()("GitFailed", {
@@ -76,3 +77,13 @@ export class Git extends Context.Service<
     }),
   )
 }
+
+/** The top level of the repository holding `path`. Git for Windows prints it with forward slashes. */
+export const topLevelOf = (git: Git["Service"], path: string) =>
+  git.run(path, ["rev-parse", "--show-toplevel"]).pipe(Effect.map((printed) => resolve(printed)))
+
+export const defaultBranchOf = (git: Git["Service"], path: string, remote: string) =>
+  git.run(path, ["symbolic-ref", "--short", `refs/remotes/${remote}/HEAD`]).pipe(
+    Effect.map((ref) => ref.slice(remote.length + 1)),
+    Effect.option,
+  )

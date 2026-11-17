@@ -1,5 +1,9 @@
-import { useAtomSet, useAtomValue } from "@effect/atom-react"
+import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
 import {
+  type CheckIn,
+  type CheckInAnswer,
+  CheckInApprove,
+  CheckInSendFeedback,
   type ConversationNeedsYou,
   type GlobalConversationNeedsYou,
   type NeedsYouItem,
@@ -11,8 +15,8 @@ import {
   referenceKey,
 } from "@glass/contracts"
 import { Link } from "@tanstack/react-router"
-import { DateTime, Match } from "effect"
-import { Atom } from "effect/reactivity"
+import { DateTime, Match, Option } from "effect"
+import { AsyncResult, Atom } from "effect/reactivity"
 import { type ReactNode, useId, useMemo, useState } from "react"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,6 +24,14 @@ import { Kbd } from "@/components/ui/kbd"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { AgentReviewMarkdown } from "./AgentReviewPanel"
+import {
+  ChangesWithFeedback,
+  LoadProblem,
+  type SidebarTab,
+  useNoteOpen,
+} from "./ChangesWithFeedback"
+import { plural } from "./plural"
+import { checkInChangesAtom, checkInNotesAtom, useCheckInNotes } from "./useCheckInNotes"
 import { Backend, backendRuntime } from "./backend"
 import { conversationAtoms, ConversationAtomsContext } from "./conversation"
 import { globalConversation, globalConversationOpenAtom } from "./globalConversation"
@@ -29,6 +41,7 @@ import {
   ItemIcon,
   Reasons,
   requestsOf,
+  summaryParts,
   titleOf,
   Waited,
 } from "./inboxItem"
@@ -55,6 +68,7 @@ export function InboxDetail(
     OutsideQuestion: (item) => (
       <OutsideQuestionDetail key={item.id} item={item} now={now} actions={actions} />
     ),
+    CheckIn: (item) => <CheckInDetail key={item.id} item={item} now={now} actions={actions} />,
     PullRequest: (item) => (
       <PullRequestDetail
         item={item}
@@ -84,17 +98,23 @@ function DetailShell(props: {
       <footer className="border-t">
         <div className="mx-auto flex min-h-14 w-full max-w-2xl flex-wrap items-center gap-2 px-8 py-3">
           {props.buttons}
-          <p className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-            {[{ key: "J K", label: "move" }, ...props.actions].map(({ key, label }) => (
-              <span key={key} className="inline-flex items-center gap-1">
-                <Kbd>{key}</Kbd>
-                {label}
-              </span>
-            ))}
-          </p>
+          <ShortcutHints actions={props.actions} />
         </div>
       </footer>
     </article>
+  )
+}
+
+function ShortcutHints(props: { actions: ReadonlyArray<InboxAction> }) {
+  return (
+    <p className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+      {[{ key: "J K", label: "move" }, ...props.actions].map(({ key, label }) => (
+        <span key={key} className="inline-flex items-center gap-1">
+          <Kbd>{key}</Kbd>
+          {label}
+        </span>
+      ))}
+    </p>
   )
 }
 
@@ -199,6 +219,115 @@ function OutsideQuestionDetail(props: DetailProps<OutsideQuestion>) {
         )}
       </form>
     </DetailShell>
+  )
+}
+
+const answerCheckInAtom = Atom.family((checkInId: string) =>
+  backendRuntime.fn((answer: CheckInAnswer) =>
+    Backend.use((backend) => backend.AnswerCheckIn({ checkInId, answer })),
+  ),
+)
+
+function CheckInDetail(props: DetailProps<CheckIn>) {
+  const { item } = props
+  const changes = useAtomValue(checkInChangesAtom(item.id))
+  const refresh = useAtomRefresh(checkInChangesAtom(item.id))
+  const notes = useAtomValue(checkInNotesAtom(item.id))
+  const store = useCheckInNotes(item.id)
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>("files")
+  const shown = Option.getOrNull(AsyncResult.value(changes))
+  const details = summaryParts(item.summary)?.details ?? ""
+
+  return (
+    <article className="flex min-h-0 flex-1 flex-col">
+      <div className="flex flex-col gap-3 border-b px-6 py-4">
+        <DetailHeader item={item} now={props.now} />
+        {details !== "" && (
+          <p className="text-sm whitespace-pre-wrap text-pretty break-words">{details}</p>
+        )}
+        {shown !== null && (
+          <p className="text-sm text-muted-foreground">
+            Changes since {shown.baseRef}, including uncommitted work, as they were when the agent
+            checked in
+          </p>
+        )}
+      </div>
+      <LoadProblem result={changes} retry={refresh} />
+      <LoadProblem result={notes} retry={store.refresh} />
+      {shown !== null && (
+        <ChangesWithFeedback
+          changes={shown}
+          store={store}
+          sidebarTab={sidebarTab}
+          setSidebarTab={setSidebarTab}
+          footer={<CheckInAnswerBar checkInId={item.id} noteCount={store.notes.length} />}
+        />
+      )}
+      <footer className="flex min-h-12 items-center border-t px-6 py-2">
+        <ShortcutHints actions={props.actions} />
+      </footer>
+    </article>
+  )
+}
+
+const answerHint = (editing: boolean, noteCount: number) => {
+  if (editing) return "Save or cancel the open note before you answer."
+
+  if (noteCount === 0) return "Select lines in the diff to leave a Feedback note."
+
+  return `${plural(noteCount, "Feedback note")} ${noteCount === 1 ? "goes" : "go"} back with your answer. On an approval, notes are guidance, not a request for changes.`
+}
+
+function CheckInAnswerBar(props: { checkInId: string; noteCount: number }) {
+  const editing = useNoteOpen()
+  const answering = answerCheckInAtom(props.checkInId)
+  const sent = useAtomValue(answering)
+  const answer = useAtomSet(answering)
+  const [text, setText] = useState("")
+  const messageId = useId()
+  const typed = text.trim()
+  const message = typed === "" ? null : typed
+  const problem = settledProblem(sent)
+  const busy = editing || sent.waiting
+
+  return (
+    <form
+      className="flex flex-col gap-2 border-t px-4 py-2"
+      onSubmit={(event) => {
+        event.preventDefault()
+        answer(CheckInSendFeedback.make({ message }))
+      }}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <Label htmlFor={messageId} className="sr-only">
+          Message to the agent
+        </Label>
+        <Input
+          id={messageId}
+          className="min-w-0 flex-1 basis-48"
+          placeholder="Message to the agent (optional)"
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          disabled={busy}
+          onClick={() => answer(CheckInApprove.make({ message }))}
+        >
+          Approve
+        </Button>
+        <Button type="submit" disabled={busy || (props.noteCount === 0 && message === null)}>
+          Send feedback
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground">{answerHint(editing, props.noteCount)}</p>
+      {problem !== null && (
+        <p role="alert" className="text-xs text-destructive">
+          {problem.detail}
+        </p>
+      )}
+    </form>
   )
 }
 

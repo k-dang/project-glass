@@ -29,7 +29,7 @@ const groupOfItem = new Map<string, StorageGroup>([
   ["conversation_turn_part", "conversations"],
   ["conversation_queued_message", "conversations"],
   ["conversation_unsent_message", "conversations"],
-  ["conversation_feedback_note", "conversations"],
+  ["feedback_note", "conversations"],
   ["local_checkout", "conversations"],
   ["global_conversation", "conversations"],
   ["past_global_conversation", "conversations"],

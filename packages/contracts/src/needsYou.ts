@@ -1,4 +1,5 @@
 import { Match, Predicate, Schema } from "effect"
+import { CheckIn } from "./checkIn"
 import { Conversation, PermissionRequestPart, QuestionPart, TurnEnd } from "./conversation"
 import { Check } from "./pullRequest"
 import { PullRequestSummary } from "./pullRequestList"
@@ -109,6 +110,7 @@ export const NeedsYouItem = Schema.Union([
   ConversationNeedsYou,
   PullRequestNeedsYou,
   OutsideQuestion,
+  CheckIn,
   GlobalConversationNeedsYou,
 ])
 
@@ -123,6 +125,7 @@ export type NeedsYouGroup = (typeof needsYouGroups)[number]
 export const needsYouGroupOf = (item: NeedsYouItem): NeedsYouGroup =>
   Match.valueTags(item, {
     OutsideQuestion: () => "stopped" as const,
+    CheckIn: () => "stopped" as const,
     GlobalConversation: () => "stopped" as const,
     Conversation: ({ reasons }) =>
       reasons.some(Predicate.isTagged("WaitingRequests"))

@@ -347,10 +347,11 @@ they send or clear it.
 _Avoid_: Draft (a Draft is a GitHub comment)
 
 **Feedback note**:
-An instruction the user leaves on a line or range on either side of a Conversation's Changes, kept
-with the code they read there. The user adds the notes to the Conversation's Unsent message and
-sends them together as one message to that Conversation, which then keeps them in its transcript;
-Glass never publishes them.
+An instruction the user leaves on a line or range on either side of a Conversation's Changes or a
+Check-in's changes, kept with the code they read there. On a Conversation, the user adds the notes
+to its Unsent message and sends them together as one message, which it then keeps in its
+transcript; on a Check-in, they go back to the Outside agent with the user's answer. Glass never
+publishes them.
 _Avoid_: Draft, review comment
 
 **Permission mode**:
@@ -374,6 +375,14 @@ question waits in the Inbox, under Stopped on you, until the user answers or the
 An agent Glass did not launch. The user approves it once, and it can then use Glass's MCP tools
 on this computer, including asking a question. It is not a Conversation Glass started.
 _Avoid_: Session, client, login
+
+**Check-in**:
+An Outside agent asking the user to read the changes in a folder on this computer, as they stood
+when it asked, and to approve them or send feedback back. Feedback notes go back either way; on an
+approval they are guidance, not a request for more changes. It waits in the Inbox, under
+Stopped on you, until the user answers or the wait ends; closing it without an answer is not
+approval.
+_Avoid_: Review, code review, Read request
 
 ### Identity
 

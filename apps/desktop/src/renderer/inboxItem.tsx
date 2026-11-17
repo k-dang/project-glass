@@ -8,8 +8,9 @@ import type {
 } from "@glass/contracts"
 import { cn } from "cn"
 import { Array as Arr, DateTime, Match, Predicate } from "effect"
-import { CircleHelp, GitPullRequest, MessagesSquare, Sparkles } from "lucide-react"
+import { CircleHelp, FileDiff, GitPullRequest, MessagesSquare, Sparkles } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { fileName } from "./fileName"
 import { ago, warningTone } from "./PullRequestRow"
 import { referenceText } from "./queue"
 
@@ -93,6 +94,7 @@ const reasonsOf = (item: NeedsYouItem): ReadonlyArray<Reason> =>
           }),
         ),
       OutsideQuestion: () => [{ label: "Question", tone: "warning" as const }],
+      CheckIn: () => [{ label: "Check-in", tone: "warning" as const }],
       PullRequest: ({ reasons }) => reasons.map(pullRequestReason),
       GlobalConversation: ({ requests }) => requests.map(requestReason),
     }),
@@ -115,6 +117,7 @@ export function ItemIcon(props: { item: NeedsYouItem; className: string }) {
   return Match.valueTags(props.item, {
     Conversation: () => <Sparkles className={props.className} aria-hidden />,
     OutsideQuestion: () => <CircleHelp className={props.className} aria-hidden />,
+    CheckIn: () => <FileDiff className={props.className} aria-hidden />,
     PullRequest: () => <GitPullRequest className={props.className} aria-hidden />,
     GlobalConversation: () => <MessagesSquare className={props.className} aria-hidden />,
   })
@@ -130,6 +133,7 @@ export const requestsOf = (item: NeedsYouItem): ReadonlyArray<RequestPart> =>
         }),
       ),
     OutsideQuestion: () => [],
+    CheckIn: () => [],
     PullRequest: () => [],
     GlobalConversation: ({ requests }) => requests,
   })
@@ -146,14 +150,25 @@ export const firstPermission = (item: NeedsYouItem) =>
         : { conversationId: waiting.conversation.id, requestId: part.requestId }
     },
     OutsideQuestion: () => null,
+    CheckIn: () => null,
     PullRequest: () => null,
     GlobalConversation: () => null,
   })
+
+/** A Check-in's summary: its first line titles it, and the rest says where to look. */
+export const summaryParts = (summary: string | null) => {
+  if (summary === null) return null
+
+  const [title = "", ...rest] = summary.split("\n")
+
+  return { title, details: rest.join("\n").trim() }
+}
 
 export const titleOf = (item: NeedsYouItem) =>
   Match.valueTags(item, {
     Conversation: ({ conversation }) => conversation.name,
     OutsideQuestion: ({ question }) => question,
+    CheckIn: ({ folder, summary }) => summaryParts(summary)?.title ?? fileName(folder),
     PullRequest: ({ pullRequest }) => pullRequest.title,
     GlobalConversation: () => "Global conversation",
   })
@@ -163,6 +178,7 @@ export const contextOf = (item: NeedsYouItem) =>
     Conversation: ({ conversation }) =>
       `${conversation.repository.owner}/${conversation.repository.repo}`,
     OutsideQuestion: ({ askedBy }) => `Asked by ${askedBy}`,
+    CheckIn: ({ askedBy, folder }) => `${folder} · Asked by ${askedBy}`,
     GlobalConversation: () => "",
     PullRequest: ({ pullRequest }) =>
       `${referenceText(pullRequest.ref)}${pullRequest.isDraft ? " · Draft" : ""}`,

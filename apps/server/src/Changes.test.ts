@@ -6,9 +6,9 @@ import { writeFileSync } from "node:fs"
 import { mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { gitIn } from "../../test/gitRepositories"
-import { overlappingGit } from "../../test/overlappingGit"
-import { Git } from "../git"
+import { gitIn } from "../test/gitRepositories"
+import { overlappingGit } from "../test/overlappingGit"
+import { Git } from "./git"
 import { Changes } from "./Changes"
 
 const changesWith = <R>(git: Layer.Layer<Git, never, R>) =>

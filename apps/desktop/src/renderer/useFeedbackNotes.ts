@@ -7,16 +7,38 @@ import { feedbackNotesAtom, writtenFeedbackAtom } from "./conversationsArea"
 import { Backend, type BackendError, useBackendRuntime } from "./backend"
 import { type Problem, problemOf } from "./problems"
 
-export interface FeedbackNotesStore {
+/** The Feedback notes left on one set of changes, as the diff writes and shows them. */
+export interface FeedbackNotesEditor {
   readonly ready: boolean
   readonly notes: ReadonlyArray<FeedbackNote>
-  readonly staged: ReadonlyArray<FeedbackNote>
   readonly save: (note: FeedbackNote) => Promise<Problem | null>
   readonly remove: (noteId: string) => Promise<Problem | null>
-  readonly stage: () => Promise<Problem | null>
-  readonly sent: (noteIds: ReadonlyArray<string>) => void
   readonly refresh: () => void
 }
+
+/** A Conversation's Feedback notes, which the user adds to its Unsent message before sending. */
+export interface FeedbackNotesStore extends FeedbackNotesEditor {
+  readonly staged: ReadonlyArray<FeedbackNote>
+  readonly stage: () => Promise<Problem | null>
+  readonly sent: (noteIds: ReadonlyArray<string>) => void
+}
+
+export const noteWriteTitles = {
+  save: "Couldn't save your Feedback note",
+  remove: "Couldn't remove your Feedback note",
+}
+
+export const notesWriter =
+  <A>(runtime: ReturnType<typeof useBackendRuntime>, keep: (written: A) => void) =>
+  async (title: string, call: Effect.Effect<A, BackendError, Backend>): Promise<Problem | null> => {
+    const exit = await runtime.runPromiseExit(call)
+
+    if (Exit.isFailure(exit)) return { ...problemOf(exit.cause), title }
+
+    keep(exit.value)
+
+    return null
+  }
 
 const noFeedback = new UnsentFeedback({ notes: [], staged: [] })
 
@@ -35,18 +57,7 @@ export function useFeedbackNotes(conversationId: string): FeedbackNotesStore {
   const unsent = written ?? saved ?? noFeedback
 
   return useMemo(() => {
-    const write = async (
-      title: string,
-      call: Effect.Effect<UnsentFeedback, BackendError, Backend>,
-    ) => {
-      const exit = await runtime.runPromiseExit(call)
-
-      if (Exit.isFailure(exit)) return { ...problemOf(exit.cause), title }
-
-      setWritten(exit.value)
-
-      return null
-    }
+    const write = notesWriter(runtime, setWritten)
 
     return {
       ready: saved !== null || written !== null,
@@ -54,12 +65,12 @@ export function useFeedbackNotes(conversationId: string): FeedbackNotesStore {
       staged: unsent.notes.filter(({ id }) => unsent.staged.includes(id)),
       save: (note) =>
         write(
-          "Couldn't save your Feedback note",
+          noteWriteTitles.save,
           Backend.use((backend) => backend.SaveFeedbackNote({ conversationId, note })),
         ),
       remove: (noteId) =>
         write(
-          "Couldn't remove your Feedback note",
+          noteWriteTitles.remove,
           Backend.use((backend) => backend.RemoveFeedbackNote({ conversationId, noteId })),
         ),
       stage: () =>

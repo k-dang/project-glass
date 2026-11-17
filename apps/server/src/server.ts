@@ -15,6 +15,8 @@ import { Conversations } from "./Conversations"
 import { ConversationTurns } from "./ConversationTurns"
 import { FeedbackNotes } from "./FeedbackNotes"
 import { DatabaseLive } from "./Database"
+import { Changes } from "./Changes"
+import { CheckIns } from "./CheckIns"
 import { Git } from "./git"
 import { GitHubAuth } from "./github/GitHubAuth"
 import { GitHubClient } from "./github/GitHubClient"
@@ -108,6 +110,9 @@ const services = (
       Layer.provide(Plugins.layer),
       Layer.provide(CheckoutRuns.layer),
       Layer.provide(Checkouts.layer),
+      Layer.provideMerge(
+        CheckIns.layer.pipe(Layer.provide(Changes.layer), Layer.provide(FeedbackNotes.layer)),
+      ),
       Layer.provide(Git.layer),
     )
     .pipe(
@@ -128,9 +133,12 @@ const services = (
 const releaseAskers = Layer.effectDiscard(
   Effect.gen(function* () {
     const questions = yield* OutsideQuestions
+    const checkIns = yield* CheckIns
 
     // Acquired after the listener, so this runs before server.close waits on open responses.
-    yield* Effect.addFinalizer(() => questions.cancelAll())
+    yield* Effect.addFinalizer(() =>
+      Effect.all([questions.cancelAll(), checkIns.cancelAll()], { concurrency: "unbounded" }),
+    )
   }),
 )
 

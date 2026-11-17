@@ -1,4 +1,5 @@
 import {
+  type CheckIn,
   ConversationNeedsYou,
   AgentReviewFinished,
   AwaitingReply,
@@ -34,6 +35,7 @@ import {
   Stream,
 } from "effect"
 import { AgentReviews } from "./AgentReviews"
+import { CheckIns } from "./CheckIns"
 import { Conversations, type FinishedConversation, type WaitingConversation } from "./Conversations"
 import { GlobalConversation } from "./GlobalConversation"
 import { OutsideQuestions } from "./OutsideQuestions"
@@ -102,20 +104,24 @@ const pullRequestItems = (waiting: ReadonlyArray<WaitingPullRequest>) =>
       }),
   )
 
-const needsYouOf = (
-  waiting: ReadonlyArray<WaitingConversation>,
-  finished: ReadonlyArray<FinishedConversation>,
-  pullRequests: ReadonlyArray<WaitingPullRequest>,
-  outside: ReadonlyArray<OutsideQuestion>,
-  global: ReadonlyArray<WaitingRequest>,
-): ReadonlyArray<NeedsYouItem> =>
+interface Waiting {
+  readonly conversations: ReadonlyArray<WaitingConversation>
+  readonly finished: ReadonlyArray<FinishedConversation>
+  readonly pullRequests: ReadonlyArray<WaitingPullRequest>
+  readonly questions: ReadonlyArray<OutsideQuestion>
+  readonly checkIns: ReadonlyArray<CheckIn>
+  readonly global: ReadonlyArray<WaitingRequest>
+}
+
+const needsYouOf = (waiting: Waiting): ReadonlyArray<NeedsYouItem> =>
   Arr.sort(
     [
-      ...waiting.map(waitingItem),
-      ...finished.map(finishedItem),
-      ...outside,
-      ...globalItem(global),
-      ...pullRequestItems(pullRequests),
+      ...waiting.conversations.map(waitingItem),
+      ...waiting.finished.map(finishedItem),
+      ...waiting.questions,
+      ...waiting.checkIns,
+      ...globalItem(waiting.global),
+      ...pullRequestItems(waiting.pullRequests),
     ],
     order,
   )
@@ -185,6 +191,7 @@ export class NeedsYou extends Context.Service<
       const queue = yield* Queue
       const agentReviews = yield* AgentReviews
       const questions = yield* OutsideQuestions
+      const checkIns = yield* CheckIns
       const mirror = yield* PullRequestMirror
       const conversation = yield* GlobalConversation
 
@@ -248,10 +255,18 @@ export class NeedsYou extends Context.Service<
             conversations.watchFinished(),
             waitingPullRequests,
             questions.watch(),
+            checkIns.watch(),
             conversation.waiting,
           ).pipe(
-            Stream.map(([waiting, finished, pullRequests, asked, global]) =>
-              needsYouOf(waiting, finished, pullRequests, asked, global),
+            Stream.map(([waiting, finished, pullRequests, asked, checkingIn, global]) =>
+              needsYouOf({
+                conversations: waiting,
+                finished,
+                pullRequests,
+                questions: asked,
+                checkIns: checkingIn,
+                global,
+              }),
             ),
             Stream.changesWith(Schema.toEquivalence(NeedsYouList)),
           ),

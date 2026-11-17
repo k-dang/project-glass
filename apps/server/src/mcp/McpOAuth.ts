@@ -284,7 +284,7 @@ export const renderApproval = (authorization: Authorization, csrf: string) => {
 <body>
 <main>
   <h1>${name} wants to connect</h1>
-  <p>${name} will be able to read your pull requests, to-dos, and agents, start and message agents, start a review, and ask you a question in the Inbox. The connection lasts 30 days. You can disconnect it in Settings.</p>
+  <p>${name} will be able to read your pull requests, to-dos, and agents, start and message agents, start a review, and, in the Inbox, ask you a question or ask you to read the changes in a folder on this computer. The connection lasts 30 days. You can disconnect it in Settings.</p>
   <p>Glass sends this approval back to <strong>${host}</strong>. Approve only a sign-in you just started.</p>
   <form method="post" action="/oauth/mcp/decision">
     ${hidden("client_id", authorization.clientId)}

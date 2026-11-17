@@ -55,10 +55,11 @@ import {
   SubscriptionRef,
 } from "effect"
 import { SqlClient, type SqlError } from "effect/sql"
-import { createHash, randomUUID } from "node:crypto"
+import { randomUUID } from "node:crypto"
+import { changesId } from "./Changes"
 import { ActivityLog } from "./ActivityLog"
 import { type ClaimedConversation, ConversationTurns } from "./ConversationTurns"
-import { FeedbackNotes } from "./FeedbackNotes"
+import { conversationNotes, FeedbackNotes } from "./FeedbackNotes"
 import {
   asConversationError,
   type HostCallError,
@@ -74,13 +75,9 @@ import { SkillPacks } from "./SkillPacks"
 import { Transcripts, type WaitingRequest } from "./Transcripts"
 import { annotateUnit } from "./wideEvents"
 
-const encodeFiles = Schema.encodeSync(Schema.Array(ChangedFile))
-
 const changesOf = (files: ReadonlyArray<ChangedFile>) =>
   new ConversationChanges({
-    id: createHash("sha256")
-      .update(JSON.stringify(encodeFiles(files)))
-      .digest("hex"),
+    id: changesId(files),
     files,
   })
 
@@ -628,7 +625,7 @@ export class Conversations extends Context.Service<
         return yield* turns.send(
           conversationId,
           { message, images, context: null },
-          notes.take(conversationId, feedback),
+          notes.take(conversationNotes(conversationId), feedback),
         )
       })
 
@@ -833,7 +830,7 @@ export class Conversations extends Context.Service<
           yield* Effect.gen(function* () {
             yield* transcripts.remove(conversationId)
             yield* turns.removeUnsent(conversationId)
-            yield* notes.removeAll(conversationId)
+            yield* notes.removeAll(conversationNotes(conversationId))
             yield* skillPacks.releaseConversation(conversationId)
             yield* sql`DELETE FROM global_started_conversation WHERE conversation_id = ${conversationId}`
             yield* sql`DELETE FROM conversation WHERE id = ${conversationId}`
@@ -894,22 +891,26 @@ export class Conversations extends Context.Service<
         send,
         changes,
         feedbackNotes: (conversationId) =>
-          find(conversationId).pipe(Effect.andThen(notes.list(conversationId))),
+          find(conversationId).pipe(Effect.andThen(notes.list(conversationNotes(conversationId)))),
         stageFeedbackNotes: (conversationId) =>
-          find(conversationId).pipe(Effect.andThen(notes.stage(conversationId))),
+          find(conversationId).pipe(Effect.andThen(notes.stage(conversationNotes(conversationId)))),
         saveFeedbackNote: (conversationId, note) =>
-          find(conversationId).pipe(Effect.andThen(notes.save(conversationId, note))),
+          find(conversationId).pipe(
+            Effect.andThen(notes.save(conversationNotes(conversationId), note)),
+          ),
         removeFeedbackNote: (conversationId, noteId) =>
-          find(conversationId).pipe(Effect.andThen(notes.remove(conversationId, noteId))),
+          find(conversationId).pipe(
+            Effect.andThen(notes.remove(conversationNotes(conversationId), noteId)),
+          ),
         steer,
         cancelQueued: (conversationId, queuedId) =>
           find(conversationId).pipe(
             Effect.andThen(
               transcripts.cancelQueued(conversationId, queuedId, (feedback) =>
-                notes.restore(conversationId, feedback),
+                notes.restore(conversationNotes(conversationId), feedback),
               ),
             ),
-            Effect.andThen(notes.list(conversationId)),
+            Effect.andThen(notes.list(conversationNotes(conversationId))),
           ),
         sendQueued,
         stop,

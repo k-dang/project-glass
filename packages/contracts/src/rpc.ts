@@ -57,6 +57,7 @@ import {
 import { CreateDraftError, Draft, UpdateDraftError } from "./draft"
 import { EngineFeature, EngineSettings } from "./engine"
 import { FeedbackNote, UnsentFeedback } from "./feedbackNote"
+import { CheckInAnswer, CheckInChanges, CheckInError, CheckInNotWaiting } from "./checkIn"
 import { FollowedRepository, InvalidRepositoryInput } from "./followedRepository"
 import { NeedsYou, OutsideQuestionAnswer, OutsideQuestionNotWaiting } from "./needsYou"
 import { OutsideAgent, OutsideAgentNotFound } from "./outsideAgent"
@@ -370,6 +371,30 @@ export class GlassRpcs extends RpcGroup.make(
   Rpc.make("AnswerOutsideQuestion", {
     payload: { id: Schema.String, answer: OutsideQuestionAnswer },
     error: OutsideQuestionNotWaiting,
+  }),
+  Rpc.make("GetCheckInChanges", {
+    payload: { checkInId: Schema.String },
+    success: CheckInChanges,
+    error: CheckInNotWaiting,
+  }),
+  Rpc.make("ListCheckInNotes", {
+    payload: { checkInId: Schema.String },
+    success: Schema.Array(FeedbackNote),
+    error: Schema.Union([CheckInNotWaiting, CheckInError]),
+  }),
+  Rpc.make("SaveCheckInNote", {
+    payload: { checkInId: Schema.String, note: FeedbackNote },
+    success: Schema.Array(FeedbackNote),
+    error: Schema.Union([CheckInNotWaiting, CheckInError]),
+  }),
+  Rpc.make("RemoveCheckInNote", {
+    payload: { checkInId: Schema.String, noteId: Schema.String },
+    success: Schema.Array(FeedbackNote),
+    error: Schema.Union([CheckInNotWaiting, CheckInError]),
+  }),
+  Rpc.make("AnswerCheckIn", {
+    payload: { checkInId: Schema.String, answer: CheckInAnswer },
+    error: Schema.Union([CheckInNotWaiting, CheckInError]),
   }),
   Rpc.make("GetMcpEndpoint", { success: Schema.Struct({ url: Schema.String }) }),
   Rpc.make("WatchOutsideAgents", { success: Schema.Array(OutsideAgent), stream: true }),
