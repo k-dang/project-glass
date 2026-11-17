@@ -116,9 +116,11 @@ export class HostConversations extends Context.Service<
               )
           })
 
-        const retire = (conversationId: string, conversation: Running) =>
+        const retire = (conversationId: string, conversation: Running | undefined) =>
           Effect.suspend(() => {
-            running.delete(conversationId)
+            if (conversation === undefined) return Effect.void
+
+            if (running.get(conversationId) === conversation) running.delete(conversationId)
 
             return Scope.close(conversation.scope, Exit.void)
           })
@@ -203,14 +205,7 @@ export class HostConversations extends Context.Service<
 
             yield* session.closed.pipe(
               Effect.andThen(
-                withConversation(
-                  conversationId,
-                  Effect.suspend(() =>
-                    running.get(conversationId) === conversation
-                      ? retire(conversationId, conversation)
-                      : Effect.void,
-                  ),
-                ),
+                withConversation(conversationId, retire(conversationId, conversation)),
               ),
               Effect.forkIn(scope),
             )
@@ -272,13 +267,7 @@ export class HostConversations extends Context.Service<
           stop: (conversationId) =>
             withConversation(
               conversationId,
-              Effect.suspend(() => {
-                const conversation = running.get(conversationId)
-
-                return conversation === undefined
-                  ? Effect.void
-                  : retire(conversationId, conversation)
-              }),
+              Effect.suspend(() => retire(conversationId, running.get(conversationId))),
             ),
         })
 

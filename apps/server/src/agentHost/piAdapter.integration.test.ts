@@ -10,8 +10,9 @@ import {
   TurnDone,
   TurnStopped,
 } from "@glass/contracts"
-import { Effect, Predicate, Schema } from "effect"
-import { mkdirSync, writeFileSync } from "node:fs"
+import { NodeFileSystem } from "@effect/platform-node"
+import { Effect, Fiber, Layer, Predicate, Schema } from "effect"
+import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import {
   writeGreetPack,
@@ -33,7 +34,9 @@ import {
 } from "../../test/fakeModelProvider"
 import { recordingSessions } from "../../test/sessionTape"
 import { PI_MODEL_ID } from "../../test/piLogin"
-import { ReviewRole } from "./protocol"
+import { HostConversations } from "./HostConversations"
+import { Journal } from "./Journal"
+import { ReviewRole, WorkRole } from "./protocol"
 
 const conversationId = "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d"
 
@@ -728,5 +731,38 @@ it.live("stops the Global conversation's Turn while a Glass tool runs, cancellin
     assert.deepStrictEqual(turn?.ended?.ending, TurnStopped.make({}))
 
     if (recordingSessions) yield* glass.waitInterrupted
+  }).pipe(Effect.scoped),
+)
+
+it.live("keeps pi's extensions when a stopped Conversation is started again straight away", () =>
+  Effect.gen(function* () {
+    const f = yield* piSession("pi-restart", { fake: {} })
+
+    const context = yield* Layer.build(
+      HostConversations.make({ "claude-code": f.adapter, pi: f.adapter }).pipe(
+        Layer.provideMerge(Journal.layer),
+        Layer.provide(NodeFileSystem.layer),
+      ),
+    )
+
+    const host = yield* HostConversations.pipe(Effect.provideContext(context))
+
+    const start = host.start({
+      conversationId,
+      harness: "pi",
+      folder: f.folder,
+      role: WorkRole.make({}),
+      skills: [],
+    })
+
+    assert.equal(yield* start, "started")
+
+    const stopping = yield* Effect.forkChild(host.stop(conversationId), { startImmediately: true })
+
+    assert.equal(yield* start, "started")
+    yield* Fiber.join(stopping)
+
+    for (const extension of ["draw-diagram.mjs", "subagent-status.js"])
+      assert.isTrue(existsSync(join(`${f.folder}.pi`, extension)), extension)
   }).pipe(Effect.scoped),
 )
