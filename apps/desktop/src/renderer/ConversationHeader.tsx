@@ -11,8 +11,6 @@ import { LOCAL_SKILLS_LABEL } from "./skillChoice"
 const fact =
   "flex h-7 w-full min-w-0 items-center gap-2 rounded-sm px-2 text-xs [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-muted-foreground"
 
-// An action takes you to another view, so the popover leaves at once instead of
-// fading out over the view it opened.
 const CloseInstantly = createContext<() => void>(() => {})
 
 export function ConversationHeader(props: {
@@ -80,14 +78,14 @@ export function ConversationHeader(props: {
   )
 }
 
-export function ConversationHeaderAction(props: { onSelect: () => void; children: ReactNode }) {
+export function ConversationHeaderAction(props: { onNavigate: () => void; children: ReactNode }) {
   const closeInstantly = use(CloseInstantly)
 
   return (
     <PopoverClose
       onClick={() => {
         closeInstantly()
-        props.onSelect()
+        props.onNavigate()
       }}
       className={cn(fact, "text-left outline-none hover:bg-accent focus-visible:bg-accent")}
     >
