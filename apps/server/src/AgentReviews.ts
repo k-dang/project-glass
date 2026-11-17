@@ -46,7 +46,7 @@ import { type JobState, pullRequestJobs, type PullRequestJob } from "./pullReque
 import { Deadlines, ServerConfig } from "./ServerConfig"
 import { engineSettingsOf, SettingsStore } from "./SettingsStore"
 
-const BACKGROUND_SLOTS = 1
+const BACKGROUND_SLOTS = 2
 
 type Status = AgentReviewState["job"]
 

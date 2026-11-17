@@ -63,7 +63,7 @@ const status = (wanted: AgentReviewState["job"]["status"]) => (state: AgentRevie
 const reviewed = (state: AgentReviewState) => state.review !== null && state.job.status === "idle"
 
 it.live(
-  "runs no Agent review for the Queue until turned on, then one at a time for PRs added after",
+  "runs no Agent review for the Queue until turned on, then two at a time for PRs added after",
   () =>
     Effect.gen(function* () {
       const f = yield* fixture()
@@ -72,18 +72,20 @@ it.live(
       assert.isFalse(yield* f.client.GetQueueWork({ feature: "agentReviews" }))
 
       yield* f.client.SetQueueWork({ feature: "agentReviews", enabled: true })
-      const [first, second] = [f.seed("Wave"), f.seed("Fibers")]
-      yield* f.client.AddToQueue({ references: [ref(first), ref(second)] })
+      const added = ["Wave", "Fibers", "Layers"].map((title) => f.seed(title))
+      yield* f.client.AddToQueue({ references: added.map(ref) })
 
-      yield* f.runners.ran(1)
-      yield* f.reviewState(first, status("reviewing"))
-      yield* f.reviewState(second, status("waiting"))
+      yield* f.runners.ran(2)
+      const states = yield* Effect.forEach(added, (pr) => f.reviewState(pr, () => true))
+      assert.deepStrictEqual(
+        states.map(({ job }) => job.status),
+        ["reviewing", "reviewing", "waiting"],
+      )
 
       yield* f.runners.release({ answer })
-      yield* f.reviewState(first, reviewed)
-      yield* f.reviewState(second, reviewed)
+      yield* Effect.forEach(added, (pr) => f.reviewState(pr, reviewed))
       yield* f.reviewState(before, status("idle"))
-      assert.deepStrictEqual(f.subjects(), ["Agent review", "Agent review"])
+      assert.deepStrictEqual(f.subjects(), ["Agent review", "Agent review", "Agent review"])
     }),
 )
 
@@ -95,18 +97,20 @@ it.live(
       yield* f.client.SetQueueWork({ feature: "tours", enabled: true })
       yield* f.client.SetQueueWork({ feature: "agentReviews", enabled: true })
       const opened = f.seed("Opened")
-      const [running, waiting] = [f.seed("Greet"), f.seed("Wave")]
+      const [running, alsoRunning, waiting] = [f.seed("Greet"), f.seed("Wave"), f.seed("Fibers")]
       yield* f.client.StartAgentReview({
         pullRequest: ref(opened),
         revision: new Revision({ base: opened.base.sha, head: opened.head.sha }),
       })
-      yield* f.client.AddToQueue({ references: [ref(running), ref(waiting)] })
+      yield* f.client.AddToQueue({ references: [ref(running), ref(alsoRunning), ref(waiting)] })
       yield* f.reviewState(running, status("reviewing"))
+      yield* f.reviewState(alsoRunning, status("reviewing"))
       yield* f.reviewState(waiting, status("waiting"))
 
       yield* f.client.SetQueueWork({ feature: "agentReviews", enabled: false })
 
       yield* f.reviewState(running, status("idle"))
+      yield* f.reviewState(alsoRunning, status("idle"))
       yield* f.reviewState(waiting, status("idle"))
       yield* f.reviewState(opened, status("reviewing"))
       yield* f.tourState(running, (state) => state.job.status === "writing")
@@ -118,15 +122,15 @@ it.live("cancels the Agent review of a PR leaving the Queue and starts the next 
   Effect.gen(function* () {
     const f = yield* fixture()
     yield* f.client.SetQueueWork({ feature: "agentReviews", enabled: true })
-    const [removed, next] = [f.seed("Greet"), f.seed("Wave")]
-    yield* f.client.AddToQueue({ references: [ref(removed), ref(next)] })
-    yield* f.runners.ran(1)
+    const [removed, running, next] = [f.seed("Greet"), f.seed("Wave"), f.seed("Fibers")]
+    yield* f.client.AddToQueue({ references: [ref(removed), ref(running), ref(next)] })
+    yield* f.runners.ran(2)
 
     yield* f.client.RemoveFromQueue({ reference: ref(removed) })
 
     yield* f.reviewState(removed, status("idle"))
     yield* f.runners.interrupted(1)
-    yield* f.runners.ran(2)
+    yield* f.runners.ran(3)
     assert.include(f.runners.runs.at(-1)?.task.prompt, next.title)
   }),
 )
