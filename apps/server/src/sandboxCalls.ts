@@ -19,6 +19,7 @@ export const SANDBOX_DEADLINES = {
   remove: Duration.minutes(2),
   extend: Duration.seconds(30),
   models: Duration.seconds(30),
+  settleAfterCancel: Duration.seconds(10),
 }
 
 const abortThenAwaitProvider = (controller: AbortController, running: Promise<unknown>) =>
@@ -29,11 +30,11 @@ const abortThenAwaitProvider = (controller: AbortController, running: Promise<un
       () => undefined,
       () => undefined,
     )
-  }).pipe(Effect.timeout("10 seconds"), Effect.ignore)
+  }).pipe(Effect.timeout(SANDBOX_DEADLINES.settleAfterCancel), Effect.ignore)
 
-const fromProvider = <A>(
+const runProvider = <A>(
   run: (signal: AbortSignal) => Promise<A>,
-  { awaitAfterAbort = false }: { readonly awaitAfterAbort?: boolean } = {},
+  cancel: (controller: AbortController, running: Promise<unknown>) => Effect.Effect<void>,
 ) =>
   Effect.callback<A, { readonly rejected: unknown }>((resume) => {
     const controller = new AbortController()
@@ -44,10 +45,14 @@ const fromProvider = <A>(
       (rejected) => resume(Effect.fail({ rejected })),
     )
 
-    return awaitAfterAbort
-      ? abortThenAwaitProvider(controller, running)
-      : Effect.sync(() => controller.abort())
+    return cancel(controller, running)
   })
+
+const fromProvider = <A>(run: (signal: AbortSignal) => Promise<A>) =>
+  runProvider(run, (controller) => Effect.sync(() => controller.abort()))
+
+const fromProviderAwaitingCleanup = <A>(run: (signal: AbortSignal) => Promise<A>) =>
+  runProvider(run, abortThenAwaitProvider)
 
 const providerFailure =
   (provider: SandboxProvider, action: string) =>
@@ -99,9 +104,9 @@ export const createSandbox = (
   request: SandboxRequest,
   context: Omit<SandboxCreation, "signal">,
 ) =>
-  fromProvider((signal) => provider.create(request, { ...context, signal }), {
-    awaitAfterAbort: true,
-  }).pipe(Effect.catch(providerFailure(provider, "create the Sandbox")))
+  fromProviderAwaitingCleanup((signal) => provider.create(request, { ...context, signal })).pipe(
+    Effect.catch(providerFailure(provider, "create the Sandbox")),
+  )
 
 export const listModels = (provider: SandboxProvider, harness: AgentHarness) => {
   const action = "list what its Sandboxes offer"
@@ -188,7 +193,15 @@ export const connectToHost = (provider: SandboxProvider, state: SandboxState, to
         [HOST_TOKEN_HEADER]: token,
       })
     }),
-    boundSandboxCall(provider, "reach the Sandbox", SANDBOX_DEADLINES.connect),
+    Effect.timeoutOrElse({
+      duration: SANDBOX_DEADLINES.connect,
+      orElse: () =>
+        Effect.fail(
+          new ConversationError({
+            message: "Glass couldn't reach the Sandbox in time. Try again.",
+          }),
+        ),
+    }),
   )
 
 const shutDownHost = (provider: SandboxProvider, state: SandboxState, token: string) =>

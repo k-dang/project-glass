@@ -618,7 +618,7 @@ it.effect(
     withWatchedClock(SANDBOX_DEADLINES.models, (deadlineSet) =>
       Effect.gen(function* () {
         const f = yield* conversationServicesFixture
-        f.sandboxes.configure({ stall: ["models"] })
+        f.sandboxes.configure({ stall: "models" })
 
         const listing = yield* Effect.forkChild(
           f.conversations.models("pi", sandbox).pipe(Effect.flip),
@@ -644,7 +644,7 @@ it.effect(
     withWatchedClock(SANDBOX_DEADLINES.startHost, (deadlineSet) =>
       Effect.gen(function* () {
         const f = yield* conversationServicesFixture
-        f.sandboxes.configure({ stall: ["target"] })
+        f.sandboxes.configure({ stall: "target" })
         const conversation = yield* createSandboxed(f)
 
         yield* deadlineSet
@@ -675,7 +675,7 @@ it.effect(
         yield* end(yield* f.started)
         yield* f.transcript(conversation.id, settled(1))
 
-        f.sandboxes.configure({ stall: ["remove"] })
+        f.sandboxes.configure({ stall: "remove" })
 
         const removing = yield* Effect.forkChild(
           f.conversations.remove(conversation.id).pipe(Effect.flip),
@@ -700,7 +700,7 @@ it.effect(
   () =>
     Effect.gen(function* () {
       const f = yield* conversationServicesFixture
-      f.sandboxes.configure({ stall: ["extend"] })
+      f.sandboxes.configure({ stall: "extend" })
       const conversation = yield* createSandboxed(f)
       yield* end(yield* f.started)
       yield* f.transcript(conversation.id, settled(1))

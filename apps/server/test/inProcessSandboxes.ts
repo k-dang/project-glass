@@ -35,7 +35,7 @@ export interface InProcessSandboxSettings {
   readonly noCapacity?: string
   readonly extensionMillis?: number
   readonly maxLifetimeMillis?: number
-  readonly stall?: ReadonlyArray<ProviderCall>
+  readonly stall?: ProviderCall
 }
 
 const TWO_DAYS = Duration.toMillis(Duration.days(2))
@@ -140,7 +140,7 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
 
   const answered = (call: ProviderCall, signal: AbortSignal) =>
     held(
-      () => settings.stall?.includes(call) ?? false,
+      () => settings.stall === call,
       signal,
       () => events.push(`abandoned ${call}`),
     )
