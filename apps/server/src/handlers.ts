@@ -164,6 +164,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       ListConversationFiles: ({ conversationId }) => conversations.files(conversationId),
       ListSandboxProviders: () => Effect.succeed(sandboxes.providers),
       CreateConversation: (input) => conversations.create(input),
+      WatchWorkingConversations: () => conversations.watchWorking(),
       WatchNeedsYou: () => needsYou.watch(),
       MarkTurnSeen: ({ conversationId, endedAt }) =>
         conversations.markTurnSeen(conversationId, endedAt),

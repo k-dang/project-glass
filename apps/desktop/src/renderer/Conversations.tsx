@@ -15,9 +15,16 @@ import {
   type SandboxStatus,
 } from "@glass/contracts"
 import { Link, Outlet, useNavigate, useParams } from "@tanstack/react-router"
-import { DateTime, Exit, Predicate } from "effect"
+import { DateTime, Exit, Option, Predicate } from "effect"
 import { AsyncResult } from "effect/reactivity"
-import { FolderGit2, PanelLeftClose, PanelLeftOpen, SquarePen, Trash2 } from "lucide-react"
+import {
+  FolderGit2,
+  LoaderCircle,
+  PanelLeftClose,
+  PanelLeftOpen,
+  SquarePen,
+  Trash2,
+} from "lucide-react"
 import { cn } from "cn"
 import { useContext, useId, useState } from "react"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -30,6 +37,7 @@ import {
   placeNames,
   removalWarningsAtom,
   removeConversation,
+  workingConversationsAtom,
 } from "./conversationsArea"
 import { conversationMarker } from "./inboxItem"
 import { conversationsNeedingYouAtom } from "./needsYou"
@@ -40,6 +48,10 @@ import { shortcutLabel } from "./shortcutLabel"
 import { useShortcuts } from "./useShortcuts"
 
 const groupNames: Record<PlaceTag, string> = { ...placeNames, sandbox: "Sandboxes" }
+
+const noneWorking: ReadonlySet<string> = new Set()
+
+const workingMarker = { label: "Working", tone: "text-muted-foreground" }
 
 const expiryFormat = new Intl.DateTimeFormat(undefined, {
   weekday: "short",
@@ -233,7 +245,13 @@ function ConversationRow(props: { conversation: Conversation }) {
 
   const needsYou = useAtomValue(conversationsNeedingYouAtom).get(conversation.id)
 
-  const marker = needsYou === undefined ? null : conversationMarker(needsYou)
+  const working = Option.getOrElse(
+    AsyncResult.value(useAtomValue(workingConversationsAtom)),
+    () => noneWorking,
+  ).has(conversation.id)
+
+  const marker =
+    needsYou !== undefined ? conversationMarker(needsYou) : working ? workingMarker : null
 
   const removeNow = () => {
     setConfirming(null)
@@ -284,7 +302,14 @@ function ConversationRow(props: { conversation: Conversation }) {
               id={markerId}
               className={cn("flex shrink-0 items-center gap-1 text-xs", marker.tone)}
             >
-              <span aria-hidden className="size-1.5 rounded-full bg-current" />
+              {marker === workingMarker ? (
+                <LoaderCircle
+                  aria-hidden
+                  className="size-3 animate-spin motion-reduce:animate-none"
+                />
+              ) : (
+                <span aria-hidden className="size-1.5 rounded-full bg-current" />
+              )}
               {marker.label}
             </span>
           )}

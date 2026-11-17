@@ -186,6 +186,14 @@ it("marks the finished Turn seen once Glass is focused on the Conversation's Cha
   focused.mockRestore()
 })
 
+it("marks a Conversation in the Conversations panel as working while its Turn runs", async () => {
+  mount({ WatchWorkingConversations: () => Stream.make([conversation.id]) }, "/conversations")
+
+  expect(
+    await screen.findByRole("link", { name: conversation.name, description: /Working/ }),
+  ).toBeTruthy()
+})
+
 it("says in the Conversations panel how a Turn that finished unseen ended", async () => {
   const ended = {
     at: DateTime.add(sentAt, { seconds: 3 }),

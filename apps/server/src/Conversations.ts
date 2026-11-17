@@ -184,6 +184,7 @@ export class Conversations extends Context.Service<
     readonly watch: () => Stream.Stream<ReadonlyArray<Conversation>, ConversationError>
     readonly watchWaiting: () => Stream.Stream<ReadonlyArray<WaitingConversation>>
     readonly watchFinished: () => Stream.Stream<ReadonlyArray<FinishedConversation>>
+    readonly watchWorking: () => Stream.Stream<ReadonlyArray<string>>
     readonly markTurnSeen: (
       conversationId: string,
       endedAt: DateTime.Utc,
@@ -910,6 +911,14 @@ export class Conversations extends Context.Service<
                   ? []
                   : [{ conversation, ended }]
               }),
+            ),
+          ),
+        watchWorking: () =>
+          Stream.zipLatest(placed, transcripts.running).pipe(
+            Stream.map(([current, running]) =>
+              current.flatMap(({ conversation }) =>
+                running.has(conversation.id) ? [conversation.id] : [],
+              ),
             ),
           ),
         markTurnSeen: transcripts.markSeen,

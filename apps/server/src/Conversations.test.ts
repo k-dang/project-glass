@@ -433,3 +433,20 @@ it.live("refuses to cancel a Queued message whose Turn started, leaving its feed
     assert.deepStrictEqual((yield* f.transcript(conversationId, settled(2)))[1]?.feedback, sent)
   }),
 )
+
+it.live("lists a Conversation as working while its Turn runs, until the Turn ends", () =>
+  Effect.gen(function* () {
+    const f = yield* conversationsFixture
+
+    const working = (until: (ids: ReadonlyArray<string>) => boolean) =>
+      f.client.WatchWorkingConversations().pipe(Stream.filter(until), Stream.runHead)
+
+    const conversation = yield* f.start("hold:first")
+    yield* f.transcript(conversation.id, holding)
+    yield* working((ids) => ids.includes(conversation.id))
+
+    yield* f.release("first")
+    yield* f.transcript(conversation.id, settled(1))
+    yield* working((ids) => !ids.includes(conversation.id))
+  }),
+)

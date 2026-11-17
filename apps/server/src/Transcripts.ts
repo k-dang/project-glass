@@ -304,6 +304,7 @@ export class Transcripts extends Context.Service<
     readonly waitingNow: Effect.Effect<WaitingByConversation>
     readonly isWaiting: (conversationId: string) => Effect.Effect<boolean>
     readonly unseen: Stream.Stream<UnseenByConversation>
+    readonly running: Stream.Stream<ReadonlySet<string>>
     readonly markSeen: (
       conversationId: string,
       endedAt: DateTime.Utc,
@@ -447,6 +448,29 @@ export class Transcripts extends Context.Service<
         unseenEnds(conversationId).pipe(
           Effect.flatMap(([row]) => setUnseen(conversationId, row?.ended)),
         )
+
+      const runningConversations = yield* SubscriptionRef.make<ReadonlySet<string>>(
+        new Set(
+          (yield* sql`SELECT DISTINCT conversation_id AS id FROM conversation_turn WHERE ended IS NULL`.pipe(
+            Effect.flatMap(decodeTurnIds),
+            Effect.catch((cause) =>
+              Effect.logWarning("Couldn't read the running Turns", cause).pipe(Effect.as([])),
+            ),
+          )).map(({ id }) => id),
+        ),
+      )
+
+      const setRunning = (conversationId: string, isRunning: boolean) =>
+        SubscriptionRef.updateSome(runningConversations, (current) => {
+          if (current.has(conversationId) === isRunning) return Option.none()
+
+          const next = new Set(current)
+
+          if (isRunning) next.add(conversationId)
+          else next.delete(conversationId)
+
+          return Option.some(next)
+        })
 
       const lockFor = (conversationId: string) => {
         const lock = locks.get(conversationId) ?? Semaphore.makeUnsafe(1)
@@ -643,7 +667,10 @@ export class Transcripts extends Context.Service<
                 (yield* waitingParts(conversationId)).map(({ part }) => part),
               )
 
-            if (updates.some(startsOrEndsTurn)) yield* refreshUnseen(conversationId)
+            if (updates.some(startsOrEndsTurn)) {
+              yield* refreshUnseen(conversationId)
+              yield* setRunning(conversationId, (yield* runningTurn(conversationId)) !== null)
+            }
 
             yield* PubSub.publishAll(
               published,
@@ -1114,6 +1141,7 @@ export class Transcripts extends Context.Service<
         isWaiting: (conversationId) =>
           SubscriptionRef.get(waiting).pipe(Effect.map((current) => current.has(conversationId))),
         unseen: SubscriptionRef.changes(unseen),
+        running: SubscriptionRef.changes(runningConversations),
         markSeen: (conversationId, endedAt) => {
           const at = DateTime.formatIso(endedAt)
 
@@ -1164,6 +1192,7 @@ export class Transcripts extends Context.Service<
           extensionStatuses.delete(conversationId)
           yield* markWaiting(conversationId, [])
           yield* setUnseen(conversationId, undefined)
+          yield* setRunning(conversationId, false)
         }, Effect.mapError(storageFailure)),
       })
     }),
