@@ -8,6 +8,7 @@ import {
   changes,
   fileOrder,
   mountTourWorkspace,
+  openTourOrder,
   resetTourWorkspace,
 } from "../../test/tourWorkspace"
 import { changedFile, pullRequestRef, revision, savedTour, tourChapter } from "../../test/workspace"
@@ -50,7 +51,7 @@ it("reads an outdated Tour against the files the PR has now", async () => {
     ),
   ).toBeNull()
 
-  await f.user.click(screen.getByRole("tab", { name: "Changes" }))
+  await openTourOrder(f.user)
   await waitFor(() => expect(fileOrder()).toEqual(["greet.ts", "api.ts", "new.ts"]))
   expect((await tourInMenu(f.user)).getByText(/Written for head/).textContent).toBe(
     "Written for head 0123456",
@@ -93,7 +94,7 @@ it("treats a Tour as outdated when only its base differs, and current when both 
 
 it("keeps the old Tour readable through a rewrite until its replacement arrives", async () => {
   const f = mount(older)
-  await f.user.click(await screen.findByRole("tab", { name: "Changes" }))
+  await openTourOrder(f.user)
   await waitFor(() => expect(fileOrder()).toEqual(["greet.ts", "api.ts", "new.ts"]))
   await f.user.click(screen.getByRole("tab", { name: "Tour" }))
   await f.user.click((await tourInMenu(f.user)).getByRole("button", { name: "Rewrite" }))

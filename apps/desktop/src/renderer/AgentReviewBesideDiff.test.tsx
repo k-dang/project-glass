@@ -13,7 +13,7 @@ import { act, screen, waitFor, within } from "@testing-library/react"
 import { DateTime, Deferred, Effect } from "effect"
 import { afterEach, expect, it } from "vite-plus/test"
 import { reviewOf } from "../../test/agentReview"
-import { mountTourWorkspace, resetTourWorkspace } from "../../test/tourWorkspace"
+import { mountTourWorkspace, openTourOrder, resetTourWorkspace } from "../../test/tourWorkspace"
 import { changedFile, revision, savedTour } from "../../test/workspace"
 
 afterEach(resetTourWorkspace)
@@ -71,8 +71,8 @@ it("keeps the Tour order while reading the Agent review", async () => {
     agentReview: { review: reviewOf(revision), job: { status: "idle" } },
   })
 
-  await f.user.click(await screen.findByRole("tab", { name: "Changes" }))
-  const tourOrder = await screen.findByRole("button", { name: "Tour" })
+  await openTourOrder(f.user)
+  const tourOrder = screen.getByRole("button", { name: "Tour" })
   expect(tourOrder.getAttribute("aria-pressed")).toBe("true")
 
   await f.user.click(screen.getByRole("button", { name: "Agent work" }))

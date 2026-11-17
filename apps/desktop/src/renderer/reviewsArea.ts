@@ -103,7 +103,7 @@ const defaultWorkspaceView: WorkspaceView = {
   tab: "overview",
   file: null,
   repositoryFile: null,
-  order: "tour",
+  order: "path",
 }
 
 export const workspaceViewAtom = Atom.make(defaultWorkspaceView).pipe(Atom.keepAlive)

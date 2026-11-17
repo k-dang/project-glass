@@ -132,3 +132,8 @@ export const fileOrder = () =>
     .map((box) => box.getAttribute("aria-label")!.slice("Viewed: ".length))
 
 export const chapter = (name: string) => within(changes()).getByRole("region", { name })
+
+export const openTourOrder = async (user: ReturnType<typeof userEvent.setup>) => {
+  await user.click(await screen.findByRole("tab", { name: "Changes" }))
+  await user.click(await screen.findByRole("button", { name: "Tour" }))
+}

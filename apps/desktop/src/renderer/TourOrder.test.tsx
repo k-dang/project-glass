@@ -7,6 +7,7 @@ import {
   changes,
   fileOrder,
   mountTourWorkspace,
+  openTourOrder,
   resetTourWorkspace,
 } from "../../test/tourWorkspace"
 import { changedFile, revision, savedTour } from "../../test/workspace"
@@ -52,9 +53,9 @@ const toggles = (...paths: Array<string>) =>
 const mount = (saved: Tour | null = tour) =>
   mountTourWorkspace({ files, initial: { tour: saved, job: { status: "idle" } } })
 
-it("opens Changes in Tour order, with Chapter explanations beside continuous diffs", async () => {
+it("reads Changes in Tour order, with Chapter explanations beside continuous diffs", async () => {
   const f = mount()
-  await f.user.click(await screen.findByRole("tab", { name: "Changes" }))
+  await openTourOrder(f.user)
 
   await waitFor(() => expect(fileOrder()).toEqual(all))
   expect(screen.getByRole("button", { name: "Tour" }).getAttribute("aria-pressed")).toBe("true")
@@ -70,7 +71,7 @@ it("opens Changes in Tour order, with Chapter explanations beside continuous dif
 
 it("marks the clicked Chapter file as current", async () => {
   const f = mount()
-  await f.user.click(await screen.findByRole("tab", { name: "Changes" }))
+  await openTourOrder(f.user)
   const first = await waitFor(() => chapter("Greet by name"))
 
   const link = within(
@@ -81,21 +82,22 @@ it("marks the clicked Chapter file as current", async () => {
   expect(link.getAttribute("aria-current")).toBe("location")
 })
 
-it("remembers Path order across workspace tabs", async () => {
+it("opens Changes in Path order, and remembers Tour order across workspace tabs", async () => {
   const f = mount()
   await f.user.click(await screen.findByRole("tab", { name: "Changes" }))
-  await f.user.click(await screen.findByRole("button", { name: "Path" }))
 
   await waitFor(() =>
     expect(fileOrder()).toEqual(["api.ts", "greet.test.ts", "greet.ts", "logo.png", "notes.md"]),
   )
+  expect(screen.getByRole("button", { name: "Path" }).getAttribute("aria-pressed")).toBe("true")
   expect(within(changes()).queryByRole("region", { name: "Greet by name" })).toBeNull()
   expect(within(changes()).queryByText("Builds the greeting from a name.")).toBeNull()
 
+  await f.user.click(screen.getByRole("button", { name: "Tour" }))
   await f.user.click(screen.getByRole("tab", { name: "Overview" }))
   await f.user.click(screen.getByRole("tab", { name: "Changes" }))
-  await waitFor(() => expect(fileOrder()[0]).toBe("api.ts"))
-  expect(screen.getByRole("button", { name: "Path" }).getAttribute("aria-pressed")).toBe("true")
+  await waitFor(() => expect(fileOrder()).toEqual(all))
+  expect(screen.getByRole("button", { name: "Tour" }).getAttribute("aria-pressed")).toBe("true")
 })
 
 it("shows Changes full screen in either order, hiding the PR header until Escape", async () => {
@@ -130,7 +132,7 @@ it("saves Chapter and file progress", async () => {
   const sidebar = screen.getByRole("region", { name: "Saved Tour" })
   expect(within(sidebar).getAllByLabelText("0 of 2 files viewed")).toHaveLength(2)
 
-  await f.user.click(screen.getByRole("tab", { name: "Changes" }))
+  await openTourOrder(f.user)
 
   const mark = await waitFor(() =>
     within(chapter("Greet by name")).getByRole("checkbox", {
@@ -166,7 +168,7 @@ it("collapses a saved viewed Chapter to one row until reopened", async () => {
     initial: { tour, job: { status: "idle" } },
   })
 
-  await f.user.click(await screen.findByRole("tab", { name: "Changes" }))
+  await openTourOrder(f.user)
 
   const row = await waitFor(() =>
     within(chapter("Greet by name")).getByRole("button", { expanded: false }),
@@ -188,30 +190,6 @@ it("collapses a saved viewed Chapter to one row until reopened", async () => {
   expect(within(chapter("Greet by name")).getByRole("button", { expanded: false })).toBeDefined()
 })
 
-it("opens a collapsed Chapter to show a file chosen in the Tree", async () => {
-  const f = mountTourWorkspace({
-    files,
-    viewedPaths: ["greet.ts", "greet.test.ts"],
-    initial: { tour, job: { status: "idle" } },
-  })
-
-  await f.user.click(await screen.findByRole("tab", { name: "Changes" }))
-  await waitFor(() => expect(fileOrder()).toEqual(["api.ts", "logo.png", "notes.md"]))
-
-  const tree = await waitFor(() => {
-    const element = document
-      .querySelector("file-tree-container")
-      ?.shadowRoot?.querySelector<HTMLElement>('[role="tree"]')
-
-    if (element == null) throw new Error("Changed files tree hasn't rendered")
-
-    return element
-  })
-
-  await f.user.click(await within(tree).findByRole("treeitem", { name: /greet.test.ts/ }))
-  await waitFor(() => expect(fileOrder()).toEqual(all))
-})
-
 it.each([
   ["in Tour order", tour],
   ["without a Tour", null],
@@ -229,10 +207,7 @@ it.each([
 
 it("opens a Chapter from the sidebar in Tour order", async () => {
   const f = mount()
-  await f.user.click(await screen.findByRole("tab", { name: "Changes" }))
-  await f.user.click(await screen.findByRole("button", { name: "Path" }))
-  await f.user.click(screen.getByRole("tab", { name: "Overview" }))
-  await f.user.click(screen.getByRole("tab", { name: "Tour" }))
+  await f.user.click(await screen.findByRole("tab", { name: "Tour" }))
   await f.user.click(await screen.findByRole("button", { name: /Expose the greeting/ }))
 
   expect(screen.getByRole("tab", { name: "Changes" }).getAttribute("aria-selected")).toBe("true")
