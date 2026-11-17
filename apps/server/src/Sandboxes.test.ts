@@ -19,13 +19,15 @@ import {
   TurnEnded,
   TurnStopped,
 } from "@glass/contracts"
-import { DateTime, Effect, Option, Predicate, Stream } from "effect"
+import { DateTime, Duration, Effect, Fiber, Option, Predicate, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { resolve } from "node:path"
 import { conversationServicesFixture } from "../test/conversationServicesFixture"
+import { withWatchedClock } from "../test/deadlines"
 import { HOST_PROTOCOL } from "./agentHost/protocol"
 import { eventually } from "../test/eventually"
 import { steps } from "../test/inProcessSandboxes"
+import { SANDBOX_DEADLINES } from "./sandboxCalls"
 
 type Fixture = Effect.Success<typeof conversationServicesFixture>
 
@@ -602,4 +604,152 @@ it.effect("runs a message sent after Glass relaunches on its Sandbox's replaceme
       "Done",
     )
   }),
+)
+
+const tookTooLong = (action: string) =>
+  `Fake Sandboxes didn't answer in time, so Glass couldn't ${action}. Try again.`
+
+const abandoned = (f: Fixture, call: string) =>
+  eventually(Effect.sync(() => assert.include(f.sandboxes.events, `abandoned ${call}`)))
+
+it.effect(
+  "stops waiting for a Sandbox provider's models at 30 seconds, and not a millisecond sooner",
+  () =>
+    withWatchedClock(SANDBOX_DEADLINES.models, (deadlineSet) =>
+      Effect.gen(function* () {
+        const f = yield* conversationServicesFixture
+        f.sandboxes.configure({ stall: "models" })
+
+        const listing = yield* Effect.forkChild(
+          f.conversations.models("pi", sandbox).pipe(Effect.flip),
+        )
+
+        yield* deadlineSet
+        yield* TestClock.adjust(Duration.millis(29_999))
+        assert.isUndefined(listing.pollUnsafe())
+
+        yield* TestClock.adjust(Duration.millis(1))
+        assert.equal(
+          (yield* Fiber.join(listing)).message,
+          tookTooLong("list what its Sandboxes offer"),
+        )
+        assert.include(f.sandboxes.events, "abandoned models")
+      }),
+    ),
+)
+
+it.effect(
+  "fails the first message when a new Sandbox's address never comes, deleting the half-built Sandbox",
+  () =>
+    withWatchedClock(SANDBOX_DEADLINES.startHost, (deadlineSet) =>
+      Effect.gen(function* () {
+        const f = yield* conversationServicesFixture
+        f.sandboxes.configure({ stall: "target" })
+        const conversation = yield* createSandboxed(f)
+
+        yield* deadlineSet
+        yield* TestClock.adjust(SANDBOX_DEADLINES.startHost)
+        yield* abandoned(f, "target")
+
+        f.sandboxes.configure({})
+        assert.equal(
+          failedReason(yield* f.transcript(conversation.id, settled(1))),
+          "The agent in the Sandbox didn't start. Try again.",
+        )
+        yield* removed(f, conversation.id)
+
+        yield* f.conversations.send(conversation.id, say("Again"))
+        yield* end(yield* f.started)
+        assert.equal(failedReason(yield* f.transcript(conversation.id, settled(2))), "Done")
+      }),
+    ),
+)
+
+it.effect(
+  "keeps a Conversation whose Sandbox provider never finishes deleting it, so removing it again can finish",
+  () =>
+    withWatchedClock(SANDBOX_DEADLINES.remove, (deadlineSet) =>
+      Effect.gen(function* () {
+        const f = yield* conversationServicesFixture
+        const conversation = yield* createSandboxed(f)
+        yield* end(yield* f.started)
+        yield* f.transcript(conversation.id, settled(1))
+
+        f.sandboxes.configure({ stall: "remove" })
+
+        const removing = yield* Effect.forkChild(
+          f.conversations.remove(conversation.id).pipe(Effect.flip),
+        )
+
+        yield* deadlineSet
+        yield* TestClock.adjust(SANDBOX_DEADLINES.remove)
+        assert.equal((yield* Fiber.join(removing)).message, tookTooLong("delete the Sandbox"))
+        assert.include(f.sandboxes.events, "abandoned remove")
+        assert.notInclude(f.sandboxes.events, `removed ${conversation.id}`)
+        yield* f.conversations.unsent(conversation.id)
+
+        f.sandboxes.configure({})
+        yield* f.conversations.remove(conversation.id)
+        assert.include(f.sandboxes.events, `removed ${conversation.id}`)
+      }),
+    ),
+)
+
+it.effect(
+  "deletes a half-built Sandbox whose deletion timed out before making another for the next message",
+  () =>
+    withWatchedClock(SANDBOX_DEADLINES.remove, (deadlineSet) =>
+      Effect.gen(function* () {
+        const f = yield* conversationServicesFixture
+        f.sandboxes.configure({ failAt: steps[0], stall: "remove" })
+        const conversation = yield* createSandboxed(f)
+
+        yield* deadlineSet
+        yield* TestClock.adjust(SANDBOX_DEADLINES.remove)
+        yield* f.transcript(conversation.id, settled(1))
+        assert.include(f.sandboxes.events, "abandoned remove")
+        assert.notInclude(f.sandboxes.events, `removed ${conversation.id}`)
+
+        f.sandboxes.configure({})
+        yield* f.conversations.send(conversation.id, say("Again"))
+        yield* end(yield* f.started)
+        assert.equal(failedReason(yield* f.transcript(conversation.id, settled(2))), "Done")
+        assert.include(f.sandboxes.events, `removed ${conversation.id}`)
+      }),
+    ),
+)
+
+it.effect(
+  "gives up a Sandbox renewal its provider never answers, and renews it on a later try",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* conversationServicesFixture
+      f.sandboxes.configure({ stall: "extend" })
+      const conversation = yield* createSandboxed(f)
+      yield* end(yield* f.started)
+      yield* f.transcript(conversation.id, settled(1))
+
+      yield* eventually(
+        Effect.gen(function* () {
+          yield* TestClock.adjust("1 second")
+          assert.include(f.sandboxes.events, "abandoned extend")
+        }),
+      )
+
+      f.sandboxes.configure({})
+
+      const renewed = yield* eventually(
+        Effect.gen(function* () {
+          yield* TestClock.adjust("1 second")
+
+          return yield* sandboxOf(f.conversations, conversation.id).pipe(
+            Stream.runHead,
+            Effect.map(Option.getOrThrow),
+            Effect.filterOrFail(({ expiresAt }) => expiresAt !== null),
+          )
+        }),
+      )
+
+      assert.equal(renewed.reach, "reachable")
+    }),
 )

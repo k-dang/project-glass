@@ -47,11 +47,11 @@ import type {
 } from "./Placement"
 import { Plugins } from "./Plugins"
 import {
-  call,
   connectToHost,
+  createSandbox,
+  deleteSandbox,
   extendSandbox,
-  removeSandbox,
-  shutDownHost,
+  listModels,
   waitForHost,
 } from "./sandboxCalls"
 import { missedConnection, type Recovery, recoveryReach } from "./reconnecting"
@@ -178,13 +178,6 @@ const orderedReports = Effect.gen(function* () {
     caughtUp: Queue.end(queue).pipe(Effect.andThen(Fiber.join(applying))),
   }
 })
-
-const deleteSandbox = (
-  provider: SandboxProvider,
-  { state, token }: Pick<SandboxRecord, "state" | "token">,
-  action: string,
-) =>
-  shutDownHost(provider, state, token).pipe(Effect.andThen(removeSandbox(provider, state, action)))
 
 const notInstalled = (providerId: string): Placement => {
   const failure = Effect.fail(
@@ -389,12 +382,16 @@ export class Sandboxes extends Context.Service<
       ) =>
         deleteSandbox(provider, record, "delete the half-built Sandbox").pipe(
           Effect.andThen(save(conversationId, null)),
-          Effect.ignore,
         )
 
       const makePlacement = (provider: SandboxProvider) => {
         const provision = ({ conversation, folder }: PlacedConversation) =>
           Effect.gen(function* () {
+            const { record: left } = yield* knownOf(conversation.id)
+
+            if (Predicate.isTagged(left, "Building"))
+              yield* discard(provider, conversation.id, left)
+
             const token = newHostToken()
             let recorded: SandboxState | undefined
             const reports = yield* orderedReports
@@ -421,16 +418,13 @@ export class Sandboxes extends Context.Service<
             }
 
             yield* Effect.gen(function* () {
-              yield* call(provider, "create the Sandbox", (signal) =>
-                provider.create(request, {
-                  progress: (step) => reports.offer(transcripts.setStatus(conversation.id, step)),
-                  record: (state) => {
-                    recorded = state
-                    reports.offer(save(conversation.id, Building.make({ state, token })))
-                  },
-                  signal,
-                }),
-              ).pipe(Effect.ensuring(reports.caughtUp))
+              yield* createSandbox(provider, request, {
+                progress: (step) => reports.offer(transcripts.setStatus(conversation.id, step)),
+                record: (state) => {
+                  recorded = state
+                  reports.offer(save(conversation.id, Building.make({ state, token })))
+                },
+              }).pipe(Effect.ensuring(reports.caughtUp))
 
               if (recorded === undefined)
                 return yield* Effect.logWarning(
@@ -450,7 +444,9 @@ export class Sandboxes extends Context.Service<
               Effect.onError(() =>
                 recorded === undefined
                   ? Effect.void
-                  : discard(provider, conversation.id, { state: recorded, token }),
+                  : discard(provider, conversation.id, { state: recorded, token }).pipe(
+                      Effect.ignore,
+                    ),
               ),
               Effect.ensuring(transcripts.setStatus(conversation.id, null)),
             )
@@ -458,7 +454,7 @@ export class Sandboxes extends Context.Service<
 
         const extendAhead = (
           conversationId: string,
-          extend: (state: SandboxState) => Promise<Date>,
+          extend: NonNullable<SandboxProvider["extend"]>,
         ) =>
           Effect.gen(function* () {
             for (;;) {
@@ -647,7 +643,7 @@ export class Sandboxes extends Context.Service<
         const placement: Placement = {
           harnesses: provider.harnesses,
           models: (harness) =>
-            call(provider, "list what its Sandboxes offer", () => provider.models(harness)).pipe(
+            listModels(provider, harness).pipe(
               Effect.flatMap((models) =>
                 decodeModels(models).pipe(
                   Effect.tapError((cause) =>
@@ -747,7 +743,7 @@ export class Sandboxes extends Context.Service<
         const provider = sandboxProviders.get(providerId)
 
         if (Predicate.isTagged(sandbox, "Building") && provider !== undefined)
-          yield* discard(provider, id, sandbox).pipe(Effect.forkIn(scope))
+          yield* discard(provider, id, sandbox).pipe(Effect.ignore, Effect.forkIn(scope))
 
         if (Predicate.isTagged(sandbox, "Ready") && expiredBy(sandbox, launchedAt))
           yield* becomeGone(id)

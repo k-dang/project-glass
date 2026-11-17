@@ -14,3 +14,13 @@ export const watchDeadlines = (deadline: number) =>
 
     return { watched, deadlineSet: Queue.take(set) }
   })
+
+export const withWatchedClock = <A, E, R>(
+  deadline: Duration.Duration,
+  test: (deadlineSet: Effect.Effect<void>) => Effect.Effect<A, E, R>,
+) =>
+  Effect.gen(function* () {
+    const { watched, deadlineSet } = yield* watchDeadlines(Duration.toMillis(deadline))
+
+    return yield* test(deadlineSet).pipe(Effect.provideService(Clock.Clock, watched))
+  })

@@ -14,7 +14,6 @@ import {
   GlobalConversationUpdate,
 } from "@glass/contracts"
 import {
-  Clock,
   DateTime,
   Deferred,
   Duration,
@@ -29,7 +28,7 @@ import {
 } from "effect"
 import { TestClock } from "effect/testing"
 import { eventually } from "../test/eventually"
-import { watchDeadlines } from "../test/deadlines"
+import { withWatchedClock } from "../test/deadlines"
 import {
   type ClaimedConversation,
   type ConversationHost,
@@ -662,19 +661,10 @@ it.live("keeps a queued operation holding the conversation after the holder fail
   ),
 )
 
-const withHostClock = <A, E, R>(
-  effect: (deadlineSet: Effect.Effect<void>) => Effect.Effect<A, E, R>,
-) =>
-  Effect.gen(function* () {
-    const { watched, deadlineSet } = yield* watchDeadlines(Duration.toMillis(HOST_CONTROL_DEADLINE))
-
-    return yield* effect(deadlineSet).pipe(Effect.provideService(Clock.Clock, watched))
-  })
-
 const failedToAnswer = TurnFailed.make({ reason: HOST_DIDNT_ANSWER })
 
 it.effect("fails a Turn the host never accepts, so Stop can return", () =>
-  withHostClock((deadlineSet) =>
+  withWatchedClock(HOST_CONTROL_DEADLINE, (deadlineSet) =>
     Effect.gen(function* () {
       const entered = yield* Deferred.make<void>()
       const release = yield* Deferred.make<void>()
@@ -708,7 +698,7 @@ it.effect("fails a Turn the host never accepts, so Stop can return", () =>
 it.effect(
   "accepts the next message after StartTurn times out, once the stalled Turn has failed",
   () =>
-    withHostClock((deadlineSet) =>
+    withWatchedClock(HOST_CONTROL_DEADLINE, (deadlineSet) =>
       Effect.gen(function* () {
         const entered = yield* Deferred.make<void>()
         const release = yield* Deferred.make<void>()
@@ -765,7 +755,7 @@ it.effect(
 )
 
 it.effect("stops a Turn when StopTurn never answers, then accepts the next message", () =>
-  withHostClock((deadlineSet) =>
+  withWatchedClock(HOST_CONTROL_DEADLINE, (deadlineSet) =>
     Effect.gen(function* () {
       const entered = yield* Deferred.make<void>()
       const release = yield* Deferred.make<void>()
@@ -814,7 +804,7 @@ it.effect("stops a Turn when StopTurn never answers, then accepts the next messa
 )
 
 it.effect("leaves a Global conversation update pending when StartTurn never answers", () =>
-  withHostClock((deadlineSet) =>
+  withWatchedClock(HOST_CONTROL_DEADLINE, (deadlineSet) =>
     Effect.gen(function* () {
       const entered = yield* Deferred.make<void>()
       const release = yield* Deferred.make<void>()
@@ -938,7 +928,7 @@ it.effect("ends a Global conversation update the user stops once the host report
 it.effect(
   "ends a Global conversation update the user stops after a timeout, when the host reports Stopped",
   () =>
-    withHostClock((deadlineSet) =>
+    withWatchedClock(HOST_CONTROL_DEADLINE, (deadlineSet) =>
       Effect.gen(function* () {
         const entered = yield* Deferred.make<void>()
         const release = yield* Deferred.make<void>()
@@ -978,12 +968,11 @@ it.effect(
 )
 
 it.effect("fails the Turn at 30 seconds, and not a millisecond sooner", () =>
-  Effect.gen(function* () {
-    const { watched, deadlineSet } = yield* watchDeadlines(30_000)
-    const entered = yield* Deferred.make<void>()
-    const release = yield* Deferred.make<void>()
+  withWatchedClock(Duration.seconds(30), (deadlineSet) =>
+    Effect.gen(function* () {
+      const entered = yield* Deferred.make<void>()
+      const release = yield* Deferred.make<void>()
 
-    yield* Effect.gen(function* () {
       const desk = yield* scripted({
         "agent-a": { startTurn: hold(entered, release) },
       })
@@ -1000,12 +989,12 @@ it.effect("fails the Turn at 30 seconds, and not a millisecond sooner", () =>
 
       const { turns } = yield* desk.transcripts.read("agent-a")
       assert.deepStrictEqual(turns[0]?.ended?.ending, failedToAnswer)
-    }).pipe(Effect.provideService(Clock.Clock, watched))
-  }).pipe(Effect.provide(layer)),
+    }),
+  ).pipe(Effect.provide(layer)),
 )
 
 it.effect("fails a timed-out Turn before a waiting Stop can end it as Stopped", () =>
-  withHostClock((deadlineSet) =>
+  withWatchedClock(HOST_CONTROL_DEADLINE, (deadlineSet) =>
     Effect.gen(function* () {
       const entered = yield* Deferred.make<void>()
       const release = yield* Deferred.make<void>()
@@ -1048,7 +1037,7 @@ it.effect("fails a timed-out Turn before a waiting Stop can end it as Stopped", 
 )
 
 it.effect("queues a message sent during a stalled StartTurn, and Stop stops that Turn", () =>
-  withHostClock((deadlineSet) =>
+  withWatchedClock(HOST_CONTROL_DEADLINE, (deadlineSet) =>
     Effect.gen(function* () {
       const entered = yield* Deferred.make<void>()
       const release = yield* Deferred.make<void>()
@@ -1096,7 +1085,7 @@ it.effect("queues a message sent during a stalled StartTurn, and Stop stops that
 )
 
 it.effect("tells the host to stop when StartTurn times out so the next message can start", () =>
-  withHostClock((deadlineSet) =>
+  withWatchedClock(HOST_CONTROL_DEADLINE, (deadlineSet) =>
     Effect.gen(function* () {
       const entered = yield* Deferred.make<void>()
       const release = yield* Deferred.make<void>()
@@ -1144,7 +1133,7 @@ it.effect("tells the host to stop when StartTurn times out so the next message c
 )
 
 it.effect("drops a late reply on a Turn the host never accepted", () =>
-  withHostClock((deadlineSet) =>
+  withWatchedClock(HOST_CONTROL_DEADLINE, (deadlineSet) =>
     Effect.gen(function* () {
       const entered = yield* Deferred.make<void>()
       const release = yield* Deferred.make<void>()
@@ -1242,7 +1231,7 @@ it.effect("does not stop the next Turn when an earlier StartTurn answers late", 
 )
 
 it.effect("does not stop the next Turn when an earlier StartTurn times out", () =>
-  withHostClock((deadlineSet) =>
+  withWatchedClock(HOST_CONTROL_DEADLINE, (deadlineSet) =>
     Effect.gen(function* () {
       const entered = yield* Deferred.make<void>()
       const secondBegun = yield* Deferred.make<void>()
@@ -1304,7 +1293,7 @@ it.effect("does not stop the next Turn when an earlier StartTurn times out", () 
 )
 
 it.effect("fails a Steer the host never acknowledges instead of sending it again", () =>
-  withHostClock((deadlineSet) =>
+  withWatchedClock(HOST_CONTROL_DEADLINE, (deadlineSet) =>
     Effect.gen(function* () {
       const begun = yield* Deferred.make<void>()
       const steerEntered = yield* Deferred.make<void>()
@@ -1392,7 +1381,7 @@ it.effect("keeps a late reply on a Stopped Turn and one on the next Turn", () =>
 )
 
 it.effect("keeps a part that arrives after StopTurn times out", () =>
-  withHostClock((deadlineSet) =>
+  withWatchedClock(HOST_CONTROL_DEADLINE, (deadlineSet) =>
     Effect.gen(function* () {
       const begun = yield* Deferred.make<void>()
       const stalled = yield* Deferred.make<void>()
