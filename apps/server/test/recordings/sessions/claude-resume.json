@@ -1,6 +1,6 @@
 {
   "scenario": "claude-resume",
-  "program": "@anthropic-ai/claude-agent-sdk 0.3.309",
+  "program": "@anthropic-ai/claude-agent-sdk 0.3.322",
   "processes": [
     {
       "args": [
@@ -19,7 +19,7 @@
       "frames": [
         {
           "out": {
-            "request_id": "356wt6b2clj",
+            "request_id": "9zxdfzyr9c",
             "type": "control_request",
             "request": {
               "subtype": "initialize",
@@ -79,7 +79,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "356wt6b2clj",
+              "request_id": "9zxdfzyr9c",
               "response": {
                 "commands": [
                   {
@@ -114,7 +114,7 @@
                   },
                   {
                     "name": "code-review",
-                    "description": "Review the current diff, or a PR number/branch/path target, for correctness bugs (plus reuse/simplification/efficiency cleanups where the model's review recipe covers them) at the given effort level (low|medium|high|xhigh|max: from few high-confidence findings up to many, some of them uncertain); with no level given, it reuses the level you typed last. Pass --comment to post findings as inline PR comments, or --fix to apply the findings to the working tree after the review. Pass --max-findings <n> to report up to n findings, or --max-findings all for every finding. The choice stays until you pass --max-findings default.",
+                    "description": "Review the current diff, or a PR number/branch/path target, for correctness bugs (plus reuse/simplification/efficiency cleanups where the model's recipe covers them) at the effort level given first, before any target (low|medium|high|xhigh|max: from few high-confidence findings to many, some uncertain); with no level given, it reuses the level you typed last. Pass --comment to post findings as inline PR comments, or --fix to apply them to the working tree after the review. Pass --max-findings <n> to report up to n findings, or --max-findings all for every finding. The choice stays until you pass --max-findings default.",
                     "argumentHint": "[low|medium|high|xhigh|max] [--fix] [--comment] [<pr#>|<branch>|<path>] [--max-findings <n>|all]",
                     "aliases": ["review"],
                     "builtin": true
@@ -160,7 +160,7 @@
                   },
                   {
                     "name": "claude-api",
-                    "description": "Reference for the Claude API / Anthropic SDK — model ids, pricing, params, streaming, tool use, MCP, agents, caching, token counting, model migration.\nTRIGGER — read BEFORE opening the target file; don't skip because it \"looks like a one-liner\" — whenever: the prompt names Claude/Anthropic in any form (Claude, Anthropic, Fable, Opus, Sonnet, Haiku, `anthropic`, `@anthropic-ai`, `claude-*`, `us.anthropic.*`, `[1m]`); the user asks about an LLM (pricing/model choice/limits/caching) — never answer from memory; OR the task is LLM-shaped with provider unstated (agent/MCP/tool-definition/multi-agent/RAG/LLM-judge/computer-use; generate/summarize/extract/classify/rewrite/converse over NL; debugging refusals/cutoffs/streaming/tool-calls/tokens).\nSKIP only when another provider is being worked on (overrides all triggers): OpenAI/GPT/Gemini/Llama/Mistral/Cohere/Ollama named in the query; OR `grep -rE 'openai|langchain_openai|google.generativeai|genai|mistralai|cohere|ollama'` over the project hits (run this grep FIRST if no provider named — don't Read the file).",
+                    "description": "Reference for the Claude API / Anthropic SDK — model ids, pricing, params, streaming, tool use, MCP, agents, caching, token counting, model migration.\nTRIGGER — read FIRST, before you answer, run a command or open a file (already started? read it now); don't skip because it \"looks like a one-liner\" — whenever: the prompt names Claude/Anthropic in any form (Claude, Anthropic, Fable, Opus, Sonnet, Haiku, `anthropic`, `@anthropic-ai`, `claude-*`, `us.anthropic.*`, `[1m]`); the user asks about an LLM (pricing/model choice/limits/caching) — never answer from memory; OR the task is LLM-shaped with provider unstated (agent/MCP/tool-definition/multi-agent/RAG/LLM-judge/computer-use; generate/summarize/extract/classify/rewrite/converse over NL; debugging refusals/cutoffs/streaming/tool-calls/tokens).\nSKIP only when another provider is being worked on (overrides all triggers): OpenAI/GPT/Gemini/Llama/Mistral/Cohere/Ollama named in the query; OR `grep -rE 'openai|langchain_openai|google.generativeai|genai|mistralai|cohere|ollama'` over the project hits (run this grep FIRST if no provider named — don't Read the file; if nothing hits, load this skill).",
                     "argumentHint": "",
                     "builtin": true
                   },
@@ -426,12 +426,13 @@
                   },
                   {
                     "value": "fable",
-                    "resolvedModel": "claude-fable-5-1",
+                    "resolvedModel": "claude-fable-5-2",
                     "displayName": "Fable",
-                    "description": "Fable 5.1 · Most capable for your hardest and longest-running tasks",
+                    "description": "Fable 5.2 · Most capable for your hardest and longest-running tasks",
                     "supportsEffort": true,
                     "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"],
                     "supportsAdaptiveThinking": true,
+                    "supportsFastMode": true,
                     "supportsAutoMode": true,
                     "supportsThinkingOff": false
                   },
@@ -461,8 +462,10 @@
                 ],
                 "account": "<redacted>",
                 "pid": "<redacted>",
-                "claude_code_version": "2.1.309",
+                "claude_code_version": "2.1.322",
                 "current_permission_mode": "default",
+                "hook_on_failure_supported": true,
+                "other_hook_ask_outranks_host": true,
                 "sdk_mcp_manifests_parked": {
                   "glass": "parked"
                 },
@@ -478,7 +481,11 @@
                 "fast_mode_state": "off",
                 "fast_mode_disabled_reason": "sdk_opt_in_required",
                 "session_state": "idle",
-                "capabilities": ["ui_surface_v1", "mcp_call_result_not_for_model_v1"]
+                "capabilities": [
+                  "ui_surface_v1",
+                  "mcp_call_result_not_for_model_v1",
+                  "mcp_call_check_permissions_v1"
+                ]
               },
               "pending_permission_requests": [],
               "pending_user_dialog_requests": []
@@ -493,7 +500,7 @@
               "content": "Remember the word lantern. Reply with exactly: Noted."
             },
             "parent_tool_use_id": null,
-            "uuid": "4e8ec1ef-07f9-48d8-924f-9988509d7ca6"
+            "uuid": "8ba7b322-d6ce-4d0f-9db3-073ccb625b0a"
           }
         },
         {
@@ -502,25 +509,25 @@
             "subtype": "session_state_changed",
             "state": "running",
             "sdk_host_only": true,
-            "uuid": "ede899e5-b7e8-4a93-8c93-8e9521af936d",
+            "uuid": "24791c9f-ff4d-431e-9122-429e76f48f4a",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "4e8ec1ef-07f9-48d8-924f-9988509d7ca6",
+            "command_uuid": "8ba7b322-d6ce-4d0f-9db3-073ccb625b0a",
             "state": "queued",
-            "uuid": "6bb7bd36-66f9-4eb0-aaa1-7aab4dc3da22",
+            "uuid": "40f6fc61-3038-40a8-b712-b06c7ccd045e",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "4e8ec1ef-07f9-48d8-924f-9988509d7ca6",
+            "command_uuid": "8ba7b322-d6ce-4d0f-9db3-073ccb625b0a",
             "state": "started",
-            "uuid": "154c58b8-4341-4adc-942d-0f1cb073f570",
+            "uuid": "6c0451bf-40d1-45c8-b864-f2ee1662663d",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -545,6 +552,7 @@
               "Glob",
               "Grep",
               "ListAgents",
+              "Monitor",
               "NotebookEdit",
               "Read",
               "RemoteTrigger",
@@ -618,7 +626,7 @@
             ],
             "terminal_slash_commands": ["doctor", "color", "focus", "reload-plugins"],
             "apiKeySource": "<redacted>",
-            "claude_code_version": "2.1.309",
+            "claude_code_version": "2.1.322",
             "output_style": "<redacted>",
             "agents": [
               "claude",
@@ -654,6 +662,11 @@
                 "source": "cc-plugin-agents-md@builtin"
               },
               {
+                "name": "cc-plugin-privacy",
+                "path": "builtin",
+                "source": "cc-plugin-privacy@builtin"
+              },
+              {
                 "name": "cc-plugin-plugin-authoring",
                 "path": "builtin",
                 "source": "cc-plugin-plugin-authoring@builtin"
@@ -666,29 +679,33 @@
               "interrupt_requeue_taken_v1",
               "msg_lifecycle_v1",
               "request_marker_lists_v1",
+              "ask_user_question_unanswered_v1",
               "lifecycle_wakeup_source_v1",
               "sdk_mcp_tools_list_changed",
               "sdk_mcp_manifests",
               "mcp_read_resource_v1",
               "mcp_tool_ui_meta_v1",
               "ui_surface_v1",
-              "mcp_call_result_not_for_model_v1"
+              "mcp_call_result_not_for_model_v1",
+              "mcp_call_check_permissions_v1"
             ],
             "analytics_disabled": true,
             "product_feedback_disabled": false,
-            "uuid": "652fd996-73fe-4bd0-85b8-d4abb1540673",
+            "uuid": "2c308ea8-f5fc-4fa6-b2cc-764151c3f431",
             "memory_paths": {
               "auto": "<folder>/.claude/projects\\<folder>/memory\\"
             },
             "original_cwd": "<folder>",
             "additional_directories": [],
-            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-491e82ee89cb4861963011d061108e54",
+            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-f5635d83b5ac792633767858176e036d",
             "fast_mode_state": "off",
             "fast_mode_disabled_reason": "sdk_opt_in_required",
             "per_turn_effort_active": true,
+            "ultrathink_available": false,
+            "ultrathink_typed_raises": false,
             "view_mode": "default",
             "powershell_path": "<home>/AppData/Local/Programs/PowerShell/7/pwsh.exe",
-            "user_message_uuids": ["4e8ec1ef-07f9-48d8-924f-9988509d7ca6"]
+            "user_message_uuids": ["8ba7b322-d6ce-4d0f-9db3-073ccb625b0a"]
           }
         },
         {
@@ -697,8 +714,8 @@
             "subtype": "status",
             "status": "requesting",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "32b1646f-80c5-41fa-ae85-210c4b0bace9",
-            "user_message_uuids": ["4e8ec1ef-07f9-48d8-924f-9988509d7ca6"]
+            "uuid": "f17bc91f-7912-4fae-9800-df507ed0595f",
+            "user_message_uuids": ["8ba7b322-d6ce-4d0f-9db3-073ccb625b0a"]
           }
         },
         {
@@ -708,7 +725,7 @@
               "type": "message_start",
               "message": {
                 "model": "claude-haiku-5-5",
-                "id": "msg_011Ch39ouuihbu3ZFzD6n2fk",
+                "id": "msg_011Ch63W9SP5dM1fWUEN4PZH",
                 "type": "message",
                 "role": "assistant",
                 "content": [],
@@ -736,12 +753,12 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "1407219c-7260-4095-adc3-75e177c0c928",
-            "ttft_ms": 475,
+            "uuid": "546f6b42-d436-4d23-a4b9-3b24b7727390",
+            "ttft_ms": 634,
             "thinking_display": "updates",
-            "api_message_id": "msg_011Ch39ouuihbu3ZFzD6n2fk",
-            "user_message_uuid": "4e8ec1ef-07f9-48d8-924f-9988509d7ca6",
-            "user_message_uuids": ["4e8ec1ef-07f9-48d8-924f-9988509d7ca6"]
+            "api_message_id": "msg_011Ch63W9SP5dM1fWUEN4PZH",
+            "user_message_uuid": "8ba7b322-d6ce-4d0f-9db3-073ccb625b0a",
+            "user_message_uuids": ["8ba7b322-d6ce-4d0f-9db3-073ccb625b0a"]
           }
         },
         {
@@ -757,8 +774,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "cbe328d2-7c7c-45a8-930f-49f72bb07f62",
-            "api_message_id": "msg_011Ch39ouuihbu3ZFzD6n2fk"
+            "uuid": "4dc69e39-c2ea-4863-b0c5-327b22199ca1",
+            "api_message_id": "msg_011Ch63W9SP5dM1fWUEN4PZH"
           }
         },
         {
@@ -774,8 +791,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "a37cb65a-d919-447d-ac17-c55c41852044",
-            "api_message_id": "msg_011Ch39ouuihbu3ZFzD6n2fk"
+            "uuid": "4b104471-0dd7-4a49-ac48-71c4f4b5574e",
+            "api_message_id": "msg_011Ch63W9SP5dM1fWUEN4PZH"
           }
         },
         {
@@ -783,7 +800,7 @@
             "type": "assistant",
             "message": {
               "model": "claude-haiku-5-5",
-              "id": "msg_011Ch39ouuihbu3ZFzD6n2fk",
+              "id": "msg_011Ch63W9SP5dM1fWUEN4PZH",
               "type": "message",
               "role": "assistant",
               "content": [
@@ -815,11 +832,11 @@
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "21cf8e99-d3a3-4576-814d-0be98826ca2e",
-            "timestamp": "2026-11-14T16:41:03.416Z",
-            "request_id": "req_011Ch39ouh5d7PPrzyBXF8Ld",
-            "user_message_uuid": "4e8ec1ef-07f9-48d8-924f-9988509d7ca6",
-            "user_message_uuids": ["4e8ec1ef-07f9-48d8-924f-9988509d7ca6"]
+            "uuid": "6ce6f759-3a97-40b1-8129-00d16c10139d",
+            "timestamp": "2026-11-16T05:20:08.807Z",
+            "request_id": "req_011Ch63W9EUEMCjNdr1i8b4w",
+            "user_message_uuid": "8ba7b322-d6ce-4d0f-9db3-073ccb625b0a",
+            "user_message_uuids": ["8ba7b322-d6ce-4d0f-9db3-073ccb625b0a"]
           }
         },
         {
@@ -831,8 +848,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "5ef25fb4-29fc-4044-b1ee-c25f7f1c284e",
-            "api_message_id": "msg_011Ch39ouuihbu3ZFzD6n2fk"
+            "uuid": "3ae5cae9-52f4-42c6-87db-c258ebd68f4f",
+            "api_message_id": "msg_011Ch63W9SP5dM1fWUEN4PZH"
           }
         },
         {
@@ -861,8 +878,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "c6588183-15c0-45ac-bfbf-7a7fe96614d2",
-            "api_message_id": "msg_011Ch39ouuihbu3ZFzD6n2fk"
+            "uuid": "d716d1ba-393b-41ff-9e61-8295a7cc8630",
+            "api_message_id": "msg_011Ch63W9SP5dM1fWUEN4PZH"
           }
         },
         {
@@ -873,21 +890,21 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "5b55b8b5-e766-4011-8308-71aa3ae8d38f",
-            "api_message_id": "msg_011Ch39ouuihbu3ZFzD6n2fk"
+            "uuid": "685a1344-5fea-4ffe-bc4f-bd97ce9e8a73",
+            "api_message_id": "msg_011Ch63W9SP5dM1fWUEN4PZH"
           }
         },
         {
           "in": {
             "type": "rate_limit_event",
             "rate_limit_info": "<redacted>",
-            "uuid": "60e5fd16-d95a-4056-a921-ed43ae57f74e",
+            "uuid": "8b9cf971-114b-4665-99e3-40f87f14530c",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
-            "duration_api_ms": 605,
+            "duration_api_ms": 643,
             "stop_reason": "end_turn",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "total_cost_usd": 0,
@@ -924,6 +941,8 @@
                 "contextWindow": 0,
                 "maxOutputTokens": 0,
                 "thinkingTokens": 0,
+                "cacheCreationEphemeral5mInputTokens": 0,
+                "cacheCreationEphemeral1hInputTokens": 0,
                 "canonicalModel": "claude-haiku-5-5",
                 "provider": "firstParty",
                 "costBasis": "list"
@@ -963,17 +982,18 @@
             "subtype": "success",
             "api_error_status": null,
             "result": "Noted.",
-            "ttft_ms": 643,
+            "ttft_ms": 714,
             "type": "result",
-            "duration_ms": 649,
-            "uuid": "a5cfc50f-c1c3-4ff0-a1f0-62928f3c1448",
-            "ttft_stream_ms": 519,
-            "time_to_request_ms": 46,
-            "first_content_frame_ms": 519,
-            "user_message_uuid": "4e8ec1ef-07f9-48d8-924f-9988509d7ca6",
-            "user_message_uuids": ["4e8ec1ef-07f9-48d8-924f-9988509d7ca6"],
-            "request_sent_wall_ms": 1794674462819,
+            "duration_ms": 721,
+            "uuid": "055f84ba-7a40-46f1-86f7-1c139088896c",
+            "ttft_stream_ms": 712,
+            "time_to_request_ms": 81,
+            "first_content_frame_ms": 713,
+            "user_message_uuid": "8ba7b322-d6ce-4d0f-9db3-073ccb625b0a",
+            "user_message_uuids": ["8ba7b322-d6ce-4d0f-9db3-073ccb625b0a"],
+            "request_sent_wall_ms": 1794806408175,
             "first_request_input_tokens": 0,
+            "first_request_cache_read_input_tokens": 14807,
             "queued_turn_count": 0,
             "result_index": 0,
             "model_usage_since_last_result": {
@@ -987,6 +1007,8 @@
                 "contextWindow": 0,
                 "maxOutputTokens": 0,
                 "thinkingTokens": 0,
+                "cacheCreationEphemeral5mInputTokens": 0,
+                "cacheCreationEphemeral1hInputTokens": 0,
                 "canonicalModel": "claude-haiku-5-5",
                 "provider": "firstParty",
                 "costBasis": "list"
@@ -997,9 +1019,9 @@
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "4e8ec1ef-07f9-48d8-924f-9988509d7ca6",
+            "command_uuid": "8ba7b322-d6ce-4d0f-9db3-073ccb625b0a",
             "state": "completed",
-            "uuid": "954d256f-7703-4984-af39-aba9c6d36438",
+            "uuid": "5c7a329b-e11b-43e0-9234-ad170cd84898",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1009,7 +1031,7 @@
             "subtype": "session_state_changed",
             "state": "idle",
             "sdk_host_only": true,
-            "uuid": "09b2165c-8c89-4fa8-a82d-73f653d6df77",
+            "uuid": "5e651dc9-858e-466c-ad79-bef295c39cb4",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1035,7 +1057,7 @@
       "frames": [
         {
           "out": {
-            "request_id": "ibqaeofdudi",
+            "request_id": "21eylak5cwa",
             "type": "control_request",
             "request": {
               "subtype": "initialize",
@@ -1095,7 +1117,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "ibqaeofdudi",
+              "request_id": "21eylak5cwa",
               "response": {
                 "commands": [
                   {
@@ -1130,7 +1152,7 @@
                   },
                   {
                     "name": "code-review",
-                    "description": "Review the current diff, or a PR number/branch/path target, for correctness bugs (plus reuse/simplification/efficiency cleanups where the model's review recipe covers them) at the given effort level (low|medium|high|xhigh|max: from few high-confidence findings up to many, some of them uncertain); with no level given, it reuses the level you typed last. Pass --comment to post findings as inline PR comments, or --fix to apply the findings to the working tree after the review. Pass --max-findings <n> to report up to n findings, or --max-findings all for every finding. The choice stays until you pass --max-findings default.",
+                    "description": "Review the current diff, or a PR number/branch/path target, for correctness bugs (plus reuse/simplification/efficiency cleanups where the model's recipe covers them) at the effort level given first, before any target (low|medium|high|xhigh|max: from few high-confidence findings to many, some uncertain); with no level given, it reuses the level you typed last. Pass --comment to post findings as inline PR comments, or --fix to apply them to the working tree after the review. Pass --max-findings <n> to report up to n findings, or --max-findings all for every finding. The choice stays until you pass --max-findings default.",
                     "argumentHint": "[low|medium|high|xhigh|max] [--fix] [--comment] [<pr#>|<branch>|<path>] [--max-findings <n>|all]",
                     "aliases": ["review"],
                     "builtin": true
@@ -1176,7 +1198,7 @@
                   },
                   {
                     "name": "claude-api",
-                    "description": "Reference for the Claude API / Anthropic SDK — model ids, pricing, params, streaming, tool use, MCP, agents, caching, token counting, model migration.\nTRIGGER — read BEFORE opening the target file; don't skip because it \"looks like a one-liner\" — whenever: the prompt names Claude/Anthropic in any form (Claude, Anthropic, Fable, Opus, Sonnet, Haiku, `anthropic`, `@anthropic-ai`, `claude-*`, `us.anthropic.*`, `[1m]`); the user asks about an LLM (pricing/model choice/limits/caching) — never answer from memory; OR the task is LLM-shaped with provider unstated (agent/MCP/tool-definition/multi-agent/RAG/LLM-judge/computer-use; generate/summarize/extract/classify/rewrite/converse over NL; debugging refusals/cutoffs/streaming/tool-calls/tokens).\nSKIP only when another provider is being worked on (overrides all triggers): OpenAI/GPT/Gemini/Llama/Mistral/Cohere/Ollama named in the query; OR `grep -rE 'openai|langchain_openai|google.generativeai|genai|mistralai|cohere|ollama'` over the project hits (run this grep FIRST if no provider named — don't Read the file).",
+                    "description": "Reference for the Claude API / Anthropic SDK — model ids, pricing, params, streaming, tool use, MCP, agents, caching, token counting, model migration.\nTRIGGER — read FIRST, before you answer, run a command or open a file (already started? read it now); don't skip because it \"looks like a one-liner\" — whenever: the prompt names Claude/Anthropic in any form (Claude, Anthropic, Fable, Opus, Sonnet, Haiku, `anthropic`, `@anthropic-ai`, `claude-*`, `us.anthropic.*`, `[1m]`); the user asks about an LLM (pricing/model choice/limits/caching) — never answer from memory; OR the task is LLM-shaped with provider unstated (agent/MCP/tool-definition/multi-agent/RAG/LLM-judge/computer-use; generate/summarize/extract/classify/rewrite/converse over NL; debugging refusals/cutoffs/streaming/tool-calls/tokens).\nSKIP only when another provider is being worked on (overrides all triggers): OpenAI/GPT/Gemini/Llama/Mistral/Cohere/Ollama named in the query; OR `grep -rE 'openai|langchain_openai|google.generativeai|genai|mistralai|cohere|ollama'` over the project hits (run this grep FIRST if no provider named — don't Read the file; if nothing hits, load this skill).",
                     "argumentHint": "",
                     "builtin": true
                   },
@@ -1442,12 +1464,13 @@
                   },
                   {
                     "value": "fable",
-                    "resolvedModel": "claude-fable-5-1",
+                    "resolvedModel": "claude-fable-5-2",
                     "displayName": "Fable",
-                    "description": "Fable 5.1 · Most capable for your hardest and longest-running tasks",
+                    "description": "Fable 5.2 · Most capable for your hardest and longest-running tasks",
                     "supportsEffort": true,
                     "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"],
                     "supportsAdaptiveThinking": true,
+                    "supportsFastMode": true,
                     "supportsAutoMode": true,
                     "supportsThinkingOff": false
                   },
@@ -1477,8 +1500,10 @@
                 ],
                 "account": "<redacted>",
                 "pid": "<redacted>",
-                "claude_code_version": "2.1.309",
+                "claude_code_version": "2.1.322",
                 "current_permission_mode": "default",
+                "hook_on_failure_supported": true,
+                "other_hook_ask_outranks_host": true,
                 "sdk_mcp_manifests_parked": {
                   "glass": "parked"
                 },
@@ -1494,7 +1519,11 @@
                 "fast_mode_state": "off",
                 "fast_mode_disabled_reason": "sdk_opt_in_required",
                 "session_state": "idle",
-                "capabilities": ["ui_surface_v1", "mcp_call_result_not_for_model_v1"]
+                "capabilities": [
+                  "ui_surface_v1",
+                  "mcp_call_result_not_for_model_v1",
+                  "mcp_call_check_permissions_v1"
+                ]
               },
               "pending_permission_requests": [],
               "pending_user_dialog_requests": []
@@ -1509,7 +1538,7 @@
               "content": "Which word did I ask you to remember? Reply with only that word, in lowercase."
             },
             "parent_tool_use_id": null,
-            "uuid": "3e1c2996-62ee-4c24-9872-2a87729cd0e8"
+            "uuid": "2a56038a-e046-46a0-8f2b-2795e78c5654"
           }
         },
         {
@@ -1518,25 +1547,25 @@
             "subtype": "session_state_changed",
             "state": "running",
             "sdk_host_only": true,
-            "uuid": "a5184755-5c6f-4f03-88f1-304bda057509",
+            "uuid": "e147f1a5-1b87-4499-82e5-4a91b3955591",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "3e1c2996-62ee-4c24-9872-2a87729cd0e8",
+            "command_uuid": "2a56038a-e046-46a0-8f2b-2795e78c5654",
             "state": "queued",
-            "uuid": "b108db05-0d8c-408b-9945-0d0c8b850ca4",
+            "uuid": "7b42a1f0-5d82-4663-a596-7587af376929",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "3e1c2996-62ee-4c24-9872-2a87729cd0e8",
+            "command_uuid": "2a56038a-e046-46a0-8f2b-2795e78c5654",
             "state": "started",
-            "uuid": "c6585bf7-5705-4e61-96f0-c1fbcd7df6a2",
+            "uuid": "37e14ab3-49ba-4682-b255-25dbad59f86d",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1561,6 +1590,7 @@
               "Glob",
               "Grep",
               "ListAgents",
+              "Monitor",
               "NotebookEdit",
               "Read",
               "RemoteTrigger",
@@ -1634,7 +1664,7 @@
             ],
             "terminal_slash_commands": ["doctor", "color", "focus", "reload-plugins"],
             "apiKeySource": "<redacted>",
-            "claude_code_version": "2.1.309",
+            "claude_code_version": "2.1.322",
             "output_style": "<redacted>",
             "agents": [
               "claude",
@@ -1670,6 +1700,11 @@
                 "source": "cc-plugin-agents-md@builtin"
               },
               {
+                "name": "cc-plugin-privacy",
+                "path": "builtin",
+                "source": "cc-plugin-privacy@builtin"
+              },
+              {
                 "name": "cc-plugin-plugin-authoring",
                 "path": "builtin",
                 "source": "cc-plugin-plugin-authoring@builtin"
@@ -1682,29 +1717,33 @@
               "interrupt_requeue_taken_v1",
               "msg_lifecycle_v1",
               "request_marker_lists_v1",
+              "ask_user_question_unanswered_v1",
               "lifecycle_wakeup_source_v1",
               "sdk_mcp_tools_list_changed",
               "sdk_mcp_manifests",
               "mcp_read_resource_v1",
               "mcp_tool_ui_meta_v1",
               "ui_surface_v1",
-              "mcp_call_result_not_for_model_v1"
+              "mcp_call_result_not_for_model_v1",
+              "mcp_call_check_permissions_v1"
             ],
             "analytics_disabled": true,
             "product_feedback_disabled": false,
-            "uuid": "44c9bcea-fa67-401d-95ad-a202daaa94e5",
+            "uuid": "35981bda-a4d4-46f9-8ea0-b4a75eff302c",
             "memory_paths": {
               "auto": "<folder>/.claude/projects\\<folder>/memory\\"
             },
             "original_cwd": "<folder>",
             "additional_directories": [],
-            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-a2e1518385a238a07a8faad34f48cd99",
+            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-01a32180606f1eadaf590bc55b7359a1",
             "fast_mode_state": "off",
             "fast_mode_disabled_reason": "sdk_opt_in_required",
             "per_turn_effort_active": true,
+            "ultrathink_available": false,
+            "ultrathink_typed_raises": false,
             "view_mode": "default",
             "powershell_path": "<home>/AppData/Local/Programs/PowerShell/7/pwsh.exe",
-            "user_message_uuids": ["3e1c2996-62ee-4c24-9872-2a87729cd0e8"]
+            "user_message_uuids": ["2a56038a-e046-46a0-8f2b-2795e78c5654"]
           }
         },
         {
@@ -1713,8 +1752,8 @@
             "subtype": "status",
             "status": "requesting",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "c94c112b-e7fe-42bd-85c1-7d054dce55e8",
-            "user_message_uuids": ["3e1c2996-62ee-4c24-9872-2a87729cd0e8"]
+            "uuid": "7ed3da9d-2fa8-40e1-88f3-b0f9044093c0",
+            "user_message_uuids": ["2a56038a-e046-46a0-8f2b-2795e78c5654"]
           }
         },
         {
@@ -1724,7 +1763,7 @@
               "type": "message_start",
               "message": {
                 "model": "claude-haiku-5-5",
-                "id": "msg_011Ch39ozQqh9n9owDmJaBvD",
+                "id": "msg_011Ch63WFM5JFVQNZ2XTTjo6",
                 "type": "message",
                 "role": "assistant",
                 "content": [],
@@ -1749,7 +1788,7 @@
                 "diagnostics": {
                   "cache_miss_reason": {
                     "type": "messages_changed",
-                    "cache_missed_input_tokens": 4531
+                    "cache_missed_input_tokens": 4623
                   }
                 },
                 "context_management": null
@@ -1757,12 +1796,12 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "4e7be1ba-0779-4af3-9efd-fd48e848969f",
-            "ttft_ms": 703,
+            "uuid": "c77a4ba2-71ad-4c08-8b94-61ef41fe75a3",
+            "ttft_ms": 629,
             "thinking_display": "updates",
-            "api_message_id": "msg_011Ch39ozQqh9n9owDmJaBvD",
-            "user_message_uuid": "3e1c2996-62ee-4c24-9872-2a87729cd0e8",
-            "user_message_uuids": ["3e1c2996-62ee-4c24-9872-2a87729cd0e8"]
+            "api_message_id": "msg_011Ch63WFM5JFVQNZ2XTTjo6",
+            "user_message_uuid": "2a56038a-e046-46a0-8f2b-2795e78c5654",
+            "user_message_uuids": ["2a56038a-e046-46a0-8f2b-2795e78c5654"]
           }
         },
         {
@@ -1778,8 +1817,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "8cc39b4b-8674-41d7-8ebe-cf3ebc339b5c",
-            "api_message_id": "msg_011Ch39ozQqh9n9owDmJaBvD"
+            "uuid": "9562df77-e0ab-4b80-9287-e61c3ccfa03c",
+            "api_message_id": "msg_011Ch63WFM5JFVQNZ2XTTjo6"
           }
         },
         {
@@ -1795,8 +1834,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "220fbe37-f2c8-4acd-a114-16b2ee5a1d64",
-            "api_message_id": "msg_011Ch39ozQqh9n9owDmJaBvD"
+            "uuid": "2901ecbe-8f4e-4a34-a348-647ae40c8868",
+            "api_message_id": "msg_011Ch63WFM5JFVQNZ2XTTjo6"
           }
         },
         {
@@ -1804,7 +1843,7 @@
             "type": "assistant",
             "message": {
               "model": "claude-haiku-5-5",
-              "id": "msg_011Ch39ozQqh9n9owDmJaBvD",
+              "id": "msg_011Ch63WFM5JFVQNZ2XTTjo6",
               "type": "message",
               "role": "assistant",
               "content": [
@@ -1834,18 +1873,18 @@
               "diagnostics": {
                 "cache_miss_reason": {
                   "type": "messages_changed",
-                  "cache_missed_input_tokens": 4531
+                  "cache_missed_input_tokens": 4623
                 }
               },
               "context_management": null
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "3c4deb67-8d7c-49bd-9ca3-3e4aeadc4235",
-            "timestamp": "2026-11-14T16:41:04.599Z",
-            "request_id": "req_011Ch39ozCT3EtRCGKb6Bo9D",
-            "user_message_uuid": "3e1c2996-62ee-4c24-9872-2a87729cd0e8",
-            "user_message_uuids": ["3e1c2996-62ee-4c24-9872-2a87729cd0e8"]
+            "uuid": "0518893e-3edc-46c6-abbe-787d6a815340",
+            "timestamp": "2026-11-16T05:20:10.171Z",
+            "request_id": "req_011Ch63WF9B92ijzYZG7TdiF",
+            "user_message_uuid": "2a56038a-e046-46a0-8f2b-2795e78c5654",
+            "user_message_uuids": ["2a56038a-e046-46a0-8f2b-2795e78c5654"]
           }
         },
         {
@@ -1857,8 +1896,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "d2ca5b9a-4b85-4e69-bc81-dbb1a2f77cf8",
-            "api_message_id": "msg_011Ch39ozQqh9n9owDmJaBvD"
+            "uuid": "13eb5cff-8aa0-443a-b9ae-afc625f236d0",
+            "api_message_id": "msg_011Ch63WFM5JFVQNZ2XTTjo6"
           }
         },
         {
@@ -1887,8 +1926,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "3fd89401-c23a-4e16-bfcb-b84f7af0670c",
-            "api_message_id": "msg_011Ch39ozQqh9n9owDmJaBvD"
+            "uuid": "12f405f1-9e5b-440e-a32e-8bea1f7ec2cd",
+            "api_message_id": "msg_011Ch63WFM5JFVQNZ2XTTjo6"
           }
         },
         {
@@ -1899,21 +1938,21 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "1585f475-655f-4878-a786-66f001e52cb9",
-            "api_message_id": "msg_011Ch39ozQqh9n9owDmJaBvD"
+            "uuid": "e5452a98-dcfa-4254-b0a5-ec2b0e357a7e",
+            "api_message_id": "msg_011Ch63WFM5JFVQNZ2XTTjo6"
           }
         },
         {
           "in": {
             "type": "rate_limit_event",
             "rate_limit_info": "<redacted>",
-            "uuid": "70df437c-c12e-460d-93ee-2af22b0bed74",
+            "uuid": "7e1f614a-8e8c-430d-af4f-72526683f04f",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
-            "duration_api_ms": 1320,
+            "duration_api_ms": 1286,
             "stop_reason": "end_turn",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "total_cost_usd": 0,
@@ -1946,6 +1985,8 @@
                 "thinkingTokens": 0,
                 "cacheReadInputTokens": 0,
                 "cacheCreationInputTokens": 0,
+                "cacheCreationEphemeral5mInputTokens": 0,
+                "cacheCreationEphemeral1hInputTokens": 0,
                 "webSearchRequests": 0,
                 "costUSD": 0,
                 "contextWindow": 0,
@@ -1989,17 +2030,18 @@
             "subtype": "success",
             "api_error_status": null,
             "result": "lantern",
-            "ttft_ms": 757,
+            "ttft_ms": 720,
             "type": "result",
-            "duration_ms": 763,
-            "uuid": "66b37e75-dc7f-4f26-9c35-4455b7a8d802",
-            "ttft_stream_ms": 756,
-            "time_to_request_ms": 55,
-            "first_content_frame_ms": 756,
-            "user_message_uuid": "3e1c2996-62ee-4c24-9872-2a87729cd0e8",
-            "user_message_uuids": ["3e1c2996-62ee-4c24-9872-2a87729cd0e8"],
-            "request_sent_wall_ms": 1794674463898,
+            "duration_ms": 730,
+            "uuid": "1f076bd7-8c68-4fb3-91a5-c840f1af0664",
+            "ttft_stream_ms": 718,
+            "time_to_request_ms": 91,
+            "first_content_frame_ms": 719,
+            "user_message_uuid": "2a56038a-e046-46a0-8f2b-2795e78c5654",
+            "user_message_uuids": ["2a56038a-e046-46a0-8f2b-2795e78c5654"],
+            "request_sent_wall_ms": 1794806409543,
             "first_request_input_tokens": 0,
+            "first_request_cache_read_input_tokens": 18077,
             "queued_turn_count": 0,
             "result_index": 0,
             "model_usage_since_last_result": {
@@ -2013,6 +2055,8 @@
                 "contextWindow": 0,
                 "maxOutputTokens": 0,
                 "thinkingTokens": 0,
+                "cacheCreationEphemeral5mInputTokens": 0,
+                "cacheCreationEphemeral1hInputTokens": 0,
                 "canonicalModel": "claude-haiku-5-5",
                 "provider": "firstParty",
                 "costBasis": "list"
@@ -2023,9 +2067,9 @@
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "3e1c2996-62ee-4c24-9872-2a87729cd0e8",
+            "command_uuid": "2a56038a-e046-46a0-8f2b-2795e78c5654",
             "state": "completed",
-            "uuid": "dda2ff30-1b32-4ba1-922d-d04247a97b97",
+            "uuid": "9192fda8-d5f1-4a1e-9892-37f34727d84e",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -2035,7 +2079,7 @@
             "subtype": "session_state_changed",
             "state": "idle",
             "sdk_host_only": true,
-            "uuid": "0e430b92-0c4e-44df-8cf7-01051decc348",
+            "uuid": "42697bbd-5456-4561-a6c3-c8835a7af37b",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -2061,12 +2105,12 @@
       "info": {
         "sessionId": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
         "summary": "Remember the word lantern. Reply with exactly: Noted.",
-        "lastModified": 1794674463438,
-        "fileSize": 175148,
+        "lastModified": 1794806408838,
+        "fileSize": 177581,
         "firstPrompt": "Remember the word lantern. Reply with exactly: Noted.",
         "gitBranch": "HEAD",
         "cwd": "<folder>",
-        "createdAt": 1794674462768
+        "createdAt": 1794806408086
       }
     }
   ]

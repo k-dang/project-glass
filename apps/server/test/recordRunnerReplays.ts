@@ -1,13 +1,14 @@
+import { NodeServices } from "@effect/platform-node"
 import type { EngineModels } from "@glass/contracts"
 import { Effect, Schema } from "effect"
-import { execSync } from "node:child_process"
+import { ChildProcessSpawner } from "effect/process"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { delimiter, dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { parseArgs } from "node:util"
 import { AgentRunners } from "../src/agentRunners"
-import { sdkExecutable } from "../src/processes"
+import { launchCommand, sdkExecutable } from "../src/processes"
 import {
   Recording,
   type RunnerScenario,
@@ -58,7 +59,14 @@ const commands = {
 }
 
 const version = (command: string) =>
-  execSync(`"${command}" --version`, { encoding: "utf8" }).trim().split("\n")[0]!
+  Effect.runPromise(
+    Effect.gen(function* () {
+      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+      const output = yield* spawner.string(launchCommand(sdkExecutable(command), ["--version"]))
+
+      return output.trim().split("\n")[0]!
+    }).pipe(Effect.provide(NodeServices.layer)),
+  )
 
 const applyEnv = (env: Readonly<Record<string, string | undefined>>) => {
   for (const [name, value] of Object.entries(env))
@@ -115,7 +123,7 @@ const record = async (scenario: RunnerScenario) => {
 
   const recording = Schema.encodeSync(Recording)({
     scenario: scenario.name,
-    program: version(commands[scenario.harness]),
+    program: await version(commands[scenario.harness]),
     models,
     outcome,
     spawns: recorder.spawns,

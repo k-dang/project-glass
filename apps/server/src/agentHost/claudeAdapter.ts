@@ -238,7 +238,7 @@ interface CancellingInterrupt {
 
 const interruptAll = (session: ClaudeQuery) =>
   Effect.tryPromise(async () => {
-    // SAFETY: SDK 0.3.309's `interrupt` passes `{ cancelQueued: true }` on as the control request's
+    // SAFETY: SDK 0.3.322's `interrupt` passes `{ cancelQueued: true }` on as the control request's
     // `cancel_queued`, which its types leave out. A CLI too old for it lists nothing as cancelled.
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion, anti-slop/no-chained-type-assertions -- See SAFETY above.
     const cancelling = session as unknown as CancellingInterrupt

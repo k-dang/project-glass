@@ -64,3 +64,19 @@ it.live("follows an npm shim on the Windows PATH to the file the Claude SDK runs
     assert.strictEqual(executable, join(folder, "bin\\claude.exe"))
   }),
 )
+
+it.live("follows a pi.dev shim on the Windows PATH to its launcher script", () =>
+  Effect.gen(function* () {
+    const folder = yield* isolatedHome
+    yield* Effect.promise(() =>
+      writeFile(
+        join(folder, "pi.cmd"),
+        `@ECHO off\r\nSETLOCAL\r\nSET "node=node"\r\n"%node%" "%~dp0pi-launcher.js" %*\r\n`,
+      ),
+    )
+
+    const executable = sdkExecutable("pi", windowsHost(folder))
+
+    assert.strictEqual(executable, join(folder, "pi-launcher.js"))
+  }),
+)

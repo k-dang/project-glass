@@ -1,6 +1,6 @@
 {
   "scenario": "pi-global-tools",
-  "program": "@earendil-works/pi-coding-agent 1.3.0",
+  "program": "@earendil-works/pi-coding-agent 1.5.2",
   "processes": [
     {
       "args": [
@@ -42,7 +42,7 @@
               "model": {
                 "id": "gpt-test",
                 "name": "gpt-test",
-                "api": "<pi-provider>-completions",
+                "api": "openai-completions",
                 "provider": "glass-test",
                 "baseUrl": "<redacted>",
                 "reasoning": false,
@@ -61,7 +61,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-16T15-18-08-182Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-17T01-05-50-885Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -105,7 +105,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794842288343,
+              "timestamp": 1794877551069,
               "toolsAdded": [
                 {
                   "name": "ask_user",
@@ -620,7 +620,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794842288343,
+              "timestamp": 1794877551069,
               "toolsAdded": [
                 {
                   "name": "ask_user",
@@ -1139,7 +1139,7 @@
                   "text": "What are my To-dos?"
                 }
               ],
-              "timestamp": 1794842288342
+              "timestamp": 1794877551068
             }
           }
         },
@@ -1154,7 +1154,7 @@
                   "text": "What are my To-dos?"
                 }
               ],
-              "timestamp": 1794842288342
+              "timestamp": 1794877551068
             }
           }
         },
@@ -1164,7 +1164,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "<pi-provider>-completions",
+              "api": "openai-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -1182,7 +1182,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794842288373
+              "timestamp": 1794877551093
             }
           }
         },
@@ -1277,7 +1277,7 @@
                   "arguments": {}
                 }
               ],
-              "api": "<pi-provider>-completions",
+              "api": "openai-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -1295,7 +1295,7 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794842288373,
+              "timestamp": 1794877551093,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
               "durationMs": 9,
@@ -1343,7 +1343,7 @@
               ],
               "isError": false,
               "durationMs": 5,
-              "timestamp": 1794842288388
+              "timestamp": 1794877551110
             }
           }
         },
@@ -1362,7 +1362,7 @@
               ],
               "isError": false,
               "durationMs": 5,
-              "timestamp": 1794842288388
+              "timestamp": 1794877551110
             }
           }
         },
@@ -1379,7 +1379,7 @@
                   "arguments": {}
                 }
               ],
-              "api": "<pi-provider>-completions",
+              "api": "openai-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -1397,7 +1397,7 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794842288373,
+              "timestamp": 1794877551093,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
               "durationMs": 9,
@@ -1416,7 +1416,7 @@
                 ],
                 "isError": false,
                 "durationMs": 5,
-                "timestamp": 1794842288388
+                "timestamp": 1794877551110
               }
             ]
           }
@@ -1432,7 +1432,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "<pi-provider>-completions",
+              "api": "openai-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -1450,7 +1450,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794842288391
+              "timestamp": 1794877551113
             }
           }
         },
@@ -1536,7 +1536,7 @@
                   "text": "The tool said: {\"toDos\":[{\"id\":1,\"title\":\"Reply to Sam\",\"notes\":\"\",\"done\":false,\"images\":[]}]}"
                 }
               ],
-              "api": "<pi-provider>-completions",
+              "api": "openai-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -1554,7 +1554,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794842288391,
+              "timestamp": 1794877551113,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -1573,7 +1573,7 @@
                   "text": "The tool said: {\"toDos\":[{\"id\":1,\"title\":\"Reply to Sam\",\"notes\":\"\",\"done\":false,\"images\":[]}]}"
                 }
               ],
-              "api": "<pi-provider>-completions",
+              "api": "openai-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -1591,7 +1591,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794842288391,
+              "timestamp": 1794877551113,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -1608,7 +1608,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1794842288343,
+                "timestamp": 1794877551069,
                 "toolsAdded": [
                   {
                     "name": "ask_user",
@@ -2122,7 +2122,7 @@
                     "text": "What are my To-dos?"
                   }
                 ],
-                "timestamp": 1794842288342
+                "timestamp": 1794877551068
               },
               {
                 "role": "assistant",
@@ -2134,7 +2134,7 @@
                     "arguments": {}
                   }
                 ],
-                "api": "<pi-provider>-completions",
+                "api": "openai-completions",
                 "provider": "glass-test",
                 "model": "gpt-test",
                 "usage": {
@@ -2152,7 +2152,7 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1794842288373,
+                "timestamp": 1794877551093,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
                 "durationMs": 9,
@@ -2170,7 +2170,7 @@
                 ],
                 "isError": false,
                 "durationMs": 5,
-                "timestamp": 1794842288388
+                "timestamp": 1794877551110
               },
               {
                 "role": "assistant",
@@ -2180,7 +2180,7 @@
                     "text": "The tool said: {\"toDos\":[{\"id\":1,\"title\":\"Reply to Sam\",\"notes\":\"\",\"done\":false,\"images\":[]}]}"
                   }
                 ],
-                "api": "<pi-provider>-completions",
+                "api": "openai-completions",
                 "provider": "glass-test",
                 "model": "gpt-test",
                 "usage": {
@@ -2198,7 +2198,7 @@
                   }
                 },
                 "stopReason": "stop",
-                "timestamp": 1794842288391,
+                "timestamp": 1794877551113,
                 "responseId": "test-completion",
                 "rawStopReason": "stop",
                 "durationMs": 2,
@@ -2230,7 +2230,7 @@
               "model": {
                 "id": "gpt-test",
                 "name": "gpt-test",
-                "api": "<pi-provider>-completions",
+                "api": "openai-completions",
                 "provider": "glass-test",
                 "baseUrl": "<redacted>",
                 "reasoning": false,
@@ -2249,7 +2249,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-16T15-18-08-182Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-17T01-05-50-885Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 5,
@@ -2297,7 +2297,7 @@
                   "text": "Read acme/api#42 at a stale Revision."
                 }
               ],
-              "timestamp": 1794842288396
+              "timestamp": 1794877551118
             }
           }
         },
@@ -2312,7 +2312,7 @@
                   "text": "Read acme/api#42 at a stale Revision."
                 }
               ],
-              "timestamp": 1794842288396
+              "timestamp": 1794877551118
             }
           }
         },
@@ -2322,7 +2322,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "<pi-provider>-completions",
+              "api": "openai-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -2340,7 +2340,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794842288398
+              "timestamp": 1794877551122
             }
           }
         },
@@ -2455,7 +2455,7 @@
                   }
                 }
               ],
-              "api": "<pi-provider>-completions",
+              "api": "openai-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -2473,10 +2473,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794842288398,
+              "timestamp": 1794877551122,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 2,
+              "durationMs": 3,
               "thinkingLevel": "off"
             }
           }
@@ -2514,7 +2514,7 @@
               "details": {}
             },
             "isError": true,
-            "durationMs": 24
+            "durationMs": 23
           }
         },
         {
@@ -2532,8 +2532,8 @@
               ],
               "details": {},
               "isError": true,
-              "durationMs": 24,
-              "timestamp": 1794842288425
+              "durationMs": 23,
+              "timestamp": 1794877551150
             }
           }
         },
@@ -2552,8 +2552,8 @@
               ],
               "details": {},
               "isError": true,
-              "durationMs": 24,
-              "timestamp": 1794842288425
+              "durationMs": 23,
+              "timestamp": 1794877551150
             }
           }
         },
@@ -2580,7 +2580,7 @@
                   }
                 }
               ],
-              "api": "<pi-provider>-completions",
+              "api": "openai-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -2598,10 +2598,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794842288398,
+              "timestamp": 1794877551122,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 2,
+              "durationMs": 3,
               "thinkingLevel": "off"
             },
             "toolResults": [
@@ -2617,8 +2617,8 @@
                 ],
                 "details": {},
                 "isError": true,
-                "durationMs": 24,
-                "timestamp": 1794842288425
+                "durationMs": 23,
+                "timestamp": 1794877551150
               }
             ]
           }
@@ -2634,7 +2634,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "<pi-provider>-completions",
+              "api": "openai-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -2652,7 +2652,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794842288427
+              "timestamp": 1794877551152
             }
           }
         },
@@ -2738,7 +2738,7 @@
                   "text": "The tool said: The PR has changed since that Revision. Read it as it is now, and tell the user what changed."
                 }
               ],
-              "api": "<pi-provider>-completions",
+              "api": "openai-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -2756,7 +2756,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794842288427,
+              "timestamp": 1794877551152,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -2775,7 +2775,7 @@
                   "text": "The tool said: The PR has changed since that Revision. Read it as it is now, and tell the user what changed."
                 }
               ],
-              "api": "<pi-provider>-completions",
+              "api": "openai-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -2793,7 +2793,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794842288427,
+              "timestamp": 1794877551152,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -2814,7 +2814,7 @@
                     "text": "Read acme/api#42 at a stale Revision."
                   }
                 ],
-                "timestamp": 1794842288396
+                "timestamp": 1794877551118
               },
               {
                 "role": "assistant",
@@ -2836,7 +2836,7 @@
                     }
                   }
                 ],
-                "api": "<pi-provider>-completions",
+                "api": "openai-completions",
                 "provider": "glass-test",
                 "model": "gpt-test",
                 "usage": {
@@ -2854,10 +2854,10 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1794842288398,
+                "timestamp": 1794877551122,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
-                "durationMs": 2,
+                "durationMs": 3,
                 "thinkingLevel": "off"
               },
               {
@@ -2872,8 +2872,8 @@
                 ],
                 "details": {},
                 "isError": true,
-                "durationMs": 24,
-                "timestamp": 1794842288425
+                "durationMs": 23,
+                "timestamp": 1794877551150
               },
               {
                 "role": "assistant",
@@ -2883,7 +2883,7 @@
                     "text": "The tool said: The PR has changed since that Revision. Read it as it is now, and tell the user what changed."
                   }
                 ],
-                "api": "<pi-provider>-completions",
+                "api": "openai-completions",
                 "provider": "glass-test",
                 "model": "gpt-test",
                 "usage": {
@@ -2901,7 +2901,7 @@
                   }
                 },
                 "stopReason": "stop",
-                "timestamp": 1794842288427,
+                "timestamp": 1794877551152,
                 "responseId": "test-completion",
                 "rawStopReason": "stop",
                 "durationMs": 2,
@@ -2933,7 +2933,7 @@
               "model": {
                 "id": "gpt-test",
                 "name": "gpt-test",
-                "api": "<pi-provider>-completions",
+                "api": "openai-completions",
                 "provider": "glass-test",
                 "baseUrl": "<redacted>",
                 "reasoning": false,
@@ -2952,7 +2952,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-16T15-18-08-182Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-17T01-05-50-885Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 9,

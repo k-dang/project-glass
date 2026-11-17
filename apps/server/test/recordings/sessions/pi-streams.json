@@ -1,6 +1,6 @@
 {
   "scenario": "pi-streams",
-  "program": "@earendil-works/pi-coding-agent 1.3.0",
+  "program": "@earendil-works/pi-coding-agent 1.5.2",
   "processes": [
     {
       "args": [
@@ -31,16 +31,11 @@
               "model": {
                 "id": "<pi-model>",
                 "name": "Claude Haiku 5.5",
-                "api": "anthropic-messages",
-                "baseUrl": "<redacted>",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
+                "baseUrl": "<redacted>",
                 "reasoning": true,
                 "input": ["text", "image"],
-                "compat": {
-                  "allowEmptySignature": true,
-                  "forceAdaptiveThinking": true,
-                  "supportsTemperature": false
-                },
                 "cost": {
                   "input": 0.1,
                   "output": 0.5,
@@ -59,11 +54,29 @@
                 "contextWindow": 1000000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
+                  "minimal": null,
+                  "low": "low",
+                  "medium": "medium",
+                  "high": "high",
                   "xhigh": "xhigh",
                   "max": "max"
                 },
+                "compat": {
+                  "forceAdaptiveThinking": true,
+                  "supportsTemperature": false,
+                  "supportsMidConvoEffort": true,
+                  "supportsMidConvoSystemMessages": true,
+                  "supportsMidConvoToolChanges": true,
+                  "supportsStrictTools": true
+                },
+                "promptCache": {
+                  "short": 300,
+                  "long": 3600
+                },
                 "inputLimits": {
+                  "maxRequestBytes": 33554432,
                   "images": {
+                    "maxPerRequest": 600,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -79,7 +92,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-15T01-30-38-619Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-17T01-05-20-807Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -104,16 +117,11 @@
             "data": {
               "id": "<pi-model>",
               "name": "Claude Haiku 5.5",
-              "api": "anthropic-messages",
-              "baseUrl": "<redacted>",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
+              "baseUrl": "<redacted>",
               "reasoning": true,
               "input": ["text", "image"],
-              "compat": {
-                "allowEmptySignature": true,
-                "forceAdaptiveThinking": true,
-                "supportsTemperature": false
-              },
               "cost": {
                 "input": 0.1,
                 "output": 0.5,
@@ -132,11 +140,29 @@
               "contextWindow": 1000000,
               "maxTokens": 128000,
               "thinkingLevelMap": {
+                "minimal": null,
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
                 "xhigh": "xhigh",
                 "max": "max"
               },
+              "compat": {
+                "forceAdaptiveThinking": true,
+                "supportsTemperature": false,
+                "supportsMidConvoEffort": true,
+                "supportsMidConvoSystemMessages": true,
+                "supportsMidConvoToolChanges": true,
+                "supportsStrictTools": true
+              },
+              "promptCache": {
+                "short": 300,
+                "long": 3600
+              },
               "inputLimits": {
+                "maxRequestBytes": 33554432,
                 "images": {
+                  "maxPerRequest": 600,
                   "resize": {
                     "maxWidth": 2000,
                     "maxHeight": 2000,
@@ -206,7 +232,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794706238841,
+              "timestamp": 1794877521044,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -349,7 +375,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794706238841,
+              "timestamp": 1794877521044,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -496,7 +522,7 @@
                   "text": "Think it through step by step first. Use the bash tool to run exactly `echo hi` and nothing else, then reply with exactly: It says hi."
                 }
               ],
-              "timestamp": 1794706238839
+              "timestamp": 1794877521042
             }
           }
         },
@@ -511,7 +537,7 @@
                   "text": "Think it through step by step first. Use the bash tool to run exactly `echo hi` and nothing else, then reply with exactly: It says hi."
                 }
               ],
-              "timestamp": 1794706238839
+              "timestamp": 1794877521042
             }
           }
         },
@@ -521,7 +547,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -539,7 +565,8 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794706238858
+              "timestamp": 1794877521133,
+              "providerThinkingLevel": "high"
             }
           }
         },
@@ -557,7 +584,8 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
+                "total": 0,
+                "totalFromProvider": false
               },
               "cacheWrite1h": 0
             },
@@ -581,14 +609,15 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
+                "total": 0,
+                "totalFromProvider": false
               },
               "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": "The"
+              "delta": "I'm running"
             }
           }
         },
@@ -606,14 +635,15 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
+                "total": 0,
+                "totalFromProvider": false
               },
               "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": " user"
+              "delta": " a qu"
             }
           }
         },
@@ -631,14 +661,15 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
+                "total": 0,
+                "totalFromProvider": false
               },
               "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": " w"
+              "delta": "ick echo command in"
             }
           }
         },
@@ -656,14 +687,15 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
+                "total": 0,
+                "totalFromProvider": false
               },
               "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": "ants me to re"
+              "delta": " bash to check that"
             }
           }
         },
@@ -681,14 +713,15 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
+                "total": 0,
+                "totalFromProvider": false
               },
               "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": "ason step"
+              "delta": " the"
             }
           }
         },
@@ -706,14 +739,15 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
+                "total": 0,
+                "totalFromProvider": false
               },
               "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": " by step out"
+              "delta": " shell respon"
             }
           }
         },
@@ -731,14 +765,15 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
+                "total": 0,
+                "totalFromProvider": false
               },
               "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": " loud, but I'd"
+              "delta": "ds,"
             }
           }
         },
@@ -756,14 +791,15 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
+                "total": 0,
+                "totalFromProvider": false
               },
               "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": " rather keep that"
+              "delta": " without going into"
             }
           }
         },
@@ -781,14 +817,15 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
+                "total": 0,
+                "totalFromProvider": false
               },
               "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": " to"
+              "delta": " my"
             }
           }
         },
@@ -806,14 +843,15 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
+                "total": 0,
+                "totalFromProvider": false
               },
               "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": " myself and sim"
+              "delta": " re"
             }
           }
         },
@@ -831,14 +869,15 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
+                "total": 0,
+                "totalFromProvider": false
               },
               "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": "ply car"
+              "delta": "asoning."
             }
           }
         },
@@ -856,107 +895,8 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": "ry out the request"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": ". I'll"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": " run `echo hi` in"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": " bash."
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
+                "total": 0,
+                "totalFromProvider": false
               },
               "cacheWrite1h": 0
             },
@@ -981,39 +921,15 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": ""
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
+                "total": 0,
+                "totalFromProvider": false
               },
               "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "thinking_end",
               "contentIndex": 0,
-              "content": "The user wants me to reason step by step out loud, but I'd rather keep that to myself and simply carry out the request. I'll run `echo hi` in bash.\n\n"
+              "content": "I'm running a quick echo command in bash to check that the shell responds, without going into my reasoning.\n\n"
             }
           }
         },
@@ -1031,14 +947,15 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
+                "total": 0,
+                "totalFromProvider": false
               },
               "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "toolcall_start",
               "contentIndex": 1,
-              "id": "toolu_01UwDy55nwYrx4JmrNtvH91u",
+              "id": "toolu_01U8j6X5Jy7fgAbkGk1JuPTm",
               "toolName": "bash"
             }
           }
@@ -1057,14 +974,15 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
+                "total": 0,
+                "totalFromProvider": false
               },
               "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "toolcall_delta",
               "contentIndex": 1,
-              "delta": "{\"command\": \"ech"
+              "delta": ""
             }
           }
         },
@@ -1082,14 +1000,15 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
+                "total": 0,
+                "totalFromProvider": false
               },
               "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "toolcall_delta",
               "contentIndex": 1,
-              "delta": "o hi"
+              "delta": "{\"command\": \"echo hi"
             }
           }
         },
@@ -1107,14 +1026,15 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
+                "total": 0,
+                "totalFromProvider": false
               },
               "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "toolcall_delta",
               "contentIndex": 1,
-              "delta": "\"}"
+              "delta": "\", \"timeout\": null"
             }
           }
         },
@@ -1132,7 +1052,34 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "toolcall_delta",
+              "contentIndex": 1,
+              "delta": "}"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
               },
               "cacheWrite1h": 0
             },
@@ -1141,10 +1088,11 @@
               "contentIndex": 1,
               "toolCall": {
                 "type": "toolCall",
-                "id": "toolu_01UwDy55nwYrx4JmrNtvH91u",
+                "id": "toolu_01U8j6X5Jy7fgAbkGk1JuPTm",
                 "name": "bash",
                 "arguments": {
-                  "command": "echo hi"
+                  "command": "echo hi",
+                  "timeout": null
                 }
               }
             }
@@ -1158,19 +1106,20 @@
               "content": [
                 {
                   "type": "thinking",
-                  "thinking": "The user wants me to reason step by step out loud, but I'd rather keep that to myself and simply carry out the request. I'll run `echo hi` in bash.\n\n",
-                  "thinkingSignature": "CAQSiAYKEAgTGAI4AUIIdGhpbmtpbmcSDAo0FxVz0vnl4US41BoMIZKMAh5Jy9/qtuWsIjDpFCGpatjOXNufHyf0TL8Aj1RltUvuVXdJ22nEoT5J4wxGpYdXusZAlsXZKFF+gQ0qpQVSRCUS+VW3L/5od5/OZCmXODlMfGyniSDJRyPtel44f74invc0GZBi26HcYy2dy5yE+VasakcKQEsjHbjtgxOXMrVcDv9rP0Ytvw9SGae/J+esZOC7FZlCxhITQQEy4qkYO96PyihTnFi6U06jqwxdunV89ZLveQBO9twVc3aOXpsalLhhVA3ZCSpOL4byaMPDCfwGsDiO6Gp6/vF2xQKyXu1zGbNUQQCzhxuQc6lYQe/8wsMTg41kOZAbp5eS5agKUER6I1xb4jHSIP241FZt9NG3eAo3J9A+Rx7gA5Te3CzRgM1wP6MwIW/mJiW33PZaboQ9cyOGgJCIEJI8RxThdOw0tanthrVoLRp5PfCILYaq6aF3EkBhIBjc9ClzJ2NgQ09ojo/W/cna/DCqQ97spdmbt5NWcs6/j53Hhy9UOD9Xjrp1JupDCaPxSsj7K2I/9M2oANyrhR2otH+3QqWLTgKsPeuDSqLbT+O/zM57iD/XgGVeAEVtqirchkr+PvofW9GYxq5gZxFHfPYX0Pp4KTiTYZoO+lgQKTOVWrb14dJeeM4Eu1icO25vpiAJaRZyLCsPGHjXWCBxS51ZUTZWu13iYB43t9GY+n/JGlfpdD/+zMLa3NttlylLpeQXka0eQoTEKdC2Tp1BS7yYqEoH7afuLdiRfrjLGBbRLWYuf9LAfFWn/y6m+Huo5Mnuu0Bl9R2K+K08V79H6D3O5l/9gsY7yrEci/JIOe7Gt2geSS13dqQ816bHdwheLeoBJ4kU8RntUCNyYjLwP4NI8UGyG1Gn2+3zF7XOpnBS3BuMa6UVjYI5VXmA2x/YEW85ZFWKuEyEavn0tgsTAEFhLmSR7FN+8ssvujkiBqERTwNZZSpjqcBOpDen3zrdmiM+1iukJqu01xgB"
+                  "thinking": "I'm running a quick echo command in bash to check that the shell responds, without going into my reasoning.\n\n",
+                  "thinkingSignature": "CAQS0wUKEAgTGAI4AUIIdGhpbmtpbmcSDI8swiDkQhjE5sv9wBoMlxDFmOdvw5YzdGbuIjDbj9db6O1tN2Tz3TCCgTA6wgndHXWCtb81HuZnGkCBqYI4tG6tUubHrcXq0rUvqCoq8AQfmmd3nORlAc4P5cQuNWM4+yS+w0ATlAFDi37s94LUO0nD5VpqHzAwTAxI3Etx9PTFnysSNROfwlnVkJPz6ysKf9WGqsW+Pd/9WAqm/kDytbHDpXlwc2Rav4tavLMHPWMlqMmOA2xIwgefTCnxHuqtd2GEwzQsNyiU7anGvN0bu8TFTdiCmTz6ai/msi9rLZYWg+dJj0WAZgOkzADnGcacE1/yBIp+r4yp1n5wYcd6y8W37zfSU8XOE/r6hOfS4Zzjun1UP0xbTsxQXXuGCxmcqoxoxOUKDNTkLQbLPY/1L9DaCp+FkLWQuOZlkjc2kZTNxVQvHk5Tp/gNt2HDUW26wl2O+ETYjDwsMRLgVzugRsBJdl92lf01OsTC/zfH9H74kE4iJQ60aYkxZQd4Yk6ITuwo2RQ9rOnOTZHQmQhbfptexUB92djgKMe8Ga9HAUIyzZVREEuCFn3+gurnowHwRpuFuIhkoMbwgzTUxZwkV05feUhsEbU8LV6CyCZOjR3BsX7a7FJxf1DNGQ1G368bOvnSR1OBQ4QlQRFf4/GDVfyi9UHpSD6C2nb9Wz7Oge+6RPjVViyoBd9qwD0kbiMhlhhRTn7ypwvvkPw5pCncUxhdnxKUhtbsw0KtXdVFINnsfHDh+wczm9c9GFMTxpzC6A9aDKlyJn88Au/H7A1MklZLj0HVOMNmz1F/+ltxESMJSwwJQoSpjO0kjv5YOYRiNDN4PxVCabSnwASGeCd6VLzoy91bONCWG3LTGmnQqFZyTeuujO/EekZvPA+5d8QY8u19lEc8rZVXoYLFeeRs7noGmo9votXMTc9LkTwhGXAYAQ=="
                 },
                 {
                   "type": "toolCall",
-                  "id": "toolu_01UwDy55nwYrx4JmrNtvH91u",
+                  "id": "toolu_01U8j6X5Jy7fgAbkGk1JuPTm",
                   "name": "bash",
                   "arguments": {
-                    "command": "echo hi"
+                    "command": "echo hi",
+                    "timeout": null
                   }
                 }
               ],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -1184,15 +1133,18 @@
                   "output": 0,
                   "cacheRead": 0,
                   "cacheWrite": 0,
-                  "total": 0
+                  "total": 0,
+                  "totalFromProvider": false
                 },
-                "cacheWrite1h": 0
+                "cacheWrite1h": 0,
+                "reasoning": 0
               },
               "stopReason": "toolUse",
-              "timestamp": 1794706238858,
-              "responseId": "gen_01M7ED7VHAQBF72C8JDQX484E5",
+              "timestamp": 1794877521133,
+              "providerThinkingLevel": "high",
+              "responseId": "msg_011Ch7btD9TiiwojTLUjeNHP",
               "rawStopReason": "tool_use",
-              "durationMs": 2496,
+              "durationMs": 1812,
               "thinkingLevel": "high"
             }
           }
@@ -1200,20 +1152,22 @@
         {
           "in": {
             "type": "tool_execution_start",
-            "toolCallId": "toolu_01UwDy55nwYrx4JmrNtvH91u",
+            "toolCallId": "toolu_01U8j6X5Jy7fgAbkGk1JuPTm",
             "toolName": "bash",
             "args": {
-              "command": "echo hi"
+              "command": "echo hi",
+              "timeout": null
             }
           }
         },
         {
           "in": {
             "type": "tool_execution_update",
-            "toolCallId": "toolu_01UwDy55nwYrx4JmrNtvH91u",
+            "toolCallId": "toolu_01U8j6X5Jy7fgAbkGk1JuPTm",
             "toolName": "bash",
             "args": {
-              "command": "echo hi"
+              "command": "echo hi",
+              "timeout": null
             },
             "partialResult": {
               "content": []
@@ -1223,10 +1177,11 @@
         {
           "in": {
             "type": "tool_execution_update",
-            "toolCallId": "toolu_01UwDy55nwYrx4JmrNtvH91u",
+            "toolCallId": "toolu_01U8j6X5Jy7fgAbkGk1JuPTm",
             "toolName": "bash",
             "args": {
-              "command": "echo hi"
+              "command": "echo hi",
+              "timeout": null
             },
             "partialResult": {
               "content": [
@@ -1242,7 +1197,7 @@
         {
           "in": {
             "type": "tool_execution_end",
-            "toolCallId": "toolu_01UwDy55nwYrx4JmrNtvH91u",
+            "toolCallId": "toolu_01U8j6X5Jy7fgAbkGk1JuPTm",
             "toolName": "bash",
             "result": {
               "content": [
@@ -1255,11 +1210,11 @@
                 "output": "hi\n",
                 "truncated": false,
                 "exit_code": 0,
-                "wall_time_seconds": 0.1
+                "wall_time_seconds": 0
               }
             },
             "isError": false,
-            "durationMs": 56
+            "durationMs": 47
           }
         },
         {
@@ -1267,7 +1222,7 @@
             "type": "message_start",
             "message": {
               "role": "toolResult",
-              "toolCallId": "toolu_01UwDy55nwYrx4JmrNtvH91u",
+              "toolCallId": "toolu_01U8j6X5Jy7fgAbkGk1JuPTm",
               "toolName": "bash",
               "content": [
                 {
@@ -1276,8 +1231,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 56,
-              "timestamp": 1794706241411
+              "durationMs": 47,
+              "timestamp": 1794877522995
             }
           }
         },
@@ -1286,7 +1241,7 @@
             "type": "message_end",
             "message": {
               "role": "toolResult",
-              "toolCallId": "toolu_01UwDy55nwYrx4JmrNtvH91u",
+              "toolCallId": "toolu_01U8j6X5Jy7fgAbkGk1JuPTm",
               "toolName": "bash",
               "content": [
                 {
@@ -1295,8 +1250,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 56,
-              "timestamp": 1794706241411
+              "durationMs": 47,
+              "timestamp": 1794877522995
             }
           }
         },
@@ -1308,19 +1263,20 @@
               "content": [
                 {
                   "type": "thinking",
-                  "thinking": "The user wants me to reason step by step out loud, but I'd rather keep that to myself and simply carry out the request. I'll run `echo hi` in bash.\n\n",
-                  "thinkingSignature": "CAQSiAYKEAgTGAI4AUIIdGhpbmtpbmcSDAo0FxVz0vnl4US41BoMIZKMAh5Jy9/qtuWsIjDpFCGpatjOXNufHyf0TL8Aj1RltUvuVXdJ22nEoT5J4wxGpYdXusZAlsXZKFF+gQ0qpQVSRCUS+VW3L/5od5/OZCmXODlMfGyniSDJRyPtel44f74invc0GZBi26HcYy2dy5yE+VasakcKQEsjHbjtgxOXMrVcDv9rP0Ytvw9SGae/J+esZOC7FZlCxhITQQEy4qkYO96PyihTnFi6U06jqwxdunV89ZLveQBO9twVc3aOXpsalLhhVA3ZCSpOL4byaMPDCfwGsDiO6Gp6/vF2xQKyXu1zGbNUQQCzhxuQc6lYQe/8wsMTg41kOZAbp5eS5agKUER6I1xb4jHSIP241FZt9NG3eAo3J9A+Rx7gA5Te3CzRgM1wP6MwIW/mJiW33PZaboQ9cyOGgJCIEJI8RxThdOw0tanthrVoLRp5PfCILYaq6aF3EkBhIBjc9ClzJ2NgQ09ojo/W/cna/DCqQ97spdmbt5NWcs6/j53Hhy9UOD9Xjrp1JupDCaPxSsj7K2I/9M2oANyrhR2otH+3QqWLTgKsPeuDSqLbT+O/zM57iD/XgGVeAEVtqirchkr+PvofW9GYxq5gZxFHfPYX0Pp4KTiTYZoO+lgQKTOVWrb14dJeeM4Eu1icO25vpiAJaRZyLCsPGHjXWCBxS51ZUTZWu13iYB43t9GY+n/JGlfpdD/+zMLa3NttlylLpeQXka0eQoTEKdC2Tp1BS7yYqEoH7afuLdiRfrjLGBbRLWYuf9LAfFWn/y6m+Huo5Mnuu0Bl9R2K+K08V79H6D3O5l/9gsY7yrEci/JIOe7Gt2geSS13dqQ816bHdwheLeoBJ4kU8RntUCNyYjLwP4NI8UGyG1Gn2+3zF7XOpnBS3BuMa6UVjYI5VXmA2x/YEW85ZFWKuEyEavn0tgsTAEFhLmSR7FN+8ssvujkiBqERTwNZZSpjqcBOpDen3zrdmiM+1iukJqu01xgB"
+                  "thinking": "I'm running a quick echo command in bash to check that the shell responds, without going into my reasoning.\n\n",
+                  "thinkingSignature": "CAQS0wUKEAgTGAI4AUIIdGhpbmtpbmcSDI8swiDkQhjE5sv9wBoMlxDFmOdvw5YzdGbuIjDbj9db6O1tN2Tz3TCCgTA6wgndHXWCtb81HuZnGkCBqYI4tG6tUubHrcXq0rUvqCoq8AQfmmd3nORlAc4P5cQuNWM4+yS+w0ATlAFDi37s94LUO0nD5VpqHzAwTAxI3Etx9PTFnysSNROfwlnVkJPz6ysKf9WGqsW+Pd/9WAqm/kDytbHDpXlwc2Rav4tavLMHPWMlqMmOA2xIwgefTCnxHuqtd2GEwzQsNyiU7anGvN0bu8TFTdiCmTz6ai/msi9rLZYWg+dJj0WAZgOkzADnGcacE1/yBIp+r4yp1n5wYcd6y8W37zfSU8XOE/r6hOfS4Zzjun1UP0xbTsxQXXuGCxmcqoxoxOUKDNTkLQbLPY/1L9DaCp+FkLWQuOZlkjc2kZTNxVQvHk5Tp/gNt2HDUW26wl2O+ETYjDwsMRLgVzugRsBJdl92lf01OsTC/zfH9H74kE4iJQ60aYkxZQd4Yk6ITuwo2RQ9rOnOTZHQmQhbfptexUB92djgKMe8Ga9HAUIyzZVREEuCFn3+gurnowHwRpuFuIhkoMbwgzTUxZwkV05feUhsEbU8LV6CyCZOjR3BsX7a7FJxf1DNGQ1G368bOvnSR1OBQ4QlQRFf4/GDVfyi9UHpSD6C2nb9Wz7Oge+6RPjVViyoBd9qwD0kbiMhlhhRTn7ypwvvkPw5pCncUxhdnxKUhtbsw0KtXdVFINnsfHDh+wczm9c9GFMTxpzC6A9aDKlyJn88Au/H7A1MklZLj0HVOMNmz1F/+ltxESMJSwwJQoSpjO0kjv5YOYRiNDN4PxVCabSnwASGeCd6VLzoy91bONCWG3LTGmnQqFZyTeuujO/EekZvPA+5d8QY8u19lEc8rZVXoYLFeeRs7noGmo9votXMTc9LkTwhGXAYAQ=="
                 },
                 {
                   "type": "toolCall",
-                  "id": "toolu_01UwDy55nwYrx4JmrNtvH91u",
+                  "id": "toolu_01U8j6X5Jy7fgAbkGk1JuPTm",
                   "name": "bash",
                   "arguments": {
-                    "command": "echo hi"
+                    "command": "echo hi",
+                    "timeout": null
                   }
                 }
               ],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -1334,21 +1290,24 @@
                   "output": 0,
                   "cacheRead": 0,
                   "cacheWrite": 0,
-                  "total": 0
+                  "total": 0,
+                  "totalFromProvider": false
                 },
-                "cacheWrite1h": 0
+                "cacheWrite1h": 0,
+                "reasoning": 0
               },
               "stopReason": "toolUse",
-              "timestamp": 1794706238858,
-              "responseId": "gen_01M7ED7VHAQBF72C8JDQX484E5",
+              "timestamp": 1794877521133,
+              "providerThinkingLevel": "high",
+              "responseId": "msg_011Ch7btD9TiiwojTLUjeNHP",
               "rawStopReason": "tool_use",
-              "durationMs": 2496,
+              "durationMs": 1812,
               "thinkingLevel": "high"
             },
             "toolResults": [
               {
                 "role": "toolResult",
-                "toolCallId": "toolu_01UwDy55nwYrx4JmrNtvH91u",
+                "toolCallId": "toolu_01U8j6X5Jy7fgAbkGk1JuPTm",
                 "toolName": "bash",
                 "content": [
                   {
@@ -1357,8 +1316,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 56,
-                "timestamp": 1794706241411
+                "durationMs": 47,
+                "timestamp": 1794877522995
               }
             ]
           }
@@ -1374,7 +1333,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -1392,7 +1351,8 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794706241415
+              "timestamp": 1794877522999,
+              "providerThinkingLevel": "high"
             }
           }
         },
@@ -1410,7 +1370,8 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
+                "total": 0,
+                "totalFromProvider": false
               },
               "cacheWrite1h": 0
             },
@@ -1434,7 +1395,8 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
+                "total": 0,
+                "totalFromProvider": false
               },
               "cacheWrite1h": 0
             },
@@ -1459,7 +1421,8 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
+                "total": 0,
+                "totalFromProvider": false
               },
               "cacheWrite1h": 0
             },
@@ -1481,7 +1444,7 @@
                   "text": "It says hi."
                 }
               ],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -1495,15 +1458,18 @@
                   "output": 0,
                   "cacheRead": 0,
                   "cacheWrite": 0,
-                  "total": 0
+                  "total": 0,
+                  "totalFromProvider": false
                 },
-                "cacheWrite1h": 0
+                "cacheWrite1h": 0,
+                "reasoning": 0
               },
               "stopReason": "stop",
-              "timestamp": 1794706241415,
-              "responseId": "gen_01M7ED7XX0JWFABEZXSH9WGQND",
+              "timestamp": 1794877522999,
+              "providerThinkingLevel": "high",
+              "responseId": "msg_011Ch7btLh98UijkvpMvKjhV",
               "rawStopReason": "end_turn",
-              "durationMs": 583,
+              "durationMs": 360,
               "thinkingLevel": "high"
             }
           }
@@ -1519,7 +1485,7 @@
                   "text": "It says hi."
                 }
               ],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -1533,15 +1499,18 @@
                   "output": 0,
                   "cacheRead": 0,
                   "cacheWrite": 0,
-                  "total": 0
+                  "total": 0,
+                  "totalFromProvider": false
                 },
-                "cacheWrite1h": 0
+                "cacheWrite1h": 0,
+                "reasoning": 0
               },
               "stopReason": "stop",
-              "timestamp": 1794706241415,
-              "responseId": "gen_01M7ED7XX0JWFABEZXSH9WGQND",
+              "timestamp": 1794877522999,
+              "providerThinkingLevel": "high",
+              "responseId": "msg_011Ch7btLh98UijkvpMvKjhV",
               "rawStopReason": "end_turn",
-              "durationMs": 583,
+              "durationMs": 360,
               "thinkingLevel": "high"
             },
             "toolResults": []
@@ -1555,7 +1524,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1794706238841,
+                "timestamp": 1794877521044,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -1697,26 +1666,27 @@
                     "text": "Think it through step by step first. Use the bash tool to run exactly `echo hi` and nothing else, then reply with exactly: It says hi."
                   }
                 ],
-                "timestamp": 1794706238839
+                "timestamp": 1794877521042
               },
               {
                 "role": "assistant",
                 "content": [
                   {
                     "type": "thinking",
-                    "thinking": "The user wants me to reason step by step out loud, but I'd rather keep that to myself and simply carry out the request. I'll run `echo hi` in bash.\n\n",
-                    "thinkingSignature": "CAQSiAYKEAgTGAI4AUIIdGhpbmtpbmcSDAo0FxVz0vnl4US41BoMIZKMAh5Jy9/qtuWsIjDpFCGpatjOXNufHyf0TL8Aj1RltUvuVXdJ22nEoT5J4wxGpYdXusZAlsXZKFF+gQ0qpQVSRCUS+VW3L/5od5/OZCmXODlMfGyniSDJRyPtel44f74invc0GZBi26HcYy2dy5yE+VasakcKQEsjHbjtgxOXMrVcDv9rP0Ytvw9SGae/J+esZOC7FZlCxhITQQEy4qkYO96PyihTnFi6U06jqwxdunV89ZLveQBO9twVc3aOXpsalLhhVA3ZCSpOL4byaMPDCfwGsDiO6Gp6/vF2xQKyXu1zGbNUQQCzhxuQc6lYQe/8wsMTg41kOZAbp5eS5agKUER6I1xb4jHSIP241FZt9NG3eAo3J9A+Rx7gA5Te3CzRgM1wP6MwIW/mJiW33PZaboQ9cyOGgJCIEJI8RxThdOw0tanthrVoLRp5PfCILYaq6aF3EkBhIBjc9ClzJ2NgQ09ojo/W/cna/DCqQ97spdmbt5NWcs6/j53Hhy9UOD9Xjrp1JupDCaPxSsj7K2I/9M2oANyrhR2otH+3QqWLTgKsPeuDSqLbT+O/zM57iD/XgGVeAEVtqirchkr+PvofW9GYxq5gZxFHfPYX0Pp4KTiTYZoO+lgQKTOVWrb14dJeeM4Eu1icO25vpiAJaRZyLCsPGHjXWCBxS51ZUTZWu13iYB43t9GY+n/JGlfpdD/+zMLa3NttlylLpeQXka0eQoTEKdC2Tp1BS7yYqEoH7afuLdiRfrjLGBbRLWYuf9LAfFWn/y6m+Huo5Mnuu0Bl9R2K+K08V79H6D3O5l/9gsY7yrEci/JIOe7Gt2geSS13dqQ816bHdwheLeoBJ4kU8RntUCNyYjLwP4NI8UGyG1Gn2+3zF7XOpnBS3BuMa6UVjYI5VXmA2x/YEW85ZFWKuEyEavn0tgsTAEFhLmSR7FN+8ssvujkiBqERTwNZZSpjqcBOpDen3zrdmiM+1iukJqu01xgB"
+                    "thinking": "I'm running a quick echo command in bash to check that the shell responds, without going into my reasoning.\n\n",
+                    "thinkingSignature": "CAQS0wUKEAgTGAI4AUIIdGhpbmtpbmcSDI8swiDkQhjE5sv9wBoMlxDFmOdvw5YzdGbuIjDbj9db6O1tN2Tz3TCCgTA6wgndHXWCtb81HuZnGkCBqYI4tG6tUubHrcXq0rUvqCoq8AQfmmd3nORlAc4P5cQuNWM4+yS+w0ATlAFDi37s94LUO0nD5VpqHzAwTAxI3Etx9PTFnysSNROfwlnVkJPz6ysKf9WGqsW+Pd/9WAqm/kDytbHDpXlwc2Rav4tavLMHPWMlqMmOA2xIwgefTCnxHuqtd2GEwzQsNyiU7anGvN0bu8TFTdiCmTz6ai/msi9rLZYWg+dJj0WAZgOkzADnGcacE1/yBIp+r4yp1n5wYcd6y8W37zfSU8XOE/r6hOfS4Zzjun1UP0xbTsxQXXuGCxmcqoxoxOUKDNTkLQbLPY/1L9DaCp+FkLWQuOZlkjc2kZTNxVQvHk5Tp/gNt2HDUW26wl2O+ETYjDwsMRLgVzugRsBJdl92lf01OsTC/zfH9H74kE4iJQ60aYkxZQd4Yk6ITuwo2RQ9rOnOTZHQmQhbfptexUB92djgKMe8Ga9HAUIyzZVREEuCFn3+gurnowHwRpuFuIhkoMbwgzTUxZwkV05feUhsEbU8LV6CyCZOjR3BsX7a7FJxf1DNGQ1G368bOvnSR1OBQ4QlQRFf4/GDVfyi9UHpSD6C2nb9Wz7Oge+6RPjVViyoBd9qwD0kbiMhlhhRTn7ypwvvkPw5pCncUxhdnxKUhtbsw0KtXdVFINnsfHDh+wczm9c9GFMTxpzC6A9aDKlyJn88Au/H7A1MklZLj0HVOMNmz1F/+ltxESMJSwwJQoSpjO0kjv5YOYRiNDN4PxVCabSnwASGeCd6VLzoy91bONCWG3LTGmnQqFZyTeuujO/EekZvPA+5d8QY8u19lEc8rZVXoYLFeeRs7noGmo9votXMTc9LkTwhGXAYAQ=="
                   },
                   {
                     "type": "toolCall",
-                    "id": "toolu_01UwDy55nwYrx4JmrNtvH91u",
+                    "id": "toolu_01U8j6X5Jy7fgAbkGk1JuPTm",
                     "name": "bash",
                     "arguments": {
-                      "command": "echo hi"
+                      "command": "echo hi",
+                      "timeout": null
                     }
                   }
                 ],
-                "api": "anthropic-messages",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
                 "model": "<pi-model>",
                 "usage": {
@@ -1730,20 +1700,23 @@
                     "output": 0,
                     "cacheRead": 0,
                     "cacheWrite": 0,
-                    "total": 0
+                    "total": 0,
+                    "totalFromProvider": false
                   },
-                  "cacheWrite1h": 0
+                  "cacheWrite1h": 0,
+                  "reasoning": 0
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1794706238858,
-                "responseId": "gen_01M7ED7VHAQBF72C8JDQX484E5",
+                "timestamp": 1794877521133,
+                "providerThinkingLevel": "high",
+                "responseId": "msg_011Ch7btD9TiiwojTLUjeNHP",
                 "rawStopReason": "tool_use",
-                "durationMs": 2496,
+                "durationMs": 1812,
                 "thinkingLevel": "high"
               },
               {
                 "role": "toolResult",
-                "toolCallId": "toolu_01UwDy55nwYrx4JmrNtvH91u",
+                "toolCallId": "toolu_01U8j6X5Jy7fgAbkGk1JuPTm",
                 "toolName": "bash",
                 "content": [
                   {
@@ -1752,8 +1725,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 56,
-                "timestamp": 1794706241411
+                "durationMs": 47,
+                "timestamp": 1794877522995
               },
               {
                 "role": "assistant",
@@ -1763,7 +1736,7 @@
                     "text": "It says hi."
                   }
                 ],
-                "api": "anthropic-messages",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
                 "model": "<pi-model>",
                 "usage": {
@@ -1777,15 +1750,18 @@
                     "output": 0,
                     "cacheRead": 0,
                     "cacheWrite": 0,
-                    "total": 0
+                    "total": 0,
+                    "totalFromProvider": false
                   },
-                  "cacheWrite1h": 0
+                  "cacheWrite1h": 0,
+                  "reasoning": 0
                 },
                 "stopReason": "stop",
-                "timestamp": 1794706241415,
-                "responseId": "gen_01M7ED7XX0JWFABEZXSH9WGQND",
+                "timestamp": 1794877522999,
+                "providerThinkingLevel": "high",
+                "responseId": "msg_011Ch7btLh98UijkvpMvKjhV",
                 "rawStopReason": "end_turn",
-                "durationMs": 583,
+                "durationMs": 360,
                 "thinkingLevel": "high"
               }
             ],
@@ -1814,16 +1790,11 @@
               "model": {
                 "id": "<pi-model>",
                 "name": "Claude Haiku 5.5",
-                "api": "anthropic-messages",
-                "baseUrl": "<redacted>",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
+                "baseUrl": "<redacted>",
                 "reasoning": true,
                 "input": ["text", "image"],
-                "compat": {
-                  "allowEmptySignature": true,
-                  "forceAdaptiveThinking": true,
-                  "supportsTemperature": false
-                },
                 "cost": {
                   "input": 0.1,
                   "output": 0.5,
@@ -1842,11 +1813,29 @@
                 "contextWindow": 1000000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
+                  "minimal": null,
+                  "low": "low",
+                  "medium": "medium",
+                  "high": "high",
                   "xhigh": "xhigh",
                   "max": "max"
                 },
+                "compat": {
+                  "forceAdaptiveThinking": true,
+                  "supportsTemperature": false,
+                  "supportsMidConvoEffort": true,
+                  "supportsMidConvoSystemMessages": true,
+                  "supportsMidConvoToolChanges": true,
+                  "supportsStrictTools": true
+                },
+                "promptCache": {
+                  "short": 300,
+                  "long": 3600
+                },
                 "inputLimits": {
+                  "maxRequestBytes": 33554432,
                   "images": {
+                    "maxPerRequest": 600,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -1862,7 +1851,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-15T01-30-38-619Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-17T01-05-20-807Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 5,
