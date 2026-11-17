@@ -117,7 +117,9 @@ export function useDiagrams(turns: ReadonlyArray<Turn>, loaded: boolean) {
   )
 
   return {
+    titles: [...diagrams.keys()],
     opened: open === null ? null : (diagrams.get(open) ?? null),
+    open: setOpen,
     close: () => setOpen(null),
     cardOf,
   }
