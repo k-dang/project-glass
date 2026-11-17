@@ -516,6 +516,44 @@ function DiagramLegend() {
   )
 }
 
+// Sits above the Chapter's diffs, so it hides to give them the card's full height.
+function ChapterDiagram(props: { source: string; title: string }) {
+  const [open, setOpen] = useState(true)
+  const body = useId()
+
+  return (
+    <section
+      aria-label={`Diagram: ${props.title}`}
+      className={cn("mb-3 flex min-h-0 shrink-0 flex-col border-b pb-2", open && "max-h-[45%]")}
+    >
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={body}
+          onClick={() => setOpen(!open)}
+          className="-ml-1 flex cursor-pointer items-center gap-1 rounded-sm px-1 text-xs font-medium hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
+        >
+          <ChevronRight
+            aria-hidden
+            className={cn(
+              "size-3.5 text-muted-foreground transition-transform",
+              open && "rotate-90",
+            )}
+          />
+          Diagram
+        </button>
+        {open && <DiagramLegend />}
+      </div>
+      {open && (
+        <div id={body} className="mt-2 min-h-0 overflow-auto">
+          <MermaidDiagram source={props.source} />
+        </div>
+      )}
+    </section>
+  )
+}
+
 function ChapterCard(props: {
   diff: Omit<TourViewProps, "onShowInReview">
   searchGroup: NonNullable<ChangedFilesViewProps["searchGroup"]>
@@ -681,15 +719,7 @@ function ChapterCard(props: {
                 title={title}
               />
             )}
-            {chapter?.diagram != null && (
-              <section
-                aria-label={`Diagram: ${title}`}
-                className="mb-3 max-h-[45%] min-h-0 overflow-auto border-b pb-3"
-              >
-                <DiagramLegend />
-                <MermaidDiagram source={chapter.diagram} className="mt-2" />
-              </section>
-            )}
+            {chapter?.diagram != null && <ChapterDiagram source={chapter.diagram} title={title} />}
             {files.length === 0 ? (
               <p className="p-4 text-sm text-muted-foreground">No files remain in this Chapter.</p>
             ) : (
