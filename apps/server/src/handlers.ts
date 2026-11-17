@@ -1,5 +1,5 @@
 import { GlassRpcs } from "@glass/contracts"
-import { Effect, Predicate, Stream } from "effect"
+import { Effect, Predicate } from "effect"
 import { ActivityLog } from "./ActivityLog"
 import { AgentReviews } from "./AgentReviews"
 import { Asks } from "./Asks"
@@ -164,10 +164,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       ListConversationFiles: ({ conversationId }) => conversations.files(conversationId),
       ListSandboxProviders: () => Effect.succeed(sandboxes.providers),
       CreateConversation: (input) => conversations.create(input),
-      WatchWaitingConversations: () =>
-        conversations
-          .watchWaiting()
-          .pipe(Stream.map((waiting) => waiting.map(({ conversation }) => conversation.id))),
+      WatchWorkingConversations: () => conversations.watchWorking(),
       WatchNeedsYou: () => needsYou.watch(),
       MarkTurnSeen: ({ conversationId, endedAt }) =>
         conversations.markTurnSeen(conversationId, endedAt),

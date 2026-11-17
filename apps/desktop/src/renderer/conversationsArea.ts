@@ -56,9 +56,9 @@ export const conversationsAtom = backendRuntime
   .atom(Stream.unwrap(Backend.useSync((backend) => backend.WatchConversations())))
   .pipe(Atom.keepAlive)
 
-export const waitingConversationsAtom = backendRuntime
+export const workingConversationsAtom = backendRuntime
   .atom(
-    Stream.unwrap(Backend.useSync((backend) => backend.WatchWaitingConversations())).pipe(
+    Stream.unwrap(Backend.useSync((backend) => backend.WatchWorkingConversations())).pipe(
       Stream.map((ids): ReadonlySet<string> => new Set(ids)),
     ),
   )

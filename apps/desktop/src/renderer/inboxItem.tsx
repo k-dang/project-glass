@@ -1,4 +1,5 @@
 import type {
+  ConversationNeedsYou,
   NeedsYouGroup,
   NeedsYouItem,
   PullRequestReason,
@@ -55,6 +56,19 @@ const turnEndingReason = (ending: TurnEnding): Reason =>
     CutOff: () => ({ label: "Cut off", tone: "danger" as const }),
     Interrupted: () => ({ label: "Interrupted", tone: "neutral" as const }),
   })
+
+export const conversationMarker = ({ reasons }: ConversationNeedsYou) => {
+  const reason = reasons.find(Predicate.isTagged("WaitingRequests")) ?? reasons[0]
+
+  return Match.valueTags(reason, {
+    WaitingRequests: () => ({ label: "Waiting on you", tone: toneClass.warning }),
+    TurnFinished: ({ ended }) => {
+      const { label, tone } = turnEndingReason(ended.ending)
+
+      return { label, tone: toneClass[tone] }
+    },
+  })
+}
 
 const pullRequestReason = (reason: PullRequestReason): Reason =>
   Match.valueTags(reason, {

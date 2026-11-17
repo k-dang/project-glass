@@ -359,11 +359,7 @@ export class GlassRpcs extends RpcGroup.make(
     error: ConversationError,
     stream: true,
   }),
-  Rpc.make("WatchWaitingConversations", {
-    success: Schema.Array(Schema.String),
-    error: ConversationError,
-    stream: true,
-  }),
+  Rpc.make("WatchWorkingConversations", { success: Schema.Array(Schema.String), stream: true }),
   Rpc.make("WatchNeedsYou", { success: NeedsYou, stream: true }),
   Rpc.make("MarkTurnSeen", {
     payload: { conversationId: Schema.String, endedAt: Schema.DateTimeUtcFromString },

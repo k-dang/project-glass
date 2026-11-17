@@ -17,7 +17,14 @@ import {
 import { Link, Outlet, useNavigate, useParams } from "@tanstack/react-router"
 import { DateTime, Exit, Option, Predicate } from "effect"
 import { AsyncResult } from "effect/reactivity"
-import { FolderGit2, PanelLeftClose, PanelLeftOpen, SquarePen, Trash2 } from "lucide-react"
+import {
+  FolderGit2,
+  LoaderCircle,
+  PanelLeftClose,
+  PanelLeftOpen,
+  SquarePen,
+  Trash2,
+} from "lucide-react"
 import { cn } from "cn"
 import { useContext, useId, useState } from "react"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -30,8 +37,10 @@ import {
   placeNames,
   removalWarningsAtom,
   removeConversation,
-  waitingConversationsAtom,
+  workingConversationsAtom,
 } from "./conversationsArea"
+import { conversationMarker } from "./inboxItem"
+import { conversationsNeedingYouAtom } from "./needsYou"
 import { ConfirmationDialog } from "./ConfirmationDialog"
 import { settledProblem, streamProblem } from "./problems"
 import { ProblemAlert } from "./ProblemAlert"
@@ -40,7 +49,9 @@ import { useShortcuts } from "./useShortcuts"
 
 const groupNames: Record<PlaceTag, string> = { ...placeNames, sandbox: "Sandboxes" }
 
-const noneWaiting: ReadonlySet<string> = new Set()
+const noneWorking: ReadonlySet<string> = new Set()
+
+const workingMarker = { label: "Working", tone: "text-muted-foreground" }
 
 const expiryFormat = new Intl.DateTimeFormat(undefined, {
   weekday: "short",
@@ -226,16 +237,21 @@ function ConversationRow(props: { conversation: Conversation }) {
 
   const problem = settledProblem(warnings)
   const repositoryId = useId()
-  const waitingId = useId()
+  const markerId = useId()
 
   const { sandbox } = conversation
   const sandboxText = sandbox === null ? null : sandboxLine(sandbox)
   const sandboxId = useId()
 
-  const waiting = Option.getOrElse(
-    AsyncResult.value(useAtomValue(waitingConversationsAtom)),
-    () => noneWaiting,
+  const needsYou = useAtomValue(conversationsNeedingYouAtom).get(conversation.id)
+
+  const working = Option.getOrElse(
+    AsyncResult.value(useAtomValue(workingConversationsAtom)),
+    () => noneWorking,
   ).has(conversation.id)
+
+  const marker =
+    needsYou !== undefined ? conversationMarker(needsYou) : working ? workingMarker : null
 
   const removeNow = () => {
     setConfirming(null)
@@ -264,7 +280,7 @@ function ConversationRow(props: { conversation: Conversation }) {
         aria-label={conversation.name}
         aria-describedby={[
           repositoryId,
-          ...(waiting ? [waitingId] : []),
+          ...(marker === null ? [] : [markerId]),
           ...(sandboxText === null ? [] : [sandboxId]),
         ].join(" ")}
         className={cn(
@@ -281,13 +297,20 @@ function ConversationRow(props: { conversation: Conversation }) {
         </span>
         <span className="flex min-w-0 items-center gap-1.5">
           <span className="truncate text-sm font-medium">{conversation.name}</span>
-          {waiting && (
+          {marker !== null && (
             <span
-              id={waitingId}
-              className="flex shrink-0 items-center gap-1 text-xs text-amber-600 dark:text-amber-400"
+              id={markerId}
+              className={cn("flex shrink-0 items-center gap-1 text-xs", marker.tone)}
             >
-              <span aria-hidden className="size-1.5 rounded-full bg-current" />
-              Waiting on you
+              {marker === workingMarker ? (
+                <LoaderCircle
+                  aria-hidden
+                  className="size-3 animate-spin motion-reduce:animate-none"
+                />
+              ) : (
+                <span aria-hidden className="size-1.5 rounded-full bg-current" />
+              )}
+              {marker.label}
             </span>
           )}
         </span>
