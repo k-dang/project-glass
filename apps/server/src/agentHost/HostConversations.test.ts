@@ -31,21 +31,31 @@ const startupFailed = new HostConversationError({
 interface Handshake {
   readonly entered: Deferred.Deferred<void>
   readonly release: Deferred.Deferred<void>
+  readonly cleaning: Deferred.Deferred<void>
+  readonly finishCleanup: Deferred.Deferred<void>
   readonly closed: Deferred.Deferred<void>
   readonly exit: Deferred.Deferred<void>
   readonly failure?: HostConversationError
 }
 
-const handshake = (failure?: HostConversationError) =>
+const handshake = ({
+  failure,
+  holdCleanup = false,
+}: { readonly failure?: HostConversationError | undefined; readonly holdCleanup?: boolean } = {}) =>
   Effect.gen(function* () {
     const entered = yield* Deferred.make<void>()
     const release = yield* Deferred.make<void>()
+    const cleaning = yield* Deferred.make<void>()
+    const finishCleanup = yield* Deferred.make<void>()
     const closed = yield* Deferred.make<void>()
     const exit = yield* Deferred.make<void>()
+    const gates = { entered, release, cleaning, finishCleanup, closed, exit }
 
-    if (failure === undefined) return { entered, release, closed, exit } satisfies Handshake
+    if (!holdCleanup) yield* Deferred.succeed(finishCleanup, undefined)
 
-    return { entered, release, closed, exit, failure } satisfies Handshake
+    if (failure === undefined) return gates satisfies Handshake
+
+    return { ...gates, failure } satisfies Handshake
   })
 
 const request = (conversationId: string): ConversationStart => ({
@@ -69,7 +79,7 @@ const session = (exit: Deferred.Deferred<void>): HarnessSession => ({
 const hosted = Effect.gen(function* () {
   const pending = yield* Queue.unbounded<Handshake>()
   let opened = 0
-  let open = 0
+  let live = 0
   let peak = 0
 
   const adapter = {
@@ -79,21 +89,24 @@ const hosted = Effect.gen(function* () {
       Effect.gen(function* () {
         const next = yield* Queue.take(pending)
 
-        open += 1
         opened += 1
-        peak = Math.max(peak, open)
+        live += 1
+        peak = Math.max(peak, live)
 
         yield* Effect.addFinalizer(() =>
-          Deferred.succeed(next.closed, undefined).pipe(Effect.asVoid),
-        )
-        yield* Deferred.succeed(next.entered, undefined)
-        yield* Deferred.await(next.release).pipe(
-          Effect.ensuring(
-            Effect.sync(() => {
-              open -= 1
-            }),
+          Deferred.succeed(next.cleaning, undefined).pipe(
+            Effect.andThen(Deferred.await(next.finishCleanup)),
+            Effect.andThen(
+              Effect.sync(() => {
+                live -= 1
+              }),
+            ),
+            Effect.andThen(Deferred.succeed(next.closed, undefined)),
+            Effect.asVoid,
           ),
         )
+        yield* Deferred.succeed(next.entered, undefined)
+        yield* Deferred.await(next.release)
 
         if (next.failure !== undefined) return yield* Effect.fail(next.failure)
 
@@ -299,7 +312,7 @@ it.live(
   () =>
     Effect.gen(function* () {
       const host = yield* hosted
-      const failed = yield* handshake(startupFailed)
+      const failed = yield* handshake({ failure: startupFailed })
       const again = yield* handshake()
 
       yield* host.offer(failed)
@@ -321,7 +334,7 @@ it.live(
   () =>
     Effect.gen(function* () {
       const host = yield* hosted
-      const failing = yield* handshake(startupFailed)
+      const failing = yield* handshake({ failure: startupFailed })
       const other = yield* handshake()
 
       yield* host.offer(failing)
@@ -409,7 +422,7 @@ const queuedStart = (
 ) =>
   Effect.gen(function* () {
     const host = yield* hosted
-    const held = yield* handshake(failure)
+    const held = yield* handshake({ failure })
     const waiter = yield* handshake()
 
     yield* host.offer(held)
@@ -597,4 +610,69 @@ it.effect("keeps to the budget for a later Turn after going over it while idle",
 
     yield* eventually(Effect.sync(() => assert.deepStrictEqual(stopped, ["turn-1"])))
   }).pipe(Effect.scoped),
+)
+
+it.live(
+  "starts a stopped Conversation again only after its old Agent harness is cleaned up",
+  () =>
+    Effect.gen(function* () {
+      const host = yield* hosted
+      const old = yield* handshake({ holdCleanup: true })
+      const again = yield* handshake()
+
+      yield* host.offer(old)
+      yield* release(old)
+      assert.equal(yield* host.conversations.start(request("a")), "started")
+
+      const stopping = yield* Effect.forkChild(host.conversations.stop("a"), {
+        startImmediately: true,
+      })
+
+      yield* Deferred.await(old.cleaning)
+
+      yield* host.offer(again)
+      yield* release(again)
+
+      const starting = yield* Effect.forkChild(host.conversations.start(request("a")), {
+        startImmediately: true,
+      })
+
+      yield* Deferred.succeed(old.finishCleanup, undefined)
+      yield* Fiber.join(stopping)
+      assert.equal(yield* Fiber.join(starting), "started")
+      assert.equal(host.peak(), 1)
+      assert.isUndefined(conversationLock(host.conversations, "a"))
+    }),
+  stall,
+)
+
+it.live(
+  "starts an exited Conversation again only after its old Agent harness is cleaned up",
+  () =>
+    Effect.gen(function* () {
+      const host = yield* hosted
+      const old = yield* handshake({ holdCleanup: true })
+      const again = yield* handshake()
+
+      yield* host.offer(old)
+      yield* release(old)
+      assert.equal(yield* host.conversations.start(request("a")), "started")
+
+      yield* host.offer(again)
+      yield* release(again)
+      yield* Deferred.succeed(old.exit, undefined)
+
+      const restarting = yield* Effect.forkChild(host.conversations.start(request("a")), {
+        startImmediately: true,
+      })
+
+      yield* Deferred.await(old.cleaning)
+      assert.isFalse(yield* Deferred.isDone(again.entered))
+
+      yield* Deferred.succeed(old.finishCleanup, undefined)
+      assert.equal(yield* Fiber.join(restarting), "started")
+      assert.equal(host.peak(), 1)
+      assert.isUndefined(conversationLock(host.conversations, "a"))
+    }),
+  stall,
 )

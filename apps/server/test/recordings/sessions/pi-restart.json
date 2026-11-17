@@ -1,0 +1,123 @@
+{
+  "scenario": "pi-restart",
+  "program": "@earendil-works/pi-coding-agent 1.5.2",
+  "processes": [
+    {
+      "args": [
+        "--mode",
+        "rpc",
+        "--session-id",
+        "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
+        "--extension",
+        "<folder>.pi/draw-diagram.mjs",
+        "--extension",
+        "<folder>.pi/subagent-status.js"
+      ],
+      "cwd": "<folder>",
+      "frames": [
+        {
+          "out": {
+            "type": "get_state",
+            "id": "glass-1"
+          }
+        },
+        {
+          "in": {
+            "id": "glass-1",
+            "type": "response",
+            "command": "get_state",
+            "success": true,
+            "data": {
+              "model": {
+                "id": "gpt-test",
+                "name": "gpt-test",
+                "api": "openai-completions",
+                "provider": "glass-test",
+                "baseUrl": "<redacted>",
+                "reasoning": false,
+                "input": ["text", "image"],
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0
+                },
+                "contextWindow": 128000,
+                "maxTokens": 4096
+              },
+              "thinkingLevel": "off",
+              "isStreaming": false,
+              "isCompacting": false,
+              "steeringMode": "one-at-a-time",
+              "followUpMode": "one-at-a-time",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-17T02-12-04-619Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
+              "autoCompactionEnabled": true,
+              "messageCount": 0,
+              "pendingMessageCount": 0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "args": [
+        "--mode",
+        "rpc",
+        "--session-id",
+        "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
+        "--extension",
+        "<folder>.pi/draw-diagram.mjs",
+        "--extension",
+        "<folder>.pi/subagent-status.js"
+      ],
+      "cwd": "<folder>",
+      "frames": [
+        {
+          "out": {
+            "type": "get_state",
+            "id": "glass-1"
+          }
+        },
+        {
+          "in": {
+            "id": "glass-1",
+            "type": "response",
+            "command": "get_state",
+            "success": true,
+            "data": {
+              "model": {
+                "id": "gpt-test",
+                "name": "gpt-test",
+                "api": "openai-completions",
+                "provider": "glass-test",
+                "baseUrl": "<redacted>",
+                "reasoning": false,
+                "input": ["text", "image"],
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0
+                },
+                "contextWindow": 128000,
+                "maxTokens": 4096
+              },
+              "thinkingLevel": "off",
+              "isStreaming": false,
+              "isCompacting": false,
+              "steeringMode": "one-at-a-time",
+              "followUpMode": "one-at-a-time",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-17T02-12-05-286Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
+              "autoCompactionEnabled": true,
+              "messageCount": 0,
+              "pendingMessageCount": 0
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "calls": []
+}
