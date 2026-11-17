@@ -120,7 +120,7 @@ export class LocalCheckouts extends Context.Service<
       ) {
         const { path, remote } = yield* get(repository)
 
-        const listed = yield* git
+        const listBranches = git
           .run(path, ["for-each-ref", "--format=%(refname:strip=3)", `refs/remotes/${remote}`])
           .pipe(
             Effect.tapError((cause) => Effect.logWarning("Couldn't list branches", cause)),
@@ -132,14 +132,18 @@ export class LocalCheckouts extends Context.Service<
             ),
           )
 
-        const names = listed.split("\n").filter((branch) => branch !== "" && branch !== "HEAD")
-
-        const remoteHead = yield* git
+        const findRemoteHead = git
           .run(path, ["symbolic-ref", "--short", `refs/remotes/${remote}/HEAD`])
           .pipe(
             Effect.map((ref) => ref.slice(remote.length + 1)),
             Effect.option,
           )
+
+        const [listed, remoteHead] = yield* Effect.all([listBranches, findRemoteHead], {
+          concurrency: "unbounded",
+        })
+
+        const names = listed.split("\n").filter((branch) => branch !== "" && branch !== "HEAD")
 
         const defaultBranch = Option.getOrElse(
           Option.filter(remoteHead, (branch) => names.includes(branch)),

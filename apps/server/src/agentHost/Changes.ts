@@ -117,26 +117,29 @@ export class Changes extends Context.Service<
       const fs = yield* FileSystem.FileSystem
 
       const workingTreeSnapshot = Effect.fnUntraced(function* (folder: string) {
-        const index = yield* git.run(folder, [
-          "rev-parse",
-          "--path-format=absolute",
-          "--git-path",
-          "index",
-        ])
+        const [index, scratch] = yield* Effect.all(
+          [
+            git.run(folder, ["rev-parse", "--path-format=absolute", "--git-path", "index"]),
+            fs.makeTempDirectoryScoped(),
+          ],
+          { concurrency: "unbounded" },
+        )
 
-        const scratchIndex = { GIT_INDEX_FILE: join(yield* fs.makeTempDirectoryScoped(), "index") }
+        const scratchIndex = { GIT_INDEX_FILE: join(scratch, "index") }
 
         if (yield* fs.exists(index)) yield* fs.copyFile(index, scratchIndex.GIT_INDEX_FILE)
         yield* git.run(folder, ["add", "--all"], scratchIndex)
 
         return yield* git.run(folder, ["write-tree"], scratchIndex)
-      })
+      }, Effect.scoped)
 
       return Changes.of({
         since: (folder, baseRef) =>
           Effect.gen(function* () {
-            const forkPoint = yield* git.run(folder, ["merge-base", "HEAD", baseRef])
-            const tree = yield* workingTreeSnapshot(folder)
+            const [forkPoint, tree] = yield* Effect.all(
+              [git.run(folder, ["merge-base", "HEAD", baseRef]), workingTreeSnapshot(folder)],
+              { concurrency: "unbounded" },
+            )
 
             const [summary, patch] = yield* Effect.all(
               [
@@ -175,7 +178,7 @@ export class Changes extends Context.Service<
                   patch: filePatch(file, patches[index]!),
                 }),
             )
-          }).pipe(Effect.scoped, failure("Couldn't read the Conversation's changes.")),
+          }).pipe(failure("Couldn't read the Conversation's changes.")),
         uncommitted: (folder) =>
           git.run(folder, ["status", "--porcelain"]).pipe(
             Effect.map((status) => status !== ""),
