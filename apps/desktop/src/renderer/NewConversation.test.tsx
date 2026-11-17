@@ -18,10 +18,13 @@ import {
 } from "@glass/contracts"
 import { cleanup, screen, waitFor, within } from "@testing-library/react"
 import { Deferred, Effect, Exit, Predicate, Stream, SubscriptionRef } from "effect"
+import { AsyncResult, AtomRegistry } from "effect/reactivity"
 import { expect, it } from "vite-plus/test"
-import { placeKey } from "./conversationsArea"
+import { createConversationAtom, placeKey } from "./conversationsArea"
 import { conversation, conversationFields } from "../../test/conversation"
 import { choice, listModels, mount, pixel } from "../../test/conversationApp"
+import { eventually } from "../../test/eventually"
+import { testRegistry } from "../../test/testBackend"
 
 const pack = (name: string, commit: string, skills: ReadonlyArray<string> = []) =>
   new SkillPack({
@@ -911,4 +914,41 @@ it("offers the chosen Agent harness's own models, and efforts only for models th
     { harness: "pi", model: "glass-test/thinker", effort: "low", permissionMode: null },
   ])
   await waitFor(() => expect(window.location.hash).toBe(`#/conversations/${conversation.id}`))
+})
+
+it("watches a created Conversation's transcript while waiting for it to be listed", async () => {
+  const listed = Effect.runSync(SubscriptionRef.make<ReadonlyArray<Conversation>>([]))
+  const watched: Array<string> = []
+
+  const registry = testRegistry({
+    WatchConversations: () => SubscriptionRef.changes(listed),
+    CreateConversation: () => Effect.succeed(conversation),
+    WatchTranscript: ({ conversationId }) => {
+      watched.push(conversationId)
+
+      return Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null }))
+    },
+  })
+
+  const release = registry.mount(createConversationAtom)
+
+  try {
+    registry.set(createConversationAtom, {
+      ...conversationFields,
+      message: "Say hello",
+      images: [],
+    })
+    await eventually(() => expect(watched).toEqual([conversation.id]))
+    expect(AsyncResult.isSuccess(registry.get(createConversationAtom))).toBe(false)
+
+    Effect.runSync(SubscriptionRef.set(listed, [conversation]))
+    expect(
+      await Effect.runPromise(
+        AtomRegistry.getResult(registry, createConversationAtom, { suspendOnWaiting: true }),
+      ),
+    ).toEqual(conversation)
+  } finally {
+    release()
+    registry.dispose()
+  }
 })

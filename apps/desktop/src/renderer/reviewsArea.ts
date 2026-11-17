@@ -172,24 +172,29 @@ const recall = (registry: AtomRegistry.AtomRegistry, ref: PullRequestRef) => {
 export const openWorkspaceAtom = backendRuntime
   .fn((request: OpenRequest, get) =>
     Effect.gen(function* () {
-      const destination = yield* AtomRegistry.getResult(get.registry, savedDestinationsAtom).pipe(
+      const savedDestination = AtomRegistry.getResult(get.registry, savedDestinationsAtom).pipe(
         Effect.map((destinations) => savedIn(destinations, "reviews")),
         Effect.catch(() => Effect.succeed(undefined)),
       )
 
-      const open =
-        request.loaded ??
-        (yield* get
-          .stream(connectionAtom)
-          .pipe(
-            Stream.filter(AsyncResult.isSuccess),
-            Stream.runHead,
-            Effect.andThen(
-              request.previous === undefined
-                ? loadShared(request.ref, get.registry)
-                : load(request, get.registry),
-            ),
-          ))
+      const workspace =
+        request.loaded === undefined
+          ? get
+              .stream(connectionAtom)
+              .pipe(
+                Stream.filter(AsyncResult.isSuccess),
+                Stream.runHead,
+                Effect.andThen(
+                  request.previous === undefined
+                    ? loadShared(request.ref, get.registry)
+                    : load(request, get.registry),
+                ),
+              )
+          : Effect.succeed(request.loaded)
+
+      const [destination, open] = yield* Effect.all([savedDestination, workspace], {
+        concurrency: "unbounded",
+      })
 
       void open.activity
         .opened()
