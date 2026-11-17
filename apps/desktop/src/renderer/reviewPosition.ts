@@ -35,7 +35,7 @@ export const restoreReviewPosition = (
     tab: position.tab,
     file: null,
     repositoryFile: null,
-    order: "tour",
+    order: "path",
   }
 
   if (position.tab === "overview") return { view, notice: null }
