@@ -1,4 +1,4 @@
-import { Effect, FileSystem, type Scope, Semaphore } from "effect"
+import { Effect, FileSystem, type Scope } from "effect"
 import { randomUUID } from "node:crypto"
 import { dirname, isAbsolute, join, relative } from "node:path"
 import { HostConversationError, type SkillSource } from "./protocol"
@@ -11,13 +11,11 @@ export interface WrittenSkills {
 
 const WRITES_AT_ONCE = 8
 
-const TOGETHER = { concurrency: "unbounded" } as const
-
 const couldNotWrite = new HostConversationError({
   message: "Glass couldn't write the Conversation's skills. Try again.",
 })
 
-const inside = (folder: string, path: string): Effect.Effect<string, HostConversationError> => {
+const inside = (folder: string, path: string) => {
   const target = join(folder, path)
   const relation = relative(folder, target)
 
@@ -38,57 +36,47 @@ export const writeSentSkills = (
     if (sources.length === 0) return []
 
     const fs = yield* FileSystem.FileSystem
-    const writes = yield* Semaphore.make(WRITES_AT_ONCE)
     const directory = yield* scopedFolder(`${folder}.skills-${randomUUID()}`)
+    const files: Array<{ target: string; contents: Uint8Array; executable: boolean }> = []
 
-    const write = (target: string, contents: Uint8Array, executable: boolean) =>
+    const written = yield* Effect.forEach(sources, ({ name, skills }) =>
       Effect.gen(function* () {
-        yield* fs.makeDirectory(dirname(target), { recursive: true })
-        yield* fs.writeFile(target, contents)
+        const plugin = yield* inside(directory, name)
 
-        if (executable) yield* fs.chmod(target, 0o755)
-      }).pipe(Effect.uninterruptible, writes.withPermits(1))
+        files.push({
+          target: join(plugin, ".claude-plugin", "plugin.json"),
+          contents: new TextEncoder().encode(JSON.stringify({ name })),
+          executable: false,
+        })
 
-    return yield* Effect.forEach(
-      sources,
-      ({ name, skills }) =>
-        Effect.gen(function* () {
-          const plugin = yield* inside(directory, name)
+        const skillFolders = yield* Effect.forEach(skills, (skill) =>
+          Effect.gen(function* () {
+            const skillFolder = yield* inside(join(plugin, "skills"), skill.name)
 
-          const [, written] = yield* Effect.all(
-            [
-              write(
-                join(plugin, ".claude-plugin", "plugin.json"),
-                new TextEncoder().encode(JSON.stringify({ name })),
-                false,
-              ),
-              Effect.forEach(
-                skills,
-                (skill) =>
-                  Effect.gen(function* () {
-                    const skillFolder = yield* inside(join(plugin, "skills"), skill.name)
+            for (const { path, executable, contents } of skill.files)
+              files.push({ target: yield* inside(skillFolder, path), contents, executable })
 
-                    yield* Effect.forEach(
-                      skill.files,
-                      ({ path, executable, contents }) =>
-                        inside(skillFolder, path).pipe(
-                          Effect.flatMap((target) => write(target, contents, executable)),
-                        ),
-                      { ...TOGETHER, discard: true },
-                    )
+            return skillFolder
+          }),
+        )
 
-                    return skillFolder
-                  }),
-                TOGETHER,
-              ),
-            ],
-            TOGETHER,
-          )
-
-          return { plugin, skills: written }
-        }),
-      TOGETHER,
+        return { plugin, skills: skillFolders }
+      }),
     )
+
+    yield* Effect.forEach(
+      files,
+      ({ target, contents, executable }) =>
+        Effect.gen(function* () {
+          yield* fs.makeDirectory(dirname(target), { recursive: true })
+          yield* fs.writeFile(target, contents)
+
+          if (executable) yield* fs.chmod(target, 0o755)
+        }).pipe(Effect.uninterruptible),
+      { concurrency: WRITES_AT_ONCE, discard: true },
+    )
+
+    return written
   }).pipe(
     Effect.catchTag("PlatformError", (cause) =>
       Effect.logWarning("Couldn't write a Conversation's skills", cause).pipe(

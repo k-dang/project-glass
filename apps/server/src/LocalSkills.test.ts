@@ -13,9 +13,10 @@ import {
 import { chmodSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { conversationsFixture, settled } from "../test/conversationsFixture"
+import { counter } from "../test/counter"
 import { isolatedHome, LAUNCH_TOKEN } from "../test/harness"
 import { skillFile } from "../test/skillFiles"
-import { meeting, wrappedFileSystem } from "../test/wrappedFileSystem"
+import { wrappedFileSystem } from "../test/wrappedFileSystem"
 import { LocalSkills } from "./LocalSkills"
 import { ServerConfig } from "./ServerConfig"
 
@@ -172,16 +173,17 @@ it.live("scans pi's skill folders together", () =>
   Effect.gen(function* () {
     const home = yield* isolatedHome
     const folders = [join(home, ".pi", "agent", "skills"), join(home, ".agents", "skills")]
-    const bothScanning = yield* meeting(2)
+    const scanning = counter()
 
     write(join(folders[0]!, "plan", "SKILL.md"), skillFile("plan", "Plan."))
     write(join(folders[1]!, "review", "SKILL.md"), skillFile("review", "Review."))
 
     const local = yield* localSkillsIn(home, (fs) => ({
       readDirectory: (path, options) =>
-        (folders.includes(path) ? bothScanning : Effect.void).pipe(
-          Effect.andThen(fs.readDirectory(path, options)),
-        ),
+        (folders.includes(path)
+          ? Effect.sync(scanning.add).pipe(Effect.andThen(scanning.reached(2)))
+          : Effect.void
+        ).pipe(Effect.andThen(fs.readDirectory(path, options))),
     }))
 
     assert.deepStrictEqual(yield* local.names("pi"), ["plan", "review"])

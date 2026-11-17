@@ -118,10 +118,19 @@ export class LocalSkills extends Context.Service<
   static readonly layer = Layer.effect(
     LocalSkills,
     Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem
-      const skillFolders = foldersOf((yield* ServerConfig).homeDirectory)
       const reads = yield* Semaphore.make(READS_AT_ONCE)
       const limited = reads.withPermits(1)
+      const unbounded = yield* FileSystem.FileSystem
+
+      const fs = {
+        realPath: (path: string) => limited(unbounded.realPath(path)),
+        readDirectory: (path: string) => limited(unbounded.readDirectory(path)),
+        stat: (path: string) => limited(unbounded.stat(path)),
+        readFile: (path: string) => limited(unbounded.readFile(path)),
+        readFileString: (path: string) => limited(unbounded.readFileString(path)),
+      }
+
+      const skillFolders = foldersOf((yield* ServerConfig).homeDirectory)
 
       const filesUnder = (
         folder: string,
@@ -129,11 +138,11 @@ export class LocalSkills extends Context.Service<
         ancestors: ReadonlySet<string>,
       ): Effect.Effect<ReadonlyArray<FoundFile>, PlatformError.PlatformError> =>
         Effect.gen(function* () {
-          const real = yield* orSkipped(limited(fs.realPath(join(folder, relative))))
+          const real = yield* orSkipped(fs.realPath(join(folder, relative)))
 
           if (Option.isNone(real) || ancestors.has(real.value)) return []
 
-          const entries = yield* orSkipped(limited(fs.readDirectory(join(folder, relative))))
+          const entries = yield* orSkipped(fs.readDirectory(join(folder, relative)))
 
           if (Option.isNone(entries)) return []
 
@@ -142,7 +151,7 @@ export class LocalSkills extends Context.Service<
             (entry) =>
               Effect.gen(function* () {
                 const path = relative === "" ? entry : `${relative}/${entry}`
-                const info = yield* orSkipped(limited(fs.stat(join(folder, path))))
+                const info = yield* orSkipped(fs.stat(join(folder, path)))
 
                 if (Option.isNone(info)) return []
 
@@ -178,7 +187,7 @@ export class LocalSkills extends Context.Service<
 
                       const read = yield* orSkipped(
                         Effect.all(
-                          [limited(fs.readFileString(skillFile)), limited(fs.realPath(skillFile))],
+                          [fs.readFileString(skillFile), fs.realPath(skillFile)],
                           TOGETHER,
                         ),
                       )
@@ -204,7 +213,7 @@ export class LocalSkills extends Context.Service<
         Effect.forEach(
           files,
           ({ path, executable }) =>
-            orSkipped(limited(fs.readFile(join(folder, path)))).pipe(
+            orSkipped(fs.readFile(join(folder, path))).pipe(
               Effect.map(
                 Option.map((contents) => ({
                   path: path.slice(directory.length + 1),
@@ -228,12 +237,12 @@ export class LocalSkills extends Context.Service<
             Effect.flatMap((skills) => {
               const taken = new Set<string>()
 
-              const named = skills.map((skill) => ({
-                skill,
-                name: claimFolder(taken, lastSegment(skill.directory)),
-              }))
-
-              return Effect.forEach(named, ({ skill, name }) => sent(name, skill), TOGETHER)
+              return Effect.all(
+                skills.map((skill) =>
+                  sent(claimFolder(taken, lastSegment(skill.directory)), skill),
+                ),
+                TOGETHER,
+              )
             }),
             Effect.map((skills) =>
               skills.length === 0
