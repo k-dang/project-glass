@@ -44,6 +44,7 @@ import {
   MessageCircle,
   Puzzle,
   Unplug,
+  Workflow,
   Wrench,
   X,
 } from "lucide-react"
@@ -271,11 +272,19 @@ function OpenConversation(props: { conversation: Conversation } & ConversationTa
           localSkills={conversation.localSkills}
         >
           {tab === "chat" ? (
-            <ConversationHeaderAction onSelect={() => onTabChange("changes")}>
-              <FileDiff aria-hidden />
-              Changes
-              <Kbd className="ml-auto">{shortcutLabel("D")}</Kbd>
-            </ConversationHeaderAction>
+            <>
+              <ConversationHeaderAction onSelect={() => onTabChange("changes")}>
+                <FileDiff aria-hidden />
+                Changes
+                <Kbd className="ml-auto">{shortcutLabel("D")}</Kbd>
+              </ConversationHeaderAction>
+              {diagrams.titles.map((title) => (
+                <ConversationHeaderAction key={title} onSelect={() => diagrams.open(title)}>
+                  <Workflow aria-hidden />
+                  <span className="truncate">{title}</span>
+                </ConversationHeaderAction>
+              ))}
+            </>
           ) : (
             <ConversationHeaderAction onSelect={() => onTabChange("chat")}>
               <MessageCircle aria-hidden />

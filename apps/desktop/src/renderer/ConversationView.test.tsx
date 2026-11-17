@@ -3,6 +3,7 @@ import {
   ActivityPage,
   Conversation,
   ConversationChanges,
+  DRAW_DIAGRAM_TOOL,
   AnswerQuestion,
   DenyRequest,
   ExtensionStatusesChanged,
@@ -361,6 +362,50 @@ it("shows the Skill packs and commits a Conversation was created with, and its L
   await user.click(await screen.findByRole("button", { name: "Details" }))
 
   expect(await screen.findByText("team @ ae5650f · Local skills")).toBeTruthy()
+})
+
+it("opens a Diagram from the Conversation's details, without scrolling back to its card", async () => {
+  const user = mount({
+    WatchTranscript: () =>
+      Stream.make(
+        TranscriptSnapshot.make({
+          queued: [],
+          status: null,
+          turns: [
+            {
+              id: "turn-1",
+              message: "Draw a diagram",
+              images: [],
+              context: null,
+              feedback: [],
+              sentAt,
+              ended: { at: sentAt, ending: TurnDone.make({}) },
+              parts: [
+                ToolCallPart.make({
+                  toolCallId: "draw-1",
+                  name: DRAW_DIAGRAM_TOOL,
+                  inputSummary: "Component map",
+                  input: JSON.stringify({
+                    title: "Component map",
+                    kind: "existing",
+                    mermaid: "flowchart LR\n  A --> B",
+                  }),
+                  output: null,
+                  status: "done",
+                  parentToolCallId: null,
+                }),
+              ],
+            },
+          ],
+        }),
+      ),
+  })
+
+  await user.click(await screen.findByRole("button", { name: "Details" }))
+  await user.click(await screen.findByRole("button", { name: "Component map" }))
+
+  const pane = await screen.findByRole("complementary", { name: "Diagram" })
+  expect(within(pane).getByText("Component map")).toBeTruthy()
 })
 
 it("lists a Sandbox Conversation's commands again once its Sandbox can be reached", async () => {
