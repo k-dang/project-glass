@@ -3,6 +3,7 @@ import { Effect, Predicate } from "effect"
 import { ActivityLog } from "./ActivityLog"
 import { AgentReviews } from "./AgentReviews"
 import { Asks } from "./Asks"
+import { ConversationPullRequests } from "./ConversationPullRequests"
 import { Conversations } from "./Conversations"
 import { GitHubClient } from "./github/GitHubClient"
 import { GlobalConversation } from "./GlobalConversation"
@@ -47,6 +48,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
     const skillPacks = yield* SkillPacks
     const localSkills = yield* LocalSkills
     const needsYou = yield* NeedsYou
+    const conversationPullRequests = yield* ConversationPullRequests
     const outsideQuestions = yield* OutsideQuestions
     const outsideAgents = yield* OutsideAgents
     const mcpCredentials = yield* McpCredentials
@@ -168,6 +170,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       ListSandboxProviders: () => Effect.succeed(sandboxes.providers),
       CreateConversation: (input) => conversations.create(input),
       WatchWorkingConversations: () => conversations.watchWorking(),
+      WatchConversationPullRequests: () => conversationPullRequests.watch(),
       WatchNeedsYou: () => needsYou.watch(),
       MarkTurnSeen: ({ conversationId, endedAt }) =>
         conversations.markTurnSeen(conversationId, endedAt),

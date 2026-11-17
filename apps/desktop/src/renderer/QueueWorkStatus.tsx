@@ -18,7 +18,7 @@ import {
   TriangleAlert,
 } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { warningTone } from "./PullRequestRow"
+import { warningTone } from "./status"
 import { agentReviewStates } from "./useAgentReview"
 import { tourStates } from "./useTour"
 

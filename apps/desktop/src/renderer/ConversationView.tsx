@@ -98,6 +98,7 @@ import {
 } from "@/components/ui/trace"
 import { ConversationChanges } from "./ConversationChanges"
 import { ConversationHeader, ConversationHeaderAction } from "./ConversationHeader"
+import { useConversationPullRequest } from "./ConversationPullRequest"
 import {
   QueueItem,
   QueueItemAction,
@@ -226,6 +227,8 @@ function OpenConversation(props: { conversation: Conversation } & ConversationTa
 
   if (tab === "changes" && !changesOpened) setChangesOpened(true)
 
+  const pullRequest = useConversationPullRequest(conversation.id)
+
   const registry = useContext(RegistryContext)
 
   useShortcuts([
@@ -276,8 +279,9 @@ function OpenConversation(props: { conversation: Conversation } & ConversationTa
           }
           place={conversation.place}
           repository={repositoryKey(conversation.repository)}
-          branch={conversation.name}
+          branch={conversation.branch ?? undefined}
           baseBranch={conversation.baseBranch}
+          pullRequest={pullRequest}
           skillPacks={conversation.skillPacks}
           localSkills={conversation.localSkills}
         >

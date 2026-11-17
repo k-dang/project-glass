@@ -41,6 +41,7 @@ import {
 } from "./conversationsArea"
 import { conversationMarker } from "./inboxItem"
 import { conversationsNeedingYouAtom } from "./needsYou"
+import { ConversationPullRequestBadge, useConversationPullRequest } from "./ConversationPullRequest"
 import { ConfirmationDialog } from "./ConfirmationDialog"
 import { settledProblem, streamProblem } from "./problems"
 import { ProblemAlert } from "./ProblemAlert"
@@ -242,6 +243,8 @@ function ConversationRow(props: { conversation: Conversation }) {
   const { sandbox } = conversation
   const sandboxText = sandbox === null ? null : sandboxLine(sandbox)
   const sandboxId = useId()
+  const pullRequestId = useId()
+  const pullRequest = useConversationPullRequest(conversation.id)
 
   const needsYou = useAtomValue(conversationsNeedingYouAtom).get(conversation.id)
 
@@ -282,6 +285,7 @@ function ConversationRow(props: { conversation: Conversation }) {
           repositoryId,
           ...(marker === null ? [] : [markerId]),
           ...(sandboxText === null ? [] : [sandboxId]),
+          ...(pullRequest === undefined ? [] : [pullRequestId]),
         ].join(" ")}
         className={cn(
           conversationLink,
@@ -294,6 +298,9 @@ function ConversationRow(props: { conversation: Conversation }) {
         >
           <FolderGit2 aria-hidden className="size-3 shrink-0" />
           <span className="truncate">{repositoryKey(conversation.repository)}</span>
+          {pullRequest !== undefined && (
+            <ConversationPullRequestBadge id={pullRequestId} pullRequest={pullRequest} />
+          )}
         </span>
         <span className="flex min-w-0 items-center gap-1.5">
           <span className="truncate text-sm font-medium">{conversation.name}</span>

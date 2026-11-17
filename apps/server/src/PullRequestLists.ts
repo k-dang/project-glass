@@ -155,6 +155,8 @@ export class PullRequestLists extends Context.Service<
   {
     readonly list: () => Effect.Effect<PullRequestListings, SettingsError | ConnectionError>
     readonly watch: () => Stream.Stream<LatestPullRequestListings>
+    /** Syncs now rather than at the next interval, for when a PR has likely just changed. */
+    readonly refreshSoon: Effect.Effect<void>
   }
 >()("@glass/server/PullRequestLists") {
   static readonly layer = Layer.effect(
@@ -252,11 +254,14 @@ export class PullRequestLists extends Context.Service<
           ? (syncedAt ?? STALE) + Duration.toMillis(WATCHED_EVERY)
           : (syncedAt ?? launchedAt) + Duration.toMillis(UNWATCHED_EVERY)
 
+      const refreshSoon = SubscriptionRef.update(pace, (current) => ({
+        ...current,
+        syncedAt: STALE,
+      }))
+
       yield* repositories.changes.pipe(
         Stream.drop(1),
-        Stream.runForEach(() =>
-          SubscriptionRef.update(pace, (current) => ({ ...current, syncedAt: STALE })),
-        ),
+        Stream.runForEach(() => refreshSoon),
         Effect.forkScoped,
       )
 
@@ -292,6 +297,7 @@ export class PullRequestLists extends Context.Service<
 
       return PullRequestLists.of({
         list,
+        refreshSoon,
         watch: () =>
           Stream.concat(Stream.make(undefined), changed).pipe(
             Stream.mapEffect(() => derive),
