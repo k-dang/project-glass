@@ -256,8 +256,6 @@ export class AgentReviews extends Context.Service<
 
           const prompt = yield* reviewPrompt
 
-          yield* jobs.progress(job, (progress) => ({ ...progress, runner: runner.identity }))
-
           const { input, answer } = yield* runner
             .run({
               pr,
@@ -265,6 +263,7 @@ export class AgentReviews extends Context.Service<
               subject: "Agent review",
               timeout: deadlines.agentReviewMs,
               read: github.reviewInput,
+              ready: jobs.progress(job, (progress) => ({ ...progress, runner: runner.identity })),
               task: (material) =>
                 Effect.succeed({
                   instructions: agentReviewInstructions(prompt),
@@ -285,7 +284,6 @@ export class AgentReviews extends Context.Service<
             includedInGlobalConversationUpdate: false,
           })
         }).pipe(
-          Effect.scoped,
           Effect.flatMap((review) => save(job, pr, review)),
           jobs.settle(
             job,

@@ -5,18 +5,10 @@ import {
   type NoCredentials,
   type PullRequestRef,
   type Revision,
+  runnerIdentity,
   type StaleRevision,
 } from "@glass/contracts"
-import {
-  Context,
-  Data,
-  type Duration,
-  Effect,
-  Layer,
-  Predicate,
-  type Schema,
-  type Scope,
-} from "effect"
+import { Context, Data, type Duration, Effect, Layer, Predicate, type Schema } from "effect"
 import type { AgentFailure } from "./agentFailure"
 import type { AgentTools } from "./agentTools"
 import { AgentRunners } from "./agentRunners"
@@ -90,6 +82,7 @@ export interface CheckoutRun<I, A> {
   readonly timeout: Duration.Input
   readonly read: (pr: PullRequestRef, revision: Revision) => Effect.Effect<I, InputReadError>
   readonly task: (input: I) => Effect.Effect<CheckoutTask<A>, CheckoutRunFailure>
+  readonly ready?: Effect.Effect<void>
 }
 
 export interface CheckoutAnswer<I, A> {
@@ -156,9 +149,7 @@ const checkoutError =
 export class CheckoutRuns extends Context.Service<
   CheckoutRuns,
   {
-    readonly select: (
-      feature: EngineFeature,
-    ) => Effect.Effect<CheckoutRunner, CheckoutRunFailure, Scope.Scope>
+    readonly select: (feature: EngineFeature) => Effect.Effect<CheckoutRunner, CheckoutRunFailure>
     readonly copy: <I>(copy: CheckoutCopy<I>) => Effect.Effect<I, CheckoutRunFailure>
   }
 >()("@glass/server/CheckoutRuns") {
@@ -191,11 +182,7 @@ export class CheckoutRuns extends Context.Service<
           Effect.mapError((error) => checkoutRunFailure("not-ready", error.message)),
         )
 
-        const selected = yield* runners
-          .select(engineSettings)
-          .pipe(Effect.mapError(fromAgentFailure))
-
-        const { identity } = selected
+        const identity = runnerIdentity(engineSettings)
 
         const run = Effect.fnUntraced(function* <I, A>({
           pr,
@@ -204,7 +191,12 @@ export class CheckoutRuns extends Context.Service<
           timeout,
           read,
           task,
+          ready = Effect.void,
         }: CheckoutRun<I, A>) {
+          const readiness = runners
+            .select(engineSettings)
+            .pipe(Effect.mapError(fromAgentFailure), Effect.tap(ready))
+
           const prepare = readMaterial({ pr, revision, subject, read }, identity).pipe(
             Effect.flatMap((input) =>
               task(input).pipe(Effect.map((prepared) => ({ input, prepared }))),
@@ -221,9 +213,10 @@ export class CheckoutRuns extends Context.Service<
             head: revision.head,
           })
 
-          const [{ input, prepared }, checkout] = yield* Effect.all([prepare, checkOut], {
-            concurrency: 2,
-          })
+          const [selected, { input, prepared }, checkout] = yield* Effect.all(
+            [readiness, prepare, checkOut],
+            { concurrency: "unbounded" },
+          )
 
           return yield* selected.run({ ...prepared, subject, checkout }).pipe(
             recordDuration("agent_ms"),
