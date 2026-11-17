@@ -145,7 +145,6 @@ export class Tours extends Context.Service<
             .pipe(Effect.mapError(fromCheckoutRunFailure))
 
           const runner = selected.identity
-          yield* jobs.progress(job, (progress) => ({ ...progress, runner }))
 
           const { input, answer } = yield* selected
             .run({
@@ -154,6 +153,7 @@ export class Tours extends Context.Service<
               subject: "Tour",
               timeout: deadlines.tourMs,
               read: github.tourInput,
+              ready: jobs.progress(job, (progress) => ({ ...progress, runner })),
               task: (material) =>
                 Effect.succeed({
                   instructions: tourInstructions,
@@ -195,7 +195,6 @@ export class Tours extends Context.Service<
             () => tour,
           )
         }).pipe(
-          Effect.scoped,
           jobs.settle(job, "Tour", (error: Option.Option<TourFailure>, { runner }) =>
             Option.getOrElse(
               error,

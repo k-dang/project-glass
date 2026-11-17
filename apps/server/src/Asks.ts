@@ -63,7 +63,6 @@ export class Asks extends Context.Service<
 
           return { answer: answer.answer, runner: runner.identity }
         },
-        Effect.scoped,
         Effect.mapError(
           ({ reason, message, runner }) => new AskFailure({ reason, message, runner }),
         ),
