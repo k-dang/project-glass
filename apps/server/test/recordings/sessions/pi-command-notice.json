@@ -1,6 +1,6 @@
 {
   "scenario": "pi-command-notice",
-  "program": "@earendil-works/pi-coding-agent 1.3.0",
+  "program": "@earendil-works/pi-coding-agent 1.5.2",
   "processes": [
     {
       "args": [
@@ -30,8 +30,8 @@
             "data": {
               "model": {
                 "id": "<pi-model>",
-                "name": "GPT-6 Luna",
-                "api": "<pi-provider>-responses",
+                "name": "Claude Haiku 5.5",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
                 "baseUrl": "<redacted>",
                 "reasoning": true,
@@ -43,18 +43,17 @@
                   "cacheWrite": 0.125,
                   "tiers": [
                     {
-                      "inputTokensAbove": 272000,
-                      "input": 0.2,
-                      "output": 0.75,
-                      "cacheRead": 0.02,
-                      "cacheWrite": 0.25
+                      "inputTokensAbove": 100000,
+                      "input": 0.5,
+                      "output": 2.5,
+                      "cacheRead": 0.05,
+                      "cacheWrite": 0.625
                     }
                   ]
                 },
-                "contextWindow": 272000,
+                "contextWindow": 1000000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
-                  "off": "none",
                   "minimal": null,
                   "low": "low",
                   "medium": "medium",
@@ -63,18 +62,21 @@
                   "max": "max"
                 },
                 "compat": {
-                  "supportsStrictMode": true,
-                  "supportsOpenAIGrammarTools": true,
-                  "supportsAdditionalTools": true,
-                  "supportsToolSearch": true,
+                  "forceAdaptiveThinking": true,
+                  "supportsTemperature": false,
+                  "supportsMidConvoEffort": true,
                   "supportsMidConvoSystemMessages": true,
-                  "supportsExplicitPromptCacheMode": true,
-                  "supportsMidConvoEffort": true
+                  "supportsMidConvoToolChanges": true,
+                  "supportsStrictTools": true
+                },
+                "promptCache": {
+                  "short": 300,
+                  "long": 3600
                 },
                 "inputLimits": {
-                  "maxRequestBytes": 536870912,
+                  "maxRequestBytes": 33554432,
                   "images": {
-                    "maxPerRequest": 1500,
+                    "maxPerRequest": 600,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -90,7 +92,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-15T01-04-45-687Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-17T01-05-34-510Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -109,7 +111,7 @@
         {
           "in": {
             "type": "extension_ui_request",
-            "id": "e2248a0d-7618-4444-95d9-ea450556e77e",
+            "id": "a7c6d8db-57cd-4225-ba25-2337da5f8eba",
             "method": "notify",
             "message": "All systems go",
             "notifyType": "info"

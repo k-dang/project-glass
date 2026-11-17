@@ -1,6 +1,6 @@
 {
   "scenario": "pi-global",
-  "program": "@earendil-works/pi-coding-agent 1.3.0",
+  "program": "@earendil-works/pi-coding-agent 1.5.2",
   "processes": [
     {
       "args": [
@@ -42,7 +42,7 @@
               "model": {
                 "id": "gpt-test",
                 "name": "gpt-test",
-                "api": "<pi-provider>-completions",
+                "api": "openai-completions",
                 "provider": "glass-test",
                 "baseUrl": "<redacted>",
                 "reasoning": false,
@@ -61,7 +61,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-16T15-18-07-524Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-17T01-05-50-131Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -105,7 +105,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794842287692,
+              "timestamp": 1794877550332,
               "toolsAdded": [
                 {
                   "name": "ask_user",
@@ -620,7 +620,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794842287692,
+              "timestamp": 1794877550332,
               "toolsAdded": [
                 {
                   "name": "ask_user",
@@ -1139,7 +1139,7 @@
                   "text": "Ask me which greeting I prefer."
                 }
               ],
-              "timestamp": 1794842287690
+              "timestamp": 1794877550331
             }
           }
         },
@@ -1154,7 +1154,7 @@
                   "text": "Ask me which greeting I prefer."
                 }
               ],
-              "timestamp": 1794842287690
+              "timestamp": 1794877550331
             }
           }
         },
@@ -1164,7 +1164,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "<pi-provider>-completions",
+              "api": "openai-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -1182,7 +1182,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794842287722
+              "timestamp": 1794877550358
             }
           }
         },
@@ -1283,7 +1283,7 @@
                   }
                 }
               ],
-              "api": "<pi-provider>-completions",
+              "api": "openai-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -1301,10 +1301,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794842287722,
+              "timestamp": 1794877550358,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 9,
+              "durationMs": 10,
               "thinkingLevel": "off"
             }
           }
@@ -1323,7 +1323,7 @@
         {
           "in": {
             "type": "extension_ui_request",
-            "id": "79b82dcb-a343-44e6-b01c-c0364b624abf",
+            "id": "db2db718-d7b4-4c48-a6ac-19b49d45d29d",
             "method": "select",
             "title": "Which greeting?",
             "options": ["Hi", "Hello"]
@@ -1332,7 +1332,7 @@
         {
           "out": {
             "type": "extension_ui_response",
-            "id": "79b82dcb-a343-44e6-b01c-c0364b624abf",
+            "id": "db2db718-d7b4-4c48-a6ac-19b49d45d29d",
             "value": "Hello"
           }
         },
@@ -1350,7 +1350,7 @@
               ]
             },
             "isError": false,
-            "durationMs": 2
+            "durationMs": 1
           }
         },
         {
@@ -1367,8 +1367,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 2,
-              "timestamp": 1794842287734
+              "durationMs": 1,
+              "timestamp": 1794877550371
             }
           }
         },
@@ -1386,8 +1386,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 2,
-              "timestamp": 1794842287734
+              "durationMs": 1,
+              "timestamp": 1794877550371
             }
           }
         },
@@ -1407,7 +1407,7 @@
                   }
                 }
               ],
-              "api": "<pi-provider>-completions",
+              "api": "openai-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -1425,10 +1425,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794842287722,
+              "timestamp": 1794877550358,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 9,
+              "durationMs": 10,
               "thinkingLevel": "off"
             },
             "toolResults": [
@@ -1443,8 +1443,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 2,
-                "timestamp": 1794842287734
+                "durationMs": 1,
+                "timestamp": 1794877550371
               }
             ]
           }
@@ -1460,7 +1460,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "<pi-provider>-completions",
+              "api": "openai-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -1478,7 +1478,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794842287737
+              "timestamp": 1794877550373
             }
           }
         },
@@ -1564,7 +1564,7 @@
                   "text": "The tool said: Hello"
                 }
               ],
-              "api": "<pi-provider>-completions",
+              "api": "openai-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -1582,7 +1582,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794842287737,
+              "timestamp": 1794877550373,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -1601,7 +1601,7 @@
                   "text": "The tool said: Hello"
                 }
               ],
-              "api": "<pi-provider>-completions",
+              "api": "openai-completions",
               "provider": "glass-test",
               "model": "gpt-test",
               "usage": {
@@ -1619,7 +1619,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794842287737,
+              "timestamp": 1794877550373,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -1636,7 +1636,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1794842287692,
+                "timestamp": 1794877550332,
                 "toolsAdded": [
                   {
                     "name": "ask_user",
@@ -2150,7 +2150,7 @@
                     "text": "Ask me which greeting I prefer."
                   }
                 ],
-                "timestamp": 1794842287690
+                "timestamp": 1794877550331
               },
               {
                 "role": "assistant",
@@ -2165,7 +2165,7 @@
                     }
                   }
                 ],
-                "api": "<pi-provider>-completions",
+                "api": "openai-completions",
                 "provider": "glass-test",
                 "model": "gpt-test",
                 "usage": {
@@ -2183,10 +2183,10 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1794842287722,
+                "timestamp": 1794877550358,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
-                "durationMs": 9,
+                "durationMs": 10,
                 "thinkingLevel": "off"
               },
               {
@@ -2200,8 +2200,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 2,
-                "timestamp": 1794842287734
+                "durationMs": 1,
+                "timestamp": 1794877550371
               },
               {
                 "role": "assistant",
@@ -2211,7 +2211,7 @@
                     "text": "The tool said: Hello"
                   }
                 ],
-                "api": "<pi-provider>-completions",
+                "api": "openai-completions",
                 "provider": "glass-test",
                 "model": "gpt-test",
                 "usage": {
@@ -2229,7 +2229,7 @@
                   }
                 },
                 "stopReason": "stop",
-                "timestamp": 1794842287737,
+                "timestamp": 1794877550373,
                 "responseId": "test-completion",
                 "rawStopReason": "stop",
                 "durationMs": 2,
@@ -2261,7 +2261,7 @@
               "model": {
                 "id": "gpt-test",
                 "name": "gpt-test",
-                "api": "<pi-provider>-completions",
+                "api": "openai-completions",
                 "provider": "glass-test",
                 "baseUrl": "<redacted>",
                 "reasoning": false,
@@ -2280,7 +2280,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-16T15-18-07-524Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-17T01-05-50-131Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 5,

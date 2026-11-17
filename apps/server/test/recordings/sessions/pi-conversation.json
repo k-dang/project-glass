@@ -1,6 +1,6 @@
 {
   "scenario": "pi-conversation",
-  "program": "@earendil-works/pi-coding-agent 1.3.0",
+  "program": "@earendil-works/pi-coding-agent 1.5.2",
   "processes": [
     {
       "args": [
@@ -30,8 +30,8 @@
             "data": {
               "model": {
                 "id": "<pi-model>",
-                "name": "GPT-6 Luna",
-                "api": "<pi-provider>-responses",
+                "name": "Claude Haiku 5.5",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
                 "baseUrl": "<redacted>",
                 "reasoning": true,
@@ -43,18 +43,17 @@
                   "cacheWrite": 0.125,
                   "tiers": [
                     {
-                      "inputTokensAbove": 272000,
-                      "input": 0.2,
-                      "output": 0.75,
-                      "cacheRead": 0.02,
-                      "cacheWrite": 0.25
+                      "inputTokensAbove": 100000,
+                      "input": 0.5,
+                      "output": 2.5,
+                      "cacheRead": 0.05,
+                      "cacheWrite": 0.625
                     }
                   ]
                 },
-                "contextWindow": 272000,
+                "contextWindow": 1000000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
-                  "off": "none",
                   "minimal": null,
                   "low": "low",
                   "medium": "medium",
@@ -63,18 +62,21 @@
                   "max": "max"
                 },
                 "compat": {
-                  "supportsStrictMode": true,
-                  "supportsOpenAIGrammarTools": true,
-                  "supportsAdditionalTools": true,
-                  "supportsToolSearch": true,
+                  "forceAdaptiveThinking": true,
+                  "supportsTemperature": false,
+                  "supportsMidConvoEffort": true,
                   "supportsMidConvoSystemMessages": true,
-                  "supportsExplicitPromptCacheMode": true,
-                  "supportsMidConvoEffort": true
+                  "supportsMidConvoToolChanges": true,
+                  "supportsStrictTools": true
+                },
+                "promptCache": {
+                  "short": 300,
+                  "long": 3600
                 },
                 "inputLimits": {
-                  "maxRequestBytes": 536870912,
+                  "maxRequestBytes": 33554432,
                   "images": {
-                    "maxPerRequest": 1500,
+                    "maxPerRequest": 600,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -90,7 +92,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-15T01-04-32-055Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-17T01-05-27-782Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -134,7 +136,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794704672274,
+              "timestamp": 1794877528023,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -277,7 +279,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794704672274,
+              "timestamp": 1794877528023,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -424,7 +426,7 @@
                   "text": "Remember the word lantern. Reply with exactly: Noted."
                 }
               ],
-              "timestamp": 1794704672273
+              "timestamp": 1794877528021
             }
           }
         },
@@ -439,7 +441,7 @@
                   "text": "Remember the word lantern. Reply with exactly: Noted."
                 }
               ],
-              "timestamp": 1794704672273
+              "timestamp": 1794877528021
             }
           }
         },
@@ -449,7 +451,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "<pi-provider>-responses",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -467,7 +469,8 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794704672305
+              "timestamp": 1794877528057,
+              "providerThinkingLevel": "medium"
             }
           }
         },
@@ -485,8 +488,10 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
-              }
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "text_start",
@@ -508,13 +513,15 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
-              }
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "text_delta",
               "contentIndex": 0,
-              "delta": "Not"
+              "delta": "Noted."
             }
           }
         },
@@ -532,56 +539,10 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
-              }
-            },
-            "assistantMessageEvent": {
-              "type": "text_delta",
-              "contentIndex": 0,
-              "delta": "ed"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              }
-            },
-            "assistantMessageEvent": {
-              "type": "text_delta",
-              "contentIndex": 0,
-              "delta": "."
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              }
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "text_end",
@@ -598,11 +559,10 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "Noted.",
-                  "textSignature": "{\"v\":1,\"id\":\"msg_014965fc0d2a721a016af90521763c87d2b036cf772cb43ad6\",\"phase\":\"final_answer\"}"
+                  "text": "Noted."
                 }
               ],
-              "api": "<pi-provider>-responses",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -610,21 +570,24 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "reasoning": 0,
                 "totalTokens": 0,
                 "cost": {
                   "input": 0,
                   "output": 0,
                   "cacheRead": 0,
                   "cacheWrite": 0,
-                  "total": 0
-                }
+                  "total": 0,
+                  "totalFromProvider": false
+                },
+                "cacheWrite1h": 0,
+                "reasoning": 0
               },
               "stopReason": "stop",
-              "timestamp": 1794704672305,
-              "responseId": "resp_014965fc0d2a721a016af90520c8d887d28f22dcba176acb1d",
-              "rawStopReason": "completed",
-              "durationMs": 1315,
+              "timestamp": 1794877528057,
+              "providerThinkingLevel": "medium",
+              "responseId": "msg_011Ch7bticWT88koCjkGqdK2",
+              "rawStopReason": "end_turn",
+              "durationMs": 630,
               "thinkingLevel": "medium"
             }
           }
@@ -637,11 +600,10 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "Noted.",
-                  "textSignature": "{\"v\":1,\"id\":\"msg_014965fc0d2a721a016af90521763c87d2b036cf772cb43ad6\",\"phase\":\"final_answer\"}"
+                  "text": "Noted."
                 }
               ],
-              "api": "<pi-provider>-responses",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -649,21 +611,24 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "reasoning": 0,
                 "totalTokens": 0,
                 "cost": {
                   "input": 0,
                   "output": 0,
                   "cacheRead": 0,
                   "cacheWrite": 0,
-                  "total": 0
-                }
+                  "total": 0,
+                  "totalFromProvider": false
+                },
+                "cacheWrite1h": 0,
+                "reasoning": 0
               },
               "stopReason": "stop",
-              "timestamp": 1794704672305,
-              "responseId": "resp_014965fc0d2a721a016af90520c8d887d28f22dcba176acb1d",
-              "rawStopReason": "completed",
-              "durationMs": 1315,
+              "timestamp": 1794877528057,
+              "providerThinkingLevel": "medium",
+              "responseId": "msg_011Ch7bticWT88koCjkGqdK2",
+              "rawStopReason": "end_turn",
+              "durationMs": 630,
               "thinkingLevel": "medium"
             },
             "toolResults": []
@@ -677,7 +642,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1794704672274,
+                "timestamp": 1794877528023,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -819,18 +784,17 @@
                     "text": "Remember the word lantern. Reply with exactly: Noted."
                   }
                 ],
-                "timestamp": 1794704672273
+                "timestamp": 1794877528021
               },
               {
                 "role": "assistant",
                 "content": [
                   {
                     "type": "text",
-                    "text": "Noted.",
-                    "textSignature": "{\"v\":1,\"id\":\"msg_014965fc0d2a721a016af90521763c87d2b036cf772cb43ad6\",\"phase\":\"final_answer\"}"
+                    "text": "Noted."
                   }
                 ],
-                "api": "<pi-provider>-responses",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
                 "model": "<pi-model>",
                 "usage": {
@@ -838,21 +802,24 @@
                   "output": 0,
                   "cacheRead": 0,
                   "cacheWrite": 0,
-                  "reasoning": 0,
                   "totalTokens": 0,
                   "cost": {
                     "input": 0,
                     "output": 0,
                     "cacheRead": 0,
                     "cacheWrite": 0,
-                    "total": 0
-                  }
+                    "total": 0,
+                    "totalFromProvider": false
+                  },
+                  "cacheWrite1h": 0,
+                  "reasoning": 0
                 },
                 "stopReason": "stop",
-                "timestamp": 1794704672305,
-                "responseId": "resp_014965fc0d2a721a016af90520c8d887d28f22dcba176acb1d",
-                "rawStopReason": "completed",
-                "durationMs": 1315,
+                "timestamp": 1794877528057,
+                "providerThinkingLevel": "medium",
+                "responseId": "msg_011Ch7bticWT88koCjkGqdK2",
+                "rawStopReason": "end_turn",
+                "durationMs": 630,
                 "thinkingLevel": "medium"
               }
             ],
@@ -880,8 +847,8 @@
             "data": {
               "model": {
                 "id": "<pi-model>",
-                "name": "GPT-6 Luna",
-                "api": "<pi-provider>-responses",
+                "name": "Claude Haiku 5.5",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
                 "baseUrl": "<redacted>",
                 "reasoning": true,
@@ -893,18 +860,17 @@
                   "cacheWrite": 0.125,
                   "tiers": [
                     {
-                      "inputTokensAbove": 272000,
-                      "input": 0.2,
-                      "output": 0.75,
-                      "cacheRead": 0.02,
-                      "cacheWrite": 0.25
+                      "inputTokensAbove": 100000,
+                      "input": 0.5,
+                      "output": 2.5,
+                      "cacheRead": 0.05,
+                      "cacheWrite": 0.625
                     }
                   ]
                 },
-                "contextWindow": 272000,
+                "contextWindow": 1000000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
-                  "off": "none",
                   "minimal": null,
                   "low": "low",
                   "medium": "medium",
@@ -913,18 +879,21 @@
                   "max": "max"
                 },
                 "compat": {
-                  "supportsStrictMode": true,
-                  "supportsOpenAIGrammarTools": true,
-                  "supportsAdditionalTools": true,
-                  "supportsToolSearch": true,
+                  "forceAdaptiveThinking": true,
+                  "supportsTemperature": false,
+                  "supportsMidConvoEffort": true,
                   "supportsMidConvoSystemMessages": true,
-                  "supportsExplicitPromptCacheMode": true,
-                  "supportsMidConvoEffort": true
+                  "supportsMidConvoToolChanges": true,
+                  "supportsStrictTools": true
+                },
+                "promptCache": {
+                  "short": 300,
+                  "long": 3600
                 },
                 "inputLimits": {
-                  "maxRequestBytes": 536870912,
+                  "maxRequestBytes": 33554432,
                   "images": {
-                    "maxPerRequest": 1500,
+                    "maxPerRequest": 600,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -940,7 +909,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-15T01-04-32-055Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-17T01-05-27-782Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 3,
@@ -988,7 +957,7 @@
                   "text": "Which word did I ask you to remember? Reply with only that word, in lowercase."
                 }
               ],
-              "timestamp": 1794704673624
+              "timestamp": 1794877528690
             }
           }
         },
@@ -1003,7 +972,7 @@
                   "text": "Which word did I ask you to remember? Reply with only that word, in lowercase."
                 }
               ],
-              "timestamp": 1794704673624
+              "timestamp": 1794877528690
             }
           }
         },
@@ -1013,7 +982,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "<pi-provider>-responses",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -1031,7 +1000,8 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794704673627
+              "timestamp": 1794877528692,
+              "providerThinkingLevel": "medium"
             }
           }
         },
@@ -1049,8 +1019,10 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
-              }
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "text_start",
@@ -1072,13 +1044,15 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
-              }
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "text_delta",
               "contentIndex": 0,
-              "delta": "lan"
+              "delta": "lantern"
             }
           }
         },
@@ -1096,32 +1070,10 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
-              }
-            },
-            "assistantMessageEvent": {
-              "type": "text_delta",
-              "contentIndex": 0,
-              "delta": "tern"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              }
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "text_end",
@@ -1138,11 +1090,10 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "lantern",
-                  "textSignature": "{\"v\":1,\"id\":\"msg_014965fc0d2a721a016af90522bd0c87d29d27707b0698e060\",\"phase\":\"final_answer\"}"
+                  "text": "lantern"
                 }
               ],
-              "api": "<pi-provider>-responses",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -1150,21 +1101,24 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "reasoning": 0,
                 "totalTokens": 0,
                 "cost": {
                   "input": 0,
                   "output": 0,
                   "cacheRead": 0,
                   "cacheWrite": 0,
-                  "total": 0
-                }
+                  "total": 0,
+                  "totalFromProvider": false
+                },
+                "cacheWrite1h": 0,
+                "reasoning": 0
               },
               "stopReason": "stop",
-              "timestamp": 1794704673627,
-              "responseId": "resp_014965fc0d2a721a016af90522156487d2b228a303de9f1bc6",
-              "rawStopReason": "completed",
-              "durationMs": 1263,
+              "timestamp": 1794877528692,
+              "providerThinkingLevel": "medium",
+              "responseId": "msg_011Ch7btm27WQxb7m5sQGtAa",
+              "rawStopReason": "end_turn",
+              "durationMs": 509,
               "thinkingLevel": "medium"
             }
           }
@@ -1177,11 +1131,10 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "lantern",
-                  "textSignature": "{\"v\":1,\"id\":\"msg_014965fc0d2a721a016af90522bd0c87d29d27707b0698e060\",\"phase\":\"final_answer\"}"
+                  "text": "lantern"
                 }
               ],
-              "api": "<pi-provider>-responses",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -1189,21 +1142,24 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "reasoning": 0,
                 "totalTokens": 0,
                 "cost": {
                   "input": 0,
                   "output": 0,
                   "cacheRead": 0,
                   "cacheWrite": 0,
-                  "total": 0
-                }
+                  "total": 0,
+                  "totalFromProvider": false
+                },
+                "cacheWrite1h": 0,
+                "reasoning": 0
               },
               "stopReason": "stop",
-              "timestamp": 1794704673627,
-              "responseId": "resp_014965fc0d2a721a016af90522156487d2b228a303de9f1bc6",
-              "rawStopReason": "completed",
-              "durationMs": 1263,
+              "timestamp": 1794877528692,
+              "providerThinkingLevel": "medium",
+              "responseId": "msg_011Ch7btm27WQxb7m5sQGtAa",
+              "rawStopReason": "end_turn",
+              "durationMs": 509,
               "thinkingLevel": "medium"
             },
             "toolResults": []
@@ -1221,18 +1177,17 @@
                     "text": "Which word did I ask you to remember? Reply with only that word, in lowercase."
                   }
                 ],
-                "timestamp": 1794704673624
+                "timestamp": 1794877528690
               },
               {
                 "role": "assistant",
                 "content": [
                   {
                     "type": "text",
-                    "text": "lantern",
-                    "textSignature": "{\"v\":1,\"id\":\"msg_014965fc0d2a721a016af90522bd0c87d29d27707b0698e060\",\"phase\":\"final_answer\"}"
+                    "text": "lantern"
                   }
                 ],
-                "api": "<pi-provider>-responses",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
                 "model": "<pi-model>",
                 "usage": {
@@ -1240,21 +1195,24 @@
                   "output": 0,
                   "cacheRead": 0,
                   "cacheWrite": 0,
-                  "reasoning": 0,
                   "totalTokens": 0,
                   "cost": {
                     "input": 0,
                     "output": 0,
                     "cacheRead": 0,
                     "cacheWrite": 0,
-                    "total": 0
-                  }
+                    "total": 0,
+                    "totalFromProvider": false
+                  },
+                  "cacheWrite1h": 0,
+                  "reasoning": 0
                 },
                 "stopReason": "stop",
-                "timestamp": 1794704673627,
-                "responseId": "resp_014965fc0d2a721a016af90522156487d2b228a303de9f1bc6",
-                "rawStopReason": "completed",
-                "durationMs": 1263,
+                "timestamp": 1794877528692,
+                "providerThinkingLevel": "medium",
+                "responseId": "msg_011Ch7btm27WQxb7m5sQGtAa",
+                "rawStopReason": "end_turn",
+                "durationMs": 509,
                 "thinkingLevel": "medium"
               }
             ],
@@ -1282,8 +1240,8 @@
             "data": {
               "model": {
                 "id": "<pi-model>",
-                "name": "GPT-6 Luna",
-                "api": "<pi-provider>-responses",
+                "name": "Claude Haiku 5.5",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
                 "baseUrl": "<redacted>",
                 "reasoning": true,
@@ -1295,18 +1253,17 @@
                   "cacheWrite": 0.125,
                   "tiers": [
                     {
-                      "inputTokensAbove": 272000,
-                      "input": 0.2,
-                      "output": 0.75,
-                      "cacheRead": 0.02,
-                      "cacheWrite": 0.25
+                      "inputTokensAbove": 100000,
+                      "input": 0.5,
+                      "output": 2.5,
+                      "cacheRead": 0.05,
+                      "cacheWrite": 0.625
                     }
                   ]
                 },
-                "contextWindow": 272000,
+                "contextWindow": 1000000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
-                  "off": "none",
                   "minimal": null,
                   "low": "low",
                   "medium": "medium",
@@ -1315,18 +1272,21 @@
                   "max": "max"
                 },
                 "compat": {
-                  "supportsStrictMode": true,
-                  "supportsOpenAIGrammarTools": true,
-                  "supportsAdditionalTools": true,
-                  "supportsToolSearch": true,
+                  "forceAdaptiveThinking": true,
+                  "supportsTemperature": false,
+                  "supportsMidConvoEffort": true,
                   "supportsMidConvoSystemMessages": true,
-                  "supportsExplicitPromptCacheMode": true,
-                  "supportsMidConvoEffort": true
+                  "supportsMidConvoToolChanges": true,
+                  "supportsStrictTools": true
+                },
+                "promptCache": {
+                  "short": 300,
+                  "long": 3600
                 },
                 "inputLimits": {
-                  "maxRequestBytes": 536870912,
+                  "maxRequestBytes": 33554432,
                   "images": {
-                    "maxPerRequest": 1500,
+                    "maxPerRequest": 600,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -1342,7 +1302,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-15T01-04-32-055Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-17T01-05-27-782Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 5,

@@ -52,13 +52,13 @@ export const launchCommand = (
   return ChildProcess.make(line, [], { ...options, shell: true })
 }
 
-// The Claude Agent SDK spawns without a shell, so an npm shim is followed to the file it runs.
+// Follows a .cmd shim to the file it runs, for spawners that don't use a shell.
 export const sdkExecutable = (command: string, host = thisHost) => {
   const resolved = resolve(command, host)
 
   if (!isScript(resolved)) return resolved
 
-  const target = /"%dp0%\\([^"]+)"\s+%\*/.exec(readFileSync(resolved, "utf8"))?.[1]
+  const target = /"%(?:dp0%\\|~dp0)([^"]+)"\s+%\*/.exec(readFileSync(resolved, "utf8"))?.[1]
 
   return target === undefined ? command : join(dirname(resolved), target)
 }

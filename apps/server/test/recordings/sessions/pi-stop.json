@@ -1,6 +1,6 @@
 {
   "scenario": "pi-stop",
-  "program": "@earendil-works/pi-coding-agent 1.3.0",
+  "program": "@earendil-works/pi-coding-agent 1.5.2",
   "processes": [
     {
       "args": [
@@ -30,8 +30,8 @@
             "data": {
               "model": {
                 "id": "<pi-model>",
-                "name": "GPT-6 Luna",
-                "api": "<pi-provider>-responses",
+                "name": "Claude Haiku 5.5",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
                 "baseUrl": "<redacted>",
                 "reasoning": true,
@@ -43,18 +43,17 @@
                   "cacheWrite": 0.125,
                   "tiers": [
                     {
-                      "inputTokensAbove": 272000,
-                      "input": 0.2,
-                      "output": 0.75,
-                      "cacheRead": 0.02,
-                      "cacheWrite": 0.25
+                      "inputTokensAbove": 100000,
+                      "input": 0.5,
+                      "output": 2.5,
+                      "cacheRead": 0.05,
+                      "cacheWrite": 0.625
                     }
                   ]
                 },
-                "contextWindow": 272000,
+                "contextWindow": 1000000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
-                  "off": "none",
                   "minimal": null,
                   "low": "low",
                   "medium": "medium",
@@ -63,18 +62,21 @@
                   "max": "max"
                 },
                 "compat": {
-                  "supportsStrictMode": true,
-                  "supportsOpenAIGrammarTools": true,
-                  "supportsAdditionalTools": true,
-                  "supportsToolSearch": true,
+                  "forceAdaptiveThinking": true,
+                  "supportsTemperature": false,
+                  "supportsMidConvoEffort": true,
                   "supportsMidConvoSystemMessages": true,
-                  "supportsExplicitPromptCacheMode": true,
-                  "supportsMidConvoEffort": true
+                  "supportsMidConvoToolChanges": true,
+                  "supportsStrictTools": true
+                },
+                "promptCache": {
+                  "short": 300,
+                  "long": 3600
                 },
                 "inputLimits": {
-                  "maxRequestBytes": 536870912,
+                  "maxRequestBytes": 33554432,
                   "images": {
-                    "maxPerRequest": 1500,
+                    "maxPerRequest": 600,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -90,7 +92,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-15T01-04-39-449Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-17T01-05-31-321Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -134,7 +136,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794704679663,
+              "timestamp": 1794877531541,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -277,7 +279,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794704679663,
+              "timestamp": 1794877531541,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -424,7 +426,7 @@
                   "text": "Use the bash tool to run exactly `echo hi` and nothing else, then reply with exactly: DONE"
                 }
               ],
-              "timestamp": 1794704679661
+              "timestamp": 1794877531540
             }
           }
         },
@@ -439,7 +441,7 @@
                   "text": "Use the bash tool to run exactly `echo hi` and nothing else, then reply with exactly: DONE"
                 }
               ],
-              "timestamp": 1794704679661
+              "timestamp": 1794877531540
             }
           }
         },
@@ -449,7 +451,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "<pi-provider>-responses",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -467,7 +469,8 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794704679684
+              "timestamp": 1794877531566,
+              "providerThinkingLevel": "medium"
             }
           }
         },
@@ -485,13 +488,15 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
-              }
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "toolcall_start",
               "contentIndex": 0,
-              "id": "call_44d3556890b44d5a829ec54306c5cc2f|fc_0422752d3c5707b4016af90528fa2c87d2888a3819dd473715",
+              "id": "toolu_01Vh3uQf3Tv2m3i1auHJHsR2",
               "toolName": "bash"
             }
           }
@@ -510,13 +515,15 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
-              }
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "toolcall_delta",
               "contentIndex": 0,
-              "delta": "{\""
+              "delta": ""
             }
           }
         },
@@ -534,13 +541,15 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
-              }
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "toolcall_delta",
               "contentIndex": 0,
-              "delta": "command"
+              "delta": "{\"command\": \"echo hi"
             }
           }
         },
@@ -558,13 +567,15 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
-              }
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "toolcall_delta",
               "contentIndex": 0,
-              "delta": "\":\""
+              "delta": "\", \"timeout\": null"
             }
           }
         },
@@ -582,152 +593,10 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
-              }
-            },
-            "assistantMessageEvent": {
-              "type": "toolcall_delta",
-              "contentIndex": 0,
-              "delta": "echo"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              }
-            },
-            "assistantMessageEvent": {
-              "type": "toolcall_delta",
-              "contentIndex": 0,
-              "delta": " hi"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              }
-            },
-            "assistantMessageEvent": {
-              "type": "toolcall_delta",
-              "contentIndex": 0,
-              "delta": "\",\""
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              }
-            },
-            "assistantMessageEvent": {
-              "type": "toolcall_delta",
-              "contentIndex": 0,
-              "delta": "timeout"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              }
-            },
-            "assistantMessageEvent": {
-              "type": "toolcall_delta",
-              "contentIndex": 0,
-              "delta": "\":"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              }
-            },
-            "assistantMessageEvent": {
-              "type": "toolcall_delta",
-              "contentIndex": 0,
-              "delta": "null"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              }
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "toolcall_delta",
@@ -750,15 +619,17 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
-              }
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "toolcall_end",
               "contentIndex": 0,
               "toolCall": {
                 "type": "toolCall",
-                "id": "call_44d3556890b44d5a829ec54306c5cc2f|fc_0422752d3c5707b4016af90528fa2c87d2888a3819dd473715",
+                "id": "toolu_01Vh3uQf3Tv2m3i1auHJHsR2",
                 "name": "bash",
                 "arguments": {
                   "command": "echo hi",
@@ -776,7 +647,7 @@
               "content": [
                 {
                   "type": "toolCall",
-                  "id": "call_44d3556890b44d5a829ec54306c5cc2f|fc_0422752d3c5707b4016af90528fa2c87d2888a3819dd473715",
+                  "id": "toolu_01Vh3uQf3Tv2m3i1auHJHsR2",
                   "name": "bash",
                   "arguments": {
                     "command": "echo hi",
@@ -784,7 +655,7 @@
                   }
                 }
               ],
-              "api": "<pi-provider>-responses",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -792,21 +663,24 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "reasoning": 0,
                 "totalTokens": 0,
                 "cost": {
                   "input": 0,
                   "output": 0,
                   "cacheRead": 0,
                   "cacheWrite": 0,
-                  "total": 0
-                }
+                  "total": 0,
+                  "totalFromProvider": false
+                },
+                "cacheWrite1h": 0,
+                "reasoning": 0
               },
               "stopReason": "toolUse",
-              "timestamp": 1794704679684,
-              "responseId": "resp_0422752d3c5707b4016af905282acc87d2b45bc9cbd44bee6e",
-              "rawStopReason": "completed",
-              "durationMs": 1563,
+              "timestamp": 1794877531566,
+              "providerThinkingLevel": "medium",
+              "responseId": "msg_011Ch7btyTyfWe4Vegk1FGt9",
+              "rawStopReason": "tool_use",
+              "durationMs": 696,
               "thinkingLevel": "medium"
             }
           }
@@ -814,7 +688,7 @@
         {
           "in": {
             "type": "tool_execution_start",
-            "toolCallId": "call_44d3556890b44d5a829ec54306c5cc2f|fc_0422752d3c5707b4016af90528fa2c87d2888a3819dd473715",
+            "toolCallId": "toolu_01Vh3uQf3Tv2m3i1auHJHsR2",
             "toolName": "bash",
             "args": {
               "command": "echo hi",
@@ -825,7 +699,7 @@
         {
           "in": {
             "type": "extension_ui_request",
-            "id": "68373559-34bc-4dc5-a8f3-65523eaf9105",
+            "id": "f12f176e-b051-4f69-91b5-a7c1c9dfff26",
             "method": "confirm",
             "title": "Run it?",
             "message": "bash"
@@ -885,7 +759,7 @@
         {
           "out": {
             "type": "extension_ui_response",
-            "id": "68373559-34bc-4dc5-a8f3-65523eaf9105",
+            "id": "f12f176e-b051-4f69-91b5-a7c1c9dfff26",
             "cancelled": true
           }
         },
@@ -898,7 +772,7 @@
         {
           "in": {
             "type": "tool_execution_end",
-            "toolCallId": "call_44d3556890b44d5a829ec54306c5cc2f|fc_0422752d3c5707b4016af90528fa2c87d2888a3819dd473715",
+            "toolCallId": "toolu_01Vh3uQf3Tv2m3i1auHJHsR2",
             "toolName": "bash",
             "result": {
               "content": [
@@ -917,7 +791,7 @@
             "type": "message_start",
             "message": {
               "role": "toolResult",
-              "toolCallId": "call_44d3556890b44d5a829ec54306c5cc2f|fc_0422752d3c5707b4016af90528fa2c87d2888a3819dd473715",
+              "toolCallId": "toolu_01Vh3uQf3Tv2m3i1auHJHsR2",
               "toolName": "bash",
               "content": [
                 {
@@ -927,7 +801,7 @@
               ],
               "details": {},
               "isError": true,
-              "timestamp": 1794704681252
+              "timestamp": 1794877532267
             }
           }
         },
@@ -936,7 +810,7 @@
             "type": "message_end",
             "message": {
               "role": "toolResult",
-              "toolCallId": "call_44d3556890b44d5a829ec54306c5cc2f|fc_0422752d3c5707b4016af90528fa2c87d2888a3819dd473715",
+              "toolCallId": "toolu_01Vh3uQf3Tv2m3i1auHJHsR2",
               "toolName": "bash",
               "content": [
                 {
@@ -946,7 +820,7 @@
               ],
               "details": {},
               "isError": true,
-              "timestamp": 1794704681252
+              "timestamp": 1794877532267
             }
           }
         },
@@ -958,7 +832,7 @@
               "content": [
                 {
                   "type": "toolCall",
-                  "id": "call_44d3556890b44d5a829ec54306c5cc2f|fc_0422752d3c5707b4016af90528fa2c87d2888a3819dd473715",
+                  "id": "toolu_01Vh3uQf3Tv2m3i1auHJHsR2",
                   "name": "bash",
                   "arguments": {
                     "command": "echo hi",
@@ -966,7 +840,7 @@
                   }
                 }
               ],
-              "api": "<pi-provider>-responses",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -974,27 +848,30 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "reasoning": 0,
                 "totalTokens": 0,
                 "cost": {
                   "input": 0,
                   "output": 0,
                   "cacheRead": 0,
                   "cacheWrite": 0,
-                  "total": 0
-                }
+                  "total": 0,
+                  "totalFromProvider": false
+                },
+                "cacheWrite1h": 0,
+                "reasoning": 0
               },
               "stopReason": "toolUse",
-              "timestamp": 1794704679684,
-              "responseId": "resp_0422752d3c5707b4016af905282acc87d2b45bc9cbd44bee6e",
-              "rawStopReason": "completed",
-              "durationMs": 1563,
+              "timestamp": 1794877531566,
+              "providerThinkingLevel": "medium",
+              "responseId": "msg_011Ch7btyTyfWe4Vegk1FGt9",
+              "rawStopReason": "tool_use",
+              "durationMs": 696,
               "thinkingLevel": "medium"
             },
             "toolResults": [
               {
                 "role": "toolResult",
-                "toolCallId": "call_44d3556890b44d5a829ec54306c5cc2f|fc_0422752d3c5707b4016af90528fa2c87d2888a3819dd473715",
+                "toolCallId": "toolu_01Vh3uQf3Tv2m3i1auHJHsR2",
                 "toolName": "bash",
                 "content": [
                   {
@@ -1004,7 +881,7 @@
                 ],
                 "details": {},
                 "isError": true,
-                "timestamp": 1794704681252
+                "timestamp": 1794877532267
               }
             ]
           }
@@ -1020,7 +897,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "<pi-provider>-responses",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -1038,7 +915,8 @@
                 }
               },
               "stopReason": "aborted",
-              "timestamp": 1794704681254,
+              "timestamp": 1794877532270,
+              "providerThinkingLevel": "medium",
               "errorMessage": "Request aborted",
               "durationMs": 3,
               "thinkingLevel": "medium"
@@ -1051,7 +929,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "<pi-provider>-responses",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -1069,7 +947,8 @@
                 }
               },
               "stopReason": "aborted",
-              "timestamp": 1794704681254,
+              "timestamp": 1794877532270,
+              "providerThinkingLevel": "medium",
               "errorMessage": "Request aborted",
               "durationMs": 3,
               "thinkingLevel": "medium"
@@ -1082,7 +961,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "<pi-provider>-responses",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -1100,7 +979,8 @@
                 }
               },
               "stopReason": "aborted",
-              "timestamp": 1794704681254,
+              "timestamp": 1794877532270,
+              "providerThinkingLevel": "medium",
               "errorMessage": "Request aborted",
               "durationMs": 3,
               "thinkingLevel": "medium"
@@ -1116,7 +996,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1794704679663,
+                "timestamp": 1794877531541,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -1258,14 +1138,14 @@
                     "text": "Use the bash tool to run exactly `echo hi` and nothing else, then reply with exactly: DONE"
                   }
                 ],
-                "timestamp": 1794704679661
+                "timestamp": 1794877531540
               },
               {
                 "role": "assistant",
                 "content": [
                   {
                     "type": "toolCall",
-                    "id": "call_44d3556890b44d5a829ec54306c5cc2f|fc_0422752d3c5707b4016af90528fa2c87d2888a3819dd473715",
+                    "id": "toolu_01Vh3uQf3Tv2m3i1auHJHsR2",
                     "name": "bash",
                     "arguments": {
                       "command": "echo hi",
@@ -1273,7 +1153,7 @@
                     }
                   }
                 ],
-                "api": "<pi-provider>-responses",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
                 "model": "<pi-model>",
                 "usage": {
@@ -1281,26 +1161,29 @@
                   "output": 0,
                   "cacheRead": 0,
                   "cacheWrite": 0,
-                  "reasoning": 0,
                   "totalTokens": 0,
                   "cost": {
                     "input": 0,
                     "output": 0,
                     "cacheRead": 0,
                     "cacheWrite": 0,
-                    "total": 0
-                  }
+                    "total": 0,
+                    "totalFromProvider": false
+                  },
+                  "cacheWrite1h": 0,
+                  "reasoning": 0
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1794704679684,
-                "responseId": "resp_0422752d3c5707b4016af905282acc87d2b45bc9cbd44bee6e",
-                "rawStopReason": "completed",
-                "durationMs": 1563,
+                "timestamp": 1794877531566,
+                "providerThinkingLevel": "medium",
+                "responseId": "msg_011Ch7btyTyfWe4Vegk1FGt9",
+                "rawStopReason": "tool_use",
+                "durationMs": 696,
                 "thinkingLevel": "medium"
               },
               {
                 "role": "toolResult",
-                "toolCallId": "call_44d3556890b44d5a829ec54306c5cc2f|fc_0422752d3c5707b4016af90528fa2c87d2888a3819dd473715",
+                "toolCallId": "toolu_01Vh3uQf3Tv2m3i1auHJHsR2",
                 "toolName": "bash",
                 "content": [
                   {
@@ -1310,12 +1193,12 @@
                 ],
                 "details": {},
                 "isError": true,
-                "timestamp": 1794704681252
+                "timestamp": 1794877532267
               },
               {
                 "role": "assistant",
                 "content": [],
-                "api": "<pi-provider>-responses",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
                 "model": "<pi-model>",
                 "usage": {
@@ -1333,7 +1216,8 @@
                   }
                 },
                 "stopReason": "aborted",
-                "timestamp": 1794704681254,
+                "timestamp": 1794877532270,
+                "providerThinkingLevel": "medium",
                 "errorMessage": "Request aborted",
                 "durationMs": 3,
                 "thinkingLevel": "medium"
@@ -1371,8 +1255,8 @@
             "data": {
               "model": {
                 "id": "<pi-model>",
-                "name": "GPT-6 Luna",
-                "api": "<pi-provider>-responses",
+                "name": "Claude Haiku 5.5",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
                 "baseUrl": "<redacted>",
                 "reasoning": true,
@@ -1384,18 +1268,17 @@
                   "cacheWrite": 0.125,
                   "tiers": [
                     {
-                      "inputTokensAbove": 272000,
-                      "input": 0.2,
-                      "output": 0.75,
-                      "cacheRead": 0.02,
-                      "cacheWrite": 0.25
+                      "inputTokensAbove": 100000,
+                      "input": 0.5,
+                      "output": 2.5,
+                      "cacheRead": 0.05,
+                      "cacheWrite": 0.625
                     }
                   ]
                 },
-                "contextWindow": 272000,
+                "contextWindow": 1000000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
-                  "off": "none",
                   "minimal": null,
                   "low": "low",
                   "medium": "medium",
@@ -1404,18 +1287,21 @@
                   "max": "max"
                 },
                 "compat": {
-                  "supportsStrictMode": true,
-                  "supportsOpenAIGrammarTools": true,
-                  "supportsAdditionalTools": true,
-                  "supportsToolSearch": true,
+                  "forceAdaptiveThinking": true,
+                  "supportsTemperature": false,
+                  "supportsMidConvoEffort": true,
                   "supportsMidConvoSystemMessages": true,
-                  "supportsExplicitPromptCacheMode": true,
-                  "supportsMidConvoEffort": true
+                  "supportsMidConvoToolChanges": true,
+                  "supportsStrictTools": true
+                },
+                "promptCache": {
+                  "short": 300,
+                  "long": 3600
                 },
                 "inputLimits": {
-                  "maxRequestBytes": 536870912,
+                  "maxRequestBytes": 33554432,
                   "images": {
-                    "maxPerRequest": 1500,
+                    "maxPerRequest": 600,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -1431,7 +1317,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-15T01-04-39-449Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-17T01-05-31-321Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 5,

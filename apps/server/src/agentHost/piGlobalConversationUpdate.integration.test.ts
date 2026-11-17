@@ -2,7 +2,7 @@ import { SessionManager } from "@earendil-works/pi-coding-agent"
 import { NodeServices } from "@effect/platform-node"
 import { assert, it } from "@effect/vitest"
 import { ConversationOutcome, TextPart, GlobalConversationUpdate } from "@glass/contracts"
-import { Deferred, Effect, Exit, Predicate, Scope } from "effect"
+import { Deferred, Effect, Exit, Predicate, Schema, Scope } from "effect"
 import { randomUUID } from "node:crypto"
 import { writeFileSync } from "node:fs"
 import { join } from "node:path"
@@ -11,7 +11,7 @@ import { bundledPi } from "../../test/demoConversation"
 import { fakeModelProvider, lastUserText } from "../../test/fakeModelProvider"
 import { isolatedHome, stubHome } from "../../test/harness"
 import { piAdapter } from "./piAdapter"
-import { globalConversationUpdateDelivery } from "./piGlobalConversationUpdate"
+import { globalConversationUpdateDelivery, SessionEntries } from "./piGlobalConversationUpdate"
 import { type HostEvent, WorkRole } from "./protocol"
 
 const sent = {
@@ -72,18 +72,16 @@ for (const stopReason of ["error", "length"] as const)
   it(`continues a Global conversation update whose ${stopReason} attempt pi omitted for recovery`, () => {
     const saved = SessionManager.inMemory()
 
-    const pending = globalConversationUpdateDelivery(
-      "global-conversation-update-1",
-      sent.prompt,
-      [],
-    )
+    const pending = globalConversationUpdateDelivery("global-conversation-update-1", sent.prompt, {
+      entries: [],
+      leafId: null,
+    })
 
     if (pending.state !== "pending") assert.fail("Expected a pending Global conversation update")
     saved.appendMessage({ role: "user", content: pending.prompt, timestamp: 1 })
 
-    const failed = saved.appendMessage({
-      role: "assistant",
-      content: [],
+    const reply = {
+      role: "assistant" as const,
       api: "openai-completions",
       provider: "glass-test",
       model: "gpt-test",
@@ -95,9 +93,30 @@ for (const stopReason of ["error", "length"] as const)
         totalTokens: 0,
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
       },
+    }
+
+    const toolCall = { id: "call-1", name: "read", arguments: { path: "notes.md" } }
+    saved.appendMessage({
+      ...reply,
+      content: [{ type: "toolCall", ...toolCall }],
+      stopReason: "toolUse",
+      timestamp: 2,
+    })
+    saved.appendMessage({
+      role: "toolResult",
+      toolCallId: toolCall.id,
+      toolName: toolCall.name,
+      content: [{ type: "text", text: "Notes" }],
+      isError: false,
+      timestamp: 3,
+    })
+
+    const failed = saved.appendMessage({
+      ...reply,
+      content: [],
       stopReason,
       errorMessage: stopReason === "error" ? "Rate limit" : "",
-      timestamp: 2,
+      timestamp: 4,
     })
 
     saved.appendContextEdit(failed, null)
@@ -108,11 +127,28 @@ for (const stopReason of ["error", "length"] as const)
     const delivery = globalConversationUpdateDelivery(
       "global-conversation-update-1",
       sent.prompt,
-      saved.getBranch(),
+      Schema.decodeUnknownSync(SessionEntries)({
+        entries: saved.getEntries(),
+        leafId: saved.getLeafId(),
+      }),
     )
 
     assert.equal(delivery.state, "responding")
-    assert.isFalse(delivery.events.some((event) => event.type === "message_end"))
+    assert.deepInclude(delivery.events, {
+      type: "message_update",
+      assistantMessageEvent: { type: "toolcall_end", toolCall },
+    })
+    assert.deepInclude(delivery.events, {
+      type: "tool_execution_end",
+      toolCallId: toolCall.id,
+      result: { content: [{ type: "text", text: "Notes" }] },
+      isError: false,
+    })
+    assert.isFalse(
+      delivery.events.some(
+        (event) => event.type === "message_end" && event.message.stopReason === stopReason,
+      ),
+    )
   })
 
 it.live(
@@ -152,7 +188,7 @@ it.live(
       const pending = globalConversationUpdateDelivery(
         "global-conversation-update-1",
         sent.prompt,
-        [],
+        { entries: [], leafId: null },
       )
 
       if (pending.state !== "pending") assert.fail("Expected a pending Global conversation update")
@@ -193,7 +229,10 @@ it.live(
       import { createInterface } from 'node:readline';
       createInterface({ input: process.stdin }).on('line', (line) => {
         const command = JSON.parse(line);
-        const data = command.type === 'prompt' ? null : { isStreaming: false, isCompacting: false };
+        const data =
+          command.type === 'prompt' ? null
+          : command.type === 'get_entries' ? { entries: [], leafId: null }
+          : { isStreaming: false, isCompacting: false };
         process.stdout.write(JSON.stringify({ type: 'response', id: command.id, success: true, data }) + "\n", () => {
           if (command.type === 'prompt') process.exit(0);
         });

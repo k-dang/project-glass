@@ -2,7 +2,6 @@ import {
   type ModelRuntime,
   resolveModelScopeWithDiagnostics,
   SettingsManager,
-  SessionManager,
 } from "@earendil-works/pi-coding-agent"
 import {
   type AgentCommand,
@@ -70,7 +69,7 @@ import { piLoadsNothing, piTools } from "../agentTools"
 import { piSubagentStatusExtension } from "./piSubagentStatus"
 import { piSuggestDraftExtension } from "./suggestDraftTool"
 import { runTurns } from "./turnLoop"
-import { globalConversationUpdateDelivery } from "./piGlobalConversationUpdate"
+import { globalConversationUpdateDelivery, SessionEntries } from "./piGlobalConversationUpdate"
 import piDrawDiagramSource from "virtual:pi-draw-diagram"
 
 const thinkingLevels = ["off", "minimal", "low", "medium", "high", "xhigh", "max"]
@@ -87,7 +86,7 @@ const parseModelId = (glassId: string) => {
 
 /**
  * The thinking levels pi offers a model. pi's RPC doesn't report them per model, so this copies
- * `getSupportedThinkingLevels` from pi-ai 1.3.0. Conversations run the user's own `pi`, which clamps a
+ * `getSupportedThinkingLevels` from pi-ai 1.5.2. Conversations run the user's own `pi`, which clamps a
  * level its model doesn't take to the nearest one it does, so drift only mislabels a choice.
  */
 const toModel = (model: PiModel): AgentModel => ({
@@ -116,7 +115,7 @@ const inScope = (models: ReadonlyArray<PiModel>) =>
 
     if (patterns.length === 0) return { scoped: [], warnings: [] }
 
-    // SAFETY: pi-coding-agent 1.3.0's resolver reads only `getAvailable()` from the runtime, and
+    // SAFETY: pi-coding-agent 1.5.2's resolver reads only `getAvailable()` from the runtime, and
     // only the `provider`, `id`, `name`, and `type` (absent, meaning a chat model) of its models.
     // The scope test in piAdapter.integration.test.ts catches a pi bump that reads more.
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- See SAFETY above.
@@ -140,7 +139,7 @@ const inScope = (models: ReadonlyArray<PiModel>) =>
   )
 
 /**
- * The thinking level a fresh pi session starts a model on, as pi-coding-agent 1.3.0's
+ * The thinking level a fresh pi session starts a model on, as pi-coding-agent 1.5.2's
  * `createAgentSession` picks it. Switching model keeps the current level instead of this one.
  */
 const freshThinkingLevel = (folder: string, model: { provider: string; id: string }) => {
@@ -456,16 +455,8 @@ export const piAdapter = (command: string) =>
           turnId: string,
           sent: DeliveredTurn,
         ) {
-          const delivery = yield* Effect.gen(function* () {
-            const { sessionFile } = yield* rpc.request({ type: "get_state" }, SessionState)
-
-            const entries =
-              sessionFile == null || !(yield* fs.exists(sessionFile))
-                ? []
-                : yield* Effect.try(() => SessionManager.open(sessionFile).getBranch())
-
-            return globalConversationUpdateDelivery(turnId, sent.prompt, entries)
-          }).pipe(
+          const delivery = yield* rpc.request({ type: "get_entries" }, SessionEntries).pipe(
+            Effect.map((session) => globalConversationUpdateDelivery(turnId, sent.prompt, session)),
             Effect.tapError((error) =>
               Effect.logWarning("Couldn't recover pi's Global conversation update", error),
             ),

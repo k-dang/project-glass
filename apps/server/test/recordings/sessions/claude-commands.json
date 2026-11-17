@@ -1,6 +1,6 @@
 {
   "scenario": "claude-commands",
-  "program": "@anthropic-ai/claude-agent-sdk 0.3.309",
+  "program": "@anthropic-ai/claude-agent-sdk 0.3.322",
   "processes": [
     {
       "args": [
@@ -17,7 +17,7 @@
       "frames": [
         {
           "out": {
-            "request_id": "x168lfcqa7",
+            "request_id": "phsvkpro9nb",
             "type": "control_request",
             "request": {
               "subtype": "initialize"
@@ -29,7 +29,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "x168lfcqa7",
+              "request_id": "phsvkpro9nb",
               "response": {
                 "commands": [
                   {
@@ -69,7 +69,7 @@
                   },
                   {
                     "name": "code-review",
-                    "description": "Review the current diff, or a PR number/branch/path target, for correctness bugs (plus reuse/simplification/efficiency cleanups where the model's review recipe covers them) at the given effort level (low|medium|high|xhigh|max: from few high-confidence findings up to many, some of them uncertain); with no level given, it reuses the level you typed last. Pass --comment to post findings as inline PR comments, or --fix to apply the findings to the working tree after the review. Pass --max-findings <n> to report up to n findings, or --max-findings all for every finding. The choice stays until you pass --max-findings default.",
+                    "description": "Review the current diff, or a PR number/branch/path target, for correctness bugs (plus reuse/simplification/efficiency cleanups where the model's recipe covers them) at the effort level given first, before any target (low|medium|high|xhigh|max: from few high-confidence findings to many, some uncertain); with no level given, it reuses the level you typed last. Pass --comment to post findings as inline PR comments, or --fix to apply them to the working tree after the review. Pass --max-findings <n> to report up to n findings, or --max-findings all for every finding. The choice stays until you pass --max-findings default.",
                     "argumentHint": "[low|medium|high|xhigh|max] [--fix] [--comment] [<pr#>|<branch>|<path>] [--max-findings <n>|all]",
                     "aliases": ["review"],
                     "builtin": true
@@ -115,7 +115,7 @@
                   },
                   {
                     "name": "claude-api",
-                    "description": "Reference for the Claude API / Anthropic SDK — model ids, pricing, params, streaming, tool use, MCP, agents, caching, token counting, model migration.\nTRIGGER — read BEFORE opening the target file; don't skip because it \"looks like a one-liner\" — whenever: the prompt names Claude/Anthropic in any form (Claude, Anthropic, Fable, Opus, Sonnet, Haiku, `anthropic`, `@anthropic-ai`, `claude-*`, `us.anthropic.*`, `[1m]`); the user asks about an LLM (pricing/model choice/limits/caching) — never answer from memory; OR the task is LLM-shaped with provider unstated (agent/MCP/tool-definition/multi-agent/RAG/LLM-judge/computer-use; generate/summarize/extract/classify/rewrite/converse over NL; debugging refusals/cutoffs/streaming/tool-calls/tokens).\nSKIP only when another provider is being worked on (overrides all triggers): OpenAI/GPT/Gemini/Llama/Mistral/Cohere/Ollama named in the query; OR `grep -rE 'openai|langchain_openai|google.generativeai|genai|mistralai|cohere|ollama'` over the project hits (run this grep FIRST if no provider named — don't Read the file).",
+                    "description": "Reference for the Claude API / Anthropic SDK — model ids, pricing, params, streaming, tool use, MCP, agents, caching, token counting, model migration.\nTRIGGER — read FIRST, before you answer, run a command or open a file (already started? read it now); don't skip because it \"looks like a one-liner\" — whenever: the prompt names Claude/Anthropic in any form (Claude, Anthropic, Fable, Opus, Sonnet, Haiku, `anthropic`, `@anthropic-ai`, `claude-*`, `us.anthropic.*`, `[1m]`); the user asks about an LLM (pricing/model choice/limits/caching) — never answer from memory; OR the task is LLM-shaped with provider unstated (agent/MCP/tool-definition/multi-agent/RAG/LLM-judge/computer-use; generate/summarize/extract/classify/rewrite/converse over NL; debugging refusals/cutoffs/streaming/tool-calls/tokens).\nSKIP only when another provider is being worked on (overrides all triggers): OpenAI/GPT/Gemini/Llama/Mistral/Cohere/Ollama named in the query; OR `grep -rE 'openai|langchain_openai|google.generativeai|genai|mistralai|cohere|ollama'` over the project hits (run this grep FIRST if no provider named — don't Read the file; if nothing hits, load this skill).",
                     "argumentHint": "",
                     "builtin": true
                   },
@@ -381,12 +381,13 @@
                   },
                   {
                     "value": "fable",
-                    "resolvedModel": "claude-fable-5-1",
+                    "resolvedModel": "claude-fable-5-2",
                     "displayName": "Fable",
-                    "description": "Fable 5.1 · Most capable for your hardest and longest-running tasks",
+                    "description": "Fable 5.2 · Most capable for your hardest and longest-running tasks",
                     "supportsEffort": true,
                     "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"],
                     "supportsAdaptiveThinking": true,
+                    "supportsFastMode": true,
                     "supportsAutoMode": true,
                     "supportsThinkingOff": false
                   },
@@ -416,8 +417,10 @@
                 ],
                 "account": "<redacted>",
                 "pid": "<redacted>",
-                "claude_code_version": "2.1.309",
+                "claude_code_version": "2.1.322",
                 "current_permission_mode": "default",
+                "hook_on_failure_supported": true,
+                "other_hook_ask_outranks_host": true,
                 "feedback_mode": {
                   "kind": "disabled"
                 },
@@ -430,7 +433,11 @@
                 "fast_mode_state": "off",
                 "fast_mode_disabled_reason": "sdk_opt_in_required",
                 "session_state": "idle",
-                "capabilities": ["ui_surface_v1", "mcp_call_result_not_for_model_v1"]
+                "capabilities": [
+                  "ui_surface_v1",
+                  "mcp_call_result_not_for_model_v1",
+                  "mcp_call_check_permissions_v1"
+                ]
               },
               "pending_permission_requests": [],
               "pending_user_dialog_requests": []

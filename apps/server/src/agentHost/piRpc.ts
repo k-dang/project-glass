@@ -16,6 +16,12 @@ const ToolResult = Schema.Struct({
 
 export type ToolResult = typeof ToolResult.Type
 
+export const ToolCall = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  arguments: ToolInput,
+})
+
 const AssistantUpdate = Schema.Union([
   Schema.Struct({
     type: Schema.Literals(["text_start", "thinking_start"]),
@@ -33,7 +39,7 @@ const AssistantUpdate = Schema.Union([
   }),
   Schema.Struct({
     type: Schema.Literal("toolcall_end"),
-    toolCall: Schema.Struct({ id: Schema.String, name: Schema.String, arguments: ToolInput }),
+    toolCall: ToolCall,
   }),
 ])
 
@@ -101,6 +107,7 @@ type PiCommand =
   | { readonly type: "clear_queue" }
   | { readonly type: "abort" }
   | { readonly type: "get_state" }
+  | { readonly type: "get_entries" }
   | { readonly type: "get_available_models" }
   | { readonly type: "get_commands" }
   | { readonly type: "set_model"; readonly provider: string; readonly modelId: string }
@@ -130,7 +137,6 @@ export const SessionState = Schema.Struct({
   model: Schema.optional(Schema.NullOr(PiModel)),
   isStreaming: Schema.Boolean,
   isCompacting: Schema.Boolean,
-  sessionFile: Schema.optional(Schema.NullOr(Schema.String)),
 })
 
 export const AvailableModels = Schema.Struct({ models: Schema.Array(PiModel) })

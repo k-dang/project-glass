@@ -1,6 +1,6 @@
 {
   "scenario": "pi-thinking-level",
-  "program": "@earendil-works/pi-coding-agent 1.3.0",
+  "program": "@earendil-works/pi-coding-agent 1.5.2",
   "processes": [
     {
       "args": [
@@ -30,8 +30,8 @@
             "data": {
               "model": {
                 "id": "<pi-model>",
-                "name": "GPT-6 Luna",
-                "api": "<pi-provider>-responses",
+                "name": "Claude Haiku 5.5",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
                 "baseUrl": "<redacted>",
                 "reasoning": true,
@@ -43,18 +43,17 @@
                   "cacheWrite": 0.125,
                   "tiers": [
                     {
-                      "inputTokensAbove": 272000,
-                      "input": 0.2,
-                      "output": 0.75,
-                      "cacheRead": 0.02,
-                      "cacheWrite": 0.25
+                      "inputTokensAbove": 100000,
+                      "input": 0.5,
+                      "output": 2.5,
+                      "cacheRead": 0.05,
+                      "cacheWrite": 0.625
                     }
                   ]
                 },
-                "contextWindow": 272000,
+                "contextWindow": 1000000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
-                  "off": "none",
                   "minimal": null,
                   "low": "low",
                   "medium": "medium",
@@ -63,18 +62,21 @@
                   "max": "max"
                 },
                 "compat": {
-                  "supportsStrictMode": true,
-                  "supportsOpenAIGrammarTools": true,
-                  "supportsAdditionalTools": true,
-                  "supportsToolSearch": true,
+                  "forceAdaptiveThinking": true,
+                  "supportsTemperature": false,
+                  "supportsMidConvoEffort": true,
                   "supportsMidConvoSystemMessages": true,
-                  "supportsExplicitPromptCacheMode": true,
-                  "supportsMidConvoEffort": true
+                  "supportsMidConvoToolChanges": true,
+                  "supportsStrictTools": true
+                },
+                "promptCache": {
+                  "short": 300,
+                  "long": 3600
                 },
                 "inputLimits": {
-                  "maxRequestBytes": 536870912,
+                  "maxRequestBytes": 33554432,
                   "images": {
-                    "maxPerRequest": 1500,
+                    "maxPerRequest": 600,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -90,7 +92,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-15T01-04-59-875Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-17T01-05-42-434Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -114,8 +116,8 @@
             "success": true,
             "data": {
               "id": "<pi-model>",
-              "name": "GPT-6 Luna",
-              "api": "<pi-provider>-responses",
+              "name": "Claude Haiku 5.5",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "baseUrl": "<redacted>",
               "reasoning": true,
@@ -127,18 +129,17 @@
                 "cacheWrite": 0.125,
                 "tiers": [
                   {
-                    "inputTokensAbove": 272000,
-                    "input": 0.2,
-                    "output": 0.75,
-                    "cacheRead": 0.02,
-                    "cacheWrite": 0.25
+                    "inputTokensAbove": 100000,
+                    "input": 0.5,
+                    "output": 2.5,
+                    "cacheRead": 0.05,
+                    "cacheWrite": 0.625
                   }
                 ]
               },
-              "contextWindow": 272000,
+              "contextWindow": 1000000,
               "maxTokens": 128000,
               "thinkingLevelMap": {
-                "off": "none",
                 "minimal": null,
                 "low": "low",
                 "medium": "medium",
@@ -147,18 +148,21 @@
                 "max": "max"
               },
               "compat": {
-                "supportsStrictMode": true,
-                "supportsOpenAIGrammarTools": true,
-                "supportsAdditionalTools": true,
-                "supportsToolSearch": true,
+                "forceAdaptiveThinking": true,
+                "supportsTemperature": false,
+                "supportsMidConvoEffort": true,
                 "supportsMidConvoSystemMessages": true,
-                "supportsExplicitPromptCacheMode": true,
-                "supportsMidConvoEffort": true
+                "supportsMidConvoToolChanges": true,
+                "supportsStrictTools": true
+              },
+              "promptCache": {
+                "short": 300,
+                "long": 3600
               },
               "inputLimits": {
-                "maxRequestBytes": 536870912,
+                "maxRequestBytes": 33554432,
                 "images": {
-                  "maxPerRequest": 1500,
+                  "maxPerRequest": 600,
                   "resize": {
                     "maxWidth": 2000,
                     "maxHeight": 2000,
@@ -228,7 +232,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794704700083,
+              "timestamp": 1794877542655,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -371,7 +375,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794704700083,
+              "timestamp": 1794877542655,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -518,7 +522,7 @@
                   "text": "Reply with exactly: FIRST"
                 }
               ],
-              "timestamp": 1794704700082
+              "timestamp": 1794877542654
             }
           }
         },
@@ -533,7 +537,7 @@
                   "text": "Reply with exactly: FIRST"
                 }
               ],
-              "timestamp": 1794704700082
+              "timestamp": 1794877542654
             }
           }
         },
@@ -543,7 +547,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "<pi-provider>-responses",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -561,7 +565,8 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794704700115
+              "timestamp": 1794877542689,
+              "providerThinkingLevel": "high"
             }
           }
         },
@@ -579,8 +584,10 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
-              }
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "text_start",
@@ -602,13 +609,15 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
-              }
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "text_delta",
               "contentIndex": 0,
-              "delta": "FIRST"
+              "delta": "F"
             }
           }
         },
@@ -626,8 +635,36 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
-              }
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "IRST"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "text_end",
@@ -644,11 +681,10 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "FIRST",
-                  "textSignature": "{\"v\":1,\"id\":\"msg_0986d6cc50de2bf0016af9053d4b5487d28a0192c0d244b3c0\",\"phase\":\"final_answer\"}"
+                  "text": "FIRST"
                 }
               ],
-              "api": "<pi-provider>-responses",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -656,21 +692,24 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "reasoning": 0,
                 "totalTokens": 0,
                 "cost": {
                   "input": 0,
                   "output": 0,
                   "cacheRead": 0,
                   "cacheWrite": 0,
-                  "total": 0
-                }
+                  "total": 0,
+                  "totalFromProvider": false
+                },
+                "cacheWrite1h": 0,
+                "reasoning": 0
               },
               "stopReason": "stop",
-              "timestamp": 1794704700115,
-              "responseId": "resp_0986d6cc50de2bf0016af9053c977887d29043112e5ce964e6",
-              "rawStopReason": "completed",
-              "durationMs": 1291,
+              "timestamp": 1794877542689,
+              "providerThinkingLevel": "high",
+              "responseId": "msg_011Ch7buo4BXRvtoBB34x4c5",
+              "rawStopReason": "end_turn",
+              "durationMs": 546,
               "thinkingLevel": "high"
             }
           }
@@ -683,11 +722,10 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "FIRST",
-                  "textSignature": "{\"v\":1,\"id\":\"msg_0986d6cc50de2bf0016af9053d4b5487d28a0192c0d244b3c0\",\"phase\":\"final_answer\"}"
+                  "text": "FIRST"
                 }
               ],
-              "api": "<pi-provider>-responses",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -695,21 +733,24 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "reasoning": 0,
                 "totalTokens": 0,
                 "cost": {
                   "input": 0,
                   "output": 0,
                   "cacheRead": 0,
                   "cacheWrite": 0,
-                  "total": 0
-                }
+                  "total": 0,
+                  "totalFromProvider": false
+                },
+                "cacheWrite1h": 0,
+                "reasoning": 0
               },
               "stopReason": "stop",
-              "timestamp": 1794704700115,
-              "responseId": "resp_0986d6cc50de2bf0016af9053c977887d29043112e5ce964e6",
-              "rawStopReason": "completed",
-              "durationMs": 1291,
+              "timestamp": 1794877542689,
+              "providerThinkingLevel": "high",
+              "responseId": "msg_011Ch7buo4BXRvtoBB34x4c5",
+              "rawStopReason": "end_turn",
+              "durationMs": 546,
               "thinkingLevel": "high"
             },
             "toolResults": []
@@ -723,7 +764,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1794704700083,
+                "timestamp": 1794877542655,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -865,18 +906,17 @@
                     "text": "Reply with exactly: FIRST"
                   }
                 ],
-                "timestamp": 1794704700082
+                "timestamp": 1794877542654
               },
               {
                 "role": "assistant",
                 "content": [
                   {
                     "type": "text",
-                    "text": "FIRST",
-                    "textSignature": "{\"v\":1,\"id\":\"msg_0986d6cc50de2bf0016af9053d4b5487d28a0192c0d244b3c0\",\"phase\":\"final_answer\"}"
+                    "text": "FIRST"
                   }
                 ],
-                "api": "<pi-provider>-responses",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
                 "model": "<pi-model>",
                 "usage": {
@@ -884,21 +924,24 @@
                   "output": 0,
                   "cacheRead": 0,
                   "cacheWrite": 0,
-                  "reasoning": 0,
                   "totalTokens": 0,
                   "cost": {
                     "input": 0,
                     "output": 0,
                     "cacheRead": 0,
                     "cacheWrite": 0,
-                    "total": 0
-                  }
+                    "total": 0,
+                    "totalFromProvider": false
+                  },
+                  "cacheWrite1h": 0,
+                  "reasoning": 0
                 },
                 "stopReason": "stop",
-                "timestamp": 1794704700115,
-                "responseId": "resp_0986d6cc50de2bf0016af9053c977887d29043112e5ce964e6",
-                "rawStopReason": "completed",
-                "durationMs": 1291,
+                "timestamp": 1794877542689,
+                "providerThinkingLevel": "high",
+                "responseId": "msg_011Ch7buo4BXRvtoBB34x4c5",
+                "rawStopReason": "end_turn",
+                "durationMs": 546,
                 "thinkingLevel": "high"
               }
             ],
@@ -926,8 +969,8 @@
             "data": {
               "model": {
                 "id": "<pi-model>",
-                "name": "GPT-6 Luna",
-                "api": "<pi-provider>-responses",
+                "name": "Claude Haiku 5.5",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
                 "baseUrl": "<redacted>",
                 "reasoning": true,
@@ -939,18 +982,17 @@
                   "cacheWrite": 0.125,
                   "tiers": [
                     {
-                      "inputTokensAbove": 272000,
-                      "input": 0.2,
-                      "output": 0.75,
-                      "cacheRead": 0.02,
-                      "cacheWrite": 0.25
+                      "inputTokensAbove": 100000,
+                      "input": 0.5,
+                      "output": 2.5,
+                      "cacheRead": 0.05,
+                      "cacheWrite": 0.625
                     }
                   ]
                 },
-                "contextWindow": 272000,
+                "contextWindow": 1000000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
-                  "off": "none",
                   "minimal": null,
                   "low": "low",
                   "medium": "medium",
@@ -959,18 +1001,21 @@
                   "max": "max"
                 },
                 "compat": {
-                  "supportsStrictMode": true,
-                  "supportsOpenAIGrammarTools": true,
-                  "supportsAdditionalTools": true,
-                  "supportsToolSearch": true,
+                  "forceAdaptiveThinking": true,
+                  "supportsTemperature": false,
+                  "supportsMidConvoEffort": true,
                   "supportsMidConvoSystemMessages": true,
-                  "supportsExplicitPromptCacheMode": true,
-                  "supportsMidConvoEffort": true
+                  "supportsMidConvoToolChanges": true,
+                  "supportsStrictTools": true
+                },
+                "promptCache": {
+                  "short": 300,
+                  "long": 3600
                 },
                 "inputLimits": {
-                  "maxRequestBytes": 536870912,
+                  "maxRequestBytes": 33554432,
                   "images": {
-                    "maxPerRequest": 1500,
+                    "maxPerRequest": 600,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -986,7 +1031,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-15T01-04-59-875Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-17T01-05-42-434Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 3,
@@ -1010,8 +1055,8 @@
             "success": true,
             "data": {
               "id": "<pi-model>",
-              "name": "GPT-6 Luna",
-              "api": "<pi-provider>-responses",
+              "name": "Claude Haiku 5.5",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "baseUrl": "<redacted>",
               "reasoning": true,
@@ -1023,18 +1068,17 @@
                 "cacheWrite": 0.125,
                 "tiers": [
                   {
-                    "inputTokensAbove": 272000,
-                    "input": 0.2,
-                    "output": 0.75,
-                    "cacheRead": 0.02,
-                    "cacheWrite": 0.25
+                    "inputTokensAbove": 100000,
+                    "input": 0.5,
+                    "output": 2.5,
+                    "cacheRead": 0.05,
+                    "cacheWrite": 0.625
                   }
                 ]
               },
-              "contextWindow": 272000,
+              "contextWindow": 1000000,
               "maxTokens": 128000,
               "thinkingLevelMap": {
-                "off": "none",
                 "minimal": null,
                 "low": "low",
                 "medium": "medium",
@@ -1043,18 +1087,21 @@
                 "max": "max"
               },
               "compat": {
-                "supportsStrictMode": true,
-                "supportsOpenAIGrammarTools": true,
-                "supportsAdditionalTools": true,
-                "supportsToolSearch": true,
+                "forceAdaptiveThinking": true,
+                "supportsTemperature": false,
+                "supportsMidConvoEffort": true,
                 "supportsMidConvoSystemMessages": true,
-                "supportsExplicitPromptCacheMode": true,
-                "supportsMidConvoEffort": true
+                "supportsMidConvoToolChanges": true,
+                "supportsStrictTools": true
+              },
+              "promptCache": {
+                "short": 300,
+                "long": 3600
               },
               "inputLimits": {
-                "maxRequestBytes": 536870912,
+                "maxRequestBytes": 33554432,
                 "images": {
-                  "maxPerRequest": 1500,
+                  "maxPerRequest": 600,
                   "resize": {
                     "maxWidth": 2000,
                     "maxHeight": 2000,
@@ -1128,7 +1175,7 @@
                   "text": "Reply with exactly: SECOND"
                 }
               ],
-              "timestamp": 1794704701411
+              "timestamp": 1794877543242
             }
           }
         },
@@ -1143,7 +1190,7 @@
                   "text": "Reply with exactly: SECOND"
                 }
               ],
-              "timestamp": 1794704701411
+              "timestamp": 1794877543242
             }
           }
         },
@@ -1153,7 +1200,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "<pi-provider>-responses",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -1171,7 +1218,8 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794704701413
+              "timestamp": 1794877543245,
+              "providerThinkingLevel": "medium"
             }
           }
         },
@@ -1189,8 +1237,10 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
-              }
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "text_start",
@@ -1212,8 +1262,10 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
-              }
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "text_delta",
@@ -1236,8 +1288,10 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
-              }
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "text_end",
@@ -1254,11 +1308,10 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "SECOND",
-                  "textSignature": "{\"v\":1,\"id\":\"msg_0986d6cc50de2bf0016af9053e9e6887d298d6fe0d97fec8c8\",\"phase\":\"final_answer\"}"
+                  "text": "SECOND"
                 }
               ],
-              "api": "<pi-provider>-responses",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -1266,21 +1319,24 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "reasoning": 0,
                 "totalTokens": 0,
                 "cost": {
                   "input": 0,
                   "output": 0,
                   "cacheRead": 0,
                   "cacheWrite": 0,
-                  "total": 0
-                }
+                  "total": 0,
+                  "totalFromProvider": false
+                },
+                "cacheWrite1h": 0,
+                "reasoning": 0
               },
               "stopReason": "stop",
-              "timestamp": 1794704701413,
-              "responseId": "resp_0986d6cc50de2bf0016af9053ddb6487d2b4a56b2811932986",
-              "rawStopReason": "completed",
-              "durationMs": 1317,
+              "timestamp": 1794877543245,
+              "providerThinkingLevel": "medium",
+              "responseId": "msg_011Ch7buqHNxJFTbhpkLMfW9",
+              "rawStopReason": "end_turn",
+              "durationMs": 508,
               "thinkingLevel": "medium"
             }
           }
@@ -1293,11 +1349,10 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "SECOND",
-                  "textSignature": "{\"v\":1,\"id\":\"msg_0986d6cc50de2bf0016af9053e9e6887d298d6fe0d97fec8c8\",\"phase\":\"final_answer\"}"
+                  "text": "SECOND"
                 }
               ],
-              "api": "<pi-provider>-responses",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -1305,21 +1360,24 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "reasoning": 0,
                 "totalTokens": 0,
                 "cost": {
                   "input": 0,
                   "output": 0,
                   "cacheRead": 0,
                   "cacheWrite": 0,
-                  "total": 0
-                }
+                  "total": 0,
+                  "totalFromProvider": false
+                },
+                "cacheWrite1h": 0,
+                "reasoning": 0
               },
               "stopReason": "stop",
-              "timestamp": 1794704701413,
-              "responseId": "resp_0986d6cc50de2bf0016af9053ddb6487d2b4a56b2811932986",
-              "rawStopReason": "completed",
-              "durationMs": 1317,
+              "timestamp": 1794877543245,
+              "providerThinkingLevel": "medium",
+              "responseId": "msg_011Ch7buqHNxJFTbhpkLMfW9",
+              "rawStopReason": "end_turn",
+              "durationMs": 508,
               "thinkingLevel": "medium"
             },
             "toolResults": []
@@ -1337,18 +1395,17 @@
                     "text": "Reply with exactly: SECOND"
                   }
                 ],
-                "timestamp": 1794704701411
+                "timestamp": 1794877543242
               },
               {
                 "role": "assistant",
                 "content": [
                   {
                     "type": "text",
-                    "text": "SECOND",
-                    "textSignature": "{\"v\":1,\"id\":\"msg_0986d6cc50de2bf0016af9053e9e6887d298d6fe0d97fec8c8\",\"phase\":\"final_answer\"}"
+                    "text": "SECOND"
                   }
                 ],
-                "api": "<pi-provider>-responses",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
                 "model": "<pi-model>",
                 "usage": {
@@ -1356,21 +1413,24 @@
                   "output": 0,
                   "cacheRead": 0,
                   "cacheWrite": 0,
-                  "reasoning": 0,
                   "totalTokens": 0,
                   "cost": {
                     "input": 0,
                     "output": 0,
                     "cacheRead": 0,
                     "cacheWrite": 0,
-                    "total": 0
-                  }
+                    "total": 0,
+                    "totalFromProvider": false
+                  },
+                  "cacheWrite1h": 0,
+                  "reasoning": 0
                 },
                 "stopReason": "stop",
-                "timestamp": 1794704701413,
-                "responseId": "resp_0986d6cc50de2bf0016af9053ddb6487d2b4a56b2811932986",
-                "rawStopReason": "completed",
-                "durationMs": 1317,
+                "timestamp": 1794877543245,
+                "providerThinkingLevel": "medium",
+                "responseId": "msg_011Ch7buqHNxJFTbhpkLMfW9",
+                "rawStopReason": "end_turn",
+                "durationMs": 508,
                 "thinkingLevel": "medium"
               }
             ],
@@ -1398,8 +1458,8 @@
             "data": {
               "model": {
                 "id": "<pi-model>",
-                "name": "GPT-6 Luna",
-                "api": "<pi-provider>-responses",
+                "name": "Claude Haiku 5.5",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
                 "baseUrl": "<redacted>",
                 "reasoning": true,
@@ -1411,18 +1471,17 @@
                   "cacheWrite": 0.125,
                   "tiers": [
                     {
-                      "inputTokensAbove": 272000,
-                      "input": 0.2,
-                      "output": 0.75,
-                      "cacheRead": 0.02,
-                      "cacheWrite": 0.25
+                      "inputTokensAbove": 100000,
+                      "input": 0.5,
+                      "output": 2.5,
+                      "cacheRead": 0.05,
+                      "cacheWrite": 0.625
                     }
                   ]
                 },
-                "contextWindow": 272000,
+                "contextWindow": 1000000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
-                  "off": "none",
                   "minimal": null,
                   "low": "low",
                   "medium": "medium",
@@ -1431,18 +1490,21 @@
                   "max": "max"
                 },
                 "compat": {
-                  "supportsStrictMode": true,
-                  "supportsOpenAIGrammarTools": true,
-                  "supportsAdditionalTools": true,
-                  "supportsToolSearch": true,
+                  "forceAdaptiveThinking": true,
+                  "supportsTemperature": false,
+                  "supportsMidConvoEffort": true,
                   "supportsMidConvoSystemMessages": true,
-                  "supportsExplicitPromptCacheMode": true,
-                  "supportsMidConvoEffort": true
+                  "supportsMidConvoToolChanges": true,
+                  "supportsStrictTools": true
+                },
+                "promptCache": {
+                  "short": 300,
+                  "long": 3600
                 },
                 "inputLimits": {
-                  "maxRequestBytes": 536870912,
+                  "maxRequestBytes": 33554432,
                   "images": {
-                    "maxPerRequest": 1500,
+                    "maxPerRequest": 600,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -1458,7 +1520,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-15T01-04-59-875Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-17T01-05-42-434Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 5,

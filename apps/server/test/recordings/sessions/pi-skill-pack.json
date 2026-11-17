@@ -1,13 +1,13 @@
 {
   "scenario": "pi-skill-pack",
-  "program": "@earendil-works/pi-coding-agent 1.3.0",
+  "program": "@earendil-works/pi-coding-agent 1.5.2",
   "processes": [
     {
       "args": [
         "--mode",
         "rpc",
         "--skill",
-        "<folder>.skills-df7d14f4-75ca-4f65-9697-732eccb24df6/team/skills/greet"
+        "<folder>.skills-10107ee5-612a-4ec2-93c9-aee8a74ae83b/team/skills/greet"
       ],
       "cwd": "<folder>",
       "frames": [
@@ -52,11 +52,11 @@
                   "description": "Greets the team by name.",
                   "source": "skill",
                   "sourceInfo": {
-                    "path": "<folder>.skills-df7d14f4-75ca-4f65-9697-732eccb24df6/team/skills/greet/SKILL.md",
+                    "path": "<folder>.skills-10107ee5-612a-4ec2-93c9-aee8a74ae83b/team/skills/greet/SKILL.md",
                     "source": "local",
                     "scope": "temporary",
                     "origin": "top-level",
-                    "baseDir": "<folder>.skills-df7d14f4-75ca-4f65-9697-732eccb24df6/team/skills/greet"
+                    "baseDir": "<folder>.skills-10107ee5-612a-4ec2-93c9-aee8a74ae83b/team/skills/greet"
                   }
                 }
               ]
@@ -70,7 +70,7 @@
         "--mode",
         "rpc",
         "--skill",
-        "<folder>.skills-5dbbfb53-9428-40ad-9a08-db3ffefe79f7/team/skills/greet"
+        "<folder>.skills-b3663ad9-ff79-4f17-b3b3-80c7a7a2177a/team/skills/greet"
       ],
       "cwd": "<folder>",
       "frames": [

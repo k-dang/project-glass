@@ -1,6 +1,6 @@
 {
   "scenario": "pi-dialogs",
-  "program": "@earendil-works/pi-coding-agent 1.3.0",
+  "program": "@earendil-works/pi-coding-agent 1.5.2",
   "processes": [
     {
       "args": [
@@ -30,8 +30,8 @@
             "data": {
               "model": {
                 "id": "<pi-model>",
-                "name": "GPT-6 Luna",
-                "api": "<pi-provider>-responses",
+                "name": "Claude Haiku 5.5",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
                 "baseUrl": "<redacted>",
                 "reasoning": true,
@@ -43,18 +43,17 @@
                   "cacheWrite": 0.125,
                   "tiers": [
                     {
-                      "inputTokensAbove": 272000,
-                      "input": 0.2,
-                      "output": 0.75,
-                      "cacheRead": 0.02,
-                      "cacheWrite": 0.25
+                      "inputTokensAbove": 100000,
+                      "input": 0.5,
+                      "output": 2.5,
+                      "cacheRead": 0.05,
+                      "cacheWrite": 0.625
                     }
                   ]
                 },
-                "contextWindow": 272000,
+                "contextWindow": 1000000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
-                  "off": "none",
                   "minimal": null,
                   "low": "low",
                   "medium": "medium",
@@ -63,18 +62,21 @@
                   "max": "max"
                 },
                 "compat": {
-                  "supportsStrictMode": true,
-                  "supportsOpenAIGrammarTools": true,
-                  "supportsAdditionalTools": true,
-                  "supportsToolSearch": true,
+                  "forceAdaptiveThinking": true,
+                  "supportsTemperature": false,
+                  "supportsMidConvoEffort": true,
                   "supportsMidConvoSystemMessages": true,
-                  "supportsExplicitPromptCacheMode": true,
-                  "supportsMidConvoEffort": true
+                  "supportsMidConvoToolChanges": true,
+                  "supportsStrictTools": true
+                },
+                "promptCache": {
+                  "short": 300,
+                  "long": 3600
                 },
                 "inputLimits": {
-                  "maxRequestBytes": 536870912,
+                  "maxRequestBytes": 33554432,
                   "images": {
-                    "maxPerRequest": 1500,
+                    "maxPerRequest": 600,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -90,7 +92,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-15T01-05-03-448Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-17T01-05-44-130Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -134,7 +136,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794704703656,
+              "timestamp": 1794877544363,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -277,7 +279,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794704703656,
+              "timestamp": 1794877544363,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -424,7 +426,7 @@
                   "text": "Use the bash tool to run exactly `echo hi` once. If it is blocked, don't try again; reply with exactly: Blocked."
                 }
               ],
-              "timestamp": 1794704703655
+              "timestamp": 1794877544362
             }
           }
         },
@@ -439,7 +441,7 @@
                   "text": "Use the bash tool to run exactly `echo hi` once. If it is blocked, don't try again; reply with exactly: Blocked."
                 }
               ],
-              "timestamp": 1794704703655
+              "timestamp": 1794877544362
             }
           }
         },
@@ -449,7 +451,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "<pi-provider>-responses",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -467,7 +469,8 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794704703677
+              "timestamp": 1794877544397,
+              "providerThinkingLevel": "medium"
             }
           }
         },
@@ -485,13 +488,15 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
-              }
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "toolcall_start",
               "contentIndex": 0,
-              "id": "call_d2b078c3086147c89290f1c1c34db4c1|fc_0c4a1affeff081ac016af90540f6d487d2b5d055c7984564c4",
+              "id": "toolu_01Qsz1thFm8eNTsSxXHViYny",
               "toolName": "bash"
             }
           }
@@ -510,13 +515,15 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
-              }
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "toolcall_delta",
               "contentIndex": 0,
-              "delta": "{\""
+              "delta": ""
             }
           }
         },
@@ -534,13 +541,15 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
-              }
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "toolcall_delta",
               "contentIndex": 0,
-              "delta": "command"
+              "delta": "{\"command\": \"echo hi"
             }
           }
         },
@@ -558,13 +567,15 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
-              }
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "toolcall_delta",
               "contentIndex": 0,
-              "delta": "\":\""
+              "delta": "\", \"timeout\": null"
             }
           }
         },
@@ -582,152 +593,10 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
-              }
-            },
-            "assistantMessageEvent": {
-              "type": "toolcall_delta",
-              "contentIndex": 0,
-              "delta": "echo"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              }
-            },
-            "assistantMessageEvent": {
-              "type": "toolcall_delta",
-              "contentIndex": 0,
-              "delta": " hi"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              }
-            },
-            "assistantMessageEvent": {
-              "type": "toolcall_delta",
-              "contentIndex": 0,
-              "delta": "\",\""
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              }
-            },
-            "assistantMessageEvent": {
-              "type": "toolcall_delta",
-              "contentIndex": 0,
-              "delta": "timeout"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              }
-            },
-            "assistantMessageEvent": {
-              "type": "toolcall_delta",
-              "contentIndex": 0,
-              "delta": "\":"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              }
-            },
-            "assistantMessageEvent": {
-              "type": "toolcall_delta",
-              "contentIndex": 0,
-              "delta": "null"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0
-              }
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "toolcall_delta",
@@ -750,15 +619,17 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
-              }
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "toolcall_end",
               "contentIndex": 0,
               "toolCall": {
                 "type": "toolCall",
-                "id": "call_d2b078c3086147c89290f1c1c34db4c1|fc_0c4a1affeff081ac016af90540f6d487d2b5d055c7984564c4",
+                "id": "toolu_01Qsz1thFm8eNTsSxXHViYny",
                 "name": "bash",
                 "arguments": {
                   "command": "echo hi",
@@ -776,7 +647,7 @@
               "content": [
                 {
                   "type": "toolCall",
-                  "id": "call_d2b078c3086147c89290f1c1c34db4c1|fc_0c4a1affeff081ac016af90540f6d487d2b5d055c7984564c4",
+                  "id": "toolu_01Qsz1thFm8eNTsSxXHViYny",
                   "name": "bash",
                   "arguments": {
                     "command": "echo hi",
@@ -784,7 +655,7 @@
                   }
                 }
               ],
-              "api": "<pi-provider>-responses",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -792,21 +663,24 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "reasoning": 0,
                 "totalTokens": 0,
                 "cost": {
                   "input": 0,
                   "output": 0,
                   "cacheRead": 0,
                   "cacheWrite": 0,
-                  "total": 0
-                }
+                  "total": 0,
+                  "totalFromProvider": false
+                },
+                "cacheWrite1h": 0,
+                "reasoning": 0
               },
               "stopReason": "toolUse",
-              "timestamp": 1794704703677,
-              "responseId": "resp_0c4a1affeff081ac016af9054022e487d2adf19ca31bd94a22",
-              "rawStopReason": "completed",
-              "durationMs": 1551,
+              "timestamp": 1794877544397,
+              "providerThinkingLevel": "medium",
+              "responseId": "msg_011Ch7buvLyscYmPycApNmo3",
+              "rawStopReason": "tool_use",
+              "durationMs": 679,
               "thinkingLevel": "medium"
             }
           }
@@ -814,7 +688,7 @@
         {
           "in": {
             "type": "tool_execution_start",
-            "toolCallId": "call_d2b078c3086147c89290f1c1c34db4c1|fc_0c4a1affeff081ac016af90540f6d487d2b5d055c7984564c4",
+            "toolCallId": "toolu_01Qsz1thFm8eNTsSxXHViYny",
             "toolName": "bash",
             "args": {
               "command": "echo hi",
@@ -825,7 +699,7 @@
         {
           "in": {
             "type": "extension_ui_request",
-            "id": "2685b4a8-6bd7-4e56-b1b2-53b19a246379",
+            "id": "ede9d2bd-c578-4d10-9ccc-a605d672bf4b",
             "method": "select",
             "title": "Which greeting?",
             "options": ["Hi", "Hello"]
@@ -834,14 +708,14 @@
         {
           "out": {
             "type": "extension_ui_response",
-            "id": "2685b4a8-6bd7-4e56-b1b2-53b19a246379",
+            "id": "ede9d2bd-c578-4d10-9ccc-a605d672bf4b",
             "value": "Hello"
           }
         },
         {
           "in": {
             "type": "extension_ui_request",
-            "id": "5dba3573-a4d4-4774-81fb-fb0a04bbb0fc",
+            "id": "f930c558-3340-49a6-b4ba-b5944ca14dd1",
             "method": "input",
             "title": "Who to greet?",
             "placeholder": "a name"
@@ -850,14 +724,14 @@
         {
           "out": {
             "type": "extension_ui_response",
-            "id": "5dba3573-a4d4-4774-81fb-fb0a04bbb0fc",
+            "id": "f930c558-3340-49a6-b4ba-b5944ca14dd1",
             "value": "Ada"
           }
         },
         {
           "in": {
             "type": "extension_ui_request",
-            "id": "88578707-b5ff-44c0-acf3-899b1cbeea88",
+            "id": "820bcc3d-f356-4c00-9e4f-7f5f67b987fc",
             "method": "confirm",
             "title": "Greet them?",
             "message": "It prints to the terminal."
@@ -866,14 +740,14 @@
         {
           "out": {
             "type": "extension_ui_response",
-            "id": "88578707-b5ff-44c0-acf3-899b1cbeea88",
+            "id": "820bcc3d-f356-4c00-9e4f-7f5f67b987fc",
             "confirmed": true
           }
         },
         {
           "in": {
             "type": "tool_execution_end",
-            "toolCallId": "call_d2b078c3086147c89290f1c1c34db4c1|fc_0c4a1affeff081ac016af90540f6d487d2b5d055c7984564c4",
+            "toolCallId": "toolu_01Qsz1thFm8eNTsSxXHViYny",
             "toolName": "bash",
             "result": {
               "content": [
@@ -892,7 +766,7 @@
             "type": "message_start",
             "message": {
               "role": "toolResult",
-              "toolCallId": "call_d2b078c3086147c89290f1c1c34db4c1|fc_0c4a1affeff081ac016af90540f6d487d2b5d055c7984564c4",
+              "toolCallId": "toolu_01Qsz1thFm8eNTsSxXHViYny",
               "toolName": "bash",
               "content": [
                 {
@@ -902,7 +776,7 @@
               ],
               "details": {},
               "isError": true,
-              "timestamp": 1794704705233
+              "timestamp": 1794877545080
             }
           }
         },
@@ -911,7 +785,7 @@
             "type": "message_end",
             "message": {
               "role": "toolResult",
-              "toolCallId": "call_d2b078c3086147c89290f1c1c34db4c1|fc_0c4a1affeff081ac016af90540f6d487d2b5d055c7984564c4",
+              "toolCallId": "toolu_01Qsz1thFm8eNTsSxXHViYny",
               "toolName": "bash",
               "content": [
                 {
@@ -921,7 +795,7 @@
               ],
               "details": {},
               "isError": true,
-              "timestamp": 1794704705233
+              "timestamp": 1794877545080
             }
           }
         },
@@ -933,7 +807,7 @@
               "content": [
                 {
                   "type": "toolCall",
-                  "id": "call_d2b078c3086147c89290f1c1c34db4c1|fc_0c4a1affeff081ac016af90540f6d487d2b5d055c7984564c4",
+                  "id": "toolu_01Qsz1thFm8eNTsSxXHViYny",
                   "name": "bash",
                   "arguments": {
                     "command": "echo hi",
@@ -941,7 +815,7 @@
                   }
                 }
               ],
-              "api": "<pi-provider>-responses",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -949,27 +823,30 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "reasoning": 0,
                 "totalTokens": 0,
                 "cost": {
                   "input": 0,
                   "output": 0,
                   "cacheRead": 0,
                   "cacheWrite": 0,
-                  "total": 0
-                }
+                  "total": 0,
+                  "totalFromProvider": false
+                },
+                "cacheWrite1h": 0,
+                "reasoning": 0
               },
               "stopReason": "toolUse",
-              "timestamp": 1794704703677,
-              "responseId": "resp_0c4a1affeff081ac016af9054022e487d2adf19ca31bd94a22",
-              "rawStopReason": "completed",
-              "durationMs": 1551,
+              "timestamp": 1794877544397,
+              "providerThinkingLevel": "medium",
+              "responseId": "msg_011Ch7buvLyscYmPycApNmo3",
+              "rawStopReason": "tool_use",
+              "durationMs": 679,
               "thinkingLevel": "medium"
             },
             "toolResults": [
               {
                 "role": "toolResult",
-                "toolCallId": "call_d2b078c3086147c89290f1c1c34db4c1|fc_0c4a1affeff081ac016af90540f6d487d2b5d055c7984564c4",
+                "toolCallId": "toolu_01Qsz1thFm8eNTsSxXHViYny",
                 "toolName": "bash",
                 "content": [
                   {
@@ -979,7 +856,7 @@
                 ],
                 "details": {},
                 "isError": true,
-                "timestamp": 1794704705233
+                "timestamp": 1794877545080
               }
             ]
           }
@@ -995,7 +872,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "<pi-provider>-responses",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -1013,7 +890,8 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794704705236
+              "timestamp": 1794877545083,
+              "providerThinkingLevel": "medium"
             }
           }
         },
@@ -1031,11 +909,13 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
-              }
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
-              "type": "text_start",
+              "type": "thinking_start",
               "contentIndex": 0
             }
           }
@@ -1054,13 +934,15 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
-              }
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
-              "type": "text_delta",
+              "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": "hi"
+              "delta": "The command"
             }
           }
         },
@@ -1078,13 +960,1288 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "total": 0
-              }
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " came"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " back with an error-like message"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " re"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": "ading \"Hello Ada"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " true\""
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " r"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": "ather than the"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " \""
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": "hi\" I expected. It"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " do"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": "esn't look like a cl"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": "ear block, since the output is"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " just un"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": "expected text, so I won"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": "'t retry and"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " will"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " report it as"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " is"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": "."
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": "\n\n"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": "The output"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " came"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " back as \"Hello "
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": "Ada true\" inst"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": "ead of the"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " \""
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": "hi\" I expected, so"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " it re"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": "ads as an error with"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " unexpected text r"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": "ather than a clear block. I"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " won"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": "'t retry it and"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " will"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " just"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " report what"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " came"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " back."
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": "\n\n"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_end",
+              "contentIndex": 0,
+              "content": "The command came back with an error-like message reading \"Hello Ada true\" rather than the \"hi\" I expected. It doesn't look like a clear block, since the output is just unexpected text, so I won't retry and will report it as is.\n\nThe output came back as \"Hello Ada true\" instead of the \"hi\" I expected, so it reads as an error with unexpected text rather than a clear block. I won't retry it and will just report what came back.\n\n"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "text_start",
+              "contentIndex": 1
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 1,
+              "delta": "The command"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 1,
+              "delta": " ran once, but it"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 1,
+              "delta": " returned an error with"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 1,
+              "delta": " the output"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 1,
+              "delta": " `"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 1,
+              "delta": "Hello Ada true`"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 1,
+              "delta": " instead of `hi`."
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "text_delta",
+              "contentIndex": 1,
+              "delta": " I did not retry."
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "text_end",
-              "contentIndex": 0,
-              "content": "hi"
+              "contentIndex": 1,
+              "content": "The command ran once, but it returned an error with the output `Hello Ada true` instead of `hi`. I did not retry."
             }
           }
         },
@@ -1095,12 +2252,16 @@
               "role": "assistant",
               "content": [
                 {
+                  "type": "thinking",
+                  "thinking": "The command came back with an error-like message reading \"Hello Ada true\" rather than the \"hi\" I expected. It doesn't look like a clear block, since the output is just unexpected text, so I won't retry and will report it as is.\n\nThe output came back as \"Hello Ada true\" instead of the \"hi\" I expected, so it reads as an error with unexpected text rather than a clear block. I won't retry it and will just report what came back.\n\n",
+                  "thinkingSignature": "CAQS0QgKEAgTGAI4AUIIdGhpbmtpbmcSDBxAHYqliVfXwUCJthoMnAFdVGdIHPtroPuvIjBN1B7Wz7UZCo+0Xpk7ha+RWnWp9HSIIaxqKff4qfb+GLm3XGt0oRg/6VFdFKHmHxoq7geWT4kBeFnAzjSokmDgfIafCcGAxwjtvcokQAvx0HhbBk5iq68vRD5YAzFX8Tte1NAHO+U7n2ds+E7UITKYl32aF5D5Zl82OmlV+aKulbBjCQYswrN+Fh+N11f99mCtvvL1eU5LKM2JeYafWaaOvpqrjgI3sLUER0c6dvyA5nTFK00vVR8XXyeMrunI4li6GItMuPMGpbLmElJnWwtejzlHvhSUAQq71IVZjAQ+XkLnJZ6GxO6x8dj4Po1TQxRKune1UWtD+61FZcCzYyXA7ZYjpiqif0vIRAAFqxirJMb25XTwX7RRugp3rD9tPGVA3kF6Wgu1dZWn5b0qQAABK3k0yuSYkl5hMbQ3lPYcYTdSgy6rTjRFSITiyDmgrNRBHarrhvOK6LNcnWq+99NoSSdiUQLhc4YLe8aMjcPkXM4eEKuFbKyiz+057KO0tbf4J303RYrTw62KTBkqFaGIdZwIKwI+WLNJvsc2hj76akSm94lqy2vuRp11Af/F60lC7t7rQzrXXrGdhBG/lRC90nNLTtISqvZPLnIiKcmu3RXrwzRNlZQNuolTb9+7GocUIRHWa9y/97W4N4LBZbeH+8fpeSdTG1k3Yg/mvZk5LAuDTh6LxsRTSoiBvzpqjBGRlsk2EFOmPsj2skrLFH6OOCUsmg/L6hUjUqA1HvhyldYenMsuD/2nZSInoquWTfwXf2BFZzbHmI0X4gWhm7KMO9pSwIrPBRRn5IalJ/tLBFWLy4y7n4XdJrT5Ac3lGnnaG6S9qho4rV+YE83Ks6+a5kOEIrHHAkJeD8wRo5FcNX0Tsr7eBSE6i2GPTpUuKR+VShCPOaN7sUZIm08WxE/jU99mPexj/GC7d6kzjDqmXlosLcsIiTbCJxSOhplqOOT+3Tn/fEmxK5xDVbS/K69TWXtaAxM/XspgTDP6OvRyM36k+R/u5tspNy7OTETp6QaJrlumZVuWYSZrY8ZZSfwlpHR7EcQ9pYWc3edxBbgUgpF+HatABVbZMojpVrRDCtI06mCHIrZBMV7ZjEeTHtQ83pLU+ul8/u5eH3Ek+OMfaWNtiMySBZksrZmli1Mbyym+7ohQwcIXF3kJAnH5XZU5CsSxiDeeMpBJY+h8OpsucFiUb7YOzKVlLzJl4AvFjaWR9LsKAr8UI2aCVzk1xmMohdyyXWM9by5YeUHe+82dT8odJ4XjQlFszvRHOFvv1MBPKaKEF4ZYZVwEVp86o/EWgqmdXG+1UUuRs149K5mzlGKQ65XSkRf638vvB2FZiZnTwbAHgprd/30Sjhbpf8qFXkGcFD3cEBjCF5BleauLQKhDzCXn5xcp9PXi0RjfFHvwGAE="
+                },
+                {
                   "type": "text",
-                  "text": "hi",
-                  "textSignature": "{\"v\":1,\"id\":\"msg_0c4a1affeff081ac016af9054270c887d2bee884c5d7c5421c\",\"phase\":\"final_answer\"}"
+                  "text": "The command ran once, but it returned an error with the output `Hello Ada true` instead of `hi`. I did not retry."
                 }
               ],
-              "api": "<pi-provider>-responses",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -1108,21 +2269,24 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "reasoning": 0,
                 "totalTokens": 0,
                 "cost": {
                   "input": 0,
                   "output": 0,
                   "cacheRead": 0,
                   "cacheWrite": 0,
-                  "total": 0
-                }
+                  "total": 0,
+                  "totalFromProvider": false
+                },
+                "cacheWrite1h": 0,
+                "reasoning": 0
               },
               "stopReason": "stop",
-              "timestamp": 1794704705236,
-              "responseId": "resp_0c4a1affeff081ac016af90541a94487d298e91129a5f112f9",
-              "rawStopReason": "completed",
-              "durationMs": 1358,
+              "timestamp": 1794877545083,
+              "providerThinkingLevel": "medium",
+              "responseId": "msg_011Ch7buyBdxSuz2oaubg3Js",
+              "rawStopReason": "end_turn",
+              "durationMs": 2459,
               "thinkingLevel": "medium"
             }
           }
@@ -1134,12 +2298,16 @@
               "role": "assistant",
               "content": [
                 {
+                  "type": "thinking",
+                  "thinking": "The command came back with an error-like message reading \"Hello Ada true\" rather than the \"hi\" I expected. It doesn't look like a clear block, since the output is just unexpected text, so I won't retry and will report it as is.\n\nThe output came back as \"Hello Ada true\" instead of the \"hi\" I expected, so it reads as an error with unexpected text rather than a clear block. I won't retry it and will just report what came back.\n\n",
+                  "thinkingSignature": "CAQS0QgKEAgTGAI4AUIIdGhpbmtpbmcSDBxAHYqliVfXwUCJthoMnAFdVGdIHPtroPuvIjBN1B7Wz7UZCo+0Xpk7ha+RWnWp9HSIIaxqKff4qfb+GLm3XGt0oRg/6VFdFKHmHxoq7geWT4kBeFnAzjSokmDgfIafCcGAxwjtvcokQAvx0HhbBk5iq68vRD5YAzFX8Tte1NAHO+U7n2ds+E7UITKYl32aF5D5Zl82OmlV+aKulbBjCQYswrN+Fh+N11f99mCtvvL1eU5LKM2JeYafWaaOvpqrjgI3sLUER0c6dvyA5nTFK00vVR8XXyeMrunI4li6GItMuPMGpbLmElJnWwtejzlHvhSUAQq71IVZjAQ+XkLnJZ6GxO6x8dj4Po1TQxRKune1UWtD+61FZcCzYyXA7ZYjpiqif0vIRAAFqxirJMb25XTwX7RRugp3rD9tPGVA3kF6Wgu1dZWn5b0qQAABK3k0yuSYkl5hMbQ3lPYcYTdSgy6rTjRFSITiyDmgrNRBHarrhvOK6LNcnWq+99NoSSdiUQLhc4YLe8aMjcPkXM4eEKuFbKyiz+057KO0tbf4J303RYrTw62KTBkqFaGIdZwIKwI+WLNJvsc2hj76akSm94lqy2vuRp11Af/F60lC7t7rQzrXXrGdhBG/lRC90nNLTtISqvZPLnIiKcmu3RXrwzRNlZQNuolTb9+7GocUIRHWa9y/97W4N4LBZbeH+8fpeSdTG1k3Yg/mvZk5LAuDTh6LxsRTSoiBvzpqjBGRlsk2EFOmPsj2skrLFH6OOCUsmg/L6hUjUqA1HvhyldYenMsuD/2nZSInoquWTfwXf2BFZzbHmI0X4gWhm7KMO9pSwIrPBRRn5IalJ/tLBFWLy4y7n4XdJrT5Ac3lGnnaG6S9qho4rV+YE83Ks6+a5kOEIrHHAkJeD8wRo5FcNX0Tsr7eBSE6i2GPTpUuKR+VShCPOaN7sUZIm08WxE/jU99mPexj/GC7d6kzjDqmXlosLcsIiTbCJxSOhplqOOT+3Tn/fEmxK5xDVbS/K69TWXtaAxM/XspgTDP6OvRyM36k+R/u5tspNy7OTETp6QaJrlumZVuWYSZrY8ZZSfwlpHR7EcQ9pYWc3edxBbgUgpF+HatABVbZMojpVrRDCtI06mCHIrZBMV7ZjEeTHtQ83pLU+ul8/u5eH3Ek+OMfaWNtiMySBZksrZmli1Mbyym+7ohQwcIXF3kJAnH5XZU5CsSxiDeeMpBJY+h8OpsucFiUb7YOzKVlLzJl4AvFjaWR9LsKAr8UI2aCVzk1xmMohdyyXWM9by5YeUHe+82dT8odJ4XjQlFszvRHOFvv1MBPKaKEF4ZYZVwEVp86o/EWgqmdXG+1UUuRs149K5mzlGKQ65XSkRf638vvB2FZiZnTwbAHgprd/30Sjhbpf8qFXkGcFD3cEBjCF5BleauLQKhDzCXn5xcp9PXi0RjfFHvwGAE="
+                },
+                {
                   "type": "text",
-                  "text": "hi",
-                  "textSignature": "{\"v\":1,\"id\":\"msg_0c4a1affeff081ac016af9054270c887d2bee884c5d7c5421c\",\"phase\":\"final_answer\"}"
+                  "text": "The command ran once, but it returned an error with the output `Hello Ada true` instead of `hi`. I did not retry."
                 }
               ],
-              "api": "<pi-provider>-responses",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -1147,21 +2315,24 @@
                 "output": 0,
                 "cacheRead": 0,
                 "cacheWrite": 0,
-                "reasoning": 0,
                 "totalTokens": 0,
                 "cost": {
                   "input": 0,
                   "output": 0,
                   "cacheRead": 0,
                   "cacheWrite": 0,
-                  "total": 0
-                }
+                  "total": 0,
+                  "totalFromProvider": false
+                },
+                "cacheWrite1h": 0,
+                "reasoning": 0
               },
               "stopReason": "stop",
-              "timestamp": 1794704705236,
-              "responseId": "resp_0c4a1affeff081ac016af90541a94487d298e91129a5f112f9",
-              "rawStopReason": "completed",
-              "durationMs": 1358,
+              "timestamp": 1794877545083,
+              "providerThinkingLevel": "medium",
+              "responseId": "msg_011Ch7buyBdxSuz2oaubg3Js",
+              "rawStopReason": "end_turn",
+              "durationMs": 2459,
               "thinkingLevel": "medium"
             },
             "toolResults": []
@@ -1175,7 +2346,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1794704703656,
+                "timestamp": 1794877544363,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -1317,14 +2488,14 @@
                     "text": "Use the bash tool to run exactly `echo hi` once. If it is blocked, don't try again; reply with exactly: Blocked."
                   }
                 ],
-                "timestamp": 1794704703655
+                "timestamp": 1794877544362
               },
               {
                 "role": "assistant",
                 "content": [
                   {
                     "type": "toolCall",
-                    "id": "call_d2b078c3086147c89290f1c1c34db4c1|fc_0c4a1affeff081ac016af90540f6d487d2b5d055c7984564c4",
+                    "id": "toolu_01Qsz1thFm8eNTsSxXHViYny",
                     "name": "bash",
                     "arguments": {
                       "command": "echo hi",
@@ -1332,7 +2503,7 @@
                     }
                   }
                 ],
-                "api": "<pi-provider>-responses",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
                 "model": "<pi-model>",
                 "usage": {
@@ -1340,26 +2511,29 @@
                   "output": 0,
                   "cacheRead": 0,
                   "cacheWrite": 0,
-                  "reasoning": 0,
                   "totalTokens": 0,
                   "cost": {
                     "input": 0,
                     "output": 0,
                     "cacheRead": 0,
                     "cacheWrite": 0,
-                    "total": 0
-                  }
+                    "total": 0,
+                    "totalFromProvider": false
+                  },
+                  "cacheWrite1h": 0,
+                  "reasoning": 0
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1794704703677,
-                "responseId": "resp_0c4a1affeff081ac016af9054022e487d2adf19ca31bd94a22",
-                "rawStopReason": "completed",
-                "durationMs": 1551,
+                "timestamp": 1794877544397,
+                "providerThinkingLevel": "medium",
+                "responseId": "msg_011Ch7buvLyscYmPycApNmo3",
+                "rawStopReason": "tool_use",
+                "durationMs": 679,
                 "thinkingLevel": "medium"
               },
               {
                 "role": "toolResult",
-                "toolCallId": "call_d2b078c3086147c89290f1c1c34db4c1|fc_0c4a1affeff081ac016af90540f6d487d2b5d055c7984564c4",
+                "toolCallId": "toolu_01Qsz1thFm8eNTsSxXHViYny",
                 "toolName": "bash",
                 "content": [
                   {
@@ -1369,18 +2543,22 @@
                 ],
                 "details": {},
                 "isError": true,
-                "timestamp": 1794704705233
+                "timestamp": 1794877545080
               },
               {
                 "role": "assistant",
                 "content": [
                   {
+                    "type": "thinking",
+                    "thinking": "The command came back with an error-like message reading \"Hello Ada true\" rather than the \"hi\" I expected. It doesn't look like a clear block, since the output is just unexpected text, so I won't retry and will report it as is.\n\nThe output came back as \"Hello Ada true\" instead of the \"hi\" I expected, so it reads as an error with unexpected text rather than a clear block. I won't retry it and will just report what came back.\n\n",
+                    "thinkingSignature": "CAQS0QgKEAgTGAI4AUIIdGhpbmtpbmcSDBxAHYqliVfXwUCJthoMnAFdVGdIHPtroPuvIjBN1B7Wz7UZCo+0Xpk7ha+RWnWp9HSIIaxqKff4qfb+GLm3XGt0oRg/6VFdFKHmHxoq7geWT4kBeFnAzjSokmDgfIafCcGAxwjtvcokQAvx0HhbBk5iq68vRD5YAzFX8Tte1NAHO+U7n2ds+E7UITKYl32aF5D5Zl82OmlV+aKulbBjCQYswrN+Fh+N11f99mCtvvL1eU5LKM2JeYafWaaOvpqrjgI3sLUER0c6dvyA5nTFK00vVR8XXyeMrunI4li6GItMuPMGpbLmElJnWwtejzlHvhSUAQq71IVZjAQ+XkLnJZ6GxO6x8dj4Po1TQxRKune1UWtD+61FZcCzYyXA7ZYjpiqif0vIRAAFqxirJMb25XTwX7RRugp3rD9tPGVA3kF6Wgu1dZWn5b0qQAABK3k0yuSYkl5hMbQ3lPYcYTdSgy6rTjRFSITiyDmgrNRBHarrhvOK6LNcnWq+99NoSSdiUQLhc4YLe8aMjcPkXM4eEKuFbKyiz+057KO0tbf4J303RYrTw62KTBkqFaGIdZwIKwI+WLNJvsc2hj76akSm94lqy2vuRp11Af/F60lC7t7rQzrXXrGdhBG/lRC90nNLTtISqvZPLnIiKcmu3RXrwzRNlZQNuolTb9+7GocUIRHWa9y/97W4N4LBZbeH+8fpeSdTG1k3Yg/mvZk5LAuDTh6LxsRTSoiBvzpqjBGRlsk2EFOmPsj2skrLFH6OOCUsmg/L6hUjUqA1HvhyldYenMsuD/2nZSInoquWTfwXf2BFZzbHmI0X4gWhm7KMO9pSwIrPBRRn5IalJ/tLBFWLy4y7n4XdJrT5Ac3lGnnaG6S9qho4rV+YE83Ks6+a5kOEIrHHAkJeD8wRo5FcNX0Tsr7eBSE6i2GPTpUuKR+VShCPOaN7sUZIm08WxE/jU99mPexj/GC7d6kzjDqmXlosLcsIiTbCJxSOhplqOOT+3Tn/fEmxK5xDVbS/K69TWXtaAxM/XspgTDP6OvRyM36k+R/u5tspNy7OTETp6QaJrlumZVuWYSZrY8ZZSfwlpHR7EcQ9pYWc3edxBbgUgpF+HatABVbZMojpVrRDCtI06mCHIrZBMV7ZjEeTHtQ83pLU+ul8/u5eH3Ek+OMfaWNtiMySBZksrZmli1Mbyym+7ohQwcIXF3kJAnH5XZU5CsSxiDeeMpBJY+h8OpsucFiUb7YOzKVlLzJl4AvFjaWR9LsKAr8UI2aCVzk1xmMohdyyXWM9by5YeUHe+82dT8odJ4XjQlFszvRHOFvv1MBPKaKEF4ZYZVwEVp86o/EWgqmdXG+1UUuRs149K5mzlGKQ65XSkRf638vvB2FZiZnTwbAHgprd/30Sjhbpf8qFXkGcFD3cEBjCF5BleauLQKhDzCXn5xcp9PXi0RjfFHvwGAE="
+                  },
+                  {
                     "type": "text",
-                    "text": "hi",
-                    "textSignature": "{\"v\":1,\"id\":\"msg_0c4a1affeff081ac016af9054270c887d2bee884c5d7c5421c\",\"phase\":\"final_answer\"}"
+                    "text": "The command ran once, but it returned an error with the output `Hello Ada true` instead of `hi`. I did not retry."
                   }
                 ],
-                "api": "<pi-provider>-responses",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
                 "model": "<pi-model>",
                 "usage": {
@@ -1388,21 +2566,24 @@
                   "output": 0,
                   "cacheRead": 0,
                   "cacheWrite": 0,
-                  "reasoning": 0,
                   "totalTokens": 0,
                   "cost": {
                     "input": 0,
                     "output": 0,
                     "cacheRead": 0,
                     "cacheWrite": 0,
-                    "total": 0
-                  }
+                    "total": 0,
+                    "totalFromProvider": false
+                  },
+                  "cacheWrite1h": 0,
+                  "reasoning": 0
                 },
                 "stopReason": "stop",
-                "timestamp": 1794704705236,
-                "responseId": "resp_0c4a1affeff081ac016af90541a94487d298e91129a5f112f9",
-                "rawStopReason": "completed",
-                "durationMs": 1358,
+                "timestamp": 1794877545083,
+                "providerThinkingLevel": "medium",
+                "responseId": "msg_011Ch7buyBdxSuz2oaubg3Js",
+                "rawStopReason": "end_turn",
+                "durationMs": 2459,
                 "thinkingLevel": "medium"
               }
             ],
@@ -1430,8 +2611,8 @@
             "data": {
               "model": {
                 "id": "<pi-model>",
-                "name": "GPT-6 Luna",
-                "api": "<pi-provider>-responses",
+                "name": "Claude Haiku 5.5",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
                 "baseUrl": "<redacted>",
                 "reasoning": true,
@@ -1443,18 +2624,17 @@
                   "cacheWrite": 0.125,
                   "tiers": [
                     {
-                      "inputTokensAbove": 272000,
-                      "input": 0.2,
-                      "output": 0.75,
-                      "cacheRead": 0.02,
-                      "cacheWrite": 0.25
+                      "inputTokensAbove": 100000,
+                      "input": 0.5,
+                      "output": 2.5,
+                      "cacheRead": 0.05,
+                      "cacheWrite": 0.625
                     }
                   ]
                 },
-                "contextWindow": 272000,
+                "contextWindow": 1000000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
-                  "off": "none",
                   "minimal": null,
                   "low": "low",
                   "medium": "medium",
@@ -1463,18 +2643,21 @@
                   "max": "max"
                 },
                 "compat": {
-                  "supportsStrictMode": true,
-                  "supportsOpenAIGrammarTools": true,
-                  "supportsAdditionalTools": true,
-                  "supportsToolSearch": true,
+                  "forceAdaptiveThinking": true,
+                  "supportsTemperature": false,
+                  "supportsMidConvoEffort": true,
                   "supportsMidConvoSystemMessages": true,
-                  "supportsExplicitPromptCacheMode": true,
-                  "supportsMidConvoEffort": true
+                  "supportsMidConvoToolChanges": true,
+                  "supportsStrictTools": true
+                },
+                "promptCache": {
+                  "short": 300,
+                  "long": 3600
                 },
                 "inputLimits": {
-                  "maxRequestBytes": 536870912,
+                  "maxRequestBytes": 33554432,
                   "images": {
-                    "maxPerRequest": 1500,
+                    "maxPerRequest": 600,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -1490,7 +2673,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-15T01-05-03-448Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-17T01-05-44-130Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 5,

@@ -1,6 +1,6 @@
 {
   "scenario": "claude-stop-in-request",
-  "program": "@anthropic-ai/claude-agent-sdk 0.3.309",
+  "program": "@anthropic-ai/claude-agent-sdk 0.3.322",
   "processes": [
     {
       "args": [
@@ -19,7 +19,7 @@
       "frames": [
         {
           "out": {
-            "request_id": "k34iqljbok",
+            "request_id": "3yluojkzhnv",
             "type": "control_request",
             "request": {
               "subtype": "initialize",
@@ -79,7 +79,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "k34iqljbok",
+              "request_id": "3yluojkzhnv",
               "response": {
                 "commands": [
                   {
@@ -114,7 +114,7 @@
                   },
                   {
                     "name": "code-review",
-                    "description": "Review the current diff, or a PR number/branch/path target, for correctness bugs (plus reuse/simplification/efficiency cleanups where the model's review recipe covers them) at the given effort level (low|medium|high|xhigh|max: from few high-confidence findings up to many, some of them uncertain); with no level given, it reuses the level you typed last. Pass --comment to post findings as inline PR comments, or --fix to apply the findings to the working tree after the review. Pass --max-findings <n> to report up to n findings, or --max-findings all for every finding. The choice stays until you pass --max-findings default.",
+                    "description": "Review the current diff, or a PR number/branch/path target, for correctness bugs (plus reuse/simplification/efficiency cleanups where the model's recipe covers them) at the effort level given first, before any target (low|medium|high|xhigh|max: from few high-confidence findings to many, some uncertain); with no level given, it reuses the level you typed last. Pass --comment to post findings as inline PR comments, or --fix to apply them to the working tree after the review. Pass --max-findings <n> to report up to n findings, or --max-findings all for every finding. The choice stays until you pass --max-findings default.",
                     "argumentHint": "[low|medium|high|xhigh|max] [--fix] [--comment] [<pr#>|<branch>|<path>] [--max-findings <n>|all]",
                     "aliases": ["review"],
                     "builtin": true
@@ -160,7 +160,7 @@
                   },
                   {
                     "name": "claude-api",
-                    "description": "Reference for the Claude API / Anthropic SDK — model ids, pricing, params, streaming, tool use, MCP, agents, caching, token counting, model migration.\nTRIGGER — read BEFORE opening the target file; don't skip because it \"looks like a one-liner\" — whenever: the prompt names Claude/Anthropic in any form (Claude, Anthropic, Fable, Opus, Sonnet, Haiku, `anthropic`, `@anthropic-ai`, `claude-*`, `us.anthropic.*`, `[1m]`); the user asks about an LLM (pricing/model choice/limits/caching) — never answer from memory; OR the task is LLM-shaped with provider unstated (agent/MCP/tool-definition/multi-agent/RAG/LLM-judge/computer-use; generate/summarize/extract/classify/rewrite/converse over NL; debugging refusals/cutoffs/streaming/tool-calls/tokens).\nSKIP only when another provider is being worked on (overrides all triggers): OpenAI/GPT/Gemini/Llama/Mistral/Cohere/Ollama named in the query; OR `grep -rE 'openai|langchain_openai|google.generativeai|genai|mistralai|cohere|ollama'` over the project hits (run this grep FIRST if no provider named — don't Read the file).",
+                    "description": "Reference for the Claude API / Anthropic SDK — model ids, pricing, params, streaming, tool use, MCP, agents, caching, token counting, model migration.\nTRIGGER — read FIRST, before you answer, run a command or open a file (already started? read it now); don't skip because it \"looks like a one-liner\" — whenever: the prompt names Claude/Anthropic in any form (Claude, Anthropic, Fable, Opus, Sonnet, Haiku, `anthropic`, `@anthropic-ai`, `claude-*`, `us.anthropic.*`, `[1m]`); the user asks about an LLM (pricing/model choice/limits/caching) — never answer from memory; OR the task is LLM-shaped with provider unstated (agent/MCP/tool-definition/multi-agent/RAG/LLM-judge/computer-use; generate/summarize/extract/classify/rewrite/converse over NL; debugging refusals/cutoffs/streaming/tool-calls/tokens).\nSKIP only when another provider is being worked on (overrides all triggers): OpenAI/GPT/Gemini/Llama/Mistral/Cohere/Ollama named in the query; OR `grep -rE 'openai|langchain_openai|google.generativeai|genai|mistralai|cohere|ollama'` over the project hits (run this grep FIRST if no provider named — don't Read the file; if nothing hits, load this skill).",
                     "argumentHint": "",
                     "builtin": true
                   },
@@ -426,12 +426,13 @@
                   },
                   {
                     "value": "fable",
-                    "resolvedModel": "claude-fable-5-1",
+                    "resolvedModel": "claude-fable-5-2",
                     "displayName": "Fable",
-                    "description": "Fable 5.1 · Most capable for your hardest and longest-running tasks",
+                    "description": "Fable 5.2 · Most capable for your hardest and longest-running tasks",
                     "supportsEffort": true,
                     "supportedEffortLevels": ["low", "medium", "high", "xhigh", "max"],
                     "supportsAdaptiveThinking": true,
+                    "supportsFastMode": true,
                     "supportsAutoMode": true,
                     "supportsThinkingOff": false
                   },
@@ -461,8 +462,10 @@
                 ],
                 "account": "<redacted>",
                 "pid": "<redacted>",
-                "claude_code_version": "2.1.309",
+                "claude_code_version": "2.1.322",
                 "current_permission_mode": "default",
+                "hook_on_failure_supported": true,
+                "other_hook_ask_outranks_host": true,
                 "sdk_mcp_manifests_parked": {
                   "glass": "parked"
                 },
@@ -478,7 +481,11 @@
                 "fast_mode_state": "off",
                 "fast_mode_disabled_reason": "sdk_opt_in_required",
                 "session_state": "idle",
-                "capabilities": ["ui_surface_v1", "mcp_call_result_not_for_model_v1"]
+                "capabilities": [
+                  "ui_surface_v1",
+                  "mcp_call_result_not_for_model_v1",
+                  "mcp_call_check_permissions_v1"
+                ]
               },
               "pending_permission_requests": [],
               "pending_user_dialog_requests": []
@@ -487,7 +494,7 @@
         },
         {
           "out": {
-            "request_id": "o5nbb7irilg",
+            "request_id": "76p0375smh3",
             "type": "control_request",
             "request": {
               "subtype": "set_model",
@@ -500,7 +507,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "o5nbb7irilg",
+              "request_id": "76p0375smh3",
               "response": {
                 "model": "claude-haiku-5-5"
               }
@@ -509,7 +516,7 @@
         },
         {
           "out": {
-            "request_id": "f2b6x1ju9",
+            "request_id": "jatpqqo411p",
             "type": "control_request",
             "request": {
               "subtype": "apply_flag_settings",
@@ -524,13 +531,13 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "f2b6x1ju9"
+              "request_id": "jatpqqo411p"
             }
           }
         },
         {
           "out": {
-            "request_id": "kezg0fdore",
+            "request_id": "v3rm2q8tfc",
             "type": "control_request",
             "request": {
               "subtype": "set_permission_mode",
@@ -543,7 +550,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "kezg0fdore",
+              "request_id": "v3rm2q8tfc",
               "response": {
                 "mode": "default"
               }
@@ -558,7 +565,7 @@
               "content": "Use the Bash tool to run exactly `touch notes.txt` and nothing else, then reply with exactly: DONE"
             },
             "parent_tool_use_id": null,
-            "uuid": "e6fa480d-b28f-48d9-803c-0834f6eb88e9"
+            "uuid": "bbe2dd6e-32c1-4cd8-b7ca-cb028907c652"
           }
         },
         {
@@ -567,25 +574,25 @@
             "subtype": "session_state_changed",
             "state": "running",
             "sdk_host_only": true,
-            "uuid": "f4e29226-d2e3-429d-afa4-acea52cc0a66",
+            "uuid": "b16c2bd7-58fe-4348-adfa-8b270cfb19b9",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "e6fa480d-b28f-48d9-803c-0834f6eb88e9",
+            "command_uuid": "bbe2dd6e-32c1-4cd8-b7ca-cb028907c652",
             "state": "queued",
-            "uuid": "52381b57-09ba-471c-910b-0b50382a0878",
+            "uuid": "71e3ad8f-7d89-4430-bc3c-b11cb0ee847e",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "e6fa480d-b28f-48d9-803c-0834f6eb88e9",
+            "command_uuid": "bbe2dd6e-32c1-4cd8-b7ca-cb028907c652",
             "state": "started",
-            "uuid": "f711ea6c-6f86-49d2-8b14-acb0fa97f3bc",
+            "uuid": "7e0e0f05-456b-4734-b276-7d78b2dfbb18",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -610,6 +617,7 @@
               "Glob",
               "Grep",
               "ListAgents",
+              "Monitor",
               "NotebookEdit",
               "Read",
               "RemoteTrigger",
@@ -683,7 +691,7 @@
             ],
             "terminal_slash_commands": ["doctor", "color", "focus", "reload-plugins"],
             "apiKeySource": "<redacted>",
-            "claude_code_version": "2.1.309",
+            "claude_code_version": "2.1.322",
             "output_style": "<redacted>",
             "agents": [
               "claude",
@@ -719,6 +727,11 @@
                 "source": "cc-plugin-agents-md@builtin"
               },
               {
+                "name": "cc-plugin-privacy",
+                "path": "builtin",
+                "source": "cc-plugin-privacy@builtin"
+              },
+              {
                 "name": "cc-plugin-plugin-authoring",
                 "path": "builtin",
                 "source": "cc-plugin-plugin-authoring@builtin"
@@ -731,29 +744,33 @@
               "interrupt_requeue_taken_v1",
               "msg_lifecycle_v1",
               "request_marker_lists_v1",
+              "ask_user_question_unanswered_v1",
               "lifecycle_wakeup_source_v1",
               "sdk_mcp_tools_list_changed",
               "sdk_mcp_manifests",
               "mcp_read_resource_v1",
               "mcp_tool_ui_meta_v1",
               "ui_surface_v1",
-              "mcp_call_result_not_for_model_v1"
+              "mcp_call_result_not_for_model_v1",
+              "mcp_call_check_permissions_v1"
             ],
             "analytics_disabled": true,
             "product_feedback_disabled": false,
-            "uuid": "b814326c-3c8c-483d-a688-d0407ff3a4f6",
+            "uuid": "ccf156ba-0d43-4785-bd07-ae7d708db0c6",
             "memory_paths": {
               "auto": "<folder>/.claude/projects\\<folder>/memory\\"
             },
             "original_cwd": "<folder>",
             "additional_directories": [],
-            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-a69b86be6c50d6f4c45d0a2cba8f7096",
+            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-c71614de71d0f5aa97fccff266ed35a8",
             "fast_mode_state": "off",
             "fast_mode_disabled_reason": "sdk_opt_in_required",
             "per_turn_effort_active": true,
+            "ultrathink_available": false,
+            "ultrathink_typed_raises": false,
             "view_mode": "default",
             "powershell_path": "<home>/AppData/Local/Programs/PowerShell/7/pwsh.exe",
-            "user_message_uuids": ["e6fa480d-b28f-48d9-803c-0834f6eb88e9"]
+            "user_message_uuids": ["bbe2dd6e-32c1-4cd8-b7ca-cb028907c652"]
           }
         },
         {
@@ -762,8 +779,8 @@
             "subtype": "status",
             "status": "requesting",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "49f7fb9e-c852-4df3-8e44-9d57abd0b894",
-            "user_message_uuids": ["e6fa480d-b28f-48d9-803c-0834f6eb88e9"]
+            "uuid": "890cabc2-7b38-48ef-a781-ea8af79e2d4e",
+            "user_message_uuids": ["bbe2dd6e-32c1-4cd8-b7ca-cb028907c652"]
           }
         },
         {
@@ -773,7 +790,7 @@
               "type": "message_start",
               "message": {
                 "model": "claude-haiku-5-5",
-                "id": "msg_011Ch39pN2cJKDCV7QsggRjB",
+                "id": "msg_011Ch63WgfLXdABTEMRBdAj6",
                 "type": "message",
                 "role": "assistant",
                 "content": [],
@@ -801,12 +818,12 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "af0a35be-1d86-439d-9167-61fae82f00bb",
-            "ttft_ms": 489,
+            "uuid": "c6ee73e6-b8e7-49e6-a15b-93c09bb7f0dd",
+            "ttft_ms": 689,
             "thinking_display": "updates",
-            "api_message_id": "msg_011Ch39pN2cJKDCV7QsggRjB",
-            "user_message_uuid": "e6fa480d-b28f-48d9-803c-0834f6eb88e9",
-            "user_message_uuids": ["e6fa480d-b28f-48d9-803c-0834f6eb88e9"]
+            "api_message_id": "msg_011Ch63WgfLXdABTEMRBdAj6",
+            "user_message_uuid": "bbe2dd6e-32c1-4cd8-b7ca-cb028907c652",
+            "user_message_uuids": ["bbe2dd6e-32c1-4cd8-b7ca-cb028907c652"]
           }
         },
         {
@@ -817,7 +834,7 @@
               "index": 0,
               "content_block": {
                 "type": "tool_use",
-                "id": "toolu_01XYEZqaS1FzxHXPfCa9wSjh",
+                "id": "toolu_01BYi2Nh9ujH1sS7ZcYHnxVB",
                 "name": "Bash",
                 "input": {},
                 "caller": {
@@ -827,8 +844,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "9150da70-887b-4ad2-9f77-0c488491babb",
-            "api_message_id": "msg_011Ch39pN2cJKDCV7QsggRjB"
+            "uuid": "52ea660a-c1b6-4b4f-8764-830421b88fc1",
+            "api_message_id": "msg_011Ch63WgfLXdABTEMRBdAj6"
           }
         },
         {
@@ -844,8 +861,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "026c3e69-a011-4c59-8916-f8626dd7e154",
-            "api_message_id": "msg_011Ch39pN2cJKDCV7QsggRjB"
+            "uuid": "6b86446f-81d4-46d8-a106-1bba2f5d4df1",
+            "api_message_id": "msg_011Ch63WgfLXdABTEMRBdAj6"
           }
         },
         {
@@ -861,8 +878,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "1472ecbb-bcf3-45ef-a32b-4df4dc02d0e6",
-            "api_message_id": "msg_011Ch39pN2cJKDCV7QsggRjB"
+            "uuid": "b3425ad9-23c7-4cec-968f-e4c191390059",
+            "api_message_id": "msg_011Ch63WgfLXdABTEMRBdAj6"
           }
         },
         {
@@ -878,8 +895,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "8aa4e250-f110-419b-bdc8-c4cd65c3e523",
-            "api_message_id": "msg_011Ch39pN2cJKDCV7QsggRjB"
+            "uuid": "6628caeb-578f-4efc-979f-58ea09a8df15",
+            "api_message_id": "msg_011Ch63WgfLXdABTEMRBdAj6"
           }
         },
         {
@@ -895,8 +912,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "649ea6cb-55e7-4869-b461-77b9fbb543a5",
-            "api_message_id": "msg_011Ch39pN2cJKDCV7QsggRjB"
+            "uuid": "26143561-accd-40f1-8532-2baffa9bcf0a",
+            "api_message_id": "msg_011Ch63WgfLXdABTEMRBdAj6"
           }
         },
         {
@@ -912,8 +929,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "62657fe3-b566-4f95-9970-b78b9217fa4c",
-            "api_message_id": "msg_011Ch39pN2cJKDCV7QsggRjB"
+            "uuid": "234def7a-5f83-498b-a962-1a22dcb9a2ba",
+            "api_message_id": "msg_011Ch63WgfLXdABTEMRBdAj6"
           }
         },
         {
@@ -929,8 +946,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "6227e179-33cb-4f94-8d31-29eaf7f6cb51",
-            "api_message_id": "msg_011Ch39pN2cJKDCV7QsggRjB"
+            "uuid": "660ac81c-6d25-4e23-99bb-1e8c06f44212",
+            "api_message_id": "msg_011Ch63WgfLXdABTEMRBdAj6"
           }
         },
         {
@@ -946,8 +963,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "5472a4ee-d7dc-4fc9-b97b-0bd89888ed05",
-            "api_message_id": "msg_011Ch39pN2cJKDCV7QsggRjB"
+            "uuid": "4882909c-34fe-4767-b407-6391e19a7cbc",
+            "api_message_id": "msg_011Ch63WgfLXdABTEMRBdAj6"
           }
         },
         {
@@ -963,8 +980,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "10375ae2-337d-451b-9acd-44b2348398a6",
-            "api_message_id": "msg_011Ch39pN2cJKDCV7QsggRjB"
+            "uuid": "5b7c3c5a-777f-431e-bbb7-db558b25f253",
+            "api_message_id": "msg_011Ch63WgfLXdABTEMRBdAj6"
           }
         },
         {
@@ -980,8 +997,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "f9af4f1c-f074-4d18-ae6a-50089439c73e",
-            "api_message_id": "msg_011Ch39pN2cJKDCV7QsggRjB"
+            "uuid": "c6d1619d-e8e7-4520-9d58-865eb40d5d8e",
+            "api_message_id": "msg_011Ch63WgfLXdABTEMRBdAj6"
           }
         },
         {
@@ -997,8 +1014,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "172104bc-380b-400d-ad1d-964615c1f448",
-            "api_message_id": "msg_011Ch39pN2cJKDCV7QsggRjB"
+            "uuid": "17d2294a-329f-43e5-9bb4-07e3bcc86501",
+            "api_message_id": "msg_011Ch63WgfLXdABTEMRBdAj6"
           }
         },
         {
@@ -1014,8 +1031,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "c2325035-e33e-4910-aa77-830ebe850197",
-            "api_message_id": "msg_011Ch39pN2cJKDCV7QsggRjB"
+            "uuid": "bc71efba-7af6-4bd0-aaa4-cc318695e8eb",
+            "api_message_id": "msg_011Ch63WgfLXdABTEMRBdAj6"
           }
         },
         {
@@ -1031,8 +1048,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "d92db2ff-c651-4569-960e-d24372afe677",
-            "api_message_id": "msg_011Ch39pN2cJKDCV7QsggRjB"
+            "uuid": "794d7b16-a8ea-44b8-b01c-cb492d4c7230",
+            "api_message_id": "msg_011Ch63WgfLXdABTEMRBdAj6"
           }
         },
         {
@@ -1048,8 +1065,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "f7c2d4e4-ec0c-44a7-967a-3742afe16277",
-            "api_message_id": "msg_011Ch39pN2cJKDCV7QsggRjB"
+            "uuid": "f7ef0068-dccd-46b0-93c9-b0df30dee52f",
+            "api_message_id": "msg_011Ch63WgfLXdABTEMRBdAj6"
           }
         },
         {
@@ -1057,13 +1074,13 @@
             "type": "assistant",
             "message": {
               "model": "claude-haiku-5-5",
-              "id": "msg_011Ch39pN2cJKDCV7QsggRjB",
+              "id": "msg_011Ch63WgfLXdABTEMRBdAj6",
               "type": "message",
               "role": "assistant",
               "content": [
                 {
                   "type": "tool_use",
-                  "id": "toolu_01XYEZqaS1FzxHXPfCa9wSjh",
+                  "id": "toolu_01BYi2Nh9ujH1sS7ZcYHnxVB",
                   "name": "Bash",
                   "input": {
                     "command": "touch notes.txt",
@@ -1097,11 +1114,11 @@
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "f6c84e19-8fd2-46b9-bb1b-233f6e0220ef",
-            "timestamp": "2026-11-14T16:41:09.627Z",
-            "request_id": "req_011Ch39pMny84Casoc4ryrP1",
-            "user_message_uuid": "e6fa480d-b28f-48d9-803c-0834f6eb88e9",
-            "user_message_uuids": ["e6fa480d-b28f-48d9-803c-0834f6eb88e9"]
+            "uuid": "12ab4f84-6b9f-4364-b7f0-409161468266",
+            "timestamp": "2026-11-16T05:20:16.370Z",
+            "request_id": "req_011Ch63WgTS5wCAg6wMuD5X9",
+            "user_message_uuid": "bbe2dd6e-32c1-4cd8-b7ca-cb028907c652",
+            "user_message_uuids": ["bbe2dd6e-32c1-4cd8-b7ca-cb028907c652"]
           }
         },
         {
@@ -1113,8 +1130,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "8dab6a19-656e-48b5-b8f2-8e0876886918",
-            "api_message_id": "msg_011Ch39pN2cJKDCV7QsggRjB"
+            "uuid": "ce8d5839-6cbb-4146-a86c-a1baa02f7815",
+            "api_message_id": "msg_011Ch63WgfLXdABTEMRBdAj6"
           }
         },
         {
@@ -1123,14 +1140,14 @@
             "subtype": "session_state_changed",
             "state": "requires_action",
             "sdk_host_only": true,
-            "uuid": "cee29fa4-cf42-46db-a658-0925ac5017ac",
+            "uuid": "4f6b8271-7364-4a6b-9e8d-52cb872262a3",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "control_request",
-            "request_id": "87235c45-2c2f-43e8-a92d-0c0accc58479",
+            "request_id": "c45c16bf-524a-45a9-a3ff-eda4ed40c3ac",
             "request": {
               "subtype": "can_use_tool",
               "tool_name": "Bash",
@@ -1164,13 +1181,13 @@
                 }
               ],
               "blocked_path": "<folder>/notes.txt",
-              "tool_use_id": "toolu_01XYEZqaS1FzxHXPfCa9wSjh"
+              "tool_use_id": "toolu_01BYi2Nh9ujH1sS7ZcYHnxVB"
             }
           }
         },
         {
           "out": {
-            "request_id": "4guip183xe2",
+            "request_id": "ad5fva0arfh",
             "type": "control_request",
             "request": {
               "subtype": "interrupt",
@@ -1204,8 +1221,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "feaf9092-a10e-4feb-8ce0-2a786edf074a",
-            "api_message_id": "msg_011Ch39pN2cJKDCV7QsggRjB"
+            "uuid": "0485456c-13d2-4f22-a2e1-be7fe348b9e4",
+            "api_message_id": "msg_011Ch63WgfLXdABTEMRBdAj6"
           }
         },
         {
@@ -1216,22 +1233,22 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "112ed20d-f0d3-4508-a215-661dbc5ccfa2",
-            "api_message_id": "msg_011Ch39pN2cJKDCV7QsggRjB"
+            "uuid": "3bcd7a82-b202-445e-80ad-699febdf9f1b",
+            "api_message_id": "msg_011Ch63WgfLXdABTEMRBdAj6"
           }
         },
         {
           "in": {
             "type": "rate_limit_event",
             "rate_limit_info": "<redacted>",
-            "uuid": "bb3c5f80-a4a2-4887-a256-c6a2543f3eb9",
+            "uuid": "d3c7e7ae-eca8-4185-8389-41cf2c63ba03",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "control_cancel_request",
-            "request_id": "87235c45-2c2f-43e8-a92d-0c0accc58479"
+            "request_id": "c45c16bf-524a-45a9-a3ff-eda4ed40c3ac"
           }
         },
         {
@@ -1239,7 +1256,7 @@
             "type": "control_response",
             "response": {
               "subtype": "error",
-              "request_id": "87235c45-2c2f-43e8-a92d-0c0accc58479",
+              "request_id": "c45c16bf-524a-45a9-a3ff-eda4ed40c3ac",
               "error": "All fibers interrupted without error"
             }
           }
@@ -1249,7 +1266,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "4guip183xe2",
+              "request_id": "ad5fva0arfh",
               "response": {
                 "still_queued": [],
                 "cancelled": []
@@ -1263,7 +1280,7 @@
             "subtype": "session_state_changed",
             "state": "running",
             "sdk_host_only": true,
-            "uuid": "58bdcbb1-f93b-4a5a-924b-e2b24699ba37",
+            "uuid": "25820add-6dcd-4cf4-a221-7f4a4a0f19c2",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1277,18 +1294,18 @@
                   "type": "tool_result",
                   "content": "The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.",
                   "is_error": true,
-                  "tool_use_id": "toolu_01XYEZqaS1FzxHXPfCa9wSjh"
+                  "tool_use_id": "toolu_01BYi2Nh9ujH1sS7ZcYHnxVB"
                 }
               ]
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "27946388-6a1f-43a9-baa0-ce15d36868a8",
-            "timestamp": "2026-11-14T16:41:09.694Z",
+            "uuid": "34d3ba36-eb32-435c-b034-e881c65255b5",
+            "timestamp": "2026-11-16T05:20:16.439Z",
             "tool_use_result": "User rejected tool use",
             "tool_result_meta": [
               {
-                "id": "toolu_01XYEZqaS1FzxHXPfCa9wSjh",
+                "id": "toolu_01BYi2Nh9ujH1sS7ZcYHnxVB",
                 "non_execution_kind": "user-rejected"
               }
             ]
@@ -1308,13 +1325,13 @@
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "2dff3fbe-b1be-408b-a22c-90a1b8897772",
-            "timestamp": "2026-11-14T16:41:09.696Z"
+            "uuid": "490f89fd-69ce-48a4-acb4-fbf14efcdb48",
+            "timestamp": "2026-11-16T05:20:16.441Z"
           }
         },
         {
           "in": {
-            "duration_api_ms": 748,
+            "duration_api_ms": 948,
             "stop_reason": "tool_use",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "total_cost_usd": 0,
@@ -1351,6 +1368,8 @@
                 "contextWindow": 0,
                 "maxOutputTokens": 0,
                 "thinkingTokens": 0,
+                "cacheCreationEphemeral5mInputTokens": 0,
+                "cacheCreationEphemeral1hInputTokens": 0,
                 "canonicalModel": "claude-haiku-5-5",
                 "provider": "firstParty",
                 "costBasis": "list"
@@ -1359,7 +1378,7 @@
             "permission_denials": [
               {
                 "tool_name": "Bash",
-                "tool_use_id": "toolu_01XYEZqaS1FzxHXPfCa9wSjh",
+                "tool_use_id": "toolu_01BYi2Nh9ujH1sS7ZcYHnxVB",
                 "tool_input": {
                   "command": "touch notes.txt",
                   "description": "Create empty notes.txt file"
@@ -1400,11 +1419,11 @@
             "errors": [
               "[ede_diagnostic] result_type=user last_content_type=n/a stop_reason=tool_use"
             ],
-            "user_message_uuid": "e6fa480d-b28f-48d9-803c-0834f6eb88e9",
+            "user_message_uuid": "bbe2dd6e-32c1-4cd8-b7ca-cb028907c652",
             "type": "result",
-            "duration_ms": 810,
-            "uuid": "d4f1aa80-3dc7-4a6f-923c-4b547b764a6d",
-            "user_message_uuids": ["e6fa480d-b28f-48d9-803c-0834f6eb88e9"],
+            "duration_ms": 1027,
+            "uuid": "2547028a-9bb8-4e81-a0fd-afed9134bb51",
+            "user_message_uuids": ["bbe2dd6e-32c1-4cd8-b7ca-cb028907c652"],
             "queued_turn_count": 0,
             "result_index": 0,
             "model_usage_since_last_result": {
@@ -1418,6 +1437,8 @@
                 "contextWindow": 0,
                 "maxOutputTokens": 0,
                 "thinkingTokens": 0,
+                "cacheCreationEphemeral5mInputTokens": 0,
+                "cacheCreationEphemeral1hInputTokens": 0,
                 "canonicalModel": "claude-haiku-5-5",
                 "provider": "firstParty",
                 "costBasis": "list"
@@ -1428,9 +1449,9 @@
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "e6fa480d-b28f-48d9-803c-0834f6eb88e9",
+            "command_uuid": "bbe2dd6e-32c1-4cd8-b7ca-cb028907c652",
             "state": "cancelled",
-            "uuid": "01110133-0fa1-4652-87ac-89d61c19cf22",
+            "uuid": "051e10b8-e7d3-456f-8b04-8e87c046e58a",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1440,7 +1461,7 @@
             "subtype": "session_state_changed",
             "state": "idle",
             "sdk_host_only": true,
-            "uuid": "07e25f4c-d759-4b85-9d9e-05b9287436a0",
+            "uuid": "8dcbe592-1237-47cf-8afc-1da7d0b539ec",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
