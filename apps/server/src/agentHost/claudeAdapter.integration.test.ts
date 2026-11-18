@@ -1,6 +1,7 @@
 import { assert, it } from "@effect/vitest"
 import {
   AllowRequest,
+  BackgroundWorkEnded,
   AnswerQuestion,
   DenyRequest,
   Image,
@@ -194,7 +195,7 @@ it.live("Steers a running Turn, showing the Steer where Claude Code takes it in"
 )
 
 it.live(
-  "shows a background subagent until it finishes, then opens a Turn for the run Claude Code starts",
+  "shows a background subagent on its tool call until it finishes, then opens a Turn saying it finished",
   () =>
     Effect.gen(function* () {
       const f = yield* claudeSession("claude-background-agent")
@@ -206,16 +207,39 @@ it.live(
           "Then, without waiting for it, reply with exactly: STARTED. " +
           "When its result comes back, reply with exactly: PONG",
       )
-      yield* f.untilStatuses((statuses) =>
-        statuses.some((status) => status.startsWith("Running a subagent: general-purpose: ")),
+
+      const running = yield* f.untilActivity(
+        ({ backgroundToolCalls }) => backgroundToolCalls.length > 0,
       )
+
       const [started, woken] = yield* f.until(settled(2))
 
       assert.deepStrictEqual(yield* f.statuses, [])
 
+      assert.deepStrictEqual(running.agentStatuses, [
+        "Running a subagent: general-purpose: Write numbers 1 to 400",
+      ])
+      assert.deepStrictEqual(
+        running.backgroundToolCalls,
+        started?.parts.flatMap((part) =>
+          Predicate.isTagged(part, "ToolCall") && part.name === "Agent" ? [part.toolCallId] : [],
+        ),
+      )
       assert.deepStrictEqual(lastText(started), TextPart.make({ text: "STARTED" }))
       assert.ok(woken, "Claude Code's own run never opened a Turn")
       assert.equal(woken.message, "")
+      assert.deepStrictEqual(
+        woken.context,
+        BackgroundWorkEnded.make({
+          work: [
+            {
+              kind: "subagent",
+              description: "general-purpose: Write numbers 1 to 400",
+              outcome: "completed",
+            },
+          ],
+        }),
+      )
       assert.deepStrictEqual(woken.ended?.ending, TurnDone.make({}))
       assert.deepStrictEqual(lastText(woken), TextPart.make({ text: "PONG" }))
     }).pipe(Effect.scoped),

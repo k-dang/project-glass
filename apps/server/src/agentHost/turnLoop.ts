@@ -1,5 +1,7 @@
 import {
   type AgentEvent,
+  type BackgroundWork,
+  BackgroundWorkEnded,
   type TurnFailed,
   type TurnMessage,
   TurnStarted,
@@ -35,6 +37,8 @@ export interface TurnMachine<State extends Steering, Input, Command> {
   readonly begin: (turnId: string, message: TurnMessage, at: DateTime.Utc) => State
   /** Whether the input shows the harness starting a run. */
   readonly startsRun: (input: Input) => boolean
+  /** The background work the input shows ending, if any. */
+  readonly endsBackgroundWork?: (input: Input) => BackgroundWork | null
   readonly exitInput: Input
   readonly stoppedReason: string
 }
@@ -60,16 +64,30 @@ export const runTurns = Effect.fnUntraced(function* <
   const closed = yield* Deferred.make<void>()
   let state: State | null = null
   let exited = false
+  // Background work that ended with no Turn open, which the harness's next run of its own answers.
+  let ended: Array<BackgroundWork> = []
 
   const offer = (input: Input) => Queue.offer(inputs, input).pipe(Effect.asVoid)
 
   const handle = Effect.fnUntraced(function* (input: Input) {
     const now = yield* DateTime.now
 
+    const work = state === null ? (machine.endsBackgroundWork?.(input) ?? null) : null
+
+    if (work !== null) ended.push(work)
+
     // A run the harness starts on its own, such as when background work ends after the Turn that
     // started it did, gets a Turn with no message.
     if (state === null && machine.startsRun(input)) {
-      const unprompted = { message: "", images: [], context: null }
+      const [first, ...rest] = ended
+
+      const unprompted = {
+        message: "",
+        images: [],
+        context: first === undefined ? null : BackgroundWorkEnded.make({ work: [first, ...rest] }),
+      }
+
+      ended = []
       state = machine.begin(randomUUID(), unprompted, now)
       yield* report(
         TurnStarted.make({ turnId: state.turn.id, ...unprompted, feedback: [], sentAt: now }),
@@ -140,6 +158,7 @@ export const runTurns = Effect.fnUntraced(function* <
         })
 
       state = machine.begin(turnId, message, at)
+      ended = []
 
       return undefined
     }),

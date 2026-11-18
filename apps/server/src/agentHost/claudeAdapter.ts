@@ -8,7 +8,6 @@ import {
   type PermissionResult,
   type Query,
   query,
-  type SDKBackgroundTasksChangedMessage,
   type SDKControlInitializeResponse,
   type SDKMessage,
   type SDKUserMessage,
@@ -18,7 +17,7 @@ import {
   type AgentCommand,
   type AgentModel,
   AgentModels,
-  AgentStatusesChanged,
+  type AgentStatusesChanged,
   QuestionPart,
   type QuestionReply,
   type RequestAnswer,
@@ -44,6 +43,11 @@ import { homedir } from "node:os"
 import { sdkExecutable } from "../processes"
 import { claudeTools } from "../agentTools"
 import type { HarnessAdapter } from "./adapter"
+import {
+  backgroundActivity,
+  noBackgroundTasks,
+  trackBackgroundTasks,
+} from "./claudeBackgroundTasks"
 import { Input, isFailure, machine } from "./claudeTurn"
 import type { DeliveredMessage, DeliveredTurn } from "./deliveredMessage"
 import {
@@ -252,20 +256,8 @@ const interruptAll = (session: ClaudeQuery) =>
     Effect.orElseSucceed((): ReadonlyArray<string> => []),
   )
 
-/** Claude Code's subagents running in the background, worded as pi's subagent status words them. */
-export const subagentStatuses = (
-  tasks: SDKBackgroundTasksChangedMessage["tasks"],
-): ReadonlyArray<string> => {
-  const running = tasks
-    .filter((task) => task.task_type === "local_agent" && task.ambient !== true)
-    .map((task) => `${task.subagent_type ?? "subagent"}: ${task.description}`)
-
-  if (running.length === 0) return []
-
-  return [
-    `Running ${running.length === 1 ? "a subagent" : `${running.length} subagents`}: ${running.join(", ")}`,
-  ]
-}
+const sameStrings = (a: ReadonlyArray<string>, b: ReadonlyArray<string>) =>
+  a.length === b.length && a.every((value, index) => value === b[index])
 
 const control = (what: "model" | "effort" | "Permission mode", call: () => Promise<void>) =>
   Effect.tryPromise(call).pipe(
@@ -455,14 +447,33 @@ export const claudeAdapter = (
       },
     )
 
-    let statuses: ReadonlyArray<string> = []
+    let background = noBackgroundTasks
+    let shown = backgroundActivity(background)
 
-    const showStatuses = (shown: ReadonlyArray<string>) =>
+    const show = (activity: AgentStatusesChanged) =>
       Effect.suspend(() => {
-        if (shown.length === 0 && statuses.length === 0) return Effect.void
-        statuses = shown
+        if (
+          sameStrings(activity.agentStatuses, shown.agentStatuses) &&
+          sameStrings(activity.backgroundToolCalls, shown.backgroundToolCalls)
+        )
+          return Effect.void
 
-        return report(AgentStatusesChanged.make({ agentStatuses: shown }))
+        shown = activity
+
+        return report(activity)
+      })
+
+    const follow = (message: SDKMessage) =>
+      Effect.suspend(() => {
+        const tracked = trackBackgroundTasks(background, message)
+        background = tracked.tasks
+
+        const inputs = [
+          Input.Message({ message }),
+          ...(tracked.ended === null ? [] : [Input.BackgroundWorkEnded({ work: tracked.ended })]),
+        ]
+
+        return show(backgroundActivity(background)).pipe(Effect.as(inputs))
       })
 
     const turns = yield* runTurns({
@@ -474,13 +485,9 @@ export const claudeAdapter = (
             ? Effect.logWarning("Claude Code ended a Turn with an error", message)
             : Effect.void,
         ),
-        Stream.tap((message) =>
-          message.type === "system" && message.subtype === "background_tasks_changed"
-            ? showStatuses(subagentStatuses(message.tasks))
-            : Effect.void,
-        ),
-        Stream.ensuring(showStatuses([])),
-        Stream.map((message) => Input.Message({ message })),
+        Stream.mapEffect(follow),
+        Stream.flattenIterable,
+        Stream.ensuring(show(backgroundActivity(noBackgroundTasks))),
         Stream.merge(Stream.fromQueue(requests), { haltStrategy: "left" }),
       ),
       report,

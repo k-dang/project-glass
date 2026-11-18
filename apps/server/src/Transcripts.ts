@@ -236,7 +236,7 @@ const storageFailure = () =>
 const queuedAgain = (inputs: ReadonlyArray<MessageWithContext>): ReadonlyArray<QueuedMessage> =>
   inputs.map((input) => ({ ...input, feedback: [], id: randomUUID() }))
 
-type SavedEvent = Exclude<HostEvent, typeof AgentStatusesChanged.Type>
+type SavedEvent = Exclude<HostEvent, AgentStatusesChanged>
 
 export class Transcripts extends Context.Service<
   Transcripts,
@@ -325,20 +325,20 @@ export class Transcripts extends Context.Service<
       const published = yield* PubSub.unbounded<Published>()
       const locks = new Map<string, Semaphore.Semaphore>()
       const statuses = new Map<string, string>()
-      const agentStatuses = new Map<string, ReadonlyArray<string>>()
+      const agentStatuses = new Map<string, AgentStatusesChanged>()
 
-      const setAgentStatuses = (conversationId: string, shown: ReadonlyArray<string>) =>
+      const setAgentStatuses = (conversationId: string, shown: AgentStatusesChanged) =>
         lockFor(conversationId).withPermits(1)(
           Effect.suspend(() => {
-            if (shown.length === 0 && !agentStatuses.has(conversationId)) return Effect.void
+            const cleared =
+              shown.agentStatuses.length === 0 && shown.backgroundToolCalls.length === 0
 
-            if (shown.length === 0) agentStatuses.delete(conversationId)
+            if (cleared && !agentStatuses.has(conversationId)) return Effect.void
+
+            if (cleared) agentStatuses.delete(conversationId)
             else agentStatuses.set(conversationId, shown)
 
-            return PubSub.publish(published, {
-              conversationId,
-              update: AgentStatusesChanged.make({ agentStatuses: shown }),
-            })
+            return PubSub.publish(published, { conversationId, update: shown })
           }),
         )
 
@@ -790,9 +790,7 @@ export class Transcripts extends Context.Service<
             ),
           ),
           Effect.andThen(
-            shown === undefined
-              ? Effect.void
-              : setAgentStatuses(conversationId, shown.agentStatuses),
+            shown === undefined ? Effect.void : setAgentStatuses(conversationId, shown),
           ),
         )
       }
@@ -863,7 +861,8 @@ export class Transcripts extends Context.Service<
           ...(yield* turnPage(conversationId, turns)),
           queued: yield* queued(conversationId),
           status: statuses.get(conversationId) ?? null,
-          agentStatuses: agentStatuses.get(conversationId) ?? [],
+          agentStatuses: agentStatuses.get(conversationId)?.agentStatuses ?? [],
+          backgroundToolCalls: agentStatuses.get(conversationId)?.backgroundToolCalls ?? [],
         })
       })
 
@@ -911,7 +910,8 @@ export class Transcripts extends Context.Service<
 
         yield* Effect.forEach(
           conversationIds,
-          (conversationId) => setAgentStatuses(conversationId, []),
+          (conversationId) =>
+            setAgentStatuses(conversationId, AgentStatusesChanged.make({ agentStatuses: [] })),
           {
             discard: true,
           },
