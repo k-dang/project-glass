@@ -7,6 +7,7 @@ export const conversationFields = {
   place: localPlace,
   repository: new FollowedRepository({ owner: "glass-demo", repo: "greeter" }),
   baseBranch: "main",
+  branch: "agent/swift-otter",
   harness: "pi",
   model: null,
   effort: null,

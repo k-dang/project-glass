@@ -87,7 +87,7 @@ export class LocalPlacement extends Context.Service<
           .run(checkout.path, ["worktree", "remove", "--force", folder])
           .pipe(Effect.andThen(git.run(checkout.path, ["branch", "-D", name])), Effect.ignore)
 
-        return { name, folder, discard }
+        return { name, branch: name, folder, discard }
       })
 
       const baseRef = Effect.fn("LocalPlacement.baseRef")(function* ({

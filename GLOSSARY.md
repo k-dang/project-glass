@@ -223,6 +223,13 @@ checkout of the review's Revision. Its agent is the AI doing the work, as in a T
 or Ask.
 _Avoid_: Session, thread, bot, box
 
+**Conversation's PR**:
+The open PR in a followed repository whose head is the branch the Conversation's folder had checked
+out when its latest Turn ended. The Conversation's header, details, and row in the list link to it
+with its Checks. A Conversation has none until a PR is opened from its branch, and none again once
+that PR is merged or closed.
+_Avoid_: Linked PR, agent PR
+
 **Global conversation**:
 The one conversation the user has with Glass itself, opened over any area without leaving it,
 run by pi. It works in no repository and needs no Local checkout; it reads no files and

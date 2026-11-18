@@ -107,6 +107,7 @@ export interface FakePullRequestSeed {
   readonly author?: string | null
   readonly baseBranch?: string
   readonly headBranch?: string
+  readonly isCrossRepository?: boolean
   readonly state?: FakePullRequestState
   readonly isDraft?: boolean
   readonly bodyHtml?: string
@@ -155,6 +156,7 @@ export class FakePullRequest {
   readonly author: string | null
   readonly baseBranch: string
   readonly headBranch: string
+  readonly isCrossRepository: boolean
   readonly bodyHtml: string
   readonly body: string
   readonly requestedReviewers: Set<string>
@@ -198,6 +200,7 @@ export class FakePullRequest {
     this.author = seed.author === undefined ? "hubot" : seed.author
     this.baseBranch = seed.baseBranch ?? "main"
     this.headBranch = seed.headBranch ?? "greeting"
+    this.isCrossRepository = seed.isCrossRepository ?? false
     this.#state = seed.state ?? "OPEN"
     this.#isDraft = seed.isDraft ?? false
     this.bodyHtml = seed.bodyHtml ?? ""

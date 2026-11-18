@@ -11,6 +11,7 @@ import { AgentReviews } from "./AgentReviews"
 import { Asks } from "./Asks"
 import { CheckoutRuns } from "./CheckoutRuns"
 import { Checkouts } from "./Checkouts"
+import { ConversationPullRequests } from "./ConversationPullRequests"
 import { Conversations } from "./Conversations"
 import { ConversationTurns } from "./ConversationTurns"
 import { FeedbackNotes } from "./FeedbackNotes"
@@ -92,6 +93,7 @@ const services = (
   Layer.mergeAll(GlassRpcHandlers, mcpTools, GlobalConversationUpdates)
     .pipe(
       Layer.provide(NeedsYou.layer),
+      Layer.provide(ConversationPullRequests.layer),
       Layer.provide(StartedWork.layer),
       Layer.provide(PullRequestLists.layer),
       Layer.provide(PullRequestMirror.layer),
