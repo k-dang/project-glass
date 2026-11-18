@@ -10,38 +10,27 @@ const node = {
   deps: { onlyBundle: false },
 } as const
 
-/**
- * A Sandbox gets the agent host as one file, so the host carries pi's extensions that call Glass's
- * own code as text, each built here with its imports, and writes them out for pi.
- */
 const piExtensions = new Map([
   ["virtual:pi-draw-diagram", "src/agentHost/piDrawDiagram.ts"],
   ["virtual:pi-suggest-draft", "src/agentHost/piSuggestDraft.ts"],
 ])
 
-const built = new Map<string, Promise<string>>()
-
-const buildPiExtension = (entry: string) =>
-  Rolldown.build({
-    input: fileURLToPath(new URL(entry, import.meta.url)),
-    platform: "node",
-    write: false,
-    output: { format: "esm", codeSplitting: false },
-  }).then(({ output }) => `export default ${JSON.stringify(output[0].code)}`)
-
 const piExtensionSources = {
   name: "pi-extension-sources",
   resolveId: (id: string) => (piExtensions.has(id) ? `\0${id}` : null),
-  load: (id: string) => {
+  load: async (id: string) => {
     const entry = id.startsWith("\0") ? piExtensions.get(id.slice(1)) : undefined
 
     if (entry === undefined) return null
 
-    const source = built.get(entry) ?? buildPiExtension(entry)
+    const { output } = await Rolldown.build({
+      input: fileURLToPath(new URL(entry, import.meta.url)),
+      platform: "node",
+      write: false,
+      output: { format: "esm", codeSplitting: false },
+    })
 
-    built.set(entry, source)
-
-    return source
+    return `export default ${JSON.stringify(output[0].code)}`
   },
 }
 
