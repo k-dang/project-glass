@@ -8,7 +8,8 @@ import {
   DRAW_DIAGRAM_TOOL,
   AnswerQuestion,
   DenyRequest,
-  ExtensionStatusesChanged,
+  AgentStatusesChanged,
+  BackgroundWorkEnded,
   PermissionRequestPart,
   QuestionPart,
   type RequestAnswer,
@@ -238,26 +239,24 @@ it("shows the statuses the Conversation's extensions set while no Turn runs, unt
           turns: [],
           queued: [],
           status: null,
-          extensionStatuses: ["Explore: Trace composer to harness"],
+          agentStatuses: ["Explore: Trace composer to harness"],
         }),
       ).pipe(
         Stream.concat(
           Stream.fromEffect(
             Deferred.await(cleared).pipe(
-              Effect.as(ExtensionStatusesChanged.make({ extensionStatuses: [] })),
+              Effect.as(AgentStatusesChanged.make({ agentStatuses: [] })),
             ),
           ),
         ),
       ),
   })
 
-  const statuses = await screen.findByRole("status", { name: "Extension statuses" })
+  const statuses = await screen.findByRole("status", { name: "Agent statuses" })
   expect(within(statuses).getByText("Explore: Trace composer to harness")).toBeTruthy()
 
   Deferred.doneUnsafe(cleared, Exit.void)
-  await waitFor(() =>
-    expect(screen.queryByRole("status", { name: "Extension statuses" })).toBeNull(),
-  )
+  await waitFor(() => expect(screen.queryByRole("status", { name: "Agent statuses" })).toBeNull())
 })
 
 it("sends a message with Enter and clears the composer", async () => {
@@ -695,6 +694,71 @@ it("folds a run of steps into one line naming the tool call still running", asyn
     }),
   ).toBeTruthy()
   expect(within(transcript).queryByRole("button", { name: "Done: Read read-1" })).toBeNull()
+})
+
+it("marks a tool call running in the background until its work ends, then says why the next Turn started", async () => {
+  const ended = Deferred.makeUnsafe<void>()
+
+  mount({
+    WatchTranscript: () =>
+      Stream.make(
+        TranscriptSnapshot.make({
+          queued: [],
+          status: null,
+          agentStatuses: ["Running a subagent: general-purpose: Count"],
+          backgroundToolCalls: ["agent-1"],
+          turns: [
+            {
+              id: "turn-1",
+              message: "Start it",
+              images: [],
+              context: null,
+              feedback: [],
+              sentAt,
+              ended: { at: sentAt, ending: TurnDone.make({}) },
+              parts: [call("agent-1", "Agent", null)],
+            },
+          ],
+        }),
+      ).pipe(
+        Stream.concat(
+          Stream.fromEffect(
+            Deferred.await(ended).pipe(Effect.as(AgentStatusesChanged.make({ agentStatuses: [] }))),
+          ),
+        ),
+        Stream.concat(
+          Stream.make(
+            TurnStarted.make({
+              turnId: "turn-2",
+              message: "",
+              images: [],
+              feedback: [],
+              sentAt,
+              context: BackgroundWorkEnded.make({
+                work: [
+                  { kind: "subagent", description: "general-purpose: Count", outcome: "completed" },
+                ],
+              }),
+            }),
+          ),
+        ),
+      ),
+  })
+
+  const transcript = await screen.findByRole("region", { name: "Transcript" })
+  expect(
+    await within(transcript).findByRole("button", {
+      name: "Running in the background: Agent agent-1",
+    }),
+  ).toBeTruthy()
+
+  Deferred.doneUnsafe(ended, Exit.void)
+
+  expect(
+    await within(transcript).findByRole("button", { name: "Done: Agent agent-1" }),
+  ).toBeTruthy()
+  expect(await within(transcript).findByText("Background work ended")).toBeTruthy()
+  expect(within(transcript).getByText("Subagent general-purpose: Count finished")).toBeTruthy()
 })
 
 it.each(["{Control>}n{/Control}", "{Meta>}n{/Meta}"])(

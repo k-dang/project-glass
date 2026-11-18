@@ -11,6 +11,7 @@ import {
   asksPermission,
   type CapturedContext,
   type WorkOutcome,
+  type BackgroundWork,
   type FeedbackNote,
   type Image,
   isNothingUnsent,
@@ -35,6 +36,7 @@ import { DateTime, Exit, Match, Option, Predicate } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import {
   ArrowUp,
+  Activity,
   Brain,
   CircleCheck,
   CirclePause,
@@ -44,7 +46,6 @@ import {
   Layers,
   LoaderCircle,
   MessageCircle,
-  Puzzle,
   Unplug,
   Workflow,
   Wrench,
@@ -159,6 +160,8 @@ export const ToolCallView = createContext<
   ((call: typeof ToolCallPart.Type) => ReactNode | null) | null
 >(null)
 
+const BackgroundToolCalls = createContext<ReadonlySet<string>>(new Set())
+
 const lastSent = (
   turns: ReadonlyArray<Turn>,
   queued: ReadonlyArray<QueuedMessage>,
@@ -211,10 +214,10 @@ function OpenConversation(props: { conversation: Conversation } & ConversationTa
 
   const loaded = AsyncResult.value(transcript)
 
-  const { turns, earlierTurns, queued, status, extensionStatuses } = Option.getOrElse(
-    loaded,
-    () => emptyTranscript,
-  )
+  const { turns, earlierTurns, queued, status, agentStatuses, backgroundToolCalls } =
+    Option.getOrElse(loaded, () => emptyTranscript)
+
+  const inBackground = new Set(backgroundToolCalls)
 
   const loadEarlier = useAtomSet(atoms.loadEarlier)
 
@@ -322,15 +325,17 @@ function OpenConversation(props: { conversation: Conversation } & ConversationTa
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <ToolCallView value={diagrams.cardOf}>
               <FileLinks value={fileLinks}>
-                <Transcript
-                  turns={turns}
-                  earlierTurns={earlierTurns}
-                  onShowEarlier={loadEarlier}
-                  status={status}
-                />
+                <BackgroundToolCalls value={inBackground}>
+                  <Transcript
+                    turns={turns}
+                    earlierTurns={earlierTurns}
+                    onShowEarlier={loadEarlier}
+                    status={status}
+                  />
+                </BackgroundToolCalls>
               </FileLinks>
             </ToolCallView>
-            <ExtensionStatuses statuses={extensionStatuses} />
+            <AgentStatuses statuses={agentStatuses} />
             {reach === "unreachable" && <UnreachableNotice conversationId={conversation.id} />}
             {readOnly === null ? (
               <Composer conversation={conversation} turns={turns} queued={queued} />
@@ -491,6 +496,54 @@ function GlobalConversationUpdateMessage(props: { work: ReadonlyArray<WorkOutcom
   )
 }
 
+const backgroundKindText: Record<BackgroundWork["kind"], string> = {
+  subagent: "Subagent",
+  command: "Command",
+}
+
+const backgroundOutcomeText: Record<BackgroundWork["outcome"], string> = {
+  completed: "finished",
+  failed: "failed",
+  stopped: "was stopped",
+}
+
+const backgroundWorkText = ({ kind, description, outcome }: BackgroundWork) =>
+  `${backgroundKindText[kind]} ${description} ${backgroundOutcomeText[outcome]}`
+
+function BackgroundWorkEndedMessage(props: { work: ReadonlyArray<BackgroundWork> }) {
+  return (
+    <Message align="end">
+      <MessageContent>
+        <span className="self-end text-xs text-muted-foreground">Background work ended</span>
+        <ul className="flex flex-col gap-1 self-end text-sm text-muted-foreground">
+          {props.work.map((work, index) => (
+            <li key={index}>{backgroundWorkText(work)}</li>
+          ))}
+        </ul>
+      </MessageContent>
+    </Message>
+  )
+}
+
+function TurnMessage(props: { turn: Turn }) {
+  const { turn } = props
+
+  if (Predicate.isTagged(turn.context, "GlobalConversationUpdate"))
+    return <GlobalConversationUpdateMessage work={turn.context.work} />
+
+  if (Predicate.isTagged(turn.context, "BackgroundWorkEnded"))
+    return <BackgroundWorkEndedMessage work={turn.context.work} />
+
+  return (
+    <UserMessage
+      message={turn.message}
+      images={turn.images}
+      feedback={turn.feedback}
+      label={sentFrom(turn.context)}
+    />
+  )
+}
+
 export function UserMessage(props: {
   message: string
   images: ReadonlyArray<Image>
@@ -531,16 +584,7 @@ const TurnView = memo(function TurnView(props: {
   return (
     <MessageScrollerItem messageId={turn.id} scrollAnchor exactHeight={props.latest}>
       <MessageGroup className="gap-4">
-        {Predicate.isTagged(turn.context, "GlobalConversationUpdate") ? (
-          <GlobalConversationUpdateMessage work={turn.context.work} />
-        ) : (
-          <UserMessage
-            message={turn.message}
-            images={turn.images}
-            feedback={turn.feedback}
-            label={sentFrom(turn.context)}
-          />
-        )}
+        <TurnMessage turn={turn} />
         <Message>
           <MessageContent>
             <TurnParts parts={turn.parts} />
@@ -683,12 +727,15 @@ const groupSteps = (
 const counted = (count: number, noun: string) =>
   count === 0 ? null : `${count} ${noun}${count === 1 ? "" : "s"}`
 
-const runningCall = (parts: ReadonlyArray<TurnPart>) =>
-  parts.find((part) => Predicate.isTagged(part, "ToolCall") && part.status === "running")
+const isRunning = (call: typeof ToolCallPart.Type, inBackground: ReadonlySet<string>) =>
+  call.status === "running" || inBackground.has(call.toolCallId)
 
-const stepsTitle = (parts: ReadonlyArray<TurnPart>) => {
+const runningCall = (parts: ReadonlyArray<TurnPart>, inBackground: ReadonlySet<string>) =>
+  parts.find((part) => Predicate.isTagged(part, "ToolCall") && isRunning(part, inBackground))
+
+const stepsTitle = (parts: ReadonlyArray<TurnPart>, inBackground: ReadonlySet<string>) => {
   const calls = parts.filter((part) => Predicate.isTagged(part, "ToolCall"))
-  const running = calls.find((call) => call.status === "running")
+  const running = calls.find((call) => isRunning(call, inBackground))
   const failed = calls.filter((call) => call.status === "failed").length
 
   const summary = [
@@ -723,17 +770,20 @@ function TurnParts(props: { parts: ReadonlyArray<TurnPart> }) {
 }
 
 function Steps(props: { steps: ReadonlyArray<NestedPart> }) {
+  const inBackground = useContext(BackgroundToolCalls)
   const parts = props.steps.map(({ part }) => part)
 
   return (
     <Trace>
       <TraceCollapsible>
         <TraceCollapsibleTrigger>
-          <TraceLine status={runningCall(parts) === undefined ? undefined : "running"}>
+          <TraceLine
+            status={runningCall(parts, inBackground) === undefined ? undefined : "running"}
+          >
             <TraceIcon>
               <Layers />
             </TraceIcon>
-            <TraceTitle>{stepsTitle(parts)}</TraceTitle>
+            <TraceTitle>{stepsTitle(parts, inBackground)}</TraceTitle>
           </TraceLine>
         </TraceCollapsibleTrigger>
         <TraceCollapsibleContent className="flex flex-col gap-2">
@@ -750,6 +800,7 @@ const toolStatus = {
   running: { label: "Running", line: "running" },
   done: { label: "Done", line: undefined },
   failed: { label: "Failed", line: "error" },
+  background: { label: "Running in the background", line: "running" },
 } as const
 
 function FencedCode(props: { code: string; language: string }) {
@@ -858,6 +909,7 @@ const PartView = memo(function PartView(props: {
   nested: ReadonlyArray<NestedPart>
 }) {
   const toolCallView = useContext(ToolCallView)
+  const inBackground = useContext(BackgroundToolCalls)
 
   return Match.value(props.part).pipe(
     Match.tagsExhaustive({
@@ -891,7 +943,8 @@ const PartView = memo(function PartView(props: {
 
         if (shown !== null) return shown
 
-        const status = toolStatus[call.status]
+        const background = call.status === "done" && inBackground.has(call.toolCallId)
+        const status = toolStatus[background ? "background" : call.status]
 
         return (
           <Trace>
@@ -905,6 +958,11 @@ const PartView = memo(function PartView(props: {
                     <span className="sr-only">{status.label}: </span>
                     <span className="shrink-0 font-medium text-foreground">{call.name}</span>{" "}
                     <span className="truncate font-mono text-xs">{call.inputSummary}</span>
+                    {background && (
+                      <span aria-hidden className="shrink-0 text-xs">
+                        · in the background
+                      </span>
+                    )}
                   </TraceTitle>
                 </TraceLine>
               </TraceCollapsibleTrigger>
@@ -975,16 +1033,16 @@ function WaitingNotice(props: { waiting: RequestPart }) {
   )
 }
 
-function ExtensionStatuses(props: { statuses: ReadonlyArray<string> }) {
+function AgentStatuses(props: { statuses: ReadonlyArray<string> }) {
   return (
     props.statuses.length > 0 && (
       <output
-        aria-label="Extension statuses"
+        aria-label="Agent statuses"
         className="mx-auto flex w-full max-w-3xl flex-wrap gap-x-4 gap-y-1 px-6 pt-2 text-xs text-muted-foreground"
       >
         {props.statuses.map((status) => (
           <span key={status} className="flex items-center gap-1.5">
-            <Puzzle aria-hidden className="size-3" />
+            <Activity aria-hidden className="size-3" />
             {status}
           </span>
         ))}

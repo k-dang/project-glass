@@ -17,6 +17,7 @@ import {
   type AgentCommand,
   type AgentModel,
   AgentModels,
+  type AgentStatusesChanged,
   QuestionPart,
   type QuestionReply,
   type RequestAnswer,
@@ -42,6 +43,11 @@ import { homedir } from "node:os"
 import { sdkExecutable } from "../processes"
 import { claudeTools } from "../agentTools"
 import type { HarnessAdapter } from "./adapter"
+import {
+  backgroundActivity,
+  noBackgroundTasks,
+  trackBackgroundTasks,
+} from "./claudeBackgroundTasks"
 import { Input, isFailure, machine } from "./claudeTurn"
 import type { DeliveredMessage, DeliveredTurn } from "./deliveredMessage"
 import {
@@ -250,6 +256,9 @@ const interruptAll = (session: ClaudeQuery) =>
     Effect.orElseSucceed((): ReadonlyArray<string> => []),
   )
 
+const sameStrings = (a: ReadonlyArray<string>, b: ReadonlyArray<string>) =>
+  a.length === b.length && a.every((value, index) => value === b[index])
+
 const control = (what: "model" | "effort" | "Permission mode", call: () => Promise<void>) =>
   Effect.tryPromise(call).pipe(
     Effect.tapError((cause) => Effect.logWarning(`Claude Code refused a ${what}`, cause)),
@@ -438,6 +447,35 @@ export const claudeAdapter = (
       },
     )
 
+    let background = noBackgroundTasks
+    let shown = backgroundActivity(background)
+
+    const show = (activity: AgentStatusesChanged) =>
+      Effect.suspend(() => {
+        if (
+          sameStrings(activity.agentStatuses, shown.agentStatuses) &&
+          sameStrings(activity.backgroundToolCalls, shown.backgroundToolCalls)
+        )
+          return Effect.void
+
+        shown = activity
+
+        return report(activity)
+      })
+
+    const follow = (message: SDKMessage) =>
+      Effect.suspend(() => {
+        const tracked = trackBackgroundTasks(background, message)
+        background = tracked.tasks
+
+        const inputs = [
+          Input.Message({ message }),
+          ...(tracked.ended === null ? [] : [Input.BackgroundWorkEnded({ work: tracked.ended })]),
+        ]
+
+        return show(backgroundActivity(background)).pipe(Effect.as(inputs))
+      })
+
     const turns = yield* runTurns({
       harness: "Claude Code",
       machine,
@@ -447,7 +485,9 @@ export const claudeAdapter = (
             ? Effect.logWarning("Claude Code ended a Turn with an error", message)
             : Effect.void,
         ),
-        Stream.map((message) => Input.Message({ message })),
+        Stream.mapEffect(follow),
+        Stream.flattenIterable,
+        Stream.ensuring(show(backgroundActivity(noBackgroundTasks))),
         Stream.merge(Stream.fromQueue(requests), { haltStrategy: "left" }),
       ),
       report,

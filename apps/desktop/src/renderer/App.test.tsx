@@ -544,7 +544,7 @@ it("starts the Global conversation fresh once confirmed and reads a past one", a
           earlierTurns: 1,
           queued: [],
           status: null,
-          extensionStatuses: [],
+          agentStatuses: [],
         }),
       ).pipe(Stream.concat(Stream.fromQueue(earlierPages))),
     LoadEarlierPastGlobalTurns: ({ before }) =>

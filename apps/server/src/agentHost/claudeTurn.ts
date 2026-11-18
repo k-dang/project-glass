@@ -2,6 +2,7 @@ import type { SDKMessage, SDKResultMessage, SDKUserMessage } from "@anthropic-ai
 import {
   type AgentEvent,
   applyConversationEvent,
+  type BackgroundWork,
   endTurnEvents,
   PartAppended,
   PartSet,
@@ -29,6 +30,7 @@ export type Input = Data.TaggedEnum<{
   Asked: { readonly part: RequestPart }
   Answered: { readonly requestId: string; readonly answer: RequestAnswer }
   Expired: { readonly requestId: string }
+  BackgroundWorkEnded: { readonly work: BackgroundWork }
   Exited: {}
 }>
 
@@ -309,6 +311,7 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
 
       if (settled !== undefined) emit(settled)
     },
+    BackgroundWorkEnded: () => {},
     Exited: () => end(TurnFailed.make({ reason: stoppedReason })),
   })
 
@@ -318,6 +321,8 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
 export const machine: TurnMachine<TurnState, Input, never> = {
   step,
   begin: beginTurn,
+  startsRun: (input) => Input.$is("Message")(input) && isMainThreadReply(input.message),
+  endsBackgroundWork: (input) => (Input.$is("BackgroundWorkEnded")(input) ? input.work : null),
   exitInput: Input.Exited(),
   stoppedReason,
 }

@@ -299,17 +299,20 @@ creating it.
 _Avoid_: My skills, user skills
 
 **Turn**:
-One message to a Conversation and its agent's whole response, or work the agent in a pi Conversation
-starts on its own, such as when an extension's background task reports back. It ends done, failed,
+One message to a Conversation and its agent's whole response, or work the agent starts on its own,
+such as when a subagent or command it ran in the background or a pi extension's background task
+reports back; for Claude Code, Glass names the background work that ended at the top of such a Turn. It ends done, failed,
 stopped by the user, cut off when Glass loses the Conversation, or interrupted when Glass quits; a
 Sandbox Conversation's Turn carries on while Glass is closed.
 _Avoid_: Run, execution, exchange
 
-**Extension status**:
-A short line one of a pi Conversation's extensions shows about itself, such as a mode it is in or
-work it runs in the background. Glass shows it on the Conversation whether or not a Turn is running,
-until the extension clears it or Glass loses the Conversation.
-_Avoid_: Widget, banner
+**Agent status**:
+A short line about what a Conversation's agent has going besides its Turn, such as subagents or
+commands it runs in the background or a mode one of a pi Conversation's extensions is in. Glass
+shows it on the Conversation whether or not a Turn is running, until the agent clears it or Glass
+loses the Conversation, and marks the tool call that started a Claude Code background task as
+running until the task ends.
+_Avoid_: Extension status, widget, banner
 
 **Diagram**:
 A named Mermaid picture a Conversation's agent draws beside the Conversation when the user asks for

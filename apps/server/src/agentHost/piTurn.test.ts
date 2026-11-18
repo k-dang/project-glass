@@ -2,13 +2,11 @@ import { assert, it } from "@effect/vitest"
 import {
   ConversationOutcome,
   GlobalConversationUpdate,
-  PartAppended,
   SteerPart,
   TextPart,
   TurnDone,
   TurnEnded,
   TurnFailed,
-  TurnStarted,
   TurnStopped,
 } from "@glass/contracts"
 import { DateTime, Predicate } from "effect"
@@ -104,44 +102,6 @@ it("ends a Turn only when pi is idle after settling, ignoring a stale idle answe
     done.events.at(-1),
     TurnEnded.make({ turnId: "turn-1", ended: { at: now, ending: TurnDone.make({}) } }),
   )
-})
-
-it("opens a Turn for work pi starts on its own after the last Turn ended", () => {
-  const woke = run(
-    [
-      { type: "agent_start" },
-      { type: "message_start", message: { role: "custom" } },
-      {
-        type: "message_update",
-        assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "Here it is" },
-      },
-      { type: "agent_settled" },
-      Input.Idle({ idle: true, generation: 1 }),
-    ],
-    null,
-  )
-
-  const [opened] = woke.events
-  assert.ok(Predicate.isTagged(opened, "TurnStarted"))
-  const { turnId } = opened
-
-  assert.deepStrictEqual(
-    opened,
-    TurnStarted.make({
-      turnId,
-      message: "",
-      images: [],
-      context: null,
-      feedback: [],
-      sentAt: now,
-    }),
-  )
-  assert.deepInclude(woke.events, PartAppended.make({ turnId, index: 0, text: "Here it is" }))
-  assert.deepStrictEqual(
-    woke.events.at(-1),
-    TurnEnded.make({ turnId, ended: { at: now, ending: TurnDone.make({}) } }),
-  )
-  assert.isNull(woke.state)
 })
 
 it("forgets a provider error once a retry answers", () => {
