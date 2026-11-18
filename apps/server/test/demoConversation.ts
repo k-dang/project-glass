@@ -47,6 +47,10 @@ const textOf = (message: FakeModelRequest["messages"][number] | undefined) => {
 
 const workingSlowly = ({ messages }: FakeModelRequest) => textOf(messages.at(-1)).includes("slowly")
 
+const keepWorkingPrompt = "Keep working until I stop you."
+
+const keepsWorking = (input: FakeModelRequest) => lastUserText(input) === keepWorkingPrompt
+
 const slowReply = `Working through it one step at a time. ${Array.from(
   { length: 12 },
   (_, step) => `Step ${step + 1} looks fine.`,
@@ -94,6 +98,7 @@ const demoReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
   const changes = {
     "Write a note": "printf 'hello from the agent\\n' > notes.txt",
     "Write another": "printf 'a second note\\n' > more.txt",
+    "Pick up the README typo PR": "git switch -c fix-the-typo-in-the-readme",
   }
 
   if (Object.hasOwn(changes, lastUserText(input))) return runCommands(changes)(input)
@@ -155,7 +160,7 @@ export const startDemoClaude = Effect.fnUntraced(function* (directory: string) {
 export const startDemoPi = Effect.fnUntraced(function* (directory: string) {
   yield* fakeModelProvider(directory, {
     reply: demoReply,
-    chunkDelay: (input) => (workingSlowly(input) ? 300 : 0),
+    chunkDelay: (input) => (workingSlowly(input) ? 300 : keepsWorking(input) ? 3_600_000 : 0),
   })
   process.env["PI_CODING_AGENT_DIR"] = join(directory, ".pi", "agent")
 })
@@ -198,6 +203,8 @@ export const seedDemoConversations = Effect.fnUntraced(function* (
 
   yield* conversation("pi", "Show me around this repository.")
   yield* conversation("pi", "Write a note")
+  yield* conversation("pi", "Pick up the README typo PR")
+  yield* conversation("pi", keepWorkingPrompt)
   yield* conversation("claude-code", "Run `pnpm test` and tell me what fails.")
   yield* conversation("claude-code", "Ask me which part of the code to look at first.")
   yield* conversation("claude-code", `${failingPrompt} to its latest major version.`)

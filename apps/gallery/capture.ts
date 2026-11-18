@@ -35,19 +35,17 @@ const fitTranscript = async (window: Page) => {
   await window.setViewportSize({ ...viewport, height: Math.min(viewport.height + hidden, 6000) })
 }
 
-const focusPadding = 16
-
-const clipAround = async (focus: Locator, { width, height }: Size) => {
+const clipAround = async (focus: Locator, padding: number, { width, height }: Size) => {
   await focus.first().waitFor()
 
   const boxes = (await Promise.all((await focus.all()).map((part) => part.boundingBox()))).flatMap(
     (box) => (box === null ? [] : [box]),
   )
 
-  const x = Math.max(0, Math.floor(Math.min(...boxes.map((box) => box.x)) - focusPadding))
-  const y = Math.max(0, Math.floor(Math.min(...boxes.map((box) => box.y)) - focusPadding))
-  const right = Math.max(...boxes.map((box) => box.x + box.width)) + focusPadding
-  const bottom = Math.max(...boxes.map((box) => box.y + box.height)) + focusPadding
+  const x = Math.max(0, Math.floor(Math.min(...boxes.map((box) => box.x)) - padding))
+  const y = Math.max(0, Math.floor(Math.min(...boxes.map((box) => box.y)) - padding))
+  const right = Math.max(...boxes.map((box) => box.x + box.width)) + padding
+  const bottom = Math.max(...boxes.map((box) => box.y + box.height)) + padding
 
   return {
     x,
@@ -94,7 +92,11 @@ const capture = async (app: ElectronApplication) => {
       if (state.wholeTranscript) await fitTranscript(window)
 
       const size = window.viewportSize() ?? viewport
-      const clip = state.focus === undefined ? null : await clipAround(state.focus(window), size)
+
+      const clip =
+        state.focus === undefined
+          ? null
+          : await clipAround(state.focus(window), state.focusPadding ?? 16, size)
 
       for (const scheme of ["light", "dark"] as const) {
         await window.emulateMedia({ colorScheme: scheme })

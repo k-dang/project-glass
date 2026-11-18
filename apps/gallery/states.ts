@@ -6,6 +6,7 @@ export interface State {
   readonly name: string
   readonly reach: (window: Page) => Promise<void | "nothing new">
   readonly focus?: (window: Page) => Locator
+  readonly focusPadding?: number
   readonly wholeTranscript?: true
 }
 
@@ -55,6 +56,26 @@ const conversationsList = async (window: Page) => {
   await area(window, "Conversations")
 
   return window.getByRole("navigation", { name: "Conversations list" })
+}
+
+const demoRows = (list: Locator) => list.getByRole("link").filter({ hasNotText: REPLAYED_PREFIX })
+
+const markers = /Finished|Working|Waiting on you|Failed|Interrupted/
+
+const listRow = (name: string, row: (list: Locator) => Locator): State => {
+  const found = (window: Page) =>
+    row(window.getByRole("navigation", { name: "Conversations list" })).first()
+
+  return {
+    area: "Conversations list",
+    name,
+    focus: found,
+    focusPadding: 0,
+    reach: async (window) => {
+      await conversationsList(window)
+      await found(window).scrollIntoViewIfNeeded()
+    },
+  }
 }
 
 const conversation = async (window: Page, status: RegExp) => {
@@ -266,6 +287,83 @@ export const states: ReadonlyArray<State> = [
       await visible(window, "heading", "What should we work on?")
     },
   },
+  {
+    area: "Conversations list",
+    name: "Whole list",
+    focus: (window) => demoRows(window.getByRole("navigation", { name: "Conversations list" })),
+    reach: async (window) => {
+      const list = await conversationsList(window)
+
+      for (const marker of [/Working/, /Waiting on you/, /Failed/, /PR #\d+/])
+        await list.getByRole("link", { description: marker }).first().waitFor()
+
+      await demoRows(list).last().scrollIntoViewIfNeeded()
+    },
+  },
+  listRow("Finished", (list) =>
+    list.getByRole("link", { description: /Finished/ }).filter({ hasNotText: REPLAYED_PREFIX }),
+  ),
+  listRow("Working", (list) => list.getByRole("link", { description: /Working/ })),
+  listRow("Waiting on you", (list) => list.getByRole("link", { description: /Waiting on you/ })),
+  listRow("Failed", (list) =>
+    list.getByRole("link", { description: /Failed/ }).filter({ hasNotText: REPLAYED_PREFIX }),
+  ),
+  listRow("Interrupted", (list) => list.getByRole("link", { description: /Interrupted/ })),
+  listRow("Linked to a PR", (list) => list.getByRole("link", { description: /PR #\d+/ })),
+  {
+    area: "Conversations",
+    name: "Remove a Conversation with uncommitted changes",
+    focus: (window) => window.getByRole("alertdialog", { name: /^Remove / }),
+    reach: async (window) => {
+      const list = await conversationsList(window)
+
+      const finished = await demoRows(list)
+        .filter({ has: window.getByText("Finished", { exact: true }) })
+        .evaluateAll((links) => links.map((link) => link.getAttribute("href")))
+
+      for (const href of finished) {
+        if (href === null) continue
+
+        const row = list.locator(`a[href="${href}"]`)
+        await row.click()
+        await window.waitForURL((url) => url.href.endsWith(href))
+        await turns(window).first().waitFor()
+
+        if (!(await transcript(window).getByText("Write a note", { exact: true }).isVisible()))
+          continue
+
+        await row.hover()
+        await window
+          .getByRole("button", { name: `Remove ${await row.getAttribute("aria-label")}` })
+          .click()
+        await window.getByText("Its worktree has uncommitted changes").waitFor()
+
+        return
+      }
+
+      throw new Error("No Conversation wrote a note")
+    },
+  },
+  {
+    area: "Conversations list",
+    name: "Open",
+    focus: (window) =>
+      window
+        .getByRole("navigation", { name: "Conversations list" })
+        .locator('a[aria-current="page"]'),
+    focusPadding: 0,
+    reach: async (window) => {
+      const list = await conversationsList(window)
+      await demoRows(list).first().click()
+      await list.locator('a[aria-current="page"]').waitFor()
+      await window.mouse.move(0, 0)
+    },
+  },
+  listRow("Seen", (list) =>
+    demoRows(list)
+      .and(list.locator('a:not([aria-current="page"])'))
+      .filter({ hasNotText: markers }),
+  ),
   {
     area: "Conversations",
     name: "Finished",
