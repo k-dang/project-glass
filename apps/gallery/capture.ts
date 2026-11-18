@@ -8,9 +8,9 @@ import { galleryPage } from "./page.ts"
 import type { Shot } from "./shot.ts"
 import { replayedStates, replays, states } from "./states.ts"
 
-const desktopDir = join(import.meta.dirname, "..")
+const desktopDir = join(import.meta.dirname, "..", "desktop")
 
-const out = join(desktopDir, "..", "..", ".gallery")
+const out = join(import.meta.dirname, "..", "..", ".gallery")
 
 const viewport = { width: 1280, height: 800 }
 
@@ -126,7 +126,7 @@ try {
   mkdirSync(join(out, "shots"), { recursive: true })
 
   const app = await _electron.launch({
-    executablePath: createRequire(import.meta.url)("electron"),
+    executablePath: createRequire(join(desktopDir, "package.json"))("electron"),
     args: [
       "-r",
       join(desktopDir, "e2e", "background.cjs"),

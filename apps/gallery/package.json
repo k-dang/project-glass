@@ -1,0 +1,13 @@
+{
+  "name": "@glass/gallery",
+  "private": true,
+  "description": "Screenshots every Glass app state into one browsable page",
+  "type": "module",
+  "scripts": {
+    "capture": "node capture.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:",
+    "@types/node": "catalog:"
+  }
+}

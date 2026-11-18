@@ -3,13 +3,5 @@
   "compilerOptions": {
     "types": ["node"]
   },
-  "include": [
-    "src/main",
-    "src/preload",
-    "e2e",
-    "gallery",
-    "playwright.config.ts",
-    "vite.config.ts"
-  ],
-  "exclude": ["gallery/viewer.ts"]
+  "include": ["src/main", "src/preload", "e2e", "playwright.config.ts", "vite.config.ts"]
 }

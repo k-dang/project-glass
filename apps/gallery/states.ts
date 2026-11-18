@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test"
-import { REPLAYED_PREFIX } from "../../server/test/replayedNames.ts"
+import { REPLAYED_PREFIX } from "../server/test/replayedNames.ts"
 
 export interface State {
   readonly area: string
