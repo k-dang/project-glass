@@ -18,6 +18,7 @@ import {
 import { flushSync } from "react-dom"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Label } from "@/components/ui/label"
 import { ChangedFilesView, type ChangedFilesViewProps, type ViewHandle } from "./ChangedFilesView"
 import { annotationSides, type ParsedFile } from "./changesView"
@@ -516,6 +517,38 @@ function DiagramLegend() {
   )
 }
 
+// Sits above the Chapter's diffs, so it hides to give them the card's full height.
+function ChapterDiagram(props: { source: string; title: string }) {
+  const [open, setOpen] = useState(true)
+
+  return (
+    <Collapsible
+      open={open}
+      onOpenChange={setOpen}
+      render={<section />}
+      aria-label={`Diagram: ${props.title}`}
+      className={cn("mb-3 flex min-h-0 shrink-0 flex-col border-b pb-2", open && "max-h-[45%]")}
+    >
+      <div className="flex items-center gap-3">
+        <CollapsibleTrigger
+          render={<Button variant="ghost" size="xs" />}
+          className="-ml-2 text-muted-foreground aria-expanded:bg-transparent aria-expanded:text-muted-foreground hover:aria-expanded:bg-muted"
+        >
+          <ChevronRight
+            aria-hidden
+            className="transition-transform duration-200 ease-out group-data-panel-open/button:rotate-90 motion-reduce:transition-none"
+          />
+          Diagram
+        </CollapsibleTrigger>
+        {open && <DiagramLegend />}
+      </div>
+      <CollapsibleContent className="mt-2 min-h-0 overflow-auto">
+        <MermaidDiagram source={props.source} />
+      </CollapsibleContent>
+    </Collapsible>
+  )
+}
+
 function ChapterCard(props: {
   diff: Omit<TourViewProps, "onShowInReview">
   searchGroup: NonNullable<ChangedFilesViewProps["searchGroup"]>
@@ -681,15 +714,7 @@ function ChapterCard(props: {
                 title={title}
               />
             )}
-            {chapter?.diagram != null && (
-              <section
-                aria-label={`Diagram: ${title}`}
-                className="mb-3 max-h-[45%] min-h-0 overflow-auto border-b pb-3"
-              >
-                <DiagramLegend />
-                <MermaidDiagram source={chapter.diagram} className="mt-2" />
-              </section>
-            )}
+            {chapter?.diagram != null && <ChapterDiagram source={chapter.diagram} title={title} />}
             {files.length === 0 ? (
               <p className="p-4 text-sm text-muted-foreground">No files remain in this Chapter.</p>
             ) : (
