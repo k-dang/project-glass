@@ -111,10 +111,11 @@ const drawDiagramInput = claudeToolInput(drawDiagramParameters)
 const toolResult = ({ accepted, text }: ToolReply) =>
   Promise.resolve({ content: [{ type: "text" as const, text }], isError: !accepted })
 
+const reviewTools = claudeTools.shell
+
 const reviewOptions = (brief: ReviewBrief): Options => ({
   systemPrompt: { type: "preset", preset: "claude_code", append: brief.instructions },
-  tools: [...claudeTools.shell],
-  allowedTools: [...claudeTools.shell, `${GLASS_MCP_PREFIX}${SUGGEST_DRAFT_TOOL}`],
+  tools: [...reviewTools],
   settingSources: [],
   strictMcpConfig: true,
   mcpServers: {
@@ -130,7 +131,6 @@ const reviewOptions = (brief: ReviewBrief): Options => ({
 })
 
 const workOptions = (): Options => ({
-  allowedTools: [`${GLASS_MCP_PREFIX}${DRAW_DIAGRAM_TOOL}`],
   mcpServers: {
     [GLASS_MCP_SERVER]: createSdkMcpServer({
       name: GLASS_MCP_SERVER,
@@ -150,6 +150,18 @@ const roleOptions = (role: RepositoryRole): Options =>
       Review: ({ brief }) => reviewOptions(brief),
     }),
   )
+
+/**
+ * The tools Glass runs without asking the user: its own, and the shell an Agent review works in.
+ * Listing them in `allowedTools` instead would keep Claude Code from consulting `canUseTool`.
+ */
+const approvedIn = (role: RepositoryRole) => {
+  const builtIn: ReadonlyArray<string> = Match.value(role).pipe(
+    Match.tagsExhaustive({ Work: () => [], Review: () => reviewTools }),
+  )
+
+  return (toolName: string) => toolName.startsWith(GLASS_MCP_PREFIX) || builtIn.includes(toolName)
+}
 
 const pluginOptions = (skills: ReadonlyArray<WrittenSkills>): Options =>
   skills.length === 0
@@ -431,20 +443,26 @@ export const claudeAdapter = (
       ),
     )
 
+    const approved = approvedIn(role)
+
+    const canUseTool: CanUseTool = (toolName, input, { toolUseID, signal }) =>
+      approved(toolName)
+        ? Promise.resolve({ behavior: "allow", updatedInput: input })
+        : Effect.runPromise(
+            ask(
+              toolName,
+              Option.getOrElse(decodeToolInput(input), () => ({})),
+              toolUseID,
+            ),
+            { signal },
+          )
+
     const { session } = yield* startClaude(
       sdk,
       command,
       folder,
       Stream.toAsyncIterable(Stream.fromQueue(prompts)),
-      (toolName, input, { toolUseID, signal }) =>
-        Effect.runPromise(
-          ask(
-            toolName,
-            Option.getOrElse(decodeToolInput(input), () => ({})),
-            toolUseID,
-          ),
-          { signal },
-        ),
+      canUseTool,
       {
         ...(saved === undefined ? { sessionId: conversation } : { resume: conversation }),
         ...roleOptions(role),
