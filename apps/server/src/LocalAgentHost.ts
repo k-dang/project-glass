@@ -1,8 +1,10 @@
-import { ConversationError } from "@glass/contracts"
+import { ConversationError, RPC_PATH } from "@glass/contracts"
 import {
   Context,
+  Data,
   Effect,
   Exit,
+  FileSystem,
   Layer,
   Option,
   Predicate,
@@ -13,30 +15,57 @@ import {
   Semaphore,
   Stream,
 } from "effect"
-import { ChildProcessSpawner } from "effect/process"
 import type { RpcClientError } from "effect/rpc"
 import { Socket } from "effect/socket"
-import { RPC_PATH } from "@glass/contracts"
+import { SqlClient } from "effect/sql"
+import { spawn } from "node:child_process"
+import { createHash } from "node:crypto"
+import { closeSync, mkdirSync, openSync } from "node:fs"
+import { dirname, join } from "node:path"
 import {
   AgentHostRpcs,
+  HEALTH_PATH,
   HOST_TOKEN_HEADER,
-  HostReady,
+  hostPort,
   type HostReplaced,
   newHostToken,
+  SHUTDOWN_PATH,
 } from "./agentHost/protocol"
+import { writeDataFile } from "./dataFiles"
 import { followJournal, greet } from "./hostJournal"
 import type { ConversationHost } from "./ConversationTurns"
 import type { HostClient } from "./Placement"
-import { launchCommand } from "./processes"
+import { nodeEntry } from "./processes"
 import { connectRpcClient } from "./rpcSocket"
 import { ServerConfig } from "./ServerConfig"
 import { AgentCommands } from "./SettingsStore"
 import { Transcripts } from "./Transcripts"
 
-const FORCE_KILL_AFTER = "2 seconds"
+/** Where the backend records the local host it leaves running when it quits (ADR 0014). */
+export const hostRecordPath = (dataDirectory: string) => join(dataDirectory, "agent-host.json")
 
-const lostConnection = (error: RpcClientError.RpcClientError | ConversationError | HostReplaced) =>
-  Predicate.isTagged(error, "RpcClientError")
+export const RecordedHost = Schema.fromJsonString(
+  Schema.Struct({ port: Schema.Int, token: Schema.String, fingerprint: Schema.String }),
+)
+
+export type RecordedHost = typeof RecordedHost.Type
+
+export const readRecordedHost = (fs: FileSystem.FileSystem, dataDirectory: string) =>
+  fs
+    .readFileString(hostRecordPath(dataDirectory))
+    .pipe(Effect.flatMap(Schema.decodeUnknownEffect(RecordedHost)), Effect.option)
+
+const REATTACH_DEADLINE = "10 seconds"
+
+const HEALTH_DEADLINE = "5 seconds"
+
+class HostGone extends Data.TaggedError("HostGone") {}
+
+class ReattachTimedOut extends Data.TaggedError("ReattachTimedOut") {}
+
+const lostConnection = (
+  error: RpcClientError.RpcClientError | ConversationError | HostReplaced | HostGone,
+) => Predicate.isTagged(error, "RpcClientError")
 
 const unavailable = () =>
   new ConversationError({
@@ -44,11 +73,58 @@ const unavailable = () =>
       "Glass couldn't start the process that runs Conversations. Try again; Glass's backend log has the details.",
   })
 
+const hostUrl = (port: number, path: string) => `http://127.0.0.1:${port}${path}`
+
+// A host that refuses the connection is gone; one slow to answer may only be busy with its Turns.
+const gone = (port: number) =>
+  Effect.tryPromise((signal) => fetch(hostUrl(port, HEALTH_PATH), { signal })).pipe(
+    Effect.map((response) => !response.ok),
+    Effect.timeoutOrElse({ duration: HEALTH_DEADLINE, orElse: () => Effect.succeed(false) }),
+    Effect.orElseSucceed(() => true),
+  )
+
+export const shutDownHost = ({ port, token }: Pick<RecordedHost, "port" | "token">) =>
+  Effect.tryPromise((signal) =>
+    fetch(hostUrl(port, SHUTDOWN_PATH), {
+      method: "POST",
+      headers: { [HOST_TOKEN_HEADER]: token },
+      signal,
+    }),
+  ).pipe(
+    Effect.timeoutOrElse({ duration: HEALTH_DEADLINE, orElse: () => Effect.void }),
+    Effect.ignore,
+  )
+
+type CarriedOn = ReadonlySet<string>
+
+export interface Resumed {
+  readonly reattached: boolean
+  /** The Conversations whose Turn the host carries on, so they aren't interrupted. */
+  readonly carriedOn: CarriedOn
+}
+
+const notResumed: Resumed = { reattached: false, carriedOn: new Set() }
+
+interface Attached {
+  readonly client: HostClient
+  readonly scope: Scope.Closeable
+}
+
 export class LocalAgentHost extends Context.Service<
   LocalAgentHost,
   {
     readonly client: Effect.Effect<HostClient, ConversationError>
     readonly running: Effect.Effect<Option.Option<HostClient>>
+    /**
+     * Reattaches, once per launch, to the host an earlier launch left running, if it can, and names
+     * the Conversations whose Turn that host carries on.
+     */
+    readonly resume: Effect.Effect<Resumed>
+    /**
+     * Starts saving a reattached host's journal. Saving starts Turns, so this waits until every
+     * service that delivers them is serving.
+     */
+    readonly followReattached: Effect.Effect<void>
     readonly lifetimeOf: (client: ConversationHost) => Effect.Effect<Option.Option<Scope.Scope>>
     readonly subscribeStopped: Effect.Effect<Stream.Stream<void>, never, Scope.Scope>
   }
@@ -58,116 +134,272 @@ export class LocalAgentHost extends Context.Service<
     Effect.gen(function* () {
       const config = yield* ServerConfig
       const commands = yield* AgentCommands
-      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+      const fs = yield* FileSystem.FileSystem
+      const sql = yield* SqlClient.SqlClient
       const transcripts = yield* Transcripts
       const webSocketConstructor = yield* Socket.WebSocketConstructor
       const backendScope = yield* Scope.Scope
       const lock = yield* Semaphore.make(1)
       const stopped = yield* PubSub.unbounded<void>()
-      let current: { readonly client: HostClient; readonly scope: Scope.Closeable } | null = null
+      const recordPath = hostRecordPath(config.dataDirectory)
+      let current: Attached | null = null
+      let pendingFollow: Effect.Effect<void> | null = null
 
-      const start = Effect.gen(function* () {
-        const scope = yield* Scope.fork(backendScope)
+      // A host built from other code, or launched with other harness commands, would keep running
+      // them for as long as Glass stays open.
+      const fingerprint = yield* fs.readFile(config.agentHostBundle).pipe(
+        Effect.map((bundle) =>
+          createHash("sha256")
+            .update(bundle)
+            .update(`\0${commands.piCommand}\0${commands.claudeCommand}`)
+            .digest("base64url"),
+        ),
+        Effect.cached,
+      )
+
+      const readRecord = readRecordedHost(fs, config.dataDirectory)
+
+      const forget = fs.remove(recordPath, { force: true }).pipe(Effect.ignore)
+
+      const record = (recorded: RecordedHost) =>
+        writeDataFile(fs, recordPath, Schema.encodeSync(RecordedHost)(recorded))
+
+      const stop = (scope: Scope.Closeable) =>
+        lock.withPermits(1)(
+          Effect.suspend(() => {
+            if (current?.scope !== scope) return Effect.void
+            current = null
+
+            return Effect.logWarning("The agent host stopped").pipe(
+              Effect.andThen(forget),
+              Effect.andThen(PubSub.publish(stopped, undefined)),
+              Effect.andThen(Scope.close(scope, Exit.void)),
+            )
+          }),
+        )
+
+      // Saving the journal can end Turns and start Queued messages, so a reattached host's `follow`
+      // waits until Glass is ready for that.
+      const attach = (recorded: RecordedHost) =>
+        Effect.gen(function* () {
+          const scope = yield* Scope.fork(backendScope)
+
+          return yield* Effect.gen(function* () {
+            const connectionScope = yield* Scope.fork(scope)
+
+            const client = yield* connectRpcClient(
+              AgentHostRpcs,
+              `ws://127.0.0.1:${recorded.port}${RPC_PATH}`,
+              { [HOST_TOKEN_HEADER]: recorded.token },
+            ).pipe(
+              Effect.provideService(Socket.WebSocketConstructor, webSocketConstructor),
+              Scope.provide(connectionScope),
+            )
+
+            const host = yield* greet(client)
+
+            const savedRows = yield* sql<{ readonly id: string; readonly saved: number }>`
+              SELECT id, journal_saved AS saved FROM conversation WHERE journal_host = ${host}
+            `.pipe(Effect.orDie)
+
+            const savedThrough = new Map(savedRows.map(({ id, saved }) => [id, saved]))
+
+            const follow = followJournal(
+              transcripts.save,
+              client,
+              { host, saved: 0 },
+              (conversationId) => savedThrough.get(conversationId) ?? 0,
+            ).pipe(
+              Effect.catchIf(lostConnection, (error) =>
+                gone(recorded.port).pipe(
+                  Effect.flatMap((isGone) => Effect.fail(isGone ? new HostGone() : error)),
+                ),
+              ),
+              Effect.tapCause((cause) => Effect.logWarning("Lost the agent host's journal", cause)),
+              Effect.retry({ while: lostConnection, schedule: Schedule.spaced("1 second") }),
+              Effect.catch(() =>
+                Scope.close(connectionScope, Exit.void).pipe(
+                  Effect.andThen(shutDownHost(recorded)),
+                  Effect.andThen(stop(scope)),
+                ),
+              ),
+              Scope.provide(scope),
+              Effect.forkIn(scope),
+              Effect.asVoid,
+            )
+
+            return { attached: { client, scope } satisfies Attached, follow }
+          }).pipe(
+            Scope.provide(scope),
+            Effect.onError(() => Scope.close(scope, Exit.void)),
+          )
+        })
+
+      // A Conversation carries on if the host has a Turn for it open, unless Glass has since started
+      // another Turn the host never got.
+      const carriedOn = (client: HostClient) =>
+        client.OpenTurns().pipe(
+          Effect.flatMap((open) =>
+            Effect.filter(open, ({ conversationId, turnId }) =>
+              transcripts.runningTurn(conversationId).pipe(
+                Effect.map((running) => running === null || running === turnId),
+                Effect.orElseSucceed(() => false),
+              ),
+            ),
+          ),
+          Effect.map(
+            (kept): CarriedOn => new Set(kept.map(({ conversationId }) => conversationId)),
+          ),
+        )
+
+      const reattach = Effect.gen(function* () {
+        const found = yield* readRecord
+
+        if (Option.isNone(found)) return Option.none()
+
+        const recorded = found.value
+
+        const giveUp = shutDownHost(recorded).pipe(
+          Effect.andThen(forget),
+          Effect.as(
+            Option.none<{
+              readonly attached: Attached
+              readonly follow: Effect.Effect<void>
+              readonly carriedOn: CarriedOn
+            }>(),
+          ),
+        )
+
+        if (recorded.fingerprint !== (yield* fingerprint))
+          return yield* Effect.logWarning(
+            "The agent host an earlier launch left running is from another build",
+          ).pipe(Effect.andThen(giveUp))
+
+        if (yield* gone(recorded.port))
+          return yield* Effect.logWarning(
+            "The agent host an earlier launch left running doesn't answer",
+          ).pipe(Effect.andThen(giveUp))
+
+        return yield* attach(recorded).pipe(
+          Effect.flatMap(({ attached, follow }) =>
+            carriedOn(attached.client).pipe(
+              Effect.map((carried) => Option.some({ attached, follow, carriedOn: carried })),
+            ),
+          ),
+          Effect.timeoutOrElse({
+            duration: REATTACH_DEADLINE,
+            orElse: () => Effect.fail(new ReattachTimedOut()),
+          }),
+          Effect.catchCause((cause) =>
+            Effect.logWarning("Couldn't reattach to the agent host", cause).pipe(
+              Effect.andThen(giveUp),
+            ),
+          ),
+        )
+      })
+
+      const launch = Effect.gen(function* () {
         const token = newHostToken()
+        const known = yield* fingerprint
 
-        return yield* Effect.gen(function* () {
-          const child = yield* spawner.spawn(
-            launchCommand(config.agentHostBundle, [], {
+        const started = Effect.acquireRelease(
+          Effect.sync(() => {
+            mkdirSync(dirname(config.logFile), { recursive: true })
+            const log = openSync(config.logFile, "a")
+
+            // Not through ChildProcessSpawner, which ends a child with the scope that spawned it:
+            // detached and unreferenced, the host keeps its Turns going after the backend quits, and
+            // it writes its logs to the file itself because a pipe would break then.
+            const entry = nodeEntry(config.agentHostBundle)
+
+            const child = spawn(entry.command, entry.args, {
               env: {
+                ...process.env,
+                ...entry.env,
                 GLASS_HOST_TOKEN: token,
                 GLASS_PI_COMMAND: commands.piCommand,
                 GLASS_CLAUDE_COMMAND: commands.claudeCommand,
               },
-              extendEnv: true,
-              stdout: "inherit",
-              stderr: "inherit",
-              additionalFds: { fd3: { type: "output" } },
-              forceKillAfter: FORCE_KILL_AFTER,
-              // Signal only the host, so it closes its Agent harnesses itself: killing its process
-              // group would end them under it, which it logs as crashes.
-              detached: false,
-            }),
-          )
+              detached: true,
+              windowsHide: true,
+              stdio: ["ignore", log, log, "pipe"],
+            })
 
-          const { port } = yield* child
-            .getOutputFd(3)
-            .pipe(
-              Stream.decodeText(),
-              Stream.mkString,
-              Effect.flatMap(Schema.decodeUnknownEffect(HostReady)),
-            )
+            closeSync(log)
+            child.unref()
 
-          const connectionScope = yield* Scope.fork(scope)
+            return child
+          }),
+          (child, exit) => (Exit.isSuccess(exit) ? Effect.void : Effect.sync(() => child.kill())),
+        )
 
-          const client = yield* connectRpcClient(
-            AgentHostRpcs,
-            `ws://127.0.0.1:${port}${RPC_PATH}`,
-            { [HOST_TOKEN_HEADER]: token },
-          ).pipe(
-            Effect.provideService(Socket.WebSocketConstructor, webSocketConstructor),
-            Scope.provide(connectionScope),
-          )
+        // A host this launch started but didn't record would be one no later launch can find.
+        const recorded = yield* Effect.uninterruptibleMask((restore) =>
+          Effect.gen(function* () {
+            const child = yield* started
+            const port = yield* restore(Effect.tryPromise(() => hostPort(child)))
+            const made = { port, token, fingerprint: known }
 
-          const host = yield* greet(client)
+            yield* record(made)
 
-          yield* followJournal(
-            (conversationId, events) => transcripts.save(conversationId, events),
-            client,
-            { host, saved: 0 },
-          ).pipe(
-            Effect.tapCause((cause) => Effect.logWarning("Lost the agent host's journal", cause)),
-            Effect.retry({
-              while: lostConnection,
-              schedule: Schedule.spaced("1 second"),
-            }),
-            Effect.catch(() =>
-              Scope.close(connectionScope, Exit.void).pipe(
-                Effect.andThen(child.kill({ forceKillAfter: FORCE_KILL_AFTER })),
-                Effect.ignore,
-              ),
-            ),
-            Effect.forkIn(scope),
-          )
+            return made
+          }),
+        ).pipe(Effect.scoped)
 
-          yield* child.exitCode.pipe(
-            Effect.ignore,
+        const { attached, follow } = yield* attach(recorded)
+        yield* follow
+
+        return attached
+      })
+
+      const resume = yield* lock
+        .withPermits(1)(
+          Effect.gen(function* () {
+            const reattached = yield* reattach
+
+            if (Option.isNone(reattached)) return notResumed
+
+            current = reattached.value.attached
+            pendingFollow = reattached.value.follow
+
+            return { reattached: true, carriedOn: reattached.value.carriedOn }
+          }),
+        )
+        .pipe(
+          Effect.tapCause((cause) => Effect.logWarning("Couldn't resume the agent host", cause)),
+          Effect.orElseSucceed(() => notResumed),
+          Effect.cached,
+        )
+
+      return LocalAgentHost.of({
+        client: resume
+          .pipe(
             Effect.andThen(
               lock.withPermits(1)(
-                Effect.suspend(() => {
-                  if (current?.scope !== scope) return Effect.void
-                  current = null
+                Effect.gen(function* () {
+                  current ??= yield* launch
 
-                  return Effect.logWarning("The agent host stopped").pipe(
-                    Effect.andThen(PubSub.publish(stopped, undefined)),
-                    Effect.andThen(Scope.close(scope, Exit.void)),
-                  )
+                  return current.client
                 }),
               ),
             ),
-            Effect.forkIn(scope),
-          )
-
-          return { client, scope }
-        }).pipe(
-          Scope.provide(scope),
-          Effect.onError(() => Scope.close(scope, Exit.void)),
-        )
-      })
-
-      return LocalAgentHost.of({
-        client: lock
-          .withPermits(1)(
-            Effect.gen(function* () {
-              current ??= yield* start
-
-              return current.client
-            }),
           )
           .pipe(
             Effect.tapCause((cause) => Effect.logWarning("Couldn't start the agent host", cause)),
             Effect.mapError(unavailable),
           ),
         running: Effect.sync(() => Option.fromNullishOr(current?.client)),
+        resume,
+        followReattached: resume.pipe(
+          Effect.andThen(
+            Effect.suspend(() => {
+              const follow = pendingFollow
+              pendingFollow = null
+
+              return follow ?? Effect.void
+            }),
+          ),
+        ),
         lifetimeOf: (client) =>
           Effect.sync(() =>
             current?.client === client ? Option.some(current.scope) : Option.none(),

@@ -1,6 +1,11 @@
-import { Context, Effect, Layer, PubSub, Stream } from "effect"
+import { Context, Effect, Layer, Predicate, PubSub, Stream, SubscriptionRef } from "effect"
 import { randomUUID } from "node:crypto"
-import { type HostEvent, HostReplaced, type JournalEntry } from "./protocol"
+import { type HostEvent, HostReplaced, type JournalEntry, type OpenTurn } from "./protocol"
+
+interface Attendance {
+  readonly followers: number
+  readonly unacknowledged: number
+}
 
 /** JSON characters of unacknowledged output kept for Glass while it is away: many Agent-hours. */
 export const JournalBudget = Context.Reference<number>("@glass/server/agentHost/JournalBudget", {
@@ -21,6 +26,9 @@ export class Journal extends Context.Service<
     readonly append: (conversationId: string, event: HostEvent) => Effect.Effect<boolean>
     readonly watch: (host: string, after: number) => Stream.Stream<JournalEntry, HostReplaced>
     readonly acknowledge: (host: string, through: number) => Effect.Effect<void>
+    /** How many backends watch the journal, and how many entries none has acknowledged yet. */
+    readonly attendance: SubscriptionRef.SubscriptionRef<Attendance>
+    readonly unacknowledgedEnds: Effect.Effect<ReadonlyArray<OpenTurn>>
   }
 >()("@glass/server/agentHost/Journal") {
   static readonly layer = Layer.effect(
@@ -33,6 +41,22 @@ export class Journal extends Context.Service<
       let keptChars = 0
       let sequence = 0
 
+      const attendance = yield* SubscriptionRef.make<Attendance>({
+        followers: 0,
+        unacknowledged: 0,
+      })
+
+      const countKept = SubscriptionRef.update(attendance, (before) => ({
+        ...before,
+        unacknowledged: kept.length,
+      }))
+
+      const follow = (change: number) =>
+        SubscriptionRef.update(attendance, (before) => ({
+          ...before,
+          followers: before.followers + change,
+        }))
+
       return Journal.of({
         host,
         append: (conversationId, event) =>
@@ -42,7 +66,10 @@ export class Journal extends Context.Service<
             kept.push({ entry, chars })
             keptChars += chars
 
-            return PubSub.publish(published, entry).pipe(Effect.as(keptChars > budget))
+            return countKept.pipe(
+              Effect.andThen(PubSub.publish(published, entry)),
+              Effect.as(keptChars > budget),
+            )
           }),
         watch: (watched, after) =>
           Stream.unwrap(
@@ -55,6 +82,8 @@ export class Journal extends Context.Service<
 
               const last = missed.at(-1)?.sequence ?? after
 
+              yield* Effect.acquireRelease(follow(1), () => follow(-1))
+
               return Stream.concat(
                 Stream.fromIterable(missed),
                 Stream.fromSubscription(live).pipe(Stream.filter((entry) => entry.sequence > last)),
@@ -62,11 +91,21 @@ export class Journal extends Context.Service<
             }),
           ),
         acknowledge: (acknowledged, through) =>
-          Effect.sync(() => {
-            if (acknowledged !== host) return
+          Effect.suspend(() => {
+            if (acknowledged !== host) return Effect.void
             const dropped = kept.splice(0, keptAfter(kept, through))
             keptChars -= dropped.reduce((total, { chars }) => total + chars, 0)
+
+            return countKept
           }),
+        attendance,
+        unacknowledgedEnds: Effect.sync(() =>
+          kept.flatMap(({ entry: { conversationId, event } }) =>
+            Predicate.isTagged(event, "TurnEnded")
+              ? [{ conversationId, turnId: event.turnId }]
+              : [],
+          ),
+        ),
       })
     }),
   )

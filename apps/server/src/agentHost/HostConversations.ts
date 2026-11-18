@@ -17,6 +17,7 @@ import {
   Predicate,
   Scope,
   Semaphore,
+  SubscriptionRef,
 } from "effect"
 import type { HarnessAdapter, HarnessSession } from "./adapter"
 import type { DeliveredMessage, DeliveredTurn } from "./deliveredMessage"
@@ -28,6 +29,7 @@ import {
   type StartOutcome,
   HostConversationError,
   type HostEvent,
+  type OpenTurn,
   type SkillSource,
   type SteersNotTakenIn,
   type TurnSettings,
@@ -42,7 +44,6 @@ interface Running {
   readonly scope: Scope.Closeable
   readonly session: HarnessSession
   applied: TurnSettings
-  turnId: string | null
 }
 
 interface OverBudgetStop {
@@ -88,6 +89,9 @@ export class HostConversations extends Context.Service<
       answer: RequestAnswer,
     ) => Effect.Effect<void, RequestNotWaiting | HostConversationError>
     readonly stop: (conversationId: string) => Effect.Effect<void>
+    readonly runningTurns: SubscriptionRef.SubscriptionRef<ReadonlyMap<string, string>>
+    /** The Turns whose end no backend has acknowledged: running ones, and ones that ended unseen. */
+    readonly openTurns: Effect.Effect<ReadonlyArray<OpenTurn>>
   }
 >()("@glass/server/agentHost/HostConversations") {
   static readonly make = (adapters: Harnesses) =>
@@ -102,6 +106,18 @@ export class HostConversations extends Context.Service<
 
         const hostScope = yield* Scope.Scope
         const running = new Map<string, Running>()
+        const runningTurns = yield* SubscriptionRef.make<ReadonlyMap<string, string>>(new Map())
+
+        const setTurn = (conversationId: string, turnId: string | null) =>
+          SubscriptionRef.update(runningTurns, (turns) => {
+            const next = new Map(turns)
+
+            if (turnId === null) next.delete(conversationId)
+            else next.set(conversationId, turnId)
+
+            return next
+          })
+
         const locks = new Map<string, { semaphore: Semaphore.Semaphore; holders: number }>()
 
         const withConversation = <A, E, R>(
@@ -135,9 +151,14 @@ export class HostConversations extends Context.Service<
           Effect.suspend(() => {
             if (conversation === undefined) return Effect.void
 
-            if (running.get(conversationId) === conversation) running.delete(conversationId)
+            if (running.get(conversationId) !== conversation)
+              return Scope.close(conversation.scope, Exit.void)
 
-            return Scope.close(conversation.scope, Exit.void)
+            running.delete(conversationId)
+
+            return Scope.close(conversation.scope, Exit.void).pipe(
+              Effect.andThen(setTurn(conversationId, null)),
+            )
           })
 
         const start = Effect.fn("HostConversations.start")(
@@ -175,19 +196,29 @@ export class HostConversations extends Context.Service<
                 Predicate.isTagged(event, "TurnStarted") ||
                 Predicate.isTagged(event, "TurnEnded")
               ) {
-                if (conversation !== undefined)
-                  conversation.turnId = Predicate.isTagged(event, "TurnStarted")
-                    ? event.turnId
-                    : null
                 overBudgetStop = null
+
+                if (conversation !== undefined)
+                  yield* setTurn(
+                    conversationId,
+                    Predicate.isTagged(event, "TurnStarted") ? event.turnId : null,
+                  )
 
                 return
               }
 
-              if (!full || overBudgetStop !== null || conversation?.turnId == null) return
+              const turnId = (yield* SubscriptionRef.get(runningTurns)).get(conversationId)
+
+              if (
+                !full ||
+                overBudgetStop !== null ||
+                conversation === undefined ||
+                turnId === undefined
+              )
+                return
 
               const stop: OverBudgetStop = {
-                turnId: conversation.turnId,
+                turnId,
                 steers: yield* Deferred.make<SteersNotTakenIn | null>(),
               }
 
@@ -232,7 +263,6 @@ export class HostConversations extends Context.Service<
               scope,
               session,
               applied: { model: null, effort: null, permissionMode: null },
-              turnId: null,
             }
 
             running.set(conversationId, conversation)
@@ -278,7 +308,7 @@ export class HostConversations extends Context.Service<
               conversation.applied = settings
             }
 
-            conversation.turnId = turnId
+            yield* setTurn(conversationId, turnId)
 
             return yield* conversation.session.startTurn(turnId, message)
           }),
@@ -303,6 +333,16 @@ export class HostConversations extends Context.Service<
               conversationId,
               Effect.suspend(() => retire(conversationId, running.get(conversationId))),
             ),
+          runningTurns,
+          openTurns: Effect.all([
+            SubscriptionRef.get(runningTurns),
+            journal.unacknowledgedEnds,
+          ]).pipe(
+            Effect.map(([turns, ended]) => [
+              ...Array.from(turns, ([conversationId, turnId]) => ({ conversationId, turnId })),
+              ...ended,
+            ]),
+          ),
         })
 
         coordination.set(conversations, locks)

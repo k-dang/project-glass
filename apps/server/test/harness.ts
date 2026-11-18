@@ -1,4 +1,4 @@
-import { NodeSocket } from "@effect/platform-node"
+import { NodeFileSystem, NodeSocket } from "@effect/platform-node"
 import {
   ActivityPullRequest,
   GlassRpcs,
@@ -7,7 +7,7 @@ import {
   RPC_PATH,
   TOKEN_PARAM,
 } from "@glass/contracts"
-import { Clock, ConfigProvider, Context, Effect, Layer, Option } from "effect"
+import { Clock, ConfigProvider, Context, Effect, FileSystem, Layer, Option } from "effect"
 import { HttpServer } from "effect/http"
 import { Socket } from "effect/socket"
 import { mkdtemp, realpath, rm } from "node:fs/promises"
@@ -16,6 +16,7 @@ import { join } from "node:path"
 import { afterEach, vi } from "vite-plus/test"
 import { connectRpcClient } from "../src/rpcSocket"
 import { AgentRunners } from "../src/agentRunners"
+import { readRecordedHost, shutDownHost } from "../src/LocalAgentHost"
 import { McpCredentials } from "../src/mcp/McpCredentials"
 import { OutsideAgents } from "../src/OutsideAgents"
 import { GlassMcpTools } from "../src/mcp/server"
@@ -40,8 +41,20 @@ export const stubHome = (home: string) => {
 export const isolatedHome = Effect.acquireRelease(
   // The real path, as programs print it: on macOS the temporary folder sits behind /private.
   Effect.promise(() => mkdtemp(join(tmpdir(), "glass-test-")).then((made) => realpath(made))),
-  (directory) => Effect.promise(() => rm(directory, { recursive: true, force: true })),
+  (directory) =>
+    leftHost(directory).pipe(
+      Effect.andThen(Effect.promise(() => rm(directory, { recursive: true, force: true }))),
+    ),
 )
+
+// A backend leaves its agent host running while a Turn is (ADR 0014), which a test's Turn may be
+// forever.
+const leftHost = (home: string) =>
+  FileSystem.FileSystem.pipe(
+    Effect.flatMap((fs) => readRecordedHost(fs, join(home, ".project-glass"))),
+    Effect.flatMap(Option.match({ onNone: () => Effect.void, onSome: shutDownHost })),
+    Effect.provide(NodeFileSystem.layer),
+  )
 
 afterEach(() => vi.unstubAllEnvs())
 

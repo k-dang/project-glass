@@ -196,6 +196,7 @@ export const conversationServicesFixture = Effect.gen(function* () {
         baseRef: () => Effect.succeed("main"),
         remove: () => Effect.void,
         subscribeLost: Effect.succeed(Stream.never),
+        resume: Effect.succeed(new Set()),
       })
 
       const services = yield* Layer.build(
@@ -256,6 +257,7 @@ export const conversationServicesFixture = Effect.gen(function* () {
         (conversationId, events) => transcripts.save(conversationId, events),
         client,
         { host, saved: 0 },
+        () => 0,
       ).pipe(Effect.forkScoped)
 
       return {

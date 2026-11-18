@@ -539,7 +539,7 @@ export class Sandboxes extends Context.Service<
                     ),
                 )
                 yield* Deferred.succeed(opened, client)
-                yield* followJournal(transcripts.save, client, position)
+                yield* followJournal(transcripts.save, client, position, () => position.saved)
               }).pipe(Effect.scoped, Effect.result)
 
               if (Result.isSuccess(ended)) return yield* Effect.void

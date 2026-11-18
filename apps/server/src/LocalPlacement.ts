@@ -26,7 +26,11 @@ const succeeds = <E, R>(effect: Effect.Effect<unknown, E, R>) =>
 
 export class LocalPlacement extends Context.Service<
   LocalPlacement,
-  Placement & { readonly subscribeLost: SubscribeLost }
+  Placement & {
+    readonly subscribeLost: SubscribeLost
+    /** Reattaches to a host left running at quit, and names the Conversations whose Turn it carries on. */
+    readonly resume: Effect.Effect<ReadonlySet<string>>
+  }
 >()("@glass/server/LocalPlacement") {
   static readonly layer = Layer.effect(
     LocalPlacement,
@@ -164,6 +168,13 @@ export class LocalPlacement extends Context.Service<
         baseRef,
         remove,
         subscribeLost: host.subscribeStopped.pipe(Effect.map(Stream.map(() => [...hosted]))),
+        resume: host.resume.pipe(
+          Effect.map(({ carriedOn }) => {
+            for (const conversationId of carriedOn) hosted.add(conversationId)
+
+            return carriedOn
+          }),
+        ),
       })
     }),
   )

@@ -17,8 +17,11 @@ import {
   TurnStarted,
 } from "@glass/contracts"
 import { Effect, Schema, SchemaTransformation } from "effect"
+import type { ChildProcess } from "node:child_process"
 import { randomBytes } from "node:crypto"
 import { resolve } from "node:path"
+import { Readable } from "node:stream"
+import { text } from "node:stream/consumers"
 import { Rpc, RpcGroup } from "effect/rpc"
 import { DeliveredMessage, DeliveredTurn } from "./deliveredMessage"
 
@@ -80,6 +83,19 @@ const HostFolder = Schema.String.pipe(
 )
 
 export const HostReady = Schema.fromJsonString(Schema.Struct({ port: Schema.Int }))
+
+/** The port a host reports on fd 3 once it listens; fails if it exits first. */
+export const hostPort = async (host: ChildProcess) => {
+  const ready = host.stdio[3]
+
+  if (!(ready instanceof Readable)) throw new Error("The host has no readiness pipe")
+
+  return Schema.decodeUnknownSync(HostReady)(await text(ready)).port
+}
+
+export const OpenTurn = Schema.Struct({ conversationId: Schema.String, turnId: Schema.String })
+
+export type OpenTurn = typeof OpenTurn.Type
 
 export const TurnSettings = Schema.Struct({
   ...ModelChoice.fields,
@@ -238,6 +254,10 @@ export class AgentHostRpcs extends RpcGroup.make(
     stream: true,
   }),
   Rpc.make("Acknowledge", { payload: { host: Schema.String, through: Schema.Int } }),
+  // Glass asks this only of a local host built from its own code, so older hosts never see it.
+  Rpc.make("OpenTurns", {
+    success: Schema.Array(OpenTurn),
+  }),
 ) {}
 
 export const couldNotSwitch = (harness: string, what: "model" | "effort" | "Permission mode") =>

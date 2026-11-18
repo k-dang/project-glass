@@ -336,6 +336,7 @@ const stallableHost = (calls: {
             ReadFile: () => Effect.die("This test does not call ReadFile"),
             WatchJournal: () => Stream.die("This test does not call WatchJournal"),
             Acknowledge: () => Effect.die("This test does not call Acknowledge"),
+            OpenTurns: () => Effect.die("This test does not call OpenTurns"),
           }),
         ),
       ),
@@ -348,6 +349,8 @@ const openGlobal = (client: HostClient, scope: Scope.Scope) => {
   const host = LocalAgentHost.of({
     client: Effect.succeed(client),
     running: Effect.succeed(Option.some(client)),
+    resume: Effect.succeed({ reattached: false, carriedOn: new Set<string>() }),
+    followReattached: Effect.void,
     lifetimeOf: () => Effect.succeed(Option.some(scope)),
     subscribeStopped: Effect.succeed(Stream.empty),
   })
@@ -375,6 +378,7 @@ const openGlobal = (client: HostClient, scope: Scope.Scope) => {
         gitRemote: "https://github.com",
         dataDirectory: home,
         homeDirectory: home,
+        logFile: join(home, "backend.log"),
       }),
     ),
     Layer.provide(NodeFileSystem.layer),

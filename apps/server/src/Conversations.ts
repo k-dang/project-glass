@@ -425,9 +425,11 @@ export class Conversations extends Context.Service<
             Effect.catchTag("ConversationNotFound", () => Effect.succeedNone),
           ),
         lost: Stream.merge(yield* localPlacement.subscribeLost, yield* sandboxes.subscribeLost),
-        interrupted: sandboxes.resume.pipe(
-          Effect.map((outlivedGlass) =>
-            stored.flatMap(({ id }) => (outlivedGlass.has(id) ? [] : [id])),
+        interrupted: Effect.all([sandboxes.resume, localPlacement.resume], {
+          concurrency: "unbounded",
+        }).pipe(
+          Effect.map(([inSandboxes, onThisDevice]) =>
+            stored.flatMap(({ id }) => (inSandboxes.has(id) || onThisDevice.has(id) ? [] : [id])),
           ),
         ),
       })

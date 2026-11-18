@@ -28,6 +28,8 @@ export class ServerConfig extends Context.Service<
     readonly gitRemote: string
     readonly dataDirectory: string
     readonly homeDirectory: string
+    /** The backend log, which the local agent host appends to itself because it outlives the backend. */
+    readonly logFile: string
   }
 >()("@glass/server/ServerConfig") {
   static readonly layer = Layer.effect(
@@ -55,6 +57,10 @@ export class ServerConfig extends Context.Service<
         Config.withDefault(join(homeDirectory, ".project-glass")),
       )
 
+      const logFile = yield* Config.String("GLASS_LOG_FILE").pipe(
+        Config.withDefault(join(dataDirectory, "backend.log")),
+      )
+
       const agentHostBundle = yield* Config.String("GLASS_AGENT_HOST_BUNDLE").pipe(
         Config.withDefault(bundledEntry("agentHost", import.meta.url)),
       )
@@ -73,6 +79,7 @@ export class ServerConfig extends Context.Service<
         gitRemote,
         dataDirectory,
         homeDirectory,
+        logFile,
       })
     }),
   )

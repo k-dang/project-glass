@@ -31,14 +31,24 @@ const acknowledge = (client: HostClient, { host }: JournalPosition, through: num
   // behind journal entries the follower hasn't taken yet.
   client.Acknowledge({ host, through }).pipe(Effect.ignore, Effect.forkScoped)
 
+export interface SavedThrough {
+  readonly host: string
+  readonly through: number
+}
+
+/**
+ * Saves the journal's entries after `position`, skipping each Conversation's entries up to the one
+ * `savedThrough` names: a host shared by many Conversations replays all it still keeps.
+ */
 export const followJournal = (
   save: (
     conversationId: string,
     events: ReadonlyArray<HostEvent>,
-    throughJournalEntry: number,
+    journal: SavedThrough,
   ) => Effect.Effect<void, ConversationError>,
   client: HostClient,
   position: JournalPosition,
+  savedThrough: (conversationId: string) => number,
 ) =>
   Effect.gen(function* () {
     yield* acknowledge(client, position, position.saved)
@@ -47,14 +57,18 @@ export const followJournal = (
     ).pipe(
       Stream.runForEachArray((entries) =>
         Effect.gen(function* () {
+          const unsaved = entries.filter(
+            ({ conversationId, sequence }) => sequence > savedThrough(conversationId),
+          )
+
           for (const [conversationId, saved] of Map.groupBy(
-            entries,
+            unsaved,
             (entry) => entry.conversationId,
           ))
             yield* save(
               conversationId,
               saved.map(({ event }) => event),
-              saved.at(-1)!.sequence,
+              { host: position.host, through: saved.at(-1)!.sequence },
             )
 
           const last = entries.at(-1)

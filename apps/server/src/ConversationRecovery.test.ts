@@ -1,9 +1,10 @@
-import { NodeSocket } from "@effect/platform-node"
+import { NodeFileSystem, NodeSocket } from "@effect/platform-node"
 import { assert, it } from "@effect/vitest"
 import {
   AllowRequest,
   isRequestPart,
   isWaiting,
+  RPC_PATH,
   TextPart,
   TOKEN_PARAM,
   type Turn,
@@ -11,14 +12,16 @@ import {
   TurnDone,
   TurnInterrupted,
 } from "@glass/contracts"
-import { Effect, Option, Predicate, Stream } from "effect"
+import { Effect, FileSystem, Option, Predicate, Schema, Stream } from "effect"
 import { Socket } from "effect/socket"
+import { writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { DatabaseSync } from "node:sqlite"
 import { conversationsFixture, holding, lastText, settled } from "../test/conversationsFixture"
-import { childProcesses, startedHost } from "../test/agentHostProcesses"
+import { childProcesses, hostExited, startedHost } from "../test/agentHostProcesses"
 import { LAUNCH_TOKEN } from "../test/harness"
-import { AgentHostRpcs } from "./agentHost/protocol"
+import { AgentHostRpcs, HOST_TOKEN_HEADER } from "./agentHost/protocol"
+import { hostRecordPath, readRecordedHost, RecordedHost } from "./LocalAgentHost"
 import { greet } from "./hostJournal"
 import { connectRpcClient } from "./rpcSocket"
 
@@ -153,29 +156,153 @@ it.live(
     }),
 )
 
-it.live("marks a running Turn interrupted after a relaunch, and runs the next message", () =>
+const recordedHost = (home: string) => {
+  const dataDirectory = join(home, ".project-glass")
+
+  const read = FileSystem.FileSystem.pipe(
+    Effect.flatMap((fs) => readRecordedHost(fs, dataDirectory)),
+    Effect.map(Option.getOrThrow),
+    Effect.provide(NodeFileSystem.layer),
+  )
+
+  return {
+    read,
+    fingerprint: (fingerprint: string) =>
+      read.pipe(
+        Effect.map((recorded) =>
+          writeFileSync(
+            hostRecordPath(dataDirectory),
+            Schema.encodeSync(RecordedHost)({ ...recorded, fingerprint }),
+          ),
+        ),
+      ),
+  }
+}
+
+// Waits, with Glass closed, until the host it left running has ended the Turn.
+const turnEnded = (home: string, turnId: string) =>
+  Effect.gen(function* () {
+    const { port, token } = yield* recordedHost(home).read
+
+    const witness = yield* connectRpcClient(AgentHostRpcs, `ws://127.0.0.1:${port}${RPC_PATH}`, {
+      [HOST_TOKEN_HEADER]: token,
+    }).pipe(Effect.provide(NodeSocket.layerWebSocketConstructor))
+
+    yield* witness.WatchJournal({ host: yield* greet(witness), after: 0 }).pipe(
+      Stream.filter(
+        ({ event }) => Predicate.isTagged(event, "TurnEnded") && event.turnId === turnId,
+      ),
+      Stream.runHead,
+    )
+  }).pipe(Effect.scoped)
+
+it.live("keeps a running Turn going while Glass is closed, and shows its reply on relaunch", () =>
   Effect.gen(function* () {
     const f = yield* conversationsFixture
     const conversation = yield* f.start("First")
     yield* f.transcript(conversation.id, settled(1))
 
-    yield* f.send(conversation.id, "hold:never")
-    yield* f.transcript(conversation.id, holding)
+    yield* f.send(conversation.id, "hold:second")
 
-    const restarted = yield* f.restart
-    yield* restarted.SendMessage({
-      conversationId: conversation.id,
-      message: "Third",
-      images: [],
-      feedback: [],
-    })
-    const turns = yield* f.transcript(conversation.id, settled(3), restarted)
+    const running = yield* f.transcript(
+      conversation.id,
+      (turns) => turns.length === 2 && holding(turns.slice(1)),
+    )
+
+    yield* f.quit
+    yield* f.release("second")
+
+    yield* turnEnded(f.home, running[1]!.id)
+
+    const relaunched = yield* f.launch
+    const turns = yield* f.transcript(conversation.id, settled(2), relaunched)
+
+    assert.deepStrictEqual(
+      turns.map((turn) => ({ parts: turn.parts, ending: turn.ended?.ending })),
+      [
+        { parts: [TextPart.make({ text: "Reply to: First" })], ending: TurnDone.make({}) },
+        {
+          parts: [
+            TextPart.make({ text: "Holding." }),
+            TextPart.make({ text: "Reply to: hold:second" }),
+          ],
+          ending: TurnDone.make({}),
+        },
+      ],
+    )
+  }),
+)
+
+it.live("starts a message Queued behind a Turn that ended while Glass was closed", () =>
+  Effect.gen(function* () {
+    const f = yield* conversationsFixture
+    const conversation = yield* f.start("hold:first")
+    const [running] = yield* f.transcript(conversation.id, holding)
+    yield* f.send(conversation.id, "Second")
+
+    yield* f.quit
+    yield* f.release("first")
+    yield* turnEnded(f.home, running!.id)
+
+    const relaunched = yield* f.launch
+    const turns = yield* f.transcript(conversation.id, settled(2), relaunched)
 
     assert.deepStrictEqual(
       turns.map(({ ended }) => ended?.ending),
-      [TurnDone.make({}), TurnInterrupted.make({}), TurnDone.make({})],
+      [TurnDone.make({}), TurnDone.make({})],
     )
-    assert.deepStrictEqual(lastText(turns[2]), TextPart.make({ text: "Reply to: Third" }))
+    assert.deepStrictEqual(lastText(turns[1]), TextPart.make({ text: "Reply to: Second" }))
+  }),
+)
+
+it.live(
+  "marks a running Turn interrupted when an updated Glass relaunches, stopping the old host",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* conversationsFixture
+      const earlierHosts = childProcesses(process.pid, "scriptedAgentHost.mjs")
+      const conversation = yield* f.start("First")
+      yield* f.transcript(conversation.id, settled(1))
+
+      yield* f.send(conversation.id, "hold:never")
+      yield* f.transcript(conversation.id, holding)
+      const host = startedHost(earlierHosts)
+      assert.isDefined(host, "the backend has no agent host running")
+
+      yield* f.quit
+      yield* recordedHost(f.home).fingerprint("an earlier Glass")
+
+      const relaunched = yield* f.launch
+      yield* hostExited(host)
+
+      yield* relaunched.SendMessage({
+        conversationId: conversation.id,
+        message: "Third",
+        images: [],
+        feedback: [],
+      })
+      const turns = yield* f.transcript(conversation.id, settled(3), relaunched)
+
+      assert.deepStrictEqual(
+        turns.map(({ ended }) => ended?.ending),
+        [TurnDone.make({}), TurnInterrupted.make({}), TurnDone.make({})],
+      )
+      assert.deepStrictEqual(lastText(turns[2]), TextPart.make({ text: "Reply to: Third" }))
+    }),
+)
+
+it.live("stops the agent host when Glass quits with no Turn running", () =>
+  Effect.gen(function* () {
+    const f = yield* conversationsFixture
+    const earlierHosts = childProcesses(process.pid, "scriptedAgentHost.mjs")
+    const conversation = yield* f.start("First")
+    yield* f.transcript(conversation.id, settled(1))
+    const host = startedHost(earlierHosts)
+    assert.isDefined(host, "the backend has no agent host running")
+
+    yield* f.quit
+
+    yield* hostExited(host)
   }),
 )
 

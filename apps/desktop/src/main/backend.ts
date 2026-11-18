@@ -80,6 +80,7 @@ export const startBackend = Effect.fn("startBackend")(function* (options: {
             GLASS_TOKEN: token,
             GLASS_ALLOWED_ORIGINS: options.rendererOrigin,
             GLASS_DATA_DIRECTORY: options.dataDirectory,
+            GLASS_LOG_FILE: options.logFile,
           },
         })
 

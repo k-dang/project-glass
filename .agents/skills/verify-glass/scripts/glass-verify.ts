@@ -66,6 +66,7 @@ const USAGE = `Usage: node .agents/skills/verify-glass/scripts/glass-verify.ts <
                                          the collector has not reached yet
   fake-github <ok|401|500|down|busy-500> change what the run's fake GitHub answers
   kill-backend                           kill the backend process, as a crash would
+  relaunch                               quit Glass and open it again on the same data
   stop                                   quit Glass, keep logs as evidence, delete run state
   list                                   show runs with live state
 
@@ -73,11 +74,13 @@ Every command except launch/list takes --run <id>; it defaults to the only live 
 
 interface RunState {
   readonly id: string
-  readonly cdpPort: number
   readonly github: "real" | "fake"
   readonly backend: "real" | "fake"
   readonly fake?: { readonly pid: number; readonly port: number }
   readonly realAgents: boolean
+  /** How Electron's environment differs from this shell's, so `relaunch` can start it the same way. */
+  readonly envChanges: Readonly<Record<string, string | null>>
+  readonly cdpPort: number
   backendUrl?: string
 }
 
@@ -444,6 +447,32 @@ const launch = async (options: {
     env["NODE_OPTIONS"] = `${env["NODE_OPTIONS"] ?? ""} --require "${preload}"`.trim()
   }
 
+  const run: GlassLaunch = {
+    id,
+    github: fakeBackend ? "fake" : github,
+    backend: options.backend,
+    ...(fake === undefined ? {} : { fake }),
+    realAgents: options.realAgents,
+    envChanges: Object.fromEntries(
+      [...new Set([...Object.keys(env), ...Object.keys(process.env)])].flatMap((key) =>
+        env[key] === process.env[key] ? [] : [[key, env[key] ?? null]],
+      ),
+    ),
+  }
+  return startGlass(run, options.failBackendStart)
+}
+
+type GlassLaunch = Omit<RunState, "cdpPort" | "backendUrl">
+
+const startGlass = async ({ backendUrl: _, ...launch }: GlassLaunch & { backendUrl?: string }, failBackendStart = false) => {
+  const { id } = launch
+  const paths = runPaths(id)
+  const env: NodeJS.ProcessEnv = { ...process.env }
+  for (const [key, value] of Object.entries(launch.envChanges)) {
+    if (value === null) delete env[key]
+    else env[key] = value
+  }
+
   const cdpPort = await freePort()
   const electron: string = createRequire(join(desktopDir, "package.json"))("electron")
   const launchedPid = startDetached(
@@ -452,14 +481,7 @@ const launch = async (options: {
     env,
     paths.electronLog,
   )
-  const run: RunState = {
-    id,
-    cdpPort,
-    github: fakeBackend ? "fake" : github,
-    backend: options.backend,
-    ...(fake === undefined ? {} : { fake }),
-    realAgents: options.realAgents,
-  }
+  const run: RunState = { ...launch, cdpPort }
   saveRun(run)
 
   const deadline = Date.now() + 60_000
@@ -473,7 +495,7 @@ const launch = async (options: {
       const { endpoint, failure } = await backendState(page, 5000)
       page.close()
       if (failure) {
-        if (options.failBackendStart) {
+        if (failBackendStart) {
           console.log(`Ready: run ${id} (CDP port ${cdpPort}, backend failed to start as asked)`)
           return console.log(`Evidence goes to ${paths.evidence}`)
         }
@@ -491,6 +513,14 @@ const launch = async (options: {
     await sleep(100)
   }
   return fail(`Glass did not become ready in 60s; see ${paths.electronLog}`)
+}
+
+// Quits Glass as closing its window would, keeping the run's data, then opens it again.
+const relaunch = async (run: RunState) => {
+  const { quit } = await quitGlass(run)
+  if (!quit) return fail("Glass did not quit")
+  console.log("Glass quit")
+  return startGlass(run)
 }
 
 const doctor = async (run: RunState) => {
@@ -691,6 +721,8 @@ const main = async () => {
       return doctor(run)
     case "stop":
       return stop(run)
+    case "relaunch":
+      return relaunch(run)
     case "fake-github": {
       if (run.backend === "fake") fail("this backend owns its fake GitHub; launch with --github fake to control GitHub modes")
       if (run.github !== "fake") fail("this run uses real GitHub; launch with --github fake")

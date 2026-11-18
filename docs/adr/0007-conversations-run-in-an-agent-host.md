@@ -11,8 +11,8 @@ dropped connection, asks the host for the events after the last one it saved. Lo
 Conversations differ only in where the host runs.
 
 This answers ADR 0001's "execution moves off-machine" trigger without promoting the backend: the
-backend stays in its `utilityProcess`, and letting local Conversations outlive the app becomes not
-stopping the local host on quit.
+backend stays in its `utilityProcess`, and local Conversations outlive the app because the backend
+leaves the local host running on quit (ADR 0014).
 
 A local Conversation works in a worktree of a Local checkout, a clone the user links, on a new
 branch from the base branch fetched through the user's own git config and credentials. A
