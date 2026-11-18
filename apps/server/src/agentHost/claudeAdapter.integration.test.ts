@@ -18,6 +18,8 @@ import {
   claudeSession,
   writeGreetPack,
   reviewBrief,
+  reviewDrafts,
+  assertSuggestedDrafts,
   run,
   writeGreeter,
   writeGreetSkill,
@@ -302,7 +304,14 @@ it.live(
       const session = yield* f.open(conversationId, ReviewRole.make({ brief: reviewBrief }))
 
       yield* session.send(
-        'Run `cat greet.ts` with the Bash tool. Then call the suggest_draft tool exactly twice, one call after the other: first with path greet.ts, side new, line 2, and body "Keep the name."; then with path greet.ts, side new, line 40, and body "Off the diff.". Then reply with exactly: DONE',
+        "Run `cat greet.ts` with the Bash tool. Then call the suggest_draft tool once for each of these drafts, one call after the other: " +
+          reviewDrafts
+            .map(
+              ({ draft: { path, side, line, body } }) =>
+                `path ${path}, side ${side}, line ${line}, body ${JSON.stringify(body)}`,
+            )
+            .join("; then ") +
+          ". Then reply with exactly: DONE",
       )
       const [turn] = yield* f.until(settled(1))
       assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
@@ -317,16 +326,7 @@ it.live(
       assert.include(calls.find(({ name }) => name === "Bash")?.output, "hello name")
 
       const suggestions = calls.filter(({ name }) => name === "suggest_draft")
-      assert.deepStrictEqual(
-        suggestions.map(({ status }) => status),
-        ["done", "failed"],
-      )
-      assert.deepStrictEqual(acceptedSuggestedDraftOf(suggestions[0]!), {
-        path: "greet.ts",
-        side: "new",
-        line: 2,
-        body: "Keep the name.",
-      })
-      assert.include(suggestions[1]?.output, "not a line of the diff")
+      assertSuggestedDrafts(suggestions)
+      assert.deepStrictEqual(acceptedSuggestedDraftOf(suggestions[0]!), reviewDrafts[0]?.draft)
     }).pipe(Effect.scoped),
 )
