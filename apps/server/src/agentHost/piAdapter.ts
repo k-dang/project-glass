@@ -67,10 +67,11 @@ import { scopedFolder } from "./scopedFolder"
 import type { WrittenSkills } from "./sentSkills"
 import { piLoadsNothing, piTools } from "../agentTools"
 import { piSubagentStatusExtension } from "./piSubagentStatus"
-import { piSuggestDraftExtension } from "./suggestDraftTool"
+import { PI_DIFF_LINES } from "./piSuggestDraft"
 import { runTurns } from "./turnLoop"
 import { globalConversationUpdateDelivery, SessionEntries } from "./piGlobalConversationUpdate"
 import piDrawDiagramSource from "virtual:pi-draw-diagram"
+import piSuggestDraftSource from "virtual:pi-suggest-draft"
 
 const thinkingLevels = ["off", "minimal", "low", "medium", "high", "xhigh", "max"]
 
@@ -167,9 +168,13 @@ const refused = (what: "model" | "effort") => (error: string) =>
     Effect.andThen(Effect.fail(couldNotSwitch("pi", what))),
   )
 
-interface PiExtension {
+interface PiFile {
   readonly name: string
   readonly source: string
+}
+
+interface PiExtension extends PiFile {
+  readonly besideIt?: ReadonlyArray<PiFile>
 }
 
 const writtenExtensions = Effect.fnUntraced(function* (
@@ -179,10 +184,12 @@ const writtenExtensions = Effect.fnUntraced(function* (
   const fs = yield* FileSystem.FileSystem
   const directory = yield* scopedFolder(`${folder}.pi`)
 
-  const flags = yield* Effect.forEach(extensions, ({ name, source }) => {
+  const flags = yield* Effect.forEach(extensions, ({ name, source, besideIt = [] }) => {
     const file = join(directory, name)
 
-    return fs.writeFileString(file, source).pipe(Effect.as(["--extension", file]))
+    return Effect.forEach(besideIt, (data) =>
+      fs.writeFileString(join(directory, data.name), data.source),
+    ).pipe(Effect.andThen(fs.writeFileString(file, source)), Effect.as(["--extension", file]))
   })
 
   return { directory, flags: flags.flat() }
@@ -226,7 +233,13 @@ const roleFlags = (folder: string, role: ConversationRole, skills: ReadonlyArray
         lockedDownFlags(
           folder,
           [...piTools.shell, SUGGEST_DRAFT_TOOL],
-          [{ name: "suggest-draft.js", source: piSuggestDraftExtension(brief) }],
+          [
+            {
+              name: "suggest-draft.mjs",
+              source: piSuggestDraftSource,
+              besideIt: [{ name: PI_DIFF_LINES, source: JSON.stringify(brief.diffLines) }],
+            },
+          ],
           brief.instructions,
         ),
       Global: () =>

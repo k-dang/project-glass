@@ -171,7 +171,7 @@ export const scriptedAdapter = (gates: string): HarnessAdapter => {
                 body: body!,
               }
 
-              const { accepted, text } = placeSuggestedDraft(review, draft)
+              const { accepted, text } = placeSuggestedDraft(review.diffLines, draft)
 
               yield* part(
                 turnId,
