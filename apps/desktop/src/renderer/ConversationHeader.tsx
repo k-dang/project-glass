@@ -7,7 +7,7 @@ import {
 import { Link } from "@tanstack/react-router"
 import { cn } from "cn"
 import { FolderGit2, GitBranch, GitPullRequest, Package, PanelTop } from "lucide-react"
-import type { ReactNode } from "react"
+import { createContext, type ReactNode, use, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ConversationPullRequestLink } from "./ConversationPullRequest"
@@ -20,6 +20,8 @@ const fact =
 
 const action = "text-left outline-none hover:bg-accent focus-visible:bg-accent"
 
+const CloseInstantly = createContext<() => void>(() => {})
+
 export function ConversationHeader(props: {
   heading: ReactNode
   place: ConversationPlace | null
@@ -31,6 +33,7 @@ export function ConversationHeader(props: {
   localSkills?: boolean | undefined
   children?: ReactNode
 }) {
+  const [instant, setInstant] = useState(false)
   const PlaceIcon = props.place === null ? null : placeIcons[props.place._tag]
 
   const skillSources = [
@@ -46,11 +49,14 @@ export function ConversationHeader(props: {
         <ConversationPullRequestLink pullRequest={props.pullRequest} />
       )}
       {PlaceIcon !== null && props.place !== null && (
-        <Popover>
+        <Popover onOpenChange={(open) => open && setInstant(false)}>
           <PopoverTrigger render={<Button variant="ghost" size="icon-sm" aria-label="Details" />}>
             <PanelTop aria-hidden />
           </PopoverTrigger>
-          <PopoverContent align="end" className="w-64 gap-0 p-1">
+          <PopoverContent
+            align="end"
+            className={cn("w-64 gap-0 p-1", instant && "data-ending-style:transition-none")}
+          >
             <div className={fact}>
               <PlaceIcon aria-hidden />
               {placeNames[props.place._tag]}
@@ -74,6 +80,7 @@ export function ConversationHeader(props: {
                     render={
                       <Link to="/reviews/$owner/$repo/$number" params={props.pullRequest.ref} />
                     }
+                    onClick={() => setInstant(true)}
                     className={cn(fact, action)}
                   >
                     <GitPullRequest aria-hidden />
@@ -91,7 +98,7 @@ export function ConversationHeader(props: {
                 <span className="truncate">{skillSources.join(" · ")}</span>
               </div>
             )}
-            {props.children}
+            <CloseInstantly value={() => setInstant(true)}>{props.children}</CloseInstantly>
           </PopoverContent>
         </Popover>
       )}
@@ -99,9 +106,17 @@ export function ConversationHeader(props: {
   )
 }
 
-export function ConversationHeaderAction(props: { onSelect: () => void; children: ReactNode }) {
+export function ConversationHeaderAction(props: { onNavigate: () => void; children: ReactNode }) {
+  const closeInstantly = use(CloseInstantly)
+
   return (
-    <PopoverClose onClick={props.onSelect} className={cn(fact, action)}>
+    <PopoverClose
+      onClick={() => {
+        closeInstantly()
+        props.onNavigate()
+      }}
+      className={cn(fact, action)}
+    >
       {props.children}
     </PopoverClose>
   )

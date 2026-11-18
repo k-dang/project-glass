@@ -1,5 +1,6 @@
 import { useAtomSet } from "@effect/atom-react"
 import type { PullRequestRef, PullRequestState, PullRequestSummary } from "@glass/contracts"
+import { useRouter } from "@tanstack/react-router"
 import { cn } from "cn"
 import { DateTime } from "effect"
 import { GitMerge, GitPullRequestClosed, History, type LucideIcon } from "lucide-react"
@@ -29,8 +30,17 @@ export function NotRefreshed(props: { problem: Problem; showLabel?: boolean }) {
 const HOVER_INTENT_MS = 100
 
 const usePreloadOnHover = (ref: PullRequestRef) => {
-  const preload = useAtomSet(preloadPullRequestAtom)
+  const preloadData = useAtomSet(preloadPullRequestAtom)
+  const router = useRouter()
   const pending = useRef<ReturnType<typeof setTimeout>>(undefined)
+
+  const preload = () => {
+    preloadData(ref)
+    void router.preloadRoute({
+      to: "/reviews/$owner/$repo/$number",
+      params: ref,
+    })
+  }
 
   const cancel = () => clearTimeout(pending.current)
 
@@ -39,12 +49,12 @@ const usePreloadOnHover = (ref: PullRequestRef) => {
   return {
     onPointerEnter: () => {
       cancel()
-      pending.current = setTimeout(() => preload(ref), HOVER_INTENT_MS)
+      pending.current = setTimeout(preload, HOVER_INTENT_MS)
     },
     onPointerLeave: cancel,
     onPointerDown: () => {
       cancel()
-      preload(ref)
+      preload()
     },
   }
 }
@@ -166,8 +176,16 @@ const finishedStates: Partial<
     { readonly label: string; readonly icon: LucideIcon; readonly tone: string }
   >
 > = {
-  merged: { label: "Merged", icon: GitMerge, tone: "text-violet-600 dark:text-violet-400" },
-  closed: { label: "Closed", icon: GitPullRequestClosed, tone: "text-red-600 dark:text-red-400" },
+  merged: {
+    label: "Merged",
+    icon: GitMerge,
+    tone: "text-violet-600 dark:text-violet-400",
+  },
+  closed: {
+    label: "Closed",
+    icon: GitPullRequestClosed,
+    tone: "text-red-600 dark:text-red-400",
+  },
 }
 
 export const ago = (date: Date, now: Date) => {

@@ -12,7 +12,7 @@ import { Cause, Effect, Exit, Match, Option, Predicate } from "effect"
 import { Atom, type AtomRegistry } from "effect/reactivity"
 import { activityPullRequest } from "./activity"
 import { Backend, backendRuntimeOf, type BackendError, type BackendRuntime } from "./backend"
-import { type LineNotePlace, sameLineNotePlaces } from "./changesView"
+import { type LineNotePlace, sameLineNotePlaces } from "./lineNotePlace"
 import {
   type DraftEntry,
   type DraftEvent,
