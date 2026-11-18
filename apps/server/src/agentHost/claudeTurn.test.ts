@@ -127,7 +127,7 @@ it("ends a Turn the user stopped as stopped, however Claude Code finishes it", (
   )
 })
 
-it("counts a run Claude Code starts on its own as started once it replies, not when it opens", () => {
+it("counts a run Claude Code starts on its own as started once it replies, since it can open one and end it without replying", () => {
   assert.isFalse(
     machine.startsRun(Input.Message({ message: sdk({ type: "system", subtype: "init" }) })),
   )

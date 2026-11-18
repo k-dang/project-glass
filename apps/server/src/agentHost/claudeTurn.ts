@@ -321,8 +321,6 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
 export const machine: TurnMachine<TurnState, Input, never> = {
   step,
   begin: beginTurn,
-  // Not `init`: a run Claude Code starts on its own can end without replying, such as when it takes
-  // in a background subagent's notification after the subagent's own report already arrived.
   startsRun: (input) => Input.$is("Message")(input) && isMainThreadReply(input.message),
   endsBackgroundWork: (input) => (Input.$is("BackgroundWorkEnded")(input) ? input.work : null),
   exitInput: Input.Exited(),

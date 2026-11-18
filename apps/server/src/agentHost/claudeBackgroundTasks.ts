@@ -8,13 +8,11 @@ interface BackgroundTask {
 }
 
 export interface BackgroundTasks {
-  /** Every task Claude Code told of and hasn't reported ending, by task id. */
-  readonly known: ReadonlyMap<string, BackgroundTask>
-  /** The ids of the tasks running in the background, in Claude Code's order. */
-  readonly running: ReadonlyArray<string>
+  readonly unendedById: ReadonlyMap<string, BackgroundTask>
+  readonly runningIds: ReadonlyArray<string>
 }
 
-export const noBackgroundTasks: BackgroundTasks = { known: new Map(), running: [] }
+export const noBackgroundTasks: BackgroundTasks = { unendedById: new Map(), runningIds: [] }
 
 const kinds = new Map<string, BackgroundWork["kind"]>([
   ["local_agent", "subagent"],
@@ -51,7 +49,6 @@ export interface Tracked {
 
 const unchanged = (tasks: BackgroundTasks): Tracked => ({ tasks, ended: null })
 
-/** Follows Claude Code's background tasks through one message, with the work it shows ending. */
 export const trackBackgroundTasks = (tasks: BackgroundTasks, message: SDKMessage): Tracked => {
   if (message.type !== "system") return unchanged(tasks)
 
@@ -62,38 +59,41 @@ export const trackBackgroundTasks = (tasks: BackgroundTasks, message: SDKMessage
       if (task === null) return unchanged(tasks)
 
       return {
-        tasks: { ...tasks, known: new Map(tasks.known).set(message.task_id, task) },
+        tasks: { ...tasks, unendedById: new Map(tasks.unendedById).set(message.task_id, task) },
         ended: null,
       }
     }
 
     // Claude Code can list a task before its `task_started`, which carries the tool call.
     case "background_tasks_changed": {
-      const known = new Map(tasks.known)
-      const running: Array<string> = []
+      const unendedById = new Map(tasks.unendedById)
+      const runningIds: Array<string> = []
 
       for (const frame of message.tasks) {
-        const task = taskOf(frame, tasks.known.get(frame.task_id)?.toolCallId ?? null)
+        const task = taskOf(frame, tasks.unendedById.get(frame.task_id)?.toolCallId ?? null)
 
         if (task === null) continue
 
-        known.set(frame.task_id, task)
-        running.push(frame.task_id)
+        unendedById.set(frame.task_id, task)
+        runningIds.push(frame.task_id)
       }
 
-      return { tasks: { known, running }, ended: null }
+      return { tasks: { unendedById, runningIds }, ended: null }
     }
 
     case "task_notification": {
-      const task = tasks.known.get(message.task_id)
+      const task = tasks.unendedById.get(message.task_id)
 
       if (task === undefined) return unchanged(tasks)
 
-      const known = new Map(tasks.known)
-      known.delete(message.task_id)
+      const unendedById = new Map(tasks.unendedById)
+      unendedById.delete(message.task_id)
 
       return {
-        tasks: { known, running: tasks.running.filter((id) => id !== message.task_id) },
+        tasks: {
+          unendedById,
+          runningIds: tasks.runningIds.filter((id) => id !== message.task_id),
+        },
         ended: { kind: task.kind, description: task.description, outcome: message.status },
       }
     }
@@ -113,9 +113,8 @@ const statusOf = (kind: BackgroundWork["kind"], running: ReadonlyArray<Backgroun
   return [`Running ${counted}: ${descriptions.join(", ")}`]
 }
 
-/** The Agent statuses and running tool calls that show Claude Code's background tasks. */
 export const backgroundActivity = (tasks: BackgroundTasks) => {
-  const running = tasks.running.flatMap((id) => tasks.known.get(id) ?? [])
+  const running = tasks.runningIds.flatMap((id) => tasks.unendedById.get(id) ?? [])
 
   return AgentStatusesChanged.make({
     agentStatuses: [...statusOf("subagent", running), ...statusOf("command", running)],
