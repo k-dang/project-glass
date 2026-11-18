@@ -8,7 +8,7 @@ import {
   localPlace,
   TOKEN_PARAM,
 } from "@glass/contracts"
-import { Effect, Option, Schema, Stream } from "effect"
+import { Effect, Schema } from "effect"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -160,26 +160,24 @@ export const startDemoPi = Effect.fnUntraced(function* (directory: string) {
   process.env["PI_CODING_AGENT_DIR"] = join(directory, ".pi", "agent")
 })
 
+export const demoCheckout = (repositories: string) => {
+  const checkout = join(repositories, DEMO_REPOSITORY.repo)
+
+  if (!existsSync(checkout)) seedClone(repositories, DEMO_REPOSITORY.owner, DEMO_REPOSITORY.repo)
+
+  return checkout
+}
+
 export const seedDemoConversations = Effect.fnUntraced(function* (
   port: number,
   token: string,
-  directory: string,
+  checkout: string,
   reviewed: PullRequestRef,
 ) {
   const client = yield* connectRpcClient(
     GlassRpcs,
     `ws://127.0.0.1:${port}${RPC_PATH}?${TOKEN_PARAM}=${token}`,
   )
-
-  const conversations = yield* client
-    .WatchConversations()
-    .pipe(Stream.runHead, Effect.map(Option.getOrElse(() => [])))
-
-  if (conversations.length > 0) return
-
-  const checkout = join(directory, DEMO_REPOSITORY.repo)
-
-  if (!existsSync(checkout)) seedClone(directory, DEMO_REPOSITORY.owner, DEMO_REPOSITORY.repo)
 
   const linked = yield* client.LinkLocalCheckout({ path: checkout })
 

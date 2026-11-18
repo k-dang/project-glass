@@ -1,18 +1,27 @@
-import { NodeSocket } from "@effect/platform-node"
+import { NodeServices, NodeSocket } from "@effect/platform-node"
 import { ConfigProvider, Context, Duration, Effect, Layer, Redacted } from "effect"
 import { FetchHttpClient } from "effect/http"
+import { SqlClient } from "effect/sql"
 import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { DatabaseLive } from "../src/Database"
 import { ASK_TIMEOUT_SECONDS, OutsideQuestions } from "../src/OutsideQuestions"
 import { GlassMcpTools } from "../src/mcp/server"
 import { serve } from "../src/server"
 import { ServerConfig } from "../src/ServerConfig"
+import { Transcripts } from "../src/Transcripts"
 import { runMain, wideEventsToStdoutAndOtlp } from "../src/wideEvents"
 import { writeAgentCommands } from "./agentCommands"
-import { bundledPi, seedDemoConversations, startDemoClaude, startDemoPi } from "./demoConversation"
+import {
+  bundledPi,
+  demoCheckout,
+  seedDemoConversations,
+  startDemoClaude,
+  startDemoPi,
+} from "./demoConversation"
 import { DEMO_GATEWAY_REPOSITORY, DEMO_REPOSITORY, seedDemoPullRequests } from "./demoPullRequests"
 import { startFakeGitHub } from "./fakeGitHub"
 import { VIEWER } from "./fakePullRequest"
@@ -21,6 +30,7 @@ import { seedDemoToDos } from "./demoToDos"
 import { seedTourOverviewPullRequests } from "./demoTourOverviews"
 import { FAKE_PI_MODEL } from "./fakeModelProvider"
 import { installFakeSandboxProvider } from "./fakeSandboxProvider"
+import { seedReplayedConversations } from "./replayedConversations"
 
 const seedDemoSettings = (dataDirectory: string) => {
   const settings = join(dataDirectory, "settings.json")
@@ -87,6 +97,30 @@ const main = Effect.gen(function* () {
   )
 
   seedDemoSettings(config.dataDirectory)
+
+  const checkout = demoCheckout(join(demo, "repositories"))
+  const replayed = process.env["GLASS_REPLAYED_TRANSCRIPTS"]
+
+  const fresh = yield* Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const existing = yield* sql`SELECT 1 FROM conversation LIMIT 1`
+
+    if (existing.length > 0) return false
+
+    if (replayed !== undefined) yield* seedReplayedConversations(replayed, checkout)
+
+    return true
+  }).pipe(
+    Effect.provide(
+      Transcripts.layer.pipe(
+        Layer.provideMerge(DatabaseLive),
+        Layer.provide(NodeServices.layer),
+        Layer.provide(ServerConfig.layer),
+        Layer.provide(configured),
+      ),
+    ),
+  )
+
   writeAgentCommands(config.dataDirectory, { claudeCommand, piCommand: bundledPi })
 
   const running = yield* Layer.build(
@@ -122,14 +156,17 @@ const main = Effect.gen(function* () {
     Effect.catchCause((cause) => Effect.logWarning("Couldn't seed the demo to-dos", cause)),
   )
 
-  yield* seedDemoConversations(
-    config.port,
-    Redacted.value(config.token),
-    join(demo, "repositories"),
-    reviewed,
-  ).pipe(
-    Effect.catchCause((cause) => Effect.logWarning("Couldn't start the demo Conversations", cause)),
-  )
+  if (fresh)
+    yield* seedDemoConversations(
+      config.port,
+      Redacted.value(config.token),
+      checkout,
+      reviewed,
+    ).pipe(
+      Effect.catchCause((cause) =>
+        Effect.logWarning("Couldn't start the demo Conversations", cause),
+      ),
+    )
 
   return yield* Effect.never
 })

@@ -1,6 +1,7 @@
 import { getSessionInfo, query } from "@anthropic-ai/claude-agent-sdk"
 import {
   type AgentEvent,
+  type AgentHarness,
   applyConversationEvent,
   type Image,
   isWaiting,
@@ -51,6 +52,7 @@ import { isolatedHome, startBackend, stubHome } from "./harness"
 import { PI_MODEL, PI_PROVIDER, type PiSettings, writePiLogin, writePiSettings } from "./piLogin"
 import { claudeLoginEnvironment, pinnedClaude, pinnedClaudeProgram } from "./pinnedClaude"
 import { writeSentSkills } from "../src/agentHost/sentSkills"
+import { ReplayedTranscript } from "./replayedConversations"
 import { recordingSessions, sessionTape } from "./sessionTape"
 
 export const run = (tool: string, command: string, reply: string) =>
@@ -75,7 +77,11 @@ export const waiting = (turns: ReadonlyArray<Turn>) =>
 
 type Work = typeof WorkRole.Type
 
+const transcriptsDirectory = process.env["GLASS_TRANSCRIPTS_DIR"]
+
 const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
+  scenario: string,
+  harness: AgentHarness,
   adapter: HarnessAdapter<Role | Work>,
   tape: ReturnType<typeof sessionTape>,
   folder: string,
@@ -85,16 +91,33 @@ const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
   const turns = yield* SubscriptionRef.make<ReadonlyArray<Turn>>([])
   const events: Array<AgentEvent> = []
   const statuses = yield* SubscriptionRef.make<ReadonlyArray<string>>([])
+  const reported: Array<HostEvent> = []
+
+  if (transcriptsDirectory !== undefined)
+    yield* Effect.addFinalizer(() =>
+      Effect.sync(() => {
+        mkdirSync(transcriptsDirectory, { recursive: true })
+        writeFileSync(
+          join(transcriptsDirectory, `${scenario}.json`),
+          Schema.encodeSync(ReplayedTranscript)({ harness, events: reported }),
+        )
+      }),
+    )
+
   let nextTurn = 0
 
   const report = (event: HostEvent) =>
-    Predicate.isTagged(event, "ExtensionStatusesChanged")
-      ? SubscriptionRef.set(statuses, event.extensionStatuses)
-      : Effect.sync(() => events.push(event)).pipe(
-          Effect.andThen(
-            SubscriptionRef.update(turns, (current) => applyConversationEvent(current, event)),
-          ),
-        )
+    Effect.sync(() => reported.push(event)).pipe(
+      Effect.andThen(
+        Predicate.isTagged(event, "ExtensionStatusesChanged")
+          ? SubscriptionRef.set(statuses, event.extensionStatuses)
+          : Effect.sync(() => events.push(event)).pipe(
+              Effect.andThen(
+                SubscriptionRef.update(turns, (current) => applyConversationEvent(current, event)),
+              ),
+            ),
+      ),
+    )
 
   const until = (holds: (current: ReadonlyArray<Turn>) => boolean) =>
     SubscriptionRef.changes(turns).pipe(
@@ -321,7 +344,9 @@ export const claudeSession = Effect.fnUntraced(function* (
       tape.sessionInfo(id, options?.dir, () => getSessionInfo(id, options)),
   }
 
-  return yield* drive(claudeAdapter(pinnedClaude(), sdk), tape, folder, { model: "haiku" })
+  return yield* drive(scenario, "claude-code", claudeAdapter(pinnedClaude(), sdk), tape, folder, {
+    model: "haiku",
+  })
 })
 
 const PROVIDER_CREDENTIAL = /^(AWS|GOOGLE|GCLOUD|AZURE|ANTHROPIC)_|_(API_KEY|TOKEN)$/
@@ -416,5 +441,5 @@ export const piSession = Effect.fnUntraced(function* (
       writeFileSync(join(extensions, name), source)
     })
 
-  return { ...(yield* drive(adapter, tape, folder)), home, extension }
+  return { ...(yield* drive(scenario, "pi", adapter, tape, folder)), home, extension }
 })
