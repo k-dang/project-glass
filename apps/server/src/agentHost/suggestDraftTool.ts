@@ -1,4 +1,4 @@
-import { SUGGEST_DRAFT_TOOL, SuggestedDraft } from "@glass/contracts"
+import { SuggestedDraft } from "@glass/contracts"
 import { replyTo, type ToolReply, toolParameters } from "./hostTool"
 import type { ReviewBrief } from "./protocol"
 
@@ -18,43 +18,18 @@ export const suggestDraftParameters = toolParameters({
   ],
 })
 
-export const SUGGEST_DRAFT_PLACED = "Glass shows this Suggested draft to the reviewer."
+const SUGGEST_DRAFT_PLACED = "Glass shows this Suggested draft to the reviewer."
 
-const refusal = (path: string, side: string, line: number) =>
+const refusal = ({ path, side, line }: SuggestedDraft) =>
   `${path} line ${line} on the ${side} side is not a line of the diff, so it can't be a Suggested draft. Place it on a line inside the diff's hunks, or put the comment in your answer.`
 
-const onDiff = (
+export const placeSuggestedDraft = (
   diffLines: ReviewBrief["diffLines"],
-  side: "old" | "new",
-  path: string,
-  line: number,
-) => diffLines[side][path]?.includes(line) === true
-
-export const placeSuggestedDraft = (brief: ReviewBrief, draft: SuggestedDraft): ToolReply =>
-  onDiff(brief.diffLines, draft.side, draft.path, draft.line)
+  draft: SuggestedDraft,
+): ToolReply =>
+  diffLines[draft.side][draft.path]?.includes(draft.line) === true
     ? { accepted: true, text: SUGGEST_DRAFT_PLACED }
-    : { accepted: false, text: refusal(draft.path, draft.side, draft.line) }
+    : { accepted: false, text: refusal(draft) }
 
-export const suggestDraft = (brief: ReviewBrief) =>
-  replyTo(SuggestedDraft, (draft) => placeSuggestedDraft(brief, draft))
-
-/** pi loads an extension in its own process, out of the host's reach, so the check goes into the file. */
-export const piSuggestDraftExtension = (brief: ReviewBrief) => `
-const diffLines = ${JSON.stringify(brief.diffLines)}
-const onDiff = ${onDiff.toString()}
-const refusal = ${refusal.toString()}
-
-export default function (pi) {
-  pi.registerTool({
-    name: ${JSON.stringify(SUGGEST_DRAFT_TOOL)},
-    label: "Suggest draft",
-    description: ${JSON.stringify(suggestDraftDescription)},
-    parameters: ${JSON.stringify(suggestDraftParameters)},
-    async execute(_toolCallId, { path, side, line, body }) {
-      if (typeof body !== "string" || body.trim() === "") throw new Error("The comment is empty.")
-      if (!onDiff(diffLines, side, path, line)) throw new Error(refusal(path, side, line))
-      return { content: [{ type: "text", text: ${JSON.stringify(SUGGEST_DRAFT_PLACED)} }], details: undefined }
-    },
-  })
-}
-`
+export const suggestDraft = (diffLines: ReviewBrief["diffLines"]) =>
+  replyTo(SuggestedDraft, (draft) => placeSuggestedDraft(diffLines, draft))
