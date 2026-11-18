@@ -3,7 +3,7 @@ import { Context, Effect, Exit, FileSystem, Layer, Option, Stream } from "effect
 import { join } from "node:path"
 import { shortConversationNames, uniqueConversationName } from "./conversationNames"
 import { Git, type GitFailed } from "./git"
-import { LocalAgentHost } from "./LocalAgentHost"
+import { type CarriedOn, LocalAgentHost } from "./LocalAgentHost"
 import { LocalCheckouts } from "./LocalCheckouts"
 import {
   asConversationError,
@@ -26,7 +26,10 @@ const succeeds = <E, R>(effect: Effect.Effect<unknown, E, R>) =>
 
 export class LocalPlacement extends Context.Service<
   LocalPlacement,
-  Placement & { readonly subscribeLost: SubscribeLost }
+  Placement & {
+    readonly subscribeLost: SubscribeLost
+    readonly resume: Effect.Effect<CarriedOn>
+  }
 >()("@glass/server/LocalPlacement") {
   static readonly layer = Layer.effect(
     LocalPlacement,
@@ -164,6 +167,13 @@ export class LocalPlacement extends Context.Service<
         baseRef,
         remove,
         subscribeLost: host.subscribeStopped.pipe(Effect.map(Stream.map(() => [...hosted]))),
+        resume: host.resume.pipe(
+          Effect.map(({ carriedOn }) => {
+            for (const conversationId of carriedOn) hosted.add(conversationId)
+
+            return carriedOn
+          }),
+        ),
       })
     }),
   )

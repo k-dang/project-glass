@@ -23,6 +23,7 @@ export const clientWith = Effect.fnUntraced(function* (
           gitRemote: "https://github.com",
           dataDirectory: "",
           homeDirectory: "",
+          logFile: "",
         }),
       ),
     ),

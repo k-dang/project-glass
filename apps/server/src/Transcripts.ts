@@ -60,6 +60,7 @@ import {
   stepConversation,
 } from "./conversationState"
 import type { HostEvent } from "./agentHost/protocol"
+import type { SavedThrough } from "./hostJournal"
 import { recordUnit } from "./wideEvents"
 
 const encodePart = Schema.encodeSync(Schema.fromJsonString(TurnPart))
@@ -244,7 +245,7 @@ export class Transcripts extends Context.Service<
     readonly save: (
       conversationId: string,
       events: ReadonlyArray<HostEvent>,
-      throughJournalEntry?: number,
+      journal?: SavedThrough,
     ) => Effect.Effect<void, ConversationError>
     readonly watch: (conversationId: string) => Stream.Stream<TranscriptUpdate, ConversationError>
     readonly read: (
@@ -739,7 +740,7 @@ export class Transcripts extends Context.Service<
       const save = (
         conversationId: string,
         hostEvents: ReadonlyArray<HostEvent>,
-        throughJournalEntry?: number,
+        journal?: SavedThrough,
       ) => {
         const events = hostEvents.filter(
           (event): event is SavedEvent => !Predicate.isTagged(event, "AgentStatusesChanged"),
@@ -752,8 +753,11 @@ export class Transcripts extends Context.Service<
         return changeWith(
           conversationId,
           Effect.gen(function* () {
-            if (throughJournalEntry !== undefined)
-              yield* sql`UPDATE conversation SET journal_saved = ${throughJournalEntry} WHERE id = ${conversationId}`
+            if (journal !== undefined)
+              yield* sql`
+                UPDATE conversation SET journal_host = ${journal.host}, journal_saved = ${journal.through}
+                WHERE id = ${conversationId}
+              `
 
             const written = yield* Effect.filter(joinConsecutiveAppends(events), (event) =>
               writeApplied(conversationId, event),

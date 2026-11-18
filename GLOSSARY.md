@@ -304,8 +304,9 @@ _Avoid_: My skills, user skills
 One message to a Conversation and its agent's whole response, or work the agent starts on its own,
 such as when a subagent or command it ran in the background or a pi extension's background task
 reports back; for Claude Code, Glass names the background work that ended at the top of such a Turn. It ends done, failed,
-stopped by the user, cut off when Glass loses the Conversation, or interrupted when Glass quits; a
-Sandbox Conversation's Turn carries on while Glass is closed.
+stopped by the user, cut off when Glass loses the Conversation, or interrupted when Glass quits and
+can't keep it, such as when Glass is updated before it reopens. Otherwise a Turn carries on while
+Glass is closed.
 _Avoid_: Run, execution, exchange
 
 **Agent status**:

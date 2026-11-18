@@ -12,6 +12,7 @@ Opening Glass shows one "Glass" window while its backend starts; the backend's o
 - `life-restart` restarts a backend that exits after starting, on the same port and token, while a "Reconnecting to Glass's backend…" banner shows above the page.
 - `life-crash` fills the window with "Glass's backend keeps stopping" once restarts run out.
 - `life-relaunch` "Relaunch Glass" quits and reopens Glass, whose new backend runs on a new port.
+- `life-outlive` a local Conversation's running Turn keeps going while Glass is closed, and its reply shows once Glass opens again.
 
 ## How to get to it (user POV)
 
@@ -31,6 +32,7 @@ Preconditions:
 - **Start error (`life-start-error`).** `node $V launch --github fake --fail-backend-start`. `node $V wait --text "didn't start"`, then `snapshot`/`screenshot`: `heading "Glass's backend didn't start"`, the log path, and `button "Relaunch Glass"`. `backend.log` shows four `Starting backend` notes, `Backend exited with code 1; restarting in` 500ms, 1s, and 2s, and `Backend exited with code 1; giving up`. A relaunch fails the same way in this mode.
 - **Restart (`life-restart`).** `node $V launch --github fake`, `wait --text "Dashboard"`. The banner lasts only while the backend restarts, about a second and a half, so start `wait --text "Reconnecting" --timeout 20000` in a second shell before `node $V kill-backend`; a `wait` started after `kill-backend` returns usually misses it. The banner then clears; `doctor` then shows the same Electron pid and "Backend health" OK on the same port. Add a to-do to prove calls work again, and `backend.log` shows `Backend exited with code 1; restarting in 500ms`.
 - **Crash and relaunch (`life-crash`, `life-relaunch`).** Run `kill-backend` four times, each once the Reconnecting banner has cleared. `wait --text "keeps stopping"` and capture `heading "Glass's backend keeps stopping"`. `click --role button --name "Relaunch Glass"`, `wait --text "Dashboard"`, then `doctor`: "Electron process" shows a new pid and "Backend health" is OK, usually on the same port: Glass reuses its last port while it is free, and only the secret is new. `backend.log` still holds the earlier launch's restarts and `giving up`, followed by a new `Listening on` line. `stop` then reports that new port closed.
+- **Turn outlives the app (`life-outlive`).** Needs `--real-agents`: the fake backend's model servers stop with Glass. Link a clone, start a Claude Code Conversation that runs `ping -c 60 127.0.0.1 | tail -1` in the foreground (Claude Code refuses a bare `sleep`, and a command it moves to the background ends the Turn at once), and once "Working" shows, close Glass without `stop` (CDP `Browser.close`). The backend port closes; the port in `.verify/<id>/state/home/.project-glass/agent-host.json` still answers `/healthz`. After the command ends, `node $V relaunch`: the Turn shows its reply once and "Done in …". `stop` with nothing running then ends that host process.
 - **Proof.** `evidence/backend.log` and `evidence/electron.log` survive `stop`, with the `Listening on` line in the backend log, alongside `opened.aria.txt`.
 
 ## Gotchas

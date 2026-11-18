@@ -31,17 +31,26 @@ const escapeArgument = (argument: string) =>
     .replace(metacharacters, "^$1")
     .replace(metacharacters, "^$1")
 
+export const nodeEntry = (script: string, args: ReadonlyArray<string> = []) => ({
+  command: globalThis.process.execPath,
+  args: [script, ...args],
+  env: { ELECTRON_RUN_AS_NODE: "1" },
+})
+
 export const launchCommand = (
   command: string,
   args: ReadonlyArray<string>,
   options: ChildProcess.CommandOptions = {},
   host = thisHost,
 ) => {
-  if (/\.[cm]?js$/i.test(command))
-    return ChildProcess.make(globalThis.process.execPath, [command, ...args], {
+  if (/\.[cm]?js$/i.test(command)) {
+    const entry = nodeEntry(command, args)
+
+    return ChildProcess.make(entry.command, entry.args, {
       ...options,
-      env: { ELECTRON_RUN_AS_NODE: "1", ...options.env },
+      env: { ...entry.env, ...options.env },
     })
+  }
 
   const resolved = resolve(command, host)
 

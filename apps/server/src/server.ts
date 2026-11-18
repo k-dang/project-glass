@@ -70,7 +70,16 @@ type AgentRunnersLayer = Layer.Layer<
   SettingsStore | AgentCommands | ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem
 >
 
-const ConversationsLive = Layer.merge(Conversations.layer, GlobalConversation.layer).pipe(
+const followReattachedHost = Layer.effectDiscard(
+  Effect.gen(function* () {
+    yield* Conversations
+    yield* GlobalConversation
+    yield* (yield* LocalAgentHost).followReattached
+  }),
+)
+
+const ConversationsLive = followReattachedHost.pipe(
+  Layer.provideMerge(Layer.merge(Conversations.layer, GlobalConversation.layer)),
   Layer.provide(LocalPlacement.layer),
   Layer.provideMerge(Sandboxes.layer),
   Layer.provide(ConversationTurns.layer),

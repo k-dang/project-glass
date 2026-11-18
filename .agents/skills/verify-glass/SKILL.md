@@ -60,6 +60,7 @@ Read-only. Checks an Electron process serves the run's CDP port, that port belon
 | `memory --sweep [--dwell n] [--gc] [--out n]`     | visits each rail area, samples it, and prints one row per area                              |
 | `fake-github <mode>`                             | changes the fake GitHub's answer for the next request                                       |
 | `kill-backend`                                   | kills the window's current backend process, as a crash would                                |
+| `relaunch`                                       | quits Glass as closing its window would, then opens it again on the same run's data         |
 
 Target elements by accessible role and name from a `snapshot` (e.g. `--role button --name "Try again"`), never by coordinates. Use `wait`, not `sleep`, after any action that triggers an RPC.
 

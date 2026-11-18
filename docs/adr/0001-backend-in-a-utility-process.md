@@ -12,8 +12,9 @@ and an origin check: crash isolation from the windows without a full server life
   and script injected into the renderer could act with the full token.
 - **Logic in the main process**: no isolation, and a custom IPC transport for Effect RPC.
 - **Independent server or daemon now**: deferred. Because the backend never imports `electron`
-  and takes its config from the environment, promoting it is a hosting change. Do it when agents
-  must outlive the app, another client appears, or execution moves off-machine.
+  and takes its config from the environment, promoting it is a hosting change. Do it when another
+  client appears. Agents outlive the app and run off-machine in the agent host instead (ADR 0007,
+  ADR 0014).
 
 ## Consequences
 
