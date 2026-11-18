@@ -1,11 +1,11 @@
-import { _electron, type ElectronApplication, type Page } from "@playwright/test"
+import { _electron, type ElectronApplication, type Locator, type Page } from "@playwright/test"
 import { spawnSync } from "node:child_process"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { galleryPage } from "./page.ts"
-import type { Shot } from "./shot.ts"
+import type { Shot, Size } from "./shot.ts"
 import { replayedStates, replays, states } from "./states.ts"
 
 const desktopDir = join(import.meta.dirname, "..", "desktop")
@@ -35,16 +35,36 @@ const fitTranscript = async (window: Page) => {
   await window.setViewportSize({ ...viewport, height: Math.min(viewport.height + hidden, 6000) })
 }
 
-const writeThumbnail = async (app: ElectronApplication, from: string, to: string) => {
-  const thumbnail = await app.evaluate(
-    ({ nativeImage }, path) =>
-      nativeImage
-        .createFromPath(path)
-        .resize({ width: 320, quality: "best" })
-        .toPNG()
-        .toString("base64"),
-    from,
+const focusPadding = 16
+
+const clipAround = async (focus: Locator, { width, height }: Size) => {
+  await focus.first().waitFor()
+
+  const boxes = (await Promise.all((await focus.all()).map((part) => part.boundingBox()))).flatMap(
+    (box) => (box === null ? [] : [box]),
   )
+
+  const x = Math.max(0, Math.floor(Math.min(...boxes.map((box) => box.x)) - focusPadding))
+  const y = Math.max(0, Math.floor(Math.min(...boxes.map((box) => box.y)) - focusPadding))
+  const right = Math.max(...boxes.map((box) => box.x + box.width)) + focusPadding
+  const bottom = Math.max(...boxes.map((box) => box.y + box.height)) + focusPadding
+
+  return {
+    x,
+    y,
+    width: Math.min(width, Math.ceil(right)) - x,
+    height: Math.min(height, Math.ceil(bottom)) - y,
+  }
+}
+
+const writeThumbnail = async (app: ElectronApplication, from: string, to: string) => {
+  const thumbnail = await app.evaluate(({ nativeImage }, path) => {
+    const image = nativeImage.createFromPath(path)
+
+    return (image.getSize().width > 320 ? image.resize({ width: 320, quality: "best" }) : image)
+      .toPNG()
+      .toString("base64")
+  }, from)
 
   writeFileSync(to, Buffer.from(thumbnail, "base64"))
 }
@@ -73,22 +93,42 @@ const capture = async (app: ElectronApplication) => {
 
       if (state.wholeTranscript) await fitTranscript(window)
 
-      const { width, height } = window.viewportSize() ?? viewport
+      const size = window.viewportSize() ?? viewport
+      const clip = state.focus === undefined ? null : await clipAround(state.focus(window), size)
 
       for (const scheme of ["light", "dark"] as const) {
         await window.emulateMedia({ colorScheme: scheme })
-        const path = join(out, "shots", `${id}-${scheme}.png`)
-        await window.screenshot({ path, animations: "disabled" })
-        thumbnails.push(
-          writeThumbnail(app, path, join(out, "shots", `${id}-${scheme}-thumb.png`)).catch(
-            (error) => {
-              failures.push(`${label} thumbnail: ${firstLine(String(error))}`)
-            },
-          ),
-        )
+
+        const framings = [
+          { path: join(out, "shots", `${id}-${scheme}`), options: {} },
+          ...(clip === null
+            ? []
+            : [{ path: join(out, "shots", `${id}-${scheme}-focus`), options: { clip } }]),
+        ]
+
+        for (const framing of framings) {
+          await window.screenshot({
+            path: `${framing.path}.png`,
+            ...framing.options,
+            animations: "disabled",
+          })
+          thumbnails.push(
+            writeThumbnail(app, `${framing.path}.png`, `${framing.path}-thumb.png`).catch(
+              (error) => {
+                failures.push(`${label} thumbnail: ${firstLine(String(error))}`)
+              },
+            ),
+          )
+        }
       }
 
-      shots.push({ id, area: state.area, name: state.name, width, height })
+      shots.push({
+        id,
+        area: state.area,
+        name: state.name,
+        ...size,
+        focus: clip === null ? null : { width: clip.width, height: clip.height },
+      })
       console.log(`✓ ${label}`)
     } catch (error) {
       const reason = `${label}: ${firstLine(String(error))}`

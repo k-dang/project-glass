@@ -1,12 +1,18 @@
-import type { Page } from "@playwright/test"
+import type { Locator, Page } from "@playwright/test"
 import { REPLAYED_PREFIX } from "../server/test/replayedNames.ts"
 
 export interface State {
   readonly area: string
   readonly name: string
   readonly reach: (window: Page) => Promise<void | "nothing new">
+  readonly focus?: (window: Page) => Locator
   readonly wholeTranscript?: true
 }
+
+const transcript = (window: Page) => window.getByRole("region", { name: "Transcript" })
+
+const turns = (window: Page) =>
+  transcript(window).locator('[data-slot="message-scroller-content"] > *')
 
 const area = async (window: Page, name: string) => {
   await window.keyboard.press("Escape")
@@ -59,8 +65,11 @@ const conversation = async (window: Page, status: RegExp) => {
     .filter({ hasNotText: REPLAYED_PREFIX })
     .first()
     .click()
-  await window.getByRole("region", { name: "Transcript" }).waitFor()
+  await transcript(window).waitFor()
 }
+
+const dialog = (name?: string | RegExp) => (window: Page) =>
+  window.getByRole("dialog", name === undefined ? {} : { name })
 
 const visible = (window: Page, role: Parameters<Page["getByRole"]>[0], name: string | RegExp) =>
   window.getByRole(role, { name }).first().waitFor()
@@ -78,6 +87,10 @@ export const states: ReadonlyArray<State> = [
   {
     area: "Inbox",
     name: "Question from an outside agent",
+    focus: (window) =>
+      window
+        .getByRole("heading", { name: "Ship the retry change?" })
+        .or(window.locator("form").filter({ has: window.getByRole("radiogroup") })),
     reach: async (window) => {
       await area(window, "Inbox")
       await visible(window, "radiogroup", "Choices")
@@ -126,6 +139,11 @@ export const states: ReadonlyArray<State> = [
   {
     area: "PR workspace",
     name: "Overview with a Draft",
+    focus: (window) =>
+      window
+        .locator("section")
+        .filter({ has: window.getByRole("heading", { name: /^Your Drafts/ }) })
+        .last(),
     reach: async (window) => {
       await pullRequest(window, "Fix the typo in the README")
       await workspaceTab(window, "Overview")
@@ -144,6 +162,7 @@ export const states: ReadonlyArray<State> = [
   {
     area: "PR workspace",
     name: "Finish your Review",
+    focus: dialog("Finish your Review"),
     reach: async (window) => {
       await pullRequest(window, "Fix the typo in the README")
       await window.getByRole("button", { name: /^Finish Review/ }).click()
@@ -210,6 +229,7 @@ export const states: ReadonlyArray<State> = [
   {
     area: "Tours",
     name: "Saved Tour",
+    focus: (window) => window.getByRole("region", { name: "Saved Tour" }),
     reach: async (window) => {
       await window.getByRole("button", { name: "Write Tour" }).click()
       await visible(window, "region", "Saved Tour")
@@ -249,11 +269,13 @@ export const states: ReadonlyArray<State> = [
   {
     area: "Conversations",
     name: "Finished",
+    focus: turns,
     reach: (window) => conversation(window, /Finished/),
   },
   {
     area: "Conversations",
     name: "Waiting on a Permission request",
+    focus: turns,
     reach: async (window) => {
       const waiting = (await conversationsList(window))
         .getByRole("link", { description: /Waiting on you/ })
@@ -274,6 +296,7 @@ export const states: ReadonlyArray<State> = [
   {
     area: "Conversations",
     name: "Failed",
+    focus: turns,
     reach: (window) => conversation(window, /Failed/),
   },
   {
@@ -295,6 +318,7 @@ export const states: ReadonlyArray<State> = [
   {
     area: "Overlays",
     name: "Keyboard shortcuts",
+    focus: dialog(),
     reach: async (window) => {
       await area(window, "Dashboard")
       await window.getByRole("button", { name: /^Keyboard shortcuts/ }).click()
@@ -304,6 +328,7 @@ export const states: ReadonlyArray<State> = [
   {
     area: "Overlays",
     name: "Resource usage",
+    focus: dialog(),
     reach: async (window) => {
       await area(window, "Dashboard")
       await window.getByRole("button", { name: "Show Glass resource usage" }).click()
@@ -313,6 +338,7 @@ export const states: ReadonlyArray<State> = [
   {
     area: "Overlays",
     name: "Global conversation",
+    focus: dialog(/Global conversation/),
     reach: async (window) => {
       await area(window, "Dashboard")
       await window.getByRole("button", { name: "Global conversation" }).click()
@@ -337,12 +363,11 @@ const openReplayed = async (window: Page, { harness, scenario }: Replay) => {
   const href = await link.getAttribute("href")
   await link.click()
   await window.waitForURL((url) => href !== null && url.href.endsWith(href))
-  await window.getByRole("region", { name: "Transcript" }).waitFor()
+  await transcript(window).waitFor()
 }
 
 const expandAll = async (window: Page) => {
-  const transcript = window.getByRole("region", { name: "Transcript" })
-  const collapsed = transcript.locator('button[aria-expanded="false"]')
+  const collapsed = transcript(window).locator('button[aria-expanded="false"]')
 
   if ((await collapsed.count()) === 0) return "nothing new"
 
@@ -382,12 +407,14 @@ export const replayedStates = (found: ReadonlyArray<Replay>): ReadonlyArray<Stat
       area: replayGroups[replay.harness],
       name: replay.scenario,
       wholeTranscript: true,
+      focus: turns,
       reach: (window: Page) => openReplayed(window, replay),
     },
     {
       area: replayGroups[replay.harness],
       name: `${replay.scenario}, expanded`,
       wholeTranscript: true,
+      focus: turns,
       reach: async (window: Page) => {
         await openReplayed(window, replay)
 

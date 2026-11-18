@@ -219,7 +219,6 @@ figcaption {
   gap: 24px;
 }
 .lane figure img {
-  width: 1280px;
   max-width: none;
   height: auto;
   border-width: 2px;

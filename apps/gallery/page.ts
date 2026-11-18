@@ -33,8 +33,9 @@ export const galleryPage = async (shots: ReadonlyArray<Shot>, capturedAt: Date) 
 <main>
   <div class="bar">
     <div class="title" id="title"></div>
-    <span class="keys">j k move · d theme · g grid · c canvas</span>
+    <span class="keys">j k move · d theme · w whole window · g grid · c canvas</span>
     <div class="seg"><button data-view="single">One</button><button data-view="grid">Grid</button><button data-view="canvas">Canvas</button></div>
+    <div class="seg"><button data-framing="focus">Focus</button><button data-framing="whole">Whole window</button></div>
     <div class="seg"><button data-scheme="light">Light</button><button data-scheme="dark">Dark</button><button data-scheme="both">Both</button></div>
   </div>
   <div id="stage"></div>

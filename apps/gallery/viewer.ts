@@ -45,13 +45,20 @@ let view: View = "single"
 
 let current = 0
 
+let whole = false
+
 const visible = () => {
   const query = filter.value.toLowerCase()
 
   return shots.filter((shot) => `${shot.area} ${shot.name}`.toLowerCase().includes(query))
 }
 
-const src = (shot: Shot, shown: Scheme, size = "") => `shots/${shot.id}-${shown}${size}.png`
+const framing = (shot: Shot) => (whole || shot.focus === null ? "" : "-focus")
+
+const sizeOf = (shot: Shot) => (whole ? shot : (shot.focus ?? shot))
+
+const src = (shot: Shot, shown: Scheme, size = "") =>
+  `shots/${shot.id}-${shown}${framing(shot)}${size}.png`
 
 const alt = (shot: Shot, shown: Scheme) => `${shot.area}: ${shot.name} (${shown})`
 
@@ -178,16 +185,19 @@ const fit = () => {
   applyCamera()
 }
 
-const laneFigure = (shot: Shot) =>
-  `<figure data-id="${shot.id}"><div class="pair">${schemesShown()
+const laneFigure = (shot: Shot) => {
+  const { width, height } = sizeOf(shot)
+
+  return `<figure data-id="${shot.id}"><div class="pair">${schemesShown()
     .map(
       (shown) =>
-        `<img decoding="async" draggable="false" width="${shot.width}" height="${shot.height}" data-full="${src(shot, shown)}" data-thumb="${src(shot, shown, "-thumb")}" alt="${alt(shot, shown)}">`,
+        `<img decoding="async" draggable="false" width="${width}" height="${height}" data-full="${src(shot, shown)}" data-thumb="${src(shot, shown, "-thumb")}" alt="${alt(shot, shown)}">`,
     )
     .join("")}</div><figcaption>${shot.name}</figcaption></figure>`
+}
 
 const buildWorld = (shown: ReadonlyArray<Shot>) => {
-  const key = `${scheme}|${shown.map((shot) => shot.id).join()}`
+  const key = `${scheme}|${whole}|${shown.map((shot) => shot.id).join()}`
   const first = builtFor === null
 
   if (builtFor !== key) {
@@ -340,6 +350,9 @@ const render = () => {
   for (const button of document.querySelectorAll<HTMLElement>("[data-scheme]"))
     button.setAttribute("aria-pressed", String(button.dataset["scheme"] === scheme))
 
+  for (const button of document.querySelectorAll<HTMLElement>("[data-framing]"))
+    button.setAttribute("aria-pressed", String((button.dataset["framing"] === "whole") === whole))
+
   for (const button of document.querySelectorAll<HTMLElement>("[data-view]"))
     button.setAttribute("aria-pressed", String(button.dataset["view"] === view))
 
@@ -415,6 +428,12 @@ for (const button of document.querySelectorAll<HTMLElement>("[data-scheme]"))
     render()
   })
 
+for (const button of document.querySelectorAll<HTMLElement>("[data-framing]"))
+  button.addEventListener("click", () => {
+    whole = button.dataset["framing"] === "whole"
+    render()
+  })
+
 for (const button of document.querySelectorAll<HTMLElement>("[data-view]"))
   button.addEventListener("click", () => {
     view = viewChoices.find((choice) => choice === button.dataset["view"]) ?? view
@@ -470,6 +489,9 @@ document.addEventListener("keydown", (event) => {
     step(-1)
   } else if (event.key === "d") {
     scheme = nextScheme[scheme]
+    render()
+  } else if (event.key === "w") {
+    whole = !whole
     render()
   } else if (event.key === "g") {
     view = view === "grid" ? "single" : "grid"
