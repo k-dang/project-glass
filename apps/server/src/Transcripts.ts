@@ -3,7 +3,7 @@ import {
   ConversationError,
   type AgentEvent,
   endTurnEvents,
-  ExtensionStatusesChanged,
+  AgentStatusesChanged,
   FeedbackNote,
   isRequestPart,
   isWaiting,
@@ -236,7 +236,7 @@ const storageFailure = () =>
 const queuedAgain = (inputs: ReadonlyArray<MessageWithContext>): ReadonlyArray<QueuedMessage> =>
   inputs.map((input) => ({ ...input, feedback: [], id: randomUUID() }))
 
-type SavedEvent = Exclude<HostEvent, typeof ExtensionStatusesChanged.Type>
+type SavedEvent = Exclude<HostEvent, typeof AgentStatusesChanged.Type>
 
 export class Transcripts extends Context.Service<
   Transcripts,
@@ -325,19 +325,19 @@ export class Transcripts extends Context.Service<
       const published = yield* PubSub.unbounded<Published>()
       const locks = new Map<string, Semaphore.Semaphore>()
       const statuses = new Map<string, string>()
-      const extensionStatuses = new Map<string, ReadonlyArray<string>>()
+      const agentStatuses = new Map<string, ReadonlyArray<string>>()
 
-      const setExtensionStatuses = (conversationId: string, shown: ReadonlyArray<string>) =>
+      const setAgentStatuses = (conversationId: string, shown: ReadonlyArray<string>) =>
         lockFor(conversationId).withPermits(1)(
           Effect.suspend(() => {
-            if (shown.length === 0 && !extensionStatuses.has(conversationId)) return Effect.void
+            if (shown.length === 0 && !agentStatuses.has(conversationId)) return Effect.void
 
-            if (shown.length === 0) extensionStatuses.delete(conversationId)
-            else extensionStatuses.set(conversationId, shown)
+            if (shown.length === 0) agentStatuses.delete(conversationId)
+            else agentStatuses.set(conversationId, shown)
 
             return PubSub.publish(published, {
               conversationId,
-              update: ExtensionStatusesChanged.make({ extensionStatuses: shown }),
+              update: AgentStatusesChanged.make({ agentStatuses: shown }),
             })
           }),
         )
@@ -742,11 +742,11 @@ export class Transcripts extends Context.Service<
         throughJournalEntry?: number,
       ) => {
         const events = hostEvents.filter(
-          (event): event is SavedEvent => !Predicate.isTagged(event, "ExtensionStatusesChanged"),
+          (event): event is SavedEvent => !Predicate.isTagged(event, "AgentStatusesChanged"),
         )
 
         const shown = hostEvents.findLast((event) =>
-          Predicate.isTagged(event, "ExtensionStatusesChanged"),
+          Predicate.isTagged(event, "AgentStatusesChanged"),
         )
 
         return changeWith(
@@ -792,7 +792,7 @@ export class Transcripts extends Context.Service<
           Effect.andThen(
             shown === undefined
               ? Effect.void
-              : setExtensionStatuses(conversationId, shown.extensionStatuses),
+              : setAgentStatuses(conversationId, shown.agentStatuses),
           ),
         )
       }
@@ -863,7 +863,7 @@ export class Transcripts extends Context.Service<
           ...(yield* turnPage(conversationId, turns)),
           queued: yield* queued(conversationId),
           status: statuses.get(conversationId) ?? null,
-          extensionStatuses: extensionStatuses.get(conversationId) ?? [],
+          agentStatuses: agentStatuses.get(conversationId) ?? [],
         })
       })
 
@@ -911,7 +911,7 @@ export class Transcripts extends Context.Service<
 
         yield* Effect.forEach(
           conversationIds,
-          (conversationId) => setExtensionStatuses(conversationId, []),
+          (conversationId) => setAgentStatuses(conversationId, []),
           {
             discard: true,
           },
@@ -1201,7 +1201,7 @@ export class Transcripts extends Context.Service<
           )
           locks.delete(conversationId)
           statuses.delete(conversationId)
-          extensionStatuses.delete(conversationId)
+          agentStatuses.delete(conversationId)
           yield* markWaiting(conversationId, [])
           yield* setUnseen(conversationId, undefined)
           yield* setRunning(conversationId, false)

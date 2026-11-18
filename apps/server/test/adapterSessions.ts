@@ -86,8 +86,8 @@ const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
   let nextTurn = 0
 
   const report = (event: HostEvent) =>
-    Predicate.isTagged(event, "ExtensionStatusesChanged")
-      ? SubscriptionRef.set(statuses, event.extensionStatuses)
+    Predicate.isTagged(event, "AgentStatusesChanged")
+      ? SubscriptionRef.set(statuses, event.agentStatuses)
       : Effect.sync(() => events.push(event)).pipe(
           Effect.andThen(
             SubscriptionRef.update(turns, (current) => applyConversationEvent(current, event)),

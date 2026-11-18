@@ -7,7 +7,7 @@ import {
   type AgentCommand,
   type AgentModel,
   AgentModels,
-  ExtensionStatusesChanged,
+  AgentStatusesChanged,
   type RequestAnswer,
   RequestNotWaiting,
   type RequestPart,
@@ -345,7 +345,7 @@ export const piAdapter = (command: string) =>
         const statuses = new Map<string, string>()
 
         const showStatuses = Effect.suspend(() =>
-          report(ExtensionStatusesChanged.make({ extensionStatuses: [...statuses.values()] })),
+          report(AgentStatusesChanged.make({ agentStatuses: [...statuses.values()] })),
         )
 
         const trackStatus = (event: PiEvent) => {

@@ -12,7 +12,7 @@ import {
 } from "@glass/contracts"
 import { DateTime, Predicate } from "effect"
 import type { ToolInput } from "./toolCalls"
-import { beginTurn, Input, step, stoppedReason, type TurnState } from "./claudeTurn"
+import { beginTurn, Input, machine, step, stoppedReason, type TurnState } from "./claudeTurn"
 
 const now = DateTime.makeUnsafe("2026-10-26T12:00:00Z")
 
@@ -125,6 +125,13 @@ it("ends a Turn the user stopped as stopped, however Claude Code finishes it", (
     tag(run([runStart([]), result(true)], { ...fresh, stopping: TurnStopped.make({}) }).ending),
     "Stopped",
   )
+})
+
+it("counts a run Claude Code starts on its own as started once it replies, not when it opens", () => {
+  assert.isFalse(
+    machine.startsRun(Input.Message({ message: sdk({ type: "system", subtype: "init" }) })),
+  )
+  assert.isTrue(machine.startsRun(Input.Message({ message: runStart([]) })))
 })
 
 it("fails the running Turn when Claude Code exits", () => {

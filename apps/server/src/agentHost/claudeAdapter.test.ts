@@ -1,6 +1,6 @@
 import { assert, it } from "@effect/vitest"
 import { Effect, Stream } from "effect"
-import { claudeAdapter, type ClaudeQuery } from "./claudeAdapter"
+import { claudeAdapter, type ClaudeQuery, subagentStatuses } from "./claudeAdapter"
 import { WorkRole } from "./protocol"
 
 it.live("reports a failed SDK handshake as a host error and closes the query", () =>
@@ -38,3 +38,16 @@ it.live("reports a failed SDK handshake as a host error and closes the query", (
     assert.isTrue(closed)
   }),
 )
+
+it("words Claude Code's background subagents as one status, leaving out other tasks", () => {
+  assert.deepStrictEqual(
+    subagentStatuses([
+      { task_id: "1", task_type: "local_agent", subagent_type: "Explore", description: "Trace it" },
+      { task_id: "2", task_type: "local_agent", subagent_type: "Plan", description: "Plan it" },
+      { task_id: "3", task_type: "local_agent", description: "Watch it", ambient: true },
+      { task_id: "4", task_type: "local_bash", description: "Serve it" },
+    ]),
+    ["Running 2 subagents: Explore: Trace it, Plan: Plan it"],
+  )
+  assert.deepStrictEqual(subagentStatuses([]), [])
+})

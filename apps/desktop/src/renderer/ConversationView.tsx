@@ -33,6 +33,7 @@ import { DateTime, Exit, Match, Option, Predicate } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import {
   ArrowUp,
+  Activity,
   Brain,
   CircleCheck,
   CirclePause,
@@ -42,7 +43,6 @@ import {
   Layers,
   LoaderCircle,
   MessageCircle,
-  Puzzle,
   Unplug,
   Workflow,
   Wrench,
@@ -207,7 +207,7 @@ function OpenConversation(props: { conversation: Conversation } & ConversationTa
 
   const loaded = AsyncResult.value(transcript)
 
-  const { turns, earlierTurns, queued, status, extensionStatuses } = Option.getOrElse(
+  const { turns, earlierTurns, queued, status, agentStatuses } = Option.getOrElse(
     loaded,
     () => emptyTranscript,
   )
@@ -323,7 +323,7 @@ function OpenConversation(props: { conversation: Conversation } & ConversationTa
                 />
               </FileLinks>
             </ToolCallView>
-            <ExtensionStatuses statuses={extensionStatuses} />
+            <AgentStatuses statuses={agentStatuses} />
             {reach === "unreachable" && <UnreachableNotice conversationId={conversation.id} />}
             {readOnly === null ? (
               <Composer conversation={conversation} turns={turns} queued={queued} />
@@ -938,16 +938,16 @@ function WaitingNotice(props: { waiting: RequestPart }) {
   )
 }
 
-function ExtensionStatuses(props: { statuses: ReadonlyArray<string> }) {
+function AgentStatuses(props: { statuses: ReadonlyArray<string> }) {
   return (
     props.statuses.length > 0 && (
       <output
-        aria-label="Extension statuses"
+        aria-label="Agent statuses"
         className="mx-auto flex w-full max-w-3xl flex-wrap gap-x-4 gap-y-1 px-6 pt-2 text-xs text-muted-foreground"
       >
         {props.statuses.map((status) => (
           <span key={status} className="flex items-center gap-1.5">
-            <Puzzle aria-hidden className="size-3" />
+            <Activity aria-hidden className="size-3" />
             {status}
           </span>
         ))}

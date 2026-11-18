@@ -8,6 +8,7 @@ import {
   type PermissionResult,
   type Query,
   query,
+  type SDKBackgroundTasksChangedMessage,
   type SDKControlInitializeResponse,
   type SDKMessage,
   type SDKUserMessage,
@@ -17,6 +18,7 @@ import {
   type AgentCommand,
   type AgentModel,
   AgentModels,
+  AgentStatusesChanged,
   QuestionPart,
   type QuestionReply,
   type RequestAnswer,
@@ -250,6 +252,21 @@ const interruptAll = (session: ClaudeQuery) =>
     Effect.orElseSucceed((): ReadonlyArray<string> => []),
   )
 
+/** Claude Code's subagents running in the background, worded as pi's subagent status words them. */
+export const subagentStatuses = (
+  tasks: SDKBackgroundTasksChangedMessage["tasks"],
+): ReadonlyArray<string> => {
+  const running = tasks
+    .filter((task) => task.task_type === "local_agent" && task.ambient !== true)
+    .map((task) => `${task.subagent_type ?? "subagent"}: ${task.description}`)
+
+  if (running.length === 0) return []
+
+  return [
+    `Running ${running.length === 1 ? "a subagent" : `${running.length} subagents`}: ${running.join(", ")}`,
+  ]
+}
+
 const control = (what: "model" | "effort" | "Permission mode", call: () => Promise<void>) =>
   Effect.tryPromise(call).pipe(
     Effect.tapError((cause) => Effect.logWarning(`Claude Code refused a ${what}`, cause)),
@@ -438,6 +455,16 @@ export const claudeAdapter = (
       },
     )
 
+    let statuses: ReadonlyArray<string> = []
+
+    const showStatuses = (shown: ReadonlyArray<string>) =>
+      Effect.suspend(() => {
+        if (shown.length === 0 && statuses.length === 0) return Effect.void
+        statuses = shown
+
+        return report(AgentStatusesChanged.make({ agentStatuses: shown }))
+      })
+
     const turns = yield* runTurns({
       harness: "Claude Code",
       machine,
@@ -447,6 +474,12 @@ export const claudeAdapter = (
             ? Effect.logWarning("Claude Code ended a Turn with an error", message)
             : Effect.void,
         ),
+        Stream.tap((message) =>
+          message.type === "system" && message.subtype === "background_tasks_changed"
+            ? showStatuses(subagentStatuses(message.tasks))
+            : Effect.void,
+        ),
+        Stream.ensuring(showStatuses([])),
         Stream.map((message) => Input.Message({ message })),
         Stream.merge(Stream.fromQueue(requests), { haltStrategy: "left" }),
       ),

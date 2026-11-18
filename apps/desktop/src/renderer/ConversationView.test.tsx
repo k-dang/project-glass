@@ -7,7 +7,7 @@ import {
   DRAW_DIAGRAM_TOOL,
   AnswerQuestion,
   DenyRequest,
-  ExtensionStatusesChanged,
+  AgentStatusesChanged,
   PermissionRequestPart,
   QuestionPart,
   type RequestAnswer,
@@ -235,26 +235,24 @@ it("shows the statuses the Conversation's extensions set while no Turn runs, unt
           turns: [],
           queued: [],
           status: null,
-          extensionStatuses: ["Explore: Trace composer to harness"],
+          agentStatuses: ["Explore: Trace composer to harness"],
         }),
       ).pipe(
         Stream.concat(
           Stream.fromEffect(
             Deferred.await(cleared).pipe(
-              Effect.as(ExtensionStatusesChanged.make({ extensionStatuses: [] })),
+              Effect.as(AgentStatusesChanged.make({ agentStatuses: [] })),
             ),
           ),
         ),
       ),
   })
 
-  const statuses = await screen.findByRole("status", { name: "Extension statuses" })
+  const statuses = await screen.findByRole("status", { name: "Agent statuses" })
   expect(within(statuses).getByText("Explore: Trace composer to harness")).toBeTruthy()
 
   Deferred.doneUnsafe(cleared, Exit.void)
-  await waitFor(() =>
-    expect(screen.queryByRole("status", { name: "Extension statuses" })).toBeNull(),
-  )
+  await waitFor(() => expect(screen.queryByRole("status", { name: "Agent statuses" })).toBeNull())
 })
 
 it("sends a message with Enter and clears the composer", async () => {

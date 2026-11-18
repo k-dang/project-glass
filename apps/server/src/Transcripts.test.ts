@@ -3,7 +3,7 @@ import { assert, it } from "@effect/vitest"
 import {
   applyTranscriptUpdate,
   emptyTranscript,
-  ExtensionStatusesChanged,
+  AgentStatusesChanged,
   PartAppended,
   PartSet,
   TextPart,
@@ -98,17 +98,17 @@ it.live(
     }).pipe(Effect.scoped, Effect.provide(transcriptsLayer)),
 )
 
-it.live("shows a Conversation's extension statuses until Glass loses the Conversation", () =>
+it.live("shows a Conversation's Agent statuses until Glass loses the Conversation", () =>
   Effect.gen(function* () {
     const transcripts = yield* Transcripts
 
     yield* transcripts.save("agent-1", [
-      ExtensionStatusesChanged.make({ extensionStatuses: ["Plan mode"] }),
+      AgentStatusesChanged.make({ agentStatuses: ["Plan mode"] }),
     ])
-    assert.deepStrictEqual((yield* transcripts.read("agent-1")).extensionStatuses, ["Plan mode"])
+    assert.deepStrictEqual((yield* transcripts.read("agent-1")).agentStatuses, ["Plan mode"])
 
     yield* transcripts.endRunning(TurnCutOff.make({}), ["agent-1"])
-    assert.deepStrictEqual((yield* transcripts.read("agent-1")).extensionStatuses, [])
+    assert.deepStrictEqual((yield* transcripts.read("agent-1")).agentStatuses, [])
   }).pipe(Effect.provide(transcriptsLayer)),
 )
 

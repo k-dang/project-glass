@@ -423,7 +423,7 @@ export const Transcript = Schema.Struct({
   earlierTurns: Schema.Int.pipe(Schema.withConstructorDefault(Effect.succeed(0))),
   queued: Schema.Array(QueuedMessage),
   status: Schema.NullOr(Schema.String),
-  extensionStatuses: Schema.Array(Schema.String).pipe(
+  agentStatuses: Schema.Array(Schema.String).pipe(
     Schema.withConstructorDefault(Effect.succeed([])),
   ),
 })
@@ -435,7 +435,7 @@ export const emptyTranscript: Transcript = {
   earlierTurns: 0,
   queued: [],
   status: null,
-  extensionStatuses: [],
+  agentStatuses: [],
 }
 
 export const TranscriptSnapshot = Schema.TaggedStruct("Snapshot", Transcript.fields)
@@ -448,8 +448,8 @@ export const StatusChanged = Schema.TaggedStruct("StatusChanged", {
   status: Transcript.fields.status,
 })
 
-export const ExtensionStatusesChanged = Schema.TaggedStruct("ExtensionStatusesChanged", {
-  extensionStatuses: Transcript.fields.extensionStatuses,
+export const AgentStatusesChanged = Schema.TaggedStruct("AgentStatusesChanged", {
+  agentStatuses: Transcript.fields.agentStatuses,
 })
 
 export const EarlierTurns = Schema.TaggedStruct("EarlierTurns", {
@@ -465,7 +465,7 @@ export const TranscriptUpdate = Schema.Union([
   EarlierTurns,
   QueuedMessagesChanged,
   StatusChanged,
-  ExtensionStatusesChanged,
+  AgentStatusesChanged,
   ...AgentEvent.members,
 ])
 
@@ -533,12 +533,12 @@ export const applyTranscriptUpdate = (
   update: TranscriptUpdate,
 ): Transcript =>
   Match.value(update).pipe(
-    Match.tag("Snapshot", ({ turns, earlierTurns, queued, status, extensionStatuses }) => ({
+    Match.tag("Snapshot", ({ turns, earlierTurns, queued, status, agentStatuses }) => ({
       turns,
       earlierTurns,
       queued,
       status,
-      extensionStatuses,
+      agentStatuses,
     })),
     Match.tag("EarlierTurns", ({ before, turns, earlierTurns }) =>
       transcript.turns[0]?.id === before
@@ -547,9 +547,9 @@ export const applyTranscriptUpdate = (
     ),
     Match.tag("QueuedMessagesChanged", ({ queued }) => ({ ...transcript, queued })),
     Match.tag("StatusChanged", ({ status }) => ({ ...transcript, status })),
-    Match.tag("ExtensionStatusesChanged", ({ extensionStatuses }) => ({
+    Match.tag("AgentStatusesChanged", ({ agentStatuses }) => ({
       ...transcript,
-      extensionStatuses,
+      agentStatuses,
     })),
     Match.orElse((event) => ({
       ...transcript,

@@ -193,6 +193,34 @@ it.live("Steers a running Turn, showing the Steer where Claude Code takes it in"
   }).pipe(Effect.scoped),
 )
 
+it.live(
+  "shows a background subagent until it finishes, then opens a Turn for the run Claude Code starts",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* claudeSession("claude-background-agent")
+      const session = yield* f.open(conversationId)
+
+      yield* session.send(
+        "Use the Agent tool with run_in_background set to true to start a general-purpose subagent with this prompt: " +
+          "`Without using any tools, write out every number from 1 to 400, separated by spaces.` " +
+          "Then, without waiting for it, reply with exactly: STARTED. " +
+          "When its result comes back, reply with exactly: PONG",
+      )
+      yield* f.untilStatuses((statuses) =>
+        statuses.some((status) => status.startsWith("Running a subagent: general-purpose: ")),
+      )
+      const [started, woken] = yield* f.until(settled(2))
+
+      assert.deepStrictEqual(yield* f.statuses, [])
+
+      assert.deepStrictEqual(lastText(started), TextPart.make({ text: "STARTED" }))
+      assert.ok(woken, "Claude Code's own run never opened a Turn")
+      assert.equal(woken.message, "")
+      assert.deepStrictEqual(woken.ended?.ending, TurnDone.make({}))
+      assert.deepStrictEqual(lastText(woken), TextPart.make({ text: "PONG" }))
+    }).pipe(Effect.scoped),
+)
+
 it.live("continues a conversation when Claude Code starts again", () =>
   Effect.gen(function* () {
     const f = yield* claudeSession("claude-resume")
