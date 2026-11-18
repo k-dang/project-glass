@@ -1,10 +1,11 @@
 import { RPC_PATH } from "@glass/contracts"
-import type { BackendEndpoint } from "@glass/contracts/desktop"
-import { Deferred, Duration, Effect, Fiber } from "effect"
-import { type UtilityProcess, utilityProcess } from "electron"
+import type { BackendEndpoint, BackendFailure } from "@glass/contracts/desktop"
+import { Cause, Deferred, Duration, Effect, Fiber, Option } from "effect"
+import { app, type UtilityProcess, utilityProcess } from "electron"
 import { randomBytes, randomUUID } from "node:crypto"
 import { BackendError, keepRunning, openBackendLog, waitForBackend } from "./backendIo"
 import { lastBoundPortOrFree } from "./backendPort"
+import { prependLoginShellPath } from "./loginShellPath"
 
 const STOP_DEADLINE = Duration.seconds(10)
 
@@ -122,3 +123,53 @@ export const startBackend = Effect.fn("startBackend")(function* (options: {
     failed,
   }
 })
+
+export const runBackend = ({
+  onReady,
+  onFailure,
+  ...options
+}: {
+  readonly entry: string
+  readonly rendererOrigin: string
+  readonly logFile: string
+  readonly dataDirectory: string
+  readonly onReady: (endpoint: BackendEndpoint) => void
+  readonly onFailure: (kind: BackendFailure["kind"], message: string) => void
+}) => {
+  const program = Effect.gen(function* () {
+    if (app.isPackaged && process.platform !== "win32") {
+      yield* prependLoginShellPath(process.env, [
+        process.env["SHELL"],
+        process.platform === "darwin" ? "/bin/zsh" : "/bin/bash",
+      ])
+    }
+
+    const backend = yield* startBackend(options)
+
+    onReady(backend.endpoint)
+    onFailure("crash", (yield* Effect.flip(backend.failed)).message)
+  }).pipe(
+    Effect.scoped,
+    Effect.catchCause((cause) =>
+      Effect.sync(() => {
+        if (Cause.hasInterruptsOnly(cause)) return
+
+        Option.match(Cause.findErrorOption(cause), {
+          onSome: (error) => onFailure("start", error.message),
+          onNone: () => {
+            console.error(Cause.pretty(cause))
+            onFailure("start", "Unexpected error while starting the backend")
+          },
+        })
+      }),
+    ),
+  )
+
+  const fiber = Effect.runFork(program)
+
+  app.on("will-quit", (event) => {
+    if (fiber.pollUnsafe() !== undefined) return
+    event.preventDefault()
+    void Effect.runPromise(Fiber.interrupt(fiber)).finally(() => app.quit())
+  })
+}
