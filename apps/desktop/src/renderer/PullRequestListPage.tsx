@@ -37,8 +37,8 @@ import {
   PullRequestRow,
   repositoryLabeller,
   subgridRow,
-  warningTone,
 } from "./PullRequestRow"
+import { warningTone } from "./status"
 import { type Group, Health, Latest, listingsAtom, syncListingsAtom } from "./pullRequestLists"
 import { queueRefreshAtom } from "./queue"
 import { QueueTab, QueueTabTrigger } from "./QueueTab"

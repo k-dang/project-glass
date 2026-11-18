@@ -99,6 +99,7 @@ export class Changes extends Context.Service<
       baseRef: string,
     ) => Effect.Effect<ReadonlyArray<ChangedFile>, HostConversationError>
     readonly uncommitted: (folder: string) => Effect.Effect<boolean, HostConversationError>
+    readonly branch: (folder: string) => Effect.Effect<string | null, HostConversationError>
     readonly files: (folder: string) => Effect.Effect<ReadonlyArray<string>, HostConversationError>
   }
 >()("@glass/server/agentHost/Changes") {
@@ -175,6 +176,11 @@ export class Changes extends Context.Service<
           git.run(folder, ["status", "--porcelain"]).pipe(
             Effect.map((status) => status !== ""),
             failure("Couldn't check the Conversation's folder for changes."),
+          ),
+        branch: (folder) =>
+          git.run(folder, ["branch", "--show-current"]).pipe(
+            Effect.map((branch) => (branch === "" ? null : branch)),
+            failure("Couldn't read the Conversation's branch."),
           ),
         files: (folder) =>
           git
