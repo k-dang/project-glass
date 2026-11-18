@@ -2,6 +2,7 @@ import { getSessionInfo, query } from "@anthropic-ai/claude-agent-sdk"
 import {
   type AgentEvent,
   type AgentHarness,
+  AgentStatusesChanged,
   applyConversationEvent,
   type Image,
   isWaiting,
@@ -90,7 +91,7 @@ const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
   yield* Effect.addFinalizer(() => tape.finish)
   const turns = yield* SubscriptionRef.make<ReadonlyArray<Turn>>([])
   const events: Array<AgentEvent> = []
-  const statuses = yield* SubscriptionRef.make<ReadonlyArray<string>>([])
+  const activity = yield* SubscriptionRef.make(AgentStatusesChanged.make({ agentStatuses: [] }))
   const reported: Array<HostEvent> = []
 
   if (transcriptsDirectory !== undefined)
@@ -109,8 +110,8 @@ const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
   const report = (event: HostEvent) =>
     Effect.sync(() => reported.push(event)).pipe(
       Effect.andThen(
-        Predicate.isTagged(event, "ExtensionStatusesChanged")
-          ? SubscriptionRef.set(statuses, event.extensionStatuses)
+        Predicate.isTagged(event, "AgentStatusesChanged")
+          ? SubscriptionRef.set(activity, event)
           : Effect.sync(() => events.push(event)).pipe(
               Effect.andThen(
                 SubscriptionRef.update(turns, (current) => applyConversationEvent(current, event)),
@@ -127,8 +128,8 @@ const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
       Effect.raceFirst(tape.mismatch),
     )
 
-  const untilStatuses = (holds: (current: ReadonlyArray<string>) => boolean) =>
-    SubscriptionRef.changes(statuses).pipe(
+  const untilActivity = (holds: (current: AgentStatusesChanged) => boolean) =>
+    SubscriptionRef.changes(activity).pipe(
       Stream.filter(holds),
       Stream.runHead,
       Effect.map(Option.getOrThrow),
@@ -173,9 +174,9 @@ const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
     folder,
     events,
     turns: SubscriptionRef.get(turns),
-    statuses: SubscriptionRef.get(statuses),
+    statuses: SubscriptionRef.get(activity).pipe(Effect.map(({ agentStatuses }) => agentStatuses)),
     until,
-    untilStatuses,
+    untilActivity,
     request,
     open,
   }

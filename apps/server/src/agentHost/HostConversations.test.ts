@@ -1,7 +1,7 @@
 import { NodeFileSystem } from "@effect/platform-node"
 import { assert, it } from "@effect/vitest"
 import {
-  ExtensionStatusesChanged,
+  AgentStatusesChanged,
   PartSet,
   TextPart,
   TurnDone,
@@ -601,7 +601,7 @@ it.effect("keeps to the budget for a later Turn after going over it while idle",
         }),
     }))
 
-    yield* report(ExtensionStatusesChanged.make({ extensionStatuses: ["a".repeat(BUDGET * 2)] }))
+    yield* report(AgentStatusesChanged.make({ agentStatuses: ["a".repeat(BUDGET * 2)] }))
     yield* conversations.startTurn(
       "a",
       "turn-1",

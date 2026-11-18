@@ -53,10 +53,14 @@ const globalConversationUpdateBlock = ({ work }: GlobalConversationUpdate) =>
     ...work.map(workOutcomeEntry),
   ])
 
-const contextBlock = (context: TurnContext) =>
-  Predicate.isTagged(context, "GlobalConversationUpdate")
-    ? globalConversationUpdateBlock(context)
-    : block("glass_context", [`The user sent this while viewing ${viewing(context)}.`])
+const contextBlock = (context: TurnContext) => {
+  if (Predicate.isTagged(context, "GlobalConversationUpdate"))
+    return globalConversationUpdateBlock(context)
+
+  if (Predicate.isTagged(context, "BackgroundWorkEnded")) return null
+
+  return block("glass_context", [`The user sent this while viewing ${viewing(context)}.`])
+}
 
 const entry = ({ id, title, notes, done }: ToDo) =>
   [

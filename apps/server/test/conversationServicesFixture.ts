@@ -55,6 +55,7 @@ import { GitHubClient } from "../src/github/GitHubClient"
 import { LocalPlacement } from "../src/LocalPlacement"
 import { ToDos } from "../src/ToDos"
 import { Transcripts } from "../src/Transcripts"
+import { isolatedHome } from "./harness"
 import { inProcessSandboxes } from "./inProcessSandboxes"
 
 interface Started {
@@ -66,6 +67,8 @@ interface Started {
 }
 
 export const conversationServicesFixture = Effect.gen(function* () {
+  const home = yield* isolatedHome
+
   const database = yield* Layer.build(
     SqliteMigrator.layer({ loader: migrationLoader }).pipe(
       Layer.provideMerge(SqliteClient.layer({ filename: ":memory:" })),
@@ -211,7 +214,11 @@ export const conversationServicesFixture = Effect.gen(function* () {
                 ServerConfig.layer.pipe(
                   Layer.provide(
                     ConfigProvider.layer(
-                      ConfigProvider.fromEnvRecord({ GLASS_PORT: "0", GLASS_TOKEN: "unused" }),
+                      ConfigProvider.fromEnvRecord({
+                        GLASS_PORT: "0",
+                        GLASS_TOKEN: "unused",
+                        GLASS_HOME: home,
+                      }),
                     ),
                   ),
                 ),
@@ -229,7 +236,11 @@ export const conversationServicesFixture = Effect.gen(function* () {
             ServerConfig.layer.pipe(
               Layer.provide(
                 ConfigProvider.layer(
-                  ConfigProvider.fromEnvRecord({ GLASS_PORT: "0", GLASS_TOKEN: "unused" }),
+                  ConfigProvider.fromEnvRecord({
+                    GLASS_PORT: "0",
+                    GLASS_TOKEN: "unused",
+                    GLASS_HOME: home,
+                  }),
                 ),
               ),
             ),

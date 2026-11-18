@@ -1,6 +1,6 @@
 import { assert, it } from "@effect/vitest"
 import {
-  ExtensionStatusesChanged,
+  AgentStatusesChanged,
   Image,
   nothingUnsent,
   PartSet,
@@ -160,10 +160,10 @@ it.live(
         ...TurnEnded.make({ turnId: turn.turnId, ended }),
         steersNotTakenIn: left,
       })
-      yield* turn.emit(ExtensionStatusesChanged.make({ extensionStatuses: ["Replayed"] }))
+      yield* turn.emit(AgentStatusesChanged.make({ agentStatuses: ["Replayed"] }))
 
-      const replayed = yield* f.transcript(conversation.id, ({ extensionStatuses }) =>
-        extensionStatuses.includes("Replayed"),
+      const replayed = yield* f.transcript(conversation.id, ({ agentStatuses }) =>
+        agentStatuses.includes("Replayed"),
       )
 
       assert.deepStrictEqual(queuedMessages(replayed), ["Also this", "Later"])

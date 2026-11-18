@@ -176,11 +176,11 @@ it.live("reports a pi extension's statuses as plain text, outside any Turn", () 
     )
     const session = yield* f.open(conversationId)
 
-    yield* f.untilStatuses((statuses) => statuses.length > 0)
+    yield* f.untilActivity(({ agentStatuses }) => agentStatuses.length > 0)
     assert.deepStrictEqual(yield* f.statuses, ["Plan mode"])
 
     yield* session.send("/leave")
-    yield* f.untilStatuses((statuses) => statuses.length === 0)
+    yield* f.untilActivity(({ agentStatuses }) => agentStatuses.length === 0)
   }).pipe(Effect.scoped),
 )
 
@@ -202,14 +202,14 @@ it.live("shows the subagents pi-subagents runs as a status until they finish", (
     const session = yield* f.open(conversationId)
 
     yield* session.send("/spawn")
-    yield* f.untilStatuses((statuses) => statuses.length > 0)
+    yield* f.untilActivity(({ agentStatuses }) => agentStatuses.length > 0)
     assert.deepStrictEqual(yield* f.statuses, [
       "Running a subagent: Explore: Trace composer to harness",
     ])
 
     yield* f.until(settled(1))
     yield* session.send("/finish")
-    yield* f.untilStatuses((statuses) => statuses.length === 0)
+    yield* f.untilActivity(({ agentStatuses }) => agentStatuses.length === 0)
   }).pipe(Effect.scoped),
 )
 

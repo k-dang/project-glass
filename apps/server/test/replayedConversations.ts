@@ -24,7 +24,7 @@ const decodeTranscript = Schema.decodeUnknownSync(ReplayedTranscript)
 
 const withTurnIds = (scenario: string, events: ReadonlyArray<HostEvent>) =>
   events.map((event) =>
-    Predicate.isTagged(event, "ExtensionStatusesChanged")
+    Predicate.isTagged(event, "AgentStatusesChanged")
       ? event
       : { ...event, turnId: `${scenario}:${event.turnId}` },
   )
@@ -50,11 +50,15 @@ const turnStates = (turn: Turn): ReadonlyArray<string> => [
 
 /** What the transcript shows that a reader could tell apart, such as a denied Permission request. */
 const uiStates = (events: ReadonlyArray<HostEvent>) => {
-  const { turns, extensionStatuses } = events.reduce(applyTranscriptUpdate, emptyTranscript)
+  const { turns, agentStatuses, backgroundToolCalls } = events.reduce(
+    applyTranscriptUpdate,
+    emptyTranscript,
+  )
 
   return new Set([
     ...turns.flatMap(turnStates),
-    ...(extensionStatuses.length > 0 ? ["extension statuses"] : []),
+    ...(agentStatuses.length > 0 ? ["agent statuses"] : []),
+    ...(backgroundToolCalls.length > 0 ? ["background tool calls"] : []),
   ])
 }
 

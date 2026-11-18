@@ -5,7 +5,7 @@ import {
   AgentModels,
   ChangedFile,
   ConversationFile,
-  ExtensionStatusesChanged,
+  AgentStatusesChanged,
   MessageWithContext,
   ModelChoice,
   NamedPaths,
@@ -37,7 +37,7 @@ export const HostEvent = Schema.Union([
   PartSet,
   PartAppended,
   HostTurnEnded,
-  ExtensionStatusesChanged,
+  AgentStatusesChanged,
 ])
 
 export type HostEvent = typeof HostEvent.Type

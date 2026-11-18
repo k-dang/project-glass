@@ -70,6 +70,6 @@ export default defineConfig({
     include: ["src/**/*.test.ts", "test/**/*.test.ts"],
     testTimeout: 30_000,
     silent: "passed-only",
-    globalSetup: ["test/buildBundles.ts"],
+    globalSetup: ["test/buildBundles.ts", "test/isolateHome.ts"],
   },
 })
