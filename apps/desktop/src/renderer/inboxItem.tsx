@@ -121,7 +121,7 @@ export function ItemIcon(props: { item: NeedsYouItem; className: string }) {
   })
 }
 
-export const requestsOf = (item: NeedsYouItem): ReadonlyArray<RequestPart> =>
+const requestsOf = (item: NeedsYouItem): ReadonlyArray<RequestPart> =>
   Match.valueTags(item, {
     Conversation: ({ reasons }) =>
       reasons.flatMap((reason) =>

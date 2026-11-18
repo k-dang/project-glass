@@ -7,7 +7,7 @@ import {
   needsYouGroups,
 } from "@glass/contracts"
 import { cn } from "cn"
-import { Option, Predicate } from "effect"
+import { Match, Option } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
 import { ChevronDown, Inbox as InboxIcon } from "lucide-react"
 import { type ReactNode, useEffect, useRef, useState } from "react"
@@ -25,11 +25,13 @@ import {
 } from "./inboxItem"
 import {
   markDoneAtom,
+  markTurnSeenAtom,
   needsYouCount,
   needsYouKey,
   type NeedsYouResult,
   needsYouStreamAtom,
   reviewDoneOf,
+  turnSeenOf,
   watchedNeedsYouAtom,
 } from "./needsYou"
 import { ProblemAlert } from "./ProblemAlert"
@@ -232,6 +234,7 @@ function InboxPane(props: {
 
 function useInboxActions(selected: NeedsYouItem | null): ReadonlyArray<InboxAction> {
   const markDone = useAtomSet(markDoneAtom)
+  const markTurnSeen = useAtomSet(markTurnSeenAtom)
   const permission = selected === null ? null : firstPermission(selected)
 
   const allow = useAtomSet(
@@ -245,10 +248,23 @@ function useInboxActions(selected: NeedsYouItem | null): ReadonlyArray<InboxActi
 
   if (selected === null) return []
 
-  const done = Predicate.isTagged(selected, "PullRequest") ? reviewDoneOf(selected) : null
+  const done = Match.valueTags(selected, {
+    PullRequest: (item) => {
+      const review = reviewDoneOf(item)
+
+      return review === null ? null : () => markDone(review)
+    },
+    Conversation: (item) => {
+      const seen = turnSeenOf(item)
+
+      return seen === null ? null : () => markTurnSeen(seen)
+    },
+    OutsideQuestion: () => null,
+    GlobalConversation: () => null,
+  })
 
   return [
-    ...(done === null ? [] : [{ key: "E" as const, label: "done", run: () => markDone(done) }]),
+    ...(done === null ? [] : [{ key: "E" as const, label: "done", run: done }]),
     ...(permission === null
       ? []
       : [{ key: "A" as const, label: "allow", run: () => allow(AllowRequest.make({})) }]),
