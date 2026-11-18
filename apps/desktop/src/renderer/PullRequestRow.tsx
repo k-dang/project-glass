@@ -1,25 +1,16 @@
 import { useAtomSet } from "@effect/atom-react"
-import type { Checks, PullRequestRef, PullRequestState, PullRequestSummary } from "@glass/contracts"
+import type { PullRequestRef, PullRequestState, PullRequestSummary } from "@glass/contracts"
+import { useRouter } from "@tanstack/react-router"
 import { cn } from "cn"
 import { DateTime } from "effect"
-import {
-  CircleCheck,
-  CircleDashed,
-  CircleDotDashed,
-  CircleX,
-  GitMerge,
-  GitPullRequestClosed,
-  History,
-  type LucideIcon,
-} from "lucide-react"
+import { GitMerge, GitPullRequestClosed, History, type LucideIcon } from "lucide-react"
 import { type ReactNode, useEffect, useId, useRef, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipHint } from "@/components/ui/tooltip"
 import { type Problem, problemText } from "./problems"
 import { preloadPullRequestAtom } from "./reviewsArea"
-
-export const warningTone = "text-amber-600 dark:text-amber-400"
+import { checksLabels, warningTone } from "./status"
 
 export function NotRefreshed(props: { problem: Problem; showLabel?: boolean }) {
   const reason = problemText(props.problem)
@@ -39,8 +30,17 @@ export function NotRefreshed(props: { problem: Problem; showLabel?: boolean }) {
 const HOVER_INTENT_MS = 100
 
 const usePreloadOnHover = (ref: PullRequestRef) => {
-  const preload = useAtomSet(preloadPullRequestAtom)
+  const preloadData = useAtomSet(preloadPullRequestAtom)
+  const router = useRouter()
   const pending = useRef<ReturnType<typeof setTimeout>>(undefined)
+
+  const preload = () => {
+    preloadData(ref)
+    void router.preloadRoute({
+      to: "/reviews/$owner/$repo/$number",
+      params: ref,
+    })
+  }
 
   const cancel = () => clearTimeout(pending.current)
 
@@ -49,12 +49,12 @@ const usePreloadOnHover = (ref: PullRequestRef) => {
   return {
     onPointerEnter: () => {
       cancel()
-      pending.current = setTimeout(() => preload(ref), HOVER_INTENT_MS)
+      pending.current = setTimeout(preload, HOVER_INTENT_MS)
     },
     onPointerLeave: cancel,
     onPointerDown: () => {
       cancel()
-      preload(ref)
+      preload()
     },
   }
 }
@@ -176,22 +176,16 @@ const finishedStates: Partial<
     { readonly label: string; readonly icon: LucideIcon; readonly tone: string }
   >
 > = {
-  merged: { label: "Merged", icon: GitMerge, tone: "text-violet-600 dark:text-violet-400" },
-  closed: { label: "Closed", icon: GitPullRequestClosed, tone: "text-red-600 dark:text-red-400" },
-}
-
-const checksLabels: Record<
-  Checks,
-  {
-    readonly label: string
-    readonly icon: LucideIcon
-    readonly tone: string
-  }
-> = {
-  passing: { label: "Passing", icon: CircleCheck, tone: "text-emerald-600 dark:text-emerald-400" },
-  failing: { label: "Failing", icon: CircleX, tone: "text-red-600 dark:text-red-400" },
-  running: { label: "Running", icon: CircleDotDashed, tone: warningTone },
-  unavailable: { label: "Unavailable", icon: CircleDashed, tone: "text-muted-foreground/60" },
+  merged: {
+    label: "Merged",
+    icon: GitMerge,
+    tone: "text-violet-600 dark:text-violet-400",
+  },
+  closed: {
+    label: "Closed",
+    icon: GitPullRequestClosed,
+    tone: "text-red-600 dark:text-red-400",
+  },
 }
 
 export const ago = (date: Date, now: Date) => {

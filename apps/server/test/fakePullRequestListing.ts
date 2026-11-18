@@ -97,6 +97,8 @@ const candidatesPage = (
       author: author(pr.author),
       updatedAt: pr.updatedAt,
       headRefOid: pr.head.sha,
+      headRefName: pr.headBranch,
+      isCrossRepository: pr.isCrossRepository,
       isDraft: pr.isDraft,
       state: pr.state,
       viewerDidAuthor: pr.author === VIEWER.login,

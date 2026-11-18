@@ -3,7 +3,7 @@ import { cn } from "cn"
 import { TriangleAlert } from "lucide-react"
 import type { ReactNode } from "react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { warningTone } from "./PullRequestRow"
+import { warningTone } from "./status"
 import { ShortSha } from "./shortSha"
 
 export function OutdatedNote(props: {

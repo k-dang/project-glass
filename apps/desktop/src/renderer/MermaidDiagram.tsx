@@ -1,6 +1,6 @@
 import { cn } from "cn"
 import DOMPurify from "dompurify"
-import { mount } from "pele"
+import type * as Pele from "pele"
 import { useCallback } from "react"
 
 const sanitize = (svg: string) =>
@@ -20,16 +20,26 @@ export function MermaidDiagram(props: {
 
   const draw = useCallback(
     (element: HTMLDivElement) => {
-      const diagram = mount(element, source, {
-        links: false,
-        images: false,
-        fontSize: 14,
-        sanitize,
-        zoom: zoomable ? { always: true, controls: true } : "auto",
-        onError: () => onInvalid?.(),
+      let diagram: ReturnType<typeof Pele.mount> | undefined
+      let removed = false
+
+      void import("pele").then(({ mount }) => {
+        if (removed) return
+
+        diagram = mount(element, source, {
+          links: false,
+          images: false,
+          fontSize: 14,
+          sanitize,
+          zoom: zoomable ? { always: true, controls: true } : "auto",
+          onError: () => onInvalid?.(),
+        })
       })
 
-      return () => diagram.destroy()
+      return () => {
+        removed = true
+        diagram?.destroy()
+      }
     },
     [source, onInvalid, zoomable],
   )

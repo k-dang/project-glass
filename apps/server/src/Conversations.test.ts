@@ -450,3 +450,48 @@ it.live("lists a Conversation as working while its Turn runs, until the Turn end
     yield* working((ids) => !ids.includes(conversation.id))
   }),
 )
+
+it.live("finds a Conversation's PR from the branch its agent left checked out, not a fork's", () =>
+  Effect.gen(function* () {
+    const f = yield* conversationsFixture
+    yield* f.client.FollowRepository({ input: "glass-demo/greeter" })
+
+    const fromBranch = {
+      owner: "glass-demo",
+      repo: "greeter",
+      headBranch: "feature/greeting",
+      base: { sha: "b0", files: {} },
+      head: { sha: "h1", files: {} },
+    }
+
+    f.github.seedPullRequest({ ...fromBranch, number: 7, updatedAt: "2026-11-01T00:00:00Z" })
+    f.github.seedPullRequest({
+      ...fromBranch,
+      number: 8,
+      isCrossRepository: true,
+      updatedAt: "2026-11-02T00:00:00Z",
+    })
+
+    const conversation = yield* f.start("hold:first")
+    yield* f.transcript(conversation.id, holding)
+    gitIn(f.worktree(conversation.name), "switch", "--quiet", "-c", "feature/greeting")
+    yield* f.release("first")
+
+    const [found] = yield* f.client.WatchConversationPullRequests().pipe(
+      Stream.map((listed) =>
+        listed.filter(({ conversationId }) => conversationId === conversation.id),
+      ),
+      Stream.filter((listed) => listed.length > 0),
+      Stream.runHead,
+      Effect.map(Option.getOrThrow),
+    )
+
+    assert.equal(found?.pullRequest.ref.number, 7)
+
+    const [listed] = yield* f.client
+      .WatchConversations()
+      .pipe(Stream.runHead, Effect.map(Option.getOrThrow))
+
+    assert.equal(listed?.branch, "feature/greeting")
+  }),
+)

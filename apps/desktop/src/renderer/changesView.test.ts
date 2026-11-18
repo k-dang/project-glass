@@ -12,13 +12,13 @@ import {
   type CollapseChoices,
   inHunk,
   layOut,
-  type LineNotePlace,
   type LineNotes,
   lineNoteAnnotations,
   toItems,
   toNoteSections,
 } from "./changesView"
 import type { DraftView } from "./draftSync"
+import type { LineNotePlace } from "./lineNotePlace"
 import { changedFile, hunks } from "../../test/workspace"
 
 const comment = (id: string) =>

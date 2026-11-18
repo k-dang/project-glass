@@ -3,7 +3,7 @@ import type { AskAnswer, AskPlace, PullRequestWorkspace } from "@glass/contracts
 import { Exit } from "effect"
 import { Atom, type AtomRegistry } from "effect/reactivity"
 import { Backend, backendRuntimeOf, type BackendRuntime } from "./backend"
-import { type LineNotePlace, sameLineNotePlaces } from "./changesView"
+import { type LineNotePlace, sameLineNotePlaces } from "./lineNotePlace"
 import { type Problem, problemOf } from "./problems"
 
 export type AskState =

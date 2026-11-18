@@ -27,6 +27,7 @@ export const AgentHostHandlers = AgentHostRpcs.toLayer(
       StopConversation: ({ conversationId }) => conversations.stop(conversationId),
       GetChanges: ({ folder, baseRef }) => changes.since(folder, baseRef),
       HasUncommittedChanges: ({ folder }) => changes.uncommitted(folder),
+      CurrentBranch: ({ folder }) => changes.branch(folder),
       ListFiles: ({ folder }) => changes.files(folder),
       ExistingFiles: ({ folder, paths }) => folderFiles.existing(folder, paths),
       ReadFile: ({ folder, path }) => folderFiles.read(folder, path),

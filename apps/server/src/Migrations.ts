@@ -12,6 +12,7 @@ import toDoImages from "./migrations/0010_to_do_images"
 import mermaidTourDiagrams from "./migrations/0011_mermaid_tour_diagrams"
 import conversations from "./migrations/0012_conversations"
 import journalHost from "./migrations/0013_journal_host"
+import conversationBranch from "./migrations/0014_conversation_branch"
 
 export const migrationLoader = SqliteMigrator.fromRecord({
   "0001_baseline": baseline,
@@ -27,4 +28,5 @@ export const migrationLoader = SqliteMigrator.fromRecord({
   "0011_mermaid_tour_diagrams": mermaidTourDiagrams,
   "0012_conversations": conversations,
   "0013_journal_host": journalHost,
+  "0014_conversation_branch": conversationBranch,
 })

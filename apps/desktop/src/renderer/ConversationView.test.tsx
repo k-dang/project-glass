@@ -4,6 +4,7 @@ import {
   Conversation,
   ConversationChanges,
   ConversationNeedsYou,
+  ConversationPullRequest,
   DRAW_DIAGRAM_TOOL,
   AnswerQuestion,
   DenyRequest,
@@ -15,6 +16,8 @@ import {
   FollowedRepository,
   PartAppended,
   PartSet,
+  PullRequestRef,
+  PullRequestSummary,
   RemovalWarnings,
   type ResumableDestination,
   SandboxPlace,
@@ -328,6 +331,36 @@ it("opens a Follow-up Conversation and keeps it out of the Conversations list", 
   expect(screen.getByRole("link", { name: conversation.name })).toBeTruthy()
 })
 
+it("opens a PR the agent links to in its PR workspace", async () => {
+  const pullRequestUrl = "https://github.com/octo-org/hello-world/pull/7"
+
+  const user = mount({
+    WatchTranscript: () =>
+      Stream.make(
+        TranscriptSnapshot.make({
+          turns: [
+            {
+              id: "turn-1",
+              message: "File the PR",
+              images: [],
+              context: null,
+              feedback: [],
+              sentAt,
+              parts: [TextPart.make({ text: `I filed the PR: ${pullRequestUrl}` })],
+              ended: { at: sentAt, ending: TurnDone.make({}) },
+            },
+          ],
+          queued: [],
+          status: null,
+        }),
+      ),
+  })
+
+  await user.click(await screen.findByRole("link", { name: pullRequestUrl }))
+
+  await waitFor(() => expect(window.location.hash).toBe("#/reviews/octo-org/hello-world/7"))
+})
+
 it("keeps the hidden panel recoverable across Conversation navigation", async () => {
   const user = mount(
     {
@@ -402,6 +435,35 @@ it("shows the Skill packs and commits a Conversation was created with, and its L
   await user.click(await screen.findByRole("button", { name: "Details" }))
 
   expect(await screen.findByText("team @ ae5650f · Local skills")).toBeTruthy()
+})
+
+it("links the Conversation's PR from its header, its details, and its row in the list", async () => {
+  const pullRequest = new PullRequestSummary({
+    ref: new PullRequestRef({ owner: "glass-demo", repo: "greeter", number: 264 }),
+    url: "https://github.com/glass-demo/greeter/pull/264",
+    title: "Greet by name",
+    author: "octocat",
+    isDraft: false,
+    checks: "passing",
+    updatedAt: sentAt,
+  })
+
+  const user = mount({
+    WatchConversations: () => Stream.make([conversation]),
+    WatchConversationPullRequests: () =>
+      Stream.make([new ConversationPullRequest({ conversationId: conversation.id, pullRequest })]),
+    WatchTranscript: () =>
+      Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
+  })
+
+  expect(await screen.findByRole("link", { name: "Open PR #264, checks passing" })).toBeTruthy()
+  expect(
+    screen.getByRole("link", { name: conversation.name, description: /PR #264, checks passing/ }),
+  ).toBeTruthy()
+
+  await user.click(screen.getByRole("button", { name: "Details" }))
+
+  expect(await screen.findByRole("link", { name: /Greet by name/ })).toBeTruthy()
 })
 
 it("opens a Diagram from the Conversation's details, without scrolling back to its card", async () => {
