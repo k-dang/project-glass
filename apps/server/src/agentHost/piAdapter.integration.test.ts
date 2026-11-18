@@ -18,6 +18,8 @@ import {
   writeGreetPack,
   piSession,
   reviewBrief,
+  reviewDrafts,
+  assertSuggestedDrafts,
   run,
   waiting,
   writeGreeter,
@@ -569,18 +571,11 @@ it.live("stops a pi Turn while its extension's dialog waits", () =>
   }).pipe(Effect.scoped),
 )
 
-const draftOn = (line: number, body: string) => ({
-  toolCall: {
-    id: `suggest-${line}`,
-    name: "suggest_draft",
-    arguments: { path: "greet.ts", side: "new", line, body },
-  },
-})
-
 const reviewReplies = [
   { toolCall: { id: "cat-greet", name: "bash", arguments: { command: "cat greet.ts" } } },
-  draftOn(2, "Keep the name."),
-  draftOn(40, "Off the diff."),
+  ...reviewDrafts.map(({ draft }, index) => ({
+    toolCall: { id: `suggest-${index}`, name: "suggest_draft", arguments: draft },
+  })),
   { text: "DONE" },
 ]
 
@@ -607,21 +602,12 @@ it.live(
 
       const calls = turn!.parts.filter((part) => Predicate.isTagged(part, "ToolCall"))
       assert.deepStrictEqual(
-        calls.map(({ name, status }) => [name, status]),
-        [
-          ["bash", "done"],
-          ["suggest_draft", "done"],
-          ["suggest_draft", "failed"],
-        ],
+        calls.map(({ name }) => name),
+        ["bash", ...reviewDrafts.map(() => "suggest_draft")],
       )
       assert.include(calls[0]?.output, "hello name")
-      assert.deepStrictEqual(acceptedSuggestedDraftOf(calls[1]!), {
-        path: "greet.ts",
-        side: "new",
-        line: 2,
-        body: "Keep the name.",
-      })
-      assert.include(calls[2]?.output, "not a line of the diff")
+      assertSuggestedDrafts(calls.slice(1))
+      assert.deepStrictEqual(acceptedSuggestedDraftOf(calls[1]!), reviewDrafts[0]?.draft)
     }).pipe(Effect.scoped),
 )
 

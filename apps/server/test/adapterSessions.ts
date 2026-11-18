@@ -6,6 +6,8 @@ import {
   isWaiting,
   type RequestAnswer,
   type RequestPart,
+  type SuggestedDraft,
+  ToolCallPart,
   type Turn,
   TurnStarted,
 } from "@glass/contracts"
@@ -26,7 +28,7 @@ import { McpServer, Tool, Toolkit } from "effect/ai"
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
-import { vi } from "vite-plus/test"
+import { assert, vi } from "vite-plus/test"
 import type { HarnessAdapter, HarnessSession } from "../src/agentHost/adapter"
 import { claudeAdapter, type ClaudeSdk } from "../src/agentHost/claudeAdapter"
 import { piAdapter } from "../src/agentHost/piAdapter"
@@ -159,6 +161,37 @@ const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
 export const reviewBrief: ReviewBrief = {
   instructions: "You answer a reviewer's questions about a pull request that changes greet.ts.",
   diffLines: { old: {}, new: { "greet.ts": [1, 2] } },
+}
+
+export const reviewDrafts: ReadonlyArray<{
+  readonly draft: typeof SuggestedDraft.Encoded
+  readonly status: "done" | "failed"
+  readonly says: string
+}> = [
+  {
+    draft: { path: "greet.ts", side: "new", line: 2, body: "Keep the name." },
+    status: "done",
+    says: "Glass shows this Suggested draft",
+  },
+  {
+    draft: { path: "greet.ts", side: "new", line: 40, body: "Off the diff." },
+    status: "failed",
+    says: "not a line of the diff",
+  },
+  {
+    draft: { path: "greet.ts", side: "new", line: 1, body: " " },
+    status: "failed",
+    says: "length of at least 1",
+  },
+]
+
+export const assertSuggestedDrafts = (calls: ReadonlyArray<typeof ToolCallPart.Type>) => {
+  assert.lengthOf(calls, reviewDrafts.length)
+
+  reviewDrafts.forEach(({ status, says }, index) => {
+    assert.equal(calls[index]?.status, status)
+    assert.include(calls[index]?.output, says)
+  })
 }
 
 export const writeGreetSkill = (skills: string) =>

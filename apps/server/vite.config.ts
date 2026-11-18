@@ -10,26 +10,38 @@ const node = {
   deps: { onlyBundle: false },
 } as const
 
-const PI_DRAW_DIAGRAM = "virtual:pi-draw-diagram"
-
 /**
- * A Sandbox gets the agent host as one file, so the host carries pi's Diagram extension as text,
- * built here with Pele and the rest of its imports, and writes it out for pi.
+ * A Sandbox gets the agent host as one file, so the host carries pi's extensions that call Glass's
+ * own code as text, each built here with its imports, and writes them out for pi.
  */
-const piDrawDiagram = {
-  name: "pi-draw-diagram",
-  resolveId: (id: string) => (id === PI_DRAW_DIAGRAM ? `\0${PI_DRAW_DIAGRAM}` : null),
-  load: async (id: string) => {
-    if (id !== `\0${PI_DRAW_DIAGRAM}`) return null
+const piExtensions = new Map([
+  ["virtual:pi-draw-diagram", "src/agentHost/piDrawDiagram.ts"],
+  ["virtual:pi-suggest-draft", "src/agentHost/piSuggestDraft.ts"],
+])
 
-    const { output } = await Rolldown.build({
-      input: fileURLToPath(new URL("src/agentHost/piDrawDiagram.ts", import.meta.url)),
-      platform: "node",
-      write: false,
-      output: { format: "esm", codeSplitting: false },
-    })
+const built = new Map<string, Promise<string>>()
 
-    return `export default ${JSON.stringify(output[0].code)}`
+const buildPiExtension = (entry: string) =>
+  Rolldown.build({
+    input: fileURLToPath(new URL(entry, import.meta.url)),
+    platform: "node",
+    write: false,
+    output: { format: "esm", codeSplitting: false },
+  }).then(({ output }) => `export default ${JSON.stringify(output[0].code)}`)
+
+const piExtensionSources = {
+  name: "pi-extension-sources",
+  resolveId: (id: string) => (piExtensions.has(id) ? `\0${id}` : null),
+  load: (id: string) => {
+    const entry = id.startsWith("\0") ? piExtensions.get(id.slice(1)) : undefined
+
+    if (entry === undefined) return null
+
+    const source = built.get(entry) ?? buildPiExtension(entry)
+
+    built.set(entry, source)
+
+    return source
   },
 }
 
@@ -41,7 +53,7 @@ const agentHost = (
   entry,
   outDir,
   outputOptions: { codeSplitting: false } as const,
-  plugins: [piDrawDiagram],
+  plugins: [piExtensionSources],
 })
 
 export default defineConfig({
@@ -64,7 +76,7 @@ export default defineConfig({
       ? [agentHost("dist-test", { scriptedAgentHost: "test/scriptedAgentHost.ts" })]
       : []),
   ],
-  plugins: [piDrawDiagram],
+  plugins: [piExtensionSources],
   test: {
     include: ["src/**/*.test.ts", "test/**/*.test.ts"],
     testTimeout: 30_000,

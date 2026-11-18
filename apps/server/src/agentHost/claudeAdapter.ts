@@ -116,7 +116,7 @@ const reviewOptions = (brief: ReviewBrief): Options => ({
       name: GLASS_MCP_SERVER,
       tools: [
         tool(SUGGEST_DRAFT_TOOL, suggestDraftDescription, suggestDraftInput, (input) =>
-          toolResult(suggestDraft(brief)(input)),
+          toolResult(suggestDraft(brief.diffLines)(input)),
         ),
       ],
     }),
