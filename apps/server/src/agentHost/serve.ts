@@ -21,24 +21,20 @@ import { Git } from "../git"
 import { HostReady } from "./protocol"
 import { hostServer } from "./server"
 
-// A local host outlives the backend that started it (ADR 0014). It stops once no backend follows
-// its journal, no Turn is running, and a backend has saved all it wrote, and not before the first
-// backend has followed it. Each change reads both refs afresh, together: a Turn's end is journaled
-// before the Turn is cleared, which paired change streams or separate reads can see the other way.
-const unattended = (journal: Journal["Service"], conversations: HostConversations["Service"]) =>
-  Stream.merge(
+const unattended = (journal: Journal["Service"], conversations: HostConversations["Service"]) => {
+  const readAttendanceAndTurnsAtOnce = Effect.sync(
+    () =>
+      [
+        SubscriptionRef.getUnsafe(journal.attendance),
+        SubscriptionRef.getUnsafe(conversations.runningTurns),
+      ] as const,
+  )
+
+  return Stream.merge(
     SubscriptionRef.changes(journal.attendance),
     SubscriptionRef.changes(conversations.runningTurns),
   ).pipe(
-    Stream.mapEffect(() =>
-      Effect.sync(
-        () =>
-          [
-            SubscriptionRef.getUnsafe(journal.attendance),
-            SubscriptionRef.getUnsafe(conversations.runningTurns),
-          ] as const,
-      ),
-    ),
+    Stream.mapEffect(() => readAttendanceAndTurnsAtOnce),
     Stream.dropWhile(([{ followers }]) => followers === 0),
     Stream.filter(
       ([{ followers, unacknowledged }, turns]) =>
@@ -46,6 +42,7 @@ const unattended = (journal: Journal["Service"], conversations: HostConversation
     ),
     Stream.runHead,
   )
+}
 
 const reportReady = (address: Parameters<typeof HttpServer.formatAddress>[0]) =>
   Effect.sync(() => {

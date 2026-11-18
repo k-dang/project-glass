@@ -36,10 +36,6 @@ export interface SavedThrough {
   readonly through: number
 }
 
-/**
- * Saves the journal's entries after `position`, skipping each Conversation's entries up to the one
- * `savedThrough` names: a host shared by many Conversations replays all it still keeps.
- */
 export const followJournal = (
   save: (
     conversationId: string,
@@ -48,7 +44,7 @@ export const followJournal = (
   ) => Effect.Effect<void, ConversationError>,
   client: HostClient,
   position: JournalPosition,
-  savedThrough: (conversationId: string) => number,
+  alreadySaved: (conversationId: string) => number,
 ) =>
   Effect.gen(function* () {
     yield* acknowledge(client, position, position.saved)
@@ -58,7 +54,7 @@ export const followJournal = (
       Stream.runForEachArray((entries) =>
         Effect.gen(function* () {
           const unsaved = entries.filter(
-            ({ conversationId, sequence }) => sequence > savedThrough(conversationId),
+            ({ conversationId, sequence }) => sequence > alreadySaved(conversationId),
           )
 
           for (const [conversationId, saved] of Map.groupBy(

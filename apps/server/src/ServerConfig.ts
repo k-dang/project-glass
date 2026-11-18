@@ -28,7 +28,6 @@ export class ServerConfig extends Context.Service<
     readonly gitRemote: string
     readonly dataDirectory: string
     readonly homeDirectory: string
-    /** The backend log, which the local agent host appends to itself because it outlives the backend. */
     readonly logFile: string
   }
 >()("@glass/server/ServerConfig") {

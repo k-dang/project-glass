@@ -31,7 +31,6 @@ const escapeArgument = (argument: string) =>
     .replace(metacharacters, "^$1")
     .replace(metacharacters, "^$1")
 
-// A script runs on the Node inside Electron, or on the Node running the backend outside it.
 export const nodeEntry = (script: string, args: ReadonlyArray<string> = []) => ({
   command: globalThis.process.execPath,
   args: [script, ...args],

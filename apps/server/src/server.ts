@@ -71,7 +71,11 @@ type AgentRunnersLayer = Layer.Layer<
 >
 
 const followReattachedHost = Layer.effectDiscard(
-  LocalAgentHost.use((host) => host.followReattached),
+  Effect.gen(function* () {
+    yield* Conversations
+    yield* GlobalConversation
+    yield* (yield* LocalAgentHost).followReattached
+  }),
 )
 
 const ConversationsLive = followReattachedHost.pipe(

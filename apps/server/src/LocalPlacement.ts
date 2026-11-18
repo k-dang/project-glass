@@ -3,7 +3,7 @@ import { Context, Effect, Exit, FileSystem, Layer, Option, Stream } from "effect
 import { join } from "node:path"
 import { shortConversationNames, uniqueConversationName } from "./conversationNames"
 import { Git, type GitFailed } from "./git"
-import { LocalAgentHost } from "./LocalAgentHost"
+import { type CarriedOn, LocalAgentHost } from "./LocalAgentHost"
 import { LocalCheckouts } from "./LocalCheckouts"
 import {
   asConversationError,
@@ -28,8 +28,7 @@ export class LocalPlacement extends Context.Service<
   LocalPlacement,
   Placement & {
     readonly subscribeLost: SubscribeLost
-    /** Reattaches to a host left running at quit, and names the Conversations whose Turn it carries on. */
-    readonly resume: Effect.Effect<ReadonlySet<string>>
+    readonly resume: Effect.Effect<CarriedOn>
   }
 >()("@glass/server/LocalPlacement") {
   static readonly layer = Layer.effect(

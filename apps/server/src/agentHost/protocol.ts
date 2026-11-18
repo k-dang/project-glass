@@ -84,7 +84,6 @@ const HostFolder = Schema.String.pipe(
 
 export const HostReady = Schema.fromJsonString(Schema.Struct({ port: Schema.Int }))
 
-/** The port a host reports on fd 3 once it listens; fails if it exits first. */
 export const hostPort = async (host: ChildProcess) => {
   const ready = host.stdio[3]
 
@@ -93,9 +92,12 @@ export const hostPort = async (host: ChildProcess) => {
   return Schema.decodeUnknownSync(HostReady)(await text(ready)).port
 }
 
-export const OpenTurn = Schema.Struct({ conversationId: Schema.String, turnId: Schema.String })
+export const UnacknowledgedTurn = Schema.Struct({
+  conversationId: Schema.String,
+  turnId: Schema.String,
+})
 
-export type OpenTurn = typeof OpenTurn.Type
+export type UnacknowledgedTurn = typeof UnacknowledgedTurn.Type
 
 export const TurnSettings = Schema.Struct({
   ...ModelChoice.fields,
@@ -254,9 +256,8 @@ export class AgentHostRpcs extends RpcGroup.make(
     stream: true,
   }),
   Rpc.make("Acknowledge", { payload: { host: Schema.String, through: Schema.Int } }),
-  // Glass asks this only of a local host built from its own code, so older hosts never see it.
-  Rpc.make("OpenTurns", {
-    success: Schema.Array(OpenTurn),
+  Rpc.make("UnacknowledgedTurns", {
+    success: Schema.Array(UnacknowledgedTurn),
   }),
 ) {}
 

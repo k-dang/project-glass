@@ -41,7 +41,6 @@ import { ServerConfig } from "./ServerConfig"
 import { AgentCommands } from "./SettingsStore"
 import { Transcripts } from "./Transcripts"
 
-/** Where the backend records the local host it leaves running when it quits (ADR 0014). */
 export const hostRecordPath = (dataDirectory: string) => join(dataDirectory, "agent-host.json")
 
 export const RecordedHost = Schema.fromJsonString(
@@ -75,11 +74,15 @@ const unavailable = () =>
 
 const hostUrl = (port: number, path: string) => `http://127.0.0.1:${port}${path}`
 
-// A host that refuses the connection is gone; one slow to answer may only be busy with its Turns.
+const glassStartedNoOtherTurn = (running: string | null, hostTurn: string) =>
+  running === null || running === hostTurn
+
+const busyWithItsTurns = Effect.succeed(false)
+
 const gone = (port: number) =>
   Effect.tryPromise((signal) => fetch(hostUrl(port, HEALTH_PATH), { signal })).pipe(
     Effect.map((response) => !response.ok),
-    Effect.timeoutOrElse({ duration: HEALTH_DEADLINE, orElse: () => Effect.succeed(false) }),
+    Effect.timeoutOrElse({ duration: HEALTH_DEADLINE, orElse: () => busyWithItsTurns }),
     Effect.orElseSucceed(() => true),
   )
 
@@ -95,11 +98,10 @@ export const shutDownHost = ({ port, token }: Pick<RecordedHost, "port" | "token
     Effect.ignore,
   )
 
-type CarriedOn = ReadonlySet<string>
+export type CarriedOn = ReadonlySet<string>
 
 export interface Resumed {
   readonly reattached: boolean
-  /** The Conversations whose Turn the host carries on, so they aren't interrupted. */
   readonly carriedOn: CarriedOn
 }
 
@@ -120,10 +122,6 @@ export class LocalAgentHost extends Context.Service<
      * the Conversations whose Turn that host carries on.
      */
     readonly resume: Effect.Effect<Resumed>
-    /**
-     * Starts saving a reattached host's journal. Saving starts Turns, so this waits until every
-     * service that delivers them is serving.
-     */
     readonly followReattached: Effect.Effect<void>
     readonly lifetimeOf: (client: ConversationHost) => Effect.Effect<Option.Option<Scope.Scope>>
     readonly subscribeStopped: Effect.Effect<Stream.Stream<void>, never, Scope.Scope>
@@ -145,8 +143,6 @@ export class LocalAgentHost extends Context.Service<
       let current: Attached | null = null
       let pendingFollow: Effect.Effect<void> | null = null
 
-      // A host built from other code, or launched with other harness commands, would keep running
-      // them for as long as Glass stays open.
       const fingerprint = yield* fs.readFile(config.agentHostBundle).pipe(
         Effect.map((bundle) =>
           createHash("sha256")
@@ -178,8 +174,6 @@ export class LocalAgentHost extends Context.Service<
           }),
         )
 
-      // Saving the journal can end Turns and start Queued messages, so a reattached host's `follow`
-      // waits until Glass is ready for that.
       const attach = (recorded: RecordedHost) =>
         Effect.gen(function* () {
           const scope = yield* Scope.fork(backendScope)
@@ -202,13 +196,14 @@ export class LocalAgentHost extends Context.Service<
               SELECT id, journal_saved AS saved FROM conversation WHERE journal_host = ${host}
             `.pipe(Effect.orDie)
 
-            const savedThrough = new Map(savedRows.map(({ id, saved }) => [id, saved]))
+            const fromOldestKept = { host, saved: 0 }
+            const alreadySaved = new Map(savedRows.map(({ id, saved }) => [id, saved]))
 
             const follow = followJournal(
               transcripts.save,
               client,
-              { host, saved: 0 },
-              (conversationId) => savedThrough.get(conversationId) ?? 0,
+              fromOldestKept,
+              (conversationId) => alreadySaved.get(conversationId) ?? 0,
             ).pipe(
               Effect.catchIf(lostConnection, (error) =>
                 gone(recorded.port).pipe(
@@ -235,14 +230,12 @@ export class LocalAgentHost extends Context.Service<
           )
         })
 
-      // A Conversation carries on if the host has a Turn for it open, unless Glass has since started
-      // another Turn the host never got.
       const carriedOn = (client: HostClient) =>
-        client.OpenTurns().pipe(
-          Effect.flatMap((open) =>
-            Effect.filter(open, ({ conversationId, turnId }) =>
+        client.UnacknowledgedTurns().pipe(
+          Effect.flatMap((unacknowledged) =>
+            Effect.filter(unacknowledged, ({ conversationId, turnId }) =>
               transcripts.runningTurn(conversationId).pipe(
-                Effect.map((running) => running === null || running === turnId),
+                Effect.map((running) => glassStartedNoOtherTurn(running, turnId)),
                 Effect.orElseSucceed(() => false),
               ),
             ),
@@ -307,9 +300,8 @@ export class LocalAgentHost extends Context.Service<
             mkdirSync(dirname(config.logFile), { recursive: true })
             const log = openSync(config.logFile, "a")
 
-            // Not through ChildProcessSpawner, which ends a child with the scope that spawned it:
-            // detached and unreferenced, the host keeps its Turns going after the backend quits, and
-            // it writes its logs to the file itself because a pipe would break then.
+            // Not through ChildProcessSpawner: it can't give a child a file as stdout and stderr, and
+            // inheriting the backend's would hand the host Electron's pipe, which closes at quit.
             const entry = nodeEntry(config.agentHostBundle)
 
             const child = spawn(entry.command, entry.args, {
@@ -333,8 +325,7 @@ export class LocalAgentHost extends Context.Service<
           (child, exit) => (Exit.isSuccess(exit) ? Effect.void : Effect.sync(() => child.kill())),
         )
 
-        // A host this launch started but didn't record would be one no later launch can find.
-        const recorded = yield* Effect.uninterruptibleMask((restore) =>
+        const startRecordedHost = Effect.uninterruptibleMask((restore) =>
           Effect.gen(function* () {
             const child = yield* started
             const port = yield* restore(Effect.tryPromise(() => hostPort(child)))
@@ -346,7 +337,7 @@ export class LocalAgentHost extends Context.Service<
           }),
         ).pipe(Effect.scoped)
 
-        const { attached, follow } = yield* attach(recorded)
+        const { attached, follow } = yield* attach(yield* startRecordedHost)
         yield* follow
 
         return attached

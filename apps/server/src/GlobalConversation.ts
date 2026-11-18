@@ -248,9 +248,7 @@ export class GlobalConversation extends Context.Service<
       const followSession = <A, E>(stream: (sessionId: string) => Stream.Stream<A, E>) =>
         SubscriptionRef.changes(session).pipe(Stream.switchMap(stream))
 
-      // A host left running at quit holds pi with the Glass tools credential of the backend that
-      // quit, which no longer works, so the Global conversation starts over.
-      const startOverOnReattachedHost = host.resume.pipe(
+      const dropSessionHoldingStaleCredential = host.resume.pipe(
         Effect.flatMap(({ reattached }) =>
           reattached ? currentSession.pipe(Effect.flatMap(stopProgram)) : Effect.void,
         ),
@@ -264,7 +262,7 @@ export class GlobalConversation extends Context.Service<
             ),
           ),
         lost: (yield* host.subscribeStopped).pipe(Stream.mapEffect(() => currentSessions)),
-        interrupted: startOverOnReattachedHost.pipe(Effect.andThen(currentSessions)),
+        interrupted: dropSessionHoldingStaleCredential.pipe(Effect.andThen(currentSessions)),
       })
 
       const changeModel = Effect.fn("GlobalConversation.changeModel")(function* (

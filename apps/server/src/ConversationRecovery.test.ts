@@ -179,8 +179,7 @@ const recordedHost = (home: string) => {
   }
 }
 
-// Waits, with Glass closed, until the host it left running has ended the Turn.
-const turnEnded = (home: string, turnId: string) =>
+const leftHostEnded = (home: string, turnId: string) =>
   Effect.gen(function* () {
     const { port, token } = yield* recordedHost(home).read
 
@@ -212,7 +211,7 @@ it.live("keeps a running Turn going while Glass is closed, and shows its reply o
     yield* f.quit
     yield* f.release("second")
 
-    yield* turnEnded(f.home, running[1]!.id)
+    yield* leftHostEnded(f.home, running[1]!.id)
 
     const relaunched = yield* f.launch
     const turns = yield* f.transcript(conversation.id, settled(2), relaunched)
@@ -242,7 +241,7 @@ it.live("starts a message Queued behind a Turn that ended while Glass was closed
 
     yield* f.quit
     yield* f.release("first")
-    yield* turnEnded(f.home, running!.id)
+    yield* leftHostEnded(f.home, running!.id)
 
     const relaunched = yield* f.launch
     const turns = yield* f.transcript(conversation.id, settled(2), relaunched)

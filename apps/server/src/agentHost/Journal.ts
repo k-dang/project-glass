@@ -1,6 +1,11 @@
 import { Context, Effect, Layer, Predicate, PubSub, Stream, SubscriptionRef } from "effect"
 import { randomUUID } from "node:crypto"
-import { type HostEvent, HostReplaced, type JournalEntry, type OpenTurn } from "./protocol"
+import {
+  type HostEvent,
+  HostReplaced,
+  type JournalEntry,
+  type UnacknowledgedTurn,
+} from "./protocol"
 
 interface Attendance {
   readonly followers: number
@@ -26,9 +31,8 @@ export class Journal extends Context.Service<
     readonly append: (conversationId: string, event: HostEvent) => Effect.Effect<boolean>
     readonly watch: (host: string, after: number) => Stream.Stream<JournalEntry, HostReplaced>
     readonly acknowledge: (host: string, through: number) => Effect.Effect<void>
-    /** How many backends watch the journal, and how many entries none has acknowledged yet. */
     readonly attendance: SubscriptionRef.SubscriptionRef<Attendance>
-    readonly unacknowledgedEnds: Effect.Effect<ReadonlyArray<OpenTurn>>
+    readonly unacknowledgedEnds: Effect.Effect<ReadonlyArray<UnacknowledgedTurn>>
   }
 >()("@glass/server/agentHost/Journal") {
   static readonly layer = Layer.effect(

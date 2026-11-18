@@ -29,7 +29,7 @@ import {
   type StartOutcome,
   HostConversationError,
   type HostEvent,
-  type OpenTurn,
+  type UnacknowledgedTurn,
   type SkillSource,
   type SteersNotTakenIn,
   type TurnSettings,
@@ -90,8 +90,7 @@ export class HostConversations extends Context.Service<
     ) => Effect.Effect<void, RequestNotWaiting | HostConversationError>
     readonly stop: (conversationId: string) => Effect.Effect<void>
     readonly runningTurns: SubscriptionRef.SubscriptionRef<ReadonlyMap<string, string>>
-    /** The Turns whose end no backend has acknowledged: running ones, and ones that ended unseen. */
-    readonly openTurns: Effect.Effect<ReadonlyArray<OpenTurn>>
+    readonly unacknowledgedTurns: Effect.Effect<ReadonlyArray<UnacknowledgedTurn>>
   }
 >()("@glass/server/agentHost/HostConversations") {
   static readonly make = (adapters: Harnesses) =>
@@ -334,7 +333,7 @@ export class HostConversations extends Context.Service<
               Effect.suspend(() => retire(conversationId, running.get(conversationId))),
             ),
           runningTurns,
-          openTurns: Effect.all([
+          unacknowledgedTurns: Effect.all([
             SubscriptionRef.get(runningTurns),
             journal.unacknowledgedEnds,
           ]).pipe(

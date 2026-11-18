@@ -78,7 +78,6 @@ interface RunState {
   readonly backend: "real" | "fake"
   readonly fake?: { readonly pid: number; readonly port: number }
   readonly realAgents: boolean
-  /** How Electron's environment differs from this shell's, so `relaunch` can start it the same way. */
   readonly envChanges: Readonly<Record<string, string | null>>
   readonly cdpPort: number
   backendUrl?: string
@@ -515,7 +514,6 @@ const startGlass = async ({ backendUrl: _, ...launch }: GlassLaunch & { backendU
   return fail(`Glass did not become ready in 60s; see ${paths.electronLog}`)
 }
 
-// Quits Glass as closing its window would, keeping the run's data, then opens it again.
 const relaunch = async (run: RunState) => {
   const { quit } = await quitGlass(run)
   if (!quit) return fail("Glass did not quit")

@@ -42,14 +42,12 @@ export const isolatedHome = Effect.acquireRelease(
   // The real path, as programs print it: on macOS the temporary folder sits behind /private.
   Effect.promise(() => mkdtemp(join(tmpdir(), "glass-test-")).then((made) => realpath(made))),
   (directory) =>
-    leftHost(directory).pipe(
+    shutDownLeftRunningHost(directory).pipe(
       Effect.andThen(Effect.promise(() => rm(directory, { recursive: true, force: true }))),
     ),
 )
 
-// A backend leaves its agent host running while a Turn is (ADR 0014), which a test's Turn may be
-// forever.
-const leftHost = (home: string) =>
+const shutDownLeftRunningHost = (home: string) =>
   FileSystem.FileSystem.pipe(
     Effect.flatMap((fs) => readRecordedHost(fs, join(home, ".project-glass"))),
     Effect.flatMap(Option.match({ onNone: () => Effect.void, onSome: shutDownHost })),
