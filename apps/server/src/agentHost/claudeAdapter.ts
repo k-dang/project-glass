@@ -49,7 +49,7 @@ import {
   trackBackgroundTasks,
 } from "./claudeBackgroundTasks"
 import { Input, isFailure, machine } from "./claudeTurn"
-import type { DeliveredMessage, DeliveredTurn } from "./deliveredMessage"
+import { agentImages, type DeliveredMessage, type DeliveredTurn } from "./deliveredMessage"
 import {
   type RepositoryRole,
   couldNotSwitch,
@@ -220,23 +220,28 @@ const toModel = (info: ModelInfo): AgentModel => ({
   efforts: info.supportedEffortLevels ?? [],
 })
 
-const userMessage = ({ prompt, images }: DeliveredTurn): SDKUserMessage => ({
-  type: "user",
-  message: {
-    role: "user",
-    content:
-      images.length === 0
-        ? prompt
-        : [
-            ...images.map(({ mediaType, data }) => ({
-              type: "image" as const,
-              source: { type: "base64" as const, media_type: mediaType, data },
-            })),
-            { type: "text" as const, text: prompt },
-          ],
-  },
-  parent_tool_use_id: null,
-})
+const userMessage = (delivered: DeliveredTurn): SDKUserMessage => {
+  const { prompt } = delivered
+  const images = agentImages(delivered)
+
+  return {
+    type: "user",
+    message: {
+      role: "user",
+      content:
+        images.length === 0
+          ? prompt
+          : [
+              ...images.map(({ mediaType, data }) => ({
+                type: "image" as const,
+                source: { type: "base64" as const, media_type: mediaType, data },
+              })),
+              { type: "text" as const, text: prompt },
+            ],
+    },
+    parent_tool_use_id: null,
+  }
+}
 
 interface CancellingInterrupt {
   interrupt(options: { readonly cancelQueued: boolean }): ReturnType<Query["interrupt"]>

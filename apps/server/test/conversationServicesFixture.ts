@@ -231,7 +231,7 @@ export const conversationServicesFixture = Effect.gen(function* () {
           Layer.provide(FeedbackNotes.layer),
           Layer.provideMerge(Transcripts.layer),
           Layer.provide(Layer.succeed(LocalPlacement, placement)),
-          Layer.provide(ToDos.layer),
+          Layer.provideMerge(ToDos.layer),
           Layer.provide(
             ServerConfig.layer.pipe(
               Layer.provide(
@@ -261,6 +261,7 @@ export const conversationServicesFixture = Effect.gen(function* () {
       return {
         conversations: Context.get(services, Conversations),
         sandboxes: Context.get(services, Sandboxes),
+        toDos: Context.get(services, ToDos),
       }
     }).pipe(Effect.provideContext(database), Scope.provide(scope))
 
@@ -269,6 +270,7 @@ export const conversationServicesFixture = Effect.gen(function* () {
     return {
       conversations: built.conversations,
       sandboxProviders: built.sandboxes.providers,
+      toDos: built.toDos,
       close: Scope.close(scope, Exit.void),
     }
   })

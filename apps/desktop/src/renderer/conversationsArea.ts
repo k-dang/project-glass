@@ -399,6 +399,8 @@ export const writtenAtom = Atom.family((_key: string) =>
   Atom.make<SentMessage | null>(null).pipe(Atom.keepAlive),
 )
 
+export const newConversationWrittenAtom = writtenAtom("new")
+
 export const unsentMessageAtom = Atom.family((conversationId: string) =>
   backendRuntime.atom(Backend.use((backend) => backend.GetUnsentMessage({ conversationId }))),
 )
