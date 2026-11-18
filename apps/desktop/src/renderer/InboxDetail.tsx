@@ -11,6 +11,7 @@ import {
   referenceKey,
 } from "@glass/contracts"
 import { Link } from "@tanstack/react-router"
+import { cn } from "cn"
 import { DateTime, Match } from "effect"
 import { Atom } from "effect/reactivity"
 import { type ReactNode, useId, useMemo, useState } from "react"
@@ -22,16 +23,9 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { AgentReviewMarkdown } from "./AgentReviewPanel"
 import { Backend, backendRuntime } from "./backend"
 import { conversationAtoms, ConversationAtomsContext } from "./conversation"
+import { ConversationChat, TranscriptProblem } from "./ConversationView"
 import { globalConversation, globalConversationOpenAtom } from "./globalConversation"
-import {
-  contextOf,
-  type InboxAction,
-  ItemIcon,
-  Reasons,
-  requestsOf,
-  titleOf,
-  Waited,
-} from "./inboxItem"
+import { contextOf, type InboxAction, ItemIcon, Reasons, titleOf, Waited } from "./inboxItem"
 import { failingChecksOf, finishedAgentReviewOf } from "./needsYou"
 import { settledProblem } from "./problems"
 import { ago } from "./PullRequestRow"
@@ -69,6 +63,9 @@ export function InboxDetail(
   })
 }
 
+// Matches the width of a Conversation's transcript and composer.
+const detailWidth = "mx-auto w-full max-w-3xl px-6"
+
 function DetailShell(props: {
   children: ReactNode
   buttons?: ReactNode
@@ -77,24 +74,28 @@ function DetailShell(props: {
   return (
     <article className="flex min-h-0 flex-1 flex-col">
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-8 py-10">
-          {props.children}
-        </div>
+        <div className={cn(detailWidth, "flex flex-col gap-6 py-10")}>{props.children}</div>
       </div>
-      <footer className="border-t">
-        <div className="mx-auto flex min-h-14 w-full max-w-2xl flex-wrap items-center gap-2 px-8 py-3">
-          {props.buttons}
-          <p className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-            {[{ key: "J K", label: "move" }, ...props.actions].map(({ key, label }) => (
-              <span key={key} className="inline-flex items-center gap-1">
-                <Kbd>{key}</Kbd>
-                {label}
-              </span>
-            ))}
-          </p>
-        </div>
-      </footer>
+      <DetailFooter buttons={props.buttons} actions={props.actions} />
     </article>
+  )
+}
+
+function DetailFooter(props: { buttons?: ReactNode; actions: ReadonlyArray<InboxAction> }) {
+  return (
+    <footer className="border-t">
+      <div className={cn(detailWidth, "flex min-h-14 flex-wrap items-center gap-2 py-3")}>
+        {props.buttons}
+        <p className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          {[{ key: "J K", label: "move" }, ...props.actions].map(({ key, label }) => (
+            <span key={key} className="inline-flex items-center gap-1">
+              <Kbd>{key}</Kbd>
+              {label}
+            </span>
+          ))}
+        </p>
+      </div>
+    </footer>
   )
 }
 
@@ -205,27 +206,37 @@ function OutsideQuestionDetail(props: DetailProps<OutsideQuestion>) {
 function ConversationDetail(props: DetailProps<ConversationNeedsYou>) {
   const { conversation } = props.item
   const atoms = useMemo(() => conversationAtoms(conversation.id), [conversation.id])
+  const done = props.actions.find(({ key }) => key === "E")
 
   return (
-    <DetailShell
-      actions={props.actions}
-      buttons={
-        <Link
-          to="/conversations/$conversationId"
-          params={{ conversationId: conversation.id }}
-          className={buttonVariants()}
-        >
-          Open the Conversation
-        </Link>
-      }
-    >
-      <DetailHeader item={props.item} now={props.now} />
-      <ConversationAtomsContext value={atoms}>
-        {requestsOf(props.item).map((part) => (
-          <RequestCard key={part.requestId} part={part} />
-        ))}
-      </ConversationAtomsContext>
-    </DetailShell>
+    <ConversationAtomsContext value={atoms}>
+      <article className="flex min-h-0 flex-1 flex-col">
+        <div className={cn(detailWidth, "pt-6 pb-2")}>
+          <DetailHeader item={props.item} now={props.now} />
+        </div>
+        <TranscriptProblem />
+        <ConversationChat conversation={conversation} latestOnly />
+        <DetailFooter
+          actions={props.actions}
+          buttons={
+            <>
+              <Link
+                to="/conversations/$conversationId"
+                params={{ conversationId: conversation.id }}
+                className={buttonVariants({ variant: "outline" })}
+              >
+                Open the Conversation
+              </Link>
+              {done === undefined ? null : (
+                <Button variant="outline" onClick={done.run}>
+                  Done
+                </Button>
+              )}
+            </>
+          }
+        />
+      </article>
+    </ConversationAtomsContext>
   )
 }
 

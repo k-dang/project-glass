@@ -10,6 +10,7 @@ import {
   Check,
   ChecksFailing,
   Discussions,
+  emptyTranscript,
   GitHubConnection,
   type NeedsYou,
   OutsideChoice,
@@ -24,6 +25,11 @@ import {
   type OutsideQuestionAnswer,
   ReadyToMerge,
   type RequestAnswer,
+  TextPart,
+  type Transcript,
+  TranscriptSnapshot,
+  type Turn,
+  TurnDone,
   TurnFailed,
   TurnFinished,
   WaitingRequests,
@@ -35,6 +41,7 @@ import { afterEach, expect, it, vi } from "vite-plus/test"
 import { App } from "./App"
 import { reviewOf } from "../../test/agentReview"
 import { conversation, conversationFields } from "../../test/conversation"
+import { listModels } from "../../test/conversationApp"
 import { pullRequestFields, revision, viewer } from "../../test/workspace"
 import { backendLayerAtom } from "./backend"
 import { type Handlers, type Held, hold, next, testLayer } from "../../test/testBackend"
@@ -57,28 +64,38 @@ const waitingConversation = ConversationNeedsYou.make({
   since: ago({ days: 2 }),
 })
 
+const laterRequest = PermissionRequestPart.make({ ...bashRequest, requestId: "bash-2" })
+
 const laterConversation = ConversationNeedsYou.make({
   conversation: new Conversation({
     ...conversationFields,
     id: "agent-2",
     name: "agent/quiet-lynx",
   }),
-  reasons: [
-    WaitingRequests.make({
-      requests: [
-        PermissionRequestPart.make({
-          requestId: "bash-2",
-          toolName: "Bash",
-          inputSummary: "pnpm test",
-          input: '{ "command": "pnpm test" }',
-          status: "waiting",
-          reason: null,
-        }),
-      ],
-    }),
-  ],
+  reasons: [WaitingRequests.make({ requests: [laterRequest] })],
   since: ago({ hours: 1 }),
 })
+
+const turnOf = (id: string, message: string, parts: Turn["parts"], ended: Turn["ended"]): Turn => ({
+  id,
+  message,
+  images: [],
+  context: null,
+  feedback: [],
+  sentAt: ago({ days: 2 }),
+  parts,
+  ended,
+})
+
+const runningTranscript = (request: typeof PermissionRequestPart.Type): Transcript => ({
+  ...emptyTranscript,
+  turns: [turnOf("turn-1", "Run the tests", [request], null)],
+})
+
+const transcripts = new Map([
+  [conversation.id, runningTranscript(bashRequest)],
+  ["agent-2", runningTranscript(laterRequest)],
+])
 
 const ref = new PullRequestRef({ owner: "octo-org", repo: "glass", number: 42 })
 
@@ -143,6 +160,11 @@ const mount = (
             GetConnection: () =>
               Effect.succeed(new GitHubConnection({ login: "kevin", tokenSource: "gh" })),
             WatchNeedsYou: () => SubscriptionRef.changes(needsYou),
+            ListAgentModels: listModels,
+            WatchTranscript: ({ conversationId }) =>
+              Stream.make(
+                TranscriptSnapshot.make(transcripts.get(conversationId) ?? emptyTranscript),
+              ),
             ...handlers,
           }),
         ],
@@ -286,6 +308,60 @@ it("puts a Conversation whose Turn finished unseen under Conversations that fini
   expect(
     within(articleOf(conversation.name)).getByRole("link", { name: "Open the Conversation" }),
   ).toBeTruthy()
+})
+
+it("works a finished Conversation from the Inbox: reads its latest reply, replies, or marks it done", async () => {
+  const endedAt = ago({ minutes: 2 })
+  const sent: Array<string> = []
+  const seen: Array<{ conversationId: string; endedAt: DateTime.Utc }> = []
+
+  const user = mount(
+    needsYouRef([
+      ConversationNeedsYou.make({
+        conversation,
+        reasons: [TurnFinished.make({ ended: { at: endedAt, ending: TurnDone.make({}) } })],
+        since: endedAt,
+      }),
+    ]),
+    {
+      WatchTranscript: () =>
+        Stream.make(
+          TranscriptSnapshot.make({
+            ...emptyTranscript,
+            turns: [
+              turnOf("turn-1", "Find the bug", [TextPart.make({ text: "It's in greet.ts." })], {
+                at: ago({ minutes: 9 }),
+                ending: TurnDone.make({}),
+              }),
+              turnOf("turn-2", "Fix it", [TextPart.make({ text: "Fixed and tested." })], {
+                at: endedAt,
+                ending: TurnDone.make({}),
+              }),
+            ],
+          }),
+        ),
+      SendMessage: ({ message }) => Effect.sync(() => void sent.push(message)),
+      MarkTurnSeen: (payload) => Effect.sync(() => void seen.push(payload)),
+    },
+  )
+
+  await screen.findByRole("heading", { name: conversation.name })
+  const detail = articleOf(conversation.name)
+  expect(await within(detail).findByText("Fixed and tested.")).toBeTruthy()
+  expect(within(detail).queryByText("It's in greet.ts.")).toBeNull()
+
+  await user.click(within(detail).getByRole("button", { name: "Show earlier Turns" }))
+  expect(within(detail).getByText("It's in greet.ts.")).toBeTruthy()
+
+  await user.type(within(detail).getByRole("textbox", { name: "Message" }), "Open a PR{Enter}")
+  expect(sent).toEqual(["Open a PR"])
+
+  await user.click(within(detail).getByRole("button", { name: "Done" }))
+  await user.keyboard("e")
+  expect(seen).toEqual([
+    { conversationId: conversation.id, endedAt },
+    { conversationId: conversation.id, endedAt },
+  ])
 })
 
 it("answers a permission in the detail pane and selects the next item when that one leaves", async () => {

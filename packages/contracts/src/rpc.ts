@@ -58,7 +58,7 @@ import { CreateDraftError, Draft, UpdateDraftError } from "./draft"
 import { EngineFeature, EngineSettings } from "./engine"
 import { FeedbackNote, UnsentFeedback } from "./feedbackNote"
 import { FollowedRepository, InvalidRepositoryInput } from "./followedRepository"
-import { NeedsYou, OutsideQuestionAnswer, OutsideQuestionNotWaiting } from "./needsYou"
+import { NeedsYou, OutsideQuestionAnswer, OutsideQuestionNotWaiting, TurnSeen } from "./needsYou"
 import { OutsideAgent, OutsideAgentNotFound } from "./outsideAgent"
 import { LoadPullRequestError, PullRequestRef, PullRequestWorkspace } from "./pullRequest"
 import {
@@ -373,7 +373,7 @@ export class GlassRpcs extends RpcGroup.make(
   }),
   Rpc.make("WatchNeedsYou", { success: NeedsYou, stream: true }),
   Rpc.make("MarkTurnSeen", {
-    payload: { conversationId: Schema.String, endedAt: Schema.DateTimeUtcFromString },
+    payload: TurnSeen,
     error: ConversationError,
   }),
   Rpc.make("AnswerOutsideQuestion", {

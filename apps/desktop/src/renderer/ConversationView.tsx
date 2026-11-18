@@ -209,17 +209,8 @@ export function ConversationView(props: { conversationId: string } & Conversatio
 function OpenConversation(props: { conversation: Conversation } & ConversationTabs) {
   const { conversation, tab, onTabChange } = props
   const atoms = useMemo(() => conversationAtoms(conversation.id), [conversation.id])
-  const transcript = useAtomValue(atoms.transcript)
-  const reconnect = useAtomRefresh(atoms.transcript)
-
-  const loaded = AsyncResult.value(transcript)
-
-  const { turns, earlierTurns, queued, status, agentStatuses, backgroundToolCalls } =
-    Option.getOrElse(loaded, () => emptyTranscript)
-
-  const inBackground = new Set(backgroundToolCalls)
-
-  const loadEarlier = useAtomSet(atoms.loadEarlier)
+  const loaded = AsyncResult.value(useAtomValue(atoms.transcript))
+  const { turns } = Option.getOrElse(loaded, () => emptyTranscript)
 
   const [changesOpened, setChangesOpened] = useState(tab === "changes")
   const [pane, setPane] = useState<SidePane>(null)
@@ -245,9 +236,6 @@ function OpenConversation(props: { conversation: Conversation } & ConversationTa
       run: () => onTabChange(tab === "chat" ? "changes" : "chat"),
     },
   ])
-
-  const reach = conversation.sandbox?.reach
-  const readOnly = readOnlyExplanation(reach)
 
   useEffect(() => {
     rememberPlace(registry, { area: "conversations", conversationId: conversation.id })
@@ -313,38 +301,13 @@ function OpenConversation(props: { conversation: Conversation } & ConversationTa
             </ConversationHeaderAction>
           )}
         </ConversationHeader>
-        {AsyncResult.isFailure(transcript) && !transcript.waiting && (
-          <div className="px-6 pt-4">
-            <ProblemAlert
-              problem={streamProblem(transcript.cause)}
-              action={{ label: "Reconnect", run: reconnect }}
-            />
-          </div>
-        )}
+        <TranscriptProblem />
         <div hidden={tab !== "chat"} className="flex min-h-0 flex-1">
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            <ToolCallView value={diagrams.cardOf}>
-              <FileLinks value={fileLinks}>
-                <BackgroundToolCalls value={inBackground}>
-                  <Transcript
-                    turns={turns}
-                    earlierTurns={earlierTurns}
-                    onShowEarlier={loadEarlier}
-                    status={status}
-                  />
-                </BackgroundToolCalls>
-              </FileLinks>
-            </ToolCallView>
-            <AgentStatuses statuses={agentStatuses} />
-            {reach === "unreachable" && <UnreachableNotice conversationId={conversation.id} />}
-            {readOnly === null ? (
-              <Composer conversation={conversation} turns={turns} queued={queued} />
-            ) : (
-              <output className="mx-auto block w-full max-w-3xl px-6 py-4 text-sm text-muted-foreground">
-                {readOnly}
-              </output>
-            )}
-          </div>
+          <ToolCallView value={diagrams.cardOf}>
+            <FileLinks value={fileLinks}>
+              <ConversationChat conversation={conversation} />
+            </FileLinks>
+          </ToolCallView>
           {openedDiagram !== undefined && (
             <DiagramPane diagram={openedDiagram} onClose={closePane} />
           )}
@@ -375,13 +338,70 @@ function OpenConversation(props: { conversation: Conversation } & ConversationTa
   )
 }
 
+export function TranscriptProblem() {
+  const atoms = useConversationAtoms()
+  const transcript = useAtomValue(atoms.transcript)
+  const reconnect = useAtomRefresh(atoms.transcript)
+
+  return (
+    AsyncResult.isFailure(transcript) &&
+    !transcript.waiting && (
+      <div className="px-6 pt-4">
+        <ProblemAlert
+          problem={streamProblem(transcript.cause)}
+          action={{ label: "Reconnect", run: reconnect }}
+        />
+      </div>
+    )
+  )
+}
+
+export function ConversationChat(props: { conversation: Conversation; latestOnly?: boolean }) {
+  const { conversation } = props
+  const atoms = useConversationAtoms()
+  const loadEarlier = useAtomSet(atoms.loadEarlier)
+
+  const { turns, earlierTurns, queued, status, agentStatuses, backgroundToolCalls } =
+    Option.getOrElse(AsyncResult.value(useAtomValue(atoms.transcript)), () => emptyTranscript)
+
+  const reach = conversation.sandbox?.reach
+  const readOnly = readOnlyExplanation(reach)
+
+  return (
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <BackgroundToolCalls value={new Set(backgroundToolCalls)}>
+        <Transcript
+          turns={turns}
+          earlierTurns={earlierTurns}
+          onShowEarlier={loadEarlier}
+          status={status}
+          latestOnly={props.latestOnly ?? false}
+        />
+      </BackgroundToolCalls>
+      <AgentStatuses statuses={agentStatuses} />
+      {reach === "unreachable" && <UnreachableNotice conversationId={conversation.id} />}
+      {readOnly === null ? (
+        <Composer conversation={conversation} turns={turns} queued={queued} />
+      ) : (
+        <output className="mx-auto block w-full max-w-3xl px-6 py-4 text-sm text-muted-foreground">
+          {readOnly}
+        </output>
+      )}
+    </div>
+  )
+}
+
 export function Transcript(props: {
   turns: ReadonlyArray<Turn>
   earlierTurns: number
   onShowEarlier: (before: string) => void
   status: string | null
   lead?: ReactNode
+  latestOnly?: boolean
 }) {
+  const [revealed, setRevealed] = useState(!props.latestOnly)
+  const collapsed = !revealed && (props.turns.length > 1 || props.earlierTurns > 0)
+  const turns = collapsed ? props.turns.slice(-1) : props.turns
   const before = props.turns[0]?.id
   const { onShowEarlier } = props
 
@@ -411,19 +431,32 @@ export function Transcript(props: {
           <MessageScrollerViewport className="px-6 py-4">
             <MessageScrollerContent className="mx-auto w-full max-w-3xl">
               {props.lead}
-              {props.earlierTurns > 0 && (
+              {collapsed ? (
                 <div className="text-center">
-                  <Button ref={showEarlierWhenSeen} variant="ghost" size="sm" onClick={showEarlier}>
+                  <Button variant="ghost" size="sm" onClick={() => setRevealed(true)}>
                     Show earlier Turns
                   </Button>
                 </div>
+              ) : (
+                props.earlierTurns > 0 && (
+                  <div className="text-center">
+                    <Button
+                      ref={showEarlierWhenSeen}
+                      variant="ghost"
+                      size="sm"
+                      onClick={showEarlier}
+                    >
+                      Show earlier Turns
+                    </Button>
+                  </div>
+                )
               )}
-              {props.turns.map((turn) => (
+              {turns.map((turn) => (
                 <TurnView
                   key={turn.id}
                   turn={turn}
-                  latest={turn === props.turns.at(-1)}
-                  status={turn === props.turns.at(-1) ? props.status : null}
+                  latest={turn === turns.at(-1)}
+                  status={turn === turns.at(-1) ? props.status : null}
                 />
               ))}
             </MessageScrollerContent>

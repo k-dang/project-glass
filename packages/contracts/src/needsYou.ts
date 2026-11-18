@@ -13,6 +13,13 @@ export const WaitingRequests = Schema.TaggedStruct("WaitingRequests", {
 
 export const TurnFinished = Schema.TaggedStruct("TurnFinished", { ended: TurnEnd })
 
+export const TurnSeen = Schema.Struct({
+  conversationId: Schema.String,
+  endedAt: Schema.DateTimeUtcFromString,
+})
+
+export type TurnSeen = typeof TurnSeen.Type
+
 export const ConversationReason = Schema.Union([WaitingRequests, TurnFinished])
 
 export type ConversationReason = typeof ConversationReason.Type
