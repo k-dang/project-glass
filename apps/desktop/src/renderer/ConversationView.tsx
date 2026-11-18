@@ -305,7 +305,7 @@ function OpenConversation(props: { conversation: Conversation } & ConversationTa
         <div hidden={tab !== "chat"} className="flex min-h-0 flex-1">
           <ToolCallView value={diagrams.cardOf}>
             <FileLinks value={fileLinks}>
-              <ConversationChat conversation={conversation} />
+              <ConversationChat conversation={conversation} place="conversation" />
             </FileLinks>
           </ToolCallView>
           {openedDiagram !== undefined && (
@@ -356,7 +356,12 @@ export function TranscriptProblem() {
   )
 }
 
-export function ConversationChat(props: { conversation: Conversation; latestOnly?: boolean }) {
+// In the Inbox the chat shows only the latest Turn and a plain Reply box: a Conversation there
+// is idle or waiting on the user, and leaves the Inbox as soon as a reply starts a Turn.
+export function ConversationChat(props: {
+  conversation: Conversation
+  place: "conversation" | "inbox"
+}) {
   const { conversation } = props
   const atoms = useConversationAtoms()
   const loadEarlier = useAtomSet(atoms.loadEarlier)
@@ -375,19 +380,45 @@ export function ConversationChat(props: { conversation: Conversation; latestOnly
           earlierTurns={earlierTurns}
           onShowEarlier={loadEarlier}
           status={status}
-          latestOnly={props.latestOnly ?? false}
+          latestOnly={props.place === "inbox"}
         />
       </BackgroundToolCalls>
       <AgentStatuses statuses={agentStatuses} />
       {reach === "unreachable" && <UnreachableNotice conversationId={conversation.id} />}
-      {readOnly === null ? (
-        <Composer conversation={conversation} turns={turns} queued={queued} />
-      ) : (
+      {readOnly !== null ? (
         <output className="mx-auto block w-full max-w-3xl px-6 py-4 text-sm text-muted-foreground">
           {readOnly}
         </output>
+      ) : props.place === "inbox" ? (
+        <ReplyBox turns={turns} />
+      ) : (
+        <Composer conversation={conversation} turns={turns} queued={queued} />
       )}
     </div>
+  )
+}
+
+function ReplyBox(props: { turns: ReadonlyArray<Turn> }) {
+  const atoms = useConversationAtoms()
+  const waiting = props.turns.at(-1)?.parts.find(isWaiting)
+  const [composed, setComposed] = usePersistedComposer(atoms)
+  const sent = useAtomValue(atoms.send)
+  const send = useAtomSet(atoms.send, { mode: "promiseExit" })
+
+  return (
+    <MessageBox
+      composed={composed}
+      setComposed={setComposed}
+      label="Reply"
+      placeholder={composerPlaceholder(false, waiting, "Reply to the Conversation")}
+      blocked={sent.waiting || waiting !== undefined}
+      problem={settledProblem(sent)}
+      send={async (message) => Exit.isSuccess(await send({ ...message, feedback: [] }))}
+      steer={null}
+      recall={null}
+      onStop={null}
+      notice={waiting !== undefined && <WaitingNotice waiting={waiting} />}
+    />
   )
 }
 

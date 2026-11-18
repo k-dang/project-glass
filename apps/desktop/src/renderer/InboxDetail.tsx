@@ -215,7 +215,7 @@ function ConversationDetail(props: DetailProps<ConversationNeedsYou>) {
           <DetailHeader item={props.item} now={props.now} />
         </div>
         <TranscriptProblem />
-        <ConversationChat conversation={conversation} latestOnly />
+        <ConversationChat conversation={conversation} place="inbox" />
         <DetailFooter
           actions={props.actions}
           buttons={

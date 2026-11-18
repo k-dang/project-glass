@@ -41,7 +41,6 @@ import { afterEach, expect, it, vi } from "vite-plus/test"
 import { App } from "./App"
 import { reviewOf } from "../../test/agentReview"
 import { conversation, conversationFields } from "../../test/conversation"
-import { listModels } from "../../test/conversationApp"
 import { pullRequestFields, revision, viewer } from "../../test/workspace"
 import { backendLayerAtom } from "./backend"
 import { type Handlers, type Held, hold, next, testLayer } from "../../test/testBackend"
@@ -160,7 +159,6 @@ const mount = (
             GetConnection: () =>
               Effect.succeed(new GitHubConnection({ login: "kevin", tokenSource: "gh" })),
             WatchNeedsYou: () => SubscriptionRef.changes(needsYou),
-            ListAgentModels: listModels,
             WatchTranscript: ({ conversationId }) =>
               Stream.make(
                 TranscriptSnapshot.make(transcripts.get(conversationId) ?? emptyTranscript),
@@ -353,7 +351,7 @@ it("works a finished Conversation from the Inbox: reads its latest reply, replie
   await user.click(within(detail).getByRole("button", { name: "Show earlier Turns" }))
   expect(within(detail).getByText("It's in greet.ts.")).toBeTruthy()
 
-  await user.type(within(detail).getByRole("textbox", { name: "Message" }), "Open a PR{Enter}")
+  await user.type(within(detail).getByRole("textbox", { name: "Reply" }), "Open a PR{Enter}")
   expect(sent).toEqual(["Open a PR"])
 
   await user.click(within(detail).getByRole("button", { name: "Done" }))
