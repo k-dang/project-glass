@@ -1,9 +1,18 @@
 import { useAtom, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
-import { ToDoError, type ToDo, type ToDoImage, type ToDoImageUpload } from "@glass/contracts"
+import {
+  mentionedToDoIds,
+  nothingUnsent,
+  toDoMention,
+  ToDoError,
+  type ToDo,
+  type ToDoImage,
+  type ToDoImageUpload,
+} from "@glass/contracts"
+import { useNavigate } from "@tanstack/react-router"
 import { cn } from "cn"
 import { AsyncResult, Atom } from "effect/reactivity"
 import { Effect, Exit, Option } from "effect"
-import { Pencil, Trash2, X } from "lucide-react"
+import { MessageSquarePlus, Pencil, Trash2, X } from "lucide-react"
 import {
   type ClipboardEvent,
   type FormEvent,
@@ -21,6 +30,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/components/ui/toast"
 import { Backend, useBackendRuntime } from "./backend"
+import { newConversationWrittenAtom } from "./conversationsArea"
 import { ImageViewer, type PreviewImage } from "./ImageViewer"
 import { imageFiles, imageSrc, maxToDoImageBytes, readToDoImages } from "./pastedImages"
 import { ProblemAlert } from "./ProblemAlert"
@@ -498,6 +508,25 @@ function CompactNotes(props: { readonly notes: string }) {
   )
 }
 
+function useStartConversation(toDo: ToDo) {
+  const navigate = useNavigate()
+  const setWritten = useAtomSet(newConversationWrittenAtom)
+
+  return () => {
+    setWritten((written) => {
+      const composed = written ?? nothingUnsent
+
+      if (mentionedToDoIds(composed.message).includes(toDo.id)) return composed
+
+      const before = composed.message.trimEnd()
+      const link = `${toDoMention(toDo)} `
+
+      return { ...composed, message: before === "" ? link : `${before} ${link}` }
+    })
+    void navigate({ to: "/conversations/new" })
+  }
+}
+
 function ToDoRow(props: { toDo: ToDo }) {
   const { toDo } = props
   const { pending, setDone, remove, sendImage } = useToDoChanges()
@@ -507,6 +536,7 @@ function ToDoRow(props: { toDo: ToDo }) {
   const started = useRef<number | null>(null)
   const toggle = useAtomValue(pendingToggleAtom)
   const checked = toggle?.id === toDo.id ? toggle.done : toDo.done
+  const startConversation = useStartConversation(toDo)
 
   useEffect(() => {
     const next = unsent[0]
@@ -573,6 +603,17 @@ function ToDoRow(props: { toDo: ToDo }) {
         <SavedImages toDo={toDo} />
         <UnsentStrip toDo={toDo} />
       </div>
+      {!toDo.done && (
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          aria-label={`Start a Conversation from ${toDo.title}`}
+          title="Start a Conversation"
+          onClick={startConversation}
+        >
+          <MessageSquarePlus aria-hidden />
+        </Button>
+      )}
       <Button
         variant="ghost"
         size="icon-xs"

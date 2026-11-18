@@ -211,7 +211,8 @@ _Avoid_: History, audit log, event log, telemetry
 ### Planning
 
 **To-do**:
-Something the user means to do, written down in Glass, open until they mark it done.
+Something the user means to do, written down in Glass, open until they mark it done. Starting a
+Conversation from an open one Mentions it in the New Conversation's message.
 _Avoid_: Task, action item
 
 ### Conversations
@@ -333,9 +334,10 @@ A message sent while a Turn runs, waiting to start the next Turn; the user can c
 then. Canceling one returns its Feedback notes to the Conversation's unsent feedback.
 
 **Mention**:
-A To-do or file the user points at from a message to a Conversation, by typing `@` and picking it.
-The message shows a To-do by its title and a file by its name. The agent reads a To-do's title and
-notes as they are when the message reaches it, and a file's path. Files come from the Conversation's
+A To-do or file the user points at from a message to a Conversation, by typing `@` and picking it,
+or for a To-do, by starting a Conversation from it. The message shows a To-do by its title and a
+file by its name. The agent reads a To-do's title, notes, and images as they are when the message
+reaches it, and a file's path. Files come from the Conversation's
 folder, or, for a New Conversation's first message, from the branch it starts from: the Local
 checkout's copy of it on this device, or GitHub's for a Sandbox.
 _Avoid_: Reference, attachment, tag, chip

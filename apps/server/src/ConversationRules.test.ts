@@ -5,6 +5,7 @@ import {
   nothingUnsent,
   PartSet,
   TextPart,
+  toDoMention,
   type Transcript,
   TurnDone,
   type TurnEnding,
@@ -237,4 +238,27 @@ it.live(
       assert.equal(command?.name, "greet")
       assert.equal(command?.description, conversation.name)
     }),
+)
+
+it.live("gives the agent each mentioned To-do's images apart from the user's own", () =>
+  Effect.gen(function* () {
+    const f = yield* conversationServicesFixture
+    const own = { mediaType: "image/png", data: "b3du" } as const
+    const screenshot = { mediaType: "image/png", data: "c2hvdA==" } as const
+
+    const [toDo] = yield* f.toDos.add("Fix spacing", "Looks off", [
+      { ...screenshot, thumbnail: "dGh1bWI=", thumbnailMediaType: "image/png" },
+    ])
+
+    const conversation = yield* f.create()
+    yield* end(yield* f.started)
+    yield* f.conversations.send(conversation.id, {
+      message: `Do ${toDoMention(toDo!)}`,
+      images: [own],
+    })
+    const turn = yield* f.started
+
+    assert.deepStrictEqual(turn.input.images, [own])
+    assert.deepStrictEqual(turn.input.mentionedImages, [screenshot])
+  }),
 )

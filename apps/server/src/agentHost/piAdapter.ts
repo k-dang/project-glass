@@ -33,7 +33,7 @@ import { stripVTControlCharacters } from "node:util"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import type { HarnessAdapter } from "./adapter"
-import type { DeliveredMessage, DeliveredTurn } from "./deliveredMessage"
+import { agentImages, type DeliveredMessage, type DeliveredTurn } from "./deliveredMessage"
 import {
   AvailableCommands,
   AvailableModels,
@@ -153,10 +153,10 @@ const freshThinkingLevel = (folder: string, model: { provider: string; id: strin
   )
 }
 
-const piMessage = (type: "prompt" | "steer", { prompt, images }: DeliveredTurn) => ({
+const piMessage = (type: "prompt" | "steer", delivered: DeliveredTurn) => ({
   type,
-  message: prompt,
-  images: images.map(({ mediaType, data }) => ({
+  message: delivered.prompt,
+  images: agentImages(delivered).map(({ mediaType, data }) => ({
     type: "image" as const,
     data,
     mimeType: mediaType,
