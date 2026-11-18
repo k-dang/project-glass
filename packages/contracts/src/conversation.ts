@@ -129,6 +129,8 @@ export class Conversation extends Schema.Class<Conversation>("Conversation")({
   place: ConversationPlace,
   repository: FollowedRepository,
   baseBranch: Schema.String,
+  /** The branch its folder had checked out when its latest Turn ended; null when detached. */
+  branch: Schema.NullOr(Schema.String),
   harness: AgentHarness,
   ...ModelChoice.fields,
   permissionMode: Schema.NullOr(PermissionMode),

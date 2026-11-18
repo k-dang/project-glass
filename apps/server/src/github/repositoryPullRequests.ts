@@ -9,7 +9,7 @@ import {
   StatusState,
 } from "./checkContexts"
 
-const CANDIDATE_FIELDS = `id number url title author { login } updatedAt headRefOid isDraft state viewerDidAuthor
+const CANDIDATE_FIELDS = `id number url title author { login } updatedAt headRefOid headRefName isCrossRepository isDraft state viewerDidAuthor
   repository { owner { login } name }
   pendingReviews: reviews(states: PENDING, first: 1) { nodes { comments { totalCount } } }
   viewerSubmittedReviews: reviews(author: $viewerLogin, states: [APPROVED, CHANGES_REQUESTED, COMMENTED, DISMISSED], first: 1) { nodes { id } }
@@ -136,6 +136,8 @@ const GitHubCandidate = Schema.Struct({
   author: GitHubAuthor,
   updatedAt: Schema.DateTimeUtcFromString,
   headRefOid: Schema.String,
+  headRefName: Schema.String,
+  isCrossRepository: Schema.Boolean,
   isDraft: Schema.Boolean,
   state: Schema.Literals(["OPEN", "CLOSED", "MERGED"]),
   viewerDidAuthor: Schema.Boolean,
@@ -162,6 +164,8 @@ export interface Candidate {
   readonly isOpen: boolean
   readonly updatedAt: DateTime.Utc
   readonly head: string
+  /** The head branch when it is in the PR's own repository, not a fork. */
+  readonly headBranch: string | null
   readonly viewerIsAuthor: boolean
   readonly viewerHasDrafts: boolean
   readonly viewerHasSubmittedReview: boolean
@@ -304,6 +308,7 @@ export const toCandidatesPage = (page: typeof CandidatesConnection.Type): Candid
     isOpen: node.state === "OPEN",
     updatedAt: node.updatedAt,
     head: node.headRefOid,
+    headBranch: node.isCrossRepository ? null : node.headRefName,
     viewerIsAuthor: node.viewerDidAuthor,
     viewerHasDrafts: (node.pendingReviews.nodes[0]?.comments.totalCount ?? 0) > 0,
     viewerHasSubmittedReview: node.viewerSubmittedReviews.nodes.length > 0,

@@ -4,6 +4,7 @@ import {
   Conversation,
   ConversationChanges,
   ConversationNeedsYou,
+  ConversationPullRequest,
   DRAW_DIAGRAM_TOOL,
   AnswerQuestion,
   DenyRequest,
@@ -15,6 +16,8 @@ import {
   FollowedRepository,
   PartAppended,
   PartSet,
+  PullRequestRef,
+  PullRequestSummary,
   RemovalWarnings,
   type ResumableDestination,
   SandboxPlace,
@@ -434,6 +437,35 @@ it("shows the Skill packs and commits a Conversation was created with, and its L
   await user.click(await screen.findByRole("button", { name: "Details" }))
 
   expect(await screen.findByText("team @ ae5650f · Local skills")).toBeTruthy()
+})
+
+it("links the Conversation's PR from its header, its details, and its row in the list", async () => {
+  const pullRequest = new PullRequestSummary({
+    ref: new PullRequestRef({ owner: "glass-demo", repo: "greeter", number: 264 }),
+    url: "https://github.com/glass-demo/greeter/pull/264",
+    title: "Greet by name",
+    author: "octocat",
+    isDraft: false,
+    checks: "passing",
+    updatedAt: sentAt,
+  })
+
+  const user = mount({
+    WatchConversations: () => Stream.make([conversation]),
+    WatchConversationPullRequests: () =>
+      Stream.make([new ConversationPullRequest({ conversationId: conversation.id, pullRequest })]),
+    WatchTranscript: () =>
+      Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
+  })
+
+  expect(await screen.findByRole("link", { name: "Open PR #264, checks passing" })).toBeTruthy()
+  expect(
+    screen.getByRole("link", { name: conversation.name, description: /PR #264, checks passing/ }),
+  ).toBeTruthy()
+
+  await user.click(screen.getByRole("button", { name: "Details" }))
+
+  expect(await screen.findByRole("link", { name: /Greet by name/ })).toBeTruthy()
 })
 
 it("opens a Diagram from the Conversation's details, without scrolling back to its card", async () => {

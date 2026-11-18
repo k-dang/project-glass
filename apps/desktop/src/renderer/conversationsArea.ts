@@ -12,6 +12,7 @@ import {
   type NewConversation,
   type PermissionMode,
   type PlaceTag,
+  type PullRequestSummary,
   type RequestAnswer,
   SandboxPlace,
   type SentMessage,
@@ -60,6 +61,17 @@ export const workingConversationsAtom = backendRuntime
   .atom(
     Stream.unwrap(Backend.useSync((backend) => backend.WatchWorkingConversations())).pipe(
       Stream.map((ids): ReadonlySet<string> => new Set(ids)),
+    ),
+  )
+  .pipe(Atom.keepAlive)
+
+export const conversationPullRequestsAtom = backendRuntime
+  .atom(
+    Stream.unwrap(Backend.useSync((backend) => backend.WatchConversationPullRequests())).pipe(
+      Stream.map(
+        (listed): ReadonlyMap<string, PullRequestSummary> =>
+          new Map(listed.map(({ conversationId, pullRequest }) => [conversationId, pullRequest])),
+      ),
     ),
   )
   .pipe(Atom.keepAlive)
