@@ -1,5 +1,5 @@
 import { mkdtempSync, rmSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { tmpdir, userInfo } from "node:os"
 import { join } from "node:path"
 
 // ServerConfig falls back to the user's home when GLASS_HOME is unset, and services clean up files
@@ -12,3 +12,6 @@ export default function isolateHome() {
 
   return () => rmSync(home, { recursive: true, force: true })
 }
+
+/** The user's own home, which tests that borrow a real login read from instead of `HOME`. */
+export const realHome = () => userInfo().homedir

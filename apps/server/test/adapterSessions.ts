@@ -27,7 +27,6 @@ import {
 } from "effect"
 import { McpServer, Tool, Toolkit } from "effect/ai"
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
-import { homedir } from "node:os"
 import { join } from "node:path"
 import { assert, vi } from "vite-plus/test"
 import type { HarnessAdapter, HarnessSession } from "../src/agentHost/adapter"
@@ -50,6 +49,7 @@ import { startFakeGitHub } from "./fakeGitHub"
 import { VIEWER } from "./fakePullRequest"
 import { isolatedHome, startBackend, stubHome } from "./harness"
 import { PI_MODEL, PI_PROVIDER, type PiSettings, writePiLogin, writePiSettings } from "./piLogin"
+import { realHome } from "./isolateHome"
 import { claudeLoginEnvironment, pinnedClaude, pinnedClaudeProgram } from "./pinnedClaude"
 import { writeSentSkills } from "../src/agentHost/sentSkills"
 import { recordingSessions, sessionTape } from "./sessionTape"
@@ -337,15 +337,15 @@ const CLOUD_LOGINS = {
 
 // pi may replace an OAuth refresh token while it runs, which voids the one in the real file.
 const lendPiLogin = Effect.fnUntraced(function* (home: string, apiKey: string | undefined) {
-  const real = process.env["PI_CODING_AGENT_DIR"] ?? join(homedir(), ".pi", "agent")
+  const real = process.env["PI_CODING_AGENT_DIR"] ?? join(realHome(), ".pi", "agent")
   const lent = join(home, ".pi", "agent")
 
   for (const file of PI_LOGIN_FILES)
     if (existsSync(join(real, file))) copyFileSync(join(real, file), join(lent, file))
 
   for (const [name, path] of Object.entries(CLOUD_LOGINS))
-    if (!process.env[name] && existsSync(join(homedir(), ...path)))
-      vi.stubEnv(name, join(homedir(), ...path))
+    if (!process.env[name] && existsSync(join(realHome(), ...path)))
+      vi.stubEnv(name, join(realHome(), ...path))
 
   if (apiKey !== undefined) {
     writePiLogin(home, PI_PROVIDER, apiKey)

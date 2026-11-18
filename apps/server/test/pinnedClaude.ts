@@ -2,8 +2,8 @@ import { Schema } from "effect"
 import { execFileSync } from "node:child_process"
 import { existsSync, readFileSync } from "node:fs"
 import { createRequire } from "node:module"
-import { homedir } from "node:os"
 import { dirname, join } from "node:path"
+import { realHome } from "./isolateHome"
 import { installedProgram } from "./replay"
 
 export const pinnedClaude = () => {
@@ -53,14 +53,17 @@ const loginToken = () => {
 
   if (given !== undefined && given !== "") return given
 
-  const config = process.env["CLAUDE_CONFIG_DIR"] ?? join(homedir(), ".claude")
+  const home = realHome()
+  const config = process.env["CLAUDE_CONFIG_DIR"] ?? join(home, ".claude")
   const file = join(config, ".credentials.json")
 
-  // On macOS, Claude Code keeps the login in the Keychain rather than the file.
+  // On macOS, Claude Code keeps the login in the Keychain rather than the file, and `security` finds
+  // the user's Keychain through HOME.
   const stored = existsSync(file)
     ? readFileSync(file, "utf8")
     : execFileSync("security", ["find-generic-password", "-s", "Claude Code-credentials", "-w"], {
         encoding: "utf8",
+        env: { ...process.env, HOME: home },
       })
 
   const { claudeAiOauth } = Schema.decodeUnknownSync(Credentials)(stored)

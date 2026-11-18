@@ -338,8 +338,10 @@ it.live("runs the next Turn in a newly chosen Permission mode", () =>
     yield* session.answer(request.requestId, AllowRequest.make({}))
     yield* f.until(settled(1))
 
-    yield* session.configure({ permissionMode: "bypassPermissions" })
-    yield* session.send(run("Bash", "touch second.txt", "DONE"))
+    yield* session.configure({ permissionMode: "acceptEdits" })
+    yield* session.send(
+      "Use the Write tool to create second.txt containing `second`, then reply with exactly: DONE",
+    )
     const [, second] = yield* f.until(settled(2))
 
     assert.deepStrictEqual(second?.ended?.ending, TurnDone.make({}))
