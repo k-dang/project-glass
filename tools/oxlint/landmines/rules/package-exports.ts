@@ -3,7 +3,7 @@ import { dirname, join, posix } from "node:path";
 import { defineRule } from "@oxlint/plugins";
 import { z } from "zod";
 
-import { packageDirectory } from "../lib/test-owner.ts";
+import { packageDirectory } from "../lib/package-directory.ts";
 
 const manifestSchema = z.object({ exports: z.json().optional() });
 

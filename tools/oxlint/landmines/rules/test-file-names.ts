@@ -1,7 +1,7 @@
 import { basename, dirname, relative, sep } from "node:path";
 import { defineRule } from "@oxlint/plugins";
 
-import { packageDirectory } from "../lib/test-owner.ts";
+import { packageDirectory } from "../lib/package-directory.ts";
 
 const extension = String.raw`\.[cm]?[jt]sx?$`;
 

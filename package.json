@@ -15,8 +15,6 @@
     "gallery": "pnpm build && pnpm --filter @glass/gallery capture"
   },
   "devDependencies": {
-    "@babel/parser": "8.1.2",
-    "@babel/types": "8.1.2",
     "@glass/plugin": "workspace:*",
     "@oxlint/plugins": "1.87.0",
     "@types/node": "catalog:",

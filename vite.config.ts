@@ -74,7 +74,6 @@ export default defineConfig({
       "landmines-testing/no-unsignaled-poll": "error",
       "landmines-testing/no-flake-masking": "error",
       "landmines-style/no-comments": ["error", { allow: ["WARNING", "SAFETY", "Flaky"] }],
-      "landmines-structure/colocated-tests": "error",
       "landmines-structure/test-file-names": "error",
       "landmines-structure/package-exports": "error",
     },
