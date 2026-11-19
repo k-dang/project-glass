@@ -77,12 +77,11 @@ export const readToDoImages = async (files: Iterable<File>) => {
     accepted
       .filter(({ file }) => file.size <= maxToDoImageBytes)
       .map(async ({ file, mediaType }) => {
-        const bytes = new Uint8Array(await file.arrayBuffer())
-        const thumbnail = await thumbnailOf(file)
+        const [buffer, thumbnail] = await Promise.all([file.arrayBuffer(), thumbnailOf(file)])
 
         return {
           mediaType,
-          data: Base64.encode(bytes),
+          data: Base64.encode(new Uint8Array(buffer)),
           thumbnail: thumbnail.data,
           thumbnailMediaType: thumbnail.mediaType,
         } satisfies ToDoImageUpload

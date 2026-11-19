@@ -1,10 +1,26 @@
 import { assert, it } from "@effect/vitest"
 import { ToDo, ToDoError, type ToDoImageUpload } from "@glass/contracts"
-import { Effect } from "effect"
+import {
+  ConfigProvider,
+  Context,
+  Deferred,
+  Effect,
+  Fiber,
+  type FileSystem,
+  Layer,
+  PlatformError,
+  Stream,
+} from "effect"
 import { mkdir, readdir, rm, stat, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { DatabaseSync } from "node:sqlite"
-import { isolatedHome, startBackend } from "../test/harness"
+import { eventually } from "../test/eventually"
+import { isolatedHome, LAUNCH_TOKEN, startBackend } from "../test/harness"
+import { wrappedFileSystem } from "../test/wrappedFileSystem"
+import { ActivityLog } from "./ActivityLog"
+import { DatabaseLive } from "./Database"
+import { ServerConfig } from "./ServerConfig"
+import { ToDos } from "./ToDos"
 
 const toDo = (id: number, title: string, done = false, notes = "") =>
   new ToDo({ id, title, notes, done })
@@ -252,5 +268,178 @@ it.live("still deletes a to-do when an image file cannot be removed", () =>
       mediaType: "image/png",
       data: "BQYH",
     })
+  }),
+)
+
+const unused = Effect.die("Not used by to-dos")
+
+const toDosIn = Effect.fnUntraced(function* (
+  home: string,
+  wrap: (fs: FileSystem.FileSystem) => Partial<FileSystem.FileSystem>,
+) {
+  const services = yield* Layer.build(
+    ToDos.layer.pipe(
+      Layer.provide(
+        Layer.succeed(
+          ActivityLog,
+          ActivityLog.of({
+            record: () => Effect.void,
+            changes: Stream.empty,
+            touchedPullRequests: () => unused,
+            list: () => unused,
+            stamps: () => unused,
+          }),
+        ),
+      ),
+      Layer.provide(DatabaseLive),
+      Layer.provide(ServerConfig.layer),
+      Layer.provide(wrappedFileSystem(wrap)),
+      Layer.provide(
+        ConfigProvider.layer(
+          ConfigProvider.fromEnvRecord({
+            GLASS_PORT: "0",
+            GLASS_TOKEN: LAUNCH_TOKEN,
+            GLASS_HOME: home,
+          }),
+        ),
+      ),
+    ),
+  )
+
+  return Context.get(services, ToDos)
+})
+
+const heldWritesThatOutliveInterruption = Effect.gen(function* () {
+  const gate = yield* Deferred.make<void>()
+  let started = 0
+  const events: Array<"wrote" | "removed"> = []
+
+  const wrap =
+    (refuse: (started: number) => boolean = () => false) =>
+    (fs: FileSystem.FileSystem): Partial<FileSystem.FileSystem> => ({
+      writeFile: (path, data, options) => {
+        started += 1
+
+        if (refuse(started))
+          return Effect.fail(
+            PlatformError.systemError({
+              // oxlint-disable-next-line anti-slop-effect/no-manual-tagged-construction -- systemError requires a reason tag option.
+              _tag: "PermissionDenied",
+              module: "FileSystem",
+              method: "writeFile",
+              pathOrDescriptor: path,
+            }),
+          )
+
+        return Effect.callback<void, PlatformError.PlatformError>((resume) => {
+          void Effect.runPromise(
+            Deferred.await(gate).pipe(
+              Effect.andThen(fs.writeFile(path, data, options)),
+              Effect.ensuring(Effect.sync(() => events.push("wrote"))),
+              Effect.exit,
+            ),
+          ).then(resume)
+        })
+      },
+      remove: (path, options) =>
+        Effect.sync(() => events.push("removed")).pipe(Effect.andThen(fs.remove(path, options))),
+    })
+
+  const startedAtLeast = (count: number) =>
+    eventually(Effect.sync(() => assert.isAtLeast(started, count)))
+
+  const removedAfterWriting = (count: number) =>
+    eventually(
+      Effect.sync(() => {
+        assert.deepStrictEqual(events.slice(0, count), Array(count).fill("wrote"))
+        assert.include(events, "removed")
+      }),
+    )
+
+  return { gate, wrap, startedAtLeast, removedAfterWriting }
+})
+
+it.live("writes to-do image originals and thumbnails concurrently, keeping image order", () =>
+  Effect.gen(function* () {
+    const home = yield* isolatedHome
+    const writes = yield* heldWritesThatOutliveInterruption
+    const toDos = yield* toDosIn(home, writes.wrap())
+    const first = { ...shot("AQIDBA=="), data: "BQYH" }
+    const second = shot("BAUGBw==")
+
+    const adding = yield* Effect.forkChild(toDos.add("Screenshot the dialog", "", [first, second]))
+    yield* writes.startedAtLeast(4)
+    yield* Deferred.succeed(writes.gate, undefined)
+
+    const added = yield* Fiber.join(adding)
+
+    assert.deepStrictEqual(
+      added[0]?.images.map(({ id }) => id),
+      [1, 2],
+    )
+    assert.deepStrictEqual(yield* toDos.readImage(1, "full"), {
+      mediaType: "image/png",
+      data: "BQYH",
+    })
+    assert.deepStrictEqual(yield* toDos.readImage(2, "thumbnail"), {
+      mediaType: "image/png",
+      data: second.thumbnail,
+    })
+  }),
+)
+
+it.live("waits for writes in flight before cleaning up a to-do image that fails to save", () =>
+  Effect.gen(function* () {
+    const home = yield* isolatedHome
+    const writes = yield* heldWritesThatOutliveInterruption
+
+    const toDos = yield* toDosIn(
+      home,
+      writes.wrap((started) => started === 4),
+    )
+
+    const adding = yield* Effect.forkChild(
+      toDos.add("Screenshot the dialog", "", [shot("AQIDBA=="), shot("BAUGBw==")]),
+    )
+
+    yield* writes.startedAtLeast(4)
+    yield* Deferred.succeed(writes.gate, undefined)
+    assert.instanceOf(yield* Fiber.join(adding).pipe(Effect.flip), ToDoError)
+    yield* writes.removedAfterWriting(3)
+    assert.deepStrictEqual(yield* filesIn(home), [])
+    assert.deepStrictEqual(yield* imageRows(home), [])
+    assert.deepStrictEqual(yield* toDos.list(), [])
+  }),
+)
+
+it.live("waits for writes in flight before cleaning up cancelled to-do images", () =>
+  Effect.gen(function* () {
+    const home = yield* isolatedHome
+    const writes = yield* heldWritesThatOutliveInterruption
+    const toDos = yield* toDosIn(home, writes.wrap())
+
+    yield* toDos.add("Keep me", "", [])
+
+    const attaching = yield* Effect.forkChild(toDos.attach(1, [shot("AQIDBA==")]))
+    yield* writes.startedAtLeast(2)
+    attaching.interruptUnsafe()
+    yield* Deferred.succeed(writes.gate, undefined)
+    yield* Fiber.await(attaching)
+    yield* writes.removedAfterWriting(2)
+
+    assert.deepStrictEqual(yield* filesIn(home), [])
+    assert.deepStrictEqual(yield* imageRows(home), [])
+    assert.deepStrictEqual(yield* toDos.list(), [toDo(1, "Keep me")])
+  }),
+)
+
+it.live("removes saved image files when attaching them to a to-do fails", () =>
+  Effect.gen(function* () {
+    const home = yield* isolatedHome
+    const toDos = yield* toDosIn(home, () => ({}))
+
+    assert.instanceOf(yield* toDos.attach(7, [shot("AQIDBA==")]).pipe(Effect.flip), ToDoError)
+    assert.deepStrictEqual(yield* filesIn(home), [])
+    assert.deepStrictEqual(yield* imageRows(home), [])
   }),
 )
