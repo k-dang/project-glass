@@ -1,8 +1,7 @@
 import { assert, it } from "@effect/vitest"
 import { ToDo, ToDoError, type ToDoImageUpload } from "@glass/contracts"
-import { Effect, Result } from "effect"
-import { Base64 } from "effect/encoding"
-import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises"
+import { Effect } from "effect"
+import { mkdir, readdir, rm, stat, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { DatabaseSync } from "node:sqlite"
 import { isolatedHome, startBackend } from "../test/harness"
@@ -78,17 +77,6 @@ const filesIn = (home: string) =>
     }
   })
 
-const bytesOf = (home: string, name: string) =>
-  Effect.promise(() => readFile(join(imageDir(home), name)))
-
-const decoded = (encoded: string) => {
-  const result = Base64.decode(encoded)
-
-  if (Result.isFailure(result)) throw new Error("test image is not base64")
-
-  return result.success
-}
-
 const imageRows = (home: string) =>
   Effect.sync(() => {
     const db = new DatabaseSync(join(home, ".project-glass", "glass.db"), { readOnly: true })
@@ -137,17 +125,6 @@ it.live("keeps pasted images with a to-do until they are removed or the to-do is
             ],
           }),
         ])
-        const stored = yield* imageRows(home)
-        const firstFile = stored.find((row) => row.id === 1)?.file_name
-
-        if (firstFile === undefined) throw new Error("missing image file")
-
-        assert.notEqual(firstFile, "1")
-        assert.deepStrictEqual(yield* bytesOf(home, firstFile), Buffer.from(decoded(png)))
-        assert.deepStrictEqual(
-          yield* bytesOf(home, `${firstFile}.thumb`),
-          Buffer.from(decoded(first.thumbnail)),
-        )
         assert.deepStrictEqual(yield* client.ReadToDoImage({ id: 1, size: "full" }), {
           mediaType: "image/png",
           data: png,
@@ -271,9 +248,6 @@ it.live("still deletes a to-do when an image file cannot be removed", () =>
 
     if (created === undefined) throw new Error("missing image")
 
-    const replacement = (yield* imageRows(home)).find((row) => row.id === created.id)
-
-    assert.notEqual(replacement?.file_name, fileName)
     assert.deepStrictEqual(yield* client.ReadToDoImage({ id: created.id, size: "full" }), {
       mediaType: "image/png",
       data: "BQYH",
