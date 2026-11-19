@@ -65,6 +65,8 @@ const workspace = new PullRequestWorkspace({
     reviewers: [],
     checks: [],
     mergeable: "mergeable",
+    mergeOffer: null,
+    mergeUnderWay: null,
   }),
   revision: new Revision({ base: "base000", head: "head001" }),
   updatedAt: DateTime.makeUnsafe("2026-10-01T00:00:00Z"),

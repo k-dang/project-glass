@@ -30,6 +30,7 @@ const samples = [
     author: "mona",
     isDraft: false,
     checks: "SUCCESS",
+    merge: { mergeQueue: true },
   },
   {
     number: 99,
@@ -38,6 +39,7 @@ const samples = [
     author: "hubot",
     isDraft: false,
     checks: "FAILURE",
+    merge: { mergeStateStatus: "BLOCKED" },
   },
   {
     number: 98,
@@ -46,6 +48,7 @@ const samples = [
     author: "monalisa",
     isDraft: false,
     checks: "PENDING",
+    merge: { mergeQueue: true, mergeStateStatus: "BLOCKED" },
   },
   {
     number: 97,
@@ -159,6 +162,7 @@ const seedRepository = (github: FakeGitHub, owner: string, repo: string) => {
       author: sample.author,
       isDraft: sample.isDraft,
       checks: sample.checks ?? undefined,
+      ...("merge" in sample ? sample.merge : {}),
       updatedAt: new Date(now - (index + 1) * 3_600_000).toISOString(),
       requestedReviewers: sample.list === "needs-review" ? [VIEWER.login] : [],
       base: { sha: "b0", files: wide?.head ?? { "greet.ts": "hello\n" } },

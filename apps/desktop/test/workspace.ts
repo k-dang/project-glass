@@ -79,6 +79,8 @@ export const pullRequestFields = {
   reviewers: [],
   checks: [],
   mergeable: "mergeable",
+  mergeOffer: null,
+  mergeUnderWay: null,
 } satisfies ConstructorParameters<typeof PullRequest>[0]
 
 export const workspace = (

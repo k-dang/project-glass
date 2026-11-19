@@ -27,6 +27,8 @@ import {
   PullRequestWorkspace,
   RepositoryFiles,
   type ReviewDecision,
+  MergeRejected,
+  type MergeRequest,
   ReviewRejected,
   Revision,
   type RevisionSide,
@@ -102,6 +104,7 @@ import {
   toChecks,
   toReviewRequestsPage,
 } from "./repositoryPullRequests"
+import { HEAD_MOVED, mergeOperation, toMerging } from "./merging"
 import { toPullRequestStatus } from "./pullRequestStatus"
 import {
   type LookedUpPullRequest,
@@ -358,6 +361,11 @@ export class GitHubClient extends Context.Service<
       decision: ReviewDecision,
       summary: string,
     ) => Effect.Effect<void, StaleRevision | ReviewRejected | ConnectionError>
+    readonly mergePullRequest: (
+      pullRequestId: string,
+      revision: Revision,
+      request: MergeRequest,
+    ) => Effect.Effect<void, StaleRevision | MergeRejected | ConnectionError>
     readonly replyToDiscussion: (
       discussionId: string,
       body: string,
@@ -634,6 +642,7 @@ export class GitHubClient extends Context.Service<
             descriptionHtml: pr.bodyHTML,
             viewerIsAuthor: pr.viewerDidAuthor,
             ...toPullRequestStatus(pr),
+            ...toMerging(pr),
           }),
           revision: new Revision({ base: pr.baseRefOid, head: pr.headRefOid }),
           updatedAt: pr.updatedAt,
@@ -1234,6 +1243,21 @@ export class GitHubClient extends Context.Service<
         })
       }, pendingReviewWrites.withPermits(1))
 
+      const mergePullRequest = Effect.fn("GitHubClient.mergePullRequest")(function* (
+        pullRequestId: string,
+        revision: Revision,
+        request: MergeRequest,
+      ) {
+        if (!(yield* isCurrent(pullRequestId, revision))) yield* new StaleRevision()
+
+        yield* graphql({
+          ...mergeOperation(pullRequestId, revision.head, request),
+          response: MutationResponse,
+          domainError: ({ message }) =>
+            HEAD_MOVED.test(message) ? new StaleRevision() : new MergeRejected({ message }),
+        })
+      })
+
       const replyToDiscussion = Effect.fn("GitHubClient.replyToDiscussion")(function* (
         discussionId: string,
         body: string,
@@ -1348,6 +1372,7 @@ export class GitHubClient extends Context.Service<
         updateDraft,
         deleteDraft,
         submitReview,
+        mergePullRequest,
         replyToDiscussion,
         setDiscussionResolved,
         setReaction,

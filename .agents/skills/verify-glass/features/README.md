@@ -36,6 +36,7 @@ Each feature file has an H1 title, one paragraph of user-visible behavior, then 
 - [Activity log](./activity-log.md): the read-only Activity area listing what the user did in Glass by day, newest first, with Load more.
 - [App navigation](./app-navigation.md): the icon rail, app routes, keeping a PR workspace while switching areas, and Dashboard's Continue card restoring the Saved place.
 - [Changed files](./changed-files.md): the changed-files tree and each file's diff or placeholder.
+- [Merge](./merge.md): merging a PR from its header, auto-merge, and the merge queue, against the fake GitHub.
 - [Tours](./tours.md): generating and reading a Tour with synthetic runners, without model charges.
 - [Full context and repository files](./full-context.md): expanding a diff's collapsed context up to the whole file, and the Repository tab for reading any file at the pinned head.
 - [Conversation composer](./conversation-composer.md): Queueing, Steering, and stopping a running Conversation Turn from its composer, on the fake backend's demo Conversation.

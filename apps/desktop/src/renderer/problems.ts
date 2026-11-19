@@ -16,6 +16,8 @@ const sourceLabel: Record<TokenSource, string> = {
   gh: "the GitHub CLI",
 }
 
+const gitHubReason = (message: string) => (message === "" ? "GitHub didn't say why." : message)
+
 export const describeSource = (source: TokenSource) => sourceLabel[source]
 
 export const describeError = (error: BackendError): Problem =>
@@ -125,7 +127,11 @@ export const describeError = (error: BackendError): Problem =>
       }),
       ReviewRejected: ({ message }) => ({
         title: "GitHub didn't accept the Review",
-        detail: message === "" ? "GitHub didn't say why." : message,
+        detail: gitHubReason(message),
+      }),
+      MergeRejected: ({ message }) => ({
+        title: "GitHub didn't merge the pull request",
+        detail: gitHubReason(message),
       }),
       CommentNotFound: () => ({
         title: "This comment is gone from GitHub",

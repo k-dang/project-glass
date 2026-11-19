@@ -3,6 +3,7 @@ import type {
   Approval,
   Check,
   CheckState,
+  MergeUnderWay,
   PullRequest,
   Reviewer,
   ReviewerState,
@@ -16,6 +17,7 @@ import {
   CircleMinus,
   CircleX,
   FileDiff,
+  GitMerge,
   type LucideIcon,
   TriangleAlert,
   Users,
@@ -122,6 +124,9 @@ export function StatusChips(props: { pullRequest: PullRequest }) {
         details={checks.length === 0 ? null : <CheckList checks={checks} />}
       />
       {open && <ConflictsChip pullRequest={pullRequest} />}
+      {pullRequest.mergeUnderWay !== null && (
+        <HintChip summary={mergesUnderWay[pullRequest.mergeUnderWay]} />
+      )}
     </>
   )
 }
@@ -222,15 +227,42 @@ export function CheckList(props: { checks: ReadonlyArray<Check> }) {
   )
 }
 
+const mergesUnderWay: Record<MergeUnderWay, HintedSummary> = {
+  "auto-merge": {
+    label: "Auto-merge on",
+    icon: GitMerge,
+    tone: "text-violet-500",
+    title: "GitHub merges this PR once required checks and Reviews pass.",
+  },
+  "merge-queue": {
+    label: "In merge queue",
+    icon: GitMerge,
+    tone: "text-violet-500",
+    title: "GitHub's merge queue merges this PR after its checks pass.",
+  },
+}
+
+interface HintedSummary extends Summary {
+  readonly title: string
+}
+
+function HintChip(props: { summary: HintedSummary }) {
+  const { label, icon: Icon, tone, title } = props.summary
+
+  return (
+    <TooltipHint content={title}>
+      <span className={cn("inline-flex items-center border border-transparent", chipClass)}>
+        <Icon aria-hidden className={cn("size-3.5", tone)} />
+        {label}
+      </span>
+    </TooltipHint>
+  )
+}
+
 function ConflictsChip(props: { pullRequest: PullRequest }) {
   const { mergeable, baseBranch } = props.pullRequest
 
-  const {
-    label,
-    icon: Icon,
-    tone,
-    title,
-  } = {
+  const summaries: Record<PullRequest["mergeable"], HintedSummary> = {
     mergeable: {
       label: "No conflicts",
       icon: CircleCheck,
@@ -249,14 +281,7 @@ function ConflictsChip(props: { pullRequest: PullRequest }) {
       tone: "text-muted-foreground",
       title: `GitHub was still checking for conflicts with ${baseBranch}. Reload to see the result.`,
     },
-  }[mergeable]
+  }
 
-  return (
-    <TooltipHint content={title}>
-      <span className={cn("inline-flex items-center border border-transparent", chipClass)}>
-        <Icon aria-hidden className={cn("size-3.5", tone)} />
-        {label}
-      </span>
-    </TooltipHint>
-  )
+  return <HintChip summary={summaries[mergeable]} />
 }

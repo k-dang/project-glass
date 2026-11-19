@@ -133,7 +133,31 @@ const unresolvedRepository = (owner: string, name: string) => ({
   ],
 })
 
+const MERGEABLE_NOW = new Set(["CLEAN", "HAS_HOOKS", "UNSTABLE"])
+
+const MergeMethodVariable = Schema.Literals(["SQUASH", "MERGE", "REBASE"])
+
+const MergeVariables = Schema.Struct({
+  pullRequestId: Schema.String,
+  expectedHeadOid: Schema.String,
+})
+
 const GraphQLRequest = Schema.Union([
+  Schema.Struct({
+    operationName: Schema.Literal("MergePullRequest"),
+    variables: Schema.Struct({ ...MergeVariables.fields, mergeMethod: MergeMethodVariable }),
+  }),
+  Schema.Struct({
+    operationName: Schema.Literal("EnablePullRequestAutoMerge"),
+    variables: Schema.Struct({
+      ...MergeVariables.fields,
+      mergeMethod: Schema.NullOr(MergeMethodVariable),
+    }),
+  }),
+  Schema.Struct({
+    operationName: Schema.Literal("EnqueuePullRequest"),
+    variables: MergeVariables,
+  }),
   Schema.Struct({
     operationName: Schema.Literals(["PullRequest", "TourInput"]),
     variables: PullRequestVariables,
@@ -543,7 +567,15 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
         repository: {
           pullRequest: {
             id: pr.id,
-            repository: { owner: { login: pr.owner }, name: pr.repo },
+            repository: {
+              owner: { login: pr.owner },
+              name: pr.repo,
+              viewerPermission: pr.viewerPermission,
+              viewerDefaultMergeMethod: pr.mergeMethods[0] ?? "MERGE",
+              squashMergeAllowed: pr.mergeMethods.includes("SQUASH"),
+              mergeCommitAllowed: pr.mergeMethods.includes("MERGE"),
+              rebaseMergeAllowed: pr.mergeMethods.includes("REBASE"),
+            },
             number: pr.number,
             url: pr.url,
             title: pr.title,
@@ -563,6 +595,11 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
             latestOpinionatedReviews: { nodes: latestOpinionatedReviews(pr) },
             reviewRequests: { nodes: reviewRequestNodes(pr) },
             commits: checkContextsNode(pr),
+            mergeStateStatus: pr.mergeStateStatus,
+            isMergeQueueEnabled: pr.mergeQueue,
+            isInMergeQueue: pr.inMergeQueue,
+            autoMergeRequest: pr.autoMerge ? { __typename: "AutoMergeRequest" } : null,
+            viewerCanEnableAutoMerge: pr.viewerCanEnableAutoMerge,
           },
         },
       },
@@ -802,8 +839,75 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
     return { data: { [field]: { subject: { reactionGroups: reactionGroups(pr, subjectId) } } } }
   }
 
+  const merge = (
+    request: Extract<
+      FakeGraphQLRequest,
+      {
+        readonly operationName:
+          | "MergePullRequest"
+          | "EnablePullRequestAutoMerge"
+          | "EnqueuePullRequest"
+      }
+    >,
+  ) => {
+    const field = {
+      MergePullRequest: "mergePullRequest",
+      EnablePullRequestAutoMerge: "enablePullRequestAutoMerge",
+      EnqueuePullRequest: "enqueuePullRequest",
+    }[request.operationName]
+
+    const { pullRequestId, expectedHeadOid } = request.variables
+    const pr = pullRequestById(pullRequestId)
+
+    if (pr === undefined) return unresolvedMutationNode(field, pullRequestId)
+
+    if (pr.head.sha !== expectedHeadOid) {
+      return unprocessable(field, "Head branch was modified. Review and try the merge again.")
+    }
+
+    const mergeableNow = MERGEABLE_NOW.has(pr.mergeStateStatus)
+
+    switch (request.operationName) {
+      case "MergePullRequest": {
+        if (pr.mergeQueue)
+          return unprocessable(field, "Changes must be made through the merge queue")
+
+        if (!mergeableNow) return unprocessable(field, "Pull request is not mergeable")
+
+        if (!pr.mergeMethods.includes(request.variables.mergeMethod)) {
+          return unprocessable(field, "Merge method is not allowed for this repository")
+        }
+
+        pr.mergedWith = request.variables.mergeMethod
+        pr.edit({ state: "MERGED" })
+        break
+      }
+
+      case "EnablePullRequestAutoMerge":
+        if (mergeableNow) return unprocessable(field, "Pull request is in clean status")
+
+        pr.autoMerge = true
+        pr.edit({})
+        break
+
+      case "EnqueuePullRequest":
+        if (!pr.mergeQueue) return unprocessable(field, "Merge queue is not enabled")
+
+        pr.inMergeQueue = true
+        pr.edit({})
+        break
+    }
+
+    return { data: { [field]: { clientMutationId: null } } }
+  }
+
   const answerGraphQL = (request: typeof GraphQLRequest.Type) => {
     switch (request.operationName) {
+      case "MergePullRequest":
+      case "EnablePullRequestAutoMerge":
+      case "EnqueuePullRequest":
+        return merge(request)
+
       case "PullRequest":
       case "TourInput":
         return pullRequestQuery(request.variables)

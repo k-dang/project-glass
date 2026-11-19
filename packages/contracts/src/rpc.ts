@@ -59,6 +59,7 @@ import { EngineFeature, EngineSettings } from "./engine"
 import { FeedbackNote, UnsentFeedback } from "./feedbackNote"
 import { CheckInAnswer, CheckInChanges, CheckInError, CheckInNotWaiting } from "./checkIn"
 import { FollowedRepository, InvalidRepositoryInput } from "./followedRepository"
+import { MergePullRequestError, MergeRequest } from "./merge"
 import { NeedsYou, OutsideQuestionAnswer, OutsideQuestionNotWaiting, TurnSeen } from "./needsYou"
 import { OutsideAgent, OutsideAgentNotFound } from "./outsideAgent"
 import { LoadPullRequestError, PullRequestRef, PullRequestWorkspace } from "./pullRequest"
@@ -313,6 +314,10 @@ export class GlassRpcs extends RpcGroup.make(
       summary: Schema.String,
     },
     error: SubmitReviewError,
+  }),
+  Rpc.make("MergePullRequest", {
+    payload: { pullRequestId: Schema.String, revision: Revision, request: MergeRequest },
+    error: MergePullRequestError,
   }),
   Rpc.make("ReplyToDiscussion", {
     payload: { discussionId: Schema.String, body: Schema.NonEmptyString },

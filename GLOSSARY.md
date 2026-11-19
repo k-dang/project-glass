@@ -87,6 +87,14 @@ _Avoid_: Review decision, review status
 An automated run reporting on a PR's head commit, such as a CI job: passed, failed, running, or
 skipped.
 
+**Merge**:
+Merging an open PR from its PR workspace, offered only to users who can write to its repository.
+Glass offers what GitHub would do now: merge with one of the repository's allowed methods, or add
+the PR to its base branch's merge queue. While required Checks or Reviews are outstanding, it
+offers auto-merge instead, so GitHub merges the PR, or adds it to the merge queue, once they pass.
+Once auto-merge is on or the PR is in a merge queue, Glass shows that instead.
+_Avoid_: Land, ship
+
 **Tour**:
 An agent-written reading order for one Revision of a PR: why the change exists, a diagram or Before
 / after of the whole change when it has one, then Chapters ordered from the part that matters most

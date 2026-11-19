@@ -2,6 +2,7 @@ import { Schema } from "effect"
 import { ConnectionError } from "./connection"
 import { Discussions } from "./discussion"
 import { Draft } from "./draft"
+import { MergeOffer, MergeUnderWay } from "./merge"
 import { Revision } from "./revision"
 
 const GRAPHQL_INT_MAX = 2 ** 31 - 1
@@ -62,6 +63,8 @@ export class PullRequest extends Schema.Class<PullRequest>("PullRequest")({
   reviewers: Schema.Array(Reviewer),
   checks: Schema.Array(Check),
   mergeable: Mergeable,
+  mergeOffer: Schema.NullOr(MergeOffer),
+  mergeUnderWay: Schema.NullOr(MergeUnderWay),
 }) {}
 
 export const ChangeType = Schema.Literals(["added", "modified", "deleted", "renamed"])

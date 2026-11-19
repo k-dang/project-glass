@@ -1,6 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
 import {
   BinaryFile,
+  CanMerge,
   Check,
   Discussions,
   FileNotFound,
@@ -146,6 +147,8 @@ describe("LoadPullRequest", () => {
             reviewers: [],
             checks: [],
             mergeable: "mergeable",
+            mergeOffer: CanMerge.make({ methods: ["merge", "squash", "rebase"] }),
+            mergeUnderWay: null,
           }),
           revision: new Revision({ base: "b0", head: "h1" }),
           updatedAt: DateTime.makeUnsafe(pr.updatedAt),
