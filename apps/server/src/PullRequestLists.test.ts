@@ -903,45 +903,28 @@ describe("Watching", () => {
     }),
   )
 
-  it.live("shows a new watcher the lists saved by the last run when GitHub can't answer", () =>
-    Effect.gen(function* () {
-      const home = yield* isolatedHome
-      const github = yield* startFakeGitHub()
-      const env = { GH_TOKEN: VIEWER.token, GLASS_GITHUB_API_URL: github.url }
-      const { client } = yield* startBackend(env, home)
-      yield* client.FollowRepository({ input: "octo-org/glass" })
-      const seed = { owner: "octo-org", repo: "glass", requestedReviewers: [VIEWER.login] }
-      const pr = github.seedPullRequest({ ...seed, base, head })
-      yield* client.ListPullRequests()
-      pr.edit({ state: "CLOSED" })
-      github.unavailableRepositories.add("octo-org/glass")
+  it.live(
+    "shows a new watcher the lists saved by the last run when GitHub can't answer, replacing an unreadable saved file",
+    () =>
+      Effect.gen(function* () {
+        const home = yield* isolatedHome
+        yield* Effect.promise(async () => {
+          await mkdir(join(home, ".project-glass"), { recursive: true })
+          await writeFile(join(home, ".project-glass", "pull-requests.json"), "{ not json")
+        })
+        const github = yield* startFakeGitHub()
+        const env = { GH_TOKEN: VIEWER.token, GLASS_GITHUB_API_URL: github.url }
+        const { client } = yield* startBackend(env, home)
+        yield* client.FollowRepository({ input: "octo-org/glass" })
+        const seed = { owner: "octo-org", repo: "glass", requestedReviewers: [VIEWER.login] }
+        const pr = github.seedPullRequest({ ...seed, base, head })
+        yield* client.ListPullRequests()
+        pr.edit({ state: "CLOSED" })
+        github.unavailableRepositories.add("octo-org/glass")
 
-      const restarted = yield* startBackend(env, home)
+        const restarted = yield* startBackend(env, home)
 
-      assert.deepStrictEqual(requestedNumbers(yield* firstUpdate(restarted.client)), [pr.number])
-    }),
-  )
-
-  it.live("treats an unreadable saved file as nothing saved and replaces it", () =>
-    Effect.gen(function* () {
-      const home = yield* isolatedHome
-      yield* Effect.promise(async () => {
-        await mkdir(join(home, ".project-glass"), { recursive: true })
-        await writeFile(join(home, ".project-glass", "pull-requests.json"), "{ not json")
-      })
-      const github = yield* startFakeGitHub()
-      const env = { GH_TOKEN: VIEWER.token, GLASS_GITHUB_API_URL: github.url }
-      const { client } = yield* startBackend(env, home)
-      yield* client.FollowRepository({ input: "octo-org/glass" })
-      const seed = { owner: "octo-org", repo: "glass", requestedReviewers: [VIEWER.login] }
-      const pr = github.seedPullRequest({ ...seed, base, head })
-      yield* client.ListPullRequests()
-      pr.edit({ state: "CLOSED" })
-      github.unavailableRepositories.add("octo-org/glass")
-
-      const restarted = yield* startBackend(env, home)
-
-      assert.deepStrictEqual(requestedNumbers(yield* firstUpdate(restarted.client)), [pr.number])
-    }),
+        assert.deepStrictEqual(requestedNumbers(yield* firstUpdate(restarted.client)), [pr.number])
+      }),
   )
 })

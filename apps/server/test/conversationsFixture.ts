@@ -103,9 +103,6 @@ export const conversationsFixture = Effect.gen(function* () {
   const send = (conversationId: string, message: string, images: ReadonlyArray<Image> = []) =>
     client.SendMessage({ conversationId, message, images, feedback: [] })
 
-  const steer = (conversationId: string, message: string, images: ReadonlyArray<Image> = []) =>
-    client.Steer({ conversationId, message, images })
-
   const start = (
     message = "Say hello",
     harness: Pick<NewConversation, "harness" | "model" | "effort"> &
@@ -198,7 +195,6 @@ export const conversationsFixture = Effect.gen(function* () {
     transcript,
     sandboxStatus,
     send,
-    steer,
     answering,
     start,
     startSandbox,
@@ -213,13 +209,6 @@ export const conversationsFixture = Effect.gen(function* () {
 
 export const settled = (count: number) => (turns: ReadonlyArray<Turn>) =>
   turns.length === count && turns.every((turn) => turn.ended !== null)
-
-export const claudeCode = {
-  harness: "claude-code",
-  model: null,
-  effort: null,
-  permissionMode: "bypassPermissions",
-} as const
 
 export const lastText = (turn: Turn | undefined) =>
   turn?.parts.findLast((part) => Predicate.isTagged(part, "Text"))

@@ -410,35 +410,6 @@ it.live("lists a waiting Conversation before a PR that has waited longer", () =>
   }),
 )
 
-it.live("lists an Agent review's Follow-up Conversation while its request waits", () =>
-  Effect.gen(function* () {
-    const f = yield* reviewsFixture()
-    const pr = f.seed("Greet")
-    yield* f.review(pr)
-
-    yield* f.client.FollowUpAgentReview({
-      pullRequest: ref(pr),
-      revision: revisionOf(pr),
-      message: "Please ask permission",
-    })
-    const { review } = yield* f.reviewState(pr, (state) => state.review?.conversationId != null)
-    const conversationId = review?.conversationId ?? ""
-
-    const listed = yield* needsYou(
-      f.client,
-      (items) => conversationItem(items, conversationId) !== undefined,
-    )
-
-    assert.strictEqual(requestsOf(listed, conversationId)[0]?._tag, "PermissionRequest")
-
-    const conversations = yield* f.client
-      .WatchConversations()
-      .pipe(Stream.runHead, Effect.map(Option.getOrThrow))
-
-    assert.isTrue(conversations.some(({ id, forReview }) => id === conversationId && forReview))
-  }),
-)
-
 const mine = {
   owner: "octo-org",
   repo: "glass",

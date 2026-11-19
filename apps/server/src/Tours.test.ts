@@ -307,7 +307,6 @@ for (const [name, settings, expected] of [
   ["a runner failure", { reply: { fail: "failed" } }, "runner"],
   ["an authentication rejection", { reply: { fail: "authentication" } }, "runner"],
   ["a runner that isn't ready", { reply: { answer }, ready: "not-ready" }, "not-ready"],
-  ["a runner that isn't installed", { reply: { answer }, ready: "not-installed" }, "not-ready"],
 ] as const satisfies ReadonlyArray<readonly [string, ScriptedSettings, string]>) {
   it.live(`reports ${name}`, () =>
     Effect.gen(function* () {

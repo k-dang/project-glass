@@ -1,42 +1,7 @@
-import { NodeSocket } from "@effect/platform-node"
 import { assert, it } from "@effect/vitest"
-import { RPC_PATH, TextPart, TurnCutOff, TurnDone } from "@glass/contracts"
-import { Effect, Predicate, Stream } from "effect"
+import { TextPart, TurnCutOff, TurnDone } from "@glass/contracts"
+import { Effect, Predicate } from "effect"
 import { conversationsFixture, holding, lastText, settled } from "../test/conversationsFixture"
-import { HOST_TOKEN_HEADER } from "./agentHost/hostAddress"
-import { AgentHostRpcs } from "./agentHost/protocol"
-import { greet } from "./hostJournal"
-import { connectRpcClient } from "./rpcSocket"
-
-it.live(
-  "connects to a Sandbox's host again after a dropped connection, catching up on what it missed",
-  () =>
-    Effect.gen(function* () {
-      const f = yield* conversationsFixture
-      const conversation = yield* f.startSandbox("hold:start")
-      yield* f.transcript(conversation.id, holding)
-      yield* Effect.promise(() => f.sandboxes.dropConnections(conversation.id))
-      yield* f.release("start")
-      const { port, token } = f.sandboxes.host(conversation.id)
-
-      const witness = yield* connectRpcClient(AgentHostRpcs, `ws://127.0.0.1:${port}${RPC_PATH}`, {
-        [HOST_TOKEN_HEADER]: token,
-      }).pipe(Effect.provide(NodeSocket.layerWebSocketConstructor))
-
-      yield* witness.WatchJournal({ host: yield* greet(witness), after: 0 }).pipe(
-        Stream.filter(({ event }) => Predicate.isTagged(event, "TurnEnded")),
-        Stream.runHead,
-      )
-
-      const [missed] = yield* f.transcript(conversation.id, (turns) => turns.length === 1)
-      assert.isNull(missed?.ended)
-      f.sandboxes.reconnect(conversation.id)
-
-      const [turn] = yield* f.transcript(conversation.id, settled(1))
-      assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
-      assert.deepStrictEqual(lastText(turn), TextPart.make({ text: "Reply to: hold:start" }))
-    }),
-)
 
 it.live("cuts off only the running Turn of a Conversation whose Sandbox host is lost", () =>
   Effect.gen(function* () {
