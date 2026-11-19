@@ -47,7 +47,8 @@ test("reviews a local Conversation's changes on its Changes tab, held still unti
   await expect(changes.getByText("hello from the agent")).toBeVisible()
   await expect(message).toBeHidden()
 
-  await details.getByRole("button", { name: "Back to Chat" }).click()
+  await window.getByRole("button", { name: "Details", exact: true }).click()
+  await window.getByRole("button", { name: "Back to Chat" }).click()
   await message.fill("Write another")
   await message.press("Enter")
   await expect(window.getByText(/^Done in/)).toHaveCount(2)

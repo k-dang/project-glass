@@ -56,14 +56,14 @@ export function ConversationFrame(props: {
   className?: string
   heading: ReactNode
   details: Details | null
-  sidePaneOpen?: boolean
+  pinnable?: boolean
   children: ReactNode
 }) {
   const wide = useSyncExternalStore(subscribeToWidth, isWide)
   const [pinned, setPinned] = useAtom(conversationDetailsPinnedAtom)
   const detailsId = useId()
   const { details } = props
-  const pins = wide && props.sidePaneOpen !== true
+  const pins = wide && props.pinnable === true
   const pinnedLabel = pinned ? "Hide details" : "Show details"
   const PinnedIcon = pinned ? PanelRightClose : PanelRightOpen
 
@@ -94,13 +94,13 @@ export function ConversationFrame(props: {
             <DetailsPopover details={details} />
           ))}
       </header>
-      <div className="flex min-h-0 flex-1">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">{props.children}</div>
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+        {props.children}
         {details !== null && pins && pinned && (
           <aside
             id={detailsId}
             aria-label="Details"
-            className="w-64 shrink-0 overflow-y-auto border-l p-1"
+            className="absolute top-2 right-4 z-10 max-h-[calc(100%-1rem)] w-64 overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10"
           >
             <ConversationDetails {...details} />
           </aside>

@@ -270,7 +270,7 @@ function OpenConversation(props: { conversation: Conversation } & ConversationTa
             <h1 className="truncate font-medium">{conversation.name}</h1>
           )
         }
-        sidePaneOpen={tab === "chat" && pane !== null}
+        pinnable={tab === "chat" && pane === null}
         details={{
           place: conversation.place,
           repository: repositoryKey(conversation.repository),

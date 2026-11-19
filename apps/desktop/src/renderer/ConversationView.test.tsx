@@ -517,7 +517,7 @@ it("opens a Diagram from the Conversation's details, without scrolling back to i
   expect(within(pane).getByText("Component map")).toBeTruthy()
 })
 
-it("pins a Conversation's details beside it on a wide window, until the user hides them", async () => {
+it("floats a Conversation's details over its chat on a wide window, until the user hides them", async () => {
   const { happyDOM } = window
   const width = window.innerWidth
 
@@ -533,9 +533,11 @@ it("pins a Conversation's details beside it on a wide window, until the user hid
   await user.click(within(details).getByRole("button", { name: /Changes/ }))
 
   expect(await screen.findByRole("heading", { name: "Changes" })).toBeTruthy()
-  expect(screen.getByRole("complementary", { name: "Details" })).toBeTruthy()
+  expect(screen.queryByRole("complementary", { name: "Details" })).toBeNull()
 
-  await user.click(screen.getByRole("button", { name: "Hide details" }))
+  await user.click(screen.getByRole("button", { name: "Details" }))
+  await user.click(await screen.findByRole("button", { name: /Back to Chat/ }))
+  await user.click(await screen.findByRole("button", { name: "Hide details" }))
 
   expect(screen.queryByRole("complementary", { name: "Details" })).toBeNull()
 })

@@ -11,14 +11,14 @@ A local Conversation's Changes view shows its worktree diff. The view keeps its 
 
 ## How to get to it (user POV)
 
-Open a Conversation and choose Changes in its Details, pinned beside it on a window at least 1200px wide and behind the Details button on narrower ones. Details also offers Back to Chat.
+Open a Conversation and choose Changes in its Details. On a window at least 1200px wide they float as a card over the Chat's top-right corner; elsewhere, and on narrower windows, they sit behind the Details button, which also offers Back to Chat.
 
 ## Driving it with glass-verify
 
 1. `node $V launch --backend fake`, doctor, and snapshot. Choose the Conversations rail link, then the seeded pi Conversation whose transcript starts "Show me around this repository." (its generated name varies). `wait --text README`.
 2. Snapshot and screenshot `chat-before`. `type --role textbox --name Message --text "Write a note"`, `press --key Enter`, then `wait --text "hello from the agent"`. Snapshot the transcript and confirm the latest bash tool is marked Done before opening Changes. This exact demo message makes the real pi CLI write notes.txt using the shared E2E command fixture, with no model call.
-3. `click --role button --name "Changes Ctrl+D"` in the pinned Details (the item's name includes its shortcut, `⌘D` on macOS), `wait --text "hello from the agent"`. Snapshot and screenshot `conversation-changes`.
-4. Choose `Back to Chat Ctrl+D`. Send `Write another` in Message. `wait --text "a second note"`, snapshot and confirm the latest bash tool is Done, then `Changes Ctrl+D`.
+3. `click --role button --name "Changes Ctrl+D"` in the floating Details (the item's name includes its shortcut, `⌘D` on macOS), `wait --text "hello from the agent"`. Snapshot and screenshot `conversation-changes`.
+4. Click `Details`, then `Back to Chat Ctrl+D`. Send `Write another` in Message. `wait --text "a second note"`, snapshot and confirm the latest bash tool is Done, then `Changes Ctrl+D`.
 5. `wait --text "worked since you opened these changes"`. Snapshot and screenshot `held-changes`: more.txt is absent. `click --role button --name "Show latest"`, `wait --text "a second note"`, then snapshot and screenshot `latest-changes`. Both files appear. Stop.
 
 Feedback notes, from step 3's Changes:
@@ -37,7 +37,7 @@ Sending feedback, from a note added in Changes:
 ## Gotchas
 
 - The demo backend writes files only for the two exact messages in `demoReply` (`apps/server/test/demoConversation.ts`), as in `apps/desktop/e2e/conversationChanges.test.ts`, and in the long Conversation in `apps/server/test/demoLongConversation.ts`. Other demo messages do not write files.
-- These steps need a window at least 1200px wide (`launch` opens one at 1280px), so Details are pinned in `complementary "Details"`. They fall back to the `Details` button while a Diagram or file pane is open; `Hide details` in the header unpins them.
+- These steps need a window at least 1200px wide (`launch` opens one at 1280px), so Details float over the Chat in `complementary "Details"`. They fall back to the `Details` button in Changes and while a Diagram or file pane is open; `Hide details` in the header hides them.
 - The first Changes view is deliberately pinned; returning to Chat does not refresh it.
 - Line numbers aren't buttons in the accessibility tree, so select lines with `press --shift` from a clicked code line rather than by clicking a number.
 - Any change to the Conversation's files marks every earlier note Older version, even on a file that didn't change.
