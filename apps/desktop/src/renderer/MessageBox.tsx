@@ -96,7 +96,7 @@ export function MessageBox(props: {
   steer: ((message: MessageInput) => Promise<boolean>) | null
   recall: SentMessage | null
   onStop: (() => void) | null
-  working?: boolean
+  beam?: boolean
   commands?: ReadonlyArray<AgentCommand>
   files?: ReadonlyArray<string>
   pickers?: ReactNode
@@ -312,7 +312,7 @@ export function MessageBox(props: {
             {picker.choices !== null && (
               <div className="absolute inset-x-0 bottom-full z-50 mb-2">{picker.choices}</div>
             )}
-            <BorderBeam active={props.working ?? false} theme="auto">
+            <BorderBeam active={props.beam ?? false} theme="auto">
               <InputGroup className="has-[[data-slot=input-group-control]:focus-visible]:border-foreground/25 has-[[data-slot=input-group-control]:focus-visible]:ring-0">
                 {composed.images.length > 0 && (
                   <InputGroupAddon align="block-start" className="flex-wrap gap-2">
