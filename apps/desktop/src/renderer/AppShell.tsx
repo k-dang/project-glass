@@ -23,7 +23,11 @@ import { ConnectionAvatar } from "./ConnectionAvatar"
 import { globalConversationOpenAtom, globalUnseenAtom } from "./globalConversation"
 import { HistoryNav } from "./HistoryNav"
 import { NeedsYouBadge } from "./NeedsYouCount"
-import { needsYouCount as countOf, watchedNeedsYouAtom } from "./needsYou"
+import {
+  conversationsNeedingYouAtom,
+  needsYouCount as countOf,
+  watchedNeedsYouAtom,
+} from "./needsYou"
 import { confirmLeave, discardPromptAtom, leavesPullRequest, reviewsLinkAtom } from "./reviewsArea"
 import { ResourceUsage } from "./ResourceUsage"
 import { ShortcutsDialog } from "./ShortcutsDialog"
@@ -78,6 +82,8 @@ export function AppShell() {
   const [GlobalConversationDialog, setGlobalConversationDialog] = useState<ComponentType>()
   const needsYouBadgeId = useId()
   const needsYouCount = countOf(useAtomValue(watchedNeedsYouAtom))
+  const conversationsNeedYouId = useId()
+  const conversationsNeedYou = useAtomValue(conversationsNeedingYouAtom).size > 0
   const unseen = Option.getOrNull(AsyncResult.value(useAtomValue(globalUnseenAtom)))
   const unread = unseen !== null && !conversing
 
@@ -139,13 +145,23 @@ export function AppShell() {
                   aria-describedby={
                     label === "Inbox" && Option.isSome(needsYouCount) && needsYouCount.value > 0
                       ? needsYouBadgeId
-                      : undefined
+                      : label === "Conversations" && conversationsNeedYou
+                        ? conversationsNeedYouId
+                        : undefined
                   }
                   aria-keyshortcuts={`Meta+${index + 1} Control+${index + 1}`}
                   className={cn(railLink, label === "Settings" && "mt-auto")}
                 >
                   <Icon className="size-4" aria-hidden />
                   {label === "Inbox" && <NeedsYouBadge id={needsYouBadgeId} />}
+                  {label === "Conversations" && conversationsNeedYou && (
+                    <span
+                      id={conversationsNeedYouId}
+                      className="absolute top-1 right-1 size-2 rounded-full bg-primary"
+                    >
+                      <span className="sr-only">Needs you</span>
+                    </span>
+                  )}
                 </Link>
               </TooltipHint>
             ))}

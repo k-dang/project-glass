@@ -659,6 +659,27 @@ it("counts what needs you on the Inbox link from another area", async () => {
   expect(screen.getByRole("link", { name: "Inbox" }).textContent).toBe("")
 })
 
+it("dots the Conversations link while a Conversation needs you", async () => {
+  const needsYou = needsYouRef([finishedReview])
+
+  mount(needsYou, {}, "/to-dos")
+
+  await screen.findByRole("link", { name: "Inbox", description: "1 need you" })
+  expect(screen.getByRole("link", { name: "Conversations" }).textContent).toBe("")
+
+  await setNeedsYou(needsYou, [waitingConversation, finishedReview])
+
+  expect(
+    await screen.findByRole("link", { name: "Conversations", description: "Needs you" }),
+  ).toBeTruthy()
+
+  await setNeedsYou(needsYou, [finishedReview])
+
+  await waitFor(() =>
+    expect(screen.getByRole("link", { name: "Conversations" }).textContent).toBe(""),
+  )
+})
+
 const loadedWorkspace = () =>
   Effect.succeed(
     new PullRequestWorkspace({
