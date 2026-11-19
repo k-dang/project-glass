@@ -9,7 +9,7 @@ import { DiffHunk, LineLocation, lineName, originalLineName } from "./Discussion
 import { ConfirmationDialog } from "./ConfirmationDialog"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemText } from "./problems"
-import { optionLabel, shortcutLabel } from "./shortcutLabel"
+import { shortcutLabel } from "./shortcutLabel"
 import type { DraftView, Feedback } from "./draftSync"
 import {
   type DraftStore,
@@ -170,17 +170,6 @@ function DraftActions(props: {
             <Kbd>{shortcutLabel("↵")}</Kbd>
           </Button>
         )}
-        <span>
-          <Kbd>↵</Kbd> saves it for your Review
-        </span>
-        {canComment && (
-          <span>
-            <Kbd>⇧↵</Kbd> comments now
-          </span>
-        )}
-        <span>
-          <Kbd>{optionLabel("↵")}</Kbd> adds a line
-        </span>
         <Button
           size="sm"
           variant="outline"
@@ -189,6 +178,7 @@ function DraftActions(props: {
           aria-label={`Save Draft on ${draftName(draft)}`}
         >
           Save Draft
+          <Kbd>↵</Kbd>
         </Button>
         {canComment && (
           <Button
@@ -200,6 +190,7 @@ function DraftActions(props: {
               <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden />
             )}
             Comment
+            <Kbd>⇧↵</Kbd>
           </Button>
         )}
       </div>
