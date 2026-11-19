@@ -955,7 +955,7 @@ const markdownComponents: Components = {
 
 function ConversationMarkdown(props: { text: string }) {
   return (
-    <Streamdown className="text-sm" components={markdownComponents}>
+    <Streamdown className="conversation-markdown text-sm" components={markdownComponents}>
       {props.text}
     </Streamdown>
   )
