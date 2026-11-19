@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { RegistryProvider } from "@effect/atom-react"
 import { PullRequest } from "@glass/contracts"
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
@@ -24,13 +25,15 @@ function mount() {
   const write = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue()
 
   const view = render(
-    <Toaster>
-      <button>Before</button>
-      <button>After</button>
-      <textarea aria-label="Draft" />
-      <OpenPullRequestDialog current={pullRequest.ref} onOpen={() => {}} />
-      <CopyMenu pullRequest={pullRequest} />
-    </Toaster>,
+    <RegistryProvider>
+      <Toaster>
+        <button>Before</button>
+        <button>After</button>
+        <textarea aria-label="Draft" />
+        <OpenPullRequestDialog current={pullRequest.ref} onOpen={() => {}} onViewQueue={() => {}} />
+        <CopyMenu pullRequest={pullRequest} />
+      </Toaster>
+    </RegistryProvider>,
   )
 
   return { user, write, ...view }

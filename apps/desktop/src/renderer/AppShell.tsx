@@ -1,7 +1,14 @@
 import { RegistryContext, useAtom, useAtomValue } from "@effect/atom-react"
 import { Option } from "effect"
 import { AsyncResult } from "effect/reactivity"
-import { Link, type LinkOptions, Outlet, useBlocker, useNavigate } from "@tanstack/react-router"
+import {
+  Link,
+  type LinkOptions,
+  Outlet,
+  useBlocker,
+  useMatch,
+  useNavigate,
+} from "@tanstack/react-router"
 import { cn } from "cn"
 import {
   LayoutDashboard,
@@ -23,12 +30,19 @@ import { ConnectionAvatar } from "./ConnectionAvatar"
 import { globalConversationOpenAtom, globalUnseenAtom } from "./globalConversation"
 import { HistoryNav } from "./HistoryNav"
 import { NeedsYouBadge } from "./NeedsYouCount"
+import { OpenPullRequestDialog } from "./OpenPullRequestDialog"
 import {
   conversationsNeedingYouAtom,
   needsYouCount as countOf,
   watchedNeedsYouAtom,
 } from "./needsYou"
-import { confirmLeave, discardPromptAtom, leavesPullRequest, reviewsLinkAtom } from "./reviewsArea"
+import {
+  confirmLeave,
+  discardPromptAtom,
+  leavesPullRequest,
+  listSearchAtom,
+  reviewsLinkAtom,
+} from "./reviewsArea"
 import { ResourceUsage } from "./ResourceUsage"
 import { ShortcutsDialog } from "./ShortcutsDialog"
 import { useShortcuts } from "./useShortcuts"
@@ -86,6 +100,8 @@ export function AppShell() {
   const conversationsNeedYou = useAtomValue(conversationsNeedingYouAtom).size > 0
   const unseen = Option.getOrNull(AsyncResult.value(useAtomValue(globalUnseenAtom)))
   const unread = unseen !== null && !conversing
+
+  const current = useMatch({ from: "/reviews/$owner/$repo/$number", shouldThrow: false })?.params
 
   useEffect(() => {
     const load = () =>
@@ -197,6 +213,16 @@ export function AppShell() {
         </div>
       </div>
       {GlobalConversationDialog && <GlobalConversationDialog />}
+      <OpenPullRequestDialog
+        current={current}
+        onOpen={(ref) => void navigate({ to: "/reviews/$owner/$repo/$number", params: ref })}
+        onViewQueue={() =>
+          void navigate({
+            to: "/reviews",
+            search: { ...registry.get(listSearchAtom), list: "queue" },
+          })
+        }
+      />
       <DiscardDialog />
     </div>
   )

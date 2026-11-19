@@ -99,6 +99,38 @@ const change = async <A>(
   return null
 }
 
+const queuedTitle = ({ added }: QueueAddition) => {
+  const [first] = added
+
+  if (first === undefined) return null
+
+  return added.length === 1 ? `Queued ${referenceText(first)}` : `Queued ${added.length} PRs`
+}
+
+export const addToQueue = async (
+  registry: AtomRegistry.AtomRegistry,
+  references: ReadonlyArray<PullRequestRef>,
+  viewQueue: () => void,
+) => {
+  const addition = await change(
+    registry,
+    (backend) => backend.AddToQueue({ references }),
+    `Couldn't queue ${conjunction.format(references.map(referenceText))}`,
+  )
+
+  if (addition === null) return
+
+  const title = queuedTitle(addition)
+  const note = describeAddition(addition)
+
+  toast.add({
+    type: title === null ? "info" : "success",
+    title: title ?? note,
+    description: title === null || note === "" ? undefined : note,
+    actionProps: { children: "View Queue", onClick: viewQueue },
+  })
+}
+
 export const removeFromQueue = async (
   registry: AtomRegistry.AtomRegistry,
   reference: PullRequestRef,

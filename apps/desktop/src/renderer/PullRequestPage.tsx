@@ -8,7 +8,7 @@ import { FolderTree, MessageCircle, Route } from "lucide-react"
 import { type ReactNode, useCallback, useContext } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { BackToPullRequests } from "./BackToPullRequests"
-import { OpenPullRequestDialog } from "./OpenPullRequestDialog"
+import { OpenPullRequestButton } from "./OpenPullRequestDialog"
 import { ProblemAlert, Problems } from "./ProblemAlert"
 import { QueueBar } from "./QueueBar"
 import { type Problem, settledProblem } from "./problems"
@@ -58,7 +58,7 @@ export function PullRequestPage() {
             problem={problem}
             onRetry={() => retryOpen(registry)}
             onBack={back}
-            open={<OpenPullRequestDialog current={ref} onOpen={openOther} />}
+            open={<OpenPullRequestButton />}
           />
         )
       ) : (

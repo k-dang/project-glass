@@ -485,3 +485,26 @@ it("adds PRs to the Queue from the bar without leaving the PR under review", asy
   )
   await showing("Greet the world")
 })
+
+it("queues PRs from Open a PR in any area: Mod Enter for one, Enter for several", async () => {
+  window.history.replaceState(null, "", "#/settings")
+  const user = mount([queued(greet)])
+
+  await screen.findByRole("heading", { name: "Settings" })
+  await user.keyboard("{Control>}l{/Control}")
+  await user.paste(wave.url)
+  await user.keyboard("{Control>}{Enter}{/Control}")
+  await screen.findByText("Queued mona/elsewhere#7")
+  expect(screen.getByRole("heading", { name: "Settings" })).toBeTruthy()
+
+  await user.keyboard("{Control>}l{/Control}")
+  await user.paste(`${greet.url} ${fibers.url}`)
+  await screen.findByText(/Queues 2 PRs/)
+  await user.keyboard("{Enter}")
+  await screen.findByText("Queued effect-ts/effect#9")
+  await screen.findByText("1 already queued")
+
+  await user.click(screen.getAllByRole("button", { name: "View Queue" })[0]!)
+  const panel = await screen.findByRole("tabpanel", { name: /^Queue/ })
+  await waitFor(() => expect(rows(panel)).toHaveLength(3))
+})
