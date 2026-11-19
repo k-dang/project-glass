@@ -173,7 +173,6 @@ const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
     adapter,
     folder,
     events,
-    turns: SubscriptionRef.get(turns),
     statuses: SubscriptionRef.get(activity).pipe(Effect.map(({ agentStatuses }) => agentStatuses)),
     until,
     untilActivity,
@@ -327,12 +326,9 @@ export const glassToolsBackend = Effect.fnUntraced(function* (sessionId: string)
   }
 })
 
-export const claudeSession = Effect.fnUntraced(function* (
-  scenario: string,
-  places: Readonly<Record<string, string>> = {},
-) {
+export const claudeSession = Effect.fnUntraced(function* (scenario: string) {
   const folder = yield* isolatedHome
-  const tape = sessionTape(scenario, pinnedClaudeProgram(), { "<folder>": folder, ...places })
+  const tape = sessionTape(scenario, pinnedClaudeProgram(), { "<folder>": folder })
 
   if (recordingSessions)
     for (const [name, value] of Object.entries(claudeLoginEnvironment(folder)))

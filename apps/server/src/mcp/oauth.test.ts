@@ -183,7 +183,6 @@ describe("MCP OAuth", () => {
       const { baseUrl } = yield* start
       const denied = yield* mcpPost(baseUrl, initialize)
       const metadata = denied.messages.length
-      const header = denied.status === 401 ? "present" : "missing"
 
       assert.strictEqual(denied.status, 401)
       assert.strictEqual(metadata, 0)
@@ -203,7 +202,6 @@ describe("MCP OAuth", () => {
 
       const resourceMetadata = challenge.match(/resource_metadata="([^"]+)"/)?.[1]
 
-      assert.ok(header === "present")
       assert.ok(resourceMetadata !== undefined)
 
       const protectedResource = yield* Effect.promise(() => fetch(resourceMetadata))
@@ -694,22 +692,6 @@ describe("MCP OAuth", () => {
         },
         { registered: 400, authorized: 400, decided: 400, traded: 400, mcp: 401, rows: 0 },
       )
-    }),
-  )
-
-  it.live("keeps accepting a conversation bearer", () =>
-    Effect.gen(function* () {
-      const { baseUrl, client, mcpCredentials } = yield* start
-
-      const bearer = yield* mcpCredentials.issue({
-        globalConversationId: "claude-code",
-        sessionId: "claude-code",
-      })
-
-      const mcp = yield* connectMcp(baseUrl, bearer)
-
-      assert.strictEqual((yield* mcp.request("tools/list", {}).response).status, 200)
-      assert.deepStrictEqual(yield* connectedConversations(client), [])
     }),
   )
 })

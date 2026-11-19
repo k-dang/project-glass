@@ -1,7 +1,7 @@
 import { SqliteClient, SqliteMigrator } from "@effect/sql-sqlite-node"
 import { assert, it } from "@effect/vitest"
 import { ConversationError, ConversationOutcome, GlobalConversationUpdate } from "@glass/contracts"
-import { DateTime, Effect, Layer, Stream } from "effect"
+import { DateTime, Effect, Layer, Stream, Option } from "effect"
 import { SqlClient } from "effect/sql"
 import { Conversations } from "./Conversations"
 import { AgentReviews } from "./AgentReviews"
@@ -66,9 +66,9 @@ it.live(
 
       yield* transcripts.startGlobalConversationUpdate("session", globalConversationUpdate, record)
       const event = yield* published.pipe(Stream.runHead)
-      assert.equal(event._tag, "Some")
       const [turn] = (yield* transcripts.read("session")).turns
       assert.isDefined(turn)
+      assert.equal(Option.getOrThrow(event).turnId, turn.id)
       assert.deepStrictEqual(
         yield* sql`SELECT global_conversation_update_outcome_at, global_conversation_update_turn_id FROM global_started_conversation`,
         [
