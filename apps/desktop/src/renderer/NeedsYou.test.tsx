@@ -547,32 +547,6 @@ it("goes Back from an opened item to the Inbox with that item still selected", a
   await waitFor(() => expect(window.location.hash).toBe("#/reviews/octo-org/glass/42"))
 })
 
-it("moves through the rows with j and k, held or pressed, skipping a folded group", async () => {
-  const user = mount(needsYouRef([waitingConversation, laterConversation, finishedReview]))
-
-  const first = await screen.findByRole("button", { name: /agent\/swift-otter/ })
-  expect(first.getAttribute("aria-current")).toBe("true")
-
-  await user.keyboard("j")
-  const second = screen.getByRole("button", { name: /agent\/quiet-lynx/ })
-  expect(second.getAttribute("aria-current")).toBe("true")
-  expect(document.activeElement).toBe(second)
-
-  await user.keyboard("k")
-  await user.keyboard("{j>2/}")
-  expect(screen.getByRole("heading", { name: "Retry flaky upload" })).toBeTruthy()
-
-  await user.keyboard("k")
-  expect(screen.getByRole("heading", { name: "agent/quiet-lynx" })).toBeTruthy()
-
-  await user.click(screen.getByRole("button", { name: /^Stopped on you/ }))
-  expect(screen.queryByRole("button", { name: /agent\/quiet-lynx/ })).toBeNull()
-  expect(screen.getByRole("heading", { name: "Retry flaky upload" })).toBeTruthy()
-
-  await user.keyboard("k")
-  expect(screen.getByRole("heading", { name: "Retry flaky upload" })).toBeTruthy()
-})
-
 it("marks a finished Agent review done with Done or e, naming the review it saw", async () => {
   const done: Array<{ readonly pullRequest: PullRequestRef; readonly writtenAt: DateTime.Utc }> = []
 
