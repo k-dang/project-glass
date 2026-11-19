@@ -309,8 +309,7 @@ const toDosIn = Effect.fnUntraced(function* (
   return Context.get(services, ToDos)
 })
 
-// Like Node's writeFile, a held write keeps going after its fiber is interrupted.
-const heldWrites = Effect.gen(function* () {
+const heldWritesThatOutliveInterruption = Effect.gen(function* () {
   const gate = yield* Deferred.make<void>()
   let started = 0
   const events: Array<"wrote" | "removed"> = []
@@ -363,7 +362,7 @@ const heldWrites = Effect.gen(function* () {
 it.live("writes to-do image originals and thumbnails concurrently, keeping image order", () =>
   Effect.gen(function* () {
     const home = yield* isolatedHome
-    const writes = yield* heldWrites
+    const writes = yield* heldWritesThatOutliveInterruption
     const toDos = yield* toDosIn(home, writes.wrap())
     const first = { ...shot("AQIDBA=="), data: "BQYH" }
     const second = shot("BAUGBw==")
@@ -392,7 +391,7 @@ it.live("writes to-do image originals and thumbnails concurrently, keeping image
 it.live("waits for writes in flight before cleaning up a to-do image that fails to save", () =>
   Effect.gen(function* () {
     const home = yield* isolatedHome
-    const writes = yield* heldWrites
+    const writes = yield* heldWritesThatOutliveInterruption
 
     const toDos = yield* toDosIn(
       home,
@@ -416,7 +415,7 @@ it.live("waits for writes in flight before cleaning up a to-do image that fails 
 it.live("waits for writes in flight before cleaning up cancelled to-do images", () =>
   Effect.gen(function* () {
     const home = yield* isolatedHome
-    const writes = yield* heldWrites
+    const writes = yield* heldWritesThatOutliveInterruption
     const toDos = yield* toDosIn(home, writes.wrap())
 
     yield* toDos.add("Keep me", "", [])
