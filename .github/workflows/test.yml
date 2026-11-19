@@ -3,35 +3,73 @@ name: Test
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - "**/*.md"
   pull_request:
-    paths-ignore:
-      - "**/*.md"
 
 concurrency:
   group: test-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  test:
-    strategy:
-      fail-fast: false
-      matrix:
-        app: [server, desktop]
+  # Picks the test jobs a pull request can affect. A path it does not know runs every job, and so
+  # does every push to main, which checks what landed after other pull requests merged. Skipped
+  # jobs still report their check, as skipped.
+  changes:
     runs-on: ubuntu-latest
+    outputs:
+      server: ${{ steps.select.outputs.server }}
+      desktop: ${{ steps.select.outputs.desktop }}
     steps:
       - uses: actions/checkout@v7
-      - uses: jdx/mise-action@v5
-      - run: pnpm install
-      - run: pnpm --filter @glass/${{ matrix.app }} test
+        with:
+          fetch-depth: 2
+      - id: select
+        run: |
+          server=true desktop=true
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            server=false desktop=false
+            # HEAD merges the pull request into its base, so HEAD^1 is the base. Without renames, a
+            # moved file lists its old path too.
+            while read -r path; do
+              case "$path" in
+                *.md | docs/* | examples/* | apps/gallery/*) ;;
+                apps/server/*) server=true ;;
+                apps/desktop/*) desktop=true ;;
+                *) echo "$path affects every app"; server=true desktop=true ;;
+              esac
+            done < <(git diff --name-only --no-renames HEAD^1 HEAD)
+          fi
+          echo "server=$server desktop=$desktop"
+          echo "server=$server" >> "$GITHUB_OUTPUT"
+          echo "desktop=$desktop" >> "$GITHUB_OUTPUT"
 
-  e2e:
+  server:
+    name: test (server)
+    needs: changes
+    if: needs.changes.outputs.server == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: jdx/mise-action@v5
-      - run: pnpm install
+      - uses: ./.github/actions/setup
+      - run: pnpm --filter @glass/server test
+
+  desktop:
+    name: test (desktop)
+    needs: changes
+    if: needs.changes.outputs.desktop == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      - run: pnpm --filter @glass/desktop test
+
+  # The end-to-end tests drive the desktop app against the server, so a change to either runs them.
+  e2e:
+    needs: changes
+    if: needs.changes.outputs.server == 'true' || needs.changes.outputs.desktop == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
       - name: Let Chromium's sandbox create the user namespaces Ubuntu's AppArmor blocks
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: xvfb-run -a pnpm test:e2e
