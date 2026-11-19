@@ -13,7 +13,6 @@ import { createHash } from "node:crypto"
 import { join } from "node:path"
 import { Git } from "./git"
 
-/** Why reading a folder's changes failed, for the caller to log and explain in its own words. */
 export class ChangesFailed extends Schema.TaggedError<ChangesFailed>()("ChangesFailed", {
   cause: Schema.Unknown,
 }) {}
@@ -23,7 +22,6 @@ const failed = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
 
 const encodeFiles = Schema.encodeSync(Schema.Array(ChangedFile))
 
-/** Names one version of a folder's changes, so a Feedback note can tell it was left on another. */
 export const changesId = (files: ReadonlyArray<ChangedFile>) =>
   createHash("sha256")
     .update(JSON.stringify(encodeFiles(files)))

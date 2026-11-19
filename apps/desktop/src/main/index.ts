@@ -251,6 +251,7 @@ const createWindow = () => {
 
     return { action: "deny" }
   })
+  // WARNING: A reload or crash skips the pages' close, so the next document starts with none.
   window.webContents.on("did-navigate", pages.clear)
   window.on("closed", pages.clear)
   window.webContents.on("will-navigate", (event) => {

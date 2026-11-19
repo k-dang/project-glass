@@ -141,7 +141,7 @@ export const SessionState = Schema.Struct({
 
 export const AvailableModels = Schema.Struct({ models: Schema.Array(PiModel) })
 
-/** pi names a skill `skill:name`; an extension's command may have no description. */
+// WARNING: pi names a skill skill:name, and an extension's command may have no description.
 export const AvailableCommands = Schema.Struct({
   commands: Schema.Array(
     Schema.Struct({ name: Schema.String, description: Schema.optional(Schema.String) }),

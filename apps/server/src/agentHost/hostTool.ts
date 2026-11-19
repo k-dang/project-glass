@@ -6,10 +6,7 @@ export interface ToolReply {
   readonly text: string
 }
 
-/**
- * Generated JSON Schema drops some checks, so Claude Code and pi only screen a tool's arguments
- * with it, and the tool decodes them with the schema Glass reads its calls back with.
- */
+// WARNING: Generated JSON Schema drops some checks, so harnesses only screen arguments with it and the tool decodes them with Glass's schema.
 export const toolParameters = (
   fields: Record.ReadonlyRecord<string, readonly [field: Schema.Top, description: string]>,
 ) => {

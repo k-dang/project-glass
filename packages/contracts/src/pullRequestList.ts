@@ -23,7 +23,6 @@ export class PullRequestSummary extends Schema.Class<PullRequestSummary>("PullRe
   updatedAt: Schema.DateTimeUtcFromString,
 }) {}
 
-/** The open PR, in a followed repository, whose head is a Conversation's branch. */
 export class ConversationPullRequest extends Schema.Class<ConversationPullRequest>(
   "ConversationPullRequest",
 )({

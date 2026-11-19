@@ -11,13 +11,8 @@ interface Waiting<Item, Result> {
   readonly settled: Deferred.Deferred<void>
 }
 
-/**
- * What Outside agents wait on in the Inbox, one per MCP session and one per subject, until the
- * user answers, the wait ends, the caller goes, or Glass shuts down.
- */
 export const inboxWaitsOf = <Item, Result>(options: {
   readonly idOf: (item: Item) => string
-  /** What only one wait may be on at a time, such as a Check-in's folder. */
   readonly subjectOf?: (item: Item) => string
   readonly timedOut: Result
   readonly cancelled: Result

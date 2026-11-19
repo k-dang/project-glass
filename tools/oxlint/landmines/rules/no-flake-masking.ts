@@ -75,7 +75,7 @@ export const noFlakeMasking = defineRule({
       timeout:
         "Do not raise a test's timeout. Wait on the event the test depends on, or move slow shared setup into a beforeAll hook.",
       stale:
-        "This file now has {{count}} test timeout bumps; lower its no-flake-masking allowlist entry for {{path}} in vite.config.ts to {{count}}, or remove the entry at 0.",
+        "This file now has {{count}} test timeout bumps; lower its no-flake-masking allowlist entry for {{path}} in .oxlintrc.jsonc to {{count}}, or remove the entry at 0.",
     },
   },
   create(context) {

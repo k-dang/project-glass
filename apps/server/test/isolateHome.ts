@@ -10,5 +10,4 @@ export default function isolateHome() {
   return () => rmSync(home, { recursive: true, force: true })
 }
 
-/** The user's own home, which tests that borrow a real login read from instead of `HOME`. */
 export const realHome = () => userInfo().homedir

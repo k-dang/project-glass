@@ -108,10 +108,6 @@ export class LocalAgentHost extends Context.Service<
   {
     readonly client: Effect.Effect<HostClient, ConversationError>
     readonly running: Effect.Effect<Option.Option<HostClient>>
-    /**
-     * Reattaches, once per launch, to the host an earlier launch left running, if it can, and names
-     * the Conversations whose Turn that host carries on.
-     */
     readonly resume: Effect.Effect<Resumed>
     readonly followReattached: Effect.Effect<void>
     readonly lifetimeOf: (client: ConversationHost) => Effect.Effect<Option.Option<Scope.Scope>>

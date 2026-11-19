@@ -531,6 +531,7 @@ export const claudeAdapter = (
 
         if (!(yield* turns.steer({ ...sent, id: uuid }))) return yield* notRunning
 
+        // WARNING: Claude Code folds a priority next message into the running Turn between tool rounds.
         return yield* Queue.offer(prompts, { ...userMessage(sent), uuid, priority: "next" }).pipe(
           Effect.asVoid,
         )

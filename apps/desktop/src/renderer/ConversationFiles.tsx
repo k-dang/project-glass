@@ -105,7 +105,6 @@ function useRereadWhenTurnEnds(atom: Atom.Atom<unknown>, lastEnded: string | nul
   }, [atom, lastEnded, refresh])
 }
 
-/** Which inline code in the transcript names a file in the Conversation's folder, gitignored or not. */
 export function useFileLinks(
   conversationId: string,
   turns: ReadonlyArray<Turn>,
@@ -124,7 +123,6 @@ export function useFileLinks(
   return useMemo(() => ({ files: new Set(lastFoundFiles), open }), [lastFoundFiles, open])
 }
 
-/** Lets inline code in a Conversation's transcript open a file in its folder. */
 export const FileLinks = createContext<{
   readonly files: ReadonlySet<string>
   readonly open: (path: string) => void
@@ -213,6 +211,7 @@ function FileView(props: { path: string; file: ConversationFile }) {
   )
 }
 
+// WARNING: The page runs in its own sandboxed origin, so files beside it don't load.
 function HtmlDocument(props: { path: string; html: string }) {
   const [src, setSrc] = useState<string | null>(null)
 

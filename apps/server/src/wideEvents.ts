@@ -17,10 +17,7 @@ import { OtlpLogger, OtlpSerialization, OtlpTracer } from "effect/observability"
 import { randomUUID } from "node:crypto"
 import type { Delivery } from "./ConversationTurns"
 
-/**
- * Fields hold IDs, counts, choices and durations. Never put message text, prompts, diffs,
- * transcripts or credentials in them: users attach `backend.log` to bug reports.
- */
+// WARNING: Fields hold only IDs, counts, choices and durations, never message text, prompts, diffs, transcripts or credentials: users attach backend.log to bug reports.
 export interface UnitFields {
   readonly pr?: string
   readonly head?: string
@@ -218,10 +215,7 @@ export const wideEventsToStdoutAndOtlp = (source: Source) => {
 export const jsonLogsToStdout = (source: Source) =>
   Logger.layer([lineLogger(emitter(source, toStdout, toStderr))])
 
-/**
- * Runs a process's main effect with `output` providing its logger, so the failure that ends it is
- * a JSON line too: `NodeRuntime.runMain`'s own report would use Effect's default text logger.
- */
+// WARNING: NodeRuntime.runMain's own failure report would use Effect's text logger, so output provides the logger for the main effect.
 export const runMain =
   (output: Layer.Layer<never>) =>
   <A, E>(main: Effect.Effect<A, E>) =>

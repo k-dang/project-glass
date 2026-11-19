@@ -151,25 +151,20 @@ export function ChangedFilesTree(props: {
     model.resetPaths({ preparedInput: preparePresortedFileTreeInput(paths) })
   }
 
+  // WARNING: Trees fires no onSelectionChange when the selected row is clicked again.
   const reopenSelectedFileOnClick = (event: MouseEvent<HTMLElement>) => {
     if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey) return
 
-    if (
-      event.nativeEvent
-        .composedPath()
-        .some((node) => node instanceof HTMLElement && node.hasAttribute("data-row-checkbox"))
-    )
-      return
+    const clicked = event.nativeEvent.composedPath().filter((node) => node instanceof HTMLElement)
+
+    if (clicked.some((element) => element.hasAttribute("data-row-checkbox"))) return
 
     const [path, ...others] = model.getSelectedPaths()
 
     if (path === undefined || others.length > 0 || !filesByPath.has(path)) return
 
-    const clickedSelected = event.nativeEvent
-      .composedPath()
-      .some((node) => node instanceof HTMLElement && node.dataset.itemPath === path)
-
-    if (clickedSelected) onSelect(path, nextSelectionScroll.current)
+    if (clicked.some((element) => element.dataset.itemPath === path))
+      onSelect(path, nextSelectionScroll.current)
   }
 
   return (

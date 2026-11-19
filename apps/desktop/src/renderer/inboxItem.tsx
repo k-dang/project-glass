@@ -156,7 +156,6 @@ export const firstPermission = (item: NeedsYouItem) =>
     GlobalConversation: () => null,
   })
 
-/** A Check-in's summary: its first line titles it, and the rest says where to look. */
 export const summaryParts = (summary: string | null) => {
   if (summary === null) return null
 

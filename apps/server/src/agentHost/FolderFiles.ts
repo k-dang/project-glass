@@ -38,16 +38,13 @@ const isInside = (root: string, path: string) => {
   return inside !== "" && inside !== ".." && !inside.startsWith(`..${sep}`) && !isAbsolute(inside)
 }
 
-/** Files in a Conversation's folder, whether git tracks them or not. */
 export class FolderFiles extends Context.Service<
   FolderFiles,
   {
-    /** The paths that name a file in the folder, kept in order. */
     readonly existing: (
       folder: string,
       paths: ReadonlyArray<string>,
     ) => Effect.Effect<ReadonlyArray<string>, HostConversationError>
-    /** Refuses a path that leaves the folder, through `..` or a symlink. */
     readonly read: (
       folder: string,
       path: string,

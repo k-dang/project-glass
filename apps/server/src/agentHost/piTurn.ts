@@ -201,6 +201,7 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
       case "agent_start":
         state = { ...turn, generation: turn.generation + 1 }
         break
+      // WARNING: pi's agent_end closes one run that retries, queued work, or an extension can follow, so settling asks whether pi is idle.
       case "agent_settled":
         commands.push(Command.CheckIdle({ generation: turn.generation }))
         break

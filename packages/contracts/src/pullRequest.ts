@@ -12,7 +12,7 @@ export class PullRequestRef extends Schema.Class<PullRequestRef>("PullRequestRef
   number: Schema.Int.check(Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(GRAPHQL_INT_MAX)),
 }) {}
 
-/** GitHub matches owner and repository names ignoring case, so this identifies one PR. */
+// WARNING: GitHub matches owner and repository names ignoring case.
 export const referenceKey = ({ owner, repo, number }: PullRequestRef) =>
   `${owner.toLowerCase()}/${repo.toLowerCase()}#${number}`
 
@@ -115,7 +115,7 @@ export class PullRequestWorkspace extends Schema.Class<PullRequestWorkspace>(
   drafts: Schema.Array(Draft),
 }) {}
 
-/** GitHub returns the same not-found response for nonexistent and inaccessible private repositories. */
+// WARNING: GitHub returns the same not-found response for nonexistent and inaccessible private repositories.
 export class PullRequestNotFound extends Schema.TaggedError<PullRequestNotFound>()(
   "PullRequestNotFound",
   { ref: PullRequestRef },

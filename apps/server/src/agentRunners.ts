@@ -98,6 +98,7 @@ const piCliFlags = (tools: AgentTools) => [
   piTools[tools].join(","),
 ]
 
+// WARNING: pi --list-models matches its search fuzzily and prints a table of provider and model columns.
 const listedModelIds = (listing: string) =>
   listing
     .split("\n")

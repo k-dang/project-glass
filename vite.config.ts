@@ -71,7 +71,10 @@ export default defineConfig({
       "anti-slop-effect/no-service-constructor-imports": "error",
       "anti-slop-effect/prefer-effect-match": "error",
       "landmines-testing/no-flake-masking": "error",
-      "landmines-style/no-comments": ["error", { allow: ["WARNING", "SAFETY", "Flaky"] }],
+      "landmines-style/no-comments": [
+        "error",
+        { allow: ["WARNING", "SAFETY", "Flaky"], publicApi: ["/packages/plugin/"] },
+      ],
       "landmines-structure/test-file-names": "error",
       "landmines-structure/package-exports": "error",
     },

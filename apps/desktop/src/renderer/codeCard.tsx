@@ -5,10 +5,7 @@ const HEADER_HEIGHT = 44
 
 type CodeOptions = CodeViewReactOptions<undefined, undefined>
 
-/**
- * Diffs' paddingBottom metric must match the rendered padding. Unified wrapping
- * keeps a scroll container; split wrapping adds padding to a shared grid.
- */
+// WARNING: Diffs' paddingBottom metric must match the rendered padding; unified wrapping keeps a scroll container, split wrapping pads a shared grid.
 export const lineOptions = (
   wrap: boolean,
   headerHeight = HEADER_HEIGHT,
@@ -23,7 +20,7 @@ export const lineOptions = (
 
 export const codeCardOptions: CodeOptions = lineOptions(true)
 
-/** overflow: hidden can change sticky headers' scroll ancestor; overflow: clip does not. */
+// WARNING: overflow: hidden can change sticky headers' scroll ancestor; overflow: clip does not.
 export const codeCardClassName =
   "[&_diffs-container]:overflow-clip [&_diffs-container]:rounded-lg [&_diffs-container]:ring-1 [&_diffs-container]:ring-border"
 

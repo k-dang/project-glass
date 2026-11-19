@@ -78,7 +78,7 @@ export class Git extends Context.Service<
   )
 }
 
-/** The top level of the repository holding `path`. Git for Windows prints it with forward slashes. */
+// WARNING: Git for Windows prints the top level with forward slashes.
 export const topLevelOf = (git: Git["Service"], path: string) =>
   git.run(path, ["rev-parse", "--show-toplevel"]).pipe(Effect.map((printed) => resolve(printed)))
 

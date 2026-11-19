@@ -12,7 +12,6 @@
 - Dropped `strict-msw`, since Glass doesn't use MSW, and `no-unsignaled-poll`, since `glass/test-waits` already bans direct `vi.waitFor`. `allowlistProperties` is no longer exported.
 - Dropped `landmines-types` and its `no-explicit-return-types`. Glass's return types keep literal tags from widening, pin Effect error channels, and type recursive functions.
 - Dropped `colocated-tests` and its `lib/test-owner.ts`. It can't see a subject reached through a `test/` harness, which is how most Glass tests reach theirs, so it guessed owners from incidental imports. `packageDirectory` moved to `lib/package-directory.ts`.
-- Allowlist `stale` messages name `vite.config.ts`, where Glass configures Oxlint, instead of `.oxlintrc.jsonc`.
 - `no-flake-masking` doesn't check the `test` block of Vite configs: a package-wide time limit is Glass policy, not a masked flake. It still checks per-test timeouts and `vi.setConfig`.
 - `no-comments` also accepts the `@vitest-environment` directive.
 - Upstream tests are not vendored.

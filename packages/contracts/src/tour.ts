@@ -13,7 +13,6 @@ export const TourCodeTarget = Schema.Struct({
 
 export type TourCodeTarget = typeof TourCodeTarget.Type
 
-/** A Mermaid flowchart. Nodes carry the `added` or `removed` class when the change adds or removes them. */
 export const TourDiagram = Schema.NonEmptyString.check(Schema.isMaxLength(4000))
 
 export type TourDiagram = typeof TourDiagram.Type

@@ -15,7 +15,6 @@ import { Transcripts } from "../src/Transcripts"
 import { DEMO_REPOSITORY } from "./demoPullRequests"
 import { REPLAYED_PREFIX } from "./replayedNames"
 
-/** What `drive` in `adapterSessions.ts` writes to `GLASS_TRANSCRIPTS_DIR` when a session ends. */
 export const ReplayedTranscript = Schema.fromJsonString(
   Schema.Struct({ harness: AgentHarness, events: Schema.Array(HostEvent) }),
 )
@@ -86,10 +85,6 @@ const distinct = (replays: ReadonlyArray<Replayed>) => {
     })
 }
 
-/**
- * Stores, as Conversations, the transcripts the recorded harness sessions produced on replay
- * (`GLASS_TRANSCRIPTS_DIR` in `adapterSessions.ts`), one for each distinct set of UI states.
- */
 export const seedReplayedConversations = (directory: string, folder: string) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient

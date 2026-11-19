@@ -1,4 +1,4 @@
-/** Follows pi-subagents' documented lifecycle events, which its own terminal widget shows but pi's RPC mode drops. */
+// WARNING: Follows pi-subagents' documented lifecycle events, which its terminal widget shows but pi's RPC mode drops.
 export const piSubagentStatusExtension = `
 export default function (pi) {
   const running = new Map()

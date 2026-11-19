@@ -22,6 +22,7 @@ export interface ParsedFile {
   readonly placeholder: string | null
 }
 
+// WARNING: Diffs reads file names and change type from a git file header, which GitHub's hunks omit.
 const toFileDiff = (file: ChangedFile, hunks: string | null): FileDiffMetadata | undefined => {
   const oldPath = file.previousPath ?? file.path
   const header = [`diff --git a/${oldPath} b/${file.path}`]
@@ -221,7 +222,7 @@ const hash = (text: string) => {
   return value >>> 0
 }
 
-/** Diffs accepts controlled item-data updates only when the item's version changes. */
+// WARNING: Diffs accepts controlled item-data updates only when the item's version changes.
 export const toItems = <M>(
   files: ReadonlyArray<ParsedFile>,
   annotationsFor: (path: string) => FileAnnotations<M>,

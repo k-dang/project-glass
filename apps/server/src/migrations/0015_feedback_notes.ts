@@ -1,7 +1,6 @@
 import { Effect } from "effect"
 import { SqlClient } from "effect/sql"
 
-/** Feedback notes now belong to a Conversation or, for Check-ins, a folder: one table for both. */
 export default Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
 

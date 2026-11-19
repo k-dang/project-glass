@@ -262,10 +262,6 @@ export class Conversations extends Context.Service<
     readonly remove: (
       conversationId: string,
     ) => Effect.Effect<void, ConversationNotFound | ConversationError>
-    /**
-     * Reads the branch a work Conversation's folder has checked out, since its agent may switch
-     * or rename it during a Turn. Succeeds with whether it could.
-     */
     readonly followBranch: (
       conversationId: string,
     ) => Effect.Effect<boolean, ConversationNotFound | ConversationError>

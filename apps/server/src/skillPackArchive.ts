@@ -20,10 +20,7 @@ const within = (folder: string, path: string) => {
   return path.startsWith(`${folder}/`) ? path.slice(folder.length + 1) : null
 }
 
-/**
- * Reads the files under `folder` from a GitHub repository tarball, whose entries all sit under one
- * `<owner>-<repo>-<sha>/` folder. Returns null when the archive has no such folder.
- */
+// WARNING: Every entry of a GitHub repository tarball sits under one <owner>-<repo>-<sha>/ folder.
 export const filesInArchive = (archive: Uint8Array, folder: string) =>
   Effect.callback<ReadonlyArray<ArchiveFile> | null, Error>((resume) => {
     const files: Array<ArchiveFile> = []

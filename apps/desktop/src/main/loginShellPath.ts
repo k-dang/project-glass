@@ -24,10 +24,7 @@ const readPath = (shell: string) =>
 const mergePaths = (...paths: ReadonlyArray<string | undefined>) =>
   [...new Set(paths.flatMap((path) => (path ?? "").split(":")).filter(Boolean))].join(":")
 
-/**
- * Apps opened from Finder or the Dock inherit launchd's bare PATH, which misses where
- * claude, pi, and git usually live (~/.local/bin, Homebrew, version managers).
- */
+// WARNING: Apps opened from Finder or the Dock inherit launchd's bare PATH, which misses where claude, pi and git usually live.
 export const prependLoginShellPath = (
   env: NodeJS.ProcessEnv,
   shells: ReadonlyArray<string | undefined>,

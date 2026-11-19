@@ -72,7 +72,6 @@ const SessionEntry = Schema.Union([
 
 type SessionEntry = typeof SessionEntry.Type
 
-/** What pi answers `get_entries` with: every entry of the session tree, and the active leaf. */
 export const SessionEntries = Schema.Struct({
   entries: Schema.Array(SessionEntry),
   leafId: Schema.NullOr(Schema.String),
@@ -98,7 +97,6 @@ export type GlobalConversationUpdateDelivery =
     }
   | { readonly state: "completed"; readonly events: ReadonlyArray<PiEvent> }
 
-/** Uses the full saved branch, including messages before compaction, to find this Global conversation update. */
 export const globalConversationUpdateDelivery = (
   turnId: string,
   prompt: string,
