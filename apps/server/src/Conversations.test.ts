@@ -9,9 +9,16 @@ import {
 } from "@glass/contracts"
 import { Effect, Option, Predicate, Stream } from "effect"
 import { existsSync } from "node:fs"
-import { mkdir, rename, writeFile } from "node:fs/promises"
+import { mkdir, rename, symlink, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
-import { conversationsFixture, holding, repository, settled } from "../test/conversationsFixture"
+import {
+  conversationsFixture,
+  conversationsFixtureWith,
+  holding,
+  repository,
+  scriptedHost,
+  settled,
+} from "../test/conversationsFixture"
 import { gitIn } from "../test/gitRepositories"
 import { isolatedHome } from "../test/harness"
 
@@ -71,6 +78,23 @@ it.live("lists a Followed repository's branches from GitHub, for a Sandbox", () 
     const missingDefault = yield* client.GetNewConversationDefaultBranch(nowhere).pipe(Effect.flip)
 
     assert.equal(missingDefault._tag, "GitHubUnavailable")
+  }),
+)
+
+it.live("fails only the Turn sent while the agent host bundle is missing", () =>
+  Effect.gen(function* () {
+    const bundle = join(yield* isolatedHome, "agentHost.mjs")
+    const f = yield* conversationsFixtureWith({ agentHostBundle: bundle })
+    const conversation = yield* f.start()
+
+    const [failed] = yield* f.transcript(conversation.id, settled(1))
+    assert.equal(failed?.ended?.ending._tag, "Failed")
+
+    yield* Effect.promise(() => symlink(scriptedHost, bundle))
+    yield* f.send(conversation.id, "Say hello again")
+
+    const turns = yield* f.transcript(conversation.id, settled(2))
+    assert.equal(turns.at(-1)?.ended?.ending._tag, "Done")
   }),
 )
 
