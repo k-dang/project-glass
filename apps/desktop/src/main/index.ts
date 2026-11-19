@@ -46,6 +46,8 @@ const APP_ORIGIN = `${APP_SCHEME}://app`
 
 const rendererOrigin = devServerUrl === undefined ? APP_ORIGIN : new URL(devServerUrl).origin
 
+const devIcon = app.isPackaged ? undefined : join(__dirname, "../../build/icon.png")
+
 const resources = app.isPackaged
   ? {
       server: join(process.resourcesPath, "server", "bin.mjs"),
@@ -192,6 +194,8 @@ const createWindow = () => {
     },
   })
 
+  if (devIcon !== undefined && process.platform !== "darwin") window.setIcon(devIcon)
+
   const updateTheme = () => updateWindowTheme(window)
 
   nativeTheme.on("updated", updateTheme)
@@ -310,7 +314,7 @@ void app.whenReady().then(() => {
 
   if (devServerUrl === undefined) serveRenderer()
 
-  if (!app.isPackaged) app.dock?.setIcon(join(__dirname, "../../build/icon.png"))
+  if (devIcon !== undefined) app.dock?.setIcon(devIcon)
 
   createWindow()
   app.on("activate", () => {
