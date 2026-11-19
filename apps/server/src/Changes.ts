@@ -8,10 +8,26 @@ import {
   PatchTooLarge,
   TextPatch,
 } from "@glass/contracts"
-import { Context, Effect, FileSystem, Layer } from "effect"
+import { Context, Effect, FileSystem, Layer, Schema } from "effect"
+import { createHash } from "node:crypto"
 import { join } from "node:path"
-import { Git } from "../git"
-import { failure, type HostConversationError } from "./protocol"
+import { Git } from "./git"
+
+/** Why reading a folder's changes failed, for the caller to log and explain in its own words. */
+export class ChangesFailed extends Schema.TaggedError<ChangesFailed>()("ChangesFailed", {
+  cause: Schema.Unknown,
+}) {}
+
+const failed = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+  effect.pipe(Effect.mapError((cause) => new ChangesFailed({ cause })))
+
+const encodeFiles = Schema.encodeSync(Schema.Array(ChangedFile))
+
+/** Names one version of a folder's changes, so a Feedback note can tell it was left on another. */
+export const changesId = (files: ReadonlyArray<ChangedFile>) =>
+  createHash("sha256")
+    .update(JSON.stringify(encodeFiles(files)))
+    .digest("hex")
 
 const MAX_PATCH_CHARS = 500_000
 
@@ -97,12 +113,12 @@ export class Changes extends Context.Service<
     readonly since: (
       folder: string,
       baseRef: string,
-    ) => Effect.Effect<ReadonlyArray<ChangedFile>, HostConversationError>
-    readonly uncommitted: (folder: string) => Effect.Effect<boolean, HostConversationError>
-    readonly branch: (folder: string) => Effect.Effect<string | null, HostConversationError>
-    readonly files: (folder: string) => Effect.Effect<ReadonlyArray<string>, HostConversationError>
+    ) => Effect.Effect<ReadonlyArray<ChangedFile>, ChangesFailed>
+    readonly uncommitted: (folder: string) => Effect.Effect<boolean, ChangesFailed>
+    readonly branch: (folder: string) => Effect.Effect<string | null, ChangesFailed>
+    readonly files: (folder: string) => Effect.Effect<ReadonlyArray<string>, ChangesFailed>
   }
->()("@glass/server/agentHost/Changes") {
+>()("@glass/server/Changes") {
   static readonly layer = Layer.effect(
     Changes,
     Effect.gen(function* () {
@@ -171,16 +187,16 @@ export class Changes extends Context.Service<
                   patch: filePatch(file, patches[index]!),
                 }),
             )
-          }).pipe(failure("Couldn't read the Conversation's changes.")),
+          }).pipe(failed),
         uncommitted: (folder) =>
           git.run(folder, ["status", "--porcelain"]).pipe(
             Effect.map((status) => status !== ""),
-            failure("Couldn't check the Conversation's folder for changes."),
+            failed,
           ),
         branch: (folder) =>
           git.run(folder, ["branch", "--show-current"]).pipe(
             Effect.map((branch) => (branch === "" ? null : branch)),
-            failure("Couldn't read the Conversation's branch."),
+            failed,
           ),
         files: (folder) =>
           git
@@ -189,7 +205,7 @@ export class Changes extends Context.Service<
               Effect.map((listed) => [
                 ...new Set(listed.split("\0").filter((path) => path !== "")),
               ]),
-              failure("Couldn't list the files in the Conversation's folder."),
+              failed,
             ),
       })
     }),
