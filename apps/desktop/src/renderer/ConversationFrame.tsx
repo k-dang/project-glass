@@ -6,15 +6,7 @@ import {
   shortSha,
 } from "@glass/contracts"
 import { cn } from "cn"
-import {
-  FolderGit2,
-  GitBranch,
-  GitPullRequest,
-  Package,
-  PanelRightClose,
-  PanelRightOpen,
-  PanelTop,
-} from "lucide-react"
+import { FolderGit2, GitBranch, GitPullRequest, Package, PanelTop } from "lucide-react"
 import { createContext, type ReactNode, use, useId, useState, useSyncExternalStore } from "react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -65,7 +57,6 @@ export function ConversationFrame(props: {
   const { details } = props
   const pins = wide && props.pinnable === true
   const pinnedLabel = pinned ? "Hide details" : "Show details"
-  const PinnedIcon = pinned ? PanelRightClose : PanelRightOpen
 
   return (
     <section
@@ -88,7 +79,7 @@ export function ConversationFrame(props: {
               aria-controls={detailsId}
               onClick={() => setPinned((open) => !open)}
             >
-              <PinnedIcon aria-hidden />
+              <PanelTop aria-hidden />
             </Button>
           ) : (
             <DetailsPopover details={details} />
