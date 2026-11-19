@@ -11,22 +11,20 @@ it("lists open to-dos newest id first", () => {
 })
 
 it("splits notes into text and links, and shortens a long link", () => {
-  expect(noteParts("See https://capy.ai/ before deciding.")).toEqual([
+  expect(noteParts("See https://example.com/ before deciding.")).toEqual([
     { kind: "text", value: "See " },
-    { kind: "link", value: "https://capy.ai/" },
+    { kind: "link", value: "https://example.com/" },
     { kind: "text", value: " before deciding." },
   ])
   expect(noteParts("https://example.com/docs).")).toEqual([
     { kind: "link", value: "https://example.com/docs" },
     { kind: "text", value: ")." },
   ])
-  expect(linkLabel("https://capy.ai/")).toBe("capy.ai")
-  expect(linkLabel("https://ui.shadcn.com/blocks/sidebar#sidebar-08")).toBe(
-    "ui.shadcn.com/blocks/sidebar#sidebar-08",
-  )
+  expect(linkLabel("https://example.com/")).toBe("example.com")
+  expect(linkLabel("https://example.com/docs#setup")).toBe("example.com/docs#setup")
   expect(
     linkLabel(
-      "https://bennettaur.github.io/yarvis/artifacts-beside-the-chat/02-diagram-beside-the-chat.png",
+      "https://example.com/docs/guides/getting-started/installation/screenshots/diagram.png",
     ),
-  ).toBe("bennettaur.github.io/…/02-diagram-beside-the-chat.png")
+  ).toBe("example.com/…/diagram.png")
 })
