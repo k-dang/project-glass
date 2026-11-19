@@ -193,6 +193,7 @@ const articleOf = (name: string) => {
 afterEach(() => {
   cleanup()
   vi.useRealTimers()
+  vi.unstubAllGlobals()
   window.history.replaceState(null, "", "#/")
 })
 
@@ -469,6 +470,41 @@ it("opens a Check-in's changes on their own page and approves them, with the not
     { checkInId: "check-1", answer: CheckInApprove.make({ message: "Ship it" }) },
   ])
   expect(await screen.findByRole("main", { name: "Inbox" })).toBeTruthy()
+})
+
+const checkInOf = (id: string, title: string) =>
+  CheckIn.make({
+    id,
+    folder: "/Users/kevin/retry",
+    summary: title,
+    askedBy: "Claude Code",
+    since: ago({ minutes: 1 }),
+  })
+
+it("brings Glass to the front on a new Check-in's page, but leaves waiting ones in the Inbox", async () => {
+  const bringToFront = vi.fn<() => Promise<void>>(() => Promise.resolve())
+  vi.stubGlobal("glass", { bringToFront })
+
+  const waiting = checkInOf("check-1", "Retry three times")
+  const needsYou = needsYouRef([waiting])
+
+  mount(needsYou, {
+    GetCheckInChanges: () =>
+      Effect.succeed(
+        new CheckInChanges({ id: "read-2", baseRef: "main", files: [changedFile("greet.ts")] }),
+      ),
+    ListCheckInNotes: () => Effect.succeed([]),
+  })
+
+  const stopped = await screen.findByRole("region", { name: "Stopped on you" })
+  expect(within(stopped).getByRole("option", { name: /Retry three times/ })).toBeTruthy()
+  expect(bringToFront).not.toHaveBeenCalled()
+
+  await setNeedsYou(needsYou, [waiting, checkInOf("check-2", "Back off longer")])
+
+  const page = within(await screen.findByRole("main", { name: "Check-in" }))
+  expect(await page.findByText("Back off longer")).toBeTruthy()
+  expect(bringToFront).toHaveBeenCalledTimes(1)
 })
 
 it("starts the next outside question with an empty answer", async () => {

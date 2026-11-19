@@ -39,6 +39,7 @@ export interface DesktopBridge {
   readonly setAppearance: (appearance: Appearance) => Promise<ColorScheme>
   readonly resourceUsage: () => Promise<ResourceUsage>
   readonly chooseFolder: () => Promise<string | null>
+  readonly bringToFront: () => Promise<void>
   readonly dogfoodReports: DogfoodReportsBridge
   readonly htmlPages: HtmlPagesBridge
 }
@@ -83,6 +84,8 @@ export const SET_APPEARANCE_CHANNEL = "glass:set-appearance"
 export const RESOURCE_USAGE_CHANNEL = "glass:resource-usage"
 
 export const CHOOSE_FOLDER_CHANNEL = "glass:choose-folder"
+
+export const BRING_TO_FRONT_CHANNEL = "glass:bring-to-front"
 
 export const RECORD_DOGFOOD_REPORT_CHANNEL = "glass:record-dogfood-report"
 

@@ -44,7 +44,8 @@ request. The agent names its folder; Glass reads the changes itself, against whe
 forked from its default branch (or the `baseRef` the agent passes), including uncommitted and
 untracked files. Glass freezes them as they are, so your notes always match the code you read.
 
-Select the Check-in in the Inbox and choose **Read the changes** to open them on their own page.
+When a Check-in arrives, Glass comes to the front on its page. Check-ins already waiting when Glass
+starts stay in the Inbox: select one and choose **Read the changes** to open them on their own page.
 Select lines in the diff to leave Feedback notes, then choose **Send feedback** for
 the agent to change the code, or **Approve** for it to carry on. Notes on an approval go to the
 agent as guidance. The agent waits up to an hour, or the time it asks for, at most two hours. If it
@@ -53,4 +54,5 @@ Check-in.
 
 To ask for a Check-in yourself, copy the [`glass-review`](glass-review/SKILL.md) folder into your
 agent's skills folder: `~/.claude/skills/` for Claude Code, then type `/glass-review`, or
-`~/.agents/skills/` for pi, then type `/skill:glass-review`.
+`~/.agents/skills/` for pi, then type `/skill:glass-review`. After Feedback, the agent addresses it
+and stops; run the skill again when you want to read the new changes.
