@@ -119,7 +119,7 @@ export function AppShell() {
   })
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden">
+    <div className="relative flex h-screen flex-col overflow-clip">
       <div className="title-strip flex shrink-0 items-center border-b pr-2 pl-[calc(env(titlebar-area-x,0px)+0.75rem)]">
         <HistoryNav />
       </div>
