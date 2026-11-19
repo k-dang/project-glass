@@ -97,7 +97,7 @@ type Emit = (
 
 const units = new WeakSet<Tracer.Span>()
 
-/** Effect's spans have no end hook, so this patches `end` on the inner tracer's own span. */
+// WARNING: Effect's spans have no end hook, so this patches end on the inner tracer's span.
 const asUnit = (span: Tracer.Span, emit: Emit) => {
   const end = span.end.bind(span)
 
@@ -196,8 +196,7 @@ export const wideEvents = (source: Source, stdout: Sink, stderr?: Sink) => {
   const emit = emitter(source, stdout, stderr)
 
   return Layer.mergeAll(
-    // Replaces the logger set rather than merging: Effect's default text logger would otherwise
-    // add non-JSON lines to backend.log (ADR 0012).
+    // WARNING: Logger.layer replaces the logger set, dropping Effect's text logger, which would add non-JSON lines to backend.log (ADR 0012).
     Logger.layer([lineLogger(emit)]),
     unitTracer(emit),
   )

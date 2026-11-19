@@ -1,7 +1,6 @@
 import { Effect } from "effect"
 import { SqlClient } from "effect/sql"
 
-// Tour diagrams became Mermaid source; saved node-and-edge diagrams can't be read as one.
 export default Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
 

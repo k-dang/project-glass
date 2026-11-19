@@ -28,7 +28,6 @@ export const inboxWaitsOf = <Item, Result>(options: {
     const publish = (slot: Deferred.Deferred<Result>, result: Result) =>
       Deferred.succeed(slot, result).pipe(Effect.ignore)
 
-    /** Ends the wait on `id` with `result`, telling whether it was still waiting. */
     const resolve = (id: string, result: Result) =>
       SubscriptionRef.modify(pending, (items) => {
         const found = items.find(({ item }) => options.idOf(item) === id)
@@ -83,7 +82,6 @@ export const inboxWaitsOf = <Item, Result>(options: {
         ),
       )
 
-    // Waits for every caller to see Cancelled, so shutting down doesn't leave a response open.
     const cancelAll = Effect.fnUntraced(function* () {
       const items = yield* SubscriptionRef.modify(pending, (current) => [current, []] as const)
 

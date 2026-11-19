@@ -285,7 +285,6 @@ it.live(
 
       let savedId = ""
 
-      // No delivery subscriber exists when the transaction commits, as in a crash before dispatch.
       yield* transcripts.startGlobalConversationUpdate(
         "agent-1",
         globalConversationUpdate,

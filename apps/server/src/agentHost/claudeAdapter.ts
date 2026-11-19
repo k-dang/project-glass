@@ -151,10 +151,7 @@ const roleOptions = (role: RepositoryRole): Options =>
     }),
   )
 
-/**
- * The tools Glass runs without asking the user: its own, and the shell an Agent review works in.
- * Listing them in `allowedTools` instead would keep Claude Code from consulting `canUseTool`.
- */
+// WARNING: Approve these here, not in allowedTools: Claude Code skips canUseTool for allowedTools.
 const approvedIn = (role: RepositoryRole) => {
   const builtIn: ReadonlyArray<string> = Match.value(role).pipe(
     Match.tagsExhaustive({ Work: () => [], Review: () => reviewTools }),
@@ -197,12 +194,12 @@ const startClaude = (
           options: {
             pathToClaudeCodeExecutable: sdkExecutable(command),
             cwd: folder,
-            // The SDK's own default system prompt is empty, unlike the terminal `claude`'s.
+            // WARNING: The Agent SDK's default system prompt is empty, unlike the terminal claude's.
             systemPrompt: { type: "preset", preset: "claude_code" },
             includePartialMessages: true,
             ...extra,
             canUseTool,
-            // The user may pick bypassPermissions between Turns.
+            // WARNING: Required so the user can switch to bypassPermissions between Turns.
             allowDangerouslySkipPermissions: true,
             stderr: (data) => {
               if (data.trim() !== "")
@@ -261,8 +258,7 @@ interface CancellingInterrupt {
 
 const interruptAll = (session: ClaudeQuery) =>
   Effect.tryPromise(async () => {
-    // SAFETY: SDK 0.3.322's `interrupt` passes `{ cancelQueued: true }` on as the control request's
-    // `cancel_queued`, which its types leave out. A CLI too old for it lists nothing as cancelled.
+    // SAFETY: SDK 0.3.322's interrupt reads { cancelQueued } and sends it as cancel_queued, but its types declare interrupt() without options.
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion, anti-slop/no-chained-type-assertions -- See SAFETY above.
     const cancelling = session as unknown as CancellingInterrupt
     const receipt = await cancelling.interrupt({ cancelQueued: true })
@@ -315,7 +311,6 @@ const requestOf = (requestId: string, toolName: string, input: ToolInput) => {
             description: description ?? null,
           })),
           multiSelect: question.multiSelect ?? false,
-          // Claude Code always offers its own words beside the options.
           freeText: true,
         })),
         status: "waiting",
@@ -326,14 +321,9 @@ const requestOf = (requestId: string, toolName: string, input: ToolInput) => {
   return permissionRequest(requestId, toolName, input)
 }
 
-/** Claude Code reads a reply as text, with a multi-select question's labels joined by commas. */
 const replyText = (reply: QuestionReply | undefined) =>
   reply?.text ?? reply?.chosen.join(", ") ?? ""
 
-/**
- * What to tell Claude Code about a request the user settled. It reads a Question's answers from the
- * tool's input, keyed by question.
- */
 const permissionResult = (settled: RequestPart, input: ToolInput): PermissionResult => {
   if (Predicate.isTagged(settled, "Question")) {
     const answers = settled.answers ?? []
@@ -360,10 +350,7 @@ interface Asked {
   readonly answered: Deferred.Deferred<PermissionResult>
 }
 
-/**
- * Starts Claude Code in `folder` only for its handshake, which sends the model nothing. It still
- * starts what the folder's settings start, such as MCP servers, plugins, and SessionStart hooks.
- */
+// WARNING: The handshake sends the model nothing but still starts the folder's MCP servers, plugins, and SessionStart hooks.
 const handshake = (sdk: ClaudeSdk, command: string, folder: string, extra: Options = {}) =>
   startClaude(
     sdk,
@@ -382,21 +369,23 @@ export const claudeAdapter = (
     const initialized = yield* handshake(sdk, command, homedir())
 
     const { models } = initialized
-    // Claude Code lists its default as a model called `default`, which a `null` model runs; it is
-    // named after the model it resolves to.
-    const fallback = models.find((model) => model.value === "default")
-    const others = models.filter((model) => model !== fallback)
+    const defaultModelEntry = models.find((model) => model.value === "default")
+    const others = models.filter((model) => model !== defaultModelEntry)
 
     const resolved = others.find(
       (model) =>
-        fallback?.resolvedModel !== undefined && model.resolvedModel === fallback.resolvedModel,
+        defaultModelEntry?.resolvedModel !== undefined &&
+        model.resolvedModel === defaultModelEntry.resolvedModel,
     )
 
     return new AgentModels({
       defaultModel:
-        fallback === undefined
+        defaultModelEntry === undefined
           ? null
-          : { ...toModel(fallback), name: resolved?.displayName ?? fallback.displayName },
+          : {
+              ...toModel(defaultModelEntry),
+              name: resolved?.displayName ?? defaultModelEntry.displayName,
+            },
       models: others.map(toModel),
     })
   }).pipe(Effect.scoped),
@@ -427,7 +416,7 @@ export const claudeAdapter = (
         Effect.ensuring(Effect.sync(() => waiting.delete(requestId))),
       )
 
-    // Claude Code refuses to resume a conversation it hasn't saved, and to start one it has.
+    // WARNING: Claude Code refuses to resume a conversation it hasn't saved, and to start one it has.
     const saved = yield* Effect.tryPromise(() =>
       sdk.getSessionInfo(conversation, { dir: folder }),
     ).pipe(
@@ -537,7 +526,6 @@ export const claudeAdapter = (
           Effect.asVoid,
         )
       }),
-      // Claude Code folds a message with priority `next` into the running Turn between tool rounds.
       steer: Effect.fnUntraced(function* (sent: DeliveredMessage) {
         const uuid = randomUUID()
 

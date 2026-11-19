@@ -81,10 +81,7 @@ export default defineConfig({
       "landmines-types/no-explicit-return-types": "error",
     },
     overrides: [
-      // Example Plugins have no Effect, so they check what they read by hand.
       { files: ["examples/**"], rules: { "anti-slop/no-runtime-typeof": "off" } },
-      // The message scroller is vendored from shadcn-ui. Its hooks read refs and its code and tests
-      // cast DOM types; rewriting that would make future upstream fixes hard to carry over.
       {
         files: ["apps/desktop/src/renderer/components/message-scroller/**"],
         rules: {
@@ -96,6 +93,7 @@ export default defineConfig({
           "anti-slop/require-safety-comment-for-type-assertion": "off",
           "anti-slop/no-runtime-typeof": "off",
           "anti-slop/no-chained-type-assertions": "off",
+          "landmines-style/no-comments": "off",
           "typescript/no-unsafe-type-assertion": "off",
           "typescript/consistent-return": "off",
           "typescript/unbound-method": "off",

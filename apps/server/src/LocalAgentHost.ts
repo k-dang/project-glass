@@ -291,8 +291,7 @@ export class LocalAgentHost extends Context.Service<
             mkdirSync(dirname(config.logFile), { recursive: true })
             const log = openSync(config.logFile, "a")
 
-            // Not through ChildProcessSpawner: it can't give a child a file as stdout and stderr, and
-            // inheriting the backend's would hand the host Electron's pipe, which closes at quit.
+            // WARNING: Raw spawn: ChildProcessSpawner can't give a child a file as stdout/stderr, and inheriting would hand the host Electron's pipe, which closes at quit.
             const entry = nodeEntry(config.agentHostBundle)
 
             const child = spawn(entry.command, entry.args, {

@@ -155,7 +155,7 @@ const killAndAwaitExit = (pid: number) =>
 
 const killTree = async (pid: number) => {
   if (process.platform === "win32") {
-    // taskkill returns before a process lets go of its working directory, which blocks deleting it.
+    // WARNING: taskkill returns before a process lets go of its working directory, which blocks deleting it.
     await execFileAsync(
       "powershell",
       ["-NoProfile", "-NonInteractive", "-Command", killAndAwaitExit(pid)],
@@ -165,7 +165,7 @@ const killTree = async (pid: number) => {
     return
   }
 
-  // Effect gives Agent harness processes their own process groups, outside the host's group.
+  // WARNING: Effect gives Agent harness processes their own process groups, outside the host's group.
   const { stdout } = await execFileAsync("ps", ["-A", "-o", "pid=,ppid="])
 
   const processes = stdout
@@ -185,7 +185,7 @@ const killTree = async (pid: number) => {
   await execFileAsync("kill", ["-KILL", ...pids.toReversed().map(String)]).catch(() => {})
 }
 
-// Electron's rmSync can't delete read-only files, such as git's objects, on Windows; rm can.
+// WARNING: Electron's rmSync can't delete read-only files, such as git's objects, on Windows; rm can.
 const removeFolder = async (folder: string) => {
   for (let attempt = 1; ; attempt++) {
     try {

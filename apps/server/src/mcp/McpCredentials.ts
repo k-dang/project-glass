@@ -20,8 +20,6 @@ export type McpCallerIdentity = GlobalConversationCaller | OutsideAgentCaller
 export class McpCaller extends Context.Service<McpCaller, McpCallerIdentity>()(
   "@glass/server/McpCaller",
 ) {
-  // `McpServer.toolkit` requires handler services when it is built, so a per-request caller can't
-  // be a typed requirement.
   static readonly current = Effect.serviceOption(McpCaller).pipe(
     Effect.flatMap(
       Option.match({

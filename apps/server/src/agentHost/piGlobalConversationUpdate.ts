@@ -78,7 +78,6 @@ export const SessionEntries = Schema.Struct({
   leafId: Schema.NullOr(Schema.String),
 })
 
-/** The entries from the root to the active leaf, as pi's `SessionManager.getBranch` walks them. */
 const activeBranch = ({ entries, leafId }: typeof SessionEntries.Type) => {
   const byId = new Map(entries.map((entry) => [entry.id, entry]))
   const branch: Array<SessionEntry> = []

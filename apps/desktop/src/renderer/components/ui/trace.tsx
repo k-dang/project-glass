@@ -90,7 +90,6 @@ function TraceCollapsible({
     <Collapsible
       data-slot="trace-collapsible"
       className={cn("flex w-full min-w-0 flex-col", className)}
-      // Keep the toggled row under the pointer instead of letting a transcript that follows its end scroll it away.
       onOpenChange={(open, eventDetails) => {
         holdScrollPosition()
         onOpenChange?.(open, eventDetails)

@@ -47,7 +47,6 @@ interface Summary {
   readonly deletions: number | null
 }
 
-/** Reads `git diff --raw --numstat -z`, whose numstat records follow the raw ones in the same order. */
 const readSummary = (output: string): ReadonlyArray<Summary> => {
   const fields = output.split("\0")
   const files: Array<Omit<Summary, "additions" | "deletions">> = []
@@ -71,7 +70,7 @@ const readSummary = (output: string): ReadonlyArray<Summary> => {
     } else {
       const [added = "", deleted = "", path] = field.split("\t")
 
-      // git leaves a rename's path empty here and names both paths in the next two fields.
+      // WARNING: git's -z numstat leaves a rename's path empty and names both paths in the next two fields.
       if (path === "") next += 2
 
       counts.push({

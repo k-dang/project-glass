@@ -9,7 +9,6 @@ const isFile = (path: string) => statSync(path, { throwIfNoEntry: false })?.isFi
 
 const isScript = (path: string) => /\.(cmd|bat)$/i.test(path)
 
-// Node finds only .exe and .com files on Windows, so npm's .cmd shims need this PATH search.
 const resolve = (command: string, host: typeof thisHost) => {
   if (host.platform !== "win32") return command
 
@@ -22,8 +21,7 @@ const resolve = (command: string, host: typeof thisHost) => {
   )
 }
 
-// cmd.exe parses a .cmd's arguments twice, once for the command line and once when the script
-// expands them, so metacharacters are escaped twice, as cross-spawn does.
+// WARNING: cmd.exe parses a .cmd's arguments twice, so metacharacters are escaped twice, as cross-spawn does.
 const metacharacters = /([()\][%!^"`<>&|;, *?])/g
 
 const escapeArgument = (argument: string) =>
@@ -61,7 +59,6 @@ export const launchCommand = (
   return ChildProcess.make(line, [], { ...options, shell: true })
 }
 
-// Follows a .cmd shim to the file it runs, for spawners that don't use a shell.
 export const sdkExecutable = (command: string, host = thisHost) => {
   const resolved = resolve(command, host)
 

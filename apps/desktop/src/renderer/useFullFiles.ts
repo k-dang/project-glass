@@ -59,7 +59,7 @@ export function useFullFiles(pullRequest: PullRequestRef, revision: Revision) {
       const problem = { title: `Couldn't expand ${fileDiff.name}`, detail }
       setLast((current) => (current === load ? { revision, problem } : current))
 
-      // Diffs leaves the partial diff intact after a load failure and retries on expansion.
+      // WARNING: Diffs keeps the partial diff and retries on the next expansion only when the loader throws.
       throw Cause.squash(exit.cause)
     },
     [pullRequest, revision, backendRuntime],

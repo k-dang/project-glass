@@ -55,9 +55,8 @@ const Settings = lazyRouteComponent(() => import("./Settings"), "Settings")
 
 const ToDos = lazyRouteComponent(() => import("./ToDos"), "ToDos")
 
-// The router loads a lazy `component` before rendering it; a route whose component wraps a lazy
-// page loads that page here instead, so it never falls back to Suspense.
-const loadCode = (page: { preload?: () => Promise<void> | undefined }) => () => page.preload?.()
+const preloadLazyPage = (page: { preload?: () => Promise<void> | undefined }) => () =>
+  page.preload?.()
 
 const parseSearch = (search: string) => Object.fromEntries(new URLSearchParams(search))
 
@@ -95,7 +94,7 @@ const listRoute = createRoute({
     if (!preload) registry.set(listSearchAtom, search)
   },
   onEnter: ({ context: { registry } }) => closePullRequest(registry),
-  loader: loadCode(PullRequestListPage),
+  loader: preloadLazyPage(PullRequestListPage),
   component: ListPage,
 })
 
@@ -119,21 +118,21 @@ const pullRequestRoute = createRoute({
 const toDosRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "to-dos",
-  loader: loadCode(ToDos),
+  loader: preloadLazyPage(ToDos),
   component: ToDosPage,
 })
 
 const activityRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "activity",
-  loader: loadCode(ActivityLogPage),
+  loader: preloadLazyPage(ActivityLogPage),
   component: ActivityArea,
 })
 
 const inboxRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "inbox",
-  loader: loadCode(Inbox),
+  loader: preloadLazyPage(Inbox),
   component: () => (
     <main aria-label="Inbox" className="flex min-h-0 flex-1 overflow-hidden">
       <Inbox />
@@ -144,7 +143,7 @@ const inboxRoute = createRoute({
 const checkInRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "inbox/check-ins/$checkInId",
-  loader: loadCode(CheckInPage),
+  loader: preloadLazyPage(CheckInPage),
   component: function CheckInRoute() {
     const { checkInId } = checkInRoute.useParams()
 
@@ -182,7 +181,7 @@ const newConversationRoute = createRoute({
   validateSearch: Schema.toStandardSchemaV1(
     Schema.Struct({ repository: Schema.optional(Schema.String) }),
   ),
-  loader: loadCode(NewConversation),
+  loader: preloadLazyPage(NewConversation),
   component: NewConversationPage,
 })
 
@@ -190,14 +189,14 @@ const conversationRoute = createRoute({
   getParentRoute: () => conversationsRoute,
   path: "$conversationId",
   validateSearch: Schema.toStandardSchemaV1(ConversationSearch),
-  loader: loadCode(ConversationView),
+  loader: preloadLazyPage(ConversationView),
   component: ConversationPage,
 })
 
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "settings",
-  loader: loadCode(Settings),
+  loader: preloadLazyPage(Settings),
   component: SettingsPage,
 })
 
@@ -229,7 +228,6 @@ const makeRouter = (registry: AtomRegistry.AtomRegistry) =>
     routeTree,
     history: createHashHistory(),
     context: { registry },
-    // Hover preloads run beforeLoad too, so hooks that change state skip them.
     defaultPreload: "intent",
     parseSearch,
     stringifySearch,

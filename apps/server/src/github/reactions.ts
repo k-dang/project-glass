@@ -28,7 +28,6 @@ export const GitHubReactionGroups = Schema.Array(
 
 export const toReactionGroups = (groups: typeof GitHubReactionGroups.Type) =>
   groups.flatMap(({ content, reactors, viewerHasReacted }) => {
-    // Skips contents GitHub added after this mapping, so they can't fail the whole workspace.
     const reaction = reactions.get(content)
 
     return reaction === undefined || reactors.totalCount === 0

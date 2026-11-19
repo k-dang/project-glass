@@ -54,6 +54,20 @@ const challenge = (issuer: string, presented: boolean) => {
   })
 }
 
+const endStreamOnRevoke = (
+  response: HttpServerResponse.HttpServerResponse,
+  revoked: Effect.Effect<void>,
+) => {
+  if (!Predicate.isTagged(response.body, "Stream")) return response
+
+  const { stream, contentType, contentLength } = response.body
+
+  return HttpServerResponse.setBody(
+    response,
+    HttpBody.stream(Stream.interruptWhen(stream, revoked), contentType, contentLength),
+  )
+}
+
 const McpAccess = HttpRouter.middleware(
   Effect.gen(function* () {
     const credentials = yield* McpCredentials
@@ -109,7 +123,7 @@ const McpAccess = HttpRouter.middleware(
           Effect.as(revoked, challenge(urls.issuer, true)),
         )
 
-        // Effect sets an opened session's id in its own pre-response handler, so read it after.
+        // WARNING: Effect sets an opened session's id in its own pre-response handler, so read it after.
         yield* HttpEffect.appendPreResponseHandler((_, final) =>
           Effect.sync(() => {
             const opened = final.headers[SESSION_HEADER]
@@ -120,16 +134,7 @@ const McpAccess = HttpRouter.middleware(
           }),
         )
 
-        // A streamed answer, such as ask_user waiting with progress, outlives the race above. Ending
-        // its body on revoke closes the request, and Effect then interrupts the tool call.
-        if (!Predicate.isTagged(response.body, "Stream")) return response
-
-        const { stream, contentType, contentLength } = response.body
-
-        return HttpServerResponse.setBody(
-          response,
-          HttpBody.stream(Stream.interruptWhen(stream, revoked), contentType, contentLength),
-        )
+        return endStreamOnRevoke(response, revoked)
       })
   }),
 )
@@ -151,7 +156,7 @@ export const McpRoutes = Layer.merge(
     path: MCP_PATH,
     protocols: [McpProtocol.v2025_11_25],
     allowedOrigins: [],
-    // Effect never expires sessions, so a runtime ending cleanly frees its own.
+    // WARNING: Effect never expires MCP sessions, so clients must be allowed to end their own.
     allowSessionTermination: true,
   }).pipe(Layer.provide(McpAccess.layer), Layer.orDie),
 )

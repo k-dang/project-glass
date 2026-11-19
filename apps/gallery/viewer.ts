@@ -67,11 +67,9 @@ const schemesShown = (): ReadonlyArray<Scheme> => (scheme === "both" ? ["light",
 const gridFigure = (shot: Shot, shown: Scheme) =>
   `<figure data-id="${shot.id}"><img loading="lazy" src="${src(shot, shown, "-thumb")}" alt="${alt(shot, shown)}"><figcaption>${shot.area} · ${shot.name}</figcaption></figure>`
 
-// A new <img> paints blank until its PNG decodes, which flashes on every step. Decode the next shot
-// off-screen, then swap it in whole, so the old one stays until the new one is ready.
 const decoded = new Map<string, Promise<HTMLImageElement>>()
 
-const decode = (url: string) => {
+const decodeOffscreen = (url: string) => {
   const cached = decoded.get(url)
 
   if (cached !== undefined) return cached
@@ -95,7 +93,7 @@ const showStage = (shot: Shot) => {
   const schemes = schemesShown()
   const token = ++showing
 
-  void Promise.all(schemes.map((shown) => decode(src(shot, shown)))).then((images) => {
+  void Promise.all(schemes.map((shown) => decodeOffscreen(src(shot, shown)))).then((images) => {
     if (token !== showing) return
 
     stage.className = schemes.length > 1 ? "both" : ""
@@ -127,7 +125,7 @@ const showStage = (shot: Shot) => {
 
   for (const url of decoded.keys()) if (!kept.includes(url)) decoded.delete(url)
 
-  for (const url of kept) void decode(url)
+  for (const url of kept) void decodeOffscreen(url)
 }
 
 const camera = { x: 0, y: 0, z: 1 }
@@ -138,9 +136,7 @@ let settle = 0
 
 let detail: "thumb" | "full" | null = null
 
-// Zoomed out, every shot is on screen at once and Chromium can't keep them all decoded at full
-// size, so show the 320px thumbnails until a shot would be drawn wider than they are.
-const showDetail = () => {
+const showThumbnailsWhenZoomedOut = () => {
   const next = camera.z * devicePixelRatio <= 0.25 ? "thumb" : "full"
 
   if (next === detail) return
@@ -158,8 +154,7 @@ const applyCamera = () => {
   canvas.style.backgroundSize = `${dots}px ${dots}px`
   canvas.style.backgroundPosition = `${camera.x}px ${camera.y}px`
   zoomLevel.textContent = `${Math.round(camera.z * 100)}%`
-  showDetail()
-  // Promote #world to its own layer only while it moves, so it re-rasterizes sharp once it stops.
+  showThumbnailsWhenZoomedOut()
   world.classList.add("moving")
   clearTimeout(settle)
   settle = window.setTimeout(() => world.classList.remove("moving"), 150)
@@ -204,7 +199,6 @@ const buildWorld = (shown: ReadonlyArray<Shot>) => {
     builtFor = key
     const lanes = Map.groupBy(shown, (shot) => shot.area)
 
-    // Short lanes share a row: wrap at the widest lane's width.
     const widest =
       Math.max(1, ...[...lanes.values()].map((lane) => lane.length)) * schemesShown().length
 
@@ -223,10 +217,9 @@ const buildWorld = (shown: ReadonlyArray<Shot>) => {
 
   if (first) return fit()
 
-  // Coming back from One view: center the current shot at the same zoom.
   const at = world.querySelector("figure[aria-current]")
 
-  if (at === null) return showDetail()
+  if (at === null) return showThumbnailsWhenZoomedOut()
 
   const box = at.getBoundingClientRect()
   const frame = canvas.getBoundingClientRect()
@@ -305,7 +298,6 @@ canvas.addEventListener(
           : 1
 
     const box = canvas.getBoundingClientRect()
-    // A pinch sends small deltas and a mouse wheel notch about 100, so cap each event's step.
     const delta = Math.max(-30, Math.min(30, event.deltaY * unit))
 
     if (event.ctrlKey || event.metaKey)

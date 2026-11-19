@@ -75,7 +75,7 @@ export class FolderFiles extends Context.Service<
         existing: (folder, paths) =>
           fs.realPath(folder).pipe(
             Effect.flatMap((root) =>
-              // `Effect.filter` keeps paths in the order their checks finish, so check, then filter.
+              // WARNING: Effect.filter keeps paths in the order their checks finish, so check with forEach, then filter.
               Effect.forEach(
                 paths,
                 (path) =>

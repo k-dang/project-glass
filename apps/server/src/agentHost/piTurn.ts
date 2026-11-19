@@ -41,7 +41,6 @@ export const Input = Data.taggedEnum<Input>()
 export type Command = Data.TaggedEnum<{
   CheckIdle: { readonly generation: number }
   DeclineDialog: { readonly id: string }
-  // pi only sends the Steers it went idle holding with a later prompt.
   Resume: { readonly turnId: string; readonly steers: ReadonlyArray<Steer> }
 }>
 
@@ -158,10 +157,11 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
 
   const finish = (turn: TurnState, ending: TurnEnding) => end(turn, turn.stopping ?? ending)
 
+  const recoversOnNextHost = (turn: TurnState) =>
+    Predicate.isTagged(turn.turn.context, "GlobalConversationUpdate") && turn.stopping === null
+
   const loseDelivery = (turn: TurnState, ending: TurnEnding) => {
-    // A transport failure cannot consume a durable Global conversation update; the next host recovers its saved input.
-    if (Predicate.isTagged(turn.turn.context, "GlobalConversationUpdate") && turn.stopping === null)
-      state = null
+    if (recoversOnNextHost(turn)) state = null
     else end(turn, ending)
   }
 
@@ -201,8 +201,6 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
       case "agent_start":
         state = { ...turn, generation: turn.generation + 1 }
         break
-      // pi's `agent_end` only closes one run that retries or queued work can follow, and an
-      // extension can start more work as pi settles, so settling asks whether pi is idle.
       case "agent_settled":
         commands.push(Command.CheckIdle({ generation: turn.generation }))
         break
@@ -299,7 +297,6 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
   return { state, events, commands }
 }
 
-// pi takes Steers in the order they were sent, so the ones it cleared are Glass's newest.
 export const leftover = (
   steers: ReadonlyArray<Steer>,
   cleared: typeof ClearedQueue.Type,

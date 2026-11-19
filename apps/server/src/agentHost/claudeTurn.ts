@@ -109,7 +109,6 @@ const Answered = Schema.Struct({
 
 const decodeAnswered = Schema.decodeUnknownOption(Answered)
 
-// A local command like `/mcp` replies in one unstreamed message that Claude Code marks with this field.
 const isLocalCommandReply = Schema.is(Schema.Struct({ local_command_source: Schema.Unknown }))
 
 const answered = (message: SDKMessage): ReadonlyArray<string> =>

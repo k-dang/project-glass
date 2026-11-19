@@ -45,7 +45,7 @@ export class Backend extends Context.Service<
     Layer.provide(
       RpcClient.layerProtocolSocket({
         retryTransientErrors: true,
-        // Effect defaults both ping interval and timeout to 5s; timer drift can cause timeouts.
+        // WARNING: Effect's pingTimeout defaults to its 5 s pingInterval, which timer drift can trip.
         pingTimeout: "15 seconds",
       }).pipe(Layer.provide(connectionHooks)),
     ),

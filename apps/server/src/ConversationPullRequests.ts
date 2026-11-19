@@ -48,12 +48,9 @@ export class ConversationPullRequests extends Context.Service<
       const lists = yield* PullRequestLists
       const transcripts = yield* Transcripts
 
-      // A Turn is when an agent opens or pushes to a PR, so see it now rather than minutes later.
       const afterTurn = (conversationId: string) =>
         conversations.followBranch(conversationId).pipe(
           Effect.flatMap((followed) => (followed ? lists.refreshSoon : Effect.void)),
-          // Defects too, such as from a Sandbox host older than CurrentBranch, so one Conversation
-          // can't stop the rest from following their branches.
           Effect.catchCause((cause) =>
             Effect.logWarning("Couldn't read a Conversation's branch", cause),
           ),

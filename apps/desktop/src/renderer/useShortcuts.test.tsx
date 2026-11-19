@@ -117,8 +117,6 @@ it("recognizes editable fields and dialogs when a browser retargets a shadow DOM
       cancelable: true,
     })
 
-    // Happy DOM does not retarget shadow events; model the path Chromium exposes
-    // when its window listener receives an event whose target is the host.
     vi.spyOn(event, "composedPath").mockReturnValue([
       origin,
       shadow,

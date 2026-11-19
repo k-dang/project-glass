@@ -29,7 +29,6 @@ export const SteersNotTakenIn = Schema.Array(MessageWithContext)
 
 export type SteersNotTakenIn = typeof SteersNotTakenIn.Type
 
-// A Turn the host stopped on its own has no StopTurn reply to give its Steers back on.
 export const HostTurnEnded = Schema.TaggedStruct("TurnEnded", {
   ...TurnEnded.fields,
   steersNotTakenIn: Schema.optional(SteersNotTakenIn),
@@ -53,11 +52,10 @@ export const JournalEntry = Schema.Struct({
 
 export type JournalEntry = typeof JournalEntry.Type
 
-// Raise this when a change to AgentHostRpcs would break talking to a host of the previous
-// version, which a Sandbox keeps running across Glass upgrades.
+// WARNING: Raise HOST_PROTOCOL when an AgentHostRpcs change breaks talking to a previous host; Sandboxes keep hosts running across upgrades.
 export const HOST_PROTOCOL = 1
 
-// Glass asks hosts of any version for this, so its shape must never change.
+// WARNING: Glass asks hosts of every version for Hello, so its shape must never change.
 export const Hello = Rpc.make("Hello", {
   success: Schema.Struct({ host: Schema.String, protocol: Schema.Int }),
 })

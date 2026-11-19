@@ -48,7 +48,6 @@ const turnStates = (turn: Turn): ReadonlyArray<string> => [
   ...turn.parts.flatMap(partStates),
 ]
 
-/** What the transcript shows that a reader could tell apart, such as a denied Permission request. */
 const uiStates = (events: ReadonlyArray<HostEvent>) => {
   const { turns, agentStatuses, backgroundToolCalls } = events.reduce(
     applyTranscriptUpdate,
@@ -69,7 +68,6 @@ interface Replayed {
   readonly states: ReadonlySet<string>
 }
 
-/** Keeps, per harness, only the replays that show a UI state no other kept replay shows. */
 const distinct = (replays: ReadonlyArray<Replayed>) => {
   const shown = new Set<string>()
 

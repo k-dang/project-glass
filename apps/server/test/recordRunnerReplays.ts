@@ -46,7 +46,7 @@ const [provider, ...modelId] = values["pi-model"].split("/")
 
 const repository = fileURLToPath(new URL("../../..", import.meta.url)).toLowerCase()
 
-// `pnpm exec` puts the repo's own bins, the bundled pi among them, ahead of the user's programs.
+// WARNING: pnpm exec puts the repo's own bins, the bundled pi among them, ahead of the user's programs.
 for (const name of Object.keys(process.env).filter((key) => key.toUpperCase() === "PATH"))
   process.env[name] = process.env[name]
     ?.split(delimiter)

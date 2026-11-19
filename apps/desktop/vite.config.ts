@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url"
 import { defineConfig } from "vite-plus"
 import type { UserConfig } from "vite-plus/pack"
 
-// Sandboxed preloads can't load other files, including shared chunks.
+// WARNING: Sandboxed Electron preloads must be one CommonJS file: they can't load ESM or other files, shared chunks included.
 const bundle = (name: string): UserConfig => ({
   entry: { index: `src/${name}/index.ts` },
   format: "cjs",
@@ -13,7 +13,6 @@ const bundle = (name: string): UserConfig => ({
   outDir: `dist/${name}`,
   clean: false,
   sourcemap: true,
-  // Sandboxed preloads must be CommonJS.
   checks: { legacyCjs: false },
   deps: { neverBundle: ["electron"], onlyBundle: false },
 })

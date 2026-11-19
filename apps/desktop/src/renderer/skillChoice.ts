@@ -44,7 +44,6 @@ interface ChosenSource {
 
 const listed = new Intl.ListFormat("en", { type: "conjunction" })
 
-/** pi keeps the first skill of a name, and Local skills come first (`skillsOf` in the server). */
 const sharedSkillNames = (harness: AgentHarness, sources: ReadonlyArray<ChosenSource>) => {
   const names = [...new Set(sources.flatMap(({ skills }) => skills))].toSorted()
 

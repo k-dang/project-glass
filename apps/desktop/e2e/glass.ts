@@ -86,8 +86,7 @@ export const test = base.extend<Glass>({
     const home = await mkdtemp(join(tmpdir(), "glass-e2e-"))
 
     await use(home)
-    // Claude Code processes outlive Glass by a moment and write their session files as they exit,
-    // so retry while `.claude` refills under the removal (ENOTEMPTY).
+    // WARNING: Exiting Claude Code processes still write session files into .claude, so rm retries on ENOTEMPTY.
     await rm(home, { recursive: true, force: true, maxRetries: 10 })
   },
   git: [false, { option: true }],

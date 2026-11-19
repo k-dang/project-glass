@@ -1011,7 +1011,6 @@ export class Transcripts extends Context.Service<
                       AND json_extract(context, '$._tag') = 'GlobalConversationUpdate'
                   `.pipe(Effect.flatMap(decodeTurns))
 
-                  // pi restores complete messages; discard streaming fragments before replaying.
                   for (const turn of globalConversationUpdates)
                     yield* sql`DELETE FROM conversation_turn_part WHERE turn_id = ${turn.id}`
 

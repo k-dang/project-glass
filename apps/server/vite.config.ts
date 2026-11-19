@@ -57,7 +57,7 @@ export default defineConfig({
       ...node,
       entry: { fakeBackend: "test/fakeBackend.ts", sqlReadWorker: "src/sqlReadWorker.ts" },
       outDir: "dist-fake",
-      // It reads ../schema.json relative to its own module, which breaks once bundled.
+      // WARNING: @octokit/graphql-schema reads ../schema.json relative to its own module, which breaks once bundled.
       deps: { ...node.deps, neverBundle: ["@octokit/graphql-schema"] },
     },
     agentHost("dist-fake"),

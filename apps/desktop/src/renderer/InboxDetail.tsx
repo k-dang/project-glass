@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input"
 import { Kbd } from "@/components/ui/kbd"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { conversationColumn } from "./conversationColumn"
 import { AgentReviewMarkdown } from "./AgentReviewPanel"
 import { Backend, backendRuntime } from "./backend"
 import { conversationAtoms, ConversationAtomsContext } from "./conversation"
@@ -73,8 +74,7 @@ export function InboxDetail(
   })
 }
 
-// Matches the width of a Conversation's transcript and composer.
-const detailWidth = "mx-auto w-full max-w-3xl px-6"
+const detailWidth = cn(conversationColumn, "w-full px-6")
 
 function DetailShell(props: {
   children: ReactNode

@@ -37,8 +37,7 @@ export const hostServer = (options: {
         "POST",
         SHUTDOWN_PATH,
         Deferred.succeed(options.shutDown, undefined).pipe(
-          // This request is still open when the server starts closing, so Node won't close its
-          // connection as idle.
+          // WARNING: This request is still open when the server starts closing, so Node won't close its connection as idle.
           Effect.as(HttpServerResponse.empty({ headers: { connection: "close" } })),
         ),
       ),

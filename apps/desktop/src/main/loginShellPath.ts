@@ -11,7 +11,7 @@ const readPath = (shell: string) =>
       new Promise<string | undefined>((resolve) => {
         const child = execFile(
           shell,
-          // zsh reads .zshrc, where installers usually add to PATH, only in interactive shells.
+          // WARNING: zsh reads .zshrc, where installers usually add to PATH, only in interactive shells.
           ["-ilc", `printf '${MARKER}%s${MARKER}' "$PATH"`],
           { encoding: "utf8", timeout: TIMEOUT_MS },
           (_error, stdout) => resolve(stdout.split(MARKER)[1] || undefined),

@@ -45,7 +45,6 @@ const MirroredPullRequest = Schema.Struct({
   isDraft: Schema.Boolean,
   updatedAt: Schema.DateTimeUtcFromString,
   head: Schema.String,
-  // Saved lists from before Glass mirrored head branches get theirs at the next full read.
   headBranch: Schema.NullOr(Schema.String).pipe(
     Schema.withDecodingDefaultKey(Effect.succeed(null)),
   ),

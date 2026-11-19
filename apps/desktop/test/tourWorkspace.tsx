@@ -18,6 +18,17 @@ import { backendLayerAtom } from "../src/renderer/backend"
 import { type Handlers, testLayer } from "./testBackend"
 import { workspace } from "./workspace"
 
+const giveDiffScrollersAViewport = () =>
+  vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+    const panel = this.parentElement
+
+    return (this.classList.contains("overflow-auto") &&
+      this.closest('[aria-label="Tour Chapters"]') !== null) ||
+      (panel?.getAttribute("role") === "tabpanel" && panel.lastElementChild === this)
+      ? new DOMRect(0, 0, 1000, 10_000)
+      : new DOMRect()
+  })
+
 export const resetTourWorkspace = () => {
   cleanup()
   vi.restoreAllMocks()
@@ -33,16 +44,7 @@ export const mountTourWorkspace = (
     readonly reviewConversationTurns?: ReadonlyArray<Turn>
   } = {},
 ) => {
-  // happy-dom lays nothing out; give each diff scroller a viewport so its files render.
-  vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
-    const panel = this.parentElement
-
-    return (this.classList.contains("overflow-auto") &&
-      this.closest('[aria-label="Tour Chapters"]') !== null) ||
-      (panel?.getAttribute("role") === "tabpanel" && panel.lastElementChild === this)
-      ? new DOMRect(0, 0, 1000, 10_000)
-      : new DOMRect()
-  })
+  giveDiffScrollersAViewport()
 
   const state = Effect.runSync(
     SubscriptionRef.make<TourState>(options.initial ?? { tour: null, job: { status: "idle" } }),

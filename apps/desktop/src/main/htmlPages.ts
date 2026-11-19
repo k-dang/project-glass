@@ -1,8 +1,6 @@
 import { HTML_PAGE_SANDBOX, HTML_PAGE_SCHEME } from "@glass/contracts/desktop"
 import { randomUUID } from "node:crypto"
 
-// An opaque origin keeps the page from Glass's storage and window; t3code serves agent HTML the
-// same way.
 const PAGE_CONTENT_SECURITY_POLICY = `sandbox ${HTML_PAGE_SANDBOX}`
 
 const idOf = (url: string) => new URL(url).pathname.slice(1)

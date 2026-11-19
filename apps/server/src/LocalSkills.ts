@@ -77,10 +77,6 @@ const orSkipped = <A>(
     }),
   )
 
-/**
- * pi loads a SKILL.md once however many paths reach it, and keeps the first skill of a name, so
- * the later ones are never sent.
- */
 const firstOfEach = (skills: ReadonlyArray<FoundSkill>) => {
   const names = new Set<string>()
   const files = new Set<string>()

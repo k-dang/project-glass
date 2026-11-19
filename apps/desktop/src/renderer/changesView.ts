@@ -22,10 +22,6 @@ export interface ParsedFile {
   readonly placeholder: string | null
 }
 
-/**
- * Diffs reads file names and change type from a git file header, which GitHub's
- * hunks omit.
- */
 const toFileDiff = (file: ChangedFile, hunks: string | null): FileDiffMetadata | undefined => {
   const oldPath = file.previousPath ?? file.path
   const header = [`diff --git a/${oldPath} b/${file.path}`]
@@ -34,7 +30,7 @@ const toFileDiff = (file: ChangedFile, hunks: string | null): FileDiffMetadata |
 
   if (file.changeType === "deleted") header.push("deleted file mode 100644")
 
-  // In Git-diff mode, Diffs needs a similarity header to recognize a rename.
+  // WARNING: In Git-diff mode, Diffs recognizes a rename only by its similarity header (100% means unchanged).
   if (file.changeType === "renamed") {
     const similarity = hunks === null ? 100 : 50
     header.push(
