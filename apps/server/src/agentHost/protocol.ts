@@ -64,13 +64,7 @@ export const Hello = Rpc.make("Hello", {
 
 export class HostReplaced extends Schema.TaggedError<HostReplaced>()("HostReplaced", {}) {}
 
-export const HOST_TOKEN_HEADER = "x-glass-host-token"
-
 export const newHostToken = () => randomBytes(32).toString("base64url")
-
-export const HEALTH_PATH = "/healthz"
-
-export const SHUTDOWN_PATH = "/shutdown"
 
 const HostFolder = Schema.String.pipe(
   Schema.decodeTo(

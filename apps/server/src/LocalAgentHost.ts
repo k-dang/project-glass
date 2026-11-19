@@ -21,16 +21,15 @@ import { SqlClient } from "effect/sql"
 import { spawn } from "node:child_process"
 import { createHash } from "node:crypto"
 import { closeSync, mkdirSync, openSync } from "node:fs"
-import { dirname, join } from "node:path"
+import { dirname } from "node:path"
 import {
-  AgentHostRpcs,
   HEALTH_PATH,
   HOST_TOKEN_HEADER,
-  hostPort,
-  type HostReplaced,
-  newHostToken,
+  hostRecordPath,
+  RecordedHost,
   SHUTDOWN_PATH,
-} from "./agentHost/protocol"
+} from "./agentHost/hostAddress"
+import { AgentHostRpcs, hostPort, type HostReplaced, newHostToken } from "./agentHost/protocol"
 import { writeDataFile } from "./dataFiles"
 import { followJournal, greet } from "./hostJournal"
 import type { ConversationHost } from "./ConversationTurns"
@@ -40,14 +39,6 @@ import { connectRpcClient } from "./rpcSocket"
 import { ServerConfig } from "./ServerConfig"
 import { AgentCommands } from "./SettingsStore"
 import { Transcripts } from "./Transcripts"
-
-export const hostRecordPath = (dataDirectory: string) => join(dataDirectory, "agent-host.json")
-
-export const RecordedHost = Schema.fromJsonString(
-  Schema.Struct({ port: Schema.Int, token: Schema.String, fingerprint: Schema.String }),
-)
-
-export type RecordedHost = typeof RecordedHost.Type
 
 export const readRecordedHost = (fs: FileSystem.FileSystem, dataDirectory: string) =>
   fs
