@@ -1172,9 +1172,7 @@ it("sends a pasted image with the message", async () => {
   expect(sent).toEqual([{ message: "What's this?", images: [pixel] }])
 })
 
-// Flaky: failed once in a full `pnpm test` run, passed when rerun on its own.
-// oxlint-disable-next-line vitest/no-disabled-tests
-it.skip("shows the Conversation's unsent message from before and saves what the user writes", async () => {
+it("shows the Conversation's unsent message from before and saves what the user writes", async () => {
   const saved: Array<string> = []
 
   const user = mount({

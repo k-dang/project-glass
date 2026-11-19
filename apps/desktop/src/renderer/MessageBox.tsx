@@ -109,6 +109,10 @@ export function MessageBox(props: {
   const editor = useEditor({
     extensions,
     content,
+    onCreate: ({ editor: created }) => {
+      const { tr, doc } = created.state
+      created.view.dispatch(tr.setSelection(Selection.atEnd(doc)).setMeta("addToHistory", false))
+    },
     onUpdate: (event) => {
       const message = toMessage(event.editor.state.doc.content)
       setComposed((current) => ({ ...current, message }))
