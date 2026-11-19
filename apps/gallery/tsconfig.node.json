@@ -4,5 +4,5 @@
     "types": ["node"]
   },
   "include": ["."],
-  "exclude": ["viewer.ts"]
+  "exclude": ["viewer", "dist"]
 }

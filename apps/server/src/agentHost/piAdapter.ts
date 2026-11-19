@@ -85,40 +85,31 @@ const parseModelId = (glassId: string) => {
     : { provider: glassId.slice(0, slash), id: glassId.slice(slash + 1) }
 }
 
-/**
- * The thinking levels pi offers a model. pi's RPC doesn't report them per model, so this copies
- * `getSupportedThinkingLevels` from pi-ai 1.5.2. Conversations run the user's own `pi`, which clamps a
- * level its model doesn't take to the nearest one it does, so drift only mislabels a choice.
- */
+// WARNING: Copies getSupportedThinkingLevels from pi-ai 1.5.2; pi's RPC doesn't report thinking levels per model.
+const supportedThinkingLevels = (model: PiModel) =>
+  model.reasoning === true
+    ? thinkingLevels.filter((level) => {
+        const mapped = model.thinkingLevelMap?.[level]
+
+        return (
+          mapped !== null && (level === "xhigh" || level === "max" ? mapped !== undefined : true)
+        )
+      })
+    : []
+
 const toModel = (model: PiModel): AgentModel => ({
   id: modelId(model),
   name: model.name ?? model.id,
-  efforts:
-    model.reasoning === true
-      ? thinkingLevels.filter((level) => {
-          const mapped = model.thinkingLevelMap?.[level]
-
-          return (
-            mapped !== null && (level === "xhigh" || level === "max" ? mapped !== undefined : true)
-          )
-        })
-      : [],
+  efforts: supportedThinkingLevels(model),
 })
 
-/**
- * The models the user scoped pi to (`enabledModels`), in their order, or none when unscoped. pi's
- * RPC lists every model it has credentials for, so this runs pi's own resolver over that list,
- * which holds the providers pi's extensions register.
- */
 const inScope = (models: ReadonlyArray<PiModel>) =>
   Effect.tryPromise(async () => {
     const patterns = SettingsManager.create(homedir()).getEnabledModels() ?? []
 
     if (patterns.length === 0) return { scoped: [], warnings: [] }
 
-    // SAFETY: pi-coding-agent 1.5.2's resolver reads only `getAvailable()` from the runtime, and
-    // only the `provider`, `id`, `name`, and `type` (absent, meaning a chat model) of its models.
-    // The scope test in piAdapter.integration.test.ts catches a pi bump that reads more.
+    // SAFETY: pi-coding-agent 1.5.2's resolver reads only getAvailable() and each model's provider, id, name, and type; piAdapter.integration.test.ts catches a bump that reads more.
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- See SAFETY above.
     const reported = { getAvailable: () => Promise.resolve(models) } as ModelRuntime
     const scope = await resolveModelScopeWithDiagnostics(patterns, reported)
@@ -139,10 +130,7 @@ const inScope = (models: ReadonlyArray<PiModel>) =>
     Effect.orElseSucceed((): ReadonlyArray<PiModel> => []),
   )
 
-/**
- * The thinking level a fresh pi session starts a model on, as pi-coding-agent 1.5.2's
- * `createAgentSession` picks it. Switching model keeps the current level instead of this one.
- */
+// WARNING: Mirrors how pi-coding-agent 1.5.2's createAgentSession picks a fresh session's thinking level.
 const freshThinkingLevel = (folder: string, model: { provider: string; id: string }) => {
   const settings = SettingsManager.create(folder)
 
@@ -297,7 +285,6 @@ export const piAdapter = (command: string) =>
 
         return new AgentModels({
           defaultModel: state.model == null ? null : toModel(state.model),
-          // Like pi, a scope that matches none of its models scopes nothing.
           models: (scoped.length > 0 ? scoped : available.models).map(toModel),
         })
       }).pipe(Effect.scoped),
@@ -345,7 +332,6 @@ export const piAdapter = (command: string) =>
 
           dialogs.set(event.id, { method: event.method, part: dialogQuestion(event) })
 
-          // pi answers a dialog itself once its timeout passes.
           return event.timeout === undefined
             ? Effect.void
             : expire(event.id).pipe(
@@ -582,7 +568,6 @@ export const piAdapter = (command: string) =>
 
             return yield* new HostConversationError({ message: "pi didn't take the message in." })
           }),
-          // pi's abort runs whatever it still holds, so the queue is cleared first (pi docs/rpc-commands.md).
           stopTurn: (turnId, ending) =>
             Effect.gen(function* () {
               const steers = yield* turns.stop(turnId, ending)
@@ -594,7 +579,7 @@ export const piAdapter = (command: string) =>
                 Effect.orElseSucceed(() => ({ steering: [], followUp: [] })),
               )
 
-              // An open dialog holds the extension, and with it pi's run, until it's answered.
+              // WARNING: An open dialog blocks its extension, and with it pi's run, until it's answered (pi docs/rpc-extension-ui.md).
               const open = Array.from(dialogs.keys())
               dialogs.clear()
               yield* Effect.forEach(

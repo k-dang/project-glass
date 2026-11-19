@@ -108,10 +108,6 @@ export class LocalAgentHost extends Context.Service<
   {
     readonly client: Effect.Effect<HostClient, ConversationError>
     readonly running: Effect.Effect<Option.Option<HostClient>>
-    /**
-     * Reattaches, once per launch, to the host an earlier launch left running, if it can, and names
-     * the Conversations whose Turn that host carries on.
-     */
     readonly resume: Effect.Effect<Resumed>
     readonly followReattached: Effect.Effect<void>
     readonly lifetimeOf: (client: ConversationHost) => Effect.Effect<Option.Option<Scope.Scope>>
@@ -291,8 +287,7 @@ export class LocalAgentHost extends Context.Service<
             mkdirSync(dirname(config.logFile), { recursive: true })
             const log = openSync(config.logFile, "a")
 
-            // Not through ChildProcessSpawner: it can't give a child a file as stdout and stderr, and
-            // inheriting the backend's would hand the host Electron's pipe, which closes at quit.
+            // WARNING: Raw spawn: ChildProcessSpawner can't give a child a file as stdout/stderr, and inheriting would hand the host Electron's pipe, which closes at quit.
             const entry = nodeEntry(config.agentHostBundle)
 
             const child = spawn(entry.command, entry.args, {

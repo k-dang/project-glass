@@ -47,7 +47,7 @@ const answerSchema = (answer: Schema.Decoder<unknown>): JsonSchema.JsonSchema =>
   return { ...document.schema, $defs: document.definitions }
 }
 
-// Not `--json-schema`: endpoint security tools may kill processes with long arguments.
+// WARNING: Not --json-schema: endpoint security tools may kill processes with long arguments.
 const promptWithSchema = (task: AgentTask<unknown>) =>
   `${task.prompt}\n\nOutput JSON Schema:\n${JSON.stringify(answerSchema(task.answer))}`
 
@@ -77,9 +77,7 @@ const startFailure = (name: string) => (error: { readonly reason: unknown }) => 
 
 const claudeFlags = ["--strict-mcp-config", "--no-session-persistence", "--disable-slash-commands"]
 
-// `--restricted` confines the file tools to the working directory and skips the user's settings
-// files, so their hooks never see the PR's files. A shell task can't be restricted, so it skips
-// the settings files by name and allows its tools, since `-p` refuses any tool not allowed.
+// WARNING: Both flag sets keep the user's settings files, and their hooks, away from the PR's files; shell can't use --restricted, and -p refuses tools not allowed.
 const claudeToolFlags: Record<AgentTools, ReadonlyArray<string>> = {
   "read-only": ["--restricted", "--tools", claudeTools["read-only"].join(",")],
   shell: [
@@ -92,7 +90,6 @@ const claudeToolFlags: Record<AgentTools, ReadonlyArray<string>> = {
   ],
 }
 
-// The thinking level is left to pi's settings: a level a model lacks fails the request.
 const piCliFlags = (tools: AgentTools) => [
   "--offline",
   "--no-session",
@@ -100,6 +97,13 @@ const piCliFlags = (tools: AgentTools) => [
   "--tools",
   piTools[tools].join(","),
 ]
+
+// WARNING: pi --list-models matches its search fuzzily and prints a table of provider and model columns.
+const listedModelIds = (listing: string) =>
+  listing
+    .split("\n")
+    .slice(1)
+    .map((row) => row.trim().split(/\s+/, 2).join("/"))
 
 const runnerStrategies = Effect.gen(function* () {
   const commands = yield* AgentCommands
@@ -247,8 +251,6 @@ const runnerStrategies = Effect.gen(function* () {
     return { identity, run: runClaudeCode(model, identity) } satisfies AgentRunner
   })
 
-  // `--mode json` ends with an `agent_end` event carrying the conversation; its last message is
-  // the model's answer after any tool calls.
   const decodePiCliEnd = Schema.decodeUnknownOption(
     Schema.fromJsonString(
       Schema.Struct({ type: Schema.Literal("agent_end"), messages: Schema.Array(Schema.Unknown) }),
@@ -283,8 +285,7 @@ const runnerStrategies = Effect.gen(function* () {
           identity,
         )
 
-      // pi reads `--system-prompt` from a file when given a path. A file keeps the instructions
-      // out of argv, where endpoint security tools may kill processes with long arguments.
+      // WARNING: pi reads --system-prompt from a file path, which keeps instructions out of argv, where endpoint security tools may kill long commands.
       const instructions = join(instructionsDirectory, "instructions.md")
       yield* fs
         .writeFileString(instructions, task.instructions)
@@ -371,11 +372,7 @@ const runnerStrategies = Effect.gen(function* () {
         "pi could not list its models. Check its installation.",
       )
 
-    // The listing is a table of `provider  model  …` rows matching the search fuzzily.
-    const available = listed.stdout
-      .split("\n")
-      .slice(1)
-      .some((row) => row.trim().split(/\s+/, 2).join("/") === model)
+    const available = listedModelIds(listed.stdout).includes(model)
 
     if (!available)
       return yield* agentFailure(

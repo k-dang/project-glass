@@ -29,7 +29,7 @@ const viewed = (path: string) => FileViewed.make({ pullRequest: recordedPullRequ
 
 describe("ActivityRecorder", () => {
   beforeEach(() => {
-    // Only the viewing delay's timers; Effect schedules its fibers with setImmediate.
+    // WARNING: Effect schedules fibers with setImmediate, so fake only setTimeout and clearTimeout.
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })
   })
 

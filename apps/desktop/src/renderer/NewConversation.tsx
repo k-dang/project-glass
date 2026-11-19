@@ -1,3 +1,4 @@
+import { cn } from "cn"
 import { useAtom, useAtomSet, useAtomValue } from "@effect/atom-react"
 import {
   type Conversation,
@@ -43,6 +44,7 @@ import {
   placeKey,
   placeOfKey,
 } from "./conversationsArea"
+import { conversationColumn } from "./conversationColumn"
 import { ConversationFrame } from "./ConversationFrame"
 import { UserMessage } from "./ConversationView"
 import type { BackendError } from "./backend"
@@ -428,7 +430,12 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto px-6 py-4">
-          <MessageGroup className="mx-auto max-w-3xl gap-4 [view-transition-name:new-conversation-start]">
+          <MessageGroup
+            className={cn(
+              conversationColumn,
+              "gap-4 [view-transition-name:new-conversation-start]",
+            )}
+          >
             <UserMessage message={starting.message} images={starting.images} />
             <Trace>
               <TraceLine status="running">

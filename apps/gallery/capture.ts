@@ -189,7 +189,10 @@ try {
   rmSync(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 })
 }
 
-writeFileSync(join(out, "index.html"), await galleryPage(shots, new Date()))
+writeFileSync(
+  join(out, "index.html"),
+  galleryPage({ shots, capturedAt: new Date().toLocaleString() }),
+)
 
 console.log(`\n${shots.length} states captured: ${join(out, "index.html")}`)
 

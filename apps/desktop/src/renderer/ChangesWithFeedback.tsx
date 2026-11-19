@@ -40,7 +40,6 @@ export type SidebarTab = "files" | "feedback"
 
 const NoteOpenContext = createContext(false)
 
-/** Whether a Feedback note is open in the diff, for a footer that waits until it is saved. */
 export const useNoteOpen = () => useContext(NoteOpenContext)
 
 export function ChangesWithFeedback(props: {
@@ -51,7 +50,6 @@ export function ChangesWithFeedback(props: {
   store: FeedbackNotesEditor
   sidebarTab: SidebarTab
   setSidebarTab: (tab: SidebarTab) => void
-  /** What the user does with the notes, shown above the diff; it reads useNoteOpen. */
   footer: ReactNode
 }) {
   const { changes, store, sidebarTab, setSidebarTab } = props

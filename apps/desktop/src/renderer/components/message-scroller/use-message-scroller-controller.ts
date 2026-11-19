@@ -145,8 +145,6 @@ function useMessageScrollerController({
     // commit can observe the grown content before follow catches up.
     const scrolledUp = scrollTop < lastScrollTopRef.current - SCROLL_POSITION_EPSILON
 
-    // Nothing programmatic scrolls while holding, so any movement is the reader
-    // (a scrollbar drag has no wheel or key intent) and ends the hold.
     if (
       modeRef.current === "holding-position" &&
       Math.abs(scrollTop - lastScrollTopRef.current) > SCROLL_POSITION_EPSILON
@@ -703,10 +701,6 @@ function useMessageScrollerController({
     }
   }, [])
 
-  // The reader is resizing content in place, such as expanding a disclosure.
-  // Following the bottom or re-anchoring the streaming turn would scroll the
-  // row they just clicked out from under the pointer, so leave the viewport
-  // where it is until they scroll, jump, or a new turn anchors.
   const holdPosition = React.useCallback(() => {
     streamingTurnRef.current = null
     modeRef.current = "holding-position"

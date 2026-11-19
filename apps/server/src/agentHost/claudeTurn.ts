@@ -36,10 +36,7 @@ export type Input = Data.TaggedEnum<{
 
 export const Input = Data.taggedEnum<Input>()
 
-/**
- * Whether a run's replies carry the uuids of the messages they answer, which shows when Claude Code
- * takes a Steer in. The run's first reply tells; a Claude Code too old to stamp never does.
- */
+// WARNING: Only Claude Code versions whose replies carry the uuids of the messages they answer show when a Steer is taken in; the run's first reply tells.
 type Stamping = "unknown" | "stamped" | "unstamped"
 
 export interface TurnState extends Steering {
@@ -68,7 +65,7 @@ export const beginTurn = (turnId: string, sent: TurnMessage, at: DateTime.Utc): 
   earlierRunFailure: null,
 })
 
-/** Claude Code reports a failed API call as a `success` marked `is_error`. */
+// WARNING: Claude Code reports a failed API call as a success marked is_error.
 export const isFailure = (message: SDKMessage): message is SDKResultMessage =>
   message.type === "result" && (message.subtype !== "success" || message.is_error)
 
@@ -109,7 +106,6 @@ const Answered = Schema.Struct({
 
 const decodeAnswered = Schema.decodeUnknownOption(Answered)
 
-// A local command like `/mcp` replies in one unstreamed message that Claude Code marks with this field.
 const isLocalCommandReply = Schema.is(Schema.Struct({ local_command_source: Schema.Unknown }))
 
 const answered = (message: SDKMessage): ReadonlyArray<string> =>

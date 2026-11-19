@@ -146,7 +146,7 @@ const releaseAskers = Layer.effectDiscard(
     const questions = yield* OutsideQuestions
     const checkIns = yield* CheckIns
 
-    // Acquired after the listener, so this runs before server.close waits on open responses.
+    // WARNING: Acquired after the listener so this runs before server.close waits on open responses.
     yield* Effect.addFinalizer(() =>
       Effect.all([questions.cancelAll(), checkIns.cancelAll()], { concurrency: "unbounded" }),
     )
@@ -163,7 +163,7 @@ export const serve = (
       HttpRouter.serve(Layer.mergeAll(RendererRoutes, McpRoutes, OAuthRoutes), {
         disableLogger: true,
       }).pipe(
-        // Provided first so it listens last: Effect's Node server leaves connections hanging until it serves.
+        // WARNING: Provided first so it listens last: Effect's Node server leaves connections hanging until it serves.
         Layer.provideMerge(NodeServerLive),
         Layer.provideMerge(services(agentRunners, mcpTools, agentCommands)),
         Layer.provide(RpcSerialization.layerJson),

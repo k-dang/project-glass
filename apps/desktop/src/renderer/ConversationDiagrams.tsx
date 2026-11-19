@@ -96,7 +96,6 @@ export function DiagramPane(props: { diagram: Diagram; onClose: () => void }) {
   )
 }
 
-/** Calls `open` with a Diagram drawn while the Conversation is on screen. */
 export function useDiagrams(
   turns: ReadonlyArray<Turn>,
   loaded: boolean,

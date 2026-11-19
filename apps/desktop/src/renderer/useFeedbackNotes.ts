@@ -7,7 +7,6 @@ import { feedbackNotesAtom, writtenFeedbackAtom } from "./conversationsArea"
 import { Backend, type BackendError, useBackendRuntime } from "./backend"
 import { type Problem, problemOf } from "./problems"
 
-/** The Feedback notes left on one set of changes, as the diff writes and shows them. */
 export interface FeedbackNotesEditor {
   readonly ready: boolean
   readonly notes: ReadonlyArray<FeedbackNote>
@@ -16,7 +15,6 @@ export interface FeedbackNotesEditor {
   readonly refresh: () => void
 }
 
-/** A Conversation's Feedback notes, which the user adds to its Unsent message before sending. */
 export interface FeedbackNotesStore extends FeedbackNotesEditor {
   readonly staged: ReadonlyArray<FeedbackNote>
   readonly stage: () => Promise<Problem | null>

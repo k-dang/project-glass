@@ -164,7 +164,6 @@ export interface Candidate {
   readonly isOpen: boolean
   readonly updatedAt: DateTime.Utc
   readonly head: string
-  /** The head branch when it is in the PR's own repository, not a fork. */
   readonly headBranch: string | null
   readonly viewerIsAuthor: boolean
   readonly viewerHasDrafts: boolean

@@ -1,7 +1,6 @@
 import type { ResourceProcess, ResourceUsage } from "@glass/contracts/desktop"
 import type { MemoryInfo, ProcessMetric } from "electron"
 
-// Electron omits memory on Linux despite declaring it as required in ProcessMetric.
 interface Metric extends Pick<ProcessMetric, "type" | "name" | "cpu"> {
   readonly memory?: MemoryInfo
 }
@@ -23,7 +22,6 @@ export function summarizeResourceUsage(metrics: ReadonlyArray<Metric>): Resource
 
     const group = groups[name]
 
-    // getAppMetrics already expresses CPU as a share of all logical processors.
     group.cpuPercent += metric.cpu.percentCPUUsage
     group.memoryBytes =
       metric.memory === undefined || group.memoryBytes === null

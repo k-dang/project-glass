@@ -252,7 +252,6 @@ export class Transcripts extends Context.Service<
       conversationId: string,
       turns?: number,
     ) => Effect.Effect<Transcript, ConversationError>
-    /** Publishes the Turns before `before` to the conversation's watchers, in order with its events. */
     readonly loadEarlier: (
       conversationId: string,
       before: string,
@@ -271,7 +270,6 @@ export class Transcripts extends Context.Service<
       conversationId: string,
     ) => Effect.Effect<string | null, ConversationError>
     readonly idle: (conversationId: string) => Effect.Effect<boolean, ConversationError>
-    /** Records the covered outcomes in the Turn's transaction, before publishing TurnStarted. */
     readonly startGlobalConversationUpdate: (
       conversationId: string,
       globalConversationUpdate: GlobalConversationUpdate,
@@ -1011,7 +1009,6 @@ export class Transcripts extends Context.Service<
                       AND json_extract(context, '$._tag') = 'GlobalConversationUpdate'
                   `.pipe(Effect.flatMap(decodeTurns))
 
-                  // pi restores complete messages; discard streaming fragments before replaying.
                   for (const turn of globalConversationUpdates)
                     yield* sql`DELETE FROM conversation_turn_part WHERE turn_id = ${turn.id}`
 

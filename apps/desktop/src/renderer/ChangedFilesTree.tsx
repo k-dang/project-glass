@@ -6,7 +6,7 @@ import { FileTree, useFileTree } from "@pierre/trees/react"
 import { cn } from "cn"
 import { Atom } from "effect/reactivity"
 import { Filter } from "lucide-react"
-import { useLayoutEffect, useMemo, useRef, useState } from "react"
+import { type MouseEvent, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
@@ -151,6 +151,22 @@ export function ChangedFilesTree(props: {
     model.resetPaths({ preparedInput: preparePresortedFileTreeInput(paths) })
   }
 
+  // WARNING: Trees fires no onSelectionChange when the selected row is clicked again.
+  const reopenSelectedFileOnClick = (event: MouseEvent<HTMLElement>) => {
+    if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey) return
+
+    const clicked = event.nativeEvent.composedPath().filter((node) => node instanceof HTMLElement)
+
+    if (clicked.some((element) => element.hasAttribute("data-row-checkbox"))) return
+
+    const [path, ...others] = model.getSelectedPaths()
+
+    if (path === undefined || others.length > 0 || !filesByPath.has(path)) return
+
+    if (clicked.some((element) => element.dataset.itemPath === path))
+      onSelect(path, nextSelectionScroll.current)
+  }
+
   return (
     <div className="relative flex min-h-0 flex-1 flex-col pt-2">
       {filterable && (
@@ -163,28 +179,9 @@ export function ChangedFilesTree(props: {
         onKeyDownCapture={() => {
           nextSelectionScroll.current = "instant"
         }}
-        // Trees does not fire onSelectionChange when the selected row is clicked again.
         onClickCapture={(event) => {
           nextSelectionScroll.current = event.detail === 0 ? "instant" : "smooth"
-
-          if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey) return
-
-          if (
-            event.nativeEvent
-              .composedPath()
-              .some((node) => node instanceof HTMLElement && node.hasAttribute("data-row-checkbox"))
-          )
-            return
-
-          const [path, ...others] = model.getSelectedPaths()
-
-          if (path === undefined || others.length > 0 || !filesByPath.has(path)) return
-
-          const clickedSelected = event.nativeEvent
-            .composedPath()
-            .some((node) => node instanceof HTMLElement && node.dataset.itemPath === path)
-
-          if (clickedSelected) onSelect(path, nextSelectionScroll.current)
+          reopenSelectedFileOnClick(event)
         }}
         className="file-tree min-h-0 flex-1"
       />

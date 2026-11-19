@@ -21,6 +21,6 @@ export const piLoadsNothing = [
   "--no-prompt-templates",
   "--no-themes",
   "--no-context-files",
-  // Ignores the folder's own pi settings and resources, which pi gates behind project trust.
+  // WARNING: --no-approve makes pi ignore the folder's own settings and resources, which pi gates behind project trust.
   "--no-approve",
 ]

@@ -1,6 +1,5 @@
 import { type DiagramType, render } from "pele"
 
-/** What Pele, which draws Mermaid in the desktop app, makes of this source. */
 export const drawWithPele = (
   mermaid: string,
 ): { readonly type: DiagramType } | { readonly problem: string } => {

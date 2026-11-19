@@ -15,10 +15,7 @@ import {
   type AuthorizationQuery,
 } from "./McpOAuth"
 
-// form-action has to name loopback hosts, not only 'self'. This page asks the
-// browser not to send a referrer, Chrome then treats the page's origin as
-// null, and 'self' no longer matches the form. The redirect after approval is
-// the client's own loopback address, which is also not 'self'.
+// WARNING: form-action must name loopback hosts: under no-referrer Chrome treats this page's origin as null, so 'self' matches neither the form nor the redirect.
 const PAGE_HEADERS = {
   "content-security-policy":
     "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' http://127.0.0.1:* http://localhost:* http://[::1]:*; frame-ancestors 'none'",
@@ -178,10 +175,7 @@ const decide = Effect.gen(function* () {
 
   const origin = request.headers.origin
 
-  // Chrome sends the literal origin "null" for this form because the page's referrer policy is
-  // no-referrer, so "null" is accepted. A sandboxed frame on another site sends "null" too, so
-  // this check does not stop a forged decision: the signed csrf field below does, because only
-  // a page that read the approval Glass rendered can carry it.
+  // WARNING: Chrome and sandboxed frames both send origin "null", so only the signed csrf field below stops a forged decision.
   if (origin !== undefined && origin !== "null" && origin !== found.value.issuer) {
     return staleApproval
   }

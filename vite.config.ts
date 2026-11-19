@@ -13,6 +13,7 @@ const ignorePatterns = [
   ".roo/**",
   ".windsurf/**",
   "tools/oxlint/anti-slop/**",
+  "tools/oxlint/landmines/**",
 ]
 
 export default defineConfig({
@@ -29,6 +30,9 @@ export default defineConfig({
       { name: "anti-slop", specifier: "./tools/oxlint/anti-slop/index.ts" },
       { name: "anti-slop-effect", specifier: "./tools/oxlint/anti-slop/effect/index.ts" },
       { name: "glass", specifier: "./tools/oxlint/glass/index.ts" },
+      { name: "landmines-testing", specifier: "./tools/oxlint/landmines/plugins/testing.ts" },
+      { name: "landmines-style", specifier: "./tools/oxlint/landmines/plugins/style.ts" },
+      { name: "landmines-structure", specifier: "./tools/oxlint/landmines/plugins/structure.ts" },
     ],
     categories: {
       correctness: "error",
@@ -66,12 +70,16 @@ export default defineConfig({
       "anti-slop-effect/no-manual-tagged-construction": "error",
       "anti-slop-effect/no-service-constructor-imports": "error",
       "anti-slop-effect/prefer-effect-match": "error",
+      "landmines-testing/no-flake-masking": "error",
+      "landmines-style/no-comments": [
+        "error",
+        { allow: ["WARNING", "SAFETY", "Flaky"], publicApi: ["/packages/plugin/"] },
+      ],
+      "landmines-structure/test-file-names": "error",
+      "landmines-structure/package-exports": "error",
     },
     overrides: [
-      // Example Plugins have no Effect, so they check what they read by hand.
       { files: ["examples/**"], rules: { "anti-slop/no-runtime-typeof": "off" } },
-      // The message scroller is vendored from shadcn-ui. Its hooks read refs and its code and tests
-      // cast DOM types; rewriting that would make future upstream fixes hard to carry over.
       {
         files: ["apps/desktop/src/renderer/components/message-scroller/**"],
         rules: {
@@ -83,6 +91,7 @@ export default defineConfig({
           "anti-slop/require-safety-comment-for-type-assertion": "off",
           "anti-slop/no-runtime-typeof": "off",
           "anti-slop/no-chained-type-assertions": "off",
+          "landmines-style/no-comments": "off",
           "typescript/no-unsafe-type-assertion": "off",
           "typescript/consistent-return": "off",
           "typescript/unbound-method": "off",

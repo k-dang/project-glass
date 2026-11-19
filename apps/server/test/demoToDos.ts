@@ -37,9 +37,7 @@ const openDemoToDos: ReadonlyArray<DemoToDo> = [
   },
 ]
 
-// Listed in the order Done shows them. The server sorts finished to-dos by
-// completed_at descending, so these are marked done from the bottom up.
-const doneDemoToDos: ReadonlyArray<DemoToDo> = [
+const doneDemoToDosNewestFirst: ReadonlyArray<DemoToDo> = [
   { title: "Send the weekly summary", notes: "" },
   {
     title: "Fix the wording on the settings page",
@@ -69,7 +67,7 @@ export const seedDemoToDos = Effect.fnUntraced(function* (port: number, token: s
 
   const finished: Array<number> = []
 
-  for (const toDo of doneDemoToDos) {
+  for (const toDo of doneDemoToDosNewestFirst) {
     const list = yield* client.AddToDo({ title: toDo.title, notes: toDo.notes })
     const id = createdId(list, toDo.title)
 

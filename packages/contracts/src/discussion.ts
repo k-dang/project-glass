@@ -38,7 +38,7 @@ export class PublishedComment extends Schema.TaggedClass<PublishedComment>()("Pu
   reactions: Schema.Array(ReactionGroup),
 }) {}
 
-/** GitHub anchors multiline comments on their last line. */
+// WARNING: GitHub anchors multiline comments on their last line.
 export class LineDiscussion extends Schema.Class<LineDiscussion>("LineDiscussion")({
   id: Schema.String,
   path: Schema.String,

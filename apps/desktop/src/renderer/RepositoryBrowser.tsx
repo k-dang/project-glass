@@ -106,7 +106,6 @@ function Note(props: { children: ReactNode }) {
   return <p className="px-4 py-3 text-sm text-muted-foreground">{props.children}</p>
 }
 
-/** useFileTree applies its options only when creating the model. */
 function RepositoryTree(props: {
   paths: ReadonlyArray<string>
   changedFiles: ReadonlyArray<ChangedFile>

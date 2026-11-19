@@ -13,7 +13,6 @@ import { createHash } from "node:crypto"
 import { join } from "node:path"
 import { Git } from "./git"
 
-/** Why reading a folder's changes failed, for the caller to log and explain in its own words. */
 export class ChangesFailed extends Schema.TaggedError<ChangesFailed>()("ChangesFailed", {
   cause: Schema.Unknown,
 }) {}
@@ -23,7 +22,6 @@ const failed = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
 
 const encodeFiles = Schema.encodeSync(Schema.Array(ChangedFile))
 
-/** Names one version of a folder's changes, so a Feedback note can tell it was left on another. */
 export const changesId = (files: ReadonlyArray<ChangedFile>) =>
   createHash("sha256")
     .update(JSON.stringify(encodeFiles(files)))
@@ -47,7 +45,6 @@ interface Summary {
   readonly deletions: number | null
 }
 
-/** Reads `git diff --raw --numstat -z`, whose numstat records follow the raw ones in the same order. */
 const readSummary = (output: string): ReadonlyArray<Summary> => {
   const fields = output.split("\0")
   const files: Array<Omit<Summary, "additions" | "deletions">> = []
@@ -71,7 +68,7 @@ const readSummary = (output: string): ReadonlyArray<Summary> => {
     } else {
       const [added = "", deleted = "", path] = field.split("\t")
 
-      // git leaves a rename's path empty here and names both paths in the next two fields.
+      // WARNING: git's -z numstat leaves a rename's path empty and names both paths in the next two fields.
       if (path === "") next += 2
 
       counts.push({

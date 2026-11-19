@@ -26,7 +26,6 @@ interface TaskFrame {
   readonly ambient?: boolean | undefined
 }
 
-// Ambient tasks, such as live-update watchers, aren't activity, so Claude Code asks hosts to hide them.
 const taskOf = (frame: TaskFrame, toolCallId: string | null): BackgroundTask | null => {
   const kind = kinds.get(frame.task_type ?? "")
 
@@ -64,7 +63,6 @@ export const trackBackgroundTasks = (tasks: BackgroundTasks, message: SDKMessage
       }
     }
 
-    // Claude Code can list a task before its `task_started`, which carries the tool call.
     case "background_tasks_changed": {
       const unendedById = new Map(tasks.unendedById)
       const runningIds: Array<string> = []

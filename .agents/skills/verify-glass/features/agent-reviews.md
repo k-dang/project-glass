@@ -25,6 +25,6 @@ Open a PR, open Agent work in its header, then Start on the Agent review row and
 
 ## Gotchas
 
-- This follows `apps/desktop/e2e/agentReview.spec.ts` with shared demo data. Synthetic output proves UI and persistence, not model quality or live authentication.
+- This follows `apps/desktop/e2e/agentReview.test.ts` with shared demo data. Synthetic output proves UI and persistence, not model quality or live authentication.
 - The demo model can't call `suggest_draft`, so adding a Suggested draft isn't drivable here; `AgentReviewBesideDiff.test.tsx` and the `*-review` adapter recordings cover it.
 - dev:fake points Agent reviews' pi at the demo model only in a fresh `settings.json`; an older run's Settings may still name a real model, which fails to sign in.

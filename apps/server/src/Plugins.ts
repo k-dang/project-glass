@@ -1,7 +1,7 @@
 import { AgentHarness } from "@glass/contracts"
 import type { Glass, Plugin, SandboxProvider } from "@glass/plugin"
 import { Context, Effect, FileSystem, Layer, Option, Predicate, Result, Schema } from "effect"
-// The static entry imports jiti's TypeScript transform, so it lands in the backend's bundle.
+// WARNING: jiti/static imports jiti's TypeScript transform statically, so the backend bundle includes it.
 import { createJiti } from "jiti/static"
 import { extname, join } from "node:path"
 import { ServerConfig } from "./ServerConfig"

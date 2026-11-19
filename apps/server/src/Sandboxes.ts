@@ -517,8 +517,7 @@ export class Sandboxes extends Context.Service<
                   Effect.provideService(Socket.WebSocketConstructor, webSocketConstructor),
                 )
 
-                // Effect's socket client connects in the background, and connects again to
-                // whichever host answers, so the journal's calls name the host they mean.
+                // WARNING: Effect's socket client reconnects in the background to whichever host answers, so journal calls name their host.
                 const host = yield* greet(client)
                 yield* refuseIfGone(conversationId)
                 const position = yield* followFrom(conversationId, host)

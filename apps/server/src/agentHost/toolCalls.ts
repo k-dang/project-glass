@@ -3,7 +3,7 @@ import { Predicate, Schema } from "effect"
 
 export const GLASS_MCP_SERVER = "glass"
 
-/** Claude Code names an MCP server's tools `mcp__<server>__<tool>`, and pi's Glass tools match. */
+// WARNING: Claude Code names an MCP server's tools mcp__<server>__<tool>, and pi's Glass tools match.
 export const GLASS_MCP_PREFIX = `mcp__${GLASS_MCP_SERVER}__`
 
 const shownName = (name: string) =>

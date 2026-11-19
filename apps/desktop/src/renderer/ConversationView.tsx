@@ -99,6 +99,7 @@ import {
   TraceLine,
   TraceTitle,
 } from "@/components/ui/trace"
+import { conversationColumn } from "./conversationColumn"
 import { ConversationChanges } from "./ConversationChanges"
 import { ConversationDetailsAction, ConversationFrame } from "./ConversationFrame"
 import { PullRequestLink, useConversationPullRequest } from "./ConversationPullRequest"
@@ -357,8 +358,6 @@ export function TranscriptProblem() {
   )
 }
 
-// In the Inbox the chat shows only the latest Turn and a plain Reply box: a Conversation there
-// is idle or waiting on the user, and leaves the Inbox as soon as a reply starts a Turn.
 export function ConversationChat(props: {
   conversation: Conversation
   place: "conversation" | "inbox"
@@ -387,7 +386,9 @@ export function ConversationChat(props: {
       <AgentStatuses statuses={agentStatuses} />
       {reach === "unreachable" && <UnreachableNotice conversationId={conversation.id} />}
       {readOnly !== null ? (
-        <output className="mx-auto block w-full max-w-3xl px-6 py-4 text-sm text-muted-foreground">
+        <output
+          className={cn(conversationColumn, "block w-full px-6 py-4 text-sm text-muted-foreground")}
+        >
           {readOnly}
         </output>
       ) : props.place === "inbox" ? (
@@ -461,7 +462,7 @@ export function Transcript(props: {
       <section aria-label="Transcript" className="flex min-h-0 flex-1 flex-col">
         <MessageScroller className="min-h-0 flex-1">
           <MessageScrollerViewport className="px-6 py-4">
-            <MessageScrollerContent className="mx-auto w-full max-w-3xl">
+            <MessageScrollerContent className={cn(conversationColumn, "w-full")}>
               {props.lead}
               {collapsed ? (
                 <div className="text-center">
@@ -1094,7 +1095,10 @@ function AgentStatuses(props: { statuses: ReadonlyArray<string> }) {
     props.statuses.length > 0 && (
       <output
         aria-label="Agent statuses"
-        className="mx-auto flex w-full max-w-3xl flex-wrap gap-x-4 gap-y-1 px-6 pt-2 text-xs text-muted-foreground"
+        className={cn(
+          conversationColumn,
+          "flex w-full flex-wrap gap-x-4 gap-y-1 px-6 pt-2 text-xs text-muted-foreground",
+        )}
       >
         {props.statuses.map((status) => (
           <span key={status} className="flex items-center gap-1.5">
@@ -1113,7 +1117,9 @@ function UnreachableNotice({ conversationId }: { conversationId: string }) {
   const problem = settledProblem(tried)
 
   return (
-    <output className="mx-auto block w-full max-w-3xl px-6 pt-2 text-sm text-muted-foreground">
+    <output
+      className={cn(conversationColumn, "block w-full px-6 pt-2 text-sm text-muted-foreground")}
+    >
       Glass can't reach this Conversation's Sandbox. Once it answers, Glass fills in what its agent
       did.{" "}
       <Button
@@ -1281,7 +1287,10 @@ function QueuedMessages(props: { queued: ReadonlyArray<QueuedMessage>; running: 
   const sendNow = useAtomSet(atoms.sendQueued)
 
   return (
-    <section aria-label="Queued messages" className="mx-auto flex max-w-3xl flex-col gap-1 pt-2">
+    <section
+      aria-label="Queued messages"
+      className={cn(conversationColumn, "flex flex-col gap-1 pt-2")}
+    >
       <p className="text-xs text-muted-foreground">
         {props.running ? "Starts when the agent finishes" : "Waiting until you send them"}
       </p>

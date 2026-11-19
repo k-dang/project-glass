@@ -22,7 +22,7 @@ const CODE_CHALLENGE = /^[A-Za-z0-9_-]{43}$/
 
 const CODE_VERIFIER = /^[A-Za-z0-9\-._~]{43,128}$/
 
-/** Host names as `URL.hostname` spells them, so IPv6 keeps its brackets. */
+// WARNING: URL.hostname keeps IPv6 brackets, so "[::1]" is spelled with them.
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"])
 
 const ClientIdPayload = Schema.Struct({
@@ -578,7 +578,6 @@ export class McpOAuth extends Context.Service<
             return yield* tokenError("invalid_client", "The client is unknown.")
           }
 
-          // A presented code is spent even when a later check fails (RFC 6749).
           const pending = yield* Ref.modify(codes, (current) => {
             const found = current.get(code)
 

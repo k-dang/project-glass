@@ -36,7 +36,7 @@ Sending feedback, from a note added in Changes:
 
 ## Gotchas
 
-- The demo backend writes files only for the two exact messages in `demoReply` (`apps/server/test/demoConversation.ts`), as in `apps/desktop/e2e/conversationChanges.spec.ts`, and in the long Conversation in `apps/server/test/demoLongConversation.ts`. Other demo messages do not write files.
+- The demo backend writes files only for the two exact messages in `demoReply` (`apps/server/test/demoConversation.ts`), as in `apps/desktop/e2e/conversationChanges.test.ts`, and in the long Conversation in `apps/server/test/demoLongConversation.ts`. Other demo messages do not write files.
 - These steps need a window at least 1200px wide (`launch` opens one at 1280px), so Details are pinned in `complementary "Details"`. They fall back to the `Details` button while a Diagram or file pane is open; `Hide details` in the header unpins them.
 - The first Changes view is deliberately pinned; returning to Chat does not refresh it.
 - Line numbers aren't buttons in the accessibility tree, so select lines with `press --shift` from a clicked code line rather than by clicking a number.

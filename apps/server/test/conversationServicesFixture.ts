@@ -146,7 +146,6 @@ export const conversationServicesFixture = Effect.gen(function* () {
         return changed
       }),
     uncommitted: () => Effect.sync(() => uncommitted),
-    // The fake placement names each folder after its Conversation, as a worktree's branch is.
     branch: (folder) => Effect.succeed(folder),
     files: () => Effect.succeed([]),
   })

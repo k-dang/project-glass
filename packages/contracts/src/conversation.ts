@@ -129,7 +129,6 @@ export class Conversation extends Schema.Class<Conversation>("Conversation")({
   place: ConversationPlace,
   repository: FollowedRepository,
   baseBranch: Schema.String,
-  /** The branch its folder had checked out when its latest Turn ended; null when detached. */
   branch: Schema.NullOr(Schema.String),
   harness: AgentHarness,
   ...ModelChoice.fields,
@@ -714,16 +713,13 @@ export class ConversationError extends Schema.TaggedError<ConversationError>()(
 
 export const ImageFile = Schema.TaggedStruct("ImageFile", {
   mediaType: Schema.String,
-  /** Base64, as an image's data URL carries it. */
   data: Schema.String,
 })
 
-/** A file in a Conversation's folder, as the File pane shows it. */
 export const ConversationFile = Schema.Union([TextFile, ImageFile, BinaryFile, FileTooLarge])
 
 export type ConversationFile = typeof ConversationFile.Type
 
-/** How many named paths Glass looks for at once: the most recent ones. */
 export const MAX_FOUND_FILES = 500
 
 export const NamedPaths = Schema.Array(Schema.String).check(Schema.isMaxLength(MAX_FOUND_FILES))

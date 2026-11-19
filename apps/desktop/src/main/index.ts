@@ -67,7 +67,7 @@ const resources = app.isPackaged
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   "script-src 'self'",
-  // Diffs injects <style> elements and inline style attributes.
+  // WARNING: @pierre/diffs injects <style> elements and inline style attributes, so style-src needs 'unsafe-inline'.
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https://github.com https://*.githubusercontent.com",
   "media-src https://github.com https://*.githubusercontent.com",
@@ -191,7 +191,7 @@ const createWindow = () => {
       sandbox: true,
       nodeIntegration: false,
       spellcheck: true,
-      // Throttled timers in a hidden window can interrupt WebSocket pings.
+      // WARNING: Chromium throttles timers in hidden windows, which can miss the backend WebSocket's pings.
       backgroundThrottling: false,
     },
   })
@@ -251,7 +251,7 @@ const createWindow = () => {
 
     return { action: "deny" }
   })
-  // A reload or crash skips the pages' close, so the next document starts with none.
+  // WARNING: A reload or crash skips the pages' close, so the next document starts with none.
   window.webContents.on("did-navigate", pages.clear)
   window.on("closed", pages.clear)
   window.webContents.on("will-navigate", (event) => {
@@ -323,7 +323,7 @@ void app.whenReady().then(() => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 
-  // Loading Effect before ready delays the window and the GPU process that gate first paint.
+  // WARNING: Importing Effect before ready delays the window and the GPU process that gate first paint.
   import("./backend")
     .then(({ runBackend }) =>
       runBackend({

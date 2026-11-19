@@ -34,7 +34,6 @@ const DEFAULT_AGENT_MODEL = MODELS.find(({ id }) => id === `vercel-ai-gateway/${
 if (DEFAULT_AGENT_MODEL === undefined)
   throw new Error(`pi-ai doesn't list ${DEFAULT_MODEL}; pick a default model it has`)
 
-// flock keeps a second start from racing the running host for its port.
 const START_HOST = `cd ${WORK} && set -a && . ${HOST}/host.env && set +a && exec flock -n ${HOST}/host.lock node ${HOST}/agent-host.mjs >> ${HOST}/host.log 2>&1`
 
 interface SandboxAddress {
@@ -185,7 +184,7 @@ const shell = async (
     )
 }
 
-// Not given a signal: aborting a detached command's request would kill the host it started.
+// WARNING: Not given a signal: aborting a detached command's request kills the host it started.
 const startHost = (sandbox: Sandbox) =>
   sandbox.runCommand({ cmd: "bash", args: ["-lc", START_HOST], detached: true })
 
@@ -217,7 +216,7 @@ const vercelSandboxes: Plugin = (glass) => {
     }
   }
 
-  // The firewall adds these headers on the way out, so no secret is ever inside the Sandbox.
+  // WARNING: The Sandbox firewall adds these headers on the way out, so no secret is ever inside the Sandbox.
   const networkPolicy = async (
     token: string,
     where: Pick<SandboxAddress, "teamId" | "projectId">,

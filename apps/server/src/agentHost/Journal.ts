@@ -12,7 +12,6 @@ interface Attendance {
   readonly unacknowledged: number
 }
 
-/** JSON characters of unacknowledged output kept for Glass while it is away: many Agent-hours. */
 export const JournalBudget = Context.Reference<number>("@glass/server/agentHost/JournalBudget", {
   defaultValue: () => 64 * 1024 * 1024,
 })
@@ -27,7 +26,6 @@ export class Journal extends Context.Service<
   Journal,
   {
     readonly host: string
-    /** Keeps every entry, and says whether the unacknowledged ones are now over the budget. */
     readonly append: (conversationId: string, event: HostEvent) => Effect.Effect<boolean>
     readonly watch: (host: string, after: number) => Stream.Stream<JournalEntry, HostReplaced>
     readonly acknowledge: (host: string, through: number) => Effect.Effect<void>

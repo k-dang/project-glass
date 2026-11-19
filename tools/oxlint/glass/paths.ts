@@ -11,4 +11,4 @@ export const projectPath = (filename: string) =>
   )
 
 export const isTest = (filename: string) =>
-  /\.(test|spec)\.[cm]?[jt]sx?$/.test(filename) || /^(apps\/[^/]+\/(test|e2e)\/)/.test(filename)
+  /\.test\.[cm]?[jt]sx?$/.test(filename) || /^(apps\/[^/]+\/(test|e2e)\/)/.test(filename)
