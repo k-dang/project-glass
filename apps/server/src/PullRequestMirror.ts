@@ -36,6 +36,8 @@ const FULL_READ_INTERVAL = Duration.minutes(10)
 
 const CATCH_UP_OVERLAP = Duration.minutes(5)
 
+const CANDIDATE_CONCURRENCY = 4
+
 const MirroredPullRequest = Schema.Struct({
   id: Schema.String,
   ref: PullRequestRef,
@@ -209,8 +211,10 @@ export class PullRequestMirror extends Context.Service<
           repository,
           fullyReadAt: now,
           syncedAt: now,
-          pullRequests: yield* Effect.forEach(candidates, (candidate) =>
-            mirrored(candidate, before),
+          pullRequests: yield* Effect.forEach(
+            candidates,
+            (candidate) => mirrored(candidate, before),
+            { concurrency: CANDIDATE_CONCURRENCY },
           ),
         } satisfies RepositoryMirror
       })
@@ -231,6 +235,7 @@ export class PullRequestMirror extends Context.Service<
         const updated = yield* Effect.forEach(
           changed.filter((candidate) => candidate.isOpen),
           (candidate) => mirrored(candidate, before),
+          { concurrency: CANDIDATE_CONCURRENCY },
         )
 
         return {

@@ -425,7 +425,7 @@ interface FakeGitHubOptions {
   readonly beforeRequest?: (
     request: FakeGitHubRequest,
     github: FakeGitHub,
-  ) => FakeFailure | undefined
+  ) => FakeFailure | undefined | Effect.Effect<FakeFailure | undefined>
 }
 
 export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubOptions = {}) {
@@ -486,9 +486,12 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
             ? yield* Effect.orDie(HttpServerRequest.schemaBodyJson(GraphQLRequest))
             : undefined
 
-        const failure =
-          options.beforeRequest?.({ method: request.method, path: pathname, graphql }, fake) ??
-          failures.shift()
+        const decided = options.beforeRequest?.(
+          { method: request.method, path: pathname, graphql },
+          fake,
+        )
+
+        const failure = (Effect.isEffect(decided) ? yield* decided : decided) ?? failures.shift()
 
         if (failure === "disconnect") {
           NodeHttpServerRequest.toIncomingMessage(request).socket.destroy()
