@@ -64,7 +64,7 @@ import { ProblemAlert } from "./ProblemAlert"
 import type { Problem } from "./problems"
 import { RepositoryBrowser } from "./RepositoryBrowser"
 import { FinishReview } from "./FinishReview"
-import { OpenPullRequestDialog } from "./OpenPullRequestDialog"
+import { OpenPullRequestButton } from "./OpenPullRequestDialog"
 import { closedAs, StatusChips } from "./PullRequestStatus"
 import {
   type ChangesOrder,
@@ -434,7 +434,7 @@ export function Workspace(props: {
           open={
             <>
               {agentWork}
-              <OpenPullRequestDialog current={pullRequest.ref} onOpen={props.onOpen} />
+              <OpenPullRequestButton />
             </>
           }
           review={

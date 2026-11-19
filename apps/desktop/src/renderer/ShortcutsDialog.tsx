@@ -4,7 +4,6 @@ import {
   Bot,
   Copy,
   FileDiff,
-  GitPullRequestArrow,
   Inbox,
   Keyboard,
   type LucideIcon,
@@ -51,6 +50,7 @@ const groups: ReadonlyArray<ShortcutGroup> = [
       { label: "Back", keys: ["Mod", "←"] },
       { label: "Forward", keys: ["Mod", "→"] },
       { label: "Open or close the Global conversation", keys: ["Mod", "J"] },
+      { label: "Open a PR, or add it to the Queue with Mod Enter", keys: ["Mod", "L"] },
       { label: "Record a Dogfood report", keys: ["Mod", "Shift", "."] },
       { label: "Show keyboard shortcuts", keys: ["?"] },
     ],
@@ -65,12 +65,6 @@ const groups: ReadonlyArray<ShortcutGroup> = [
     ],
   },
   {
-    title: "Reviews",
-    icon: GitPullRequestArrow,
-    note: "On the Reviews list.",
-    shortcuts: [{ label: "Open a PR", keys: ["Mod", "L"] }],
-  },
-  {
     title: "Conversations",
     icon: Bot,
     note: "In an open Conversation.",
@@ -82,7 +76,6 @@ const groups: ReadonlyArray<ShortcutGroup> = [
     note: "In a PR workspace. Queue commands work when this PR is in the Queue; Next PR needs another queued PR.",
     shortcuts: [
       { label: "Back to PRs", keys: ["Escape"] },
-      { label: "Open another PR", keys: ["Mod", "L"] },
       { label: "Open Copy menu", keys: ["C"] },
       { label: "Open or close the Agent review", keys: ["Mod", "D"] },
       { label: "Remove from Queue & advance", keys: ["Mod", "]"] },

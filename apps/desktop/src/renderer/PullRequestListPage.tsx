@@ -26,7 +26,6 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Empty } from "./Lists"
-import { OpenPullRequestDialog } from "./OpenPullRequestDialog"
 import { plural } from "./plural"
 import { ProblemAlert } from "./ProblemAlert"
 import { type Problem, problemText, streamProblem } from "./problems"
@@ -92,7 +91,6 @@ export function PullRequestListPage(props: {
           {props.search.list !== "queue" && <NotRefreshedNote list={props.search.list} />}
           <span className="ml-auto flex items-center gap-2">
             <PullRequestUrlForm onOpen={props.onOpen} />
-            <OpenPullRequestDialog onOpen={props.onOpen} />
             <ToggleGroup
               variant="outline"
               size="sm"
