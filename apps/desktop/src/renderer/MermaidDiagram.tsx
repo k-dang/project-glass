@@ -49,7 +49,8 @@ export function MermaidDiagram(props: {
       ref={draw}
       className={cn(
         "pele",
-        zoomable && "[--pele-zoom-bottom:0] [--pele-zoom-right:0] [--pele-zoom-top:auto]",
+        zoomable &&
+          "overflow-hidden [--pele-zoom-bottom:0] [--pele-zoom-right:0] [--pele-zoom-top:auto] [&>svg]:max-h-full [&>svg]:w-auto",
         props.className,
       )}
     />
