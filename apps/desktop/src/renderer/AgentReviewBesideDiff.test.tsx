@@ -99,7 +99,7 @@ it("marks an outdated Agent review and still reads it", async () => {
   await f.user.click(screen.getByRole("button", { name: "Agent work" }))
   const row = within(await screen.findByRole("listitem", { name: "Agent review" }))
 
-  expect(row.getByText(/Written for head/).textContent).toBe("Written for head 0123456")
+  expect((await row.findByText(/Written for head/)).textContent).toBe("Written for head 0123456")
   await f.user.click(row.getByRole("button", { name: "Read" }))
   expect(sidePanel()).not.toBeNull()
 })
