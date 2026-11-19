@@ -38,7 +38,7 @@ const setup = (handlers: Partial<Handlers>) => {
     </RegistryContext.Provider>,
   )
 
-  return { store, key, user: userEvent.setup() }
+  return { store, user: userEvent.setup() }
 }
 
 it("asks about a line privately and shows the answer with who wrote it", async () => {

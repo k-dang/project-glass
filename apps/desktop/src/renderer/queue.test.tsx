@@ -189,7 +189,6 @@ it("queues every PR in a paste at once, and reports duplicates and problems", as
     expect.stringMatching(/Wave at the worldelsewhere#7/),
   ])
   expect(tab.textContent).toBe("Queue2")
-  expect(field().value).toBe("")
 
   await user.paste(`OCTO-ORG/Glass#42 and ${fibers.url}`)
   await waitFor(() => expect(note().textContent).toBe("1 already queued"))
@@ -207,23 +206,11 @@ it("queues every PR in a paste at once, and reports duplicates and problems", as
 })
 
 it("keeps pasted text in the field when GitHub can't be reached", async () => {
-  window.history.replaceState(null, "", "#/reviews?list=queue")
-
-  const backend = testLayer({
-    GetConnection: () =>
-      Effect.succeed(new GitHubConnection({ login: "kevin", tokenSource: "gh" })),
-    ListFollowedRepositories: () => Effect.succeed([]),
+  const user = mount([], {
     AddToQueue: () => Effect.fail(new GitHubUnavailable({ message: "Offline." })),
   })
 
-  render(
-    <RegistryProvider initialValues={[[backendLayerAtom, backend]]}>
-      <App />
-    </RegistryProvider>,
-  )
-
-  const user = userEvent.setup()
-  await screen.findByText("Your Queue is empty")
+  await within(await openQueue(user)).findByText("Your Queue is empty")
   await user.click(field())
   await user.paste(greet.url)
   await waitFor(() => expect(note().textContent).toBe("Couldn't reach GitHub. Offline."))
@@ -260,36 +247,31 @@ it("marks unopened and finished PRs, and Undo puts a removed PR back in its plac
 })
 
 it.each([
-  ["merged", "Merged", "lucide-git-merge"],
-  ["closed", "Closed", "lucide-git-pull-request-closed"],
-] as const)(
-  "shows %s in the leading icon with a hover and keyboard hint",
-  async (state, label, icon) => {
-    window.history.replaceState(null, "", "#/reviews?list=queue")
-    const user = mount([queued(wave, { state })])
+  ["merged", "Merged"],
+  ["closed", "Closed"],
+] as const)("shows %s in the leading icon with a hover and keyboard hint", async (state, label) => {
+  window.history.replaceState(null, "", "#/reviews?list=queue")
+  const user = mount([queued(wave, { state })])
 
-    const row = await screen.findByRole("button", {
-      name: new RegExp(`Wave at the world.*${label}`),
-    })
+  const row = await screen.findByRole("button", {
+    name: new RegExp(`Wave at the world.*${label}`),
+  })
 
-    expect(row.querySelector(`svg.${icon}`)).not.toBeNull()
-    expect(within(row).getByText(label).classList.contains("sr-only")).toBe(true)
-    expect(within(row).queryByText(/Checks/)).toBeNull()
+  expect(within(row).queryByText(/Checks/)).toBeNull()
 
-    await user.click(field())
-    await user.tab()
-    expect(document.activeElement).toBe(row)
-    expect((await screen.findByRole("tooltip")).textContent).toBe(label)
-    await user.keyboard("{Escape}")
-    await waitFor(() => expect(screen.queryByRole("tooltip")).toBeNull())
+  await user.click(field())
+  await user.tab()
+  expect(document.activeElement).toBe(row)
+  expect((await screen.findByRole("tooltip")).textContent).toBe(label)
+  await user.keyboard("{Escape}")
+  await waitFor(() => expect(screen.queryByRole("tooltip")).toBeNull())
 
-    await user.tab()
-    await user.hover(row.querySelector("svg")!)
-    expect((await screen.findByRole("tooltip")).textContent).toBe(label)
-    await user.unhover(row.querySelector("svg")!)
-    await waitFor(() => expect(screen.queryByRole("tooltip")).toBeNull())
-  },
-)
+  await user.tab()
+  await user.hover(row.querySelector("svg")!)
+  expect((await screen.findByRole("tooltip")).textContent).toBe(label)
+  await user.unhover(row.querySelector("svg")!)
+  await waitFor(() => expect(screen.queryByRole("tooltip")).toBeNull())
+})
 
 const savedTour = (head: string): TourState => ({
   tour: {

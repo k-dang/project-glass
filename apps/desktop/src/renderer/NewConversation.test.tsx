@@ -469,9 +469,9 @@ it("keeps local branch, harness, model, effort, and unsent work when exploring a
   await select("Where the Conversation runs", "Fake Sandboxes")
   await within(newConversationDraft()).findByRole("button", { name: "Claude Code: Remote model" })
   expect(
-    within(within(newConversationDraft()).getByRole("combobox", { name: "Base branch" })).getByText(
-      "trunk",
-    ),
+    await within(
+      within(newConversationDraft()).getByRole("combobox", { name: "Base branch" }),
+    ).findByText("trunk"),
   ).toBeTruthy()
   expect(within(newConversationDraft()).queryByRole("combobox", { name: "Effort" })).toBeNull()
   expect(

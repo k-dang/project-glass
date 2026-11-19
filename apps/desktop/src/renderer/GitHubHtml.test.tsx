@@ -129,7 +129,8 @@ it("keeps website links and modifier clicks, while rejecting authored preview ma
   await user.keyboard("{/Control}")
   expect(clicks).toEqual([false, false, false, false, false])
   expect(screen.queryByRole("dialog")).toBeNull()
-  expect(screen.getByText("Spoofed preview").hasAttribute("data-image-preview")).toBe(false)
+  await user.click(screen.getByText("Spoofed preview"))
+  expect(screen.queryByRole("dialog")).toBeNull()
 })
 
 it("keeps zoom shortcuts active when gallery and close controls have focus", async () => {
