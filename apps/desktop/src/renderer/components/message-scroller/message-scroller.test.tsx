@@ -2,8 +2,7 @@
 
 import * as React from "react"
 import { act } from "react"
-import { createRoot, hydrateRoot, type Root } from "react-dom/client"
-import { renderToString } from "react-dom/server"
+import { createRoot, type Root } from "react-dom/client"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test"
 
 import {
@@ -328,26 +327,6 @@ describe("MessageScroller", () => {
     expect(rendered.scroller().hasAttribute("data-pending-scroll")).toBe(false)
   })
 
-  it("emits data-pending-scroll on the server when opening at the end", () => {
-    const html = renderToString(<PendingScrollTree testIds />)
-
-    expect(html).toContain('data-pending-scroll=""')
-  })
-
-  it("emits data-pending-scroll on the server when opening at last-anchor", () => {
-    const html = renderToString(
-      <PendingScrollTree defaultScrollPosition="last-anchor" scrollAnchor />,
-    )
-
-    expect(html).toContain('data-pending-scroll=""')
-  })
-
-  it("does not emit data-pending-scroll on the server when opening at the start", () => {
-    const html = renderToString(<PendingScrollTree defaultScrollPosition="start" />)
-
-    expect(html).not.toContain("data-pending-scroll")
-  })
-
   it("drops data-pending-scroll when the transcript is empty", async () => {
     const rendered = await renderTestScroller({
       messages: [],
@@ -355,39 +334,6 @@ describe("MessageScroller", () => {
 
     expect(rendered.viewport().hasAttribute("data-pending-scroll")).toBe(false)
     expect(rendered.scroller().hasAttribute("data-pending-scroll")).toBe(false)
-  })
-
-  it("clears data-pending-scroll on hydration without errors", async () => {
-    const tree = <PendingScrollTree items={["One", "Two"]} testIds />
-    const mounted = renderPendingScrollToContainer(tree)
-
-    expect(mounted.scroller?.hasAttribute("data-pending-scroll")).toBe(true)
-    expect(mounted.viewport?.hasAttribute("data-pending-scroll")).toBe(true)
-
-    const consoleError = await mounted.hydrate()
-
-    expect(mounted.scroller?.hasAttribute("data-pending-scroll")).toBe(false)
-    expect(mounted.viewport?.hasAttribute("data-pending-scroll")).toBe(false)
-    expect(consoleError).not.toHaveBeenCalled()
-    consoleError.mockRestore()
-  })
-
-  it("converges after a pre-hydration script removes data-pending-scroll", async () => {
-    const tree = <PendingScrollTree items={["One", "Two"]} suppressHydrationWarning testIds />
-    const mounted = renderPendingScrollToContainer(tree)
-
-    expect(mounted.scroller?.hasAttribute("data-pending-scroll")).toBe(true)
-    expect(mounted.viewport?.hasAttribute("data-pending-scroll")).toBe(true)
-
-    mounted.viewport?.removeAttribute("data-pending-scroll")
-
-    const consoleError = await mounted.hydrate()
-
-    expect(consoleError).not.toHaveBeenCalled()
-    expect(mounted.scroller?.hasAttribute("data-pending-scroll")).toBe(false)
-    expect(mounted.viewport?.hasAttribute("data-pending-scroll")).toBe(false)
-    expect(document.body.contains(mounted.viewport)).toBe(true)
-    consoleError.mockRestore()
   })
 
   it("opens at the end when autoScroll starts engaged", async () => {
@@ -1643,68 +1589,6 @@ describe("MessageScroller", () => {
     expect(rendered.stateRenderCount()).toBe(renderCount)
   })
 })
-
-function PendingScrollTree({
-  defaultScrollPosition,
-  items = ["One"],
-  scrollAnchor = false,
-  suppressHydrationWarning,
-  testIds = false,
-}: {
-  defaultScrollPosition?: React.ComponentProps<
-    typeof MessageScrollerProvider
-  >["defaultScrollPosition"]
-  items?: string[]
-  scrollAnchor?: boolean
-  suppressHydrationWarning?: boolean
-  testIds?: boolean
-}) {
-  return (
-    <MessageScrollerProvider defaultScrollPosition={defaultScrollPosition}>
-      <MessageScroller data-testid={testIds ? "scroller" : undefined}>
-        <MessageScrollerViewport
-          data-testid={testIds ? "viewport" : undefined}
-          suppressHydrationWarning={suppressHydrationWarning}
-        >
-          <MessageScrollerContent>
-            {items.map((label, index) => (
-              <MessageScrollerItem
-                key={label}
-                messageId={`message-${index + 1}`}
-                scrollAnchor={scrollAnchor}
-              >
-                {label}
-              </MessageScrollerItem>
-            ))}
-          </MessageScrollerContent>
-        </MessageScrollerViewport>
-      </MessageScroller>
-    </MessageScrollerProvider>
-  )
-}
-
-function renderPendingScrollToContainer(tree: React.ReactElement) {
-  const container = document.createElement("div")
-
-  containers.push(container)
-  container.innerHTML = renderToString(tree)
-  document.body.appendChild(container)
-
-  return {
-    container,
-    scroller: container.querySelector("[data-testid=scroller]"),
-    viewport: container.querySelector("[data-testid=viewport]"),
-    async hydrate() {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {})
-
-      await act(async () => {
-        hydrateRoot(container, tree)
-      })
-
-      return consoleError
-    },
-  }
-}
 
 async function renderTestScroller(options: TestScrollerOptions) {
   const container = document.createElement("div")

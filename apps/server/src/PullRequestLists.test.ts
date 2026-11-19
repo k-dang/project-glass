@@ -134,20 +134,32 @@ const approved = (pr: FakePullRequest) => {
 
 const minute = (minutes: number) => new Date(Date.UTC(2026, 0, 1) + minutes * 60_000).toISOString()
 
+const startWithTeamsFailing = Effect.gen(function* () {
+  const teams = { failing: true }
+
+  const github = yield* startFakeGitHub({
+    beforeRequest: ({ path }) => (teams.failing && path === "/user/teams" ? 503 : undefined),
+  })
+
+  const { client } = yield* startBackend({
+    GH_TOKEN: VIEWER.token,
+    GLASS_GITHUB_API_URL: github.url,
+  })
+
+  return { client, teams }
+})
+
 afterEach(() => {
   vi.useRealTimers()
 })
 
 describe("Needs review", () => {
-  // Flaky: failed in 1 of 3 runs of this file on main; passed on rerun.
-  it.live.skip(
+  it.live(
     "lists open PRs awaiting the user's or their team's review in followed repositories",
     () =>
       Effect.gen(function* () {
         const { github, client } = yield* startSignedInBackend
         assert.deepStrictEqual(yield* listed(client, "needs-review"), [])
-        yield* client.FollowRepository({ input: "octo-org/glass" })
-        yield* client.FollowRepository({ input: "effect-ts/effect" })
 
         const direct = github.seedPullRequest({
           owner: "octo-org",
@@ -200,6 +212,9 @@ describe("Needs review", () => {
           base,
           head,
         })
+
+        yield* client.FollowRepository({ input: "octo-org/glass" })
+        yield* client.FollowRepository({ input: "effect-ts/effect" })
 
         assert.deepStrictEqual(yield* listed(client, "needs-review"), [
           new RepositoryPullRequests({
@@ -289,12 +304,10 @@ describe("Needs review", () => {
     }),
   )
 
-  // Flaky: failed in 3 of 6 runs of this file, on main and this branch; passed on rerun.
-  it.live.skip("fails the lists when the user's teams can't be read", () =>
+  it.live("fails the lists when the user's teams can't be read", () =>
     Effect.gen(function* () {
-      const { github, client } = yield* startSignedInBackend
+      const { client } = yield* startWithTeamsFailing
       yield* client.FollowRepository({ input: "octo-org/glass" })
-      github.beforeNext("/user/teams", () => github.failNext(503))
 
       assert.instanceOf(yield* Effect.flip(client.ListPullRequests()), GitHubUnavailable)
     }),
@@ -328,7 +341,6 @@ describe("Needs review", () => {
   it.live("lists every requested PR, newest first, without paging", () =>
     Effect.gen(function* () {
       const { github, client } = yield* startSignedInBackend
-      yield* client.FollowRepository({ input: "octo-org/busy" })
 
       const seeded = Array.from({ length: 205 }, (_, index) =>
         github.seedPullRequest({
@@ -341,6 +353,8 @@ describe("Needs review", () => {
         }),
       )
 
+      yield* client.FollowRepository({ input: "octo-org/busy" })
+
       assert.deepStrictEqual(numbers(yield* listed(client, "needs-review")), [
         { repository: "octo-org/busy", numbers: seeded.toReversed().map((pr) => pr.number) },
       ])
@@ -352,7 +366,6 @@ describe("My PRs", () => {
   it.live("lists the user's open PRs, marking those that are drafts", () =>
     Effect.gen(function* () {
       const { github, client } = yield* startSignedInBackend
-      yield* client.FollowRepository({ input: "octo-org/glass" })
       const mine = { owner: "octo-org", repo: "glass", author: VIEWER.login, base, head }
 
       const ready = github.seedPullRequest({ ...mine, updatedAt: "2026-03-01T10:00:00Z" })
@@ -367,6 +380,7 @@ describe("My PRs", () => {
       github.seedPullRequest({ ...mine, state: "MERGED" })
       github.seedPullRequest({ ...mine, owner: "other-org", repo: "unfollowed" })
       github.seedPullRequest({ owner: "octo-org", repo: "glass", base, head })
+      yield* client.FollowRepository({ input: "octo-org/glass" })
 
       const [glass] = yield* listed(client, "my-prs")
 
@@ -385,7 +399,6 @@ describe("PR list membership", () => {
   it.live("includes touched PRs in Reviewing alongside outstanding review requests", () =>
     Effect.gen(function* () {
       const { github, client } = yield* startSignedInBackend
-      yield* client.FollowRepository({ input: "octo-org/glass" })
       const seed = { owner: "octo-org", repo: "glass", base, head }
       const requested = { ...seed, requestedReviewers: [VIEWER.login] }
       const mine = { ...seed, author: VIEWER.login }
@@ -436,6 +449,7 @@ describe("PR list membership", () => {
       prs.othersFeedbackOnly.addComment({ author: "mona", bodyHtml: "<p>Hmm</p>" })
       prs.othersFeedbackOnly.addReview({ author: "mona", state: "APPROVED" })
       prs.mine.addComment({ author: VIEWER.login, bodyHtml: "<p>Ready</p>" })
+      yield* client.FollowRepository({ input: "octo-org/glass" })
 
       for (const pr of [prs.openedOnly, prs.openedWhileRequested]) {
         yield* openPullRequest(client, new PullRequestRef(pr))
@@ -515,7 +529,6 @@ describe("PR list membership", () => {
   it.live("lists every qualifying Reviewing PR beyond GitHub's first page of open PRs", () =>
     Effect.gen(function* () {
       const { github, client } = yield* startSignedInBackend
-      yield* client.FollowRepository({ input: "octo-org/busy" })
       const seed = { owner: "octo-org", repo: "busy", base, head }
 
       Array.from({ length: 150 }, (_, index) =>
@@ -530,6 +543,7 @@ describe("PR list membership", () => {
 
       const reviewed = github.seedPullRequest({ ...seed, updatedAt: minute(400) })
       reviewed.addReview({ author: VIEWER.login, state: "APPROVED" })
+      yield* client.FollowRepository({ input: "octo-org/busy" })
 
       assert.deepStrictEqual(numbers(yield* listed(client, "reviewing")), [
         { repository: "octo-org/busy", numbers: [reviewed.number, drafting.number] },
@@ -830,29 +844,26 @@ describe("Watching", () => {
     }),
   )
 
-  // Flaky: failed in 1 of 6 runs of this file; passed on rerun.
-  it.live.skip("tells watchers why a sync failed, until one succeeds", () =>
+  it.live("tells watchers why a sync failed, until one succeeds", () =>
     Effect.gen(function* () {
-      const { github, client } = yield* startSignedInBackend
+      const { client, teams } = yield* startWithTeamsFailing
       yield* client.FollowRepository({ input: "octo-org/glass" })
-      github.beforeNext("/user/teams", () => github.failNext(503))
       const latest = yield* watching(client)
 
       const failed = yield* latest(({ problem }) => problem !== null)
       assert.strictEqual(failed._tag, "ListFailed")
       assert.instanceOf(failed.problem, GitHubUnavailable)
 
+      teams.failing = false
       yield* client.ListPullRequests()
       yield* latest((update) => Predicate.isTagged(update, "Listed") && update.problem === null)
     }),
   )
 
-  // Flaky: failed once in a full server run; passed three times on its own.
-  it.live.skip("clears a failed sync once a sync succeeds with nothing followed", () =>
+  it.live("clears a failed sync once a sync succeeds with nothing followed", () =>
     Effect.gen(function* () {
-      const { github, client } = yield* startSignedInBackend
+      const { client } = yield* startWithTeamsFailing
       yield* client.FollowRepository({ input: "octo-org/glass" })
-      github.beforeNext("/user/teams", () => github.failNext(503))
       const latest = yield* watching(client)
       yield* latest(({ problem }) => problem !== null)
 
