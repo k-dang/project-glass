@@ -46,7 +46,9 @@ const APP_ORIGIN = `${APP_SCHEME}://app`
 
 const rendererOrigin = devServerUrl === undefined ? APP_ORIGIN : new URL(devServerUrl).origin
 
-const devIcon = app.isPackaged ? undefined : join(__dirname, "../../build/icon.png")
+const devIcon = app.isPackaged
+  ? undefined
+  : join(__dirname, "../../build", process.platform === "darwin" ? "icon-mac.png" : "icon.png")
 
 const resources = app.isPackaged
   ? {

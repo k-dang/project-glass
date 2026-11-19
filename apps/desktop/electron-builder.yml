@@ -16,6 +16,7 @@ extraResources:
 win:
   target: nsis
 mac:
+  icon: build/icon-mac.png
   target: dmg
 linux:
   target: AppImage
