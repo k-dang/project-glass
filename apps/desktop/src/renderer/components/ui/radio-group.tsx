@@ -1,11 +1,16 @@
 import { Radio as RadioPrimitive } from "@base-ui/react/radio"
 import { RadioGroup as RadioGroupPrimitive } from "@base-ui/react/radio-group"
 import { cn } from "cn"
+import { useId } from "react"
 
-function RadioGroup<Value>({ className, ...props }: RadioGroupPrimitive.Props<Value>) {
+// WARNING: without a name, Base UI pins the hidden input at top-left, so a label click scrolls the view to it.
+function RadioGroup<Value>({ className, name, ...props }: RadioGroupPrimitive.Props<Value>) {
+  const fallbackName = useId()
+
   return (
     <RadioGroupPrimitive
       data-slot="radio-group"
+      name={name ?? fallbackName}
       className={cn("grid w-full gap-2", className)}
       {...props}
     />
