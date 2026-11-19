@@ -1236,6 +1236,7 @@ export function ConversationComposer(props: {
         {...staged}
         recall={lastSent(turns, props.queued)}
         onStop={running ? () => stop() : null}
+        beam
         notice={waiting !== undefined && <WaitingNotice waiting={waiting} />}
         commands={commands}
         files={files}
