@@ -43,7 +43,10 @@ export const isolatedHome = Effect.acquireRelease(
   Effect.promise(() => mkdtemp(join(tmpdir(), "glass-test-")).then((made) => realpath(made))),
   (directory) =>
     shutDownLeftRunningHost(directory).pipe(
-      Effect.andThen(Effect.promise(() => rm(directory, { recursive: true, force: true }))),
+      // Windows keeps the folder locked until the shut-down host and its agents have exited.
+      Effect.andThen(
+        Effect.promise(() => rm(directory, { recursive: true, force: true, maxRetries: 20 })),
+      ),
     ),
 )
 
