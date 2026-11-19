@@ -72,7 +72,10 @@ export default defineConfig({
       "anti-slop-effect/prefer-effect-match": "error",
       "landmines-testing/strict-msw": "error",
       "landmines-testing/no-unsignaled-poll": "error",
-      "landmines-testing/no-flake-masking": "error",
+      "landmines-testing/no-flake-masking": [
+        "error",
+        { allow: { "apps/desktop/vite.config.ts": 1, "apps/server/vite.config.ts": 1 } },
+      ],
       "landmines-style/no-comments": ["error", { allow: ["WARNING", "SAFETY", "Flaky"] }],
       "landmines-structure/test-file-names": "error",
       "landmines-structure/package-exports": "error",
