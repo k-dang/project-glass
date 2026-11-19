@@ -33,8 +33,10 @@ export const groupLooks: Record<NeedsYouGroup, { readonly label: string; readonl
     finished: { label: "Conversations that finished", tone: "text-muted-foreground" },
   }
 
+export const inboxKeys = ["E", "A"] as const
+
 export interface InboxAction {
-  readonly key: "E" | "A"
+  readonly key: (typeof inboxKeys)[number]
   readonly label: string
   readonly run: () => void
 }

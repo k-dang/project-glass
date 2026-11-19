@@ -9,6 +9,7 @@ import {
 import { cn } from "cn"
 import { Match, Option } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
+import { Listbox, ListboxItem, ListboxItemIcon } from "@ui-sdk/react/listbox"
 import { ChevronDown, Inbox as InboxIcon } from "lucide-react"
 import { type ReactNode, useEffect, useState } from "react"
 import { ConversationRequest, answerRequestAtom } from "./conversationsArea"
@@ -18,6 +19,7 @@ import {
   firstPermission,
   groupLooks,
   type InboxAction,
+  inboxKeys,
   ItemIcon,
   Reasons,
   titleOf,
@@ -126,9 +128,10 @@ function InboxGroups(props: {
 }) {
   return props.groups.map(({ group, rows }) => {
     const open = !props.folded.has(group)
+    const { label } = groupLooks[group]
 
     return (
-      <section key={group} aria-label={groupLooks[group].label} className="pb-1">
+      <section key={group} aria-label={label} className="pb-1">
         <h2>
           <button
             type="button"
@@ -139,7 +142,7 @@ function InboxGroups(props: {
             )}
             onClick={() => props.onFold(group)}
           >
-            {groupLooks[group].label}
+            {label}
             <span className="font-normal text-muted-foreground tabular-nums">{rows.length}</span>
             <ChevronDown
               className={cn("ml-auto size-3.5 transition-transform", !open && "-rotate-90")}
@@ -148,43 +151,37 @@ function InboxGroups(props: {
           </button>
         </h2>
         {open && (
-          <ul className="px-2">
+          <Listbox
+            aria-label={label}
+            loop={false}
+            value={props.selectedKey}
+            onValueChange={(key) => key !== null && props.onPick(key)}
+            className="px-2 outline-none"
+          >
             {rows.map((item) => (
-              <li key={needsYouKey(item)}>
-                <InboxRow
-                  item={item}
-                  selected={needsYouKey(item) === props.selectedKey}
-                  now={props.now}
-                  onPick={props.onPick}
-                />
-              </li>
+              <InboxRow key={needsYouKey(item)} item={item} now={props.now} />
             ))}
-          </ul>
+          </Listbox>
         )}
       </section>
     )
   })
 }
 
-function InboxRow(props: {
-  item: NeedsYouItem
-  selected: boolean
-  now: Date
-  onPick: (key: string) => void
-}) {
+function InboxRow(props: { item: NeedsYouItem; now: Date }) {
   const { item } = props
-  const key = needsYouKey(item)
+  const title = titleOf(item)
 
   return (
-    <button
-      type="button"
-      aria-current={props.selected ? "true" : undefined}
-      className="grid w-full grid-cols-[1rem_minmax(0,1fr)_auto] gap-x-3 gap-y-1 rounded-md px-2 py-2 text-left text-sm outline-none hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring aria-[current=true]:bg-accent aria-[current=true]:focus-visible:ring-0"
-      onClick={() => props.onPick(key)}
+    <ListboxItem
+      value={needsYouKey(item)}
+      className="grid cursor-default grid-cols-[1rem_minmax(0,1fr)_auto] gap-x-3 gap-y-1 rounded-md px-2 py-2 text-sm outline-none hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring data-[selected]:bg-accent data-[selected]:focus-visible:ring-0"
     >
-      <ItemIcon item={item} className="row-span-2 mt-0.5 size-4 text-muted-foreground" />
-      <span className="truncate font-medium" title={titleOf(item)}>
-        {titleOf(item)}
+      <ListboxItemIcon className="row-span-2 mt-0.5">
+        <ItemIcon item={item} className="size-4 text-muted-foreground" />
+      </ListboxItemIcon>
+      <span className="truncate font-medium" title={title}>
+        {title}
       </span>
       <Waited since={item.since} now={props.now} />
       <span className="col-span-2 flex min-w-0 flex-wrap items-center gap-1.5">
@@ -193,7 +190,7 @@ function InboxRow(props: {
           {contextOf(item)}
         </span>
       </span>
-    </button>
+    </ListboxItem>
   )
 }
 
@@ -318,7 +315,13 @@ export function Inbox() {
       return next
     })
 
-  useShortcuts(actions.map(({ key, run }) => ({ key, run })))
+  useShortcuts(
+    inboxKeys.map((key) => ({
+      key,
+      beforeWidgets: true,
+      run: () => actions.find((action) => action.key === key)?.run(),
+    })),
+  )
 
   return (
     <div className="flex min-h-0 flex-1">

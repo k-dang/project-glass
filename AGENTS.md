@@ -10,6 +10,10 @@ The repo uses Effect 4, whose APIs differ from the Effect 3 most examples show (
 
 - Expected failures are tagged errors in the error channel; services stay transport-agnostic and RPC handlers stay thin (`apps/server/src/handlers.ts`).
 
+## ui-sdk
+
+Before using ui-sdk (`@ui-sdk/react`, `@ui-sdk/core` in `apps/desktop`), follow the `ui-sdk` skill if it's installed, and read `apps/desktop/node_modules/@ui-sdk/react/docs/llms.txt`. To build a new component, also search `docs/core.md` there by heading, and read `docs/rendering.md` next to it.
+
 ## Gotchas
 
 - The per-launch secret travels in the `token` query parameter, so request logging stays off (`disableLogger` in `apps/server/src/server.ts`) and HTTP spans redact it (`UrlParams.CurrentRedactedNames` there).

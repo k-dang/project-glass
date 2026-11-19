@@ -40,6 +40,8 @@
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "@ui-sdk/core": "catalog:",
+    "@ui-sdk/react": "catalog:",
     "@vitejs/plugin-react": "catalog:",
     "class-variance-authority": "catalog:",
     "cn": "catalog:",

@@ -6,11 +6,14 @@ interface Shortcut {
   readonly allowShift?: boolean
   readonly allowInEditable?: boolean
   readonly allowInDialog?: boolean
+  readonly beforeWidgets?: boolean
   readonly run: () => void
 }
 
 export function useShortcuts(shortcuts: ReadonlyArray<Shortcut>) {
   const handle = useEffectEvent((event: KeyboardEvent) => {
+    const beforeWidgets = event.eventPhase === Event.CAPTURING_PHASE
+
     if (event.defaultPrevented || event.isComposing) return
     const elements = event.composedPath().filter((target) => target instanceof Element)
 
@@ -24,6 +27,7 @@ export function useShortcuts(shortcuts: ReadonlyArray<Shortcut>) {
 
     for (const shortcut of shortcuts) {
       if (
+        (shortcut.beforeWidgets ?? false) !== beforeWidgets ||
         event.key.toLowerCase() !== shortcut.key.toLowerCase() ||
         (event.metaKey || event.ctrlKey) !== (shortcut.mod ?? false) ||
         event.altKey ||
@@ -42,8 +46,12 @@ export function useShortcuts(shortcuts: ReadonlyArray<Shortcut>) {
   })
 
   useEffect(() => {
+    window.addEventListener("keydown", handle, { capture: true })
     window.addEventListener("keydown", handle)
 
-    return () => window.removeEventListener("keydown", handle)
+    return () => {
+      window.removeEventListener("keydown", handle, { capture: true })
+      window.removeEventListener("keydown", handle)
+    }
   }, [])
 }
