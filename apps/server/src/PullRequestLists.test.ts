@@ -11,7 +11,7 @@ import {
   RepositoryPullRequests,
   RepositoryUnavailable,
 } from "@glass/contracts"
-import { Clock, DateTime, Effect, Option, Predicate, Queue, Stream } from "effect"
+import { Clock, DateTime, Deferred, Effect, Option, Predicate, Queue, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
@@ -282,6 +282,54 @@ describe("Needs review", () => {
 
       assert.deepStrictEqual(numbers(yield* listed(client, "needs-review")), [
         { repository: "octo-org/glass", numbers: [team.number, direct.number] },
+      ])
+    }),
+  )
+
+  it.live("reads further reviewer pages for several PRs at once", () =>
+    Effect.gen(function* () {
+      const paging = new Set<string>()
+      const allPaging = yield* Deferred.make<void>()
+
+      const github = yield* startFakeGitHub({
+        beforeRequest: ({ graphql }) => {
+          if (graphql?.operationName !== "PullRequestReviewRequests") return undefined
+
+          const id = graphql.variables.id
+
+          return Effect.gen(function* () {
+            paging.add(id)
+
+            if (paging.size === 3) yield* Deferred.succeed(allPaging, undefined)
+
+            yield* Deferred.await(allPaging)
+
+            return undefined
+          })
+        },
+      })
+
+      const { client } = yield* startBackend({
+        GH_TOKEN: VIEWER.token,
+        GLASS_GITHUB_API_URL: github.url,
+      })
+
+      yield* client.FollowRepository({ input: "octo-org/glass" })
+      const reviewers = Array.from({ length: 100 }, (_, i) => `reviewer-${i}`)
+
+      const prs = Array.from({ length: 3 }, (_, index) =>
+        github.seedPullRequest({
+          owner: "octo-org",
+          repo: "glass",
+          requestedReviewers: [...reviewers, VIEWER.login],
+          updatedAt: minute(index),
+          base,
+          head,
+        }),
+      )
+
+      assert.deepStrictEqual(numbers(yield* listed(client, "needs-review")), [
+        { repository: "octo-org/glass", numbers: prs.toReversed().map((pr) => pr.number) },
       ])
     }),
   )
