@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { stopAgentHost } from "../server/test/stopAgentHost.ts"
 import { galleryPage } from "./page.ts"
 import type { Shot, Size } from "./shot.ts"
 import { replayedStates, replays, states } from "./states.ts"
@@ -184,7 +185,8 @@ try {
     await app.close()
   }
 } finally {
-  rmSync(home, { recursive: true, force: true, maxRetries: 10 })
+  await stopAgentHost(join(home, ".project-glass"))
+  rmSync(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 })
 }
 
 writeFileSync(join(out, "index.html"), await galleryPage(shots, new Date()))
