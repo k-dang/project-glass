@@ -1,7 +1,7 @@
 import type { Context, ESTree } from "@oxlint/plugins";
 import { z } from "zod";
 
-export const allowlistProperties = {
+const allowlistProperties = {
   allow: {
     type: "object" as const,
     additionalProperties: { type: "integer" as const, minimum: 1 },

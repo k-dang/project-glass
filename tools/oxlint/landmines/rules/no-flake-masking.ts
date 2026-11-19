@@ -128,11 +128,6 @@ export const noFlakeMasking = defineRule({
       "Program:exit"(program) {
         reportAllowed(context, program, timeouts, "timeout");
       },
-      Property(node) {
-        if (keyName(node) === "test") {
-          inspect(node.value, configTimeouts);
-        }
-      },
     };
   },
 });
