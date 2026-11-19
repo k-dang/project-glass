@@ -72,7 +72,7 @@ export function ConversationFrame(props: {
       aria-label={props.label}
       className={cn("flex min-h-0 flex-1 flex-col", props.className)}
     >
-      <header className="flex h-11 shrink-0 items-center gap-2 border-b px-4 text-sm">
+      <header className="box-content flex h-11 shrink-0 items-center gap-2 border-b px-4 text-sm">
         <ConversationsPanelToggle />
         <div className="flex min-w-0 flex-1 items-center gap-2">{props.heading}</div>
         {details?.pullRequest !== undefined && (
