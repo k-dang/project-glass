@@ -54,9 +54,6 @@ function useMessageScroller() {
   )
 }
 
-// Returns a function that holds the viewport still while the caller resizes
-// content in place. A no-op outside a MessageScroller, so shared disclosures can
-// call it wherever they render.
 function useHoldScrollPosition() {
   return React.useContext(MessageScrollerContext)?.holdPosition ?? noop
 }

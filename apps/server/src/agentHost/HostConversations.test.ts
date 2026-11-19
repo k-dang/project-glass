@@ -22,8 +22,6 @@ import {
 } from "./protocol"
 import type { StopEnding } from "./turnLoop"
 
-const stall = 5_000
-
 const startupFailed = new HostConversationError({
   message: "The Conversation's Agent harness did not start.",
 })
@@ -133,222 +131,201 @@ const hosted = Effect.gen(function* () {
 
 const release = (gate: Handshake) => Deferred.succeed(gate.release, undefined)
 
-it.live(
-  "starts another Conversation while one's Agent harness is still starting",
-  () =>
-    Effect.gen(function* () {
-      const host = yield* hosted
-      const held = yield* handshake()
-      const other = yield* handshake()
+it.live("starts another Conversation while one's Agent harness is still starting", () =>
+  Effect.gen(function* () {
+    const host = yield* hosted
+    const held = yield* handshake()
+    const other = yield* handshake()
 
-      yield* host.offer(held)
+    yield* host.offer(held)
 
-      const starting = yield* Effect.forkChild(host.conversations.start(request("a")), {
-        startImmediately: true,
-      })
+    const starting = yield* Effect.forkChild(host.conversations.start(request("a")), {
+      startImmediately: true,
+    })
 
-      yield* Deferred.await(held.entered)
+    yield* Deferred.await(held.entered)
 
-      yield* host.offer(other)
-      yield* release(other)
+    yield* host.offer(other)
+    yield* release(other)
 
-      const otherStart = yield* Effect.forkChild(host.conversations.start(request("b")), {
-        startImmediately: true,
-      })
+    const otherStart = yield* Effect.forkChild(host.conversations.start(request("b")), {
+      startImmediately: true,
+    })
 
-      yield* Deferred.await(other.entered)
-      assert.equal(yield* Fiber.join(otherStart), "started")
-      assert.equal(host.peak(), 2)
+    yield* Deferred.await(other.entered)
+    assert.equal(yield* Fiber.join(otherStart), "started")
+    assert.equal(host.peak(), 2)
 
-      yield* release(held)
-      assert.equal(yield* Fiber.join(starting), "started")
-      assert.equal(host.opened(), 2)
-    }),
-  stall,
+    yield* release(held)
+    assert.equal(yield* Fiber.join(starting), "started")
+    assert.equal(host.opened(), 2)
+  }),
 )
 
-it.live(
-  "removes a running Conversation while another's Agent harness is still starting",
-  () =>
-    Effect.gen(function* () {
-      const host = yield* hosted
-      const running = yield* handshake()
-      const held = yield* handshake()
+it.live("removes a running Conversation while another's Agent harness is still starting", () =>
+  Effect.gen(function* () {
+    const host = yield* hosted
+    const running = yield* handshake()
+    const held = yield* handshake()
 
-      yield* host.offer(running)
-      yield* release(running)
-      assert.equal(yield* host.conversations.start(request("b")), "started")
+    yield* host.offer(running)
+    yield* release(running)
+    assert.equal(yield* host.conversations.start(request("b")), "started")
 
-      yield* host.offer(held)
+    yield* host.offer(held)
 
-      const starting = yield* Effect.forkChild(host.conversations.start(request("a")), {
-        startImmediately: true,
-      })
+    const starting = yield* Effect.forkChild(host.conversations.start(request("a")), {
+      startImmediately: true,
+    })
 
-      yield* Deferred.await(held.entered)
+    yield* Deferred.await(held.entered)
 
-      const stopping = yield* Effect.forkChild(host.conversations.stop("b"), {
-        startImmediately: true,
-      })
+    const stopping = yield* Effect.forkChild(host.conversations.stop("b"), {
+      startImmediately: true,
+    })
 
-      yield* Deferred.await(running.closed)
-      yield* Fiber.join(stopping)
+    yield* Deferred.await(running.closed)
+    yield* Fiber.join(stopping)
 
-      yield* release(held)
-      assert.equal(yield* Fiber.join(starting), "started")
-    }),
-  stall,
+    yield* release(held)
+    assert.equal(yield* Fiber.join(starting), "started")
+  }),
 )
 
-it.live(
-  "closes a running Conversation's Agent harness while another's is still starting",
-  () =>
-    Effect.gen(function* () {
-      const host = yield* hosted
-      const running = yield* handshake()
-      const held = yield* handshake()
+it.live("closes a running Conversation's Agent harness while another's is still starting", () =>
+  Effect.gen(function* () {
+    const host = yield* hosted
+    const running = yield* handshake()
+    const held = yield* handshake()
 
-      yield* host.offer(running)
-      yield* release(running)
-      assert.equal(yield* host.conversations.start(request("b")), "started")
+    yield* host.offer(running)
+    yield* release(running)
+    assert.equal(yield* host.conversations.start(request("b")), "started")
 
-      yield* host.offer(held)
+    yield* host.offer(held)
 
-      const starting = yield* Effect.forkChild(host.conversations.start(request("a")), {
-        startImmediately: true,
-      })
+    const starting = yield* Effect.forkChild(host.conversations.start(request("a")), {
+      startImmediately: true,
+    })
 
-      yield* Deferred.await(held.entered)
+    yield* Deferred.await(held.entered)
 
-      yield* Deferred.succeed(running.exit, undefined)
-      yield* Deferred.await(running.closed)
+    yield* Deferred.succeed(running.exit, undefined)
+    yield* Deferred.await(running.closed)
 
-      const again = yield* handshake()
-      yield* host.offer(again)
-      yield* release(again)
-      assert.equal(yield* host.conversations.start(request("b")), "started")
-      assert.equal(host.opened(), 3)
+    const again = yield* handshake()
+    yield* host.offer(again)
+    yield* release(again)
+    assert.equal(yield* host.conversations.start(request("b")), "started")
+    assert.equal(host.opened(), 3)
 
-      yield* release(held)
-      assert.equal(yield* Fiber.join(starting), "started")
-    }),
-  stall,
+    yield* release(held)
+    assert.equal(yield* Fiber.join(starting), "started")
+  }),
 )
 
-it.live(
-  "starts one Agent harness when the same Conversation is started twice",
-  () =>
-    Effect.gen(function* () {
-      const host = yield* hosted
-      const first = yield* handshake()
-      const second = yield* handshake()
+it.live("starts one Agent harness when the same Conversation is started twice", () =>
+  Effect.gen(function* () {
+    const host = yield* hosted
+    const first = yield* handshake()
+    const second = yield* handshake()
 
-      yield* host.offer(first)
+    yield* host.offer(first)
 
-      const starting = yield* Effect.forkChild(host.conversations.start(request("a")), {
-        startImmediately: true,
-      })
+    const starting = yield* Effect.forkChild(host.conversations.start(request("a")), {
+      startImmediately: true,
+    })
 
-      yield* Deferred.await(first.entered)
+    yield* Deferred.await(first.entered)
 
-      yield* host.offer(second)
+    yield* host.offer(second)
 
-      const again = yield* Effect.forkChild(host.conversations.start(request("a")), {
-        startImmediately: true,
-      })
+    const again = yield* Effect.forkChild(host.conversations.start(request("a")), {
+      startImmediately: true,
+    })
 
-      yield* Effect.yieldNow
-      assert.equal(host.opened(), 1)
-      assert.isFalse(yield* Deferred.isDone(second.entered))
+    yield* Effect.yieldNow
+    assert.equal(host.opened(), 1)
+    assert.isFalse(yield* Deferred.isDone(second.entered))
 
-      yield* release(first)
-      yield* release(second)
-      assert.equal(yield* Fiber.join(starting), "started")
-      assert.equal(yield* Fiber.join(again), "alreadyRunning")
-      assert.equal(host.opened(), 1)
-      assert.equal(host.peak(), 1)
-    }),
-  stall,
+    yield* release(first)
+    yield* release(second)
+    assert.equal(yield* Fiber.join(starting), "started")
+    assert.equal(yield* Fiber.join(again), "alreadyRunning")
+    assert.equal(host.opened(), 1)
+    assert.equal(host.peak(), 1)
+  }),
 )
 
-it.live(
-  "removes a Conversation only after its startup has registered the Agent harness",
-  () =>
-    Effect.gen(function* () {
-      const host = yield* hosted
-      const first = yield* handshake()
+it.live("removes a Conversation only after its startup has registered the Agent harness", () =>
+  Effect.gen(function* () {
+    const host = yield* hosted
+    const first = yield* handshake()
 
-      yield* host.offer(first)
+    yield* host.offer(first)
 
-      const starting = yield* Effect.forkChild(host.conversations.start(request("a")), {
-        startImmediately: true,
-      })
+    const starting = yield* Effect.forkChild(host.conversations.start(request("a")), {
+      startImmediately: true,
+    })
 
-      yield* Deferred.await(first.entered)
+    yield* Deferred.await(first.entered)
 
-      const stopping = yield* Effect.forkChild(host.conversations.stop("a"), {
-        startImmediately: true,
-      })
+    const stopping = yield* Effect.forkChild(host.conversations.stop("a"), {
+      startImmediately: true,
+    })
 
-      yield* release(first)
-      assert.equal(yield* Fiber.join(starting), "started")
-      yield* Fiber.join(stopping)
-      yield* Deferred.await(first.closed)
+    yield* release(first)
+    assert.equal(yield* Fiber.join(starting), "started")
+    yield* Fiber.join(stopping)
+    yield* Deferred.await(first.closed)
 
-      const again = yield* handshake()
-      yield* host.offer(again)
-      yield* release(again)
-      assert.equal(yield* host.conversations.start(request("a")), "started")
-      assert.equal(host.opened(), 2)
-    }),
-  stall,
+    const again = yield* handshake()
+    yield* host.offer(again)
+    yield* release(again)
+    assert.equal(yield* host.conversations.start(request("a")), "started")
+    assert.equal(host.opened(), 2)
+  }),
 )
 
-it.live(
-  "starts a Conversation again after its Agent harness fails to start",
-  () =>
-    Effect.gen(function* () {
-      const host = yield* hosted
-      const failed = yield* handshake({ failure: startupFailed })
-      const again = yield* handshake()
+it.live("starts a Conversation again after its Agent harness fails to start", () =>
+  Effect.gen(function* () {
+    const host = yield* hosted
+    const failed = yield* handshake({ failure: startupFailed })
+    const again = yield* handshake()
 
-      yield* host.offer(failed)
-      yield* release(failed)
-      const error = yield* host.conversations.start(request("a")).pipe(Effect.flip)
-      assert.strictEqual(error, startupFailed)
-      yield* Deferred.await(failed.closed)
+    yield* host.offer(failed)
+    yield* release(failed)
+    const error = yield* host.conversations.start(request("a")).pipe(Effect.flip)
+    assert.strictEqual(error, startupFailed)
+    yield* Deferred.await(failed.closed)
 
-      yield* host.offer(again)
-      yield* release(again)
-      assert.equal(yield* host.conversations.start(request("a")), "started")
-      assert.equal(host.opened(), 2)
-    }),
-  stall,
+    yield* host.offer(again)
+    yield* release(again)
+    assert.equal(yield* host.conversations.start(request("a")), "started")
+    assert.equal(host.opened(), 2)
+  }),
 )
 
-it.live(
-  "starts a Conversation again after its startup is interrupted",
-  () =>
-    Effect.gen(function* () {
-      const host = yield* hosted
-      const held = yield* handshake()
-      const again = yield* handshake()
+it.live("starts a Conversation again after its startup is interrupted", () =>
+  Effect.gen(function* () {
+    const host = yield* hosted
+    const held = yield* handshake()
+    const again = yield* handshake()
 
-      yield* host.offer(held)
+    yield* host.offer(held)
 
-      const starting = yield* Effect.forkChild(host.conversations.start(request("a")), {
-        startImmediately: true,
-      })
+    const starting = yield* Effect.forkChild(host.conversations.start(request("a")), {
+      startImmediately: true,
+    })
 
-      yield* Deferred.await(held.entered)
-      yield* Fiber.interrupt(starting)
+    yield* Deferred.await(held.entered)
+    yield* Fiber.interrupt(starting)
 
-      yield* host.offer(again)
-      yield* release(again)
-      assert.equal(yield* host.conversations.start(request("a")), "started")
-      assert.equal(host.opened(), 2)
-    }),
-  stall,
+    yield* host.offer(again)
+    yield* release(again)
+    assert.equal(yield* host.conversations.start(request("a")), "started")
+    assert.equal(host.opened(), 2)
+  }),
 )
 
 const queuedStart = (
@@ -396,23 +373,19 @@ const queuedStart = (
     assert.equal(host.peak(), 1)
   })
 
-it.live(
-  "runs a startup queued behind a failed one alone, starting no second Agent harness",
-  () =>
-    queuedStart(startupFailed, (starting, gate) =>
-      release(gate).pipe(
-        Effect.andThen(Fiber.join(starting).pipe(Effect.flip)),
-        Effect.tap((error) => Effect.sync(() => assert.strictEqual(error, startupFailed))),
-        Effect.asVoid,
-      ),
+it.live("runs a startup queued behind a failed one alone, starting no second Agent harness", () =>
+  queuedStart(startupFailed, (starting, gate) =>
+    release(gate).pipe(
+      Effect.andThen(Fiber.join(starting).pipe(Effect.flip)),
+      Effect.tap((error) => Effect.sync(() => assert.strictEqual(error, startupFailed))),
+      Effect.asVoid,
     ),
-  stall,
+  ),
 )
 
 it.live(
   "runs a startup queued behind an interrupted one alone, starting no second Agent harness",
   () => queuedStart(undefined, (starting) => Fiber.interrupt(starting)),
-  stall,
 )
 
 const BUDGET = 1_000
@@ -527,65 +500,59 @@ it.effect("keeps to the budget for a later Turn after going over it while idle",
   }).pipe(Effect.scoped),
 )
 
-it.live(
-  "starts a stopped Conversation again only after its old Agent harness is cleaned up",
-  () =>
-    Effect.gen(function* () {
-      const host = yield* hosted
-      const old = yield* handshake({ holdCleanup: true })
-      const again = yield* handshake()
+it.live("starts a stopped Conversation again only after its old Agent harness is cleaned up", () =>
+  Effect.gen(function* () {
+    const host = yield* hosted
+    const old = yield* handshake({ holdCleanup: true })
+    const again = yield* handshake()
 
-      yield* host.offer(old)
-      yield* release(old)
-      assert.equal(yield* host.conversations.start(request("a")), "started")
+    yield* host.offer(old)
+    yield* release(old)
+    assert.equal(yield* host.conversations.start(request("a")), "started")
 
-      const stopping = yield* Effect.forkChild(host.conversations.stop("a"), {
-        startImmediately: true,
-      })
+    const stopping = yield* Effect.forkChild(host.conversations.stop("a"), {
+      startImmediately: true,
+    })
 
-      yield* Deferred.await(old.cleaning)
+    yield* Deferred.await(old.cleaning)
 
-      yield* host.offer(again)
-      yield* release(again)
+    yield* host.offer(again)
+    yield* release(again)
 
-      const starting = yield* Effect.forkChild(host.conversations.start(request("a")), {
-        startImmediately: true,
-      })
+    const starting = yield* Effect.forkChild(host.conversations.start(request("a")), {
+      startImmediately: true,
+    })
 
-      yield* Deferred.succeed(old.finishCleanup, undefined)
-      yield* Fiber.join(stopping)
-      assert.equal(yield* Fiber.join(starting), "started")
-      assert.equal(host.peak(), 1)
-    }),
-  stall,
+    yield* Deferred.succeed(old.finishCleanup, undefined)
+    yield* Fiber.join(stopping)
+    assert.equal(yield* Fiber.join(starting), "started")
+    assert.equal(host.peak(), 1)
+  }),
 )
 
-it.live(
-  "starts an exited Conversation again only after its old Agent harness is cleaned up",
-  () =>
-    Effect.gen(function* () {
-      const host = yield* hosted
-      const old = yield* handshake({ holdCleanup: true })
-      const again = yield* handshake()
+it.live("starts an exited Conversation again only after its old Agent harness is cleaned up", () =>
+  Effect.gen(function* () {
+    const host = yield* hosted
+    const old = yield* handshake({ holdCleanup: true })
+    const again = yield* handshake()
 
-      yield* host.offer(old)
-      yield* release(old)
-      assert.equal(yield* host.conversations.start(request("a")), "started")
+    yield* host.offer(old)
+    yield* release(old)
+    assert.equal(yield* host.conversations.start(request("a")), "started")
 
-      yield* host.offer(again)
-      yield* release(again)
-      yield* Deferred.succeed(old.exit, undefined)
+    yield* host.offer(again)
+    yield* release(again)
+    yield* Deferred.succeed(old.exit, undefined)
 
-      const restarting = yield* Effect.forkChild(host.conversations.start(request("a")), {
-        startImmediately: true,
-      })
+    const restarting = yield* Effect.forkChild(host.conversations.start(request("a")), {
+      startImmediately: true,
+    })
 
-      yield* Deferred.await(old.cleaning)
-      assert.isFalse(yield* Deferred.isDone(again.entered))
+    yield* Deferred.await(old.cleaning)
+    assert.isFalse(yield* Deferred.isDone(again.entered))
 
-      yield* Deferred.succeed(old.finishCleanup, undefined)
-      assert.equal(yield* Fiber.join(restarting), "started")
-      assert.equal(host.peak(), 1)
-    }),
-  stall,
+    yield* Deferred.succeed(old.finishCleanup, undefined)
+    assert.equal(yield* Fiber.join(restarting), "started")
+    assert.equal(host.peak(), 1)
+  }),
 )

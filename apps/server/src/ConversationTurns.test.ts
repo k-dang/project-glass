@@ -208,8 +208,6 @@ const scripted = (scripts: { readonly [id: string]: Script }) =>
     return { turns, transcripts, conversations, started }
   })
 
-const hostStall = 5_000
-
 const stopRunningTurn = (
   conversationId: string,
   running: OpenTurn,
@@ -285,7 +283,6 @@ it.live(
 
       let savedId = ""
 
-      // No delivery subscriber exists when the transaction commits, as in a crash before dispatch.
       yield* transcripts.startGlobalConversationUpdate(
         "agent-1",
         globalConversationUpdate,
@@ -386,7 +383,6 @@ const acceptsWhileStartIsHeld = (otherId: string) =>
 it.live(
   "accepts and dispatches another Conversation's message while StartTurn is still unanswered",
   () => acceptsWhileStartIsHeld("agent-b"),
-  hostStall,
 )
 
 it.live(
@@ -424,7 +420,6 @@ it.live(
       yield* Deferred.succeed(release, undefined)
       yield* Fiber.join(stopping)
     }).pipe(Effect.provide(layer)),
-  hostStall,
 )
 
 it.live(
@@ -484,7 +479,6 @@ it.live(
       yield* Deferred.await(heldStarted)
       yield* Fiber.join(held)
     }).pipe(Effect.provide(layer)),
-  hostStall,
 )
 
 it.live("dispatches a Queued message sent after the running Turn stops", () =>

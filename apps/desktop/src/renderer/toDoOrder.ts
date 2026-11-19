@@ -1,6 +1,5 @@
 import type { ToDo } from "@glass/contracts"
 
-/** The server lists open to-dos oldest first, by id. The page shows the reverse. */
 export const newestFirst = (toDos: ReadonlyArray<ToDo>) =>
   toDos.toSorted((left, right) => right.id - left.id)
 

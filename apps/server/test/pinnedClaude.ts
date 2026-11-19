@@ -57,8 +57,7 @@ const loginToken = () => {
   const config = process.env["CLAUDE_CONFIG_DIR"] ?? join(home, ".claude")
   const file = join(config, ".credentials.json")
 
-  // On macOS, Claude Code keeps the login in the Keychain rather than the file, and `security` finds
-  // the user's Keychain through HOME.
+  // WARNING: On macOS Claude Code keeps the login in the Keychain, which security finds through HOME.
   const stored = existsSync(file)
     ? readFileSync(file, "utf8")
     : execFileSync("security", ["find-generic-password", "-s", "Claude Code-credentials", "-w"], {

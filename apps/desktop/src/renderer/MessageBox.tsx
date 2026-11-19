@@ -1,3 +1,4 @@
+import { cn } from "cn"
 import {
   type AgentCommand,
   type Image,
@@ -19,6 +20,7 @@ import { ArrowUp, LoaderCircle, Paperclip, Square, X } from "lucide-react"
 import { memo, type ReactNode, useLayoutEffect, useRef, useState } from "react"
 import { InputGroup, InputGroupAddon, InputGroupButton } from "@/components/ui/input-group"
 import { Suggestion, Suggestions } from "@/components/ui/suggestion"
+import { conversationColumn } from "./conversationColumn"
 import { noCommands, noFiles } from "./conversationsArea"
 import { CommandHighlight, useCommandPicker } from "./Commands"
 import { pastedSlice, toContent, Mention, toMessage } from "./composerDocument"
@@ -276,7 +278,7 @@ export function MessageBox(props: {
     <>
       {props.attachment !== undefined && (
         <div className="px-6 pt-2">
-          <div className="mx-auto max-w-3xl rounded-lg border bg-muted/30 px-3 py-2">
+          <div className={cn(conversationColumn, "rounded-lg border bg-muted/30 px-3 py-2")}>
             {props.attachment}
           </div>
         </div>
@@ -288,7 +290,7 @@ export function MessageBox(props: {
           void submit(props.send)
         }}
       >
-        <div className="mx-auto flex max-w-3xl flex-col gap-2">
+        <div className={cn(conversationColumn, "flex flex-col gap-2")}>
           {props.problem !== null && <ProblemAlert problem={props.problem} />}
           {props.notice}
           {props.suggestions !== undefined && props.suggestions.length > 0 && (

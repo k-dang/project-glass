@@ -2,9 +2,7 @@ import { useEffect, useState } from "react"
 import type { Shot } from "../shot.ts"
 import { alt, schemesShown, src, type Framing, type Scheme, type SchemeChoice } from "./model.ts"
 
-// A new <img> paints blank until its PNG decodes, which flashes on every step. Decode the next shot
-// off-screen and keep showing the old one until it's ready. Holding the decoded images keeps the
-// neighbors ready too.
+// WARNING: A new <img> paints blank until its PNG decodes, so the next shot decodes off-screen while the old one stays.
 const decoded = new Map<string, Promise<HTMLImageElement>>()
 
 const decode = (url: string) => {
@@ -68,7 +66,6 @@ export const SingleStage = ({ shot, previous, next, scheme, framing }: SingleSta
   const pair = displayed.schemes.length > 1
   const urls = displayed.schemes.map((shown) => src(displayed.shot, shown, displayed.framing))
 
-  // A new key gives each shot a fresh stage, scrolled to the top.
   return (
     <div className={pair ? "stage both" : "stage"} key={urls.join()}>
       {displayed.schemes.map((shown, index) => (

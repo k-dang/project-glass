@@ -2,7 +2,6 @@ import { ConversationError, FeedbackNote, UnsentFeedback } from "@glass/contract
 import { Context, Effect, Layer, Schema } from "effect"
 import { SqlClient } from "effect/sql"
 
-/** Whose Feedback notes these are: one Conversation's, or one folder's for its Check-ins. */
 export type NotesOwner = `conversation:${string}` | `folder:${string}`
 
 export const conversationNotes = (conversationId: string): NotesOwner =>
@@ -52,12 +51,10 @@ export class FeedbackNotes extends Context.Service<
       noteId: string,
     ) => Effect.Effect<UnsentFeedback, ConversationError>
     readonly stage: (owner: NotesOwner) => Effect.Effect<UnsentFeedback, ConversationError>
-    /** Removes and returns the staged notes named, failing unless all of them are still there. */
     readonly take: (
       owner: NotesOwner,
       noteIds: ReadonlyArray<string>,
     ) => Effect.Effect<ReadonlyArray<FeedbackNote>, ConversationError>
-    /** Removes and returns every note, in the order they were left. */
     readonly takeAll: (
       owner: NotesOwner,
     ) => Effect.Effect<ReadonlyArray<FeedbackNote>, ConversationError>

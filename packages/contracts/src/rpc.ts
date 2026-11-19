@@ -258,7 +258,7 @@ export class GlassRpcs extends RpcGroup.make(
     success: PullRequestWorkspace,
     error: LoadPullRequestError,
   }),
-  /** Misses changes GitHub makes without touching the PR's updatedAt, like a removed Review request. */
+  // WARNING: Misses changes GitHub makes without touching the PR's updatedAt, such as a removed Review request.
   Rpc.make("HasPullRequestChanged", {
     payload: {
       pullRequestId: Schema.String,
@@ -469,7 +469,6 @@ export class GlassRpcs extends RpcGroup.make(
     success: Schema.Array(Schema.String),
     error: Schema.Union([ConversationNotFound, ConversationError]),
   }),
-  /** The paths that name a file in the Conversation's folder, gitignored or not. */
   Rpc.make("FindConversationFiles", {
     payload: { conversationId: Schema.String, paths: NamedPaths },
     success: Schema.Array(Schema.String),

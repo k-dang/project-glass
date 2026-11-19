@@ -246,7 +246,6 @@ export const states: ReadonlyArray<State> = [
       await visible(window, "button", "Write Tour")
     },
   },
-  // Writing a Tour can't be repeated, so Saved Tour and Reading a Tour carry on from the state before.
   {
     area: "Tours",
     name: "Saved Tour",

@@ -1,12 +1,13 @@
-import { Deferred, Effect, Option, Predicate, Queue, Schema, Scope, Stream } from "effect"
+import { Deferred, Duration, Effect, Option, Predicate, Queue, Schema, Scope, Stream } from "effect"
 import { ChildProcessSpawner } from "effect/process"
 import { launchCommand } from "../processes"
 import { piGlassToolsEnvironment } from "./piGlassTools"
 import { type GlassToolsAccess, HostConversationError } from "./protocol"
 import { ToolInput } from "./toolCalls"
 
-// Longer than the 30 seconds pi waits on a lock a crashed pi left behind.
-const REQUEST_TIMEOUT = "60 seconds"
+const PI_STALE_LOCK_WAIT = Duration.seconds(30)
+
+const REQUEST_TIMEOUT = Duration.times(PI_STALE_LOCK_WAIT, 2)
 
 const ToolResult = Schema.Struct({
   content: Schema.Array(
@@ -76,7 +77,6 @@ const PiEvent = Schema.Union([
     options: Schema.optional(Schema.Array(Schema.String)),
     statusKey: Schema.optional(Schema.String),
     statusText: Schema.optional(Schema.String),
-    /** Milliseconds until pi stops waiting for an answer. */
     timeout: Schema.optional(Schema.Number),
   }),
 ])
@@ -141,7 +141,7 @@ export const SessionState = Schema.Struct({
 
 export const AvailableModels = Schema.Struct({ models: Schema.Array(PiModel) })
 
-/** pi names a skill `skill:name`; an extension's command may have no description. */
+// WARNING: pi names a skill skill:name, and an extension's command may have no description.
 export const AvailableCommands = Schema.Struct({
   commands: Schema.Array(
     Schema.Struct({ name: Schema.String, description: Schema.optional(Schema.String) }),
@@ -154,7 +154,7 @@ interface PiRpc {
   readonly request: <A>(command: PiCommand, schema: Schema.Decoder<A>) => Effect.Effect<A, string>
 }
 
-// pi's RPC framing is LF only: `readline` would also split on U+2028 and U+2029, which JSON strings may hold.
+// WARNING: pi's RPC is LF-framed; readline also splits on U+2028 and U+2029, which JSON strings may hold (pi docs/rpc.md).
 export const lineFramer = () => {
   let pending: Array<string> = []
 

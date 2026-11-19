@@ -119,11 +119,6 @@ const optionId = <T,>(listbox: string, { source }: Open<T>, choice: T) =>
 
 const keepComposerFocus = (event: MouseEvent) => event.preventDefault()
 
-/**
- * WAI-ARIA APG combobox: focus stays in the composer, which drives these options through
- * `aria-activedescendant`, so they take no focus. A native `select` would take focus, and
- * `datalist` can't attach to an editor.
- */
 function Choices<T>(props: { id: string; open: Open<T>; onChoose: (choice: T) => void }) {
   const { open } = props
 

@@ -155,7 +155,6 @@ export class PullRequestLists extends Context.Service<
   {
     readonly list: () => Effect.Effect<PullRequestListings, SettingsError | ConnectionError>
     readonly watch: () => Stream.Stream<LatestPullRequestListings>
-    /** Syncs now rather than at the next interval, for when a PR has likely just changed. */
     readonly refreshSoon: Effect.Effect<void>
   }
 >()("@glass/server/PullRequestLists") {

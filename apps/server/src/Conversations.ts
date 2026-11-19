@@ -262,10 +262,6 @@ export class Conversations extends Context.Service<
     readonly remove: (
       conversationId: string,
     ) => Effect.Effect<void, ConversationNotFound | ConversationError>
-    /**
-     * Reads the branch a work Conversation's folder has checked out, since its agent may switch
-     * or rename it during a Turn. Succeeds with whether it could.
-     */
     readonly followBranch: (
       conversationId: string,
     ) => Effect.Effect<boolean, ConversationNotFound | ConversationError>
@@ -366,10 +362,7 @@ export class Conversations extends Context.Service<
           ),
         )
 
-      /**
-       * Local skills go first: pi keeps the first skill of a name, so a Sandbox Conversation's Local skill
-       * wins over a pack's, as a local Conversation's does.
-       */
+      // WARNING: pi keeps the first skill of a name, so Local skills go first to win over a pack's.
       const skillsOf = (conversation: Conversation) =>
         Effect.all(
           [
@@ -792,7 +785,6 @@ export class Conversations extends Context.Service<
             Effect.map(
               (some) => new RemovalWarnings({ uncommittedChanges: some ? "some" : "none" }),
             ),
-            // A connection to a host that just died ends interrupted, not failed.
             Effect.catchCause((cause) =>
               Effect.logWarning("Couldn't check a Conversation for uncommitted work", cause).pipe(
                 Effect.as(new RemovalWarnings({ uncommittedChanges: "unchecked" })),

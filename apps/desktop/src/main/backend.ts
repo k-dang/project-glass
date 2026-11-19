@@ -9,8 +9,7 @@ import { prependLoginShellPath } from "./loginShellPath"
 
 const STOP_DEADLINE = Duration.seconds(10)
 
-// `kill()` SIGKILLs a backend still running two seconds after its SIGTERM (Chromium's
-// EnsureProcessTerminated), cutting off its shutdown of the Agent host.
+// WARNING: UtilityProcess.kill() SIGKILLs 2 s after its SIGTERM (Chromium EnsureProcessTerminated), cutting off the Agent host's shutdown.
 const stopBackend = (backend: UtilityProcess, exitCode: Promise<number>) =>
   Effect.sync(() => {
     if (backend.pid !== undefined) process.kill(backend.pid, "SIGINT")

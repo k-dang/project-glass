@@ -1,7 +1,7 @@
 const { app } = require("electron")
 
 if (process.platform === "darwin") {
-  // Setting this policy at only one launch stage still let Electron activate.
+  // WARNING: Electron still activates on macOS unless the activation policy is set at every launch stage.
   const prohibit = () => app.setActivationPolicy("prohibited")
 
   prohibit()
@@ -10,10 +10,9 @@ if (process.platform === "darwin") {
 }
 
 if (!process.env.CI) {
-  // Hidden windows render at 1 frame per second, and each Playwright click waits on those frames.
+  // WARNING: Chromium draws hidden windows at 1 fps and each Playwright click waits on frames, so windows show transparent instead.
   app.on("browser-window-created", (_event, window) => {
     window.show = () => {
-      // setOpacity does nothing on Linux, so a shown window would appear on the desktop.
       if (process.platform === "linux") return
 
       window.setOpacity(0)

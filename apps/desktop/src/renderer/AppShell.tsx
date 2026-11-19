@@ -81,8 +81,6 @@ export function AppShell() {
   const unseen = Option.getOrNull(AsyncResult.value(useAtomValue(globalUnseenAtom)))
   const unread = unseen !== null && !conversing
 
-  // Loading while idle keeps the dialog off first paint and mounts it closed, so its first open
-  // animates in like the rest.
   useEffect(() => {
     const load = () =>
       void import("./GlobalConversationDialog").then((module) =>

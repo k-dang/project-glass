@@ -39,7 +39,7 @@ because they expose implementation APIs too. Effect HTTP, HTTP API, RPC, Node HT
 the Node platform's HTTP exports, and `effect/ai`'s `McpServer` and `McpProtocol` are covered;
 `effect/ai`'s `Tool`, `Toolkit` and `McpSchema` remain available for tool contracts.
 
-`*.test.*`, `*.spec.*`, and files under `apps/*/test/` or `apps/*/e2e/` may import across
+`*.test.*` files and files under `apps/*/test/` or `apps/*/e2e/` may import across
 tiers. This preserves fixtures such as `apps/desktop/e2e/glass.ts`. Production renderer
 code cannot use those fixtures as an import bridge.
 

@@ -2,7 +2,6 @@ import { Schema, Struct } from "effect"
 import { FeedbackNote } from "./feedbackNote"
 import { ChangedFile } from "./pullRequest"
 
-/** A Check-in waiting in the Inbox. Its changes are read apart, so Needs you stays small. */
 export const CheckIn = Schema.TaggedStruct("CheckIn", {
   id: Schema.String,
   folder: Schema.String,
@@ -13,7 +12,6 @@ export const CheckIn = Schema.TaggedStruct("CheckIn", {
 
 export type CheckIn = typeof CheckIn.Type
 
-/** The changes a Check-in asked about, as they stood when it asked. */
 export class CheckInChanges extends Schema.Class<CheckInChanges>("CheckInChanges")({
   id: Schema.String,
   baseRef: Schema.String,

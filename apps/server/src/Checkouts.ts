@@ -157,7 +157,7 @@ export class Checkouts extends Context.Service<
           const env = authenticatedEnv(token)
 
           yield* ensureClone(repository, clone, env)
-          // The base ref keeps the base commit reachable, so maintenance never prunes it.
+          // WARNING: Fetch the base into a ref so git maintenance never prunes the base commit.
           yield* git(
             [
               "--git-dir",
@@ -186,7 +186,7 @@ export class Checkouts extends Context.Service<
             `${join(clone, "objects")}\n`,
           )
 
-          // Run in the clone, whose remote fetches the blobs a blobless clone lacks.
+          // WARNING: Run in the clone, whose promisor remote fetches the blobs a blobless clone lacks.
           yield* git(
             ["--git-dir", clone, "--work-tree", files, "read-tree", "--reset", "-u", head],
             {

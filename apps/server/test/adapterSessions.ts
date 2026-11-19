@@ -356,7 +356,7 @@ const CLOUD_LOGINS = {
   GOOGLE_APPLICATION_CREDENTIALS: [".config", "gcloud", "application_default_credentials.json"],
 }
 
-// pi may replace an OAuth refresh token while it runs, which voids the one in the real file.
+// WARNING: pi may replace an OAuth refresh token while it runs, voiding the real file's, so it gets a copy.
 const lendPiLogin = Effect.fnUntraced(function* (home: string, apiKey: string | undefined) {
   const real = process.env["PI_CODING_AGENT_DIR"] ?? join(realHome(), ".pi", "agent")
   const lent = join(home, ".pi", "agent")
@@ -414,7 +414,6 @@ export const piSession = Effect.fnUntraced(function* (
     if (recordingSessions) yield* lendPiLogin(home, apiKey)
   }
 
-  // pi reads the user's `~/.agents/skills`, which would put the machine in the recording.
   stubHome(home)
   vi.stubEnv("PI_OFFLINE", "1")
 

@@ -16,12 +16,9 @@ interface Camera {
   z: number
 }
 
-// The page holds one canvas, and its camera outlives each mount: leaving for One view and coming
-// back keeps the zoom. Null until the first mount fits the world.
 let saved: Camera | null = null
 
-// Zoomed out, every shot is on screen at once and Chromium can't keep them all decoded at full
-// size, so show the 320px thumbnails until a shot would be drawn wider than they are.
+// WARNING: Zoomed out, Chromium can't keep every shot decoded at full size, so thumbnails show until a shot is drawn wider than 320px.
 const detailAt = (z: number): Detail => (z * devicePixelRatio <= 0.25 ? "thumb" : "full")
 
 const pans = new Map<string, readonly [number, number]>([
@@ -31,8 +28,6 @@ const pans = new Map<string, readonly [number, number]>([
   ["ArrowDown", [0, -1]],
 ])
 
-// The camera moves every frame while panning, so it writes styles straight to the DOM instead of
-// going through React state.
 const cameraOn = (
   canvas: HTMLElement,
   world: HTMLElement,
@@ -51,7 +46,6 @@ const cameraOn = (
     canvas.style.backgroundPosition = `${camera.x}px ${camera.y}px`
     label.textContent = `${Math.round(camera.z * 100)}%`
     onDetail(detailAt(camera.z))
-    // Promote the world to its own layer only while it moves, so it re-rasterizes sharp once it stops.
     world.classList.add("moving")
     clearTimeout(settle)
     settle = window.setTimeout(() => world.classList.remove("moving"), 150)
@@ -149,7 +143,6 @@ export const Canvas = ({ ref, areas, current, scheme, framing, onOpen }: CanvasP
   const drag = useRef<Drag | null>(null)
   const [detail, setDetail] = useState(() => detailAt(saved?.z ?? 0))
   const schemes = schemesShown(scheme)
-  // Short lanes share a row: wrap at the widest lane's width.
   const widest = Math.max(1, ...[...areas.values()].map((lane) => lane.length)) * schemes.length
 
   useImperativeHandle(ref, () => ({ key: (event) => controls.current?.key(event) ?? false }), [])
@@ -169,7 +162,6 @@ export const Canvas = ({ ref, areas, current, scheme, framing, onOpen }: CanvasP
 
     if (seen === null) control.fit()
     else {
-      // Centering measures the figure on screen, so the saved camera has to be in place first.
       control.apply()
 
       if (at !== null) control.center(at)
@@ -185,7 +177,6 @@ export const Canvas = ({ ref, areas, current, scheme, framing, onOpen }: CanvasP
             ? canvas.clientHeight
             : 1
 
-      // A pinch sends small deltas and a mouse wheel notch about 100, so cap each event's step.
       const delta = Math.max(-30, Math.min(30, event.deltaY * unit))
 
       if (event.ctrlKey || event.metaKey)

@@ -1,6 +1,4 @@
-// A stand-in for Claude Code that speaks just enough of the Agent SDK's stream-json protocol to
-// answer each message with a canned reply. The protocol is the SDK's private one, so a Glass that
-// pins a newer SDK may need more from it.
+// WARNING: Speaks just enough of the Agent SDK's private stream-json protocol; a Glass pinning a newer SDK may need more.
 import { randomUUID } from "node:crypto"
 import { createInterface } from "node:readline"
 

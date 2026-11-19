@@ -11,7 +11,7 @@ const script = built("viewer.js")
 if (script.includes("</script"))
   throw new Error("The viewer bundle contains </script, which would end its inline <script> early")
 
-// Everything is inlined, because a page opened from disk can't load module scripts from other files.
+// WARNING: A page opened from disk can't load module scripts from other files, so everything is inlined.
 export const galleryPage = (data: GalleryData) => `<!doctype html>
 <html lang="en">
 <head>

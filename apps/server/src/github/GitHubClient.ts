@@ -575,7 +575,7 @@ export class GitHubClient extends Context.Service<
         lastViewer === null ? viewer : Effect.succeed(lastViewer),
       )
 
-      /** GitHub's REST file list cannot be pinned to a base/head pair. */
+      // WARNING: GitHub's REST file list can't be pinned to a base/head pair, so the read retries until the Revision holds.
       const pullRequest = Effect.fn("GitHubClient.pullRequest")(function* (ref: PullRequestRef) {
         for (let attempt = 1; ; attempt++) {
           const workspace = yield* readPullRequest(ref)
@@ -1116,7 +1116,7 @@ export class GitHubClient extends Context.Service<
         return new Uint8Array(body)
       })
 
-      /** GitHub places new Drafts on the current head; this mutation has no commit precondition. */
+      // WARNING: GitHub places new Drafts on the current head; this mutation has no commit precondition.
       const createDraft = Effect.fn("GitHubClient.createDraft")(function* (draft: NewDraft) {
         if (!(yield* isCurrent(draft.pullRequestId, draft.revision))) {
           return yield* new StaleRevision()

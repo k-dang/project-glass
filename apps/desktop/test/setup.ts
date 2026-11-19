@@ -2,7 +2,6 @@ import { configure } from "@testing-library/react"
 
 configure({ asyncUtilTimeout: 25_000 })
 
-// happy-dom has no View Transitions; run the update at once, as Chromium does without animating.
 if ("document" in globalThis && !("startViewTransition" in document))
   Object.defineProperty(document, "startViewTransition", {
     configurable: true,
@@ -20,7 +19,6 @@ if ("document" in globalThis && !("startViewTransition" in document))
     },
   })
 
-// happy-dom has no idle callbacks; run them on the next task.
 if (!("requestIdleCallback" in globalThis)) {
   globalThis.requestIdleCallback = (callback) =>
     window.setTimeout(() => callback({ didTimeout: false, timeRemaining: () => 0 }))

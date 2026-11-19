@@ -13,10 +13,7 @@ import { type AlreadyWaiting, inboxWaitsOf } from "./inboxWaits"
 
 export const ASK_TIMEOUT_SECONDS = 10 * 60
 
-/**
- * Shorter than the minute a typical MCP client waits before it gives up on a call.
- * Each notification resets that wait, so Glass's own limit is the one that ends the call.
- */
+// WARNING: Shorter than the minute a typical MCP client waits on a call; each notification resets that wait, so Glass's limit ends the call.
 export const ASK_PROGRESS_SECONDS = 15
 
 export class OutsideQuestions extends Context.Service<

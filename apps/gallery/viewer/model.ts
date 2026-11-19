@@ -42,7 +42,6 @@ export const alt = (shot: Shot, shown: Scheme) => `${shot.area}: ${shot.name} ($
 export const matches = (shot: Shot, query: string) =>
   `${shot.area} ${shot.name}`.toLowerCase().includes(query.toLowerCase())
 
-// A shot link keeps its href so a modified click can still open it in a new tab.
 export const openOnClick = (open: (id: string) => void, id: string) => (event: MouseEvent) => {
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
 

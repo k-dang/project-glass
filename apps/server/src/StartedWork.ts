@@ -176,7 +176,6 @@ export class StartedWork extends Context.Service<
     readonly pendingOutcomes: (
       globalConversationId: string,
     ) => Effect.Effect<ReadonlyArray<PendingOutcome>, ConversationError | AgentReviewFailure>
-    /** Links pending outcomes to their saved Global conversation update before delivery. */
     readonly recordGlobalConversationUpdate: (
       globalConversationId: string,
       turnId: string,

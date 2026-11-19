@@ -39,7 +39,7 @@ type MessageScrollerMode =
   | "free-scrolling" // reader scrolled away; position left alone (prepends still preserved).
   | "anchored-to-message" // holding a turn at the reading line while it streams.
   | "settling-jump" // a programmatic jump is animating; intent detection suppressed until it settles.
-  | "holding-position" // the reader changed content in place (expanded a disclosure); nothing moves the viewport until they scroll or a new turn anchors.
+  | "holding-position"
 
 // Where a saved transcript opens on the first non-empty render.
 type MessageScrollerDefaultScrollPosition = "start" | "end" | "last-anchor"

@@ -16,7 +16,7 @@ export const GitHubViewedFile = Schema.Struct({
   viewerViewedState: Schema.Literals(["VIEWED", "UNVIEWED", "DISMISSED"]),
 })
 
-// GitHub takes a path, but no expected commit; callers check the Revision before writing.
+// WARNING: GitHub's viewed-file mutations take no expected commit, so check the Revision before sending them.
 export const MARK_FILE_VIEWED_MUTATION = `mutation MarkFileAsViewed($pullRequestId: ID!, $path: String!) {
   markFileAsViewed(input: { pullRequestId: $pullRequestId, path: $path }) { clientMutationId }
 }`

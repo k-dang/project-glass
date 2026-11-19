@@ -98,7 +98,6 @@ export class CheckIns extends Context.Service<
       const changes = yield* Changes
       const notes = yield* FeedbackNotes
 
-      // One Check-in per folder, since the folder's notes go back with whichever is answered.
       const waits = yield* inboxWaitsOf<Waiting, CheckInResult>({
         idOf: ({ checkIn }) => checkIn.id,
         subjectOf: ({ checkIn }) => checkIn.folder,
@@ -112,7 +111,6 @@ export class CheckIns extends Context.Service<
           Effect.mapError(() => new CheckInNotWaiting()),
         )
 
-      // Notes belong to the folder, not one Check-in, so a timed out Check-in's notes come back.
       const listedFor = (
         checkInId: string,
         write: (
@@ -195,8 +193,6 @@ export class CheckIns extends Context.Service<
           )
       })
 
-      // Taking the notes before ending the wait keeps a note saved meanwhile for next time, rather
-      // than losing it; if the wait ended first, the notes go back.
       const answer = Effect.fnUntraced(function* (checkInId: string, given: CheckInAnswer) {
         const { checkIn, changes: snapshot } = yield* waiting(checkInId)
         const owner = folderNotes(checkIn.folder)

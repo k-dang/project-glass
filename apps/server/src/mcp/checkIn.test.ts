@@ -32,7 +32,6 @@ const waitingCheckIn = (client: Backend["client"]) =>
 
 const temporaryFolder = Effect.promise(() => mkdtemp(join(tmpdir(), "glass-check-in-")))
 
-/** A repository on a branch off main, with one committed and one uncommitted change. */
 const repositoryWithWork = Effect.gen(function* () {
   const folder = yield* temporaryFolder
 

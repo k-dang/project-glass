@@ -9,7 +9,7 @@ export const ADD_DRAFT_MUTATION = `mutation AddPullRequestReviewThread($pullRequ
   }
 }`
 
-/** GitHub's update/delete mutations also act on published comments. */
+// WARNING: GitHub's update and delete mutations also act on published comments.
 export const DRAFT_STATE_QUERY = `query DraftState($id: ID!) {
   node(id: $id) { ... on PullRequestReviewComment { state } }
 }`

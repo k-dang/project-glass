@@ -55,7 +55,6 @@ export const Gallery = ({ shots, capturedAt }: GalleryData) => {
   const filterRef = useRef<HTMLInputElement>(null)
   const canvas = useRef<CanvasHandle>(null)
 
-  // The list, j/k stepping and the canvas lanes all share this grouped order.
   const areas = useMemo(
     () =>
       Map.groupBy(
@@ -76,7 +75,6 @@ export const Gallery = ({ shots, capturedAt }: GalleryData) => {
     setView("single")
   }
 
-  // j/k replace the history entry, so Back skips the shots stepped through.
   const open = (id: string, entry: "push" | "replace" = "push") => {
     if (entry === "push") history.pushState(null, "", `#${id}`)
     else history.replaceState(null, "", `#${id}`)
@@ -123,7 +121,6 @@ export const Gallery = ({ shots, capturedAt }: GalleryData) => {
 
   const gridScheme = scheme === "dark" ? "dark" : "light"
 
-  // The canvas lays out its world once per mount, so a new layout remounts it.
   const canvasLayout = `${scheme}|${framing}|${filter}`
 
   return (

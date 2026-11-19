@@ -45,7 +45,6 @@ const inlineCodeIn = (node: MarkdownNode): ReadonlyArray<string> =>
 
 const turnPaths = new WeakMap<Turn, ReadonlyArray<string>>()
 
-// A finished Turn doesn't change, so each is parsed once however often the transcript streams.
 const pathsOfTurn = (turn: Turn) => {
   const known = turnPaths.get(turn)
 
@@ -62,7 +61,6 @@ const pathsOfTurn = (turn: Turn) => {
   return paths
 }
 
-/** What the agent wrote as inline code in its finished Turns that could name a file, most recent kept. */
 const namedPaths = (turns: ReadonlyArray<Turn>) => {
   const named = new Set<string>()
 
@@ -94,10 +92,6 @@ const noFiles: ReadonlyArray<string> = []
 export const lastEndedOf = (turns: ReadonlyArray<Turn>) =>
   turns.findLast((turn) => turn.ended !== null)?.id ?? null
 
-/**
- * Reads the atom again once another Turn ends, which may have written files, keeping what it
- * showed until then. `undefined` waits for the transcript to load.
- */
 function useRereadWhenTurnEnds(atom: Atom.Atom<unknown>, lastEnded: string | null | undefined) {
   const refresh = useAtomRefresh(atom)
   const seen = useRef({ atom, lastEnded })
@@ -111,7 +105,6 @@ function useRereadWhenTurnEnds(atom: Atom.Atom<unknown>, lastEnded: string | nul
   }, [atom, lastEnded, refresh])
 }
 
-/** Which inline code in the transcript names a file in the Conversation's folder, gitignored or not. */
 export function useFileLinks(
   conversationId: string,
   turns: ReadonlyArray<Turn>,
@@ -121,17 +114,15 @@ export function useFileLinks(
   const named = useMemo(() => namedPaths(turns), [turns])
   const atom = foundFilesAtom(new NamedPathsKey({ conversationId, paths: named }))
   const result = AsyncResult.value(useAtomValue(atom))
-  // A Turn naming new paths makes a new lookup; links stay as they were until it answers.
-  const [found, setFound] = useState(noFiles)
+  const [lastFoundFiles, setLastFoundFiles] = useState(noFiles)
 
-  if (Option.isSome(result) && result.value !== found) setFound(result.value)
+  if (Option.isSome(result) && result.value !== lastFoundFiles) setLastFoundFiles(result.value)
 
   useRereadWhenTurnEnds(atom, loaded ? lastEndedOf(turns) : undefined)
 
-  return useMemo(() => ({ files: new Set(found), open }), [found, open])
+  return useMemo(() => ({ files: new Set(lastFoundFiles), open }), [lastFoundFiles, open])
 }
 
-/** Lets inline code in a Conversation's transcript open a file in its folder. */
 export const FileLinks = createContext<{
   readonly files: ReadonlySet<string>
   readonly open: (path: string) => void
@@ -220,7 +211,7 @@ function FileView(props: { path: string; file: ConversationFile }) {
   )
 }
 
-/** The page runs in its own sandboxed origin, so files beside it don't load. */
+// WARNING: The page runs in its own sandboxed origin, so files beside it don't load.
 function HtmlDocument(props: { path: string; html: string }) {
   const [src, setSrc] = useState<string | null>(null)
 

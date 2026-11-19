@@ -27,8 +27,7 @@ export const greet = (client: HostClient) =>
   )
 
 const acknowledge = (client: HostClient, { host }: JournalPosition, through: number) =>
-  // Waiting for the answer would deadlock a fast stream: the answer queues on the same connection
-  // behind journal entries the follower hasn't taken yet.
+  // WARNING: Awaiting Acknowledge deadlocks a fast stream: its answer queues behind journal entries the follower hasn't taken.
   client.Acknowledge({ host, through }).pipe(Effect.ignore, Effect.forkScoped)
 
 export interface SavedThrough {

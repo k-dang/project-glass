@@ -517,7 +517,6 @@ function DiagramLegend() {
   )
 }
 
-// Sits above the Chapter's diffs, so it hides to give them the card's full height.
 function ChapterDiagram(props: { source: string; title: string }) {
   const [open, setOpen] = useState(true)
 

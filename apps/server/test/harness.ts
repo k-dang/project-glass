@@ -39,11 +39,11 @@ export const stubHome = (home: string) => {
 }
 
 export const isolatedHome = Effect.acquireRelease(
-  // The real path, as programs print it: on macOS the temporary folder sits behind /private.
+  // WARNING: On macOS the temporary folder sits behind /private, so use the real path programs print.
   Effect.promise(() => mkdtemp(join(tmpdir(), "glass-test-")).then((made) => realpath(made))),
   (directory) =>
     shutDownLeftRunningHost(directory).pipe(
-      // Windows keeps the folder locked until the shut-down host and its agents have exited.
+      // WARNING: Windows keeps the folder locked until the shut-down host and its agents have exited.
       Effect.andThen(
         Effect.promise(() => rm(directory, { recursive: true, force: true, maxRetries: 20 })),
       ),
@@ -118,8 +118,7 @@ export const startBackend = Effect.fnUntraced(function* (
     withRealTimeHeartbeat,
   )
 
-  // Effect closes a still-connecting WebSocket after dropping its error listener, which `ws` then
-  // throws as an uncaught exception; a test that never calls the client would end that way.
+  // WARNING: Effect drops a connecting WebSocket's error listener, which ws then throws uncaught, so connect before returning.
   yield* client.ListSandboxProviders()
 
   return {
