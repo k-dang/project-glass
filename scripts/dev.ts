@@ -73,7 +73,14 @@ const shutdown = async (code: number) => {
     ),
   )
 
-  if (fakeHome) rmSync(fakeHome, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
+  if (fakeHome) {
+    try {
+      rmSync(fakeHome, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 })
+    } catch (error) {
+      console.warn(`[dev] Could not remove ${fakeHome}: ${String(error)}`)
+    }
+  }
+
   process.exit(code)
 }
 

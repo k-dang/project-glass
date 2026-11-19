@@ -6,8 +6,10 @@ import {
   type NeedsYouItem,
   type PullRequestNeedsYou,
   referenceKey,
+  TurnFinished,
+  type TurnSeen,
 } from "@glass/contracts"
-import { type Cause, type DateTime, Match, Option, Schema, Stream } from "effect"
+import { type Cause, Match, Option, Schema, Stream } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
 import { type BackendError, Backend, backendRuntime } from "./backend"
 import { queueRefreshAtom } from "./queue"
@@ -65,11 +67,18 @@ export const reviewDoneOf = (item: PullRequestNeedsYou): AgentReviewDone | null 
     : { pullRequest: item.pullRequest.ref, writtenAt: review.writtenAt }
 }
 
+export const turnSeenOf = ({ conversation, reasons }: ConversationNeedsYou): TurnSeen | null => {
+  const finished = reasons.find(Schema.is(TurnFinished))
+
+  return finished === undefined
+    ? null
+    : { conversationId: conversation.id, endedAt: finished.ended.at }
+}
+
 export const markDoneAtom = backendRuntime.fn((review: AgentReviewDone) =>
   Backend.use((backend) => backend.MarkAgentReviewDone(review)),
 )
 
-export const markTurnSeenAtom = backendRuntime.fn(
-  (seen: { readonly conversationId: string; readonly endedAt: DateTime.Utc }) =>
-    Backend.use((backend) => backend.MarkTurnSeen(seen)),
+export const markTurnSeenAtom = backendRuntime.fn((seen: TurnSeen) =>
+  Backend.use((backend) => backend.MarkTurnSeen(seen)),
 )

@@ -5,7 +5,7 @@ import {
   AgentModels,
   ChangedFile,
   ConversationFile,
-  ExtensionStatusesChanged,
+  AgentStatusesChanged,
   MessageWithContext,
   ModelChoice,
   NamedPaths,
@@ -17,8 +17,11 @@ import {
   TurnStarted,
 } from "@glass/contracts"
 import { Effect, Schema, SchemaTransformation } from "effect"
+import type { ChildProcess } from "node:child_process"
 import { randomBytes } from "node:crypto"
 import { resolve } from "node:path"
+import { Readable } from "node:stream"
+import { text } from "node:stream/consumers"
 import { Rpc, RpcGroup } from "effect/rpc"
 import { DeliveredMessage, DeliveredTurn } from "./deliveredMessage"
 
@@ -37,7 +40,7 @@ export const HostEvent = Schema.Union([
   PartSet,
   PartAppended,
   HostTurnEnded,
-  ExtensionStatusesChanged,
+  AgentStatusesChanged,
 ])
 
 export type HostEvent = typeof HostEvent.Type
@@ -80,6 +83,21 @@ const HostFolder = Schema.String.pipe(
 )
 
 export const HostReady = Schema.fromJsonString(Schema.Struct({ port: Schema.Int }))
+
+export const hostPort = async (host: ChildProcess) => {
+  const ready = host.stdio[3]
+
+  if (!(ready instanceof Readable)) throw new Error("The host has no readiness pipe")
+
+  return Schema.decodeUnknownSync(HostReady)(await text(ready)).port
+}
+
+export const UnacknowledgedTurn = Schema.Struct({
+  conversationId: Schema.String,
+  turnId: Schema.String,
+})
+
+export type UnacknowledgedTurn = typeof UnacknowledgedTurn.Type
 
 export const TurnSettings = Schema.Struct({
   ...ModelChoice.fields,
@@ -226,6 +244,11 @@ export class AgentHostRpcs extends RpcGroup.make(
     success: Schema.Boolean,
     error: HostConversationError,
   }),
+  Rpc.make("CurrentBranch", {
+    payload: { folder: HostFolder },
+    success: Schema.NullOr(Schema.String),
+    error: HostConversationError,
+  }),
   Rpc.make("WatchJournal", {
     payload: { host: Schema.String, after: Schema.Int },
     success: JournalEntry,
@@ -233,6 +256,9 @@ export class AgentHostRpcs extends RpcGroup.make(
     stream: true,
   }),
   Rpc.make("Acknowledge", { payload: { host: Schema.String, through: Schema.Int } }),
+  Rpc.make("UnacknowledgedTurns", {
+    success: Schema.Array(UnacknowledgedTurn),
+  }),
 ) {}
 
 export const couldNotSwitch = (harness: string, what: "model" | "effort" | "Permission mode") =>

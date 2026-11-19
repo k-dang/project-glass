@@ -26,7 +26,6 @@
     "@pierre/diffs": "catalog:",
     "@pierre/trees": "catalog:",
     "@playwright/test": "catalog:",
-    "@shadcn/react": "catalog:",
     "@tailwindcss/vite": "catalog:",
     "@tanstack/react-router": "catalog:",
     "@testing-library/react": "catalog:",

@@ -70,6 +70,28 @@ export default defineConfig({
     overrides: [
       // Example Plugins have no Effect, so they check what they read by hand.
       { files: ["examples/**"], rules: { "anti-slop/no-runtime-typeof": "off" } },
+      // The message scroller is vendored from shadcn-ui. Its hooks read refs and its code and tests
+      // cast DOM types; rewriting that would make future upstream fixes hard to carry over.
+      {
+        files: ["apps/desktop/src/renderer/components/message-scroller/**"],
+        rules: {
+          "react-hooks/exhaustive-deps": "off",
+          "react/memo-dependencies": "off",
+          "react/refs": "off",
+          "react/exhaustive-effect-dependencies": "off",
+          "react/globals": "off",
+          "anti-slop/require-safety-comment-for-type-assertion": "off",
+          "anti-slop/no-runtime-typeof": "off",
+          "anti-slop/no-chained-type-assertions": "off",
+          "typescript/no-unsafe-type-assertion": "off",
+          "typescript/consistent-return": "off",
+          "typescript/unbound-method": "off",
+          "typescript/no-misused-spread": "off",
+          "unicorn/consistent-function-scoping": "off",
+          "eslint/no-shadow": "off",
+          "jsx-a11y/no-static-element-interactions": "off",
+        },
+      },
     ],
     options: {
       typeAware: true,

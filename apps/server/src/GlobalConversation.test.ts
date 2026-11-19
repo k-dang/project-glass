@@ -330,23 +330,27 @@ const stallableHost = (calls: {
             GetChanges: () => Effect.die("This test does not call GetChanges"),
             HasUncommittedChanges: () =>
               Effect.die("This test does not call HasUncommittedChanges"),
+            CurrentBranch: () => Effect.die("This test does not call CurrentBranch"),
             ListFiles: () => Effect.die("This test does not call ListFiles"),
             ExistingFiles: () => Effect.die("This test does not call ExistingFiles"),
             ReadFile: () => Effect.die("This test does not call ReadFile"),
             WatchJournal: () => Stream.die("This test does not call WatchJournal"),
             Acknowledge: () => Effect.die("This test does not call Acknowledge"),
+            UnacknowledgedTurns: () => Effect.die("This test does not call UnacknowledgedTurns"),
           }),
         ),
       ),
     ),
   )
 
-const openGlobal = (client: HostClient, scope: Scope.Scope) => {
+const openGlobal = (client: HostClient, scope: Scope.Scope, reattached = false) => {
   const home = mkdtempSync(join(tmpdir(), "glass-host-"))
 
   const host = LocalAgentHost.of({
     client: Effect.succeed(client),
     running: Effect.succeed(Option.some(client)),
+    resume: Effect.succeed({ reattached, carriedOn: new Set<string>() }),
+    followReattached: Effect.void,
     lifetimeOf: () => Effect.succeed(Option.some(scope)),
     subscribeStopped: Effect.succeed(Stream.empty),
   })
@@ -374,6 +378,7 @@ const openGlobal = (client: HostClient, scope: Scope.Scope) => {
         gitRemote: "https://github.com",
         dataDirectory: home,
         homeDirectory: home,
+        logFile: join(home, "backend.log"),
       }),
     ),
     Layer.provide(NodeFileSystem.layer),
@@ -386,6 +391,25 @@ const openGlobal = (client: HostClient, scope: Scope.Scope) => {
 
   return layer
 }
+
+it.effect(
+  "stops pi on a host left running at quit, whose Glass tools credential died with it",
+  () =>
+    Effect.gen(function* () {
+      const stopped = yield* Deferred.make<void>()
+
+      const client = yield* stallableHost({
+        startTurn: () => Effect.void,
+        stopTurn: () => Effect.succeed(null),
+        stopConversation: () => Deferred.succeed(stopped, undefined).pipe(Effect.asVoid),
+      })
+
+      yield* Effect.gen(function* () {
+        yield* GlobalConversation
+        assert.isTrue(yield* Deferred.isDone(stopped))
+      }).pipe(Effect.provide(openGlobal(client, yield* Scope.Scope, true)))
+    }),
+)
 
 it.effect("lets Start fresh and mark-seen finish once a stalled StopTurn times out", () =>
   Effect.gen(function* () {

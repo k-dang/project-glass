@@ -2,6 +2,7 @@ import * as React from "react"
 import { cn } from "cn"
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { useHoldScrollPosition } from "@/components/message-scroller"
 import { ChevronRightIcon } from "lucide-react"
 
 function Trace({ className, ...props }: React.ComponentProps<"div">) {
@@ -73,6 +74,7 @@ function TraceDescription({ className, ...props }: React.ComponentProps<"span">)
 
 function TraceCollapsible({
   className,
+  onOpenChange,
   ...props
 }: Omit<React.ComponentProps<typeof Collapsible>, "open"> &
   (
@@ -82,10 +84,17 @@ function TraceCollapsible({
         onOpenChange: NonNullable<React.ComponentProps<typeof Collapsible>["onOpenChange"]>
       }
   )) {
+  const holdScrollPosition = useHoldScrollPosition()
+
   return (
     <Collapsible
       data-slot="trace-collapsible"
       className={cn("flex w-full min-w-0 flex-col", className)}
+      // Keep the toggled row under the pointer instead of letting a transcript that follows its end scroll it away.
+      onOpenChange={(open, eventDetails) => {
+        holdScrollPosition()
+        onOpenChange?.(open, eventDetails)
+      }}
       {...props}
     />
   )
@@ -106,7 +115,7 @@ function TraceCollapsibleTrigger({
       {...props}
     >
       {children}
-      <TraceIcon className="transition-transform group-aria-expanded/trace-collapsible-trigger:rotate-90">
+      <TraceIcon className="transition-transform duration-150 ease-out group-aria-expanded/trace-collapsible-trigger:rotate-90 motion-reduce:transition-none">
         <ChevronRightIcon />
       </TraceIcon>
     </CollapsibleTrigger>
@@ -121,13 +130,13 @@ function TraceCollapsibleContent({
   return (
     <CollapsibleContent
       data-slot="trace-collapsible-content"
-      className="h-(--collapsible-panel-height) min-w-0 overflow-hidden transition-[height] duration-200 data-ending-style:h-0 data-starting-style:h-0"
+      className="group/trace-collapsible-content h-(--collapsible-panel-height) min-w-0 overflow-hidden transition-[height] duration-150 ease-out data-ending-style:h-0 data-starting-style:h-0 motion-reduce:transition-none"
       {...props}
     >
       <div
         data-slot="trace-collapsible-content-inner"
         className={cn(
-          "mt-2 mb-1 ml-[calc(--spacing(2)-1px)] min-w-0 border-l pr-1 pl-4 leading-relaxed wrap-break-word text-muted-foreground",
+          "mt-2 mb-1 ml-[calc(--spacing(2)-1px)] min-w-0 border-l pr-1 pl-4 leading-relaxed wrap-break-word text-muted-foreground transition-opacity duration-150 ease-out group-data-ending-style/trace-collapsible-content:opacity-0 group-data-starting-style/trace-collapsible-content:opacity-0 motion-reduce:transition-none",
           className,
         )}
       >

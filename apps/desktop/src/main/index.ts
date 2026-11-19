@@ -18,7 +18,6 @@ import {
   type Appearance,
 } from "@glass/contracts/desktop"
 import type { Theme } from "@glass/contracts"
-import { Cause, Effect, Fiber, Option } from "effect"
 import {
   app,
   BrowserWindow,
@@ -35,10 +34,8 @@ import { execFile } from "node:child_process"
 import { homedir } from "node:os"
 import { join, relative } from "node:path"
 import { pathToFileURL } from "node:url"
-import { startBackend } from "./backend"
 import { dogfoodReportWriter } from "./dogfoodReports"
 import { htmlPages } from "./htmlPages"
-import { prependLoginShellPath } from "./loginShellPath"
 import { summarizeResourceUsage } from "./resourceUsage"
 
 const devServerUrl = process.env["VITE_DEV_SERVER_URL"]
@@ -48,6 +45,8 @@ const APP_SCHEME = "glass"
 const APP_ORIGIN = `${APP_SCHEME}://app`
 
 const rendererOrigin = devServerUrl === undefined ? APP_ORIGIN : new URL(devServerUrl).origin
+
+const devIcon = app.isPackaged ? undefined : join(__dirname, "../../build/icon.png")
 
 const resources = app.isPackaged
   ? {
@@ -195,6 +194,8 @@ const createWindow = () => {
     },
   })
 
+  if (devIcon !== undefined && process.platform !== "darwin") window.setIcon(devIcon)
+
   const updateTheme = () => updateWindowTheme(window)
 
   nativeTheme.on("updated", updateTheme)
@@ -267,40 +268,6 @@ const backendFailed = Promise.withResolvers<BackendFailure>()
 const reportFailure = (kind: BackendFailure["kind"], message: string) =>
   backendFailed.resolve({ kind, message, logFile })
 
-const program = Effect.gen(function* () {
-  if (app.isPackaged && process.platform !== "win32") {
-    yield* prependLoginShellPath(process.env, [
-      process.env["SHELL"],
-      process.platform === "darwin" ? "/bin/zsh" : "/bin/bash",
-    ])
-  }
-
-  const backend = yield* startBackend({
-    entry: resources.server,
-    rendererOrigin,
-    logFile,
-    dataDirectory,
-  })
-
-  backendReady.resolve(backend.endpoint)
-  reportFailure("crash", (yield* Effect.flip(backend.failed)).message)
-}).pipe(
-  Effect.scoped,
-  Effect.catchCause((cause) =>
-    Effect.sync(() => {
-      if (Cause.hasInterruptsOnly(cause)) return
-
-      Option.match(Cause.findErrorOption(cause), {
-        onSome: (error) => reportFailure("start", error.message),
-        onNone: () => {
-          console.error(Cause.pretty(cause))
-          reportFailure("start", "Unexpected error while starting the backend")
-        },
-      })
-    }),
-  ),
-)
-
 void app.whenReady().then(() => {
   ipcMain.handle(BACKEND_ENDPOINT_CHANNEL, () => backendReady.promise)
   ipcMain.handle(BACKEND_FAILURE_CHANNEL, () => backendFailed.promise)
@@ -347,20 +314,29 @@ void app.whenReady().then(() => {
 
   if (devServerUrl === undefined) serveRenderer()
 
-  if (!app.isPackaged) app.dock?.setIcon(join(__dirname, "../../build/icon.png"))
+  if (devIcon !== undefined) app.dock?.setIcon(devIcon)
 
   createWindow()
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 
-  const fiber = Effect.runFork(program)
-
-  app.on("will-quit", (event) => {
-    if (fiber.pollUnsafe() !== undefined) return
-    event.preventDefault()
-    void Effect.runPromise(Fiber.interrupt(fiber)).finally(() => app.quit())
-  })
+  // Loading Effect before ready delays the window and the GPU process that gate first paint.
+  import("./backend")
+    .then(({ runBackend }) =>
+      runBackend({
+        entry: resources.server,
+        rendererOrigin,
+        logFile,
+        dataDirectory,
+        onReady: backendReady.resolve,
+        onFailure: reportFailure,
+      }),
+    )
+    .catch((error) => {
+      console.error(error)
+      reportFailure("start", "Couldn't load the backend")
+    })
 })
 
 app.on("window-all-closed", () => {

@@ -36,6 +36,7 @@ pnpm start        # build everything and run the app as it ships
 pnpm dist         # package an installer into apps/desktop/release
 pnpm test         # backend, renderer, and verification helper tests
 pnpm test:e2e     # build, then drive the Electron app with Playwright
+pnpm gallery      # build, then screenshot every app state on the demo data into .gallery/index.html
 pnpm check        # format check, type-aware lint, and type check
 pnpm fix          # apply format and lint fixes
 ```

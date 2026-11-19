@@ -18,7 +18,7 @@
         "--no-context-files",
         "--no-approve",
         "--extension",
-        "<folder>.pi/suggest-draft.js",
+        "<folder>.pi/suggest-draft.mjs",
         "--append-system-prompt",
         "<folder>.pi/instructions.md"
       ],
@@ -59,7 +59,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-17T01-05-49-307Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-18T05-03-30-001Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -103,7 +103,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794877549445,
+              "timestamp": 1794978210114,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -271,7 +271,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794877549445,
+              "timestamp": 1794978210114,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -443,7 +443,7 @@
                   "text": "Draft comments on greet.ts."
                 }
               ],
-              "timestamp": 1794877549444
+              "timestamp": 1794978210112
             }
           }
         },
@@ -458,7 +458,7 @@
                   "text": "Draft comments on greet.ts."
                 }
               ],
-              "timestamp": 1794877549444
+              "timestamp": 1794978210112
             }
           }
         },
@@ -486,7 +486,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794877549474
+              "timestamp": 1794978210141
             }
           }
         },
@@ -603,10 +603,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794877549474,
+              "timestamp": 1794978210141,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 19,
+              "durationMs": 23,
               "thinkingLevel": "off"
             }
           }
@@ -673,7 +673,7 @@
               }
             },
             "isError": false,
-            "durationMs": 59
+            "durationMs": 55
           }
         },
         {
@@ -690,8 +690,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 59,
-              "timestamp": 1794877549554
+              "durationMs": 55,
+              "timestamp": 1794978210222
             }
           }
         },
@@ -709,8 +709,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 59,
-              "timestamp": 1794877549554
+              "durationMs": 55,
+              "timestamp": 1794978210222
             }
           }
         },
@@ -747,10 +747,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794877549474,
+              "timestamp": 1794978210141,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 19,
+              "durationMs": 23,
               "thinkingLevel": "off"
             },
             "toolResults": [
@@ -765,8 +765,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 59,
-                "timestamp": 1794877549554
+                "durationMs": 55,
+                "timestamp": 1794978210222
               }
             ]
           }
@@ -800,7 +800,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794877549557
+              "timestamp": 1794978210225
             }
           }
         },
@@ -824,7 +824,7 @@
             "assistantMessageEvent": {
               "type": "toolcall_start",
               "contentIndex": 0,
-              "id": "suggest-2",
+              "id": "suggest-0",
               "toolName": "suggest_draft"
             }
           }
@@ -875,7 +875,7 @@
               "contentIndex": 0,
               "toolCall": {
                 "type": "toolCall",
-                "id": "suggest-2",
+                "id": "suggest-0",
                 "name": "suggest_draft",
                 "arguments": {
                   "path": "greet.ts",
@@ -895,7 +895,7 @@
               "content": [
                 {
                   "type": "toolCall",
-                  "id": "suggest-2",
+                  "id": "suggest-0",
                   "name": "suggest_draft",
                   "arguments": {
                     "path": "greet.ts",
@@ -923,10 +923,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794877549557,
+              "timestamp": 1794978210225,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 3,
+              "durationMs": 4,
               "thinkingLevel": "off"
             }
           }
@@ -934,7 +934,7 @@
         {
           "in": {
             "type": "tool_execution_start",
-            "toolCallId": "suggest-2",
+            "toolCallId": "suggest-0",
             "toolName": "suggest_draft",
             "args": {
               "path": "greet.ts",
@@ -947,7 +947,7 @@
         {
           "in": {
             "type": "tool_execution_end",
-            "toolCallId": "suggest-2",
+            "toolCallId": "suggest-0",
             "toolName": "suggest_draft",
             "result": {
               "content": [
@@ -958,7 +958,7 @@
               ]
             },
             "isError": false,
-            "durationMs": 0
+            "durationMs": 1
           }
         },
         {
@@ -966,7 +966,7 @@
             "type": "message_start",
             "message": {
               "role": "toolResult",
-              "toolCallId": "suggest-2",
+              "toolCallId": "suggest-0",
               "toolName": "suggest_draft",
               "content": [
                 {
@@ -975,8 +975,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 0,
-              "timestamp": 1794877549562
+              "durationMs": 1,
+              "timestamp": 1794978210231
             }
           }
         },
@@ -985,7 +985,7 @@
             "type": "message_end",
             "message": {
               "role": "toolResult",
-              "toolCallId": "suggest-2",
+              "toolCallId": "suggest-0",
               "toolName": "suggest_draft",
               "content": [
                 {
@@ -994,8 +994,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 0,
-              "timestamp": 1794877549562
+              "durationMs": 1,
+              "timestamp": 1794978210231
             }
           }
         },
@@ -1007,7 +1007,7 @@
               "content": [
                 {
                   "type": "toolCall",
-                  "id": "suggest-2",
+                  "id": "suggest-0",
                   "name": "suggest_draft",
                   "arguments": {
                     "path": "greet.ts",
@@ -1035,16 +1035,16 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794877549557,
+              "timestamp": 1794978210225,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 3,
+              "durationMs": 4,
               "thinkingLevel": "off"
             },
             "toolResults": [
               {
                 "role": "toolResult",
-                "toolCallId": "suggest-2",
+                "toolCallId": "suggest-0",
                 "toolName": "suggest_draft",
                 "content": [
                   {
@@ -1053,8 +1053,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 0,
-                "timestamp": 1794877549562
+                "durationMs": 1,
+                "timestamp": 1794978210231
               }
             ]
           }
@@ -1088,7 +1088,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794877549563
+              "timestamp": 1794978210234
             }
           }
         },
@@ -1112,7 +1112,7 @@
             "assistantMessageEvent": {
               "type": "toolcall_start",
               "contentIndex": 0,
-              "id": "suggest-40",
+              "id": "suggest-1",
               "toolName": "suggest_draft"
             }
           }
@@ -1163,7 +1163,7 @@
               "contentIndex": 0,
               "toolCall": {
                 "type": "toolCall",
-                "id": "suggest-40",
+                "id": "suggest-1",
                 "name": "suggest_draft",
                 "arguments": {
                   "path": "greet.ts",
@@ -1183,7 +1183,7 @@
               "content": [
                 {
                   "type": "toolCall",
-                  "id": "suggest-40",
+                  "id": "suggest-1",
                   "name": "suggest_draft",
                   "arguments": {
                     "path": "greet.ts",
@@ -1211,10 +1211,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794877549563,
+              "timestamp": 1794978210234,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 3,
+              "durationMs": 4,
               "thinkingLevel": "off"
             }
           }
@@ -1222,7 +1222,7 @@
         {
           "in": {
             "type": "tool_execution_start",
-            "toolCallId": "suggest-40",
+            "toolCallId": "suggest-1",
             "toolName": "suggest_draft",
             "args": {
               "path": "greet.ts",
@@ -1235,7 +1235,7 @@
         {
           "in": {
             "type": "tool_execution_end",
-            "toolCallId": "suggest-40",
+            "toolCallId": "suggest-1",
             "toolName": "suggest_draft",
             "result": {
               "content": [
@@ -1255,7 +1255,7 @@
             "type": "message_start",
             "message": {
               "role": "toolResult",
-              "toolCallId": "suggest-40",
+              "toolCallId": "suggest-1",
               "toolName": "suggest_draft",
               "content": [
                 {
@@ -1266,7 +1266,7 @@
               "details": {},
               "isError": true,
               "durationMs": 0,
-              "timestamp": 1794877549567
+              "timestamp": 1794978210238
             }
           }
         },
@@ -1275,7 +1275,7 @@
             "type": "message_end",
             "message": {
               "role": "toolResult",
-              "toolCallId": "suggest-40",
+              "toolCallId": "suggest-1",
               "toolName": "suggest_draft",
               "content": [
                 {
@@ -1286,7 +1286,7 @@
               "details": {},
               "isError": true,
               "durationMs": 0,
-              "timestamp": 1794877549567
+              "timestamp": 1794978210238
             }
           }
         },
@@ -1298,7 +1298,7 @@
               "content": [
                 {
                   "type": "toolCall",
-                  "id": "suggest-40",
+                  "id": "suggest-1",
                   "name": "suggest_draft",
                   "arguments": {
                     "path": "greet.ts",
@@ -1326,16 +1326,16 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1794877549563,
+              "timestamp": 1794978210234,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 3,
+              "durationMs": 4,
               "thinkingLevel": "off"
             },
             "toolResults": [
               {
                 "role": "toolResult",
-                "toolCallId": "suggest-40",
+                "toolCallId": "suggest-1",
                 "toolName": "suggest_draft",
                 "content": [
                   {
@@ -1346,7 +1346,7 @@
                 "details": {},
                 "isError": true,
                 "durationMs": 0,
-                "timestamp": 1794877549567
+                "timestamp": 1794978210238
               }
             ]
           }
@@ -1380,7 +1380,304 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794877549569
+              "timestamp": 1794978210240
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "assistantMessageEvent": {
+              "type": "toolcall_start",
+              "contentIndex": 0,
+              "id": "suggest-2",
+              "toolName": "suggest_draft"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "assistantMessageEvent": {
+              "type": "toolcall_delta",
+              "contentIndex": 0,
+              "delta": "{\"path\":\"greet.ts\",\"side\":\"new\",\"line\":1,\"body\":\" \"}"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "assistantMessageEvent": {
+              "type": "toolcall_end",
+              "contentIndex": 0,
+              "toolCall": {
+                "type": "toolCall",
+                "id": "suggest-2",
+                "name": "suggest_draft",
+                "arguments": {
+                  "path": "greet.ts",
+                  "side": "new",
+                  "line": 1,
+                  "body": " "
+                }
+              }
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "toolCall",
+                  "id": "suggest-2",
+                  "name": "suggest_draft",
+                  "arguments": {
+                    "path": "greet.ts",
+                    "side": "new",
+                    "line": 1,
+                    "body": " "
+                  }
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "glass-test",
+              "model": "gpt-test",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "toolUse",
+              "timestamp": 1794978210240,
+              "responseId": "test-completion",
+              "rawStopReason": "tool_calls",
+              "durationMs": 2,
+              "thinkingLevel": "off"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "tool_execution_start",
+            "toolCallId": "suggest-2",
+            "toolName": "suggest_draft",
+            "args": {
+              "path": "greet.ts",
+              "side": "new",
+              "line": 1,
+              "body": " "
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "tool_execution_end",
+            "toolCallId": "suggest-2",
+            "toolName": "suggest_draft",
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Expected a value with a length of at least 1\n  at [\"body\"]"
+                }
+              ],
+              "details": {}
+            },
+            "isError": true,
+            "durationMs": 1
+          }
+        },
+        {
+          "in": {
+            "type": "message_start",
+            "message": {
+              "role": "toolResult",
+              "toolCallId": "suggest-2",
+              "toolName": "suggest_draft",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Expected a value with a length of at least 1\n  at [\"body\"]"
+                }
+              ],
+              "details": {},
+              "isError": true,
+              "durationMs": 1,
+              "timestamp": 1794978210244
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_end",
+            "message": {
+              "role": "toolResult",
+              "toolCallId": "suggest-2",
+              "toolName": "suggest_draft",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Expected a value with a length of at least 1\n  at [\"body\"]"
+                }
+              ],
+              "details": {},
+              "isError": true,
+              "durationMs": 1,
+              "timestamp": 1794978210244
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "turn_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "toolCall",
+                  "id": "suggest-2",
+                  "name": "suggest_draft",
+                  "arguments": {
+                    "path": "greet.ts",
+                    "side": "new",
+                    "line": 1,
+                    "body": " "
+                  }
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "glass-test",
+              "model": "gpt-test",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "toolUse",
+              "timestamp": 1794978210240,
+              "responseId": "test-completion",
+              "rawStopReason": "tool_calls",
+              "durationMs": 2,
+              "thinkingLevel": "off"
+            },
+            "toolResults": [
+              {
+                "role": "toolResult",
+                "toolCallId": "suggest-2",
+                "toolName": "suggest_draft",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Expected a value with a length of at least 1\n  at [\"body\"]"
+                  }
+                ],
+                "details": {},
+                "isError": true,
+                "durationMs": 1,
+                "timestamp": 1794978210244
+              }
+            ]
+          }
+        },
+        {
+          "in": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "in": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "DONE"
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "glass-test",
+              "model": "gpt-test",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1794978210246
             }
           }
         },
@@ -1484,10 +1781,10 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794877549569,
+              "timestamp": 1794978210246,
               "responseId": "test-completion",
               "rawStopReason": "stop",
-              "durationMs": 2,
+              "durationMs": 3,
               "thinkingLevel": "off"
             }
           }
@@ -1521,10 +1818,10 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794877549569,
+              "timestamp": 1794978210246,
               "responseId": "test-completion",
               "rawStopReason": "stop",
-              "durationMs": 2,
+              "durationMs": 3,
               "thinkingLevel": "off"
             },
             "toolResults": []
@@ -1538,7 +1835,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1794877549445,
+                "timestamp": 1794978210114,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -1705,7 +2002,7 @@
                     "text": "Draft comments on greet.ts."
                   }
                 ],
-                "timestamp": 1794877549444
+                "timestamp": 1794978210112
               },
               {
                 "role": "assistant",
@@ -1737,10 +2034,10 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1794877549474,
+                "timestamp": 1794978210141,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
-                "durationMs": 19,
+                "durationMs": 23,
                 "thinkingLevel": "off"
               },
               {
@@ -1754,15 +2051,15 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 59,
-                "timestamp": 1794877549554
+                "durationMs": 55,
+                "timestamp": 1794978210222
               },
               {
                 "role": "assistant",
                 "content": [
                   {
                     "type": "toolCall",
-                    "id": "suggest-2",
+                    "id": "suggest-0",
                     "name": "suggest_draft",
                     "arguments": {
                       "path": "greet.ts",
@@ -1790,15 +2087,15 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1794877549557,
+                "timestamp": 1794978210225,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
-                "durationMs": 3,
+                "durationMs": 4,
                 "thinkingLevel": "off"
               },
               {
                 "role": "toolResult",
-                "toolCallId": "suggest-2",
+                "toolCallId": "suggest-0",
                 "toolName": "suggest_draft",
                 "content": [
                   {
@@ -1807,15 +2104,15 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 0,
-                "timestamp": 1794877549562
+                "durationMs": 1,
+                "timestamp": 1794978210231
               },
               {
                 "role": "assistant",
                 "content": [
                   {
                     "type": "toolCall",
-                    "id": "suggest-40",
+                    "id": "suggest-1",
                     "name": "suggest_draft",
                     "arguments": {
                       "path": "greet.ts",
@@ -1843,15 +2140,15 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1794877549563,
+                "timestamp": 1794978210234,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
-                "durationMs": 3,
+                "durationMs": 4,
                 "thinkingLevel": "off"
               },
               {
                 "role": "toolResult",
-                "toolCallId": "suggest-40",
+                "toolCallId": "suggest-1",
                 "toolName": "suggest_draft",
                 "content": [
                   {
@@ -1862,7 +2159,61 @@
                 "details": {},
                 "isError": true,
                 "durationMs": 0,
-                "timestamp": 1794877549567
+                "timestamp": 1794978210238
+              },
+              {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "toolCall",
+                    "id": "suggest-2",
+                    "name": "suggest_draft",
+                    "arguments": {
+                      "path": "greet.ts",
+                      "side": "new",
+                      "line": 1,
+                      "body": " "
+                    }
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "glass-test",
+                "model": "gpt-test",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "toolUse",
+                "timestamp": 1794978210240,
+                "responseId": "test-completion",
+                "rawStopReason": "tool_calls",
+                "durationMs": 2,
+                "thinkingLevel": "off"
+              },
+              {
+                "role": "toolResult",
+                "toolCallId": "suggest-2",
+                "toolName": "suggest_draft",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Expected a value with a length of at least 1\n  at [\"body\"]"
+                  }
+                ],
+                "details": {},
+                "isError": true,
+                "durationMs": 1,
+                "timestamp": 1794978210244
               },
               {
                 "role": "assistant",
@@ -1890,10 +2241,10 @@
                   }
                 },
                 "stopReason": "stop",
-                "timestamp": 1794877549569,
+                "timestamp": 1794978210246,
                 "responseId": "test-completion",
                 "rawStopReason": "stop",
-                "durationMs": 2,
+                "durationMs": 3,
                 "thinkingLevel": "off"
               }
             ],
@@ -1941,10 +2292,10 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-17T01-05-49-307Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-18T05-03-30-001Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
-              "messageCount": 9,
+              "messageCount": 11,
               "pendingMessageCount": 0
             }
           }

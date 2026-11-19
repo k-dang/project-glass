@@ -17,6 +17,7 @@ import {
   type AgentCommand,
   type AgentModel,
   AgentModels,
+  type AgentStatusesChanged,
   QuestionPart,
   type QuestionReply,
   type RequestAnswer,
@@ -42,8 +43,13 @@ import { homedir } from "node:os"
 import { sdkExecutable } from "../processes"
 import { claudeTools } from "../agentTools"
 import type { HarnessAdapter } from "./adapter"
+import {
+  backgroundActivity,
+  noBackgroundTasks,
+  trackBackgroundTasks,
+} from "./claudeBackgroundTasks"
 import { Input, isFailure, machine } from "./claudeTurn"
-import type { DeliveredMessage, DeliveredTurn } from "./deliveredMessage"
+import { agentImages, type DeliveredMessage, type DeliveredTurn } from "./deliveredMessage"
 import {
   type RepositoryRole,
   couldNotSwitch,
@@ -105,10 +111,11 @@ const drawDiagramInput = claudeToolInput(drawDiagramParameters)
 const toolResult = ({ accepted, text }: ToolReply) =>
   Promise.resolve({ content: [{ type: "text" as const, text }], isError: !accepted })
 
+const reviewTools = claudeTools.shell
+
 const reviewOptions = (brief: ReviewBrief): Options => ({
   systemPrompt: { type: "preset", preset: "claude_code", append: brief.instructions },
-  tools: [...claudeTools.shell],
-  allowedTools: [...claudeTools.shell, `${GLASS_MCP_PREFIX}${SUGGEST_DRAFT_TOOL}`],
+  tools: [...reviewTools],
   settingSources: [],
   strictMcpConfig: true,
   mcpServers: {
@@ -116,7 +123,7 @@ const reviewOptions = (brief: ReviewBrief): Options => ({
       name: GLASS_MCP_SERVER,
       tools: [
         tool(SUGGEST_DRAFT_TOOL, suggestDraftDescription, suggestDraftInput, (input) =>
-          toolResult(suggestDraft(brief)(input)),
+          toolResult(suggestDraft(brief.diffLines)(input)),
         ),
       ],
     }),
@@ -124,7 +131,6 @@ const reviewOptions = (brief: ReviewBrief): Options => ({
 })
 
 const workOptions = (): Options => ({
-  allowedTools: [`${GLASS_MCP_PREFIX}${DRAW_DIAGRAM_TOOL}`],
   mcpServers: {
     [GLASS_MCP_SERVER]: createSdkMcpServer({
       name: GLASS_MCP_SERVER,
@@ -144,6 +150,18 @@ const roleOptions = (role: RepositoryRole): Options =>
       Review: ({ brief }) => reviewOptions(brief),
     }),
   )
+
+/**
+ * The tools Glass runs without asking the user: its own, and the shell an Agent review works in.
+ * Listing them in `allowedTools` instead would keep Claude Code from consulting `canUseTool`.
+ */
+const approvedIn = (role: RepositoryRole) => {
+  const builtIn: ReadonlyArray<string> = Match.value(role).pipe(
+    Match.tagsExhaustive({ Work: () => [], Review: () => reviewTools }),
+  )
+
+  return (toolName: string) => toolName.startsWith(GLASS_MCP_PREFIX) || builtIn.includes(toolName)
+}
 
 const pluginOptions = (skills: ReadonlyArray<WrittenSkills>): Options =>
   skills.length === 0
@@ -214,23 +232,28 @@ const toModel = (info: ModelInfo): AgentModel => ({
   efforts: info.supportedEffortLevels ?? [],
 })
 
-const userMessage = ({ prompt, images }: DeliveredTurn): SDKUserMessage => ({
-  type: "user",
-  message: {
-    role: "user",
-    content:
-      images.length === 0
-        ? prompt
-        : [
-            ...images.map(({ mediaType, data }) => ({
-              type: "image" as const,
-              source: { type: "base64" as const, media_type: mediaType, data },
-            })),
-            { type: "text" as const, text: prompt },
-          ],
-  },
-  parent_tool_use_id: null,
-})
+const userMessage = (delivered: DeliveredTurn): SDKUserMessage => {
+  const { prompt } = delivered
+  const images = agentImages(delivered)
+
+  return {
+    type: "user",
+    message: {
+      role: "user",
+      content:
+        images.length === 0
+          ? prompt
+          : [
+              ...images.map(({ mediaType, data }) => ({
+                type: "image" as const,
+                source: { type: "base64" as const, media_type: mediaType, data },
+              })),
+              { type: "text" as const, text: prompt },
+            ],
+    },
+    parent_tool_use_id: null,
+  }
+}
 
 interface CancellingInterrupt {
   interrupt(options: { readonly cancelQueued: boolean }): ReturnType<Query["interrupt"]>
@@ -249,6 +272,9 @@ const interruptAll = (session: ClaudeQuery) =>
     Effect.tapError((cause) => Effect.logWarning("Claude Code refused to stop", cause)),
     Effect.orElseSucceed((): ReadonlyArray<string> => []),
   )
+
+const sameStrings = (a: ReadonlyArray<string>, b: ReadonlyArray<string>) =>
+  a.length === b.length && a.every((value, index) => value === b[index])
 
 const control = (what: "model" | "effort" | "Permission mode", call: () => Promise<void>) =>
   Effect.tryPromise(call).pipe(
@@ -417,26 +443,61 @@ export const claudeAdapter = (
       ),
     )
 
+    const approved = approvedIn(role)
+
+    const canUseTool: CanUseTool = (toolName, input, { toolUseID, signal }) =>
+      approved(toolName)
+        ? Promise.resolve({ behavior: "allow", updatedInput: input })
+        : Effect.runPromise(
+            ask(
+              toolName,
+              Option.getOrElse(decodeToolInput(input), () => ({})),
+              toolUseID,
+            ),
+            { signal },
+          )
+
     const { session } = yield* startClaude(
       sdk,
       command,
       folder,
       Stream.toAsyncIterable(Stream.fromQueue(prompts)),
-      (toolName, input, { toolUseID, signal }) =>
-        Effect.runPromise(
-          ask(
-            toolName,
-            Option.getOrElse(decodeToolInput(input), () => ({})),
-            toolUseID,
-          ),
-          { signal },
-        ),
+      canUseTool,
       {
         ...(saved === undefined ? { sessionId: conversation } : { resume: conversation }),
         ...roleOptions(role),
         ...pluginOptions(skills),
       },
     )
+
+    let background = noBackgroundTasks
+    let shown = backgroundActivity(background)
+
+    const show = (activity: AgentStatusesChanged) =>
+      Effect.suspend(() => {
+        if (
+          sameStrings(activity.agentStatuses, shown.agentStatuses) &&
+          sameStrings(activity.backgroundToolCalls, shown.backgroundToolCalls)
+        )
+          return Effect.void
+
+        shown = activity
+
+        return report(activity)
+      })
+
+    const follow = (message: SDKMessage) =>
+      Effect.suspend(() => {
+        const tracked = trackBackgroundTasks(background, message)
+        background = tracked.tasks
+
+        const inputs = [
+          Input.Message({ message }),
+          ...(tracked.ended === null ? [] : [Input.BackgroundWorkEnded({ work: tracked.ended })]),
+        ]
+
+        return show(backgroundActivity(background)).pipe(Effect.as(inputs))
+      })
 
     const turns = yield* runTurns({
       harness: "Claude Code",
@@ -447,7 +508,9 @@ export const claudeAdapter = (
             ? Effect.logWarning("Claude Code ended a Turn with an error", message)
             : Effect.void,
         ),
-        Stream.map((message) => Input.Message({ message })),
+        Stream.mapEffect(follow),
+        Stream.flattenIterable,
+        Stream.ensuring(show(backgroundActivity(noBackgroundTasks))),
         Stream.merge(Stream.fromQueue(requests), { haltStrategy: "left" }),
       ),
       report,

@@ -15,17 +15,16 @@ import {
   Settings,
   Sparkles,
 } from "lucide-react"
-import { useContext, useId } from "react"
+import { type ComponentType, useContext, useEffect, useId, useState } from "react"
 import { TooltipHint } from "@/components/ui/tooltip"
 import { backendReachableAtom } from "./backend"
 import { ConfirmationDialog } from "./ConfirmationDialog"
+import { ConnectionAvatar } from "./ConnectionAvatar"
 import { globalConversationOpenAtom, globalUnseenAtom } from "./globalConversation"
-import { GlobalConversationDialog } from "./GlobalConversationDialog"
 import { HistoryNav } from "./HistoryNav"
 import { NeedsYouBadge } from "./NeedsYouCount"
 import { needsYouCount as countOf, watchedNeedsYouAtom } from "./needsYou"
 import { confirmLeave, discardPromptAtom, leavesPullRequest, reviewsLinkAtom } from "./reviewsArea"
-import { ConnectionAvatar } from "./Settings"
 import { ResourceUsage } from "./ResourceUsage"
 import { ShortcutsDialog } from "./ShortcutsDialog"
 import { useShortcuts } from "./useShortcuts"
@@ -76,10 +75,26 @@ export function AppShell() {
   const areas = useAreas()
   const navigate = useNavigate()
   const [conversing, setConversing] = useAtom(globalConversationOpenAtom)
+  const [GlobalConversationDialog, setGlobalConversationDialog] = useState<ComponentType>()
   const needsYouBadgeId = useId()
   const needsYouCount = countOf(useAtomValue(watchedNeedsYouAtom))
   const unseen = Option.getOrNull(AsyncResult.value(useAtomValue(globalUnseenAtom)))
   const unread = unseen !== null && !conversing
+
+  // Loading while idle keeps the dialog off first paint and mounts it closed, so its first open
+  // animates in like the rest.
+  useEffect(() => {
+    const load = () =>
+      void import("./GlobalConversationDialog").then((module) =>
+        setGlobalConversationDialog(() => module.GlobalConversationDialog),
+      )
+
+    if (conversing) load()
+
+    const idle = requestIdleCallback(load)
+
+    return () => cancelIdleCallback(idle)
+  }, [conversing])
 
   useShortcuts([
     ...areas.map(({ link }, index) => ({
@@ -104,7 +119,7 @@ export function AppShell() {
   })
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden">
+    <div className="relative flex h-screen flex-col overflow-clip">
       <div className="title-strip flex shrink-0 items-center border-b pr-2 pl-[calc(env(titlebar-area-x,0px)+0.75rem)]">
         <HistoryNav />
       </div>
@@ -167,7 +182,7 @@ export function AppShell() {
           </footer>
         </div>
       </div>
-      <GlobalConversationDialog />
+      {GlobalConversationDialog && <GlobalConversationDialog />}
       <DiscardDialog />
     </div>
   )

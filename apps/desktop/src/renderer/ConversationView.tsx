@@ -11,6 +11,7 @@ import {
   asksPermission,
   type CapturedContext,
   type WorkOutcome,
+  type BackgroundWork,
   type FeedbackNote,
   type Image,
   isNothingUnsent,
@@ -35,6 +36,7 @@ import { DateTime, Exit, Match, Option, Predicate } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import {
   ArrowUp,
+  Activity,
   Brain,
   CircleCheck,
   CirclePause,
@@ -44,7 +46,6 @@ import {
   Layers,
   LoaderCircle,
   MessageCircle,
-  Puzzle,
   Unplug,
   Workflow,
   Wrench,
@@ -101,6 +102,7 @@ import {
 } from "@/components/ui/trace"
 import { ConversationChanges } from "./ConversationChanges"
 import { ConversationHeader, ConversationHeaderAction } from "./ConversationHeader"
+import { useConversationPullRequest } from "./ConversationPullRequest"
 import {
   QueueItem,
   QueueItemAction,
@@ -158,6 +160,8 @@ export const ToolCallView = createContext<
   ((call: typeof ToolCallPart.Type) => ReactNode | null) | null
 >(null)
 
+const BackgroundToolCalls = createContext<ReadonlySet<string>>(new Set())
+
 const lastSent = (
   turns: ReadonlyArray<Turn>,
   queued: ReadonlyArray<QueuedMessage>,
@@ -205,17 +209,8 @@ export function ConversationView(props: { conversationId: string } & Conversatio
 function OpenConversation(props: { conversation: Conversation } & ConversationTabs) {
   const { conversation, tab, onTabChange } = props
   const atoms = useMemo(() => conversationAtoms(conversation.id), [conversation.id])
-  const transcript = useAtomValue(atoms.transcript)
-  const reconnect = useAtomRefresh(atoms.transcript)
-
-  const loaded = AsyncResult.value(transcript)
-
-  const { turns, earlierTurns, queued, status, extensionStatuses } = Option.getOrElse(
-    loaded,
-    () => emptyTranscript,
-  )
-
-  const loadEarlier = useAtomSet(atoms.loadEarlier)
+  const loaded = AsyncResult.value(useAtomValue(atoms.transcript))
+  const { turns } = Option.getOrElse(loaded, () => emptyTranscript)
 
   const [changesOpened, setChangesOpened] = useState(tab === "changes")
   const [pane, setPane] = useState<SidePane>(null)
@@ -229,6 +224,8 @@ function OpenConversation(props: { conversation: Conversation } & ConversationTa
 
   if (tab === "changes" && !changesOpened) setChangesOpened(true)
 
+  const pullRequest = useConversationPullRequest(conversation.id)
+
   const registry = useContext(RegistryContext)
 
   useShortcuts([
@@ -239,9 +236,6 @@ function OpenConversation(props: { conversation: Conversation } & ConversationTa
       run: () => onTabChange(tab === "chat" ? "changes" : "chat"),
     },
   ])
-
-  const reach = conversation.sandbox?.reach
-  const readOnly = readOnlyExplanation(reach)
 
   useEffect(() => {
     rememberPlace(registry, { area: "conversations", conversationId: conversation.id })
@@ -279,8 +273,9 @@ function OpenConversation(props: { conversation: Conversation } & ConversationTa
           }
           place={conversation.place}
           repository={repositoryKey(conversation.repository)}
-          branch={conversation.name}
+          branch={conversation.branch ?? undefined}
           baseBranch={conversation.baseBranch}
+          pullRequest={pullRequest}
           skillPacks={conversation.skillPacks}
           localSkills={conversation.localSkills}
         >
@@ -306,36 +301,13 @@ function OpenConversation(props: { conversation: Conversation } & ConversationTa
             </ConversationHeaderAction>
           )}
         </ConversationHeader>
-        {AsyncResult.isFailure(transcript) && !transcript.waiting && (
-          <div className="px-6 pt-4">
-            <ProblemAlert
-              problem={streamProblem(transcript.cause)}
-              action={{ label: "Reconnect", run: reconnect }}
-            />
-          </div>
-        )}
+        <TranscriptProblem />
         <div hidden={tab !== "chat"} className="flex min-h-0 flex-1">
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            <ToolCallView value={diagrams.cardOf}>
-              <FileLinks value={fileLinks}>
-                <Transcript
-                  turns={turns}
-                  earlierTurns={earlierTurns}
-                  onShowEarlier={loadEarlier}
-                  status={status}
-                />
-              </FileLinks>
-            </ToolCallView>
-            <ExtensionStatuses statuses={extensionStatuses} />
-            {reach === "unreachable" && <UnreachableNotice conversationId={conversation.id} />}
-            {readOnly === null ? (
-              <Composer conversation={conversation} turns={turns} queued={queued} />
-            ) : (
-              <output className="mx-auto block w-full max-w-3xl px-6 py-4 text-sm text-muted-foreground">
-                {readOnly}
-              </output>
-            )}
-          </div>
+          <ToolCallView value={diagrams.cardOf}>
+            <FileLinks value={fileLinks}>
+              <ConversationChat conversation={conversation} place="conversation" />
+            </FileLinks>
+          </ToolCallView>
           {openedDiagram !== undefined && (
             <DiagramPane diagram={openedDiagram} onClose={closePane} />
           )}
@@ -366,13 +338,101 @@ function OpenConversation(props: { conversation: Conversation } & ConversationTa
   )
 }
 
+export function TranscriptProblem() {
+  const atoms = useConversationAtoms()
+  const transcript = useAtomValue(atoms.transcript)
+  const reconnect = useAtomRefresh(atoms.transcript)
+
+  return (
+    AsyncResult.isFailure(transcript) &&
+    !transcript.waiting && (
+      <div className="px-6 pt-4">
+        <ProblemAlert
+          problem={streamProblem(transcript.cause)}
+          action={{ label: "Reconnect", run: reconnect }}
+        />
+      </div>
+    )
+  )
+}
+
+// In the Inbox the chat shows only the latest Turn and a plain Reply box: a Conversation there
+// is idle or waiting on the user, and leaves the Inbox as soon as a reply starts a Turn.
+export function ConversationChat(props: {
+  conversation: Conversation
+  place: "conversation" | "inbox"
+}) {
+  const { conversation } = props
+  const atoms = useConversationAtoms()
+  const loadEarlier = useAtomSet(atoms.loadEarlier)
+
+  const { turns, earlierTurns, queued, status, agentStatuses, backgroundToolCalls } =
+    Option.getOrElse(AsyncResult.value(useAtomValue(atoms.transcript)), () => emptyTranscript)
+
+  const reach = conversation.sandbox?.reach
+  const readOnly = readOnlyExplanation(reach)
+
+  return (
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <BackgroundToolCalls value={new Set(backgroundToolCalls)}>
+        <Transcript
+          turns={turns}
+          earlierTurns={earlierTurns}
+          onShowEarlier={loadEarlier}
+          status={status}
+          latestOnly={props.place === "inbox"}
+        />
+      </BackgroundToolCalls>
+      <AgentStatuses statuses={agentStatuses} />
+      {reach === "unreachable" && <UnreachableNotice conversationId={conversation.id} />}
+      {readOnly !== null ? (
+        <output className="mx-auto block w-full max-w-3xl px-6 py-4 text-sm text-muted-foreground">
+          {readOnly}
+        </output>
+      ) : props.place === "inbox" ? (
+        <ReplyBox turns={turns} />
+      ) : (
+        <Composer conversation={conversation} turns={turns} queued={queued} />
+      )}
+    </div>
+  )
+}
+
+function ReplyBox(props: { turns: ReadonlyArray<Turn> }) {
+  const atoms = useConversationAtoms()
+  const waiting = props.turns.at(-1)?.parts.find(isWaiting)
+  const [composed, setComposed] = usePersistedComposer(atoms)
+  const sent = useAtomValue(atoms.send)
+  const send = useAtomSet(atoms.send, { mode: "promiseExit" })
+
+  return (
+    <MessageBox
+      composed={composed}
+      setComposed={setComposed}
+      label="Reply"
+      placeholder={composerPlaceholder(false, waiting, "Reply to the Conversation")}
+      blocked={sent.waiting || waiting !== undefined}
+      problem={settledProblem(sent)}
+      send={async (message) => Exit.isSuccess(await send({ ...message, feedback: [] }))}
+      steer={null}
+      recall={null}
+      onStop={null}
+      notice={waiting !== undefined && <WaitingNotice waiting={waiting} />}
+    />
+  )
+}
+
 export function Transcript(props: {
   turns: ReadonlyArray<Turn>
   earlierTurns: number
   onShowEarlier: (before: string) => void
   status: string | null
   lead?: ReactNode
+  latestOnly?: boolean
 }) {
+  const [revealed, setRevealed] = useState(!props.latestOnly)
+  const collapsed = !revealed && (props.turns.length > 1 || props.earlierTurns > 0)
+  const turns = collapsed ? props.turns.slice(-1) : props.turns
   const before = props.turns[0]?.id
   const { onShowEarlier } = props
 
@@ -402,19 +462,32 @@ export function Transcript(props: {
           <MessageScrollerViewport className="px-6 py-4">
             <MessageScrollerContent className="mx-auto w-full max-w-3xl">
               {props.lead}
-              {props.earlierTurns > 0 && (
+              {collapsed ? (
                 <div className="text-center">
-                  <Button ref={showEarlierWhenSeen} variant="ghost" size="sm" onClick={showEarlier}>
+                  <Button variant="ghost" size="sm" onClick={() => setRevealed(true)}>
                     Show earlier Turns
                   </Button>
                 </div>
+              ) : (
+                props.earlierTurns > 0 && (
+                  <div className="text-center">
+                    <Button
+                      ref={showEarlierWhenSeen}
+                      variant="ghost"
+                      size="sm"
+                      onClick={showEarlier}
+                    >
+                      Show earlier Turns
+                    </Button>
+                  </div>
+                )
               )}
-              {props.turns.map((turn) => (
+              {turns.map((turn) => (
                 <TurnView
                   key={turn.id}
                   turn={turn}
-                  latest={turn === props.turns.at(-1)}
-                  status={turn === props.turns.at(-1) ? props.status : null}
+                  latest={turn === turns.at(-1)}
+                  status={turn === turns.at(-1) ? props.status : null}
                 />
               ))}
             </MessageScrollerContent>
@@ -487,6 +560,54 @@ function GlobalConversationUpdateMessage(props: { work: ReadonlyArray<WorkOutcom
   )
 }
 
+const backgroundKindText: Record<BackgroundWork["kind"], string> = {
+  subagent: "Subagent",
+  command: "Command",
+}
+
+const backgroundOutcomeText: Record<BackgroundWork["outcome"], string> = {
+  completed: "finished",
+  failed: "failed",
+  stopped: "was stopped",
+}
+
+const backgroundWorkText = ({ kind, description, outcome }: BackgroundWork) =>
+  `${backgroundKindText[kind]} ${description} ${backgroundOutcomeText[outcome]}`
+
+function BackgroundWorkEndedMessage(props: { work: ReadonlyArray<BackgroundWork> }) {
+  return (
+    <Message align="end">
+      <MessageContent>
+        <span className="self-end text-xs text-muted-foreground">Background work ended</span>
+        <ul className="flex flex-col gap-1 self-end text-sm text-muted-foreground">
+          {props.work.map((work, index) => (
+            <li key={index}>{backgroundWorkText(work)}</li>
+          ))}
+        </ul>
+      </MessageContent>
+    </Message>
+  )
+}
+
+function TurnMessage(props: { turn: Turn }) {
+  const { turn } = props
+
+  if (Predicate.isTagged(turn.context, "GlobalConversationUpdate"))
+    return <GlobalConversationUpdateMessage work={turn.context.work} />
+
+  if (Predicate.isTagged(turn.context, "BackgroundWorkEnded"))
+    return <BackgroundWorkEndedMessage work={turn.context.work} />
+
+  return (
+    <UserMessage
+      message={turn.message}
+      images={turn.images}
+      feedback={turn.feedback}
+      label={sentFrom(turn.context)}
+    />
+  )
+}
+
 export function UserMessage(props: {
   message: string
   images: ReadonlyArray<Image>
@@ -527,16 +648,7 @@ const TurnView = memo(function TurnView(props: {
   return (
     <MessageScrollerItem messageId={turn.id} scrollAnchor exactHeight={props.latest}>
       <MessageGroup className="gap-4">
-        {Predicate.isTagged(turn.context, "GlobalConversationUpdate") ? (
-          <GlobalConversationUpdateMessage work={turn.context.work} />
-        ) : (
-          <UserMessage
-            message={turn.message}
-            images={turn.images}
-            feedback={turn.feedback}
-            label={sentFrom(turn.context)}
-          />
-        )}
+        <TurnMessage turn={turn} />
         <Message>
           <MessageContent>
             <TurnParts parts={turn.parts} />
@@ -679,12 +791,15 @@ const groupSteps = (
 const counted = (count: number, noun: string) =>
   count === 0 ? null : `${count} ${noun}${count === 1 ? "" : "s"}`
 
-const runningCall = (parts: ReadonlyArray<TurnPart>) =>
-  parts.find((part) => Predicate.isTagged(part, "ToolCall") && part.status === "running")
+const isRunning = (call: typeof ToolCallPart.Type, inBackground: ReadonlySet<string>) =>
+  call.status === "running" || inBackground.has(call.toolCallId)
 
-const stepsTitle = (parts: ReadonlyArray<TurnPart>) => {
+const runningCall = (parts: ReadonlyArray<TurnPart>, inBackground: ReadonlySet<string>) =>
+  parts.find((part) => Predicate.isTagged(part, "ToolCall") && isRunning(part, inBackground))
+
+const stepsTitle = (parts: ReadonlyArray<TurnPart>, inBackground: ReadonlySet<string>) => {
   const calls = parts.filter((part) => Predicate.isTagged(part, "ToolCall"))
-  const running = calls.find((call) => call.status === "running")
+  const running = calls.find((call) => isRunning(call, inBackground))
   const failed = calls.filter((call) => call.status === "failed").length
 
   const summary = [
@@ -719,17 +834,20 @@ function TurnParts(props: { parts: ReadonlyArray<TurnPart> }) {
 }
 
 function Steps(props: { steps: ReadonlyArray<NestedPart> }) {
+  const inBackground = useContext(BackgroundToolCalls)
   const parts = props.steps.map(({ part }) => part)
 
   return (
     <Trace>
       <TraceCollapsible>
         <TraceCollapsibleTrigger>
-          <TraceLine status={runningCall(parts) === undefined ? undefined : "running"}>
+          <TraceLine
+            status={runningCall(parts, inBackground) === undefined ? undefined : "running"}
+          >
             <TraceIcon>
               <Layers />
             </TraceIcon>
-            <TraceTitle>{stepsTitle(parts)}</TraceTitle>
+            <TraceTitle>{stepsTitle(parts, inBackground)}</TraceTitle>
           </TraceLine>
         </TraceCollapsibleTrigger>
         <TraceCollapsibleContent className="flex flex-col gap-2">
@@ -746,6 +864,7 @@ const toolStatus = {
   running: { label: "Running", line: "running" },
   done: { label: "Done", line: undefined },
   failed: { label: "Failed", line: "error" },
+  background: { label: "Running in the background", line: "running" },
 } as const
 
 function FencedCode(props: { code: string; language: string }) {
@@ -854,6 +973,7 @@ const PartView = memo(function PartView(props: {
   nested: ReadonlyArray<NestedPart>
 }) {
   const toolCallView = useContext(ToolCallView)
+  const inBackground = useContext(BackgroundToolCalls)
 
   return Match.value(props.part).pipe(
     Match.tagsExhaustive({
@@ -887,7 +1007,8 @@ const PartView = memo(function PartView(props: {
 
         if (shown !== null) return shown
 
-        const status = toolStatus[call.status]
+        const background = call.status === "done" && inBackground.has(call.toolCallId)
+        const status = toolStatus[background ? "background" : call.status]
 
         return (
           <Trace>
@@ -901,6 +1022,11 @@ const PartView = memo(function PartView(props: {
                     <span className="sr-only">{status.label}: </span>
                     <span className="shrink-0 font-medium text-foreground">{call.name}</span>{" "}
                     <span className="truncate font-mono text-xs">{call.inputSummary}</span>
+                    {background && (
+                      <span aria-hidden className="shrink-0 text-xs">
+                        · in the background
+                      </span>
+                    )}
                   </TraceTitle>
                 </TraceLine>
               </TraceCollapsibleTrigger>
@@ -971,16 +1097,16 @@ function WaitingNotice(props: { waiting: RequestPart }) {
   )
 }
 
-function ExtensionStatuses(props: { statuses: ReadonlyArray<string> }) {
+function AgentStatuses(props: { statuses: ReadonlyArray<string> }) {
   return (
     props.statuses.length > 0 && (
       <output
-        aria-label="Extension statuses"
+        aria-label="Agent statuses"
         className="mx-auto flex w-full max-w-3xl flex-wrap gap-x-4 gap-y-1 px-6 pt-2 text-xs text-muted-foreground"
       >
         {props.statuses.map((status) => (
           <span key={status} className="flex items-center gap-1.5">
-            <Puzzle aria-hidden className="size-3" />
+            <Activity aria-hidden className="size-3" />
             {status}
           </span>
         ))}

@@ -14,12 +14,10 @@ import {
   type TurnEnding,
   TurnFailed,
   type TurnPart,
-  TurnStarted,
   type MessageWithContext,
   type TurnMessage,
   withContextOf,
 } from "@glass/contracts"
-import { randomUUID } from "node:crypto"
 import { Data, type DateTime, Predicate } from "effect"
 import type { AssistantUpdate, ClearedQueue, PiEvent, ToolResult } from "./piRpc"
 import { saysSignInFailed } from "../agentFailure"
@@ -250,12 +248,6 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
 
   Input.$match(input, {
     Event: ({ event }) => {
-      if (state === null && event.type === "agent_start") {
-        const unprompted = { message: "", images: [], context: null }
-        state = beginTurn(randomUUID(), unprompted, now)
-        emit(TurnStarted.make({ turnId: state.turn.id, ...unprompted, feedback: [], sentAt: now }))
-      }
-
       if (event.type === "extension_ui_request" && dialogMethods.has(event.method)) {
         if (state === null) commands.push(Command.DeclineDialog({ id: event.id }))
         else setPart(state, state.turn.parts.length, dialogQuestion(event))
@@ -328,6 +320,7 @@ export const leftover = (
 export const machine: TurnMachine<TurnState, Input, Command> = {
   step,
   begin: beginTurn,
+  startsRun: (input) => Input.$is("Event")(input) && input.event.type === "agent_start",
   exitInput: Input.Exited(),
   stoppedReason,
 }

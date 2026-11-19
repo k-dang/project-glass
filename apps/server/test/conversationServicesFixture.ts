@@ -55,6 +55,7 @@ import { GitHubClient } from "../src/github/GitHubClient"
 import { LocalPlacement } from "../src/LocalPlacement"
 import { ToDos } from "../src/ToDos"
 import { Transcripts } from "../src/Transcripts"
+import { isolatedHome } from "./harness"
 import { inProcessSandboxes } from "./inProcessSandboxes"
 
 interface Started {
@@ -66,6 +67,8 @@ interface Started {
 }
 
 export const conversationServicesFixture = Effect.gen(function* () {
+  const home = yield* isolatedHome
+
   const database = yield* Layer.build(
     SqliteMigrator.layer({ loader: migrationLoader }).pipe(
       Layer.provideMerge(SqliteClient.layer({ filename: ":memory:" })),
@@ -143,6 +146,8 @@ export const conversationServicesFixture = Effect.gen(function* () {
         return changed
       }),
     uncommitted: () => Effect.sync(() => uncommitted),
+    // The fake placement names each folder after its Conversation, as a worktree's branch is.
+    branch: (folder) => Effect.succeed(folder),
     files: () => Effect.succeed([]),
   })
 
@@ -183,7 +188,7 @@ export const conversationServicesFixture = Effect.gen(function* () {
           Effect.sync(() => {
             const name = `agent/test-${++nextName}`
 
-            return { name, folder: name, discard: Effect.void }
+            return { name, branch: name, folder: name, discard: Effect.void }
           }),
         host: () => Effect.succeed(client),
         runningHost: () => Effect.succeedSome(client),
@@ -191,6 +196,7 @@ export const conversationServicesFixture = Effect.gen(function* () {
         baseRef: () => Effect.succeed("main"),
         remove: () => Effect.void,
         subscribeLost: Effect.succeed(Stream.never),
+        resume: Effect.succeed(new Set()),
       })
 
       const services = yield* Layer.build(
@@ -209,7 +215,11 @@ export const conversationServicesFixture = Effect.gen(function* () {
                 ServerConfig.layer.pipe(
                   Layer.provide(
                     ConfigProvider.layer(
-                      ConfigProvider.fromEnvRecord({ GLASS_PORT: "0", GLASS_TOKEN: "unused" }),
+                      ConfigProvider.fromEnvRecord({
+                        GLASS_PORT: "0",
+                        GLASS_TOKEN: "unused",
+                        GLASS_HOME: home,
+                      }),
                     ),
                   ),
                 ),
@@ -222,12 +232,16 @@ export const conversationServicesFixture = Effect.gen(function* () {
           Layer.provide(FeedbackNotes.layer),
           Layer.provideMerge(Transcripts.layer),
           Layer.provide(Layer.succeed(LocalPlacement, placement)),
-          Layer.provide(ToDos.layer),
+          Layer.provideMerge(ToDos.layer),
           Layer.provide(
             ServerConfig.layer.pipe(
               Layer.provide(
                 ConfigProvider.layer(
-                  ConfigProvider.fromEnvRecord({ GLASS_PORT: "0", GLASS_TOKEN: "unused" }),
+                  ConfigProvider.fromEnvRecord({
+                    GLASS_PORT: "0",
+                    GLASS_TOKEN: "unused",
+                    GLASS_HOME: home,
+                  }),
                 ),
               ),
             ),
@@ -243,11 +257,13 @@ export const conversationServicesFixture = Effect.gen(function* () {
         (conversationId, events) => transcripts.save(conversationId, events),
         client,
         { host, saved: 0 },
+        () => 0,
       ).pipe(Effect.forkScoped)
 
       return {
         conversations: Context.get(services, Conversations),
         sandboxes: Context.get(services, Sandboxes),
+        toDos: Context.get(services, ToDos),
       }
     }).pipe(Effect.provideContext(database), Scope.provide(scope))
 
@@ -256,6 +272,7 @@ export const conversationServicesFixture = Effect.gen(function* () {
     return {
       conversations: built.conversations,
       sandboxProviders: built.sandboxes.providers,
+      toDos: built.toDos,
       close: Scope.close(scope, Exit.void),
     }
   })

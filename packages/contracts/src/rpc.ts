@@ -59,10 +59,14 @@ import { EngineFeature, EngineSettings } from "./engine"
 import { FeedbackNote, UnsentFeedback } from "./feedbackNote"
 import { CheckInAnswer, CheckInChanges, CheckInError, CheckInNotWaiting } from "./checkIn"
 import { FollowedRepository, InvalidRepositoryInput } from "./followedRepository"
-import { NeedsYou, OutsideQuestionAnswer, OutsideQuestionNotWaiting } from "./needsYou"
+import { NeedsYou, OutsideQuestionAnswer, OutsideQuestionNotWaiting, TurnSeen } from "./needsYou"
 import { OutsideAgent, OutsideAgentNotFound } from "./outsideAgent"
 import { LoadPullRequestError, PullRequestRef, PullRequestWorkspace } from "./pullRequest"
-import { LatestPullRequestListings, PullRequestListings } from "./pullRequestList"
+import {
+  ConversationPullRequest,
+  LatestPullRequestListings,
+  PullRequestListings,
+} from "./pullRequestList"
 import { Queue, QueueAddition, QueueError, QueuedPullRequest } from "./queue"
 import { FileContents, GetFileContentsError, RepositoryFiles } from "./repository"
 import { ReviewDecision, SubmitReviewError } from "./review"
@@ -363,9 +367,14 @@ export class GlassRpcs extends RpcGroup.make(
     stream: true,
   }),
   Rpc.make("WatchWorkingConversations", { success: Schema.Array(Schema.String), stream: true }),
+  Rpc.make("WatchConversationPullRequests", {
+    success: Schema.Array(ConversationPullRequest),
+    error: ConversationError,
+    stream: true,
+  }),
   Rpc.make("WatchNeedsYou", { success: NeedsYou, stream: true }),
   Rpc.make("MarkTurnSeen", {
-    payload: { conversationId: Schema.String, endedAt: Schema.DateTimeUtcFromString },
+    payload: TurnSeen,
     error: ConversationError,
   }),
   Rpc.make("AnswerOutsideQuestion", {

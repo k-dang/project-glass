@@ -12,6 +12,7 @@ import {
   type RequestNotWaiting,
   RequestWaiting,
   type SentMessage,
+  ToDo,
   type TurnContext,
   withContextOf,
   TurnCutOff,
@@ -192,11 +193,36 @@ export class ConversationTurns extends Context.Service<
                 Effect.orElseSucceed(() => []),
               )
 
-        const mentioned = ids.flatMap((id) => listed.find((toDo) => toDo.id === id) ?? [])
+        const found = ids.flatMap((id) => listed.find((toDo) => toDo.id === id) ?? [])
+
+        const mentioned = yield* Effect.forEach(
+          found,
+          (toDo) =>
+            Effect.forEach(toDo.images, ({ id }) => toDos.readImage(id, "full"), {
+              concurrency: "unbounded",
+            }).pipe(
+              Effect.map((images) => ({ toDo, images })),
+              Effect.tapError((cause) =>
+                Effect.logWarning("Couldn't read a mentioned To-do's images", cause),
+              ),
+              Effect.orElseSucceed(() => {
+                const { id, title, notes, done } = toDo
+
+                return { toDo: new ToDo({ id, title, notes, done, images: [] }), images: [] }
+              }),
+            ),
+          { concurrency: "unbounded" },
+        )
 
         return {
           ...withContextOf(sent),
-          prompt: prompt(sent.message, mentioned, sent.context, feedback),
+          mentionedImages: mentioned.flatMap(({ images }) => images),
+          prompt: prompt(
+            sent.message,
+            mentioned.map(({ toDo }) => toDo),
+            sent.context,
+            feedback,
+          ),
         }
       })
 

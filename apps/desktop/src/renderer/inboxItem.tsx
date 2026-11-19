@@ -11,7 +11,8 @@ import { Array as Arr, DateTime, Match, Predicate } from "effect"
 import { CircleHelp, FileDiff, GitPullRequest, MessagesSquare, Sparkles } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { fileName } from "./fileName"
-import { ago, warningTone } from "./PullRequestRow"
+import { ago } from "./PullRequestRow"
+import { warningTone } from "./status"
 import { referenceText } from "./queue"
 
 type Tone = "warning" | "danger" | "review" | "success" | "neutral"
@@ -123,7 +124,7 @@ export function ItemIcon(props: { item: NeedsYouItem; className: string }) {
   })
 }
 
-export const requestsOf = (item: NeedsYouItem): ReadonlyArray<RequestPart> =>
+const requestsOf = (item: NeedsYouItem): ReadonlyArray<RequestPart> =>
   Match.valueTags(item, {
     Conversation: ({ reasons }) =>
       reasons.flatMap((reason) =>

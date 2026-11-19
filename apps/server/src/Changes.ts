@@ -115,6 +115,7 @@ export class Changes extends Context.Service<
       baseRef: string,
     ) => Effect.Effect<ReadonlyArray<ChangedFile>, ChangesFailed>
     readonly uncommitted: (folder: string) => Effect.Effect<boolean, ChangesFailed>
+    readonly branch: (folder: string) => Effect.Effect<string | null, ChangesFailed>
     readonly files: (folder: string) => Effect.Effect<ReadonlyArray<string>, ChangesFailed>
   }
 >()("@glass/server/Changes") {
@@ -190,6 +191,11 @@ export class Changes extends Context.Service<
         uncommitted: (folder) =>
           git.run(folder, ["status", "--porcelain"]).pipe(
             Effect.map((status) => status !== ""),
+            failed,
+          ),
+        branch: (folder) =>
+          git.run(folder, ["branch", "--show-current"]).pipe(
+            Effect.map((branch) => (branch === "" ? null : branch)),
             failed,
           ),
         files: (folder) =>

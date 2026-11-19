@@ -2,11 +2,14 @@
 import { TourFailure, type TourState } from "@glass/contracts"
 import { act, screen, waitFor, within } from "@testing-library/react"
 import { DateTime, Deferred, Effect } from "effect"
-import { afterEach, expect, it } from "vite-plus/test"
+import { afterEach, expect, it, vi } from "vite-plus/test"
 import { mountTourWorkspace, resetTourWorkspace } from "../../test/tourWorkspace"
 import { pullRequestRef, revision } from "../../test/workspace"
 
-afterEach(resetTourWorkspace)
+afterEach(() => {
+  vi.useRealTimers()
+  resetTourWorkspace()
+})
 
 const mount = (initial: TourState = { tour: null, job: { status: "idle" } }) =>
   mountTourWorkspace({ initial })
@@ -15,6 +18,7 @@ const commandFailure = (message: string) =>
   new TourFailure({ reason: "storage", runner: null, message })
 
 it("writes only on request", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] })
   const f = mount()
   await f.user.click(await screen.findByRole("tab", { name: "Tour" }))
   expect(f.write).not.toHaveBeenCalled()
@@ -25,7 +29,7 @@ it("writes only on request", async () => {
     tour: null,
     job: {
       status: "writing",
-      startedAt: f.startedAt,
+      startedAt: Date.now() - 65_000,
       runner: { harness: "pi", model: "openai/gpt-test" },
     },
   })
@@ -34,7 +38,7 @@ it("writes only on request", async () => {
   expect(
     within(screen.getByRole("tabpanel", { name: "Tour" })).getByLabelText("Time elapsed")
       .textContent,
-  ).toMatch(/^0:0[3-5]$/)
+  ).toBe("1:05")
   await f.user.click(screen.getByRole("button", { name: "Cancel" }))
   await waitFor(() => expect(f.cancel).toHaveBeenCalled())
   expect(await screen.findByRole("button", { name: "Write Tour" })).toBeDefined()

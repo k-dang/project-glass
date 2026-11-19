@@ -1,0 +1,276 @@
+:root {
+  color-scheme: light;
+  --bg: #fafafa;
+  --panel: #fff;
+  --fg: #18181b;
+  --muted: #71717a;
+  --line: #e4e4e7;
+  --hover: #f4f4f5;
+  --accent: #18181b;
+  --accent-fg: #fff;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #09090b;
+    --panel: #111113;
+    --fg: #fafafa;
+    --muted: #a1a1aa;
+    --line: #27272a;
+    --hover: #1c1c1f;
+    --accent: #fafafa;
+    --accent-fg: #09090b;
+  }
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  height: 100vh;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  grid-template-rows: minmax(0, 1fr);
+  background: var(--bg);
+  color: var(--fg);
+  font:
+    14px/1.4 system-ui,
+    sans-serif;
+}
+nav {
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+header {
+  padding: 16px;
+  border-bottom: 1px solid var(--line);
+}
+h1 {
+  margin: 0 0 2px;
+  font-size: 16px;
+}
+.meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+input {
+  width: 100%;
+  margin-top: 12px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+}
+#list {
+  overflow-y: auto;
+  padding: 8px;
+}
+h2 {
+  margin: 12px 8px 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+#list a {
+  display: block;
+  padding: 5px 8px;
+  border-radius: 6px;
+  color: inherit;
+  text-decoration: none;
+}
+#list a:hover {
+  background: var(--hover);
+}
+#list a[aria-current] {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--line);
+}
+.bar .title {
+  flex: 1;
+  font-weight: 600;
+}
+.bar .title span {
+  color: var(--muted);
+  font-weight: 400;
+}
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.seg button {
+  border: 0;
+  padding: 5px 10px;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+.seg button[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+#stage {
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+#stage.both {
+  grid-template-columns: 1fr 1fr;
+}
+#stage.grid {
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+}
+figure {
+  margin: 0;
+}
+figure img {
+  display: block;
+  max-width: 100%;
+  margin: 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+#stage:not(.grid):not(.both) img {
+  max-height: calc(100vh - 100px);
+}
+#stage.grid figure {
+  cursor: pointer;
+}
+figcaption {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.keys {
+  color: var(--muted);
+  font-size: 12px;
+}
+#canvas {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  background-image: radial-gradient(var(--line) 1px, transparent 1px);
+}
+#canvas.dragging {
+  cursor: grabbing;
+}
+#canvas[hidden],
+#stage[hidden] {
+  display: none;
+}
+#world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 200px 240px;
+  padding: 120px;
+  box-sizing: content-box;
+}
+#world.moving {
+  will-change: transform;
+}
+.lane h3 {
+  margin: 0 0 32px;
+  font-size: 64px;
+  letter-spacing: -0.02em;
+}
+.lane-shots {
+  display: flex;
+  gap: 96px;
+  align-items: flex-start;
+}
+.lane figure {
+  cursor: pointer;
+}
+.lane figure .pair {
+  display: flex;
+  gap: 24px;
+}
+.lane figure img {
+  max-width: none;
+  height: auto;
+  border-width: 2px;
+  border-radius: 16px;
+}
+.lane figure[aria-current] img {
+  outline: 8px solid var(--accent);
+  outline-offset: 12px;
+}
+.lane figcaption {
+  margin-top: 20px;
+  font-size: 28px;
+}
+.zoom {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.08);
+  cursor: default;
+}
+.zoom button {
+  min-width: 32px;
+  height: 28px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    transform 120ms cubic-bezier(0.23, 1, 0.32, 1),
+    background-color 120ms ease;
+}
+.zoom button:active {
+  transform: scale(0.97);
+}
+@media (hover: hover) and (pointer: fine) {
+  .zoom button:hover {
+    background: var(--hover);
+  }
+}
+.zoom output {
+  min-width: 48px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: 12px;
+}

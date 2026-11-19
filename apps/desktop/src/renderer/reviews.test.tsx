@@ -296,7 +296,10 @@ it("distinguishes no followed repositories, no PRs needing review, and a failed 
   await user.click(screen.getByRole("button", { name: "Retry" }))
   ;(await next(lists.syncs)).answer(Effect.succeed(listings({})))
   await user.click(await screen.findByRole("link", { name: "Follow repositories" }))
-  await user.type(screen.getByRole("textbox", { name: "Repository" }), "octo-org/quiet{Enter}")
+  await user.type(
+    await screen.findByRole("textbox", { name: "Repository" }),
+    "octo-org/quiet{Enter}",
+  )
   await screen.findByRole("button", { name: "Unfollow octo-org/quiet" })
   lists.finish(Effect.succeed(needing(listed(quiet, []))))
   await user.click(screen.getByRole("link", { name: "Reviews" }))

@@ -1,6 +1,7 @@
 import { assert, it } from "@effect/vitest"
 import {
   AllowRequest,
+  BackgroundWorkEnded,
   AnswerQuestion,
   DenyRequest,
   Image,
@@ -18,6 +19,8 @@ import {
   claudeSession,
   writeGreetPack,
   reviewBrief,
+  reviewDrafts,
+  assertSuggestedDrafts,
   run,
   writeGreeter,
   writeGreetSkill,
@@ -193,6 +196,57 @@ it.live("Steers a running Turn, showing the Steer where Claude Code takes it in"
   }).pipe(Effect.scoped),
 )
 
+it.live(
+  "shows a background subagent on its tool call until it finishes, then opens a Turn saying it finished",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* claudeSession("claude-background-agent")
+      const session = yield* f.open(conversationId)
+
+      yield* session.send(
+        "Use the Agent tool with run_in_background set to true to start a general-purpose subagent with this prompt: " +
+          "`Without using any tools, write out every number from 1 to 400, separated by spaces.` " +
+          "Then, without waiting for it, reply with exactly: STARTED. " +
+          "When its result comes back, reply with exactly: PONG",
+      )
+
+      const running = yield* f.untilActivity(
+        ({ backgroundToolCalls }) => backgroundToolCalls.length > 0,
+      )
+
+      const [started, woken] = yield* f.until(settled(2))
+
+      assert.deepStrictEqual(yield* f.statuses, [])
+
+      assert.deepStrictEqual(running.agentStatuses, [
+        "Running a subagent: general-purpose: Write numbers 1 to 400",
+      ])
+      assert.deepStrictEqual(
+        running.backgroundToolCalls,
+        started?.parts.flatMap((part) =>
+          Predicate.isTagged(part, "ToolCall") && part.name === "Agent" ? [part.toolCallId] : [],
+        ),
+      )
+      assert.deepStrictEqual(lastText(started), TextPart.make({ text: "STARTED" }))
+      assert.ok(woken, "Claude Code's own run never opened a Turn")
+      assert.equal(woken.message, "")
+      assert.deepStrictEqual(
+        woken.context,
+        BackgroundWorkEnded.make({
+          work: [
+            {
+              kind: "subagent",
+              description: "general-purpose: Write numbers 1 to 400",
+              outcome: "completed",
+            },
+          ],
+        }),
+      )
+      assert.deepStrictEqual(woken.ended?.ending, TurnDone.make({}))
+      assert.deepStrictEqual(lastText(woken), TextPart.make({ text: "PONG" }))
+    }).pipe(Effect.scoped),
+)
+
 it.live("continues a conversation when Claude Code starts again", () =>
   Effect.gen(function* () {
     const f = yield* claudeSession("claude-resume")
@@ -284,8 +338,10 @@ it.live("runs the next Turn in a newly chosen Permission mode", () =>
     yield* session.answer(request.requestId, AllowRequest.make({}))
     yield* f.until(settled(1))
 
-    yield* session.configure({ permissionMode: "bypassPermissions" })
-    yield* session.send(run("Bash", "touch second.txt", "DONE"))
+    yield* session.configure({ permissionMode: "acceptEdits" })
+    yield* session.send(
+      "Use the Write tool to create second.txt containing `second`, then reply with exactly: DONE",
+    )
     const [, second] = yield* f.until(settled(2))
 
     assert.deepStrictEqual(second?.ended?.ending, TurnDone.make({}))
@@ -302,7 +358,14 @@ it.live(
       const session = yield* f.open(conversationId, ReviewRole.make({ brief: reviewBrief }))
 
       yield* session.send(
-        'Run `cat greet.ts` with the Bash tool. Then call the suggest_draft tool exactly twice, one call after the other: first with path greet.ts, side new, line 2, and body "Keep the name."; then with path greet.ts, side new, line 40, and body "Off the diff.". Then reply with exactly: DONE',
+        "Run `cat greet.ts` with the Bash tool. Then call the suggest_draft tool once for each of these drafts, one call after the other: " +
+          reviewDrafts
+            .map(
+              ({ draft: { path, side, line, body } }) =>
+                `path ${path}, side ${side}, line ${line}, body ${JSON.stringify(body)}`,
+            )
+            .join("; then ") +
+          ". Then reply with exactly: DONE",
       )
       const [turn] = yield* f.until(settled(1))
       assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
@@ -317,16 +380,7 @@ it.live(
       assert.include(calls.find(({ name }) => name === "Bash")?.output, "hello name")
 
       const suggestions = calls.filter(({ name }) => name === "suggest_draft")
-      assert.deepStrictEqual(
-        suggestions.map(({ status }) => status),
-        ["done", "failed"],
-      )
-      assert.deepStrictEqual(acceptedSuggestedDraftOf(suggestions[0]!), {
-        path: "greet.ts",
-        side: "new",
-        line: 2,
-        body: "Keep the name.",
-      })
-      assert.include(suggestions[1]?.output, "not a line of the diff")
+      assertSuggestedDrafts(suggestions)
+      assert.deepStrictEqual(acceptedSuggestedDraftOf(suggestions[0]!), reviewDrafts[0]?.draft)
     }).pipe(Effect.scoped),
 )

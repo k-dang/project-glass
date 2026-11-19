@@ -27,7 +27,7 @@ import { Trace, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace"
 import {
   conversationsAtom,
   agentModelsAtom,
-  writtenAtom,
+  newConversationWrittenAtom,
   createConversationAtom,
   linkCheckoutAtom,
   localCheckoutsAtom,
@@ -55,8 +55,6 @@ import { ProblemAlert } from "./ProblemAlert"
 import { problemOf, settledProblem } from "./problems"
 import { useSkillChoice } from "./skillChoice"
 import { LocalSkillsToggle, SharedSkillNames, SkillPackPicker } from "./SkillPackPicker"
-
-const NEW_AGENT_TEXT = "new"
 
 type HarnessChoice = {
   readonly harness: AgentHarness
@@ -281,7 +279,7 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
   const navigate = useNavigate()
   const folder = useChooseFolder()
   const PlaceIcon = placeIcons[where.place._tag]
-  const [written, setWritten] = useAtom(writtenAtom(NEW_AGENT_TEXT))
+  const [written, setWritten] = useAtom(newConversationWrittenAtom)
   const composed = written ?? nothingUnsent
 
   const find = (key: string | undefined) =>

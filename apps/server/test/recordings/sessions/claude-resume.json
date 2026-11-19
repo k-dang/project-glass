@@ -10,7 +10,6 @@
         "--input-format",
         "stream-json",
         "--permission-prompt-tool=stdio",
-        "--allowedTools=mcp__glass__draw_diagram",
         "--allow-dangerously-skip-permissions",
         "--include-partial-messages",
         "--session-id=6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
@@ -19,7 +18,7 @@
       "frames": [
         {
           "out": {
-            "request_id": "9zxdfzyr9c",
+            "request_id": "gxzsyrqg1xk",
             "type": "control_request",
             "request": {
               "subtype": "initialize",
@@ -79,7 +78,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "9zxdfzyr9c",
+              "request_id": "gxzsyrqg1xk",
               "response": {
                 "commands": [
                   {
@@ -149,13 +148,6 @@
                     "description": "Run a prompt or slash command on a recurring interval (e.g. /loop 5m /foo). Omit the interval to let the model self-pace.",
                     "argumentHint": "[interval] [prompt]",
                     "aliases": ["proactive"],
-                    "builtin": true
-                  },
-                  {
-                    "name": "schedule",
-                    "description": "Create, update, list, or run scheduled cloud agents (routines) that execute on a cron schedule.",
-                    "argumentHint": "",
-                    "aliases": ["routines"],
                     "builtin": true
                   },
                   {
@@ -366,11 +358,6 @@
                   {
                     "name": "claude",
                     "description": "Catch-all for any task that doesn't fit a more specific agent. FleetView's default when no agent name is typed."
-                  },
-                  {
-                    "name": "claude-code-guide",
-                    "description": "Use this agent when the user asks questions (\"Can Claude...\", \"Does Claude...\", \"How do I...\") about: (1) Claude Code (the CLI tool) - features, hooks, slash commands, MCP servers, settings, IDE integrations, keyboard shortcuts; (2) Claude Agent SDK - building custom agents; (3) Claude API (formerly Anthropic API) - Messages API for directly passing messages to Claude, Tool Runner (`client.beta.messages.tool_runner`) for running an agentic loop over your own tools, manual tool-use loops, Managed Agents for server-hosted agents with a managed sandbox, prompt caching, and general Anthropic SDK usage; (4) Claude Tag (Claude in Slack) - what it is, setting it up for a Slack workspace, `/install-slack-app`; (5) `claude plugin eval` (writing and running plugin eval suites, its JSON/report, sandbox, CI) and the `/skill-doctor` report. **IMPORTANT:** Before spawning a new agent, check if there is already a running or recently completed claude-code-guide agent that you can continue via SendMessage.",
-                    "model": "haiku"
                   },
                   {
                     "name": "Explore",
@@ -500,7 +487,7 @@
               "content": "Remember the word lantern. Reply with exactly: Noted."
             },
             "parent_tool_use_id": null,
-            "uuid": "8ba7b322-d6ce-4d0f-9db3-073ccb625b0a"
+            "uuid": "eb82edf8-dd5a-45b6-a497-bdd05ae28952"
           }
         },
         {
@@ -509,25 +496,25 @@
             "subtype": "session_state_changed",
             "state": "running",
             "sdk_host_only": true,
-            "uuid": "24791c9f-ff4d-431e-9122-429e76f48f4a",
+            "uuid": "0c1dcf0f-237d-45a1-a92b-133795825ee2",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "8ba7b322-d6ce-4d0f-9db3-073ccb625b0a",
+            "command_uuid": "eb82edf8-dd5a-45b6-a497-bdd05ae28952",
             "state": "queued",
-            "uuid": "40f6fc61-3038-40a8-b712-b06c7ccd045e",
+            "uuid": "c6315f22-e41e-4e21-a1e2-2646643be7e8",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "8ba7b322-d6ce-4d0f-9db3-073ccb625b0a",
+            "command_uuid": "eb82edf8-dd5a-45b6-a497-bdd05ae28952",
             "state": "started",
-            "uuid": "6c0451bf-40d1-45c8-b864-f2ee1662663d",
+            "uuid": "f461a0a6-a62b-4206-94b3-4a9829f14767",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -549,13 +536,10 @@
               "EnterWorktree",
               "ExitPlanMode",
               "ExitWorktree",
-              "Glob",
-              "Grep",
               "ListAgents",
               "Monitor",
               "NotebookEdit",
               "Read",
-              "RemoteTrigger",
               "ReportFindings",
               "ScheduleWakeup",
               "SendMessage",
@@ -589,7 +573,6 @@
               "fewer-permission-prompts",
               "doctor",
               "loop",
-              "schedule",
               "claude-api",
               "workflow-authoring",
               "run",
@@ -628,14 +611,7 @@
             "apiKeySource": "<redacted>",
             "claude_code_version": "2.1.322",
             "output_style": "<redacted>",
-            "agents": [
-              "claude",
-              "claude-code-guide",
-              "Explore",
-              "general-purpose",
-              "Plan",
-              "statusline-setup"
-            ],
+            "agents": ["claude", "Explore", "general-purpose", "Plan", "statusline-setup"],
             "skills": [
               "deep-research",
               "dataviz",
@@ -648,7 +624,6 @@
               "fewer-permission-prompts",
               "doctor",
               "loop",
-              "schedule",
               "claude-api",
               "workflow-authoring",
               "run",
@@ -656,6 +631,11 @@
               "plugin-authoring"
             ],
             "plugins": [
+              {
+                "name": "cc-plugin-sec-default",
+                "path": "builtin",
+                "source": "cc-plugin-sec-default@builtin"
+              },
               {
                 "name": "cc-plugin-agents-md",
                 "path": "builtin",
@@ -690,22 +670,21 @@
               "mcp_call_check_permissions_v1"
             ],
             "analytics_disabled": true,
-            "product_feedback_disabled": false,
-            "uuid": "2c308ea8-f5fc-4fa6-b2cc-764151c3f431",
+            "product_feedback_disabled": true,
+            "uuid": "946daa6b-72e2-4040-be5c-80644d84cd24",
             "memory_paths": {
-              "auto": "<folder>/.claude/projects\\<folder>/memory\\"
+              "auto": "<folder>/.claude/projects/<folder>/memory/"
             },
             "original_cwd": "<folder>",
             "additional_directories": [],
-            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-f5635d83b5ac792633767858176e036d",
+            "messaging_socket_path": "/tmp/cc-socks/71237.sock",
             "fast_mode_state": "off",
             "fast_mode_disabled_reason": "sdk_opt_in_required",
             "per_turn_effort_active": true,
             "ultrathink_available": false,
             "ultrathink_typed_raises": false,
             "view_mode": "default",
-            "powershell_path": "<home>/AppData/Local/Programs/PowerShell/7/pwsh.exe",
-            "user_message_uuids": ["8ba7b322-d6ce-4d0f-9db3-073ccb625b0a"]
+            "user_message_uuids": ["eb82edf8-dd5a-45b6-a497-bdd05ae28952"]
           }
         },
         {
@@ -714,8 +693,8 @@
             "subtype": "status",
             "status": "requesting",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "f17bc91f-7912-4fae-9800-df507ed0595f",
-            "user_message_uuids": ["8ba7b322-d6ce-4d0f-9db3-073ccb625b0a"]
+            "uuid": "ee0c209a-9d26-4b6f-9d83-4581ec865f49",
+            "user_message_uuids": ["eb82edf8-dd5a-45b6-a497-bdd05ae28952"]
           }
         },
         {
@@ -725,7 +704,7 @@
               "type": "message_start",
               "message": {
                 "model": "claude-haiku-5-5",
-                "id": "msg_011Ch63W9SP5dM1fWUEN4PZH",
+                "id": "msg_011ChAv3foh9ZdkHGLfXr9wK",
                 "type": "message",
                 "role": "assistant",
                 "content": [],
@@ -753,12 +732,12 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "546f6b42-d436-4d23-a4b9-3b24b7727390",
-            "ttft_ms": 634,
+            "uuid": "455f9824-bae9-4b4e-aeb8-bdc393ff6596",
+            "ttft_ms": 661,
             "thinking_display": "updates",
-            "api_message_id": "msg_011Ch63W9SP5dM1fWUEN4PZH",
-            "user_message_uuid": "8ba7b322-d6ce-4d0f-9db3-073ccb625b0a",
-            "user_message_uuids": ["8ba7b322-d6ce-4d0f-9db3-073ccb625b0a"]
+            "api_message_id": "msg_011ChAv3foh9ZdkHGLfXr9wK",
+            "user_message_uuid": "eb82edf8-dd5a-45b6-a497-bdd05ae28952",
+            "user_message_uuids": ["eb82edf8-dd5a-45b6-a497-bdd05ae28952"]
           }
         },
         {
@@ -774,8 +753,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "4dc69e39-c2ea-4863-b0c5-327b22199ca1",
-            "api_message_id": "msg_011Ch63W9SP5dM1fWUEN4PZH"
+            "uuid": "04e55f83-5021-4271-a84e-bb3a84d8944d",
+            "api_message_id": "msg_011ChAv3foh9ZdkHGLfXr9wK"
           }
         },
         {
@@ -791,8 +770,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "4b104471-0dd7-4a49-ac48-71c4f4b5574e",
-            "api_message_id": "msg_011Ch63W9SP5dM1fWUEN4PZH"
+            "uuid": "cfa78e0d-2404-4d03-aa4a-b2815d8d4ae9",
+            "api_message_id": "msg_011ChAv3foh9ZdkHGLfXr9wK"
           }
         },
         {
@@ -800,7 +779,7 @@
             "type": "assistant",
             "message": {
               "model": "claude-haiku-5-5",
-              "id": "msg_011Ch63W9SP5dM1fWUEN4PZH",
+              "id": "msg_011ChAv3foh9ZdkHGLfXr9wK",
               "type": "message",
               "role": "assistant",
               "content": [
@@ -832,11 +811,11 @@
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "6ce6f759-3a97-40b1-8129-00d16c10139d",
-            "timestamp": "2026-11-16T05:20:08.807Z",
-            "request_id": "req_011Ch63W9EUEMCjNdr1i8b4w",
-            "user_message_uuid": "8ba7b322-d6ce-4d0f-9db3-073ccb625b0a",
-            "user_message_uuids": ["8ba7b322-d6ce-4d0f-9db3-073ccb625b0a"]
+            "uuid": "79a9fd47-9680-4a9e-b20b-d78a6c698812",
+            "timestamp": "2026-11-18T19:05:19.592Z",
+            "request_id": "req_011ChAv3f5XqZsTJ5kh9ysHk",
+            "user_message_uuid": "eb82edf8-dd5a-45b6-a497-bdd05ae28952",
+            "user_message_uuids": ["eb82edf8-dd5a-45b6-a497-bdd05ae28952"]
           }
         },
         {
@@ -848,8 +827,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "3ae5cae9-52f4-42c6-87db-c258ebd68f4f",
-            "api_message_id": "msg_011Ch63W9SP5dM1fWUEN4PZH"
+            "uuid": "3c251d63-4b1d-4b0d-a0c8-74654da55bfb",
+            "api_message_id": "msg_011ChAv3foh9ZdkHGLfXr9wK"
           }
         },
         {
@@ -878,8 +857,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "d716d1ba-393b-41ff-9e61-8295a7cc8630",
-            "api_message_id": "msg_011Ch63W9SP5dM1fWUEN4PZH"
+            "uuid": "68b43486-b112-442c-9707-dc5dd2fc3a82",
+            "api_message_id": "msg_011ChAv3foh9ZdkHGLfXr9wK"
           }
         },
         {
@@ -890,21 +869,21 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "685a1344-5fea-4ffe-bc4f-bd97ce9e8a73",
-            "api_message_id": "msg_011Ch63W9SP5dM1fWUEN4PZH"
+            "uuid": "18f15ad0-65aa-4797-a6e6-1b7f036b72e8",
+            "api_message_id": "msg_011ChAv3foh9ZdkHGLfXr9wK"
           }
         },
         {
           "in": {
             "type": "rate_limit_event",
             "rate_limit_info": "<redacted>",
-            "uuid": "8b9cf971-114b-4665-99e3-40f87f14530c",
+            "uuid": "6851539a-b8bc-4dde-aca4-a3fb7f41cbd6",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
-            "duration_api_ms": 643,
+            "duration_api_ms": 671,
             "stop_reason": "end_turn",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "total_cost_usd": 0,
@@ -982,18 +961,18 @@
             "subtype": "success",
             "api_error_status": null,
             "result": "Noted.",
-            "ttft_ms": 714,
+            "ttft_ms": 773,
             "type": "result",
-            "duration_ms": 721,
-            "uuid": "055f84ba-7a40-46f1-86f7-1c139088896c",
-            "ttft_stream_ms": 712,
-            "time_to_request_ms": 81,
-            "first_content_frame_ms": 713,
-            "user_message_uuid": "8ba7b322-d6ce-4d0f-9db3-073ccb625b0a",
-            "user_message_uuids": ["8ba7b322-d6ce-4d0f-9db3-073ccb625b0a"],
-            "request_sent_wall_ms": 1794806408175,
+            "duration_ms": 793,
+            "uuid": "e0487ebf-a699-4ee7-bc75-24100d3d0657",
+            "ttft_stream_ms": 772,
+            "time_to_request_ms": 181,
+            "first_content_frame_ms": 773,
+            "user_message_uuid": "eb82edf8-dd5a-45b6-a497-bdd05ae28952",
+            "user_message_uuids": ["eb82edf8-dd5a-45b6-a497-bdd05ae28952"],
+            "request_sent_wall_ms": 1795028719000,
             "first_request_input_tokens": 0,
-            "first_request_cache_read_input_tokens": 14807,
+            "first_request_cache_read_input_tokens": 12935,
             "queued_turn_count": 0,
             "result_index": 0,
             "model_usage_since_last_result": {
@@ -1019,9 +998,9 @@
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "8ba7b322-d6ce-4d0f-9db3-073ccb625b0a",
+            "command_uuid": "eb82edf8-dd5a-45b6-a497-bdd05ae28952",
             "state": "completed",
-            "uuid": "5c7a329b-e11b-43e0-9234-ad170cd84898",
+            "uuid": "4a2ebe5f-16e7-4902-ba1e-cd639ee14789",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1031,7 +1010,7 @@
             "subtype": "session_state_changed",
             "state": "idle",
             "sdk_host_only": true,
-            "uuid": "5e651dc9-858e-466c-ad79-bef295c39cb4",
+            "uuid": "63f7e246-5068-40a9-9bcd-8579caead4ee",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1049,7 +1028,6 @@
         "stream-json",
         "--permission-prompt-tool=stdio",
         "--resume=6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-        "--allowedTools=mcp__glass__draw_diagram",
         "--allow-dangerously-skip-permissions",
         "--include-partial-messages"
       ],
@@ -1057,7 +1035,7 @@
       "frames": [
         {
           "out": {
-            "request_id": "21eylak5cwa",
+            "request_id": "dd625yyx6pl",
             "type": "control_request",
             "request": {
               "subtype": "initialize",
@@ -1117,7 +1095,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "21eylak5cwa",
+              "request_id": "dd625yyx6pl",
               "response": {
                 "commands": [
                   {
@@ -1187,13 +1165,6 @@
                     "description": "Run a prompt or slash command on a recurring interval (e.g. /loop 5m /foo). Omit the interval to let the model self-pace.",
                     "argumentHint": "[interval] [prompt]",
                     "aliases": ["proactive"],
-                    "builtin": true
-                  },
-                  {
-                    "name": "schedule",
-                    "description": "Create, update, list, or run scheduled cloud agents (routines) that execute on a cron schedule.",
-                    "argumentHint": "",
-                    "aliases": ["routines"],
                     "builtin": true
                   },
                   {
@@ -1406,11 +1377,6 @@
                     "description": "Catch-all for any task that doesn't fit a more specific agent. FleetView's default when no agent name is typed."
                   },
                   {
-                    "name": "claude-code-guide",
-                    "description": "Use this agent when the user asks questions (\"Can Claude...\", \"Does Claude...\", \"How do I...\") about: (1) Claude Code (the CLI tool) - features, hooks, slash commands, MCP servers, settings, IDE integrations, keyboard shortcuts; (2) Claude Agent SDK - building custom agents; (3) Claude API (formerly Anthropic API) - Messages API for directly passing messages to Claude, Tool Runner (`client.beta.messages.tool_runner`) for running an agentic loop over your own tools, manual tool-use loops, Managed Agents for server-hosted agents with a managed sandbox, prompt caching, and general Anthropic SDK usage; (4) Claude Tag (Claude in Slack) - what it is, setting it up for a Slack workspace, `/install-slack-app`; (5) `claude plugin eval` (writing and running plugin eval suites, its JSON/report, sandbox, CI) and the `/skill-doctor` report. **IMPORTANT:** Before spawning a new agent, check if there is already a running or recently completed claude-code-guide agent that you can continue via SendMessage.",
-                    "model": "haiku"
-                  },
-                  {
                     "name": "Explore",
                     "description": "Fast read-only search agent for locating code. Use it to find files by pattern (eg. \"src/components/**/*.tsx\"), grep for symbols or keywords (eg. \"API endpoints\"), or answer \"where is X defined / which files reference Y.\" Do NOT use it for code review, design-doc auditing, cross-file consistency checks, or open-ended analysis — it reads excerpts rather than whole files and will miss content past its read window. When calling, specify search breadth: \"quick\" for a single targeted lookup, \"medium\" for moderate exploration, or \"very thorough\" to search across multiple locations and naming conventions.",
                     "model": "inherit"
@@ -1538,7 +1504,7 @@
               "content": "Which word did I ask you to remember? Reply with only that word, in lowercase."
             },
             "parent_tool_use_id": null,
-            "uuid": "2a56038a-e046-46a0-8f2b-2795e78c5654"
+            "uuid": "a928d410-d7c2-403e-96b2-66ebb94a7b31"
           }
         },
         {
@@ -1547,25 +1513,25 @@
             "subtype": "session_state_changed",
             "state": "running",
             "sdk_host_only": true,
-            "uuid": "e147f1a5-1b87-4499-82e5-4a91b3955591",
+            "uuid": "dae91c39-161f-4a09-85b4-1c03b9e94665",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "2a56038a-e046-46a0-8f2b-2795e78c5654",
+            "command_uuid": "a928d410-d7c2-403e-96b2-66ebb94a7b31",
             "state": "queued",
-            "uuid": "7b42a1f0-5d82-4663-a596-7587af376929",
+            "uuid": "81646402-564a-4ab4-9dcf-767d107c3511",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "2a56038a-e046-46a0-8f2b-2795e78c5654",
+            "command_uuid": "a928d410-d7c2-403e-96b2-66ebb94a7b31",
             "state": "started",
-            "uuid": "37e14ab3-49ba-4682-b255-25dbad59f86d",
+            "uuid": "0ebb4977-0691-49e1-baac-21430660b2f6",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1587,13 +1553,10 @@
               "EnterWorktree",
               "ExitPlanMode",
               "ExitWorktree",
-              "Glob",
-              "Grep",
               "ListAgents",
               "Monitor",
               "NotebookEdit",
               "Read",
-              "RemoteTrigger",
               "ReportFindings",
               "ScheduleWakeup",
               "SendMessage",
@@ -1627,7 +1590,6 @@
               "fewer-permission-prompts",
               "doctor",
               "loop",
-              "schedule",
               "claude-api",
               "workflow-authoring",
               "run",
@@ -1666,14 +1628,7 @@
             "apiKeySource": "<redacted>",
             "claude_code_version": "2.1.322",
             "output_style": "<redacted>",
-            "agents": [
-              "claude",
-              "claude-code-guide",
-              "Explore",
-              "general-purpose",
-              "Plan",
-              "statusline-setup"
-            ],
+            "agents": ["claude", "Explore", "general-purpose", "Plan", "statusline-setup"],
             "skills": [
               "deep-research",
               "dataviz",
@@ -1686,7 +1641,6 @@
               "fewer-permission-prompts",
               "doctor",
               "loop",
-              "schedule",
               "claude-api",
               "workflow-authoring",
               "run",
@@ -1694,6 +1648,11 @@
               "plugin-authoring"
             ],
             "plugins": [
+              {
+                "name": "cc-plugin-sec-default",
+                "path": "builtin",
+                "source": "cc-plugin-sec-default@builtin"
+              },
               {
                 "name": "cc-plugin-agents-md",
                 "path": "builtin",
@@ -1728,22 +1687,21 @@
               "mcp_call_check_permissions_v1"
             ],
             "analytics_disabled": true,
-            "product_feedback_disabled": false,
-            "uuid": "35981bda-a4d4-46f9-8ea0-b4a75eff302c",
+            "product_feedback_disabled": true,
+            "uuid": "c12a059e-c4d7-4cdc-bdca-a5dbbb62e640",
             "memory_paths": {
-              "auto": "<folder>/.claude/projects\\<folder>/memory\\"
+              "auto": "<folder>/.claude/projects/<folder>/memory/"
             },
             "original_cwd": "<folder>",
             "additional_directories": [],
-            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-01a32180606f1eadaf590bc55b7359a1",
+            "messaging_socket_path": "/tmp/cc-socks/71466.sock",
             "fast_mode_state": "off",
             "fast_mode_disabled_reason": "sdk_opt_in_required",
             "per_turn_effort_active": true,
             "ultrathink_available": false,
             "ultrathink_typed_raises": false,
             "view_mode": "default",
-            "powershell_path": "<home>/AppData/Local/Programs/PowerShell/7/pwsh.exe",
-            "user_message_uuids": ["2a56038a-e046-46a0-8f2b-2795e78c5654"]
+            "user_message_uuids": ["a928d410-d7c2-403e-96b2-66ebb94a7b31"]
           }
         },
         {
@@ -1752,8 +1710,8 @@
             "subtype": "status",
             "status": "requesting",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "7ed3da9d-2fa8-40e1-88f3-b0f9044093c0",
-            "user_message_uuids": ["2a56038a-e046-46a0-8f2b-2795e78c5654"]
+            "uuid": "d318d193-16a0-4a2b-8d5d-454569802c8c",
+            "user_message_uuids": ["a928d410-d7c2-403e-96b2-66ebb94a7b31"]
           }
         },
         {
@@ -1763,7 +1721,7 @@
               "type": "message_start",
               "message": {
                 "model": "claude-haiku-5-5",
-                "id": "msg_011Ch63WFM5JFVQNZ2XTTjo6",
+                "id": "msg_011ChAv3qCzv5sqipX2uQpS7",
                 "type": "message",
                 "role": "assistant",
                 "content": [],
@@ -1788,7 +1746,7 @@
                 "diagnostics": {
                   "cache_miss_reason": {
                     "type": "messages_changed",
-                    "cache_missed_input_tokens": 4623
+                    "cache_missed_input_tokens": 3433
                   }
                 },
                 "context_management": null
@@ -1796,12 +1754,12 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "c77a4ba2-71ad-4c08-8b94-61ef41fe75a3",
-            "ttft_ms": 629,
+            "uuid": "2798772b-0c5a-4dbe-a0dc-508aa6f832ba",
+            "ttft_ms": 515,
             "thinking_display": "updates",
-            "api_message_id": "msg_011Ch63WFM5JFVQNZ2XTTjo6",
-            "user_message_uuid": "2a56038a-e046-46a0-8f2b-2795e78c5654",
-            "user_message_uuids": ["2a56038a-e046-46a0-8f2b-2795e78c5654"]
+            "api_message_id": "msg_011ChAv3qCzv5sqipX2uQpS7",
+            "user_message_uuid": "a928d410-d7c2-403e-96b2-66ebb94a7b31",
+            "user_message_uuids": ["a928d410-d7c2-403e-96b2-66ebb94a7b31"]
           }
         },
         {
@@ -1817,8 +1775,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "9562df77-e0ab-4b80-9287-e61c3ccfa03c",
-            "api_message_id": "msg_011Ch63WFM5JFVQNZ2XTTjo6"
+            "uuid": "d5c15743-5c2f-49d2-b57b-6789af660c45",
+            "api_message_id": "msg_011ChAv3qCzv5sqipX2uQpS7"
           }
         },
         {
@@ -1834,8 +1792,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "2901ecbe-8f4e-4a34-a348-647ae40c8868",
-            "api_message_id": "msg_011Ch63WFM5JFVQNZ2XTTjo6"
+            "uuid": "2b8455b9-f7dc-4936-8ad6-e552ef1f032d",
+            "api_message_id": "msg_011ChAv3qCzv5sqipX2uQpS7"
           }
         },
         {
@@ -1843,7 +1801,7 @@
             "type": "assistant",
             "message": {
               "model": "claude-haiku-5-5",
-              "id": "msg_011Ch63WFM5JFVQNZ2XTTjo6",
+              "id": "msg_011ChAv3qCzv5sqipX2uQpS7",
               "type": "message",
               "role": "assistant",
               "content": [
@@ -1873,18 +1831,18 @@
               "diagnostics": {
                 "cache_miss_reason": {
                   "type": "messages_changed",
-                  "cache_missed_input_tokens": 4623
+                  "cache_missed_input_tokens": 3433
                 }
               },
               "context_management": null
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "0518893e-3edc-46c6-abbe-787d6a815340",
-            "timestamp": "2026-11-16T05:20:10.171Z",
-            "request_id": "req_011Ch63WF9B92ijzYZG7TdiF",
-            "user_message_uuid": "2a56038a-e046-46a0-8f2b-2795e78c5654",
-            "user_message_uuids": ["2a56038a-e046-46a0-8f2b-2795e78c5654"]
+            "uuid": "9627ff8f-c31e-42d9-8714-baf5a71fa3c2",
+            "timestamp": "2026-11-18T19:05:21.788Z",
+            "request_id": "req_011ChAv3pqRhPefraQtv4tCb",
+            "user_message_uuid": "a928d410-d7c2-403e-96b2-66ebb94a7b31",
+            "user_message_uuids": ["a928d410-d7c2-403e-96b2-66ebb94a7b31"]
           }
         },
         {
@@ -1896,8 +1854,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "13eb5cff-8aa0-443a-b9ae-afc625f236d0",
-            "api_message_id": "msg_011Ch63WFM5JFVQNZ2XTTjo6"
+            "uuid": "f85c03d3-7ec6-4db8-b25d-19c0117dc42a",
+            "api_message_id": "msg_011ChAv3qCzv5sqipX2uQpS7"
           }
         },
         {
@@ -1926,8 +1884,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "12f405f1-9e5b-440e-a32e-8bea1f7ec2cd",
-            "api_message_id": "msg_011Ch63WFM5JFVQNZ2XTTjo6"
+            "uuid": "23993ec1-122a-4ac8-ba1a-e028f31fcffb",
+            "api_message_id": "msg_011ChAv3qCzv5sqipX2uQpS7"
           }
         },
         {
@@ -1938,21 +1896,21 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "e5452a98-dcfa-4254-b0a5-ec2b0e357a7e",
-            "api_message_id": "msg_011Ch63WFM5JFVQNZ2XTTjo6"
+            "uuid": "28e76c75-93ae-458e-b764-e56dac068dd3",
+            "api_message_id": "msg_011ChAv3qCzv5sqipX2uQpS7"
           }
         },
         {
           "in": {
             "type": "rate_limit_event",
             "rate_limit_info": "<redacted>",
-            "uuid": "7e1f614a-8e8c-430d-af4f-72526683f04f",
+            "uuid": "446e4953-9766-4527-b951-97cd3c53d80c",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
-            "duration_api_ms": 1286,
+            "duration_api_ms": 1214,
             "stop_reason": "end_turn",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "total_cost_usd": 0,
@@ -2030,18 +1988,18 @@
             "subtype": "success",
             "api_error_status": null,
             "result": "lantern",
-            "ttft_ms": 720,
+            "ttft_ms": 652,
             "type": "result",
-            "duration_ms": 730,
-            "uuid": "1f076bd7-8c68-4fb3-91a5-c840f1af0664",
-            "ttft_stream_ms": 718,
-            "time_to_request_ms": 91,
-            "first_content_frame_ms": 719,
-            "user_message_uuid": "2a56038a-e046-46a0-8f2b-2795e78c5654",
-            "user_message_uuids": ["2a56038a-e046-46a0-8f2b-2795e78c5654"],
-            "request_sent_wall_ms": 1794806409543,
+            "duration_ms": 674,
+            "uuid": "5cf3e9a9-c725-44a0-9ade-88e00e2f747b",
+            "ttft_stream_ms": 651,
+            "time_to_request_ms": 138,
+            "first_content_frame_ms": 652,
+            "user_message_uuid": "a928d410-d7c2-403e-96b2-66ebb94a7b31",
+            "user_message_uuids": ["a928d410-d7c2-403e-96b2-66ebb94a7b31"],
+            "request_sent_wall_ms": 1795028721273,
             "first_request_input_tokens": 0,
-            "first_request_cache_read_input_tokens": 18077,
+            "first_request_cache_read_input_tokens": 15545,
             "queued_turn_count": 0,
             "result_index": 0,
             "model_usage_since_last_result": {
@@ -2067,9 +2025,9 @@
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "2a56038a-e046-46a0-8f2b-2795e78c5654",
+            "command_uuid": "a928d410-d7c2-403e-96b2-66ebb94a7b31",
             "state": "completed",
-            "uuid": "9192fda8-d5f1-4a1e-9892-37f34727d84e",
+            "uuid": "635409c8-7cd2-453a-bb7f-6f92e4ba783c",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -2079,7 +2037,7 @@
             "subtype": "session_state_changed",
             "state": "idle",
             "sdk_host_only": true,
-            "uuid": "42697bbd-5456-4561-a6c3-c8835a7af37b",
+            "uuid": "b1eac930-8573-43ad-9945-02bc7596ce27",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -2105,12 +2063,12 @@
       "info": {
         "sessionId": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
         "summary": "Remember the word lantern. Reply with exactly: Noted.",
-        "lastModified": 1794806408838,
-        "fileSize": 177581,
+        "lastModified": 1795028719622,
+        "fileSize": 155390,
         "firstPrompt": "Remember the word lantern. Reply with exactly: Noted.",
         "gitBranch": "HEAD",
         "cwd": "<folder>",
-        "createdAt": 1794806408086
+        "createdAt": 1795028718770
       }
     }
   ]

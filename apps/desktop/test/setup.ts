@@ -19,3 +19,10 @@ if ("document" in globalThis && !("startViewTransition" in document))
       }
     },
   })
+
+// happy-dom has no idle callbacks; run them on the next task.
+if (!("requestIdleCallback" in globalThis)) {
+  globalThis.requestIdleCallback = (callback) =>
+    window.setTimeout(() => callback({ didTimeout: false, timeRemaining: () => 0 }))
+  globalThis.cancelIdleCallback = (handle) => window.clearTimeout(handle)
+}

@@ -1,11 +1,15 @@
 import { getSessionInfo, query } from "@anthropic-ai/claude-agent-sdk"
 import {
   type AgentEvent,
+  type AgentHarness,
+  AgentStatusesChanged,
   applyConversationEvent,
   type Image,
   isWaiting,
   type RequestAnswer,
   type RequestPart,
+  type SuggestedDraft,
+  ToolCallPart,
   type Turn,
   TurnStarted,
 } from "@glass/contracts"
@@ -24,9 +28,8 @@ import {
 } from "effect"
 import { McpServer, Tool, Toolkit } from "effect/ai"
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
-import { homedir } from "node:os"
 import { join } from "node:path"
-import { vi } from "vite-plus/test"
+import { assert, vi } from "vite-plus/test"
 import type { HarnessAdapter, HarnessSession } from "../src/agentHost/adapter"
 import { claudeAdapter, type ClaudeSdk } from "../src/agentHost/claudeAdapter"
 import { piAdapter } from "../src/agentHost/piAdapter"
@@ -47,8 +50,10 @@ import { startFakeGitHub } from "./fakeGitHub"
 import { VIEWER } from "./fakePullRequest"
 import { isolatedHome, startBackend, stubHome } from "./harness"
 import { PI_MODEL, PI_PROVIDER, type PiSettings, writePiLogin, writePiSettings } from "./piLogin"
+import { realHome } from "./isolateHome"
 import { claudeLoginEnvironment, pinnedClaude, pinnedClaudeProgram } from "./pinnedClaude"
 import { writeSentSkills } from "../src/agentHost/sentSkills"
+import { ReplayedTranscript } from "./replayedConversations"
 import { recordingSessions, sessionTape } from "./sessionTape"
 
 export const run = (tool: string, command: string, reply: string) =>
@@ -73,7 +78,11 @@ export const waiting = (turns: ReadonlyArray<Turn>) =>
 
 type Work = typeof WorkRole.Type
 
+const transcriptsDirectory = process.env["GLASS_TRANSCRIPTS_DIR"]
+
 const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
+  scenario: string,
+  harness: AgentHarness,
   adapter: HarnessAdapter<Role | Work>,
   tape: ReturnType<typeof sessionTape>,
   folder: string,
@@ -82,17 +91,34 @@ const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
   yield* Effect.addFinalizer(() => tape.finish)
   const turns = yield* SubscriptionRef.make<ReadonlyArray<Turn>>([])
   const events: Array<AgentEvent> = []
-  const statuses = yield* SubscriptionRef.make<ReadonlyArray<string>>([])
+  const activity = yield* SubscriptionRef.make(AgentStatusesChanged.make({ agentStatuses: [] }))
+  const reported: Array<HostEvent> = []
+
+  if (transcriptsDirectory !== undefined)
+    yield* Effect.addFinalizer(() =>
+      Effect.sync(() => {
+        mkdirSync(transcriptsDirectory, { recursive: true })
+        writeFileSync(
+          join(transcriptsDirectory, `${scenario}.json`),
+          Schema.encodeSync(ReplayedTranscript)({ harness, events: reported }),
+        )
+      }),
+    )
+
   let nextTurn = 0
 
   const report = (event: HostEvent) =>
-    Predicate.isTagged(event, "ExtensionStatusesChanged")
-      ? SubscriptionRef.set(statuses, event.extensionStatuses)
-      : Effect.sync(() => events.push(event)).pipe(
-          Effect.andThen(
-            SubscriptionRef.update(turns, (current) => applyConversationEvent(current, event)),
-          ),
-        )
+    Effect.sync(() => reported.push(event)).pipe(
+      Effect.andThen(
+        Predicate.isTagged(event, "AgentStatusesChanged")
+          ? SubscriptionRef.set(activity, event)
+          : Effect.sync(() => events.push(event)).pipe(
+              Effect.andThen(
+                SubscriptionRef.update(turns, (current) => applyConversationEvent(current, event)),
+              ),
+            ),
+      ),
+    )
 
   const until = (holds: (current: ReadonlyArray<Turn>) => boolean) =>
     SubscriptionRef.changes(turns).pipe(
@@ -102,8 +128,8 @@ const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
       Effect.raceFirst(tape.mismatch),
     )
 
-  const untilStatuses = (holds: (current: ReadonlyArray<string>) => boolean) =>
-    SubscriptionRef.changes(statuses).pipe(
+  const untilActivity = (holds: (current: AgentStatusesChanged) => boolean) =>
+    SubscriptionRef.changes(activity).pipe(
       Stream.filter(holds),
       Stream.runHead,
       Effect.map(Option.getOrThrow),
@@ -148,9 +174,9 @@ const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
     folder,
     events,
     turns: SubscriptionRef.get(turns),
-    statuses: SubscriptionRef.get(statuses),
+    statuses: SubscriptionRef.get(activity).pipe(Effect.map(({ agentStatuses }) => agentStatuses)),
     until,
-    untilStatuses,
+    untilActivity,
     request,
     open,
   }
@@ -159,6 +185,37 @@ const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
 export const reviewBrief: ReviewBrief = {
   instructions: "You answer a reviewer's questions about a pull request that changes greet.ts.",
   diffLines: { old: {}, new: { "greet.ts": [1, 2] } },
+}
+
+export const reviewDrafts: ReadonlyArray<{
+  readonly draft: typeof SuggestedDraft.Encoded
+  readonly status: "done" | "failed"
+  readonly says: string
+}> = [
+  {
+    draft: { path: "greet.ts", side: "new", line: 2, body: "Keep the name." },
+    status: "done",
+    says: "Glass shows this Suggested draft",
+  },
+  {
+    draft: { path: "greet.ts", side: "new", line: 40, body: "Off the diff." },
+    status: "failed",
+    says: "not a line of the diff",
+  },
+  {
+    draft: { path: "greet.ts", side: "new", line: 1, body: " " },
+    status: "failed",
+    says: "length of at least 1",
+  },
+]
+
+export const assertSuggestedDrafts = (calls: ReadonlyArray<typeof ToolCallPart.Type>) => {
+  assert.lengthOf(calls, reviewDrafts.length)
+
+  reviewDrafts.forEach(({ status, says }, index) => {
+    assert.equal(calls[index]?.status, status)
+    assert.include(calls[index]?.output, says)
+  })
 }
 
 export const writeGreetSkill = (skills: string) =>
@@ -288,7 +345,9 @@ export const claudeSession = Effect.fnUntraced(function* (
       tape.sessionInfo(id, options?.dir, () => getSessionInfo(id, options)),
   }
 
-  return yield* drive(claudeAdapter(pinnedClaude(), sdk), tape, folder, { model: "haiku" })
+  return yield* drive(scenario, "claude-code", claudeAdapter(pinnedClaude(), sdk), tape, folder, {
+    model: "haiku",
+  })
 })
 
 const PROVIDER_CREDENTIAL = /^(AWS|GOOGLE|GCLOUD|AZURE|ANTHROPIC)_|_(API_KEY|TOKEN)$/
@@ -303,15 +362,15 @@ const CLOUD_LOGINS = {
 
 // pi may replace an OAuth refresh token while it runs, which voids the one in the real file.
 const lendPiLogin = Effect.fnUntraced(function* (home: string, apiKey: string | undefined) {
-  const real = process.env["PI_CODING_AGENT_DIR"] ?? join(homedir(), ".pi", "agent")
+  const real = process.env["PI_CODING_AGENT_DIR"] ?? join(realHome(), ".pi", "agent")
   const lent = join(home, ".pi", "agent")
 
   for (const file of PI_LOGIN_FILES)
     if (existsSync(join(real, file))) copyFileSync(join(real, file), join(lent, file))
 
   for (const [name, path] of Object.entries(CLOUD_LOGINS))
-    if (!process.env[name] && existsSync(join(homedir(), ...path)))
-      vi.stubEnv(name, join(homedir(), ...path))
+    if (!process.env[name] && existsSync(join(realHome(), ...path)))
+      vi.stubEnv(name, join(realHome(), ...path))
 
   if (apiKey !== undefined) {
     writePiLogin(home, PI_PROVIDER, apiKey)
@@ -383,5 +442,5 @@ export const piSession = Effect.fnUntraced(function* (
       writeFileSync(join(extensions, name), source)
     })
 
-  return { ...(yield* drive(adapter, tape, folder)), home, extension }
+  return { ...(yield* drive(scenario, "pi", adapter, tape, folder)), home, extension }
 })

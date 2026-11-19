@@ -41,6 +41,7 @@ export interface PlacedConversation {
 
 export interface Placed {
   readonly name: string
+  readonly branch: string
   readonly folder: string
   readonly discard: Effect.Effect<void>
 }

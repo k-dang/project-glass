@@ -9,6 +9,7 @@ import {
 import { type FileTreePreparedInput, prepareFileTreeInput } from "@pierre/trees"
 import { Match, Predicate } from "effect"
 import type { DraftView } from "./draftSync"
+import type { LineNotePlace } from "./lineNotePlace"
 
 export type LineNote =
   | { readonly type: "discussion"; readonly discussion: LineDiscussion }
@@ -151,29 +152,6 @@ export const groupByPath = <A>(values: ReadonlyArray<A>, pathOf: (value: A) => s
 
   return byPath
 }
-
-export interface LineNotePlace {
-  readonly key: string
-  readonly path: string
-  readonly side: DiffSide
-  readonly line: number
-}
-
-export const sameLineNotePlaces = (
-  previous: ReadonlyArray<LineNotePlace>,
-  next: ReadonlyArray<LineNotePlace>,
-) =>
-  previous.length === next.length &&
-  previous.every((place, index) => {
-    const other = next[index]!
-
-    return (
-      place.key === other.key &&
-      place.path === other.path &&
-      place.side === other.side &&
-      place.line === other.line
-    )
-  })
 
 export interface LineNotes {
   readonly discussions: ReadonlyArray<LineDiscussion>

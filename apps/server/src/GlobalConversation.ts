@@ -248,6 +248,12 @@ export class GlobalConversation extends Context.Service<
       const followSession = <A, E>(stream: (sessionId: string) => Stream.Stream<A, E>) =>
         SubscriptionRef.changes(session).pipe(Stream.switchMap(stream))
 
+      const dropSessionHoldingStaleCredential = host.resume.pipe(
+        Effect.flatMap(({ reattached }) =>
+          reattached ? currentSession.pipe(Effect.flatMap(stopProgram)) : Effect.void,
+        ),
+      )
+
       yield* turns.serve({
         claim: (conversationId) =>
           conversation.pipe(
@@ -256,7 +262,7 @@ export class GlobalConversation extends Context.Service<
             ),
           ),
         lost: (yield* host.subscribeStopped).pipe(Stream.mapEffect(() => currentSessions)),
-        interrupted: currentSessions,
+        interrupted: dropSessionHoldingStaleCredential.pipe(Effect.andThen(currentSessions)),
       })
 
       const changeModel = Effect.fn("GlobalConversation.changeModel")(function* (

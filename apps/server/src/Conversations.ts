@@ -1,7 +1,6 @@
 import {
   Conversation,
   ConversationBusy,
-  type ConversationSkillPack,
   type AgentHarness,
   ConversationError,
   type ConversationFile,
@@ -31,7 +30,6 @@ import {
   type RequestNotWaiting,
   type RequestWaiting,
   type Revision,
-  SandboxPlace,
   localPlace,
   type Transcript,
   type TranscriptUpdate,
@@ -58,6 +56,7 @@ import { SqlClient, type SqlError } from "effect/sql"
 import { randomUUID } from "node:crypto"
 import { changesId } from "./Changes"
 import { ActivityLog } from "./ActivityLog"
+import { conversationWith, decodeStored, sandboxProviderOf, toRow } from "./conversationRows"
 import { type ClaimedConversation, ConversationTurns } from "./ConversationTurns"
 import { conversationNotes, FeedbackNotes } from "./FeedbackNotes"
 import {
@@ -81,61 +80,11 @@ const changesOf = (files: ReadonlyArray<ChangedFile>) =>
     files,
   })
 
-const StoredConversation = Schema.Struct({
-  id: Conversation.fields.id,
-  name: Conversation.fields.name,
-  sandboxProvider: Schema.NullOr(Schema.String),
-  owner: FollowedRepository.fields.owner,
-  repo: FollowedRepository.fields.repo,
-  baseBranch: Conversation.fields.baseBranch,
-  harness: Conversation.fields.harness,
-  model: Conversation.fields.model,
-  effort: Conversation.fields.effort,
-  permissionMode: Conversation.fields.permissionMode,
-  localSkills: Schema.BooleanFromBit,
-  folder: Schema.String,
-  createdAt: Conversation.fields.createdAt,
-  forReview: Schema.BooleanFromBit,
-})
-
 const BriefJson = Schema.fromJsonString(ReviewBrief)
 
 const encodeBrief = Schema.encodeSync(BriefJson)
 
 const decodeBrief = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ brief: BriefJson })))
-
-const decodeStored = Schema.decodeUnknownEffect(Schema.Array(StoredConversation))
-
-const toRow = (
-  {
-    owner,
-    repo,
-    folder,
-    sandboxProvider,
-    forReview,
-    ...conversation
-  }: typeof StoredConversation.Type,
-  skillPacks: ReadonlyArray<ConversationSkillPack>,
-): PlacedConversation => ({
-  conversation: new Conversation({
-    ...conversation,
-    forReview,
-    skillPacks,
-    place:
-      sandboxProvider === null ? localPlace : SandboxPlace.make({ providerId: sandboxProvider }),
-    repository: new FollowedRepository({ owner, repo }),
-    sandbox: null,
-  }),
-  folder,
-  forReview,
-})
-
-const conversationWith = (conversation: Conversation, change: Partial<typeof Conversation.Type>) =>
-  // oxlint-disable-next-line typescript/no-misused-spread -- The fields go straight back into Conversation.
-  new Conversation({ ...conversation, ...change })
-
-const sandboxProviderOf = (place: ConversationPlace) =>
-  Predicate.isTagged(place, "sandbox") ? place.providerId : null
 
 const annotateConversation = ({ id, harness, model, place }: Conversation) =>
   annotateUnit({ conversation_id: id, harness, model, sandbox_provider: sandboxProviderOf(place) })
@@ -313,6 +262,13 @@ export class Conversations extends Context.Service<
     readonly remove: (
       conversationId: string,
     ) => Effect.Effect<void, ConversationNotFound | ConversationError>
+    /**
+     * Reads the branch a work Conversation's folder has checked out, since its agent may switch
+     * or rename it during a Turn. Succeeds with whether it could.
+     */
+    readonly followBranch: (
+      conversationId: string,
+    ) => Effect.Effect<boolean, ConversationNotFound | ConversationError>
   }
 >()("@glass/server/Conversations") {
   static readonly layer = Layer.effect(
@@ -332,7 +288,7 @@ export class Conversations extends Context.Service<
 
       const stored = yield* sql`
         SELECT id, name, sandbox_provider AS sandboxProvider, owner, repo, base_branch AS baseBranch,
-          harness, model, effort, permission_mode AS permissionMode, local_skills AS localSkills, folder,
+          branch, harness, model, effort, permission_mode AS permissionMode, local_skills AS localSkills, folder,
           created_at AS createdAt,
           review_brief IS NOT NULL AS forReview
         FROM conversation ORDER BY created_at
@@ -466,11 +422,53 @@ export class Conversations extends Context.Service<
             Effect.catchTag("ConversationNotFound", () => Effect.succeedNone),
           ),
         lost: Stream.merge(yield* localPlacement.subscribeLost, yield* sandboxes.subscribeLost),
-        interrupted: sandboxes.resume.pipe(
-          Effect.map((outlivedGlass) =>
-            stored.flatMap(({ id }) => (outlivedGlass.has(id) ? [] : [id])),
+        interrupted: Effect.all([sandboxes.resume, localPlacement.resume], {
+          concurrency: "unbounded",
+        }).pipe(
+          Effect.map(([inSandboxes, onThisDevice]) =>
+            stored.flatMap(({ id }) => (inSandboxes.has(id) || onThisDevice.has(id) ? [] : [id])),
           ),
         ),
+      })
+
+      const replace = (conversation: Conversation) =>
+        SubscriptionRef.update(rows, (current) =>
+          current.map((row) =>
+            row.conversation.id === conversation.id ? { ...row, conversation } : row,
+          ),
+        )
+
+      const followBranch = Effect.fn("Conversations.followBranch")(function* (
+        conversationId: string,
+      ) {
+        const row = yield* find(conversationId)
+
+        if (row.forReview) return false
+
+        const host = yield* placementOf(row).runningHost(row)
+
+        if (Option.isNone(host)) return false
+
+        const branch = yield* host.value
+          .CurrentBranch({ folder: row.folder })
+          .pipe(Effect.mapError(asConversationError))
+
+        if (branch !== row.conversation.branch)
+          yield* lock.withPermits(1)(
+            Effect.gen(function* () {
+              const found = yield* find(conversationId)
+
+              yield* sql`UPDATE conversation SET branch = ${branch} WHERE id = ${conversationId}`.pipe(
+                Effect.tapError((cause) =>
+                  Effect.logWarning("Couldn't save a Conversation's branch", cause),
+                ),
+                Effect.mapError(storageFailure),
+              )
+              yield* replace(conversationWith(found.conversation, { branch }))
+            }),
+          )
+
+        return true
       })
 
       const insert = (placed: PlacedConversation, first: MessageInput, purpose: Purpose) => {
@@ -498,6 +496,7 @@ export class Conversations extends Context.Service<
                 owner: repository.owner,
                 repo: repository.repo,
                 base_branch: conversation.baseBranch,
+                branch: conversation.branch,
                 harness: conversation.harness,
                 model: conversation.model,
                 effort: conversation.effort,
@@ -544,6 +543,7 @@ export class Conversations extends Context.Service<
           place: localPlace,
           repository: input.repository,
           baseBranch: input.revision.base,
+          branch: null,
           harness: input.harness,
           model: input.model,
           effort: null,
@@ -574,7 +574,7 @@ export class Conversations extends Context.Service<
               ? (input.permissionMode ?? defaultPermissionMode)
               : "bypassPermissions"
 
-        const { name, folder, discard } = yield* placement.place(repository, baseBranch)
+        const { name, branch, folder, discard } = yield* placement.place(repository, baseBranch)
 
         const conversation = new Conversation({
           id: randomUUID(),
@@ -582,6 +582,7 @@ export class Conversations extends Context.Service<
           place,
           repository,
           baseBranch,
+          branch,
           harness,
           model,
           effort,
@@ -746,11 +747,7 @@ export class Conversations extends Context.Service<
               ),
               Effect.mapError(storageFailure),
             )
-            yield* SubscriptionRef.update(rows, (current) =>
-              current.map((row) =>
-                row.conversation.id === conversationId ? { ...row, conversation } : row,
-              ),
-            )
+            yield* replace(conversation)
 
             return yield* withSandbox(conversation)
           }),
@@ -954,6 +951,7 @@ export class Conversations extends Context.Service<
             ),
           ),
         markTurnSeen: transcripts.markSeen,
+        followBranch,
         changeModel: update,
         changePermissionMode,
         answer,

@@ -3,7 +3,7 @@ import {
   ConversationError,
   type AgentEvent,
   endTurnEvents,
-  ExtensionStatusesChanged,
+  AgentStatusesChanged,
   FeedbackNote,
   isRequestPart,
   isWaiting,
@@ -60,6 +60,7 @@ import {
   stepConversation,
 } from "./conversationState"
 import type { HostEvent } from "./agentHost/protocol"
+import type { SavedThrough } from "./hostJournal"
 import { recordUnit } from "./wideEvents"
 
 const encodePart = Schema.encodeSync(Schema.fromJsonString(TurnPart))
@@ -236,7 +237,7 @@ const storageFailure = () =>
 const queuedAgain = (inputs: ReadonlyArray<MessageWithContext>): ReadonlyArray<QueuedMessage> =>
   inputs.map((input) => ({ ...input, feedback: [], id: randomUUID() }))
 
-type SavedEvent = Exclude<HostEvent, typeof ExtensionStatusesChanged.Type>
+type SavedEvent = Exclude<HostEvent, AgentStatusesChanged>
 
 export class Transcripts extends Context.Service<
   Transcripts,
@@ -244,7 +245,7 @@ export class Transcripts extends Context.Service<
     readonly save: (
       conversationId: string,
       events: ReadonlyArray<HostEvent>,
-      throughJournalEntry?: number,
+      journal?: SavedThrough,
     ) => Effect.Effect<void, ConversationError>
     readonly watch: (conversationId: string) => Stream.Stream<TranscriptUpdate, ConversationError>
     readonly read: (
@@ -325,20 +326,20 @@ export class Transcripts extends Context.Service<
       const published = yield* PubSub.unbounded<Published>()
       const locks = new Map<string, Semaphore.Semaphore>()
       const statuses = new Map<string, string>()
-      const extensionStatuses = new Map<string, ReadonlyArray<string>>()
+      const agentStatuses = new Map<string, AgentStatusesChanged>()
 
-      const setExtensionStatuses = (conversationId: string, shown: ReadonlyArray<string>) =>
+      const setAgentStatuses = (conversationId: string, shown: AgentStatusesChanged) =>
         lockFor(conversationId).withPermits(1)(
           Effect.suspend(() => {
-            if (shown.length === 0 && !extensionStatuses.has(conversationId)) return Effect.void
+            const cleared =
+              shown.agentStatuses.length === 0 && shown.backgroundToolCalls.length === 0
 
-            if (shown.length === 0) extensionStatuses.delete(conversationId)
-            else extensionStatuses.set(conversationId, shown)
+            if (cleared && !agentStatuses.has(conversationId)) return Effect.void
 
-            return PubSub.publish(published, {
-              conversationId,
-              update: ExtensionStatusesChanged.make({ extensionStatuses: shown }),
-            })
+            if (cleared) agentStatuses.delete(conversationId)
+            else agentStatuses.set(conversationId, shown)
+
+            return PubSub.publish(published, { conversationId, update: shown })
           }),
         )
 
@@ -739,21 +740,24 @@ export class Transcripts extends Context.Service<
       const save = (
         conversationId: string,
         hostEvents: ReadonlyArray<HostEvent>,
-        throughJournalEntry?: number,
+        journal?: SavedThrough,
       ) => {
         const events = hostEvents.filter(
-          (event): event is SavedEvent => !Predicate.isTagged(event, "ExtensionStatusesChanged"),
+          (event): event is SavedEvent => !Predicate.isTagged(event, "AgentStatusesChanged"),
         )
 
         const shown = hostEvents.findLast((event) =>
-          Predicate.isTagged(event, "ExtensionStatusesChanged"),
+          Predicate.isTagged(event, "AgentStatusesChanged"),
         )
 
         return changeWith(
           conversationId,
           Effect.gen(function* () {
-            if (throughJournalEntry !== undefined)
-              yield* sql`UPDATE conversation SET journal_saved = ${throughJournalEntry} WHERE id = ${conversationId}`
+            if (journal !== undefined)
+              yield* sql`
+                UPDATE conversation SET journal_host = ${journal.host}, journal_saved = ${journal.through}
+                WHERE id = ${conversationId}
+              `
 
             const written = yield* Effect.filter(joinConsecutiveAppends(events), (event) =>
               writeApplied(conversationId, event),
@@ -790,9 +794,7 @@ export class Transcripts extends Context.Service<
             ),
           ),
           Effect.andThen(
-            shown === undefined
-              ? Effect.void
-              : setExtensionStatuses(conversationId, shown.extensionStatuses),
+            shown === undefined ? Effect.void : setAgentStatuses(conversationId, shown),
           ),
         )
       }
@@ -863,7 +865,8 @@ export class Transcripts extends Context.Service<
           ...(yield* turnPage(conversationId, turns)),
           queued: yield* queued(conversationId),
           status: statuses.get(conversationId) ?? null,
-          extensionStatuses: extensionStatuses.get(conversationId) ?? [],
+          agentStatuses: agentStatuses.get(conversationId)?.agentStatuses ?? [],
+          backgroundToolCalls: agentStatuses.get(conversationId)?.backgroundToolCalls ?? [],
         })
       })
 
@@ -911,7 +914,8 @@ export class Transcripts extends Context.Service<
 
         yield* Effect.forEach(
           conversationIds,
-          (conversationId) => setExtensionStatuses(conversationId, []),
+          (conversationId) =>
+            setAgentStatuses(conversationId, AgentStatusesChanged.make({ agentStatuses: [] })),
           {
             discard: true,
           },
@@ -1201,7 +1205,7 @@ export class Transcripts extends Context.Service<
           )
           locks.delete(conversationId)
           statuses.delete(conversationId)
-          extensionStatuses.delete(conversationId)
+          agentStatuses.delete(conversationId)
           yield* markWaiting(conversationId, [])
           yield* setUnseen(conversationId, undefined)
           yield* setRunning(conversationId, false)

@@ -31,6 +31,8 @@ export const AgentHostHandlers = AgentHostRpcs.toLayer(
         changes
           .uncommitted(folder)
           .pipe(failure("Couldn't check the Conversation's folder for changes.")),
+      CurrentBranch: ({ folder }) =>
+        changes.branch(folder).pipe(failure("Couldn't read the Conversation's branch.")),
       ListFiles: ({ folder }) =>
         changes
           .files(folder)
@@ -39,6 +41,7 @@ export const AgentHostHandlers = AgentHostRpcs.toLayer(
       ReadFile: ({ folder, path }) => folderFiles.read(folder, path),
       WatchJournal: ({ host, after }) => journal.watch(host, after),
       Acknowledge: ({ host, through }) => journal.acknowledge(host, through),
+      UnacknowledgedTurns: () => conversations.unacknowledgedTurns,
     })
   }),
 )

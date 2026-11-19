@@ -18,7 +18,8 @@ import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
 import { isolatedGitEnv } from "../src/gitEnv.ts"
 import type { AgentModels, Plugin } from "@glass/plugin"
-import { hostPort, portOf } from "./ports.ts"
+import { hostPort } from "../src/agentHost/protocol.ts"
+import { portOf } from "./ports.ts"
 import { whenExists } from "./whenExists.ts"
 
 const FakeSandboxSettings = Schema.Struct({

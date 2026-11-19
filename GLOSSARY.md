@@ -19,8 +19,9 @@ Inbox rail link in every area.
 A queued PR waits once its Agent review is finished, until the user marks that Agent review done or
 a Global conversation update includes it; writing it again puts the PR back.
 A Conversation waits once its latest Turn ends while the user isn't looking, unless they stopped it,
-until they look at its Chat with Glass focused; an Agent review's own Conversation waits only
-through its PR.
+until they look at its Chat with Glass focused, reply to it, or mark it done in the Inbox; an Agent
+review's own Conversation waits only through its PR. The Inbox shows its latest Turn with a reply
+box, so the user can work it without opening the Conversation.
 The user's own open PRs in followed repositories wait while changes are requested, checks fail, or
 a review thread is unresolved with someone else's comment last; with none of those, an approved PR
 GitHub would merge waits as ready to merge.
@@ -211,7 +212,8 @@ _Avoid_: History, audit log, event log, telemetry
 ### Planning
 
 **To-do**:
-Something the user means to do, written down in Glass, open until they mark it done.
+Something the user means to do, written down in Glass, open until they mark it done. Starting a
+Conversation from an open one Mentions it in the New Conversation's message.
 _Avoid_: Task, action item
 
 ### Conversations
@@ -222,6 +224,13 @@ working in one place: a worktree on this device, a Sandbox, or, for an Agent rev
 checkout of the review's Revision. Its agent is the AI doing the work, as in a Tour, Agent review,
 or Ask.
 _Avoid_: Session, thread, bot, box
+
+**Conversation's PR**:
+The open PR in a followed repository whose head is the branch the Conversation's folder had checked
+out when its latest Turn ended. The Conversation's header, details, and row in the list link to it
+with its Checks. A Conversation has none until a PR is opened from its branch, and none again once
+that PR is merged or closed.
+_Avoid_: Linked PR, agent PR
 
 **Global conversation**:
 The one conversation the user has with Glass itself, opened over any area without leaving it,
@@ -292,17 +301,21 @@ creating it.
 _Avoid_: My skills, user skills
 
 **Turn**:
-One message to a Conversation and its agent's whole response, or work the agent in a pi Conversation
-starts on its own, such as when an extension's background task reports back. It ends done, failed,
-stopped by the user, cut off when Glass loses the Conversation, or interrupted when Glass quits; a
-Sandbox Conversation's Turn carries on while Glass is closed.
+One message to a Conversation and its agent's whole response, or work the agent starts on its own,
+such as when a subagent or command it ran in the background or a pi extension's background task
+reports back; for Claude Code, Glass names the background work that ended at the top of such a Turn. It ends done, failed,
+stopped by the user, cut off when Glass loses the Conversation, or interrupted when Glass quits and
+can't keep it, such as when Glass is updated before it reopens. Otherwise a Turn carries on while
+Glass is closed.
 _Avoid_: Run, execution, exchange
 
-**Extension status**:
-A short line one of a pi Conversation's extensions shows about itself, such as a mode it is in or
-work it runs in the background. Glass shows it on the Conversation whether or not a Turn is running,
-until the extension clears it or Glass loses the Conversation.
-_Avoid_: Widget, banner
+**Agent status**:
+A short line about what a Conversation's agent has going besides its Turn, such as subagents or
+commands it runs in the background or a mode one of a pi Conversation's extensions is in. Glass
+shows it on the Conversation whether or not a Turn is running, until the agent clears it or Glass
+loses the Conversation, and marks the tool call that started a Claude Code background task as
+running until the task ends.
+_Avoid_: Extension status, widget, banner
 
 **Diagram**:
 A named Mermaid picture a Conversation's agent draws beside the Conversation when the user asks for
@@ -323,9 +336,10 @@ A message sent while a Turn runs, waiting to start the next Turn; the user can c
 then. Canceling one returns its Feedback notes to the Conversation's unsent feedback.
 
 **Mention**:
-A To-do or file the user points at from a message to a Conversation, by typing `@` and picking it.
-The message shows a To-do by its title and a file by its name. The agent reads a To-do's title and
-notes as they are when the message reaches it, and a file's path. Files come from the Conversation's
+A To-do or file the user points at from a message to a Conversation, by typing `@` and picking it,
+or for a To-do, by starting a Conversation from it. The message shows a To-do by its title and a
+file by its name. The agent reads a To-do's title, notes, and images as they are when the message
+reaches it, and a file's path. Files come from the Conversation's
 folder, or, for a New Conversation's first message, from the branch it starts from: the Local
 checkout's copy of it on this device, or GitHub's for a Sandbox.
 _Avoid_: Reference, attachment, tag, chip

@@ -1,4 +1,7 @@
+import { assert } from "@effect/vitest"
+import { Effect } from "effect"
 import { execFileSync } from "node:child_process"
+import { eventually } from "./eventually"
 
 const processes = (): ReadonlyArray<{ pid: number; ppid: number; command: string }> =>
   process.platform === "win32"
@@ -29,3 +32,8 @@ export const childProcesses = (parent: number, command: string) =>
 
 export const startedHost = (before: ReadonlyArray<number>) =>
   childProcesses(process.pid, "scriptedAgentHost.mjs").find((pid) => !before.includes(pid))
+
+export const hostExited = (pid: number) =>
+  eventually(
+    Effect.sync(() => assert.notInclude(childProcesses(process.pid, "scriptedAgentHost.mjs"), pid)),
+  )
