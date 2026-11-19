@@ -46,7 +46,6 @@ import {
 import { ResourceUsage } from "./ResourceUsage"
 import { ShortcutsDialog } from "./ShortcutsDialog"
 import { useShortcuts } from "./useShortcuts"
-import { useOpenNewCheckIns } from "./useOpenNewCheckIns"
 
 const railLink =
   "relative flex size-8 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-accent aria-[current=page]:text-accent-foreground aria-[current=page]:before:absolute aria-[current=page]:before:-left-2 aria-[current=page]:before:h-3 aria-[current=page]:before:w-0.5 aria-[current=page]:before:rounded-full aria-[current=page]:before:bg-foreground"
@@ -103,8 +102,6 @@ export function AppShell() {
   const unread = unseen !== null && !conversing
 
   const current = useMatch({ from: "/reviews/$owner/$repo/$number", shouldThrow: false })?.params
-
-  useOpenNewCheckIns()
 
   useEffect(() => {
     const load = () =>
