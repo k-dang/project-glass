@@ -79,7 +79,7 @@ function CheckInReview(props: { checkIn: CheckIn; onBack: () => void }) {
 
   return (
     <>
-      <header className="flex h-11 shrink-0 items-center gap-2 border-b px-4 text-sm">
+      <header className="box-content flex h-11 shrink-0 items-center gap-2 border-b px-4 text-sm">
         <TooltipHint content="Back to Inbox (Esc)">
           <Button
             variant="ghost"

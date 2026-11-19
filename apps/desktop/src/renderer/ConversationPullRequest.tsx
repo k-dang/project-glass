@@ -63,8 +63,7 @@ export function ConversationPullRequestLink(props: { pullRequest: PullRequestSum
           "shrink-0 gap-1.5 tabular-nums",
         )}
       >
-        <ChecksIcon checks={pullRequest.checks} className="size-3.5" />
-        <span className="[text-box:trim-both_cap_alphabetic]">#{pullRequest.ref.number}</span>
+        <ChecksIcon checks={pullRequest.checks} className="size-3.5" />#{pullRequest.ref.number}
       </PullRequestLink>
     </TooltipHint>
   )
