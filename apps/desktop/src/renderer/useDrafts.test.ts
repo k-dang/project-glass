@@ -399,18 +399,6 @@ describe("DraftStore", () => {
     expect(store.locked()).toBe(false)
   })
 
-  it("asks for a Reload, not a retry, when GitHub may have taken the Review", async () => {
-    const { store, submits } = draftStore([loaded])
-
-    const submitting = store.submit("approve", "")
-
-    ;(await next(submits)).answer(Effect.fail(new GitHubUnavailable({ message: "Timed out" })))
-
-    expect(await submitting).toMatchObject({ type: "failed", problem: { fixedByReload: true } })
-    expect(await store.submit("approve", "")).toMatchObject({ problem: { fixedByReload: true } })
-    expect(submits).toHaveLength(0)
-  })
-
   it("holds the submission state, keeping a may-have-submitted failure until the store is replaced", async () => {
     const { store, submits } = draftStore([loaded])
 
@@ -418,7 +406,8 @@ describe("DraftStore", () => {
     expect(store.submission().type).toBe("draining")
 
     ;(await next(submits)).answer(Effect.fail(new GitHubUnavailable({ message: "Timed out" })))
-    await submitting
+    expect(await submitting).toMatchObject({ type: "failed", problem: { fixedByReload: true } })
+    expect(await store.submit("approve", "")).toMatchObject({ problem: { fixedByReload: true } })
     store.setSummary("A different summary")
     store.clearSubmitFailure()
 
@@ -429,20 +418,6 @@ describe("DraftStore", () => {
     store.discardUnsaved()
     expect(await store.submit("approve", "")).toMatchObject({ type: "failed" })
     expect(submits).toHaveLength(0)
-  })
-
-  it("clears a retryable submission failure when asked", async () => {
-    const { store, updates } = draftStore([loaded])
-
-    save(store, "D1", "Hi!")
-    ;(await next(updates)).answer(Effect.fail(new GitHubUnavailable({ message: "Down" })))
-    await eventually(() => expect(store.view("D1")?.feedback?.type).toBe("failed"))
-    await store.submit("approve", "")
-    expect(store.submission()).toMatchObject({ type: "editable", problem: expect.anything() })
-
-    store.clearSubmitFailure()
-
-    expect(store.submission()).toEqual({ type: "editable", problem: null })
   })
 
   it("submits no Review while a Draft hasn't saved to GitHub", async () => {
@@ -458,6 +433,9 @@ describe("DraftStore", () => {
       problem: { title: "Some Drafts haven't saved to GitHub" },
     })
     expect(submits).toHaveLength(0)
+
+    store.clearSubmitFailure()
+    expect(store.submission()).toEqual({ type: "editable", problem: null })
     expect(store.locked()).toBe(false)
   })
 

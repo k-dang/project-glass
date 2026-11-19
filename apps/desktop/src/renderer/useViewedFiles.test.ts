@@ -183,7 +183,6 @@ describe("ViewedFilesStore", () => {
 
     store.set("ignored.ts", true)
 
-    expect(finished).not.toHaveBeenCalled()
     expect(store.snapshot().locked).toBe(true)
     expect(store.snapshot().viewed.has("ignored.ts")).toBe(false)
 

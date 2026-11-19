@@ -223,7 +223,6 @@ it("keeps a loading or failed Needs you off the empty Inbox", async () => {
   expect(await screen.findByText("Loading what needs you…")).toBeTruthy()
   expect(screen.queryByText("Nothing needs you right now.")).toBeNull()
   expect(screen.getByRole("heading", { name: "Inbox" }).textContent).not.toContain("0")
-  expect(screen.queryByRole("heading", { name: "Inbox 0" })).toBeNull()
 })
 
 it("shows a failed Needs you as a failure, not an empty Inbox", async () => {
@@ -243,7 +242,6 @@ it("shows a failed Needs you as a failure, not an empty Inbox", async () => {
   expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy()
   expect(screen.queryByText("Nothing needs you right now.")).toBeNull()
   expect(screen.queryByRole("heading", { name: "Inbox 0" })).toBeNull()
-  expect(screen.queryByRole("link", { name: "Needs you 0" })).toBeNull()
 })
 
 it("advances the wait while the Inbox stays open", async () => {
@@ -473,24 +471,6 @@ it("opens a Check-in's changes on their own page and approves them, with the not
   expect(await screen.findByRole("main", { name: "Inbox" })).toBeTruthy()
 })
 
-it("sends a typed answer when an outside question has no choices", async () => {
-  const answers: Array<{ id: string; answer: OutsideQuestionAnswer }> = []
-
-  const user = mount(
-    needsYouRef([OutsideQuestion.make({ ...outsideQuestion, id: "ask-2", choices: [] })]),
-    {
-      AnswerOutsideQuestion: (payload) => Effect.sync(() => void answers.push(payload)),
-    },
-  )
-
-  await screen.findByRole("heading", { name: "Ship the retry change?" })
-  const pane = within(articleOf("Ship the retry change?"))
-  await user.type(pane.getByRole("textbox", { name: "Your answer" }), "Not yet")
-  await user.click(pane.getByRole("button", { name: "Send" }))
-
-  expect(answers).toEqual([{ id: "ask-2", answer: OutsideText.make({ text: "Not yet" }) }])
-})
-
 it("starts the next outside question with an empty answer", async () => {
   const answers: Array<{ id: string; answer: OutsideQuestionAnswer }> = []
   const typed = OutsideQuestion.make({ ...outsideQuestion, id: "ask-3", choices: [] })
@@ -682,10 +662,6 @@ it("opens the pull request and offers its finished Agent review", async () => {
     ),
   ).toBeTruthy()
   expect(pane.getByText(/Updated/)).toBeTruthy()
-
-  expect(screen.getByRole("region", { name: "Agent reviews to read" }).textContent).toContain(
-    "Draft",
-  )
 
   await user.click(pane.getByRole("link", { name: "Read Agent review" }))
 

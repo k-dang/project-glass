@@ -524,8 +524,9 @@ it("puts the newest open to-do directly under the composer", async () => {
     "See https://capy.ai/ before deciding",
   )
   await user.type(within(form()).getByRole("textbox", { name: "New to-do" }), "Newer errand{Enter}")
+  await within(page).findByText("Newer errand")
 
-  const open = await within(page).findByRole("list", { name: "Open to-dos" })
+  const open = within(page).getByRole("list", { name: "Open to-dos" })
   expect(form().compareDocumentPosition(open) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   expect(openTitles()).toEqual(["Newer errand", "Older errand"])
   expect(within(open).getByText("See before deciding").classList.contains("line-clamp-2")).toBe(

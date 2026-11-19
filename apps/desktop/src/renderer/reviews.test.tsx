@@ -332,9 +332,7 @@ it("arranges PRs by repository, kept through Back to PRs", async () => {
   await screen.findByRole("region", { name: "octo-org/glass" })
 })
 
-// Flaky: failed once in a full `pnpm test` run after 26 seconds, passed when rerun on its own.
-// oxlint-disable-next-line vitest/no-disabled-tests
-it.skip("opens only full URLs or repository-qualified references", async () => {
+it("opens only full URLs or repository-qualified references", async () => {
   const opens: Array<PullRequestRef> = []
 
   const user = mount({
@@ -354,11 +352,12 @@ it.skip("opens only full URLs or repository-qualified references", async () => {
 
   await user.clear(input)
   await user.type(input, "unfollowed/repo#42{Enter}")
-  await user.click(await screen.findByRole("button", { name: "Back to PRs" }))
+  await screen.findByText("head001")
+  await user.click(screen.getByRole("button", { name: "Back to PRs" }))
   expect(opens).toEqual([new PullRequestRef({ owner: "unfollowed", repo: "repo", number: 42 })])
 
   await user.type(await screen.findByRole("textbox", { name: "Open a PR" }), `${greet.url}{Enter}`)
-  await screen.findByRole("button", { name: "Back to PRs" })
+  await screen.findByText("head001")
   expect(opens).toEqual([
     new PullRequestRef({ owner: "unfollowed", repo: "repo", number: 42 }),
     greet.ref,
