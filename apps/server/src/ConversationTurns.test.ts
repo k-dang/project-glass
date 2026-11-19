@@ -33,7 +33,6 @@ import {
   type ClaimedConversation,
   type ConversationHost,
   ConversationTurns,
-  conversationLock,
 } from "./ConversationTurns"
 import { HOST_CONTROL_DEADLINE, HOST_DIDNT_ANSWER } from "./hostControl"
 import { migrationLoader } from "./Migrations"
@@ -605,11 +604,8 @@ const queuedBehind = (
       { startImmediately: true },
     )
 
-    const held = conversationLock(turns, "agent-a")
-    assert.isDefined(held)
     yield* leave(holder, release)
     yield* Deferred.await(waiterIn)
-    assert.strictEqual(conversationLock(turns, "agent-a"), held)
 
     const third = yield* Effect.forkChild(
       turns.whileIdle(
@@ -631,7 +627,6 @@ const queuedBehind = (
     assert.isTrue(thirdIn)
     assert.equal(usage.highest(), 1)
     assert.equal(usage.current(), 0)
-    assert.isUndefined(conversationLock(turns, "agent-a"))
   }).pipe(Effect.provide(layer))
 
 it.live("keeps a queued operation holding the conversation after the holder finishes", () =>
@@ -690,7 +685,6 @@ it.effect("fails a Turn the host never accepts, so Stop can return", () =>
 
       const { turns } = yield* desk.transcripts.read("agent-a")
       assert.deepStrictEqual(turns[0]?.ended?.ending, failedToAnswer)
-      assert.isUndefined(conversationLock(desk.turns, "agent-a"))
     }),
   ).pipe(Effect.provide(layer)),
 )

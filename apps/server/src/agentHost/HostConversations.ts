@@ -344,23 +344,7 @@ export class HostConversations extends Context.Service<
           ),
         })
 
-        coordination.set(conversations, locks)
-
         return conversations
       }),
     )
 }
-
-interface ConversationLockOwner {
-  readonly stop: (conversationId: string) => Effect.Effect<void>
-}
-
-const coordination = new WeakMap<
-  ConversationLockOwner,
-  Map<string, { semaphore: Semaphore.Semaphore; holders: number }>
->()
-
-export const conversationLock = (
-  owner: ConversationLockOwner,
-  conversationId: string,
-): object | undefined => coordination.get(owner)?.get(conversationId)

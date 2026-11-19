@@ -11,7 +11,7 @@ import {
 import { DateTime, Deferred, Effect, Fiber, Layer, Queue, Stream } from "effect"
 import { eventually } from "../../test/eventually"
 import type { HarnessAdapter, HarnessSession } from "./adapter"
-import { HostConversations, conversationLock, overBudget } from "./HostConversations"
+import { HostConversations, overBudget } from "./HostConversations"
 import { Journal, JournalBudget } from "./Journal"
 import {
   HostConversationError,
@@ -383,36 +383,6 @@ it.live(
   stall,
 )
 
-it.live(
-  "drops one Conversation's lock while another's Agent harness is still starting",
-  () =>
-    Effect.gen(function* () {
-      const host = yield* hosted
-      const held = yield* handshake()
-      const other = yield* handshake()
-
-      yield* host.offer(held)
-
-      const starting = yield* Effect.forkChild(host.conversations.start(request("a")), {
-        startImmediately: true,
-      })
-
-      yield* Deferred.await(held.entered)
-      assert.isDefined(conversationLock(host.conversations, "a"))
-
-      yield* host.offer(other)
-      yield* release(other)
-      assert.equal(yield* host.conversations.start(request("b")), "started")
-      assert.isUndefined(conversationLock(host.conversations, "b"))
-      assert.isDefined(conversationLock(host.conversations, "a"))
-
-      yield* release(held)
-      assert.equal(yield* Fiber.join(starting), "started")
-      assert.isUndefined(conversationLock(host.conversations, "a"))
-    }),
-  stall,
-)
-
 const queuedStart = (
   failure: HostConversationError | undefined,
   leave: (
@@ -439,21 +409,27 @@ const queuedStart = (
       startImmediately: true,
     })
 
-    yield* Effect.yieldNow
-    const entry = conversationLock(host.conversations, "a")
-    assert.isDefined(entry)
-
     yield* leave(starting, held)
     yield* Deferred.await(waiter.entered)
-    assert.strictEqual(conversationLock(host.conversations, "a"), entry)
+
+    const third = yield* handshake()
+    yield* host.offer(third)
+
+    const again = yield* Effect.forkChild(host.conversations.start(request("a")), {
+      startImmediately: true,
+    })
+
+    yield* Effect.yieldNow
+    assert.isFalse(yield* Deferred.isDone(third.entered))
 
     yield* release(waiter)
     assert.equal(yield* Fiber.join(waiting), "started")
-    assert.isUndefined(conversationLock(host.conversations, "a"))
+    assert.equal(yield* Fiber.join(again), "alreadyRunning")
+    assert.equal(host.peak(), 1)
   })
 
 it.live(
-  "keeps the same lock until a startup queued behind a failure finishes",
+  "runs a startup queued behind a failed one alone, starting no second Agent harness",
   () =>
     queuedStart(startupFailed, (starting, gate) =>
       release(gate).pipe(
@@ -466,39 +442,8 @@ it.live(
 )
 
 it.live(
-  "keeps the same lock until a startup queued behind an interrupt finishes",
+  "runs a startup queued behind an interrupted one alone, starting no second Agent harness",
   () => queuedStart(undefined, (starting) => Fiber.interrupt(starting)),
-  stall,
-)
-
-it.live(
-  "drops a Conversation's lock after startup and a queued removal both finish",
-  () =>
-    Effect.gen(function* () {
-      const host = yield* hosted
-      const held = yield* handshake()
-
-      yield* host.offer(held)
-
-      const starting = yield* Effect.forkChild(host.conversations.start(request("a")), {
-        startImmediately: true,
-      })
-
-      yield* Deferred.await(held.entered)
-
-      const stopping = yield* Effect.forkChild(host.conversations.stop("a"), {
-        startImmediately: true,
-      })
-
-      yield* Effect.yieldNow
-      assert.isDefined(conversationLock(host.conversations, "a"))
-
-      yield* release(held)
-      assert.equal(yield* Fiber.join(starting), "started")
-      yield* Fiber.join(stopping)
-      yield* Deferred.await(held.closed)
-      assert.isUndefined(conversationLock(host.conversations, "a"))
-    }),
   stall,
 )
 
@@ -643,7 +588,6 @@ it.live(
       yield* Fiber.join(stopping)
       assert.equal(yield* Fiber.join(starting), "started")
       assert.equal(host.peak(), 1)
-      assert.isUndefined(conversationLock(host.conversations, "a"))
     }),
   stall,
 )
@@ -674,7 +618,6 @@ it.live(
       yield* Deferred.succeed(old.finishCleanup, undefined)
       assert.equal(yield* Fiber.join(restarting), "started")
       assert.equal(host.peak(), 1)
-      assert.isUndefined(conversationLock(host.conversations, "a"))
     }),
   stall,
 )

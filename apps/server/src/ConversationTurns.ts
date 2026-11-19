@@ -538,21 +538,7 @@ export class ConversationTurns extends Context.Service<
           ),
       })
 
-      coordination.set(turns, locks)
-
       return turns
     }),
   )
 }
-
-interface TurnOwner {
-  readonly removeUnsent: (conversationId: string) => Effect.Effect<void, ConversationError>
-}
-
-const coordination = new WeakMap<
-  TurnOwner,
-  Map<string, { semaphore: Semaphore.Semaphore; holders: number }>
->()
-
-export const conversationLock = (owner: TurnOwner, conversationId: string): object | undefined =>
-  coordination.get(owner)?.get(conversationId)
