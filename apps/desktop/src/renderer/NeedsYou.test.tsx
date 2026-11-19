@@ -8,7 +8,12 @@ import {
   AwaitingReply,
   ChangesRequested,
   Check,
+  CheckIn,
+  type CheckInAnswer,
+  CheckInApprove,
+  CheckInChanges,
   ChecksFailing,
+  FeedbackNote,
   Discussions,
   emptyTranscript,
   GitHubConnection,
@@ -41,7 +46,7 @@ import { afterEach, expect, it, vi } from "vite-plus/test"
 import { App } from "./App"
 import { reviewOf } from "../../test/agentReview"
 import { conversation, conversationFields } from "../../test/conversation"
-import { pullRequestFields, revision, viewer } from "../../test/workspace"
+import { changedFile, pullRequestFields, revision, viewer } from "../../test/workspace"
 import { backendLayerAtom } from "./backend"
 import { type Handlers, type Held, hold, next, testLayer } from "../../test/testBackend"
 
@@ -415,6 +420,57 @@ it("answers an outside question in Stopped on you", async () => {
   await setNeedsYou(needsYou, [finishedReview])
   expect(await screen.findByRole("heading", { name: "Retry flaky upload" })).toBeTruthy()
   expect(screen.queryByRole("button", { name: /Ship the retry change/ })).toBeNull()
+})
+
+it("opens a Check-in's changes on their own page and approves them, with the notes left on them", async () => {
+  const answers: Array<{ checkInId: string; answer: CheckInAnswer }> = []
+
+  const checkIn = CheckIn.make({
+    id: "check-1",
+    folder: "/Users/kevin/retry",
+    summary: "Retry three times\nThe backoff is in greet.ts.",
+    askedBy: "Claude Code",
+    since: ago({ minutes: 1 }),
+  })
+
+  const note = new FeedbackNote({
+    id: "note-1",
+    path: "greet.ts",
+    side: "new",
+    start: 2,
+    end: 2,
+    code: "B",
+    changesId: "read-1",
+    text: "Rename B",
+  })
+
+  const user = mount(needsYouRef([checkIn]), {
+    GetCheckInChanges: () =>
+      Effect.succeed(
+        new CheckInChanges({ id: "read-1", baseRef: "main", files: [changedFile("greet.ts")] }),
+      ),
+    ListCheckInNotes: () => Effect.succeed([note]),
+    AnswerCheckIn: (payload) => Effect.sync(() => void answers.push(payload)),
+  })
+
+  const stopped = await screen.findByRole("region", { name: "Stopped on you" })
+  expect(within(stopped).getByRole("button", { name: /Retry three times/ })).toBeTruthy()
+
+  const pane = within(articleOf("Retry three times"))
+  expect(pane.getByText("The backoff is in greet.ts.")).toBeTruthy()
+  await user.click(pane.getByRole("link", { name: "Read the changes" }))
+
+  const page = within(await screen.findByRole("main", { name: "Check-in" }))
+  expect(await page.findByText(/since main/)).toBeTruthy()
+  expect(await page.findByText(/1 Feedback note goes back with your answer/)).toBeTruthy()
+
+  await user.type(page.getByRole("textbox", { name: "Message to the agent" }), "Ship it")
+  await user.click(page.getByRole("button", { name: "Approve" }))
+
+  expect(answers).toEqual([
+    { checkInId: "check-1", answer: CheckInApprove.make({ message: "Ship it" }) },
+  ])
+  expect(await screen.findByRole("main", { name: "Inbox" })).toBeTruthy()
 })
 
 it("sends a typed answer when an outside question has no choices", async () => {

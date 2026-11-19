@@ -83,6 +83,9 @@ it.live("upgrades main's schema directly, preserving completed and unfinished up
       VALUES ('global', 'glass-demo', 'greeter', 7, ${at}, ${at})`
     yield* sql`INSERT INTO agent_reviews (owner, repo, number, base, head, written_at, markdown, reported)
       VALUES ('glass-demo', 'greeter', 7, 'b', 'h', ${at}, 'Looks fine.', 1)`
+    yield* sql`INSERT INTO agent_feedback_note
+        (agent_id, id, path, side, start_line, end_line, code, changes_id, text, staged)
+      VALUES ('started', 'note', 'greet.ts', 'new', 2, 2, 'B', 'read-1', 'Rename B', 1)`
 
     assert.deepStrictEqual(yield* SqliteMigrator.run({ loader: migrationLoader }), [
       [9, "global_conversation_updates"],
@@ -91,6 +94,7 @@ it.live("upgrades main's schema directly, preserving completed and unfinished up
       [12, "conversations"],
       [13, "journal_host"],
       [14, "conversation_branch"],
+      [15, "feedback_notes"],
     ])
     const transcripts = yield* Transcripts
     const { turns } = yield* transcripts.read("global")
@@ -125,6 +129,9 @@ it.live("upgrades main's schema directly, preserving completed and unfinished up
       yield* sql`SELECT included_in_global_conversation_update, done FROM agent_reviews`,
       [{ included_in_global_conversation_update: 1, done: 0 }],
     )
+    assert.deepStrictEqual(yield* sql`SELECT owner, id, text, staged FROM feedback_note`, [
+      { owner: "conversation:started", id: "note", text: "Rename B", staged: 1 },
+    ])
     yield* sql`UPDATE global_started_agent_review SET global_conversation_update_turn_id = 'completed'`
     yield* sql`DELETE FROM conversation_turn WHERE id = 'completed'`
     assert.deepStrictEqual(
@@ -159,6 +166,7 @@ it.live("creates the schema once and reads Activity through its indexes after re
         [12, "conversations"],
         [13, "journal_host"],
         [14, "conversation_branch"],
+        [15, "feedback_notes"],
       ],
       [],
     ] as const) {

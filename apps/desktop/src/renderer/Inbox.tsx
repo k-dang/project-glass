@@ -67,7 +67,7 @@ const nextRemaining = (
 
 const minute = 60_000
 
-function useMinuteClock() {
+export function useMinuteClock() {
   const [now, setNow] = useState(() => new Date())
 
   useEffect(() => {
@@ -260,6 +260,7 @@ function useInboxActions(selected: NeedsYouItem | null): ReadonlyArray<InboxActi
       return seen === null ? null : () => markTurnSeen(seen)
     },
     OutsideQuestion: () => null,
+    CheckIn: () => null,
     GlobalConversation: () => null,
   })
 

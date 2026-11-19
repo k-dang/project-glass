@@ -49,6 +49,11 @@ const keepWorkingPrompt = "Keep working until I stop you."
 
 const keepsWorking = (input: FakeModelRequest) => lastUserText(input) === keepWorkingPrompt
 
+const answersFollowUp = (input: FakeModelRequest) =>
+  !isGlobalConversation(input) &&
+  input.messages.at(-1)?.role === "user" &&
+  input.messages.some(({ role }) => role === "assistant")
+
 const slowReply = `Working through it one step at a time. ${Array.from(
   { length: 12 },
   (_, step) => `Step ${step + 1} looks fine.`,
@@ -135,8 +140,11 @@ const demoReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
 
   if (lastUserText(input) === "Draw a diagram") return [{ text: diagramReply }]
 
-  if (messages.some(({ role }) => role === "assistant"))
-    return [{ text: `Got it: “${textOf(last)}”.` }]
+  if (answersFollowUp(input))
+    return [
+      { thinking: "Reading your reply." },
+      ...`Got it: “${textOf(last)}”.`.split(/(?<= )/).map((text) => ({ text })),
+    ]
 
   return [
     { thinking: "I'll look at what's in the repository first." },
@@ -162,7 +170,8 @@ export const startDemoClaude = Effect.fnUntraced(function* (directory: string) {
 export const startDemoPi = Effect.fnUntraced(function* (directory: string) {
   yield* fakeModelProvider(directory, {
     reply: demoReply,
-    chunkDelay: (input) => (workingSlowly(input) ? 300 : keepsWorking(input) ? 3_600_000 : 0),
+    chunkDelay: (input) =>
+      workingSlowly(input) || answersFollowUp(input) ? 300 : keepsWorking(input) ? 3_600_000 : 0,
   })
   process.env["PI_CODING_AGENT_DIR"] = join(directory, ".pi", "agent")
 })

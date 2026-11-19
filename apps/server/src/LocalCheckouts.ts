@@ -8,8 +8,7 @@ import {
 } from "@glass/contracts"
 import { Context, Effect, Layer, Option, Schema } from "effect"
 import { SqlClient } from "effect/sql"
-import { resolve } from "node:path"
-import { Git } from "./git"
+import { defaultBranchOf, Git, topLevelOf } from "./git"
 
 const LinkedCheckout = Schema.Struct({ path: Schema.String, remote: Schema.String })
 
@@ -81,11 +80,7 @@ export class LocalCheckouts extends Context.Service<
             "That folder isn't a clone of a GitHub repository. Choose the folder you cloned it into.",
         })
 
-        const top = yield* git.run(path, ["rev-parse", "--show-toplevel"]).pipe(
-          // Git for Windows prints the top level with forward slashes.
-          Effect.map((printed) => resolve(printed)),
-          Effect.mapError(() => notAClone),
-        )
+        const top = yield* topLevelOf(git, path).pipe(Effect.mapError(() => notAClone))
 
         const remotes = yield* git
           .run(top, ["config", "--get-regexp", "^remote\\..*\\.url$"])
@@ -132,16 +127,12 @@ export class LocalCheckouts extends Context.Service<
             ),
           )
 
-        const findRemoteHead = git
-          .run(path, ["symbolic-ref", "--short", `refs/remotes/${remote}/HEAD`])
-          .pipe(
-            Effect.map((ref) => ref.slice(remote.length + 1)),
-            Effect.option,
-          )
-
-        const [listed, remoteHead] = yield* Effect.all([listBranches, findRemoteHead], {
-          concurrency: "unbounded",
-        })
+        const [listed, remoteHead] = yield* Effect.all(
+          [listBranches, defaultBranchOf(git, path, remote)],
+          {
+            concurrency: "unbounded",
+          },
+        )
 
         const names = listed.split("\n").filter((branch) => branch !== "" && branch !== "HEAD")
 

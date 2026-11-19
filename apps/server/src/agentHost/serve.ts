@@ -13,7 +13,7 @@ import {
 import { HttpServer } from "effect/http"
 import { closeSync, writeSync } from "node:fs"
 import { createServer } from "node:http"
-import { Changes } from "./Changes"
+import { Changes } from "../Changes"
 import { FolderFiles } from "./FolderFiles"
 import { HostConversations, type Harnesses } from "./HostConversations"
 import { Journal } from "./Journal"

@@ -2,15 +2,23 @@ import { ConversationError, FeedbackNote, UnsentFeedback } from "@glass/contract
 import { Context, Effect, Layer, Schema } from "effect"
 import { SqlClient } from "effect/sql"
 
+/** Whose Feedback notes these are: one Conversation's, or one folder's for its Check-ins. */
+export type NotesOwner = `conversation:${string}` | `folder:${string}`
+
+export const conversationNotes = (conversationId: string): NotesOwner =>
+  `conversation:${conversationId}`
+
+export const folderNotes = (folder: string): NotesOwner => `folder:${folder}`
+
 const decodeNotes = Schema.decodeUnknownEffect(Schema.Array(FeedbackNote))
 
 const decodeStaged = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ id: Schema.String, staged: Schema.BooleanFromBit })),
 )
 
-const row = (conversationId: string, note: FeedbackNote) => ({
+const row = (owner: NotesOwner, note: FeedbackNote) => ({
   id: note.id,
-  conversation_id: conversationId,
+  owner,
   path: note.path,
   side: note.side,
   start_line: note.start,
@@ -34,25 +42,30 @@ const guarded =
 export class FeedbackNotes extends Context.Service<
   FeedbackNotes,
   {
-    readonly list: (conversationId: string) => Effect.Effect<UnsentFeedback, ConversationError>
+    readonly list: (owner: NotesOwner) => Effect.Effect<UnsentFeedback, ConversationError>
     readonly save: (
-      conversationId: string,
+      owner: NotesOwner,
       note: FeedbackNote,
     ) => Effect.Effect<UnsentFeedback, ConversationError>
     readonly remove: (
-      conversationId: string,
+      owner: NotesOwner,
       noteId: string,
     ) => Effect.Effect<UnsentFeedback, ConversationError>
-    readonly stage: (conversationId: string) => Effect.Effect<UnsentFeedback, ConversationError>
+    readonly stage: (owner: NotesOwner) => Effect.Effect<UnsentFeedback, ConversationError>
+    /** Removes and returns the staged notes named, failing unless all of them are still there. */
     readonly take: (
-      conversationId: string,
+      owner: NotesOwner,
       noteIds: ReadonlyArray<string>,
     ) => Effect.Effect<ReadonlyArray<FeedbackNote>, ConversationError>
+    /** Removes and returns every note, in the order they were left. */
+    readonly takeAll: (
+      owner: NotesOwner,
+    ) => Effect.Effect<ReadonlyArray<FeedbackNote>, ConversationError>
     readonly restore: (
-      conversationId: string,
+      owner: NotesOwner,
       notes: ReadonlyArray<FeedbackNote>,
     ) => Effect.Effect<void, ConversationError>
-    readonly removeAll: (conversationId: string) => Effect.Effect<void, ConversationError>
+    readonly removeAll: (owner: NotesOwner) => Effect.Effect<void, ConversationError>
   }
 >()("@glass/server/FeedbackNotes") {
   static readonly layer = Layer.effect(
@@ -64,10 +77,10 @@ export class FeedbackNotes extends Context.Service<
         id, path, side, start_line AS start, end_line AS end, code, changes_id AS changesId, text
       `
 
-      const list = Effect.fn("FeedbackNotes.list")((conversationId: string) =>
+      const list = Effect.fn("FeedbackNotes.list")((owner: NotesOwner) =>
         sql`
-            SELECT ${columns}, staged FROM conversation_feedback_note
-            WHERE conversation_id = ${conversationId} ORDER BY rowid
+            SELECT ${columns}, staged FROM feedback_note
+            WHERE owner = ${owner} ORDER BY rowid
           `.pipe(
           Effect.flatMap((rows) =>
             Effect.all({
@@ -84,30 +97,31 @@ export class FeedbackNotes extends Context.Service<
 
       return FeedbackNotes.of({
         list,
-        save: Effect.fn("FeedbackNotes.save")((conversationId, note) =>
+        save: Effect.fn("FeedbackNotes.save")((owner, note) =>
           sql`
-            INSERT INTO conversation_feedback_note ${sql.insert(row(conversationId, note))}
-            ON CONFLICT (conversation_id, id) DO UPDATE SET text = excluded.text
-          `.pipe(guarded("save"), Effect.andThen(list(conversationId))),
+            INSERT INTO feedback_note ${sql.insert(row(owner, note))}
+            ON CONFLICT (owner, id) DO UPDATE SET text = excluded.text
+          `.pipe(guarded("save"), Effect.andThen(list(owner))),
         ),
-        remove: Effect.fn("FeedbackNotes.remove")((conversationId, noteId) =>
-          sql`
-            DELETE FROM conversation_feedback_note WHERE id = ${noteId} AND conversation_id = ${conversationId}
-          `.pipe(guarded("remove"), Effect.andThen(list(conversationId))),
-        ),
-        stage: Effect.fn("FeedbackNotes.stage")((conversationId) =>
-          sql`UPDATE conversation_feedback_note SET staged = 1 WHERE conversation_id = ${conversationId}`.pipe(
-            guarded("stage"),
-            Effect.andThen(list(conversationId)),
+        remove: Effect.fn("FeedbackNotes.remove")((owner, noteId) =>
+          sql`DELETE FROM feedback_note WHERE id = ${noteId} AND owner = ${owner}`.pipe(
+            guarded("remove"),
+            Effect.andThen(list(owner)),
           ),
         ),
-        take: Effect.fn("FeedbackNotes.take")(function* (conversationId, noteIds) {
+        stage: Effect.fn("FeedbackNotes.stage")((owner) =>
+          sql`UPDATE feedback_note SET staged = 1 WHERE owner = ${owner}`.pipe(
+            guarded("stage"),
+            Effect.andThen(list(owner)),
+          ),
+        ),
+        take: Effect.fn("FeedbackNotes.take")(function* (owner, noteIds) {
           if (noteIds.length === 0) return []
 
           const ids = Array.from(new Set(noteIds))
 
           const taken = yield* sql`
-            DELETE FROM conversation_feedback_note WHERE conversation_id = ${conversationId} AND staged = 1 AND ${sql.in("id", noteIds)}
+            DELETE FROM feedback_note WHERE owner = ${owner} AND staged = 1 AND ${sql.in("id", noteIds)}
             RETURNING ${columns}
           `.pipe(
             Effect.flatMap(decodeNotes),
@@ -123,16 +137,26 @@ export class FeedbackNotes extends Context.Service<
 
           return taken
         }),
-        restore: Effect.fn("FeedbackNotes.restore")((conversationId, notes) =>
+        takeAll: Effect.fn("FeedbackNotes.takeAll")((owner) =>
+          sql<{ readonly position: number }>`
+            DELETE FROM feedback_note WHERE owner = ${owner}
+            RETURNING rowid AS position, ${columns}
+          `.pipe(
+            Effect.map((rows) => rows.toSorted((a, b) => a.position - b.position)),
+            Effect.flatMap(decodeNotes),
+            guarded("send"),
+          ),
+        ),
+        restore: Effect.fn("FeedbackNotes.restore")((owner, notes) =>
           notes.length === 0
             ? Effect.void
             : sql`
-                INSERT INTO conversation_feedback_note ${sql.insert(notes.map((note) => row(conversationId, note)))}
-                ON CONFLICT (conversation_id, id) DO NOTHING
+                INSERT INTO feedback_note ${sql.insert(notes.map((note) => row(owner, note)))}
+                ON CONFLICT (owner, id) DO NOTHING
               `.pipe(Effect.asVoid, guarded("restore")),
         ),
-        removeAll: Effect.fn("FeedbackNotes.removeAll")((conversationId) =>
-          sql`DELETE FROM conversation_feedback_note WHERE conversation_id = ${conversationId}`.pipe(
+        removeAll: Effect.fn("FeedbackNotes.removeAll")((owner) =>
+          sql`DELETE FROM feedback_note WHERE owner = ${owner}`.pipe(
             Effect.asVoid,
             guarded("remove"),
           ),

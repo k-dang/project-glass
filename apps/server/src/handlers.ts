@@ -13,6 +13,7 @@ import { LocalCheckouts } from "./LocalCheckouts"
 import { NeedsYou } from "./NeedsYou"
 import { OutsideAgents } from "./OutsideAgents"
 import { OutsideQuestions } from "./OutsideQuestions"
+import { CheckIns } from "./CheckIns"
 import { McpCredentials } from "./mcp/McpCredentials"
 import { PullRequestLists } from "./PullRequestLists"
 import { PullRequestWorkspaces } from "./PullRequestWorkspaces"
@@ -50,6 +51,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
     const needsYou = yield* NeedsYou
     const conversationPullRequests = yield* ConversationPullRequests
     const outsideQuestions = yield* OutsideQuestions
+    const checkIns = yield* CheckIns
     const outsideAgents = yield* OutsideAgents
     const mcpCredentials = yield* McpCredentials
 
@@ -175,6 +177,11 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       MarkTurnSeen: ({ conversationId, endedAt }) =>
         conversations.markTurnSeen(conversationId, endedAt),
       AnswerOutsideQuestion: ({ id, answer }) => outsideQuestions.answer(id, answer),
+      GetCheckInChanges: ({ checkInId }) => checkIns.changes(checkInId),
+      ListCheckInNotes: ({ checkInId }) => checkIns.notes(checkInId),
+      SaveCheckInNote: ({ checkInId, note }) => checkIns.saveNote(checkInId, note),
+      RemoveCheckInNote: ({ checkInId, noteId }) => checkIns.removeNote(checkInId, noteId),
+      AnswerCheckIn: ({ checkInId, answer }) => checkIns.answer(checkInId, answer),
       GetMcpEndpoint: () => mcpCredentials.endpoint.pipe(Effect.map((url) => ({ url }))),
       WatchOutsideAgents: () => outsideAgents.watch(),
       RevokeOutsideAgent: ({ id }) => outsideAgents.revoke(id),

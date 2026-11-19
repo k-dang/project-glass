@@ -77,6 +77,7 @@ describe("Glass tools over MCP", () => {
           ["create_conversation", false],
           ["send_conversation_message", false],
           ["ask_user", false],
+          ["check_in", false],
         ],
       )
     }),

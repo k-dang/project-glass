@@ -31,6 +31,8 @@ import {
 
 const ActivityLogPage = lazyRouteComponent(() => import("./ActivityLogPage"), "ActivityLogPage")
 
+const CheckInPage = lazyRouteComponent(() => import("./CheckInPage"), "CheckInPage")
+
 const ConversationsLayout = lazyRouteComponent(
   () => import("./Conversations"),
   "ConversationsLayout",
@@ -139,6 +141,17 @@ const inboxRoute = createRoute({
   ),
 })
 
+const checkInRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "inbox/check-ins/$checkInId",
+  loader: loadCode(CheckInPage),
+  component: function CheckInRoute() {
+    const { checkInId } = checkInRoute.useParams()
+
+    return <CheckInPage key={checkInId} checkInId={checkInId} />
+  },
+})
+
 const dashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "dashboard",
@@ -194,6 +207,7 @@ const routeTree = rootRoute.addChildren([
   toDosRoute,
   activityRoute,
   inboxRoute,
+  checkInRoute,
   dashboardRoute,
   conversationsRoute.addChildren([noConversationRoute, newConversationRoute, conversationRoute]),
   settingsRoute,

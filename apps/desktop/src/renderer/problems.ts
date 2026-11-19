@@ -182,6 +182,11 @@ export const describeError = (error: BackendError): Problem =>
         title: "Already settled",
         detail: "That question was answered already, or the wait ended.",
       }),
+      CheckInNotWaiting: () => ({
+        title: "Already settled",
+        detail: "That Check-in was answered already, or the wait ended.",
+      }),
+      CheckInError: ({ message }) => ({ title: "Couldn't finish the Check-in", detail: message }),
       OutsideAgentNotFound: () => ({
         title: "That agent is already disconnected",
         detail: "It is no longer in the list of connected outside agents.",

@@ -6,6 +6,8 @@ export * from "./appearance"
 
 export * from "./ask"
 
+export * from "./checkIn"
+
 export * from "./checkoutRun"
 
 export * from "./conversation"

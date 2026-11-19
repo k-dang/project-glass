@@ -1,5 +1,6 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import {
+  type CheckIn,
   type ConversationNeedsYou,
   type GlobalConversationNeedsYou,
   type NeedsYouItem,
@@ -25,7 +26,15 @@ import { Backend, backendRuntime } from "./backend"
 import { conversationAtoms, ConversationAtomsContext } from "./conversation"
 import { ConversationChat, TranscriptProblem } from "./ConversationView"
 import { globalConversation, globalConversationOpenAtom } from "./globalConversation"
-import { contextOf, type InboxAction, ItemIcon, Reasons, titleOf, Waited } from "./inboxItem"
+import {
+  contextOf,
+  type InboxAction,
+  ItemIcon,
+  Reasons,
+  summaryParts,
+  titleOf,
+  Waited,
+} from "./inboxItem"
 import { failingChecksOf, finishedAgentReviewOf } from "./needsYou"
 import { settledProblem } from "./problems"
 import { ago } from "./PullRequestRow"
@@ -49,6 +58,7 @@ export function InboxDetail(
     OutsideQuestion: (item) => (
       <OutsideQuestionDetail key={item.id} item={item} now={now} actions={actions} />
     ),
+    CheckIn: (item) => <CheckInDetail key={item.id} item={item} now={now} actions={actions} />,
     PullRequest: (item) => (
       <PullRequestDetail
         item={item}
@@ -199,6 +209,31 @@ function OutsideQuestionDetail(props: DetailProps<OutsideQuestion>) {
           </p>
         )}
       </form>
+    </DetailShell>
+  )
+}
+
+function CheckInDetail(props: DetailProps<CheckIn>) {
+  const { item } = props
+  const details = summaryParts(item.summary)?.details ?? ""
+
+  return (
+    <DetailShell
+      actions={props.actions}
+      buttons={
+        <Link
+          to="/inbox/check-ins/$checkInId"
+          params={{ checkInId: item.id }}
+          className={buttonVariants()}
+        >
+          Read the changes
+        </Link>
+      }
+    >
+      <DetailHeader item={item} now={props.now} />
+      {details !== "" && (
+        <p className="text-sm whitespace-pre-wrap text-pretty break-words">{details}</p>
+      )}
     </DetailShell>
   )
 }

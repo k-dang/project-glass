@@ -28,7 +28,7 @@ import {
   rangeLabel,
 } from "./feedbackLines"
 import { FeedbackEditor, FeedbackNoteCard, FeedbackOverview, SelectionBar } from "./FeedbackNotes"
-import type { FeedbackNotesStore } from "./useFeedbackNotes"
+import type { FeedbackNotesEditor } from "./useFeedbackNotes"
 
 type NoteDraft = Omit<FeedbackNote, "text">
 
@@ -69,7 +69,7 @@ type FeedbackDiffProps = Required<
 
 export function useFeedbackComposer(props: {
   changesId: string | null
-  store: FeedbackNotesStore
+  store: FeedbackNotesEditor
   layout: ChangesLayout
   diffArea: RefObject<HTMLDivElement | null>
   reveal: (path: string, line: number, side: AnnotationSide, align: "center" | "nearest") => void
