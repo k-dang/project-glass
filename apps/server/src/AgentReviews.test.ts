@@ -304,6 +304,7 @@ it.live("cancels a running review, removing its checkout, and replaces the last 
     )
 
     assert.strictEqual(replaced.review?.markdown, replacement.markdown)
+    assert.strictEqual((yield* f.restart).review?.markdown, replacement.markdown)
   }),
 )
 
