@@ -41,7 +41,7 @@ export const validateTourBeforeAfter = (
   }
 }
 
-export const validateTourCallouts = (callouts: TourCallouts, files: ReadonlyArray<ChangedFile>) =>
+const validateTourCallouts = (callouts: TourCallouts, files: ReadonlyArray<ChangedFile>) =>
   callouts.filter((callout) => rangeInFiles(files, callout.target))
 
 export const repairTourVisuals = (

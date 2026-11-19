@@ -4,7 +4,6 @@ import {
   repairChapterVisuals,
   validateTourBeforeAfter,
   validateTourDiagram,
-  validateTourCallouts,
   repairTourVisuals,
 } from "./tourVisuals"
 
@@ -121,10 +120,22 @@ it("keeps callouts anchored to the Chapter diff and drops invalid targets", () =
     target: { path: file.path, side: "new", startLine: 2, endLine: 3 },
   } as const
 
+  const elsewhere = new ChangedFile({
+    path: "other.ts",
+    previousPath: null,
+    changeType: "modified",
+    additions: file.additions,
+    deletions: file.deletions,
+    patch: file.patch,
+  })
+
+  const callouts = [
+    callout,
+    { ...callout, target: { ...callout.target, startLine: 99, endLine: 99 } },
+    { ...callout, target: { ...callout.target, path: elsewhere.path } },
+  ]
+
   expect(
-    validateTourCallouts(
-      [callout, { ...callout, target: { ...callout.target, startLine: 99, endLine: 99 } }],
-      [file],
-    ),
+    repairChapterVisuals({ ...chapter, diagram: null, callouts }, [file, elsewhere]).callouts,
   ).toEqual([callout])
 })
