@@ -1,8 +1,9 @@
 import { useAtomValue } from "@effect/atom-react"
-import type { PullRequestSummary } from "@glass/contracts"
-import { Link } from "@tanstack/react-router"
+import type { PullRequestRef, PullRequestSummary } from "@glass/contracts"
+import { useNavigate } from "@tanstack/react-router"
 import { cn } from "cn"
 import { Option } from "effect"
+import type { ComponentProps } from "react"
 import { AsyncResult } from "effect/reactivity"
 import { buttonVariants } from "@/components/ui/button"
 import { TooltipHint } from "@/components/ui/tooltip"
@@ -17,14 +18,45 @@ export const useConversationPullRequest = (conversationId: string) =>
 export const pullRequestLabel = ({ ref, checks }: PullRequestSummary) =>
   `PR #${ref.number}, checks ${checksLabels[checks].label.toLowerCase()}`
 
+export function PullRequestLink({
+  href,
+  pullRequest,
+  onClick,
+  children,
+  ...props
+}: ComponentProps<"a"> & { href: string; pullRequest: PullRequestRef }) {
+  const navigate = useNavigate()
+
+  return (
+    <a
+      {...props}
+      href={href}
+      rel="noreferrer"
+      target="_blank"
+      onClick={(event) => {
+        onClick?.(event)
+
+        const opensInBrowser = event.metaKey || event.ctrlKey
+
+        if (opensInBrowser) return
+
+        event.preventDefault()
+        void navigate({ to: "/reviews/$owner/$repo/$number", params: pullRequest })
+      }}
+    >
+      {children}
+    </a>
+  )
+}
+
 export function ConversationPullRequestLink(props: { pullRequest: PullRequestSummary }) {
   const { pullRequest } = props
 
   return (
     <TooltipHint content={pullRequest.title}>
-      <Link
-        to="/reviews/$owner/$repo/$number"
-        params={pullRequest.ref}
+      <PullRequestLink
+        href={pullRequest.url}
+        pullRequest={pullRequest.ref}
         aria-label={`Open ${pullRequestLabel(pullRequest)}`}
         className={cn(
           buttonVariants({ variant: "ghost", size: "sm" }),
@@ -32,7 +64,7 @@ export function ConversationPullRequestLink(props: { pullRequest: PullRequestSum
         )}
       >
         <ChecksIcon checks={pullRequest.checks} className="size-3.5" />#{pullRequest.ref.number}
-      </Link>
+      </PullRequestLink>
     </TooltipHint>
   )
 }

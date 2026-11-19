@@ -30,7 +30,6 @@ import {
   readOnlyExplanation,
   shortSha,
 } from "@glass/contracts"
-import { useNavigate } from "@tanstack/react-router"
 import { cn } from "cn"
 import { DateTime, Exit, Match, Option, Predicate } from "effect"
 import { AsyncResult } from "effect/reactivity"
@@ -102,7 +101,7 @@ import {
 } from "@/components/ui/trace"
 import { ConversationChanges } from "./ConversationChanges"
 import { ConversationHeader, ConversationHeaderAction } from "./ConversationHeader"
-import { useConversationPullRequest } from "./ConversationPullRequest"
+import { PullRequestLink, useConversationPullRequest } from "./ConversationPullRequest"
 import {
   QueueItem,
   QueueItemAction,
@@ -909,32 +908,23 @@ function MermaidBlock(props: { code: string }) {
   )
 }
 
-// A link to a GitHub PR opens its PR workspace; Cmd- or Ctrl-click still opens it on GitHub,
-// skipping the link-safety prompt other links show since the URL is a parsed github.com PR.
-// Streamdown's default renders that prompt as a button, so this mirrors the markup of Streamdown
-// 2.7.1's plain anchor; recheck it when Streamdown moves.
-function MarkdownLink(props: ComponentProps<typeof defaultComponents.a>) {
-  const navigate = useNavigate()
-  const pullRequest = props.href === undefined ? null : parsePullRequestReference(props.href)
+const streamdownLinkClass = "wrap-anywhere font-medium text-primary underline"
 
-  if (pullRequest === null) return <defaultComponents.a {...props} />
+function MarkdownLink(props: ComponentProps<typeof defaultComponents.a>) {
+  const { href } = props
+  const pullRequest = href === undefined ? null : parsePullRequestReference(href)
+
+  if (href === undefined || pullRequest === null) return <defaultComponents.a {...props} />
 
   return (
-    <a
-      className={cn("wrap-anywhere font-medium text-primary underline", props.className)}
+    <PullRequestLink
+      className={cn(streamdownLinkClass, props.className)}
       data-streamdown="link"
-      href={props.href}
-      rel="noreferrer"
-      target="_blank"
-      onClick={(event) => {
-        if (event.metaKey || event.ctrlKey) return
-
-        event.preventDefault()
-        void navigate({ to: "/reviews/$owner/$repo/$number", params: pullRequest })
-      }}
+      href={href}
+      pullRequest={pullRequest}
     >
       {props.children}
-    </a>
+    </PullRequestLink>
   )
 }
 

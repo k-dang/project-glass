@@ -4,13 +4,12 @@ import {
   type PullRequestSummary,
   shortSha,
 } from "@glass/contracts"
-import { Link } from "@tanstack/react-router"
 import { cn } from "cn"
 import { FolderGit2, GitBranch, GitPullRequest, Package, PanelTop } from "lucide-react"
 import { createContext, type ReactNode, use, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { ConversationPullRequestLink } from "./ConversationPullRequest"
+import { ConversationPullRequestLink, PullRequestLink } from "./ConversationPullRequest"
 import { ConversationsPanelToggle } from "./Conversations"
 import { placeIcons, placeNames } from "./conversationsArea"
 import { LOCAL_SKILLS_LABEL } from "./skillChoice"
@@ -78,7 +77,10 @@ export function ConversationHeader(props: {
                 {props.pullRequest !== undefined && (
                   <PopoverClose
                     render={
-                      <Link to="/reviews/$owner/$repo/$number" params={props.pullRequest.ref} />
+                      <PullRequestLink
+                        href={props.pullRequest.url}
+                        pullRequest={props.pullRequest.ref}
+                      />
                     }
                     onClick={() => setInstant(true)}
                     className={cn(fact, action)}

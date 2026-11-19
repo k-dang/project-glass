@@ -457,14 +457,20 @@ it("links the Conversation's PR from its header, its details, and its row in the
       Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
   })
 
-  expect(await screen.findByRole("link", { name: "Open PR #264, checks passing" })).toBeTruthy()
+  const headerLink = await screen.findByRole("link", { name: "Open PR #264, checks passing" })
+  expect(headerLink.getAttribute("href")).toBe(pullRequest.url)
   expect(
     screen.getByRole("link", { name: conversation.name, description: /PR #264, checks passing/ }),
   ).toBeTruthy()
 
   await user.click(screen.getByRole("button", { name: "Details" }))
 
-  expect(await screen.findByRole("link", { name: /Greet by name/ })).toBeTruthy()
+  const detailsLink = await screen.findByRole("link", { name: /Greet by name/ })
+  expect(detailsLink.getAttribute("href")).toBe(pullRequest.url)
+
+  await user.click(detailsLink)
+
+  await waitFor(() => expect(window.location.hash).toBe("#/reviews/glass-demo/greeter/264"))
 })
 
 it("opens a Diagram from the Conversation's details, without scrolling back to its card", async () => {
