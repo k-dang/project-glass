@@ -43,7 +43,7 @@ import {
   placeKey,
   placeOfKey,
 } from "./conversationsArea"
-import { ConversationHeader } from "./ConversationHeader"
+import { ConversationFrame } from "./ConversationFrame"
 import { UserMessage } from "./ConversationView"
 import type { BackendError } from "./backend"
 import { ChipSelect } from "./chips"
@@ -411,20 +411,16 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
   }
 
   return (
-    <section
-      aria-label="New Conversation"
-      className="flex min-h-0 flex-1 flex-col [&_[data-slot=input-group]]:[view-transition-name:new-conversation-composer]"
+    <ConversationFrame
+      label="New Conversation"
+      className="[&_[data-slot=input-group]]:[view-transition-name:new-conversation-composer]"
+      heading={
+        <h1 className="truncate font-medium">
+          {starting === null ? "New Conversation" : "Starting Conversation…"}
+        </h1>
+      }
+      details={null}
     >
-      <ConversationHeader
-        heading={
-          <h1 className="truncate font-medium">
-            {starting === null ? "New Conversation" : "Starting Conversation…"}
-          </h1>
-        }
-        place={where.place}
-        repository={key}
-        baseBranch={baseBranch}
-      />
       {starting === null ? (
         <div className="flex flex-1 flex-col items-center justify-end gap-2 px-6 pb-4 text-center">
           <h2 className="text-2xl font-semibold tracking-tight">What should we work on?</h2>
@@ -561,7 +557,7 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
         )}
       </MessageBox>
       {starting === null && <div className="flex-1" />}
-    </section>
+    </ConversationFrame>
   )
 }
 

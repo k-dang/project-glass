@@ -100,7 +100,7 @@ import {
   TraceTitle,
 } from "@/components/ui/trace"
 import { ConversationChanges } from "./ConversationChanges"
-import { ConversationHeader, ConversationHeaderAction } from "./ConversationHeader"
+import { ConversationDetailsAction, ConversationFrame } from "./ConversationFrame"
 import { PullRequestLink, useConversationPullRequest } from "./ConversationPullRequest"
 import {
   QueueItem,
@@ -181,18 +181,17 @@ export function ConversationView(props: { conversationId: string } & Conversatio
 
   if (conversation === undefined)
     return (
-      <section aria-label="Conversation" className="flex min-h-0 flex-1 flex-col">
-        <ConversationHeader
-          heading={<h1 className="truncate font-medium">Conversation</h1>}
-          place={null}
-          baseBranch={null}
-        />
+      <ConversationFrame
+        label="Conversation"
+        heading={<h1 className="truncate font-medium">Conversation</h1>}
+        details={null}
+      >
         {AsyncResult.isSuccess(conversations) && (
           <p className="p-6 text-sm text-muted-foreground">
             This Conversation is gone. Pick another Conversation or start a new one.
           </p>
         )}
-      </section>
+      </ConversationFrame>
     )
 
   return (
@@ -251,55 +250,58 @@ function OpenConversation(props: { conversation: Conversation } & ConversationTa
 
   return (
     <ConversationAtomsContext value={atoms}>
-      <section aria-label={conversation.name} className="flex min-h-0 flex-1 flex-col">
-        <ConversationHeader
-          heading={
-            tab === "changes" ? (
-              <>
-                <button
-                  type="button"
-                  className="truncate text-muted-foreground hover:text-foreground"
-                  onClick={() => onTabChange("chat")}
-                >
-                  {conversation.name}
-                </button>
-                <span className="text-muted-foreground/50">/</span>
-                <h1 className="font-medium">Changes</h1>
-              </>
-            ) : (
-              <h1 className="truncate font-medium">{conversation.name}</h1>
-            )
-          }
-          place={conversation.place}
-          repository={repositoryKey(conversation.repository)}
-          branch={conversation.branch ?? undefined}
-          baseBranch={conversation.baseBranch}
-          pullRequest={pullRequest}
-          skillPacks={conversation.skillPacks}
-          localSkills={conversation.localSkills}
-        >
-          {tab === "chat" ? (
+      <ConversationFrame
+        label={conversation.name}
+        heading={
+          tab === "changes" ? (
             <>
-              <ConversationHeaderAction onNavigate={() => onTabChange("changes")}>
-                <FileDiff aria-hidden />
-                Changes
-                <Kbd className="ml-auto">{shortcutLabel("D")}</Kbd>
-              </ConversationHeaderAction>
-              {diagrams.titles.map((title) => (
-                <ConversationHeaderAction key={title} onNavigate={() => openDiagram(title)}>
-                  <Workflow aria-hidden />
-                  <span className="truncate">{title}</span>
-                </ConversationHeaderAction>
-              ))}
+              <button
+                type="button"
+                className="truncate text-muted-foreground hover:text-foreground"
+                onClick={() => onTabChange("chat")}
+              >
+                {conversation.name}
+              </button>
+              <span className="text-muted-foreground/50">/</span>
+              <h1 className="font-medium">Changes</h1>
             </>
           ) : (
-            <ConversationHeaderAction onNavigate={() => onTabChange("chat")}>
-              <MessageCircle aria-hidden />
-              Back to Chat
-              <Kbd className="ml-auto">{shortcutLabel("D")}</Kbd>
-            </ConversationHeaderAction>
-          )}
-        </ConversationHeader>
+            <h1 className="truncate font-medium">{conversation.name}</h1>
+          )
+        }
+        sidePaneOpen={tab === "chat" && pane !== null}
+        details={{
+          place: conversation.place,
+          repository: repositoryKey(conversation.repository),
+          branch: conversation.branch ?? undefined,
+          baseBranch: conversation.baseBranch,
+          pullRequest,
+          skillPacks: conversation.skillPacks,
+          localSkills: conversation.localSkills,
+          actions:
+            tab === "chat" ? (
+              <>
+                <ConversationDetailsAction onNavigate={() => onTabChange("changes")}>
+                  <FileDiff aria-hidden />
+                  Changes
+                  <Kbd className="ml-auto">{shortcutLabel("D")}</Kbd>
+                </ConversationDetailsAction>
+                {diagrams.titles.map((title) => (
+                  <ConversationDetailsAction key={title} onNavigate={() => openDiagram(title)}>
+                    <Workflow aria-hidden />
+                    <span className="truncate">{title}</span>
+                  </ConversationDetailsAction>
+                ))}
+              </>
+            ) : (
+              <ConversationDetailsAction onNavigate={() => onTabChange("chat")}>
+                <MessageCircle aria-hidden />
+                Back to Chat
+                <Kbd className="ml-auto">{shortcutLabel("D")}</Kbd>
+              </ConversationDetailsAction>
+            ),
+        }}
+      >
         <TranscriptProblem />
         <div hidden={tab !== "chat"} className="flex min-h-0 flex-1">
           <ToolCallView value={diagrams.cardOf}>
@@ -332,7 +334,7 @@ function OpenConversation(props: { conversation: Conversation } & ConversationTa
             />
           )}
         </section>
-      </section>
+      </ConversationFrame>
     </ConversationAtomsContext>
   )
 }

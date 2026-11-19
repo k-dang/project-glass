@@ -47,7 +47,7 @@ import {
 import { cleanup, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { DateTime, Deferred, Effect, Exit, Stream } from "effect"
-import { afterEach, expect, it, vi } from "vite-plus/test"
+import { afterEach, expect, it, onTestFinished, vi } from "vite-plus/test"
 import { conversation, conversationFields } from "../../test/conversation"
 import { choice, mount, pixel } from "../../test/conversationApp"
 
@@ -515,6 +515,29 @@ it("opens a Diagram from the Conversation's details, without scrolling back to i
 
   const pane = await screen.findByRole("complementary", { name: "Diagram" })
   expect(within(pane).getByText("Component map")).toBeTruthy()
+})
+
+it("pins a Conversation's details beside it on a wide window, until the user hides them", async () => {
+  const { happyDOM } = window
+  const width = window.innerWidth
+
+  happyDOM.setViewport({ width: 1400 })
+  onTestFinished(() => happyDOM.setViewport({ width }))
+
+  const user = mount({
+    WatchTranscript: () =>
+      Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
+  })
+
+  const details = await screen.findByRole("complementary", { name: "Details" })
+  await user.click(within(details).getByRole("button", { name: /Changes/ }))
+
+  expect(await screen.findByRole("heading", { name: "Changes" })).toBeTruthy()
+  expect(screen.getByRole("complementary", { name: "Details" })).toBeTruthy()
+
+  await user.click(screen.getByRole("button", { name: "Hide details" }))
+
+  expect(screen.queryByRole("complementary", { name: "Details" })).toBeNull()
 })
 
 it("lists a Sandbox Conversation's commands again once its Sandbox can be reached", async () => {

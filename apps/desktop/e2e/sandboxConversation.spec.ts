@@ -137,6 +137,7 @@ test("gives a Sandbox Conversation a Skill pack and the Local skills, and shows 
   window,
 }, testInfo) => {
   testInfo.setTimeout(90_000)
+  await window.setViewportSize({ width: 1280, height: 800 })
   github.seedBranches(repository, { defaultBranch: "main", branches: ["main"] })
 
   const commit = github.pushRepository({ owner: "acme", repo: "skills" }, "main", {
@@ -186,6 +187,9 @@ test("gives a Sandbox Conversation a Skill pack and the Local skills, and shows 
   await expect(commands).toContainText("/skill:architect")
   await expect(commands).toContainText("/skill:grilling")
 
-  await window.getByRole("button", { name: "Details" }).click()
-  await expect(window.getByText(`team @ ${shortSha(commit)} · Local skills`)).toBeVisible()
+  await expect(
+    window
+      .getByRole("complementary", { name: "Details" })
+      .getByText(`team @ ${shortSha(commit)} · Local skills`),
+  ).toBeVisible()
 })
