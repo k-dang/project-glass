@@ -147,9 +147,9 @@ const change = <A,>(list: ReadonlyArray<A>, index: number, value: A) =>
   list.map((current, at) => (at === index ? value : current))
 
 const option = (label: string, description: string | null, control: ReactNode) => (
-  <Label key={label} className="flex items-start gap-2 font-normal">
-    {control}
-    <span className="flex flex-col">
+  <Label key={label} className="flex items-start gap-2.5 leading-snug font-normal">
+    <span className="flex h-[1lh] items-center">{control}</span>
+    <span className="flex flex-col gap-0.5">
       <span>{label}</span>
       {description !== null && <span className="text-xs text-muted-foreground">{description}</span>}
     </span>
@@ -231,8 +231,8 @@ function QuestionView(props: {
   const textLabel = asked.options.length > 0 ? "Or answer in your own words" : "Your answer"
 
   return (
-    <fieldset aria-labelledby={questionId} className="flex flex-col gap-2">
-      <legend id={questionId} className="flex flex-wrap items-baseline gap-2">
+    <fieldset aria-labelledby={questionId} className="flex flex-col gap-3">
+      <legend id={questionId} className="mb-3 flex flex-wrap items-baseline gap-2">
         {asked.header !== null && (
           <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
             {asked.header}
@@ -251,7 +251,7 @@ function QuestionView(props: {
         <>
           {asked.options.length > 0 &&
             (asked.multiSelect ? (
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-3">
                 {asked.options.map(({ label, description }) =>
                   option(
                     label,
@@ -272,6 +272,7 @@ function QuestionView(props: {
             ) : (
               <RadioGroup<string | null>
                 aria-labelledby={questionId}
+                className="gap-3"
                 value={props.chosen[0] ?? null}
                 onValueChange={(label) => props.onChoose(label === null ? [] : [label])}
               >
