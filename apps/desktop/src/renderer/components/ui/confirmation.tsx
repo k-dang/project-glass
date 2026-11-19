@@ -10,7 +10,7 @@ function Confirmation({ className, ...props }: React.ComponentProps<"section">) 
       size="sm"
       render={<section {...props} />}
       className={cn(
-        "flex-col flex-nowrap items-stretch gap-2 bg-card text-card-foreground",
+        "flex-col flex-nowrap items-stretch gap-3 bg-card text-card-foreground",
         className,
       )}
     />
