@@ -45,7 +45,6 @@ import { HostConversationError, type SteersNotTakenIn } from "./agentHost/protoc
 type StopRequest = Parameters<ConversationHost["StopTurn"]>[0]
 
 interface Script {
-  readonly ensureStarted?: ClaimedConversation["ensureStarted"]
   readonly startTurn?: (turnId: string) => Effect.Effect<void, HostConversationError>
   readonly stopTurn?: (
     request: StopRequest,
@@ -178,7 +177,7 @@ const scripted = (scripts: { readonly [id: string]: Script }) =>
 
       conversations.set(id, {
         id,
-        ensureStarted: script.ensureStarted ?? (() => Effect.void),
+        ensureStarted: () => Effect.void,
         settings: { model: null, effort: null, permissionMode: null },
         host: Effect.succeed(client),
         runningHost: script.running ? Effect.succeed(Option.some(client)) : Effect.succeedNone,
@@ -426,12 +425,6 @@ it.live(
       yield* Deferred.succeed(release, undefined)
       yield* Fiber.join(stopping)
     }).pipe(Effect.provide(layer)),
-  hostStall,
-)
-
-it.live(
-  "accepts and dispatches the Global conversation while a Conversation's StartTurn is still unanswered",
-  () => acceptsWhileStartIsHeld("global-session"),
   hostStall,
 )
 

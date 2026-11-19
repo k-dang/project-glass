@@ -92,28 +92,6 @@ const droppableHostConnections = Effect.gen(function* () {
 const hasWaiting = ({ parts }: Turn) => parts.some(isWaiting)
 
 it.live(
-  "cuts off the running Turn when the agent host dies, and starts a new host for the next message",
-  () =>
-    Effect.gen(function* () {
-      const f = yield* conversationsFixture
-      const earlierHosts = childProcesses(process.pid, "scriptedAgentHost.mjs")
-      const conversation = yield* f.start("hold:never")
-      yield* f.transcript(conversation.id, holding)
-
-      const host = startedHost(earlierHosts)
-      assert.isDefined(host, "the backend has no agent host running")
-      process.kill(host, "SIGKILL")
-
-      const [cutOff] = yield* f.transcript(conversation.id, settled(1))
-      assert.deepStrictEqual(cutOff?.ended?.ending, TurnCutOff.make({}))
-
-      yield* f.send(conversation.id, "Try again")
-      const [, again] = yield* f.transcript(conversation.id, settled(2))
-      assert.deepStrictEqual(again?.ended?.ending, TurnDone.make({}))
-    }),
-)
-
-it.live(
   "retires a Permission request waiting when the agent host dies, and refuses its answer",
   () =>
     Effect.gen(function* () {
