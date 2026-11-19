@@ -6,7 +6,6 @@ interface Shortcut {
   readonly allowShift?: boolean
   readonly allowInEditable?: boolean
   readonly allowInDialog?: boolean
-  readonly allowRepeat?: boolean
   readonly run: () => void
 }
 
@@ -31,7 +30,7 @@ export function useShortcuts(shortcuts: ReadonlyArray<Shortcut>) {
         (event.shiftKey && !shortcut.allowShift) ||
         (editable && !shortcut.allowInEditable) ||
         (dialog && !shortcut.allowInDialog) ||
-        (event.repeat && !shortcut.allowRepeat)
+        event.repeat
       )
         continue
 

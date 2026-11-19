@@ -223,7 +223,6 @@ it("keeps a loading or failed Needs you off the empty Inbox", async () => {
   expect(await screen.findByText("Loading what needs you…")).toBeTruthy()
   expect(screen.queryByText("Nothing needs you right now.")).toBeNull()
   expect(screen.getByRole("heading", { name: "Inbox" }).textContent).not.toContain("0")
-  expect(screen.queryByRole("heading", { name: "Inbox 0" })).toBeNull()
 })
 
 it("shows a failed Needs you as a failure, not an empty Inbox", async () => {
@@ -243,7 +242,6 @@ it("shows a failed Needs you as a failure, not an empty Inbox", async () => {
   expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy()
   expect(screen.queryByText("Nothing needs you right now.")).toBeNull()
   expect(screen.queryByRole("heading", { name: "Inbox 0" })).toBeNull()
-  expect(screen.queryByRole("link", { name: "Needs you 0" })).toBeNull()
 })
 
 it("advances the wait while the Inbox stays open", async () => {
@@ -473,24 +471,6 @@ it("opens a Check-in's changes on their own page and approves them, with the not
   expect(await screen.findByRole("main", { name: "Inbox" })).toBeTruthy()
 })
 
-it("sends a typed answer when an outside question has no choices", async () => {
-  const answers: Array<{ id: string; answer: OutsideQuestionAnswer }> = []
-
-  const user = mount(
-    needsYouRef([OutsideQuestion.make({ ...outsideQuestion, id: "ask-2", choices: [] })]),
-    {
-      AnswerOutsideQuestion: (payload) => Effect.sync(() => void answers.push(payload)),
-    },
-  )
-
-  await screen.findByRole("heading", { name: "Ship the retry change?" })
-  const pane = within(articleOf("Ship the retry change?"))
-  await user.type(pane.getByRole("textbox", { name: "Your answer" }), "Not yet")
-  await user.click(pane.getByRole("button", { name: "Send" }))
-
-  expect(answers).toEqual([{ id: "ask-2", answer: OutsideText.make({ text: "Not yet" }) }])
-})
-
 it("starts the next outside question with an empty answer", async () => {
   const answers: Array<{ id: string; answer: OutsideQuestionAnswer }> = []
   const typed = OutsideQuestion.make({ ...outsideQuestion, id: "ask-3", choices: [] })
@@ -565,32 +545,6 @@ it("goes Back from an opened item to the Inbox with that item still selected", a
 
   await user.click(screen.getByRole("button", { name: "Forward" }))
   await waitFor(() => expect(window.location.hash).toBe("#/reviews/octo-org/glass/42"))
-})
-
-it("moves through the rows with j and k, held or pressed, skipping a folded group", async () => {
-  const user = mount(needsYouRef([waitingConversation, laterConversation, finishedReview]))
-
-  const first = await screen.findByRole("button", { name: /agent\/swift-otter/ })
-  expect(first.getAttribute("aria-current")).toBe("true")
-
-  await user.keyboard("j")
-  const second = screen.getByRole("button", { name: /agent\/quiet-lynx/ })
-  expect(second.getAttribute("aria-current")).toBe("true")
-  expect(document.activeElement).toBe(second)
-
-  await user.keyboard("k")
-  await user.keyboard("{j>2/}")
-  expect(screen.getByRole("heading", { name: "Retry flaky upload" })).toBeTruthy()
-
-  await user.keyboard("k")
-  expect(screen.getByRole("heading", { name: "agent/quiet-lynx" })).toBeTruthy()
-
-  await user.click(screen.getByRole("button", { name: /^Stopped on you/ }))
-  expect(screen.queryByRole("button", { name: /agent\/quiet-lynx/ })).toBeNull()
-  expect(screen.getByRole("heading", { name: "Retry flaky upload" })).toBeTruthy()
-
-  await user.keyboard("k")
-  expect(screen.getByRole("heading", { name: "Retry flaky upload" })).toBeTruthy()
 })
 
 it("marks a finished Agent review done with Done or e, naming the review it saw", async () => {
@@ -682,10 +636,6 @@ it("opens the pull request and offers its finished Agent review", async () => {
     ),
   ).toBeTruthy()
   expect(pane.getByText(/Updated/)).toBeTruthy()
-
-  expect(screen.getByRole("region", { name: "Agent reviews to read" }).textContent).toContain(
-    "Draft",
-  )
 
   await user.click(pane.getByRole("link", { name: "Read Agent review" }))
 

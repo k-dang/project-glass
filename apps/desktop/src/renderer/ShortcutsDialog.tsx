@@ -60,8 +60,6 @@ const groups: ReadonlyArray<ShortcutGroup> = [
     icon: Inbox,
     note: "In the Inbox. These do nothing while typing.",
     shortcuts: [
-      { label: "Next item", keys: ["J"] },
-      { label: "Previous item", keys: ["K"] },
       { label: "Allow the selected permission", keys: ["A"] },
       { label: "Mark the selected Agent review done", keys: ["E"] },
     ],

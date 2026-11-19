@@ -1,0 +1,10 @@
+{
+  "name": "@glass/example-vercel-sandboxes",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@earendil-works/pi-ai": "1.5.2",
+    "@vercel/oidc": "4.0.0",
+    "@vercel/sandbox": "4.0.0"
+  }
+}

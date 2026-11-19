@@ -469,9 +469,9 @@ it("keeps local branch, harness, model, effort, and unsent work when exploring a
   await select("Where the Conversation runs", "Fake Sandboxes")
   await within(newConversationDraft()).findByRole("button", { name: "Claude Code: Remote model" })
   expect(
-    within(within(newConversationDraft()).getByRole("combobox", { name: "Base branch" })).getByText(
-      "trunk",
-    ),
+    await within(
+      within(newConversationDraft()).getByRole("combobox", { name: "Base branch" }),
+    ).findByText("trunk"),
   ).toBeTruthy()
   expect(within(newConversationDraft()).queryByRole("combobox", { name: "Effort" })).toBeNull()
   expect(
@@ -511,9 +511,7 @@ it("keeps local branch, harness, model, effort, and unsent work when exploring a
   ])
 })
 
-// Flaky: timed out after 25 seconds in a full desktop run; passed when its file was rerun alone.
-// oxlint-disable-next-line vitest/no-disabled-tests
-it.skip("restores each harness's choices and keeps local Permission mode separate from a Sandbox", async () => {
+it("restores each harness's choices and keeps local Permission mode separate from a Sandbox", async () => {
   const created: Array<NewConversation> = []
 
   const user = mount(
@@ -564,12 +562,18 @@ it.skip("restores each harness's choices and keeps local Permission mode separat
   await user.keyboard("{Escape}")
   await within(newConversationDraft()).findByRole("button", { name: "Claude Code: Sonnet 5.5" })
   await select("Where the Conversation runs", "Fake Sandboxes")
-  await within(newConversationDraft()).findByRole("button", { name: "Claude Code: Opus 5.5" })
+  await within(await screen.findByRole("region", { name: "New Conversation" })).findByRole(
+    "button",
+    { name: "Claude Code: Opus 5.5" },
+  )
   expect(
     within(newConversationDraft()).queryByRole("combobox", { name: "Permission mode" }),
   ).toBeNull()
   await select("Where the Conversation runs", "Local")
-  await within(newConversationDraft()).findByRole("button", { name: "Claude Code: Sonnet 5.5" })
+  await within(await screen.findByRole("region", { name: "New Conversation" })).findByRole(
+    "button",
+    { name: "Claude Code: Sonnet 5.5" },
+  )
   expect(
     within(
       within(newConversationDraft()).getByRole("combobox", { name: "Permission mode" }),

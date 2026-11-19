@@ -97,7 +97,7 @@ function DetailFooter(props: { buttons?: ReactNode; actions: ReadonlyArray<Inbox
       <div className={cn(detailWidth, "flex min-h-14 flex-wrap items-center gap-2 py-3")}>
         {props.buttons}
         <p className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          {[{ key: "J K", label: "move" }, ...props.actions].map(({ key, label }) => (
+          {props.actions.map(({ key, label }) => (
             <span key={key} className="inline-flex items-center gap-1">
               <Kbd>{key}</Kbd>
               {label}

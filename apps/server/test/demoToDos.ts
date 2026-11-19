@@ -9,46 +9,45 @@ interface DemoToDo {
 
 const openDemoToDos: ReadonlyArray<DemoToDo> = [
   {
-    title: "[glass] dedicated show me artifacts / flow diagrams on tours",
+    title: "Write up the release checklist",
     notes:
-      "A Tour should open its diagram beside the chat, the same way a review pins a file. The reading order is the hard part: the map has to stay put while the chapter changes.\nhttps://bennettaur.github.io/yarvis/artifacts-beside-the-chat/02-diagram-beside-the-chat.png",
+      "Each release repeats the same steps from memory. A short checklist would make them easy to hand over: build, sign, upload, then announce.\nhttps://example.com/docs/guides/releases/checklists/release-checklist.png",
   },
   {
-    title: "Implement our own version of lavish, does it fit well inside of project-glass?",
+    title: "Compare two caching approaches",
     notes:
-      "Lavish presents an agent trace as a small stage. Glass already has a transcript and a Tour overview, so a copy has to earn its place: either it shows a run more clearly than the transcript, or it should stay out.",
+      "One keeps results in memory and is fast but forgets on restart. The other writes to disk and survives restarts but needs cleanup. Pick one before the next feature depends on it.",
   },
   {
-    title: "glass redesign?",
-    notes: "https://capy.ai/\nhttps://ui.shadcn.com/blocks/sidebar#sidebar-08",
+    title: "Try a lighter sidebar layout",
+    notes: "https://example.com/\nhttps://example.com/layouts#sidebar",
   },
   {
-    title: "Use vercel sandbox as a provider plugin",
+    title: "Book a room for the planning session",
     notes: "",
   },
   {
-    title: "Decide where sandbox logs belong",
+    title: "Decide where build logs belong",
     notes:
-      "The provider boots a sandbox, runs one command, and streams logs back into the Conversation. The lifecycle is written up at https://vercel.com/docs/sandbox and the open question is whether those logs sit beside the local checkout or in their own plugin.",
+      "The build runs one command and streams its logs back. The steps are written up at https://example.com/docs/builds and the open question is whether those logs sit beside the project or on their own page.",
   },
   {
-    title: "Reply to the sidebar thread",
+    title: "Reply to the review thread",
     notes: "",
   },
 ]
 
 const doneDemoToDosNewestFirst: ReadonlyArray<DemoToDo> = [
-  { title: "Task 1", notes: "" },
+  { title: "Send the weekly summary", notes: "" },
   {
-    title: "Fix the copy prompt for glass/plugins",
-    notes: 'The prompt still says "plugin" where the UI says "skill pack".',
+    title: "Fix the wording on the settings page",
+    notes: 'The page still says "plugin" where the rest of the app says "extension".',
   },
   {
-    title: "[glass] Some sort of artifacts beside a chat/review",
-    notes:
-      "https://bennettaur.github.io/yarvis/artifacts-beside-the-chat/02-diagram-beside-the-chat.png",
+    title: "Update the onboarding screenshots",
+    notes: "https://example.com/docs/guides/onboarding/screenshots/first-run.png",
   },
-  { title: "Task 2", notes: "" },
+  { title: "Clean up old branches", notes: "" },
 ]
 
 const createdId = (list: ReadonlyArray<ToDo>, title: string) =>

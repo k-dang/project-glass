@@ -13,6 +13,7 @@ bundle Glass hands it, with the token, port, and address in its environment. Gla
 host through `target` and keeps the transcript in SQLite, resuming from the last saved event after a
 dropped connection.
 
-To write one, start from [`examples/fake-sandboxes`](../../examples/fake-sandboxes) or paste
+To write one, start from [`examples/fake-sandboxes`](../../examples/fake-sandboxes), see a real
+platform's in [`examples/vercel-sandboxes`](../../examples/vercel-sandboxes), or paste
 [`examples/sandbox-provider-prompt.md`](../../examples/sandbox-provider-prompt.md) into your coding
 agent.

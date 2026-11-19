@@ -53,7 +53,7 @@ export function ConversationPullRequestLink(props: { pullRequest: PullRequestSum
   const { pullRequest } = props
 
   return (
-    <TooltipHint content={pullRequest.title}>
+    <TooltipHint content={pullRequest.title} side="bottom">
       <PullRequestLink
         href={pullRequest.url}
         pullRequest={pullRequest.ref}

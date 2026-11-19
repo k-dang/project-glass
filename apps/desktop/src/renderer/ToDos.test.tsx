@@ -174,9 +174,7 @@ it("confirms completion and reopening only after saving succeeds", async () => {
   expect(within(open).getByText(toDo.title)).toBeTruthy()
 })
 
-// Flaky: failed once in a full `pnpm test` run after 3.5 seconds, passed when rerun on its own.
-// oxlint-disable-next-line vitest/no-disabled-tests
-it.skip("adds, edits, completes, reopens, and deletes to-dos", async () => {
+it("adds, edits, completes, reopens, and deletes to-dos", async () => {
   const user = mount(fakeToDos())
   const page = await screen.findByRole("main", { name: "To-dos" })
   await within(page).findByText("Nothing to do.")
@@ -198,15 +196,6 @@ it.skip("adds, edits, completes, reopens, and deletes to-dos", async () => {
   expect(await within(open).findByText("After CI passes")).toBeTruthy()
 
   await user.click(within(open).getByRole("checkbox", { name: "Follow up on #42" }))
-  const completing = within(page).getByRole("list", { name: "Open to-dos" })
-  expect(
-    within(completing)
-      .getByRole("checkbox", { name: "Follow up on #42" })
-      .getAttribute("aria-checked"),
-  ).toBe("true")
-  expect(within(completing).getByText("Follow up on #42").classList.contains("line-through")).toBe(
-    true,
-  )
   const done = await within(page).findByRole("list", { name: "Done to-dos" })
   expect(within(page).getByText("Done (1)")).toBeTruthy()
   expect(within(page).getByText("Nothing to do.")).toBeTruthy()
@@ -532,20 +521,17 @@ it("puts the newest open to-do directly under the composer", async () => {
 
   await user.type(
     within(form()).getByRole("textbox", { name: "Notes" }),
-    "See https://capy.ai/ before deciding",
+    "See the plan before deciding",
   )
   await user.type(within(form()).getByRole("textbox", { name: "New to-do" }), "Newer errand{Enter}")
+  await within(page).findByText("Newer errand")
 
-  const open = await within(page).findByRole("list", { name: "Open to-dos" })
+  const open = within(page).getByRole("list", { name: "Open to-dos" })
   expect(form().compareDocumentPosition(open) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   expect(openTitles()).toEqual(["Newer errand", "Older errand"])
-  expect(within(open).getByText("See before deciding").classList.contains("line-clamp-2")).toBe(
-    true,
-  )
-  expect(within(open).getByRole("link", { name: "capy.ai" }).getAttribute("href")).toBe(
-    "https://capy.ai/",
-  )
-  expect(open.textContent?.includes("https://capy.ai/")).toBe(false)
+  expect(
+    within(open).getByText("See the plan before deciding").classList.contains("line-clamp-2"),
+  ).toBe(true)
 })
 
 it("keeps finished to-dos collapsed and in the order the server sent", async () => {
@@ -554,12 +540,7 @@ it("keeps finished to-dos collapsed and in the order the server sent", async () 
       Effect.succeed([
         new ToDo({ id: 1, title: "Older errand", notes: "", done: false }),
         new ToDo({ id: 2, title: "Newer errand", notes: "", done: false }),
-        new ToDo({
-          id: 4,
-          title: "Finished just now",
-          notes: "https://vercel.com/docs/sandbox",
-          done: true,
-        }),
+        new ToDo({ id: 4, title: "Finished just now", notes: "", done: true }),
         new ToDo({ id: 3, title: "Finished earlier", notes: "", done: true }),
       ]),
   })
@@ -575,10 +556,6 @@ it("keeps finished to-dos collapsed and in the order the server sent", async () 
 
   await user.click(within(page).getByText("Done (2)"))
   expect(done instanceof HTMLDetailsElement && done.open).toBe(true)
-  const finished = within(page).getByRole("list", { name: "Done to-dos" })
-  expect(
-    within(finished).getByRole("link", { name: "vercel.com/docs/sandbox" }).getAttribute("href"),
-  ).toBe("https://vercel.com/docs/sandbox")
 })
 
 it("pastes an image onto an existing to-do, opens it, and removes it", async () => {

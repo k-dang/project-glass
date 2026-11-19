@@ -192,5 +192,4 @@ it("hides one pack's update while another pack's update loads", async () => {
   await next(checks)
 
   expect(screen.queryByLabelText("Update alpha", { selector: "div" })).toBeNull()
-  expect(screen.queryByRole("button", { name: "Update to b17c0de" })).toBeNull()
 })

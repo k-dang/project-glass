@@ -1,6 +1,7 @@
 packages:
   - apps/*
   - packages/*
+  - examples/*
 
 minimumReleaseAge: 7200
 
