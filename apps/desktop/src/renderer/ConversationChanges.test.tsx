@@ -235,7 +235,7 @@ it("shows the Changes while Feedback notes can't load, then the notes once a ret
   expect(
     await within(region).findByText("Couldn't read your Feedback notes. Try again."),
   ).toBeTruthy()
-  expect(within(region).getByText("1 file changed")).toBeTruthy()
+  expect(await within(region).findByText("1 file changed")).toBeTruthy()
   expect(within(region).queryByText(/No feedback yet/)).toBeNull()
 
   await user.click(within(region).getByRole("button", { name: "Retry" }))
@@ -275,7 +275,7 @@ it("keeps Feedback notes readable when the Changes can't be read", async () => {
     ListFeedbackNotes: () => Effect.succeed(unsent(note("current", "read-1", "Rename B"))),
   })
 
-  expect(within(region).getByText("The Sandbox expired.")).toBeTruthy()
+  expect(await within(region).findByText("The Sandbox expired.")).toBeTruthy()
 
   const kept = await within(overview).findByRole("article", {
     name: "Feedback on greet.ts New line 2",
@@ -319,7 +319,7 @@ it("stages Feedback notes beside the unsent text and sends them as one message o
         : Effect.sync(() => void sent.push({ message, feedback })),
   })
 
-  await user.click(within(region).getByRole("button", { name: "Review feedback" }))
+  await user.click(await within(region).findByRole("button", { name: "Review feedback" }))
   const attached = await screen.findByRole("region", { name: "Feedback attached to this message" })
   expect(store.current().staged).toEqual(["first", "second"])
   expect(within(attached).getAllByRole("article")).toHaveLength(2)
@@ -421,7 +421,7 @@ it("returns a canceled Queued message's Feedback notes beside newer work once a 
         : store.handlers.SaveFeedbackNote({ conversationId: conversation.id, note: queuedNote }),
   })
 
-  await user.click(within(region).getByRole("button", { name: "Review feedback" }))
+  await user.click(await within(region).findByRole("button", { name: "Review feedback" }))
   const attached = await screen.findByRole("region", { name: "Feedback attached to this message" })
 
   const queue = await screen.findByRole("region", { name: "Queued messages" })
