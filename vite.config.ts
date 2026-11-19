@@ -13,6 +13,7 @@ const ignorePatterns = [
   ".roo/**",
   ".windsurf/**",
   "tools/oxlint/anti-slop/**",
+  "tools/oxlint/landmines/**",
 ]
 
 export default defineConfig({
@@ -29,6 +30,10 @@ export default defineConfig({
       { name: "anti-slop", specifier: "./tools/oxlint/anti-slop/index.ts" },
       { name: "anti-slop-effect", specifier: "./tools/oxlint/anti-slop/effect/index.ts" },
       { name: "glass", specifier: "./tools/oxlint/glass/index.ts" },
+      { name: "landmines-testing", specifier: "./tools/oxlint/landmines/plugins/testing.ts" },
+      { name: "landmines-style", specifier: "./tools/oxlint/landmines/plugins/style.ts" },
+      { name: "landmines-structure", specifier: "./tools/oxlint/landmines/plugins/structure.ts" },
+      { name: "landmines-types", specifier: "./tools/oxlint/landmines/plugins/types.ts" },
     ],
     categories: {
       correctness: "error",
@@ -66,6 +71,14 @@ export default defineConfig({
       "anti-slop-effect/no-manual-tagged-construction": "error",
       "anti-slop-effect/no-service-constructor-imports": "error",
       "anti-slop-effect/prefer-effect-match": "error",
+      "landmines-testing/strict-msw": "error",
+      "landmines-testing/no-unsignaled-poll": "error",
+      "landmines-testing/no-flake-masking": "error",
+      "landmines-style/no-comments": ["error", { allow: ["WARNING", "SAFETY", "Flaky"] }],
+      "landmines-structure/colocated-tests": "error",
+      "landmines-structure/test-file-names": "error",
+      "landmines-structure/package-exports": "error",
+      "landmines-types/no-explicit-return-types": "error",
     },
     overrides: [
       // Example Plugins have no Effect, so they check what they read by hand.
