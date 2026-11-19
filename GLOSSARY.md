@@ -15,7 +15,7 @@ in Conversations. Visiting Settings or Activity leaves every Saved place unchang
 **Needs you**:
 The Conversations, questions from an agent outside Glass or the Global conversation, and PRs waiting
 on the user now. They live in the Inbox, grouped by why they are waiting, with their count on the
-Inbox rail link in every area.
+Inbox rail link in every area and a dot on the Conversations rail link while a Conversation waits.
 A queued PR waits once its Agent review is finished, until the user marks that Agent review done or
 a Global conversation update includes it; writing it again puts the PR back.
 A Conversation waits once its latest Turn ends while the user isn't looking, unless they stopped it,
