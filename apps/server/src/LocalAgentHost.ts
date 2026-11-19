@@ -130,15 +130,17 @@ export class LocalAgentHost extends Context.Service<
       let current: Attached | null = null
       let pendingFollow: Effect.Effect<void> | null = null
 
-      const fingerprint = yield* fs.readFile(config.agentHostBundle).pipe(
-        Effect.map((bundle) =>
-          createHash("sha256")
-            .update(bundle)
-            .update(`\0${commands.piCommand}\0${commands.claudeCommand}`)
-            .digest("base64url"),
-        ),
-        Effect.cached,
-      )
+      // WARNING: Don't cache: in dev the bundle can be missing or rebuilt under a running backend, and the fingerprint must match the file the host spawns from.
+      const fingerprint = fs
+        .readFile(config.agentHostBundle)
+        .pipe(
+          Effect.map((bundle) =>
+            createHash("sha256")
+              .update(bundle)
+              .update(`\0${commands.piCommand}\0${commands.claudeCommand}`)
+              .digest("base64url"),
+          ),
+        )
 
       const readRecord = readRecordedHost(fs, config.dataDirectory)
 

@@ -18,12 +18,13 @@ if (!pnpmPath) throw new Error("Start the dev launcher with pnpm dev")
 
 const fake = process.argv.includes("--fake")
 
+const serverDist = join(root, "apps", "server", fake ? "dist-fake" : "dist")
+
 const outputs = [
   join(desktopDir, "dist", "main", "index.cjs"),
   join(desktopDir, "dist", "preload", "index.cjs"),
-  fake
-    ? join(root, "apps", "server", "dist-fake", "fakeBackend.mjs")
-    : join(root, "apps", "server", "dist", "bin.mjs"),
+  join(serverDist, fake ? "fakeBackend.mjs" : "bin.mjs"),
+  join(serverDist, "agentHost.mjs"),
 ]
 
 const children = new Set<ChildProcess>()
