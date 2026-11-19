@@ -33,7 +33,6 @@ export default defineConfig({
       { name: "landmines-testing", specifier: "./tools/oxlint/landmines/plugins/testing.ts" },
       { name: "landmines-style", specifier: "./tools/oxlint/landmines/plugins/style.ts" },
       { name: "landmines-structure", specifier: "./tools/oxlint/landmines/plugins/structure.ts" },
-      { name: "landmines-types", specifier: "./tools/oxlint/landmines/plugins/types.ts" },
     ],
     categories: {
       correctness: "error",
@@ -78,7 +77,6 @@ export default defineConfig({
       "landmines-structure/colocated-tests": "error",
       "landmines-structure/test-file-names": "error",
       "landmines-structure/package-exports": "error",
-      "landmines-types/no-explicit-return-types": "error",
     },
     overrides: [
       { files: ["examples/**"], rules: { "anti-slop/no-runtime-typeof": "off" } },
