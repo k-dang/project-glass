@@ -469,6 +469,7 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
         }
         send={send}
         steer={null}
+        beam
         recall={null}
         onStop={null}
         commands={commands}
