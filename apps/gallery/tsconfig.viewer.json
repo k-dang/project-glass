@@ -2,7 +2,8 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2024", "DOM", "DOM.Iterable"],
-    "types": []
+    "jsx": "react-jsx",
+    "types": ["vite/client"]
   },
-  "include": ["viewer.ts", "shot.ts"]
+  "include": ["viewer", "shot.ts"]
 }

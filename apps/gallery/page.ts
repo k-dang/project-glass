@@ -1,19 +1,18 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import { transformWithOxc } from "vite-plus"
-import type { Shot } from "./shot.ts"
+import type { GalleryData } from "./shot.ts"
 
-const style = readFileSync(join(import.meta.dirname, "viewer.css"), "utf8")
+const built = (name: string) => readFileSync(join(import.meta.dirname, "dist", name), "utf8")
 
-const viewer = join(import.meta.dirname, "viewer.ts")
+const style = built("viewer.css")
 
-const escape = (text: string) =>
-  text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
+const script = built("viewer.js")
 
-export const galleryPage = async (shots: ReadonlyArray<Shot>, capturedAt: Date) => {
-  const { code } = await transformWithOxc(readFileSync(viewer, "utf8"), viewer)
+if (script.includes("</script"))
+  throw new Error("The viewer bundle contains </script, which would end its inline <script> early")
 
-  return `<!doctype html>
+// Everything is inlined, because a page opened from disk can't load module scripts from other files.
+export const galleryPage = (data: GalleryData) => `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -22,31 +21,9 @@ export const galleryPage = async (shots: ReadonlyArray<Shot>, capturedAt: Date) 
 <style>${style}</style>
 </head>
 <body>
-<nav>
-  <header>
-    <h1>Glass app states</h1>
-    <div class="meta">${shots.length} states · captured ${escape(capturedAt.toLocaleString())}</div>
-    <input id="filter" type="search" placeholder="Filter  ( / )" aria-label="Filter states">
-  </header>
-  <div id="list"></div>
-</nav>
-<main>
-  <div class="bar">
-    <div class="title" id="title"></div>
-    <span class="keys">j k move · d theme · w whole window · g grid · c canvas</span>
-    <div class="seg"><button data-view="single">One</button><button data-view="grid">Grid</button><button data-view="canvas">Canvas</button></div>
-    <div class="seg"><button data-framing="focus">Focus</button><button data-framing="whole">Whole window</button></div>
-    <div class="seg"><button data-scheme="light">Light</button><button data-scheme="dark">Dark</button><button data-scheme="both">Both</button></div>
-  </div>
-  <div id="stage"></div>
-  <div id="canvas" hidden aria-label="Canvas of every state">
-    <div id="world"></div>
-    <div class="zoom"><button id="zoom-out" aria-label="Zoom out">−</button><output id="zoom-level">100%</output><button id="zoom-in" aria-label="Zoom in">+</button><button id="zoom-fit">Fit</button></div>
-  </div>
-</main>
-<script type="application/json" id="shots">${JSON.stringify(shots).replaceAll("<", "\\u003c")}</script>
-<script type="module">${code}</script>
+<div id="root"></div>
+<script type="application/json" id="gallery">${JSON.stringify(data).replaceAll("<", "\\u003c")}</script>
+<script type="module">${script}</script>
 </body>
 </html>
 `
-}
