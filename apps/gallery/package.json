@@ -4,10 +4,17 @@
   "description": "Screenshots every Glass app state into one browsable page",
   "type": "module",
   "scripts": {
-    "capture": "node capture.ts"
+    "capture": "vp build && node capture.ts"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",
-    "@types/node": "catalog:"
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
   }
 }
