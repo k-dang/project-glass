@@ -8,11 +8,16 @@ import {
   localPlace,
   TOKEN_PARAM,
 } from "@glass/contracts"
-import { Effect, Schema } from "effect"
+import { Effect } from "effect"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { connectRpcClient } from "../src/rpcSocket"
+import {
+  LONG_CONVERSATION_FOLLOW_UPS,
+  LONG_CONVERSATION_OPENING,
+  longConversationReply,
+} from "./demoLongConversation"
 import { DEMO_REPOSITORY } from "./demoPullRequests"
 import { lastUserWords, replyTo, startFakeAnthropic } from "./fakeAnthropic"
 import { globalConversationReply, isGlobalConversation } from "./fakeGlobalConversation"
@@ -22,6 +27,7 @@ import {
   fakeModelProvider,
   lastUserText,
   runCommands,
+  textOf,
 } from "./fakeModelProvider"
 import { seedClone } from "./gitRepositories"
 import { fakeAnthropicEnvironment, pinnedClaude } from "./pinnedClaude"
@@ -36,14 +42,6 @@ export const bundledPi = fileURLToPath(new URL("dist/bundle/cli.js", bundledPiPa
 
 export const bundledPiProgram = () =>
   installedProgram(fileURLToPath(new URL("package.json", bundledPiPackage)))
-
-const textOf = (message: FakeModelRequest["messages"][number] | undefined) => {
-  const content = message?.content
-
-  return Schema.is(Schema.String)(content)
-    ? content
-    : (content ?? []).map((part) => part.text ?? "").join("")
-}
 
 const workingSlowly = ({ messages }: FakeModelRequest) => textOf(messages.at(-1)).includes("slowly")
 
@@ -99,6 +97,10 @@ const diagramDrawings = {
 
 const demoReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
   if (isGlobalConversation(input)) return globalConversationReply(input)
+
+  const scripted = longConversationReply(input)
+
+  if (scripted !== undefined) return scripted
 
   const changes = {
     "Write a note": "printf 'hello from the agent\\n' > notes.txt",
@@ -211,6 +213,12 @@ export const seedDemoConversations = Effect.fnUntraced(function* (
     })
 
   yield* conversation("pi", "Show me around this repository.")
+  const long = yield* conversation("pi", LONG_CONVERSATION_OPENING)
+  yield* Effect.forEach(
+    LONG_CONVERSATION_FOLLOW_UPS,
+    (message) => client.SendMessage({ conversationId: long.id, message, images: [], feedback: [] }),
+    { discard: true },
+  )
   yield* conversation("pi", "Write a note")
   yield* conversation("pi", "Pick up the README typo PR")
   yield* conversation("pi", keepWorkingPrompt)
