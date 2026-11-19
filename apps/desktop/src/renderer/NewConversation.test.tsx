@@ -584,9 +584,7 @@ it.skip("restores each harness's choices and keeps local Permission mode separat
   ])
 })
 
-// Flaky: could not find the "develop" option in a full `pnpm test` run; passed when its file was rerun alone.
-// oxlint-disable-next-line vitest/no-disabled-tests
-it.skip("keeps branches per repository and falls back when a remembered branch disappears", async () => {
+it("keeps branches per repository and falls back when a remembered branch disappears", async () => {
   const other = new FollowedRepository({ owner: "glass-demo", repo: "lamp" })
   let localBranches = ["main", "develop"]
   const created: Array<NewConversation> = []
@@ -627,6 +625,13 @@ it.skip("keeps branches per repository and falls back when a remembered branch d
     await user.click(await screen.findByRole("option", { name: option }))
   }
 
+  await waitFor(() =>
+    expect(
+      within(
+        within(newConversationDraft()).getByRole("combobox", { name: "Base branch" }),
+      ).getByText("main"),
+    ).toBeTruthy(),
+  )
   await select("Base branch", "develop")
   await select("Repository", "glass-demo/lamp")
   await waitFor(() =>

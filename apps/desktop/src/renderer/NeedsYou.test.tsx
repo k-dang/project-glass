@@ -367,9 +367,7 @@ it("works a finished Conversation from the Inbox: reads its latest reply, replie
   ])
 })
 
-// Flaky: could not find the "Allow" button in a full `pnpm test` run; passed when its file was rerun alone.
-// oxlint-disable-next-line vitest/no-disabled-tests
-it.skip("answers a permission in the detail pane and selects the next item when that one leaves", async () => {
+it("answers a permission in the detail pane and selects the next item when that one leaves", async () => {
   const needsYou = needsYouRef([waitingConversation, laterConversation])
   const answers: Array<{ conversationId: string; requestId: string; answer: RequestAnswer }> = []
 
@@ -378,7 +376,9 @@ it.skip("answers a permission in the detail pane and selects the next item when 
   })
 
   await screen.findByRole("heading", { name: conversation.name })
-  await user.click(within(articleOf(conversation.name)).getByRole("button", { name: "Allow" }))
+  await user.click(
+    await within(articleOf(conversation.name)).findByRole("button", { name: "Allow" }),
+  )
 
   expect(answers).toEqual([
     { conversationId: conversation.id, requestId: "bash-1", answer: AllowRequest.make({}) },
