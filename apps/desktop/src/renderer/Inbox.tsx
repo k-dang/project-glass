@@ -10,7 +10,7 @@ import { cn } from "cn"
 import { Match, Option } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
 import { ChevronDown, Inbox as InboxIcon } from "lucide-react"
-import { type ReactNode, useEffect, useRef, useState } from "react"
+import { type ReactNode, useEffect, useState } from "react"
 import { ConversationRequest, answerRequestAtom } from "./conversationsArea"
 import { InboxDetail } from "./InboxDetail"
 import {
@@ -178,7 +178,6 @@ function InboxRow(props: {
   return (
     <button
       type="button"
-      data-inbox-row={key}
       aria-current={props.selected ? "true" : undefined}
       className="grid w-full grid-cols-[1rem_minmax(0,1fr)_auto] gap-x-3 gap-y-1 rounded-md px-2 py-2 text-left text-sm outline-none hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring aria-[current=true]:bg-accent aria-[current=true]:focus-visible:ring-0"
       onClick={() => props.onPick(key)}
@@ -278,7 +277,6 @@ export function Inbox() {
   const retry = useAtomRefresh(needsYouStreamAtom)
 
   const markReview = useAtomSet(readAgentReviewOnOpenAtom)
-  const list = useRef<HTMLDivElement>(null)
   const [folded, setFolded] = useState<ReadonlySet<NeedsYouGroup>>(new Set())
 
   const items = AsyncResult.isSuccess(status) ? status.value : []
@@ -311,18 +309,6 @@ export function Inbox() {
   const selected = flat.find((item) => needsYouKey(item) === selectedKey) ?? null
   const actions = useInboxActions(selected)
 
-  const move = (by: 1 | -1) => {
-    const at = selectedKey === null ? -1 : keys.indexOf(selectedKey)
-    const key = keys[at === -1 ? 0 : Math.min(keys.length - 1, Math.max(0, at + by))]
-
-    if (key === undefined) return
-
-    setPicked(key)
-    const row = list.current?.querySelector<HTMLElement>(`[data-inbox-row="${CSS.escape(key)}"]`)
-    row?.focus({ preventScroll: true })
-    row?.scrollIntoView({ block: "nearest" })
-  }
-
   const fold = (group: NeedsYouGroup) =>
     setFolded((last) => {
       const next = new Set(last)
@@ -332,11 +318,7 @@ export function Inbox() {
       return next
     })
 
-  useShortcuts([
-    { key: "j", allowRepeat: true, run: () => move(1) },
-    { key: "k", allowRepeat: true, run: () => move(-1) },
-    ...actions.map(({ key, run }) => ({ key, run })),
-  ])
+  useShortcuts(actions.map(({ key, run }) => ({ key, run })))
 
   return (
     <div className="flex min-h-0 flex-1">
@@ -346,7 +328,7 @@ export function Inbox() {
             Inbox <InboxCount status={status} />
           </h1>
         </header>
-        <div ref={list} className="relative min-h-0 flex-1 overflow-y-auto">
+        <div className="relative min-h-0 flex-1 overflow-y-auto">
           <InboxRows status={status} onRetry={retry}>
             <InboxGroups
               groups={groups}
