@@ -4,7 +4,8 @@ import { RpcSerialization, RpcServer } from "effect/rpc"
 import { RPC_PATH } from "@glass/contracts"
 import { isToken } from "../access"
 import { AgentHostHandlers } from "./handlers"
-import { AgentHostRpcs, HEALTH_PATH, HOST_TOKEN_HEADER, SHUTDOWN_PATH } from "./protocol"
+import { HEALTH_PATH, HOST_TOKEN_HEADER, SHUTDOWN_PATH } from "./hostAddress"
+import { AgentHostRpcs } from "./protocol"
 
 const RequireToken = (token: Redacted.Redacted) =>
   HttpRouter.middleware(

@@ -8,7 +8,8 @@ import type {
   SandboxTarget,
 } from "@glass/plugin"
 import { DateTime, Duration, Effect, Schedule } from "effect"
-import { AgentHostRpcs, HEALTH_PATH, HOST_TOKEN_HEADER, SHUTDOWN_PATH } from "./agentHost/protocol"
+import { HEALTH_PATH, HOST_TOKEN_HEADER, SHUTDOWN_PATH } from "./agentHost/hostAddress"
+import { AgentHostRpcs } from "./agentHost/protocol"
 import { connectRpcClient } from "./rpcSocket"
 import { MissingLogin, NoCapacity, SandboxGone } from "./sandboxFailures"
 

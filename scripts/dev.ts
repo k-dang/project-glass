@@ -4,6 +4,7 @@ import { createRequire } from "node:module"
 import { connect } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { stopAgentHost } from "../apps/server/test/stopAgentHost.ts"
 
 const root = join(import.meta.dirname, "..")
 
@@ -74,6 +75,8 @@ const shutdown = async (code: number) => {
   )
 
   if (fakeHome) {
+    await stopAgentHost(join(fakeHome, ".project-glass"))
+
     try {
       rmSync(fakeHome, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 })
     } catch (error) {

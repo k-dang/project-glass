@@ -21,6 +21,7 @@ import { formatAreas, formatSummary, type MemorySample, startSampler } from "./m
 import { githubMode } from "./launch-options.ts"
 import { FAKE_MODES, isFakeMode, serveFakeGitHub } from "./fake-github.ts"
 import { writeAgentCommands } from "../../../../apps/server/test/agentCommands.ts"
+import { stopAgentHost } from "../../../../apps/server/test/stopAgentHost.ts"
 import { VIEWER } from "../../../../apps/server/test/fakePullRequest.ts"
 
 const root = join(import.meta.dirname, "..", "..", "..", "..")
@@ -612,6 +613,7 @@ const stop = async (run: RunState) => {
     if (await glassRunning(run)) return fail(`Glass is still running (pid ${pid}); run state kept`)
   }
   if (run.fake !== undefined) killTree(run.fake.pid)
+  await stopAgentHost(join(paths.home, ".project-glass"))
   if (backendUrl) {
     const port = Number(new URL(backendUrl).port)
     for (let attempt = 0; attempt < 50 && (await portIsOpen(port)); attempt++) await sleep(100)
