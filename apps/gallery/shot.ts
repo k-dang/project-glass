@@ -9,3 +9,8 @@ export interface Shot extends Size {
   readonly name: string
   readonly focus: Size | null
 }
+
+export interface GalleryData {
+  readonly shots: ReadonlyArray<Shot>
+  readonly capturedAt: string
+}
