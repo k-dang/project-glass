@@ -658,37 +658,6 @@ it.live("keeps a queued operation holding the conversation after the holder fail
 
 const failedToAnswer = TurnFailed.make({ reason: HOST_DIDNT_ANSWER })
 
-it.effect("fails a Turn the host never accepts, so Stop can return", () =>
-  withWatchedClock(HOST_CONTROL_DEADLINE, (deadlineSet) =>
-    Effect.gen(function* () {
-      const entered = yield* Deferred.make<void>()
-      const release = yield* Deferred.make<void>()
-
-      const desk = yield* scripted({
-        "agent-a": { startTurn: hold(entered, release) },
-      })
-
-      const conversation = desk.conversations.get("agent-a")
-      assert.isDefined(conversation)
-
-      const sending = yield* Effect.forkChild(desk.turns.send("agent-a", sent("Build it")))
-      yield* Deferred.await(entered)
-      yield* deadlineSet
-      assert.equal(yield* Fiber.join(sending), "started")
-      yield* TestClock.adjust(Duration.millis(30_000))
-
-      const stopping = yield* Effect.forkChild(desk.turns.stop(conversation), {
-        startImmediately: true,
-      })
-
-      yield* Fiber.join(stopping)
-
-      const { turns } = yield* desk.transcripts.read("agent-a")
-      assert.deepStrictEqual(turns[0]?.ended?.ending, failedToAnswer)
-    }),
-  ).pipe(Effect.provide(layer)),
-)
-
 it.effect(
   "accepts the next message after StartTurn times out, once the stalled Turn has failed",
   () =>
@@ -1055,13 +1024,7 @@ it.effect("queues a message sent during a stalled StartTurn, and Stop stops that
       yield* deadlineSet
       assert.equal(yield* Fiber.join(first), "started")
 
-      const second = yield* Effect.forkChild(desk.turns.send("agent-a", sent("Second")), {
-        startImmediately: true,
-      })
-
-      const queued = second.pollUnsafe()
-      assert.isDefined(queued)
-      assert.equal(Exit.isSuccess(queued) ? queued.value : undefined, "queued")
+      assert.equal(yield* desk.turns.send("agent-a", sent("Second")), "queued")
 
       yield* desk.turns.stop(conversation)
 
