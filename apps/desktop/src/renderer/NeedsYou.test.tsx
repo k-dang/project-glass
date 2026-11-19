@@ -269,10 +269,10 @@ it("groups Conversations and finished reviews, and labels a draft", async () => 
   const stopped = await screen.findByRole("region", { name: "Stopped on you" })
   const reviews = screen.getByRole("region", { name: "Agent reviews to read" })
 
-  expect(within(stopped).getByRole("button", { name: /agent\/swift-otter/ })).toBeTruthy()
-  expect(within(reviews).getByRole("button", { name: /Retry flaky upload/ })).toBeTruthy()
+  expect(within(stopped).getByRole("option", { name: /agent\/swift-otter/ })).toBeTruthy()
+  expect(within(reviews).getByRole("option", { name: /Retry flaky upload/ })).toBeTruthy()
   expect(within(reviews).getByText(/Draft/)).toBeTruthy()
-  expect(within(reviews).getByRole("button", { name: /Sketch the empty state/ })).toBeTruthy()
+  expect(within(reviews).getByRole("option", { name: /Sketch the empty state/ })).toBeTruthy()
   expect(screen.getByRole("heading", { name: conversation.name })).toBeTruthy()
 })
 
@@ -298,7 +298,7 @@ it("puts a Conversation whose Turn finished unseen under Conversations that fini
     name: "Conversations that finished",
   })
 
-  const row = within(finishedConversations).getByRole("button", {
+  const row = within(finishedConversations).getByRole("option", {
     name: /agent\/swift-otter/,
   })
 
@@ -385,7 +385,7 @@ it("answers a permission in the detail pane and selects the next item when that 
   await setNeedsYou(needsYou, [laterConversation])
 
   expect(await screen.findByRole("heading", { name: "agent/quiet-lynx" })).toBeTruthy()
-  expect(screen.queryByRole("button", { name: /agent\/swift-otter/ })).toBeNull()
+  expect(screen.queryByRole("option", { name: /agent\/swift-otter/ })).toBeNull()
 })
 
 const outsideQuestion = OutsideQuestion.make({
@@ -405,8 +405,8 @@ it("answers an outside question in Stopped on you", async () => {
   })
 
   const stopped = await screen.findByRole("region", { name: "Stopped on you" })
-  const row = within(stopped).getByRole("button", { name: /Ship the retry change/ })
-  expect(row.getAttribute("aria-current")).toBe("true")
+  const row = within(stopped).getByRole("option", { name: /Ship the retry change/ })
+  expect(row.getAttribute("aria-selected")).toBe("true")
   expect(within(stopped).getByText("Asked by Claude Code")).toBeTruthy()
 
   const pane = within(articleOf("Ship the retry change?"))
@@ -417,7 +417,7 @@ it("answers an outside question in Stopped on you", async () => {
 
   await setNeedsYou(needsYou, [finishedReview])
   expect(await screen.findByRole("heading", { name: "Retry flaky upload" })).toBeTruthy()
-  expect(screen.queryByRole("button", { name: /Ship the retry change/ })).toBeNull()
+  expect(screen.queryByRole("option", { name: /Ship the retry change/ })).toBeNull()
 })
 
 it("opens a Check-in's changes on their own page and approves them, with the notes left on them", async () => {
@@ -452,7 +452,7 @@ it("opens a Check-in's changes on their own page and approves them, with the not
   })
 
   const stopped = await screen.findByRole("region", { name: "Stopped on you" })
-  expect(within(stopped).getByRole("button", { name: /Retry three times/ })).toBeTruthy()
+  expect(within(stopped).getByRole("option", { name: /Retry three times/ })).toBeTruthy()
 
   const pane = within(articleOf("Retry three times"))
   expect(pane.getByText("The backoff is in greet.ts.")).toBeTruthy()
@@ -517,8 +517,8 @@ it("allows the selected permission with a", async () => {
     AnswerRequest: (payload) => Effect.sync(() => void answers.push(payload)),
   })
 
-  const conversationRow = await screen.findByRole("button", { name: /agent\/swift-otter/ })
-  expect(conversationRow.getAttribute("aria-current")).toBe("true")
+  const conversationRow = await screen.findByRole("option", { name: /agent\/swift-otter/ })
+  expect(conversationRow.getAttribute("aria-selected")).toBe("true")
 
   await user.keyboard("a")
   expect(answers).toEqual([
@@ -533,15 +533,15 @@ it("goes Back from an opened item to the Inbox with that item still selected", a
     LoadPullRequest: hold(opened),
   })
 
-  await user.click(await screen.findByRole("button", { name: /Retry flaky upload/ }))
+  await user.click(await screen.findByRole("option", { name: /Retry flaky upload/ }))
   await user.click(screen.getByRole("link", { name: "Open pull request" }))
   await next(opened)
 
   await user.click(screen.getByRole("button", { name: "Back" }))
 
   await waitFor(() => expect(window.location.hash).toBe("#/inbox"))
-  const row = await screen.findByRole("button", { name: /Retry flaky upload/ })
-  expect(row.getAttribute("aria-current")).toBe("true")
+  const row = await screen.findByRole("option", { name: /Retry flaky upload/ })
+  expect(row.getAttribute("aria-selected")).toBe("true")
 
   await user.click(screen.getByRole("button", { name: "Forward" }))
   await waitFor(() => expect(window.location.hash).toBe("#/reviews/octo-org/glass/42"))
@@ -554,10 +554,10 @@ it("marks a finished Agent review done with Done or e, naming the review it saw"
     MarkAgentReviewDone: (payload) => Effect.sync(() => void done.push(payload)),
   })
 
-  await user.click(await screen.findByRole("button", { name: /Retry flaky upload/ }))
+  await user.click(await screen.findByRole("option", { name: /Retry flaky upload/ }))
   await user.click(within(articleOf("Retry flaky upload")).getByRole("button", { name: "Done" }))
 
-  await user.click(screen.getByRole("button", { name: /Sketch the empty state/ }))
+  await user.click(screen.getByRole("option", { name: /Sketch the empty state/ }))
   await user.keyboard("e")
 
   await waitFor(() =>
@@ -596,7 +596,7 @@ it("shows why the user's own PRs wait on them, without Agent review actions", as
   )
 
   const mine = await screen.findByRole("region", { name: "Your pull requests" })
-  const cache = within(mine).getByRole("button", { name: /Cache the diff/ })
+  const cache = within(mine).getByRole("option", { name: /Cache the diff/ })
 
   for (const reason of ["Changes requested", "CI failing", "2 threads awaiting reply"]) {
     expect(within(cache).getByText(reason)).toBeTruthy()
@@ -604,7 +604,7 @@ it("shows why the user's own PRs wait on them, without Agent review actions", as
 
   expect(within(mine).getByText("Ready to merge")).toBeTruthy()
 
-  await user.click(screen.getByRole("button", { name: /Cache the diff/ }))
+  await user.click(screen.getByRole("option", { name: /Cache the diff/ }))
   const pane = within(articleOf("Cache the diff"))
   const failing = within(pane.getByRole("region", { name: "Failing checks" }))
   expect(failing.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
@@ -626,7 +626,7 @@ it("opens the pull request and offers its finished Agent review", async () => {
     LoadPullRequest: hold(opened),
   })
 
-  await user.click(await screen.findByRole("button", { name: /Retry flaky upload/ }))
+  await user.click(await screen.findByRole("option", { name: /Retry flaky upload/ }))
   const pane = within(articleOf("Retry flaky upload"))
   expect(pane.getByText(/hubot/)).toBeTruthy()
   expect(pane.getByText("Agent review finished")).toBeTruthy()
@@ -702,4 +702,54 @@ it("opens Changes and the Agent review when the pull request is still loading", 
     expect(screen.getByRole("tab", { name: "Changes" }).getAttribute("aria-selected")).toBe("true"),
   )
   expect(screen.getByRole("complementary", { name: "Agent review" })).toBeTruthy()
+})
+
+it("moves through a group with the arrow keys, Home and End, opening each item", async () => {
+  const user = mount(needsYouRef([finishedReview, finishedDraft]))
+
+  const reviews = within(await screen.findByRole("listbox", { name: "Agent reviews to read" }))
+  const first = reviews.getByRole("option", { name: /Retry flaky upload/ })
+  const last = reviews.getByRole("option", { name: /Sketch the empty state/ })
+  await user.click(first)
+
+  await user.keyboard("{ArrowDown}")
+  expect(last.getAttribute("aria-selected")).toBe("true")
+  expect(document.activeElement).toBe(last)
+  expect(screen.getByRole("heading", { name: "Sketch the empty state" })).toBeTruthy()
+
+  await user.keyboard("{Home}")
+  expect(first.getAttribute("aria-selected")).toBe("true")
+
+  await user.keyboard("{End}")
+  expect(last.getAttribute("aria-selected")).toBe("true")
+})
+
+it("runs e on the selected item even when another title starts with E", async () => {
+  const done: Array<{ readonly pullRequest: PullRequestRef; readonly writtenAt: DateTime.Utc }> = []
+  const ensureRef = new PullRequestRef({ owner: "octo-org", repo: "glass", number: 9 })
+
+  const ensure = finished(
+    summary(ensureRef, "Ensure retries back off", false, ago({ hours: 2 })),
+    ago({ hours: 2 }),
+  )
+
+  const user = mount(needsYouRef([finishedReview, ensure]), {
+    MarkAgentReviewDone: (payload) => Effect.sync(() => void done.push(payload)),
+  })
+
+  await user.click(await screen.findByRole("option", { name: /Retry flaky upload/ }))
+  await user.keyboard("e")
+
+  await waitFor(() => expect(done).toEqual([{ pullRequest: ref, writtenAt: finishedReview.since }]))
+})
+
+it("keeps e from jumping to a title starting with E when the selected item has no done", async () => {
+  const ensure = OutsideQuestion.make({ ...outsideQuestion, id: "ask-e", question: "Ensure it?" })
+  const user = mount(needsYouRef([waitingConversation, ensure]))
+
+  const waiting = await screen.findByRole("option", { name: /agent\/swift-otter/ })
+  await user.click(waiting)
+  await user.keyboard("e")
+
+  expect(waiting.getAttribute("aria-selected")).toBe("true")
 })
