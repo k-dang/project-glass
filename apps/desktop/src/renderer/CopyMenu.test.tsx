@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { PullRequest } from "@glass/contracts"
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, expect, it, vi } from "vite-plus/test"
 import { Toaster } from "@/components/ui/toast"
