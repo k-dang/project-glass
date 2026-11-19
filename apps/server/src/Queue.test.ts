@@ -151,12 +151,22 @@ it.live("puts a removed PR back in its old place, even after more were added", (
   }),
 )
 
-// Flaky: failed once in a full server test run, then passed three times on its own.
-it.live.skip(
+it.live(
   "refreshes queued PRs from GitHub, keeping the last known row of one GitHub won't give",
   () =>
     Effect.gen(function* () {
-      const { github, start } = yield* startSignedIn
+      let failQueueReads = false
+
+      const github = yield* startFakeGitHub({
+        beforeRequest: ({ graphql }) =>
+          failQueueReads && graphql?.operationName === "QueuedPullRequests" ? 502 : undefined,
+      })
+
+      const start = startBackend(
+        { GH_TOKEN: VIEWER.token, GLASS_GITHUB_API_URL: github.url },
+        yield* isolatedHome,
+      )
+
       const merged = github.seedPullRequest({ owner: "octo-org", title: "Merge me", base, head })
       const closed = github.seedPullRequest({ owner: "octo-org", title: "Close me", base, head })
       const drafted = github.seedPullRequest({ owner: "octo-org", title: "Draft me", base, head })
@@ -208,7 +218,7 @@ it.live.skip(
       )
       github.timingOutRepositories.clear()
 
-      github.failNext(502)
+      failQueueReads = true
       const failure = yield* client.RefreshQueue().pipe(Effect.flip)
       assert.strictEqual(failure._tag, "GitHubUnavailable")
     }),
