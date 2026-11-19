@@ -216,8 +216,8 @@ it("shows pending saves and actionable errors without claiming failed changes we
 
   const user = mount({ FollowRepository: hold(follows), UnfollowRepository: hold(unfollows) })
   await user.click(await screen.findByRole("link", { name: "Follow repositories" }))
-  const repositories = screen.getByRole("region", { name: "Followed repositories" })
-  const input = screen.getByRole("textbox", { name: "Repository" })
+  const repositories = await screen.findByRole("region", { name: "Followed repositories" })
+  const input = within(repositories).getByRole("textbox", { name: "Repository" })
   await user.type(input, "invalid")
   await user.keyboard("{Enter}")
   const invalid = await next(follows)
@@ -318,7 +318,7 @@ it("preserves a pending follow and its failure when leaving and returning to Set
 
   const user = mount({ FollowRepository: hold(follows) })
   await user.click(await screen.findByRole("link", { name: "Follow repositories" }))
-  await user.type(screen.getByRole("textbox", { name: "Repository" }), "octo-org/glass")
+  await user.type(await screen.findByRole("textbox", { name: "Repository" }), "octo-org/glass")
   await user.keyboard("{Enter}")
   const follow = await next(follows)
   await user.click(screen.getByRole("link", { name: "Reviews" }))
@@ -564,7 +564,7 @@ it("starts the Global conversation fresh once confirmed and reads a past one", a
 
   await user.click(within(conversation).getByRole("button", { name: "Past conversations" }))
   const past = await screen.findByRole("dialog", { name: "Past conversations" })
-  await user.click(within(within(past).getByRole("listitem")).getByRole("button"))
+  await user.click(within(await within(past).findByRole("listitem")).getByRole("button"))
 
   await screen.findByText("Old reply")
   expect(screen.queryByRole("textbox")).toBeNull()

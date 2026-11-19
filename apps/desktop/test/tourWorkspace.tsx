@@ -80,7 +80,6 @@ export const mountTourWorkspace = (
       Effect.succeed(
         workspace([], { files: options.files ?? [], viewedPaths: options.viewedPaths ?? [] }),
       ),
-    RecordActivity: () => Effect.void,
     HasPullRequestChanged: () => Effect.succeed(false),
     SetFileViewed: setViewed,
     WriteTour: write,

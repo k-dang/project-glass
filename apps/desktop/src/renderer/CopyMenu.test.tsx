@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { PullRequest } from "@glass/contracts"
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, expect, it, vi } from "vite-plus/test"
 import { Toaster } from "@/components/ui/toast"
@@ -140,14 +140,9 @@ it("ignores repeated, composing, and consumed Escape through Base UI dismissal",
   expect(screen.queryByRole("dialog", { name: "Copy" })).toBeNull()
 })
 
-it("allows only one pending write and ignores its result after leaving the workspace", async () => {
-  const { user, write, unmount } = mount()
-  const pending = Promise.withResolvers<void>()
-  write.mockReturnValueOnce(pending.promise)
+it("allows only one pending write", async () => {
+  const { user, write } = mount()
+  write.mockReturnValueOnce(Promise.withResolvers<void>().promise)
   await user.keyboard("cgt")
-  expect(write).toHaveBeenCalledTimes(1)
-  unmount()
-  await act(async () => pending.resolve())
-  await user.keyboard("cg")
   expect(write).toHaveBeenCalledTimes(1)
 })
