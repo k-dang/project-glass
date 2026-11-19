@@ -33,6 +33,8 @@ export type ConversationTab = "chat" | "changes"
 
 export const conversationsPanelOpenAtom = Atom.make(true)
 
+export const conversationDetailsPinnedAtom = Atom.make(true).pipe(Atom.keepAlive)
+
 export const ConversationSearch = Schema.Struct({
   view: Schema.optional(Schema.Literal("changes")),
 })

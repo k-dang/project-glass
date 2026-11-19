@@ -18,6 +18,7 @@ test("reviews a local Conversation's changes on its Changes tab, held still unti
   window,
 }, testInfo) => {
   testInfo.setTimeout(90_000)
+  await window.setViewportSize({ width: 1280, height: 800 })
   const { checkout } = seedClone(join(home, "repositories"), "glass-demo", "greeter")
 
   await app.evaluate(({ dialog }, path) => {
@@ -40,21 +41,19 @@ test("reviews a local Conversation's changes on its Changes tab, held still unti
   await message.press("Enter")
   await expect(window.getByText(/^Done in/)).toBeVisible()
 
-  const details = window.getByRole("button", { name: "Details" })
-  await details.click()
-  await window.getByRole("button", { name: "Changes" }).click()
+  const details = window.getByRole("complementary", { name: "Details" })
+  await details.getByRole("button", { name: "Changes" }).click()
   const changes = window.getByRole("region", { name: "Changes" })
   await expect(changes.getByText("hello from the agent")).toBeVisible()
   await expect(message).toBeHidden()
 
-  await details.click()
+  await window.getByRole("button", { name: "Details", exact: true }).click()
   await window.getByRole("button", { name: "Back to Chat" }).click()
   await message.fill("Write another")
   await message.press("Enter")
   await expect(window.getByText(/^Done in/)).toHaveCount(2)
 
-  await details.click()
-  await window.getByRole("button", { name: "Changes" }).click()
+  await details.getByRole("button", { name: "Changes" }).click()
   await expect(changes.getByRole("note")).toContainText("worked since you opened these changes")
   await expect(changes.getByText("a second note")).toHaveCount(0)
 
