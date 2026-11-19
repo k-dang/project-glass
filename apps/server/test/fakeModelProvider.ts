@@ -46,13 +46,19 @@ export type FakeModelDelta =
       }
     }
 
-export const lastUserText = ({ messages }: FakeModelRequest) => {
-  const content = messages.findLast(({ role }) => role === "user")?.content
+export const textOf = (message: FakeModelRequest["messages"][number] | undefined) => {
+  const content = message?.content
 
   return Predicate.isString(content)
     ? content
     : (content ?? []).map(({ text }) => text ?? "").join("")
 }
+
+export const firstUserText = ({ messages }: FakeModelRequest) =>
+  textOf(messages.find(({ role }) => role === "user"))
+
+export const lastUserText = ({ messages }: FakeModelRequest) =>
+  textOf(messages.findLast(({ role }) => role === "user"))
 
 export const runCommands =
   (commandsByMessage: Readonly<Record<string, string>>) =>

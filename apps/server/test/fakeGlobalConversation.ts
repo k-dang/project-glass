@@ -1,9 +1,11 @@
 import { localPlace } from "@glass/contracts"
 import { Predicate, type Schema } from "effect"
-import { type FakeModelDelta, type FakeModelRequest, lastUserText } from "./fakeModelProvider.ts"
-
-const textOf = ({ content }: FakeModelRequest["messages"][number]) =>
-  Predicate.isString(content) ? content : (content ?? []).map(({ text }) => text ?? "").join("")
+import {
+  type FakeModelDelta,
+  type FakeModelRequest,
+  lastUserText,
+  textOf,
+} from "./fakeModelProvider.ts"
 
 const toolNames = ({ tools = [] }: FakeModelRequest) =>
   tools.flatMap((tool) =>

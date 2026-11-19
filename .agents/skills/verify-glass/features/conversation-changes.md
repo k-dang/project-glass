@@ -36,7 +36,7 @@ Sending feedback, from a note added in Changes:
 
 ## Gotchas
 
-- The demo backend writes files only for the two exact messages, in `demoReply` (`apps/server/test/demoConversation.ts`), as in `apps/desktop/e2e/conversationChanges.spec.ts`. Other demo messages do not write files.
+- The demo backend writes files only for the two exact messages in `demoReply` (`apps/server/test/demoConversation.ts`), as in `apps/desktop/e2e/conversationChanges.spec.ts`, and in the long Conversation in `apps/server/test/demoLongConversation.ts`. Other demo messages do not write files.
 - Capture snapshots before selecting Details menu items; target their accessible roles and names.
 - The first Changes view is deliberately pinned; returning to Chat does not refresh it.
 - Line numbers aren't buttons in the accessibility tree, so select lines with `press --shift` from a clicked code line rather than by clicking a number.
