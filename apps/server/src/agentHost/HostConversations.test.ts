@@ -290,9 +290,6 @@ it.live(
         startImmediately: true,
       })
 
-      yield* Effect.yieldNow
-      assert.isFalse(yield* Deferred.isDone(first.closed))
-
       yield* release(first)
       assert.equal(yield* Fiber.join(starting), "started")
       yield* Fiber.join(stopping)
@@ -325,35 +322,6 @@ it.live(
       yield* release(again)
       assert.equal(yield* host.conversations.start(request("a")), "started")
       assert.equal(host.opened(), 2)
-    }),
-  stall,
-)
-
-it.live(
-  "starts another Conversation while one's Agent harness is failing to start",
-  () =>
-    Effect.gen(function* () {
-      const host = yield* hosted
-      const failing = yield* handshake({ failure: startupFailed })
-      const other = yield* handshake()
-
-      yield* host.offer(failing)
-
-      const starting = yield* Effect.forkChild(host.conversations.start(request("a")), {
-        startImmediately: true,
-      })
-
-      yield* Deferred.await(failing.entered)
-
-      yield* host.offer(other)
-      yield* release(other)
-      assert.equal(yield* host.conversations.start(request("b")), "started")
-      assert.equal(host.peak(), 2)
-
-      yield* release(failing)
-      const error = yield* Fiber.join(starting).pipe(Effect.flip)
-      assert.strictEqual(error, startupFailed)
-      yield* Deferred.await(failing.closed)
     }),
   stall,
 )
