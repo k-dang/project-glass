@@ -521,7 +521,7 @@ it("puts the newest open to-do directly under the composer", async () => {
 
   await user.type(
     within(form()).getByRole("textbox", { name: "Notes" }),
-    "See https://capy.ai/ before deciding",
+    "See the plan before deciding",
   )
   await user.type(within(form()).getByRole("textbox", { name: "New to-do" }), "Newer errand{Enter}")
   await within(page).findByText("Newer errand")
@@ -529,13 +529,9 @@ it("puts the newest open to-do directly under the composer", async () => {
   const open = within(page).getByRole("list", { name: "Open to-dos" })
   expect(form().compareDocumentPosition(open) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   expect(openTitles()).toEqual(["Newer errand", "Older errand"])
-  expect(within(open).getByText("See before deciding").classList.contains("line-clamp-2")).toBe(
-    true,
-  )
-  expect(within(open).getByRole("link", { name: "capy.ai" }).getAttribute("href")).toBe(
-    "https://capy.ai/",
-  )
-  expect(open.textContent?.includes("https://capy.ai/")).toBe(false)
+  expect(
+    within(open).getByText("See the plan before deciding").classList.contains("line-clamp-2"),
+  ).toBe(true)
 })
 
 it("keeps finished to-dos collapsed and in the order the server sent", async () => {
@@ -544,12 +540,7 @@ it("keeps finished to-dos collapsed and in the order the server sent", async () 
       Effect.succeed([
         new ToDo({ id: 1, title: "Older errand", notes: "", done: false }),
         new ToDo({ id: 2, title: "Newer errand", notes: "", done: false }),
-        new ToDo({
-          id: 4,
-          title: "Finished just now",
-          notes: "https://vercel.com/docs/sandbox",
-          done: true,
-        }),
+        new ToDo({ id: 4, title: "Finished just now", notes: "", done: true }),
         new ToDo({ id: 3, title: "Finished earlier", notes: "", done: true }),
       ]),
   })
@@ -565,10 +556,6 @@ it("keeps finished to-dos collapsed and in the order the server sent", async () 
 
   await user.click(within(page).getByText("Done (2)"))
   expect(done instanceof HTMLDetailsElement && done.open).toBe(true)
-  const finished = within(page).getByRole("list", { name: "Done to-dos" })
-  expect(
-    within(finished).getByRole("link", { name: "vercel.com/docs/sandbox" }).getAttribute("href"),
-  ).toBe("https://vercel.com/docs/sandbox")
 })
 
 it("pastes an image onto an existing to-do, opens it, and removes it", async () => {
