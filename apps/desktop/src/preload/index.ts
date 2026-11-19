@@ -1,6 +1,7 @@
 import {
   BACKEND_ENDPOINT_CHANNEL,
   BACKEND_FAILURE_CHANNEL,
+  BRING_TO_FRONT_CHANNEL,
   CHOOSE_FOLDER_CHANNEL,
   CLOSE_HTML_PAGE_CHANNEL,
   type DesktopBridge,
@@ -21,6 +22,7 @@ const bridge: DesktopBridge = {
   setAppearance: (appearance) => ipcRenderer.invoke(SET_APPEARANCE_CHANNEL, appearance),
   resourceUsage: () => ipcRenderer.invoke(RESOURCE_USAGE_CHANNEL),
   chooseFolder: () => ipcRenderer.invoke(CHOOSE_FOLDER_CHANNEL),
+  bringToFront: () => ipcRenderer.invoke(BRING_TO_FRONT_CHANNEL),
   dogfoodReports: {
     record: () => ipcRenderer.invoke(RECORD_DOGFOOD_REPORT_CHANNEL),
     finish: (details) => ipcRenderer.invoke(FINISH_DOGFOOD_REPORT_CHANNEL, details),

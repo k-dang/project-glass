@@ -2,6 +2,7 @@ import {
   BACKEND_ENDPOINT_CHANNEL,
   BACKEND_FAILURE_CHANNEL,
   type BackendEndpoint,
+  BRING_TO_FRONT_CHANNEL,
   CHOOSE_FOLDER_CHANNEL,
   CLOSE_HTML_PAGE_CHANNEL,
   type BackendFailure,
@@ -292,6 +293,18 @@ void app.whenReady().then(() => {
         : await dialog.showOpenDialog(window, options)
 
     return chosen.canceled ? null : (chosen.filePaths[0] ?? null)
+  })
+  ipcMain.handle(BRING_TO_FRONT_CHANNEL, (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+
+    if (window === null) return
+
+    if (window.isMinimized()) window.restore()
+
+    window.show()
+    // WARNING: macOS won't activate an app another app is in front of without steal.
+    app.focus({ steal: true })
+    window.focus()
   })
 
   ipcMain.handle(RECORD_DOGFOOD_REPORT_CHANNEL, async (event) => {

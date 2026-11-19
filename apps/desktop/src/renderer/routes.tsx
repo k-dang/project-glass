@@ -20,6 +20,7 @@ import { Dashboard } from "./Dashboard"
 import { Connecting, ConnectionProblem } from "./ConnectionProblem"
 import { useConnection } from "./connection"
 import { Viewed, viewedAtom } from "./globalConversation"
+import { openNewCheckIns } from "./openNewCheckIns"
 import {
   closePullRequest,
   decodePullRequestParams,
@@ -237,6 +238,10 @@ export const createAppRouter = (registry: AtomRegistry.AtomRegistry) => {
   const router = makeRouter(registry)
 
   router.subscribe("onResolved", () => registry.set(viewedAtom, viewedIn(router)))
+  openNewCheckIns(registry, (checkInId) => {
+    void window.glass.bringToFront()
+    void router.navigate({ to: "/inbox/check-ins/$checkInId", params: { checkInId } })
+  })
 
   return router
 }
