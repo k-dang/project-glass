@@ -73,7 +73,7 @@ function DetailShell(props: {
 }) {
   return (
     <article className="flex min-h-0 flex-1 flex-col">
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="relative min-h-0 flex-1 overflow-y-auto">
         <div className={cn(detailWidth, "flex flex-col gap-6 py-10")}>{props.children}</div>
       </div>
       <DetailFooter buttons={props.buttons} actions={props.actions} />

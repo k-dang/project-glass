@@ -345,7 +345,7 @@ export function Inbox() {
             Inbox <InboxCount status={status} />
           </h1>
         </header>
-        <div ref={list} className="min-h-0 flex-1 overflow-y-auto">
+        <div ref={list} className="relative min-h-0 flex-1 overflow-y-auto">
           <InboxRows status={status} onRetry={retry}>
             <InboxGroups
               groups={groups}
