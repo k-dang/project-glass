@@ -163,19 +163,17 @@ describe("ask_user", () => {
 
       const inFlight = yield* Effect.forkChild(call.response)
 
-      yield* needsYou(client, (items) => outside(items).length === 1)
+      const [asked] = outside(yield* needsYou(client, (items) => outside(items).length === 1))
+      assert.isDefined(asked)
 
       assert.deepStrictEqual(
         askResult(toolResult(yield* Fiber.join(inFlight)).structuredContent),
         AskUserTimedOut.make({}),
       )
-      assert.equal(
-        outside(yield* needsYou(client, (items) => outside(items).length === 0)).length,
-        0,
-      )
+      yield* needsYou(client, (items) => outside(items).length === 0)
 
       const late = yield* client
-        .AnswerOutsideQuestion({ id: "gone", answer: OutsideText.make({ text: "too late" }) })
+        .AnswerOutsideQuestion({ id: asked.id, answer: OutsideText.make({ text: "too late" }) })
         .pipe(Effect.flip)
 
       assert.equal(late._tag, "OutsideQuestionNotWaiting")
