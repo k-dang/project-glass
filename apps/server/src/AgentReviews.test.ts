@@ -299,7 +299,10 @@ it.live("cancels a running review, removing its checkout, and replaces the last 
     yield* f.runners.configure({ reply: { answer: replacement } })
     yield* f.start
 
-    const replaced = yield* f.state((state) => reviewed(state) && state.review !== first)
+    const replaced = yield* f.state(
+      (state) => reviewed(state) && state.review?.markdown !== first.markdown,
+    )
+
     assert.strictEqual(replaced.review?.markdown, replacement.markdown)
   }),
 )
@@ -366,8 +369,7 @@ it.live(
       f.github.gitRefusedRepositories.clear()
       f.github.unavailableRepositories.add(repository)
       yield* f.start
-      yield* f.state((state) => state.job.status === "reviewing")
-      assert.strictEqual((yield* f.failed).reason, "fetch-failed")
+      yield* f.state(({ job }) => job.status === "failed" && job.reason.reason === "fetch-failed")
     }),
 )
 

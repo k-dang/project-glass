@@ -31,6 +31,7 @@ const startRelay = Effect.gen(function* () {
   const requests: Array<string> = []
   const arrivals = new Map<string, Deferred.Deferred<void>>()
   const holds = new Map<string, Deferred.Deferred<void>>()
+  const failing = new Map<string, number>()
 
   const arrival = (kind: string) => {
     const known = arrivals.get(kind)
@@ -62,6 +63,14 @@ const startRelay = Effect.gen(function* () {
         await Promise.race([Effect.runPromise(Deferred.await(hold)), aborted])
       }
 
+      const status = failing.get(kind)
+
+      if (status !== undefined) {
+        failing.delete(kind)
+
+        return new Response(null, { status })
+      }
+
       const { pathname, search } = new URL(request.url)
 
       return fetch(`${github.url}${pathname}${search}`, {
@@ -82,6 +91,9 @@ const startRelay = Effect.gen(function* () {
     revision: new Revision({ base: "b0", head: "h1" }),
     requests,
     arrived: (kind: string) => Deferred.await(arrival(kind)),
+    failNext: (kind: string, status: number) => {
+      failing.set(kind, status)
+    },
     hold: (kind: string) => {
       const release = Deferred.makeUnsafe<void>()
       holds.set(kind, release)
@@ -170,9 +182,9 @@ describe("Reading Tour and Agent review inputs", () => {
 
   it.live("a stale PR wins over a changed-files read that failed first", () =>
     Effect.gen(function* () {
-      const { client, github, pr, ref, revision, arrived, hold } = yield* startRelay
+      const { client, pr, ref, revision, arrived, hold, failNext } = yield* startRelay
       const release = hold("TourInput")
-      github.failNext(503)
+      failNext(FILES, 503)
 
       const reading = yield* client
         .reviewInput(ref, revision)
