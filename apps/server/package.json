@@ -7,7 +7,7 @@
     "dev": "vp pack --watch",
     "record:runners": "jiti test/recordRunnerReplays.ts",
     "record:sessions": "jiti test/recordSessions.ts",
-    "test": "vp test run"
+    "test": "vp test run --maxWorkers=6"
   },
   "devDependencies": {
     "@anthropic-ai/claude-agent-sdk": "0.3.322",
