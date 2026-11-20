@@ -29,6 +29,7 @@ import { Plugins } from "./Plugins"
 import { Sandboxes } from "./Sandboxes"
 import { ServerConfig } from "./ServerConfig"
 import { LocalPlacement } from "./LocalPlacement"
+import { GlassToolRelay } from "./mcp/GlassToolRelay"
 import { McpCredentials } from "./mcp/McpCredentials"
 import { McpOAuth } from "./mcp/McpOAuth"
 import { OAuthRoutes } from "./mcp/oauthHttp"
@@ -132,6 +133,7 @@ const services = (
       Layer.provide(Layer.merge(ActivityLog.layer, Storage.layer)),
       Layer.provideMerge(OutsideAgents.layer),
       Layer.provideMerge(McpOAuth.layer),
+      Layer.provide(GlassToolRelay.layer),
       Layer.provide(DatabaseLive),
       Layer.provide(FollowedRepositories.layer),
       Layer.provide(SettingsStore.layer),

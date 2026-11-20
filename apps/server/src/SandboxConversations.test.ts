@@ -1,7 +1,91 @@
 import { assert, it } from "@effect/vitest"
-import { TextPart, TurnCutOff, TurnDone } from "@glass/contracts"
+import {
+  type ConversationPlace,
+  localPlace,
+  SandboxPlace,
+  TextPart,
+  TurnCutOff,
+  TurnDone,
+} from "@glass/contracts"
 import { Effect, Predicate } from "effect"
-import { conversationsFixture, holding, lastText, settled } from "../test/conversationsFixture"
+import {
+  glassCall,
+  conversationOutcomesInStartedWorkUpdates,
+  conversationsFixture,
+  glassCalls,
+  holding,
+  lastText,
+  repository,
+  settled,
+} from "../test/conversationsFixture"
+
+const createIn = (place: ConversationPlace, message: string) =>
+  glassCall("create_conversation", {
+    repository: { owner: repository.owner, repo: repository.repo },
+    baseBranch: "main",
+    place,
+    harness: "pi",
+    model: null,
+    effort: null,
+    message,
+  })
+
+it.live(
+  "a Conversation in a Sandbox creates a Conversation through Glass's tools and hears when it ends",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* conversationsFixture
+
+      const parent = yield* f.startSandbox(
+        createIn(SandboxPlace.make({ providerId: "fake" }), "hold:child"),
+      )
+
+      yield* f.transcript(parent.id, settled(1))
+      const [child] = (yield* f.conversations).filter(({ id }) => id !== parent.id)
+      yield* f.transcript(child!.id, holding)
+      yield* f.release("child")
+
+      const turns = yield* f.transcript(parent.id, settled(2))
+
+      assert.deepStrictEqual(child?.place, SandboxPlace.make({ providerId: "fake" }))
+      assert.deepStrictEqual(conversationOutcomesInStartedWorkUpdates(turns), [
+        [child!.id, "finished"],
+      ])
+    }),
+)
+
+it.live("a Conversation in a Sandbox can't create or message one on this device", () =>
+  Effect.gen(function* () {
+    const f = yield* conversationsFixture
+    const local = yield* f.start("Say hello")
+    yield* f.transcript(local.id, settled(1))
+
+    const sandboxed = yield* f.startSandbox(createIn(localPlace, "Investigate"))
+    yield* f.transcript(sandboxed.id, settled(1))
+    yield* f.send(
+      sandboxed.id,
+      glassCall("send_conversation_message", { conversationId: local.id, message: "Hi" }),
+    )
+    const [created, messaged] = yield* f.transcript(sandboxed.id, settled(2))
+
+    assert.deepStrictEqual(
+      [...(glassCalls(created) ?? []), ...(glassCalls(messaged) ?? [])].map(({ status }) => status),
+      ["failed", "failed"],
+    )
+    assert.include(
+      glassCalls(created)?.[0]?.output,
+      "A Conversation in a Sandbox can only create Conversations in a Sandbox.",
+    )
+    assert.include(
+      glassCalls(messaged)?.[0]?.output,
+      "A Conversation in a Sandbox can only message Conversations in a Sandbox.",
+    )
+    assert.deepStrictEqual(
+      (yield* f.conversations).map(({ id }) => id),
+      [local.id, sandboxed.id],
+    )
+  }),
+)
 
 it.live("cuts off only the running Turn of a Conversation whose Sandbox host is lost", () =>
   Effect.gen(function* () {

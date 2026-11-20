@@ -14,6 +14,7 @@ import {
   Exit,
   FileSystem,
   Layer,
+  Match,
   Predicate,
   Scope,
   Semaphore,
@@ -21,6 +22,7 @@ import {
 } from "effect"
 import type { HarnessAdapter, HarnessSession } from "./adapter"
 import type { DeliveredMessage, DeliveredTurn } from "./deliveredMessage"
+import { HostGlassTools } from "./HostGlassTools"
 import { Journal } from "./Journal"
 import { writeSentSkills } from "./sentSkills"
 import {
@@ -98,6 +100,7 @@ export class HostConversations extends Context.Service<
       HostConversations,
       Effect.gen(function* () {
         const journal = yield* Journal
+        const glassTools = yield* HostGlassTools
         const fs = yield* FileSystem.FileSystem
 
         const written = (folder: string, skills: ReadonlyArray<SkillSource>) =>
@@ -236,11 +239,20 @@ export class HostConversations extends Context.Service<
             const started = Effect.gen(function* () {
               const skills = yield* written(folder, starting.skills)
 
+              const tools = yield* Match.value(starting.role).pipe(
+                Match.tagsExhaustive({
+                  Global: (role) => Effect.succeed(role.tools),
+                  Work: () => glassTools.access(conversationId),
+                  Review: () => Effect.succeed(undefined),
+                }),
+              )
+
               return yield* starting.harness === "pi"
                 ? adapters.pi.start({
                     folder,
                     conversation: conversationId,
                     role: starting.role,
+                    glassTools: tools,
                     skills,
                     report,
                   })
@@ -248,6 +260,7 @@ export class HostConversations extends Context.Service<
                     folder,
                     conversation: conversationId,
                     role: starting.role,
+                    glassTools: tools,
                     skills,
                     report,
                   })

@@ -2,6 +2,7 @@ import { Effect } from "effect"
 import { AgentHostRpcs, failure, HOST_PROTOCOL } from "./protocol"
 import { Changes } from "../Changes"
 import { FolderFiles } from "./FolderFiles"
+import { HostGlassTools } from "./HostGlassTools"
 import { HostConversations } from "./HostConversations"
 import { Journal } from "./Journal"
 
@@ -11,6 +12,7 @@ export const AgentHostHandlers = AgentHostRpcs.toLayer(
     const journal = yield* Journal
     const changes = yield* Changes
     const folderFiles = yield* FolderFiles
+    const glassTools = yield* HostGlassTools
 
     return AgentHostRpcs.of({
       Hello: () => Effect.succeed({ host: journal.host, protocol: HOST_PROTOCOL }),
@@ -42,6 +44,9 @@ export const AgentHostHandlers = AgentHostRpcs.toLayer(
       WatchJournal: ({ host, after }) => journal.watch(host, after),
       Acknowledge: ({ host, through }) => journal.acknowledge(host, through),
       UnacknowledgedTurns: () => conversations.unacknowledgedTurns,
+      OfferGlassTools: ({ host, tools }) => glassTools.offer(host, tools),
+      WatchToolCalls: ({ host }) => glassTools.watch(host),
+      AnswerToolCall: ({ host, callId, result }) => glassTools.answer(host, callId, result),
     })
   }),
 )

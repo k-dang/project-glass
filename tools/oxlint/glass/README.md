@@ -25,9 +25,11 @@ source as in the app's bundler configuration.
   service or every file in a subdirectory as domain logic.
 
 Transport owners are `bin.ts`, `server.ts`, `handlers.ts`, `access.ts`, `agentHost.ts`,
-`agentHost/handlers.ts`, `agentHost/server.ts`, `rpcSocket.ts`, `mcp/server.ts`, `LocalAgentHost.ts`,
-and `sandboxCalls.ts` under `apps/server/src/`. The last two are connection adapters that services may call;
-other code cannot import the entry points or socket implementation directly.
+`agentHost/handlers.ts`, `agentHost/server.ts`, `rpcSocket.ts`, `mcp/server.ts`, `mcp/mcpHttp.ts`,
+`LocalAgentHost.ts`, `sandboxCalls.ts`, `agentHost/HostGlassTools.ts`, and `mcp/GlassToolRelay.ts` under `apps/server/src/`.
+The last four are connection adapters that services may call; `HostGlassTools` and `GlassToolRelay`
+carry Glass's tool calls between a host's MCP endpoint and the backend's. Other code cannot import
+the entry points or socket implementation directly.
 `github/GitHubClient.ts` may import the named outbound Effect HTTP client modules in
 `httpClient`, but cannot import inbound routing/server implementations.
 

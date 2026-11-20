@@ -10,8 +10,9 @@ import {
   TurnDone,
   TurnStopped,
 } from "@glass/contracts"
-import { NodeFileSystem } from "@effect/platform-node"
-import { Effect, Fiber, Layer, Predicate, Schema } from "effect"
+import { NodeHttpServer, NodeServices } from "@effect/platform-node"
+import { Deferred, Effect, Fiber, Layer, Predicate, Redacted, Schema } from "effect"
+import { createServer } from "node:http"
 import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import {
@@ -36,9 +37,14 @@ import {
 } from "../../test/fakeModelProvider"
 import { recordingSessions } from "../../test/sessionTape"
 import { PI_MODEL_ID } from "../../test/piLogin"
+import { Changes } from "../Changes"
+import { Git } from "../git"
+import { FolderFiles } from "./FolderFiles"
 import { HostConversations } from "./HostConversations"
+import { HostGlassTools } from "./HostGlassTools"
 import { Journal } from "./Journal"
-import { ReviewRole, WorkRole } from "./protocol"
+import { newHostToken, ReviewRole, WorkRole } from "./protocol"
+import { hostServer } from "./server"
 
 const conversationId = "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d"
 
@@ -725,9 +731,18 @@ it.live("keeps pi's extensions when a stopped Conversation is started again stra
     const f = yield* piSession("pi-restart", { fake: {} })
 
     const context = yield* Layer.build(
-      HostConversations.make({ "claude-code": f.adapter, pi: f.adapter }).pipe(
+      hostServer({
+        token: Redacted.make(newHostToken()),
+        shutDown: yield* Deferred.make<void>(),
+      }).pipe(
+        Layer.provideMerge(NodeHttpServer.layer(createServer, { port: 0, host: "127.0.0.1" })),
+        Layer.provideMerge(HostConversations.make({ "claude-code": f.adapter, pi: f.adapter })),
+        Layer.provideMerge(HostGlassTools.layer),
         Layer.provideMerge(Journal.layer),
-        Layer.provide(NodeFileSystem.layer),
+        Layer.provide(Changes.layer),
+        Layer.provide(FolderFiles.layer),
+        Layer.provide(Git.layer),
+        Layer.provide(NodeServices.layer),
       ),
     )
 
@@ -748,7 +763,7 @@ it.live("keeps pi's extensions when a stopped Conversation is started again stra
     assert.equal(yield* start, "started")
     yield* Fiber.join(stopping)
 
-    for (const extension of ["draw-diagram.mjs", "subagent-status.js"])
+    for (const extension of ["draw-diagram.mjs", "subagent-status.js", "glass-tools.js"])
       assert.isTrue(existsSync(join(`${f.folder}.pi`, extension)), extension)
   }).pipe(Effect.scoped),
 )

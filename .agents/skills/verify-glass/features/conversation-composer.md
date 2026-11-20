@@ -35,4 +35,4 @@ Preconditions:
 - Send now and Cancel are hidden until hover; target them by name rather than by sight.
 - `type` replaces the box's text without a key press, so send with `press --key Enter`.
 - `--backend fake` brings its own fake GitHub, so it doesn't combine with `--github fake`.
-- A message that is `call:<glass tool> <json input>`, such as `call:list_conversation_places {}`, has a Conversation's agent, pi or Claude Code, call that Glass tool, so `create_conversation` and `send_conversation_message` start and message other Conversations and the parent gets "Update from Glass" when they end.
+- A message that is `call:<glass tool> <json input>`, such as `call:list_conversation_places {}`, has a Conversation's agent, pi or Claude Code, call that Glass tool, so `create_conversation` and `send_conversation_message` start and message other Conversations and the parent gets "Update from Glass" when they end. It works on this device and in a Sandbox, but a Conversation in a Sandbox can only create and message Conversations in a Sandbox.

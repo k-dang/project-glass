@@ -1,6 +1,7 @@
 import type { ConversationError } from "@glass/contracts"
-import { Data, Effect, Stream } from "effect"
+import { Data, Effect, type Scope, Stream } from "effect"
 import { HOST_PROTOCOL, type HostEvent } from "./agentHost/protocol"
+import type { GlassToolRelay, ToolCallOrigin } from "./mcp/GlassToolRelay"
 import type { HostClient } from "./Placement"
 
 export class IncompatibleHost extends Data.TaggedError("IncompatibleHost")<{
@@ -75,4 +76,38 @@ export const followJournal = (
         }),
       ),
     )
+  })
+
+export const followHost = (
+  client: HostClient,
+  position: JournalPosition,
+  options: {
+    readonly save: Parameters<typeof followJournal>[0]
+    readonly alreadySaved: (conversationId: string) => number
+    readonly relay: GlassToolRelay["Service"]
+    readonly origin: ToolCallOrigin
+    readonly calls: Scope.Scope
+  },
+) =>
+  Effect.gen(function* () {
+    const { save, alreadySaved, relay, origin, calls } = options
+
+    yield* client.OfferGlassTools({ host: position.host, tools: yield* relay.tools })
+
+    const toolCalls = client.WatchToolCalls({ host: position.host }).pipe(
+      Stream.runForEach((call) =>
+        relay.answer(origin, call).pipe(
+          Effect.flatMap((result) =>
+            client.AnswerToolCall({ host: position.host, callId: call.callId, result }),
+          ),
+          Effect.ignore,
+          Effect.forkIn(calls),
+        ),
+      ),
+    )
+
+    return Effect.all([followJournal(save, client, position, alreadySaved), toolCalls], {
+      concurrency: "unbounded",
+      discard: true,
+    })
   })
