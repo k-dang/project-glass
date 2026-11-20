@@ -255,6 +255,29 @@ it.live("deletes a Sandbox still being made when its Conversation is removed", (
   }),
 )
 
+it.live("shows no changes or files for a Sandbox still being made, without waiting on it", () =>
+  Effect.gen(function* () {
+    const f = yield* conversationServicesFixture
+    f.sandboxes.configure({ holdAt: steps[0] })
+    const conversation = yield* createSandboxed(f)
+    yield* f.transcript(conversation.id, ({ status }) => status === steps[0])
+
+    assert.isEmpty((yield* f.conversations.changes(conversation.id)).files)
+    assert.isEmpty(yield* f.conversations.files(conversation.id))
+    assert.equal(
+      (yield* f.conversations.removalWarnings(conversation.id)).uncommittedChanges,
+      "none",
+    )
+    assert.isEmpty(f.changesAsked)
+
+    f.sandboxes.configure({})
+    yield* end(yield* f.started)
+    yield* f.transcript(conversation.id, settled(1))
+    yield* f.conversations.changes(conversation.id)
+    assert.lengthOf(f.changesAsked, 1)
+  }),
+)
+
 it.live("deletes a Sandbox still being made when Glass quits, and makes a new one after", () =>
   Effect.gen(function* () {
     const f = yield* conversationServicesFixture

@@ -227,8 +227,8 @@ export class GlobalConversation extends Context.Service<
             id: sessionId,
             ensureStarted: start(sessionId),
             settings: { ...choice, permissionMode: null },
-            host: host.client,
-            runningHost: host.running,
+            prepareHost: host.client,
+            connectedHost: host.running,
           })),
         )
 
