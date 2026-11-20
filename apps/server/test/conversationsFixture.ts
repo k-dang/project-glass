@@ -14,7 +14,7 @@ import {
   localPlace,
   type Turn,
 } from "@glass/contracts"
-import { Effect, Exit, Option, Predicate, Scope, Stream } from "effect"
+import { Effect, Exit, Option, Predicate, type Schema, Scope, Stream } from "effect"
 import { mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -256,6 +256,9 @@ export const conversationOutcomesInStartedWorkUpdates = (turns: ReadonlyArray<Tu
 
 export const lastSettled = (message: string) => (turns: ReadonlyArray<Turn>) =>
   turns.at(-1)?.message === message && turns.every((turn) => turn.ended !== null)
+
+export const glassCall = (name: string, args: Schema.JsonObject) =>
+  `call:${name} ${JSON.stringify(args)}`
 
 export const glassCalls = (turn: Turn | undefined) =>
   turn?.parts.flatMap((part) =>

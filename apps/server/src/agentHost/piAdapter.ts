@@ -60,7 +60,6 @@ import {
   type ConversationRole,
   couldNotSwitch,
   type GlassToolsAccess,
-  glassToolsOf,
   HostConversationError,
   notRunning,
 } from "./protocol"
@@ -211,21 +210,26 @@ const lockedDownFlags = Effect.fnUntraced(function* (
 const skillFlags = (skills: ReadonlyArray<WrittenSkills>) =>
   skills.flatMap((plugin) => plugin.skills.flatMap((skill) => ["--skill", skill]))
 
-const roleFlags = (folder: string, role: ConversationRole, skills: ReadonlyArray<WrittenSkills>) =>
+const roleFlags = (
+  folder: string,
+  role: ConversationRole,
+  glassTools: GlassToolsAccess | undefined,
+  skills: ReadonlyArray<WrittenSkills>,
+) =>
   Match.value(role).pipe(
     Match.tagsExhaustive({
-      Work: ({ tools }) =>
+      Work: () =>
         writtenExtensions(folder, [
           { name: "draw-diagram.mjs", source: piDrawDiagramSource },
           { name: "subagent-status.js", source: piSubagentStatusExtension },
-          ...(tools === undefined
+          ...(glassTools === undefined
             ? []
             : [{ name: "glass-tools.js", source: piGlassToolsExtension }]),
         ]).pipe(
           Effect.map(({ flags }) => [
             ...skillFlags(skills),
             ...flags,
-            ...(tools === undefined ? [] : ["--append-system-prompt", workInstructions]),
+            ...(glassTools === undefined ? [] : ["--append-system-prompt", workInstructions]),
           ]),
         ),
       Review: ({ brief }) =>
@@ -318,10 +322,17 @@ export const piAdapter = (command: string) =>
           }))
         }).pipe(Effect.scoped),
 
-      start: Effect.fnUntraced(function* ({ folder, conversation, role, skills, report }) {
+      start: Effect.fnUntraced(function* ({
+        folder,
+        conversation,
+        role,
+        glassTools,
+        skills,
+        report,
+      }) {
         const scope = yield* Scope.Scope
 
-        const flags = yield* roleFlags(folder, role, skills).pipe(
+        const flags = yield* roleFlags(folder, role, glassTools, skills).pipe(
           Effect.provideService(FileSystem.FileSystem, fs),
           Effect.tapError((error) => Effect.logWarning("Couldn't prepare pi's tools", error)),
           Effect.mapError(
@@ -374,7 +385,7 @@ export const piAdapter = (command: string) =>
           return showStatuses
         }
 
-        const rpc = yield* startPi(folder, conversation, flags, glassToolsOf(role), (event) =>
+        const rpc = yield* startPi(folder, conversation, flags, glassTools, (event) =>
           trackDialog(event).pipe(
             Effect.andThen(trackStatus(event)),
             Effect.andThen(logProviderError(event)),

@@ -3,6 +3,7 @@ import type { Effect, Scope } from "effect"
 import type { DeliveredMessage, DeliveredTurn } from "./deliveredMessage"
 import type {
   ConversationRole,
+  GlassToolsAccess,
   HostConversationError,
   HostEvent,
   SteersNotTakenIn,
@@ -37,6 +38,7 @@ export interface HarnessAdapter<Role extends ConversationRole = ConversationRole
     readonly folder: string
     readonly conversation: string
     readonly role: Role
+    readonly glassTools: GlassToolsAccess | undefined
     readonly skills: ReadonlyArray<WrittenSkills>
     readonly report: (event: HostEvent) => Effect.Effect<void>
   }) => Effect.Effect<HarnessSession, HostConversationError, Scope.Scope>

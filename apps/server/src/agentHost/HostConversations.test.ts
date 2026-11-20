@@ -8,10 +8,11 @@ import {
   TurnEnded,
   TurnStarted,
 } from "@glass/contracts"
-import { DateTime, Deferred, Effect, Fiber, Layer, Queue, Stream } from "effect"
+import { Context, DateTime, Deferred, Effect, Fiber, Layer, Queue, Stream } from "effect"
 import { eventually } from "../../test/eventually"
 import type { HarnessAdapter, HarnessSession } from "./adapter"
 import { HostConversations, overBudget } from "./HostConversations"
+import { HostGlassTools } from "./HostGlassTools"
 import { Journal, JournalBudget } from "./Journal"
 import {
   HostConversationError,
@@ -114,12 +115,14 @@ const hosted = Effect.gen(function* () {
 
   const context = yield* Layer.build(
     HostConversations.make({ "claude-code": adapter, pi: adapter }).pipe(
+      Layer.provideMerge(HostGlassTools.layer),
       Layer.provideMerge(Journal.layer),
       Layer.provide(NodeFileSystem.layer),
     ),
   )
 
   const conversations = yield* HostConversations.pipe(Effect.provideContext(context))
+  yield* Context.get(context, HostGlassTools).listening(0)
 
   return {
     conversations,
@@ -408,6 +411,7 @@ const budgeted = (
 
     const context = yield* Layer.build(
       HostConversations.make({ "claude-code": adapter, pi: adapter }).pipe(
+        Layer.provideMerge(HostGlassTools.layer),
         Layer.provideMerge(Journal.layer),
         Layer.provide(NodeFileSystem.layer),
         Layer.provide(Layer.succeed(JournalBudget, BUDGET)),
@@ -416,6 +420,7 @@ const budgeted = (
 
     const conversations = yield* HostConversations.pipe(Effect.provideContext(context))
     const journal = yield* Journal.pipe(Effect.provideContext(context))
+    yield* Context.get(context, HostGlassTools).listening(0)
 
     yield* conversations.start(request("a"))
 

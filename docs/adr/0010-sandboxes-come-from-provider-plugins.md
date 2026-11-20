@@ -5,7 +5,8 @@ details. A Sandbox provider is a plugin the user installs, and it creates, reach
 Sandboxes. A company's own Sandbox platform is one such plugin, kept outside this repository, so it
 can use internal packages and name internal hosts without Glass depending on them. The agent host,
 its journal, and the backend as the transcript of record (ADR 0007) are the same for every
-provider.
+provider. A Sandbox's Conversation reaches Glass's tools over the connection Glass already holds to
+its host (ADR 0013), so a provider opens no other way into this device.
 
 The seam is coarse: Glass hands a provider what the agent host needs, and the provider does
 everything specific to its platform, including logins, cloning, and starting the host.

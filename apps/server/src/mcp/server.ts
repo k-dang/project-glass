@@ -1,8 +1,7 @@
 import { Effect, Layer, Option, Predicate, Redacted, Schema, Stream } from "effect"
-import { McpProtocol, McpSchema, McpServer } from "effect/ai"
+import { McpSchema, McpServer } from "effect/ai"
 import {
   HttpBody,
-  HttpEffect,
   HttpRouter,
   HttpServer,
   HttpServerRequest,
@@ -12,12 +11,10 @@ import { HttpApiBuilder, HttpApiSecurity } from "effect/http-api"
 import { OutsideAgents } from "../OutsideAgents"
 import { AskProgress } from "./AskProgress"
 import { GlassToolHandlers, GlassTools } from "./glassTools"
+import { GlassToolRelay } from "./GlassToolRelay"
 import { McpCaller, McpCredentials, OutsideAgentCaller } from "./McpCredentials"
+import { claimOpenedSession, glassMcpHttp, MCP_PATH, ownsSession, SESSION_HEADER } from "./mcpHttp"
 import { requestUrls } from "./McpOAuth"
-
-export const MCP_PATH = "/mcp"
-
-const SESSION_HEADER = "mcp-session-id"
 
 const progressTokenOf = (metadata: Schema.JsonObject | undefined) =>
   Schema.decodeUnknownOption(McpSchema.ProgressToken)(metadata?.["progressToken"])
@@ -97,11 +94,10 @@ const McpAccess = HttpRouter.middleware(
         }
 
         const { caller, ownedSessions, revoked } = credential.value
-        const session = request.headers[SESSION_HEADER]
 
-        if (session !== undefined && !ownedSessions.has(session)) {
-          return HttpServerResponse.empty({ status: 404 })
-        }
+        if (!ownsSession(request, ownedSessions)) return HttpServerResponse.empty({ status: 404 })
+
+        const session = request.headers[SESSION_HEADER]
 
         const calling =
           Predicate.isTagged(caller, "OutsideAgent") && session !== undefined
@@ -121,16 +117,7 @@ const McpAccess = HttpRouter.middleware(
           Effect.as(revoked, challenge(urls.issuer, true)),
         )
 
-        // WARNING: Effect sets an opened session's id in its own pre-response handler, so read it after.
-        yield* HttpEffect.appendPreResponseHandler((_, final) =>
-          Effect.sync(() => {
-            const opened = final.headers[SESSION_HEADER]
-
-            if (opened !== undefined) ownedSessions.add(opened)
-
-            return final
-          }),
-        )
+        yield* claimOpenedSession(ownedSessions)
 
         return endStreamOnRevoke(response, revoked)
       })
@@ -148,15 +135,11 @@ const Endpoint = Layer.effectDiscard(
 
 export const McpRoutes = Layer.merge(
   Endpoint,
-  McpServer.layerHttp({
-    name: "glass",
-    version: "1.0.0",
-    path: MCP_PATH,
-    protocols: [McpProtocol.v2025_11_25],
-    allowedOrigins: [],
-    // WARNING: Effect never expires MCP sessions, so clients must be allowed to end their own.
-    allowSessionTermination: true,
-  }).pipe(Layer.provide(McpAccess.layer), Layer.orDie),
+  glassMcpHttp().pipe(Layer.provide(McpAccess.layer), Layer.orDie),
 )
 
-export const GlassMcpTools = McpServer.toolkit(GlassTools).pipe(Layer.provide(GlassToolHandlers))
+export const GlassMcpTools = Layer.effectDiscard(
+  Effect.gen(function* () {
+    yield* (yield* GlassToolRelay).toolsRegistered
+  }),
+).pipe(Layer.provide(McpServer.toolkit(GlassTools)), Layer.provide(GlassToolHandlers))

@@ -33,6 +33,7 @@ import { Changes } from "../src/Changes"
 import { FolderFiles } from "../src/agentHost/FolderFiles"
 import { AgentHostHandlers } from "../src/agentHost/handlers"
 import { HostConversations } from "../src/agentHost/HostConversations"
+import { HostGlassTools } from "../src/agentHost/HostGlassTools"
 import { Journal } from "../src/agentHost/Journal"
 import {
   AgentHostRpcs,
@@ -48,8 +49,7 @@ import { followJournal, greet } from "../src/hostJournal"
 import { migrationLoader } from "../src/Migrations"
 import { Plugins } from "../src/Plugins"
 import { Sandboxes } from "../src/Sandboxes"
-import { LocalAgentHost } from "../src/LocalAgentHost"
-import { McpCredentials } from "../src/mcp/McpCredentials"
+import { GlassToolRelay } from "../src/mcp/GlassToolRelay"
 import { LocalSkills } from "../src/LocalSkills"
 import { SkillPacks } from "../src/SkillPacks"
 import { ServerConfig } from "../src/ServerConfig"
@@ -155,6 +155,7 @@ export const conversationServicesFixture = Effect.gen(function* () {
   const hostServices = () =>
     Layer.mergeAll(
       HostConversations.make({ "claude-code": adapter, pi: adapter }).pipe(
+        Layer.provideMerge(HostGlassTools.layer),
         Layer.provideMerge(Journal.layer),
         Layer.provide(NodeFileSystem.layer),
       ),
@@ -171,6 +172,7 @@ export const conversationServicesFixture = Effect.gen(function* () {
 
     const build = Effect.gen(function* () {
       const hostContext = yield* Layer.build(hostServices())
+      yield* Context.get(hostContext, HostGlassTools).listening(0)
 
       const client = yield* RpcTest.makeClient(AgentHostRpcs).pipe(
         Effect.provide(AgentHostHandlers),
@@ -204,6 +206,7 @@ export const conversationServicesFixture = Effect.gen(function* () {
         Conversations.layer.pipe(
           Layer.provideMerge(
             Sandboxes.layer.pipe(
+              Layer.provide(Layer.mock(GlassToolRelay)({ tools: Effect.succeed([]) })),
               Layer.provide(
                 Layer.succeed(
                   Plugins,
@@ -229,8 +232,6 @@ export const conversationServicesFixture = Effect.gen(function* () {
           ),
           Layer.provide(SkillPacks.layer.pipe(Layer.provide(Layer.mock(GitHubClient)({})))),
           Layer.provide(Layer.mock(LocalSkills)({})),
-          Layer.provide(Layer.mock(LocalAgentHost)({ lifetimeOf: () => Effect.succeedNone })),
-          Layer.provide(McpCredentials.layer),
           Layer.provide(ConversationTurns.layer),
           Layer.provide(FeedbackNotes.layer),
           Layer.provideMerge(Transcripts.layer),
