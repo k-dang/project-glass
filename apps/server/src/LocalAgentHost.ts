@@ -26,6 +26,7 @@ import {
   HEALTH_PATH,
   HOST_TOKEN_HEADER,
   hostRecordPath,
+  readHostRecord,
   RecordedHost,
   SHUTDOWN_PATH,
 } from "./agentHost/hostAddress"
@@ -39,11 +40,6 @@ import { connectRpcClient } from "./rpcSocket"
 import { ServerConfig } from "./ServerConfig"
 import { AgentCommands } from "./SettingsStore"
 import { Transcripts } from "./Transcripts"
-
-export const readRecordedHost = (fs: FileSystem.FileSystem, dataDirectory: string) =>
-  fs
-    .readFileString(hostRecordPath(dataDirectory))
-    .pipe(Effect.flatMap(Schema.decodeUnknownEffect(RecordedHost)), Effect.option)
 
 const REATTACH_DEADLINE = "10 seconds"
 
@@ -142,7 +138,7 @@ export class LocalAgentHost extends Context.Service<
           ),
         )
 
-      const readRecord = readRecordedHost(fs, config.dataDirectory)
+      const readRecord = readHostRecord(fs, recordPath).pipe(Effect.option)
 
       const forget = fs.remove(recordPath, { force: true }).pipe(Effect.ignore)
 
@@ -297,6 +293,7 @@ export class LocalAgentHost extends Context.Service<
                 ...process.env,
                 ...entry.env,
                 GLASS_HOST_TOKEN: token,
+                GLASS_HOST_RECORD: recordPath,
                 GLASS_PI_COMMAND: commands.piCommand,
                 GLASS_CLAUDE_COMMAND: commands.claudeCommand,
               },

@@ -20,9 +20,13 @@ import { DatabaseSync } from "node:sqlite"
 import { conversationsFixture, holding, lastText, settled } from "../test/conversationsFixture"
 import { childProcesses, hostExited, startedHost } from "../test/agentHostProcesses"
 import { LAUNCH_TOKEN } from "../test/harness"
-import { HOST_TOKEN_HEADER, hostRecordPath, RecordedHost } from "./agentHost/hostAddress"
+import {
+  HOST_TOKEN_HEADER,
+  hostRecordPath,
+  readHostRecord,
+  RecordedHost,
+} from "./agentHost/hostAddress"
 import { AgentHostRpcs } from "./agentHost/protocol"
-import { readRecordedHost } from "./LocalAgentHost"
 import { greet } from "./hostJournal"
 import { connectRpcClient } from "./rpcSocket"
 
@@ -139,8 +143,8 @@ const recordedHost = (home: string) => {
   const dataDirectory = join(home, ".project-glass")
 
   const read = FileSystem.FileSystem.pipe(
-    Effect.flatMap((fs) => readRecordedHost(fs, dataDirectory)),
-    Effect.map(Option.getOrThrow),
+    Effect.flatMap((fs) => readHostRecord(fs, hostRecordPath(dataDirectory))),
+    Effect.orDie,
     Effect.provide(NodeFileSystem.layer),
   )
 

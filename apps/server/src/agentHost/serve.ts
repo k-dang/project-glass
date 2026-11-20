@@ -15,6 +15,7 @@ import { closeSync, writeSync } from "node:fs"
 import { createServer } from "node:http"
 import { Changes } from "../Changes"
 import { FolderFiles } from "./FolderFiles"
+import { forgottenByGlass } from "./forgotten"
 import { HostConversations, type Harnesses } from "./HostConversations"
 import { Journal } from "./Journal"
 import { Git } from "../git"
@@ -63,6 +64,7 @@ export const serveAgentHost = <E, R>(harnesses: Effect.Effect<Harnesses, E, R>) 
 
     const standalone = Option.isSome(port)
     const address = yield* Config.String("GLASS_HOST_ADDRESS").pipe(Config.withDefault("127.0.0.1"))
+    const record = yield* Config.String("GLASS_HOST_RECORD").pipe(Config.option)
 
     const adapters = yield* harnesses
 
@@ -87,10 +89,14 @@ export const serveAgentHost = <E, R>(harnesses: Effect.Effect<Harnesses, E, R>) 
     if (!standalone || port.value === 0)
       yield* reportReady(Context.get(services, HttpServer.HttpServer).address)
 
-    yield* Effect.race(
+    const journal = Context.get(services, Journal)
+
+    yield* Effect.raceAll([
       Deferred.await(shutDown),
-      standalone
-        ? Effect.never
-        : unattended(Context.get(services, Journal), Context.get(services, HostConversations)),
-    )
+      standalone ? Effect.never : unattended(journal, Context.get(services, HostConversations)),
+      Option.match(record, {
+        onNone: () => Effect.never,
+        onSome: (path) => forgottenByGlass(path, token, journal.attendance),
+      }),
+    ])
   })
