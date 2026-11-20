@@ -173,11 +173,11 @@ export const describeError = (error: BackendError): Problem =>
         detail: {
           running: "A Turn is running. Stop it or wait for it to end, then start fresh.",
           queued: "A Queued message is waiting to send. Send or remove it, then start fresh.",
-          waiting: "The conversation is waiting on you. Answer its Question, then start fresh.",
+          waiting: "The Global chat is waiting on you. Answer its Question, then start fresh.",
         }[reason],
       }),
       PastChatNotFound: () => ({
-        title: "That conversation is gone",
+        title: "That chat is gone",
         detail: "Glass couldn't find that past chat. Go back and pick another.",
       }),
       RequestNotWaiting: () => ({
