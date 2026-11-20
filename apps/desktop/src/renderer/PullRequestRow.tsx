@@ -133,11 +133,9 @@ export function PullRequestRow(props: {
         {props.lead}
       </span>
       <span className="flex min-w-0 items-center gap-2.5 overflow-hidden">
-        <TooltipHint content={pullRequest.title}>
-          <span className={cn("min-w-0 truncate font-medium", props.dimmed && "opacity-55")}>
-            {pullRequest.title}
-          </span>
-        </TooltipHint>
+        <span className={cn("min-w-0 truncate font-medium", props.dimmed && "opacity-55")}>
+          {pullRequest.title}
+        </span>
         {props.notRefreshed !== undefined && <NotRefreshed problem={props.notRefreshed} />}
         {pullRequest.isDraft && (
           <Badge
