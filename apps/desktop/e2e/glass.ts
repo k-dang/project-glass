@@ -19,6 +19,7 @@ import { type FakeModelSettings, fakeModelProvider } from "../../server/test/fak
 import { type FakeGitHub, startFakeGitHub } from "../../server/test/fakeGitHub"
 import { type FakePullRequest, VIEWER } from "../../server/test/fakePullRequest"
 import { fakeAnthropicEnvironment, pinnedClaude } from "../../server/test/pinnedClaude"
+import { stopAgentHost } from "../../server/test/stopAgentHost"
 
 const desktopDir = join(import.meta.dirname, "..")
 
@@ -86,6 +87,7 @@ export const test = base.extend<Glass>({
     const home = await mkdtemp(join(tmpdir(), "glass-e2e-"))
 
     await use(home)
+    await stopAgentHost(join(home, ".project-glass"))
     // WARNING: Exiting Claude Code processes still write session files into .claude, so rm retries on ENOTEMPTY.
     await rm(home, { recursive: true, force: true, maxRetries: 10 })
   },
