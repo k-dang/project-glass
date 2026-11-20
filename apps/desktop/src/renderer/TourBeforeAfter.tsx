@@ -32,20 +32,25 @@ function Line(props: {
 
   const content = (
     <>
-      <span aria-hidden className={cn("w-3 shrink-0 text-center", look.signTone)}>
+      <span aria-hidden className={cn("w-3 shrink-0 text-center font-mono", look.signTone)}>
         {look.sign}
       </span>
       <span
-        className="min-w-0 flex-1 wrap-anywhere"
+        className="flex min-w-0 flex-1 flex-col gap-0.5"
         style={{ paddingInlineStart: `${line.depth * 14}px` }}
       >
-        {line.text}
+        <span className="wrap-anywhere">{line.text}</span>
+        {target !== null && (
+          <span className="truncate font-mono text-[10px] leading-3.5 text-muted-foreground">
+            {locationOf(target)}
+          </span>
+        )}
       </span>
     </>
   )
 
   const row = cn(
-    "flex w-full gap-1.5 border-l-2 py-0.75 pr-2.5 pl-1.5 text-left font-mono text-xs leading-4.5",
+    "flex w-full gap-1.5 border-l-2 py-1 pr-2.5 pl-1.5 text-left text-xs leading-4.5",
     look.row,
   )
 
@@ -65,9 +70,6 @@ function Line(props: {
           onClick={() => props.onSelect(target)}
         >
           {content}
-          <span className="shrink-0 pt-px text-[10px] text-muted-foreground">
-            {locationOf(target)}
-          </span>
         </button>
       )}
     </li>
