@@ -25,25 +25,47 @@ import { conversationColumn } from "./conversationColumn"
 import { noCommands, noFiles } from "./conversationsArea"
 import { CommandHighlight, useCommandPicker } from "./Commands"
 import { pastedSlice, toContent, Mention, toMessage } from "./composerDocument"
-import { imageFiles, readImages } from "./pastedImages"
+import { ImageViewer } from "./ImageViewer"
+import { imageFiles, imageSrc, readImages } from "./pastedImages"
 import { MarkdownStyling } from "./markdownStyling"
 import { useMentionPicker } from "./Mentions"
 import { type Problem } from "./problems"
 import { ProblemAlert } from "./ProblemAlert"
 
 export const Attachment = memo(function Attachment(props: {
-  image: Image
+  images: ReadonlyArray<Image>
   index: number
   className: string
 }) {
-  const { mediaType, data } = props.image
+  const [opener, setOpener] = useState<HTMLElement | null>(null)
+  const { mediaType, data } = props.images[props.index]!
 
   return (
-    <img
-      src={`data:${mediaType};base64,${data}`}
-      alt={`Attachment ${props.index + 1}`}
-      className={props.className}
-    />
+    <>
+      <button
+        type="button"
+        aria-label={`Open attachment ${props.index + 1}`}
+        className="rounded-lg"
+        onClick={(event) => setOpener(event.currentTarget)}
+      >
+        <img
+          src={imageSrc(mediaType, data)}
+          alt={`Attachment ${props.index + 1}`}
+          className={props.className}
+        />
+      </button>
+      {opener !== null && (
+        <ImageViewer
+          images={props.images.map((image, at) => ({
+            src: imageSrc(image.mediaType, image.data),
+            name: `Attachment ${at + 1}`,
+          }))}
+          index={props.index}
+          opener={opener}
+          onClose={() => setOpener(null)}
+        />
+      )}
+    </>
   )
 })
 
@@ -316,10 +338,10 @@ export function MessageBox(props: {
               <InputGroup className="has-[[data-slot=input-group-control]:focus-visible]:border-foreground/25 has-[[data-slot=input-group-control]:focus-visible]:ring-0">
                 {composed.images.length > 0 && (
                   <InputGroupAddon align="block-start" className="flex-wrap gap-2">
-                    {composed.images.map((image, index) => (
+                    {composed.images.map((_image, index) => (
                       <span key={index} className="relative">
                         <Attachment
-                          image={image}
+                          images={composed.images}
                           index={index}
                           className="size-14 rounded-md border object-cover"
                         />

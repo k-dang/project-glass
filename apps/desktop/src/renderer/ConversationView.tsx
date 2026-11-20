@@ -535,10 +535,10 @@ function AttachedImages(props: { images: ReadonlyArray<Image> }) {
   return (
     props.images.length > 0 && (
       <div className="flex flex-wrap justify-end gap-2">
-        {props.images.map((image, index) => (
+        {props.images.map((_, index) => (
           <Attachment
             key={index}
-            image={image}
+            images={props.images}
             index={index}
             className="max-h-40 max-w-60 rounded-lg border object-contain"
           />
@@ -1364,10 +1364,10 @@ function QueuedMessages(props: { queued: ReadonlyArray<QueuedMessage>; running: 
               {queued.feedback.length > 0 && <SentFeedback feedback={queued.feedback} />}
               {queued.images.length > 0 && (
                 <QueueItemAttachment>
-                  {queued.images.map((image, index) => (
+                  {queued.images.map((_, index) => (
                     <Attachment
                       key={index}
-                      image={image}
+                      images={queued.images}
                       index={index}
                       className="size-8 rounded border object-cover"
                     />

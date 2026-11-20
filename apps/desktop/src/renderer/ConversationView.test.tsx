@@ -1251,7 +1251,7 @@ it("recalls the last message with ↑ in an empty composer", async () => {
   expect(composer).toHaveProperty("textContent", "Then docs")
 })
 
-it("sends a pasted image with the message", async () => {
+it("opens a pasted image large and sends it with the message", async () => {
   const sent: Array<{ message: string; images: ReadonlyArray<unknown> }> = []
 
   const user = mount({
@@ -1266,7 +1266,10 @@ it("sends a pasted image with the message", async () => {
   const clipboard = new DataTransfer()
   clipboard.items.add(new File([bytes], "pixel.png", { type: "image/png" }))
   await user.paste(clipboard)
-  expect(await screen.findByRole("img", { name: "Attachment 1" })).toBeTruthy()
+  await user.click(await screen.findByRole("button", { name: "Open attachment 1" }))
+  expect(await screen.findByRole("dialog", { name: "Attachment 1" })).toBeTruthy()
+  await user.keyboard("{Escape}")
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
 
   await user.type(composer, "What's this?{Enter}")
 
