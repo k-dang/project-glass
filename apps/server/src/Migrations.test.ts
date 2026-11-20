@@ -95,6 +95,7 @@ it.live("upgrades main's schema directly, preserving completed and unfinished up
       [13, "journal_host"],
       [14, "conversation_branch"],
       [15, "feedback_notes"],
+      [16, "turn_retries_delivery"],
     ])
     const transcripts = yield* Transcripts
     const { turns } = yield* transcripts.read("global")
@@ -104,7 +105,7 @@ it.live("upgrades main's schema directly, preserving completed and unfinished up
     )
     assert.equal(turns.find((turn) => turn.id === "ordinary")?.message, "Report a bug")
     assert.deepStrictEqual(
-      (yield* transcripts.recoverGlobalConversationUpdates(["global"])).map((turn) => turn.turnId),
+      (yield* transcripts.retryDeliveries(["global"])).map((turn) => turn.turnId),
       ["pending"],
     )
     assert.deepStrictEqual(
@@ -167,6 +168,7 @@ it.live("creates the schema once and reads Activity through its indexes after re
         [13, "journal_host"],
         [14, "conversation_branch"],
         [15, "feedback_notes"],
+        [16, "turn_retries_delivery"],
       ],
       [],
     ] as const) {

@@ -9,14 +9,19 @@ export const GlobalConversationUpdates = Layer.effectDiscard(
     const started = yield* StartedWork
 
     const sendUpdateOnce = conversation
-      .whenIdle((globalConversationUpdate) =>
+      .whenIdle((start) =>
         Effect.gen(function* () {
           const found = yield* started.pendingOutcomes(conversation.id)
 
           if (!Arr.isReadonlyArrayNonEmpty(found)) return
 
-          yield* globalConversationUpdate(
-            GlobalConversationUpdate.make({ work: Arr.map(found, ({ work }) => work) }),
+          yield* start(
+            {
+              message: "",
+              images: [],
+              context: GlobalConversationUpdate.make({ work: Arr.map(found, ({ work }) => work) }),
+              retriesDelivery: true,
+            },
             (turnId) => started.recordGlobalConversationUpdate(conversation.id, turnId, found),
           )
         }),

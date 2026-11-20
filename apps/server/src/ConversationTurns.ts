@@ -20,7 +20,6 @@ import {
   TurnFailed,
   TurnInterrupted,
   TurnStopped,
-  type GlobalConversationUpdate,
 } from "@glass/contracts"
 import {
   Context,
@@ -41,7 +40,7 @@ import { boundHostCall } from "./hostControl"
 import { type HostCallError, type HostClient, hostFailure } from "./Placement"
 import { prompt } from "./prompt"
 import { ToDos } from "./ToDos"
-import { encodeImages, StoredMessage, Transcripts } from "./Transcripts"
+import { encodeImages, type IdleTurn, StoredMessage, Transcripts } from "./Transcripts"
 import { annotateUnit } from "./wideEvents"
 
 type HostCall<Name extends keyof HostClient> = (
@@ -75,6 +74,11 @@ export interface Served {
 }
 
 export type Delivery = "dispatched" | "superseded" | "failed" | "pending"
+
+export type StartIdle = (
+  turn: IdleTurn,
+  record: (turnId: string) => Effect.Effect<void, ConversationError>,
+) => Effect.Effect<void, ConversationError>
 
 type StartedMessage = Pick<Turn, "message" | "images" | "context" | "feedback">
 
@@ -119,12 +123,7 @@ export class ConversationTurns extends Context.Service<
     ) => Effect.Effect<void, RequestWaiting | ConversationError>
     readonly whenIdle: <E>(
       conversationId: string,
-      effect: (
-        start: (
-          globalConversationUpdate: GlobalConversationUpdate,
-          record: (turnId: string) => Effect.Effect<void, ConversationError>,
-        ) => Effect.Effect<void, ConversationError>,
-      ) => Effect.Effect<void, E>,
+      effect: (start: StartIdle) => Effect.Effect<void, E>,
     ) => Effect.Effect<void, E | ConversationError>
     readonly sendQueued: (
       conversationId: string,
@@ -251,19 +250,18 @@ export class ConversationTurns extends Context.Service<
       const settleUndelivered = (
         conversation: ClaimedConversation,
         turnId: string,
-        context: StartedMessage["context"],
         error: HostCallError,
       ) =>
-        Effect.gen(function* () {
-          yield* Effect.yieldNow
-
-          if (Predicate.isTagged(context, "GlobalConversationUpdate"))
-            return yield* transcripts
-              .setStatus(conversation.id, hostFailure(error))
-              .pipe(Effect.as("pending" as const satisfies Delivery))
-
-          return yield* failTurn(conversation.id, turnId, hostFailure(error))
-        })
+        Effect.yieldNow.pipe(
+          Effect.andThen(
+            transcripts.settleUndelivered(conversation.id, turnId, hostFailure(error)),
+          ),
+          Effect.catch((cause) =>
+            Effect.logWarning("Couldn't settle an undelivered Turn", cause).pipe(
+              Effect.as("failed" as const satisfies Delivery),
+            ),
+          ),
+        )
 
       const dispatch = (
         conversation: ClaimedConversation,
@@ -308,12 +306,7 @@ export class ConversationTurns extends Context.Service<
                 return "superseded" as const satisfies Delivery
               }
 
-              const settled = yield* settleUndelivered(
-                conversation,
-                turnId,
-                message.context,
-                started,
-              )
+              const settled = yield* settleUndelivered(conversation, turnId, started)
 
               yield* stopHost(conversation, turnId)
 
@@ -325,7 +318,7 @@ export class ConversationTurns extends Context.Service<
       const deliver = (conversation: ClaimedConversation, turnId: string, sent: StartedMessage) =>
         prepare(conversation, sent).pipe(
           Effect.flatMap((prepared) => dispatch(conversation, turnId, prepared)),
-          Effect.catch((error) => settleUndelivered(conversation, turnId, sent.context, error)),
+          Effect.catch((error) => settleUndelivered(conversation, turnId, error)),
           Effect.tap((delivery) =>
             annotateUnit({ conversation_id: conversation.id, turn_id: turnId, delivery }),
           ),
@@ -346,11 +339,9 @@ export class ConversationTurns extends Context.Service<
 
         const interruptedIds = yield* interrupted
 
-        const recovered = yield* transcripts
-          .recoverGlobalConversationUpdates(interruptedIds)
-          .pipe(Effect.orDie)
+        const retried = yield* transcripts.retryDeliveries(interruptedIds).pipe(Effect.orDie)
 
-        yield* Stream.merge(Stream.fromIterable(recovered), started).pipe(
+        yield* Stream.merge(Stream.fromIterable(retried), started).pipe(
           Stream.runForEach(({ conversationId, turnId, message, images, context, feedback }) =>
             claim(conversationId).pipe(
               Effect.flatMap(
@@ -369,14 +360,7 @@ export class ConversationTurns extends Context.Service<
           Effect.forkIn(scope),
         )
 
-        yield* transcripts
-          .endRunning(
-            TurnInterrupted.make({}),
-            interruptedIds.filter(
-              (id) => !recovered.some(({ conversationId }) => conversationId === id),
-            ),
-          )
-          .pipe(Effect.orDie)
+        yield* transcripts.endRunning(TurnInterrupted.make({}), interruptedIds).pipe(Effect.orDie)
       })
 
       const refuseWhileWaiting = (conversationId: string) =>
@@ -516,13 +500,7 @@ export class ConversationTurns extends Context.Service<
             Effect.gen(function* () {
               if (!(yield* transcripts.idle(conversationId))) return
 
-              yield* effect((globalConversationUpdate, record) =>
-                transcripts.startGlobalConversationUpdate(
-                  conversationId,
-                  globalConversationUpdate,
-                  record,
-                ),
-              )
+              yield* effect((turn, record) => transcripts.startIfIdle(conversationId, turn, record))
             }),
           ),
         sendQueued: (conversationId, queuedId) =>

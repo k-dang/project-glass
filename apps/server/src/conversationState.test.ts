@@ -25,7 +25,7 @@ const startsQueued = (id: string): ConversationStep => ({
   outcome: { type: "started" },
   writes: [
     { type: "dequeue", queuedId: id },
-    { type: "startTurn", message: message(id) },
+    { type: "startTurn", message: { ...message(id), retriesDelivery: false } },
   ],
 })
 
@@ -64,7 +64,10 @@ it("starts a Turn when idle and queues at the back while running", () => {
 
   assert.deepStrictEqual(
     stepConversation({ running: null, queued: [] }, { type: "send", message: sent }),
-    { outcome: { type: "started" }, writes: [{ type: "startTurn", message: sent }] },
+    {
+      outcome: { type: "started" },
+      writes: [{ type: "startTurn", message: { ...sent, retriesDelivery: false } }],
+    },
   )
   assert.deepStrictEqual(stepConversation(busy, { type: "send", message: sent }), {
     outcome: { type: "queued" },
@@ -72,29 +75,20 @@ it("starts a Turn when idle and queues at the back while running", () => {
   })
 })
 
-it("starts a Global conversation update only after the running Turn and all Queued messages", () => {
-  const globalConversationUpdate = message("globalConversationUpdate")
+it("starts an idle-only Turn only after the running Turn and all Queued messages", () => {
+  const idleOnly = { ...message("idleOnly"), retriesDelivery: true }
 
   for (const state of [busy, idle])
-    assert.deepStrictEqual(
-      stepConversation(state, {
-        type: "globalConversationUpdate",
-        message: globalConversationUpdate,
-      }),
-      {
-        outcome: { type: "busy" },
-        writes: [],
-      },
-    )
+    assert.deepStrictEqual(stepConversation(state, { type: "startIfIdle", message: idleOnly }), {
+      outcome: { type: "busy" },
+      writes: [],
+    })
 
   assert.deepStrictEqual(
-    stepConversation(
-      { running: null, queued: [] },
-      { type: "globalConversationUpdate", message: globalConversationUpdate },
-    ),
+    stepConversation({ running: null, queued: [] }, { type: "startIfIdle", message: idleOnly }),
     {
       outcome: { type: "started" },
-      writes: [{ type: "startTurn", message: globalConversationUpdate }],
+      writes: [{ type: "startTurn", message: idleOnly }],
     },
   )
 })

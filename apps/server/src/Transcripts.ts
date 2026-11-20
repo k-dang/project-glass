@@ -25,13 +25,13 @@ import {
   TurnEnd,
   TurnEnded,
   type TurnEnding,
+  TurnFailed,
   TurnContext,
   CapturedContext,
   EarlierTurns,
   type MessageWithContext,
   TurnPart,
   TurnStarted,
-  type GlobalConversationUpdate,
 } from "@glass/contracts"
 import {
   Array as Arr,
@@ -57,6 +57,7 @@ import {
   type ConversationEvent,
   type ConversationState,
   type ConversationWrite,
+  type StartingTurn,
   stepConversation,
 } from "./conversationState"
 import type { HostEvent } from "./agentHost/protocol"
@@ -185,6 +186,8 @@ export type UnseenByConversation = ReadonlyMap<string, TurnEnd>
 
 export type StartedTurn = typeof TurnStarted.Type & { readonly conversationId: string }
 
+export type IdleTurn = Omit<StartingTurn, "id" | "feedback">
+
 const joinConsecutiveAppends = (events: ReadonlyArray<SavedEvent>) => {
   const joined: Array<SavedEvent> = []
 
@@ -270,12 +273,17 @@ export class Transcripts extends Context.Service<
       conversationId: string,
     ) => Effect.Effect<string | null, ConversationError>
     readonly idle: (conversationId: string) => Effect.Effect<boolean, ConversationError>
-    readonly startGlobalConversationUpdate: (
+    readonly startIfIdle: (
       conversationId: string,
-      globalConversationUpdate: GlobalConversationUpdate,
+      turn: IdleTurn,
       record: (turnId: string) => Effect.Effect<void, ConversationError>,
     ) => Effect.Effect<void, ConversationError>
-    readonly recoverGlobalConversationUpdates: (
+    readonly settleUndelivered: (
+      conversationId: string,
+      turnId: string,
+      reason: string,
+    ) => Effect.Effect<"failed" | "pending", ConversationError>
+    readonly retryDeliveries: (
       conversationIds: ReadonlyArray<string>,
     ) => Effect.Effect<ReadonlyArray<StartedTurn>, ConversationError>
     readonly runningMessage: (
@@ -501,19 +509,26 @@ export class Transcripts extends Context.Service<
           Effect.flatMap((failed) => (failed ? Effect.succeed(false) : write)),
         )
 
+      const insertTurn = (
+        conversationId: string,
+        { turnId, message, images, context, feedback, sentAt }: typeof TurnStarted.Type,
+        retriesDelivery: boolean,
+      ) =>
+        sql`INSERT INTO conversation_turn ${sql.insert({
+          id: turnId,
+          conversation_id: conversationId,
+          message,
+          images: encodeImages(images),
+          context: encodeContext(context),
+          feedback: encodeFeedback(feedback),
+          sent_at: DateTime.formatIso(sentAt),
+          retries_delivery: retriesDelivery ? 1 : 0,
+        })}`.pipe(Effect.as(true))
+
       const writeApplied = (conversationId: string, event: AgentEvent) =>
         Match.value(event).pipe(
           Match.tagsExhaustive({
-            TurnStarted: ({ turnId, message, images, context, feedback, sentAt }) =>
-              sql`INSERT INTO conversation_turn ${sql.insert({
-                id: turnId,
-                conversation_id: conversationId,
-                message,
-                images: encodeImages(images),
-                context: encodeContext(context),
-                feedback: encodeFeedback(feedback),
-                sent_at: DateTime.formatIso(sentAt),
-              })}`.pipe(Effect.as(true)),
+            TurnStarted: (started) => insertTurn(conversationId, started, false),
             PartSet: ({ turnId, index, part }) =>
               unlessFailed(
                 turnId,
@@ -538,9 +553,7 @@ export class Transcripts extends Context.Service<
               ]
 
               if (Predicate.isTagged(ended.ending, "Stopped") && !askedStops.has(turnId))
-                conditions.push(
-                  sql`COALESCE(json_extract(context, '$._tag'), '') != 'GlobalConversationUpdate'`,
-                )
+                conditions.push(sql`retries_delivery = 0`)
 
               return sql`
                 UPDATE conversation_turn SET ended = ${encodeEnd(ended)}
@@ -606,7 +619,7 @@ export class Transcripts extends Context.Service<
                 sentAt: yield* DateTime.now,
               })
 
-              yield* writeApplied(conversationId, event)
+              yield* insertTurn(conversationId, event, write.message.retriesDelivery)
               started.push(event)
               break
             }
@@ -880,9 +893,7 @@ export class Transcripts extends Context.Service<
         if (onlyTurnId !== null) conditions.push(sql`t.id = ${onlyTurnId}`)
 
         if (Predicate.isTagged(ending, "CutOff") || Predicate.isTagged(ending, "Interrupted"))
-          conditions.push(
-            sql`COALESCE(json_extract(t.context, '$._tag'), '') != 'GlobalConversationUpdate'`,
-          )
+          conditions.push(sql`t.retries_delivery = 0`)
 
         const running = yield* sql`
           SELECT t.conversation_id AS conversationId, t.id AS turnId, p.part AS part
@@ -929,6 +940,19 @@ export class Transcripts extends Context.Service<
         (ending: TurnEnding, conversationId: string, endedTurnId: string) =>
           endUnfinished(ending, [conversationId], endedTurnId),
       )
+
+      const setStatus = (conversationId: string, status: string | null) =>
+        lockFor(conversationId).withPermits(1)(
+          Effect.suspend(() => {
+            if (status === null) statuses.delete(conversationId)
+            else statuses.set(conversationId, status)
+
+            return PubSub.publish(published, {
+              conversationId,
+              update: StatusChanged.make({ status }),
+            })
+          }),
+        )
 
       const withStorageFailure = <A, E, R>(name: string, effect: Effect.Effect<A, E, R>) =>
         Effect.catchIf(effect, isStorageError, (cause) =>
@@ -997,28 +1021,46 @@ export class Transcripts extends Context.Service<
               Effect.map(([turn]) => turn?.message ?? null),
             ),
           ),
-        recoverGlobalConversationUpdates: (conversationIds) =>
+        settleUndelivered: Effect.fnUntraced(function* (conversationId, turnId, reason) {
+          const retried = yield* withStorageFailure(
+            "read whether a Turn retries delivery",
+            sql`SELECT id FROM conversation_turn WHERE id = ${turnId} AND retries_delivery = 1`,
+          )
+
+          if (retried.length > 0) {
+            yield* setStatus(conversationId, reason)
+
+            return "pending" as const
+          }
+
+          const ended = { at: yield* DateTime.now, ending: TurnFailed.make({ reason }) }
+
+          yield* save(conversationId, [TurnEnded.make({ turnId, ended })])
+
+          return "failed" as const
+        }),
+        retryDeliveries: (conversationIds) =>
           withStorageFailure(
-            "recover Global conversation updates",
+            "retry undelivered Turns",
             Effect.forEach(conversationIds, (conversationId) =>
               lockFor(conversationId).withPermits(1)(
                 Effect.gen(function* () {
-                  const globalConversationUpdates = yield* sql`
+                  const retried = yield* sql`
                     SELECT id, message, images, context, feedback, sent_at AS sentAt, ended
-                    FROM conversation_turn WHERE conversation_id = ${conversationId} AND ended IS NULL
-                      AND json_extract(context, '$._tag') = 'GlobalConversationUpdate'
+                    FROM conversation_turn
+                    WHERE conversation_id = ${conversationId} AND ended IS NULL AND retries_delivery = 1
                   `.pipe(Effect.flatMap(decodeTurns))
 
-                  for (const turn of globalConversationUpdates)
+                  for (const turn of retried)
                     yield* sql`DELETE FROM conversation_turn_part WHERE turn_id = ${turn.id}`
 
-                  if (globalConversationUpdates.length > 0)
+                  if (retried.length > 0)
                     yield* markWaiting(
                       conversationId,
                       (yield* waitingParts(conversationId)).map(({ part }) => part),
                     )
 
-                  return globalConversationUpdates.map((turn) => ({
+                  return retried.map((turn) => ({
                     ...TurnStarted.make({
                       turnId: turn.id,
                       message: turn.message,
@@ -1031,24 +1073,18 @@ export class Transcripts extends Context.Service<
                   }))
                 }),
               ),
-            ).pipe(Effect.map((globalConversationUpdates) => globalConversationUpdates.flat())),
+            ).pipe(Effect.map((retried) => retried.flat())),
           ),
-        startGlobalConversationUpdate: (conversationId, globalConversationUpdate, record) =>
+        startIfIdle: (conversationId, turn, record) =>
           withStorageFailure(
             "start a Turn",
             changeWith(
               conversationId,
               Effect.gen(function* () {
-                const message = {
-                  message: "",
-                  images: [],
-                  context: globalConversationUpdate,
-                  feedback: [],
-                  id: randomUUID(),
-                }
+                const message = { ...turn, feedback: [], id: randomUUID() }
 
                 const { outcome, updates } = yield* step(conversationId, {
-                  type: "globalConversationUpdate",
+                  type: "startIfIdle",
                   message,
                 })
 
@@ -1177,18 +1213,7 @@ export class Transcripts extends Context.Service<
             ),
           )
         },
-        setStatus: (conversationId, status) =>
-          lockFor(conversationId).withPermits(1)(
-            Effect.suspend(() => {
-              if (status === null) statuses.delete(conversationId)
-              else statuses.set(conversationId, status)
-
-              return PubSub.publish(published, {
-                conversationId,
-                update: StatusChanged.make({ status }),
-              })
-            }),
-          ),
+        setStatus,
         remove: Effect.fn("Transcripts.remove")(function* (conversationId: string) {
           yield* lockFor(conversationId).withPermits(1)(
             Effect.gen(function* () {
