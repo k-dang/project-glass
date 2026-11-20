@@ -5,7 +5,7 @@ import { join } from "node:path"
 const page = join(import.meta.dirname, "..", "..", ".gallery", "index.html")
 
 if (!existsSync(page)) {
-  console.error(`No gallery at ${page}. Run pnpm gallery first.`)
+  console.error(`No gallery at ${page}. Run pnpm gallery:capture first.`)
   process.exit(1)
 }
 

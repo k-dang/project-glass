@@ -12,7 +12,7 @@
     "fix": "vp check --fix",
     "test": "pnpm -r test",
     "test:e2e": "pnpm build && pnpm --filter @glass/desktop test:e2e",
-    "gallery": "pnpm build && pnpm --filter @glass/gallery capture",
+    "gallery:capture": "pnpm build && pnpm --filter @glass/gallery capture",
     "gallery:show": "pnpm --filter @glass/gallery run show"
   },
   "devDependencies": {
