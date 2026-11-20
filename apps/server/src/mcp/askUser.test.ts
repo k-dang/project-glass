@@ -332,7 +332,7 @@ describe("ask_user", () => {
 
       const bearer = yield* mcpCredentials.issue(
         GlobalChatCaller.make({
-          globalChatId: "conversation-1",
+          globalChatId: "global-chat",
           sessionId: "session-1",
         }),
       )

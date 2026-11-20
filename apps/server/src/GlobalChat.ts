@@ -43,13 +43,13 @@ import { ServerConfig } from "./ServerConfig"
 import { Transcripts, type WaitingRequest } from "./Transcripts"
 import { annotateUnit } from "./wideEvents"
 
-const StoredConversation = Schema.Struct({
+const StoredGlobalChat = Schema.Struct({
   id: Schema.String,
   sessionId: Schema.String,
   ...ModelChoice.fields,
 })
 
-const decodeStored = Schema.decodeUnknownEffect(Schema.Array(StoredConversation))
+const decodeStored = Schema.decodeUnknownEffect(Schema.Array(StoredGlobalChat))
 
 const decodeIds = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ id: Schema.String })))
 
