@@ -18,7 +18,9 @@ import {
   isWaiting,
   nothingUnsent,
   parsePullRequestReference,
+  type PullRequestRef,
   type QueuedMessage,
+  referenceKey,
   repositoryKey,
   type RequestPart,
   type SentMessage,
@@ -102,7 +104,12 @@ import {
 import { conversationColumn } from "./conversationColumn"
 import { ConversationChanges } from "./ConversationChanges"
 import { ConversationDetailsAction, ConversationFrame } from "./ConversationFrame"
-import { PullRequestLink, useConversationPullRequest } from "./ConversationPullRequest"
+import {
+  PullRequestLink,
+  PullRequestPanes,
+  useConversationPullRequest,
+} from "./ConversationPullRequest"
+import { PullRequestPane } from "./PullRequestPane"
 import {
   QueueItem,
   QueueItemAction,
@@ -147,7 +154,11 @@ import { type FeedbackNotesStore, useFeedbackNotes } from "./useFeedbackNotes"
 import { markTurnSeenAtom } from "./needsYou"
 import { useWindowFocused } from "./useWindowFocused"
 
-type SidePane = { kind: "diagram"; title: string } | { kind: "file"; path: string } | null
+type SidePane =
+  | { kind: "diagram"; title: string }
+  | { kind: "file"; path: string }
+  | { kind: "pullRequest"; pullRequest: PullRequestRef }
+  | null
 
 interface ConversationTabs {
   tab: ConversationTab
@@ -221,6 +232,14 @@ function OpenConversation(props: { conversation: Conversation } & ConversationTa
   const openFile = useCallback((path: string) => setPane({ kind: "file", path }), [setPane])
   const fileLinks = useFileLinks(conversation.id, turns, Option.isSome(loaded), openFile)
 
+  const openPullRequestPane = useCallback(
+    (pullRequest: PullRequestRef) => {
+      setPane({ kind: "pullRequest", pullRequest })
+      onTabChange("chat")
+    },
+    [setPane, onTabChange],
+  )
+
   if (tab === "changes" && !changesOpened) setChangesOpened(true)
 
   const pullRequest = useConversationPullRequest(conversation.id)
@@ -253,91 +272,100 @@ function OpenConversation(props: { conversation: Conversation } & ConversationTa
 
   return (
     <ConversationAtomsContext value={atoms}>
-      <ConversationFrame
-        label={conversation.name}
-        heading={
-          tab === "changes" ? (
-            <>
-              <button
-                type="button"
-                className="truncate text-muted-foreground hover:text-foreground"
-                onClick={() => onTabChange("chat")}
-              >
-                {conversation.name}
-              </button>
-              <span className="text-muted-foreground/50">/</span>
-              <h1 className="font-medium">Changes</h1>
-            </>
-          ) : (
-            <h1 className="truncate font-medium">{conversation.name}</h1>
-          )
-        }
-        pinnable={tab === "chat" && pane === null}
-        details={{
-          place: conversation.place,
-          repository: repositoryKey(conversation.repository),
-          branch: conversation.branch ?? undefined,
-          baseBranch: conversation.baseBranch,
-          pullRequest,
-          skillPacks: conversation.skillPacks,
-          localSkills: conversation.localSkills,
-          actions:
-            tab === "chat" ? (
+      <PullRequestPanes value={openPullRequestPane}>
+        <ConversationFrame
+          label={conversation.name}
+          heading={
+            tab === "changes" ? (
               <>
-                <ConversationDetailsAction onNavigate={() => onTabChange("changes")}>
-                  <FileDiff aria-hidden className="text-muted-foreground" />
-                  Changes
-                  <Kbd className="ml-auto">{shortcutLabel("D")}</Kbd>
-                </ConversationDetailsAction>
-                {diagrams.titles.map((title) => (
-                  <ConversationDetailsAction key={title} onNavigate={() => openDiagram(title)}>
-                    <Workflow aria-hidden className="text-muted-foreground" />
-                    <span className="truncate">{title}</span>
-                  </ConversationDetailsAction>
-                ))}
+                <button
+                  type="button"
+                  className="truncate text-muted-foreground hover:text-foreground"
+                  onClick={() => onTabChange("chat")}
+                >
+                  {conversation.name}
+                </button>
+                <span className="text-muted-foreground/50">/</span>
+                <h1 className="font-medium">Changes</h1>
               </>
             ) : (
-              <ConversationDetailsAction onNavigate={() => onTabChange("chat")}>
-                <MessageCircle aria-hidden className="text-muted-foreground" />
-                Back to Chat
-                <Kbd className="ml-auto">{shortcutLabel("D")}</Kbd>
-              </ConversationDetailsAction>
-            ),
-        }}
-      >
-        <TranscriptProblem />
-        <div hidden={tab !== "chat"} className="flex min-h-0 flex-1">
-          <ToolCallView value={diagrams.cardOf}>
-            <FileLinks value={fileLinks}>
-              <ConversationChat conversation={conversation} place="conversation" />
-            </FileLinks>
-          </ToolCallView>
-          {openedDiagram !== undefined && (
-            <DiagramPane diagram={openedDiagram} onClose={closePane} />
-          )}
-          {pane?.kind === "file" && (
-            <FilePane
-              conversationId={conversation.id}
-              path={pane.path}
-              lastEnded={lastEndedOf(turns)}
-              onClose={closePane}
-            />
-          )}
-        </div>
-        <section
-          aria-label="Changes"
-          hidden={tab !== "changes"}
-          className="flex min-h-0 min-w-0 flex-1 flex-col"
+              <h1 className="truncate font-medium">{conversation.name}</h1>
+            )
+          }
+          pinnable={tab === "chat" && pane === null}
+          details={{
+            place: conversation.place,
+            repository: repositoryKey(conversation.repository),
+            branch: conversation.branch ?? undefined,
+            baseBranch: conversation.baseBranch,
+            pullRequest,
+            skillPacks: conversation.skillPacks,
+            localSkills: conversation.localSkills,
+            actions:
+              tab === "chat" ? (
+                <>
+                  <ConversationDetailsAction onNavigate={() => onTabChange("changes")}>
+                    <FileDiff aria-hidden className="text-muted-foreground" />
+                    Changes
+                    <Kbd className="ml-auto">{shortcutLabel("D")}</Kbd>
+                  </ConversationDetailsAction>
+                  {diagrams.titles.map((title) => (
+                    <ConversationDetailsAction key={title} onNavigate={() => openDiagram(title)}>
+                      <Workflow aria-hidden className="text-muted-foreground" />
+                      <span className="truncate">{title}</span>
+                    </ConversationDetailsAction>
+                  ))}
+                </>
+              ) : (
+                <ConversationDetailsAction onNavigate={() => onTabChange("chat")}>
+                  <MessageCircle aria-hidden className="text-muted-foreground" />
+                  Back to Chat
+                  <Kbd className="ml-auto">{shortcutLabel("D")}</Kbd>
+                </ConversationDetailsAction>
+              ),
+          }}
         >
-          {changesOpened && (
-            <ConversationChanges
-              conversation={conversation}
-              turns={turns}
-              onReviewFeedback={() => onTabChange("chat")}
-            />
-          )}
-        </section>
-      </ConversationFrame>
+          <TranscriptProblem />
+          <div hidden={tab !== "chat"} className="flex min-h-0 flex-1">
+            <ToolCallView value={diagrams.cardOf}>
+              <FileLinks value={fileLinks}>
+                <ConversationChat conversation={conversation} place="conversation" />
+              </FileLinks>
+            </ToolCallView>
+            {openedDiagram !== undefined && (
+              <DiagramPane diagram={openedDiagram} onClose={closePane} />
+            )}
+            {pane?.kind === "file" && (
+              <FilePane
+                conversationId={conversation.id}
+                path={pane.path}
+                lastEnded={lastEndedOf(turns)}
+                onClose={closePane}
+              />
+            )}
+            {pane?.kind === "pullRequest" && (
+              <PullRequestPane
+                key={referenceKey(pane.pullRequest)}
+                pullRequest={pane.pullRequest}
+                onClose={closePane}
+              />
+            )}
+          </div>
+          <section
+            aria-label="Changes"
+            hidden={tab !== "changes"}
+            className="flex min-h-0 min-w-0 flex-1 flex-col"
+          >
+            {changesOpened && (
+              <ConversationChanges
+                conversation={conversation}
+                turns={turns}
+                onReviewFeedback={() => onTabChange("chat")}
+              />
+            )}
+          </section>
+        </ConversationFrame>
+      </PullRequestPanes>
     </ConversationAtomsContext>
   )
 }

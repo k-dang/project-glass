@@ -147,3 +147,10 @@ function GitHubMermaid(props: { source: string }) {
     <MermaidDiagram source={props.source} onInvalid={onInvalid} />
   )
 }
+
+export function DescriptionBody(props: { html: string }) {
+  if (props.html.trim() === "")
+    return <p className="text-sm text-muted-foreground italic">No description provided.</p>
+
+  return <GitHubHtml html={props.html} />
+}

@@ -9,6 +9,7 @@ import {
   DRAW_DIAGRAM_TOOL,
   AnswerQuestion,
   DenyRequest,
+  Merge,
   AgentStatusesChanged,
   BackgroundWorkEnded,
   PermissionRequestPart,
@@ -51,6 +52,7 @@ import userEvent from "@testing-library/user-event"
 import { DateTime, Deferred, Effect, Exit, Stream } from "effect"
 import { afterEach, expect, it, onTestFinished, vi } from "vite-plus/test"
 import { conversation, conversationFields } from "../../test/conversation"
+import { changedFile, workspace } from "../../test/workspace"
 import { choice, mount, pixel } from "../../test/conversationApp"
 
 const sentAt = DateTime.makeUnsafe("2026-10-26T12:00:00Z")
@@ -334,10 +336,62 @@ it("opens a Follow-up Conversation and keeps it out of the Conversations list", 
   expect(screen.getByRole("link", { name: conversation.name })).toBeTruthy()
 })
 
-it("opens a PR the agent links to in its PR workspace", async () => {
-  const pullRequestUrl = "https://github.com/octo-org/hello-world/pull/7"
+it("opens a PR the agent links to in a pane beside the chat, with its diffs and its review", async () => {
+  const pullRequestUrl = "https://github.com/octo-org/hello-world/pull/42"
 
   const user = mount({
+    LoadPullRequest: () => Effect.succeed(workspace([], { files: [changedFile("greet.ts")] })),
+    WatchTranscript: () =>
+      Stream.make(
+        TranscriptSnapshot.make({
+          turns: [
+            {
+              id: "turn-1",
+              message: "File the PR",
+              images: [],
+              context: null,
+              feedback: [],
+              sentAt,
+              parts: [TextPart.make({ text: `I filed the PR: ${pullRequestUrl}` })],
+              ended: { at: sentAt, ending: TurnDone.make({}) },
+            },
+          ],
+          queued: [],
+          status: null,
+        }),
+      ),
+  })
+
+  const link = await screen.findByRole("link", { name: pullRequestUrl })
+  const conversationHash = window.location.hash
+  await user.click(link)
+
+  const pane = await screen.findByRole("complementary", { name: "Pull request" })
+  expect(await within(pane).findByText("Greet the world")).toBeTruthy()
+  expect(window.location.hash).toBe(conversationHash)
+
+  await user.click(within(pane).getByRole("tab", { name: "Code" }))
+  expect(await within(pane).findByRole("button", { name: "Hide greet.ts" })).toBeTruthy()
+
+  await user.click(within(pane).getByRole("button", { name: "Open review" }))
+
+  await waitFor(() => expect(window.location.hash).toBe("#/reviews/octo-org/hello-world/42"))
+})
+
+it("shows the PR as merged after merging it from the pane", async () => {
+  const pullRequestUrl = "https://github.com/octo-org/hello-world/pull/42"
+  const loads: Array<number> = []
+
+  const user = mount({
+    LoadPullRequest: () =>
+      Effect.sync(() => {
+        loads.push(loads.length)
+
+        return loads.length === 1
+          ? workspace([], { pullRequest: { mergeAction: Merge.make({ method: "squash" }) } })
+          : workspace([], { pullRequest: { state: "merged" } })
+      }),
+    MergePullRequest: () => Effect.void,
     WatchTranscript: () =>
       Stream.make(
         TranscriptSnapshot.make({
@@ -360,8 +414,11 @@ it("opens a PR the agent links to in its PR workspace", async () => {
   })
 
   await user.click(await screen.findByRole("link", { name: pullRequestUrl }))
+  const pane = await screen.findByRole("complementary", { name: "Pull request" })
+  await user.click(await within(pane).findByRole("button", { name: "Merge" }))
 
-  await waitFor(() => expect(window.location.hash).toBe("#/reviews/octo-org/hello-world/7"))
+  await waitFor(() => expect(within(pane).queryByText("No conflicts")).toBeNull())
+  expect(loads).toHaveLength(2)
 })
 
 it("keeps the hidden panel recoverable across Conversation navigation", async () => {
@@ -453,6 +510,7 @@ it("links the Conversation's PR from its header, its details, and its row in the
   const pullRequest = conversationPullRequest(PullRequestOpen.make({ checks: "passing" }))
 
   const user = mount({
+    LoadPullRequest: () => Effect.succeed(workspace()),
     WatchConversations: () => Stream.make([conversation]),
     WatchConversationPullRequests: () => Stream.make([pullRequest]),
     WatchTranscript: () =>
@@ -472,7 +530,8 @@ it("links the Conversation's PR from its header, its details, and its row in the
 
   await user.click(detailsLink)
 
-  await waitFor(() => expect(window.location.hash).toBe("#/reviews/glass-demo/greeter/264"))
+  const pane = await screen.findByRole("complementary", { name: "Pull request" })
+  expect(await within(pane).findByText("Greet the world")).toBeTruthy()
 })
 
 it("tells the user the Conversation's PR merged, in its header and its row in the list", async () => {

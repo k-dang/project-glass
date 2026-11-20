@@ -105,20 +105,22 @@ export function useOpenedFiles<M>(viewOf: (path: string) => ViewHandle<M> | null
 
 const hideHeaderCounts = "[data-additions-count], [data-deletions-count] { display: none; }"
 
+const noAnnotations = () => ({ annotations: [], drawn: null })
+
 export interface DiffViewProps<M> {
   initialPath: string | null
   files: ReadonlyArray<ParsedFile>
-  annotationsFor: (path: string) => FileAnnotations<M>
+  annotationsFor?: (path: string) => FileAnnotations<M>
   display: Display
   loadDiffFiles?: FileDiffContentsLoader
   opened: CollapseChoices["opened"]
   all: CollapseChoices["all"]
   collapsedWhenSuggested: CollapseChoices["collapsedWhenSuggested"]
   onOpenChange: (path: string, open: boolean) => void
-  onCurrentPathChange: (path: string) => void
+  onCurrentPathChange?: (path: string) => void
   summaries: ReadonlyMap<string, string> | null
   searchGroup?: CodeViewReactOptions<M, undefined>["searchGroup"]
-  renderAnnotation: (annotation: DiffLineAnnotation<M>) => ReactNode
+  renderAnnotation?: (annotation: DiffLineAnnotation<M>) => ReactNode
   renderGutterUtility:
     | ((getHoveredLine: () => HoveredLine | undefined, item: CodeViewItem<M>) => ReactNode)
     | null
@@ -131,7 +133,7 @@ export interface DiffViewProps<M> {
 
 export function DiffView<M>(props: DiffViewProps<M>) {
   const { files, opened, onOpenChange, summaries, onCurrentPathChange, ref, display } = props
-  const { renderFileActions, annotationsFor, onGutterUtilityClick } = props
+  const { renderFileActions, annotationsFor = noAnnotations, onGutterUtilityClick } = props
   const parsed = useMemo(() => new Map(files.map((entry) => [entry.file.path, entry])), [files])
   const [initialPath] = useState(props.initialPath)
   const ready = useRef(false)
@@ -306,7 +308,7 @@ export function DiffView<M>(props: DiffViewProps<M>) {
         else high = middle - 1
       }
 
-      onCurrentPathChange(items[low]!.id)
+      onCurrentPathChange?.(items[low]!.id)
     },
     [items, onCurrentPathChange, inTour],
   )
@@ -319,7 +321,9 @@ export function DiffView<M>(props: DiffViewProps<M>) {
       renderHeaderPrefix={renderHeaderPrefix}
       renderHeaderMetadata={renderHeaderMetadata}
       renderItemLead={renderItemLead}
-      renderAnnotation={props.renderAnnotation}
+      {...(props.renderAnnotation === undefined
+        ? {}
+        : { renderAnnotation: props.renderAnnotation })}
       {...(props.renderGutterUtility === null
         ? {}
         : { renderGutterUtility: props.renderGutterUtility })}
@@ -351,6 +355,7 @@ export interface ChangedFilesViewProps extends Omit<
   | "renderFileActions"
   | "collapsedWhenSuggested"
 > {
+  onCurrentPathChange: (path: string) => void
   discussions: ReadonlyArray<LineDiscussion>
   drafts: DraftStore
   asks: AskStore

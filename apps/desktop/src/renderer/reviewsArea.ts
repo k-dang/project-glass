@@ -297,10 +297,34 @@ export const preloadAtom = Atom.family((ref: PullRequestRef) =>
     get.addFinalizer(() => setAgingSince(get.registry, ref, Date.now()))
 
     return loadShared(ref, get.registry).pipe(
-      Effect.andThen(Effect.sync(() => setAgingSince(get.registry, ref, null))),
+      Effect.tap(() => Effect.sync(() => setAgingSince(get.registry, ref, null))),
+      Effect.map((open) => open.workspace),
     )
   }),
 )
+
+const forget = (registry: AtomRegistry.AtomRegistry, ref: PullRequestRef) =>
+  registry.update(loadedAtom, (loaded) => {
+    const entry = loaded.get(urlOf(ref))
+
+    if (entry === undefined) return loaded
+
+    entry.open.feedback.dispose()
+
+    const next = new Map(loaded)
+    next.delete(urlOf(ref))
+
+    return next
+  })
+
+export const reloadPreloaded = async (registry: AtomRegistry.AtomRegistry, ref: PullRequestRef) => {
+  const target = registry.get(targetAtom)
+
+  if (target !== null && sameRef(target, ref)) await reloadPullRequest(registry)
+  else forget(registry, ref)
+
+  registry.refresh(preloadAtom(ref))
+}
 
 export const openPullRequest = (registry: AtomRegistry.AtomRegistry, ref: PullRequestRef) => {
   const target = registry.get(targetAtom)

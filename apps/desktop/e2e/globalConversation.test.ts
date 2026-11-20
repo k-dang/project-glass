@@ -114,8 +114,7 @@ test("reads the PR in view through Glass's tools, keeping that PR after navigati
   await expect(conversation).toContainText(/Done in/)
 })
 
-// Flaky: its home folder stayed locked by the agent host after Glass quit in a full e2e run; passed alone on rerun.
-test.skip("starts a Conversation through Glass's tools, which appears in Conversations and runs its first Turn", async ({
+test("starts a Conversation through Glass's tools, which appears in Conversations and runs its first Turn", async ({
   app,
   home,
   window,

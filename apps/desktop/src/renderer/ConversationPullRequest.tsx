@@ -7,12 +7,14 @@ import type {
 import { useNavigate } from "@tanstack/react-router"
 import { cn } from "cn"
 import { Match, Option } from "effect"
-import type { ComponentProps } from "react"
+import { type ComponentProps, createContext, use } from "react"
 import { AsyncResult } from "effect/reactivity"
 import { buttonVariants } from "@/components/ui/button"
 import { TooltipHint } from "@/components/ui/tooltip"
 import { conversationPullRequestsAtom } from "./conversationsArea"
 import { checksLabels, closedLabel, mergedLabel, StatusIcon, type StatusLabel } from "./status"
+
+export const PullRequestPanes = createContext<((pullRequest: PullRequestRef) => void) | null>(null)
 
 export const useConversationPullRequest = (conversationId: string) =>
   Option.getOrUndefined(AsyncResult.value(useAtomValue(conversationPullRequestsAtom)))?.get(
@@ -47,6 +49,7 @@ export function PullRequestLink({
   ...props
 }: ComponentProps<"a"> & { href: string; pullRequest: PullRequestRef }) {
   const navigate = useNavigate()
+  const openPane = use(PullRequestPanes)
 
   return (
     <a
@@ -62,6 +65,9 @@ export function PullRequestLink({
         if (opensInBrowser) return
 
         event.preventDefault()
+
+        if (openPane !== null) return openPane(pullRequest)
+
         void navigate({ to: "/reviews/$owner/$repo/$number", params: pullRequest })
       }}
     >
