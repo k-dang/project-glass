@@ -36,6 +36,9 @@ it("opens linked and bare images as one gallery, keeps comments separate, and re
   await user.keyboard("{ArrowRight}")
   dialog = screen.getByRole("dialog", { name: "After" })
   expect(within(dialog).getByText("2 / 2")).toBeTruthy()
+  expect(document.activeElement).toBe(
+    within(dialog).getByRole("button", { name: "After, zoomable image" }),
+  )
   await user.click(within(dialog).getByRole("button", { name: "Next image" }))
   expect(screen.getByRole("dialog", { name: "Before" })).toBeTruthy()
   await user.keyboard("{Escape}")

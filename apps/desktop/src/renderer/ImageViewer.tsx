@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react"
+import { flushSync } from "react-dom"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 
@@ -31,21 +32,17 @@ export function ImageViewer(props: {
 }) {
   const [index, setIndex] = useState(props.index)
   const canvasRef = useRef<ImageCanvasHandle>(null)
-  const refocusCanvas = useRef(false)
   const image = props.images[index]!
 
   const navigate = (direction: number) => {
     if (props.images.length < 2) return
-    refocusCanvas.current = document.activeElement === canvasRef.current?.element
-    setIndex((current) => (current + direction + props.images.length) % props.images.length)
-  }
+    const canvasHadFocus = document.activeElement === canvasRef.current?.element
+    flushSync(() =>
+      setIndex((current) => (current + direction + props.images.length) % props.images.length),
+    )
 
-  useLayoutEffect(() => {
-    if (refocusCanvas.current) {
-      canvasRef.current?.element?.focus({ preventScroll: true })
-      refocusCanvas.current = false
-    }
-  })
+    if (canvasHadFocus) canvasRef.current?.element?.focus({ preventScroll: true })
+  }
 
   return (
     <Dialog
