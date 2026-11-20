@@ -30,5 +30,5 @@ export const reviewOf = (revision: Revision): AgentReview => ({
   lowAttention: [],
   conversationId: null,
   done: false,
-  includedInGlobalConversationUpdate: false,
+  includedInStartedWorkUpdate: false,
 })

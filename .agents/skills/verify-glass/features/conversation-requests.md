@@ -32,5 +32,5 @@ Preconditions:
 ## Gotchas
 
 - The real CLI approves read-only commands such as `ls` itself, even in Default; ask for a command that changes something, such as `touch`, to get a card.
-- The fake model only calls a tool for a command in backticks or a message containing "ask"; anything else gets "Fake reply to: …" and the Turn ends at once.
+- The fake model only calls a tool for a command in backticks, a message containing "ask", or a message that is `call:<glass tool> <json input>`, such as `call:list_conversation_places {}`, which calls that Glass tool; anything else gets "Fake reply to: …" and the Turn ends at once.
 - Two seeded Conversations already wait on you; start a new Claude Code Conversation so the cards you drive are your own.

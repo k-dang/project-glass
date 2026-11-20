@@ -67,6 +67,28 @@ export const harnessCapabilities: Record<AgentHarness, AgentCapabilities> = {
   pi: { permissionModes: [] },
 }
 
+export const startingPermissionMode = (
+  place: ConversationPlace,
+  harness: AgentHarness,
+  requested: PermissionMode | null,
+): PermissionMode | null => {
+  if (harnessCapabilities[harness].permissionModes.length === 0) return null
+
+  return asksPermission(place) ? (requested ?? defaultPermissionMode) : "bypassPermissions"
+}
+
+const reachOf: Record<PermissionMode, number> = {
+  default: 0,
+  acceptEdits: 1,
+  auto: 2,
+  bypassPermissions: 3,
+}
+
+const permissionReach = (mode: PermissionMode | null) => (mode === null ? Infinity : reachOf[mode])
+
+export const asksLessThan = (mode: PermissionMode | null, than: PermissionMode | null) =>
+  permissionReach(mode) > permissionReach(than)
+
 export const AgentCommand = Schema.Struct({
   name: Schema.String,
   description: Schema.String,
@@ -201,11 +223,11 @@ export const WorkOutcome = Schema.Union([ConversationOutcome, AgentReviewOutcome
 
 export type WorkOutcome = typeof WorkOutcome.Type
 
-export const GlobalConversationUpdate = Schema.TaggedStruct("GlobalConversationUpdate", {
+export const StartedWorkUpdate = Schema.TaggedStruct("StartedWorkUpdate", {
   work: Schema.NonEmptyArray(WorkOutcome),
 })
 
-export type GlobalConversationUpdate = typeof GlobalConversationUpdate.Type
+export type StartedWorkUpdate = typeof StartedWorkUpdate.Type
 
 export const BackgroundWork = Schema.Struct({
   kind: Schema.Literals(["subagent", "command"]),
@@ -222,7 +244,7 @@ export const BackgroundWorkEnded = Schema.TaggedStruct("BackgroundWorkEnded", {
 export const TurnContext = Schema.Union([
   PullRequestContext,
   ConversationContext,
-  GlobalConversationUpdate,
+  StartedWorkUpdate,
   BackgroundWorkEnded,
 ])
 

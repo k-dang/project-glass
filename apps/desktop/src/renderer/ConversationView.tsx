@@ -575,13 +575,11 @@ const workOutcomeText = (work: WorkOutcome) => {
   return `${subject} ${outcomeText[work.outcome]}`
 }
 
-function GlobalConversationUpdateMessage(props: { work: ReadonlyArray<WorkOutcome> }) {
+function StartedWorkUpdateMessage(props: { work: ReadonlyArray<WorkOutcome> }) {
   return (
     <Message align="end">
       <MessageContent>
-        <span className="self-end text-xs text-muted-foreground">
-          Global conversation update from Glass
-        </span>
+        <span className="self-end text-xs text-muted-foreground">Update from Glass</span>
         <ul className="flex flex-col gap-1 self-end text-sm text-muted-foreground">
           {props.work.map((work, index) => (
             <li key={index}>{workOutcomeText(work)}</li>
@@ -624,8 +622,8 @@ function BackgroundWorkEndedMessage(props: { work: ReadonlyArray<BackgroundWork>
 function TurnMessage(props: { turn: Turn }) {
   const { turn } = props
 
-  if (Predicate.isTagged(turn.context, "GlobalConversationUpdate"))
-    return <GlobalConversationUpdateMessage work={turn.context.work} />
+  if (Predicate.isTagged(turn.context, "StartedWorkUpdate"))
+    return <StartedWorkUpdateMessage work={turn.context.work} />
 
   if (Predicate.isTagged(turn.context, "BackgroundWorkEnded"))
     return <BackgroundWorkEndedMessage work={turn.context.work} />

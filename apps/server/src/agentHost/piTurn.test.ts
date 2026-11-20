@@ -1,7 +1,7 @@
 import { assert, it } from "@effect/vitest"
 import {
   ConversationOutcome,
-  GlobalConversationUpdate,
+  StartedWorkUpdate,
   SteerPart,
   TextPart,
   TurnDone,
@@ -22,7 +22,7 @@ const updating = beginTurn(
   {
     message: "",
     images: [],
-    context: GlobalConversationUpdate.make({
+    context: StartedWorkUpdate.make({
       work: [
         ConversationOutcome.make({
           conversationId: "started",
@@ -57,7 +57,7 @@ const assistantEnd = (stopReason: string, errorMessage = ""): PiEvent => ({
   message: { role: "assistant", stopReason, errorMessage },
 })
 
-it("releases a Global conversation update after transport failure without claiming it ended", () => {
+it("releases a Started work update after transport failure without claiming it ended", () => {
   for (const input of [Input.Refused({ turnId: "turn-1" }), Input.Exited()]) {
     const lost = run([input], updating)
     assert.isNull(lost.state)
@@ -65,7 +65,7 @@ it("releases a Global conversation update after transport failure without claimi
   }
 })
 
-it("keeps a completed provider failure terminal for a Global conversation update", () => {
+it("keeps a completed provider failure terminal for a Started work update", () => {
   const failed = run(
     [
       { type: "agent_start" },

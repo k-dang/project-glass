@@ -48,6 +48,8 @@ import { followJournal, greet } from "../src/hostJournal"
 import { migrationLoader } from "../src/Migrations"
 import { Plugins } from "../src/Plugins"
 import { Sandboxes } from "../src/Sandboxes"
+import { LocalAgentHost } from "../src/LocalAgentHost"
+import { McpCredentials } from "../src/mcp/McpCredentials"
 import { LocalSkills } from "../src/LocalSkills"
 import { SkillPacks } from "../src/SkillPacks"
 import { ServerConfig } from "../src/ServerConfig"
@@ -227,6 +229,8 @@ export const conversationServicesFixture = Effect.gen(function* () {
           ),
           Layer.provide(SkillPacks.layer.pipe(Layer.provide(Layer.mock(GitHubClient)({})))),
           Layer.provide(Layer.mock(LocalSkills)({})),
+          Layer.provide(Layer.mock(LocalAgentHost)({ lifetimeOf: () => Effect.succeedNone })),
+          Layer.provide(McpCredentials.layer),
           Layer.provide(ConversationTurns.layer),
           Layer.provide(FeedbackNotes.layer),
           Layer.provideMerge(Transcripts.layer),

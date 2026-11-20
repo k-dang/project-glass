@@ -1,4 +1,5 @@
 import { assert, describe, it } from "@effect/vitest"
+import { GlobalConversationCaller } from "./McpCredentials"
 import { AskUserAnswered, AskUserResult, type NeedsYou, OutsideText } from "@glass/contracts"
 import { Effect, Fiber, Option, Predicate, Redacted, Schema, Stream } from "effect"
 import { createHash, randomBytes } from "node:crypto"
@@ -664,10 +665,9 @@ describe("MCP OAuth", () => {
         "application/x-www-form-urlencoded",
       )
 
-      const conversation = yield* mcpCredentials.issue({
-        globalConversationId: "rebind",
-        sessionId: "rebind",
-      })
+      const conversation = yield* mcpCredentials.issue(
+        GlobalConversationCaller.make({ globalConversationId: "rebind", sessionId: "rebind" }),
+      )
 
       const mcp = yield* send(
         "POST",

@@ -11,7 +11,7 @@ import {
   TextPart,
   TurnFailed,
   TurnStopped,
-  GlobalConversationUpdate,
+  StartedWorkUpdate,
 } from "@glass/contracts"
 import {
   DateTime,
@@ -106,7 +106,7 @@ const decodeLine = Schema.decodeUnknownSync(Schema.fromJsonString(UnitLine))
 
 const sent = (message: string) => ({ message, images: [], context: null })
 
-const globalConversationUpdate = GlobalConversationUpdate.make({
+const startedWorkUpdate = StartedWorkUpdate.make({
   work: [
     ConversationOutcome.make({
       conversationId: "started",
@@ -118,10 +118,10 @@ const globalConversationUpdate = GlobalConversationUpdate.make({
   ],
 })
 
-const globalConversationUpdateTurn = {
+const startedWorkUpdateTurn = {
   message: "",
   images: [],
-  context: globalConversationUpdate,
+  context: startedWorkUpdate,
   retriesDelivery: true,
 }
 
@@ -290,7 +290,7 @@ it.live(
 
       let savedId = ""
 
-      yield* transcripts.startIfIdle("agent-1", globalConversationUpdateTurn, (turnId) =>
+      yield* transcripts.startIfIdle("agent-1", startedWorkUpdateTurn, (turnId) =>
         Effect.sync(() => {
           savedId = turnId
         }),
@@ -326,11 +326,11 @@ it.live(
   () =>
     Effect.gen(function* () {
       const transcripts = yield* Transcripts
-      yield* transcripts.startIfIdle("agent-1", globalConversationUpdateTurn, () => Effect.void)
+      yield* transcripts.startIfIdle("agent-1", startedWorkUpdateTurn, () => Effect.void)
       const savedId = yield* transcripts.runningTurn("agent-1")
       yield* transcripts.startOrQueue("agent-1", sent("After"))
       const firstScope = yield* Scope.make()
-      const reason = "Couldn't recover pi's Global conversation update. Restart Glass to try again."
+      const reason = "Couldn't recover pi's Started work update. Restart Glass to try again."
 
       const first = yield* harness(
         () => Effect.void,
@@ -366,7 +366,7 @@ it.live("fails a Turn started when idle that doesn't retry delivery once the hos
     )
 
     yield* h.turns.whenIdle("agent-1", (start) =>
-      start({ ...globalConversationUpdateTurn, retriesDelivery: false }, () => Effect.void),
+      start({ ...startedWorkUpdateTurn, retriesDelivery: false }, () => Effect.void),
     )
 
     assert.deepStrictEqual(yield* h.delivered(1), ["failed"])
@@ -530,7 +530,7 @@ it.live("starts an idle update only while that conversation has nothing running 
     let started = 0
 
     yield* h.turns.whenIdle("agent-1", (start) =>
-      start(globalConversationUpdateTurn, () =>
+      start(startedWorkUpdateTurn, () =>
         Effect.sync(() => {
           started += 1
         }),
@@ -546,7 +546,7 @@ it.live("starts an idle update only while that conversation has nothing running 
       }),
     )
     assert.isFalse(again)
-    assert.equal((yield* h.transcript).turns[0]?.context?._tag, "GlobalConversationUpdate")
+    assert.equal((yield* h.transcript).turns[0]?.context?._tag, "StartedWorkUpdate")
   }).pipe(Effect.provide(layer)),
 )
 
@@ -790,7 +790,7 @@ it.effect("leaves a Turn that retries delivery pending when StartTurn never answ
       })
 
       yield* desk.turns.whenIdle("agent-1", (start) =>
-        start(globalConversationUpdateTurn, () => Effect.void),
+        start(startedWorkUpdateTurn, () => Effect.void),
       )
       yield* Deferred.await(entered)
       yield* deadlineSet
@@ -813,7 +813,7 @@ it.effect("leaves a Turn that retries delivery pending when StartTurn never answ
       const waiting = yield* desk.transcripts.read("agent-1")
       assert.equal(waiting.turns[0]?.ended, null)
       assert.equal(waiting.status, HOST_DIDNT_ANSWER)
-      assert.equal(waiting.turns[0]?.context?._tag, "GlobalConversationUpdate")
+      assert.equal(waiting.turns[0]?.context?._tag, "StartedWorkUpdate")
 
       const retryable = yield* desk.transcripts.retryDeliveries(["agent-1"])
       assert.lengthOf(retryable, 1)
@@ -851,7 +851,7 @@ it.effect(
       assert.isDefined(conversation)
 
       yield* desk.turns.whenIdle("agent-1", (start) =>
-        start(globalConversationUpdateTurn, () => Effect.void),
+        start(startedWorkUpdateTurn, () => Effect.void),
       )
       yield* Deferred.await(begun)
       yield* desk.turns.stop(conversation)
@@ -880,7 +880,7 @@ it.effect(
       assert.isDefined(conversation)
 
       yield* desk.turns.whenIdle("agent-1", (start) =>
-        start(globalConversationUpdateTurn, () => Effect.void),
+        start(startedWorkUpdateTurn, () => Effect.void),
       )
       yield* Deferred.await(begun)
       yield* desk.turns.stop(conversation)
@@ -918,7 +918,7 @@ it.effect(
         assert.isDefined(conversation)
 
         yield* desk.turns.whenIdle("agent-1", (start) =>
-          start(globalConversationUpdateTurn, () => Effect.void),
+          start(startedWorkUpdateTurn, () => Effect.void),
         )
         yield* Deferred.await(entered)
         yield* deadlineSet

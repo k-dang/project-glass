@@ -78,7 +78,7 @@ const stored = Schema.Array(
     low_attention: LowAttentionJson,
     conversation_id: Schema.NullOr(Schema.String),
     done: Schema.BooleanFromBit,
-    included_in_global_conversation_update: Schema.BooleanFromBit,
+    included_in_started_work_update: Schema.BooleanFromBit,
   }),
 )
 
@@ -156,7 +156,7 @@ export class AgentReviews extends Context.Service<
       pr: PullRequestRef,
       writtenAt: DateTime.Utc,
     ) => Effect.Effect<void, AgentReviewFailure>
-    readonly markIncludedInGlobalConversationUpdate: (
+    readonly markIncludedInStartedWorkUpdate: (
       pr: PullRequestRef,
       writtenAt: DateTime.Utc,
     ) => Effect.Effect<void, AgentReviewFailure>
@@ -183,7 +183,7 @@ export class AgentReviews extends Context.Service<
       const load = Effect.fnUntraced(
         function* (pr: PullRequestRef) {
           const rows =
-            yield* sql`SELECT base, head, written_at, markdown, hotspots, low_attention, conversation_id, done, included_in_global_conversation_update FROM agent_reviews WHERE ${where(pr)}`.pipe(
+            yield* sql`SELECT base, head, written_at, markdown, hotspots, low_attention, conversation_id, done, included_in_started_work_update FROM agent_reviews WHERE ${where(pr)}`.pipe(
               Effect.flatMap(Schema.decodeUnknownEffect(stored)),
             )
 
@@ -200,7 +200,7 @@ export class AgentReviews extends Context.Service<
                   lowAttention: row.low_attention,
                   conversationId: row.conversation_id,
                   done: row.done,
-                  includedInGlobalConversationUpdate: row.included_in_global_conversation_update,
+                  includedInStartedWorkUpdate: row.included_in_started_work_update,
                 })
 
           return review
@@ -227,9 +227,9 @@ export class AgentReviews extends Context.Service<
 
           yield* jobs.commit(
             job,
-            sql`INSERT INTO agent_reviews (owner, repo, number, base, head, written_at, markdown, hotspots, low_attention, conversation_id, done, included_in_global_conversation_update)
+            sql`INSERT INTO agent_reviews (owner, repo, number, base, head, written_at, markdown, hotspots, low_attention, conversation_id, done, included_in_started_work_update)
               VALUES (${pr.owner}, ${pr.repo}, ${pr.number}, ${review.revision.base}, ${review.revision.head}, ${DateTime.formatIso(review.writtenAt)}, ${review.markdown}, ${encodeHotspots(review.hotspots)}, ${encodeLowAttention(review.lowAttention)}, NULL, 0, 0)
-              ON CONFLICT (owner, repo, number) DO UPDATE SET base = excluded.base, head = excluded.head, written_at = excluded.written_at, markdown = excluded.markdown, hotspots = excluded.hotspots, low_attention = excluded.low_attention, conversation_id = NULL, done = 0, included_in_global_conversation_update = 0`.pipe(
+              ON CONFLICT (owner, repo, number) DO UPDATE SET base = excluded.base, head = excluded.head, written_at = excluded.written_at, markdown = excluded.markdown, hotspots = excluded.hotspots, low_attention = excluded.low_attention, conversation_id = NULL, done = 0, included_in_started_work_update = 0`.pipe(
               logStorageFailure,
               Effect.mapError(storageFailure),
             ),
@@ -281,7 +281,7 @@ export class AgentReviews extends Context.Service<
             ...fitToDiff(answer, input.files),
             conversationId: null,
             done: false,
-            includedInGlobalConversationUpdate: false,
+            includedInStartedWorkUpdate: false,
           })
         }).pipe(
           Effect.flatMap((review) => save(job, pr, review)),
@@ -456,7 +456,7 @@ export class AgentReviews extends Context.Service<
           )
       })
 
-      const mark = (flag: "done" | "includedInGlobalConversationUpdate", name: string) =>
+      const mark = (flag: "done" | "includedInStartedWorkUpdate", name: string) =>
         Effect.fn(name)(function* (pr: PullRequestRef, writtenAt: DateTime.Utc) {
           const job = yield* jobs.jobFor(pr)
 
@@ -469,7 +469,7 @@ export class AgentReviews extends Context.Service<
               )
                 return review
 
-              const column = flag === "done" ? "done" : "included_in_global_conversation_update"
+              const column = flag === "done" ? "done" : "included_in_started_work_update"
 
               yield* sql`UPDATE agent_reviews SET ${sql(column)} = 1 WHERE ${where(pr)}`.pipe(
                 logStorageFailure,
@@ -487,9 +487,9 @@ export class AgentReviews extends Context.Service<
         followUp,
         cancel: jobs.stop,
         markDone: mark("done", "AgentReviews.markDone"),
-        markIncludedInGlobalConversationUpdate: mark(
-          "includedInGlobalConversationUpdate",
-          "AgentReviews.markIncludedInGlobalConversationUpdate",
+        markIncludedInStartedWorkUpdate: mark(
+          "includedInStartedWorkUpdate",
+          "AgentReviews.markIncludedInStartedWorkUpdate",
         ),
         cancelBackground: jobs.stopBackground,
         watch: jobs.watch,

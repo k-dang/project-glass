@@ -55,10 +55,12 @@ import {
 } from "./piTurn"
 import { globalInstructions, PI_QUESTION_TOOL, piQuestionExtension } from "./globalRole"
 import { PI_GLASS_TOOLS, piGlassToolsExtension } from "./piGlassTools"
+import { workInstructions } from "./workRole"
 import {
   type ConversationRole,
   couldNotSwitch,
   type GlassToolsAccess,
+  glassToolsOf,
   HostConversationError,
   notRunning,
 } from "./protocol"
@@ -69,7 +71,7 @@ import { piLoadsNothing, piTools } from "../agentTools"
 import { piSubagentStatusExtension } from "./piSubagentStatus"
 import { PI_DIFF_LINES } from "./piSuggestDraft"
 import { runTurns } from "./turnLoop"
-import { globalConversationUpdateDelivery, SessionEntries } from "./piGlobalConversationUpdate"
+import { startedWorkUpdateDelivery, SessionEntries } from "./piStartedWorkUpdate"
 import piDrawDiagramSource from "virtual:pi-draw-diagram"
 import piSuggestDraftSource from "virtual:pi-suggest-draft"
 
@@ -212,11 +214,20 @@ const skillFlags = (skills: ReadonlyArray<WrittenSkills>) =>
 const roleFlags = (folder: string, role: ConversationRole, skills: ReadonlyArray<WrittenSkills>) =>
   Match.value(role).pipe(
     Match.tagsExhaustive({
-      Work: () =>
+      Work: ({ tools }) =>
         writtenExtensions(folder, [
           { name: "draw-diagram.mjs", source: piDrawDiagramSource },
           { name: "subagent-status.js", source: piSubagentStatusExtension },
-        ]).pipe(Effect.map(({ flags }) => [...skillFlags(skills), ...flags])),
+          ...(tools === undefined
+            ? []
+            : [{ name: "glass-tools.js", source: piGlassToolsExtension }]),
+        ]).pipe(
+          Effect.map(({ flags }) => [
+            ...skillFlags(skills),
+            ...flags,
+            ...(tools === undefined ? [] : ["--append-system-prompt", workInstructions]),
+          ]),
+        ),
       Review: ({ brief }) =>
         lockedDownFlags(
           folder,
@@ -363,18 +374,13 @@ export const piAdapter = (command: string) =>
           return showStatuses
         }
 
-        const rpc = yield* startPi(
-          folder,
-          conversation,
-          flags,
-          Predicate.isTagged(role, "Global") ? role.tools : undefined,
-          (event) =>
-            trackDialog(event).pipe(
-              Effect.andThen(trackStatus(event)),
-              Effect.andThen(logProviderError(event)),
-              Effect.andThen(Queue.offer(inbox, Input.Event({ event }))),
-              Effect.asVoid,
-            ),
+        const rpc = yield* startPi(folder, conversation, flags, glassToolsOf(role), (event) =>
+          trackDialog(event).pipe(
+            Effect.andThen(trackStatus(event)),
+            Effect.andThen(logProviderError(event)),
+            Effect.andThen(Queue.offer(inbox, Input.Event({ event }))),
+            Effect.asVoid,
+          ),
         )
 
         yield* rpc.exited.pipe(
@@ -450,20 +456,19 @@ export const piAdapter = (command: string) =>
           yield* Queue.offer(inbox, answer)
         })
 
-        const startGlobalConversationUpdate = Effect.fnUntraced(function* (
+        const startStartedWorkUpdate = Effect.fnUntraced(function* (
           turnId: string,
           sent: DeliveredTurn,
         ) {
           const delivery = yield* rpc.request({ type: "get_entries" }, SessionEntries).pipe(
-            Effect.map((session) => globalConversationUpdateDelivery(turnId, sent.prompt, session)),
+            Effect.map((session) => startedWorkUpdateDelivery(turnId, sent.prompt, session)),
             Effect.tapError((error) =>
-              Effect.logWarning("Couldn't recover pi's Global conversation update", error),
+              Effect.logWarning("Couldn't recover pi's Started work update", error),
             ),
             Effect.mapError(
               () =>
                 new HostConversationError({
-                  message:
-                    "Couldn't recover pi's Global conversation update. Restart Glass to try again.",
+                  message: "Couldn't recover pi's Started work update. Restart Glass to try again.",
                 }),
             ),
           )
@@ -483,16 +488,13 @@ export const piAdapter = (command: string) =>
             .pipe(
               Effect.tapError(() => Queue.offer(inbox, Input.Refused({ turnId }))),
               Effect.tapError((error) =>
-                Effect.logWarning(
-                  "Couldn't confirm pi's Global conversation update delivery",
-                  error,
-                ),
+                Effect.logWarning("Couldn't confirm pi's Started work update delivery", error),
               ),
               Effect.mapError(
                 () =>
                   new HostConversationError({
                     message:
-                      "Couldn't confirm pi's Global conversation update delivery. Restart Glass to try again.",
+                      "Couldn't confirm pi's Started work update delivery. Restart Glass to try again.",
                   }),
               ),
             )
@@ -526,8 +528,8 @@ export const piAdapter = (command: string) =>
             return undefined
           }),
           startTurn: (turnId, sent) =>
-            Predicate.isTagged(sent.context, "GlobalConversationUpdate")
-              ? startGlobalConversationUpdate(turnId, sent)
+            Predicate.isTagged(sent.context, "StartedWorkUpdate")
+              ? startStartedWorkUpdate(turnId, sent)
               : startMessage(turnId, sent),
           answer: Effect.fnUntraced(function* (requestId: string, answer: RequestAnswer) {
             const dialog = dialogs.get(requestId)

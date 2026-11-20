@@ -6,7 +6,7 @@ import {
   glassCalls,
   globalTurns,
   lastSettled,
-  conversationOutcomesInGlobalConversationUpdates,
+  conversationOutcomesInStartedWorkUpdates,
   repository,
   sendGlobal,
   settled,
@@ -66,7 +66,7 @@ it.live(
 
       yield* globalTurns(f.client, (turns) =>
         [created.id, messaged.id].every((id) =>
-          conversationOutcomesInGlobalConversationUpdates(turns).some(
+          conversationOutcomesInStartedWorkUpdates(turns).some(
             ([conversationId]) => conversationId === id,
           ),
         ),

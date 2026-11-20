@@ -8,10 +8,11 @@ import {
   localPlace,
   TOKEN_PARAM,
 } from "@glass/contracts"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { GLASS_MCP_PREFIX } from "../src/agentHost/toolCalls"
 import { connectRpcClient } from "../src/rpcSocket"
 import {
   LONG_CONVERSATION_FOLLOW_UPS,
@@ -95,8 +96,34 @@ const diagramDrawings = {
   },
 } satisfies Record<string, Diagram>
 
+const decodeToolArguments = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.JsonObject))
+
+const glassToolReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> | undefined => {
+  const called = /^call:(\S+) (.+)$/.exec(lastUserText(input))
+
+  if (called === null) return undefined
+
+  const last = input.messages.at(-1)
+
+  if (last?.role === "tool") return [{ text: `The fake model saw: ${textOf(last).slice(0, 200)}` }]
+
+  return [
+    {
+      toolCall: {
+        id: `demo-glass-${input.messages.length}`,
+        name: `${GLASS_MCP_PREFIX}${called[1]}`,
+        arguments: decodeToolArguments(called[2]),
+      },
+    },
+  ]
+}
+
 const demoReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
   if (isGlobalConversation(input)) return globalConversationReply(input)
+
+  const glassTool = glassToolReply(input)
+
+  if (glassTool !== undefined) return glassTool
 
   const scripted = longConversationReply(input)
 

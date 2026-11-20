@@ -9,7 +9,7 @@ import {
   type TranscriptUpdate,
   EarlierTurns,
   TurnDone,
-  GlobalConversationUpdate,
+  StartedWorkUpdate,
   type Activity,
   ActivityPage,
   ActivityPullRequest,
@@ -611,7 +611,7 @@ it("won't start fresh while a Turn runs, and says why", async () => {
   ).toBe(true)
 })
 
-it("marks the rail while a Global conversation reply is unseen, and shows a Global conversation update as from Glass", async () => {
+it("marks the rail while a Global conversation reply is unseen, and shows a Started work update as from Glass", async () => {
   vi.spyOn(document, "hasFocus").mockReturnValue(true)
   const at = DateTime.makeUnsafe("2026-11-05T12:00:00Z")
   const ended = { at, ending: TurnDone.make({}) }
@@ -630,7 +630,7 @@ it("marks the rail while a Global conversation reply is unseen, and shows a Glob
               id: "report-1",
               message: "",
               images: [],
-              context: GlobalConversationUpdate.make({
+              context: StartedWorkUpdate.make({
                 work: [
                   AgentReviewOutcome.make({
                     pullRequest: workspace.pullRequest.ref,
@@ -659,7 +659,7 @@ it("marks the rail while a Global conversation reply is unseen, and shows a Glob
 
   const conversation = await screen.findByRole("dialog", { name: "Global conversation" })
   await within(conversation).findByText("The review on #42 is in.")
-  expect(within(conversation).getByText("Global conversation update from Glass")).toBeTruthy()
+  expect(within(conversation).getByText("Update from Glass")).toBeTruthy()
   expect(within(conversation).getByText("Agent review on octo-org/glass#42 finished")).toBeTruthy()
   expect(within(rail).queryByText("Unread reply")).toBeNull()
   await waitFor(() => expect(seen).toEqual([DateTime.formatIso(at)]))

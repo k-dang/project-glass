@@ -21,7 +21,7 @@ import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from
 import { basename, dirname, join } from "node:path"
 import type { HarnessAdapter, HarnessSession } from "../src/agentHost/adapter"
 import type { DeliveredTurn } from "../src/agentHost/deliveredMessage"
-import { GlassToolsAccess, notRunning } from "../src/agentHost/protocol"
+import { GlassToolsAccess, glassToolsOf, notRunning } from "../src/agentHost/protocol"
 import type { WrittenSkills } from "../src/agentHost/sentSkills"
 import { MCP_PATH } from "../src/mcp/server"
 import { filesIn } from "./filesIn"
@@ -87,12 +87,12 @@ export const scriptedAdapter = (gates: string): HarnessAdapter => {
     start: ({ folder, conversation, role, skills, report }) =>
       Effect.gen(function* () {
         const review = Predicate.isTagged(role, "Review") ? role.brief : null
-        const glass = Predicate.isTagged(role, "Global") ? role.tools : null
+        const glass = glassToolsOf(role) ?? null
         const scope = yield* Scope.Scope
 
-        if (glass !== null) {
+        if (Predicate.isTagged(role, "Global")) {
           if (existsSync(currentStart)) renameSync(currentStart, previousStart)
-          writeFileSync(currentStart, encodeAccess(glass))
+          writeFileSync(currentStart, encodeAccess(role.tools))
         }
 
         let turn: {

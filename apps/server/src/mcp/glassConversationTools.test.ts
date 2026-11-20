@@ -1,4 +1,5 @@
 import { assert, describe, it } from "@effect/vitest"
+import { ConversationCaller, GlobalConversationCaller } from "./McpCredentials"
 import {
   Conversation,
   AgentReviewState,
@@ -6,6 +7,7 @@ import {
   NeedsYou,
   PullRequestRef,
   localPlace,
+  SandboxPlace,
   TurnDone,
 } from "@glass/contracts"
 import { Effect, Option, Predicate, Schema, Stream } from "effect"
@@ -17,7 +19,10 @@ import { connectMcp, toolText } from "../../test/mcpClient"
 import { scriptedAgentRunners } from "../../test/scriptedAgentRunners"
 import { StartedItem } from "../StartedWork"
 
-const caller = { globalConversationId: "global-conversation", sessionId: "global-session" }
+const caller = GlobalConversationCaller.make({
+  globalConversationId: "global-conversation",
+  sessionId: "global-session",
+})
 
 const startGlass = Effect.gen(function* () {
   const f = yield* conversationsFixture
@@ -333,6 +338,103 @@ describe("Glass's Agent review tools over MCP", () => {
       )
 
       assert.equal(job.status === "failed" && job.reason.reason, "stale-revision")
+    }),
+  )
+})
+
+const asConversation = (f: Effect.Success<typeof conversationsFixture>, conversationId: string) =>
+  f.mcpCredentials
+    .issue(ConversationCaller.make({ conversationId }))
+    .pipe(Effect.flatMap((bearer) => connectMcp(f.baseUrl, bearer)))
+
+describe("Glass's Conversation tools called by a Conversation", () => {
+  it.live(
+    "tells a Conversation in its own transcript once a Conversation its agent created ends",
+    () =>
+      Effect.gen(function* () {
+        const f = yield* conversationsFixture
+
+        const parent = yield* f.start(
+          `call:create_conversation ${JSON.stringify(onThisDevice("hold:child"))}`,
+        )
+
+        yield* f.transcript(parent.id, settled(1))
+        const [child] = (yield* f.conversations).filter(({ id }) => id !== parent.id)
+        yield* f.transcript(child!.id, holding)
+        yield* f.release("child")
+
+        const [, update] = yield* f.transcript(parent.id, settled(2))
+        const { call } = yield* asConversation(f, parent.id)
+
+        assert.deepStrictEqual<unknown>(
+          Predicate.isTagged(update?.context, "StartedWorkUpdate") &&
+            update.context.work.map((work) => [
+              Predicate.isTagged(work, "Conversation") && work.conversationId,
+              work.outcome,
+            ]),
+          [[child!.id, "finished"]],
+        )
+        assert.deepStrictEqual(
+          decodeStarted((yield* call("list_started_work")).structuredContent).items.map(
+            (item) => Predicate.isTagged(item, "Conversation") && item.conversation.id,
+          ),
+          [child!.id],
+        )
+      }),
+  )
+
+  it.live("gives a Conversation it creates its own Permission mode, never one asking less", () =>
+    Effect.gen(function* () {
+      const f = yield* conversationsFixture
+
+      const parent = yield* f.start("Say hello", {
+        harness: "claude-code",
+        model: null,
+        effort: null,
+        permissionMode: "default",
+      })
+
+      const { call } = yield* asConversation(f, parent.id)
+      const claude = { ...onThisDevice("Investigate"), harness: "claude-code" }
+
+      const local = yield* call("create_conversation", claude)
+
+      const inSandbox = yield* call("create_conversation", {
+        ...claude,
+        place: SandboxPlace.make({ providerId: "fake" }),
+      })
+
+      const pi = yield* call("create_conversation", onThisDevice("Investigate"))
+
+      assert.equal(decodeCreated(local.structuredContent).conversation.permissionMode, "default")
+
+      const refusal =
+        "That Conversation would ask the user less than you do, so you can't create it. Create one on this device with Claude Code instead, or ask the user to."
+
+      assert.deepStrictEqual(
+        [inSandbox, pi].map((refused) => [refused.isError, toolText(refused)]),
+        [
+          [true, refusal],
+          [true, refusal],
+        ],
+      )
+      assert.equal((yield* f.conversations).length, 2)
+    }),
+  )
+
+  it.live("refuses a message to itself", () =>
+    Effect.gen(function* () {
+      const f = yield* conversationsFixture
+      const conversation = yield* f.start("Say hello")
+      yield* f.transcript(conversation.id, settled(1))
+      const { call } = yield* asConversation(f, conversation.id)
+
+      const result = yield* call("send_conversation_message", {
+        conversationId: conversation.id,
+        message: "Again",
+      })
+
+      assert.include(toolText(result), "can't send a message to itself")
     }),
   )
 })

@@ -162,9 +162,10 @@ _Avoid_: Task, action item
 ### Conversations
 
 **Conversation**:
-A named conversation the user starts from Glass with an agent, run by an Agent harness and a model
-and working in one place: a worktree on this device, a Sandbox, or a checkout of an Agent review's
-Revision.
+A named conversation started from Glass with an agent, run by an Agent harness and a model and
+working in one place: a worktree on this device, a Sandbox, or a checkout of an Agent review's
+Revision. The user starts one, or the Global conversation or another Conversation's agent does for
+them; a Conversation never starts one that asks the user less than it does.
 _Avoid_: Session, thread, bot, box
 
 **Conversation's PR**:
@@ -181,10 +182,10 @@ A Global conversation the user ended with Start fresh, kept to read but not to c
 the id of the pi session it ran in, which is the one place "session" belongs.
 _Avoid_: Session (in UI copy), history, archived chat
 
-**Global conversation update**:
-A Turn Glass starts in the Global conversation to tell the user that work it started finished,
-failed, or needs their input.
-_Avoid_: Notification, event, wake-up
+**Started work update**:
+A Turn Glass starts in the Global conversation or a Conversation to tell it that work it started
+finished, failed, or needs the user's input.
+_Avoid_: Global conversation update, notification, event, wake-up
 
 **Agent harness**:
 Claude Code or pi, the harness that runs an agent and decides which models and Efforts it offers.

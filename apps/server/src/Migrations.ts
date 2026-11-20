@@ -15,6 +15,7 @@ import journalHost from "./migrations/0013_journal_host"
 import conversationBranch from "./migrations/0014_conversation_branch"
 import feedbackNotes from "./migrations/0015_feedback_notes"
 import turnRetriesDelivery from "./migrations/0016_turn_retries_delivery"
+import startedWork from "./migrations/0017_started_work"
 
 export const migrationLoader = SqliteMigrator.fromRecord({
   "0001_baseline": baseline,
@@ -33,4 +34,5 @@ export const migrationLoader = SqliteMigrator.fromRecord({
   "0014_conversation_branch": conversationBranch,
   "0015_feedback_notes": feedbackNotes,
   "0016_turn_retries_delivery": turnRetriesDelivery,
+  "0017_started_work": startedWork,
 })

@@ -1,4 +1,5 @@
 import { assert, describe, it } from "@effect/vitest"
+import { GlobalConversationCaller } from "./McpCredentials"
 import { PullRequestRef, Revision } from "@glass/contracts"
 import { Effect, Schema } from "effect"
 import { type FakeGitHubRequest, startFakeGitHub } from "../../test/fakeGitHub"
@@ -42,10 +43,12 @@ const startGlass = Effect.gen(function* () {
 
   const mcp = yield* connectMcp(
     backend.baseUrl,
-    yield* backend.mcpCredentials.issue({
-      globalConversationId: "global-conversation",
-      sessionId: "global-session",
-    }),
+    yield* backend.mcpCredentials.issue(
+      GlobalConversationCaller.make({
+        globalConversationId: "global-conversation",
+        sessionId: "global-session",
+      }),
+    ),
   )
 
   return { ...backend, github, requests, pr, mcp, call: mcp.call }

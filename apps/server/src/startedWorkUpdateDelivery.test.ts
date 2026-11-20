@@ -1,6 +1,6 @@
 import { SqliteClient, SqliteMigrator } from "@effect/sql-sqlite-node"
 import { assert, it } from "@effect/vitest"
-import { ConversationError, ConversationOutcome, GlobalConversationUpdate } from "@glass/contracts"
+import { ConversationError, ConversationOutcome, StartedWorkUpdate } from "@glass/contracts"
 import { DateTime, Effect, Layer, Stream, Option } from "effect"
 import { SqlClient } from "effect/sql"
 import { Conversations } from "./Conversations"
@@ -21,7 +21,7 @@ const layer = StartedWork.layer.pipe(
 
 const at = DateTime.makeUnsafe("2026-11-14T12:00:00Z")
 
-const globalConversationUpdate = GlobalConversationUpdate.make({
+const startedWorkUpdate = StartedWorkUpdate.make({
   work: [
     ConversationOutcome.make({
       conversationId: "started",
@@ -33,31 +33,29 @@ const globalConversationUpdate = GlobalConversationUpdate.make({
   ],
 })
 
-const globalConversationUpdateTurn = {
+const startedWorkUpdateTurn = {
   message: "",
   images: [],
-  context: globalConversationUpdate,
+  context: startedWorkUpdate,
   retriesDelivery: true,
 }
 
 it.live(
-  "commits the Global conversation update and its covered outcomes together, publishing only after commit",
+  "commits the Started work update and its covered outcomes together, publishing only after commit",
   () =>
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
       const transcripts = yield* Transcripts
       const started = yield* StartedWork
-      yield* sql`INSERT INTO global_started_conversation (global_conversation_id, conversation_id, started_at)
+      yield* sql`INSERT INTO started_conversation (started_by, conversation_id, started_at)
       VALUES ('global', 'started', ${DateTime.formatIso(at)})`
       const published = yield* transcripts.subscribeStarted
 
       const record = (turnId: string) =>
-        started.recordGlobalConversationUpdate("global", turnId, [
-          { work: globalConversationUpdate.work[0], at },
-        ])
+        started.recordStartedWorkUpdate("global", turnId, [{ work: startedWorkUpdate.work[0], at }])
 
       const failed = yield* Effect.exit(
-        transcripts.startIfIdle("session", globalConversationUpdateTurn, (turnId) =>
+        transcripts.startIfIdle("session", startedWorkUpdateTurn, (turnId) =>
           record(turnId).pipe(
             Effect.andThen(new ConversationError({ message: "Crash before commit" })),
           ),
@@ -66,22 +64,22 @@ it.live(
 
       assert.equal(failed._tag, "Failure")
       assert.deepStrictEqual(
-        yield* sql`SELECT global_conversation_update_outcome_at, global_conversation_update_turn_id FROM global_started_conversation`,
-        [{ global_conversation_update_outcome_at: null, global_conversation_update_turn_id: null }],
+        yield* sql`SELECT started_work_update_outcome_at, started_work_update_turn_id FROM started_conversation`,
+        [{ started_work_update_outcome_at: null, started_work_update_turn_id: null }],
       )
       assert.deepStrictEqual((yield* transcripts.read("session")).turns, [])
 
-      yield* transcripts.startIfIdle("session", globalConversationUpdateTurn, record)
+      yield* transcripts.startIfIdle("session", startedWorkUpdateTurn, record)
       const event = yield* published.pipe(Stream.runHead)
       const [turn] = (yield* transcripts.read("session")).turns
       assert.isDefined(turn)
       assert.equal(Option.getOrThrow(event).turnId, turn.id)
       assert.deepStrictEqual(
-        yield* sql`SELECT global_conversation_update_outcome_at, global_conversation_update_turn_id FROM global_started_conversation`,
+        yield* sql`SELECT started_work_update_outcome_at, started_work_update_turn_id FROM started_conversation`,
         [
           {
-            global_conversation_update_outcome_at: DateTime.formatIso(at),
-            global_conversation_update_turn_id: turn.id,
+            started_work_update_outcome_at: DateTime.formatIso(at),
+            started_work_update_turn_id: turn.id,
           },
         ],
       )

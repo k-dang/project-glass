@@ -5,6 +5,10 @@ its Agent harness runs in the agent host (ADR 0007). So the backend serves the t
 MCP endpoint that Claude Code and pi both reach, with a credential of its own rather than the
 renderer's.
 
+A Conversation on this device reaches the same endpoint the same way: Glass issues it a credential
+when its agent starts and revokes it when the agent stops, so each call knows which Conversation
+made it. A Conversation in a Sandbox gets none, since its host can't reach this device's endpoint.
+
 ## Considered options
 
 - **Tools defined in the agent host**, as the Suggested draft tool is (ADR 0009): no new endpoint,

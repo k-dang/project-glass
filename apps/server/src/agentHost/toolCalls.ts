@@ -3,11 +3,19 @@ import { Predicate, Schema } from "effect"
 
 export const GLASS_MCP_SERVER = "glass"
 
+export const GLASS_TOOLS_MCP_SERVER = "glass_tools"
+
 // WARNING: Claude Code names an MCP server's tools mcp__<server>__<tool>, and pi's Glass tools match.
 export const GLASS_MCP_PREFIX = `mcp__${GLASS_MCP_SERVER}__`
 
-const shownName = (name: string) =>
-  name.startsWith(GLASS_MCP_PREFIX) ? name.slice(GLASS_MCP_PREFIX.length) : name
+const GLASS_TOOLS_MCP_PREFIX = `mcp__${GLASS_TOOLS_MCP_SERVER}__`
+
+const glassPrefixOf = (name: string) =>
+  [GLASS_MCP_PREFIX, GLASS_TOOLS_MCP_PREFIX].find((prefix) => name.startsWith(prefix))
+
+export const isGlassTool = (name: string) => glassPrefixOf(name) !== undefined
+
+const shownName = (name: string) => name.slice(glassPrefixOf(name)?.length ?? 0)
 
 export const ToolInput = Schema.Record(Schema.String, Schema.Json)
 

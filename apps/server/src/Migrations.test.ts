@@ -3,7 +3,7 @@ import { assert, it } from "@effect/vitest"
 import {
   ConversationContext,
   ConversationOutcome,
-  GlobalConversationUpdate,
+  StartedWorkUpdate,
   SteerPart,
   TurnDone,
   TurnEnd,
@@ -49,7 +49,7 @@ it.live("upgrades main's schema directly, preserving completed and unfinished up
 
     const at = "2026-11-14T12:00:00.000Z"
 
-    const globalConversationUpdate = GlobalConversationUpdate.make({
+    const startedWorkUpdate = StartedWorkUpdate.make({
       work: [
         ConversationOutcome.make({
           conversationId: "started",
@@ -96,12 +96,13 @@ it.live("upgrades main's schema directly, preserving completed and unfinished up
       [14, "conversation_branch"],
       [15, "feedback_notes"],
       [16, "turn_retries_delivery"],
+      [17, "started_work"],
     ])
     const transcripts = yield* Transcripts
     const { turns } = yield* transcripts.read("global")
     assert.deepStrictEqual(
       turns.filter((turn) => turn.id !== "ordinary").map((turn) => turn.context),
-      [globalConversationUpdate, globalConversationUpdate],
+      [startedWorkUpdate, startedWorkUpdate],
     )
     assert.equal(turns.find((turn) => turn.id === "ordinary")?.message, "Report a bug")
     assert.deepStrictEqual(
@@ -109,35 +110,35 @@ it.live("upgrades main's schema directly, preserving completed and unfinished up
       ["pending"],
     )
     assert.deepStrictEqual(
-      yield* sql`SELECT global_conversation_update_outcome_at, global_conversation_update_turn_id FROM global_started_conversation`,
+      yield* sql`SELECT started_work_update_outcome_at, started_work_update_turn_id FROM started_conversation`,
       [
         {
-          global_conversation_update_outcome_at: at,
-          global_conversation_update_turn_id: null,
+          started_work_update_outcome_at: at,
+          started_work_update_turn_id: null,
         },
       ],
     )
     assert.deepStrictEqual(
-      yield* sql`SELECT global_conversation_update_outcome_at, global_conversation_update_turn_id FROM global_started_agent_review`,
+      yield* sql`SELECT started_work_update_outcome_at, started_work_update_turn_id FROM started_agent_review`,
       [
         {
-          global_conversation_update_outcome_at: at,
-          global_conversation_update_turn_id: null,
+          started_work_update_outcome_at: at,
+          started_work_update_turn_id: null,
         },
       ],
     )
     assert.deepStrictEqual(
-      yield* sql`SELECT included_in_global_conversation_update, done FROM agent_reviews`,
-      [{ included_in_global_conversation_update: 1, done: 0 }],
+      yield* sql`SELECT included_in_started_work_update, done FROM agent_reviews`,
+      [{ included_in_started_work_update: 1, done: 0 }],
     )
     assert.deepStrictEqual(yield* sql`SELECT owner, id, text, staged FROM feedback_note`, [
       { owner: "conversation:started", id: "note", text: "Rename B", staged: 1 },
     ])
-    yield* sql`UPDATE global_started_agent_review SET global_conversation_update_turn_id = 'completed'`
+    yield* sql`UPDATE started_agent_review SET started_work_update_turn_id = 'completed'`
     yield* sql`DELETE FROM conversation_turn WHERE id = 'completed'`
     assert.deepStrictEqual(
-      yield* sql`SELECT global_conversation_update_turn_id FROM global_started_agent_review`,
-      [{ global_conversation_update_turn_id: null }],
+      yield* sql`SELECT started_work_update_turn_id FROM started_agent_review`,
+      [{ started_work_update_turn_id: null }],
     )
   }).pipe(
     Effect.provide(Transcripts.layer),
@@ -169,6 +170,7 @@ it.live("creates the schema once and reads Activity through its indexes after re
         [14, "conversation_branch"],
         [15, "feedback_notes"],
         [16, "turn_retries_delivery"],
+        [17, "started_work"],
       ],
       [],
     ] as const) {
@@ -282,7 +284,7 @@ it.live("counts the Turns that ended before Turns could be seen as seen", () =>
 )
 
 it.live(
-  "counts pre-existing work as already included when Global conversation updates are introduced",
+  "counts pre-existing work as already included when Started work updates are introduced",
   () =>
     Effect.gen(function* () {
       const home = yield* isolatedHome
@@ -313,15 +315,15 @@ it.live(
         yield* SqliteMigrator.run({ loader: migrationLoader })
 
         const [started] = yield* sql<{
-          global_conversation_update_outcome_at: string
-        }>`SELECT global_conversation_update_outcome_at FROM global_started_conversation`
+          started_work_update_outcome_at: string
+        }>`SELECT started_work_update_outcome_at FROM started_conversation`
 
         const [review] = yield* sql<{
-          global_conversation_update_outcome_at: string
-        }>`SELECT global_conversation_update_outcome_at FROM global_started_agent_review`
+          started_work_update_outcome_at: string
+        }>`SELECT started_work_update_outcome_at FROM started_agent_review`
 
-        assert.isTrue(started!.global_conversation_update_outcome_at > "2026-11-11T01:00:00.000Z")
-        assert.isTrue(review!.global_conversation_update_outcome_at > "2026-11-11T01:00:00.000Z")
+        assert.isTrue(started!.started_work_update_outcome_at > "2026-11-11T01:00:00.000Z")
+        assert.isTrue(review!.started_work_update_outcome_at > "2026-11-11T01:00:00.000Z")
         assert.deepStrictEqual(yield* sql`SELECT turn_seen_at FROM global_conversation`, [
           { turn_seen_at: "2026-11-11T01:00:00.000Z" },
         ])
@@ -518,8 +520,8 @@ it.live(
           [renamed],
         )
         assert.deepStrictEqual(
-          yield* sql`SELECT global_conversation_id, conversation_id FROM global_started_conversation`,
-          [{ global_conversation_id: "global", conversation_id: "otter" }],
+          yield* sql`SELECT started_by, conversation_id FROM started_conversation`,
+          [{ started_by: "global", conversation_id: "otter" }],
         )
         assert.deepStrictEqual(yield* sql`SELECT kind, payload FROM activity`, [
           {

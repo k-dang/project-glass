@@ -9,7 +9,9 @@ import {
   type ConnectionError,
   ConversationNotFound,
   type ConversationPlace,
+  asksLessThan,
   asksPermission,
+  startingPermissionMode,
   ConversationChanges,
   ConversationStarted,
   ChangedFile,
@@ -19,8 +21,6 @@ import {
   type MessageDelivery,
   type MessageInput,
   type ModelChoice,
-  defaultPermissionMode,
-  harnessCapabilities,
   type NewConversation,
   type PermissionMode,
   RemovalWarnings,
@@ -57,7 +57,11 @@ import { randomUUID } from "node:crypto"
 import { changesId } from "./Changes"
 import { ActivityLog } from "./ActivityLog"
 import { conversationWith, decodeStored, sandboxProviderOf, toRow } from "./conversationRows"
-import { type ClaimedConversation, ConversationTurns } from "./ConversationTurns"
+import {
+  type ClaimedConversation,
+  type ConversationHost,
+  ConversationTurns,
+} from "./ConversationTurns"
 import { conversationNotes, FeedbackNotes } from "./FeedbackNotes"
 import {
   asConversationError,
@@ -68,10 +72,20 @@ import {
   type Placement,
 } from "./Placement"
 import { Sandboxes } from "./Sandboxes"
+import { LocalAgentHost } from "./LocalAgentHost"
 import { LocalPlacement } from "./LocalPlacement"
-import { type RepositoryRole, ReviewBrief, ReviewRole, WorkRole } from "./agentHost/protocol"
+import {
+  type GlassToolsAccess,
+  type RepositoryRole,
+  type StartOutcome,
+  ReviewBrief,
+  ReviewRole,
+  WorkRole,
+} from "./agentHost/protocol"
+import { ConversationCaller, McpCredentials } from "./mcp/McpCredentials"
 import { LocalSkills } from "./LocalSkills"
 import { SkillPacks } from "./SkillPacks"
+import { forgetStartedWork } from "./startedWorkRows"
 import { Transcripts, type WaitingRequest } from "./Transcripts"
 import { annotateUnit } from "./wideEvents"
 
@@ -191,6 +205,13 @@ export class Conversations extends Context.Service<
     readonly create: (
       input: NewConversation,
     ) => Effect.Effect<Conversation, InvalidLocalCheckout | ConversationError>
+    readonly createFrom: (
+      parentId: string,
+      input: Omit<NewConversation, "permissionMode">,
+    ) => Effect.Effect<
+      Conversation,
+      ConversationNotFound | InvalidLocalCheckout | ConversationError
+    >
     readonly createForReview: (
       input: NewReviewConversation,
     ) => Effect.Effect<Conversation, ConversationError>
@@ -198,6 +219,11 @@ export class Conversations extends Context.Service<
       conversationId: string,
       input: SentMessage,
       feedback?: ReadonlyArray<string>,
+    ) => Effect.Effect<MessageDelivery, ConversationNotFound | RequestWaiting | ConversationError>
+    readonly sendFrom: (
+      senderId: string,
+      conversationId: string,
+      input: SentMessage,
     ) => Effect.Effect<MessageDelivery, ConversationNotFound | RequestWaiting | ConversationError>
     readonly steer: (
       conversationId: string,
@@ -266,6 +292,7 @@ export class Conversations extends Context.Service<
     readonly followBranch: (
       conversationId: string,
     ) => Effect.Effect<boolean, ConversationNotFound | ConversationError>
+    readonly whenIdle: (typeof ConversationTurns.Service)["whenIdle"]
   }
 >()("@glass/server/Conversations") {
   static readonly layer = Layer.effect(
@@ -280,8 +307,25 @@ export class Conversations extends Context.Service<
       const notes = yield* FeedbackNotes
       const skillPacks = yield* SkillPacks
       const localSkills = yield* LocalSkills
+      const localHost = yield* LocalAgentHost
+      const credentials = yield* McpCredentials
       const fs = yield* FileSystem.FileSystem
       const lock = yield* Semaphore.make(1)
+
+      const startWithTools = <E>(
+        conversationId: string,
+        client: ConversationHost,
+        start: (tools: GlassToolsAccess | undefined) => Effect.Effect<StartOutcome, E>,
+      ) =>
+        localHost.lifetimeOf(client).pipe(
+          Effect.flatMap(
+            Option.match({
+              onNone: () => start(undefined),
+              onSome: (lifetime) =>
+                credentials.startWith(lifetime, ConversationCaller.make({ conversationId }), start),
+            }),
+          ),
+        )
 
       const stored = yield* sql`
         SELECT id, name, sandbox_provider AS sandboxProvider, owner, repo, base_branch AS baseBranch,
@@ -386,25 +430,28 @@ export class Conversations extends Context.Service<
         const hosting = hostingOf(row)
         const { id, harness, model, effort, permissionMode } = row.conversation
 
-        const role: Effect.Effect<RepositoryRole, ConversationError> = row.forReview
-          ? reviewBrief(row).pipe(Effect.map((brief) => ReviewRole.make({ brief })))
-          : Effect.succeed(WorkRole.make({}))
+        const startAs = (client: ConversationHost, role: RepositoryRole) =>
+          skillsOf(row.conversation).pipe(
+            Effect.flatMap((skills) =>
+              client.StartConversation({
+                conversationId: id,
+                harness,
+                folder: row.folder,
+                role,
+                skills,
+              }),
+            ),
+          )
 
         return {
           id,
           ensureStarted: (client) =>
-            Effect.all([role, skillsOf(row.conversation)], { concurrency: "unbounded" }).pipe(
-              Effect.flatMap(([started, skills]) =>
-                client.StartConversation({
-                  conversationId: id,
-                  harness,
-                  folder: row.folder,
-                  role: started,
-                  skills,
-                }),
-              ),
-              Effect.asVoid,
-            ),
+            (row.forReview
+              ? reviewBrief(row).pipe(
+                  Effect.flatMap((brief) => startAs(client, ReviewRole.make({ brief }))),
+                )
+              : startWithTools(id, client, (tools) => startAs(client, WorkRole.make({ tools })))
+            ).pipe(Effect.asVoid),
           settings: { model, effort, permissionMode },
           prepareHost: hosting.prepareHost(row),
           connectedHost: hosting.connectedHost(row),
@@ -558,17 +605,13 @@ export class Conversations extends Context.Service<
         )
       })
 
-      const create = Effect.fn("Conversations.create")(function* (input: NewConversation) {
+      const createWith = Effect.fnUntraced(function* (
+        input: Omit<NewConversation, "permissionMode">,
+        permissionMode: PermissionMode | null,
+      ) {
         const { repository, baseBranch, harness, model, effort, place } = input
         const { message, images } = input
         const placement = yield* placementRunning(place, harness)
-
-        const permissionMode =
-          harnessCapabilities[harness].permissionModes.length === 0
-            ? null
-            : asksPermission(place)
-              ? (input.permissionMode ?? defaultPermissionMode)
-              : "bypassPermissions"
 
         const { name, branch, folder, discard } = yield* placement.place(repository, baseBranch)
 
@@ -609,6 +652,34 @@ export class Conversations extends Context.Service<
         return yield* withSandbox(created)
       })
 
+      const create = Effect.fn("Conversations.create")(function* (input: NewConversation) {
+        return yield* createWith(
+          input,
+          startingPermissionMode(input.place, input.harness, input.permissionMode),
+        )
+      })
+
+      const createFrom = Effect.fn("Conversations.createFrom")(function* (
+        parentId: string,
+        input: Omit<NewConversation, "permissionMode">,
+      ) {
+        const parent = (yield* find(parentId)).conversation
+
+        const permissionMode = startingPermissionMode(
+          input.place,
+          input.harness,
+          parent.permissionMode,
+        )
+
+        if (asksLessThan(permissionMode, parent.permissionMode))
+          return yield* new ConversationError({
+            message:
+              "That Conversation would ask the user less than you do, so you can't create it. Create one on this device with Claude Code instead, or ask the user to.",
+          })
+
+        return yield* createWith(input, permissionMode)
+      })
+
       const findWritable = (conversationId: string) =>
         find(conversationId).pipe(Effect.tap(() => sandboxes.refuseIfGone(conversationId)))
 
@@ -624,6 +695,28 @@ export class Conversations extends Context.Service<
           { message, images, context: null },
           notes.take(conversationNotes(conversationId), feedback),
         )
+      })
+
+      const sendFrom = Effect.fn("Conversations.sendFrom")(function* (
+        senderId: string,
+        conversationId: string,
+        input: SentMessage,
+      ) {
+        if (senderId === conversationId)
+          return yield* new ConversationError({
+            message: "A Conversation can't send a message to itself.",
+          })
+
+        const sender = (yield* find(senderId)).conversation
+        const target = (yield* find(conversationId)).conversation
+
+        if (asksLessThan(target.permissionMode, sender.permissionMode))
+          return yield* new ConversationError({
+            message:
+              "That Conversation asks the user less than you do, so you can't send it a message. Ask the user to.",
+          })
+
+        return yield* send(conversationId, input)
       })
 
       const steer = Effect.fn("Conversations.steer")(function* (
@@ -817,6 +910,8 @@ export class Conversations extends Context.Service<
               Effect.ignore,
             )
 
+          yield* credentials.revoke(ConversationCaller.make({ conversationId }))
+
           yield* hosting.remove(row)
 
           yield* Effect.gen(function* () {
@@ -824,7 +919,7 @@ export class Conversations extends Context.Service<
             yield* turns.removeUnsent(conversationId)
             yield* notes.removeAll(conversationNotes(conversationId))
             yield* skillPacks.releaseConversation(conversationId)
-            yield* sql`DELETE FROM global_started_conversation WHERE conversation_id = ${conversationId}`
+            yield* forgetStartedWork(sql, conversationId)
             yield* sql`DELETE FROM conversation WHERE id = ${conversationId}`
           }).pipe(sql.withTransaction, Effect.mapError(storageFailure))
         }).pipe(
@@ -879,8 +974,10 @@ export class Conversations extends Context.Service<
         existingFiles,
         file,
         create,
+        createFrom,
         createForReview,
         send,
+        sendFrom,
         changes,
         feedbackNotes: (conversationId) =>
           find(conversationId).pipe(Effect.andThen(notes.list(conversationNotes(conversationId)))),
@@ -947,6 +1044,7 @@ export class Conversations extends Context.Service<
           ),
         markTurnSeen: transcripts.markSeen,
         followBranch,
+        whenIdle: turns.whenIdle,
         changeModel: update,
         changePermissionMode,
         answer,
