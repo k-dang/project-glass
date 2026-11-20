@@ -2,41 +2,12 @@ import type { PullRequest } from "@glass/contracts"
 import { type KeyboardEvent, useEffect, useRef, useState } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { Kbd, KbdGroup } from "@/components/ui/kbd"
-import { Copy } from "lucide-react"
-import { type Action, useActions } from "./actions"
 import { copyText } from "./clipboard"
 import { useShortcuts } from "./useShortcuts"
 import { refusedEscape } from "./refusedEscape"
 
-const copies = (pullRequest: PullRequest) => [
-  { key: "g", label: "Copy link to PR", value: pullRequest.url, done: "PR link copied" },
-  { key: "t", label: "Copy title", value: pullRequest.title, done: "Title copied" },
-  {
-    key: "b",
-    label: "Copy PR branch name",
-    value: pullRequest.headBranch,
-    done: "Branch name copied",
-  },
-  {
-    key: "c",
-    label: "Copy CLI checkout command",
-    value: `gh pr checkout ${pullRequest.url}`,
-    done: "Checkout command copied",
-  },
-]
-
 export function CopyMenu(props: { pullRequest: PullRequest }) {
   const [opener, setOpener] = useState<HTMLElement | null>(null)
-
-  useActions(
-    copies(props.pullRequest).map(({ key, label, value, done }): Action => ({
-      id: `copy-${key}`,
-      title: label,
-      group: "Copy",
-      icon: Copy,
-      run: () => void copyText(value, done),
-    })),
-  )
 
   useShortcuts([
     {
@@ -69,7 +40,22 @@ function CopyPanel(props: { pullRequest: PullRequest; opener: HTMLElement; onClo
     }
   }, [])
 
-  const actions = copies(pullRequest)
+  const actions = [
+    { key: "g", label: "Copy link to PR", value: pullRequest.url, done: "PR link copied" },
+    { key: "t", label: "Copy title", value: pullRequest.title, done: "Title copied" },
+    {
+      key: "b",
+      label: "Copy PR branch name",
+      value: pullRequest.headBranch,
+      done: "Branch name copied",
+    },
+    {
+      key: "c",
+      label: "Copy CLI checkout command",
+      value: `gh pr checkout ${pullRequest.url}`,
+      done: "Checkout command copied",
+    },
+  ]
 
   const copy = async (action: (typeof actions)[number]) => {
     if (copying.current) return

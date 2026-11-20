@@ -3,8 +3,8 @@ import { ArrowLeft, ArrowRight } from "lucide-react"
 import { useEffect, useEffectEvent } from "react"
 import { Button } from "@/components/ui/button"
 import { TooltipHint } from "@/components/ui/tooltip"
-import { useActions } from "./actions"
 import { shortcutLabel } from "./shortcutLabel"
+import { useShortcuts } from "./useShortcuts"
 
 const BACK_BUTTON = 3
 
@@ -24,23 +24,9 @@ export function HistoryNav() {
     if (canGoForward) history.forward()
   }
 
-  useActions([
-    canGoBack && {
-      id: "back",
-      title: "Back",
-      group: "Glass",
-      icon: ArrowLeft,
-      shortcut: { key: "ArrowLeft", mod: true },
-      run: back,
-    },
-    canGoForward && {
-      id: "forward",
-      title: "Forward",
-      group: "Glass",
-      icon: ArrowRight,
-      shortcut: { key: "ArrowRight", mod: true },
-      run: forward,
-    },
+  useShortcuts([
+    { key: "ArrowLeft", mod: true, run: back },
+    { key: "ArrowRight", mod: true, run: forward },
   ])
 
   const onMouseUp = useEffectEvent((event: MouseEvent) => {

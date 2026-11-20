@@ -10,11 +10,9 @@ import { cn } from "cn"
 import { Match, Option } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
 import { Listbox, ListboxItem, ListboxItemIcon } from "@ui-sdk/react/listbox"
-import { CheckCheck, ChevronDown, Inbox as InboxIcon, ShieldCheck } from "lucide-react"
+import { ChevronDown, Inbox as InboxIcon } from "lucide-react"
 import { type ReactNode, useEffect, useState } from "react"
 import { ConversationRequest, answerRequestAtom } from "./conversationsArea"
-import { type Action, useActions } from "./actions"
-import { useShortcuts } from "./useShortcuts"
 import { InboxDetail } from "./InboxDetail"
 import {
   contextOf,
@@ -41,6 +39,7 @@ import {
 import { ProblemAlert } from "./ProblemAlert"
 import { streamProblem } from "./problems"
 import { readAgentReviewOnOpenAtom } from "./reviewsArea"
+import { useShortcuts } from "./useShortcuts"
 
 const pickedAtom = Atom.make<string | null>(null).pipe(Atom.keepAlive)
 
@@ -262,28 +261,10 @@ function useInboxActions(selected: NeedsYouItem | null): ReadonlyArray<InboxActi
   })
 
   return [
-    ...(done === null
-      ? []
-      : [
-          {
-            key: "E" as const,
-            label: "done",
-            title: "Mark the selected item done",
-            icon: CheckCheck,
-            run: done,
-          },
-        ]),
+    ...(done === null ? [] : [{ key: "E" as const, label: "done", run: done }]),
     ...(permission === null
       ? []
-      : [
-          {
-            key: "A" as const,
-            label: "allow",
-            title: "Allow the selected permission",
-            icon: ShieldCheck,
-            run: () => allow(AllowRequest.make({})),
-          },
-        ]),
+      : [{ key: "A" as const, label: "allow", run: () => allow(AllowRequest.make({})) }]),
   ]
 }
 
@@ -334,21 +315,12 @@ export function Inbox() {
       return next
     })
 
-  useActions(
-    actions.map(({ key, title, icon, run }): Action => ({
-      id: `inbox-${key}`,
-      title,
-      group: "Inbox",
-      icon,
-      shortcut: { key, beforeWidgets: true },
-      run,
-    })),
-  )
-
   useShortcuts(
-    inboxKeys
-      .filter((key) => !actions.some((action) => action.key === key))
-      .map((key) => ({ key, beforeWidgets: true, run: () => {} })),
+    inboxKeys.map((key) => ({
+      key,
+      beforeWidgets: true,
+      run: () => actions.find((action) => action.key === key)?.run(),
+    })),
   )
 
   return (

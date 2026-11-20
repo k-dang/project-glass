@@ -70,12 +70,12 @@ it("runs the chosen action once the menu closes, and returns focus to where it w
 it("lists only mounted actions, in group order", async () => {
   const { user, rerender } = mount({
     actions: [action("settings", "Settings", "Go to")],
-    extra: [action("copy-title", "Copy title", "Copy")],
+    extra: [action("agent-review", "Open the Agent review", "Pull request")],
   })
 
   await user.keyboard("{Control>}k{/Control}")
   await screen.findByRole("dialog", { name: "Command menu" })
-  expect(options()).toEqual(["Copy title", "Settings"])
+  expect(options()).toEqual(["Open the Agent review", "Settings"])
 
   await user.keyboard("{Escape}")
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())

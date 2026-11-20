@@ -11,7 +11,6 @@ import type {
 import { referenceKey } from "@glass/contracts"
 import { cn } from "cn"
 import {
-  ChevronLeft,
   ChevronRight,
   FileDiff,
   FolderTree,
@@ -20,9 +19,7 @@ import {
   GitPullRequestClosed,
   GitPullRequestDraft,
   type LucideIcon,
-  Maximize,
   MessageCircle,
-  Minimize,
   PanelLeft,
   RotateCw,
   Route,
@@ -273,40 +270,28 @@ export function Workspace(props: {
     if (reading !== null && hasOverview(reading)) tourView.current?.showOverview()
   }
 
-  useActions([
-    inChanges && {
-      id: "full-screen",
-      title: fullScreen ? "Exit full screen" : "Show Changes full screen",
-      group: "Pull request",
-      icon: fullScreen ? Minimize : Maximize,
-      shortcut: { key: "f" },
-      run: () => setFullScreen(!fullScreen),
-    },
-    tourInChanges && {
-      id: "next-chapter",
-      title: "Next Chapter",
-      group: "Pull request",
-      icon: ChevronRight,
-      shortcut: { key: "]" },
-      run: () => openChapter((tourView.current?.currentChapter() ?? 0) + 1, "instant"),
-    },
-    tourInChanges && {
-      id: "previous-chapter",
-      title: "Previous Chapter",
-      group: "Pull request",
-      icon: ChevronLeft,
-      shortcut: { key: "[" },
-      run: () => {
-        const inView = tourView.current?.currentChapter() ?? 0
+  useShortcuts([
+    ...(inChanges ? [{ key: "f", run: () => setFullScreen(!fullScreen) }] : []),
+    ...(fullScreen ? [{ key: "Escape", run: () => setFullScreen(false) }] : []),
+    ...(tourInChanges
+      ? [
+          {
+            key: "]",
+            run: () => openChapter((tourView.current?.currentChapter() ?? 0) + 1, "instant"),
+          },
+          {
+            key: "[",
+            run: () => {
+              const inView = tourView.current?.currentChapter() ?? 0
 
-        if (inView === 0 && reading !== null && hasOverview(reading))
-          tourView.current?.showOverview()
-        else openChapter(inView - 1, "instant")
-      },
-    },
+              if (inView === 0 && reading !== null && hasOverview(reading))
+                tourView.current?.showOverview()
+              else openChapter(inView - 1, "instant")
+            },
+          },
+        ]
+      : []),
   ])
-
-  useShortcuts(fullScreen ? [{ key: "Escape", run: () => setFullScreen(false) }] : [])
 
   useTourReadyToast(tour.latest, reading, startReading)
 

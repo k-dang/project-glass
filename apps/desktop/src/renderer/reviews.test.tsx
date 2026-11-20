@@ -448,26 +448,6 @@ it("jumps to a listed PR by searching its title in the Command menu", async () =
   await screen.findByText("head001")
 })
 
-it("offers the open PR's actions in the Command menu, and drops them after leaving", async () => {
-  const user = mount({ LoadPullRequest: () => Effect.succeed(workspaceOf(greet, "head001")) })
-  const write = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue()
-  await user.click(await rowFor("Greet the world"))
-  await screen.findByText("head001")
-
-  await user.keyboard("{Control>}k{/Control}")
-  const menu = await screen.findByRole("dialog", { name: "Command menu" })
-  expect(within(menu).getByRole("option", { name: /Back to PRs/ })).toBeTruthy()
-  await user.keyboard("copy title{Enter}")
-  await waitFor(() => expect(write).toHaveBeenCalledWith(greet.title))
-
-  await user.click(screen.getByRole("button", { name: "Back to PRs" }))
-  await rowFor("Greet the world")
-  await user.keyboard("{Control>}k{/Control}")
-  const list = await screen.findByRole("dialog", { name: "Command menu" })
-  expect(within(list).queryByRole("option", { name: /Copy title/ })).toBeNull()
-  expect(within(list).getByRole("option", { name: /Inbox/ })).toBeTruthy()
-})
-
 const listed = (repository: FollowedRepository, pullRequests: ReadonlyArray<PullRequestSummary>) =>
   new RepositoryPullRequests({ repository, pullRequests })
 
