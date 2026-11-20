@@ -75,6 +75,7 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         DeleteDraft: unused,
         SubmitReview: unused,
         ReplyToDiscussion: unused,
+        MergePullRequest: unused,
         SetDiscussionResolved: unused,
         SetReaction: unused,
         RecordActivity: () => Effect.void,

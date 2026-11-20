@@ -187,6 +187,8 @@ const workspaceOf = (
       reviewers: [],
       checks: [],
       mergeable: "mergeable",
+      mergeAction: null,
+      mergeUnderWay: null,
     }),
     revision: new Revision({ base: "base000", head }),
     updatedAt: DateTime.makeUnsafe("2026-10-01T00:00:00Z"),

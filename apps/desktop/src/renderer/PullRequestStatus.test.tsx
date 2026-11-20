@@ -63,3 +63,14 @@ it("shows conflicts only while the PR is open", () => {
   render(<StatusChips pullRequest={pullRequest({ state: "merged", mergeable: "conflicting" })} />)
   expect(screen.queryByText("Conflicts")).toBeNull()
 })
+
+it("shows a merge GitHub already has under way", () => {
+  for (const [mergeUnderWay, label] of [
+    ["auto-merge", "Auto-merge on"],
+    ["merge-queue", "In merge queue"],
+  ] as const) {
+    render(<StatusChips pullRequest={pullRequest({ mergeUnderWay })} />)
+    expect(screen.getByText(label)).toBeDefined()
+    cleanup()
+  }
+})

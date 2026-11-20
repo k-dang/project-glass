@@ -4,6 +4,12 @@ import { AddedDraft, DraftState } from "./drafts"
 import { ThreadResolution } from "./discussions"
 import { ReactionMutationPayload } from "./reactions"
 import { AddedReply } from "./replies"
+import {
+  MERGING_FIELDS,
+  MERGING_REPOSITORY_FIELDS,
+  MergingFields,
+  MergingRepositoryFields,
+} from "./merging"
 import { PULL_REQUEST_STATUS_FIELDS, PullRequestStatusFields } from "./pullRequestStatus"
 import {
   RepositoryPullRequestsData,
@@ -36,7 +42,11 @@ export const PULL_REQUEST_QUERY = `query PullRequest($owner: String!, $name: Str
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
       id
-      repository { owner { login } name }
+      repository {
+        owner { login }
+        name
+        ${MERGING_REPOSITORY_FIELDS}
+      }
       number
       url
       title
@@ -51,6 +61,7 @@ export const PULL_REQUEST_QUERY = `query PullRequest($owner: String!, $name: Str
       bodyHTML
       viewerDidAuthor
       ${PULL_REQUEST_STATUS_FIELDS}
+      ${MERGING_FIELDS}
     }
   }
 }`
@@ -123,6 +134,7 @@ const PullRequestData = Schema.Struct({
           repository: Schema.Struct({
             owner: Schema.Struct({ login: Schema.String }),
             name: Schema.String,
+            ...MergingRepositoryFields,
           }),
           number: Schema.Number,
           url: Schema.String,
@@ -138,6 +150,7 @@ const PullRequestData = Schema.Struct({
           bodyHTML: Schema.String,
           viewerDidAuthor: Schema.Boolean,
           ...PullRequestStatusFields,
+          ...MergingFields,
         }),
       ),
     }),

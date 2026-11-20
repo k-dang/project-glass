@@ -64,6 +64,7 @@ import { ProblemAlert } from "./ProblemAlert"
 import type { Problem } from "./problems"
 import { RepositoryBrowser } from "./RepositoryBrowser"
 import { FinishReview } from "./FinishReview"
+import { MergePullRequest } from "./MergePullRequest"
 import { OpenPullRequestButton } from "./OpenPullRequestDialog"
 import { closedAs, StatusChips } from "./PullRequestStatus"
 import {
@@ -770,6 +771,12 @@ function PullRequestHeader(props: {
               <RotateCw className={props.reloading ? "animate-spin" : undefined} aria-hidden />
             </Button>
           </TooltipHint>
+          <MergePullRequest
+            key={pullRequest.id}
+            pullRequest={pullRequest}
+            revision={revision}
+            onReload={props.onReload}
+          />
           {props.review}
         </div>
       </div>

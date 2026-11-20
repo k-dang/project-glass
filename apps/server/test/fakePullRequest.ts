@@ -99,6 +99,19 @@ export type FakeReviewDecision = "APPROVED" | "CHANGES_REQUESTED" | "REVIEW_REQU
 
 export type FakeMergeable = "MERGEABLE" | "CONFLICTING" | "UNKNOWN"
 
+export type FakeMergeStateStatus =
+  | "CLEAN"
+  | "HAS_HOOKS"
+  | "UNSTABLE"
+  | "BLOCKED"
+  | "BEHIND"
+  | "DIRTY"
+  | "UNKNOWN"
+
+export type FakeMergeMethod = "SQUASH" | "MERGE" | "REBASE"
+
+export type FakePermission = "ADMIN" | "MAINTAIN" | "WRITE" | "TRIAGE" | "READ"
+
 export interface FakePullRequestSeed {
   readonly owner?: string
   readonly repo?: string
@@ -118,6 +131,11 @@ export interface FakePullRequestSeed {
   readonly checkContexts?: ReadonlyArray<FakeCheck>
   readonly reviewDecision?: FakeReviewDecision
   readonly mergeable?: FakeMergeable
+  readonly mergeStateStatus?: FakeMergeStateStatus
+  readonly mergeQueue?: boolean
+  readonly viewerCanEnableAutoMerge?: boolean
+  readonly viewerPermission?: FakePermission
+  readonly mergeMethods?: ReadonlyArray<FakeMergeMethod>
   readonly updatedAt?: string
   readonly base: FakeCommit
   readonly head: FakeCommit
@@ -165,6 +183,14 @@ export class FakePullRequest {
   checkContexts: ReadonlyArray<FakeCheck>
   reviewDecision: FakeReviewDecision | null
   mergeable: FakeMergeable
+  mergeStateStatus: FakeMergeStateStatus
+  readonly mergeQueue: boolean
+  readonly viewerCanEnableAutoMerge: boolean
+  readonly viewerPermission: FakePermission
+  readonly mergeMethods: ReadonlyArray<FakeMergeMethod>
+  autoMerge = false
+  inMergeQueue = false
+  mergedWith: FakeMergeMethod | null = null
   #state: FakePullRequestState
   #isDraft: boolean
   #updatedAt: string
@@ -211,6 +237,11 @@ export class FakePullRequest {
     this.checkContexts = seed.checkContexts ?? []
     this.reviewDecision = seed.reviewDecision ?? null
     this.mergeable = seed.mergeable ?? "MERGEABLE"
+    this.mergeStateStatus = seed.mergeStateStatus ?? "CLEAN"
+    this.mergeQueue = seed.mergeQueue ?? false
+    this.viewerCanEnableAutoMerge = seed.viewerCanEnableAutoMerge ?? true
+    this.viewerPermission = seed.viewerPermission ?? "WRITE"
+    this.mergeMethods = seed.mergeMethods ?? ["MERGE", "SQUASH", "REBASE"]
     this.#updatedAt = seed.updatedAt ?? now()
     this.#base = seed.base
     this.#head = seed.head
