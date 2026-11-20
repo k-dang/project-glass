@@ -8,7 +8,7 @@ export interface ConversationState {
 
 export type ConversationEvent =
   | { readonly type: "send"; readonly message: QueuedMessage }
-  | { readonly type: "globalConversationUpdate"; readonly message: StartingTurn }
+  | { readonly type: "startIfIdle"; readonly message: StartingTurn }
   | { readonly type: "sendQueued" | "cancelQueued"; readonly queuedId: string }
   | {
       readonly type: "turnEnded"
@@ -16,7 +16,8 @@ export type ConversationEvent =
       readonly requeued: ReadonlyArray<QueuedMessage>
     }
 
-export type StartingTurn = Omit<QueuedMessage, "context"> & Pick<TurnMessage, "context">
+export type StartingTurn = Omit<QueuedMessage, "context"> &
+  Pick<TurnMessage, "context"> & { readonly retriesDelivery: boolean }
 
 export type ConversationWrite =
   | { readonly type: "startTurn"; readonly message: StartingTurn }
@@ -35,12 +36,14 @@ export interface ConversationStep {
 
 const unchanged: ConversationStep = { outcome: { type: "unchanged" }, writes: [] }
 
+const startSent = (message: QueuedMessage): ConversationWrite => ({
+  type: "startTurn",
+  message: { ...message, retriesDelivery: false },
+})
+
 const startQueued = (queued: QueuedMessage): ConversationStep => ({
   outcome: { type: "started" },
-  writes: [
-    { type: "dequeue", queuedId: queued.id },
-    { type: "startTurn", message: queued },
-  ],
+  writes: [{ type: "dequeue", queuedId: queued.id }, startSent(queued)],
 })
 
 export const stepConversation = (
@@ -50,13 +53,13 @@ export const stepConversation = (
   Match.value(event).pipe(
     Match.withReturnType<ConversationStep>(),
     Match.discriminatorsExhaustive("type")({
-      globalConversationUpdate: ({ message }) =>
+      startIfIdle: ({ message }) =>
         state.running === null && state.queued.length === 0
           ? { outcome: { type: "started" }, writes: [{ type: "startTurn", message }] }
           : { outcome: { type: "busy" }, writes: [] },
       send: ({ message }) =>
         state.running === null
-          ? { outcome: { type: "started" }, writes: [{ type: "startTurn", message }] }
+          ? { outcome: { type: "started" }, writes: [startSent(message)] }
           : { outcome: { type: "queued" }, writes: [{ type: "enqueue", message }] },
       sendQueued: ({ queuedId }) => {
         if (state.running !== null) return { outcome: { type: "busy" }, writes: [] }

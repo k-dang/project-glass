@@ -13,7 +13,6 @@ import {
   StartFreshRefused,
   type TranscriptUpdate,
   TurnEnd,
-  type GlobalConversationUpdate,
 } from "@glass/contracts"
 import {
   Context,
@@ -39,6 +38,7 @@ import {
   type ClaimedConversation,
   type ConversationHost,
   ConversationTurns,
+  type StartIdle,
 } from "./ConversationTurns"
 import { boundHostCall } from "./hostControl"
 import { ServerConfig } from "./ServerConfig"
@@ -110,12 +110,7 @@ export class GlobalConversation extends Context.Service<
     readonly unseen: Stream.Stream<TurnEnd | null>
     readonly markSeen: (endedAt: DateTime.Utc) => Effect.Effect<void, ConversationError>
     readonly whenIdle: <E>(
-      effect: (
-        globalConversationUpdate: (
-          globalConversationUpdate: GlobalConversationUpdate,
-          record: (turnId: string) => Effect.Effect<void, ConversationError>,
-        ) => Effect.Effect<void, ConversationError>,
-      ) => Effect.Effect<void, E>,
+      effect: (start: StartIdle) => Effect.Effect<void, E>,
     ) => Effect.Effect<void, E | ConversationError>
   }
 >()("@glass/server/GlobalConversation") {

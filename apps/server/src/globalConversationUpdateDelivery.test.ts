@@ -33,6 +33,13 @@ const globalConversationUpdate = GlobalConversationUpdate.make({
   ],
 })
 
+const globalConversationUpdateTurn = {
+  message: "",
+  images: [],
+  context: globalConversationUpdate,
+  retriesDelivery: true,
+}
+
 it.live(
   "commits the Global conversation update and its covered outcomes together, publishing only after commit",
   () =>
@@ -50,7 +57,7 @@ it.live(
         ])
 
       const failed = yield* Effect.exit(
-        transcripts.startGlobalConversationUpdate("session", globalConversationUpdate, (turnId) =>
+        transcripts.startIfIdle("session", globalConversationUpdateTurn, (turnId) =>
           record(turnId).pipe(
             Effect.andThen(new ConversationError({ message: "Crash before commit" })),
           ),
@@ -64,7 +71,7 @@ it.live(
       )
       assert.deepStrictEqual((yield* transcripts.read("session")).turns, [])
 
-      yield* transcripts.startGlobalConversationUpdate("session", globalConversationUpdate, record)
+      yield* transcripts.startIfIdle("session", globalConversationUpdateTurn, record)
       const event = yield* published.pipe(Stream.runHead)
       const [turn] = (yield* transcripts.read("session")).turns
       assert.isDefined(turn)
