@@ -41,23 +41,27 @@ export const changeGlobalModelAtom = backendRuntime.fn((choice: ModelChoice, get
   ),
 )
 
-export const pastChatsAtom = backendRuntime.atom(Backend.use((backend) => backend.ListPastChats()))
+export const endedSessionsAtom = backendRuntime.atom(
+  Backend.use((backend) => backend.ListEndedGlobalChatSessions()),
+)
 
-export const pastChatTranscriptAtom = Atom.family((id: string) =>
+export const sessionTranscriptAtom = Atom.family((id: string) =>
   backendRuntime.atom(
-    transcriptOf(Stream.unwrap(Backend.useSync((backend) => backend.WatchPastChat({ id })))),
+    transcriptOf(
+      Stream.unwrap(Backend.useSync((backend) => backend.WatchGlobalChatSession({ id }))),
+    ),
   ),
 )
 
-export const loadEarlierPastTurnsAtom = Atom.family((id: string) =>
+export const loadEarlierInSessionAtom = Atom.family((id: string) =>
   backendRuntime.fn((before: string) =>
-    Backend.use((backend) => backend.LoadEarlierPastChatTurns({ id, before })),
+    Backend.use((backend) => backend.LoadEarlierGlobalChatSessionTurns({ id, before })),
   ),
 )
 
 export const startGlobalFreshAtom = backendRuntime.fn((_: void, get) =>
   Backend.use((backend) => backend.StartGlobalChatFresh()).pipe(
-    Effect.tap(() => Effect.sync(() => get.refresh(pastChatsAtom))),
+    Effect.tap(() => Effect.sync(() => get.refresh(endedSessionsAtom))),
   ),
 )
 

@@ -32,7 +32,7 @@ const groupOfItem = new Map<string, StorageGroup>([
   ["feedback_note", "conversations"],
   ["local_checkout", "conversations"],
   ["global_chat", "conversations"],
-  ["past_chat", "conversations"],
+  ["global_chat_session", "conversations"],
   ["started_conversation", "conversations"],
   ["started_agent_review", "conversations"],
   ["skill_pack", "conversations"],

@@ -3,9 +3,9 @@ import {
   type QueuedMessageStarted,
   ConversationError,
   type MessageInputWithContext,
+  EndedGlobalChatSession,
+  GlobalChatSessionNotFound,
   ModelChoice,
-  PastChat,
-  PastChatNotFound,
   type RequestAnswer,
   type RequestNotWaiting,
   type RequestWaiting,
@@ -45,7 +45,6 @@ import { annotateUnit } from "./wideEvents"
 
 const StoredGlobalChat = Schema.Struct({
   id: Schema.String,
-  sessionId: Schema.String,
   ...ModelChoice.fields,
 })
 
@@ -53,7 +52,7 @@ const decodeStored = Schema.decodeUnknownEffect(Schema.Array(StoredGlobalChat))
 
 const decodeIds = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ id: Schema.String })))
 
-const decodePast = Schema.decodeUnknownEffect(Schema.Array(PastChat))
+const decodeEnded = Schema.decodeUnknownEffect(Schema.Array(EndedGlobalChatSession))
 
 const hostGone = new ConversationError({
   message: "Glass lost the process that runs Conversations. Try again.",
@@ -95,15 +94,15 @@ export class GlobalChat extends Context.Service<
     readonly saveUnsent: (unsent: SentMessage) => Effect.Effect<void, ConversationError>
     readonly id: string
     readonly startFresh: Effect.Effect<void, StartFreshRefused | ConversationError>
-    readonly past: Effect.Effect<ReadonlyArray<PastChat>, ConversationError>
+    readonly endedSessions: Effect.Effect<ReadonlyArray<EndedGlobalChatSession>, ConversationError>
     readonly loadEarlier: (before: string) => Effect.Effect<void, ConversationError>
-    readonly watchPast: (
+    readonly watchSession: (
       sessionId: string,
-    ) => Stream.Stream<TranscriptUpdate, PastChatNotFound | ConversationError>
-    readonly loadEarlierPast: (
+    ) => Stream.Stream<TranscriptUpdate, GlobalChatSessionNotFound | ConversationError>
+    readonly loadEarlierInSession: (
       sessionId: string,
       before: string,
-    ) => Effect.Effect<void, PastChatNotFound | ConversationError>
+    ) => Effect.Effect<void, GlobalChatSessionNotFound | ConversationError>
     readonly waiting: Stream.Stream<ReadonlyArray<WaitingRequest>>
     readonly unseen: Stream.Stream<TurnEnd | null>
     readonly markSeen: (endedAt: DateTime.Utc) => Effect.Effect<void, ConversationError>
@@ -126,19 +125,26 @@ export class GlobalChat extends Context.Service<
       const folder = join(config.dataDirectory, "global-conversation")
 
       const [saved] = yield* sql`
-        SELECT id, session_id AS sessionId, model, effort FROM global_chat LIMIT 1
+        SELECT id, model, effort FROM global_chat LIMIT 1
       `.pipe(Effect.flatMap(decodeStored), Effect.orDie)
 
       const id = saved?.id ?? randomUUID()
-      const firstSession = saved?.sessionId ?? randomUUID()
 
       if (saved === undefined)
-        yield* sql`INSERT INTO global_chat ${sql.insert({
-          id,
-          session_id: firstSession,
-          session_started_at: DateTime.formatIso(yield* DateTime.now),
-          model: null,
-          effort: null,
+        yield* sql`INSERT INTO global_chat ${sql.insert({ id, model: null, effort: null })}`.pipe(
+          Effect.orDie,
+        )
+
+      const [currentRow] = yield* sql`
+        SELECT id FROM global_chat_session WHERE ended_at IS NULL
+      `.pipe(Effect.flatMap(decodeIds), Effect.orDie)
+
+      const firstSession = currentRow?.id ?? randomUUID()
+
+      if (currentRow === undefined)
+        yield* sql`INSERT INTO global_chat_session ${sql.insert({
+          id: firstSession,
+          started_at: DateTime.formatIso(yield* DateTime.now),
         })}`.pipe(Effect.orDie)
 
       const session = yield* SubscriptionRef.make(firstSession)
@@ -276,14 +282,8 @@ export class GlobalChat extends Context.Service<
             sql.withTransaction(
               Effect.all(
                 [
-                  sql`
-                    INSERT INTO past_chat (id, started_at, ended_at)
-                    SELECT session_id, session_started_at, ${at} FROM global_chat
-                  `,
-                  sql`
-                    UPDATE global_chat
-                    SET session_id = ${next}, session_started_at = ${at}, turn_seen_at = NULL
-                  `,
+                  sql`UPDATE global_chat_session SET ended_at = ${at} WHERE id = ${ending}`,
+                  sql`INSERT INTO global_chat_session ${sql.insert({ id: next, started_at: at })}`,
                 ],
                 { discard: true },
               ),
@@ -294,23 +294,23 @@ export class GlobalChat extends Context.Service<
         }),
       ).pipe(Effect.withSpan("GlobalChat.startFresh"))
 
-      const past = stored(
-        "read Past chats",
+      const endedSessions = stored(
+        "read the Global chat's ended Sessions",
         sql`
           SELECT id, started_at AS startedAt, ended_at AS endedAt
-          FROM past_chat ORDER BY started_at DESC
-        `.pipe(Effect.flatMap(decodePast)),
+          FROM global_chat_session WHERE ended_at IS NOT NULL ORDER BY started_at DESC
+        `.pipe(Effect.flatMap(decodeEnded)),
       )
 
-      const findPast = Effect.fnUntraced(function* (sessionId: string) {
-        const [ended] = yield* stored(
-          "read a Past chat",
+      const findSession = Effect.fnUntraced(function* (sessionId: string) {
+        const [found] = yield* stored(
+          "read a Global chat Session",
           sql`
-            SELECT id FROM past_chat WHERE id = ${sessionId}
+            SELECT id FROM global_chat_session WHERE id = ${sessionId}
           `.pipe(Effect.flatMap(decodeIds)),
         )
 
-        if (ended === undefined) yield* new PastChatNotFound({ id: sessionId })
+        if (found === undefined) yield* new GlobalChatSessionNotFound({ id: sessionId })
       })
 
       return GlobalChat.of({
@@ -331,11 +331,11 @@ export class GlobalChat extends Context.Service<
         saveUnsent: (unsent) => turns.saveUnsent(id, unsent),
         id,
         startFresh,
-        past,
-        watchPast: (sessionId) =>
-          Stream.unwrap(findPast(sessionId).pipe(Effect.as(transcripts.watch(sessionId)))),
-        loadEarlierPast: (sessionId, before) =>
-          findPast(sessionId).pipe(Effect.andThen(transcripts.loadEarlier(sessionId, before))),
+        endedSessions,
+        watchSession: (sessionId) =>
+          Stream.unwrap(findSession(sessionId).pipe(Effect.as(transcripts.watch(sessionId)))),
+        loadEarlierInSession: (sessionId, before) =>
+          findSession(sessionId).pipe(Effect.andThen(transcripts.loadEarlier(sessionId, before))),
         waiting: followSession((sessionId) =>
           transcripts.waiting.pipe(Stream.map((waiting) => waiting.get(sessionId) ?? [])),
         ),

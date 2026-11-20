@@ -1,10 +1,10 @@
 import { useAtom, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
 import {
   emptyTranscript,
+  type EndedGlobalChatSession,
   isWaiting,
   localPlace,
   type ModelChoice,
-  type PastChat,
   type QueuedMessage,
   StartFreshRefused,
   type Turn,
@@ -22,15 +22,15 @@ import { ConfirmationDialog } from "./ConfirmationDialog"
 import { ConversationAtomsContext } from "./conversation"
 import {
   capturedContextAtom,
-  loadEarlierPastTurnsAtom,
   changeGlobalModelAtom,
+  endedSessionsAtom,
   globalChat,
   globalChatOpenAtom,
   globalModelAtom,
   globalUnseenAtom,
+  loadEarlierInSessionAtom,
   markGlobalTurnSeenAtom,
-  pastChatsAtom,
-  pastChatTranscriptAtom,
+  sessionTranscriptAtom,
   startGlobalFreshAtom,
 } from "./globalChat"
 import { ModelPicker } from "./ModelPicker"
@@ -54,8 +54,8 @@ function GlobalModelPicker(props: { choice: ModelChoice }) {
 
 type Showing = Data.TaggedEnum<{
   Current: {}
-  Past: {}
-  PastTranscript: { readonly chat: PastChat }
+  EndedSessions: {}
+  EndedSession: { readonly session: EndedGlobalChatSession }
 }>
 
 const Showing = Data.taggedEnum<Showing>()
@@ -91,15 +91,15 @@ function Shown(props: { showing: Showing; show: (showing: Showing) => void }) {
   const { show } = props
 
   return Showing.$match(props.showing, {
-    Current: () => <GlobalChat onShowPast={() => show(Showing.Past())} />,
-    Past: () => (
-      <PastChats
+    Current: () => <GlobalChat onShowEnded={() => show(Showing.EndedSessions())} />,
+    EndedSessions: () => (
+      <EndedSessions
         onBack={() => show(showingCurrent)}
-        onOpen={(chat) => show(Showing.PastTranscript({ chat }))}
+        onOpen={(session) => show(Showing.EndedSession({ session }))}
       />
     ),
-    PastTranscript: ({ chat }) => (
-      <PastTranscript chat={chat} onBack={() => show(Showing.Past())} />
+    EndedSession: ({ session }) => (
+      <EndedSession session={session} onBack={() => show(Showing.EndedSessions())} />
     ),
   })
 }
@@ -182,7 +182,7 @@ function StartFreshButton(props: {
   )
 }
 
-function GlobalChat(props: { onShowPast: () => void }) {
+function GlobalChat(props: { onShowEnded: () => void }) {
   const transcript = useAtomValue(globalChat.transcript)
   const reconnect = useAtomRefresh(globalChat.transcript)
   const choice = Option.getOrNull(AsyncResult.value(useAtomValue(globalModelAtom)))
@@ -211,7 +211,12 @@ function GlobalChat(props: { onShowPast: () => void }) {
   return (
     <>
       <Header title="Global chat">
-        <Button variant="ghost" size="icon-sm" aria-label="Past chats" onClick={props.onShowPast}>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Earlier Sessions"
+          onClick={props.onShowEnded}
+        >
           <History aria-hidden />
         </Button>
         <StartFreshButton
@@ -246,7 +251,7 @@ function GlobalChat(props: { onShowPast: () => void }) {
       <ConfirmationDialog
         open={confirming}
         title="Start fresh?"
-        description="Your next message starts a new chat. This one moves to Past chats."
+        description="Your next message starts a new Session. This one moves to Earlier Sessions."
         confirmLabel="Start fresh"
         confirmVariant="default"
         onConfirm={() => {
@@ -267,33 +272,36 @@ const shortDate = (at: DateTime.Utc) =>
     minute: "2-digit",
   })
 
-const spanOf = ({ startedAt, endedAt }: PastChat) =>
+const spanOf = ({ startedAt, endedAt }: EndedGlobalChatSession) =>
   `${shortDate(startedAt)} – ${shortDate(endedAt)}`
 
-function PastChats(props: { onBack: () => void; onOpen: (chat: PastChat) => void }) {
-  const past = useAtomValue(pastChatsAtom)
-  const problem = settledProblem(past)
-  const chats = Option.getOrElse(AsyncResult.value(past), () => [])
+function EndedSessions(props: {
+  onBack: () => void
+  onOpen: (session: EndedGlobalChatSession) => void
+}) {
+  const ended = useAtomValue(endedSessionsAtom)
+  const problem = settledProblem(ended)
+  const sessions = Option.getOrElse(AsyncResult.value(ended), () => [])
 
   return (
     <>
-      <Header title="Past chats" onBack={props.onBack} />
+      <Header title="Earlier Sessions" onBack={props.onBack} />
       <div className="flex-1 overflow-y-auto p-2">
         {problem !== null && <ProblemAlert problem={problem} />}
-        {AsyncResult.isSuccess(past) && chats.length === 0 && (
+        {AsyncResult.isSuccess(ended) && sessions.length === 0 && (
           <p className="p-4 text-sm text-muted-foreground">
-            Chats you end with Start fresh appear here.
+            Sessions you end with Start fresh appear here.
           </p>
         )}
         <ul>
-          {chats.map((chat) => (
-            <li key={chat.id}>
+          {sessions.map((session) => (
+            <li key={session.id}>
               <Button
                 variant="ghost"
                 className="w-full justify-start"
-                onClick={() => props.onOpen(chat)}
+                onClick={() => props.onOpen(session)}
               >
-                {spanOf(chat)}
+                {spanOf(session)}
               </Button>
             </li>
           ))}
@@ -303,9 +311,9 @@ function PastChats(props: { onBack: () => void; onOpen: (chat: PastChat) => void
   )
 }
 
-function PastTranscript(props: { chat: PastChat; onBack: () => void }) {
-  const read = useAtomValue(pastChatTranscriptAtom(props.chat.id))
-  const loadEarlier = useAtomSet(loadEarlierPastTurnsAtom(props.chat.id))
+function EndedSession(props: { session: EndedGlobalChatSession; onBack: () => void }) {
+  const read = useAtomValue(sessionTranscriptAtom(props.session.id))
+  const loadEarlier = useAtomSet(loadEarlierInSessionAtom(props.session.id))
 
   const { turns, earlierTurns, status } = Option.getOrElse(
     AsyncResult.value(read),
@@ -314,7 +322,7 @@ function PastTranscript(props: { chat: PastChat; onBack: () => void }) {
 
   return (
     <>
-      <Header title={spanOf(props.chat)} onBack={props.onBack} />
+      <Header title={spanOf(props.session)} onBack={props.onBack} />
       {AsyncResult.isFailure(read) && !read.waiting && (
         <PaddedProblem problem={streamProblem(read.cause)} />
       )}

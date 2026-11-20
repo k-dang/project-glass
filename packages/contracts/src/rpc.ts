@@ -19,6 +19,8 @@ import {
   AgentModels,
   ConversationPlace,
   ConversationNotFound,
+  EndedGlobalChatSession,
+  GlobalChatSessionNotFound,
   Image,
   InvalidLocalCheckout,
   LocalCheckout,
@@ -27,8 +29,6 @@ import {
   ModelChoice,
   NewConversation,
   NoPermissionModes,
-  PastChat,
-  PastChatNotFound,
   PermissionMode,
   QueuedMessageStarted,
   RemovalWarnings,
@@ -620,19 +620,19 @@ export class GlassRpcs extends RpcGroup.make(
   Rpc.make("StartGlobalChatFresh", {
     error: Schema.Union([StartFreshRefused, ConversationError]),
   }),
-  Rpc.make("ListPastChats", {
-    success: Schema.Array(PastChat),
+  Rpc.make("ListEndedGlobalChatSessions", {
+    success: Schema.Array(EndedGlobalChatSession),
     error: ConversationError,
   }),
-  Rpc.make("WatchPastChat", {
+  Rpc.make("WatchGlobalChatSession", {
     payload: { id: Schema.String },
     success: TranscriptUpdate,
-    error: Schema.Union([PastChatNotFound, ConversationError]),
+    error: Schema.Union([GlobalChatSessionNotFound, ConversationError]),
     stream: true,
   }),
-  Rpc.make("LoadEarlierPastChatTurns", {
+  Rpc.make("LoadEarlierGlobalChatSessionTurns", {
     payload: { id: Schema.String, before: Schema.String },
-    error: Schema.Union([PastChatNotFound, ConversationError]),
+    error: Schema.Union([GlobalChatSessionNotFound, ConversationError]),
   }),
 ) {}
 

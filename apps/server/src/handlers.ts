@@ -230,9 +230,10 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       WatchGlobalUnseen: () => globalChat.unseen,
       MarkGlobalTurnSeen: ({ endedAt }) => globalChat.markSeen(endedAt),
       StartGlobalChatFresh: () => globalChat.startFresh,
-      ListPastChats: () => globalChat.past,
-      WatchPastChat: ({ id }) => globalChat.watchPast(id),
-      LoadEarlierPastChatTurns: ({ id, before }) => globalChat.loadEarlierPast(id, before),
+      ListEndedGlobalChatSessions: () => globalChat.endedSessions,
+      WatchGlobalChatSession: ({ id }) => globalChat.watchSession(id),
+      LoadEarlierGlobalChatSessionTurns: ({ id, before }) =>
+        globalChat.loadEarlierInSession(id, before),
     })
   }),
 )

@@ -176,13 +176,14 @@ _Avoid_: Linked PR, agent PR
 
 **Global chat**:
 The one chat the user has with Glass itself, opened over any Area, which works through
-Glass's tools rather than in a repository.
+Glass's tools rather than in a repository. Its model and the work it started stay with it across
+Sessions.
 _Avoid_: Assistant, copilot, Global conversation
 
-**Past chat**:
-A Global chat the user ended with Start fresh, kept to read but not to continue. Its id is
-the id of the pi session it ran in, which is the one place "session" belongs.
-_Avoid_: Session (in UI copy), history, archived chat, Past conversation
+**Session**:
+One stretch of the Global chat's transcript, run in one pi session and sharing its id. Start fresh
+ends the current Session and begins the next; an ended Session stays readable but can't continue.
+_Avoid_: Past chat, Past conversation, history, archived chat
 
 **Started work update**:
 A Turn Glass starts in the Global chat or a Conversation to tell it that work it started

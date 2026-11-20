@@ -176,9 +176,9 @@ export const describeError = (error: BackendError): Problem =>
           waiting: "The Global chat is waiting on you. Answer its Question, then start fresh.",
         }[reason],
       }),
-      PastChatNotFound: () => ({
-        title: "That chat is gone",
-        detail: "Glass couldn't find that past chat. Go back and pick another.",
+      GlobalChatSessionNotFound: () => ({
+        title: "That Session is gone",
+        detail: "Glass couldn't find that Session. Go back and pick another.",
       }),
       RequestNotWaiting: () => ({
         title: "Already settled",

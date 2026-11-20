@@ -512,7 +512,7 @@ it("opens the Global chat over the current area, labelling each message with whe
   await within(await screen.findByRole("dialog", { name: "Global chat" })).findByText("Nearly.")
 })
 
-it("starts the Global chat fresh once confirmed and reads a past one", async () => {
+it("starts the Global chat fresh once confirmed and reads an earlier Session", async () => {
   const at = DateTime.makeUnsafe("2026-11-05T12:00:00Z")
   let started = 0
   const earlierPages = Effect.runSync(Queue.unbounded<TranscriptUpdate>())
@@ -531,8 +531,9 @@ it("starts the Global chat fresh once confirmed and reads a past one", async () 
   const user = mount({
     ListAgentModels: () => Effect.succeed(new AgentModels({ defaultModel: null, models: [] })),
     StartGlobalChatFresh: () => Effect.sync(() => void started++),
-    ListPastChats: () => Effect.succeed([{ id: "past-1", startedAt: at, endedAt: at }]),
-    WatchPastChat: () =>
+    ListEndedGlobalChatSessions: () =>
+      Effect.succeed([{ id: "past-1", startedAt: at, endedAt: at }]),
+    WatchGlobalChatSession: () =>
       Stream.make(
         TranscriptSnapshot.make({
           turns: [pastTurn("turn-2", "Old reply")],
@@ -542,7 +543,7 @@ it("starts the Global chat fresh once confirmed and reads a past one", async () 
           agentStatuses: [],
         }),
       ).pipe(Stream.concat(Stream.fromQueue(earlierPages))),
-    LoadEarlierPastChatTurns: ({ before }) =>
+    LoadEarlierGlobalChatSessionTurns: ({ before }) =>
       Queue.offer(
         earlierPages,
         EarlierTurns.make({ before, turns: [pastTurn("turn-1", "Older reply")], earlierTurns: 0 }),
@@ -557,8 +558,8 @@ it("starts the Global chat fresh once confirmed and reads a past one", async () 
   await user.click(within(confirm).getByRole("button", { name: "Start fresh" }))
   await waitFor(() => expect(started).toBe(1))
 
-  await user.click(within(chat).getByRole("button", { name: "Past chats" }))
-  const past = await screen.findByRole("dialog", { name: "Past chats" })
+  await user.click(within(chat).getByRole("button", { name: "Earlier Sessions" }))
+  const past = await screen.findByRole("dialog", { name: "Earlier Sessions" })
   await user.click(within(await within(past).findByRole("listitem")).getByRole("button"))
 
   await screen.findByText("Old reply")
