@@ -147,12 +147,6 @@ function LoadedPullRequest(props: { workspace: PullRequestWorkspace }) {
   )
 }
 
-const noAnnotations = () => ({ annotations: [], drawn: null })
-
-const noAnnotation = () => null
-
-const noCurrentPath = () => {}
-
 function PaneChanges(props: { workspace: PullRequestWorkspace }) {
   const { pullRequest, revision } = props.workspace
   const { files } = useMemo(() => layOut(props.workspace.files), [props.workspace.files])
@@ -170,19 +164,16 @@ function PaneChanges(props: { workspace: PullRequestWorkspace }) {
           <ProblemAlert problem={fullFiles.problem} />
         </div>
       )}
-      <DiffView<undefined>
+      <DiffView
         ref={view}
         initialPath={null}
         files={files}
-        annotationsFor={noAnnotations}
         display={defaultDisplay}
         opened={opened}
         all="expanded"
         collapsedWhenSuggested={noneCollapsedWhenSuggested}
         onOpenChange={(path, open) => setFilesOpen([path], open)}
-        onCurrentPathChange={noCurrentPath}
         summaries={null}
-        renderAnnotation={noAnnotation}
         renderGutterUtility={null}
         loadDiffFiles={fullFiles.loadDiffFiles}
       />
