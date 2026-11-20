@@ -1,18 +1,11 @@
-import type {
-  ConversationNeedsYou,
-  NeedsYouGroup,
-  NeedsYouItem,
-  PullRequestReason,
-  RequestPart,
-  TurnEnding,
-} from "@glass/contracts"
+import type { NeedsYouGroup, NeedsYouItem, PullRequestReason, RequestPart } from "@glass/contracts"
 import { cn } from "cn"
 import { Array as Arr, DateTime, Match, Predicate } from "effect"
 import { CircleHelp, FileDiff, GitPullRequest, MessagesSquare, Sparkles } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { fileName } from "./fileName"
 import { ago } from "./PullRequestRow"
-import { warningTone } from "./status"
+import { turnEndingLooks, warningTone } from "./status"
 import { referenceText } from "./queue"
 
 type Tone = "warning" | "danger" | "review" | "success" | "neutral"
@@ -43,47 +36,25 @@ export interface InboxAction {
 
 interface Reason {
   readonly label: string
-  readonly tone: Tone
+  readonly tone: string
 }
 
 const requestReason = (part: RequestPart): Reason =>
   Match.valueTags(part, {
-    PermissionRequest: () => ({ label: "Permission request", tone: "warning" as const }),
-    Question: () => ({ label: "Question", tone: "warning" as const }),
+    PermissionRequest: () => ({ label: "Permission request", tone: toneClass.warning }),
+    Question: () => ({ label: "Question", tone: toneClass.warning }),
   })
-
-const turnEndingReason = (ending: TurnEnding): Reason =>
-  Match.valueTags(ending, {
-    Done: () => ({ label: "Finished", tone: "neutral" as const }),
-    Failed: () => ({ label: "Failed", tone: "danger" as const }),
-    Stopped: () => ({ label: "Stopped", tone: "neutral" as const }),
-    CutOff: () => ({ label: "Cut off", tone: "danger" as const }),
-    Interrupted: () => ({ label: "Interrupted", tone: "neutral" as const }),
-  })
-
-export const conversationMarker = ({ reasons }: ConversationNeedsYou) => {
-  const reason = reasons.find(Predicate.isTagged("WaitingRequests")) ?? reasons[0]
-
-  return Match.valueTags(reason, {
-    WaitingRequests: () => ({ label: "Waiting on you", tone: toneClass.warning }),
-    TurnFinished: ({ ended }) => {
-      const { label, tone } = turnEndingReason(ended.ending)
-
-      return { label, tone: toneClass[tone] }
-    },
-  })
-}
 
 const pullRequestReason = (reason: PullRequestReason): Reason =>
   Match.valueTags(reason, {
-    AgentReviewFinished: () => ({ label: "Agent review finished", tone: "review" as const }),
-    ChangesRequested: () => ({ label: "Changes requested", tone: "danger" as const }),
-    ChecksFailing: () => ({ label: "CI failing", tone: "danger" as const }),
+    AgentReviewFinished: () => ({ label: "Agent review finished", tone: toneClass.review }),
+    ChangesRequested: () => ({ label: "Changes requested", tone: toneClass.danger }),
+    ChecksFailing: () => ({ label: "CI failing", tone: toneClass.danger }),
     AwaitingReply: ({ threads }) => ({
       label: threads === 1 ? "1 thread awaiting reply" : `${threads} threads awaiting reply`,
-      tone: "neutral" as const,
+      tone: toneClass.neutral,
     }),
-    ReadyToMerge: () => ({ label: "Ready to merge", tone: "success" as const }),
+    ReadyToMerge: () => ({ label: "Ready to merge", tone: toneClass.success }),
   })
 
 const reasonsOf = (item: NeedsYouItem): ReadonlyArray<Reason> =>
@@ -93,11 +64,11 @@ const reasonsOf = (item: NeedsYouItem): ReadonlyArray<Reason> =>
         reasons.flatMap((reason) =>
           Match.valueTags(reason, {
             WaitingRequests: ({ requests }) => requests.map(requestReason),
-            TurnFinished: ({ ended }) => [turnEndingReason(ended.ending)],
+            TurnFinished: ({ ended }) => [turnEndingLooks[ended.ending._tag]],
           }),
         ),
-      OutsideQuestion: () => [{ label: "Question", tone: "warning" as const }],
-      CheckIn: () => [{ label: "Check-in", tone: "warning" as const }],
+      OutsideQuestion: () => [{ label: "Question", tone: toneClass.warning }],
+      CheckIn: () => [{ label: "Check-in", tone: toneClass.warning }],
       PullRequest: ({ reasons }) => reasons.map(pullRequestReason),
       GlobalConversation: ({ requests }) => requests.map(requestReason),
     }),
@@ -109,7 +80,7 @@ export function Reasons(props: { item: NeedsYouItem }) {
     <Badge
       key={reason.label}
       variant="outline"
-      className={cn("rounded-sm px-1.5 font-normal", toneClass[reason.tone])}
+      className={cn("rounded-sm px-1.5 font-normal", reason.tone)}
     >
       {reason.label}
     </Badge>
