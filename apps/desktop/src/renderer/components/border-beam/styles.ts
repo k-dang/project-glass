@@ -1473,6 +1473,10 @@ function scaleBlur(px: number, glowSize = 1): number {
   return Math.max(0.5, Math.round(px * glowSize * 100) / 100)
 }
 
+// Chromium caches a painted bitmap for every distinct beam angle, so a smooth spin grows
+// renderer memory without bound (~110 MB a minute). A fixed set of angles keeps it flat.
+const SPIN_STEPS = "steps(60)"
+
 /**
  * Generate complete CSS for a BorderBeam instance
  */
@@ -1631,13 +1635,13 @@ function generateSmallVariantCSS(options: GenerateStylesOptions): string {
 
 [data-beam="${id}"][data-active] {
   animation:
-    beam-spin-${id} ${duration}s linear infinite,
+    beam-spin-${id} ${duration}s ${SPIN_STEPS} infinite,
     beam-fade-in-${id} 0.6s ease forwards;
 }
 
 [data-beam="${id}"][data-fading] {
   animation:
-    beam-spin-${id} ${duration}s linear infinite,
+    beam-spin-${id} ${duration}s ${SPIN_STEPS} infinite,
     beam-fade-out-${id} 0.5s ease forwards;
 }
 
@@ -1864,13 +1868,13 @@ function generateBorderVariantCSS(options: GenerateStylesOptions): string {
 
 [data-beam="${id}"][data-active] {
   animation:
-    beam-spin-${id} ${duration}s linear infinite,
+    beam-spin-${id} ${duration}s ${SPIN_STEPS} infinite,
     beam-fade-in-${id} 0.6s ease forwards;
 }
 
 [data-beam="${id}"][data-fading] {
   animation:
-    beam-spin-${id} ${duration}s linear infinite,
+    beam-spin-${id} ${duration}s ${SPIN_STEPS} infinite,
     beam-fade-out-${id} 0.5s ease forwards;
 }
 
