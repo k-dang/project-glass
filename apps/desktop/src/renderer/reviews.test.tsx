@@ -380,13 +380,17 @@ it("opens another PR from a PR workspace with ⌘L or Open another PR", async ()
   await screen.findByText("head001")
   const trigger = screen.getByRole("button", { name: "Open another PR" })
   await user.click(trigger)
-  await screen.findByRole("dialog", { name: "Open a PR" })
+  await screen.findByRole("dialog", { name: "Command menu" })
   await user.keyboard("{Escape}")
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
   expect(document.activeElement).toBe(trigger)
 
   await user.keyboard("{Meta>}l{/Meta}")
-  const input = await screen.findByRole<HTMLInputElement>("textbox", { name: "Open a PR" })
+
+  const input = await screen.findByRole<HTMLInputElement>("combobox", {
+    name: "Search actions, or paste a PR",
+  })
+
   await waitFor(() => expect(document.activeElement).toBe(input))
   await user.type(input, "owner/repo#123")
   await user.keyboard("{Control>}l{/Control}")
@@ -403,7 +407,7 @@ it("opens a PR from the Reviews list with ⌘L", async () => {
   await rowFor("Greet the world")
 
   await user.keyboard("{Meta>}l{/Meta}")
-  await screen.findByRole("dialog", { name: "Open a PR" })
+  await screen.findByRole("dialog", { name: "Command menu" })
   await user.keyboard(`${greet.url}{Enter}`)
   await screen.findByText("head001")
   expect(screen.queryByRole("dialog")).toBeNull()
@@ -429,6 +433,39 @@ it("scopes Copy to every loaded PR workspace tab and removes it when leaving", a
   expect(screen.queryByRole("dialog", { name: "Copy" })).toBeNull()
   await user.keyboard("c")
   expect(screen.queryByRole("dialog", { name: "Copy" })).toBeNull()
+})
+
+it("jumps to a listed PR by searching its title in the Command menu", async () => {
+  const user = mount({ LoadPullRequest: () => Effect.succeed(workspaceOf(greet, "head001")) })
+  await rowFor("Greet the world")
+
+  await user.click(screen.getByRole("link", { name: "Settings" }))
+  await user.keyboard("{Control>}k{/Control}")
+  await user.keyboard("greet the")
+  const row = await screen.findByRole("option", { name: /Greet the world/ })
+  expect(row.textContent).toContain(`${greet.ref.owner}/${greet.ref.repo}#${greet.ref.number}`)
+  await user.keyboard("{Enter}")
+  await screen.findByText("head001")
+})
+
+it("offers the open PR's actions in the Command menu, and drops them after leaving", async () => {
+  const user = mount({ LoadPullRequest: () => Effect.succeed(workspaceOf(greet, "head001")) })
+  const write = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue()
+  await user.click(await rowFor("Greet the world"))
+  await screen.findByText("head001")
+
+  await user.keyboard("{Control>}k{/Control}")
+  const menu = await screen.findByRole("dialog", { name: "Command menu" })
+  expect(within(menu).getByRole("option", { name: /Back to PRs/ })).toBeTruthy()
+  await user.keyboard("copy title{Enter}")
+  await waitFor(() => expect(write).toHaveBeenCalledWith(greet.title))
+
+  await user.click(screen.getByRole("button", { name: "Back to PRs" }))
+  await rowFor("Greet the world")
+  await user.keyboard("{Control>}k{/Control}")
+  const list = await screen.findByRole("dialog", { name: "Command menu" })
+  expect(within(list).queryByRole("option", { name: /Copy title/ })).toBeNull()
+  expect(within(list).getByRole("option", { name: /Inbox/ })).toBeTruthy()
 })
 
 const listed = (repository: FollowedRepository, pullRequests: ReadonlyArray<PullRequestSummary>) =>

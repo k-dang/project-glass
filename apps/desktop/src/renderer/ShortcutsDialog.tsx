@@ -22,7 +22,8 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Kbd } from "@/components/ui/kbd"
-import { useShortcuts } from "./useShortcuts"
+import { useActions } from "./actions"
+import { refusedEscape } from "./refusedEscape"
 
 interface ShortcutGroup {
   readonly title: string
@@ -50,7 +51,8 @@ const groups: ReadonlyArray<ShortcutGroup> = [
       { label: "Back", keys: ["Mod", "←"] },
       { label: "Forward", keys: ["Mod", "→"] },
       { label: "Open or close the Global conversation", keys: ["Mod", "J"] },
-      { label: "Open a PR, or add it to the Queue with Mod Enter", keys: ["Mod", "L"] },
+      { label: "Open the Command menu", keys: ["Mod", "K"] },
+      { label: "Open a PR from the Command menu", keys: ["Mod", "L"] },
       { label: "Record a Dogfood report", keys: ["Mod", "Shift", "."] },
       { label: "Show keyboard shortcuts", keys: ["?"] },
     ],
@@ -145,20 +147,23 @@ export function ShortcutsDialog() {
     setOpen(true)
   }
 
-  useShortcuts([{ key: "?", allowShift: true, run: show }])
+  useActions([
+    {
+      id: "keyboard-shortcuts",
+      title: "Show keyboard shortcuts",
+      group: "Glass",
+      icon: Keyboard,
+      keywords: ["hotkeys", "keys"],
+      shortcut: { key: "?", shift: "any" },
+      run: show,
+    },
+  ])
 
   return (
     <Dialog
       open={open}
       onOpenChange={(next, details) => {
-        if (
-          details.reason === "escape-key" &&
-          (details.event.defaultPrevented || details.event.isComposing || details.event.repeat)
-        ) {
-          details.cancel()
-
-          return
-        }
+        if (refusedEscape(details)) return
 
         if (next) show()
         else setOpen(false)

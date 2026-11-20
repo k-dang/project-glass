@@ -25,12 +25,13 @@ import {
 import { type ComponentType, useContext, useEffect, useId, useState } from "react"
 import { TooltipHint } from "@/components/ui/tooltip"
 import { backendReachableAtom } from "./backend"
+import { type Action, useActions } from "./actions"
+import { CommandMenu } from "./CommandMenu"
 import { ConfirmationDialog } from "./ConfirmationDialog"
 import { ConnectionAvatar } from "./ConnectionAvatar"
 import { globalConversationOpenAtom, globalUnseenAtom } from "./globalConversation"
 import { HistoryNav } from "./HistoryNav"
 import { NeedsYouBadge } from "./NeedsYouCount"
-import { OpenPullRequestDialog } from "./OpenPullRequestDialog"
 import {
   conversationsNeedingYouAtom,
   needsYouCount as countOf,
@@ -45,7 +46,6 @@ import {
 } from "./reviewsArea"
 import { ResourceUsage } from "./ResourceUsage"
 import { ShortcutsDialog } from "./ShortcutsDialog"
-import { useShortcuts } from "./useShortcuts"
 
 const railLink =
   "relative flex size-8 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-accent aria-[current=page]:text-accent-foreground aria-[current=page]:before:absolute aria-[current=page]:before:-left-2 aria-[current=page]:before:h-3 aria-[current=page]:before:w-0.5 aria-[current=page]:before:rounded-full aria-[current=page]:before:bg-foreground"
@@ -116,19 +116,24 @@ export function AppShell() {
     return () => cancelIdleCallback(idle)
   }, [conversing])
 
-  useShortcuts([
-    ...areas.map(({ link }, index) => ({
-      key: `${index + 1}`,
-      mod: true,
-      allowInEditable: true,
+  const toggleConversing = () => setConversing((open) => !open)
+
+  useActions([
+    ...areas.map(({ label, icon, link }, index): Action => ({
+      id: `go-to-${label}`,
+      title: label,
+      group: "Go to",
+      icon,
+      shortcut: { key: `${index + 1}`, mod: true, allowInEditable: true },
       run: () => void navigate(link),
     })),
     {
-      key: "j",
-      mod: true,
-      allowInEditable: true,
-      allowInDialog: true,
-      run: () => setConversing((open) => !open),
+      id: "global-conversation",
+      title: conversing ? "Close the Global conversation" : "Open the Global conversation",
+      group: "Glass",
+      icon: MessagesSquare,
+      shortcut: { key: "j", mod: true, allowInEditable: true, allowInDialog: true },
+      run: toggleConversing,
     },
   ])
 
@@ -189,7 +194,7 @@ export function AppShell() {
               aria-pressed={conversing}
               aria-keyshortcuts="Meta+J Control+J"
               className={cn(railLink, "aria-pressed:bg-accent aria-pressed:text-accent-foreground")}
-              onClick={() => setConversing((open) => !open)}
+              onClick={toggleConversing}
             >
               <MessagesSquare className="size-4" aria-hidden />
               {unread && (
@@ -213,9 +218,12 @@ export function AppShell() {
         </div>
       </div>
       {GlobalConversationDialog && <GlobalConversationDialog />}
-      <OpenPullRequestDialog
+      <CommandMenu
         current={current}
         onOpen={(ref) => void navigate({ to: "/reviews/$owner/$repo/$number", params: ref })}
+        onOpenConversation={(conversationId) =>
+          void navigate({ to: "/conversations/$conversationId", params: { conversationId } })
+        }
         onViewQueue={() =>
           void navigate({
             to: "/reviews",

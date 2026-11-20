@@ -486,7 +486,7 @@ it("adds PRs to the Queue from the bar without leaving the PR under review", asy
   await showing("Greet the world")
 })
 
-it("queues PRs from Open a PR in any area: Mod Enter for one, Enter for several", async () => {
+it("queues PRs pasted into the Command menu in any area: Mod Enter for one, Enter for several", async () => {
   window.history.replaceState(null, "", "#/settings")
   const user = mount([queued(greet)])
 
@@ -499,7 +499,7 @@ it("queues PRs from Open a PR in any area: Mod Enter for one, Enter for several"
 
   await user.keyboard("{Control>}l{/Control}")
   await user.paste(`${greet.url} ${fibers.url}`)
-  await screen.findByText(/Queues 2 PRs/)
+  await screen.findByText(/Queue 2 PRs/)
   await user.keyboard("{Enter}")
   await screen.findByText("Queued effect-ts/effect#9")
   await screen.findByText("1 already queued")

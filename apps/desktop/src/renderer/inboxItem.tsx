@@ -8,7 +8,14 @@ import type {
 } from "@glass/contracts"
 import { cn } from "cn"
 import { Array as Arr, DateTime, Match, Predicate } from "effect"
-import { CircleHelp, FileDiff, GitPullRequest, MessagesSquare, Sparkles } from "lucide-react"
+import {
+  CircleHelp,
+  FileDiff,
+  GitPullRequest,
+  type LucideIcon,
+  MessagesSquare,
+  Sparkles,
+} from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { fileName } from "./fileName"
 import { ago } from "./PullRequestRow"
@@ -38,6 +45,8 @@ export const inboxKeys = ["E", "A"] as const
 export interface InboxAction {
   readonly key: (typeof inboxKeys)[number]
   readonly label: string
+  readonly title: string
+  readonly icon: LucideIcon
   readonly run: () => void
 }
 

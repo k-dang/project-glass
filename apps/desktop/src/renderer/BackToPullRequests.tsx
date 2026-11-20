@@ -1,19 +1,21 @@
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { TooltipHint } from "@/components/ui/tooltip"
-import { useShortcuts } from "./useShortcuts"
+import { useActions } from "./actions"
 
 export function BackToPullRequests(props: {
   onBack: () => void
   disabled?: boolean
   iconOnly?: boolean
 }) {
-  useShortcuts([
-    {
-      key: "Escape",
-      run: () => {
-        if (!props.disabled) props.onBack()
-      },
+  useActions([
+    !props.disabled && {
+      id: "back-to-pull-requests",
+      title: "Back to PRs",
+      group: "Pull request",
+      icon: ArrowLeft,
+      shortcut: { key: "Escape" },
+      run: props.onBack,
     },
   ])
 

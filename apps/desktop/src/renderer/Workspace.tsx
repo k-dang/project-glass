@@ -11,6 +11,7 @@ import type {
 import { referenceKey } from "@glass/contracts"
 import { cn } from "cn"
 import {
+  ChevronLeft,
   ChevronRight,
   FileDiff,
   FolderTree,
@@ -19,10 +20,13 @@ import {
   GitPullRequestClosed,
   GitPullRequestDraft,
   type LucideIcon,
+  Maximize,
   MessageCircle,
+  Minimize,
   PanelLeft,
   RotateCw,
   Route,
+  Sparkles,
 } from "lucide-react"
 import {
   type ReactNode,
@@ -65,7 +69,7 @@ import type { Problem } from "./problems"
 import { RepositoryBrowser } from "./RepositoryBrowser"
 import { FinishReview } from "./FinishReview"
 import { MergePullRequest } from "./MergePullRequest"
-import { OpenPullRequestButton } from "./OpenPullRequestDialog"
+import { OpenPullRequestButton } from "./CommandMenu"
 import { closedAs, StatusChips } from "./PullRequestStatus"
 import {
   type ChangesOrder,
@@ -82,6 +86,7 @@ import type { ReplyStore } from "./useReplies"
 import type { Reactions } from "./useReactions"
 import type { Resolutions } from "./useResolutions"
 import { type ViewedFilesStore, useViewedFiles } from "./useViewedFiles"
+import { useActions } from "./actions"
 import { useShortcuts } from "./useShortcuts"
 import { TourView, type TourViewHandle } from "./TourView"
 import { hasOverview, readTour } from "./tourReading"
@@ -268,28 +273,40 @@ export function Workspace(props: {
     if (reading !== null && hasOverview(reading)) tourView.current?.showOverview()
   }
 
-  useShortcuts([
-    ...(inChanges ? [{ key: "f", run: () => setFullScreen(!fullScreen) }] : []),
-    ...(fullScreen ? [{ key: "Escape", run: () => setFullScreen(false) }] : []),
-    ...(tourInChanges
-      ? [
-          {
-            key: "]",
-            run: () => openChapter((tourView.current?.currentChapter() ?? 0) + 1, "instant"),
-          },
-          {
-            key: "[",
-            run: () => {
-              const inView = tourView.current?.currentChapter() ?? 0
+  useActions([
+    inChanges && {
+      id: "full-screen",
+      title: fullScreen ? "Exit full screen" : "Show Changes full screen",
+      group: "Pull request",
+      icon: fullScreen ? Minimize : Maximize,
+      shortcut: { key: "f" },
+      run: () => setFullScreen(!fullScreen),
+    },
+    tourInChanges && {
+      id: "next-chapter",
+      title: "Next Chapter",
+      group: "Pull request",
+      icon: ChevronRight,
+      shortcut: { key: "]" },
+      run: () => openChapter((tourView.current?.currentChapter() ?? 0) + 1, "instant"),
+    },
+    tourInChanges && {
+      id: "previous-chapter",
+      title: "Previous Chapter",
+      group: "Pull request",
+      icon: ChevronLeft,
+      shortcut: { key: "[" },
+      run: () => {
+        const inView = tourView.current?.currentChapter() ?? 0
 
-              if (inView === 0 && reading !== null && hasOverview(reading))
-                tourView.current?.showOverview()
-              else openChapter(inView - 1, "instant")
-            },
-          },
-        ]
-      : []),
+        if (inView === 0 && reading !== null && hasOverview(reading))
+          tourView.current?.showOverview()
+        else openChapter(inView - 1, "instant")
+      },
+    },
   ])
+
+  useShortcuts(fullScreen ? [{ key: "Escape", run: () => setFullScreen(false) }] : [])
 
   useTourReadyToast(tour.latest, reading, startReading)
 
@@ -382,18 +399,16 @@ export function Workspace(props: {
     />
   )
 
-  useShortcuts(
-    agentReview.review === null
-      ? []
-      : [
-          {
-            key: "d",
-            mod: true,
-            allowInEditable: true,
-            run: () => (reviewShown ? setReviewOpen(false) : readAgentReview()),
-          },
-        ],
-  )
+  useActions([
+    agentReview.review !== null && {
+      id: "agent-review",
+      title: reviewShown ? "Close the Agent review" : "Open the Agent review",
+      group: "Pull request",
+      icon: Sparkles,
+      shortcut: { key: "d", mod: true, allowInEditable: true },
+      run: () => (reviewShown ? setReviewOpen(false) : readAgentReview()),
+    },
+  ])
 
   const additions = files.reduce((sum, file) => sum + file.additions, 0)
   const deletions = files.reduce((sum, file) => sum + file.deletions, 0)
