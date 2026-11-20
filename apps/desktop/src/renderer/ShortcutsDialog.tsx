@@ -22,8 +22,8 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Kbd } from "@/components/ui/kbd"
-import { useActions } from "./actions"
 import { refusedEscape } from "./refusedEscape"
+import { useShortcuts } from "./useShortcuts"
 
 interface ShortcutGroup {
   readonly title: string
@@ -147,17 +147,7 @@ export function ShortcutsDialog() {
     setOpen(true)
   }
 
-  useActions([
-    {
-      id: "keyboard-shortcuts",
-      title: "Show keyboard shortcuts",
-      group: "Glass",
-      icon: Keyboard,
-      keywords: ["hotkeys", "keys"],
-      shortcut: { key: "?", shift: "any" },
-      run: show,
-    },
-  ])
+  useShortcuts([{ key: "?", shift: "any", run: show }])
 
   return (
     <Dialog
