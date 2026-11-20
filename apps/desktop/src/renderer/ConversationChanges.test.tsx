@@ -11,7 +11,7 @@ import {
   TurnEnded,
   UnsentFeedback,
 } from "@glass/contracts"
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { DateTime, Deferred, Effect, Exit, Stream } from "effect"
 import { afterEach, expect, it } from "vite-plus/test"
@@ -443,4 +443,24 @@ it("returns a canceled Queued message's Feedback notes beside newer work once a 
   expect(within(newer!).getByText("Newer")).toBeTruthy()
   expect(within(restored!).getByText("Cap the attempts")).toBeTruthy()
   expect(within(restored!).getByText("Older version")).toBeTruthy()
+})
+
+it("selects lines with Shift+Arrow keys and starts a Feedback note on them with Enter", async () => {
+  const store = savedNotes()
+
+  const { user, region, overview } = await openChanges({
+    WatchTranscript: idle,
+    GetConversationChanges: () => Effect.succeed(changes("read-1")),
+    ...store.handlers,
+  })
+
+  const diff = within(region).getByRole("button", { name: "Hide greet.ts" }).parentElement!
+  fireEvent.keyDown(diff, { key: "ArrowDown", shiftKey: true })
+  fireEvent.keyDown(diff, { key: "Enter" })
+
+  const editor = await within(region).findByRole("textbox", { name: "Feedback on selected code" })
+  await user.type(editor, "Rename A")
+  await user.click(within(region).getByRole("button", { name: "Add note" }))
+
+  expect(await within(overview).findByText("Rename A")).toBeTruthy()
 })
