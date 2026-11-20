@@ -7,74 +7,55 @@ with coding agents.
 
 ### Getting around
 
+**Area**:
+One of the top-level parts of Glass the user moves between from the rail, such as Reviews or
+Conversations.
+_Avoid_: Section, tab, page
+
 **Command menu**:
 The search box opened with ⌘K or Ctrl+K from anywhere in Glass, for running any action the current
-view offers, with its keyboard shortcut beside it, and for jumping to a PR or Conversation by name.
-Pasting a PR's URL or `owner/repo#number` into it opens that PR or adds it to the Queue.
+view offers and for jumping to a PR or Conversation by name.
 _Avoid_: Command palette, quick open (a Command is something an Agent harness runs)
 
 ### Resuming work
 
 **Saved place**:
-The last piece of work the user was doing in an area of Glass, with their place in it, kept on this
-device for them to continue. Each area keeps its own: the last PR in Reviews, the last Conversation
-in Conversations. Visiting Settings or Activity leaves every Saved place unchanged.
+The last piece of work the user was doing in an Area, with their place in it, kept on this device
+for them to continue.
 
 **Needs you**:
-The Conversations, questions from an agent outside Glass or the Global conversation, and PRs waiting
-on the user now. They live in the Inbox, grouped by why they are waiting, with their count on the
-Inbox rail link in every area and a dot on the Conversations rail link while a Conversation waits.
-A queued PR waits once its Agent review is finished, until the user marks that Agent review done or
-a Started work update includes it; writing it again puts the PR back.
-A Conversation waits once its latest Turn ends while the user isn't looking, unless they stopped it,
-until they look at its Chat with Glass focused, reply to it, or mark it done in the Inbox; an Agent
-review's own Conversation waits only through its PR. The Inbox shows its latest Turn with a reply
-box, so the user can work it without opening the Conversation.
-The user's own open PRs in followed repositories wait while changes are requested, checks fail, or
-a review thread is unresolved with someone else's comment last; with none of those, an approved PR
-GitHub would merge waits as ready to merge.
-The Dashboard shows that count once Needs you has loaded, and links to the Inbox.
-While it is loading or the stream has failed, the count stays off the Dashboard, the Inbox header,
-and the rail.
+The Conversations, questions, Check-ins, and PRs waiting on the user now, listed in the Inbox and
+grouped by why they wait.
 
 ### Reviewing
 
 **PR list**:
-Pull requests from followed repositories in Reviews, listed together newest first or by repository,
-from which the user opens a PR workspace.
+Pull requests from Followed repositories, listed in Reviews, from which the user opens a PR
+workspace.
 
 **Followed repository**:
 A repository the user selects as a source for Glass's PR lists.
 _Avoid_: Watched repository
 
-**Review request**:
-A request on GitHub for a person or team to submit a Review on a PR. It is outstanding while GitHub
-still marks that review as requested.
-
 **Needs review**:
-The PR list of open pull requests by other authors, not marked as draft, with an outstanding Review
-request to the user or one of their teams.
+The PR list of open, non-draft pull requests by other authors that request a review from the user
+or one of their teams.
 
 **My PRs**:
-The PR list of open pull requests authored by the user, including PRs marked as draft.
+The PR list of open pull requests authored by the user, including drafts.
 
 **Reviewing**:
-The PR list for resuming open pull requests by other authors, not marked as draft, that the user
-has opened or worked on in Glass, or where they have Drafts or a submitted Review on GitHub.
-A PR can appear in both Reviewing and Needs review.
+The PR list of open, non-draft pull requests by other authors that the user has worked on in Glass
+or on GitHub, for picking them back up.
 
 **Queue**:
-The pull requests the user has added to review next, from any repository, kept on this device in the
-order added. When the user turns on Tours or Agent reviews for the Queue in Settings, Glass writes
-a Tour or runs an Agent review for each open PR that joins it without one, two at a time
-for each. It leaves them outdated rather than redoing them after new commits;
-turning either off cancels the ones still in progress. A PR leaves the Queue when the user removes
-it or submits a Review on it, which cancels its Tour or Agent review still in progress. It sits
-beside the PR lists in Reviews but is not one of them.
+The pull requests the user has added to review next, from any repository, kept on this device in
+the order added; Glass can write a Tour or run an Agent review for each. It sits beside the PR
+lists but is not one of them.
 _Avoid_: Batch, backlog, review list
 
 **PR workspace**:
-One open pull request with its description, changed files, diffs, and discussions, pinned to a
+One open pull request with its description, changed files, diffs, and comments, pinned to a
 Revision.
 _Avoid_: PR view, session
 
@@ -82,129 +63,79 @@ _Avoid_: PR view, session
 The base and head commit pair a PR workspace is pinned to.
 _Avoid_: Version, snapshot, latest
 
-**Reviewer**:
-A person or team with an outstanding Review request on a PR, or whose latest Review approved or
-requested changes.
-
-**Approval**:
-Whether a PR's Reviews meet its repository's rules: approved, changes requested, or review
-required. A repository that requires no reviews gives no Approval.
-_Avoid_: Review decision, review status
-
-**Check**:
-An automated run reporting on a PR's head commit, such as a CI job: passed, failed, running, or
-skipped.
-
-**Merge**:
-Merging an open PR from its PR workspace in one click, offered only to users who can write to its
-repository. Glass does what GitHub would do now with the user's default merge method: merge, or add
-the PR to its base branch's merge queue. While required Checks or Reviews are outstanding, it turns
-on auto-merge instead, so GitHub merges the PR, or adds it to the merge queue, once they pass.
-Once auto-merge is on or the PR is in a merge queue, Glass shows that instead.
-_Avoid_: Land, ship
-
 **Tour**:
-An agent-written reading order for one Revision of a PR: why the change exists, a diagram or Before
-/ after of the whole change when it has one, then Chapters ordered from the part that matters most
-to the glue.
+An agent-written reading order for one Revision of a PR: why the change exists, then Chapters
+ordered from the part that matters most to the glue.
 _Avoid_: Code tour, guided review, guide, walkthrough
 
-**Before / after**:
-A short plain-language outline of how something worked and how it works now, with removed and added
-lines beside the unchanged ones that place them. A Tour may open with one for the whole PR, and a
-Chapter may carry one for its own part.
-_Avoid_: Show me, summary diagram
-
 **Tour overview**:
-The card that opens a Tour: why the change exists beside one map, either a diagram or a Before / after,
-when available, above the first Chapter. A diagram is a Mermaid flowchart marking what the PR adds and
-removes.
+The card that opens a Tour: why the change exists beside one diagram or Before / after.
 _Avoid_: Overview (the PR's Overview tab is a different place)
 
 **Chapter**:
-One step of a Tour: a group of changed files that belong together, with an explanation of what
-they do and why. A Chapter may include one map, either a diagram or a Before / after, plus callouts
-linked to diff lines.
+One step of a Tour: a group of changed files that belong together, with what they do and why.
 _Avoid_: Section, stop, step
 
+**Before / after**:
+A short plain-language outline of how something worked and how it works now, for a whole PR or one
+Chapter.
+_Avoid_: Show me, summary diagram
+
 **Tour engine**:
-The agent that writes every Tour, whether the user starts it from a PR or the Queue starts it:
-Claude Code or pi, each with its own model. The user chooses it in Settings.
+The Agent harness, with its model, that writes every Tour, chosen in Settings.
 _Avoid_: Default engine, runner (in UI copy), generator, provider
 
-**Agent review engine**:
-The agent that runs every Agent review, chosen in Settings apart from the Tour engine and with its
-own model for each Agent harness. It starts as pi.
-_Avoid_: Default engine, runner (in UI copy), reviewer
-
 **Agent review**:
-An agent-written critique of one Revision of a PR, kept on this device for the user alone:
-Markdown that opens with the PR's main risk, its Hotspots, and its Low-attention files, read beside
-the diff. Glass keeps the latest one for each PR and leaves it outdated after new commits. Unlike a
-Review, it is never published and never suggests a Review decision.
+An agent-written critique of one Revision of a PR, kept on this device for the user alone and
+read beside the diff. Unlike a GitHub review, it is never published and never approves or
+requests changes.
 _Avoid_: AI review, code review, critique
 
+**Agent review engine**:
+The Agent harness, with its model, that runs every Agent review and answers every Ask, chosen in
+Settings apart from the Tour engine.
+_Avoid_: Default engine, runner (in UI copy), reviewer
+
 **Hotspot**:
-One of the few places in a PR an Agent review ranks for the closest read, at most five: a risk
-kind, why it matters in this PR, the code it rests on, and what to check, usually with the diff
-lines it is about. A Tour of the same Revision shows them where to look first and in their Chapters.
-An Agent review with nothing that stands out has none.
+One of the few places in a PR an Agent review ranks for the closest read, with why it matters and
+what to check.
 _Avoid_: Finding, issue, risk area
 
 **Low-attention file**:
-A changed file an Agent review says needs little attention, such as generated code, wiring, or a
-version bump. The diff collapses it at first and keeps it one click away.
+A changed file an Agent review says needs little attention, such as generated code or a version
+bump.
 _Avoid_: Plumbing, noise, skippable file
 
 **Follow-up**:
-A message the user sends about an Agent review, read beside it, and the agent's answer, which may
-include Suggested drafts. Each one is a Turn of the Agent review's own Conversation, which Glass
-starts on the first Follow-up. An Agent review keeps its Follow-ups until it is written again, and
-takes new ones only while it is current.
+A message the user sends about an Agent review and the agent's answer, a Turn of the Agent
+review's own Conversation.
 _Avoid_: Chat, thread
 
 **Suggested draft**:
-A comment for the PR's author that the agent proposes in a Follow-up, on a line of the diff. It
-becomes a Draft only when the user adds it, after any edits.
+A comment the agent proposes in a Follow-up on a line of the diff, which becomes a Draft only when
+the user adds it.
 _Avoid_: Proposed comment, AI comment
 
+**Ask**:
+A question the user asks the agent about one line of a PR's diff, answered privately beside it and
+never sent to GitHub.
+_Avoid_: Question (an agent asks those), comment
+
 **Review prompt**:
-The user's own description of how they review, set once in Settings and used by every Agent review
-inside Glass's fixed instructions. It starts as a default the user can restore.
+The user's own description of how they review, set in Settings and given to every Agent review.
 _Avoid_: System prompt, instructions
 
 ### Feedback
 
 **Draft**:
-An unpublished inline comment on the user's GitHub pending review, visible only to them until a
-Review is submitted.
+An unpublished inline comment on the user's GitHub pending review, visible only to them until their
+review is submitted.
 _Avoid_: Pending comment, unsent comment
 
 **Flagged draft**:
-A Draft that can't be placed in the current diff because its line is outdated, it is on a whole
+A Draft that can't be placed in the current diff, because its line is outdated, it is on a whole
 file, or its file's diff isn't shown.
 _Avoid_: Broken draft, orphaned comment
-
-**Review**:
-Published feedback on a PR, consisting of a Review decision, an optional summary, and any Drafts
-submitted together.
-_Avoid_: Submission, batch
-
-**Review decision**:
-One of comment, approve, or request changes.
-_Avoid_: Verdict, status
-
-**Discussion**:
-A published thread of comments on a line or on the PR itself.
-_Avoid_: Conversation, comment chain
-
-**Reply**:
-A comment added to an existing Discussion.
-_Avoid_: Response, answer
-
-**Reaction**:
-One of GitHub's eight emoji a person gives a published comment, which publishes right away.
-_Avoid_: Emoji, like
 
 **Feedback state**:
 Where a piece of the user's feedback stands: draft, sending, confirmed by GitHub, or failed.
@@ -213,79 +144,55 @@ _Avoid_: Sync status
 ### Activity
 
 **Activity**:
-One meaningful thing the user did in Glass, with when it happened, what it was done to, and what
-they wrote: opening a PR workspace, viewing a file in it, submitting a Review, sending a Reply,
-adding a To-do, marking one done, or starting a Conversation. Messages to a Conversation are not
-Activities. Scrolling past a file is not viewing it; editing, reopening, or deleting a To-do is not
-an Activity.
+One meaningful thing the user did in Glass, such as opening a PR workspace, submitting a review,
+or starting a Conversation, with when it happened and what it was done to.
 _Avoid_: Event, action, audit entry
 
 **Activity log**:
-Every Activity the user has done, kept on this device, listed newest first in Glass for the user
-to look back over and for agents and later features to search.
+Every Activity the user has done, kept on this device, for the user to look back over and for
+agents to search.
 _Avoid_: History, audit log, event log, telemetry
 
 ### Planning
 
 **To-do**:
-Something the user means to do, written down in Glass, open until they mark it done. Starting a
-Conversation from an open one Mentions it in the New Conversation's message.
+Something the user means to do, written down in Glass, open until they mark it done.
 _Avoid_: Task, action item
 
 ### Conversations
 
 **Conversation**:
-A named conversation started from Glass with an agent, run by an Agent harness and a model,
-working in one place: a worktree on this device, a Sandbox, or, for an Agent review's Follow-ups, a
-checkout of the review's Revision. Its agent is the AI doing the work, as in a Tour, Agent review,
-or Ask. The user starts one, or the Global conversation or another Conversation's agent does for
-them. A Conversation in a worktree on this device can create and message other Conversations
-through Glass's tools, but never one that asks the user less than it does, and never itself.
+A named conversation started from Glass with an agent, run by an Agent harness and a model and
+working in one place: a worktree on this device, a Sandbox, or a checkout of an Agent review's
+Revision. The user starts one, or the Global conversation or another Conversation's agent does for
+them; a Conversation never starts one that asks the user less than it does.
 _Avoid_: Session, thread, bot, box
 
 **Conversation's PR**:
-The PR in a followed repository whose head is the branch the Conversation's folder had checked out
-when its latest Turn ended: the open one, or once none is open, the latest merged or closed one
-unless that branch is the Conversation's base branch. The Conversation's header, details, and row
-in the list link to it, with its Checks while it's open and as merged or closed after. A
-Conversation has none until a PR is opened from its branch.
+The PR whose head is the branch the Conversation's folder has checked out.
 _Avoid_: Linked PR, agent PR
 
 **Global conversation**:
-The one conversation the user has with Glass itself, opened over any area without leaving it,
-run by pi. It works in no repository and needs no Local checkout; it reads no files and
-runs no commands, but reads the user's work in Glass through Glass's tools, starts Agent reviews,
-creates Conversations and messages them, and asks the user Questions. Glass keeps a record of the
-Conversations and Agent reviews it started or messaged, so it can say how they stand. A message
-keeps the PR workspace and Revision, or the Conversation, in view when it was sent. Its rail button
-carries a marker while a Turn ended that the user hasn't seen with the conversation open. Start
-fresh ends it into a Past conversation and starts an empty one with the same model, Effort, Unsent
-message, and record of what it started; Glass refuses while a Turn runs, a Queued message waits, or
-a Question waits on the user.
+The one conversation the user has with Glass itself, opened over any Area, which works through
+Glass's tools rather than in a repository.
 _Avoid_: Assistant, chat, copilot
 
 **Past conversation**:
-A Global conversation the user ended with Start fresh, kept with its start and end dates to read
-but not to continue. The Global conversation that follows doesn't see it. Its id is the id of
-the pi session it ran in, which is the one place "session" belongs.
+A Global conversation the user ended with Start fresh, kept to read but not to continue. Its id is
+the id of the pi session it ran in, which is the one place "session" belongs.
 _Avoid_: Session (in UI copy), history, archived chat
 
 **Started work update**:
-A Turn Glass starts in the Global conversation, or in a Conversation, to tell its agent about work
-it started or messaged that finished, failed, or needs the user's input, combining pending outcomes
-once the conversation is idle. It clears completed work from Needs you without marking an Agent
-review done; a Conversation the user stopped is excluded. In the Global conversation, it offers
-the user a next step without acting until they say so.
-_Avoid_: Started work update, notification, event, wake-up
+A Turn Glass starts in the Global conversation or a Conversation to tell it that work it started
+finished, failed, or needs the user's input.
+_Avoid_: Global conversation update, notification, event, wake-up
 
 **Agent harness**:
-Claude Code or pi, the harness that runs a Conversation's agent. It decides which models and efforts
-the user can pick, and leaving either to it runs its own default.
+Claude Code or pi, the harness that runs an agent and decides which models and Efforts it offers.
 _Avoid_: Engine, provider
 
 **Effort**:
-How hard a Conversation's model works on each Turn, from the levels its Agent harness offers for
-that model.
+How hard a Conversation's model works on each Turn, from the levels its Agent harness offers.
 _Avoid_: Thinking level, reasoning budget
 
 **Local checkout**:
@@ -293,81 +200,52 @@ A clone of a repository on this device that the user links in Glass, from which 
 Conversation gets a worktree of its own.
 
 **Sandbox**:
-The remote machine a Sandbox provider creates for one Conversation, kept until the user removes the
-Conversation or it expires. While Glass runs, it extends a Sandbox that expires ahead of expiry, up
-to the platform's cap.
+The remote machine a Sandbox provider creates for one Conversation.
 _Avoid_: Box, computer, devbox, pod
 
 **Sandbox provider**:
-A kind of Sandbox the user can start Conversations in, such as a company's own Sandboxes, added to
-Glass by a Plugin.
+A kind of Sandbox the user can start Conversations in, added to Glass by a plugin.
 _Avoid_: Backend, platform, adapter
 
-**Plugin**:
-Code the user installs in Glass's plugins folder to add to what Glass can do, such as a Sandbox
-provider.
-_Avoid_: Extension, add-on
-
 **Skill pack**:
-A named set of skills from one GitHub folder, pinned to a commit, that the user adds in Settings
-and picks for a Conversation when creating it. A Conversation keeps the packs and commits it was
-created with.
+A named set of skills from one GitHub folder, pinned to a commit, that the user picks for a
+Conversation when creating it.
 _Avoid_: Skill set, registry, bundle, plugin
 
 **Local skills**:
-The skills in the user's skill folders on this device that the Agent harness reads. Local
-Conversations always have them; a Sandbox Conversation has them only if the user picks them when
-creating it.
+The skills in the user's skill folders on this device that the Agent harness reads.
 _Avoid_: My skills, user skills
 
 **Turn**:
-One message to a Conversation and its agent's whole response, or work the agent starts on its own,
-such as when a subagent or command it ran in the background or a pi extension's background task
-reports back; for Claude Code, Glass names the background work that ended at the top of such a Turn. It ends done, failed,
-stopped by the user, cut off when Glass loses the Conversation, or interrupted when Glass quits and
-can't keep it, such as when Glass is updated before it reopens. Otherwise a Turn carries on while
-Glass is closed.
+One message to a Conversation and its agent's whole response, or work the agent starts on its own
+when background work reports back.
 _Avoid_: Run, execution, exchange
 
 **Agent status**:
-A short line about what a Conversation's agent has going besides its Turn, such as subagents or
-commands it runs in the background or a mode one of a pi Conversation's extensions is in. Glass
-shows it on the Conversation whether or not a Turn is running, until the agent clears it or Glass
-loses the Conversation, and marks the tool call that started a Claude Code background task as
-running until the task ends.
+A short line about what a Conversation's agent has going besides its Turn, such as background
+subagents or commands.
 _Avoid_: Extension status, widget, banner
 
 **Diagram**:
 A named Mermaid picture a Conversation's agent draws beside the Conversation when the user asks for
-one, labeled as existing behavior, a proposed design, or an uncertain inference. Asking for changes
-redraws it under the same name; a version Glass can't draw leaves the last one in place. A
-Conversation keeps its Diagrams with its Turns.
+one.
 _Avoid_: Artifact, chart, whiteboard
 
 **File pane**:
-A file from a Conversation's folder shown beside the Conversation when the user opens it from a
-path the agent named, rereading it whenever a Turn ends. HTML runs as a self-contained page, kept
-from Glass and the folder's other files; Markdown and images are shown as they read, and other text
-as code.
+A file from a Conversation's folder shown beside the Conversation, opened from a path the agent
+named.
 _Avoid_: Artifact, preview, viewer
 
 **Queued message**:
-A message sent while a Turn runs, waiting to start the next Turn; the user can cancel it before
-then. Canceling one returns its Feedback notes to the Conversation's unsent feedback.
+A message sent while a Turn runs, waiting to start the next Turn.
 
 **Mention**:
-A To-do or file the user points at from a message to a Conversation, by typing `@` and picking it,
-or for a To-do, by starting a Conversation from it. The message shows a To-do by its title and a
-file by its name. The agent reads a To-do's title, notes, and images as they are when the message
-reaches it, and a file's path. Files come from the Conversation's
-folder, or, for a New Conversation's first message, from the branch it starts from: the Local
-checkout's copy of it on this device, or GitHub's for a Sandbox.
+A To-do or file the user points at from a message to a Conversation by typing `@` and picking it.
 _Avoid_: Reference, attachment, tag, chip
 
 **Command**:
 A skill, prompt template, or command the Agent harness runs when a message starts with `/` and its
-name, as the harness lists them for the Conversation's folder. Glass offers them after a leading
-`/`; a Sandbox Conversation has none until its Sandbox is up.
+name.
 _Avoid_: Slash command (in UI copy), skill (for the whole list)
 
 **Steer**:
@@ -375,47 +253,31 @@ A message sent into the running Turn, for the agent to take in before it finishe
 _Avoid_: Interrupt, inject
 
 **Unsent message**:
-What the user has written to a Conversation or the Global conversation and not sent yet, with any
-images and, for a Conversation, the Feedback notes added to it, kept for each on this device until
-they send or clear it.
+What the user has written to a Conversation or the Global conversation and not sent yet, kept on
+this device.
 _Avoid_: Draft (a Draft is a GitHub comment)
 
 **Feedback note**:
-An instruction the user leaves on a line or range on either side of a Conversation's Changes or a
-Check-in's changes, kept with the code they read there. On a Conversation, the user adds the notes
-to its Unsent message and sends them together as one message, which it then keeps in its
-transcript; on a Check-in, they go back to the Outside agent with the user's answer. Glass never
-publishes them.
+An instruction the user leaves on a line or range of a Conversation's or Check-in's changes, sent
+to the agent and never published.
 _Avoid_: Draft, review comment
 
 **Permission mode**:
-How much the agent in a local Claude Code Conversation may do without asking: default, accept edits,
-auto, or bypass. Conversations in a Sandbox always bypass.
-
-**Permission request**:
-A Conversation's agent asking the user to allow one tool call, waiting in its transcript until they
-answer.
-_Avoid_: Approval, prompt
+How much the agent in a local Claude Code Conversation may do without asking: default, accept
+edits, auto, or bypass.
 
 **Question**:
-A Conversation's agent asking the user to choose between options or answer in their own words,
-waiting in its transcript until they answer.
-A Conversation with a Permission request or Question waiting is marked in the Conversations list and
-listed in Needs you.
-An agent outside Glass can ask through Glass's MCP endpoint after the user approves it. That
-question waits in the Inbox, under Stopped on you, until the user answers or the wait ends.
+An agent asking the user to choose between options or answer in their own words, waiting until
+they answer.
 
 **Outside agent**:
-An agent Glass did not launch. The user approves it once, and it can then use Glass's MCP tools
-on this computer, including asking a question. It is not a Conversation Glass started.
+An agent Glass did not launch that the user has approved to use Glass's MCP tools on this
+computer.
 _Avoid_: Session, client, login
 
 **Check-in**:
-An Outside agent asking the user to read the changes in a folder on this computer, as they stood
-when it asked, and to approve them or send feedback back. Feedback notes go back either way; on an
-approval they are guidance, not a request for more changes. It waits in the Inbox, under
-Stopped on you, until the user answers or the wait ends; closing it without an answer is not
-approval.
+An Outside agent asking the user to read the changes in a folder on this computer and approve them
+or send Feedback notes back.
 _Avoid_: Review, code review, Read request
 
 ### Identity
@@ -426,22 +288,15 @@ _Avoid_: Session, account, login
 
 ### Storage
 
-**Storage**:
-The disk space Glass's database takes up on this device, shown in Settings.
-_Avoid_: Disk usage
-
 **Storage group**:
-One part of Storage: Conversations, Reviews, Activity, To-dos, Glass internals, or SQLite overhead.
-Each
-holds the tables behind that part of Glass; SQLite overhead holds its write-ahead log and free
-space.
-_Avoid_: Area, which names a part of Glass the user visits
+One part of the disk space Glass's database takes on this device, shown in Settings:
+Conversations, Reviews, Activity, To-dos, Glass internals, or SQLite overhead.
+_Avoid_: Disk usage, Area
 
 ### Developing Glass
 
 **Dogfood report**:
 A note a Glass developer records the moment something in Glass is broken or could be better, kept
-with what Glass was showing and the data behind it, so an agent can bring that moment back,
-compare it with new code, and, for a Tour or Agent review, write it again. Dogfood reports never
-leave the device.
+on this device with what Glass was showing and the data behind it, so an agent can bring that
+moment back.
 _Avoid_: Feedback, bug report, snag
