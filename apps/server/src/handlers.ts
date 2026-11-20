@@ -21,6 +21,7 @@ import { Queue } from "./Queue"
 import { engineSettingsOf, SettingsStore, withEngineSettings } from "./SettingsStore"
 import { Sandboxes } from "./Sandboxes"
 import { SavedPlaces } from "./SavedPlaces"
+import { SettledConversations } from "./SettledConversations"
 import { LocalSkills } from "./LocalSkills"
 import { SkillPacks } from "./SkillPacks"
 import { Storage } from "./Storage"
@@ -50,6 +51,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
     const localSkills = yield* LocalSkills
     const needsYou = yield* NeedsYou
     const conversationPullRequests = yield* ConversationPullRequests
+    const settledConversations = yield* SettledConversations
     const outsideQuestions = yield* OutsideQuestions
     const checkIns = yield* CheckIns
     const outsideAgents = yield* OutsideAgents
@@ -175,6 +177,8 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       CreateConversation: (input) => conversations.create(input),
       WatchWorkingConversations: () => conversations.watchWorking(),
       WatchConversationPullRequests: () => conversationPullRequests.watch(),
+      WatchSettledConversations: () => settledConversations.watch(),
+      BringBackConversation: ({ conversationId }) => conversations.bringBack(conversationId),
       WatchNeedsYou: () => needsYou.watch(),
       MarkTurnSeen: ({ conversationId, endedAt }) =>
         conversations.markTurnSeen(conversationId, endedAt),

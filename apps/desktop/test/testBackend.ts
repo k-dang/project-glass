@@ -91,6 +91,8 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         ReadToDoImage: unused,
         WatchConversations: () => Stream.make([]),
         WatchWorkingConversations: () => Stream.make([]),
+        WatchSettledConversations: () => Stream.make([]),
+        BringBackConversation: unused,
         WatchConversationPullRequests: () => Stream.make([]),
         WatchNeedsYou: () => Stream.make([]),
         MarkTurnSeen: () => Effect.void,

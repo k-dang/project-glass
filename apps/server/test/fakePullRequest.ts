@@ -192,6 +192,7 @@ export class FakePullRequest {
   inMergeQueue = false
   mergedWith: FakeMergeMethod | null = null
   #state: FakePullRequestState
+  #mergedAt: string | null
   #isDraft: boolean
   #updatedAt: string
   #base: FakeCommit
@@ -243,6 +244,7 @@ export class FakePullRequest {
     this.viewerPermission = seed.viewerPermission ?? "WRITE"
     this.mergeMethods = seed.mergeMethods ?? ["MERGE", "SQUASH", "REBASE"]
     this.#updatedAt = seed.updatedAt ?? now()
+    this.#mergedAt = this.#state === "MERGED" ? this.#updatedAt : null
     this.#base = seed.base
     this.#head = seed.head
     this.publishHead(seed)
@@ -338,6 +340,10 @@ export class FakePullRequest {
     return this.#state
   }
 
+  get mergedAt(): string | null {
+    return this.#mergedAt
+  }
+
   get isDraft(): boolean {
     return this.#isDraft
   }
@@ -347,9 +353,12 @@ export class FakePullRequest {
   }
 
   edit(changes: { readonly state?: FakePullRequestState; readonly isDraft?: boolean }): void {
+    this.#updatedAt = this.now()
+
+    if (changes.state === "MERGED" && this.#state !== "MERGED") this.#mergedAt = this.#updatedAt
+
     this.#state = changes.state ?? this.#state
     this.#isDraft = changes.isDraft ?? this.#isDraft
-    this.#updatedAt = this.now()
   }
 
   requestReview(login: string): void {

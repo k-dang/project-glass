@@ -55,7 +55,7 @@ export const StartedWorkUpdates = Layer.effectDiscard(
       Effect.catch((cause) => Effect.logWarning("Couldn't read what conversations started", cause)),
     )
 
-    yield* Stream.merge(started.changes, yield* transcripts.subscribeSettled).pipe(
+    yield* Stream.merge(started.changes, yield* transcripts.subscribeMaybeIdle).pipe(
       Stream.buffer({ capacity: 1, strategy: "sliding" }),
       Stream.runForEach(() => sendUpdates),
       Effect.forkScoped,

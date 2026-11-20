@@ -19,6 +19,7 @@ import {
   scriptedHost,
   settled,
 } from "../test/conversationsFixture"
+import type { FakePullRequest } from "../test/fakePullRequest"
 import { gitIn } from "../test/gitRepositories"
 import { isolatedHome } from "../test/harness"
 
@@ -559,4 +560,92 @@ it.live("keeps showing a Conversation's PR as merged once it merges", () =>
     assert.equal(merged?.ref.number, 7)
     assert.equal(merged?.url, pr.url)
   }),
+)
+
+it.live(
+  "settles a Conversation once its PR merges, until the user writes, steers, or brings it back",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* conversationsFixture
+      yield* f.client.FollowRepository({ input: "glass-demo/greeter" })
+
+      const onPullRequest = Effect.fnUntraced(function* (gate: string, number: number) {
+        const headBranch = `feature/${gate}`
+
+        const pr = f.github.seedPullRequest({
+          owner: "glass-demo",
+          repo: "greeter",
+          number,
+          headBranch,
+          base: { sha: "b0", files: {} },
+          head: { sha: `h${number}`, files: {} },
+        })
+
+        const conversation = yield* f.start(`hold:${gate}`)
+        yield* f.transcript(conversation.id, holding)
+        gitIn(f.worktree(conversation.name), "switch", "--quiet", "-c", headBranch)
+        yield* f.release(gate)
+
+        return { pr, conversationId: conversation.id }
+      })
+
+      const settledIds = (until: (ids: ReadonlyArray<string>) => boolean) =>
+        f.client
+          .WatchSettledConversations()
+          .pipe(Stream.filter(until), Stream.runHead, Effect.map(Option.getOrThrow))
+
+      const merge = (pr: FakePullRequest) =>
+        Effect.sync(() => pr.edit({ state: "MERGED" })).pipe(
+          Effect.andThen(f.client.ListPullRequests()),
+        )
+
+      const written = yield* onPullRequest("written", 7)
+      yield* merge(written.pr)
+      yield* settledIds((ids) => ids.includes(written.conversationId))
+
+      yield* f.send(written.conversationId, "hold:again")
+      yield* settledIds((ids) => !ids.includes(written.conversationId))
+      yield* f.release("again")
+      yield* f.transcript(written.conversationId, settled(2))
+
+      const steered = yield* onPullRequest("steered", 8)
+      yield* f.send(steered.conversationId, "hold:late")
+      yield* f.transcript(steered.conversationId, holding)
+      yield* merge(steered.pr)
+      yield* f.client.Steer({
+        conversationId: steered.conversationId,
+        message: "Also this",
+        images: [],
+      })
+      yield* f.release("late")
+      yield* f.transcript(steered.conversationId, settled(2))
+
+      const broughtBack = yield* onPullRequest("brought-back", 9)
+      yield* merge(broughtBack.pr)
+      yield* settledIds((ids) => ids.includes(broughtBack.conversationId))
+
+      const settledAfterRestart = Effect.gen(function* () {
+        const restarted = yield* f.restart
+        yield* restarted.ListPullRequests()
+
+        yield* restarted.WatchConversationPullRequests().pipe(
+          Stream.filter(
+            (listed) =>
+              listed.length === 3 &&
+              listed.every(({ state }) => Predicate.isTagged(state, "Merged")),
+          ),
+          Stream.runHead,
+        )
+
+        const ids = yield* restarted.WatchSettledConversations().pipe(Stream.runHead)
+
+        return { client: restarted, ids: Option.getOrThrow(ids) }
+      })
+
+      const restarted = yield* settledAfterRestart
+      assert.deepStrictEqual(restarted.ids, [broughtBack.conversationId])
+
+      yield* restarted.client.BringBackConversation({ conversationId: broughtBack.conversationId })
+      assert.deepStrictEqual((yield* settledAfterRestart).ids, [])
+    }),
 )
