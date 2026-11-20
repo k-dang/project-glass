@@ -58,7 +58,7 @@ import {
 import { ChangesToolbar } from "./ChangesToolbar"
 import { CopyMenu } from "./CopyMenu"
 import { OutdatedDiscussions, Timeline } from "./Discussions"
-import { GitHubHtml } from "./GitHubHtml"
+import { DescriptionBody } from "./GitHubHtml"
 import { DraftList, showDraft } from "./Drafts"
 import { NotesList } from "./Notes"
 import { ProblemAlert } from "./ProblemAlert"
@@ -836,11 +836,7 @@ function Description(props: { html: string }) {
   return (
     <Card render={<section />}>
       <CardContent>
-        {props.html.trim() === "" ? (
-          <p className="text-sm text-muted-foreground italic">No description provided.</p>
-        ) : (
-          <GitHubHtml html={props.html} />
-        )}
+        <DescriptionBody html={props.html} />
       </CardContent>
     </Card>
   )

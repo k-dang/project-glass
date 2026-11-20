@@ -89,37 +89,41 @@ export const closedAs = (pullRequest: PullRequest) =>
 export function StatusChips(props: { pullRequest: PullRequest }) {
   const { pullRequest } = props
 
-  const checks = pullRequest.checks.toSorted(
-    (a, b) => checkOrder.indexOf(a.state) - checkOrder.indexOf(b.state),
-  )
-
-  const open = isOpen(pullRequest)
-
   return (
     <>
-      <StatusChip
-        summary={
-          pullRequest.approval === null
-            ? reviewersSummary(pullRequest.reviewers)
-            : approvalSummaries[pullRequest.approval]
-        }
-        title="Reviewers"
-        details={
-          pullRequest.reviewers.length === 0 ? null : (
-            <ReviewerList reviewers={pullRequest.reviewers} />
-          )
-        }
-      />
-      <StatusChip
-        summary={checksSummary(checks)}
-        title="Checks"
-        details={checks.length === 0 ? null : <CheckList checks={checks} />}
-      />
-      {open && <ConflictsChip pullRequest={pullRequest} />}
+      <ReviewersChip pullRequest={pullRequest} />
+      <ChecksChip pullRequest={pullRequest} />
+      <ConflictsChip pullRequest={pullRequest} />
       {pullRequest.mergeUnderWay !== null && (
         <HintChip summary={mergesUnderWay[pullRequest.mergeUnderWay]} />
       )}
     </>
+  )
+}
+
+export function ReviewersChip(props: { pullRequest: PullRequest }) {
+  const { approval, reviewers } = props.pullRequest
+
+  return (
+    <StatusChip
+      summary={approval === null ? reviewersSummary(reviewers) : approvalSummaries[approval]}
+      title="Reviewers"
+      details={reviewers.length === 0 ? null : <ReviewerList reviewers={reviewers} />}
+    />
+  )
+}
+
+export function ChecksChip(props: { pullRequest: PullRequest }) {
+  const checks = props.pullRequest.checks.toSorted(
+    (a, b) => checkOrder.indexOf(a.state) - checkOrder.indexOf(b.state),
+  )
+
+  return (
+    <StatusChip
+      summary={checksSummary(checks)}
+      title="Checks"
+      details={checks.length === 0 ? null : <CheckList checks={checks} />}
+    />
   )
 }
 
@@ -251,8 +255,10 @@ function HintChip(props: { summary: HintedSummary }) {
   )
 }
 
-function ConflictsChip(props: { pullRequest: PullRequest }) {
+export function ConflictsChip(props: { pullRequest: PullRequest }) {
   const { mergeable, baseBranch } = props.pullRequest
+
+  if (!isOpen(props.pullRequest)) return null
 
   const summaries: Record<PullRequest["mergeable"], HintedSummary> = {
     mergeable: {
