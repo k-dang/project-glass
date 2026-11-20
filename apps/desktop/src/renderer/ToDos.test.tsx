@@ -505,6 +505,53 @@ it("keeps a paste made while another to-do change is saving", async () => {
   expect(attach.payload.images).toHaveLength(1)
 })
 
+it("sends images pasted onto a to-do one at a time and holds them after a failure", async () => {
+  const toDo = new ToDo({ id: 1, title: "Write release notes", notes: "", done: false })
+
+  const attaches: Array<
+    Held<Parameters<Handlers["AttachToDoImages"]>[0], ReadonlyArray<ToDo>, ToDoError>
+  > = []
+
+  const user = mount({
+    ListToDos: () => Effect.succeed([toDo]),
+    AttachToDoImages: hold(attaches),
+  })
+
+  const open = await screen.findByRole("list", { name: "Open to-dos" })
+  await user.click(within(open).getByText(toDo.title))
+  await pasteImage(user, "one.png")
+  await pasteImage(user, "two.png")
+
+  const unsent = await within(open).findByRole("list", {
+    name: "Images to save on Write release notes",
+  })
+
+  await waitFor(() => expect(within(unsent).getAllByRole("listitem")).toHaveLength(2))
+
+  const failed = await next(attaches)
+  expect(attaches).toHaveLength(0)
+  failed.answer(Effect.fail(new ToDoError({ message: "Couldn't save your to-do. Try again." })))
+
+  const tryAgain = await within(open).findByRole("button", { name: "Try again" })
+  expect(attaches).toHaveLength(0)
+  expect(within(unsent).getAllByRole("listitem")).toHaveLength(2)
+
+  await user.click(tryAgain)
+  const first = await next(attaches)
+  first.answer(Effect.succeed([toDo]))
+
+  const second = await next(attaches)
+  expect(second.payload.id).toBe(toDo.id)
+  second.answer(Effect.succeed([toDo]))
+
+  await waitFor(() =>
+    expect(
+      within(open).queryByRole("list", { name: "Images to save on Write release notes" }),
+    ).toBeNull(),
+  )
+  expect(attaches).toHaveLength(0)
+})
+
 it("puts the newest open to-do directly under the composer", async () => {
   const user = mount(fakeToDos())
   const page = await screen.findByRole("main", { name: "To-dos" })
