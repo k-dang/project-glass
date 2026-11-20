@@ -3,6 +3,7 @@ import {
   useId,
   useEffect,
   useState,
+  useSyncExternalStore,
   useCallback,
   useMemo,
   useRef,
@@ -15,25 +16,19 @@ import type { BorderBeamProps, BorderBeamTheme } from "./types"
 import { sizePresets, sizeThemePresets, generateBeamCSS, getPulseDriverConfig } from "./styles"
 import { registerPulseInstance } from "./pulseDriver"
 
+const darkScheme = window.matchMedia("(prefers-color-scheme: dark)")
+
+function subscribeToSystemTheme(onChange: () => void) {
+  darkScheme.addEventListener("change", onChange)
+  return () => darkScheme.removeEventListener("change", onChange)
+}
+
+function getSystemTheme(): "dark" | "light" {
+  return darkScheme.matches ? "dark" : "light"
+}
+
 function useSystemTheme(): "dark" | "light" {
-  const [theme, setTheme] = useState<"dark" | "light">(() => {
-    if (typeof window === "undefined") return "dark"
-    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
-  })
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
-    const handler = (e: MediaQueryListEvent) => {
-      setTheme(e.matches ? "dark" : "light")
-    }
-
-    mediaQuery.addEventListener("change", handler)
-    return () => mediaQuery.removeEventListener("change", handler)
-  }, [])
-
-  return theme
+  return useSyncExternalStore(subscribeToSystemTheme, getSystemTheme)
 }
 
 function resolveTheme(theme: BorderBeamTheme, systemTheme: "dark" | "light"): "dark" | "light" {
@@ -86,6 +81,12 @@ export const BorderBeam = forwardRef<HTMLDivElement, BorderBeamProps>(function B
   const [detectedRadius, setDetectedRadius] = useState<number | null>(null)
   const [pulseGlowScale, setPulseGlowScale] = useState<{ x: number; y: number }>({ x: 1, y: 1 })
 
+  if (active && !isActive && !isFading) {
+    setIsActive(true)
+  } else if (!active && isActive && !isFading) {
+    setIsFading(true)
+  }
+
   // Auto-detect child border radius when no explicit value is provided
   useEffect(() => {
     if (customBorderRadius != null) return
@@ -110,14 +111,6 @@ export const BorderBeam = forwardRef<HTMLDivElement, BorderBeamProps>(function B
     return () => observer.disconnect()
   }, [customBorderRadius, children])
 
-  useEffect(() => {
-    if (active && !isActive && !isFading) {
-      setIsActive(true)
-    } else if (!active && isActive && !isFading) {
-      setIsFading(true)
-    }
-  }, [active, isActive, isFading])
-
   // Pause the (paint-heavy) animations while the element is scrolled offscreen.
   // This stops per-frame painting entirely for hidden instances without changing
   // their logical active/fading state, so it never fires onActivate/onDeactivate.
@@ -141,10 +134,7 @@ export const BorderBeam = forwardRef<HTMLDivElement, BorderBeamProps>(function B
   // element (~350x140). Measure the actual wrapped element and scale the glow
   // per-axis so the halo grows/shrinks to fit any component it's applied to.
   useEffect(() => {
-    if (size !== "pulse-outside") {
-      setPulseGlowScale({ x: 1, y: 1 })
-      return
-    }
+    if (size !== "pulse-outside") return
 
     const el = internalRef.current
     if (!el) return
