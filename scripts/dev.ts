@@ -139,7 +139,10 @@ start(process.execPath, [
   String(RENDERER_PORT),
 ])
 
-start(process.execPath, [pnpmPath, "--filter", "@glass/server", "dev"])
+start(process.execPath, [pnpmPath, "--filter", "@glass/server", "dev"], {
+  ...process.env,
+  GLASS_PACK_BACKEND: fake ? "fake" : "real",
+})
 
 start(process.execPath, [pnpmPath, "--filter", "@glass/desktop", "dev"])
 

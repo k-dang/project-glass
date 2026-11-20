@@ -45,22 +45,32 @@ const agentHost = (
   plugins: [piExtensionSources],
 })
 
+const backend = process.env["GLASS_PACK_BACKEND"]
+
 export default defineConfig({
   pack: [
-    {
-      ...node,
-      entry: { bin: "src/bin.ts", sqlReadWorker: "src/sqlReadWorker.ts" },
-      outDir: "dist",
-    },
-    agentHost("dist"),
-    {
-      ...node,
-      entry: { fakeBackend: "test/fakeBackend.ts", sqlReadWorker: "src/sqlReadWorker.ts" },
-      outDir: "dist-fake",
-      // WARNING: @octokit/graphql-schema reads ../schema.json relative to its own module, which breaks once bundled.
-      deps: { ...node.deps, neverBundle: ["@octokit/graphql-schema"] },
-    },
-    agentHost("dist-fake"),
+    ...(backend === "fake"
+      ? []
+      : [
+          {
+            ...node,
+            entry: { bin: "src/bin.ts", sqlReadWorker: "src/sqlReadWorker.ts" },
+            outDir: "dist",
+          },
+          agentHost("dist"),
+        ]),
+    ...(backend === "real"
+      ? []
+      : [
+          {
+            ...node,
+            entry: { fakeBackend: "test/fakeBackend.ts", sqlReadWorker: "src/sqlReadWorker.ts" },
+            outDir: "dist-fake",
+            // WARNING: @octokit/graphql-schema reads ../schema.json relative to its own module, which breaks once bundled.
+            deps: { ...node.deps, neverBundle: ["@octokit/graphql-schema"] },
+          },
+          agentHost("dist-fake"),
+        ]),
     ...(process.env["GLASS_PACK_TEST_HOST"] === "1"
       ? [agentHost("dist-test", { scriptedAgentHost: "test/scriptedAgentHost.ts" })]
       : []),
