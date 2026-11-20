@@ -260,6 +260,7 @@ function MenuBody({
       filter={pastedList.length > 0 ? false : "fuzzy"}
       autoHighlight
       loop
+      className="min-w-0"
     >
       <div className="flex items-center gap-2.5 border-b px-3.5">
         <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden />
@@ -345,7 +346,7 @@ function MenuSection(props: { section: Section }) {
           )}
           <CommandItemText className="min-w-0 truncate [&_mark]:bg-transparent [&_mark]:font-semibold [&_mark]:text-foreground" />
           {row.detail && (
-            <span className="min-w-0 truncate text-xs text-muted-foreground">{row.detail}</span>
+            <span className="shrink-0 text-xs text-muted-foreground">{row.detail}</span>
           )}
           {row.shortcut && (
             <CommandShortcut
