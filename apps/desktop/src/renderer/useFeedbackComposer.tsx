@@ -5,16 +5,7 @@ import type {
   DiffLineAnnotation,
   SelectedLineRange,
 } from "@pierre/diffs"
-import {
-  type ReactNode,
-  type RefObject,
-  useCallback,
-  useEffect,
-  useEffectEvent,
-  useMemo,
-  useRef,
-  useState,
-} from "react"
+import { type KeyboardEvent, type ReactNode, useCallback, useMemo, useRef, useState } from "react"
 import type { DiffViewProps } from "./ChangedFilesView"
 import { annotationSides, type ChangesLayout, sideOf } from "./changesView"
 import {
@@ -71,10 +62,9 @@ export function useFeedbackComposer(props: {
   changesId: string | null
   store: FeedbackNotesEditor
   layout: ChangesLayout
-  diffArea: RefObject<HTMLDivElement | null>
   reveal: (path: string, line: number, side: AnnotationSide, align: "center" | "nearest") => void
 }) {
-  const { changesId, store, layout, reveal, diffArea } = props
+  const { changesId, store, layout, reveal } = props
   const [composer, setComposer] = useState<Composer>(idle)
   const currentPath = useRef<string | null>(null)
   const editing = composer.type === "editing" ? composer : null
@@ -138,7 +128,7 @@ export function useFeedbackComposer(props: {
     [editing],
   )
 
-  const onKeyDown = useEffectEvent((event: KeyboardEvent) => {
+  const onKeyDown = (event: KeyboardEvent) => {
     if (editing !== null || isTyping(event.target)) return
 
     const selecting = composer.type === "selecting" ? composer : null
@@ -175,15 +165,7 @@ export function useFeedbackComposer(props: {
 
     setComposer({ type: "selecting", path, range })
     reveal(path, range.end, range.endSide ?? range.side ?? "additions", "nearest")
-  })
-
-  useEffect(() => {
-    const area = diffArea.current
-
-    area?.addEventListener("keydown", onKeyDown)
-
-    return () => area?.removeEventListener("keydown", onKeyDown)
-  }, [diffArea])
+  }
 
   const selectedTarget = useMemo(() => {
     if (composer.type !== "selecting") return null
@@ -297,5 +279,5 @@ export function useFeedbackComposer(props: {
     />
   )
 
-  return { diffProps, overview, editing: editing !== null }
+  return { diffProps, overview, onKeyDown, editing: editing !== null }
 }

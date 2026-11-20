@@ -88,15 +88,7 @@ export function ChangesWithFeedback(props: {
     view.current?.scrollTo({ type: "line", id: path, lineNumber, side, align })
   }
 
-  const diffArea = useRef<HTMLDivElement>(null)
-
-  const feedback = useFeedbackComposer({
-    changesId,
-    store,
-    layout,
-    reveal,
-    diffArea,
-  })
+  const feedback = useFeedbackComposer({ changesId, store, layout, reveal })
 
   const showAll = (next: CollapseChoices["all"]) => {
     flushSync(() => {
@@ -180,7 +172,11 @@ export function ChangesWithFeedback(props: {
           />
         )}
         {layout.files.length > 0 && (
-          <div ref={diffArea} className="flex min-h-0 flex-1 flex-col">
+          <div
+            role="presentation"
+            className="flex min-h-0 flex-1 flex-col"
+            onKeyDown={feedback.onKeyDown}
+          >
             <DiffView
               initialPath={null}
               ref={view}
