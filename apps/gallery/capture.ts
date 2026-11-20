@@ -1,6 +1,6 @@
 import { _electron, type ElectronApplication, type Locator, type Page } from "@playwright/test"
 import { spawnSync } from "node:child_process"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -165,8 +165,10 @@ try {
     throw new Error("Replaying the recorded sessions failed")
   }
 
-  rmSync(out, { recursive: true, force: true })
-  mkdirSync(join(out, "shots"), { recursive: true })
+  mkdirSync(out, { recursive: true })
+
+  for (const entry of readdirSync(out)) rmSync(join(out, entry), { recursive: true, force: true })
+  mkdirSync(join(out, "shots"))
 
   const app = await _electron.launch({
     executablePath: createRequire(join(desktopDir, "package.json"))("electron"),
