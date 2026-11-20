@@ -37,6 +37,7 @@ pnpm dist         # package an installer into apps/desktop/release
 pnpm test         # backend, renderer, and verification helper tests
 pnpm test:e2e     # build, then drive the Electron app with Playwright
 pnpm gallery      # build, then screenshot every app state on the demo data into .gallery/index.html
+pnpm gallery:show # open the last gallery in your browser
 pnpm check        # format check, type-aware lint, and type check
 pnpm fix          # apply format and lint fixes
 ```
