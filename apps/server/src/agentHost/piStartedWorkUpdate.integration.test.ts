@@ -1,7 +1,7 @@
 import { SessionManager } from "@earendil-works/pi-coding-agent"
 import { NodeServices } from "@effect/platform-node"
 import { assert, it } from "@effect/vitest"
-import { ConversationOutcome, TextPart, GlobalConversationUpdate } from "@glass/contracts"
+import { ConversationOutcome, TextPart, StartedWorkUpdate } from "@glass/contracts"
 import { Deferred, Effect, Exit, Predicate, Schema, Scope } from "effect"
 import { randomUUID } from "node:crypto"
 import { writeFileSync } from "node:fs"
@@ -11,14 +11,14 @@ import { bundledPi } from "../../test/demoConversation"
 import { fakeModelProvider, lastUserText } from "../../test/fakeModelProvider"
 import { isolatedHome, stubHome } from "../../test/harness"
 import { piAdapter } from "./piAdapter"
-import { globalConversationUpdateDelivery, SessionEntries } from "./piGlobalConversationUpdate"
+import { startedWorkUpdateDelivery, SessionEntries } from "./piStartedWorkUpdate"
 import { type HostEvent, WorkRole } from "./protocol"
 
 const sent = {
   message: "",
   images: [],
-  prompt: "Global conversation update the completed work.",
-  context: GlobalConversationUpdate.make({
+  prompt: "Started work update the completed work.",
+  context: StartedWorkUpdate.make({
     work: [
       ConversationOutcome.make({
         conversationId: "started",
@@ -69,15 +69,15 @@ const fixture = Effect.gen(function* () {
 })
 
 for (const stopReason of ["error", "length"] as const)
-  it(`continues a Global conversation update whose ${stopReason} attempt pi omitted for recovery`, () => {
+  it(`continues a Started work update whose ${stopReason} attempt pi omitted for recovery`, () => {
     const saved = SessionManager.inMemory()
 
-    const pending = globalConversationUpdateDelivery("global-conversation-update-1", sent.prompt, {
+    const pending = startedWorkUpdateDelivery("started-work-update-1", sent.prompt, {
       entries: [],
       leafId: null,
     })
 
-    if (pending.state !== "pending") assert.fail("Expected a pending Global conversation update")
+    if (pending.state !== "pending") assert.fail("Expected a pending Started work update")
     saved.appendMessage({ role: "user", content: pending.prompt, timestamp: 1 })
 
     const reply = {
@@ -124,8 +124,8 @@ for (const stopReason of ["error", "length"] as const)
     if (stopReason === "length")
       saved.appendCompaction("Earlier context summarized", failed, 100_000)
 
-    const delivery = globalConversationUpdateDelivery(
-      "global-conversation-update-1",
+    const delivery = startedWorkUpdateDelivery(
+      "started-work-update-1",
       sent.prompt,
       Schema.decodeUnknownSync(SessionEntries)({
         entries: saved.getEntries(),
@@ -152,18 +152,18 @@ for (const stopReason of ["error", "length"] as const)
   })
 
 it.live(
-  "restores pi's saved Global conversation update response into the same Turn without another model request",
+  "restores pi's saved Started work update response into the same Turn without another model request",
   () =>
     Effect.gen(function* () {
       const f = yield* fixture
       const conversation = randomUUID()
       const first = yield* f.open(conversation)
-      yield* first.session.startTurn("global-conversation-update-1", sent)
+      yield* first.session.startTurn("started-work-update-1", sent)
       yield* first.ended
       yield* first.close
 
       const restored = yield* f.open(conversation)
-      yield* restored.session.startTurn("global-conversation-update-1", {
+      yield* restored.session.startTurn("started-work-update-1", {
         ...sent,
         prompt: "The instructions changed after an upgrade.",
       })
@@ -174,32 +174,31 @@ it.live(
       assert.deepInclude(output, {
         part: TextPart.make({ text: "The work finished. Want to review it?" }),
       })
-      assert.deepInclude(restored.events.at(-1), { turnId: "global-conversation-update-1" })
+      assert.deepInclude(restored.events.at(-1), { turnId: "started-work-update-1" })
     }).pipe(Effect.provide(NodeServices.layer)),
 )
 
 it.live(
-  "finishes and restores an accepted Global conversation update without repeating its original input",
+  "finishes and restores an accepted Started work update without repeating its original input",
   () =>
     Effect.gen(function* () {
       const f = yield* fixture
       const saved = SessionManager.create(f.home)
 
-      const pending = globalConversationUpdateDelivery(
-        "global-conversation-update-1",
-        sent.prompt,
-        { entries: [], leafId: null },
-      )
+      const pending = startedWorkUpdateDelivery("started-work-update-1", sent.prompt, {
+        entries: [],
+        leafId: null,
+      })
 
-      if (pending.state !== "pending") assert.fail("Expected a pending Global conversation update")
+      if (pending.state !== "pending") assert.fail("Expected a pending Started work update")
       saved.appendMessage({ role: "user", content: pending.prompt, timestamp: 1 })
 
       const restored = yield* f.open(saved.getSessionId())
-      yield* restored.session.startTurn("global-conversation-update-1", sent)
+      yield* restored.session.startTurn("started-work-update-1", sent)
       yield* restored.ended
 
       assert.lengthOf(f.model.calls, 1)
-      assert.include(lastUserText(f.model.calls[0]!), "Finish that Global conversation update")
+      assert.include(lastUserText(f.model.calls[0]!), "Finish that Started work update")
       const branch = SessionManager.open(saved.getSessionFile()!).getBranch()
 
       const users = branch.flatMap((entry) =>
@@ -211,14 +210,14 @@ it.live(
 
       yield* restored.close
       const completed = yield* f.open(saved.getSessionId())
-      yield* completed.session.startTurn("global-conversation-update-1", sent)
+      yield* completed.session.startTurn("started-work-update-1", sent)
       yield* completed.ended
       assert.lengthOf(f.model.calls, 1)
     }).pipe(Effect.provide(NodeServices.layer)),
 )
 
 it.live(
-  "keeps a Global conversation update unfinished when pi's prompt response is invalid and the process exits",
+  "keeps a Started work update unfinished when pi's prompt response is invalid and the process exits",
   () =>
     Effect.gen(function* () {
       const home = yield* isolatedHome
@@ -253,13 +252,11 @@ it.live(
           }),
       })
 
-      const error = yield* Effect.flip(
-        session.startTurn("global-conversation-update-transport", sent),
-      )
+      const error = yield* Effect.flip(session.startTurn("started-work-update-transport", sent))
 
       assert.equal(
         error.message,
-        "Couldn't confirm pi's Global conversation update delivery. Restart Glass to try again.",
+        "Couldn't confirm pi's Started work update delivery. Restart Glass to try again.",
       )
       yield* session.closed
       assert.isFalse(events.some(Predicate.isTagged("TurnEnded")))

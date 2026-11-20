@@ -609,7 +609,7 @@ it.live(
 )
 
 it.live(
-  "drops a queued PR once a Global conversation update includes the Agent review the Global conversation started, leaving it not done",
+  "drops a queued PR once a Started work update includes the Agent review the Global conversation started, leaving it not done",
   () =>
     Effect.gen(function* () {
       const f = yield* reviewsFixture({ reply: "hold" })
@@ -627,7 +627,7 @@ it.live(
 
       const { review } = yield* f.reviewState(
         pr,
-        (state) => reviewed(state) && state.review?.includedInGlobalConversationUpdate === true,
+        (state) => reviewed(state) && state.review?.includedInStartedWorkUpdate === true,
       )
 
       assert.isFalse(review?.done)

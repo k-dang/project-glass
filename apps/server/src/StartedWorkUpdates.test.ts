@@ -7,8 +7,8 @@ import {
   globalTurns,
   holding,
   lastSettled,
-  outcomesInGlobalConversationUpdates,
-  conversationOutcomesInGlobalConversationUpdates,
+  outcomesInStartedWorkUpdates,
+  conversationOutcomesInStartedWorkUpdates,
   repository,
   sendGlobal,
   settled,
@@ -29,11 +29,11 @@ const createConversation = (message: string) =>
     }),
   )}`
 
-const globalConversationUpdates = (turns: ReadonlyArray<Turn>) =>
-  turns.filter(({ context }) => Predicate.isTagged(context, "GlobalConversationUpdate"))
+const startedWorkUpdates = (turns: ReadonlyArray<Turn>) =>
+  turns.filter(({ context }) => Predicate.isTagged(context, "StartedWorkUpdate"))
 
 it.live(
-  "sends one Global conversation update for Conversations that finished during its own Turn, marking them seen",
+  "sends one Started work update for Conversations that finished during its own Turn, marking them seen",
   () =>
     Effect.gen(function* () {
       const f = yield* conversationsFixture
@@ -65,10 +65,10 @@ it.live(
       yield* f.release("global")
       const turns = yield* globalTurns(f.client, settled(4))
 
-      assert.lengthOf(globalConversationUpdates(turns), 1)
+      assert.lengthOf(startedWorkUpdates(turns), 1)
       assert.strictEqual(turns[3]?.message, "")
       assert.sameDeepMembers(
-        outcomesInGlobalConversationUpdates(turns).map((work) => [
+        outcomesInStartedWorkUpdates(turns).map((work) => [
           Predicate.isTagged(work, "Conversation") && work.conversationId,
           work.outcome,
           work.askedWith,
@@ -91,7 +91,7 @@ it.live(
 )
 
 it.live(
-  "sends a Global conversation update for a Conversation waiting on a Question, and another when it ends",
+  "sends a Started work update for a Conversation waiting on a Question, and another when it ends",
   () =>
     Effect.gen(function* () {
       const f = yield* conversationsFixture
@@ -105,11 +105,11 @@ it.live(
       const waiting = yield* globalTurns(
         f.client,
         (all) =>
-          conversationOutcomesInGlobalConversationUpdates(all).length === 1 &&
+          conversationOutcomesInStartedWorkUpdates(all).length === 1 &&
           all.every(({ ended }) => ended !== null),
       )
 
-      assert.deepStrictEqual(conversationOutcomesInGlobalConversationUpdates(waiting), [
+      assert.deepStrictEqual(conversationOutcomesInStartedWorkUpdates(waiting), [
         [conversation.id, "waiting"],
       ])
 
@@ -119,10 +119,10 @@ it.live(
 
       const turns = yield* globalTurns(
         f.client,
-        (all) => conversationOutcomesInGlobalConversationUpdates(all).length === 2,
+        (all) => conversationOutcomesInStartedWorkUpdates(all).length === 2,
       )
 
-      assert.deepStrictEqual(conversationOutcomesInGlobalConversationUpdates(turns), [
+      assert.deepStrictEqual(conversationOutcomesInStartedWorkUpdates(turns), [
         [conversation.id, "waiting"],
         [conversation.id, "finished"],
       ])
@@ -146,42 +146,39 @@ it.live("leaves out a Conversation it started that the user stopped", () =>
 
     const turns = yield* globalTurns(f.client, lastSettled("After"))
 
-    assert.deepStrictEqual(outcomesInGlobalConversationUpdates(turns), [])
+    assert.deepStrictEqual(outcomesInStartedWorkUpdates(turns), [])
+  }),
+)
+
+it.live("keeps a sent Started work update after restart without repeating the same outcome", () =>
+  Effect.gen(function* () {
+    const f = yield* conversationsFixture
+    yield* f.client.LinkLocalCheckout({ path: f.clone.checkout })
+    yield* sendGlobal(f.client, createConversation("Finish this"))
+
+    const before = yield* globalTurns(
+      f.client,
+      (all) => startedWorkUpdates(all).length === 1 && all.every(({ ended }) => ended !== null),
+    )
+
+    const startedWorkUpdateId = startedWorkUpdates(before)[0]?.id
+    const restarted = yield* f.restart
+    yield* sendGlobal(restarted, "After restart")
+    const after = yield* globalTurns(restarted, lastSettled("After restart"))
+
+    assert.deepStrictEqual(
+      startedWorkUpdates(after).map(({ id }) => id),
+      [startedWorkUpdateId],
+    )
+    assert.deepStrictEqual(
+      conversationOutcomesInStartedWorkUpdates(after),
+      conversationOutcomesInStartedWorkUpdates(before),
+    )
   }),
 )
 
 it.live(
-  "keeps a sent Global conversation update after restart without repeating the same outcome",
-  () =>
-    Effect.gen(function* () {
-      const f = yield* conversationsFixture
-      yield* f.client.LinkLocalCheckout({ path: f.clone.checkout })
-      yield* sendGlobal(f.client, createConversation("Finish this"))
-
-      const before = yield* globalTurns(
-        f.client,
-        (all) =>
-          globalConversationUpdates(all).length === 1 && all.every(({ ended }) => ended !== null),
-      )
-
-      const globalConversationUpdateId = globalConversationUpdates(before)[0]?.id
-      const restarted = yield* f.restart
-      yield* sendGlobal(restarted, "After restart")
-      const after = yield* globalTurns(restarted, lastSettled("After restart"))
-
-      assert.deepStrictEqual(
-        globalConversationUpdates(after).map(({ id }) => id),
-        [globalConversationUpdateId],
-      )
-      assert.deepStrictEqual(
-        conversationOutcomesInGlobalConversationUpdates(after),
-        conversationOutcomesInGlobalConversationUpdates(before),
-      )
-    }),
-)
-
-it.live(
-  "sends a Global conversation update in the new conversation for work started before Start fresh",
+  "sends a Started work update in the new conversation for work started before Start fresh",
   () =>
     Effect.gen(function* () {
       const f = yield* conversationsFixture
@@ -196,11 +193,11 @@ it.live(
       yield* f.client.StartGlobalConversationFresh()
       yield* f.release("first")
 
-      const [globalConversationUpdate] = yield* globalTurns(f.client, settled(1))
+      const [startedWorkUpdate] = yield* globalTurns(f.client, settled(1))
 
       assert.deepStrictEqual(
-        outcomesInGlobalConversationUpdates(
-          globalConversationUpdate === undefined ? [] : [globalConversationUpdate],
+        outcomesInStartedWorkUpdates(
+          startedWorkUpdate === undefined ? [] : [startedWorkUpdate],
         ).map((work) => [
           Predicate.isTagged(work, "Conversation") && work.conversationId,
           work.outcome,

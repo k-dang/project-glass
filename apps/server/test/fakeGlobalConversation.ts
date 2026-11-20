@@ -26,7 +26,7 @@ export const globalConversationReply = (input: FakeModelRequest): ReadonlyArray<
 
   const words = lastUserText(input)
 
-  if (words.startsWith("<glass_global_conversation_update>"))
+  if (words.startsWith("<glass_started_work_update>"))
     return [{ text: "The Conversation you started is done. Want me to look at what it changed?" }]
 
   const call = (name: string, args: Schema.JsonObject): ReadonlyArray<FakeModelDelta> => [

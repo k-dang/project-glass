@@ -62,6 +62,8 @@ const lastWords = (message: Message | undefined) =>
     .filter((block) => block.type === "text" && !isSystemReminder(block.text))
     .at(-1)?.text ?? ""
 
+const decodeJson = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Json))
+
 const isSideRequest = (request: FakeAnthropicRequest) => (request.tools ?? []).length === 0
 
 export const lastUserWords = (request: FakeAnthropicRequest) =>
@@ -79,6 +81,15 @@ export const replyTo = (request: FakeAnthropicRequest): Reply => {
 
   if (onlyCancelledToolResult)
     return { type: "text", text: `The fake model saw: ${textOf(result.content).slice(0, 200)}` }
+
+  const glassCall = /^call:(\S+) (.+)$/.exec(words)
+
+  if (glassCall !== null)
+    return {
+      type: "tool_use",
+      name: `mcp__glass_tools__${glassCall[1]}`,
+      input: decodeJson(glassCall[2]!),
+    }
 
   const command = /`([^`]+)`/.exec(words)?.[1]
 

@@ -1,4 +1,5 @@
 import { assert, describe, it } from "@effect/vitest"
+import { GlobalConversationCaller } from "./McpCredentials"
 import {
   AskUserAnswered,
   AskUserCancelled,
@@ -329,10 +330,12 @@ describe("ask_user", () => {
     Effect.gen(function* () {
       const { baseUrl, client, mcpCredentials } = yield* startBackend({})
 
-      const bearer = yield* mcpCredentials.issue({
-        globalConversationId: "conversation-1",
-        sessionId: "session-1",
-      })
+      const bearer = yield* mcpCredentials.issue(
+        GlobalConversationCaller.make({
+          globalConversationId: "conversation-1",
+          sessionId: "session-1",
+        }),
+      )
 
       const mcp = yield* connectMcp(baseUrl, bearer)
 

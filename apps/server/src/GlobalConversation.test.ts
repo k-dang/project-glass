@@ -365,6 +365,9 @@ const openGlobal = (client: HostClient, scope: Scope.Scope, reattached = false) 
           authenticate: () => Option.none(),
           endpoint: Effect.succeed("http://127.0.0.1:9"),
           listening: () => Effect.void,
+          startWith: (_lifetime, _caller, start) =>
+            start({ url: "http://127.0.0.1:9", bearer: Redacted.make("bearer") }),
+          revoke: () => Effect.void,
         }),
       ),
     ),

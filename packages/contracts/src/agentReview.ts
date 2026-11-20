@@ -67,7 +67,7 @@ export const AgentReview = Schema.Struct({
   lowAttention: Schema.Array(LowAttentionFile),
   conversationId: Schema.NullOr(Schema.String),
   done: Schema.Boolean,
-  includedInGlobalConversationUpdate: Schema.Boolean,
+  includedInStartedWorkUpdate: Schema.Boolean,
 })
 
 export type AgentReview = typeof AgentReview.Type

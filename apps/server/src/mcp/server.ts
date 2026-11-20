@@ -86,13 +86,11 @@ const McpAccess = HttpRouter.middleware(
         }
 
         const bearer = yield* HttpApiBuilder.securityDecode(HttpApiSecurity.bearer)
-        const globalConversation = credentials.authenticate(bearer)
+        const issued = credentials.authenticate(bearer)
 
-        const outside = Option.isSome(globalConversation)
-          ? Option.none()
+        const credential = Option.isSome(issued)
+          ? issued
           : yield* outsideAgents.authenticate(bearer)
-
-        const credential = Option.isSome(globalConversation) ? globalConversation : outside
 
         if (Option.isNone(credential)) {
           return challenge(urls.issuer, Redacted.value(bearer) !== "")

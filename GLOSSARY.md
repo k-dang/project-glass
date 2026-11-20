@@ -25,7 +25,7 @@ The Conversations, questions from an agent outside Glass or the Global conversat
 on the user now. They live in the Inbox, grouped by why they are waiting, with their count on the
 Inbox rail link in every area and a dot on the Conversations rail link while a Conversation waits.
 A queued PR waits once its Agent review is finished, until the user marks that Agent review done or
-a Global conversation update includes it; writing it again puts the PR back.
+a Started work update includes it; writing it again puts the PR back.
 A Conversation waits once its latest Turn ends while the user isn't looking, unless they stopped it,
 until they look at its Chat with Glass focused, reply to it, or mark it done in the Inbox; an Agent
 review's own Conversation waits only through its PR. The Inbox shows its latest Turn with a reply
@@ -235,10 +235,12 @@ _Avoid_: Task, action item
 ### Conversations
 
 **Conversation**:
-A named conversation the user starts from Glass with an agent, run by an Agent harness and a model,
+A named conversation started from Glass with an agent, run by an Agent harness and a model,
 working in one place: a worktree on this device, a Sandbox, or, for an Agent review's Follow-ups, a
 checkout of the review's Revision. Its agent is the AI doing the work, as in a Tour, Agent review,
-or Ask.
+or Ask. The user starts one, or the Global conversation or another Conversation's agent does for
+them. A Conversation in a worktree on this device can create and message other Conversations
+through Glass's tools, but never one that asks the user less than it does, and never itself.
 _Avoid_: Session, thread, bot, box
 
 **Conversation's PR**:
@@ -268,12 +270,13 @@ but not to continue. The Global conversation that follows doesn't see it. Its id
 the pi session it ran in, which is the one place "session" belongs.
 _Avoid_: Session (in UI copy), history, archived chat
 
-**Global conversation update**:
-A Turn Glass starts in the Global conversation to tell the user about work it started or messaged
-that finished, failed, or needs their input, combining pending outcomes once the conversation is
-idle. It offers a next step without acting until the user says so, and clears completed work from
-Needs you without marking an Agent review done; a Conversation the user stopped is excluded.
-_Avoid_: Notification, event, wake-up
+**Started work update**:
+A Turn Glass starts in the Global conversation, or in a Conversation, to tell its agent about work
+it started or messaged that finished, failed, or needs the user's input, combining pending outcomes
+once the conversation is idle. It clears completed work from Needs you without marking an Agent
+review done; a Conversation the user stopped is excluded. In the Global conversation, it offers
+the user a next step without acting until they say so.
+_Avoid_: Started work update, notification, event, wake-up
 
 **Agent harness**:
 Claude Code or pi, the harness that runs a Conversation's agent. It decides which models and efforts

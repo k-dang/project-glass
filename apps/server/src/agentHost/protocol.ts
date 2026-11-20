@@ -16,7 +16,7 @@ import {
   TurnEnded,
   TurnStarted,
 } from "@glass/contracts"
-import { Effect, Schema, SchemaTransformation } from "effect"
+import { Effect, Match, Schema, SchemaTransformation } from "effect"
 import type { ChildProcess } from "node:child_process"
 import { randomBytes } from "node:crypto"
 import { resolve } from "node:path"
@@ -123,16 +123,16 @@ export const SkillSource = Schema.Struct({ name: Schema.String, skills: Schema.A
 
 export type SkillSource = typeof SkillSource.Type
 
-export const WorkRole = Schema.TaggedStruct("Work", {})
-
-export const ReviewRole = Schema.TaggedStruct("Review", { brief: ReviewBrief })
-
 export const GlassToolsAccess = Schema.Struct({
   url: Schema.String,
   bearer: Schema.RedactedFromValue(Schema.String),
 })
 
 export type GlassToolsAccess = typeof GlassToolsAccess.Type
+
+export const WorkRole = Schema.TaggedStruct("Work", { tools: Schema.optional(GlassToolsAccess) })
+
+export const ReviewRole = Schema.TaggedStruct("Review", { brief: ReviewBrief })
 
 export const GlobalRole = Schema.TaggedStruct("Global", { tools: GlassToolsAccess })
 
@@ -141,6 +141,15 @@ export const RepositoryRole = Schema.Union([WorkRole, ReviewRole])
 export type RepositoryRole = typeof RepositoryRole.Type
 
 export type ConversationRole = RepositoryRole | typeof GlobalRole.Type
+
+export const glassToolsOf = (role: ConversationRole): GlassToolsAccess | undefined =>
+  Match.value(role).pipe(
+    Match.tagsExhaustive({
+      Work: ({ tools }) => tools,
+      Review: () => undefined,
+      Global: ({ tools }) => tools,
+    }),
+  )
 
 export const StartOutcome = Schema.Literals(["started", "alreadyRunning"])
 

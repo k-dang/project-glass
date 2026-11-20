@@ -158,7 +158,7 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
   const finish = (turn: TurnState, ending: TurnEnding) => end(turn, turn.stopping ?? ending)
 
   const recoversOnNextHost = (turn: TurnState) =>
-    Predicate.isTagged(turn.turn.context, "GlobalConversationUpdate") && turn.stopping === null
+    Predicate.isTagged(turn.turn.context, "StartedWorkUpdate") && turn.stopping === null
 
   const loseDelivery = (turn: TurnState, ending: TurnEnding) => {
     if (recoversOnNextHost(turn)) state = null

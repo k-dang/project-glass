@@ -200,7 +200,7 @@ export class NeedsYou extends Context.Service<
           Stream.map((state): WaitingPullRequest | null => {
             const review = finishedReview(state)
 
-            return review === null || review.done || review.includedInGlobalConversationUpdate
+            return review === null || review.done || review.includedInStartedWorkUpdate
               ? null
               : {
                   pullRequest,

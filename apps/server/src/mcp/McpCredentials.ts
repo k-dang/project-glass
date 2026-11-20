@@ -1,5 +1,17 @@
-import { Context, Deferred, Effect, Layer, Option, Redacted, Schema, type Scope } from "effect"
+import {
+  Context,
+  Deferred,
+  Effect,
+  Exit,
+  Layer,
+  Option,
+  Predicate,
+  Redacted,
+  Schema,
+  Scope,
+} from "effect"
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto"
+import type { GlassToolsAccess, StartOutcome } from "../agentHost/protocol"
 
 export class GlobalConversationCaller extends Schema.TaggedClass<GlobalConversationCaller>()(
   "GlobalConversation",
@@ -15,7 +27,18 @@ export class OutsideAgentCaller extends Schema.TaggedClass<OutsideAgentCaller>()
   session: Schema.String,
 }) {}
 
-export type McpCallerIdentity = GlobalConversationCaller | OutsideAgentCaller
+export class ConversationCaller extends Schema.TaggedClass<ConversationCaller>()("Conversation", {
+  conversationId: Schema.String,
+}) {}
+
+export type McpCallerIdentity = GlobalConversationCaller | ConversationCaller | OutsideAgentCaller
+
+export type IssuedCaller = GlobalConversationCaller | ConversationCaller
+
+const runningKey = (caller: IssuedCaller) =>
+  Predicate.isTagged(caller, "GlobalConversation")
+    ? `GlobalConversation:${caller.globalConversationId}`
+    : `Conversation:${caller.conversationId}`
 
 export class McpCaller extends Context.Service<McpCaller, McpCallerIdentity>()(
   "@glass/server/McpCaller",
@@ -50,13 +73,16 @@ export interface McpCredential {
 export class McpCredentials extends Context.Service<
   McpCredentials,
   {
-    readonly issue: (caller: {
-      readonly globalConversationId: string
-      readonly sessionId: string
-    }) => Effect.Effect<Redacted.Redacted, never, Scope.Scope>
+    readonly issue: (caller: IssuedCaller) => Effect.Effect<Redacted.Redacted, never, Scope.Scope>
     readonly authenticate: (bearer: Redacted.Redacted) => Option.Option<McpCredential>
     readonly endpoint: Effect.Effect<string>
     readonly listening: (url: string) => Effect.Effect<void>
+    readonly startWith: <E>(
+      lifetime: Scope.Scope,
+      caller: IssuedCaller,
+      start: (access: GlassToolsAccess) => Effect.Effect<StartOutcome, E>,
+    ) => Effect.Effect<StartOutcome, E>
+    readonly revoke: (caller: IssuedCaller) => Effect.Effect<void>
   }
 >()("@glass/server/McpCredentials") {
   static readonly layer = Layer.effect(
@@ -64,32 +90,62 @@ export class McpCredentials extends Context.Service<
     Effect.gen(function* () {
       const credentialsByDigest = new Map<string, McpCredential>()
       const endpoint = yield* Deferred.make<string>()
+      const running = new Map<string, Scope.Closeable>()
+
+      const replaceRunning = (key: string, next: Scope.Closeable | null) =>
+        Effect.suspend(() => {
+          const ending = running.get(key)
+
+          if (next === null) running.delete(key)
+          else running.set(key, next)
+
+          return ending === undefined ? Effect.void : Scope.close(ending, Exit.void)
+        })
+
+      const issue = (caller: IssuedCaller) =>
+        Effect.acquireRelease(
+          Effect.gen(function* () {
+            const bearer = mintBearer()
+            const key = digest(bearer)
+            const revoked = yield* Deferred.make<void>()
+
+            credentialsByDigest.set(key, {
+              caller,
+              ownedSessions: new Set(),
+              revoked: Deferred.await(revoked),
+            })
+
+            return { bearer: Redacted.make(bearer), key, revoked }
+          }),
+          ({ key, revoked }) =>
+            Effect.sync(() => credentialsByDigest.delete(key)).pipe(
+              Effect.andThen(Deferred.succeed(revoked, undefined)),
+            ),
+        ).pipe(Effect.map(({ bearer }) => bearer))
 
       return McpCredentials.of({
-        issue: (caller) =>
-          Effect.acquireRelease(
-            Effect.gen(function* () {
-              const bearer = mintBearer()
-              const key = digest(bearer)
-              const revoked = yield* Deferred.make<void>()
-
-              credentialsByDigest.set(key, {
-                caller: GlobalConversationCaller.make(caller),
-                ownedSessions: new Set(),
-                revoked: Deferred.await(revoked),
-              })
-
-              return { bearer: Redacted.make(bearer), key, revoked }
-            }),
-            ({ key, revoked }) =>
-              Effect.sync(() => credentialsByDigest.delete(key)).pipe(
-                Effect.andThen(Deferred.succeed(revoked, undefined)),
-              ),
-          ).pipe(Effect.map(({ bearer }) => bearer)),
+        issue,
         authenticate: (bearer) =>
           Option.fromNullishOr(credentialsByDigest.get(digest(Redacted.value(bearer)))),
         endpoint: Deferred.await(endpoint),
         listening: (url) => Deferred.succeed(endpoint, url).pipe(Effect.asVoid),
+        startWith: (lifetime, caller, start) =>
+          Effect.gen(function* () {
+            const credential = yield* Scope.fork(lifetime)
+            const revoke = Scope.close(credential, Exit.void)
+
+            const access = {
+              url: yield* Deferred.await(endpoint),
+              bearer: yield* issue(caller).pipe(Scope.provide(credential)),
+            }
+
+            const started = yield* start(access).pipe(Effect.onError(() => revoke))
+
+            yield* started === "started" ? replaceRunning(runningKey(caller), credential) : revoke
+
+            return started
+          }),
+        revoke: (caller) => replaceRunning(runningKey(caller), null),
       })
     }),
   )

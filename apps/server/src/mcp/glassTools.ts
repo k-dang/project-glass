@@ -59,11 +59,11 @@ import { FollowedRepositories } from "../FollowedRepositories"
 import { LocalCheckouts } from "../LocalCheckouts"
 import { AskProgress } from "./AskProgress"
 import { CHECK_IN_MAX_TIMEOUT_SECONDS, CHECK_IN_TIMEOUT_SECONDS, CheckIns } from "../CheckIns"
-import { type GlobalConversationCaller, McpCaller, type OutsideAgentCaller } from "./McpCredentials"
+import { McpCaller, type McpCallerIdentity, type OutsideAgentCaller } from "./McpCredentials"
 import { NeedsYou } from "../NeedsYou"
 import { ASK_PROGRESS_SECONDS, ASK_TIMEOUT_SECONDS, OutsideQuestions } from "../OutsideQuestions"
 import { Sandboxes } from "../Sandboxes"
-import { StartedItem, StartedWork } from "../StartedWork"
+import { type Starter, StartedItem, StartedWork } from "../StartedWork"
 import { PullRequestLists } from "../PullRequestLists"
 import { Queue } from "../Queue"
 import { ToDos } from "../ToDos"
@@ -231,7 +231,7 @@ const action = Context.make(Tool.Readonly, false).pipe(
 
 const CreateConversation = Tool.make("create_conversation", {
   description:
-    "Creates a Conversation: a named coding conversation working on a branch of its own, made from a base branch of a repository. It starts its first Turn with the message, and appears in the user's Conversations. This returns once Glass created the Conversation, not when it finishes its Turn: read_conversation_transcript shows its progress. Choose the place, harness, base branch, and model from list_conversation_places and list_conversation_options, never from guesses. If this call fails without saying why, or is cut off, call list_conversations before trying again rather than creating a second Conversation.",
+    "Creates a Conversation: a named coding conversation working on a branch of its own, made from a base branch of a repository. It starts its first Turn with the message, and appears in the user's Conversations. This returns once Glass created the Conversation, not when it finishes its Turn. When you are the Global conversation or a Conversation, Glass sends you an update when it finishes, fails, or waits on the user, so end your Turn rather than reading its transcript to wait; otherwise read_conversation_transcript shows its progress. A Conversation that creates one gives it its own Permission mode, and can't create one that asks the user less than it does, such as one in a Sandbox, unless it never asks either. Choose the place, harness, base branch, and model from list_conversation_places and list_conversation_options, never from guesses. If this call fails without saying why, or is cut off, call list_conversations before trying again rather than creating a second Conversation.",
   parameters: Schema.Struct({
     repository: FollowedRepository,
     baseBranch: Schema.String.annotate({
@@ -258,7 +258,7 @@ const CreateConversation = Tool.make("create_conversation", {
 
 const SendConversationMessage = Tool.make("send_conversation_message", {
   description:
-    "Sends a message to one of the user's Conversations, as the user would from the Conversation. An idle Conversation starts a Turn with it; a busy Conversation keeps it as a Queued message and starts on it after its running Turn. This returns once Glass accepted the message, not when its agent answers: read_conversation_transcript shows its progress. If this call fails without saying why, or is cut off, read the Conversation's transcript before sending again rather than sending it twice.",
+    "Sends a message to one of the user's Conversations, as the user would from the Conversation. An idle Conversation starts a Turn with it; a busy Conversation keeps it as a Queued message and starts on it after its running Turn. This returns once Glass accepted the message, not when its agent answers. When you are the Global conversation or a Conversation, Glass sends you an update when it finishes, fails, or waits on the user, so end your Turn rather than reading its transcript to wait; otherwise read_conversation_transcript shows its progress. A Conversation can't message itself, or one that asks the user less than it does. If this call fails without saying why, or is cut off, read the Conversation's transcript before sending again rather than sending it twice.",
   parameters: Schema.Struct({
     conversationId: Schema.String.annotate({
       description: "The Conversation's id, from list_conversations.",
@@ -464,21 +464,27 @@ const dropLargestDiffsToFit = (files: ReadonlyArray<FileMaterial>) => {
 const first = <A, E, R>(stream: Stream.Stream<A, E, R>) =>
   stream.pipe(Stream.runHead, Effect.map(Option.getOrThrow))
 
+const starterOf = (caller: McpCallerIdentity): Option.Option<Starter> =>
+  Match.value(caller).pipe(
+    Match.tagsExhaustive({
+      GlobalConversation: ({ globalConversationId, sessionId }) =>
+        Option.some({ startedBy: globalConversationId, sessionId }),
+      Conversation: ({ conversationId }) =>
+        Option.some({ startedBy: conversationId, sessionId: conversationId }),
+      OutsideAgent: () => Option.none(),
+    }),
+  )
+
 const recordedFor = <A, E, R, E2>(
   work: Effect.Effect<A, E, R>,
-  record: (
-    caller: GlobalConversationCaller,
-    since: DateTime.Utc,
-    done: A,
-  ) => Effect.Effect<void, E2>,
+  record: (starter: Starter, since: DateTime.Utc, done: A) => Effect.Effect<void, E2>,
 ) =>
   Effect.gen(function* () {
     const since = yield* DateTime.now
     const done = yield* work
-    const caller = yield* McpCaller.current
+    const starter = starterOf(yield* McpCaller.current)
 
-    if (Predicate.isTagged(caller, "GlobalConversation"))
-      yield* record(caller, since, done).pipe(Effect.ignore)
+    if (Option.isSome(starter)) yield* record(starter.value, since, done).pipe(Effect.ignore)
 
     return done
   }).pipe(Effect.uninterruptible)
@@ -548,6 +554,14 @@ export const GlassToolHandlers = GlassTools.toLayer(
         })
     })
 
+    const callingConversationId = McpCaller.current.pipe(
+      Effect.map((caller) =>
+        Predicate.isTagged(caller, "Conversation")
+          ? Option.some(caller.conversationId)
+          : Option.none(),
+      ),
+    )
+
     return GlassTools.of({
       list_pull_requests: () =>
         lists
@@ -581,12 +595,12 @@ export const GlassToolHandlers = GlassTools.toLayer(
       list_needs_you: () => first(needsYou.watch()).pipe(Effect.map((items) => ({ items }))),
       list_started_work: () =>
         Effect.gen(function* () {
-          const caller = yield* McpCaller.current
+          const starter = starterOf(yield* McpCaller.current)
 
-          if (!Predicate.isTagged(caller, "GlobalConversation")) return { items: [] }
+          if (Option.isNone(starter)) return { items: [] }
 
           const items = yield* startedWork
-            .list(caller.globalConversationId)
+            .list(starter.value.startedBy)
             .pipe(Effect.mapError(explained))
 
           return {
@@ -620,8 +634,8 @@ export const GlassToolHandlers = GlassTools.toLayer(
       read_agent_review: ({ pullRequest }) =>
         first(agentReviews.watch(pullRequest)).pipe(Effect.mapError(explained)),
       start_agent_review: ({ pullRequest, revision }) =>
-        recordedFor(agentReviews.start(pullRequest, revision), (caller, since) =>
-          startedWork.startedAgentReview(caller, pullRequest, since),
+        recordedFor(agentReviews.start(pullRequest, revision), (starter, since) =>
+          startedWork.startedAgentReview(starter, pullRequest, since),
         ).pipe(Effect.andThen(first(agentReviews.watch(pullRequest))), Effect.mapError(explained)),
       list_conversation_places: () =>
         Effect.gen(function* () {
@@ -647,23 +661,28 @@ export const GlassToolHandlers = GlassTools.toLayer(
         Effect.gen(function* () {
           yield* refuseUnofferedModel(input)
 
+          const created = { ...input, skillPacks: [], localSkills: false, images: [] }
+          const parent = yield* callingConversationId
+
           const conversation = yield* recordedFor(
-            conversations.create({
-              ...input,
-              permissionMode: null,
-              skillPacks: [],
-              localSkills: false,
-              images: [],
-            }),
-            (caller, since, { id }) => startedWork.linkConversation(caller, id, since),
+            Option.isSome(parent)
+              ? conversations.createFrom(parent.value, created)
+              : conversations.create({ ...created, permissionMode: null }),
+            (starter, since, { id }) => startedWork.linkConversation(starter, id, since),
           )
 
           return { conversation }
         }).pipe(Effect.mapError(explained)),
       send_conversation_message: ({ conversationId, message }) =>
-        recordedFor(conversations.send(conversationId, { message, images: [] }), (caller, since) =>
-          startedWork.linkConversation(caller, conversationId, since),
-        ).pipe(
+        callingConversationId.pipe(
+          Effect.flatMap((sender) =>
+            recordedFor(
+              Option.isSome(sender)
+                ? conversations.sendFrom(sender.value, conversationId, { message, images: [] })
+                : conversations.send(conversationId, { message, images: [] }),
+              (starter, since) => startedWork.linkConversation(starter, conversationId, since),
+            ),
+          ),
           Effect.map((delivery) => ({ delivery })),
           Effect.mapError(explained),
         ),

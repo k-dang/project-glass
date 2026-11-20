@@ -51,7 +51,7 @@ import { ToDos } from "./ToDos"
 import { AgentRunners } from "./agentRunners"
 import { Tours } from "./Tours"
 import { Transcripts } from "./Transcripts"
-import { GlobalConversationUpdates } from "./GlobalConversationUpdates"
+import { StartedWorkUpdates } from "./StartedWorkUpdates"
 
 const RendererRoutes = Layer.mergeAll(
   RpcServer.layerHttp({ group: GlassRpcs, path: RPC_PATH, protocol: "websocket" }),
@@ -101,7 +101,7 @@ const services = (
   mcpTools: McpToolsLayer,
   agentCommands: AgentCommandsLayer,
 ) =>
-  Layer.mergeAll(GlassRpcHandlers, mcpTools, GlobalConversationUpdates)
+  Layer.mergeAll(GlassRpcHandlers, mcpTools, StartedWorkUpdates)
     .pipe(
       Layer.provide(NeedsYou.layer),
       Layer.provide(ConversationPullRequests.layer),

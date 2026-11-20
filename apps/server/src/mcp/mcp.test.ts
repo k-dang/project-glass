@@ -4,7 +4,7 @@ import { McpServer, Tool, Toolkit } from "effect/ai"
 import { AgentRunners } from "../agentRunners"
 import { LAUNCH_TOKEN, RENDERER_ORIGIN, startBackend } from "../../test/harness"
 import { connectMcp, initialize, listedTools, mcpPost, toolResult } from "../../test/mcpClient"
-import { McpCaller } from "./McpCredentials"
+import { McpCaller, GlobalConversationCaller } from "./McpCredentials"
 
 const DescribeTarget = Tool.make("describe_target", {
   description: "Names the caller and the conversation it asked about.",
@@ -31,6 +31,7 @@ const startMcpBackend = Effect.gen(function* () {
           Effect.map(McpCaller.current, (caller) => ({
             caller: Match.valueTags(caller, {
               GlobalConversation: (global) => global.globalConversationId,
+              Conversation: ({ conversationId: calling }) => calling,
               OutsideAgent: ({ agentId }) => agentId,
             }),
             target: conversationId,
@@ -50,7 +51,10 @@ const startMcpBackend = Effect.gen(function* () {
   return { ...backend, started, released, interrupted }
 })
 
-const GLOBAL = { globalConversationId: "global-conversation", sessionId: "global-session" }
+const GLOBAL = GlobalConversationCaller.make({
+  globalConversationId: "global-conversation",
+  sessionId: "global-session",
+})
 
 describe("MCP endpoint", () => {
   it.live("discovers and calls tools with the runtime's credential", () =>
@@ -84,10 +88,12 @@ describe("MCP endpoint", () => {
       const { baseUrl, mcpCredentials } = yield* startMcpBackend
       const mcp = yield* connectMcp(baseUrl, yield* mcpCredentials.issue(GLOBAL))
 
-      const other = yield* mcpCredentials.issue({
-        globalConversationId: "other-runtime",
-        sessionId: "other-runtime",
-      })
+      const other = yield* mcpCredentials.issue(
+        GlobalConversationCaller.make({
+          globalConversationId: "other-runtime",
+          sessionId: "other-runtime",
+        }),
+      )
 
       const intruding = yield* mcp.request("tools/list", {}, other).response
 

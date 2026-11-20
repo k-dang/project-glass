@@ -18,12 +18,10 @@ import {
   Context,
   DateTime,
   Effect,
-  Exit,
   FileSystem,
   Layer,
   Option,
   Schema,
-  Scope,
   Semaphore,
   Stream,
   SubscriptionRef,
@@ -33,7 +31,7 @@ import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 import { GlobalRole } from "./agentHost/protocol"
 import { LocalAgentHost } from "./LocalAgentHost"
-import { McpCredentials } from "./mcp/McpCredentials"
+import { GlobalConversationCaller, McpCredentials } from "./mcp/McpCredentials"
 import {
   type ClaimedConversation,
   type ConversationHost,
@@ -154,15 +152,9 @@ export class GlobalConversation extends Context.Service<
       yield* fs.makeDirectory(folder, { recursive: true }).pipe(Effect.orDie)
 
       const starting = yield* Semaphore.make(1)
-      let runningCredential: Scope.Closeable | null = null
 
-      const replaceRunning = (next: Scope.Closeable | null) =>
-        Effect.suspend(() => {
-          const ending = runningCredential
-          runningCredential = next
-
-          return ending === null ? Effect.void : Scope.close(ending, Exit.void)
-        })
+      const callerOf = (sessionId: string) =>
+        GlobalConversationCaller.make({ globalConversationId: id, sessionId })
 
       const start = (sessionId: string) => (client: ConversationHost) =>
         starting.withPermits(1)(
@@ -172,29 +164,15 @@ export class GlobalConversation extends Context.Service<
               Effect.mapError(() => hostGone),
             )
 
-            const credential = yield* Scope.fork(lifetime)
-            const revoke = Scope.close(credential, Exit.void)
-
-            const role = GlobalRole.make({
-              tools: {
-                url: yield* credentials.endpoint,
-                bearer: yield* credentials
-                  .issue({ globalConversationId: id, sessionId })
-                  .pipe(Scope.provide(credential)),
-              },
-            })
-
-            const started = yield* client
-              .StartConversation({
+            yield* credentials.startWith(lifetime, callerOf(sessionId), (tools) =>
+              client.StartConversation({
                 conversationId: sessionId,
                 harness: "pi",
                 folder,
-                role,
+                role: GlobalRole.make({ tools }),
                 skills: [],
-              })
-              .pipe(Effect.onError(() => revoke))
-
-            yield* started === "started" ? replaceRunning(credential) : revoke
+              }),
+            )
           }),
         )
 
@@ -212,7 +190,7 @@ export class GlobalConversation extends Context.Service<
                 ),
               )
 
-            yield* replaceRunning(null)
+            yield* credentials.revoke(callerOf(sessionId))
           }),
         )
 
