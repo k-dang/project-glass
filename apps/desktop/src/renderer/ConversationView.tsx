@@ -1184,6 +1184,7 @@ function Composer(props: {
       turns={props.turns}
       queued={props.queued}
       feedback={feedback}
+      beam
       problem={settledProblem(changed) ?? settledProblem(modeChanged)}
       pickers={
         <>
@@ -1217,6 +1218,7 @@ export function ConversationComposer(props: {
   pickers?: ReactNode
   suggestions?: ReadonlyArray<ComposerSuggestion>
   feedback?: FeedbackNotesStore
+  beam?: boolean
 }) {
   const { turns } = props
   const atoms = useConversationAtoms()
@@ -1266,7 +1268,7 @@ export function ConversationComposer(props: {
         {...staged}
         recall={lastSent(turns, props.queued)}
         onStop={running ? () => stop() : null}
-        beam
+        beam={props.beam ?? false}
         notice={waiting !== undefined && <WaitingNotice waiting={waiting} />}
         commands={commands}
         files={files}
