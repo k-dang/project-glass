@@ -11,7 +11,7 @@ import {
 import { useNavigate } from "@tanstack/react-router"
 import { cn } from "cn"
 import { AsyncResult, Atom } from "effect/reactivity"
-import { Effect, Exit, Option } from "effect"
+import { Effect, Exit, Option, Stream } from "effect"
 import { MessageSquarePlus, Pencil, Trash2, X } from "lucide-react"
 import {
   type ClipboardEvent,
@@ -19,8 +19,6 @@ import {
   type KeyboardEvent,
   type ReactNode,
   useCallback,
-  useEffect,
-  useRef,
   useState,
 } from "react"
 import { Button } from "@/components/ui/button"
@@ -29,7 +27,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/components/ui/toast"
-import { Backend, useBackendRuntime } from "./backend"
+import { Backend, backendRuntime, useBackendRuntime } from "./backend"
 import { newConversationWrittenAtom } from "./conversationsArea"
 import { ImageViewer, type PreviewImage } from "./ImageViewer"
 import { imageFiles, imageSrc, maxToDoImageBytes, readToDoImages } from "./pastedImages"
@@ -66,6 +64,42 @@ const emptyToDo: NewToDo = { title: "", notes: "", images: [], savedId: null }
 const unsentAtom = Atom.family((_id: number) => Atom.make<ReadonlyArray<DraftImage>>([]))
 
 const unsentHeldAtom = Atom.family((_id: number) => Atom.make(false))
+
+const sendImagesAtom = Atom.family((id: number) =>
+  backendRuntime.fn((added: ReadonlyArray<DraftImage>, get) => {
+    get.registry.set(unsentHeldAtom(id), false)
+    get.registry.update(unsentAtom(id), (current) => [...current, ...added])
+
+    return Effect.gen(function* () {
+      while (true) {
+        yield* get.stream(changeAtom).pipe(
+          Stream.filter((change) => !change.waiting),
+          Stream.runHead,
+        )
+
+        const image = get.registry.get(unsentAtom(id))[0]
+
+        if (image === undefined || get.registry.get(unsentHeldAtom(id))) return
+
+        get.set(changeAtom, {
+          save: Backend.use((backend) =>
+            backend
+              .AttachToDoImages({ id, images: [uploadOf(image)] })
+              .pipe(
+                Effect.tapError(() =>
+                  Effect.sync(() => get.registry.set(unsentHeldAtom(id), true)),
+                ),
+              ),
+          ),
+          onSaved: () =>
+            get.registry.update(unsentAtom(id), (current) =>
+              current.filter((queued) => queued.key !== image.key),
+            ),
+        })
+      }
+    })
+  }),
+)
 
 let nextDraftImage = 0
 
@@ -171,15 +205,6 @@ function useToDoChanges() {
         },
       }),
     remove: (id: number) => run({ save: Backend.use((backend) => backend.DeleteToDo({ id })) }),
-    sendImage: (id: number, image: DraftImage, onSaved: () => void, onFailed: () => void) =>
-      run({
-        save: Backend.use((backend) =>
-          backend
-            .AttachToDoImages({ id, images: [uploadOf(image)] })
-            .pipe(Effect.tapError(() => Effect.sync(onFailed))),
-        ),
-        onSaved,
-      }),
     removeImage: (id: number) =>
       run({ save: Backend.use((backend) => backend.RemoveToDoImage({ id })) }),
   }
@@ -437,7 +462,7 @@ function AddToDo() {
 function UnsentStrip(props: { toDo: ToDo }) {
   const unsent = useAtomValue(unsentAtom(props.toDo.id))
   const held = useAtomValue(unsentHeldAtom(props.toDo.id))
-  const setHeld = useAtomSet(unsentHeldAtom(props.toDo.id))
+  const sendImages = useAtomSet(sendImagesAtom(props.toDo.id))
 
   if (unsent.length === 0) return null
 
@@ -456,7 +481,7 @@ function UnsentStrip(props: { toDo: ToDo }) {
         ))}
       </ImageStrip>
       {held && (
-        <Button type="button" size="sm" className="mt-2" onClick={() => setHeld(false)}>
+        <Button type="button" size="sm" className="mt-2" onClick={() => sendImages([])}>
           Try again
         </Button>
       )}
@@ -529,44 +554,14 @@ function useStartConversation(toDo: ToDo) {
 
 function ToDoRow(props: { toDo: ToDo }) {
   const { toDo } = props
-  const { pending, setDone, remove, sendImage } = useToDoChanges()
+  const { pending, setDone, remove } = useToDoChanges()
   const [edit, setEdit] = useAtom(editAtom(toDo.id))
-  const [unsent, setUnsent] = useAtom(unsentAtom(toDo.id))
-  const [held, setHeld] = useAtom(unsentHeldAtom(toDo.id))
-  const started = useRef<number | null>(null)
+  const sendImages = useAtomSet(sendImagesAtom(toDo.id))
   const toggle = useAtomValue(pendingToggleAtom)
   const checked = toggle?.id === toDo.id ? toggle.done : toDo.done
   const startConversation = useStartConversation(toDo)
 
-  useEffect(() => {
-    const next = unsent[0]
-
-    if (pending || held || next === undefined || started.current === next.key) return
-
-    const key = next.key
-    started.current = key
-
-    const began = sendImage(
-      toDo.id,
-      next,
-      () => {
-        started.current = null
-        setUnsent((current) => current.filter((image) => image.key !== key))
-      },
-      () => {
-        started.current = null
-        setHeld(true)
-      },
-    )
-
-    if (!began) started.current = null
-  }, [held, pending, sendImage, setHeld, setUnsent, toDo.id, unsent])
-
-  const paste = (event: ClipboardEvent) =>
-    takePastedImages(event, (images) => {
-      setHeld(false)
-      setUnsent((current) => [...current, ...images])
-    })
+  const paste = (event: ClipboardEvent) => takePastedImages(event, sendImages)
 
   if (edit !== null) {
     return (
