@@ -486,7 +486,29 @@ it("adds PRs to the Queue from the bar without leaving the PR under review", asy
   await showing("Greet the world")
 })
 
-it("queues PRs from Open a PR in any area: Mod Enter for one, Enter for several", async () => {
+it("offers the open PR's Queue actions in the Command menu, and drops them after leaving", async () => {
+  window.history.replaceState(null, "", "#/reviews?list=queue")
+  const user = mount([queued(greet), queued(wave), queued(fibers)])
+
+  await user.click(await screen.findByRole("button", { name: /Wave at the world/ }))
+  await showing("Wave at the world")
+  await user.keyboard("{Control>}k{/Control}")
+  const menu = await screen.findByRole("dialog", { name: "Command menu" })
+  expect(
+    within(menu).getByRole("option", { name: /Remove from Queue & open the next PR/ }),
+  ).toBeTruthy()
+  await user.keyboard("next queued{Enter}")
+  await showing("Speed up fibers")
+
+  await user.click(screen.getByRole("button", { name: "Back to PRs" }))
+  await screen.findByRole("tab", { name: /^Queue/ })
+  await user.keyboard("{Control>}k{/Control}")
+  const list = await screen.findByRole("dialog", { name: "Command menu" })
+  expect(within(list).queryByRole("option", { name: /Next queued PR/ })).toBeNull()
+  expect(within(list).getByRole("option", { name: /Inbox/ })).toBeTruthy()
+})
+
+it("queues PRs pasted into the Command menu in any area: Mod Enter for one, Enter for several", async () => {
   window.history.replaceState(null, "", "#/settings")
   const user = mount([queued(greet)])
 
@@ -499,7 +521,7 @@ it("queues PRs from Open a PR in any area: Mod Enter for one, Enter for several"
 
   await user.keyboard("{Control>}l{/Control}")
   await user.paste(`${greet.url} ${fibers.url}`)
-  await screen.findByText(/Queues 2 PRs/)
+  await screen.findByText(/Queue 2 PRs/)
   await user.keyboard("{Enter}")
   await screen.findByText("Queued effect-ts/effect#9")
   await screen.findByText("1 already queued")

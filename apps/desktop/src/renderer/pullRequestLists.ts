@@ -1,15 +1,18 @@
-import type {
-  FollowedRepository,
-  LatestPullRequestListings,
-  PullRequestList,
-  PullRequestListings,
-  PullRequestSummary,
-  RepositoryListing,
+import {
+  type FollowedRepository,
+  type LatestPullRequestListings,
+  type PullRequestList,
+  type PullRequestListings,
+  type PullRequestRef,
+  type PullRequestSummary,
+  type RepositoryListing,
+  referenceKey,
 } from "@glass/contracts"
 import { Data, Effect, Match, Option, Record, Stream } from "effect"
-import { Atom } from "effect/reactivity"
+import { AsyncResult, Atom } from "effect/reactivity"
 import { Backend, backendRuntime } from "./backend"
 import { describeError, type Problem } from "./problems"
+import { savedQueueAtom } from "./queue"
 
 export type Health = Data.TaggedEnum<{
   Current: {}
@@ -130,3 +133,25 @@ export const listingsAtom = backendRuntime.atom((get) => {
 export const syncListingsAtom = backendRuntime
   .fn(() => Backend.use((backend) => backend.ListPullRequests()))
   .pipe(Atom.keepAlive)
+
+export interface KnownPullRequest {
+  readonly ref: PullRequestRef
+  readonly title: string
+}
+
+export const knownPullRequestsAtom = Atom.make((get): ReadonlyArray<KnownPullRequest> => {
+  const known = new Map<string, KnownPullRequest>()
+  const add = ({ ref, title }: KnownPullRequest) => known.set(referenceKey(ref), { ref, title })
+
+  for (const { pullRequest } of Option.getOrElse(AsyncResult.value(get(savedQueueAtom)), () => []))
+    add(pullRequest)
+
+  const latest = Option.getOrNull(get(lastSeenAtom))
+
+  if (latest?._tag === "Listed")
+    for (const listing of Object.values(latest.listings))
+      for (const group of listing.groups)
+        for (const pullRequest of group.pullRequests) add(pullRequest)
+
+  return [...known.values()]
+})

@@ -137,6 +137,7 @@ import { ProblemAlert } from "./ProblemAlert"
 import { type Problem, problemText, settledProblem, streamProblem } from "./problems"
 import { referenceText } from "./queue"
 import { rememberPlace } from "./savedPlace"
+import { useActions } from "./actions"
 import { shortcutLabel } from "./shortcutLabel"
 import { useStagedFeedback } from "./useStagedFeedback"
 import { MermaidDiagram } from "./MermaidDiagram"
@@ -144,7 +145,6 @@ import { DiagramPane, useDiagrams } from "./ConversationDiagrams"
 import { FileLink, FileLinks, FilePane, lastEndedOf, useFileLinks } from "./ConversationFiles"
 import { type FeedbackNotesStore, useFeedbackNotes } from "./useFeedbackNotes"
 import { markTurnSeenAtom } from "./needsYou"
-import { useShortcuts } from "./useShortcuts"
 import { useWindowFocused } from "./useWindowFocused"
 
 type SidePane = { kind: "diagram"; title: string } | { kind: "file"; path: string } | null
@@ -227,11 +227,13 @@ function OpenConversation(props: { conversation: Conversation } & ConversationTa
 
   const registry = useContext(RegistryContext)
 
-  useShortcuts([
+  useActions([
     {
-      key: "d",
-      mod: true,
-      allowInEditable: true,
+      id: "conversation-tab",
+      title: tab === "chat" ? "Show Changes" : "Show Chat",
+      group: "Conversation",
+      icon: tab === "chat" ? FileDiff : MessageCircle,
+      shortcut: { key: "d", mod: true, allowInEditable: true },
       run: () => onTabChange(tab === "chat" ? "changes" : "chat"),
     },
   ])

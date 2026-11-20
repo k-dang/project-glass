@@ -5,10 +5,11 @@ import { Link, useNavigate } from "@tanstack/react-router"
 import { cn } from "cn"
 import { Option } from "effect"
 import { AsyncResult } from "effect/reactivity"
-import { ListOrdered, ListPlus } from "lucide-react"
-import { type ReactNode, useContext, useEffect, useEffectEvent, useState } from "react"
+import { ArrowRight, ListChecks, ListOrdered, ListPlus } from "lucide-react"
+import { type ReactNode, useContext, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { useActions } from "./actions"
 import { removeFromQueue, reviewedOutAtom, savedQueueAtom } from "./queue"
 import { QueueField } from "./QueueTab"
 import { listSearchAtom, openWorkspaceAtom, preloadAtom, sameRef, targetAtom } from "./reviewsArea"
@@ -53,33 +54,24 @@ export function QueueBar(props: {
     await removeFromQueue(registry, current)
   }
 
-  const onShortcut = useEffectEvent((event: KeyboardEvent) => {
-    const typing =
-      event.target instanceof Element &&
-      event.target.closest("input, textarea, [contenteditable], [role=dialog]") !== null
-
-    if (
-      !queued ||
-      typing ||
-      (event.key !== "]" && !(event.shiftKey && event.key === "}")) ||
-      !(event.metaKey || event.ctrlKey) ||
-      event.altKey
-    )
-      return
-
-    if (event.shiftKey && next === null) return
-
-    event.preventDefault()
-
-    if (event.shiftKey) props.onOpen(next!.pullRequest.ref)
-    else void removeThenNext()
-  })
-
-  useEffect(() => {
-    window.addEventListener("keydown", onShortcut)
-
-    return () => window.removeEventListener("keydown", onShortcut)
-  }, [])
+  useActions([
+    queued && {
+      id: "remove-from-queue",
+      title: next === null ? "Remove from Queue" : "Remove from Queue & open the next PR",
+      group: "Pull request",
+      icon: ListChecks,
+      shortcut: { key: "]", mod: true },
+      run: () => void removeThenNext(),
+    },
+    next !== null && {
+      id: "next-queued",
+      title: "Next queued PR",
+      group: "Pull request",
+      icon: ArrowRight,
+      shortcut: { key: ["]", "}"], mod: true, shift: true },
+      run: () => props.onOpen(next.pullRequest.ref),
+    },
+  ])
 
   if (queued) {
     return (

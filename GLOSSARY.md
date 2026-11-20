@@ -5,6 +5,14 @@ with coding agents.
 
 ## Language
 
+### Getting around
+
+**Command menu**:
+The search box opened with ⌘K or Ctrl+K from anywhere in Glass, for running any action the current
+view offers, with its keyboard shortcut beside it, and for jumping to a PR or Conversation by name.
+Pasting a PR's URL or `owner/repo#number` into it opens that PR or adds it to the Queue.
+_Avoid_: Command palette, quick open (a Command is something an Agent harness runs)
+
 ### Resuming work
 
 **Saved place**:

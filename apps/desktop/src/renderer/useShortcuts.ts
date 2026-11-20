@@ -1,9 +1,9 @@
 import { useEffect, useEffectEvent } from "react"
 
-interface Shortcut {
-  readonly key: string
+export interface Shortcut {
+  readonly key: string | ReadonlyArray<string>
   readonly mod?: boolean
-  readonly allowShift?: boolean
+  readonly shift?: true | "any"
   readonly allowInEditable?: boolean
   readonly allowInDialog?: boolean
   readonly beforeWidgets?: boolean
@@ -28,10 +28,10 @@ export function useShortcuts(shortcuts: ReadonlyArray<Shortcut>) {
     for (const shortcut of shortcuts) {
       if (
         (shortcut.beforeWidgets ?? false) !== beforeWidgets ||
-        event.key.toLowerCase() !== shortcut.key.toLowerCase() ||
+        ![shortcut.key].flat().some((key) => key.toLowerCase() === event.key.toLowerCase()) ||
         (event.metaKey || event.ctrlKey) !== (shortcut.mod ?? false) ||
         event.altKey ||
-        (event.shiftKey && !shortcut.allowShift) ||
+        (shortcut.shift === true ? !event.shiftKey : event.shiftKey && shortcut.shift !== "any") ||
         (editable && !shortcut.allowInEditable) ||
         (dialog && !shortcut.allowInDialog) ||
         event.repeat

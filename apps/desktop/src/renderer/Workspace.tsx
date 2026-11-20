@@ -23,6 +23,7 @@ import {
   PanelLeft,
   RotateCw,
   Route,
+  Sparkles,
 } from "lucide-react"
 import {
   type ReactNode,
@@ -65,7 +66,7 @@ import type { Problem } from "./problems"
 import { RepositoryBrowser } from "./RepositoryBrowser"
 import { FinishReview } from "./FinishReview"
 import { MergePullRequest } from "./MergePullRequest"
-import { OpenPullRequestButton } from "./OpenPullRequestDialog"
+import { OpenPullRequestButton } from "./CommandMenu"
 import { closedAs, StatusChips } from "./PullRequestStatus"
 import {
   type ChangesOrder,
@@ -82,6 +83,7 @@ import type { ReplyStore } from "./useReplies"
 import type { Reactions } from "./useReactions"
 import type { Resolutions } from "./useResolutions"
 import { type ViewedFilesStore, useViewedFiles } from "./useViewedFiles"
+import { useActions } from "./actions"
 import { useShortcuts } from "./useShortcuts"
 import { TourView, type TourViewHandle } from "./TourView"
 import { hasOverview, readTour } from "./tourReading"
@@ -382,18 +384,16 @@ export function Workspace(props: {
     />
   )
 
-  useShortcuts(
-    agentReview.review === null
-      ? []
-      : [
-          {
-            key: "d",
-            mod: true,
-            allowInEditable: true,
-            run: () => (reviewShown ? setReviewOpen(false) : readAgentReview()),
-          },
-        ],
-  )
+  useActions([
+    agentReview.review !== null && {
+      id: "agent-review",
+      title: reviewShown ? "Close the Agent review" : "Open the Agent review",
+      group: "Pull request",
+      icon: Sparkles,
+      shortcut: { key: "d", mod: true, allowInEditable: true },
+      run: () => (reviewShown ? setReviewOpen(false) : readAgentReview()),
+    },
+  ])
 
   const additions = files.reduce((sum, file) => sum + file.additions, 0)
   const deletions = files.reduce((sum, file) => sum + file.deletions, 0)

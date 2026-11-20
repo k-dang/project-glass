@@ -7,7 +7,7 @@ import { afterEach, expect, it, vi } from "vite-plus/test"
 import { Toaster } from "@/components/ui/toast"
 import { pullRequestFields } from "../../test/workspace"
 import { CopyMenu } from "./CopyMenu"
-import { OpenPullRequestDialog } from "./OpenPullRequestDialog"
+import { CommandMenu } from "./CommandMenu"
 
 afterEach(() => {
   cleanup()
@@ -30,7 +30,12 @@ function mount() {
         <button>Before</button>
         <button>After</button>
         <textarea aria-label="Draft" />
-        <OpenPullRequestDialog current={pullRequest.ref} onOpen={() => {}} onViewQueue={() => {}} />
+        <CommandMenu
+          current={pullRequest.ref}
+          onOpen={() => {}}
+          onOpenConversation={() => {}}
+          onViewQueue={() => {}}
+        />
         <CopyMenu pullRequest={pullRequest} />
       </Toaster>
     </RegistryProvider>,
@@ -85,7 +90,7 @@ it("leaves typing and other dialogs alone, and preserves Cmd/Ctrl+L from the men
   expect(screen.queryByRole("dialog")).toBeNull()
   await user.click(screen.getByRole("button", { name: "Before" }))
   await user.keyboard("c{Control>}l{/Control}")
-  const input = await screen.findByRole("textbox", { name: "Open a PR" })
+  const input = await screen.findByRole("combobox", { name: "Search actions, or paste a PR" })
   await waitFor(() => expect(document.activeElement).toBe(input))
   expect(screen.queryByRole("dialog", { name: "Copy" })).toBeNull()
   await user.keyboard("c")
@@ -111,7 +116,7 @@ it("keeps failures open for retry and ignores repeats and composition", async ()
   fireEvent.keyDown(menu, { key: "g", isComposing: true })
   expect(write).not.toHaveBeenCalled()
   await user.keyboard("g")
-  await screen.findByRole("alert")
+  await screen.findByText("Couldn't copy to the clipboard")
   expect(screen.getByRole("dialog", { name: "Copy" })).toBe(menu)
   await user.keyboard("g")
   await screen.findByText("PR link copied")

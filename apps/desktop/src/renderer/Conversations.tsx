@@ -53,8 +53,8 @@ import { harnessNames } from "./harnesses"
 import { ConfirmationDialog } from "./ConfirmationDialog"
 import { settledProblem, streamProblem } from "./problems"
 import { ProblemAlert } from "./ProblemAlert"
+import { useActions } from "./actions"
 import { shortcutLabel } from "./shortcutLabel"
-import { useShortcuts } from "./useShortcuts"
 
 const groupNames: Record<PlaceTag, string> = { ...placeNames, sandbox: "Sandboxes" }
 
@@ -111,23 +111,29 @@ export function ConversationsLayout() {
   const [panelOpen, setPanelOpen] = useAtom(conversationsPanelOpenAtom)
   const navigate = useNavigate()
 
-  useShortcuts([
+  const togglePanel = () => {
+    if (panelOpen && document.getElementById(panelId)?.contains(document.activeElement))
+      document.getElementById(panelToggleId)?.focus()
+
+    setPanelOpen((open) => !open)
+  }
+
+  useActions([
     {
-      key: "n",
-      mod: true,
-      allowInEditable: true,
+      id: "new-conversation",
+      title: "New Conversation",
+      group: "Conversation",
+      icon: SquarePen,
+      shortcut: { key: "n", mod: true, allowInEditable: true },
       run: () => void navigate({ to: "/conversations/new" }),
     },
     {
-      key: "b",
-      mod: true,
-      allowInEditable: true,
-      run: () => {
-        if (panelOpen && document.getElementById(panelId)?.contains(document.activeElement))
-          document.getElementById(panelToggleId)?.focus()
-
-        setPanelOpen((open) => !open)
-      },
+      id: "conversations-panel",
+      title: panelOpen ? "Hide the Conversations list" : "Show the Conversations list",
+      group: "Conversation",
+      icon: panelOpen ? PanelLeftClose : PanelLeftOpen,
+      shortcut: { key: "b", mod: true, allowInEditable: true },
+      run: togglePanel,
     },
   ])
 

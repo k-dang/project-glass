@@ -2,8 +2,9 @@ import type { PullRequest } from "@glass/contracts"
 import { type KeyboardEvent, useEffect, useRef, useState } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { Kbd, KbdGroup } from "@/components/ui/kbd"
-import { toast } from "@/components/ui/toast"
+import { copyText } from "./clipboard"
 import { useShortcuts } from "./useShortcuts"
+import { refusedEscape } from "./refusedEscape"
 
 export function CopyMenu(props: { pullRequest: PullRequest }) {
   const [opener, setOpener] = useState<HTMLElement | null>(null)
@@ -29,7 +30,6 @@ function CopyPanel(props: { pullRequest: PullRequest; opener: HTMLElement; onClo
   const restoreFocus = useRef(true)
   const active = useRef(true)
   const copying = useRef(false)
-  const [error, setError] = useState(false)
   const { pullRequest } = props
 
   useEffect(() => {
@@ -60,19 +60,10 @@ function CopyPanel(props: { pullRequest: PullRequest; opener: HTMLElement; onClo
   const copy = async (action: (typeof actions)[number]) => {
     if (copying.current) return
     copying.current = true
-    setError(false)
+    const copied = await copyText(action.value, action.done)
+    copying.current = false
 
-    try {
-      await navigator.clipboard.writeText(action.value)
-
-      if (!active.current) return
-      props.onClose()
-      toast.add({ type: "success", title: action.done, timeout: 2500 })
-    } catch {
-      if (active.current) setError(true)
-    } finally {
-      copying.current = false
-    }
+    if (copied && active.current) props.onClose()
   }
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -107,14 +98,7 @@ function CopyPanel(props: { pullRequest: PullRequest; opener: HTMLElement; onClo
       onOpenChange={(open, details) => {
         if (open) return
 
-        if (
-          details.reason === "escape-key" &&
-          (details.event.defaultPrevented || details.event.isComposing || details.event.repeat)
-        ) {
-          details.cancel()
-
-          return
-        }
+        if (refusedEscape(details)) return
 
         if (details.reason === "outside-press" || details.reason === "focus-out")
           restoreFocus.current = false
@@ -156,11 +140,6 @@ function CopyPanel(props: { pullRequest: PullRequest; opener: HTMLElement; onClo
             </li>
           ))}
         </ul>
-        {error && (
-          <p role="alert" className="px-1 text-xs text-destructive">
-            Couldn't copy to the clipboard. Press an action key to try again.
-          </p>
-        )}
       </DialogContent>
     </Dialog>
   )
