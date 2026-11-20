@@ -232,7 +232,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       StartGlobalChatFresh: () => globalChat.startFresh,
       ListPastChats: () => globalChat.past,
       WatchPastChat: ({ id }) => globalChat.watchPast(id),
-      LoadEarlierPastGlobalTurns: ({ id, before }) => globalChat.loadEarlierPast(id, before),
+      LoadEarlierPastChatTurns: ({ id, before }) => globalChat.loadEarlierPast(id, before),
     })
   }),
 )

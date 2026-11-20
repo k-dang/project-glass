@@ -153,7 +153,7 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         StartGlobalChatFresh: unused,
         ListPastChats: () => Effect.succeed([]),
         WatchPastChat: unused,
-        LoadEarlierPastGlobalTurns: unused,
+        LoadEarlierPastChatTurns: unused,
         ...handlers,
       }),
     ),

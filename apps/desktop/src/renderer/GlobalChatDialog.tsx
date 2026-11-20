@@ -30,7 +30,7 @@ import {
   globalUnseenAtom,
   markGlobalTurnSeenAtom,
   pastChatsAtom,
-  pastGlobalTranscriptAtom,
+  pastChatTranscriptAtom,
   startGlobalFreshAtom,
 } from "./globalChat"
 import { ModelPicker } from "./ModelPicker"
@@ -304,7 +304,7 @@ function PastChats(props: { onBack: () => void; onOpen: (chat: PastChat) => void
 }
 
 function PastTranscript(props: { chat: PastChat; onBack: () => void }) {
-  const read = useAtomValue(pastGlobalTranscriptAtom(props.chat.id))
+  const read = useAtomValue(pastChatTranscriptAtom(props.chat.id))
   const loadEarlier = useAtomSet(loadEarlierPastTurnsAtom(props.chat.id))
 
   const { turns, earlierTurns, status } = Option.getOrElse(

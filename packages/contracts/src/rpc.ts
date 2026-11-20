@@ -630,7 +630,7 @@ export class GlassRpcs extends RpcGroup.make(
     error: Schema.Union([PastChatNotFound, ConversationError]),
     stream: true,
   }),
-  Rpc.make("LoadEarlierPastGlobalTurns", {
+  Rpc.make("LoadEarlierPastChatTurns", {
     payload: { id: Schema.String, before: Schema.String },
     error: Schema.Union([PastChatNotFound, ConversationError]),
   }),

@@ -542,7 +542,7 @@ it("starts the Global chat fresh once confirmed and reads a past one", async () 
           agentStatuses: [],
         }),
       ).pipe(Stream.concat(Stream.fromQueue(earlierPages))),
-    LoadEarlierPastGlobalTurns: ({ before }) =>
+    LoadEarlierPastChatTurns: ({ before }) =>
       Queue.offer(
         earlierPages,
         EarlierTurns.make({ before, turns: [pastTurn("turn-1", "Older reply")], earlierTurns: 0 }),

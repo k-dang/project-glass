@@ -43,7 +43,7 @@ export const changeGlobalModelAtom = backendRuntime.fn((choice: ModelChoice, get
 
 export const pastChatsAtom = backendRuntime.atom(Backend.use((backend) => backend.ListPastChats()))
 
-export const pastGlobalTranscriptAtom = Atom.family((id: string) =>
+export const pastChatTranscriptAtom = Atom.family((id: string) =>
   backendRuntime.atom(
     transcriptOf(Stream.unwrap(Backend.useSync((backend) => backend.WatchPastChat({ id })))),
   ),
@@ -51,7 +51,7 @@ export const pastGlobalTranscriptAtom = Atom.family((id: string) =>
 
 export const loadEarlierPastTurnsAtom = Atom.family((id: string) =>
   backendRuntime.fn((before: string) =>
-    Backend.use((backend) => backend.LoadEarlierPastGlobalTurns({ id, before })),
+    Backend.use((backend) => backend.LoadEarlierPastChatTurns({ id, before })),
   ),
 )
 
