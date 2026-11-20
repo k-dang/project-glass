@@ -1,4 +1,4 @@
-import type { Checks, TurnEnding } from "@glass/contracts"
+import type { Checks, PullRequestState, TurnEnding } from "@glass/contracts"
 import { cn } from "cn"
 import {
   CircleCheck,
@@ -6,33 +6,44 @@ import {
   CircleDotDashed,
   CircleStop,
   CircleX,
+  GitMerge,
+  GitPullRequestClosed,
   type LucideIcon,
 } from "lucide-react"
 
 export const warningTone = "text-amber-600 dark:text-amber-400"
 
-export const checksLabels: Record<
-  Checks,
-  {
-    readonly label: string
-    readonly icon: LucideIcon
-    readonly tone: string
-  }
-> = {
+export interface StatusLabel {
+  readonly label: string
+  readonly icon: LucideIcon
+  readonly tone: string
+}
+
+export const checksLabels: Record<Checks, StatusLabel> = {
   passing: { label: "Passing", icon: CircleCheck, tone: "text-emerald-600 dark:text-emerald-400" },
   failing: { label: "Failing", icon: CircleX, tone: "text-red-600 dark:text-red-400" },
   running: { label: "Running", icon: CircleDotDashed, tone: warningTone },
   unavailable: { label: "Unavailable", icon: CircleDashed, tone: "text-muted-foreground/60" },
 }
 
-export const turnEndingLooks: Record<
-  TurnEnding["_tag"],
-  {
-    readonly label: string
-    readonly icon: LucideIcon
-    readonly tone: string
-  }
-> = {
+export const mergedLabel: StatusLabel = {
+  label: "Merged",
+  icon: GitMerge,
+  tone: "text-violet-600 dark:text-violet-400",
+}
+
+export const closedLabel: StatusLabel = {
+  label: "Closed",
+  icon: GitPullRequestClosed,
+  tone: "text-red-600 dark:text-red-400",
+}
+
+export const finishedStates: Partial<Record<PullRequestState, StatusLabel>> = {
+  merged: mergedLabel,
+  closed: closedLabel,
+}
+
+export const turnEndingLooks: Record<TurnEnding["_tag"], StatusLabel> = {
   Done: { label: "Finished", icon: CircleCheck, tone: "text-added" },
   Failed: { label: "Failed", icon: CircleX, tone: "text-deleted" },
   CutOff: { label: "Cut off", icon: CircleX, tone: "text-deleted" },
@@ -40,8 +51,8 @@ export const turnEndingLooks: Record<
   Interrupted: { label: "Interrupted", icon: CircleStop, tone: "text-muted-foreground" },
 }
 
-export function ChecksIcon(props: { checks: Checks; className: string }) {
-  const { icon: Icon, tone } = checksLabels[props.checks]
+export function StatusIcon(props: { status: StatusLabel; className: string }) {
+  const { icon: Icon, tone } = props.status
 
   return <Icon aria-hidden className={cn(props.className, tone)} />
 }

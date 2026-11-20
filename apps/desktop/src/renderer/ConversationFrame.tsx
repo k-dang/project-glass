@@ -1,22 +1,27 @@
 import { useAtom } from "@effect/atom-react"
 import {
   type ConversationPlace,
+  type ConversationPullRequest,
   type ConversationSkillPack,
-  type PullRequestSummary,
   shortSha,
 } from "@glass/contracts"
 import { cn } from "cn"
+import { Predicate } from "effect"
 import { FolderGit2, GitBranch, GitPullRequest, Package, PanelTop } from "lucide-react"
 import { createContext, type ReactNode, use, useId, useState, useSyncExternalStore } from "react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { ConversationPullRequestLink, PullRequestLink } from "./ConversationPullRequest"
+import {
+  ConversationPullRequestLink,
+  PullRequestLink,
+  PullRequestStatusIcon,
+} from "./ConversationPullRequest"
 import { ConversationsPanelToggle } from "./Conversations"
 import { conversationDetailsPinnedAtom, placeIcons, placeNames } from "./conversationsArea"
 import { LOCAL_SKILLS_LABEL } from "./skillChoice"
 
 const fact =
-  "flex h-7 w-full min-w-0 items-center gap-2 rounded-sm px-2 text-xs [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-muted-foreground"
+  "flex h-7 w-full min-w-0 items-center gap-2 rounded-sm px-2 text-xs [&_svg]:size-3.5 [&_svg]:shrink-0"
 
 const action = "text-left outline-none hover:bg-accent focus-visible:bg-accent"
 
@@ -37,7 +42,7 @@ export interface Details {
   repository: string | undefined
   branch: string | undefined
   baseBranch: string | null
-  pullRequest: PullRequestSummary | undefined
+  pullRequest: ConversationPullRequest | undefined
   skillPacks: ReadonlyArray<ConversationSkillPack>
   localSkills: boolean
   actions: ReactNode
@@ -145,18 +150,18 @@ function ConversationDetails(props: Details) {
   return (
     <>
       <div className={fact}>
-        <PlaceIcon aria-hidden />
+        <PlaceIcon aria-hidden className="text-muted-foreground" />
         {placeNames[props.place._tag]}
       </div>
       <div className={fact}>
-        <FolderGit2 aria-hidden />
+        <FolderGit2 aria-hidden className="text-muted-foreground" />
         <span className="truncate">{props.repository ?? "No repository"}</span>
       </div>
       {props.baseBranch !== null && (
         <>
           <div className="-mx-1 my-1 border-t" />
           <div className={fact}>
-            <GitBranch aria-hidden />
+            <GitBranch aria-hidden className="text-muted-foreground" />
             {props.branch !== undefined && <span className="truncate">{props.branch}</span>}
             <span className="ml-auto shrink-0 text-muted-foreground">from {props.baseBranch}</span>
           </div>
@@ -167,7 +172,7 @@ function ConversationDetails(props: Details) {
       )}
       {skillSources.length > 0 && (
         <div className={fact}>
-          <Package aria-hidden />
+          <Package aria-hidden className="text-muted-foreground" />
           <span className="truncate">{skillSources.join(" · ")}</span>
         </div>
       )}
@@ -176,7 +181,7 @@ function ConversationDetails(props: Details) {
   )
 }
 
-function DetailsPullRequestLink(props: { pullRequest: PullRequestSummary }) {
+function DetailsPullRequestLink(props: { pullRequest: ConversationPullRequest }) {
   const close = use(ClosePopover)
   const { pullRequest } = props
 
@@ -187,7 +192,11 @@ function DetailsPullRequestLink(props: { pullRequest: PullRequestSummary }) {
       onClick={close}
       className={cn(fact, action)}
     >
-      <GitPullRequest aria-hidden />
+      {Predicate.isTagged(pullRequest.state, "Open") ? (
+        <GitPullRequest aria-hidden className="text-muted-foreground" />
+      ) : (
+        <PullRequestStatusIcon state={pullRequest.state} className="size-3.5" />
+      )}
       <span className="truncate">{pullRequest.title}</span>
       <span className="ml-auto shrink-0 text-muted-foreground tabular-nums">
         #{pullRequest.ref.number}

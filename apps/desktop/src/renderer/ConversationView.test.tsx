@@ -5,6 +5,7 @@ import {
   ConversationChanges,
   ConversationNeedsYou,
   ConversationPullRequest,
+  type ConversationPullRequestState,
   DRAW_DIAGRAM_TOOL,
   AnswerQuestion,
   DenyRequest,
@@ -18,7 +19,8 @@ import {
   PartAppended,
   PartSet,
   PullRequestRef,
-  PullRequestSummary,
+  PullRequestMerged,
+  PullRequestOpen,
   RemovalWarnings,
   type ResumableDestination,
   SandboxPlace,
@@ -438,21 +440,21 @@ it("shows the Skill packs and commits a Conversation was created with, and its L
   expect(await screen.findByText("team @ ae5650f · Local skills")).toBeTruthy()
 })
 
-it("links the Conversation's PR from its header, its details, and its row in the list", async () => {
-  const pullRequest = new PullRequestSummary({
+const conversationPullRequest = (state: ConversationPullRequestState) =>
+  new ConversationPullRequest({
+    conversationId: conversation.id,
     ref: new PullRequestRef({ owner: "glass-demo", repo: "greeter", number: 264 }),
     url: "https://github.com/glass-demo/greeter/pull/264",
     title: "Greet by name",
-    author: "octocat",
-    isDraft: false,
-    checks: "passing",
-    updatedAt: sentAt,
+    state,
   })
+
+it("links the Conversation's PR from its header, its details, and its row in the list", async () => {
+  const pullRequest = conversationPullRequest(PullRequestOpen.make({ checks: "passing" }))
 
   const user = mount({
     WatchConversations: () => Stream.make([conversation]),
-    WatchConversationPullRequests: () =>
-      Stream.make([new ConversationPullRequest({ conversationId: conversation.id, pullRequest })]),
+    WatchConversationPullRequests: () => Stream.make([pullRequest]),
     WatchTranscript: () =>
       Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
   })
@@ -471,6 +473,21 @@ it("links the Conversation's PR from its header, its details, and its row in the
   await user.click(detailsLink)
 
   await waitFor(() => expect(window.location.hash).toBe("#/reviews/glass-demo/greeter/264"))
+})
+
+it("tells the user the Conversation's PR merged, in its header and its row in the list", async () => {
+  mount({
+    WatchConversations: () => Stream.make([conversation]),
+    WatchConversationPullRequests: () =>
+      Stream.make([conversationPullRequest(PullRequestMerged.make({}))]),
+    WatchTranscript: () =>
+      Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
+  })
+
+  expect(await screen.findByRole("link", { name: "Open PR #264, merged" })).toBeTruthy()
+  expect(
+    screen.getByRole("link", { name: conversation.name, description: /PR #264, merged/ }),
+  ).toBeTruthy()
 })
 
 it("opens a Diagram from the Conversation's details, without scrolling back to its card", async () => {

@@ -106,13 +106,14 @@ import {
 } from "./repositoryPullRequests"
 import { HEAD_MOVED, mergeOperation, toMerging } from "./merging"
 import { toPullRequestStatus } from "./pullRequestStatus"
+import { type LookedUpPullRequest, QueuedPullRequests } from "./queuedPullRequests"
+import { type Branch, EndedBranchPullRequests, type EndedPullRequest } from "./branchPullRequests"
 import {
-  type LookedUpPullRequest,
-  QueuedPullRequestsResponse,
-  queuedPullRequestsQuery,
-  queuedPullRequestsVariables,
-  toLookedUpBatch,
-} from "./queuedPullRequests"
+  type AliasedLookup,
+  aliasedAnswers,
+  aliasedQuery,
+  aliasedVariables,
+} from "./aliasedLookups"
 import { REPLY_MUTATION } from "./replies"
 import { ADD_REVIEW_MUTATION, reviewEvents, SUBMIT_REVIEW_MUTATION } from "./reviews"
 import { login } from "./author"
@@ -198,8 +199,6 @@ const foundRepository = <A>({ repository }: { readonly repository: A | null }) =
 const CHECKS_BATCH_SIZE = 100
 
 const ATTENTION_BATCH_SIZE = 50
-
-const QUEUED_BATCH_SIZE = 50
 
 const states: Record<typeof GitHubPullRequestState.Type, PullRequestState> = {
   OPEN: "open",
@@ -314,6 +313,9 @@ export class GitHubClient extends Context.Service<
     readonly queuedPullRequests: (
       refs: ReadonlyArray<PullRequestRef>,
     ) => Effect.Effect<ReadonlyArray<LookedUpPullRequest | null>, ConnectionError>
+    readonly endedBranchPullRequests: (
+      branches: ReadonlyArray<Branch>,
+    ) => Effect.Effect<ReadonlyArray<EndedPullRequest | null>, ConnectionError>
     readonly reviewRequests: (
       pullRequestId: string,
       after: string,
@@ -926,35 +928,49 @@ export class GitHubClient extends Context.Service<
           ),
       )
 
-      const lookUpQueued = Effect.fnUntraced(function* (refs: ReadonlyArray<PullRequestRef>) {
-        const { body } = yield* send(
-          HttpClientRequest.post("/graphql").pipe(
-            HttpClientRequest.bodyJsonUnsafe({
-              operationName: "QueuedPullRequests",
-              query: queuedPullRequestsQuery(refs.length),
-              variables: queuedPullRequestsVariables(refs),
-            }),
-          ),
-          QueuedPullRequestsResponse,
-          { readKey: JSON.stringify(["QueuedPullRequests", refs]) },
-        )
-
-        return yield* Result.match(toLookedUpBatch(refs.length, body), {
-          onSuccess: Effect.succeed,
-          onFailure: (message) =>
-            unavailable("GitHub had a problem answering. Try again in a moment.")({ message }),
-        })
-      })
-
-      const queuedPullRequests = Effect.fn("GitHubClient.queuedPullRequests")(function* (
-        refs: ReadonlyArray<PullRequestRef>,
+      const aliasedBatches = Effect.fnUntraced(function* <I, S extends Schema.Top, A>(
+        lookup: AliasedLookup<I, S, A>,
+        items: ReadonlyArray<I>,
       ) {
-        const batches = yield* Effect.forEach(Arr.chunksOf(refs, QUEUED_BATCH_SIZE), lookUpQueued, {
-          concurrency: "unbounded",
-        })
+        const batches = yield* Effect.forEach(
+          Arr.chunksOf(items, lookup.batchSize),
+          (batch) =>
+            Effect.gen(function* () {
+              const variables = aliasedVariables(lookup, batch)
+
+              const { body } = yield* send(
+                HttpClientRequest.post("/graphql").pipe(
+                  HttpClientRequest.bodyJsonUnsafe({
+                    operationName: lookup.name,
+                    query: aliasedQuery(lookup, batch.length),
+                    variables,
+                  }),
+                ),
+                lookup.response,
+                { readKey: JSON.stringify([lookup.name, variables]) },
+              )
+
+              return yield* Result.match(aliasedAnswers(lookup, batch, body), {
+                onSuccess: Effect.succeed,
+                onFailure: (message) =>
+                  unavailable("GitHub had a problem answering. Try again in a moment.")({
+                    message,
+                  }),
+              })
+            }),
+          { concurrency: "unbounded" },
+        )
 
         return batches.flat()
       })
+
+      const queuedPullRequests = Effect.fn("GitHubClient.queuedPullRequests")(
+        (refs: ReadonlyArray<PullRequestRef>) => aliasedBatches(QueuedPullRequests, refs),
+      )
+
+      const endedBranchPullRequests = Effect.fn("GitHubClient.endedBranchPullRequests")(
+        (branches: ReadonlyArray<Branch>) => aliasedBatches(EndedBranchPullRequests, branches),
+      )
 
       const reviewRequests = Effect.fn("GitHubClient.reviewRequests")(function* (
         pullRequestId: string,
@@ -1359,6 +1375,7 @@ export class GitHubClient extends Context.Service<
         pullRequestChecks,
         pullRequestAttention,
         queuedPullRequests,
+        endedBranchPullRequests,
         reviewRequests,
         viewerTeams,
         fileContents,

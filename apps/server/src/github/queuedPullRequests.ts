@@ -4,43 +4,10 @@ import {
   PullRequestSummary,
   Revision,
 } from "@glass/contracts"
-import { Result, Schema } from "effect"
+import { Schema } from "effect"
 import { login, GitHubAuthor } from "./author"
+import { aliasedLookup } from "./aliasedLookups"
 import { checksOfRollup, StatusState } from "./checkContexts"
-
-export const queuedPullRequestsQuery = (count: number) => {
-  const indexes = Array.from({ length: count }, (_, index) => index)
-
-  const variables = indexes
-    .map((index) => `$owner${index}: String!, $name${index}: String!, $number${index}: Int!`)
-    .join(", ")
-
-  const lookups = indexes
-    .map(
-      (index) =>
-        `pr${index}: repository(owner: $owner${index}, name: $name${index}) { pullRequest(number: $number${index}) { ...QueuedPullRequest } }`,
-    )
-    .join("\n  ")
-
-  return `query QueuedPullRequests(${variables}) {
-  ${lookups}
-}
-
-fragment QueuedPullRequest on PullRequest {
-  id number url title author { login } updatedAt isDraft state baseRefOid headRefOid
-  repository { owner { login } name }
-  commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
-}`
-}
-
-export const queuedPullRequestsVariables = (refs: ReadonlyArray<PullRequestRef>) =>
-  Object.fromEntries(
-    refs.flatMap((ref, index) => [
-      [`owner${index}`, ref.owner],
-      [`name${index}`, ref.repo],
-      [`number${index}`, ref.number],
-    ]),
-  )
 
 const GitHubQueuedPullRequest = Schema.Struct({
   id: Schema.String,
@@ -66,26 +33,6 @@ const GitHubQueuedPullRequest = Schema.Struct({
       }),
     ),
   }),
-})
-
-export const QueuedPullRequestsResponse = Schema.Struct({
-  data: Schema.optional(
-    Schema.NullOr(
-      Schema.Record(
-        Schema.String,
-        Schema.NullOr(Schema.Struct({ pullRequest: Schema.NullOr(GitHubQueuedPullRequest) })),
-      ),
-    ),
-  ),
-  errors: Schema.optional(
-    Schema.Array(
-      Schema.Struct({
-        type: Schema.optional(Schema.String),
-        message: Schema.String,
-        path: Schema.optional(Schema.Array(Schema.Union([Schema.String, Schema.Number]))),
-      }),
-    ),
-  ),
 })
 
 export interface LookedUpPullRequest {
@@ -116,27 +63,22 @@ const toLookedUp = (node: typeof GitHubQueuedPullRequest.Type): LookedUpPullRequ
   revision: new Revision({ base: node.baseRefOid, head: node.headRefOid }),
 })
 
-const missingTypes = new Set(["NOT_FOUND", "FORBIDDEN"])
-
-export const toLookedUpBatch = (
-  count: number,
-  { data, errors }: typeof QueuedPullRequestsResponse.Type,
-): Result.Result<ReadonlyArray<LookedUpPullRequest | null>, string> => {
-  const aliases = Array.from({ length: count }, (_, index) => `pr${index}`)
-
-  const unanswered = errors?.find(
-    (error) => !aliases.includes(String(error.path?.[0])) || !missingTypes.has(error.type ?? ""),
-  )
-
-  if (unanswered !== undefined) return Result.fail(unanswered.message)
-
-  if (data == null) return Result.fail("GraphQL QueuedPullRequests answered without data")
-
-  return Result.succeed(
-    aliases.map((alias) => {
-      const node = data[alias]?.pullRequest
-
-      return node == null ? null : toLookedUp(node)
-    }),
-  )
-}
+export const QueuedPullRequests = aliasedLookup({
+  name: "QueuedPullRequests",
+  batchSize: 50,
+  declarations: (index) => `$owner${index}: String!, $name${index}: String!, $number${index}: Int!`,
+  selection: (index) =>
+    `repository(owner: $owner${index}, name: $name${index}) { pullRequest(number: $number${index}) { ...QueuedPullRequest } }`,
+  fragment: `fragment QueuedPullRequest on PullRequest {
+  id number url title author { login } updatedAt isDraft state baseRefOid headRefOid
+  repository { owner { login } name }
+  commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
+}`,
+  variables: (ref: PullRequestRef, index) => [
+    [`owner${index}`, ref.owner],
+    [`name${index}`, ref.repo],
+    [`number${index}`, ref.number],
+  ],
+  answer: Schema.Struct({ pullRequest: Schema.NullOr(GitHubQueuedPullRequest) }),
+  decode: ({ pullRequest }) => (pullRequest === null ? null : toLookedUp(pullRequest)),
+})

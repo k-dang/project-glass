@@ -39,6 +39,10 @@ export const ListingRequest = Schema.Union([
     operationName: Schema.Literal("QueuedPullRequests"),
     variables: Schema.Record(Schema.String, Schema.Union([Schema.String, Schema.Number])),
   }),
+  Schema.Struct({
+    operationName: Schema.Literal("EndedBranchPullRequests"),
+    variables: Schema.Record(Schema.String, Schema.String),
+  }),
 ])
 
 const checksNode = (pr: FakePullRequest) => ({
@@ -234,9 +238,9 @@ const queuedPullRequests = (
     { length: Object.keys(variables).filter((name) => name.startsWith("owner")).length },
     (_, index) =>
       [
-        `pr${index}`,
+        `lookup${index}`,
         queuedPullRequest(
-          `pr${index}`,
+          `lookup${index}`,
           String(variables[`owner${index}`]),
           String(variables[`name${index}`]),
           Number(variables[`number${index}`]),
@@ -252,6 +256,37 @@ const queuedPullRequests = (
 
   return errors.length === 0 ? { data } : { data, errors }
 }
+
+const endedBranchPullRequests = (
+  variables: Readonly<Record<string, string>>,
+  pullRequests: ReadonlyArray<FakePullRequest>,
+) => ({
+  data: Object.fromEntries(
+    Array.from(
+      { length: Object.keys(variables).filter((name) => name.startsWith("owner")).length },
+      (_, index) => {
+        const owner = variables[`owner${index}`]!
+        const name = variables[`name${index}`]!
+        const branch = variables[`branch${index}`]
+
+        const nodes = pullRequests
+          .filter(
+            (pr) => inRepo(owner, name)(pr) && pr.headBranch === branch && pr.state !== "OPEN",
+          )
+          .toSorted((a, b) => b.number - a.number)
+          .map((pr) => ({
+            number: pr.number,
+            url: pr.url,
+            title: pr.title,
+            state: pr.state,
+            isCrossRepository: pr.isCrossRepository,
+          }))
+
+        return [`lookup${index}`, { pullRequests: { nodes } }]
+      },
+    ),
+  ),
+})
 
 export const answerListing = (
   request: typeof ListingRequest.Type,
@@ -315,6 +350,9 @@ export const answerListing = (
         unavailableRepositories,
         timingOutRepositories,
       )
+
+    case "EndedBranchPullRequests":
+      return endedBranchPullRequests(request.variables, pullRequests)
 
     default:
       return absurd<never>(request)

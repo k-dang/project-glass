@@ -23,11 +23,32 @@ export class PullRequestSummary extends Schema.Class<PullRequestSummary>("PullRe
   updatedAt: Schema.DateTimeUtcFromString,
 }) {}
 
+export const PullRequestOpen = Schema.TaggedStruct("Open", { checks: Checks })
+
+export const PullRequestMerged = Schema.TaggedStruct("Merged", {})
+
+export const PullRequestClosed = Schema.TaggedStruct("Closed", {})
+
+export const PullRequestEnded = Schema.Union([PullRequestMerged, PullRequestClosed])
+
+export type PullRequestEnded = typeof PullRequestEnded.Type
+
+export const ConversationPullRequestState = Schema.Union([
+  PullRequestOpen,
+  PullRequestMerged,
+  PullRequestClosed,
+])
+
+export type ConversationPullRequestState = typeof ConversationPullRequestState.Type
+
 export class ConversationPullRequest extends Schema.Class<ConversationPullRequest>(
   "ConversationPullRequest",
 )({
   conversationId: Schema.String,
-  pullRequest: PullRequestSummary,
+  ref: PullRequestRef,
+  url: Schema.String,
+  title: Schema.String,
+  state: ConversationPullRequestState,
 }) {}
 
 export class RepositoryPullRequests extends Schema.TaggedClass<RepositoryPullRequests>()(

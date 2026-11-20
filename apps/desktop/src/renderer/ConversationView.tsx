@@ -283,20 +283,20 @@ function OpenConversation(props: { conversation: Conversation } & ConversationTa
             tab === "chat" ? (
               <>
                 <ConversationDetailsAction onNavigate={() => onTabChange("changes")}>
-                  <FileDiff aria-hidden />
+                  <FileDiff aria-hidden className="text-muted-foreground" />
                   Changes
                   <Kbd className="ml-auto">{shortcutLabel("D")}</Kbd>
                 </ConversationDetailsAction>
                 {diagrams.titles.map((title) => (
                   <ConversationDetailsAction key={title} onNavigate={() => openDiagram(title)}>
-                    <Workflow aria-hidden />
+                    <Workflow aria-hidden className="text-muted-foreground" />
                     <span className="truncate">{title}</span>
                   </ConversationDetailsAction>
                 ))}
               </>
             ) : (
               <ConversationDetailsAction onNavigate={() => onTabChange("chat")}>
-                <MessageCircle aria-hidden />
+                <MessageCircle aria-hidden className="text-muted-foreground" />
                 Back to Chat
                 <Kbd className="ml-auto">{shortcutLabel("D")}</Kbd>
               </ConversationDetailsAction>

@@ -3,14 +3,14 @@ import type { PullRequestRef, PullRequestState, PullRequestSummary } from "@glas
 import { useRouter } from "@tanstack/react-router"
 import { cn } from "cn"
 import { DateTime } from "effect"
-import { GitMerge, GitPullRequestClosed, History, type LucideIcon } from "lucide-react"
+import { History } from "lucide-react"
 import { type ReactNode, useEffect, useId, useRef, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipHint } from "@/components/ui/tooltip"
 import { type Problem, problemText } from "./problems"
 import { preloadPullRequestAtom } from "./reviewsArea"
-import { checksLabels, warningTone } from "./status"
+import { checksLabels, finishedStates, warningTone } from "./status"
 
 export function NotRefreshed(props: { problem: Problem; showLabel?: boolean }) {
   const reason = problemText(props.problem)
@@ -168,24 +168,6 @@ export function PullRequestRow(props: {
       <span className="sr-only">{label}</span>
     </Button>
   )
-}
-
-const finishedStates: Partial<
-  Record<
-    PullRequestState,
-    { readonly label: string; readonly icon: LucideIcon; readonly tone: string }
-  >
-> = {
-  merged: {
-    label: "Merged",
-    icon: GitMerge,
-    tone: "text-violet-600 dark:text-violet-400",
-  },
-  closed: {
-    label: "Closed",
-    icon: GitPullRequestClosed,
-    tone: "text-red-600 dark:text-red-400",
-  },
 }
 
 export const ago = (date: Date, now: Date) => {

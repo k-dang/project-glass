@@ -18,37 +18,29 @@ import {
   CircleX,
   FileDiff,
   GitMerge,
-  type LucideIcon,
   TriangleAlert,
   Users,
 } from "lucide-react"
 import type { ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/components/ui/popover"
+import { type StatusLabel, warningTone } from "./status"
 
-const warningTone = "text-amber-600 dark:text-amber-400"
+const approved: StatusLabel = { label: "Approved", icon: CircleCheck, tone: "text-added" }
 
-interface Summary {
-  readonly label: string
-  readonly icon: LucideIcon
-  readonly tone: string
-}
-
-const approved: Summary = { label: "Approved", icon: CircleCheck, tone: "text-added" }
-
-const changesRequested: Summary = {
+const changesRequested: StatusLabel = {
   label: "Changes requested",
   icon: FileDiff,
   tone: "text-deleted",
 }
 
-const approvalSummaries: Record<Approval, Summary> = {
+const approvalSummaries: Record<Approval, StatusLabel> = {
   approved,
   "changes-requested": changesRequested,
   "review-required": { label: "Review required", icon: Users, tone: warningTone },
 }
 
-const reviewersSummary = (reviewers: ReadonlyArray<Reviewer>): Summary => {
+const reviewersSummary = (reviewers: ReadonlyArray<Reviewer>): StatusLabel => {
   const has = (state: ReviewerState) => reviewers.some((r) => r.state === state)
 
   if (has("changes-requested")) return changesRequested
@@ -60,7 +52,7 @@ const reviewersSummary = (reviewers: ReadonlyArray<Reviewer>): Summary => {
   return { label: "No reviews", icon: Users, tone: "text-muted-foreground" }
 }
 
-const checksSummary = (checks: ReadonlyArray<Check>): Summary => {
+const checksSummary = (checks: ReadonlyArray<Check>): StatusLabel => {
   const count = (state: CheckState) => checks.filter((check) => check.state === state).length
 
   if (checks.length === 0)
@@ -73,13 +65,13 @@ const checksSummary = (checks: ReadonlyArray<Check>): Summary => {
   return { ...checkStates.passed, label: "Checks passed" }
 }
 
-const reviewerStates: Record<ReviewerState, Summary> = {
+const reviewerStates: Record<ReviewerState, StatusLabel> = {
   approved,
   "changes-requested": changesRequested,
   requested: { label: "Awaiting review", icon: CircleDotDashed, tone: warningTone },
 }
 
-const checkStates: Record<CheckState, Summary> = {
+const checkStates: Record<CheckState, StatusLabel> = {
   failed: { label: "Failed", icon: CircleX, tone: "text-deleted" },
   running: { label: "Running", icon: CircleDotDashed, tone: warningTone },
   passed: { label: "Passed", icon: CircleCheck, tone: "text-added" },
@@ -133,7 +125,7 @@ export function StatusChips(props: { pullRequest: PullRequest }) {
 
 const chipClass = "h-6 gap-1 rounded-full px-2 text-xs font-normal text-foreground"
 
-function StatusChip(props: { summary: Summary; title: string; details: ReactNode | null }) {
+function StatusChip(props: { summary: StatusLabel; title: string; details: ReactNode | null }) {
   const { label, icon: Icon, tone } = props.summary
 
   const content = (
@@ -167,7 +159,7 @@ function StatusChip(props: { summary: Summary; title: string; details: ReactNode
   )
 }
 
-function StateIcon(props: { state: Summary }) {
+function StateIcon(props: { state: StatusLabel }) {
   const { label, icon: Icon, tone } = props.state
 
   return (
@@ -242,7 +234,7 @@ const mergesUnderWay: Record<MergeUnderWay, HintedSummary> = {
   },
 }
 
-interface HintedSummary extends Summary {
+interface HintedSummary extends StatusLabel {
   readonly title: string
 }
 
