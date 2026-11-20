@@ -28,7 +28,7 @@ import { allViewed, twoDigits } from "./tourProgress"
 import { hasOverview, type TourChapter, type TourReading } from "./tourReading"
 import { TourText } from "./TourText"
 import { MermaidDiagram } from "./MermaidDiagram"
-import { TourBeforeAfter } from "./TourBeforeAfter"
+import { BeforeAfterCounts, BeforeAfterLines, TourBeforeAfter } from "./TourBeforeAfter"
 import { StartReading } from "./TourSidebar"
 import { AttentionMark, ChapterHotspots, TourHotspots } from "./Hotspots"
 import { useViewedFiles, type ViewedFilesStore } from "./useViewedFiles"
@@ -548,6 +548,43 @@ function ChapterDiagram(props: { source: string; title: string }) {
   )
 }
 
+function ChapterBeforeAfter(props: {
+  beforeAfter: NonNullable<TourChapter["beforeAfter"]>
+  onSelect: (target: TourCodeTarget) => void
+}) {
+  const [open, setOpen] = useState(true)
+
+  return (
+    <Collapsible
+      open={open}
+      onOpenChange={setOpen}
+      render={<section />}
+      aria-label={`Before / after: ${props.beforeAfter.title}`}
+      className={cn("mb-3 flex min-h-0 shrink-0 flex-col border-b pb-2", open && "max-h-[45%]")}
+    >
+      <div className="flex min-w-0 items-center gap-2 text-xs">
+        <CollapsibleTrigger
+          render={<Button variant="ghost" size="xs" />}
+          className="-ml-2 shrink-0 text-muted-foreground aria-expanded:bg-transparent aria-expanded:text-muted-foreground hover:aria-expanded:bg-muted"
+        >
+          <ChevronRight
+            aria-hidden
+            className="transition-transform duration-200 ease-out group-data-panel-open/button:rotate-90 motion-reduce:transition-none"
+          />
+          Before / after
+        </CollapsibleTrigger>
+        <span className="min-w-0 flex-1 truncate text-muted-foreground">
+          {props.beforeAfter.title}
+        </span>
+        <BeforeAfterCounts beforeAfter={props.beforeAfter} />
+      </div>
+      <CollapsibleContent className="mt-2 min-h-0 overflow-auto rounded-[7px] border bg-background">
+        <BeforeAfterLines beforeAfter={props.beforeAfter} onSelect={props.onSelect} />
+      </CollapsibleContent>
+    </Collapsible>
+  )
+}
+
 function ChapterCard(props: {
   diff: Omit<TourViewProps, "onShowInReview">
   searchGroup: NonNullable<ChangedFilesViewProps["searchGroup"]>
@@ -633,10 +670,7 @@ function ChapterCard(props: {
         <>
           <aside
             className={cn(
-              "max-h-(--tour-card-height) min-w-0 overflow-y-auto px-5 py-5.5 [scrollbar-width:thin] @max-[850px]/tour:p-4",
-              chapter?.beforeAfter == null
-                ? "@max-[700px]/tour:max-h-75"
-                : "@max-[700px]/tour:max-h-none",
+              "max-h-(--tour-card-height) min-w-0 overflow-y-auto px-5 py-5.5 [scrollbar-width:thin] @max-[850px]/tour:p-4 @max-[700px]/tour:max-h-75",
             )}
             aria-label={`Chapter explanation: ${title}`}
           >
@@ -689,11 +723,6 @@ function ChapterCard(props: {
                 onShowTarget={props.onShowTarget}
               />
             )}
-            {chapter?.beforeAfter != null && (
-              <div className="my-5">
-                <TourBeforeAfter beforeAfter={chapter.beforeAfter} onSelect={props.onShowTarget} />
-              </div>
-            )}
           </aside>
           <div
             className={cn(
@@ -714,6 +743,9 @@ function ChapterCard(props: {
               />
             )}
             {chapter?.diagram != null && <ChapterDiagram source={chapter.diagram} title={title} />}
+            {chapter?.beforeAfter != null && (
+              <ChapterBeforeAfter beforeAfter={chapter.beforeAfter} onSelect={props.onShowTarget} />
+            )}
             {files.length === 0 ? (
               <p className="p-4 text-sm text-muted-foreground">No files remain in this Chapter.</p>
             ) : (

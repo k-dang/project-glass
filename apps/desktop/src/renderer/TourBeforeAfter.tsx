@@ -74,6 +74,28 @@ function Line(props: {
   )
 }
 
+export function BeforeAfterCounts(props: { beforeAfter: BeforeAfter }) {
+  return (
+    <LineCounts
+      additions={countOf(props.beforeAfter, "added")}
+      deletions={countOf(props.beforeAfter, "removed")}
+    />
+  )
+}
+
+export function BeforeAfterLines(props: {
+  beforeAfter: BeforeAfter
+  onSelect: (target: TourCodeTarget) => void
+}) {
+  return (
+    <ol>
+      {props.beforeAfter.lines.map((line, index) => (
+        <Line key={index} line={line} onSelect={props.onSelect} />
+      ))}
+    </ol>
+  )
+}
+
 export function TourBeforeAfter(props: {
   beforeAfter: BeforeAfter
   onSelect: (target: TourCodeTarget) => void
@@ -90,16 +112,9 @@ export function TourBeforeAfter(props: {
         <span className="min-w-0 flex-1 truncate font-normal text-muted-foreground">
           {beforeAfter.title}
         </span>
-        <LineCounts
-          additions={countOf(beforeAfter, "added")}
-          deletions={countOf(beforeAfter, "removed")}
-        />
+        <BeforeAfterCounts beforeAfter={beforeAfter} />
       </header>
-      <ol>
-        {beforeAfter.lines.map((line, index) => (
-          <Line key={index} line={line} onSelect={props.onSelect} />
-        ))}
-      </ol>
+      <BeforeAfterLines beforeAfter={beforeAfter} onSelect={props.onSelect} />
     </section>
   )
 }
