@@ -1,6 +1,17 @@
-import { ChevronLeft, ChevronRight, Maximize, Minus, Plus } from "lucide-react"
+import {
+  createDialogController,
+  Dialog,
+  DialogBackdrop,
+  DialogClose,
+  DialogContent,
+  type DialogController,
+  DialogDescription,
+  DialogTitle,
+} from "@ui-sdk/react/dialog"
+import { ChevronLeft, ChevronRight, Maximize, Minus, Plus, X } from "lucide-react"
 import {
   type Ref,
+  type RefObject,
   useCallback,
   useEffect,
   useImperativeHandle,
@@ -10,12 +21,20 @@ import {
 } from "react"
 import { flushSync } from "react-dom"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 
 export interface PreviewImage {
   readonly src: string
   readonly name: string
 }
+
+export interface ImagePreview {
+  readonly images: ReadonlyArray<PreviewImage>
+  readonly index: number
+}
+
+export type ImageViewerController = DialogController<ImagePreview>
+
+export const createImageViewer = (): ImageViewerController => createDialogController<ImagePreview>()
 
 interface ImageCanvasHandle {
   readonly element: HTMLButtonElement | null
@@ -24,89 +43,97 @@ interface ImageCanvasHandle {
   readonly pan: (key: string) => boolean
 }
 
-export function ImageViewer(props: {
-  images: ReadonlyArray<PreviewImage>
-  index: number
-  opener: HTMLElement
-  onClose: () => void
-}) {
-  const [index, setIndex] = useState(props.index)
+export function ImageViewer(props: { controller: ImageViewerController }) {
   const canvasRef = useRef<ImageCanvasHandle>(null)
-  const image = props.images[index]!
+
+  return (
+    <Dialog controller={props.controller}>
+      <DialogBackdrop className="fixed inset-0 isolate z-50 bg-black/10 backdrop-motion supports-backdrop-filter:backdrop-blur-xs" />
+      <DialogContent<ImagePreview>
+        className="fixed inset-0 z-50 m-auto grid h-[90vh] w-[94vw] grid-rows-[auto_minmax(0,1fr)] gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 popup-motion outline-none"
+        initialFocus={() => canvasRef.current?.element ?? null}
+      >
+        {({ payload }) => payload && <ImagePages preview={payload} canvasRef={canvasRef} />}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function ImagePages(props: {
+  preview: ImagePreview
+  canvasRef: RefObject<ImageCanvasHandle | null>
+}) {
+  const { images } = props.preview
+  const { canvasRef } = props
+  const [index, setIndex] = useState(props.preview.index)
+  const image = images[index]!
 
   const navigate = (direction: number) => {
-    if (props.images.length < 2) return
+    if (images.length < 2) return
     const canvasHadFocus = document.activeElement === canvasRef.current?.element
-    flushSync(() =>
-      setIndex((current) => (current + direction + props.images.length) % props.images.length),
-    )
+    flushSync(() => setIndex((current) => (current + direction + images.length) % images.length))
 
     if (canvasHadFocus) canvasRef.current?.element?.focus({ preventScroll: true })
   }
 
   return (
-    <Dialog
-      open
-      onOpenChange={(open) => {
-        if (!open) props.onClose()
+    // oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- Viewer-wide zoom and paging keys.
+    <div
+      className="contents"
+      onKeyDown={(event) => {
+        if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return
+        const canvas = canvasRef.current
+
+        if (!canvas) return
+
+        if (event.key === "+" || event.key === "=") canvas.zoom(1.5)
+        else if (event.key === "-") canvas.zoom(1 / 1.5)
+        else if (event.key === "0") canvas.fit()
+        else if (canvas.pan(event.key)) {
+          event.preventDefault()
+
+          return
+        } else if (event.key === "ArrowLeft" || event.key === "ArrowRight")
+          navigate(event.key === "ArrowLeft" ? -1 : 1)
+        else return
+        event.preventDefault()
       }}
     >
-      <DialogContent
-        className="h-[90vh] w-[94vw] max-w-none grid-rows-[auto_minmax(0,1fr)] sm:max-w-none"
-        initialFocus={() => canvasRef.current?.element ?? false}
-        finalFocus={() => props.opener}
-        onKeyDown={(event) => {
-          if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return
-          const canvas = canvasRef.current
-
-          if (!canvas) return
-
-          if (event.key === "+" || event.key === "=") canvas.zoom(1.5)
-          else if (event.key === "-") canvas.zoom(1 / 1.5)
-          else if (event.key === "0") canvas.fit()
-          else if (canvas.pan(event.key)) {
-            event.preventDefault()
-
-            return
-          } else if (event.key === "ArrowLeft" || event.key === "ArrowRight")
-            navigate(event.key === "ArrowLeft" ? -1 : 1)
-          else return
-          event.preventDefault()
-        }}
+      <header className="flex min-w-0 items-center gap-3 pr-8">
+        <DialogTitle className="min-w-0 flex-1 truncate text-base leading-none font-medium">
+          {image.name}
+        </DialogTitle>
+        {images.length > 1 && (
+          <div className="flex shrink-0 items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Previous image"
+              onClick={() => navigate(-1)}
+            >
+              <ChevronLeft aria-hidden />
+            </Button>
+            <span className="text-xs tabular-nums text-muted-foreground" aria-live="polite">
+              {index + 1} / {images.length}
+            </span>
+            <Button variant="ghost" size="icon" aria-label="Next image" onClick={() => navigate(1)}>
+              <ChevronRight aria-hidden />
+            </Button>
+          </div>
+        )}
+      </header>
+      <DialogDescription className="sr-only">
+        Click to zoom, scroll to zoom around the pointer, and drag to pan. Use plus and minus to
+        zoom, 0 to fit, arrow keys to pan or change images, and Escape to close.
+      </DialogDescription>
+      <ImageCanvas key={index} image={image} ref={canvasRef} />
+      <DialogClose
+        aria-label="Close"
+        render={<Button variant="ghost" size="icon-sm" className="absolute top-2 right-2" />}
       >
-        <header className="flex min-w-0 items-center gap-3 pr-8">
-          <DialogTitle className="min-w-0 flex-1 truncate">{image.name}</DialogTitle>
-          {props.images.length > 1 && (
-            <div className="flex shrink-0 items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="Previous image"
-                onClick={() => navigate(-1)}
-              >
-                <ChevronLeft aria-hidden />
-              </Button>
-              <span className="text-xs tabular-nums text-muted-foreground" aria-live="polite">
-                {index + 1} / {props.images.length}
-              </span>
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="Next image"
-                onClick={() => navigate(1)}
-              >
-                <ChevronRight aria-hidden />
-              </Button>
-            </div>
-          )}
-        </header>
-        <DialogDescription className="sr-only">
-          Click to zoom, scroll to zoom around the pointer, and drag to pan. Use plus and minus to
-          zoom, 0 to fit, arrow keys to pan or change images, and Escape to close.
-        </DialogDescription>
-        <ImageCanvas key={index} image={image} ref={canvasRef} />
-      </DialogContent>
-    </Dialog>
+        <X aria-hidden />
+      </DialogClose>
+    </div>
   )
 }
 

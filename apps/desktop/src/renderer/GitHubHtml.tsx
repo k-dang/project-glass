@@ -2,7 +2,7 @@ import { cn } from "cn"
 import DOMPurify from "dompurify"
 import { type KeyboardEvent, type MouseEvent, useCallback, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
-import { ImageViewer, type PreviewImage } from "./ImageViewer"
+import { createImageViewer, ImageViewer, type PreviewImage } from "./ImageViewer"
 import { MermaidDiagram } from "./MermaidDiagram"
 
 function imagePreviewSource(image: HTMLImageElement): string | null {
@@ -89,7 +89,7 @@ function HtmlContent(props: {
   content: ReturnType<typeof prepareHtml>
   className: string | undefined
 }) {
-  const [preview, setPreview] = useState<{ index: number; opener: HTMLElement } | null>(null)
+  const [viewer] = useState(createImageViewer)
   const [root, setRoot] = useState<HTMLDivElement | null>(null)
 
   const openImage = (event: MouseEvent<HTMLDivElement> | KeyboardEvent<HTMLDivElement>) => {
@@ -104,7 +104,7 @@ function HtmlContent(props: {
 
     event.preventDefault()
     event.stopPropagation()
-    setPreview({ index, opener })
+    void viewer.open({ payload: { images: props.content.images, index } })
   }
 
   return (
@@ -125,14 +125,7 @@ function HtmlContent(props: {
 
           return target && createPortal(<GitHubMermaid source={source} />, target, index)
         })}
-      {preview && (
-        <ImageViewer
-          images={props.content.images}
-          index={preview.index}
-          opener={preview.opener}
-          onClose={() => setPreview(null)}
-        />
-      )}
+      <ImageViewer controller={viewer} />
     </>
   )
 }

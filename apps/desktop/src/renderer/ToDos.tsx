@@ -9,6 +9,7 @@ import {
   type ToDoImageUpload,
 } from "@glass/contracts"
 import { useNavigate } from "@tanstack/react-router"
+import { DialogTrigger } from "@ui-sdk/react/dialog"
 import { cn } from "cn"
 import { AsyncResult, Atom } from "effect/reactivity"
 import { Effect, Exit, Option, Stream } from "effect"
@@ -29,7 +30,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/components/ui/toast"
 import { Backend, backendRuntime, useBackendRuntime } from "./backend"
 import { newConversationWrittenAtom } from "./conversationsArea"
-import { ImageViewer, type PreviewImage } from "./ImageViewer"
+import { createImageViewer, ImageViewer } from "./ImageViewer"
 import { imageFiles, imageSrc, maxToDoImageBytes, readToDoImages } from "./pastedImages"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf, settledProblem } from "./problems"
@@ -294,21 +295,6 @@ function ToDoItems(props: { label: string; toDos: ReadonlyArray<ToDo>; className
   )
 }
 
-interface OpenedImage {
-  readonly image: PreviewImage
-  readonly opener: HTMLElement
-}
-
-function LargeImage(props: { opened: OpenedImage | null; onClose: () => void }) {
-  const opened = props.opened
-
-  if (opened === null) return null
-
-  return (
-    <ImageViewer images={[opened.image]} index={0} opener={opened.opener} onClose={props.onClose} />
-  )
-}
-
 function ImageStrip(props: { label: string; children: ReactNode }) {
   return (
     <ul aria-label={props.label} className="flex flex-wrap gap-2 pt-2">
@@ -323,7 +309,7 @@ function AddToDo() {
   const { pending, add } = useToDoChanges()
   const { title, notes, images, savedId } = draft
   const trimmed = title.trim()
-  const [opened, setOpened] = useState<OpenedImage | null>(null)
+  const [viewer] = useState(createImageViewer)
 
   const knownIds = Option.match(AsyncResult.value(listed), {
     onNone: () => [],
@@ -377,26 +363,23 @@ function AddToDo() {
         <ImageStrip label="Images">
           {images.map((image, index) => (
             <li key={image.key} className="flex items-start gap-0.5">
-              <button
-                type="button"
+              <DialogTrigger
+                controller={viewer}
+                payload={{
+                  images: [
+                    { src: imageSrc(image.mediaType, image.data), name: `Image ${index + 1}` },
+                  ],
+                  index: 0,
+                }}
                 aria-label={`Open image ${index + 1}`}
                 className="rounded-md"
-                onClick={(event) =>
-                  setOpened({
-                    image: {
-                      src: imageSrc(image.mediaType, image.data),
-                      name: `Image ${index + 1}`,
-                    },
-                    opener: event.currentTarget,
-                  })
-                }
               >
                 <img
                   src={imageSrc(image.thumbnailMediaType, image.thumbnail)}
                   alt=""
                   className="size-14 rounded-md border object-cover"
                 />
-              </button>
+              </DialogTrigger>
               <Button
                 type="button"
                 variant="ghost"
@@ -454,7 +437,7 @@ function AddToDo() {
           {submitLabel}
         </Button>
       </CardFooter>
-      <LargeImage opened={opened} onClose={() => setOpened(null)} />
+      <ImageViewer controller={viewer} />
     </Card>
   )
 }
@@ -747,22 +730,23 @@ function SavedImage(props: {
 }) {
   const { setElement, visible } = useWhenVisible()
   const runtime = useBackendRuntime()
-  const [opened, setOpened] = useState<OpenedImage | null>(null)
+  const [viewer] = useState(createImageViewer)
   const number = props.index + 1
 
-  const open = (opener: HTMLButtonElement) => {
+  const open = () => {
     void runtime
       .runPromiseExit(
         Backend.use((backend) => backend.ReadToDoImage({ id: props.image.id, size: "full" })),
       )
       .then((exit) => {
         if (Exit.isSuccess(exit)) {
-          setOpened({
-            image: {
-              src: imageSrc(exit.value.mediaType, exit.value.data),
-              name: `Image ${number}`,
+          void viewer.open({
+            payload: {
+              images: [
+                { src: imageSrc(exit.value.mediaType, exit.value.data), name: `Image ${number}` },
+              ],
+              index: 0,
             },
-            opener,
           })
 
           return
@@ -779,7 +763,7 @@ function SavedImage(props: {
         ref={setElement}
         aria-label={`Open image ${number} of ${props.title}`}
         className="rounded-md"
-        onClick={(event) => open(event.currentTarget)}
+        onClick={open}
       >
         {visible ? (
           <ToDoThumbnail id={props.image.id} />
@@ -797,7 +781,7 @@ function SavedImage(props: {
       >
         <X aria-hidden />
       </Button>
-      <LargeImage opened={opened} onClose={() => setOpened(null)} />
+      <ImageViewer controller={viewer} />
     </li>
   )
 }

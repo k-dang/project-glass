@@ -15,6 +15,7 @@ import { Placeholder, UndoRedo } from "@tiptap/extensions"
 import { Selection, TextSelection } from "@tiptap/pm/state"
 import { type EditorView } from "@tiptap/pm/view"
 import { EditorContent, useEditor } from "@tiptap/react"
+import { DialogTrigger } from "@ui-sdk/react/dialog"
 import { Predicate } from "effect"
 import { ArrowUp, LoaderCircle, Paperclip, Square, X } from "lucide-react"
 import { memo, type ReactNode, useLayoutEffect, useRef, useState } from "react"
@@ -25,7 +26,7 @@ import { conversationColumn } from "./conversationColumn"
 import { noCommands, noFiles } from "./conversationsArea"
 import { CommandHighlight, useCommandPicker } from "./Commands"
 import { pastedSlice, toContent, Mention, toMessage } from "./composerDocument"
-import { ImageViewer } from "./ImageViewer"
+import { createImageViewer, ImageViewer, type ImageViewerController } from "./ImageViewer"
 import { imageFiles, imageSrc, readImages } from "./pastedImages"
 import { MarkdownStyling } from "./markdownStyling"
 import { useMentionPicker } from "./Mentions"
@@ -35,37 +36,31 @@ import { ProblemAlert } from "./ProblemAlert"
 export const Attachment = memo(function Attachment(props: {
   images: ReadonlyArray<Image>
   index: number
+  viewer: ImageViewerController
   className: string
 }) {
-  const [opener, setOpener] = useState<HTMLElement | null>(null)
   const { mediaType, data } = props.images[props.index]!
+  const number = props.index + 1
 
   return (
-    <>
-      <button
-        type="button"
-        aria-label={`Open attachment ${props.index + 1}`}
-        className="rounded-lg"
-        onClick={(event) => setOpener(event.currentTarget)}
-      >
-        <img
-          src={imageSrc(mediaType, data)}
-          alt={`Attachment ${props.index + 1}`}
-          className={props.className}
-        />
-      </button>
-      {opener !== null && (
-        <ImageViewer
-          images={props.images.map((image, at) => ({
-            src: imageSrc(image.mediaType, image.data),
-            name: `Attachment ${at + 1}`,
-          }))}
-          index={props.index}
-          opener={opener}
-          onClose={() => setOpener(null)}
-        />
-      )}
-    </>
+    <DialogTrigger
+      controller={props.viewer}
+      payload={{
+        images: props.images.map((image, at) => ({
+          src: imageSrc(image.mediaType, image.data),
+          name: `Attachment ${at + 1}`,
+        })),
+        index: props.index,
+      }}
+      aria-label={`Open attachment ${number}`}
+      className="rounded-lg"
+    >
+      <img
+        src={imageSrc(mediaType, data)}
+        alt={`Attachment ${number}`}
+        className={props.className}
+      />
+    </DialogTrigger>
   )
 })
 
@@ -128,6 +123,7 @@ export function MessageBox(props: {
   const { composed, setComposed } = props
   const sending = useRef(false)
   const fileInput = useRef<HTMLInputElement>(null)
+  const [viewer] = useState(createImageViewer)
   const [awaiting, setAwaiting] = useState(false)
 
   const [content] = useState(() => toContent(composed.message))
@@ -343,6 +339,7 @@ export function MessageBox(props: {
                         <Attachment
                           images={composed.images}
                           index={index}
+                          viewer={viewer}
                           className="size-14 rounded-md border object-cover"
                         />
                         <InputGroupButton
@@ -361,6 +358,7 @@ export function MessageBox(props: {
                         </InputGroupButton>
                       </span>
                     ))}
+                    <ImageViewer controller={viewer} />
                   </InputGroupAddon>
                 )}
                 <EditorContent editor={editor} className="w-full min-w-0" />
