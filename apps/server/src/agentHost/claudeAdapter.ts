@@ -72,6 +72,7 @@ import {
   ToolInput,
 } from "./toolCalls"
 import { runTurns } from "./turnLoop"
+import { workInstructions } from "./workRole"
 
 const QUESTION_TOOL = "AskUserQuestion"
 
@@ -150,14 +151,18 @@ const workOptions = (tools: GlassToolsAccess | undefined): Options => {
     }),
   }
 
-  if (tools !== undefined)
-    mcpServers[GLASS_TOOLS_MCP_SERVER] = {
-      type: "http",
-      url: tools.url,
-      headers: { authorization: `Bearer ${Redacted.value(tools.bearer)}` },
-    }
+  if (tools === undefined) return { mcpServers }
 
-  return { mcpServers }
+  mcpServers[GLASS_TOOLS_MCP_SERVER] = {
+    type: "http",
+    url: tools.url,
+    headers: { authorization: `Bearer ${Redacted.value(tools.bearer)}` },
+  }
+
+  return {
+    mcpServers,
+    systemPrompt: { type: "preset", preset: "claude_code", append: workInstructions },
+  }
 }
 
 const roleOptions = (role: RepositoryRole): Options =>

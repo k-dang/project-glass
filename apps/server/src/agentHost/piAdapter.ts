@@ -55,6 +55,7 @@ import {
 } from "./piTurn"
 import { globalInstructions, PI_QUESTION_TOOL, piQuestionExtension } from "./globalRole"
 import { PI_GLASS_TOOLS, piGlassToolsExtension } from "./piGlassTools"
+import { workInstructions } from "./workRole"
 import {
   type ConversationRole,
   couldNotSwitch,
@@ -220,7 +221,13 @@ const roleFlags = (folder: string, role: ConversationRole, skills: ReadonlyArray
           ...(tools === undefined
             ? []
             : [{ name: "glass-tools.js", source: piGlassToolsExtension }]),
-        ]).pipe(Effect.map(({ flags }) => [...skillFlags(skills), ...flags])),
+        ]).pipe(
+          Effect.map(({ flags }) => [
+            ...skillFlags(skills),
+            ...flags,
+            ...(tools === undefined ? [] : ["--append-system-prompt", workInstructions]),
+          ]),
+        ),
       Review: ({ brief }) =>
         lockedDownFlags(
           folder,
