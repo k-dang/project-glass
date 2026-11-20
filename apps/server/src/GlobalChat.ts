@@ -4,8 +4,8 @@ import {
   ConversationError,
   type MessageInputWithContext,
   ModelChoice,
-  PastConversation,
-  PastConversationNotFound,
+  PastChat,
+  PastChatNotFound,
   type RequestAnswer,
   type RequestNotWaiting,
   type RequestWaiting,
@@ -31,7 +31,7 @@ import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 import { GlobalRole } from "./agentHost/protocol"
 import { LocalAgentHost } from "./LocalAgentHost"
-import { GlobalConversationCaller, McpCredentials } from "./mcp/McpCredentials"
+import { GlobalChatCaller, McpCredentials } from "./mcp/McpCredentials"
 import {
   type ClaimedConversation,
   type ConversationHost,
@@ -53,14 +53,14 @@ const decodeStored = Schema.decodeUnknownEffect(Schema.Array(StoredConversation)
 
 const decodeIds = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ id: Schema.String })))
 
-const decodePast = Schema.decodeUnknownEffect(Schema.Array(PastConversation))
+const decodePast = Schema.decodeUnknownEffect(Schema.Array(PastChat))
 
 const hostGone = new ConversationError({
   message: "Glass lost the process that runs Conversations. Try again.",
 })
 
 const storageFailure = () =>
-  new ConversationError({ message: "Couldn't read or save the Global conversation. Try again." })
+  new ConversationError({ message: "Couldn't read or save the Global chat. Try again." })
 
 const stored = <A, E, R>(what: string, effect: Effect.Effect<A, E, R>) =>
   effect.pipe(
@@ -68,8 +68,8 @@ const stored = <A, E, R>(what: string, effect: Effect.Effect<A, E, R>) =>
     Effect.mapError(storageFailure),
   )
 
-export class GlobalConversation extends Context.Service<
-  GlobalConversation,
+export class GlobalChat extends Context.Service<
+  GlobalChat,
   {
     readonly model: Effect.Effect<ModelChoice>
     readonly changeModel: (choice: ModelChoice) => Effect.Effect<void, ConversationError>
@@ -95,15 +95,15 @@ export class GlobalConversation extends Context.Service<
     readonly saveUnsent: (unsent: SentMessage) => Effect.Effect<void, ConversationError>
     readonly id: string
     readonly startFresh: Effect.Effect<void, StartFreshRefused | ConversationError>
-    readonly past: Effect.Effect<ReadonlyArray<PastConversation>, ConversationError>
+    readonly past: Effect.Effect<ReadonlyArray<PastChat>, ConversationError>
     readonly loadEarlier: (before: string) => Effect.Effect<void, ConversationError>
     readonly watchPast: (
       sessionId: string,
-    ) => Stream.Stream<TranscriptUpdate, PastConversationNotFound | ConversationError>
+    ) => Stream.Stream<TranscriptUpdate, PastChatNotFound | ConversationError>
     readonly loadEarlierPast: (
       sessionId: string,
       before: string,
-    ) => Effect.Effect<void, PastConversationNotFound | ConversationError>
+    ) => Effect.Effect<void, PastChatNotFound | ConversationError>
     readonly waiting: Stream.Stream<ReadonlyArray<WaitingRequest>>
     readonly unseen: Stream.Stream<TurnEnd | null>
     readonly markSeen: (endedAt: DateTime.Utc) => Effect.Effect<void, ConversationError>
@@ -111,9 +111,9 @@ export class GlobalConversation extends Context.Service<
       effect: (start: StartIdle) => Effect.Effect<void, E>,
     ) => Effect.Effect<void, E | ConversationError>
   }
->()("@glass/server/GlobalConversation") {
+>()("@glass/server/GlobalChat") {
   static readonly layer = Layer.effect(
-    GlobalConversation,
+    GlobalChat,
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
       const config = yield* ServerConfig
@@ -122,17 +122,18 @@ export class GlobalConversation extends Context.Service<
       const turns = yield* ConversationTurns
       const host = yield* LocalAgentHost
       const credentials = yield* McpCredentials
+      // WARNING: pi keys its session files by working directory; renaming this folder loses the live session.
       const folder = join(config.dataDirectory, "global-conversation")
 
       const [saved] = yield* sql`
-        SELECT id, session_id AS sessionId, model, effort FROM global_conversation LIMIT 1
+        SELECT id, session_id AS sessionId, model, effort FROM global_chat LIMIT 1
       `.pipe(Effect.flatMap(decodeStored), Effect.orDie)
 
       const id = saved?.id ?? randomUUID()
       const firstSession = saved?.sessionId ?? randomUUID()
 
       if (saved === undefined)
-        yield* sql`INSERT INTO global_conversation ${sql.insert({
+        yield* sql`INSERT INTO global_chat ${sql.insert({
           id,
           session_id: firstSession,
           session_started_at: DateTime.formatIso(yield* DateTime.now),
@@ -153,8 +154,7 @@ export class GlobalConversation extends Context.Service<
 
       const starting = yield* Semaphore.make(1)
 
-      const callerOf = (sessionId: string) =>
-        GlobalConversationCaller.make({ globalConversationId: id, sessionId })
+      const callerOf = (sessionId: string) => GlobalChatCaller.make({ globalChatId: id, sessionId })
 
       const start = (sessionId: string) => (client: ConversationHost) =>
         starting.withPermits(1)(
@@ -186,7 +186,7 @@ export class GlobalConversation extends Context.Service<
                 running.value.StopConversation({ conversationId: sessionId }),
               ).pipe(
                 Effect.catch((cause) =>
-                  Effect.logWarning("Couldn't stop pi for the ended Global conversation", cause),
+                  Effect.logWarning("Couldn't stop pi for the ended Global chat", cause),
                 ),
               )
 
@@ -238,13 +238,11 @@ export class GlobalConversation extends Context.Service<
         interrupted: dropSessionHoldingStaleCredential.pipe(Effect.andThen(currentSessions)),
       })
 
-      const changeModel = Effect.fn("GlobalConversation.changeModel")(function* (
-        choice: ModelChoice,
-      ) {
+      const changeModel = Effect.fn("GlobalChat.changeModel")(function* (choice: ModelChoice) {
         yield* stored(
-          "save the Global conversation's model",
+          "save the Global chat's model",
           sql`
-            UPDATE global_conversation
+            UPDATE global_chat
             SET model = ${choice.model}, effort = ${choice.effort}
             WHERE id = ${id}
           `,
@@ -274,16 +272,16 @@ export class GlobalConversation extends Context.Service<
 
           yield* stopProgram(ending)
           yield* stored(
-            "start the Global conversation fresh",
+            "start the Global chat fresh",
             sql.withTransaction(
               Effect.all(
                 [
                   sql`
-                    INSERT INTO past_global_conversation (id, started_at, ended_at)
-                    SELECT session_id, session_started_at, ${at} FROM global_conversation
+                    INSERT INTO past_chat (id, started_at, ended_at)
+                    SELECT session_id, session_started_at, ${at} FROM global_chat
                   `,
                   sql`
-                    UPDATE global_conversation
+                    UPDATE global_chat
                     SET session_id = ${next}, session_started_at = ${at}, turn_seen_at = NULL
                   `,
                 ],
@@ -294,28 +292,28 @@ export class GlobalConversation extends Context.Service<
           yield* SubscriptionRef.set(session, next)
           yield* annotateUnit({ conversation_id: next })
         }),
-      ).pipe(Effect.withSpan("GlobalConversation.startFresh"))
+      ).pipe(Effect.withSpan("GlobalChat.startFresh"))
 
       const past = stored(
-        "read past Global conversations",
+        "read Past chats",
         sql`
           SELECT id, started_at AS startedAt, ended_at AS endedAt
-          FROM past_global_conversation ORDER BY started_at DESC
+          FROM past_chat ORDER BY started_at DESC
         `.pipe(Effect.flatMap(decodePast)),
       )
 
       const findPast = Effect.fnUntraced(function* (sessionId: string) {
         const [ended] = yield* stored(
-          "read a past Global conversation",
+          "read a Past chat",
           sql`
-            SELECT id FROM past_global_conversation WHERE id = ${sessionId}
+            SELECT id FROM past_chat WHERE id = ${sessionId}
           `.pipe(Effect.flatMap(decodeIds)),
         )
 
-        if (ended === undefined) yield* new PastConversationNotFound({ id: sessionId })
+        if (ended === undefined) yield* new PastChatNotFound({ id: sessionId })
       })
 
-      return GlobalConversation.of({
+      return GlobalChat.of({
         model: SubscriptionRef.get(model),
         changeModel,
         transcript: followSession(transcripts.watch),

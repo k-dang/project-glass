@@ -4,7 +4,7 @@ import { McpServer, Tool, Toolkit } from "effect/ai"
 import { AgentRunners } from "../agentRunners"
 import { LAUNCH_TOKEN, RENDERER_ORIGIN, startBackend } from "../../test/harness"
 import { connectMcp, initialize, listedTools, mcpPost, toolResult } from "../../test/mcpClient"
-import { McpCaller, GlobalConversationCaller } from "./McpCredentials"
+import { McpCaller, GlobalChatCaller } from "./McpCredentials"
 
 const DescribeTarget = Tool.make("describe_target", {
   description: "Names the caller and the conversation it asked about.",
@@ -30,7 +30,7 @@ const startMcpBackend = Effect.gen(function* () {
         describe_target: ({ conversationId }) =>
           Effect.map(McpCaller.current, (caller) => ({
             caller: Match.valueTags(caller, {
-              GlobalConversation: (global) => global.globalConversationId,
+              GlobalChat: (global) => global.globalChatId,
               Conversation: ({ conversationId: calling }) => calling,
               OutsideAgent: ({ agentId }) => agentId,
             }),
@@ -51,8 +51,8 @@ const startMcpBackend = Effect.gen(function* () {
   return { ...backend, started, released, interrupted }
 })
 
-const GLOBAL = GlobalConversationCaller.make({
-  globalConversationId: "global-conversation",
+const GLOBAL = GlobalChatCaller.make({
+  globalChatId: "global-chat",
   sessionId: "global-session",
 })
 
@@ -77,7 +77,7 @@ describe("MCP endpoint", () => {
       }).response
 
       assert.deepStrictEqual(toolResult(called).structuredContent, {
-        caller: "global-conversation",
+        caller: "global-chat",
         target: "another-conversation",
       })
     }),
@@ -89,8 +89,8 @@ describe("MCP endpoint", () => {
       const mcp = yield* connectMcp(baseUrl, yield* mcpCredentials.issue(GLOBAL))
 
       const other = yield* mcpCredentials.issue(
-        GlobalConversationCaller.make({
-          globalConversationId: "other-runtime",
+        GlobalChatCaller.make({
+          globalChatId: "other-runtime",
           sessionId: "other-runtime",
         }),
       )

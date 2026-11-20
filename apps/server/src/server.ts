@@ -22,7 +22,7 @@ import { Git } from "./git"
 import { GitHubAuth } from "./github/GitHubAuth"
 import { GitHubClient } from "./github/GitHubClient"
 import { GlassRpcHandlers } from "./handlers"
-import { GlobalConversation } from "./GlobalConversation"
+import { GlobalChat } from "./GlobalChat"
 import { LocalAgentHost } from "./LocalAgentHost"
 import { LocalCheckouts } from "./LocalCheckouts"
 import { Plugins } from "./Plugins"
@@ -75,13 +75,13 @@ type AgentRunnersLayer = Layer.Layer<
 const followReattachedHost = Layer.effectDiscard(
   Effect.gen(function* () {
     yield* Conversations
-    yield* GlobalConversation
+    yield* GlobalChat
     yield* (yield* LocalAgentHost).followReattached
   }),
 )
 
 const ConversationsLive = followReattachedHost.pipe(
-  Layer.provideMerge(Layer.merge(Conversations.layer, GlobalConversation.layer)),
+  Layer.provideMerge(Layer.merge(Conversations.layer, GlobalChat.layer)),
   Layer.provide(LocalPlacement.layer),
   Layer.provideMerge(Sandboxes.layer),
   Layer.provide(ConversationTurns.layer),

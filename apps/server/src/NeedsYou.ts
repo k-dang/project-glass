@@ -7,7 +7,7 @@ import {
   ChecksFailing,
   finishedReview,
   splitLead,
-  GlobalConversationNeedsYou,
+  GlobalChatNeedsYou,
   canRunQueueWork,
   type NeedsYouItem,
   NeedsYou as NeedsYouList,
@@ -37,7 +37,7 @@ import {
 import { AgentReviews } from "./AgentReviews"
 import { CheckIns } from "./CheckIns"
 import { Conversations, type FinishedConversation, type WaitingConversation } from "./Conversations"
-import { GlobalConversation } from "./GlobalConversation"
+import { GlobalChat } from "./GlobalChat"
 import { OutsideQuestions } from "./OutsideQuestions"
 import {
   type Mirror,
@@ -80,9 +80,7 @@ const waitingItem = ({ conversation, requests }: WaitingConversation) => {
 }
 
 const globalItem = (requests: ReadonlyArray<WaitingRequest>) =>
-  Arr.isReadonlyArrayNonEmpty(requests)
-    ? [GlobalConversationNeedsYou.make(waitingOn(requests))]
-    : []
+  Arr.isReadonlyArrayNonEmpty(requests) ? [GlobalChatNeedsYou.make(waitingOn(requests))] : []
 
 const finishedItem = ({ conversation, ended }: FinishedConversation) =>
   ConversationNeedsYou.make({
@@ -193,7 +191,7 @@ export class NeedsYou extends Context.Service<
       const questions = yield* OutsideQuestions
       const checkIns = yield* CheckIns
       const mirror = yield* PullRequestMirror
-      const conversation = yield* GlobalConversation
+      const globalChat = yield* GlobalChat
 
       const finishedReviewOf = (pullRequest: PullRequestSummary) =>
         agentReviews.watch(pullRequest.ref).pipe(
@@ -256,7 +254,7 @@ export class NeedsYou extends Context.Service<
             waitingPullRequests,
             questions.watch(),
             checkIns.watch(),
-            conversation.waiting,
+            globalChat.waiting,
           ).pipe(
             Stream.map(([waiting, finished, pullRequests, asked, checkingIn, global]) =>
               needsYouOf({

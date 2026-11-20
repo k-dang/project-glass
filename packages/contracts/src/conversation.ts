@@ -708,18 +708,17 @@ export class StartFreshRefused extends Schema.TaggedError<StartFreshRefused>()(
   { reason: Schema.Literals(["running", "queued", "waiting"]) },
 ) {}
 
-export const PastConversation = Schema.Struct({
+export const PastChat = Schema.Struct({
   id: Schema.String,
   startedAt: Schema.DateTimeUtcFromString,
   endedAt: Schema.DateTimeUtcFromString,
 })
 
-export type PastConversation = typeof PastConversation.Type
+export type PastChat = typeof PastChat.Type
 
-export class PastConversationNotFound extends Schema.TaggedError<PastConversationNotFound>()(
-  "PastConversationNotFound",
-  { id: Schema.String },
-) {}
+export class PastChatNotFound extends Schema.TaggedError<PastChatNotFound>()("PastChatNotFound", {
+  id: Schema.String,
+}) {}
 
 export class NoPermissionModes extends Schema.TaggedError<NoPermissionModes>()(
   "NoPermissionModes",

@@ -21,7 +21,7 @@ import {
 } from "./demoLongConversation"
 import { DEMO_REPOSITORY } from "./demoPullRequests"
 import { lastUserWords, replyTo, startFakeAnthropic } from "./fakeAnthropic"
-import { globalConversationReply, isGlobalConversation } from "./fakeGlobalConversation"
+import { globalChatReply, isGlobalChat } from "./fakeGlobalChat"
 import {
   type FakeModelDelta,
   type FakeModelRequest,
@@ -51,7 +51,7 @@ const keepWorkingPrompt = "Keep working until I stop you."
 const keepsWorking = (input: FakeModelRequest) => lastUserText(input) === keepWorkingPrompt
 
 const answersFollowUp = (input: FakeModelRequest) =>
-  !isGlobalConversation(input) &&
+  !isGlobalChat(input) &&
   input.messages.at(-1)?.role === "user" &&
   input.messages.some(({ role }) => role === "assistant")
 
@@ -119,7 +119,7 @@ const glassToolReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> 
 }
 
 const demoReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
-  if (isGlobalConversation(input)) return globalConversationReply(input)
+  if (isGlobalChat(input)) return globalChatReply(input)
 
   const glassTool = glassToolReply(input)
 

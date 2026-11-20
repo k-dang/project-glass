@@ -176,9 +176,9 @@ export const describeError = (error: BackendError): Problem =>
           waiting: "The conversation is waiting on you. Answer its Question, then start fresh.",
         }[reason],
       }),
-      PastConversationNotFound: () => ({
+      PastChatNotFound: () => ({
         title: "That conversation is gone",
-        detail: "Glass couldn't find that past conversation. Go back and pick another.",
+        detail: "Glass couldn't find that past chat. Go back and pick another.",
       }),
       RequestNotWaiting: () => ({
         title: "Already settled",

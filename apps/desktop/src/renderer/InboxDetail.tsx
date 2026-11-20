@@ -2,7 +2,7 @@ import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import {
   type CheckIn,
   type ConversationNeedsYou,
-  type GlobalConversationNeedsYou,
+  type GlobalChatNeedsYou,
   type NeedsYouItem,
   OutsideChoice,
   type OutsideQuestion,
@@ -26,7 +26,7 @@ import { AgentReviewMarkdown } from "./AgentReviewPanel"
 import { Backend, backendRuntime } from "./backend"
 import { conversationAtoms, ConversationAtomsContext } from "./conversation"
 import { ConversationChat, TranscriptProblem } from "./ConversationView"
-import { globalConversation, globalConversationOpenAtom } from "./globalConversation"
+import { globalChat, globalChatOpenAtom } from "./globalChat"
 import {
   contextOf,
   type InboxAction,
@@ -68,9 +68,7 @@ export function InboxDetail(
         onReadReview={props.onReadReview}
       />
     ),
-    GlobalConversation: (item) => (
-      <GlobalConversationDetail item={item} now={now} actions={actions} />
-    ),
+    GlobalChat: (item) => <GlobalChatDetail item={item} now={now} actions={actions} />,
   })
 }
 
@@ -275,16 +273,16 @@ function ConversationDetail(props: DetailProps<ConversationNeedsYou>) {
   )
 }
 
-function GlobalConversationDetail(props: DetailProps<GlobalConversationNeedsYou>) {
-  const open = useAtomSet(globalConversationOpenAtom)
+function GlobalChatDetail(props: DetailProps<GlobalChatNeedsYou>) {
+  const open = useAtomSet(globalChatOpenAtom)
 
   return (
     <DetailShell
       actions={props.actions}
-      buttons={<Button onClick={() => open(true)}>Open the Global conversation</Button>}
+      buttons={<Button onClick={() => open(true)}>Open the Global chat</Button>}
     >
       <DetailHeader item={props.item} now={props.now} />
-      <ConversationAtomsContext value={globalConversation}>
+      <ConversationAtomsContext value={globalChat}>
         {props.item.requests.map((part) => (
           <RequestCard key={part.requestId} part={part} />
         ))}

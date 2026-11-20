@@ -1,5 +1,5 @@
 import { getSessionInfo, query } from "@anthropic-ai/claude-agent-sdk"
-import { GlobalConversationCaller } from "../src/mcp/McpCredentials"
+import { GlobalChatCaller } from "../src/mcp/McpCredentials"
 import {
   type AgentEvent,
   type AgentHarness,
@@ -315,7 +315,7 @@ export const glassToolsBackend = Effect.fnUntraced(function* (sessionId: string)
   const url = yield* mcpCredentials.endpoint
 
   const bearer = yield* mcpCredentials.issue(
-    GlobalConversationCaller.make({ globalConversationId: "global-conversation", sessionId }),
+    GlobalChatCaller.make({ globalChatId: "global-chat", sessionId }),
   )
 
   return {

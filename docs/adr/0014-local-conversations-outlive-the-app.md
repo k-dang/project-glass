@@ -46,7 +46,7 @@ break once the backend quits.
 
 - Background work that a Claude Code agent leaves running after its Turn ends doesn't keep the
   host alive, so quitting Glass still ends that work.
-- The Global conversation still ends interrupted on relaunch. Its pi holds a Glass tools
+- The Global chat still ends interrupted on relaunch. Its pi holds a Glass tools
   credential that died with the backend, so Glass stops it on the host and starts it again.
 - The token sits in a file only this user can read. Anyone who can read the data directory can
   already read Glass's database.

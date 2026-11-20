@@ -13,13 +13,10 @@ import {
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto"
 import type { GlassToolsAccess, StartOutcome } from "../agentHost/protocol"
 
-export class GlobalConversationCaller extends Schema.TaggedClass<GlobalConversationCaller>()(
-  "GlobalConversation",
-  {
-    globalConversationId: Schema.String,
-    sessionId: Schema.String,
-  },
-) {}
+export class GlobalChatCaller extends Schema.TaggedClass<GlobalChatCaller>()("GlobalChat", {
+  globalChatId: Schema.String,
+  sessionId: Schema.String,
+}) {}
 
 export class OutsideAgentCaller extends Schema.TaggedClass<OutsideAgentCaller>()("OutsideAgent", {
   agentId: Schema.String,
@@ -31,13 +28,13 @@ export class ConversationCaller extends Schema.TaggedClass<ConversationCaller>()
   conversationId: Schema.String,
 }) {}
 
-export type McpCallerIdentity = GlobalConversationCaller | ConversationCaller | OutsideAgentCaller
+export type McpCallerIdentity = GlobalChatCaller | ConversationCaller | OutsideAgentCaller
 
-export type IssuedCaller = GlobalConversationCaller | ConversationCaller
+export type IssuedCaller = GlobalChatCaller | ConversationCaller
 
 const runningKey = (caller: IssuedCaller) =>
-  Predicate.isTagged(caller, "GlobalConversation")
-    ? `GlobalConversation:${caller.globalConversationId}`
+  Predicate.isTagged(caller, "GlobalChat")
+    ? `GlobalChat:${caller.globalChatId}`
     : `Conversation:${caller.conversationId}`
 
 export class McpCaller extends Context.Service<McpCaller, McpCallerIdentity>()(

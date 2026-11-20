@@ -21,7 +21,7 @@ import { Backend, backendRuntime, backendRuntimeOf } from "./backend"
 import type { ConversationAtoms } from "./conversation"
 import { openWorkspaceAtom, sameRef } from "./reviewsArea"
 
-export const globalConversationOpenAtom = Atom.make(false).pipe(Atom.keepAlive)
+export const globalChatOpenAtom = Atom.make(false).pipe(Atom.keepAlive)
 
 export const globalUnseenAtom = backendRuntime
   .atom(Stream.unwrap(Backend.useSync((backend) => backend.WatchGlobalUnseen())))
@@ -32,24 +32,20 @@ export const markGlobalTurnSeenAtom = backendRuntime.fn((endedAt: DateTime.Utc) 
 )
 
 export const globalModelAtom = backendRuntime
-  .atom(Backend.use((backend) => backend.GetGlobalConversationModel()))
+  .atom(Backend.use((backend) => backend.GetGlobalChatModel()))
   .pipe(Atom.keepAlive)
 
 export const changeGlobalModelAtom = backendRuntime.fn((choice: ModelChoice, get) =>
-  Backend.use((backend) => backend.ChangeGlobalConversationModel(choice)).pipe(
+  Backend.use((backend) => backend.ChangeGlobalChatModel(choice)).pipe(
     Effect.tap(() => Effect.sync(() => get.refresh(globalModelAtom))),
   ),
 )
 
-export const pastGlobalConversationsAtom = backendRuntime.atom(
-  Backend.use((backend) => backend.ListPastGlobalConversations()),
-)
+export const pastChatsAtom = backendRuntime.atom(Backend.use((backend) => backend.ListPastChats()))
 
 export const pastGlobalTranscriptAtom = Atom.family((id: string) =>
   backendRuntime.atom(
-    transcriptOf(
-      Stream.unwrap(Backend.useSync((backend) => backend.WatchPastGlobalConversation({ id }))),
-    ),
+    transcriptOf(Stream.unwrap(Backend.useSync((backend) => backend.WatchPastChat({ id })))),
   ),
 )
 
@@ -60,8 +56,8 @@ export const loadEarlierPastTurnsAtom = Atom.family((id: string) =>
 )
 
 export const startGlobalFreshAtom = backendRuntime.fn((_: void, get) =>
-  Backend.use((backend) => backend.StartGlobalConversationFresh()).pipe(
-    Effect.tap(() => Effect.sync(() => get.refresh(pastGlobalConversationsAtom))),
+  Backend.use((backend) => backend.StartGlobalChatFresh()).pipe(
+    Effect.tap(() => Effect.sync(() => get.refresh(pastChatsAtom))),
   ),
 )
 
@@ -108,8 +104,8 @@ const sending = ({ message, images }: MessageInput, get: Atom.FnContext) => ({
   context: get(capturedContextAtom),
 })
 
-export const globalConversation: ConversationAtoms = {
-  composerKey: "global-conversation",
+export const globalChat: ConversationAtoms = {
+  composerKey: "global-chat",
   transcript: backendRuntime
     .atom(
       transcriptOf(Stream.unwrap(Backend.useSync((backend) => backend.WatchGlobalTranscript()))),

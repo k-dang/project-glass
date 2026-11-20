@@ -27,8 +27,8 @@ import {
   ModelChoice,
   NewConversation,
   NoPermissionModes,
-  PastConversation,
-  PastConversationNotFound,
+  PastChat,
+  PastChatNotFound,
   PermissionMode,
   QueuedMessageStarted,
   RemovalWarnings,
@@ -572,11 +572,11 @@ export class GlassRpcs extends RpcGroup.make(
     payload: { conversationId: Schema.String },
     error: Schema.Union([ConversationNotFound, ConversationError]),
   }),
-  Rpc.make("GetGlobalConversationModel", {
+  Rpc.make("GetGlobalChatModel", {
     success: ModelChoice,
     error: ConversationError,
   }),
-  Rpc.make("ChangeGlobalConversationModel", {
+  Rpc.make("ChangeGlobalChatModel", {
     payload: ModelChoice.fields,
     error: ConversationError,
   }),
@@ -617,22 +617,22 @@ export class GlassRpcs extends RpcGroup.make(
     payload: { endedAt: Schema.DateTimeUtcFromString },
     error: ConversationError,
   }),
-  Rpc.make("StartGlobalConversationFresh", {
+  Rpc.make("StartGlobalChatFresh", {
     error: Schema.Union([StartFreshRefused, ConversationError]),
   }),
-  Rpc.make("ListPastGlobalConversations", {
-    success: Schema.Array(PastConversation),
+  Rpc.make("ListPastChats", {
+    success: Schema.Array(PastChat),
     error: ConversationError,
   }),
-  Rpc.make("WatchPastGlobalConversation", {
+  Rpc.make("WatchPastChat", {
     payload: { id: Schema.String },
     success: TranscriptUpdate,
-    error: Schema.Union([PastConversationNotFound, ConversationError]),
+    error: Schema.Union([PastChatNotFound, ConversationError]),
     stream: true,
   }),
   Rpc.make("LoadEarlierPastGlobalTurns", {
     payload: { id: Schema.String, before: Schema.String },
-    error: Schema.Union([PastConversationNotFound, ConversationError]),
+    error: Schema.Union([PastChatNotFound, ConversationError]),
   }),
 ) {}
 

@@ -76,12 +76,12 @@ export const OutsideQuestion = Schema.TaggedStruct("OutsideQuestion", {
 
 export type OutsideQuestion = typeof OutsideQuestion.Type
 
-export const GlobalConversationNeedsYou = Schema.TaggedStruct("GlobalConversation", {
+export const GlobalChatNeedsYou = Schema.TaggedStruct("GlobalChat", {
   requests: WaitingRequestParts,
   since: Schema.DateTimeUtcFromString,
 })
 
-export type GlobalConversationNeedsYou = typeof GlobalConversationNeedsYou.Type
+export type GlobalChatNeedsYou = typeof GlobalChatNeedsYou.Type
 
 export const OutsideChoice = Schema.TaggedStruct("Choice", {
   choice: Schema.String,
@@ -118,7 +118,7 @@ export const NeedsYouItem = Schema.Union([
   PullRequestNeedsYou,
   OutsideQuestion,
   CheckIn,
-  GlobalConversationNeedsYou,
+  GlobalChatNeedsYou,
 ])
 
 export type NeedsYouItem = typeof NeedsYouItem.Type
@@ -133,7 +133,7 @@ export const needsYouGroupOf = (item: NeedsYouItem): NeedsYouGroup =>
   Match.valueTags(item, {
     OutsideQuestion: () => "stopped" as const,
     CheckIn: () => "stopped" as const,
-    GlobalConversation: () => "stopped" as const,
+    GlobalChat: () => "stopped" as const,
     Conversation: ({ reasons }) =>
       reasons.some(Predicate.isTagged("WaitingRequests"))
         ? ("stopped" as const)

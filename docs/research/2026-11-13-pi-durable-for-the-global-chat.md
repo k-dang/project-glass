@@ -1,6 +1,6 @@
-# pi-durable for the Global conversation (2026-11-13)
+# pi-durable for the Global chat (2026-11-13)
 
-Should the Global conversation run on [`@earendil-works/pi-durable`](https://github.com/earendil-works/pi/tree/main/packages/durable)
+Should the Global chat run on [`@earendil-works/pi-durable`](https://github.com/earendil-works/pi/tree/main/packages/durable)
 instead of the pi CLI in RPC mode? **Not yet.** Revisit when the triggers below change.
 
 Read at pi commit `3e23dd9` (2026-11-13), pi-durable 1.5.2 on npm; Glass at `58765d9`.
@@ -25,7 +25,7 @@ Read at pi commit `3e23dd9` (2026-11-13), pi-durable 1.5.2 on npm; Glass at `587
 - Consumers read committed state through `conversation.watch()`; a reconnecting client gets the
   current view plus pagination via `ConversationTranscript`, not a replay (examples 18, 20).
 - Model is per-conversation `configure({ model, thinkingLevel })`, applied from the next request.
-- Example 22 (subagent-background) is the closest shape to the Global conversation: one tool spawns
+- Example 22 (subagent-background) is the closest shape to the Global chat: one tool spawns
   and messages persistent child conversations and posts their answers back, surviving a restart.
 - Coding-agent extensions can't run under the Harness ([#10386](https://github.com/earendil-works/pi/issues/10386)).
 
@@ -37,7 +37,7 @@ Read at pi commit `3e23dd9` (2026-11-13), pi-durable 1.5.2 on npm; Glass at `587
   older harnesses from opening newer databases (CHANGELOG).
 - About 110k lines including a 7,266-line normative spec; 106 test files.
 
-## How Glass runs the Global conversation today
+## How Glass runs the Global chat today
 
 - pi CLI spawned as `pi --mode rpc --session-id <id>` in the agent host
   (`apps/server/src/agentHost/piRpc.ts`), using the user's own `pi` (`SettingsStore.ts`).
@@ -52,7 +52,7 @@ Read at pi commit `3e23dd9` (2026-11-13), pi-durable 1.5.2 on npm; Glass at `587
 
 - **Small gain.** Global Turns are short MCP calls into the backend; when the backend dies, so do
   the tools, so resuming mid-Turn mostly retries a tool call after relaunch.
-- **A second stack.** Moving only the Global conversation forks it from the shared Agent path: a
+- **A second stack.** Moving only the Global chat forks it from the shared Agent path: a
   second transcript store or an adapter from durable's watch ops to `TranscriptUpdate`, plus an MCP
   bridge.
 - **Immature API**, and the signals that `ask_user` needs are unreleased.
@@ -65,4 +65,4 @@ Read at pi commit `3e23dd9` (2026-11-13), pi-durable 1.5.2 on npm; Glass at `587
 - Agents should outlive the app (ADR 0007). The bigger fit is then the whole agent host for pi
   Agents, replacing `piRpc`, `turnLoop` and the in-memory journal; Claude Code Agents would still
   need their own runtime.
-- Lost Turns or Questions on quit become a real complaint for the Global conversation.
+- Lost Turns or Questions on quit become a real complaint for the Global chat.

@@ -31,7 +31,7 @@ const listedBy = (turn: Turn | undefined) => {
 }
 
 it.live(
-  "lists the Conversations the Global conversation created or messaged, with the message that asked, after a restart",
+  "lists the Conversations the Global chat created or messaged, with the message that asked, after a restart",
   () =>
     Effect.gen(function* () {
       const f = yield* conversationsFixture

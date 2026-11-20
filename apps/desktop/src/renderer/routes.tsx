@@ -19,7 +19,7 @@ import { AppShell } from "./AppShell"
 import { Dashboard } from "./Dashboard"
 import { Connecting, ConnectionProblem } from "./ConnectionProblem"
 import { useConnection } from "./connection"
-import { Viewed, viewedAtom } from "./globalConversation"
+import { Viewed, viewedAtom } from "./globalChat"
 import { openNewCheckIns } from "./openNewCheckIns"
 import {
   closePullRequest,
