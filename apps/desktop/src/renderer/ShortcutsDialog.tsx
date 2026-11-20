@@ -69,8 +69,12 @@ const groups: ReadonlyArray<ShortcutGroup> = [
   {
     title: "Conversations",
     icon: Bot,
-    note: "In an open Conversation.",
-    shortcuts: [{ label: "Switch between Chat and Changes", keys: ["Mod", "D"] }],
+    note: "In Conversations. Switching between Chat and Changes needs an open Conversation.",
+    shortcuts: [
+      { label: "New Conversation", keys: ["Mod", "N"] },
+      { label: "Show or hide the Conversations panel", keys: ["Mod", "B"] },
+      { label: "Switch between Chat and Changes", keys: ["Mod", "D"] },
+    ],
   },
   {
     title: "Workspace",
