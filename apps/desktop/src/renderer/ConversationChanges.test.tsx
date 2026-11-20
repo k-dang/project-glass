@@ -446,12 +446,10 @@ it("returns a canceled Queued message's Feedback notes beside newer work once a 
 })
 
 it("selects lines with Shift+Arrow keys and starts a Feedback note on them with Enter", async () => {
-  const store = savedNotes()
-
   const { user, region, overview } = await openChanges({
     WatchTranscript: idle,
     GetConversationChanges: () => Effect.succeed(changes("read-1")),
-    ...store.handlers,
+    ...savedNotes().handlers,
   })
 
   const diff = within(region).getByRole("button", { name: "Hide greet.ts" }).parentElement!
