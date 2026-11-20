@@ -155,10 +155,10 @@ export class LocalPlacement extends Context.Service<
           return listed.split("\0").filter((file) => file !== "")
         }),
         place,
-        host: ({ conversation }) =>
+        prepareHost: ({ conversation }) =>
           host.client.pipe(Effect.tap(() => Effect.sync(() => void hosted.add(conversation.id)))),
-        runningHost: () => host.running,
-        hostOnceMade: (placed) =>
+        connectedHost: () => host.running,
+        hostIfPrepared: (placed) =>
           worktreeExists(placed).pipe(
             Effect.flatMap((exists) =>
               exists ? host.client.pipe(Effect.map(Option.some)) : Effect.succeedNone,
