@@ -15,6 +15,7 @@ import { Placeholder, UndoRedo } from "@tiptap/extensions"
 import { Selection, TextSelection } from "@tiptap/pm/state"
 import { type EditorView } from "@tiptap/pm/view"
 import { EditorContent, useEditor } from "@tiptap/react"
+import { DialogTrigger } from "@ui-sdk/react/dialog"
 import { Predicate } from "effect"
 import { ArrowUp, LoaderCircle, Paperclip, Square, X } from "lucide-react"
 import { memo, type ReactNode, useLayoutEffect, useRef, useState } from "react"
@@ -25,25 +26,41 @@ import { conversationColumn } from "./conversationColumn"
 import { noCommands, noFiles } from "./conversationsArea"
 import { CommandHighlight, useCommandPicker } from "./Commands"
 import { pastedSlice, toContent, Mention, toMessage } from "./composerDocument"
-import { imageFiles, readImages } from "./pastedImages"
+import { createImageViewer, ImageViewer, type ImageViewerController } from "./ImageViewer"
+import { imageFiles, imageSrc, readImages } from "./pastedImages"
 import { MarkdownStyling } from "./markdownStyling"
 import { useMentionPicker } from "./Mentions"
 import { type Problem } from "./problems"
 import { ProblemAlert } from "./ProblemAlert"
 
 export const Attachment = memo(function Attachment(props: {
-  image: Image
+  images: ReadonlyArray<Image>
   index: number
+  viewer: ImageViewerController
   className: string
 }) {
-  const { mediaType, data } = props.image
+  const { mediaType, data } = props.images[props.index]!
+  const number = props.index + 1
 
   return (
-    <img
-      src={`data:${mediaType};base64,${data}`}
-      alt={`Attachment ${props.index + 1}`}
-      className={props.className}
-    />
+    <DialogTrigger
+      controller={props.viewer}
+      payload={{
+        images: props.images.map((image, at) => ({
+          src: imageSrc(image.mediaType, image.data),
+          name: `Attachment ${at + 1}`,
+        })),
+        index: props.index,
+      }}
+      aria-label={`Open attachment ${number}`}
+      className="rounded-lg"
+    >
+      <img
+        src={imageSrc(mediaType, data)}
+        alt={`Attachment ${number}`}
+        className={props.className}
+      />
+    </DialogTrigger>
   )
 })
 
@@ -106,6 +123,7 @@ export function MessageBox(props: {
   const { composed, setComposed } = props
   const sending = useRef(false)
   const fileInput = useRef<HTMLInputElement>(null)
+  const [viewer] = useState(createImageViewer)
   const [awaiting, setAwaiting] = useState(false)
 
   const [content] = useState(() => toContent(composed.message))
@@ -316,11 +334,12 @@ export function MessageBox(props: {
               <InputGroup className="has-[[data-slot=input-group-control]:focus-visible]:border-foreground/25 has-[[data-slot=input-group-control]:focus-visible]:ring-0">
                 {composed.images.length > 0 && (
                   <InputGroupAddon align="block-start" className="flex-wrap gap-2">
-                    {composed.images.map((image, index) => (
+                    {composed.images.map((_image, index) => (
                       <span key={index} className="relative">
                         <Attachment
-                          image={image}
+                          images={composed.images}
                           index={index}
+                          viewer={viewer}
                           className="size-14 rounded-md border object-cover"
                         />
                         <InputGroupButton
@@ -339,6 +358,7 @@ export function MessageBox(props: {
                         </InputGroupButton>
                       </span>
                     ))}
+                    <ImageViewer controller={viewer} />
                   </InputGroupAddon>
                 )}
                 <EditorContent editor={editor} className="w-full min-w-0" />

@@ -135,6 +135,7 @@ import {
   useConversationAtoms,
 } from "./conversation"
 import { MessageText, readableText } from "./Mentions"
+import { createImageViewer, ImageViewer } from "./ImageViewer"
 import { Attachment, type ComposerSuggestion, MessageBox } from "./MessageBox"
 import { SentFeedback } from "./FeedbackNotes"
 import { ModelPicker } from "./ModelPicker"
@@ -532,17 +533,21 @@ export function Transcript(props: {
 }
 
 function AttachedImages(props: { images: ReadonlyArray<Image> }) {
+  const [viewer] = useState(createImageViewer)
+
   return (
     props.images.length > 0 && (
       <div className="flex flex-wrap justify-end gap-2">
-        {props.images.map((image, index) => (
+        {props.images.map((_, index) => (
           <Attachment
             key={index}
-            image={image}
+            images={props.images}
             index={index}
+            viewer={viewer}
             className="max-h-40 max-w-60 rounded-lg border object-contain"
           />
         ))}
+        <ImageViewer controller={viewer} />
       </div>
     )
   )
@@ -1316,6 +1321,7 @@ function QueuedMessages(props: { queued: ReadonlyArray<QueuedMessage>; running: 
   const atoms = useConversationAtoms()
   const cancel = useAtomSet(atoms.cancelQueued)
   const sendNow = useAtomSet(atoms.sendQueued)
+  const [viewer] = useState(createImageViewer)
 
   return (
     <section
@@ -1364,11 +1370,12 @@ function QueuedMessages(props: { queued: ReadonlyArray<QueuedMessage>; running: 
               {queued.feedback.length > 0 && <SentFeedback feedback={queued.feedback} />}
               {queued.images.length > 0 && (
                 <QueueItemAttachment>
-                  {queued.images.map((image, index) => (
+                  {queued.images.map((_, index) => (
                     <Attachment
                       key={index}
-                      image={image}
+                      images={queued.images}
                       index={index}
+                      viewer={viewer}
                       className="size-8 rounded border object-cover"
                     />
                   ))}
@@ -1378,6 +1385,7 @@ function QueuedMessages(props: { queued: ReadonlyArray<QueuedMessage>; running: 
           )
         })}
       </QueueList>
+      <ImageViewer controller={viewer} />
     </section>
   )
 }
