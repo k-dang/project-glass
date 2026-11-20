@@ -1,5 +1,6 @@
 import {
   type Conversation,
+  type ConversationPullRequest,
   type AgentCommand,
   type AgentHarness,
   type ConversationMessageInput,
@@ -12,7 +13,6 @@ import {
   type NewConversation,
   type PermissionMode,
   type PlaceTag,
-  type PullRequestSummary,
   type RequestAnswer,
   SandboxPlace,
   type SentMessage,
@@ -71,8 +71,8 @@ export const conversationPullRequestsAtom = backendRuntime
   .atom(
     Stream.unwrap(Backend.useSync((backend) => backend.WatchConversationPullRequests())).pipe(
       Stream.map(
-        (listed): ReadonlyMap<string, PullRequestSummary> =>
-          new Map(listed.map(({ conversationId, pullRequest }) => [conversationId, pullRequest])),
+        (listed): ReadonlyMap<string, ConversationPullRequest> =>
+          new Map(listed.map((pullRequest) => [pullRequest.conversationId, pullRequest])),
       ),
     ),
   )

@@ -510,12 +510,53 @@ it.live("finds a Conversation's PR from the branch its agent left checked out, n
       Effect.map(Option.getOrThrow),
     )
 
-    assert.equal(found?.pullRequest.ref.number, 7)
+    assert.equal(found?.ref.number, 7)
 
     const [listed] = yield* f.client
       .WatchConversations()
       .pipe(Stream.runHead, Effect.map(Option.getOrThrow))
 
     assert.equal(listed?.branch, "feature/greeting")
+  }),
+)
+
+it.live("keeps showing a Conversation's PR as merged once it merges", () =>
+  Effect.gen(function* () {
+    const f = yield* conversationsFixture
+    yield* f.client.FollowRepository({ input: "glass-demo/greeter" })
+
+    const pr = f.github.seedPullRequest({
+      owner: "glass-demo",
+      repo: "greeter",
+      number: 7,
+      headBranch: "feature/greeting",
+      base: { sha: "b0", files: {} },
+      head: { sha: "h1", files: {} },
+    })
+
+    const conversation = yield* f.start("hold:first")
+    yield* f.transcript(conversation.id, holding)
+    gitIn(f.worktree(conversation.name), "switch", "--quiet", "-c", "feature/greeting")
+    yield* f.release("first")
+
+    const stateOfPr = (tag: string) =>
+      f.client.WatchConversationPullRequests().pipe(
+        Stream.map((listed) =>
+          listed.find(({ conversationId }) => conversationId === conversation.id),
+        ),
+        Stream.filter((found) => found?.state._tag === tag),
+        Stream.runHead,
+        Effect.map(Option.getOrThrow),
+      )
+
+    yield* stateOfPr("Open")
+
+    pr.edit({ state: "MERGED" })
+    yield* f.client.ListPullRequests()
+
+    const merged = yield* stateOfPr("Merged")
+
+    assert.equal(merged?.ref.number, 7)
+    assert.equal(merged?.url, pr.url)
   }),
 )

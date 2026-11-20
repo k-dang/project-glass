@@ -1,22 +1,43 @@
 import { useAtomValue } from "@effect/atom-react"
-import type { PullRequestRef, PullRequestSummary } from "@glass/contracts"
+import type {
+  ConversationPullRequest,
+  ConversationPullRequestState,
+  PullRequestRef,
+} from "@glass/contracts"
 import { useNavigate } from "@tanstack/react-router"
 import { cn } from "cn"
-import { Option } from "effect"
+import { Match, Option } from "effect"
 import type { ComponentProps } from "react"
 import { AsyncResult } from "effect/reactivity"
 import { buttonVariants } from "@/components/ui/button"
 import { TooltipHint } from "@/components/ui/tooltip"
 import { conversationPullRequestsAtom } from "./conversationsArea"
-import { ChecksIcon, checksLabels } from "./status"
+import { checksLabels, closedLabel, mergedLabel, StatusIcon, type StatusLabel } from "./status"
 
 export const useConversationPullRequest = (conversationId: string) =>
   Option.getOrUndefined(AsyncResult.value(useAtomValue(conversationPullRequestsAtom)))?.get(
     conversationId,
   )
 
-export const pullRequestLabel = ({ ref, checks }: PullRequestSummary) =>
-  `PR #${ref.number}, checks ${checksLabels[checks].label.toLowerCase()}`
+const statusOf = (state: ConversationPullRequestState): StatusLabel =>
+  Match.valueTags(state, {
+    Open: ({ checks }) => ({
+      ...checksLabels[checks],
+      label: `checks ${checksLabels[checks].label.toLowerCase()}`,
+    }),
+    Merged: () => ({ ...mergedLabel, label: "merged" }),
+    Closed: () => ({ ...closedLabel, label: "closed" }),
+  })
+
+export const pullRequestLabel = ({ ref, state }: ConversationPullRequest) =>
+  `PR #${ref.number}, ${statusOf(state).label}`
+
+export function PullRequestStatusIcon(props: {
+  state: ConversationPullRequestState
+  className: string
+}) {
+  return <StatusIcon status={statusOf(props.state)} className={props.className} />
+}
 
 export function PullRequestLink({
   href,
@@ -49,7 +70,7 @@ export function PullRequestLink({
   )
 }
 
-export function ConversationPullRequestLink(props: { pullRequest: PullRequestSummary }) {
+export function ConversationPullRequestLink(props: { pullRequest: ConversationPullRequest }) {
   const { pullRequest } = props
 
   return (
@@ -63,7 +84,8 @@ export function ConversationPullRequestLink(props: { pullRequest: PullRequestSum
           "shrink-0 gap-1.5 tabular-nums",
         )}
       >
-        <ChecksIcon checks={pullRequest.checks} className="size-3.5" />#{pullRequest.ref.number}
+        <PullRequestStatusIcon state={pullRequest.state} className="size-3.5" />#
+        {pullRequest.ref.number}
       </PullRequestLink>
     </TooltipHint>
   )
@@ -71,7 +93,7 @@ export function ConversationPullRequestLink(props: { pullRequest: PullRequestSum
 
 export function ConversationPullRequestBadge(props: {
   id: string
-  pullRequest: PullRequestSummary
+  pullRequest: ConversationPullRequest
 }) {
   const { pullRequest } = props
 
@@ -80,7 +102,7 @@ export function ConversationPullRequestBadge(props: {
       id={props.id}
       className="ml-auto flex shrink-0 items-center gap-1 text-xs text-muted-foreground tabular-nums"
     >
-      <ChecksIcon checks={pullRequest.checks} className="size-3" />
+      <PullRequestStatusIcon state={pullRequest.state} className="size-3" />
       <span aria-hidden>#{pullRequest.ref.number}</span>
       <span className="sr-only">{pullRequestLabel(pullRequest)}</span>
     </span>

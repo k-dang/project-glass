@@ -234,10 +234,11 @@ or Ask.
 _Avoid_: Session, thread, bot, box
 
 **Conversation's PR**:
-The open PR in a followed repository whose head is the branch the Conversation's folder had checked
-out when its latest Turn ended. The Conversation's header, details, and row in the list link to it
-with its Checks. A Conversation has none until a PR is opened from its branch, and none again once
-that PR is merged or closed.
+The PR in a followed repository whose head is the branch the Conversation's folder had checked out
+when its latest Turn ended: the open one, or once none is open, the latest merged or closed one
+unless that branch is the Conversation's base branch. The Conversation's header, details, and row
+in the list link to it, with its Checks while it's open and as merged or closed after. A
+Conversation has none until a PR is opened from its branch.
 _Avoid_: Linked PR, agent PR
 
 **Global conversation**:

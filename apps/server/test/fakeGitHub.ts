@@ -931,6 +931,7 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
       case "PullRequestChecks":
       case "PullRequestAttention":
       case "QueuedPullRequests":
+      case "EndedBranchPullRequests":
         return answerListing(request, pullRequests, unavailableRepositories, timingOutRepositories)
 
       case "PullRequestRevision": {
