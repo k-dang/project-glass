@@ -1,9 +1,10 @@
-import type { Checks, PullRequestState } from "@glass/contracts"
+import type { Checks, PullRequestState, TurnEnding } from "@glass/contracts"
 import { cn } from "cn"
 import {
   CircleCheck,
   CircleDashed,
   CircleDotDashed,
+  CircleStop,
   CircleX,
   GitMerge,
   GitPullRequestClosed,
@@ -40,6 +41,14 @@ export const closedLabel: StatusLabel = {
 export const finishedStates: Partial<Record<PullRequestState, StatusLabel>> = {
   merged: mergedLabel,
   closed: closedLabel,
+}
+
+export const turnEndingLooks: Record<TurnEnding["_tag"], StatusLabel> = {
+  Done: { label: "Finished", icon: CircleCheck, tone: "text-added" },
+  Failed: { label: "Failed", icon: CircleX, tone: "text-deleted" },
+  CutOff: { label: "Cut off", icon: CircleX, tone: "text-deleted" },
+  Stopped: { label: "Stopped", icon: CircleStop, tone: "text-muted-foreground" },
+  Interrupted: { label: "Interrupted", icon: CircleStop, tone: "text-muted-foreground" },
 }
 
 export function StatusIcon(props: { status: StatusLabel; className: string }) {

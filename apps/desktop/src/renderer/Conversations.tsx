@@ -7,6 +7,7 @@ import {
 } from "@effect/atom-react"
 import {
   type Conversation,
+  type ConversationNeedsYou,
   isGone,
   readOnlyExplanation,
   isOutOfReach,
@@ -15,11 +16,14 @@ import {
   type SandboxStatus,
 } from "@glass/contracts"
 import { Link, Outlet, useNavigate, useParams } from "@tanstack/react-router"
-import { DateTime, Exit, Option, Predicate } from "effect"
+import { DateTime, Exit, Match, Option, Predicate } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import {
+  CircleDashed,
+  CircleHelp,
   FolderGit2,
-  LoaderCircle,
+  GitBranch,
+  type LucideIcon,
   PanelLeftClose,
   PanelLeftOpen,
   SquarePen,
@@ -39,9 +43,13 @@ import {
   removeConversation,
   workingConversationsAtom,
 } from "./conversationsArea"
-import { conversationMarker } from "./inboxItem"
+import { AgentHarnessIcon } from "./AgentHarnessIcon"
 import { conversationsNeedingYouAtom } from "./needsYou"
 import { ConversationPullRequestBadge, useConversationPullRequest } from "./ConversationPullRequest"
+import { useMinuteClock } from "./Inbox"
+import { ago } from "./PullRequestRow"
+import { turnEndingLooks, warningTone } from "./status"
+import { harnessNames } from "./harnesses"
 import { ConfirmationDialog } from "./ConfirmationDialog"
 import { settledProblem, streamProblem } from "./problems"
 import { ProblemAlert } from "./ProblemAlert"
@@ -52,7 +60,26 @@ const groupNames: Record<PlaceTag, string> = { ...placeNames, sandbox: "Sandboxe
 
 const noneWorking: ReadonlySet<string> = new Set()
 
-const workingMarker = { label: "Working", tone: "text-muted-foreground" }
+interface Marker {
+  readonly label: string
+  readonly icon: LucideIcon
+  readonly tone: string
+}
+
+const workingMarker: Marker = {
+  label: "Working",
+  icon: CircleDashed,
+  tone: "text-sky-600 dark:text-sky-400",
+}
+
+const markerOf = ({ reasons }: ConversationNeedsYou): Marker => {
+  const reason = reasons.find(Predicate.isTagged("WaitingRequests")) ?? reasons[0]
+
+  return Match.valueTags(reason, {
+    WaitingRequests: () => ({ label: "Waiting on you", icon: CircleHelp, tone: warningTone }),
+    TurnFinished: ({ ended }) => turnEndingLooks[ended.ending._tag],
+  })
+}
 
 const expiryFormat = new Intl.DateTimeFormat(undefined, {
   weekday: "short",
@@ -74,7 +101,7 @@ const sandboxLine = ({ reach, expiresAt }: SandboxStatus) => {
 }
 
 const conversationLink =
-  "flex flex-col gap-0.5 rounded-md py-1.5 pr-8 pl-2 outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-accent"
+  "flex flex-col gap-0.5 rounded-lg px-2 py-2 outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-accent"
 
 const panelId = "conversations-panel"
 
@@ -180,6 +207,7 @@ function NewConversationLink() {
 function ConversationList() {
   const conversations = useAtomValue(conversationsAtom)
   const retry = useAtomRefresh(conversationsAtom)
+  const now = useMinuteClock()
 
   return AsyncResult.builder(conversations)
     .onInitial(() => (
@@ -202,7 +230,7 @@ function ConversationList() {
               </h2>
               <ul className="flex flex-col gap-0.5">
                 {onMachine.map((conversation) => (
-                  <ConversationRow key={conversation.id} conversation={conversation} />
+                  <ConversationRow key={conversation.id} conversation={conversation} now={now} />
                 ))}
               </ul>
             </section>
@@ -226,7 +254,7 @@ const removalWarning = (conversation: Conversation, warning: "some" | "unchecked
     : `Its worktree has uncommitted changes, which removing it discards. The branch ${conversation.name} and its commits stay.`
 }
 
-function ConversationRow(props: { conversation: Conversation }) {
+function ConversationRow(props: { conversation: Conversation; now: Date }) {
   const { conversation } = props
   const navigate = useNavigate()
   const open = useParams({ strict: false }).conversationId === conversation.id
@@ -242,7 +270,8 @@ function ConversationRow(props: { conversation: Conversation }) {
 
   const { sandbox } = conversation
   const sandboxText = sandbox === null ? null : sandboxLine(sandbox)
-  const sandboxId = useId()
+  const originId = useId()
+  const harnessId = useId()
   const pullRequestId = useId()
   const pullRequest = useConversationPullRequest(conversation.id)
 
@@ -253,8 +282,9 @@ function ConversationRow(props: { conversation: Conversation }) {
     () => noneWorking,
   ).has(conversation.id)
 
-  const marker =
-    needsYou !== undefined ? conversationMarker(needsYou) : working ? workingMarker : null
+  const showsWorking = needsYou === undefined && working
+
+  const marker = needsYou !== undefined ? markerOf(needsYou) : showsWorking ? workingMarker : null
 
   const removeNow = () => {
     setConfirming(null)
@@ -284,54 +314,79 @@ function ConversationRow(props: { conversation: Conversation }) {
         aria-describedby={[
           repositoryId,
           ...(marker === null ? [] : [markerId]),
-          ...(sandboxText === null ? [] : [sandboxId]),
+          originId,
           ...(pullRequest === undefined ? [] : [pullRequestId]),
+          harnessId,
         ].join(" ")}
         className={cn(
           conversationLink,
           sandbox !== null && isOutOfReach(sandbox.reach) && "opacity-60",
         )}
       >
-        <span
-          id={repositoryId}
-          className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground"
-        >
-          <FolderGit2 aria-hidden className="size-3 shrink-0" />
-          <span className="truncate">{repositoryKey(conversation.repository)}</span>
-          {pullRequest !== undefined && (
-            <ConversationPullRequestBadge id={pullRequestId} pullRequest={pullRequest} />
-          )}
-        </span>
-        <span className="flex min-w-0 items-center gap-1.5">
-          <span className="truncate text-sm font-medium">{conversation.name}</span>
-          {marker !== null && (
+        <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+          <FolderGit2 aria-hidden className="size-3.5 shrink-0" />
+          <span id={repositoryId} className="min-w-0 flex-1 truncate">
+            {repositoryKey(conversation.repository)}
+          </span>
+          {marker === null ? (
+            <span className="shrink-0 tabular-nums">
+              {ago(DateTime.toDateUtc(conversation.createdAt), props.now)}
+            </span>
+          ) : (
             <span
+              key={marker.label}
               id={markerId}
-              className={cn("flex shrink-0 items-center gap-1 text-xs", marker.tone)}
-            >
-              {marker === workingMarker ? (
-                <LoaderCircle
-                  aria-hidden
-                  className="size-3 animate-spin motion-reduce:animate-none"
-                />
-              ) : (
-                <span aria-hidden className="size-1.5 rounded-full bg-current" />
+              className={cn(
+                "flex shrink-0 items-center gap-1 font-medium transition-[opacity,filter] duration-200 ease-out starting:opacity-0 starting:blur-[2px]",
+                marker.tone,
               )}
+            >
+              <marker.icon
+                aria-hidden
+                className={cn(
+                  "size-3.5",
+                  showsWorking &&
+                    "animate-spin [animation-duration:2.5s] motion-reduce:animate-none",
+                )}
+              />
               {marker.label}
             </span>
           )}
         </span>
-        {sandboxText !== null && (
-          <span
-            id={sandboxId}
-            className={cn(
-              "truncate text-xs text-muted-foreground",
-              readOnlyExplanation(sandbox?.reach) !== null && "text-destructive",
+        <span
+          className={cn("truncate text-sm font-semibold", showsWorking && "text-muted-foreground")}
+        >
+          {conversation.name}
+        </span>
+        <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+          {sandboxText === null ? (
+            <>
+              <GitBranch aria-hidden className="size-3.5 shrink-0" />
+              <span id={originId} className="min-w-0 flex-1 truncate">
+                from {conversation.baseBranch}
+              </span>
+            </>
+          ) : (
+            <span
+              id={originId}
+              className={cn(
+                "min-w-0 flex-1 truncate",
+                readOnlyExplanation(sandbox?.reach) !== null && "text-destructive",
+              )}
+            >
+              {sandboxText}
+            </span>
+          )}
+          <span className="flex shrink-0 items-center gap-1.5 group-hover/row:opacity-0 group-has-[button:focus-visible]/row:opacity-0">
+            {pullRequest !== undefined && (
+              <ConversationPullRequestBadge id={pullRequestId} pullRequest={pullRequest} />
             )}
-          >
-            {sandboxText}
+            <AgentHarnessIcon harness={conversation.harness} className="size-3" />
+            <span id={harnessId} className="sr-only">
+              {harnessNames[conversation.harness]}
+            </span>
           </span>
-        )}
+        </span>
       </Link>
       <Button
         variant="ghost"
@@ -339,7 +394,7 @@ function ConversationRow(props: { conversation: Conversation }) {
         aria-label={`Remove ${conversation.name}`}
         disabled={warnings.waiting}
         onClick={() => void start()}
-        className="absolute top-1/2 right-1 -translate-y-1/2 opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100"
+        className="absolute right-1 bottom-1 opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100"
       >
         <Trash2 aria-hidden />
       </Button>
