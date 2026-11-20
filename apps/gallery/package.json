@@ -4,7 +4,8 @@
   "description": "Screenshots every Glass app state into one browsable page",
   "type": "module",
   "scripts": {
-    "capture": "vp build && node capture.ts"
+    "capture": "vp build && node capture.ts",
+    "show": "node show.ts"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",
