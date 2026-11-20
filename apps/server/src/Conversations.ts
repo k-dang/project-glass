@@ -64,6 +64,7 @@ import {
   type HostCallError,
   type HostClient,
   type PlacedConversation,
+  type ConversationHosting,
   type Placement,
 } from "./Placement"
 import { Sandboxes } from "./Sandboxes"
@@ -330,9 +331,11 @@ export class Conversations extends Context.Service<
             )
       }
 
-      const reviewPlacement: Placement = {
-        ...localPlacement,
-        hostOnceMade: () => Effect.succeedNone,
+      const reviewHosting: ConversationHosting = {
+        prepareHost: localPlacement.prepareHost,
+        hostIfPrepared: () => Effect.succeedNone,
+        connectedHost: localPlacement.connectedHost,
+        baseRef: localPlacement.baseRef,
         remove: ({ folder }) =>
           fs.remove(folder, { recursive: true, force: true }).pipe(
             Effect.tapError((cause) =>
@@ -342,8 +345,8 @@ export class Conversations extends Context.Service<
           ),
       }
 
-      const placementOf = (row: PlacedConversation) =>
-        row.forReview ? reviewPlacement : placementFor(row.conversation.place)
+      const hostingOf = (row: PlacedConversation): ConversationHosting =>
+        row.forReview ? reviewHosting : placementFor(row.conversation.place)
 
       const withSandbox = (conversation: Conversation) =>
         sandboxes
@@ -380,7 +383,7 @@ export class Conversations extends Context.Service<
         ).pipe(Effect.map(([local, packs]) => [...local, ...packs]))
 
       const conversationOf = (row: PlacedConversation): ClaimedConversation => {
-        const placement = placementOf(row)
+        const hosting = hostingOf(row)
         const { id, harness, model, effort, permissionMode } = row.conversation
 
         const role: Effect.Effect<RepositoryRole, ConversationError> = row.forReview
@@ -403,8 +406,8 @@ export class Conversations extends Context.Service<
               Effect.asVoid,
             ),
           settings: { model, effort, permissionMode },
-          host: placement.host(row),
-          runningHost: placement.runningHost(row),
+          prepareHost: hosting.prepareHost(row),
+          connectedHost: hosting.connectedHost(row),
         }
       }
 
@@ -438,7 +441,7 @@ export class Conversations extends Context.Service<
 
         if (row.forReview) return false
 
-        const host = yield* placementOf(row).runningHost(row)
+        const host = yield* hostingOf(row).connectedHost(row)
 
         if (Option.isNone(host)) return false
 
@@ -659,13 +662,13 @@ export class Conversations extends Context.Service<
 
       const changes = Effect.fn("Conversations.changes")(function* (conversationId: string) {
         const row = yield* find(conversationId)
-        const placement = placementOf(row)
+        const hosting = hostingOf(row)
 
-        const host = yield* placement.hostOnceMade(row)
+        const host = yield* hosting.hostIfPrepared(row)
 
         if (Option.isNone(host)) return changesOf([])
 
-        const baseRef = yield* placement.baseRef(row)
+        const baseRef = yield* hosting.baseRef(row)
 
         return yield* host.value
           .GetChanges({ folder: row.folder, baseRef })
@@ -678,7 +681,7 @@ export class Conversations extends Context.Service<
         absent: Effect.Effect<A, E>,
       ) {
         const row = yield* find(conversationId)
-        const host = yield* placementOf(row).hostOnceMade(row)
+        const host = yield* hostingOf(row).hostIfPrepared(row)
 
         if (Option.isNone(host)) return yield* absent
 
@@ -772,8 +775,8 @@ export class Conversations extends Context.Service<
       ) {
         const row = yield* find(conversationId)
 
-        return yield* placementOf(row)
-          .hostOnceMade(row)
+        return yield* hostingOf(row)
+          .hostIfPrepared(row)
           .pipe(
             Effect.flatMap(
               Option.match({
@@ -805,8 +808,8 @@ export class Conversations extends Context.Service<
         )
 
         yield* Effect.gen(function* () {
-          const placement = placementOf(row)
-          const running = yield* placement.runningHost(row)
+          const hosting = hostingOf(row)
+          const running = yield* hosting.connectedHost(row)
 
           if (Option.isSome(running))
             yield* running.value.StopConversation({ conversationId }).pipe(
@@ -814,7 +817,7 @@ export class Conversations extends Context.Service<
               Effect.ignore,
             )
 
-          yield* placement.remove(row)
+          yield* hosting.remove(row)
 
           yield* Effect.gen(function* () {
             yield* transcripts.remove(conversationId)
@@ -905,7 +908,7 @@ export class Conversations extends Context.Service<
         stop,
         reachSandbox: (conversationId) =>
           find(conversationId).pipe(
-            Effect.flatMap((row) => placementOf(row).host(row)),
+            Effect.flatMap((row) => hostingOf(row).prepareHost(row)),
             Effect.asVoid,
           ),
         unsent,

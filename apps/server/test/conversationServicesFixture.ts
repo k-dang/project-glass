@@ -189,9 +189,9 @@ export const conversationServicesFixture = Effect.gen(function* () {
 
             return { name, branch: name, folder: name, discard: Effect.void }
           }),
-        host: () => Effect.succeed(client),
-        runningHost: () => Effect.succeedSome(client),
-        hostOnceMade: () => Effect.succeedSome(client),
+        prepareHost: () => Effect.succeed(client),
+        hostIfPrepared: () => Effect.succeedSome(client),
+        connectedHost: () => Effect.succeedSome(client),
         baseRef: () => Effect.succeed("main"),
         remove: () => Effect.void,
         subscribeLost: Effect.succeed(Stream.never),

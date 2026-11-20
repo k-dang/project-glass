@@ -194,9 +194,9 @@ const notInstalled = (providerId: string): Placement => {
     branches: () => failure,
     files: () => Effect.succeed([]),
     place: () => failure,
-    host: () => failure,
-    runningHost: () => Effect.succeedNone,
-    hostOnceMade: () => Effect.succeedNone,
+    prepareHost: () => failure,
+    hostIfPrepared: () => Effect.succeedNone,
+    connectedHost: () => Effect.succeedNone,
     baseRef: () => failure,
     remove: ({ conversation }) =>
       Effect.logWarning(
@@ -682,7 +682,7 @@ export class Sandboxes extends Context.Service<
 
               return { name, branch: name, folder: repository.repo, discard: Effect.void }
             }),
-          host: (placed) =>
+          prepareHost: (placed) =>
             connect(placed.conversation.id, placed).pipe(
               Effect.catchTag("SandboxGone", () =>
                 refuseIfGone(placed.conversation.id).pipe(
@@ -690,8 +690,8 @@ export class Sandboxes extends Context.Service<
                 ),
               ),
             ),
-          runningHost: ({ conversation }) => knownOf(conversation.id).pipe(Effect.map(clientOf)),
-          hostOnceMade: ({ conversation }) =>
+          connectedHost: ({ conversation }) => knownOf(conversation.id).pipe(Effect.map(clientOf)),
+          hostIfPrepared: ({ conversation }) =>
             knownOf(conversation.id).pipe(
               Effect.flatMap(({ record }) =>
                 Predicate.isTagged(record, "Ready")

@@ -46,7 +46,17 @@ export interface Placed {
   readonly discard: Effect.Effect<void>
 }
 
-export interface Placement {
+export interface ConversationHosting {
+  readonly prepareHost: (placed: PlacedConversation) => Effect.Effect<HostClient, ConversationError>
+  readonly hostIfPrepared: (
+    placed: PlacedConversation,
+  ) => Effect.Effect<Option.Option<HostClient>, ConversationError>
+  readonly connectedHost: (placed: PlacedConversation) => Effect.Effect<Option.Option<HostClient>>
+  readonly baseRef: (placed: PlacedConversation) => Effect.Effect<string, ConversationError>
+  readonly remove: (placed: PlacedConversation) => Effect.Effect<void, ConversationError>
+}
+
+export interface Placement extends ConversationHosting {
   readonly harnesses: ReadonlyArray<AgentHarness>
   readonly models: (harness: AgentHarness) => Effect.Effect<AgentModels, ConversationError>
   readonly commands: (
@@ -70,11 +80,4 @@ export interface Placement {
     repository: FollowedRepository,
     baseBranch: string,
   ) => Effect.Effect<Placed, InvalidLocalCheckout | ConversationError>
-  readonly host: (placed: PlacedConversation) => Effect.Effect<HostClient, ConversationError>
-  readonly runningHost: (placed: PlacedConversation) => Effect.Effect<Option.Option<HostClient>>
-  readonly hostOnceMade: (
-    placed: PlacedConversation,
-  ) => Effect.Effect<Option.Option<HostClient>, ConversationError>
-  readonly baseRef: (placed: PlacedConversation) => Effect.Effect<string, ConversationError>
-  readonly remove: (placed: PlacedConversation) => Effect.Effect<void, ConversationError>
 }

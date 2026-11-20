@@ -60,8 +60,8 @@ export interface ClaimedConversation {
   readonly id: string
   readonly ensureStarted: (client: ConversationHost) => Effect.Effect<void, HostCallError>
   readonly settings: TurnSettings
-  readonly host: Effect.Effect<ConversationHost, ConversationError>
-  readonly runningHost: Effect.Effect<Option.Option<ConversationHost>>
+  readonly prepareHost: Effect.Effect<ConversationHost, ConversationError>
+  readonly connectedHost: Effect.Effect<Option.Option<ConversationHost>>
 }
 
 export type ClaimConversation = (
@@ -89,7 +89,7 @@ const unsentFailure = () =>
   new ConversationError({ message: "Couldn't read or save your unsent message. Try again." })
 
 const stopHost = (conversation: ClaimedConversation, turnId: string) =>
-  conversation.runningHost.pipe(
+  conversation.connectedHost.pipe(
     Effect.flatMap((running) =>
       Option.isNone(running)
         ? Effect.succeed(null)
@@ -228,7 +228,7 @@ export class ConversationTurns extends Context.Service<
 
       const prepare = (conversation: ClaimedConversation, sent: StartedMessage) =>
         Effect.gen(function* () {
-          const client = yield* conversation.host
+          const client = yield* conversation.prepareHost
 
           const [, message] = yield* Effect.all(
             [conversation.ensureStarted(client), delivered(sent, sent.feedback)],
@@ -390,7 +390,7 @@ export class ConversationTurns extends Context.Service<
 
           if ((yield* transcripts.runningTurn(conversationId)) === null) return false
 
-          const running = yield* conversation.runningHost
+          const running = yield* conversation.connectedHost
 
           if (Option.isNone(running)) return false
 
@@ -434,7 +434,7 @@ export class ConversationTurns extends Context.Service<
         requestId: string,
         given: RequestAnswer,
       ) {
-        return yield* conversation.host.pipe(
+        return yield* conversation.prepareHost.pipe(
           Effect.flatMap((client) =>
             boundHostCall(
               client.AnswerRequest({ conversationId: conversation.id, requestId, answer: given }),

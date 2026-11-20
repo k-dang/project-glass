@@ -136,8 +136,8 @@ const harness = (
       id: "agent-1",
       ensureStarted,
       settings: { model: null, effort: null, permissionMode: null },
-      host: Effect.succeed(client),
-      runningHost: Effect.succeedNone,
+      prepareHost: Effect.succeed(client),
+      connectedHost: Effect.succeedNone,
     }
 
     yield* turns
@@ -178,8 +178,8 @@ const scripted = (scripts: { readonly [id: string]: Script }) =>
         id,
         ensureStarted: () => Effect.void,
         settings: { model: null, effort: null, permissionMode: null },
-        host: Effect.succeed(client),
-        runningHost: script.running ? Effect.succeed(Option.some(client)) : Effect.succeedNone,
+        prepareHost: Effect.succeed(client),
+        connectedHost: script.running ? Effect.succeed(Option.some(client)) : Effect.succeedNone,
       })
     }
 
