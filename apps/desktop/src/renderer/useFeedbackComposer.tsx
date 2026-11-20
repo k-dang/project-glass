@@ -36,6 +36,19 @@ type Composer =
 
 const idle: Composer = { type: "idle" }
 
+const covers = (note: NoteDraft, path: string, range: SelectedLineRange) =>
+  note.path === path &&
+  note.start === Math.min(range.start, range.end) &&
+  note.end === Math.max(range.start, range.end) &&
+  note.side === sideOf(range.side) &&
+  note.side === sideOf(range.endSide ?? range.side)
+
+const holdsWork = (composer: Composer) =>
+  composer.type === "editing" && (composer.saved || composer.draft.trim() !== "")
+
+const keepsEditor = (composer: Composer, path: string, range: SelectedLineRange) =>
+  holdsWork(composer) || (composer.type === "editing" && covers(composer.note, path, range))
+
 const isTyping = (target: EventTarget | null) =>
   target instanceof HTMLElement &&
   target.closest("textarea, input, button, [contenteditable]") !== null
@@ -53,6 +66,7 @@ type FeedbackDiffProps = Required<
     | "renderAnnotation"
     | "onCurrentPathChange"
     | "onGutterUtilityClick"
+    | "onLineSelectionEnd"
     | "selectedLines"
     | "onSelectedLinesChange"
   >
@@ -78,24 +92,26 @@ export function useFeedbackComposer(props: {
 
   const startNote = useCallback(
     (path: string, range: SelectedLineRange) => {
-      if (editing !== null || changesId === null) return
+      if (changesId === null) return
 
       const fileDiff = layout.diffOf(path)
       const target = fileDiff === null || !store.ready ? null : feedbackTarget(fileDiff, range)
 
-      setComposer(
-        target === null
-          ? { type: "selecting", path, range }
-          : {
-              type: "editing",
-              note: { ...target, id: crypto.randomUUID(), path, changesId },
-              saved: false,
-              draft: "",
-              where: "diff",
-            },
+      setComposer((current) =>
+        keepsEditor(current, path, range)
+          ? current
+          : target === null
+            ? { type: "selecting", path, range }
+            : {
+                type: "editing",
+                note: { ...target, id: crypto.randomUUID(), path, changesId },
+                saved: false,
+                draft: "",
+                where: "diff",
+              },
       )
     },
-    [editing, layout, store.ready, changesId],
+    [layout, store.ready, changesId],
   )
 
   const editNote = (note: FeedbackNote, where: "diff" | "overview") => {
@@ -120,13 +136,15 @@ export function useFeedbackComposer(props: {
     return problem
   }
 
-  const onSelectedLinesChange = useCallback(
-    (next: CodeViewLineSelection | null) => {
-      if (editing === null)
-        setComposer(next === null ? idle : { type: "selecting", path: next.id, range: next.range })
-    },
-    [editing],
-  )
+  const onSelectedLinesChange = useCallback((next: CodeViewLineSelection | null) => {
+    setComposer((current) => {
+      if (next === null) return holdsWork(current) ? current : idle
+
+      return keepsEditor(current, next.id, next.range)
+        ? current
+        : { type: "selecting", path: next.id, range: next.range }
+    })
+  }, [])
 
   const onKeyDown = (event: KeyboardEvent) => {
     if (editing !== null || isTyping(event.target)) return
@@ -262,6 +280,7 @@ export function useFeedbackComposer(props: {
     renderAnnotation,
     onCurrentPathChange,
     onGutterUtilityClick: startNote,
+    onLineSelectionEnd: startNote,
     selectedLines: selectedLines(),
     onSelectedLinesChange,
   }

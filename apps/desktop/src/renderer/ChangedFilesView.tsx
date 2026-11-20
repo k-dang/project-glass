@@ -125,6 +125,7 @@ export interface DiffViewProps<M> {
     | ((getHoveredLine: () => HoveredLine | undefined, item: CodeViewItem<M>) => ReactNode)
     | null
   onGutterUtilityClick?: (path: string, range: SelectedLineRange) => void
+  onLineSelectionEnd?: (path: string, range: SelectedLineRange) => void
   selectedLines?: CodeViewLineSelection | null
   onSelectedLinesChange?: (selection: CodeViewLineSelection | null) => void
   renderFileActions?: (path: string) => ReactNode
@@ -133,7 +134,8 @@ export interface DiffViewProps<M> {
 
 export function DiffView<M>(props: DiffViewProps<M>) {
   const { files, opened, onOpenChange, summaries, onCurrentPathChange, ref, display } = props
-  const { renderFileActions, annotationsFor = noAnnotations, onGutterUtilityClick } = props
+  const { renderFileActions, annotationsFor = noAnnotations } = props
+  const { onGutterUtilityClick, onLineSelectionEnd } = props
   const parsed = useMemo(() => new Map(files.map((entry) => [entry.file.path, entry])), [files])
   const [initialPath] = useState(props.initialPath)
   const ready = useRef(false)
@@ -212,6 +214,11 @@ export function DiffView<M>(props: DiffViewProps<M>) {
       codeOptions.onGutterUtilityClick = (range, context) =>
         onGutterUtilityClick(context.item.id, range)
 
+    if (onLineSelectionEnd !== undefined)
+      codeOptions.onLineSelectionEnd = (range, context) => {
+        if (range !== null) onLineSelectionEnd(context.item.id, range)
+      }
+
     return codeOptions
   }, [
     display,
@@ -219,6 +226,7 @@ export function DiffView<M>(props: DiffViewProps<M>) {
     props.searchGroup,
     props.renderGutterUtility,
     onGutterUtilityClick,
+    onLineSelectionEnd,
     files,
     ref,
     inTour,
@@ -350,6 +358,7 @@ export interface ChangedFilesViewProps extends Omit<
   | "renderAnnotation"
   | "renderGutterUtility"
   | "onGutterUtilityClick"
+  | "onLineSelectionEnd"
   | "selectedLines"
   | "onSelectedLinesChange"
   | "renderFileActions"
