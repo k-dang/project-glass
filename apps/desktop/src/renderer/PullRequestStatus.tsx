@@ -269,6 +269,12 @@ function ConflictsChip(props: { pullRequest: PullRequest }) {
       tone: "text-added",
       title: `No conflicts with ${baseBranch}`,
     },
+    behind: {
+      label: `Behind ${baseBranch}`,
+      icon: TriangleAlert,
+      tone: "text-amber-500",
+      title: `${baseBranch} has moved ahead. Update this branch on GitHub before it can merge.`,
+    },
     conflicting: {
       label: "Conflicts",
       icon: TriangleAlert,

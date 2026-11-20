@@ -28,7 +28,7 @@ import {
   RepositoryFiles,
   type ReviewDecision,
   MergeRejected,
-  type MergeRequest,
+  type MergeAction,
   ReviewRejected,
   Revision,
   type RevisionSide,
@@ -364,7 +364,7 @@ export class GitHubClient extends Context.Service<
     readonly mergePullRequest: (
       pullRequestId: string,
       revision: Revision,
-      request: MergeRequest,
+      action: MergeAction,
     ) => Effect.Effect<void, StaleRevision | MergeRejected | ConnectionError>
     readonly replyToDiscussion: (
       discussionId: string,
@@ -1246,12 +1246,12 @@ export class GitHubClient extends Context.Service<
       const mergePullRequest = Effect.fn("GitHubClient.mergePullRequest")(function* (
         pullRequestId: string,
         revision: Revision,
-        request: MergeRequest,
+        action: MergeAction,
       ) {
         if (!(yield* isCurrent(pullRequestId, revision))) yield* new StaleRevision()
 
         yield* graphql({
-          ...mergeOperation(pullRequestId, revision.head, request),
+          ...mergeOperation(pullRequestId, revision.head, action),
           response: MutationResponse,
           domainError: ({ message }) =>
             HEAD_MOVED.test(message) ? new StaleRevision() : new MergeRejected({ message }),

@@ -79,7 +79,7 @@ export const pullRequestFields = {
   reviewers: [],
   checks: [],
   mergeable: "mergeable",
-  mergeOffer: null,
+  mergeAction: null,
   mergeUnderWay: null,
 } satisfies ConstructorParameters<typeof PullRequest>[0]
 

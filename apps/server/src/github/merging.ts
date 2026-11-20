@@ -1,14 +1,13 @@
 import {
-  CanAddToMergeQueue,
-  CanAddToMergeQueueWhenReady,
-  CanMerge,
-  CanMergeWhenReady,
+  AddToMergeQueue,
+  AddToMergeQueueWhenReady,
+  Merge,
+  type MergeAction,
   MergeMethod,
-  type MergeOffer,
-  type MergeRequest,
   type MergeUnderWay,
+  MergeWhenReady,
 } from "@glass/contracts"
-import { Array as Arr, Match, Schema } from "effect"
+import { Match, Schema } from "effect"
 import type { GitHubPullRequestState } from "./queries"
 
 export const MERGING_FIELDS = `mergeStateStatus
@@ -69,7 +68,7 @@ const gitHubMethods: Record<MergeMethod, typeof GitHubMergeMethod.Type> = {
   rebase: "REBASE",
 }
 
-const allowedMethods = (repository: GitHubMerging["repository"]) => {
+const defaultMethod = (repository: GitHubMerging["repository"]) => {
   const allowed: Record<MergeMethod, boolean> = {
     squash: repository.squashMergeAllowed,
     merge: repository.mergeCommitAllowed,
@@ -78,9 +77,7 @@ const allowedMethods = (repository: GitHubMerging["repository"]) => {
 
   const preferred = methods[repository.viewerDefaultMergeMethod]
 
-  return [preferred, ...MergeMethod.literals.filter((method) => method !== preferred)].filter(
-    (method) => allowed[method],
-  )
+  return [preferred, ...MergeMethod.literals].find((method) => allowed[method])
 }
 
 const canMerge: Record<NonNullable<GitHubMerging["repository"]["viewerPermission"]>, boolean> = {
@@ -101,26 +98,24 @@ const readiness: Record<GitHubMerging["mergeStateStatus"], "now" | "when-ready" 
   UNKNOWN: null,
 }
 
-const offerFor = (pr: GitHubMerging): MergeOffer | null => {
+const actionFor = (pr: GitHubMerging): MergeAction | null => {
   const ready = readiness[pr.mergeStateStatus]
 
   if (ready === null || (ready === "when-ready" && !pr.viewerCanEnableAutoMerge)) return null
 
   if (pr.isMergeQueueEnabled) {
-    return ready === "now" ? CanAddToMergeQueue.make({}) : CanAddToMergeQueueWhenReady.make({})
+    return ready === "now" ? AddToMergeQueue.make({}) : AddToMergeQueueWhenReady.make({})
   }
 
-  const allowed = allowedMethods(pr.repository)
+  const method = defaultMethod(pr.repository)
 
-  if (!Arr.isReadonlyArrayNonEmpty(allowed)) return null
+  if (method === undefined) return null
 
-  return ready === "now"
-    ? CanMerge.make({ methods: allowed })
-    : CanMergeWhenReady.make({ methods: allowed })
+  return ready === "now" ? Merge.make({ method }) : MergeWhenReady.make({ method })
 }
 
 interface Merging {
-  readonly mergeOffer: MergeOffer | null
+  readonly mergeAction: MergeAction | null
   readonly mergeUnderWay: MergeUnderWay | null
 }
 
@@ -128,14 +123,14 @@ export const toMerging = (pr: GitHubMerging): Merging => {
   const permission = pr.repository.viewerPermission
 
   if (pr.state !== "OPEN" || pr.isDraft || permission === null || !canMerge[permission]) {
-    return { mergeOffer: null, mergeUnderWay: null }
+    return { mergeAction: null, mergeUnderWay: null }
   }
 
-  if (pr.isInMergeQueue) return { mergeOffer: null, mergeUnderWay: "merge-queue" }
+  if (pr.isInMergeQueue) return { mergeAction: null, mergeUnderWay: "merge-queue" }
 
-  if (pr.autoMergeRequest !== null) return { mergeOffer: null, mergeUnderWay: "auto-merge" }
+  if (pr.autoMergeRequest !== null) return { mergeAction: null, mergeUnderWay: "auto-merge" }
 
-  return { mergeOffer: offerFor(pr), mergeUnderWay: null }
+  return { mergeAction: actionFor(pr), mergeUnderWay: null }
 }
 
 const MERGE_MUTATION = `mutation MergePullRequest($pullRequestId: ID!, $expectedHeadOid: GitObjectID!, $mergeMethod: PullRequestMergeMethod!) {
@@ -150,10 +145,10 @@ const ENQUEUE_MUTATION = `mutation EnqueuePullRequest($pullRequestId: ID!, $expe
   enqueuePullRequest(input: { pullRequestId: $pullRequestId, expectedHeadOid: $expectedHeadOid }) { clientMutationId }
 }`
 
-export const mergeOperation = (pullRequestId: string, head: string, request: MergeRequest) => {
+export const mergeOperation = (pullRequestId: string, head: string, action: MergeAction) => {
   const target = { pullRequestId, expectedHeadOid: head }
 
-  return Match.value(request).pipe(
+  return Match.value(action).pipe(
     Match.tagsExhaustive({
       Merge: ({ method }) => ({
         name: "MergePullRequest",

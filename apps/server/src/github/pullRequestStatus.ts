@@ -2,6 +2,7 @@ import { type Approval, type Mergeable, Reviewer } from "@glass/contracts"
 import { Schema } from "effect"
 import { GitHubAuthor, login } from "./author"
 import { CHECK_CONTEXTS_FIELDS, CheckContexts, checksOfCommits } from "./checkContexts"
+import type { MergingFields } from "./merging"
 import { ReviewRequest, ReviewState } from "./repositoryPullRequests"
 
 const MAX_STATUS_ITEMS = 100
@@ -31,7 +32,9 @@ export const PullRequestStatusFields = {
   commits: CheckContexts,
 }
 
-type GitHubPullRequestStatus = Schema.Struct.Type<typeof PullRequestStatusFields>
+type GitHubPullRequestStatus = Schema.Struct.Type<typeof PullRequestStatusFields> & {
+  readonly mergeStateStatus: typeof MergingFields.mergeStateStatus.Type
+}
 
 const approvals: Record<NonNullable<GitHubPullRequestStatus["reviewDecision"]>, Approval> = {
   APPROVED: "approved",
@@ -80,5 +83,8 @@ export const toPullRequestStatus = (pr: GitHubPullRequestStatus) => ({
   approval: pr.reviewDecision === null ? null : approvals[pr.reviewDecision],
   reviewers: toReviewers(pr),
   checks: checksOfCommits(pr.commits),
-  mergeable: mergeables[pr.mergeable],
+  mergeable:
+    pr.mergeable === "MERGEABLE" && pr.mergeStateStatus === "BEHIND"
+      ? "behind"
+      : mergeables[pr.mergeable],
 })

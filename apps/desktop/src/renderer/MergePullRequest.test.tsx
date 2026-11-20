@@ -2,11 +2,9 @@
 import { RegistryContext } from "@effect/atom-react"
 import {
   AddToMergeQueue,
-  CanAddToMergeQueue,
-  CanMerge,
   Merge,
+  type MergeAction,
   MergeRejected,
-  type MergeOffer,
   PullRequest,
 } from "@glass/contracts"
 import { cleanup, render, screen } from "@testing-library/react"
@@ -26,7 +24,7 @@ afterEach(() => {
   for (const registry of registries.splice(0)) registry.dispose()
 })
 
-const mount = (mergeOffer: MergeOffer | null, merge: Handlers["MergePullRequest"]) => {
+const mount = (mergeAction: MergeAction | null, merge: Handlers["MergePullRequest"]) => {
   const registry = testRegistry({ MergePullRequest: merge })
   registries.push(registry)
   const onReload = vi.fn<() => void>()
@@ -35,7 +33,7 @@ const mount = (mergeOffer: MergeOffer | null, merge: Handlers["MergePullRequest"
     <RegistryContext.Provider value={registry}>
       <Toaster>
         <MergePullRequest
-          pullRequest={new PullRequest({ ...pullRequestFields, mergeOffer })}
+          pullRequest={new PullRequest({ ...pullRequestFields, mergeAction })}
           revision={revision}
           onReload={onReload}
         />
@@ -46,50 +44,41 @@ const mount = (mergeOffer: MergeOffer | null, merge: Handlers["MergePullRequest"
   return { onReload, user: userEvent.setup() }
 }
 
-it("merges with the method picked, then reloads the PR", async () => {
+it("merges in one click, then hides Merge and reloads the PR", async () => {
   const merge = vi.fn<Handlers["MergePullRequest"]>(() => Effect.void)
-  const { onReload, user } = mount(CanMerge.make({ methods: ["squash", "merge"] }), merge)
+  const action = Merge.make({ method: "squash" })
+  const { onReload, user } = mount(action, merge)
 
   await user.click(screen.getByRole("button", { name: "Merge" }))
-  await screen.findByRole("dialog", { name: "Merge pull request" })
-  await user.click(screen.getByRole("radio", { name: "Create a merge commit" }))
-  await user.click(screen.getByRole("button", { name: "Create a merge commit" }))
 
   await screen.findByText("Merged")
   expect(merge).toHaveBeenCalledWith(
-    {
-      pullRequestId: pullRequestFields.id,
-      revision,
-      request: Merge.make({ method: "merge" }),
-    },
+    { pullRequestId: pullRequestFields.id, revision, action },
     expect.anything(),
   )
+  expect(screen.queryByRole("button", { name: "Merge" })).toBeNull()
   expect(onReload).toHaveBeenCalledOnce()
 })
 
-it("adds the PR to its merge queue without asking for a method", async () => {
+it("names what GitHub would do on the button", async () => {
   const merge = vi.fn<Handlers["MergePullRequest"]>(() => Effect.void)
-  const { user } = mount(CanAddToMergeQueue.make({}), merge)
+  const { user } = mount(AddToMergeQueue.make({}), merge)
 
-  await user.click(screen.getByRole("button", { name: "Merge" }))
-  await screen.findByRole("dialog", { name: "Add to merge queue" })
-  expect(screen.queryByRole("radiogroup")).toBeNull()
   await user.click(screen.getByRole("button", { name: "Add to merge queue" }))
 
   await screen.findByText("Added to merge queue")
-  expect(merge.mock.calls[0]?.[0].request).toEqual(AddToMergeQueue.make({}))
+  expect(merge.mock.calls[0]?.[0].action).toEqual(AddToMergeQueue.make({}))
 })
 
-it("shows GitHub's reason when it won't merge, leaving the PR as it was", async () => {
-  const { onReload, user } = mount(CanMerge.make({ methods: ["squash"] }), () =>
+it("shows GitHub's reason when it won't merge, leaving Merge in place", async () => {
+  const { onReload, user } = mount(Merge.make({ method: "squash" }), () =>
     Effect.fail(new MergeRejected({ message: "Required status check is failing." })),
   )
 
   await user.click(screen.getByRole("button", { name: "Merge" }))
-  await user.click(await screen.findByRole("button", { name: "Squash and merge" }))
 
   expect(await screen.findByText("Required status check is failing.")).toBeDefined()
-  expect(screen.getByRole("dialog", { name: "Merge pull request" })).toBeDefined()
+  expect(screen.getByRole("button", { name: "Merge" })).toBeDefined()
   expect(onReload).not.toHaveBeenCalled()
 })
 

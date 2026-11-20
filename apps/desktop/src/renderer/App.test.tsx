@@ -65,7 +65,7 @@ const workspace = new PullRequestWorkspace({
     reviewers: [],
     checks: [],
     mergeable: "mergeable",
-    mergeOffer: null,
+    mergeAction: null,
     mergeUnderWay: null,
   }),
   revision: new Revision({ base: "base000", head: "head001" }),

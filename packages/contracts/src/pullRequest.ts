@@ -2,7 +2,7 @@ import { Schema } from "effect"
 import { ConnectionError } from "./connection"
 import { Discussions } from "./discussion"
 import { Draft } from "./draft"
-import { MergeOffer, MergeUnderWay } from "./merge"
+import { MergeAction, MergeUnderWay } from "./merge"
 import { Revision } from "./revision"
 
 const GRAPHQL_INT_MAX = 2 ** 31 - 1
@@ -44,7 +44,7 @@ export class Check extends Schema.Class<Check>("Check")({
   url: Schema.NullOr(Schema.String),
 }) {}
 
-export const Mergeable = Schema.Literals(["mergeable", "conflicting", "checking"])
+export const Mergeable = Schema.Literals(["mergeable", "behind", "conflicting", "checking"])
 
 export type Mergeable = typeof Mergeable.Type
 
@@ -63,7 +63,7 @@ export class PullRequest extends Schema.Class<PullRequest>("PullRequest")({
   reviewers: Schema.Array(Reviewer),
   checks: Schema.Array(Check),
   mergeable: Mergeable,
-  mergeOffer: Schema.NullOr(MergeOffer),
+  mergeAction: Schema.NullOr(MergeAction),
   mergeUnderWay: Schema.NullOr(MergeUnderWay),
 }) {}
 

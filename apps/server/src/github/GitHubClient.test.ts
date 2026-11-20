@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
 import {
   BinaryFile,
-  CanMerge,
+  Merge,
   Check,
   Discussions,
   FileNotFound,
@@ -147,7 +147,7 @@ describe("LoadPullRequest", () => {
             reviewers: [],
             checks: [],
             mergeable: "mergeable",
-            mergeOffer: CanMerge.make({ methods: ["merge", "squash", "rebase"] }),
+            mergeAction: Merge.make({ method: "merge" }),
             mergeUnderWay: null,
           }),
           revision: new Revision({ base: "b0", head: "h1" }),
@@ -299,16 +299,17 @@ describe("LoadPullRequest", () => {
     }),
   )
 
-  it.live("tells whether the PR conflicts with its base branch", () =>
+  it.live("tells whether the PR conflicts with or is behind its base branch", () =>
     Effect.gen(function* () {
       const { github, client } = yield* startSignedInBackend
 
       for (const [seed, expected] of [
-        ["MERGEABLE", "mergeable"],
-        ["CONFLICTING", "conflicting"],
-        ["UNKNOWN", "checking"],
+        [{ mergeable: "MERGEABLE" }, "mergeable"],
+        [{ mergeable: "MERGEABLE", mergeStateStatus: "BEHIND" }, "behind"],
+        [{ mergeable: "CONFLICTING" }, "conflicting"],
+        [{ mergeable: "UNKNOWN" }, "checking"],
       ] as const) {
-        const pr = github.seedPullRequest({ mergeable: seed, base, head })
+        const pr = github.seedPullRequest({ ...seed, base, head })
 
         const { pullRequest } = yield* client.LoadPullRequest({
           pullRequest: new PullRequestRef(pr),

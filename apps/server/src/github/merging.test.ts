@@ -2,10 +2,6 @@ import { assert, describe, it } from "@effect/vitest"
 import {
   AddToMergeQueue,
   AddToMergeQueueWhenReady,
-  CanAddToMergeQueue,
-  CanAddToMergeQueueWhenReady,
-  CanMerge,
-  CanMergeWhenReady,
   Merge,
   MergeRejected,
   MergeWhenReady,
@@ -26,18 +22,15 @@ describe("Merging", () => {
       const { github, client } = yield* startSignedInBackend
 
       for (const [seed, expected] of [
-        [{}, CanMerge.make({ methods: ["merge", "squash", "rebase"] })],
-        [{ mergeMethods: ["REBASE", "SQUASH"] }, CanMerge.make({ methods: ["rebase", "squash"] })],
-        [
-          { mergeStateStatus: "UNSTABLE" },
-          CanMerge.make({ methods: ["merge", "squash", "rebase"] }),
-        ],
+        [{}, Merge.make({ method: "merge" })],
+        [{ mergeMethods: ["REBASE", "SQUASH"] }, Merge.make({ method: "rebase" })],
+        [{ mergeStateStatus: "UNSTABLE" }, Merge.make({ method: "merge" })],
         [
           { mergeStateStatus: "BLOCKED", mergeMethods: ["SQUASH"] },
-          CanMergeWhenReady.make({ methods: ["squash"] }),
+          MergeWhenReady.make({ method: "squash" }),
         ],
-        [{ mergeQueue: true }, CanAddToMergeQueue.make({})],
-        [{ mergeQueue: true, mergeStateStatus: "BEHIND" }, CanAddToMergeQueueWhenReady.make({})],
+        [{ mergeQueue: true }, AddToMergeQueue.make({})],
+        [{ mergeQueue: true, mergeStateStatus: "BEHIND" }, AddToMergeQueueWhenReady.make({})],
         [{ mergeStateStatus: "BLOCKED", viewerCanEnableAutoMerge: false }, null],
         [{ mergeStateStatus: "DIRTY" }, null],
         [{ mergeStateStatus: "UNKNOWN" }, null],
@@ -52,7 +45,7 @@ describe("Merging", () => {
         })
 
         assert.deepStrictEqual(
-          [pullRequest.mergeOffer, pullRequest.mergeUnderWay],
+          [pullRequest.mergeAction, pullRequest.mergeUnderWay],
           [expected, null],
           JSON.stringify(seed),
         )
@@ -60,7 +53,7 @@ describe("Merging", () => {
     }),
   )
 
-  it.live("merges with the chosen method, then shows the PR merged", () =>
+  it.live("merges with the given method, then shows the PR merged", () =>
     Effect.gen(function* () {
       const { github, client } = yield* startSignedInBackend
       const pr = github.seedPullRequest({ base, head })
@@ -70,14 +63,14 @@ describe("Merging", () => {
       yield* client.MergePullRequest({
         pullRequestId: pullRequest.id,
         revision,
-        request: Merge.make({ method: "squash" }),
+        action: Merge.make({ method: "squash" }),
       })
 
       assert.strictEqual(pr.mergedWith, "SQUASH")
 
       const reloaded = (yield* client.LoadPullRequest({ pullRequest: ref })).pullRequest
       assert.deepStrictEqual(
-        [reloaded.state, reloaded.mergeOffer, reloaded.mergeUnderWay],
+        [reloaded.state, reloaded.mergeAction, reloaded.mergeUnderWay],
         ["merged", null, null],
       )
     }),
@@ -87,7 +80,7 @@ describe("Merging", () => {
     Effect.gen(function* () {
       const { github, client } = yield* startSignedInBackend
 
-      for (const [seed, request, expected] of [
+      for (const [seed, action, expected] of [
         [{ mergeStateStatus: "BLOCKED" }, MergeWhenReady.make({ method: "rebase" }), "auto-merge"],
         [{ mergeQueue: true }, AddToMergeQueue.make({}), "merge-queue"],
         [
@@ -100,11 +93,11 @@ describe("Merging", () => {
         const ref = new PullRequestRef(pr)
         const { pullRequest, revision } = yield* client.LoadPullRequest({ pullRequest: ref })
 
-        yield* client.MergePullRequest({ pullRequestId: pullRequest.id, revision, request })
+        yield* client.MergePullRequest({ pullRequestId: pullRequest.id, revision, action })
 
         const reloaded = (yield* client.LoadPullRequest({ pullRequest: ref })).pullRequest
         assert.deepStrictEqual(
-          [reloaded.state, reloaded.mergeOffer, reloaded.mergeUnderWay],
+          [reloaded.state, reloaded.mergeAction, reloaded.mergeUnderWay],
           ["open", null, expected],
         )
       }
@@ -126,7 +119,7 @@ describe("Merging", () => {
         .MergePullRequest({
           pullRequestId: pullRequest.id,
           revision,
-          request: Merge.make({ method: "merge" }),
+          action: Merge.make({ method: "merge" }),
         })
         .pipe(Effect.flip)
 
@@ -147,7 +140,7 @@ describe("Merging", () => {
         .MergePullRequest({
           pullRequestId: pullRequest.id,
           revision,
-          request: Merge.make({ method: "merge" }),
+          action: Merge.make({ method: "merge" }),
         })
         .pipe(Effect.flip)
 
