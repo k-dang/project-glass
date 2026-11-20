@@ -16,6 +16,12 @@ user, such as one with a Permission request, also keeps its host until Glass ope
 a new host later costs nothing, because Claude Code and pi pick up a Conversation from their own
 saved sessions.
 
+The record is how a host knows Glass will come back for it. The host reads the record once a minute,
+and it stops if the record is gone or names another host while no backend follows its journal.
+Glass forgets a host it gives up on even when the host never hears the shutdown request, and a
+deleted data directory takes its record with it, so without this check such a host would run until
+the device restarts.
+
 Glass reattaches only to a host with the same fingerprint, meaning the same host bundle and harness
 commands, and never to one that is gone. A host that refuses the connection is gone; one slow to
 answer is busy with its Turns, not dead. It asks any other host to shut down and ends that host's

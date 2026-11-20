@@ -16,7 +16,8 @@ import { join } from "node:path"
 import { afterEach, vi } from "vite-plus/test"
 import { connectRpcClient } from "../src/rpcSocket"
 import { AgentRunners } from "../src/agentRunners"
-import { readRecordedHost, shutDownHost } from "../src/LocalAgentHost"
+import { hostRecordPath, readHostRecord } from "../src/agentHost/hostAddress"
+import { shutDownHost } from "../src/LocalAgentHost"
 import { McpCredentials } from "../src/mcp/McpCredentials"
 import { OutsideAgents } from "../src/OutsideAgents"
 import { GlassMcpTools } from "../src/mcp/server"
@@ -52,8 +53,9 @@ export const isolatedHome = Effect.acquireRelease(
 
 const shutDownLeftRunningHost = (home: string) =>
   FileSystem.FileSystem.pipe(
-    Effect.flatMap((fs) => readRecordedHost(fs, join(home, ".project-glass"))),
-    Effect.flatMap(Option.match({ onNone: () => Effect.void, onSome: shutDownHost })),
+    Effect.flatMap((fs) => readHostRecord(fs, hostRecordPath(join(home, ".project-glass")))),
+    Effect.flatMap(shutDownHost),
+    Effect.ignore,
     Effect.provide(NodeFileSystem.layer),
   )
 

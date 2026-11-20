@@ -1,4 +1,4 @@
-import { Schema } from "effect"
+import { Effect, type FileSystem, Schema } from "effect"
 import { join } from "node:path"
 
 export const HOST_TOKEN_HEADER = "x-glass-host-token"
@@ -14,3 +14,6 @@ export const RecordedHost = Schema.fromJsonString(
 )
 
 export type RecordedHost = typeof RecordedHost.Type
+
+export const readHostRecord = (fs: FileSystem.FileSystem, path: string) =>
+  fs.readFileString(path).pipe(Effect.flatMap(Schema.decodeUnknownEffect(RecordedHost)))
