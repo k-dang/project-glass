@@ -58,6 +58,7 @@ function ResizeHandle(props: { name: string; width: number; onResize: (width: nu
 export function SidePanel(props: {
   name: string
   heading: ReactNode
+  actions?: ReactNode
   width: Atom.Writable<number>
   onClose: () => void
   children: ReactNode
@@ -78,6 +79,7 @@ export function SidePanel(props: {
       />
       <header className="flex h-12 shrink-0 items-center gap-2 border-b px-5">
         <h2 className="min-w-0 flex-1 truncate font-medium">{props.heading}</h2>
+        {props.actions}
         <Button
           variant="ghost"
           size="icon-sm"

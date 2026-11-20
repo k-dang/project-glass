@@ -89,11 +89,12 @@ export const workspace = (
     readonly files?: ReadonlyArray<ChangedFile>
     readonly viewedPaths?: ReadonlyArray<string>
     readonly revision?: Revision
+    readonly pullRequest?: Partial<ConstructorParameters<typeof PullRequest>[0]>
   } = {},
 ) =>
   new PullRequestWorkspace({
     viewer,
-    pullRequest: new PullRequest(pullRequestFields),
+    pullRequest: new PullRequest({ ...pullRequestFields, ...changes.pullRequest }),
     revision: changes.revision ?? revision,
     updatedAt: DateTime.makeUnsafe("2026-10-01T00:00:00Z"),
     files: changes.files ?? [],
