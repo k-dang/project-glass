@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest"
-import { ConversationCaller, GlobalConversationCaller } from "./McpCredentials"
+import { GlobalConversationCaller } from "./McpCredentials"
 import {
   Conversation,
   AgentReviewState,
@@ -9,9 +9,17 @@ import {
   localPlace,
   SandboxPlace,
   TurnDone,
+  type Turn,
 } from "@glass/contracts"
 import { Effect, Option, Predicate, Schema, Stream } from "effect"
-import { conversationsFixture, holding, repository, settled } from "../../test/conversationsFixture"
+import {
+  glassCall,
+  conversationsFixture,
+  glassCalls,
+  holding,
+  repository,
+  settled,
+} from "../../test/conversationsFixture"
 import { startFakeGitHub } from "../../test/fakeGitHub"
 import { VIEWER } from "../../test/fakePullRequest"
 import { isolatedHome, startBackend } from "../../test/harness"
@@ -342,10 +350,24 @@ describe("Glass's Agent review tools over MCP", () => {
   )
 })
 
-const asConversation = (f: Effect.Success<typeof conversationsFixture>, conversationId: string) =>
-  f.mcpCredentials
-    .issue(ConversationCaller.make({ conversationId }))
-    .pipe(Effect.flatMap((bearer) => connectMcp(f.baseUrl, bearer)))
+const decodeResult = Schema.decodeUnknownSync(
+  Schema.fromJsonString(Schema.Tuple([Schema.Struct({ text: Schema.String })])),
+)
+
+const calledBy = (turn: Turn | undefined) => {
+  const [called] = glassCalls(turn) ?? []
+
+  return { status: called?.status, text: decodeResult(called?.output)[0].text }
+}
+
+const callsIn = (turns: ReadonlyArray<Turn>) =>
+  turns.filter(({ message }) => message.startsWith("call:"))
+
+const callsSettled = (count: number) => (turns: ReadonlyArray<Turn>) =>
+  callsIn(turns).length === count && turns.every(({ ended }) => ended !== null)
+
+const createdIn = (turn: Turn | undefined) =>
+  decodeCreated(JSON.parse(calledBy(turn).text)).conversation
 
 describe("Glass's Conversation tools called by a Conversation", () => {
   it.live(
@@ -354,9 +376,7 @@ describe("Glass's Conversation tools called by a Conversation", () => {
       Effect.gen(function* () {
         const f = yield* conversationsFixture
 
-        const parent = yield* f.start(
-          `call:create_conversation ${JSON.stringify(onThisDevice("hold:child"))}`,
-        )
+        const parent = yield* f.start(glassCall("create_conversation", onThisDevice("hold:child")))
 
         yield* f.transcript(parent.id, settled(1))
         const [child] = (yield* f.conversations).filter(({ id }) => id !== parent.id)
@@ -364,7 +384,8 @@ describe("Glass's Conversation tools called by a Conversation", () => {
         yield* f.release("child")
 
         const [, update] = yield* f.transcript(parent.id, settled(2))
-        const { call } = yield* asConversation(f, parent.id)
+        yield* f.send(parent.id, glassCall("list_started_work", {}))
+        const [, , listed] = yield* f.transcript(parent.id, settled(3))
 
         assert.deepStrictEqual<unknown>(
           Predicate.isTagged(update?.context, "StartedWorkUpdate") &&
@@ -375,7 +396,7 @@ describe("Glass's Conversation tools called by a Conversation", () => {
           [[child!.id, "finished"]],
         )
         assert.deepStrictEqual(
-          decodeStarted((yield* call("list_started_work")).structuredContent).items.map(
+          decodeStarted(JSON.parse(calledBy(listed).text)).items.map(
             (item) => Predicate.isTagged(item, "Conversation") && item.conversation.id,
           ),
           [child!.id],
@@ -386,38 +407,34 @@ describe("Glass's Conversation tools called by a Conversation", () => {
   it.live("gives a Conversation it creates its own Permission mode, never one asking less", () =>
     Effect.gen(function* () {
       const f = yield* conversationsFixture
+      const claude = { ...onThisDevice("Investigate"), harness: "claude-code" }
 
-      const parent = yield* f.start("Say hello", {
+      const parent = yield* f.start(glassCall("create_conversation", claude), {
         harness: "claude-code",
         model: null,
         effort: null,
         permissionMode: "default",
       })
 
-      const { call } = yield* asConversation(f, parent.id)
-      const claude = { ...onThisDevice("Investigate"), harness: "claude-code" }
-
-      const local = yield* call("create_conversation", claude)
-
-      const inSandbox = yield* call("create_conversation", {
-        ...claude,
-        place: SandboxPlace.make({ providerId: "fake" }),
-      })
-
-      const pi = yield* call("create_conversation", onThisDevice("Investigate"))
-
-      assert.equal(decodeCreated(local.structuredContent).conversation.permissionMode, "default")
-
-      const refusal =
-        "That Conversation would ask the user less than you do, so you can't create it. Create one on this device with Claude Code instead, or ask the user to."
-
-      assert.deepStrictEqual(
-        [inSandbox, pi].map((refused) => [refused.isError, toolText(refused)]),
-        [
-          [true, refusal],
-          [true, refusal],
-        ],
+      yield* f.transcript(parent.id, callsSettled(1))
+      yield* f.send(
+        parent.id,
+        glassCall("create_conversation", {
+          ...claude,
+          place: SandboxPlace.make({ providerId: "fake" }),
+        }),
       )
+      yield* f.transcript(parent.id, callsSettled(2))
+      yield* f.send(parent.id, glassCall("create_conversation", onThisDevice("Investigate")))
+      const [local, inSandbox, pi] = callsIn(yield* f.transcript(parent.id, callsSettled(3)))
+
+      const refused = {
+        status: "failed",
+        text: "That Conversation would ask the user less than you do, so you can't create it. Create one on this device with Claude Code instead, or ask the user to.",
+      }
+
+      assert.equal(createdIn(local).permissionMode, "default")
+      assert.deepStrictEqual([calledBy(inSandbox), calledBy(pi)], [refused, refused])
       assert.equal((yield* f.conversations).length, 2)
     }),
   )
@@ -427,14 +444,43 @@ describe("Glass's Conversation tools called by a Conversation", () => {
       const f = yield* conversationsFixture
       const conversation = yield* f.start("Say hello")
       yield* f.transcript(conversation.id, settled(1))
-      const { call } = yield* asConversation(f, conversation.id)
 
-      const result = yield* call("send_conversation_message", {
+      yield* f.send(
+        conversation.id,
+        glassCall("send_conversation_message", {
+          conversationId: conversation.id,
+          message: "Again",
+        }),
+      )
+      const [, refused] = yield* f.transcript(conversation.id, settled(2))
+
+      assert.include(calledBy(refused).text, "can't send a message to itself")
+    }),
+  )
+
+  it.live("a local Conversation keeps Glass's tools after Glass relaunches", () =>
+    Effect.gen(function* () {
+      const f = yield* conversationsFixture
+      const conversation = yield* f.start("hold:x")
+      yield* f.transcript(conversation.id, holding)
+
+      yield* f.quit
+      const relaunched = yield* f.launch
+      yield* f.release("x")
+      yield* f.transcript(conversation.id, settled(1), relaunched)
+
+      yield* relaunched.SendMessage({
         conversationId: conversation.id,
-        message: "Again",
+        message: glassCall("list_started_work", {}),
+        images: [],
+        feedback: [],
       })
+      const [, listed] = yield* f.transcript(conversation.id, settled(2), relaunched)
 
-      assert.include(toolText(result), "can't send a message to itself")
+      assert.deepStrictEqual(calledBy(listed), {
+        status: "done",
+        text: JSON.stringify({ items: [] }),
+      })
     }),
   )
 })

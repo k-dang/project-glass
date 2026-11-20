@@ -50,6 +50,7 @@ const fixture = Effect.gen(function* () {
           folder: home,
           conversation,
           role: WorkRole.make({}),
+          glassTools: undefined,
           skills: [],
           report: (event) =>
             Effect.sync(() => events.push(event)).pipe(
@@ -245,6 +246,7 @@ it.live(
         folder: home,
         conversation: randomUUID(),
         role: WorkRole.make({}),
+        glassTools: undefined,
         skills: [],
         report: (event) =>
           Effect.sync(() => {

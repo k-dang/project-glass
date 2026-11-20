@@ -23,6 +23,9 @@ export interface UnitFields {
   readonly head?: string
   readonly conversation_id?: string
   readonly turn_id?: string
+  readonly tool?: string
+  readonly caller_id?: string
+  readonly tool_failed?: boolean
   readonly harness?: string | null
   readonly model?: string | null
   readonly effort?: string | null

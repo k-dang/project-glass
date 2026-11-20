@@ -2,7 +2,7 @@ import { assert, it } from "@effect/vitest"
 import type { Options } from "@anthropic-ai/claude-agent-sdk"
 import { Effect, Redacted, Stream } from "effect"
 import { claudeAdapter, type ClaudeQuery } from "./claudeAdapter"
-import { WorkRole } from "./protocol"
+import { type GlassToolsAccess, WorkRole } from "./protocol"
 import { workInstructions } from "./workRole"
 
 it.live("reports a failed SDK handshake as a host error and closes the query", () =>
@@ -31,6 +31,7 @@ it.live("reports a failed SDK handshake as a host error and closes the query", (
         folder: "checkout",
         conversation: "new",
         role: WorkRole.make({}),
+        glassTools: undefined,
         skills: [],
         report: () => Effect.void,
       })
@@ -66,21 +67,20 @@ it.live("gives a Work Conversation Glass's tools and how to use them only when i
       getSessionInfo: async () => undefined,
     })
 
-    const start = (role: typeof WorkRole.Type) =>
+    const start = (glassTools: GlassToolsAccess | undefined) =>
       adapter
         .start({
           folder: "checkout",
           conversation: "new",
-          role,
+          role: WorkRole.make({}),
+          glassTools,
           skills: [],
           report: () => Effect.void,
         })
         .pipe(Effect.scoped, Effect.flip)
 
-    yield* start(WorkRole.make({}))
-    yield* start(
-      WorkRole.make({ tools: { url: "http://127.0.0.1:9/mcp", bearer: Redacted.make("bearer") } }),
-    )
+    yield* start(undefined)
+    yield* start({ url: "http://127.0.0.1:9/mcp", bearer: Redacted.make("bearer") })
 
     assert.deepStrictEqual(
       given.map((options) => ({

@@ -4,11 +4,12 @@ Conversations run on this device and in Sandboxes, and Glass must render a struc
 answer Permission requests, Steer, and survive dropped connections for both. So every Conversation
 runs inside an agent host: a small Node server built from Glass's own code that drives Claude Code
 through the Claude Agent SDK (pointed at the user's installed `claude`) and pi through `pi --mode
-rpc`, keeps a journal of numbered events, and serves Effect RPC over WebSocket. The backend starts a
-host as a child process for local Conversations; in a Sandbox, its provider starts the same host
-(ADR 0010). The backend persists every event in SQLite as the transcript of record and, after a
-dropped connection, asks the host for the events after the last one it saved. Local and remote
-Conversations differ only in where the host runs.
+rpc`, keeps a journal of numbered events, and serves Effect RPC over WebSocket. It also serves its
+agents an MCP endpoint for Glass's tools and relays each call to the backend over that connection
+(ADR 0013). The backend starts a host as a child process for local Conversations; in a Sandbox,
+its provider starts the same host (ADR 0010). The backend persists every event in SQLite as the
+transcript of record and, after a dropped connection, asks the host for the events after the last
+one it saved. Local and remote Conversations differ only in where the host runs.
 
 This answers ADR 0001's "execution moves off-machine" trigger without promoting the backend: the
 backend stays in its `utilityProcess`, and local Conversations outlive the app because the backend

@@ -37,7 +37,8 @@ import { Socket } from "effect/socket"
 import { newHostToken } from "./agentHost/protocol"
 import { uniqueConversationName } from "./conversationNames"
 import { GitHubClient } from "./github/GitHubClient"
-import { followJournal, greet, type JournalPosition } from "./hostJournal"
+import { followHost, greet, type JournalPosition } from "./hostJournal"
+import { GlassToolRelay, ToolCallOrigin } from "./mcp/GlassToolRelay"
 import type {
   HostClient,
   LostConversationIds,
@@ -224,6 +225,7 @@ export class Sandboxes extends Context.Service<
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
       const transcripts = yield* Transcripts
+      const relay = yield* GlassToolRelay
       const config = yield* ServerConfig
       const webSocketConstructor = yield* Socket.WebSocketConstructor
       const { sandboxProviders } = yield* Plugins
@@ -521,6 +523,15 @@ export class Sandboxes extends Context.Service<
                 const host = yield* greet(client)
                 yield* refuseIfGone(conversationId)
                 const position = yield* followFrom(conversationId, host)
+
+                const following = yield* followHost(client, position, {
+                  save: transcripts.save,
+                  alreadySaved: () => position.saved,
+                  relay,
+                  origin: ToolCallOrigin.Sandbox({ conversationId }),
+                  calls: scope,
+                })
+
                 yield* Effect.acquireRelease(
                   recover(conversationId, opened, () => ({ phase: "reachable", client })),
                   () =>
@@ -538,7 +549,7 @@ export class Sandboxes extends Context.Service<
                     ),
                 )
                 yield* Deferred.succeed(opened, client)
-                yield* followJournal(transcripts.save, client, position, () => position.saved)
+                yield* following
               }).pipe(Effect.scoped, Effect.result)
 
               if (Result.isSuccess(ended)) return yield* Effect.void

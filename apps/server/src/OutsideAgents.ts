@@ -14,7 +14,8 @@ import {
 } from "effect"
 import { SqlClient } from "effect/sql"
 import { randomUUID } from "node:crypto"
-import { digest, mintBearer, OutsideAgentCaller, type McpCredential } from "./mcp/McpCredentials"
+import { mintBearer, OutsideAgentCaller, type McpCredential } from "./mcp/McpCredentials"
+import { digest } from "./mcp/mcpHttp"
 
 export const OUTSIDE_AGENT_TTL = Duration.days(30)
 

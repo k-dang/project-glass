@@ -165,7 +165,9 @@ _Avoid_: Task, action item
 A named conversation started from Glass with an agent, run by an Agent harness and a model and
 working in one place: a worktree on this device, a Sandbox, or a checkout of an Agent review's
 Revision. The user starts one, or the Global conversation or another Conversation's agent does for
-them; a Conversation never starts one that asks the user less than it does.
+them. Any Conversation can create and message other Conversations through Glass's tools, but never
+one that asks the user less than it does, and never itself; one in a Sandbox can reach only
+Conversations in a Sandbox.
 _Avoid_: Session, thread, bot, box
 
 **Conversation's PR**:

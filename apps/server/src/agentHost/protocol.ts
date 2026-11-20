@@ -16,7 +16,8 @@ import {
   TurnEnded,
   TurnStarted,
 } from "@glass/contracts"
-import { Effect, Match, Schema, SchemaTransformation } from "effect"
+import { Effect, Schema, SchemaTransformation } from "effect"
+import { McpSchema } from "effect/ai"
 import type { ChildProcess } from "node:child_process"
 import { randomBytes } from "node:crypto"
 import { resolve } from "node:path"
@@ -53,7 +54,7 @@ export const JournalEntry = Schema.Struct({
 export type JournalEntry = typeof JournalEntry.Type
 
 // WARNING: Raise HOST_PROTOCOL when an AgentHostRpcs change breaks talking to a previous host; Sandboxes keep hosts running across upgrades.
-export const HOST_PROTOCOL = 1
+export const HOST_PROTOCOL = 2
 
 // WARNING: Glass asks hosts of every version for Hello, so its shape must never change.
 export const Hello = Rpc.make("Hello", {
@@ -130,7 +131,7 @@ export const GlassToolsAccess = Schema.Struct({
 
 export type GlassToolsAccess = typeof GlassToolsAccess.Type
 
-export const WorkRole = Schema.TaggedStruct("Work", { tools: Schema.optional(GlassToolsAccess) })
+export const WorkRole = Schema.TaggedStruct("Work", {})
 
 export const ReviewRole = Schema.TaggedStruct("Review", { brief: ReviewBrief })
 
@@ -141,15 +142,6 @@ export const RepositoryRole = Schema.Union([WorkRole, ReviewRole])
 export type RepositoryRole = typeof RepositoryRole.Type
 
 export type ConversationRole = RepositoryRole | typeof GlobalRole.Type
-
-export const glassToolsOf = (role: ConversationRole): GlassToolsAccess | undefined =>
-  Match.value(role).pipe(
-    Match.tagsExhaustive({
-      Work: ({ tools }) => tools,
-      Review: () => undefined,
-      Global: ({ tools }) => tools,
-    }),
-  )
 
 export const StartOutcome = Schema.Literals(["started", "alreadyRunning"])
 
@@ -173,6 +165,18 @@ export const ConversationStart = Schema.Union([
 ])
 
 export type ConversationStart = typeof ConversationStart.Type
+
+export const RelayedToolCall = Schema.Struct({
+  callId: Schema.String,
+  conversationId: Schema.String,
+  name: Schema.String,
+  arguments: Schema.JsonObject,
+})
+
+export type RelayedToolCall = typeof RelayedToolCall.Type
+
+export const failedToolCall = (reason: string) =>
+  new McpSchema.CallToolResult({ isError: true, content: [{ type: "text", text: reason }] })
 
 export class HostConversationError extends Schema.TaggedError<HostConversationError>()(
   "HostConversationError",
@@ -259,6 +263,19 @@ export class AgentHostRpcs extends RpcGroup.make(
   Rpc.make("Acknowledge", { payload: { host: Schema.String, through: Schema.Int } }),
   Rpc.make("UnacknowledgedTurns", {
     success: Schema.Array(UnacknowledgedTurn),
+  }),
+  Rpc.make("OfferGlassTools", {
+    payload: { host: Schema.String, tools: Schema.Array(McpSchema.Tool) },
+    error: HostReplaced,
+  }),
+  Rpc.make("WatchToolCalls", {
+    payload: { host: Schema.String },
+    success: RelayedToolCall,
+    error: HostReplaced,
+    stream: true,
+  }),
+  Rpc.make("AnswerToolCall", {
+    payload: { host: Schema.String, callId: Schema.String, result: McpSchema.CallToolResult },
   }),
 ) {}
 

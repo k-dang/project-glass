@@ -1,6 +1,6 @@
 import { Effect, Redacted, Schema } from "effect"
 import { McpSchema } from "effect/ai"
-import { MCP_PATH } from "../src/mcp/server"
+import { MCP_PATH } from "../src/mcp/mcpHttp"
 
 export interface JsonRpcMessage {
   readonly jsonrpc: "2.0"

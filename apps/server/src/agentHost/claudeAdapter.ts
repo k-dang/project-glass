@@ -165,10 +165,10 @@ const workOptions = (tools: GlassToolsAccess | undefined): Options => {
   }
 }
 
-const roleOptions = (role: RepositoryRole): Options =>
+const roleOptions = (role: RepositoryRole, glassTools: GlassToolsAccess | undefined): Options =>
   Match.value(role).pipe(
     Match.tagsExhaustive({
-      Work: ({ tools }) => workOptions(tools),
+      Work: () => workOptions(glassTools),
       Review: ({ brief }) => reviewOptions(brief),
     }),
   )
@@ -420,7 +420,7 @@ export const claudeAdapter = (
       Effect.scoped,
     ),
 
-  start: Effect.fnUntraced(function* ({ folder, conversation, role, skills, report }) {
+  start: Effect.fnUntraced(function* ({ folder, conversation, role, glassTools, skills, report }) {
     const prompts = yield* Queue.unbounded<SDKUserMessage>()
     const requests = yield* Queue.unbounded<Input>()
     const waiting = new Map<string, Asked>()
@@ -476,7 +476,7 @@ export const claudeAdapter = (
       canUseTool,
       {
         ...(saved === undefined ? { sessionId: conversation } : { resume: conversation }),
-        ...roleOptions(role),
+        ...roleOptions(role, glassTools),
         ...pluginOptions(skills),
       },
     )

@@ -21,6 +21,7 @@ import type { Socket } from "node:net"
 import type { Changes } from "../src/Changes"
 import type { FolderFiles } from "../src/agentHost/FolderFiles"
 import type { HostConversations } from "../src/agentHost/HostConversations"
+import type { HostGlassTools } from "../src/agentHost/HostGlassTools"
 import type { Journal } from "../src/agentHost/Journal"
 import { Hello } from "../src/agentHost/protocol"
 import { hostServer } from "../src/agentHost/server"
@@ -79,7 +80,7 @@ const otherHost = (kind: Exclude<HostKind, { readonly kind: "current" }>) =>
       )
 
 export const inProcessSandboxes = Effect.fnUntraced(function* (
-  host: () => Layer.Layer<HostConversations | Journal | Changes | FolderFiles>,
+  host: () => Layer.Layer<HostConversations | HostGlassTools | Journal | Changes | FolderFiles>,
 ) {
   const clock = yield* Clock.Clock
   const context = yield* Effect.context()
