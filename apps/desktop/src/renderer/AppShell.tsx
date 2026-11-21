@@ -32,6 +32,7 @@ import { CommandMenu } from "./CommandMenu"
 import { useStartThread } from "./threadsArea"
 import { ConfirmationDialog } from "./ConfirmationDialog"
 import { ConnectionAvatar } from "./ConnectionAvatar"
+import { ConnectionMenu } from "./ConnectionMenu"
 import { globalChatOpenAtom, globalUnseenAtom } from "./globalChat"
 import { HistoryNav } from "./HistoryNav"
 import { NeedsYouBadge } from "./NeedsYouCount"
@@ -45,7 +46,7 @@ import {
 } from "./reviewsArea"
 import { ResourceUsage } from "./ResourceUsage"
 import { ShellPanelSlot } from "./shellPanelSlot"
-import { ShortcutsDialog } from "./ShortcutsDialog"
+import { ShortcutsButton, ShortcutsDialog } from "./ShortcutsDialog"
 import { useAppearance } from "./theme"
 
 const classicRailLink =
@@ -59,11 +60,12 @@ type AreaLabel = "Dashboard" | "Inbox" | "Reviews" | "To-dos" | "Threads" | "Act
 interface RailStyle {
   readonly link: string
   readonly bottomFrom: AreaLabel
+  readonly connection: ComponentType
 }
 
 const railStyles = {
-  classic: { link: classicRailLink, bottomFrom: "Settings" },
-  inset: { link: insetRailLink, bottomFrom: "Activity" },
+  classic: { link: classicRailLink, bottomFrom: "Settings", connection: ConnectionAvatar },
+  inset: { link: insetRailLink, bottomFrom: "Activity", connection: ConnectionMenu },
 } satisfies Record<Layout, RailStyle>
 
 interface Area {
@@ -178,10 +180,6 @@ export function AppShell() {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <Outlet />
       </div>
-      <footer className="flex h-7 shrink-0 items-center justify-end gap-1 border-t bg-muted/20 px-3">
-        <ShortcutsDialog />
-        <ResourceUsage />
-      </footer>
     </>
   )
 
@@ -208,6 +206,7 @@ export function AppShell() {
         }
       />
       <DiscardDialog />
+      <ShortcutsDialog />
     </div>
   )
 }
@@ -228,7 +227,13 @@ function ClassicFrame(props: { rail: ReactNode; children: ReactNode }) {
           </TooltipHint>
           {props.rail}
         </aside>
-        <div className="flex min-w-0 flex-1 flex-col">{props.children}</div>
+        <div className="flex min-w-0 flex-1 flex-col">
+          {props.children}
+          <footer className="flex h-7 shrink-0 items-center justify-end gap-1 border-t bg-muted/20 px-3">
+            <ShortcutsButton />
+            <ResourceUsage />
+          </footer>
+        </div>
       </div>
     </>
   )
@@ -333,7 +338,7 @@ function AreaRail(props: {
           )}
         </button>
       </TooltipHint>
-      <ConnectionAvatar />
+      <props.style.connection />
     </>
   )
 }
