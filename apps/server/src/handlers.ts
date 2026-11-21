@@ -111,6 +111,10 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
         github
           .hasChanged(pullRequestId, revision, updatedAt)
           .pipe(Effect.provideService(BackgroundGitHubRequest, true)),
+      GetPullRequestStatus: ({ pullRequestId }) =>
+        github
+          .pullRequestStatus(pullRequestId)
+          .pipe(Effect.provideService(BackgroundGitHubRequest, true)),
       GetFileContents: ({ pullRequest, revision, side, path }) =>
         github.fileContents(pullRequest, revision, side, path),
       ListRepositoryFiles: ({ pullRequest, revision }) =>

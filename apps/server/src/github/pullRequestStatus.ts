@@ -1,21 +1,36 @@
-import { type Approval, type Mergeable, Reviewer } from "@glass/contracts"
+import { type Approval, type Mergeable, type PullRequestState, Reviewer } from "@glass/contracts"
 import { Schema } from "effect"
 import { GitHubAuthor, login } from "./author"
 import { CHECK_CONTEXTS_FIELDS, CheckContexts, checksOfCommits } from "./checkContexts"
-import type { MergingFields } from "./merging"
+import {
+  MERGING_FIELDS,
+  MERGING_REPOSITORY_FIELDS,
+  MergingFields,
+  MergingRepositoryFields,
+  toMerging,
+} from "./merging"
 import { ReviewRequest, ReviewState } from "./repositoryPullRequests"
 
 const MAX_STATUS_ITEMS = 100
 
-export const PULL_REQUEST_STATUS_FIELDS = `reviewDecision
+export const GitHubPullRequestState = Schema.Literals(["OPEN", "CLOSED", "MERGED"])
+
+export const PULL_REQUEST_STATUS_FIELDS = `repository { ${MERGING_REPOSITORY_FIELDS} }
+      state
+      isDraft
+      reviewDecision
       mergeable
       latestOpinionatedReviews(first: ${MAX_STATUS_ITEMS}) { nodes { author { login } state } }
       reviewRequests(first: ${MAX_STATUS_ITEMS}) {
         nodes { requestedReviewer { __typename ... on User { login } ... on Team { slug organization { login } } } }
       }
-      ${CHECK_CONTEXTS_FIELDS}`
+      ${CHECK_CONTEXTS_FIELDS}
+      ${MERGING_FIELDS}`
 
 export const PullRequestStatusFields = {
+  repository: Schema.Struct(MergingRepositoryFields),
+  state: GitHubPullRequestState,
+  isDraft: Schema.Boolean,
   reviewDecision: Schema.NullOr(
     Schema.Literals(["APPROVED", "CHANGES_REQUESTED", "REVIEW_REQUIRED"]),
   ),
@@ -30,10 +45,15 @@ export const PullRequestStatusFields = {
   }),
   reviewRequests: Schema.Struct({ nodes: Schema.Array(ReviewRequest) }),
   commits: CheckContexts,
+  ...MergingFields,
 }
 
-type GitHubPullRequestStatus = Schema.Struct.Type<typeof PullRequestStatusFields> & {
-  readonly mergeStateStatus: typeof MergingFields.mergeStateStatus.Type
+type GitHubPullRequestStatus = Schema.Struct.Type<typeof PullRequestStatusFields>
+
+const states: Record<typeof GitHubPullRequestState.Type, PullRequestState> = {
+  OPEN: "open",
+  CLOSED: "closed",
+  MERGED: "merged",
 }
 
 const approvals: Record<NonNullable<GitHubPullRequestStatus["reviewDecision"]>, Approval> = {
@@ -80,6 +100,7 @@ const toReviewers = (pr: GitHubPullRequestStatus) => {
 }
 
 export const toPullRequestStatus = (pr: GitHubPullRequestStatus) => ({
+  state: pr.state === "OPEN" && pr.isDraft ? ("draft" as const) : states[pr.state],
   approval: pr.reviewDecision === null ? null : approvals[pr.reviewDecision],
   reviewers: toReviewers(pr),
   checks: checksOfCommits(pr.commits),
@@ -87,4 +108,5 @@ export const toPullRequestStatus = (pr: GitHubPullRequestStatus) => ({
     pr.mergeable === "MERGEABLE" && pr.mergeStateStatus === "BEHIND"
       ? "behind"
       : mergeables[pr.mergeable],
+  ...toMerging(pr),
 })

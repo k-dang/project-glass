@@ -68,6 +68,7 @@ import { ProblemAlert } from "./ProblemAlert"
 import type { Problem } from "./problems"
 import { RepositoryBrowser } from "./RepositoryBrowser"
 import { FinishReview } from "./FinishReview"
+import { useLiveStatus } from "./liveStatus"
 import { MergePullRequest } from "./MergePullRequest"
 import { OpenPullRequestButton } from "./CommandMenu"
 import { closedAs, StatusChips } from "./PullRequestStatus"
@@ -115,8 +116,8 @@ export function Workspace(props: {
   onBack: () => void
   onOpen: (pullRequest: PullRequestRef) => void
 }) {
-  const { pullRequest, revision, files, lineReviewThreads, outdatedReviewThreads, timeline } =
-    props.workspace
+  const { revision, files, lineReviewThreads, outdatedReviewThreads, timeline } = props.workspace
+  const pullRequest = useLiveStatus(props.workspace.pullRequest)
 
   const tour = useTour(pullRequest.ref, revision)
   const agentReview = useAgentReview(pullRequest.ref, revision, closedAs(pullRequest))

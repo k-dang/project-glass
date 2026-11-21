@@ -1,5 +1,5 @@
 import { RegistryContext, useAtomValue } from "@effect/atom-react"
-import type { PullRequestRef, PullRequestWorkspace } from "@glass/contracts"
+import type { PullRequest, PullRequestRef, PullRequestWorkspace } from "@glass/contracts"
 import { useNavigate } from "@tanstack/react-router"
 import { Option } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
@@ -16,6 +16,7 @@ import { MergePullRequest } from "./MergePullRequest"
 import { ProblemAlert } from "./ProblemAlert"
 import { settledProblem } from "./problems"
 import { LineCounts } from "./LineCounts"
+import { useLiveStatus } from "./liveStatus"
 import { plural } from "./plural"
 import { ChecksChip, ConflictsChip, ReviewersChip } from "./PullRequestStatus"
 import { preloadAtom, reloadPreloaded } from "./reviewsArea"
@@ -32,6 +33,7 @@ export function PullRequestPane(props: { pullRequest: PullRequestRef; onClose: (
   const navigate = useNavigate()
   const problem = settledProblem(result)
   const loaded = Option.getOrNull(AsyncResult.value(result))
+  const pullRequest = useLiveStatus(loaded?.pullRequest ?? null)
 
   return (
     <SidePanel
@@ -39,11 +41,11 @@ export function PullRequestPane(props: { pullRequest: PullRequestRef; onClose: (
       heading={
         <span className="text-sm font-normal text-muted-foreground">
           {owner}/{repo}{" "}
-          {loaded === null ? (
+          {pullRequest === null ? (
             `#${number}`
           ) : (
             <a
-              href={loaded.pullRequest.url}
+              href={pullRequest.url}
               target="_blank"
               rel="noreferrer"
               className="text-emerald-500 hover:underline"
@@ -55,10 +57,10 @@ export function PullRequestPane(props: { pullRequest: PullRequestRef; onClose: (
       }
       actions={
         <>
-          {loaded !== null && (
+          {loaded !== null && pullRequest !== null && (
             <MergePullRequest
-              key={loaded.pullRequest.id}
-              pullRequest={loaded.pullRequest}
+              key={pullRequest.id}
+              pullRequest={pullRequest}
               revision={loaded.revision}
               onReload={reload}
             />
@@ -80,8 +82,8 @@ export function PullRequestPane(props: { pullRequest: PullRequestRef; onClose: (
       width={paneWidthAtom}
       onClose={props.onClose}
     >
-      {loaded !== null ? (
-        <LoadedPullRequest workspace={loaded} />
+      {loaded !== null && pullRequest !== null ? (
+        <LoadedPullRequest workspace={loaded} pullRequest={pullRequest} />
       ) : problem !== null ? (
         <div className="px-5 py-4">
           <ProblemAlert problem={problem} action={{ label: "Try again", run: reload }} />
@@ -97,8 +99,9 @@ export function PullRequestPane(props: { pullRequest: PullRequestRef; onClose: (
   )
 }
 
-function LoadedPullRequest(props: { workspace: PullRequestWorkspace }) {
-  const { pullRequest, files } = props.workspace
+function LoadedPullRequest(props: { workspace: PullRequestWorkspace; pullRequest: PullRequest }) {
+  const { pullRequest } = props
+  const { files } = props.workspace
 
   return (
     <>

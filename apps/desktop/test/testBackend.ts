@@ -121,6 +121,7 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         GetConnection: unused,
         LoadPullRequest: unused,
         HasPullRequestChanged: unused,
+        GetPullRequestStatus: () => Effect.never,
         GetFileContents: unused,
         ListRepositoryFiles: unused,
         SetFileViewed: unused,
