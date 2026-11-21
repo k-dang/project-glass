@@ -11,7 +11,18 @@ import {
   RepositoryPullRequests,
   RepositoryUnavailable,
 } from "@glass/contracts"
-import { Clock, DateTime, Deferred, Effect, Option, Predicate, Queue, Stream } from "effect"
+import {
+  Clock,
+  DateTime,
+  Deferred,
+  Effect,
+  Layer,
+  Option,
+  Predicate,
+  Queue,
+  Stream,
+  SubscriptionRef,
+} from "effect"
 import { TestClock } from "effect/testing"
 import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
@@ -21,6 +32,11 @@ import { type FakeGitHub, startFakeGitHub } from "../test/fakeGitHub"
 import type { FakePullRequest } from "../test/fakePullRequest"
 import { VIEWER } from "../test/fakePullRequest"
 import { isolatedHome, openPullRequest, startBackend, startSignedInBackend } from "../test/harness"
+import { ActivityLog } from "./ActivityLog"
+import { FollowedRepositories } from "./FollowedRepositories"
+import { GitHubClient } from "./github/GitHubClient"
+import { PullRequestLists } from "./PullRequestLists"
+import { type Mirror, type MirroredPullRequest, PullRequestMirror } from "./PullRequestMirror"
 
 const base = { sha: "b0", files: {} }
 
@@ -103,14 +119,14 @@ const follow = Effect.fnUntraced(function* (client: Client, input: string) {
   )
 })
 
-const watching = Effect.fnUntraced(function* (client: Client) {
-  const updates = yield* Queue.unbounded<LatestPullRequestListings>()
-  yield* client.WatchPullRequests().pipe(
+const latestOf = Effect.fnUntraced(function* <A, E>(watch: Stream.Stream<A, E>) {
+  const updates = yield* Queue.unbounded<A>()
+  yield* watch.pipe(
     Stream.runForEach((update) => Queue.offer(updates, update)),
     Effect.forkScoped,
   )
 
-  return Effect.fnUntraced(function* (until: (update: LatestPullRequestListings) => boolean) {
+  return Effect.fnUntraced(function* (until: (update: A) => boolean) {
     for (;;) {
       const update = yield* Queue.take(updates)
 
@@ -118,6 +134,8 @@ const watching = Effect.fnUntraced(function* (client: Client) {
     }
   })
 })
+
+const watching = (client: Client) => latestOf(client.WatchPullRequests())
 
 const operations = (github: FakeGitHub) =>
   github.graphQLRequests.map((request) => request.operationName)
@@ -892,8 +910,7 @@ describe("Watching", () => {
     }),
   )
 
-  // Flaky: timed out at 30 s during a full `pnpm test`, then passed alone on rerun.
-  it.live.skip("tells watchers why a sync failed, until one succeeds", () =>
+  it.live("tells watchers why a sync failed, until one succeeds", () =>
     Effect.gen(function* () {
       const { client, teams } = yield* startWithTeamsFailing
       yield* client.FollowRepository({ input: "octo-org/glass" })
@@ -906,6 +923,87 @@ describe("Watching", () => {
       teams.failing = false
       yield* client.ListPullRequests()
       yield* latest((update) => Predicate.isTagged(update, "Listed") && update.problem === null)
+    }),
+  )
+
+  it.effect("shows a new watcher a change that lands while it reads the lists", () =>
+    Effect.gen(function* () {
+      const repository = new FollowedRepository({ owner: "octo-org", repo: "glass" })
+      const now = DateTime.makeUnsafe("2026-03-01T10:00:00Z")
+
+      const mine: MirroredPullRequest = {
+        id: "PR_1",
+        ref: new PullRequestRef({ owner: "octo-org", repo: "glass", number: 1 }),
+        url: "https://github.com/octo-org/glass/pull/1",
+        title: "Greet the world",
+        author: VIEWER.login,
+        isDraft: false,
+        updatedAt: now,
+        head: "h1",
+        headBranch: null,
+        checks: "passing",
+        attention: null,
+        viewerIsAuthor: true,
+        viewerHasDrafts: false,
+        viewerHasSubmittedReview: false,
+        requestedUsers: [],
+        requestedTeams: [],
+      }
+
+      const mirrored = (pullRequests: ReadonlyArray<MirroredPullRequest>): Mirror => ({
+        viewer: VIEWER.login,
+        teams: [],
+        repositories: [{ repository, fullyReadAt: now, syncedAt: now, pullRequests }],
+      })
+
+      const mirror = yield* SubscriptionRef.make<Mirror | undefined>(mirrored([]))
+      const writes = yield* SubscriptionRef.make(0)
+      const reading = yield* Deferred.make<void>()
+      const changed = yield* Deferred.make<void>()
+      let first = true
+
+      const touchedPullRequests = () =>
+        first
+          ? Effect.sync(() => (first = false)).pipe(
+              Effect.andThen(Deferred.succeed(reading, undefined)),
+              Effect.andThen(Deferred.await(changed)),
+              Effect.as([]),
+            )
+          : Effect.succeed([])
+
+      const lists = yield* PullRequestLists.pipe(
+        Effect.provide(
+          PullRequestLists.layer.pipe(
+            Layer.provide([
+              Layer.mock(FollowedRepositories)({
+                list: () => Effect.succeed([repository]),
+                changes: SubscriptionRef.changes(writes),
+              }),
+              Layer.mock(GitHubClient)({ viewer: Effect.never }),
+              Layer.mock(ActivityLog)({
+                touchedPullRequests,
+                changes: SubscriptionRef.changes(writes),
+              }),
+              Layer.mock(PullRequestMirror)({
+                saved: SubscriptionRef.get(mirror),
+                changes: SubscriptionRef.changes(mirror),
+              }),
+            ]),
+          ),
+        ),
+      )
+
+      const latest = yield* latestOf(lists.watch())
+
+      yield* Deferred.await(reading)
+      yield* SubscriptionRef.set(mirror, mirrored([mine]))
+      yield* Deferred.succeed(changed, undefined)
+
+      yield* latest((update) =>
+        (listingsIn(update)?.["my-prs"] ?? []).some((listing) =>
+          listing.pullRequests.some((pr) => pr.url === mine.url),
+        ),
+      )
     }),
   )
 

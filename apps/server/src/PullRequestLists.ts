@@ -143,8 +143,6 @@ const shownIn = (lists: ReturnType<typeof classify>) => [
   ).values(),
 ]
 
-const later = <A>(changes: Stream.Stream<A>) => changes.pipe(Stream.drop(1), Stream.as(undefined))
-
 interface LastSync {
   readonly failures: ReadonlyMap<string, GitHubUnavailable>
   readonly problem: SettingsError | ConnectionError | null
@@ -284,21 +282,16 @@ export class PullRequestLists extends Context.Service<
           watchers: current.watchers + change,
         }))
 
-      const changed = Stream.mergeAll(
-        [
-          later(pullRequests.changes),
-          later(activity.changes),
-          later(repositories.changes),
-          later(SubscriptionRef.changes(lastSync)),
-        ],
-        { concurrency: "unbounded" },
-      )
-
       return PullRequestLists.of({
         list,
         refreshSoon,
         watch: () =>
-          Stream.concat(Stream.make(undefined), changed).pipe(
+          Stream.zipLatestAll(
+            pullRequests.changes,
+            activity.changes,
+            repositories.changes,
+            SubscriptionRef.changes(lastSync),
+          ).pipe(
             Stream.mapEffect(() => derive),
             Stream.filter(Predicate.isNotNull),
             Stream.onStart(watching(1)),
