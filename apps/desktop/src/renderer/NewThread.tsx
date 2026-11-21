@@ -247,37 +247,29 @@ function ChoosePlace(props: {
     newest,
   }
 
-  return provider === undefined ? (
-    <>
-      {props.checkouts.map((linked) => (
-        <PrefetchBranches key={repositoryKey(linked.repository)} checkout={linked} />
-      ))}
-      <Draft
-        {...choices}
-        repositories={props.checkouts.map(({ repository, path }) => ({
-          repository,
-          title: path,
-        }))}
-      />
-    </>
-  ) : (
-    <InSandbox {...choices} followed={props.followed} />
-  )
-}
-
-function InSandbox(props: DraftChoices & { followed: Followed }) {
-  const { followed, ...choices } = props
-
-  return AsyncResult.builder(followed)
-    .onFailure((cause) => (
+  if (provider !== undefined && AsyncResult.isFailure(props.followed))
+    return (
       <div className="p-6">
-        <ProblemAlert problem={problemOf(cause)} />
+        <ProblemAlert problem={problemOf(props.followed.cause)} />
       </div>
-    ))
-    .onSuccess((repositories) => (
-      <Draft {...choices} repositories={repositories.map((repository) => ({ repository }))} />
-    ))
-    .render()
+    )
+
+  const repositories =
+    provider === undefined
+      ? props.checkouts.map(({ repository, path }) => ({ repository, title: path }))
+      : Option.getOrElse(AsyncResult.value(props.followed), () => []).map((repository) => ({
+          repository,
+        }))
+
+  return (
+    <>
+      {provider === undefined &&
+        props.checkouts.map((linked) => (
+          <PrefetchBranches key={repositoryKey(linked.repository)} checkout={linked} />
+        ))}
+      <Draft {...choices} repositories={repositories} />
+    </>
+  )
 }
 
 function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> }) {

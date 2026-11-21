@@ -1005,3 +1005,38 @@ it("keeps the New Thread region on screen when first switching to a Sandbox", as
   observer.disconnect()
   expect(vanished).toBe(false)
 })
+
+it("keeps the same draft, glow and all, when switching between Local and a Sandbox", async () => {
+  const user = mount(
+    {
+      ...newThreadHandlers([], []),
+      ListSandboxProviders: () =>
+        Effect.succeed([
+          new SandboxProviderInfo({
+            id: "fake",
+            name: "Fake Sandboxes",
+            harnesses: ["claude-code"],
+          }),
+        ]),
+      ListFollowedRepositories: () => Effect.succeed([thread.repository]),
+    },
+    "/threads/new",
+  )
+
+  const heading = await screen.findByRole("heading", { name: "What should we work on?" })
+
+  const select = async (option: string) => {
+    await user.click(
+      await within(await findDraft()).findByRole("combobox", { name: "Where the Thread runs" }),
+    )
+    await user.click(await screen.findByRole("option", { name: option }))
+  }
+
+  await select("Fake Sandboxes")
+  await within(await findDraft()).findByText("The agent works on a branch of its own.")
+  expect(screen.getByRole("heading", { name: "What should we work on?" })).toBe(heading)
+
+  await select("Local")
+  await baseBranchShows("main")
+  expect(screen.getByRole("heading", { name: "What should we work on?" })).toBe(heading)
+})
