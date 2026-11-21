@@ -156,7 +156,9 @@ _Avoid_: History, audit log, event log, telemetry
 ### Planning
 
 **To-do**:
-Something the user means to do, written down in Glass, open until they mark it done.
+Something the user means to do, written down in Glass, open until they mark it done. A To-do
+mentioned in a Conversation's first message is marked done when that Conversation's PR merges,
+unless the user marked it done first.
 _Avoid_: Task, action item
 
 ### Conversations

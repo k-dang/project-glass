@@ -3,6 +3,7 @@ import { ToDo, ToDoError, type ToDoImageUpload } from "@glass/contracts"
 import {
   ConfigProvider,
   Context,
+  DateTime,
   Deferred,
   Effect,
   Fiber,
@@ -308,6 +309,45 @@ const toDosIn = Effect.fnUntraced(function* (
 
   return Context.get(services, ToDos)
 })
+
+const mergedAt = (at: string) => [
+  { conversationId: "merged", completedAt: DateTime.makeUnsafe(at) },
+]
+
+it.live(
+  "marks a merged Conversation's to-dos done once, skipping ones the user finished first and merges from before the link",
+  () =>
+    Effect.gen(function* () {
+      const toDos = yield* toDosIn(yield* isolatedHome, () => ({}))
+
+      const merged = mergedAt("2100-01-01T00:00:00Z")
+
+      yield* toDos.add("Fix spacing", "", [])
+      yield* toDos.add("Rename the flag", "", [])
+      yield* toDos.add("Tidy later", "", [])
+      yield* toDos.linkConversation("merged", [1, 2])
+      yield* toDos.setDone(2, true)
+      yield* toDos.setDone(2, false)
+
+      yield* toDos.completeLinked(mergedAt("2000-01-01T00:00:00Z"))
+      assert.isFalse((yield* toDos.list()).some(({ done }) => done))
+
+      yield* toDos.completeLinked(merged)
+      assert.deepStrictEqual(yield* toDos.list(), [
+        toDo(2, "Rename the flag"),
+        toDo(3, "Tidy later"),
+        toDo(1, "Fix spacing", true),
+      ])
+
+      yield* toDos.setDone(1, false)
+      yield* toDos.completeLinked(merged)
+      assert.deepStrictEqual(yield* toDos.list(), [
+        toDo(1, "Fix spacing"),
+        toDo(2, "Rename the flag"),
+        toDo(3, "Tidy later"),
+      ])
+    }),
+)
 
 const heldWritesThatOutliveInterruption = Effect.gen(function* () {
   const gate = yield* Deferred.make<void>()

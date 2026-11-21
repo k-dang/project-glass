@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { RegistryProvider } from "@effect/atom-react"
 import {
+  defaultReviewPrompt,
   GitHubConnection,
   ToDo,
   ToDoError,
@@ -9,7 +10,7 @@ import {
 } from "@glass/contracts"
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { Effect } from "effect"
+import { Effect, Queue, Stream } from "effect"
 import { afterEach, expect, it } from "vite-plus/test"
 import { App } from "./App"
 import { backendLayerAtom } from "./backend"
@@ -70,6 +71,7 @@ const fakeToDos = () => {
 
   return {
     ListToDos: sorted,
+    WatchToDos: () => Stream.fromEffect(sorted()),
     AddToDo: ({ title, notes, images }) => {
       toDos = [
         ...toDos,
@@ -134,7 +136,7 @@ afterEach(() => {
 it("confirms completion and reopening only after saving succeeds", async () => {
   const toDo = new ToDo({ id: 1, title: "Write release notes", notes: "", done: false })
   const changes: Array<Held<{ id: number; done: boolean }, ReadonlyArray<ToDo>, ToDoError>> = []
-  const user = mount({ ListToDos: () => Effect.succeed([toDo]), SetToDoDone: hold(changes) })
+  const user = mount({ WatchToDos: () => Stream.make([toDo]), SetToDoDone: hold(changes) })
 
   await user.click(await screen.findByRole("checkbox", { name: toDo.title }))
   const failed = await next(changes)
@@ -211,7 +213,7 @@ it("adds, edits, completes, reopens, and deletes to-dos", async () => {
 
 it("keeps the typed to-do and shows the problem when saving fails", async () => {
   const adds: Array<Held<{ title: string; notes: string }, ReadonlyArray<ToDo>, ToDoError>> = []
-  const user = mount({ ListToDos: () => Effect.succeed([]), AddToDo: hold(adds) })
+  const user = mount({ WatchToDos: () => Stream.make([]), AddToDo: hold(adds) })
   const page = await screen.findByRole("main", { name: "To-dos" })
 
   const input = await within(page).findByRole<HTMLInputElement>("textbox", { name: "New to-do" })
@@ -228,7 +230,7 @@ it("keeps the typed to-do and shows the problem when saving fails", async () => 
 
 it("keeps text typed while an add is saving", async () => {
   const adds: Array<Held<{ title: string; notes: string }, ReadonlyArray<ToDo>, ToDoError>> = []
-  const user = mount({ ListToDos: () => Effect.succeed([]), AddToDo: hold(adds) })
+  const user = mount({ WatchToDos: () => Stream.make([]), AddToDo: hold(adds) })
   const page = await screen.findByRole("main", { name: "To-dos" })
 
   const input = await within(page).findByRole<HTMLInputElement>("textbox", { name: "New to-do" })
@@ -250,7 +252,20 @@ it("keeps an unfinished edit across areas and text typed while it saves", async 
     Held<{ id: number; title: string; notes: string }, ReadonlyArray<ToDo>, ToDoError>
   > = []
 
-  const user = mount({ ListToDos: () => Effect.succeed([toDo]), EditToDo: hold(edits) })
+  const user = mount({
+    WatchToDos: () => Stream.make([toDo]),
+    EditToDo: hold(edits),
+    ListFollowedRepositories: () => Effect.succeed([]),
+    GetEngineSettings: () =>
+      Effect.succeed({
+        harness: "claude-code",
+        models: {
+          "claude-code": "claude-sonnet-5-5",
+          pi: { provider: "anthropic", modelId: "claude-sonnet-5-5" },
+        },
+      }),
+    GetReviewPrompt: () => Effect.succeed(defaultReviewPrompt),
+  })
 
   await user.click(await screen.findByRole("button", { name: "Edit Rebase the branch" }))
   const formName = "Edit Rebase the branch"
@@ -327,7 +342,7 @@ it("adds a to-do with pasted images and can drop one before saving", async () =>
   > = []
 
   const user = mount({
-    ListToDos: () => Effect.succeed([]),
+    WatchToDos: () => Stream.make([]),
     AddToDo: hold(adds),
     AttachToDoImages: hold(attaches),
   })
@@ -372,7 +387,7 @@ it("sends each pasted image in its own message", async () => {
   > = []
 
   const user = mount({
-    ListToDos: () => Effect.succeed([]),
+    WatchToDos: () => Stream.make([]),
     AddToDo: hold(adds),
     AttachToDoImages: hold(attaches),
   })
@@ -420,7 +435,7 @@ it("keeps an image that failed to attach and retries it on the same to-do", asyn
   > = []
 
   const user = mount({
-    ListToDos: () => Effect.succeed([]),
+    WatchToDos: () => Stream.make([]),
     AddToDo: hold(adds),
     AttachToDoImages: hold(attaches),
   })
@@ -455,7 +470,7 @@ it("keeps an image that failed to attach and retries it on the same to-do", asyn
 })
 
 it("tells you when a pasted image is too big to send and keeps the smaller ones", async () => {
-  const user = mount({ ListToDos: () => Effect.succeed([]) })
+  const user = mount({ WatchToDos: () => Stream.make([]) })
   const form = within(await screen.findByRole("form", { name: "Add a to-do" }))
   const huge = new File([pixel], "huge.png", { type: "image/png" })
   Object.defineProperty(huge, "size", { value: maxToDoImageBytes + 1 })
@@ -480,7 +495,7 @@ it("keeps a paste made while another to-do change is saving", async () => {
   > = []
 
   const user = mount({
-    ListToDos: () => Effect.succeed([toDo]),
+    WatchToDos: () => Stream.make([toDo]),
     SetToDoDone: hold(changes),
     AttachToDoImages: hold(attaches),
   })
@@ -513,7 +528,7 @@ it("sends images pasted onto a to-do one at a time and holds them after a failur
   > = []
 
   const user = mount({
-    ListToDos: () => Effect.succeed([toDo]),
+    WatchToDos: () => Stream.make([toDo]),
     AttachToDoImages: hold(attaches),
   })
 
@@ -581,10 +596,24 @@ it("puts the newest open to-do directly under the composer", async () => {
   ).toBe(true)
 })
 
+it("moves a to-do into Done when the server reports it finished elsewhere", async () => {
+  const toDo = new ToDo({ id: 1, title: "Fix spacing", notes: "", done: false })
+  const lists = Effect.runSync(Queue.unbounded<ReadonlyArray<ToDo>>())
+  Queue.offerUnsafe(lists, [toDo])
+  mount({ WatchToDos: () => Stream.fromQueue(lists) })
+
+  const page = await screen.findByRole("main", { name: "To-dos" })
+  await within(page).findByRole("list", { name: "Open to-dos" })
+
+  Queue.offerUnsafe(lists, [new ToDo({ id: 1, title: "Fix spacing", notes: "", done: true })])
+  await within(page).findByText("Done (1)")
+  expect(within(page).getByText("Nothing to do.")).toBeTruthy()
+})
+
 it("keeps finished to-dos collapsed and in the order the server sent", async () => {
   const user = mount({
-    ListToDos: () =>
-      Effect.succeed([
+    WatchToDos: () =>
+      Stream.make([
         new ToDo({ id: 1, title: "Older errand", notes: "", done: false }),
         new ToDo({ id: 2, title: "Newer errand", notes: "", done: false }),
         new ToDo({ id: 4, title: "Finished just now", notes: "", done: true }),

@@ -27,6 +27,7 @@ import {
   type FakeModelRequest,
   fakeModelProvider,
   lastUserText,
+  commandFor,
   runCommands,
   textOf,
 } from "./fakeModelProvider"
@@ -148,9 +149,10 @@ const demoReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
     "Write a note": "printf 'hello from the agent\\n' > notes.txt",
     "Write another": "printf 'a second note\\n' > more.txt",
     "Pick up the README typo PR": "git switch -c fix-the-typo-in-the-readme",
+    "Pick up the slow query PR": "git switch -c log-slow-database-queries",
   }
 
-  if (Object.hasOwn(changes, lastUserText(input))) return runCommands(changes)(input)
+  if (commandFor(changes, input) !== undefined) return runCommands(changes)(input)
   const { messages } = input
   const last = messages.at(-1)
 

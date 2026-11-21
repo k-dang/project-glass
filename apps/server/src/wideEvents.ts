@@ -39,6 +39,7 @@ export interface UnitFields {
   readonly tool_calls?: number
   readonly failed_tool_calls?: number
   readonly ended_lookups?: number
+  readonly to_dos_done?: number
 }
 
 type DurationField = "checkout_ms" | "agent_ms"

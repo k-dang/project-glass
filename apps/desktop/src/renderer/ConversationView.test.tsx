@@ -1486,8 +1486,8 @@ it("mentions an open To-do picked after @, and shows the Mention as its title", 
   const sent: Array<string> = []
 
   const user = mount({
-    ListToDos: () =>
-      Effect.succeed([
+    WatchToDos: () =>
+      Stream.make([
         flaky,
         new ToDo({ id: 4, title: "Fix the docs", notes: "", done: true }),
         new ToDo({ id: 5, title: "Write the release notes", notes: "", done: false }),
@@ -1531,7 +1531,7 @@ it("offers the Conversation's files after its To-dos, those named after what's t
   const sent: Array<string> = []
 
   const user = mount({
-    ListToDos: () => Effect.succeed([flaky]),
+    WatchToDos: () => Stream.make([flaky]),
     ListConversationFiles: () =>
       Effect.succeed(["fixtures/readme.md", "src/fix.ts", "docs/notes.md"]),
     WatchTranscript: () =>
@@ -1558,7 +1558,7 @@ it("keeps the To-do choices closed after Escape, so Enter sends the @ as written
   const sent: Array<string> = []
 
   const user = mount({
-    ListToDos: () => Effect.succeed([flaky]),
+    WatchToDos: () => Stream.make([flaky]),
     WatchTranscript: () =>
       Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
     SendMessage: ({ message }) => Effect.sync(() => void sent.push(message)),

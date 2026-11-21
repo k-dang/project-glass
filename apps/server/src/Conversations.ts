@@ -31,6 +31,7 @@ import {
   type RequestWaiting,
   type Revision,
   localPlace,
+  mentionedToDoIds,
   type Transcript,
   type TranscriptUpdate,
   type TurnEnd,
@@ -77,6 +78,7 @@ import { type RepositoryRole, ReviewBrief, ReviewRole, WorkRole } from "./agentH
 import { LocalSkills } from "./LocalSkills"
 import { SkillPacks } from "./SkillPacks"
 import { forgetStartedWork } from "./startedWorkRows"
+import { ToDos } from "./ToDos"
 import { Transcripts, type WaitingRequest } from "./Transcripts"
 import { annotateUnit } from "./wideEvents"
 
@@ -318,6 +320,7 @@ export class Conversations extends Context.Service<
       const turns = yield* ConversationTurns
       const notes = yield* FeedbackNotes
       const skillPacks = yield* SkillPacks
+      const toDos = yield* ToDos
       const localSkills = yield* LocalSkills
       const fs = yield* FileSystem.FileSystem
       const lock = yield* Semaphore.make(1)
@@ -570,6 +573,11 @@ export class Conversations extends Context.Service<
                   Review: ({ brief }) => encodeBrief(brief),
                 }),
               })}`
+
+              yield* Purpose.$match(purpose, {
+                Work: () => toDos.linkConversation(id, mentionedToDoIds(first.message)),
+                Review: () => Effect.void,
+              })
 
               yield* SubscriptionRef.update(rows, (current) => [
                 ...current,
@@ -953,6 +961,7 @@ export class Conversations extends Context.Service<
             yield* notes.removeAll(conversationNotes(conversationId))
             yield* skillPacks.releaseConversation(conversationId)
             yield* forgetStartedWork(sql, conversationId)
+            yield* toDos.unlinkConversation(conversationId)
             yield* sql`DELETE FROM conversation WHERE id = ${conversationId}`
           }).pipe(sql.withTransaction, Effect.mapError(storageFailure))
         }).pipe(

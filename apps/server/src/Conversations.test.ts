@@ -8,8 +8,9 @@ import {
   TextPatch,
   UnsentFeedback,
   localPlace,
+  toDoMention,
 } from "@glass/contracts"
-import { Effect, Option, Predicate, Stream } from "effect"
+import { Effect, Fiber, Option, Predicate, Stream } from "effect"
 import { existsSync } from "node:fs"
 import { mkdir, rename, symlink, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
@@ -602,6 +603,54 @@ it.live("keeps showing a Conversation's PR as merged once it merges", () =>
 
     assert.equal(merged?.ref.number, 7)
     assert.equal(merged?.url, pr.url)
+  }),
+)
+
+it.live("marks the To-dos a Conversation started from done once its PR merges", () =>
+  Effect.gen(function* () {
+    const f = yield* conversationsFixture
+    yield* f.client.FollowRepository({ input: "glass-demo/greeter" })
+    yield* f.client.AddToDo({ title: "Fix spacing", notes: "" })
+    yield* f.client.AddToDo({ title: "Tidy later", notes: "" })
+
+    const pr = f.github.seedPullRequest({
+      owner: "glass-demo",
+      repo: "greeter",
+      number: 7,
+      headBranch: "feature/spacing",
+      base: { sha: "b0", files: {} },
+      head: { sha: "h1", files: {} },
+    })
+
+    const conversation = yield* f.start(`hold:first
+${toDoMention({ id: 1, title: "Fix spacing" })}`)
+
+    yield* f.transcript(conversation.id, holding)
+    gitIn(f.worktree(conversation.name), "switch", "--quiet", "-c", "feature/spacing")
+    yield* f.release("first")
+    yield* f.transcript(conversation.id, settled(1))
+    yield* f.send(conversation.id, toDoMention({ id: 2, title: "Tidy later" }))
+    yield* f.transcript(conversation.id, settled(2))
+
+    const finished = yield* f.client.WatchToDos().pipe(
+      Stream.filter((toDos) => toDos.some(({ done }) => done)),
+      Stream.runHead,
+      Effect.map(Option.getOrThrow),
+      Effect.forkChild,
+    )
+
+    pr.edit({ state: "MERGED" })
+    yield* f.client.ListPullRequests()
+
+    const listed = yield* Fiber.join(finished)
+
+    assert.deepStrictEqual(
+      listed.map(({ title, done }) => ({ title, done })),
+      [
+        { title: "Tidy later", done: false },
+        { title: "Fix spacing", done: true },
+      ],
+    )
   }),
 )
 

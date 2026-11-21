@@ -113,6 +113,7 @@ it.live("upgrades main's schema directly, preserving completed and unfinished up
       [18, "conversation_kept_going"],
       [19, "global_chat_sessions"],
       [20, "page_notes"],
+      [21, "conversation_to_dos"],
     ])
     const transcripts = yield* Transcripts
     const { turns } = yield* transcripts.read("global")
@@ -218,6 +219,7 @@ it.live("creates the schema once and reads Activity through its indexes after re
         [18, "conversation_kept_going"],
         [19, "global_chat_sessions"],
         [20, "page_notes"],
+        [21, "conversation_to_dos"],
       ],
       [],
     ] as const) {
@@ -743,6 +745,7 @@ it.live(
         assert.deepStrictEqual(yield* SqliteMigrator.run({ loader: migrationLoader }), [
           [19, "global_chat_sessions"],
           [20, "page_notes"],
+          [21, "conversation_to_dos"],
         ])
         assert.deepStrictEqual(yield* sql`SELECT * FROM global_chat`, [
           { id: "global", model: "gpt-test", effort: null, singleton: 1 },
