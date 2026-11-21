@@ -905,10 +905,9 @@ export class Threads extends Context.Service<
           const running = yield* hosting.connectedHost(row)
 
           if (Option.isSome(running))
-            yield* running.value.StopThread({ threadId }).pipe(
-              Effect.tapError((cause) => Effect.logWarning("Couldn't stop a Thread", cause)),
-              Effect.ignore,
-            )
+            yield* running.value
+              .StopThread({ threadId })
+              .pipe(Effect.ignore({ log: "Warn", message: "Couldn't stop a Thread" }))
 
           yield* hosting.remove(row)
 
