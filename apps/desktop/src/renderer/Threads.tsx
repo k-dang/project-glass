@@ -32,7 +32,8 @@ import {
   Undo2,
 } from "lucide-react"
 import { cn } from "cn"
-import { useContext, useId, useState } from "react"
+import { use, useContext, useId, useState } from "react"
+import { createPortal } from "react-dom"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Kbd } from "@/components/ui/kbd"
@@ -61,6 +62,7 @@ import { ConfirmationDialog } from "./ConfirmationDialog"
 import { settledProblem, streamProblem } from "./problems"
 import { ProblemAlert } from "./ProblemAlert"
 import { useActions } from "./actions"
+import { ShellPanelSlot } from "./shellPanelSlot"
 import { shortcutLabel } from "./shortcutLabel"
 
 const groupNames: Record<PlaceTag, string> = { ...placeNames, sandbox: "Sandboxes" }
@@ -110,12 +112,33 @@ const sandboxLine = ({ reach, expiresAt }: SandboxStatus) => {
 const threadLink =
   "flex flex-col gap-0.5 rounded-lg px-2 py-2 outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-accent"
 
+const panelStyles: Record<
+  "inline" | "beside",
+  { aside: string; header: string; heading: "h1" | "h2"; title: string }
+> = {
+  inline: {
+    aside: "flex w-64 shrink-0 flex-col gap-4 border-r px-3 py-4",
+    header: "flex items-center justify-between pl-2",
+    heading: "h1",
+    title: "text-sm font-semibold",
+  },
+  beside: {
+    aside: "flex w-64 shrink-0 flex-col gap-2 pr-2 pb-2",
+    header:
+      "title-strip flex shrink-0 items-center justify-between pl-[max(0.5rem,calc(env(titlebar-area-x,0px)-3rem))]",
+    heading: "h2",
+    title: "text-base font-semibold",
+  },
+}
+
 const panelId = "threads-panel"
 
 const panelToggleId = "threads-panel-toggle"
 
 export function ThreadsLayout() {
   const [panelOpen, setPanelOpen] = useAtom(threadsPanelOpenAtom)
+  const panelSlot = use(ShellPanelSlot)
+  const styles = panelSlot === null ? panelStyles.inline : panelStyles.beside
 
   const togglePanel = () => {
     if (panelOpen && document.getElementById(panelId)?.contains(document.activeElement))
@@ -135,22 +158,21 @@ export function ThreadsLayout() {
     },
   ])
 
+  const panel = (
+    <aside id={panelId} aria-label="Threads panel" hidden={!panelOpen} className={styles.aside}>
+      <div className={styles.header}>
+        <styles.heading className={styles.title}>Threads</styles.heading>
+        <NewThreadLink />
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <ThreadList />
+      </div>
+    </aside>
+  )
+
   return (
     <main aria-label="Threads" className="flex min-h-0 flex-1">
-      <aside
-        id={panelId}
-        aria-label="Threads panel"
-        hidden={!panelOpen}
-        className="flex w-64 shrink-0 flex-col gap-4 border-r px-3 py-4"
-      >
-        <div className="flex items-center justify-between pl-2">
-          <h1 className="text-sm font-semibold">Threads</h1>
-          <NewThreadLink />
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <ThreadList />
-        </div>
-      </aside>
+      {panelSlot === null ? panel : createPortal(panel, panelSlot)}
       <div className="flex min-w-0 flex-1 flex-col">
         <Outlet />
       </div>
@@ -200,7 +222,10 @@ function NewThreadLink() {
       <Link
         to="/threads/new"
         aria-label="New Thread"
-        className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
+        className={cn(
+          buttonVariants({ variant: "ghost", size: "icon-sm" }),
+          "[app-region:no-drag]",
+        )}
       >
         <SquarePen aria-hidden />
       </Link>

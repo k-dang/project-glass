@@ -1,4 +1,4 @@
-import { type ColorScheme, ColorSchemePreference, Theme } from "@glass/contracts"
+import { type ColorScheme, ColorSchemePreference, Layout, Theme } from "@glass/contracts"
 import { Moon, Sun } from "lucide-react"
 import { type ReactNode, useId } from "react"
 import { SettingsSection } from "./SettingsSection"
@@ -17,6 +17,14 @@ const themeDetails = {
   linear: { label: "Linear", description: "Quiet surfaces. Lavender accent." },
   vercel: { label: "Vercel", description: "Ink and hairlines. Geist throughout." },
 } satisfies Record<Theme, { label: string; description: string }>
+
+const layoutDetails = {
+  classic: { label: "Classic", description: "An icon rail beside the page." },
+  inset: {
+    label: "Inset",
+    description: "Experimental. The page sits in a raised card, with Threads in a panel beside it.",
+  },
+} satisfies Record<Layout, { label: string; description: string }>
 
 const optionCard =
   "flex cursor-pointer flex-col gap-3 rounded-lg border bg-card p-3 has-checked:border-ring has-checked:ring-1 has-checked:ring-ring has-focus-visible:outline-2 has-focus-visible:outline-offset-4 has-focus-visible:outline-ring"
@@ -66,8 +74,28 @@ function Swatch(props: { theme: Theme; scheme: ColorScheme }) {
   )
 }
 
+function LayoutPreview(props: { layout: Layout }) {
+  return props.layout === "inset" ? (
+    <span className="flex h-16 gap-1.5 rounded-md border bg-chrome p-1.5" aria-hidden>
+      <span className="flex w-2.5 flex-col gap-1 pt-0.5">
+        <i className="h-1.5 rounded-xs bg-muted-foreground/40" />
+        <i className="h-1.5 rounded-xs bg-muted-foreground/40" />
+      </span>
+      <span className="flex-1 rounded-sm border bg-background shadow-xs" />
+    </span>
+  ) : (
+    <span className="flex h-16 overflow-hidden rounded-md border bg-background" aria-hidden>
+      <span className="flex w-4 flex-col items-center gap-1 border-r bg-muted/40 pt-1.5">
+        <i className="size-1.5 rounded-xs bg-muted-foreground/40" />
+        <i className="size-1.5 rounded-xs bg-muted-foreground/40" />
+      </span>
+      <span className="flex-1" />
+    </span>
+  )
+}
+
 export function AppearanceSettings() {
-  const { theme, colorScheme, setTheme, setColorScheme } = useAppearance()
+  const { theme, colorScheme, layout, setTheme, setColorScheme, setLayout } = useAppearance()
 
   return (
     <SettingsSection
@@ -116,6 +144,21 @@ export function AppearanceSettings() {
               <Swatch theme={value} scheme="light" />
               <Swatch theme={value} scheme="dark" />
             </span>
+          </Option>
+        ))}
+      </fieldset>
+      <fieldset className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <legend className="mb-3 text-sm font-medium">Layout</legend>
+        {Layout.literals.map((value) => (
+          <Option
+            key={value}
+            name="layout"
+            label={layoutDetails[value].label}
+            checked={layout === value}
+            onSelect={() => setLayout(value)}
+            description={layoutDetails[value].description}
+          >
+            <LayoutPreview layout={value} />
           </Option>
         ))}
       </fieldset>

@@ -1,7 +1,7 @@
 import type { CapturedContext } from "./thread"
 import type { AgentReview } from "./agentReview"
 import type { Tour } from "./tour"
-import type { ColorSchemePreference, Theme } from "./appearance"
+import type { ColorSchemePreference, Layout, Theme } from "./appearance"
 
 export interface BackendEndpoint {
   readonly url: string
@@ -19,6 +19,7 @@ export type ColorScheme = "light" | "dark"
 export interface Appearance {
   readonly theme: Theme
   readonly colorScheme: ColorSchemePreference
+  readonly layout: Layout
 }
 
 export type ResourceProcess = "Main" | "Renderer" | "Backend" | "GPU / other"
