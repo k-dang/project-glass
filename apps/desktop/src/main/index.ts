@@ -135,21 +135,24 @@ const titleBarColors = {
   Record<"light" | "dark", { background: string; chrome: string; symbolColor: string }>
 >
 
-const windowColors = () => {
+const titleBarOverlay = () => {
   const colors =
     titleBarColors[appearance.theme][nativeTheme.shouldUseDarkColors ? "dark" : "light"]
 
+  const inset = appearance.layout === "inset"
+
   return {
-    color: appearance.layout === "inset" ? colors.chrome : colors.background,
+    color: inset ? colors.chrome : colors.background,
     symbolColor: colors.symbolColor,
+    height: inset ? 44 : 36,
   }
 }
 
 const updateWindowTheme = (window: BrowserWindow) => {
-  const colors = windowColors()
-  window.setBackgroundColor(colors.color)
+  const overlay = titleBarOverlay()
+  window.setBackgroundColor(overlay.color)
 
-  if (process.platform !== "darwin") window.setTitleBarOverlay(colors)
+  if (process.platform !== "darwin") window.setTitleBarOverlay(overlay)
 }
 
 const glassHome = process.env["GLASS_HOME"] || homedir()
@@ -185,7 +188,7 @@ const recordDogfoodReportOf = async (window: BrowserWindow): Promise<DogfoodRepo
 }
 
 const createWindow = () => {
-  const initialColors = windowColors()
+  const initialOverlay = titleBarOverlay()
 
   const window = new BrowserWindow({
     width: 1280,
@@ -194,9 +197,9 @@ const createWindow = () => {
     minHeight: 480,
     title: "Glass",
     titleBarStyle: "hidden",
-    titleBarOverlay: { height: 36, ...initialColors },
+    titleBarOverlay: initialOverlay,
     show: false,
-    backgroundColor: initialColors.color,
+    backgroundColor: initialOverlay.color,
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
       contextIsolation: true,
