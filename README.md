@@ -34,7 +34,7 @@ pnpm dev             # Vite + watch builds + Electron, restarted on main/preload
 pnpm dev:fake        # pnpm dev on a fake GitHub with demo PRs and model-free Tours, in fresh data
 pnpm start           # build everything and run the app as it ships
 pnpm dist            # package an installer into apps/desktop/release
-pnpm test            # backend, renderer, and verification helper tests
+pnpm test            # backend, renderer, and verification helper tests, at once on half the cores each
 pnpm test:e2e        # build, then drive the Electron app with Playwright
 pnpm gallery:capture # build, then screenshot every app state on the demo data into .gallery/index.html
 pnpm gallery:show    # open the last gallery in your browser

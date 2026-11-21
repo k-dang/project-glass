@@ -135,9 +135,7 @@ it.live("cancels the Agent review of a PR leaving the Queue and starts the next 
   }),
 )
 
-// Flaky: timed out after 30 seconds in a full server run; passed when its file was rerun alone.
-// oxlint-disable-next-line vitest/no-disabled-tests
-it.skip("runs no Agent review for a queued PR that already has one", () =>
+it.live("runs no Agent review for a queued PR that already has one", () =>
   Effect.gen(function* () {
     const f = yield* fixture()
     yield* f.runners.configure({ reply: { answer } })
@@ -153,4 +151,5 @@ it.skip("runs no Agent review for a queued PR that already has one", () =>
 
     assert.deepStrictEqual(yield* f.reviewState(pr, () => true), before)
     assert.lengthOf(f.runners.runs, 1)
-  }))
+  }),
+)

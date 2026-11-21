@@ -10,7 +10,7 @@
     "dist": "pnpm build && pnpm --filter @glass/desktop dist",
     "check": "vp check",
     "fix": "vp check --fix",
-    "test": "pnpm -r test",
+    "test": "pnpm -r test --maxWorkers=50%",
     "test:e2e": "pnpm build && pnpm --filter @glass/desktop test:e2e",
     "gallery:capture": "pnpm build && pnpm --filter @glass/gallery capture",
     "gallery:show": "pnpm --filter @glass/gallery run show"
