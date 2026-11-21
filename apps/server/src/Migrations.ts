@@ -23,7 +23,7 @@ import conversationToDos from "./migrations/0021_conversation_to_dos"
 import reviewThreadReplies from "./migrations/0022_review_thread_replies"
 import threads from "./migrations/0023_threads"
 
-export const migrations = {
+const migrations = {
   "0001_baseline": baseline,
   "0002_agent_review_hotspots": agentReviewHotspots,
   "0003_agent_review_done": agentReviewDone,

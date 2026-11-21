@@ -545,45 +545,6 @@ it.live("finds a Thread's PR from the branch its agent left checked out, not a f
   }),
 )
 
-it.live("keeps showing a Thread's PR as merged once it merges", () =>
-  Effect.gen(function* () {
-    const f = yield* threadsFixture
-    yield* f.client.FollowRepository({ input: "glass-demo/greeter" })
-
-    const pr = f.github.seedPullRequest({
-      owner: "glass-demo",
-      repo: "greeter",
-      number: 7,
-      headBranch: "feature/greeting",
-      base: { sha: "b0", files: {} },
-      head: { sha: "h1", files: {} },
-    })
-
-    const thread = yield* f.start("hold:first")
-    yield* f.transcript(thread.id, holding)
-    gitIn(f.worktree(thread.name), "switch", "--quiet", "-c", "feature/greeting")
-    yield* f.release("first")
-
-    const stateOfPr = (tag: string) =>
-      f.client.WatchThreadPullRequests().pipe(
-        Stream.map((listed) => listed.find(({ threadId }) => threadId === thread.id)),
-        Stream.filter((found) => found?.state._tag === tag),
-        Stream.runHead,
-        Effect.map(Option.getOrThrow),
-      )
-
-    yield* stateOfPr("Open")
-
-    pr.edit({ state: "MERGED" })
-    yield* f.client.ListPullRequests()
-
-    const merged = yield* stateOfPr("Merged")
-
-    assert.equal(merged?.ref.number, 7)
-    assert.equal(merged?.url, pr.url)
-  }),
-)
-
 it.live("marks the To-dos a Thread started from done once its PR merges", () =>
   Effect.gen(function* () {
     const f = yield* threadsFixture
@@ -656,6 +617,15 @@ it.live(
         gitIn(f.worktree(thread.name), "switch", "--quiet", "-c", headBranch)
         yield* f.release(gate)
 
+        yield* f.client.WatchThreadPullRequests().pipe(
+          Stream.filter((listed) =>
+            listed.some(
+              ({ threadId, state }) => threadId === thread.id && Predicate.isTagged(state, "Open"),
+            ),
+          ),
+          Stream.runHead,
+        )
+
         return { pr, threadId: thread.id }
       })
 
@@ -698,22 +668,32 @@ it.live(
         const restarted = yield* f.restart
         yield* restarted.ListPullRequests()
 
-        yield* restarted.WatchThreadPullRequests().pipe(
+        const merged = yield* restarted.WatchThreadPullRequests().pipe(
           Stream.filter(
             (listed) =>
               listed.length === 3 &&
               listed.every(({ state }) => Predicate.isTagged(state, "Merged")),
           ),
           Stream.runHead,
+          Effect.map(Option.getOrThrow),
         )
 
         const ids = yield* restarted.WatchSettledThreads().pipe(Stream.runHead)
 
-        return { client: restarted, ids: Option.getOrThrow(ids) }
+        return { client: restarted, merged, ids: Option.getOrThrow(ids) }
       })
 
       const restarted = yield* settledAfterRestart
       assert.deepStrictEqual(restarted.ids, [broughtBack.threadId])
+
+      assert.sameDeepMembers(
+        restarted.merged.map(({ threadId, ref, url }) => ({ threadId, number: ref.number, url })),
+        [written, steered, broughtBack].map(({ threadId, pr }) => ({
+          threadId,
+          number: pr.number,
+          url: pr.url,
+        })),
+      )
 
       yield* restarted.client.BringBackThread({ threadId: broughtBack.threadId })
       assert.deepStrictEqual((yield* settledAfterRestart).ids, [])

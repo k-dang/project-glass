@@ -270,24 +270,7 @@ it("sends a suggestion's prompt as the first Follow-up", async () => {
   expect(f.followUp.mock.calls[0]?.[0]).toMatchObject({ revision, message: draftPrComments })
 })
 
-it("sends a suggestion's prompt to the review's Thread", async () => {
-  const f = mountTourWorkspace({
-    files,
-    agentReview: { review: followedUp(revision), job: { status: "idle" } },
-    reviewThreadTurns: followUps,
-  })
-
-  await readBesideTheDiff(f)
-  await f.user.click(await screen.findByRole("button", { name: "Draft PR comments" }))
-
-  await waitFor(() => expect(f.sendMessage).toHaveBeenCalledOnce())
-  expect(f.sendMessage.mock.calls[0]?.[0]).toMatchObject({
-    threadId: "review-agent",
-    message: draftPrComments,
-  })
-})
-
-it("sends later Follow-ups to the review's Thread", async () => {
+it("sends later Follow-ups and suggestions to the review's Thread", async () => {
   const f = mountTourWorkspace({
     files,
     agentReview: { review: followedUp(revision), job: { status: "idle" } },
@@ -304,6 +287,14 @@ it("sends later Follow-ups to the review's Thread", async () => {
   expect(f.sendMessage.mock.calls[0]?.[0]).toMatchObject({
     threadId: "review-agent",
     message: "And the other caller?",
+  })
+
+  await f.user.click(await screen.findByRole("button", { name: "Draft PR comments" }))
+
+  await waitFor(() => expect(f.sendMessage).toHaveBeenCalledTimes(2))
+  expect(f.sendMessage.mock.calls[1]?.[0]).toMatchObject({
+    threadId: "review-agent",
+    message: draftPrComments,
   })
   expect(f.followUp).not.toHaveBeenCalled()
 })

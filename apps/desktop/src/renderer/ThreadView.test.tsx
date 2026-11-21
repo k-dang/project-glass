@@ -472,9 +472,11 @@ it("shows the PR as merged after merging it from the pane", async () => {
 
   await user.click(await screen.findByRole("link", { name: pullRequestUrl }))
   const pane = await screen.findByRole("complementary", { name: "Pull request" })
-  await user.click(await within(pane).findByRole("button", { name: "Merge" }))
+  expect(await within(pane).findByText("No conflicts")).toBeTruthy()
+  await user.click(within(pane).getByRole("button", { name: "Merge" }))
 
   await waitFor(() => expect(within(pane).queryByText("No conflicts")).toBeNull())
+  expect(within(pane).getByText("Greet the world")).toBeTruthy()
   expect(loads).toHaveLength(2)
 })
 
