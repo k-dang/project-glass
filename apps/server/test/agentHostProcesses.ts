@@ -1,39 +1,30 @@
-import { assert } from "@effect/vitest"
-import { Effect } from "effect"
-import { execFileSync } from "node:child_process"
+import { Effect, Predicate } from "effect"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
+import { hostRecordPath } from "../src/agentHost/hostAddress"
 import { eventually } from "./eventually"
 
-const processes = (): ReadonlyArray<{ pid: number; ppid: number; command: string }> =>
-  process.platform === "win32"
-    ? JSON.parse(
-        execFileSync(
-          "powershell.exe",
-          [
-            "-NoProfile",
-            "-Command",
-            "Get-CimInstance Win32_Process | ForEach-Object { @{ pid = $_.ProcessId; ppid = $_.ParentProcessId; command = [string]$_.CommandLine } } | ConvertTo-Json -Compress",
-          ],
-          { encoding: "utf8" },
-        ),
-      )
-    : execFileSync("ps", ["-A", "-o", "pid=,ppid=,command="], { encoding: "utf8" })
-        .split("\n")
-        .map((line) => line.trim().split(/\s+/))
-        .map(([pid, ppid, ...words]) => ({
-          pid: Number(pid),
-          ppid: Number(ppid),
-          command: words.join(" "),
-        }))
+export const hostPidPath = (hostRecord: string) => `${hostRecord}.pid`
 
-export const childProcesses = (parent: number, command: string) =>
-  processes()
-    .filter((child) => child.ppid === parent && child.command.includes(command))
-    .map((child) => child.pid)
+export const runningHost = (home: string) =>
+  Number(readFileSync(hostPidPath(hostRecordPath(join(home, ".project-glass"))), "utf8"))
 
-export const startedHost = (before: ReadonlyArray<number>) =>
-  childProcesses(process.pid, "scriptedAgentHost.mjs").find((pid) => !before.includes(pid))
+const isRunning = (pid: number) => {
+  try {
+    process.kill(pid, 0)
+
+    return true
+  } catch (error) {
+    if (Predicate.hasProperty(error, "code") && error.code === "ESRCH") return false
+    throw error
+  }
+}
 
 export const hostExited = (pid: number) =>
   eventually(
-    Effect.sync(() => assert.notInclude(childProcesses(process.pid, "scriptedAgentHost.mjs"), pid)),
+    Effect.suspend(() =>
+      isRunning(pid)
+        ? Effect.fail(new Error(`The agent host ${pid} is still running`))
+        : Effect.void,
+    ),
   )
