@@ -1,5 +1,16 @@
 import { type ChildProcess, spawn, spawnSync } from "node:child_process"
-import { existsSync, mkdtempSync, rmSync, watch } from "node:fs"
+import { createHash } from "node:crypto"
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  watch,
+} from "node:fs"
 import { createRequire } from "node:module"
 import { connect } from "node:net"
 import { tmpdir } from "node:os"
@@ -10,6 +21,8 @@ const root = join(import.meta.dirname, "..")
 
 const desktopDir = join(root, "apps", "desktop")
 
+const serverDir = join(root, "apps", "server")
+
 const isWindows = process.platform === "win32"
 
 const pnpmPath = process.env["npm_execpath"]
@@ -18,14 +31,60 @@ if (!pnpmPath) throw new Error("Start the dev launcher with pnpm dev")
 
 const fake = process.argv.includes("--fake")
 
-const serverDist = join(root, "apps", "server", fake ? "dist-fake" : "dist")
+const serverDist = join(serverDir, fake ? "dist-fake" : "dist")
 
-const outputs = [
+const serverEntries = [fake ? "fakeBackend.mjs" : "bin.mjs", "sqlReadWorker.mjs", "agentHost.mjs"]
+
+const serverInstalled = serverEntries.map((name) => join(serverDist, name))
+
+const desktopOutputs = [
   join(desktopDir, "dist", "main", "index.cjs"),
   join(desktopDir, "dist", "preload", "index.cjs"),
-  join(serverDist, fake ? "fakeBackend.mjs" : "bin.mjs"),
-  join(serverDist, "agentHost.mjs"),
 ]
+
+const installed = [...desktopOutputs, ...serverInstalled]
+
+const serverSources = [
+  join(root, "pnpm-lock.yaml"),
+  join(serverDir, "vite.config.ts"),
+  join(serverDir, "src"),
+  ...(fake ? [join(serverDir, "test")] : []),
+  join(root, "packages", "contracts", "src"),
+  join(root, "packages", "plugin", "src"),
+]
+
+const exist = (files: ReadonlyArray<string>) => files.every((file) => existsSync(file))
+
+const lastChanged = (path: string): number => {
+  const stats = statSync(path)
+
+  if (!stats.isDirectory()) return stats.mtimeMs
+
+  return Math.max(0, ...readdirSync(path).map((name) => lastChanged(join(path, name))))
+}
+
+const serverUpToDate =
+  exist(serverInstalled) &&
+  Math.max(...serverSources.map(lastChanged)) < Math.min(...serverInstalled.map(lastChanged))
+
+// WARNING: Never rebuild reused server bundles in place. A backend that reads a half-written agentHost.mjs takes it for another build and shuts down the running agent host.
+const serverBuild = serverUpToDate ? `${serverDist}-dev` : serverDist
+
+const built = [...desktopOutputs, ...serverEntries.map((name) => join(serverBuild, name))]
+
+const fingerprint = (files: ReadonlyArray<string>) => {
+  const hash = createHash("sha256")
+
+  for (const file of files) hash.update(readFileSync(file))
+
+  return hash.digest("hex")
+}
+
+const empty = (dir: string) => {
+  mkdirSync(dir, { recursive: true })
+
+  for (const name of readdirSync(dir)) rmSync(join(dir, name), { recursive: true, force: true })
+}
 
 const children = new Set<ChildProcess>()
 
@@ -128,7 +187,9 @@ const RENDERER_PORT = await pickRendererPort()
 
 const devServerUrl = `http://127.0.0.1:${RENDERER_PORT}`
 
-for (const file of outputs) rmSync(file, { force: true })
+const builtDirs = new Set(built.map((file) => join(file, "..")))
+
+for (const dir of builtDirs) empty(dir)
 
 start(process.execPath, [
   pnpmPath,
@@ -139,16 +200,17 @@ start(process.execPath, [
   String(RENDERER_PORT),
 ])
 
-start(process.execPath, [pnpmPath, "--filter", "@glass/server", "dev"], {
-  ...process.env,
-  GLASS_PACK_BACKEND: fake ? "fake" : "real",
-})
+start(
+  process.execPath,
+  [pnpmPath, "--filter", "@glass/server", "dev", "--out-dir", serverBuild, "--no-clean"],
+  { ...process.env, GLASS_PACK_BACKEND: fake ? "fake" : "real" },
+)
 
 start(process.execPath, [pnpmPath, "--filter", "@glass/desktop", "dev"])
 
 await waitFor("the Vite dev server", () => portIsOpen(RENDERER_PORT))
 
-await waitFor("the first builds", () => outputs.every((file) => existsSync(file)))
+await waitFor("the first builds", () => exist(installed))
 
 const electronPath: string = createRequire(join(desktopDir, "package.json"))("electron")
 
@@ -168,9 +230,12 @@ if (fake) {
 
 let electron: ChildProcess | undefined
 
+let launched: string | undefined
+
 const launchElectron = () => {
   if (shuttingDown) return
 
+  launched = fingerprint(installed)
   const child = start(electronPath, electronArgs, electronEnv)
   electron = child
   child.once("exit", (code) => {
@@ -184,20 +249,29 @@ const launchElectron = () => {
 const scheduleRestart = () => {
   clearTimeout(restartTimer)
   restartTimer = setTimeout(() => {
-    if (!outputs.every((file) => existsSync(file))) return
+    if (!exist(built) || fingerprint(built) === launched) return
+
     console.log("[dev] Rebuilt; restarting Electron")
     const previous = electron
     electron = undefined
 
     if (previous) stopTree(previous)
+
+    if (serverBuild !== serverDist) {
+      empty(serverDist)
+      cpSync(serverBuild, serverDist, { recursive: true })
+    }
+
     launchElectron()
   }, 300)
 }
 
-for (const dir of new Set(outputs.map((file) => join(file, "..")))) {
+for (const dir of builtDirs) {
   watch(dir, (_event, filename) => {
-    if (filename !== null && outputs.some((file) => file.endsWith(filename))) scheduleRestart()
+    if (filename !== null && built.some((file) => file.endsWith(filename))) scheduleRestart()
   })
 }
 
 launchElectron()
+
+scheduleRestart()
