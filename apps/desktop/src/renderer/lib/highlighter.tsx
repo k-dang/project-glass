@@ -43,9 +43,26 @@ const getShiki = () =>
     engine: createJavaScriptRegexEngine({ forgiving: true }),
   }))
 
-export async function loadHighlighter(language: string) {
+type Shiki = Awaited<ReturnType<typeof createHighlighterCore>>
+
+export type Highlighter = ReturnType<typeof highlighterFor>
+
+const loaded = new Map<string, Highlighter>()
+
+const grammarName = (language: string) => {
   const name = language.toLowerCase()
-  const lang = aliases.get(name) ?? name
+
+  return aliases.get(name) ?? name
+}
+
+export const loadedHighlighter = (language: string): Highlighter | null | undefined => {
+  const lang = grammarName(language)
+
+  return languages.has(lang) ? loaded.get(lang) : null
+}
+
+export async function loadHighlighter(language: string) {
+  const lang = grammarName(language)
   const grammar = languages.get(lang)
 
   if (grammar === undefined) {
@@ -58,6 +75,13 @@ export async function loadHighlighter(language: string) {
     await highlighter.loadLanguage(grammar)
   }
 
+  const ready = loaded.get(lang) ?? highlighterFor(highlighter, lang)
+  loaded.set(lang, ready)
+
+  return ready
+}
+
+function highlighterFor(highlighter: Shiki, lang: string) {
   return {
     highlight(code: string, state?: GrammarState) {
       const options: CodeToTokensWithThemesOptions = {
