@@ -576,40 +576,38 @@ it.effect("refreshes the user's PRs once two minutes pass without a sync", () =>
   }),
 )
 
-it.live(
-  "lists the Global conversation while its own Question waits, until the user answers it",
-  () =>
-    Effect.gen(function* () {
-      const f = yield* conversationsFixture
-      yield* f.client.SendGlobalMessage({
-        message: "Please ask a question",
-        images: [],
-        context: null,
-      })
+it.live("lists the Global chat while its own Question waits, until the user answers it", () =>
+  Effect.gen(function* () {
+    const f = yield* conversationsFixture
+    yield* f.client.SendGlobalMessage({
+      message: "Please ask a question",
+      images: [],
+      context: null,
+    })
 
-      const listed = yield* needsYou(f.client, (items) =>
-        items.some(Predicate.isTagged("GlobalConversation")),
-      )
+    const listed = yield* needsYou(f.client, (items) =>
+      items.some(Predicate.isTagged("GlobalChat")),
+    )
 
-      const asked = listed.flatMap((item) =>
-        Predicate.isTagged(item, "GlobalConversation") ? [item] : [],
-      )[0]
+    const asked = listed.flatMap((item) =>
+      Predicate.isTagged(item, "GlobalChat") ? [item] : [],
+    )[0]
 
-      assert.strictEqual(listed[0], asked)
-      const [question] = asked?.requests ?? []
-      assert.strictEqual(question?._tag, "Question")
+    assert.strictEqual(listed[0], asked)
+    const [question] = asked?.requests ?? []
+    assert.strictEqual(question?._tag, "Question")
 
-      yield* f.client.AnswerGlobalRequest({
-        requestId: question?.requestId ?? "",
-        answer: AnswerQuestion.make({ answers: [{ chosen: [], text: "Only source files" }] }),
-      })
+    yield* f.client.AnswerGlobalRequest({
+      requestId: question?.requestId ?? "",
+      answer: AnswerQuestion.make({ answers: [{ chosen: [], text: "Only source files" }] }),
+    })
 
-      yield* needsYou(f.client, (items) => !items.some(Predicate.isTagged("GlobalConversation")))
-    }),
+    yield* needsYou(f.client, (items) => !items.some(Predicate.isTagged("GlobalChat")))
+  }),
 )
 
 it.live(
-  "drops a queued PR once a Started work update includes the Agent review the Global conversation started, leaving it not done",
+  "drops a queued PR once a Started work update includes the Agent review the Global chat started, leaving it not done",
   () =>
     Effect.gen(function* () {
       const f = yield* reviewsFixture({ reply: "hold" })

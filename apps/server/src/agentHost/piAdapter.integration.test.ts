@@ -645,7 +645,7 @@ const globalReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => 
   return call("mcp__glass__wait_for_release")
 }
 
-it.live("asks a Question as the Global conversation", () =>
+it.live("asks a Question as the Global chat", () =>
   Effect.gen(function* () {
     const glass = yield* glassToolsBackend(conversationId)
     const f = yield* piSession("pi-global", { fake: { reply: globalReply }, places: glass.places })
@@ -672,7 +672,7 @@ it.live("asks a Question as the Global conversation", () =>
   }).pipe(Effect.scoped),
 )
 
-it.live("reads Glass through its tools as the Global conversation, explaining a failed read", () =>
+it.live("reads Glass through its tools as the Global chat, explaining a failed read", () =>
   Effect.gen(function* () {
     const glass = yield* glassToolsBackend(conversationId)
 
@@ -701,7 +701,7 @@ it.live("reads Glass through its tools as the Global conversation, explaining a 
   }).pipe(Effect.scoped),
 )
 
-it.live("stops the Global conversation's Turn while a Glass tool runs, cancelling the call", () =>
+it.live("stops the Global chat's Turn while a Glass tool runs, cancelling the call", () =>
   Effect.gen(function* () {
     const glass = yield* glassToolsBackend(conversationId)
 

@@ -73,7 +73,7 @@ export const scriptedAdapter = (gates: string): HarnessAdapter => {
   const earlierStart = Effect.suspend(() =>
     existsSync(previousStart)
       ? Effect.succeed(decodeAccess(readFileSync(previousStart, "utf8")))
-      : Effect.die("The Global conversation has no earlier start"),
+      : Effect.die("The Global chat has no earlier start"),
   )
 
   return {

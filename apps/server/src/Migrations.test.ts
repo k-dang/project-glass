@@ -29,6 +29,7 @@ import conversationBranch from "./migrations/0014_conversation_branch"
 import feedbackNotes from "./migrations/0015_feedback_notes"
 import turnRetriesDelivery from "./migrations/0016_turn_retries_delivery"
 import startedWork from "./migrations/0017_started_work"
+import conversationKeptGoing from "./migrations/0018_conversation_kept_going"
 import { migrationLoader } from "./Migrations"
 import { Transcripts } from "./Transcripts"
 
@@ -102,6 +103,7 @@ it.live("upgrades main's schema directly, preserving completed and unfinished up
       [16, "turn_retries_delivery"],
       [17, "started_work"],
       [18, "conversation_kept_going"],
+      [19, "global_chat_sessions"],
     ])
     const transcripts = yield* Transcripts
     const { turns } = yield* transcripts.read("global")
@@ -177,6 +179,7 @@ it.live("creates the schema once and reads Activity through its indexes after re
         [16, "turn_retries_delivery"],
         [17, "started_work"],
         [18, "conversation_kept_going"],
+        [19, "global_chat_sessions"],
       ],
       [],
     ] as const) {
@@ -330,7 +333,7 @@ it.live(
 
         assert.isTrue(started!.started_work_update_outcome_at > "2026-11-11T01:00:00.000Z")
         assert.isTrue(review!.started_work_update_outcome_at > "2026-11-11T01:00:00.000Z")
-        assert.deepStrictEqual(yield* sql`SELECT turn_seen_at FROM global_conversation`, [
+        assert.deepStrictEqual(yield* sql`SELECT turn_seen_at FROM global_chat_session`, [
           { turn_seen_at: "2026-11-11T01:00:00.000Z" },
         ])
       }).pipe(
@@ -340,7 +343,7 @@ it.live(
     }),
 )
 
-it.live("keeps the Global conversation's pi session, started at its first Turn", () =>
+it.live("keeps the Global chat's pi session, started at its first Turn", () =>
   Effect.gen(function* () {
     const home = yield* isolatedHome
 
@@ -370,10 +373,9 @@ it.live("keeps the Global conversation's pi session, started at its first Turn",
 
       yield* SqliteMigrator.run({ loader: migrationLoader })
 
-      assert.deepStrictEqual(
-        yield* sql`SELECT session_id, session_started_at FROM global_conversation`,
-        [{ session_id: "global", session_started_at: "2026-11-11T01:00:00.000Z" }],
-      )
+      assert.deepStrictEqual(yield* sql`SELECT id, started_at FROM global_chat_session`, [
+        { id: "global", started_at: "2026-11-11T01:00:00.000Z" },
+      ])
     }).pipe(Effect.provide(SqliteClient.layer({ filename: join(home, "glass.db") })), Effect.scoped)
   }),
 )
@@ -651,6 +653,71 @@ it.live(
             { id: "quiet", keptGoingAt: "2026-11-17T00:00:00.000Z" },
             { id: "written", keptGoingAt: "2026-11-19T00:00:00.000Z" },
           ],
+        )
+      }).pipe(
+        Effect.provide(SqliteClient.layer({ filename: join(home, "glass.db") })),
+        Effect.scoped,
+      )
+    }),
+)
+
+it.live(
+  "keeps the Global chat's settings and moves its current and ended Sessions into one table",
+  () =>
+    Effect.gen(function* () {
+      const home = yield* isolatedHome
+
+      yield* Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient
+        const at = "2026-11-19T00:00:00.000Z"
+
+        yield* SqliteMigrator.run({
+          loader: SqliteMigrator.fromRecord({
+            "0001_baseline": baseline,
+            "0002_agent_review_hotspots": agentReviewHotspots,
+            "0003_agent_review_done": agentReviewDone,
+            "0004_outside_agent": outsideAgent,
+            "0005_conversation_started_work": conversationStartedWork,
+            "0006_turn_seen": turnSeen,
+            "0007_work_reports": workReports,
+            "0008_past_global_conversations": pastGlobalConversations,
+            "0009_global_conversation_updates": globalConversationUpdates,
+            "0010_to_do_images": toDoImages,
+            "0011_mermaid_tour_diagrams": mermaidTourDiagrams,
+            "0012_conversations": conversations,
+            "0013_journal_host": journalHost,
+            "0014_conversation_branch": conversationBranch,
+            "0015_feedback_notes": feedbackNotes,
+            "0016_turn_retries_delivery": turnRetriesDelivery,
+            "0017_started_work": startedWork,
+            "0018_conversation_kept_going": conversationKeptGoing,
+          }),
+        })
+
+        const ended = "2026-11-19T01:00:00.000Z"
+        const seen = "2026-11-19T02:00:00.000Z"
+
+        yield* sql`INSERT INTO global_conversation (id, session_id, session_started_at, turn_seen_at, model)
+        VALUES ('global', 'current', ${ended}, ${seen}, 'gpt-test')`
+        yield* sql`INSERT INTO past_global_conversation (id, started_at, ended_at)
+        VALUES ('earlier', ${at}, ${ended})`
+
+        assert.deepStrictEqual(yield* SqliteMigrator.run({ loader: migrationLoader }), [
+          [19, "global_chat_sessions"],
+        ])
+        assert.deepStrictEqual(yield* sql`SELECT * FROM global_chat`, [
+          { id: "global", model: "gpt-test", effort: null, singleton: 1 },
+        ])
+        assert.deepStrictEqual(
+          yield* sql`SELECT id, started_at, ended_at, turn_seen_at FROM global_chat_session ORDER BY started_at`,
+          [
+            { id: "earlier", started_at: at, ended_at: ended, turn_seen_at: null },
+            { id: "current", started_at: ended, ended_at: null, turn_seen_at: seen },
+          ],
+        )
+        assert.deepStrictEqual(
+          yield* sql`SELECT name FROM sqlite_schema WHERE name = 'past_global_conversation'`,
+          [],
         )
       }).pipe(
         Effect.provide(SqliteClient.layer({ filename: join(home, "glass.db") })),

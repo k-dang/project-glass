@@ -70,7 +70,7 @@ const reasonsOf = (item: NeedsYouItem): ReadonlyArray<Reason> =>
       OutsideQuestion: () => [{ label: "Question", tone: toneClass.warning }],
       CheckIn: () => [{ label: "Check-in", tone: toneClass.warning }],
       PullRequest: ({ reasons }) => reasons.map(pullRequestReason),
-      GlobalConversation: ({ requests }) => requests.map(requestReason),
+      GlobalChat: ({ requests }) => requests.map(requestReason),
     }),
     (a, b) => a.label === b.label,
   )
@@ -93,7 +93,7 @@ export function ItemIcon(props: { item: NeedsYouItem; className: string }) {
     OutsideQuestion: () => <CircleHelp className={props.className} aria-hidden />,
     CheckIn: () => <FileDiff className={props.className} aria-hidden />,
     PullRequest: () => <GitPullRequest className={props.className} aria-hidden />,
-    GlobalConversation: () => <MessagesSquare className={props.className} aria-hidden />,
+    GlobalChat: () => <MessagesSquare className={props.className} aria-hidden />,
   })
 }
 
@@ -109,7 +109,7 @@ const requestsOf = (item: NeedsYouItem): ReadonlyArray<RequestPart> =>
     OutsideQuestion: () => [],
     CheckIn: () => [],
     PullRequest: () => [],
-    GlobalConversation: ({ requests }) => requests,
+    GlobalChat: ({ requests }) => requests,
   })
 
 export const firstPermission = (item: NeedsYouItem) =>
@@ -126,7 +126,7 @@ export const firstPermission = (item: NeedsYouItem) =>
     OutsideQuestion: () => null,
     CheckIn: () => null,
     PullRequest: () => null,
-    GlobalConversation: () => null,
+    GlobalChat: () => null,
   })
 
 export const summaryParts = (summary: string | null) => {
@@ -143,7 +143,7 @@ export const titleOf = (item: NeedsYouItem) =>
     OutsideQuestion: ({ question }) => question,
     CheckIn: ({ folder, summary }) => summaryParts(summary)?.title ?? fileName(folder),
     PullRequest: ({ pullRequest }) => pullRequest.title,
-    GlobalConversation: () => "Global conversation",
+    GlobalChat: () => "Global chat",
   })
 
 export const contextOf = (item: NeedsYouItem) =>
@@ -152,7 +152,7 @@ export const contextOf = (item: NeedsYouItem) =>
       `${conversation.repository.owner}/${conversation.repository.repo}`,
     OutsideQuestion: ({ askedBy }) => `Asked by ${askedBy}`,
     CheckIn: ({ askedBy, folder }) => `${folder} · Asked by ${askedBy}`,
-    GlobalConversation: () => "",
+    GlobalChat: () => "",
     PullRequest: ({ pullRequest }) =>
       `${referenceText(pullRequest.ref)}${pullRequest.isDraft ? " · Draft" : ""}`,
   })

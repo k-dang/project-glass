@@ -164,7 +164,7 @@ _Avoid_: Task, action item
 **Conversation**:
 A named conversation started from Glass with an agent, run by an Agent harness and a model and
 working in one place: a worktree on this device, a Sandbox, or a checkout of an Agent review's
-Revision. The user starts one, or the Global conversation or another Conversation's agent does for
+Revision. The user starts one, or the Global chat or another Conversation's agent does for
 them. Any Conversation can create and message other Conversations through Glass's tools, but never
 one that asks the user less than it does, and never itself; one in a Sandbox can reach only
 Conversations in a Sandbox.
@@ -180,20 +180,21 @@ the user. Glass lists it apart from the Conversations still going, and it stops 
 the user writes to it again or brings it back.
 _Avoid_: Archived, done, finished, closed
 
-**Global conversation**:
-The one conversation the user has with Glass itself, opened over any Area, which works through
-Glass's tools rather than in a repository.
-_Avoid_: Assistant, chat, copilot
+**Global chat**:
+The one chat the user has with Glass itself, opened over any Area, which works through
+Glass's tools rather than in a repository. Its model and the work it started stay with it across
+Sessions.
+_Avoid_: Assistant, copilot, Global conversation
 
-**Past conversation**:
-A Global conversation the user ended with Start fresh, kept to read but not to continue. Its id is
-the id of the pi session it ran in, which is the one place "session" belongs.
-_Avoid_: Session (in UI copy), history, archived chat
+**Session**:
+One stretch of the Global chat's transcript, run in one pi session and sharing its id. Start fresh
+ends the current Session and begins the next; an ended Session stays readable but can't continue.
+_Avoid_: Past chat, Past conversation, history, archived chat
 
 **Started work update**:
-A Turn Glass starts in the Global conversation or a Conversation to tell it that work it started
+A Turn Glass starts in the Global chat or a Conversation to tell it that work it started
 finished, failed, or needs the user's input.
-_Avoid_: Global conversation update, notification, event, wake-up
+_Avoid_: Global chat update, notification, event, wake-up
 
 **Agent harness**:
 Claude Code or pi, the harness that runs an agent and decides which models and Efforts it offers.
@@ -261,7 +262,7 @@ A message sent into the running Turn, for the agent to take in before it finishe
 _Avoid_: Interrupt, inject
 
 **Unsent message**:
-What the user has written to a Conversation or the Global conversation and not sent yet, kept on
+What the user has written to a Conversation or the Global chat and not sent yet, kept on
 this device.
 _Avoid_: Draft (a Draft is a GitHub comment)
 

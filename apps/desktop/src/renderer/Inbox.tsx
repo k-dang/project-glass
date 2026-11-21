@@ -257,7 +257,7 @@ function useInboxActions(selected: NeedsYouItem | null): ReadonlyArray<InboxActi
     },
     OutsideQuestion: () => null,
     CheckIn: () => null,
-    GlobalConversation: () => null,
+    GlobalChat: () => null,
   })
 
   return [

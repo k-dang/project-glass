@@ -29,7 +29,7 @@ import { type Action, useActions } from "./actions"
 import { CommandMenu } from "./CommandMenu"
 import { ConfirmationDialog } from "./ConfirmationDialog"
 import { ConnectionAvatar } from "./ConnectionAvatar"
-import { globalConversationOpenAtom, globalUnseenAtom } from "./globalConversation"
+import { globalChatOpenAtom, globalUnseenAtom } from "./globalChat"
 import { HistoryNav } from "./HistoryNav"
 import { NeedsYouBadge } from "./NeedsYouCount"
 import {
@@ -92,31 +92,31 @@ export function AppShell() {
   const registry = useContext(RegistryContext)
   const areas = useAreas()
   const navigate = useNavigate()
-  const [conversing, setConversing] = useAtom(globalConversationOpenAtom)
-  const [GlobalConversationDialog, setGlobalConversationDialog] = useState<ComponentType>()
+  const [chatting, setChatting] = useAtom(globalChatOpenAtom)
+  const [GlobalChatDialog, setGlobalChatDialog] = useState<ComponentType>()
   const needsYouBadgeId = useId()
   const needsYouCount = countOf(useAtomValue(watchedNeedsYouAtom))
   const conversationsNeedYouId = useId()
   const conversationsNeedYou = useAtomValue(conversationsNeedingYouAtom).size > 0
   const unseen = Option.getOrNull(AsyncResult.value(useAtomValue(globalUnseenAtom)))
-  const unread = unseen !== null && !conversing
+  const unread = unseen !== null && !chatting
 
   const current = useMatch({ from: "/reviews/$owner/$repo/$number", shouldThrow: false })?.params
 
   useEffect(() => {
     const load = () =>
-      void import("./GlobalConversationDialog").then((module) =>
-        setGlobalConversationDialog(() => module.GlobalConversationDialog),
+      void import("./GlobalChatDialog").then((module) =>
+        setGlobalChatDialog(() => module.GlobalChatDialog),
       )
 
-    if (conversing) load()
+    if (chatting) load()
 
     const idle = requestIdleCallback(load)
 
     return () => cancelIdleCallback(idle)
-  }, [conversing])
+  }, [chatting])
 
-  const toggleConversing = () => setConversing((open) => !open)
+  const toggleChatting = () => setChatting((open) => !open)
 
   useActions([
     ...areas.map(({ label, icon, link }, index): Action => ({
@@ -128,12 +128,12 @@ export function AppShell() {
       run: () => void navigate(link),
     })),
     {
-      id: "global-conversation",
-      title: conversing ? "Close the Global conversation" : "Open the Global conversation",
+      id: "global-chat",
+      title: chatting ? "Close the Global chat" : "Open the Global chat",
       group: "Glass",
       icon: MessagesSquare,
       shortcut: { key: "j", mod: true, allowInEditable: true, allowInDialog: true },
-      run: toggleConversing,
+      run: toggleChatting,
     },
   ])
 
@@ -187,14 +187,14 @@ export function AppShell() {
               </TooltipHint>
             ))}
           </nav>
-          <TooltipHint content="Global conversation" side="right">
+          <TooltipHint content="Global chat" side="right">
             <button
               type="button"
-              aria-label="Global conversation"
-              aria-pressed={conversing}
+              aria-label="Global chat"
+              aria-pressed={chatting}
               aria-keyshortcuts="Meta+J Control+J"
               className={cn(railLink, "aria-pressed:bg-accent aria-pressed:text-accent-foreground")}
-              onClick={toggleConversing}
+              onClick={toggleChatting}
             >
               <MessagesSquare className="size-4" aria-hidden />
               {unread && (
@@ -217,7 +217,7 @@ export function AppShell() {
           </footer>
         </div>
       </div>
-      {GlobalConversationDialog && <GlobalConversationDialog />}
+      {GlobalChatDialog && <GlobalChatDialog />}
       <CommandMenu
         current={current}
         onOpen={(ref) => void navigate({ to: "/reviews/$owner/$repo/$number", params: ref })}

@@ -1,6 +1,6 @@
-# The Global conversation reaches Glass through the backend's own MCP endpoint
+# The Global chat reaches Glass through the backend's own MCP endpoint
 
-The Global conversation's tools read and act on state owned by backend services (ADR 0001), while
+The Global chat's tools read and act on state owned by backend services (ADR 0001), while
 its Agent harness runs in the agent host (ADR 0007). So the backend serves the tools itself, over an
 MCP endpoint that Claude Code and pi both reach, with a credential of its own rather than the
 renderer's.

@@ -1,21 +1,18 @@
 import { StartedWorkUpdate } from "@glass/contracts"
 import { Array as Arr, Effect, Layer, Stream } from "effect"
 import { Conversations } from "./Conversations"
-import { GlobalConversation } from "./GlobalConversation"
+import { GlobalChat } from "./GlobalChat"
 import { StartedWork } from "./StartedWork"
 import { Transcripts } from "./Transcripts"
 
 export const StartedWorkUpdates = Layer.effectDiscard(
   Effect.gen(function* () {
-    const global = yield* GlobalConversation
+    const global = yield* GlobalChat
     const conversations = yield* Conversations
     const started = yield* StartedWork
     const transcripts = yield* Transcripts
 
-    const sendUpdateOnce = (
-      startedBy: string,
-      whenIdle: (typeof GlobalConversation.Service)["whenIdle"],
-    ) =>
+    const sendUpdateOnce = (startedBy: string, whenIdle: (typeof GlobalChat.Service)["whenIdle"]) =>
       whenIdle((start) =>
         Effect.gen(function* () {
           const found = yield* started.pendingOutcomes(startedBy)

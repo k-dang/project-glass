@@ -466,7 +466,7 @@ it("lists to-do Activity", async () => {
   )
 })
 
-it("opens the Global conversation over the current area, labelling each message with where it was sent from", async () => {
+it("opens the Global chat over the current area, labelling each message with where it was sent from", async () => {
   const sentAt = DateTime.makeUnsafe("2026-11-05T12:00:00Z")
 
   const user = mount({
@@ -498,27 +498,21 @@ it("opens the Global conversation over the current area, labelling each message 
   await user.click(await screen.findByRole("link", { name: "To-dos" }))
   await user.keyboard("{Meta>}j{/Meta}")
 
-  const conversation = await screen.findByRole("dialog", { name: "Global conversation" })
-  await within(conversation).findByText("Nearly.")
-  expect(within(conversation).getByText("From octo-org/glass#42 at head001")).toBeTruthy()
+  const chat = await screen.findByRole("dialog", { name: "Global chat" })
+  await within(chat).findByText("Nearly.")
+  expect(within(chat).getByText("From octo-org/glass#42 at head001")).toBeTruthy()
   expect(
     screen.getByRole("link", { name: "To-dos", hidden: true }).getAttribute("aria-current"),
   ).toBe("page")
 
-  await user.click(
-    within(conversation).getByRole("button", { name: "Close the Global conversation" }),
-  )
-  await waitFor(() =>
-    expect(screen.queryByRole("dialog", { name: "Global conversation" })).toBeNull(),
-  )
+  await user.click(within(chat).getByRole("button", { name: "Close the Global chat" }))
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "Global chat" })).toBeNull())
 
-  await user.click(screen.getByRole("button", { name: "Global conversation" }))
-  await within(await screen.findByRole("dialog", { name: "Global conversation" })).findByText(
-    "Nearly.",
-  )
+  await user.click(screen.getByRole("button", { name: "Global chat" }))
+  await within(await screen.findByRole("dialog", { name: "Global chat" })).findByText("Nearly.")
 })
 
-it("starts the Global conversation fresh once confirmed and reads a past one", async () => {
+it("starts the Global chat fresh once confirmed and reads an earlier Session", async () => {
   const at = DateTime.makeUnsafe("2026-11-05T12:00:00Z")
   let started = 0
   const earlierPages = Effect.runSync(Queue.unbounded<TranscriptUpdate>())
@@ -536,10 +530,10 @@ it("starts the Global conversation fresh once confirmed and reads a past one", a
 
   const user = mount({
     ListAgentModels: () => Effect.succeed(new AgentModels({ defaultModel: null, models: [] })),
-    StartGlobalConversationFresh: () => Effect.sync(() => void started++),
-    ListPastGlobalConversations: () =>
+    StartGlobalChatFresh: () => Effect.sync(() => void started++),
+    ListEndedGlobalChatSessions: () =>
       Effect.succeed([{ id: "past-1", startedAt: at, endedAt: at }]),
-    WatchPastGlobalConversation: () =>
+    WatchGlobalChatSession: () =>
       Stream.make(
         TranscriptSnapshot.make({
           turns: [pastTurn("turn-2", "Old reply")],
@@ -549,23 +543,23 @@ it("starts the Global conversation fresh once confirmed and reads a past one", a
           agentStatuses: [],
         }),
       ).pipe(Stream.concat(Stream.fromQueue(earlierPages))),
-    LoadEarlierPastGlobalTurns: ({ before }) =>
+    LoadEarlierGlobalChatSessionTurns: ({ before }) =>
       Queue.offer(
         earlierPages,
         EarlierTurns.make({ before, turns: [pastTurn("turn-1", "Older reply")], earlierTurns: 0 }),
       ).pipe(Effect.asVoid),
   })
 
-  await user.click(await screen.findByRole("button", { name: "Global conversation" }))
-  const conversation = await screen.findByRole("dialog", { name: "Global conversation" })
+  await user.click(await screen.findByRole("button", { name: "Global chat" }))
+  const chat = await screen.findByRole("dialog", { name: "Global chat" })
 
-  await user.click(within(conversation).getByRole("button", { name: "Start fresh" }))
+  await user.click(within(chat).getByRole("button", { name: "Start fresh" }))
   const confirm = await screen.findByRole("alertdialog", { name: "Start fresh?" })
   await user.click(within(confirm).getByRole("button", { name: "Start fresh" }))
   await waitFor(() => expect(started).toBe(1))
 
-  await user.click(within(conversation).getByRole("button", { name: "Past conversations" }))
-  const past = await screen.findByRole("dialog", { name: "Past conversations" })
+  await user.click(within(chat).getByRole("button", { name: "Earlier Sessions" }))
+  const past = await screen.findByRole("dialog", { name: "Earlier Sessions" })
   await user.click(within(await within(past).findByRole("listitem")).getByRole("button"))
 
   await screen.findByText("Old reply")
@@ -602,16 +596,16 @@ it("won't start fresh while a Turn runs, and says why", async () => {
       ),
   })
 
-  await user.click(await screen.findByRole("button", { name: "Global conversation" }))
-  const conversation = await screen.findByRole("dialog", { name: "Global conversation" })
+  await user.click(await screen.findByRole("button", { name: "Global chat" }))
+  const chat = await screen.findByRole("dialog", { name: "Global chat" })
 
-  await within(conversation).findByText(/A Turn is running/)
-  expect(
-    within(conversation).getByRole("button", { name: "Start fresh" }).hasAttribute("disabled"),
-  ).toBe(true)
+  await within(chat).findByText(/A Turn is running/)
+  expect(within(chat).getByRole("button", { name: "Start fresh" }).hasAttribute("disabled")).toBe(
+    true,
+  )
 })
 
-it("marks the rail while a Global conversation reply is unseen, and shows a Started work update as from Glass", async () => {
+it("marks the rail while a Global chat reply is unseen, and shows a Started work update as from Glass", async () => {
   vi.spyOn(document, "hasFocus").mockReturnValue(true)
   const at = DateTime.makeUnsafe("2026-11-05T12:00:00Z")
   const ended = { at, ending: TurnDone.make({}) }
@@ -652,15 +646,15 @@ it("marks the rail while a Global conversation reply is unseen, and shows a Star
       ),
   })
 
-  const rail = await screen.findByRole("button", { name: /Global conversation/ })
+  const rail = await screen.findByRole("button", { name: /Global chat/ })
   await within(rail).findByText("Unread reply")
 
   await user.click(rail)
 
-  const conversation = await screen.findByRole("dialog", { name: "Global conversation" })
-  await within(conversation).findByText("The review on #42 is in.")
-  expect(within(conversation).getByText("Update from Glass")).toBeTruthy()
-  expect(within(conversation).getByText("Agent review on octo-org/glass#42 finished")).toBeTruthy()
+  const chat = await screen.findByRole("dialog", { name: "Global chat" })
+  await within(chat).findByText("The review on #42 is in.")
+  expect(within(chat).getByText("Update from Glass")).toBeTruthy()
+  expect(within(chat).getByText("Agent review on octo-org/glass#42 finished")).toBeTruthy()
   expect(within(rail).queryByText("Unread reply")).toBeNull()
   await waitFor(() => expect(seen).toEqual([DateTime.formatIso(at)]))
 })

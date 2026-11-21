@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest"
-import { GlobalConversationCaller } from "./McpCredentials"
+import { GlobalChatCaller } from "./McpCredentials"
 import {
   Conversation,
   AgentReviewState,
@@ -27,8 +27,8 @@ import { connectMcp, toolText } from "../../test/mcpClient"
 import { scriptedAgentRunners } from "../../test/scriptedAgentRunners"
 import { StartedItem } from "../StartedWork"
 
-const caller = GlobalConversationCaller.make({
-  globalConversationId: "global-conversation",
+const caller = GlobalChatCaller.make({
+  globalChatId: "global-chat",
   sessionId: "global-session",
 })
 
