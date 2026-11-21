@@ -1,4 +1,3 @@
-import { RegistryProvider } from "@effect/atom-react"
 import {
   type AgentReviewState,
   type ChangedFile,
@@ -17,6 +16,7 @@ import { App } from "../src/renderer/App"
 import { backendLayerAtom } from "../src/renderer/backend"
 import { type Handlers, testLayer } from "./testBackend"
 import { workspace } from "./workspace"
+import { RegistryProvider } from "./registry"
 
 const giveDiffScrollersAViewport = () =>
   vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {

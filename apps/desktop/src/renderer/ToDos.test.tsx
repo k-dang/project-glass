@@ -1,5 +1,4 @@
 // @vitest-environment happy-dom
-import { RegistryProvider } from "@effect/atom-react"
 import {
   defaultReviewPrompt,
   GitHubConnection,
@@ -16,6 +15,7 @@ import { App } from "./App"
 import { backendLayerAtom } from "./backend"
 import { maxToDoImageBytes } from "./pastedImages"
 import { type Handlers, type Held, hold, next, testLayer } from "../../test/testBackend"
+import { RegistryProvider } from "../../test/registry"
 
 const mount = (handlers: Parameters<typeof testLayer>[0]) => {
   const backend = testLayer({

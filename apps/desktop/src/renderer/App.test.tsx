@@ -35,7 +35,6 @@ import {
   type EngineFeature,
   type EngineSettings,
 } from "@glass/contracts"
-import { RegistryProvider } from "@effect/atom-react"
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { DateTime, Effect, Queue, Stream } from "effect"
@@ -46,6 +45,7 @@ import { backendLayerAtom } from "./backend"
 import { openReview } from "../../test/finishReview"
 import { type Held, hold, next, testLayer } from "../../test/testBackend"
 import { viewer } from "../../test/workspace"
+import { RegistryProvider } from "../../test/registry"
 
 const workspace = new PullRequestWorkspace({
   viewer,

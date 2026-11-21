@@ -1,11 +1,11 @@
 // @vitest-environment happy-dom
-import { RegistryProvider } from "@effect/atom-react"
 import { PullRequestRef } from "@glass/contracts"
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, expect, it, vi } from "vite-plus/test"
 import { type Action, useActions } from "./actions"
 import { CommandMenu, pastedRows } from "./CommandMenu"
+import { RegistryProvider } from "../../test/registry"
 
 afterEach(() => {
   cleanup()

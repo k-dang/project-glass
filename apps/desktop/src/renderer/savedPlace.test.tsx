@@ -1,5 +1,4 @@
 // @vitest-environment happy-dom
-import { RegistryProvider } from "@effect/atom-react"
 import {
   ActivityPage,
   GitHubConnection,
@@ -41,6 +40,7 @@ import {
   tourChapter,
   workspace,
 } from "../../test/workspace"
+import { RegistryProvider } from "../../test/registry"
 
 const pr = workspace([], {
   files: [changedFile("first.ts"), changedFile("second.ts"), changedFile("third.ts")],

@@ -1,5 +1,4 @@
 // @vitest-environment happy-dom
-import { RegistryProvider } from "@effect/atom-react"
 import {
   type ActivityLogError,
   ActivityStamp,
@@ -16,6 +15,7 @@ import { afterEach, expect, it } from "vite-plus/test"
 import { App } from "./App"
 import { backendLayerAtom } from "./backend"
 import { type Handlers, type Held, hold, next, testLayer } from "../../test/testBackend"
+import { RegistryProvider } from "../../test/registry"
 
 const queued = (number: number, title: string) =>
   new QueuedPullRequest({
@@ -131,9 +131,7 @@ it("totals what the user got done over the chosen days", async () => {
   ).toEqual(["Reviews 0", "Replies 1", "Threads started 0", "To-dos done 1"])
 })
 
-// Flaky: threw "window is not defined" in watched.ts after the file's DOM teardown in a CI run; passed on rerun.
-// oxlint-disable-next-line vitest/no-disabled-tests
-it.skip("keeps the Activity chart visible while refreshing on a return to the Dashboard", async () => {
+it("keeps the Activity chart visible while refreshing on a return to the Dashboard", async () => {
   const reads: Array<
     Held<
       Parameters<Handlers["ListActivityStamps"]>[0],
