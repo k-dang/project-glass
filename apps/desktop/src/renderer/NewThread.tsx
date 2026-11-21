@@ -47,7 +47,7 @@ import {
 import { threadColumn } from "./threadColumn"
 import { DitherGlow } from "./DitherGlow"
 import { ThreadFrame } from "./ThreadFrame"
-import { UserMessage } from "./ThreadView"
+import { UserMessage } from "./UserMessage"
 import type { BackendError } from "./backend"
 import { ChipSelect } from "./chips"
 import { repositoriesAtom } from "./FollowedRepositories"

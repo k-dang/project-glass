@@ -274,7 +274,9 @@ export const TextPart = Schema.TaggedStruct("Text", { text: Schema.String })
 
 export const ThinkingPart = Schema.TaggedStruct("Thinking", { text: Schema.String })
 
-const ToolCallStatus = Schema.Literals(["running", "done", "failed"])
+export const SUBAGENT_TOOL = "Agent"
+
+const ToolCallStatus = Schema.Literals(["running", "done", "failed", "stopped"])
 
 export const ToolCallPart = Schema.TaggedStruct("ToolCall", {
   toolCallId: Schema.String,
@@ -446,7 +448,18 @@ export const PartAppended = Schema.TaggedStruct("PartAppended", {
 
 export const TurnEnded = Schema.TaggedStruct("TurnEnded", { turnId: Schema.String, ended: TurnEnd })
 
-export const AgentEvent = Schema.Union([TurnStarted, PartSet, PartAppended, TurnEnded])
+export const ToolCallStatusSet = Schema.TaggedStruct("ToolCallStatusSet", {
+  toolCallId: Schema.String,
+  status: ToolCallStatus,
+})
+
+export const AgentEvent = Schema.Union([
+  TurnStarted,
+  PartSet,
+  PartAppended,
+  ToolCallStatusSet,
+  TurnEnded,
+])
 
 export type AgentEvent = typeof AgentEvent.Type
 
@@ -564,6 +577,21 @@ export const applyThreadEvent = (
           const appended = appendText(parts[index], text)
 
           if (appended !== undefined) parts[index] = appended
+
+          return { ...turn, parts }
+        }),
+      ToolCallStatusSet: ({ toolCallId, status }) =>
+        turns.map((turn) => {
+          const index = turn.parts.findIndex(
+            (part) => Predicate.isTagged(part, "ToolCall") && part.toolCallId === toolCallId,
+          )
+
+          const part = turn.parts[index]
+
+          if (!Predicate.isTagged(part, "ToolCall")) return turn
+
+          const parts = [...turn.parts]
+          parts[index] = { ...part, status }
 
           return { ...turn, parts }
         }),

@@ -16,6 +16,7 @@ import {
   PermissionRequestPart,
   QuestionPart,
   type RequestAnswer,
+  type Turn,
   type TurnPart,
   FollowedRepository,
   PartAppended,
@@ -38,6 +39,7 @@ import {
   toDoMention,
   fileMention,
   ToolCallPart,
+  ToolCallStatusSet,
   TranscriptSnapshot,
   TurnCutOff,
   TurnDone,
@@ -895,7 +897,7 @@ it("shows a replied Turn still running while its background work runs", async ()
   expect(within(transcript).queryByText(/^Done in/)).toBeNull()
 })
 
-it("marks a tool call running in the background until its work ends, then says why the next Turn started", async () => {
+it("marks a tool call running in the background until its work ends, then continues its Turn with what ended", async () => {
   const ended = Deferred.makeUnsafe<void>()
 
   mount({
@@ -927,6 +929,7 @@ it("marks a tool call running in the background until its work ends, then says w
         ),
         Stream.concat(
           Stream.make(
+            ToolCallStatusSet.make({ toolCallId: "agent-1", status: "failed" }),
             TurnStarted.make({
               turnId: "turn-2",
               message: "",
@@ -935,10 +938,16 @@ it("marks a tool call running in the background until its work ends, then says w
               sentAt,
               context: BackgroundWorkEnded.make({
                 work: [
-                  { kind: "subagent", description: "general-purpose: Count", outcome: "completed" },
+                  { kind: "subagent", description: "general-purpose: Count", outcome: "failed" },
                 ],
               }),
             }),
+            PartSet.make({
+              turnId: "turn-2",
+              index: 0,
+              part: TextPart.make({ text: "It failed." }),
+            }),
+            TurnEnded.make({ turnId: "turn-2", ended: { at: sentAt, ending: TurnDone.make({}) } }),
           ),
         ),
       ),
@@ -953,12 +962,110 @@ it("marks a tool call running in the background until its work ends, then says w
 
   Deferred.doneUnsafe(ended, Exit.void)
 
+  expect(await within(transcript).findByText("It failed.")).toBeTruthy()
+  expect(within(transcript).getByRole("button", { name: "Failed: Agent agent-1" })).toBeTruthy()
+  expect(within(transcript).getByText("Subagent general-purpose: Count failed")).toBeTruthy()
+  expect(within(transcript).getAllByText(/^Done in/)).toHaveLength(1)
+})
+
+it("keeps the Turns Claude Code starts on its own with the Turn before them, under one ending", async () => {
+  const later = DateTime.add(sentAt, { seconds: 65 })
+  const done = { at: later, ending: TurnDone.make({}) }
+
+  const unprompted = (id: string, text: string, context: Turn["context"]) => ({
+    id,
+    message: "",
+    images: [],
+    context,
+    feedback: [],
+    sentAt: later,
+    ended: done,
+    parts: [TextPart.make({ text })],
+  })
+
+  mount({
+    WatchTranscript: () =>
+      Stream.make(
+        TranscriptSnapshot.make({
+          queued: [],
+          status: null,
+          turns: [
+            {
+              id: "turn-1",
+              message: "Start them",
+              images: [],
+              context: null,
+              feedback: [],
+              sentAt,
+              ended: { at: sentAt, ending: TurnDone.make({}) },
+              parts: [TextPart.make({ text: "Started." })],
+            },
+            unprompted(
+              "turn-2",
+              "The first is back.",
+              BackgroundWorkEnded.make({
+                work: [
+                  { kind: "subagent", description: "Explore: Check it", outcome: "completed" },
+                ],
+              }),
+            ),
+            unprompted("turn-3", "The second is back.", null),
+          ],
+        }),
+      ),
+  })
+
+  const transcript = await screen.findByRole("region", { name: "Transcript" })
+  expect(await within(transcript).findByText("The second is back.")).toBeTruthy()
   expect(
-    await within(transcript).findByRole("button", { name: "Done: Agent agent-1" }),
+    within(transcript)
+      .getAllByText(/^Done in/)
+      .map((line) => line.textContent),
+  ).toEqual(["Done in 1m 5s"])
+})
+
+it("folds subagents started together into one line counting how they stand", async () => {
+  const user = mount({
+    WatchTranscript: () =>
+      Stream.make(
+        TranscriptSnapshot.make({
+          queued: [],
+          status: null,
+          backgroundToolCalls: ["agent-1"],
+          turns: [
+            {
+              id: "turn-1",
+              message: "Review it",
+              images: [],
+              context: null,
+              feedback: [],
+              sentAt,
+              ended: { at: sentAt, ending: TurnDone.make({}) },
+              parts: [
+                call("agent-1", "Agent", null),
+                ToolCallPart.make({ ...call("agent-2", "Agent", null), status: "failed" }),
+                call("agent-3", "Agent", null),
+              ],
+            },
+          ],
+        }),
+      ),
+  })
+
+  const transcript = await screen.findByRole("region", { name: "Transcript" })
+
+  const subagents = await within(transcript).findByRole("button", {
+    name: "3 subagents · 1 running · 1 done · 1 failed",
+  })
+
+  await user.click(subagents)
+  expect(
+    await within(transcript).findByRole("button", {
+      name: "Running in the background: Agent agent-1",
+    }),
   ).toBeTruthy()
-  expect(within(transcript).getByText("Done in 0s")).toBeTruthy()
-  expect(await within(transcript).findByText("Background work ended")).toBeTruthy()
-  expect(within(transcript).getByText("Subagent general-purpose: Count finished")).toBeTruthy()
+  expect(within(transcript).getByRole("button", { name: "Failed: Agent agent-2" })).toBeTruthy()
+  expect(within(transcript).getByRole("button", { name: "Done: Agent agent-3" })).toBeTruthy()
 })
 
 it.each(["{Control>}n{/Control}", "{Meta>}n{/Meta}"])(

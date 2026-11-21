@@ -504,7 +504,7 @@ export const claudeAdapter = (
 
         const inputs = [
           Input.Message({ message }),
-          ...(tracked.ended === null ? [] : [Input.BackgroundWorkEnded({ work: tracked.ended })]),
+          ...(tracked.ended === null ? [] : [Input.BackgroundWorkEnded(tracked.ended)]),
         ]
 
         return show(backgroundActivity(background)).pipe(Effect.as(inputs))

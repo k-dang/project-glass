@@ -521,6 +521,18 @@ export class Transcripts extends Context.Service<
                   WHERE turn_id = ${turnId} AND position = ${index}
                 `.pipe(Effect.as(true)),
               ),
+            ToolCallStatusSet: ({ toolCallId, status }) =>
+              sql`
+                UPDATE thread_turn_part SET part = json_set(part, '$.status', ${status})
+                WHERE json_extract(part, '$._tag') = 'ToolCall'
+                  AND json_extract(part, '$.toolCallId') = ${toolCallId}
+                  AND turn_id IN (
+                    SELECT id FROM thread_turn
+                    WHERE thread_id = ${threadId}
+                      AND json_extract(ended, '$.ending._tag') IS NOT 'Failed'
+                  )
+                RETURNING turn_id
+              `.pipe(Effect.map((rows) => rows.length > 0)),
             TurnEnded: ({ turnId, ended }) => {
               const conditions = [
                 sql`id = ${turnId}`,
