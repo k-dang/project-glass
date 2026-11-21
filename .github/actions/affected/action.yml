@@ -1,0 +1,42 @@
+name: Affected
+description: Report whether the event can affect the apps a test job tests
+inputs:
+  apps:
+    description: The apps the job tests, separated by spaces (server, desktop)
+    required: true
+outputs:
+  affected:
+    description: "'true' when the job's tests should run"
+    value: ${{ steps.select.outputs.affected }}
+runs:
+  using: composite
+  steps:
+    - id: select
+      shell: bash
+      env:
+        APPS: ${{ inputs.apps }}
+      run: |
+        server=true desktop=true
+        if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+          server=false desktop=false
+          # HEAD merges the pull request into its base, so HEAD^1 is the base, which needs checkout's
+          # fetch-depth: 2. Without renames, a moved file lists its old path too.
+          while read -r path; do
+            case "$path" in
+              *.md | docs/* | examples/* | apps/gallery/*) ;;
+              apps/server/*) server=true ;;
+              apps/desktop/*) desktop=true ;;
+              *) echo "$path affects every app"; server=true desktop=true ;;
+            esac
+          done < <(git diff --name-only --no-renames HEAD^1 HEAD)
+        fi
+        affected=false
+        for app in $APPS; do
+          case "$app" in
+            server) [ "$server" = false ] || affected=true ;;
+            desktop) [ "$desktop" = false ] || affected=true ;;
+            *) echo "::error::Unknown app: $app"; exit 1 ;;
+          esac
+        done
+        echo "server=$server desktop=$desktop affected=$affected"
+        echo "affected=$affected" >> "$GITHUB_OUTPUT"
