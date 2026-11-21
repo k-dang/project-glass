@@ -46,6 +46,7 @@ import {
 import { ResourceUsage } from "./ResourceUsage"
 import { ShellPanelSlot } from "./shellPanelSlot"
 import { ShortcutsDialog } from "./ShortcutsDialog"
+import { AccountMenu, PrototypeSwitcher, useStatusVariant } from "./StatusBarPrototype"
 import { useAppearance } from "./theme"
 
 const classicRailLink =
@@ -112,6 +113,8 @@ export function AppShell() {
   const [chatting, setChatting] = useAtom(globalChatOpenAtom)
   const [GlobalChatDialog, setGlobalChatDialog] = useState<ComponentType>()
   const { layout } = useAppearance()
+  const variant = useStatusVariant()
+  const v = layout === "inset" ? variant : "current"
 
   const current = useMatch({ from: "/reviews/$owner/$repo/$number", shouldThrow: false })?.params
 
@@ -169,6 +172,7 @@ export function AppShell() {
       chatting={chatting}
       onToggleChatting={toggleChatting}
       style={railStyles[layout]}
+      variant={v}
     />
   )
 
@@ -178,17 +182,23 @@ export function AppShell() {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <Outlet />
       </div>
-      <footer className="flex h-7 shrink-0 items-center justify-end gap-1 border-t bg-muted/20 px-3">
-        <ShortcutsDialog />
-        <ResourceUsage />
-      </footer>
+      {v === "current" ? (
+        <footer className="flex h-7 shrink-0 items-center justify-end gap-1 border-t bg-muted/20 px-3">
+          <ShortcutsDialog />
+          <ResourceUsage />
+        </footer>
+      ) : (
+        (v === "A" || v === "D") && <ShortcutsDialog look="hidden" />
+      )}
     </>
   )
 
   return (
     <div className="relative flex h-screen flex-col overflow-clip">
       {layout === "inset" ? (
-        <InsetFrame rail={rail}>{page}</InsetFrame>
+        <InsetFrame rail={rail} variant={v}>
+          {page}
+        </InsetFrame>
       ) : (
         <ClassicFrame rail={rail}>{page}</ClassicFrame>
       )}
@@ -208,6 +218,7 @@ export function AppShell() {
         }
       />
       <DiscardDialog />
+      {layout === "inset" && <PrototypeSwitcher />}
     </div>
   )
 }
@@ -234,7 +245,7 @@ function ClassicFrame(props: { rail: ReactNode; children: ReactNode }) {
   )
 }
 
-function InsetFrame(props: { rail: ReactNode; children: ReactNode }) {
+function InsetFrame(props: { rail: ReactNode; children: ReactNode; variant: string }) {
   const [panelSlot] = useState(() =>
     Object.assign(document.createElement("div"), { className: "contents" }),
   )
@@ -261,10 +272,32 @@ function InsetFrame(props: { rail: ReactNode; children: ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="title-strip flex shrink-0 items-center pl-[max(0px,calc(env(titlebar-area-x,0px)-3.5rem))]">
           <HistoryNav />
+          {props.variant === "B" && (
+            <div
+              className="ml-auto flex items-center gap-1 [app-region:no-drag]"
+              style={{
+                marginRight:
+                  "calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 0.5rem)",
+              }}
+            >
+              <ShortcutsDialog look="icon" />
+              <ResourceUsage look="pill" side="bottom" />
+            </div>
+          )}
         </div>
-        <div className="mr-2 mb-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border bg-background shadow-sm">
+        <div
+          className={cn(
+            "mr-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border bg-background shadow-sm",
+            props.variant !== "D" && "mb-2",
+          )}
+        >
           <ShellPanelSlot value={panelSlot}>{props.children}</ShellPanelSlot>
         </div>
+        {props.variant === "D" && (
+          <footer className="mr-2 flex h-6 shrink-0 items-center justify-end gap-1 opacity-80">
+            <ResourceUsage />
+          </footer>
+        )}
       </div>
     </div>
   )
@@ -275,6 +308,7 @@ function AreaRail(props: {
   chatting: boolean
   onToggleChatting: () => void
   style: RailStyle
+  variant: string
 }) {
   const needsYouBadgeId = useId()
   const needsYouCount = countOf(useAtomValue(watchedNeedsYouAtom))
@@ -333,7 +367,13 @@ function AreaRail(props: {
           )}
         </button>
       </TooltipHint>
-      <ConnectionAvatar />
+      {props.variant === "C" && (
+        <div className="flex flex-col items-center gap-1 border-t border-black/5 pt-2 dark:border-white/10">
+          <ShortcutsDialog look="icon" />
+          <ResourceUsage look="meter" side="right" />
+        </div>
+      )}
+      {props.variant === "A" ? <AccountMenu /> : <ConnectionAvatar />}
     </>
   )
 }

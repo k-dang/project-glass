@@ -119,7 +119,8 @@ const groups: ReadonlyArray<ShortcutGroup> = [
   },
 ]
 
-export function ShortcutsDialog() {
+export function ShortcutsDialog(props: { look?: "footer" | "icon" | "hidden" } = {}) {
+  const look = props.look ?? "footer"
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
   const search = useRef<HTMLInputElement>(null)
@@ -163,21 +164,38 @@ export function ShortcutsDialog() {
         else setOpen(false)
       }}
     >
-      <DialogTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 gap-1.5 px-1.5 text-[11px] font-normal text-muted-foreground"
-            aria-keyshortcuts="?"
-            title="Keyboard shortcuts (?)"
-          />
-        }
-      >
-        <Keyboard aria-hidden />
-        Keyboard shortcuts
-        <Kbd>?</Kbd>
-      </DialogTrigger>
+      {look === "footer" && (
+        <DialogTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 gap-1.5 px-1.5 text-[11px] font-normal text-muted-foreground"
+              aria-keyshortcuts="?"
+              title="Keyboard shortcuts (?)"
+            />
+          }
+        >
+          <Keyboard aria-hidden />
+          Keyboard shortcuts
+          <Kbd>?</Kbd>
+        </DialogTrigger>
+      )}
+      {look === "icon" && (
+        <DialogTrigger
+          render={
+            <button
+              type="button"
+              className="relative flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-black/5 hover:text-foreground dark:hover:bg-white/5"
+              aria-keyshortcuts="?"
+              title="Keyboard shortcuts (?)"
+            />
+          }
+        >
+          <Keyboard className="size-4" aria-hidden />
+          <span className="sr-only">Keyboard shortcuts</span>
+        </DialogTrigger>
+      )}
       <DialogContent
         instant
         initialFocus={search}
