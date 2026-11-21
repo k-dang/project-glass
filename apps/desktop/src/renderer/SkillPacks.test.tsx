@@ -1,5 +1,4 @@
 // @vitest-environment happy-dom
-import { RegistryProvider } from "@effect/atom-react"
 import {
   Skill,
   SkillPack,
@@ -17,6 +16,7 @@ import { afterEach, expect, it, vi } from "vite-plus/test"
 import { backendLayerAtom } from "./backend"
 import { SkillPacksSettings } from "./SkillPacks"
 import { type Handlers, type Held, hold, next, testLayer } from "../../test/testBackend"
+import { RegistryProvider } from "../../test/registry"
 
 afterEach(cleanup)
 

@@ -1,5 +1,4 @@
 // @vitest-environment happy-dom
-import { RegistryProvider } from "@effect/atom-react"
 import { OutsideAgent } from "@glass/contracts"
 import { cleanup, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
@@ -8,6 +7,7 @@ import { afterEach, expect, it } from "vite-plus/test"
 import { backendLayerAtom } from "./backend"
 import { OutsideAgentsSettings } from "./OutsideAgentsSettings"
 import { testLayer } from "../../test/testBackend"
+import { RegistryProvider } from "../../test/registry"
 
 afterEach(cleanup)
 

@@ -30,7 +30,6 @@ import {
   type SettingsError,
   type SubmitReviewError,
 } from "@glass/contracts"
-import { RegistryProvider } from "@effect/atom-react"
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { DateTime, Effect, Predicate, PubSub, Stream } from "effect"
@@ -57,6 +56,7 @@ import {
   testRegistry,
 } from "../../test/testBackend"
 import { viewer } from "../../test/workspace"
+import { RegistryProvider } from "../../test/registry"
 
 const glass = new FollowedRepository({ owner: "octo-org", repo: "glass" })
 

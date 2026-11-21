@@ -1,4 +1,3 @@
-import { RegistryProvider } from "@effect/atom-react"
 import { type AgentHarness, AgentModels, GitHubConnection } from "@glass/contracts"
 import { cleanup, render, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
@@ -8,6 +7,7 @@ import { App } from "../src/renderer/App"
 import { backendLayerAtom } from "../src/renderer/backend"
 import { thread } from "./thread"
 import { testLayer } from "./testBackend"
+import { RegistryProvider } from "./registry"
 
 export const piModels = new AgentModels({
   defaultModel: { id: "glass-test/gpt-test", name: "gpt-test", efforts: [] },

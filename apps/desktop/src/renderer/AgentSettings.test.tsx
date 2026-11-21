@@ -1,5 +1,4 @@
 // @vitest-environment happy-dom
-import { RegistryProvider } from "@effect/atom-react"
 import {
   defaultReviewPrompt,
   type EngineFeature,
@@ -13,6 +12,7 @@ import { afterEach, expect, it, vi } from "vite-plus/test"
 import { AgentSettings } from "./AgentSettings"
 import { backendLayerAtom } from "./backend"
 import { type Handlers, type Held, hold, next, testLayer } from "../../test/testBackend"
+import { RegistryProvider } from "../../test/registry"
 
 afterEach(cleanup)
 

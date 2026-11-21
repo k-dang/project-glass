@@ -1,5 +1,4 @@
 // @vitest-environment happy-dom
-import { RegistryProvider } from "@effect/atom-react"
 import {
   Thread,
   ThreadNeedsYou,
@@ -48,6 +47,7 @@ import { thread, threadFields } from "../../test/thread"
 import { changedFile, pullRequestFields, revision, viewer } from "../../test/workspace"
 import { backendLayerAtom } from "./backend"
 import { type Handlers, type Held, hold, next, testLayer } from "../../test/testBackend"
+import { RegistryProvider } from "../../test/registry"
 
 const ago = (parts: Partial<DateTime.DateTime.PartsForMath>) =>
   DateTime.subtract(DateTime.nowUnsafe(), parts)
