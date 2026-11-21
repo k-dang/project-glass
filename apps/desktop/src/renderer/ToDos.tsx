@@ -1,14 +1,18 @@
-import { useAtom, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
+import {
+  RegistryContext,
+  useAtom,
+  useAtomRefresh,
+  useAtomSet,
+  useAtomValue,
+} from "@effect/atom-react"
 import {
   mentionedToDoIds,
-  nothingUnsent,
   toDoMention,
   ToDoError,
   type ToDo,
   type ToDoImage,
   type ToDoImageUpload,
 } from "@glass/contracts"
-import { useNavigate } from "@tanstack/react-router"
 import { DialogTrigger } from "@ui-sdk/react/dialog"
 import { cn } from "cn"
 import { AsyncResult, Atom } from "effect/reactivity"
@@ -20,6 +24,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
   useCallback,
+  useContext,
   useState,
 } from "react"
 import { Button } from "@/components/ui/button"
@@ -29,7 +34,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/components/ui/toast"
 import { Backend, backendRuntime, useBackendRuntime } from "./backend"
-import { newConversationWrittenAtom } from "./conversationsArea"
+import { newConversationWrittenAtom, useStartConversation } from "./conversationsArea"
 import { createImageViewer, ImageViewer } from "./ImageViewer"
 import { imageFiles, imageSrc, maxToDoImageBytes, readToDoImages } from "./pastedImages"
 import { ProblemAlert } from "./ProblemAlert"
@@ -516,25 +521,6 @@ function CompactNotes(props: { readonly notes: string }) {
   )
 }
 
-function useStartConversation(toDo: ToDo) {
-  const navigate = useNavigate()
-  const setWritten = useAtomSet(newConversationWrittenAtom)
-
-  return () => {
-    setWritten((written) => {
-      const composed = written ?? nothingUnsent
-
-      if (mentionedToDoIds(composed.message).includes(toDo.id)) return composed
-
-      const before = composed.message.trimEnd()
-      const link = `${toDoMention(toDo)} `
-
-      return { ...composed, message: before === "" ? link : `${before} ${link}` }
-    })
-    void navigate({ to: "/conversations/new" })
-  }
-}
-
 function ToDoRow(props: { toDo: ToDo }) {
   const { toDo } = props
   const { pending, setDone, remove } = useToDoChanges()
@@ -542,7 +528,14 @@ function ToDoRow(props: { toDo: ToDo }) {
   const sendImages = useAtomSet(sendImagesAtom(toDo.id))
   const toggle = useAtomValue(pendingToggleAtom)
   const checked = toggle?.id === toDo.id ? toggle.done : toDo.done
-  const startConversation = useStartConversation(toDo)
+  const registry = useContext(RegistryContext)
+  const startConversation = useStartConversation()
+
+  const startFromToDo = () => {
+    const written = registry.get(newConversationWrittenAtom)?.message ?? ""
+
+    startConversation(mentionedToDoIds(written).includes(toDo.id) ? undefined : toDoMention(toDo))
+  }
 
   const paste = (event: ClipboardEvent) => takePastedImages(event, sendImages)
 
@@ -587,7 +580,7 @@ function ToDoRow(props: { toDo: ToDo }) {
           size="icon-xs"
           aria-label={`Start a Conversation from ${toDo.title}`}
           title="Start a Conversation"
-          onClick={startConversation}
+          onClick={startFromToDo}
         >
           <MessageSquarePlus aria-hidden />
         </Button>

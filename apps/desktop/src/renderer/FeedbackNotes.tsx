@@ -1,12 +1,13 @@
-import { FeedbackNote } from "@glass/contracts"
+import { type FeedbackNote, LineNote, PageNote, type PagePart } from "@glass/contracts"
 import { cn } from "cn"
+import { Match } from "effect"
 import { History, MessageSquarePlus, PenLine, Trash2, X } from "lucide-react"
 import { type ReactNode, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Kbd } from "@/components/ui/kbd"
 import { Textarea } from "@/components/ui/textarea"
-import { type FeedbackTarget, isOlder, rangeLabel } from "./feedbackLines"
+import { isOlder, rangeLabel } from "./feedbackLines"
 import { plural } from "./plural"
 import { ProblemAlert } from "./ProblemAlert"
 import type { Problem } from "./problems"
@@ -30,15 +31,51 @@ function Snippet(props: { code: string }) {
   )
 }
 
+interface NoteView {
+  readonly place: string
+  readonly location: string
+  readonly about: "code" | "page"
+  readonly code: string | null
+  readonly quote: string | null
+}
+
+const quoted = (text: string) => `“${text.length > 48 ? `${text.slice(0, 47).trimEnd()}…` : text}”`
+
+export const pagePartLabel = (part: PagePart) =>
+  Match.valueTags(part, {
+    PageText: ({ excerpt }) => quoted(excerpt),
+    PageElement: ({ label }) => label,
+  })
+
+const viewOf = (note: FeedbackNote): NoteView =>
+  Match.valueTags(note, {
+    LineNote: ({ path, side, start, end, code }): NoteView => {
+      const place = rangeLabel(side, start, end)
+
+      return { place, location: `${path} ${place}`, about: "code", code, quote: null }
+    },
+    PageNote: ({ path, part }): NoteView => {
+      const place = pagePartLabel(part)
+
+      return {
+        place,
+        location: `${path} · ${place}`,
+        about: "page",
+        code: null,
+        quote: part.excerpt,
+      }
+    },
+  })
+
 export function FeedbackNoteCard(props: {
   note: FeedbackNote
-  older: boolean
+  olderCode: string | null
   location: string
   onShow: (() => void) | null
   onEdit: (() => void) | null
   onRemove: () => Promise<Problem | null>
 }) {
-  const { note, older } = props
+  const { note, olderCode } = props
   const [removing, setRemoving] = useState(false)
   const [problem, setProblem] = useState<Problem | null>(null)
 
@@ -52,7 +89,7 @@ export function FeedbackNoteCard(props: {
 
   return (
     <article
-      aria-label={`Feedback on ${noteLocation(note)}`}
+      aria-label={`Feedback on ${viewOf(note).location}`}
       className="flex flex-col gap-2 rounded-lg border bg-background p-3 font-sans text-sm"
     >
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -67,9 +104,9 @@ export function FeedbackNoteCard(props: {
             {props.location}
           </button>
         )}
-        {older && <OlderVersion />}
+        {olderCode !== null && <OlderVersion />}
       </div>
-      {older && <Snippet code={note.code} />}
+      {olderCode !== null && <Snippet code={olderCode} />}
       <p className="whitespace-pre-wrap wrap-anywhere">{note.text}</p>
       {problem !== null && (
         <ProblemAlert problem={problem} action={{ label: "Retry", run: () => void remove() }} />
@@ -93,8 +130,13 @@ export function FeedbackNoteCard(props: {
   )
 }
 
-const noteLocation = (note: FeedbackNote) =>
-  `${note.path} ${rangeLabel(note.side, note.start, note.end)}`
+export const withText = (note: FeedbackNote, text: string) =>
+  Match.valueTags(note, {
+    // oxlint-disable-next-line typescript/no-misused-spread -- The fields go straight back into LineNote.
+    LineNote: (line) => new LineNote({ ...line, text }),
+    // oxlint-disable-next-line typescript/no-misused-spread -- The fields go straight back into PageNote.
+    PageNote: (page) => new PageNote({ ...page, text }),
+  })
 
 export interface StagedEdit {
   readonly id: string
@@ -123,14 +165,14 @@ export function StagedFeedback(props: {
           <li key={note.id}>
             {editing?.id === note.id ? (
               <FeedbackEditor
-                target={note}
-                older={false}
+                place={viewOf(note).place}
+                about={viewOf(note).about}
+                olderCode={null}
                 saved
                 draft={editing.draft}
                 onDraftChange={(draft) => setEditing({ id: note.id, draft })}
                 onSave={async (text) => {
-                  // oxlint-disable-next-line typescript/no-misused-spread -- The fields go straight back into FeedbackNote.
-                  const problem = await props.onSave(new FeedbackNote({ ...note, text }))
+                  const problem = await props.onSave(withText(note, text))
 
                   if (problem === null) setEditing(null)
 
@@ -141,8 +183,8 @@ export function StagedFeedback(props: {
             ) : (
               <FeedbackNoteCard
                 note={note}
-                older={false}
-                location={noteLocation(note)}
+                olderCode={null}
+                location={viewOf(note).location}
                 onShow={null}
                 onEdit={
                   editing === null ? () => setEditing({ id: note.id, draft: note.text }) : null
@@ -165,11 +207,7 @@ export function SentFeedback(props: { feedback: ReadonlyArray<FeedbackNote>; cla
       </summary>
       <ul className="flex flex-col gap-3 pt-2">
         {props.feedback.map((note) => (
-          <li key={note.id} className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">{noteLocation(note)}</span>
-            <Snippet code={note.code} />
-            <p className="whitespace-pre-wrap wrap-anywhere">{note.text}</p>
-          </li>
+          <SentNote key={note.id} note={note} />
         ))}
       </ul>
     </details>
@@ -178,16 +216,34 @@ export function SentFeedback(props: { feedback: ReadonlyArray<FeedbackNote>; cla
 
 const focusOnMount = (element: HTMLTextAreaElement | null) => element?.focus()
 
+function SentNote(props: { note: FeedbackNote }) {
+  const { location, code, quote } = viewOf(props.note)
+
+  return (
+    <li className="flex flex-col gap-1">
+      <span className="text-xs text-muted-foreground">{location}</span>
+      {code !== null && <Snippet code={code} />}
+      {quote !== null && (
+        <p className="line-clamp-3 border-l-2 pl-2 text-xs text-muted-foreground wrap-anywhere">
+          {quote}
+        </p>
+      )}
+      <p className="whitespace-pre-wrap wrap-anywhere">{props.note.text}</p>
+    </li>
+  )
+}
+
 export function FeedbackEditor(props: {
-  target: FeedbackTarget
-  older: boolean
+  place: string
+  about: "code" | "page"
+  olderCode: string | null
   saved: boolean
   draft: string
   onDraftChange: (draft: string) => void
   onSave: (text: string) => Promise<Problem | null>
   onCancel: () => void
 }) {
-  const { target, older, saved, draft } = props
+  const { olderCode, saved, draft } = props
   const [saving, setSaving] = useState(false)
   const [problem, setProblem] = useState<Problem | null>(null)
   const empty = draft.trim() === ""
@@ -214,14 +270,18 @@ export function FeedbackEditor(props: {
         <span className="font-medium text-foreground">
           {saved ? "Edit feedback" : "Add feedback"}
         </span>
-        <span>{rangeLabel(target.side, target.start, target.end)}</span>
-        {older && <OlderVersion />}
+        <span className="min-w-0 truncate">{props.place}</span>
+        {olderCode !== null && <OlderVersion />}
       </div>
-      {older && <Snippet code={target.code} />}
+      {olderCode !== null && <Snippet code={olderCode} />}
       <Textarea
         value={draft}
         ref={focusOnMount}
-        aria-label="Feedback on selected code"
+        aria-label={
+          props.about === "code"
+            ? "Feedback on selected code"
+            : "Feedback on the selected part of the page"
+        }
         placeholder="What should the agent change here?"
         className="bg-background"
         onChange={(event) => props.onDraftChange(event.target.value)}
@@ -280,13 +340,13 @@ export function SelectionBar(props: {
 
 export function FeedbackOverview(props: {
   ready: boolean
-  notes: ReadonlyArray<FeedbackNote>
+  notes: ReadonlyArray<LineNote>
   changesId: string | null
   editingId: string | null
   editor: ReactNode
-  onShow: (note: FeedbackNote) => void
-  onEdit: ((note: FeedbackNote) => void) | null
-  onRemove: (note: FeedbackNote) => Promise<Problem | null>
+  onShow: (note: LineNote) => void
+  onEdit: ((note: LineNote) => void) | null
+  onRemove: (note: LineNote) => Promise<Problem | null>
 }) {
   const { onEdit } = props
 
@@ -311,8 +371,8 @@ export function FeedbackOverview(props: {
             ) : (
               <FeedbackNoteCard
                 note={note}
-                older={older}
-                location={noteLocation(note)}
+                olderCode={older ? note.code : null}
+                location={viewOf(note).location}
                 onShow={older ? null : () => props.onShow(note)}
                 onEdit={onEdit === null ? null : () => onEdit(note)}
                 onRemove={() => props.onRemove(note)}

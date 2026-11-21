@@ -8,7 +8,7 @@ import type {
   Revision,
   TourCodeTarget,
 } from "@glass/contracts"
-import { referenceKey } from "@glass/contracts"
+import { referenceKey, repositoryKey } from "@glass/contracts"
 import { cn } from "cn"
 import {
   ChevronRight,
@@ -24,6 +24,7 @@ import {
   RotateCw,
   Route,
   Sparkles,
+  SquarePen,
 } from "lucide-react"
 import {
   type ReactNode,
@@ -56,6 +57,7 @@ import {
   type ViewHandle,
 } from "./ChangedFilesView"
 import { ChangesToolbar } from "./ChangesToolbar"
+import { useStartConversation } from "./conversationsArea"
 import { CopyMenu } from "./CopyMenu"
 import { OutdatedDiscussions, Timeline } from "./Discussions"
 import { DescriptionBody } from "./GitHubHtml"
@@ -384,7 +386,16 @@ export function Workspace(props: {
     />
   )
 
+  const startConversation = useStartConversation()
+
   useActions([
+    {
+      id: "conversation-about-pr",
+      title: "New Conversation about this PR",
+      group: "Pull request",
+      icon: SquarePen,
+      run: () => startConversation(pullRequest.url, repositoryKey(pullRequest.ref)),
+    },
     agentReview.review !== null && {
       id: "agent-review",
       title: reviewShown ? "Close the Agent review" : "Open the Agent review",

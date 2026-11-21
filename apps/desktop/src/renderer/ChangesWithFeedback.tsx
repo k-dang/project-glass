@@ -34,7 +34,7 @@ import { plural } from "./plural"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf } from "./problems"
 import { useFeedbackComposer } from "./useFeedbackComposer"
-import type { FeedbackNotesEditor } from "./useFeedbackNotes"
+import type { LineNotesEditor } from "./useFeedbackNotes"
 
 export type SidebarTab = "files" | "feedback"
 
@@ -47,7 +47,7 @@ export function ChangesWithFeedback(props: {
     | { readonly id: string; readonly files: ReadonlyArray<ChangedFile> }
     | "loading"
     | "unavailable"
-  store: FeedbackNotesEditor
+  store: LineNotesEditor
   sidebarTab: SidebarTab
   setSidebarTab: (tab: SidebarTab) => void
   footer: ReactNode

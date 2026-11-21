@@ -1,4 +1,4 @@
-import { FeedbackNote } from "@glass/contracts"
+import { LineNote } from "@glass/contracts"
 import type {
   AnnotationSide,
   CodeViewLineSelection,
@@ -19,9 +19,9 @@ import {
   rangeLabel,
 } from "./feedbackLines"
 import { FeedbackEditor, FeedbackNoteCard, FeedbackOverview, SelectionBar } from "./FeedbackNotes"
-import type { FeedbackNotesEditor } from "./useFeedbackNotes"
+import type { LineNotesEditor } from "./useFeedbackNotes"
 
-type NoteDraft = Omit<FeedbackNote, "text">
+type NoteDraft = Omit<LineNote, "_tag" | "text">
 
 type Composer =
   | { readonly type: "idle" }
@@ -74,7 +74,7 @@ type FeedbackDiffProps = Required<
 
 export function useFeedbackComposer(props: {
   changesId: string | null
-  store: FeedbackNotesEditor
+  store: LineNotesEditor
   layout: ChangesLayout
   reveal: (path: string, line: number, side: AnnotationSide, align: "center" | "nearest") => void
 }) {
@@ -114,7 +114,7 @@ export function useFeedbackComposer(props: {
     [layout, store.ready, changesId],
   )
 
-  const editNote = (note: FeedbackNote, where: "diff" | "overview") => {
+  const editNote = (note: LineNote, where: "diff" | "overview") => {
     const older = isOlder(note, changesId)
 
     setComposer({
@@ -129,7 +129,7 @@ export function useFeedbackComposer(props: {
   }
 
   const save = async (note: NoteDraft, text: string) => {
-    const problem = await store.save(new FeedbackNote({ ...note, text }))
+    const problem = await store.save(new LineNote({ ...note, text }))
 
     if (problem === null) setComposer(idle)
 
@@ -227,8 +227,9 @@ export function useFeedbackComposer(props: {
 
   const renderEditor = (current: Extract<Composer, { type: "editing" }>) => (
     <FeedbackEditor
-      target={current.note}
-      older={isOlder(current.note, changesId)}
+      place={rangeLabel(current.note.side, current.note.start, current.note.end)}
+      about="code"
+      olderCode={isOlder(current.note, changesId) ? current.note.code : null}
       saved={current.saved}
       draft={current.draft}
       onDraftChange={(draft) => setComposer({ ...current, draft })}
@@ -260,7 +261,7 @@ export function useFeedbackComposer(props: {
       <FeedbackNoteCard
         key={note.id}
         note={note}
-        older={false}
+        olderCode={null}
         location={rangeLabel(note.side, note.start, note.end)}
         onShow={null}
         onEdit={editing === null ? () => editNote(note, "diff") : null}

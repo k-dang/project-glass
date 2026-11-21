@@ -3,15 +3,18 @@ import { assert, it } from "@effect/vitest"
 import {
   ConversationContext,
   ConversationOutcome,
+  LineNote,
   StartedWorkUpdate,
   SteerPart,
   TurnDone,
   TurnEnd,
+  UnsentFeedback,
 } from "@glass/contracts"
 import { DateTime, Effect, Schema } from "effect"
 import { SqlClient } from "effect/sql"
 import { join } from "node:path"
 import { isolatedHome } from "../test/harness"
+import { FeedbackNotes } from "./FeedbackNotes"
 import baseline from "./migrations/0001_baseline"
 import agentReviewHotspots from "./migrations/0002_agent_review_hotspots"
 import agentReviewDone from "./migrations/0003_agent_review_done"
@@ -80,8 +83,13 @@ it.live("upgrades main's schema directly, preserving completed and unfinished up
     ] as const)
       yield* sql`INSERT INTO agent_turn (id, agent_id, message, context, sent_at, ended)
         VALUES (${id}, 'global', '', ${context}, ${at}, ${end})`
-    yield* sql`INSERT INTO agent_turn (id, agent_id, message, sent_at, ended)
-      VALUES ('ordinary', 'global', 'Report a bug', ${at}, ${ended})`
+
+    const sentNote =
+      '[{"id":"sent","path":"greet.ts","side":"new","start":1,"end":1,"code":"A",' +
+      '"changesId":"read-0","text":"Rename A"}]'
+
+    yield* sql`INSERT INTO agent_turn (id, agent_id, message, sent_at, ended, feedback)
+      VALUES ('ordinary', 'global', 'Report a bug', ${at}, ${ended}, ${sentNote})`
     yield* sql`INSERT INTO conversation_agent (conversation_id, agent_id, started_at, reported_at)
       VALUES ('global', 'started', ${at}, ${at})`
     yield* sql`INSERT INTO conversation_agent_review (conversation_id, owner, repo, number, started_at, reported_at)
@@ -104,7 +112,8 @@ it.live("upgrades main's schema directly, preserving completed and unfinished up
       [17, "started_work"],
       [18, "conversation_kept_going"],
       [19, "global_chat_sessions"],
-      [20, "conversation_to_dos"],
+      [20, "page_notes"],
+      [21, "conversation_to_dos"],
     ])
     const transcripts = yield* Transcripts
     const { turns } = yield* transcripts.read("global")
@@ -112,7 +121,20 @@ it.live("upgrades main's schema directly, preserving completed and unfinished up
       turns.filter((turn) => turn.id !== "ordinary").map((turn) => turn.context),
       [startedWorkUpdate, startedWorkUpdate],
     )
-    assert.equal(turns.find((turn) => turn.id === "ordinary")?.message, "Report a bug")
+    const ordinary = turns.find((turn) => turn.id === "ordinary")
+    assert.equal(ordinary?.message, "Report a bug")
+    assert.deepStrictEqual(ordinary?.feedback, [
+      new LineNote({
+        id: "sent",
+        path: "greet.ts",
+        side: "new",
+        start: 1,
+        end: 1,
+        code: "A",
+        changesId: "read-0",
+        text: "Rename A",
+      }),
+    ])
     assert.deepStrictEqual(
       (yield* transcripts.retryDeliveries(["global"])).map((turn) => turn.turnId),
       ["pending"],
@@ -139,9 +161,24 @@ it.live("upgrades main's schema directly, preserving completed and unfinished up
       yield* sql`SELECT included_in_started_work_update, done FROM agent_reviews`,
       [{ included_in_started_work_update: 1, done: 0 }],
     )
-    assert.deepStrictEqual(yield* sql`SELECT owner, id, text, staged FROM feedback_note`, [
-      { owner: "conversation:started", id: "note", text: "Rename B", staged: 1 },
-    ])
+    assert.deepStrictEqual(
+      yield* (yield* FeedbackNotes).list("conversation:started"),
+      new UnsentFeedback({
+        notes: [
+          new LineNote({
+            id: "note",
+            path: "greet.ts",
+            side: "new",
+            start: 2,
+            end: 2,
+            code: "B",
+            changesId: "read-1",
+            text: "Rename B",
+          }),
+        ],
+        staged: ["note"],
+      }),
+    )
     yield* sql`UPDATE started_agent_review SET started_work_update_turn_id = 'completed'`
     yield* sql`DELETE FROM conversation_turn WHERE id = 'completed'`
     assert.deepStrictEqual(
@@ -149,7 +186,7 @@ it.live("upgrades main's schema directly, preserving completed and unfinished up
       [{ started_work_update_turn_id: null }],
     )
   }).pipe(
-    Effect.provide(Transcripts.layer),
+    Effect.provide([Transcripts.layer, FeedbackNotes.layer]),
     Effect.provide(SqliteClient.layer({ filename: ":memory:" })),
     Effect.scoped,
   ),
@@ -181,7 +218,8 @@ it.live("creates the schema once and reads Activity through its indexes after re
         [17, "started_work"],
         [18, "conversation_kept_going"],
         [19, "global_chat_sessions"],
-        [20, "conversation_to_dos"],
+        [20, "page_notes"],
+        [21, "conversation_to_dos"],
       ],
       [],
     ] as const) {
@@ -706,7 +744,8 @@ it.live(
 
         assert.deepStrictEqual(yield* SqliteMigrator.run({ loader: migrationLoader }), [
           [19, "global_chat_sessions"],
-          [20, "conversation_to_dos"],
+          [20, "page_notes"],
+          [21, "conversation_to_dos"],
         ])
         assert.deepStrictEqual(yield* sql`SELECT * FROM global_chat`, [
           { id: "global", model: "gpt-test", effort: null, singleton: 1 },

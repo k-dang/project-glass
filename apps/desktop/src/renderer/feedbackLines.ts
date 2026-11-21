@@ -1,4 +1,4 @@
-import type { DiffSide, FeedbackNote } from "@glass/contracts"
+import type { DiffSide, LineNote } from "@glass/contracts"
 import type { DiffLineAnnotation, FileDiffMetadata, SelectedLineRange } from "@pierre/diffs"
 import {
   annotationSides,
@@ -9,7 +9,7 @@ import {
   sideOf,
 } from "./changesView"
 
-export type FeedbackTarget = Pick<FeedbackNote, "side" | "start" | "end" | "code">
+export type FeedbackTarget = Pick<LineNote, "side" | "start" | "end" | "code">
 
 export const feedbackTarget = (
   fileDiff: FileDiffMetadata,
@@ -75,14 +75,14 @@ export type FeedbackAnnotation =
   | { readonly type: "editor" }
   | { readonly type: "selection" }
 
-export type FeedbackExtra = Pick<FeedbackNote, "path" | "side" | "end"> &
+export type FeedbackExtra = Pick<LineNote, "path" | "side" | "end"> &
   ({ readonly type: "selection" } | { readonly type: "editor"; readonly id: string })
 
-export const isOlder = (note: Pick<FeedbackNote, "changesId">, changesId: string | null) =>
+export const isOlder = (note: Pick<LineNote, "changesId">, changesId: string | null) =>
   note.changesId !== changesId
 
 export const feedbackAnnotations = (
-  notes: ReadonlyArray<FeedbackNote>,
+  notes: ReadonlyArray<LineNote>,
   changesId: string | null,
   extra: FeedbackExtra | null,
 ) => {

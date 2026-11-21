@@ -13,6 +13,8 @@ import {
   type CheckInResult,
   type ConversationError,
   type FeedbackNote,
+  isLineNote,
+  type LineNote,
 } from "@glass/contracts"
 import {
   Context,
@@ -62,7 +64,7 @@ const asCheckInError = Effect.mapError(
   ({ message }: ConversationError) => new CheckInError({ message }),
 )
 
-const forAgent = (changes: CheckInChanges) => (note: FeedbackNote) => ({
+const forAgent = (changes: CheckInChanges) => (note: LineNote) => ({
   ...Struct.pick(note, checkInNoteKeys),
   outdated: note.changesId !== changes.id,
 })
@@ -74,15 +76,15 @@ export class CheckIns extends Context.Service<
     readonly changes: (checkInId: string) => Effect.Effect<CheckInChanges, CheckInNotWaiting>
     readonly notes: (
       checkInId: string,
-    ) => Effect.Effect<ReadonlyArray<FeedbackNote>, CheckInNotWaiting | CheckInError>
+    ) => Effect.Effect<ReadonlyArray<LineNote>, CheckInNotWaiting | CheckInError>
     readonly saveNote: (
       checkInId: string,
-      note: FeedbackNote,
-    ) => Effect.Effect<ReadonlyArray<FeedbackNote>, CheckInNotWaiting | CheckInError>
+      note: LineNote,
+    ) => Effect.Effect<ReadonlyArray<LineNote>, CheckInNotWaiting | CheckInError>
     readonly removeNote: (
       checkInId: string,
       noteId: string,
-    ) => Effect.Effect<ReadonlyArray<FeedbackNote>, CheckInNotWaiting | CheckInError>
+    ) => Effect.Effect<ReadonlyArray<LineNote>, CheckInNotWaiting | CheckInError>
     readonly answer: (
       checkInId: string,
       answer: CheckInAnswer,
@@ -119,7 +121,7 @@ export class CheckIns extends Context.Service<
       ) =>
         waiting(checkInId).pipe(
           Effect.flatMap(({ checkIn }) => write(folderNotes(checkIn.folder)).pipe(asCheckInError)),
-          Effect.map(({ notes: listed }) => listed),
+          Effect.map(({ notes: listed }) => listed.filter(isLineNote)),
         )
 
       const read = Effect.fnUntraced(function* (folder: string, baseRef: string | null) {
@@ -207,7 +209,10 @@ export class CheckIns extends Context.Service<
             message: "Leave a Feedback note or a message before you send feedback.",
           })
 
-        const sent = { message: given.message, notes: taken.map(forAgent(snapshot)) }
+        const sent = {
+          message: given.message,
+          notes: taken.filter(isLineNote).map(forAgent(snapshot)),
+        }
 
         const answered = yield* waits.resolve(
           checkInId,
