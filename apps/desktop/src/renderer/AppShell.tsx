@@ -21,12 +21,14 @@ import {
   MessagesSquare,
   Settings,
   Sparkles,
+  SquarePen,
 } from "lucide-react"
 import { type ComponentType, useContext, useEffect, useId, useState } from "react"
 import { TooltipHint } from "@/components/ui/tooltip"
 import { backendReachableAtom } from "./backend"
 import { type Action, useActions } from "./actions"
 import { CommandMenu } from "./CommandMenu"
+import { useStartConversation } from "./conversationsArea"
 import { ConfirmationDialog } from "./ConfirmationDialog"
 import { ConnectionAvatar } from "./ConnectionAvatar"
 import { globalChatOpenAtom, globalUnseenAtom } from "./globalChat"
@@ -92,6 +94,7 @@ export function AppShell() {
   const registry = useContext(RegistryContext)
   const areas = useAreas()
   const navigate = useNavigate()
+  const startConversation = useStartConversation()
   const [chatting, setChatting] = useAtom(globalChatOpenAtom)
   const [GlobalChatDialog, setGlobalChatDialog] = useState<ComponentType>()
   const needsYouBadgeId = useId()
@@ -127,6 +130,14 @@ export function AppShell() {
       shortcut: { key: `${index + 1}`, mod: true, allowInEditable: true },
       run: () => void navigate(link),
     })),
+    {
+      id: "new-conversation",
+      title: "New Conversation",
+      group: "Conversation",
+      icon: SquarePen,
+      shortcut: { key: "n", mod: true, allowInEditable: true },
+      run: () => void navigate({ to: "/conversations/new" }),
+    },
     {
       id: "global-chat",
       title: chatting ? "Close the Global chat" : "Open the Global chat",
@@ -224,6 +235,7 @@ export function AppShell() {
         onOpenConversation={(conversationId) =>
           void navigate({ to: "/conversations/$conversationId", params: { conversationId } })
         }
+        onStartConversation={startConversation}
         onViewQueue={() =>
           void navigate({
             to: "/reviews",
