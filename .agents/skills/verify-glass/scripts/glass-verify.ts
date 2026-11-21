@@ -14,18 +14,16 @@ import {
 } from "node:fs"
 import { createRequire } from "node:module"
 import { connect, createServer as createNetServer } from "node:net"
-import { homedir } from "node:os"
 import { basename, delimiter, join } from "node:path"
 import { parseArgs } from "node:util"
 import { Cdp, cdpJson } from "./cdp.ts"
-import { type CheckoutProcess, checkoutProcesses, orphans } from "./processes.ts"
+import { checkoutProcesses } from "./processes.ts"
 import { formatAreas, formatSummary, type MemorySample, startSampler } from "./memory.ts"
 import { githubMode } from "./launch-options.ts"
 import { FAKE_MODES, isFakeMode, serveFakeGitHub } from "./fake-github.ts"
 import { writeAgentCommands } from "../../../../apps/server/test/agentCommands.ts"
 import { removeFolder, stopAgentHost } from "../../../../apps/server/test/glassHome.ts"
 import { VIEWER } from "../../../../apps/server/test/fakePullRequest.ts"
-import { hostRecordPath, RecordedHost } from "../../../../apps/server/src/agentHost/hostAddress.ts"
 
 const root = join(import.meta.dirname, "..", "..", "..", "..")
 const desktopDir = join(root, "apps", "desktop")
@@ -72,9 +70,8 @@ const USAGE = `Usage: node .agents/skills/verify-glass/scripts/glass-verify.ts <
   kill-backend                           kill the backend process, as a crash would
   relaunch                               quit Glass and open it again on the same data
   stop                                   quit Glass, keep logs as evidence, delete run state
-  stop --orphans                         kill this checkout's node and Electron processes whose
-                                         parent is gone, sparing your own Glass's agent host
-  ps                                     list this checkout's node and Electron processes
+  ps                                     list this checkout's node and Electron processes, naming
+                                         the live run each belongs to
   list                                   show runs with live state
 
 Every command except launch/list takes --run <id>; it defaults to the only live run.`
@@ -189,40 +186,18 @@ const listenerPid = (port: number) => {
 
 const glassPid = (run: RunState) => listenerPid(run.cdpPort)
 
-const ownAgentHostPid = () => {
-  const record = hostRecordPath(join(homedir(), ".project-glass"))
-  if (!existsSync(record)) return undefined
-  return listenerPid(Schema.decodeUnknownSync(RecordedHost)(readFileSync(record, "utf8")).port)
-}
-
-const keptPids = () =>
-  new Set(
-    [
-      ownAgentHostPid(),
-      ...liveRuns().flatMap((id) => {
-        const run = loadRun(id)
-        return [glassPid(run), run.fake?.pid]
-      }),
-    ].filter((pid) => pid !== undefined),
-  )
-
-const describeProcess = (listed: CheckoutProcess) =>
-  `${String(listed.pid).padStart(7)}  parent ${String(listed.parentPid).padStart(7)} ${listed.parentAlive ? "alive" : "gone "}  ${listed.command}`
-
 const listProcesses = () => {
   const processes = checkoutProcesses(root)
   if (processes.length === 0) return console.log("(no node or Electron processes from this checkout)")
-  const orphaned = new Set(orphans(processes, keptPids()).map((listed) => listed.pid))
-  for (const listed of processes)
-    console.log(`${orphaned.has(listed.pid) ? "orphan" : "      "} ${describeProcess(listed)}`)
-}
-
-const stopOrphans = () => {
-  const orphaned = orphans(checkoutProcesses(root), keptPids())
-  if (orphaned.length === 0) return console.log("No orphaned processes from this checkout")
-  for (const listed of orphaned) {
-    killTree(listed.pid)
-    console.log(`Killed ${describeProcess(listed)}`)
+  const runOf = new Map(
+    liveRuns().flatMap((id) => {
+      const run = loadRun(id)
+      return [glassPid(run), run.fake?.pid].flatMap((pid) => (pid === undefined ? [] : [[pid, id] as const]))
+    }),
+  )
+  for (const { pid, command } of processes) {
+    const run = runOf.get(pid)
+    console.log(`${String(pid).padStart(7)}  ${run === undefined ? "" : `[run ${run}] `}${command}`)
   }
 }
 
@@ -707,7 +682,6 @@ const main = async () => {
     allowPositionals: true,
     options: {
       run: { type: "string" },
-      orphans: { type: "boolean", default: false },
       github: { type: "string" },
       "fake-mode": { type: "string", default: "ok" },
       "real-agents": { type: "boolean", default: false },
@@ -760,8 +734,6 @@ const main = async () => {
     case "help":
       return console.log(USAGE)
   }
-
-  if (command === "stop" && values.orphans) return stopOrphans()
 
   const run = loadRun(values.run)
   switch (command) {

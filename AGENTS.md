@@ -18,7 +18,7 @@ Before using ui-sdk (`@ui-sdk/react`, `@ui-sdk/core` in `apps/desktop`), follow 
 ## Gotchas
 
 - The per-launch secret travels in the `token` query parameter, so request logging stays off (`disableLogger` in `apps/server/src/server.ts`) and HTTP spans redact it (`UrlParams.CurrentRedactedNames` there).
-- When a leftover process holds a folder (`EBUSY`, `EPERM`), run `node .agents/skills/verify-glass/scripts/glass-verify.ts ps`, then `stop --orphans`. Tear down a Glass home with `removeGlassHome` from `apps/server/test/glassHome.ts`.
+- When a leftover process holds a folder (`EBUSY`, `EPERM`), run `node .agents/skills/verify-glass/scripts/glass-verify.ts ps` to see what holds it. Tear down a Glass home with `removeGlassHome` from `apps/server/test/glassHome.ts`.
 
 ## Tests
 
