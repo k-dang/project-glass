@@ -234,6 +234,36 @@ it("lists Settled Threads apart from the ones still going, in a section that col
   await waitFor(() => expect(broughtBack).toEqual([thread.id]))
 })
 
+it("removes every Settled Thread without uncommitted changes at once", async () => {
+  const clean = new Thread({ ...threadFields, id: "agent-2", name: "agent/calm-heron" })
+  const removed: Array<string> = []
+
+  const user = mount(
+    {
+      WatchThreads: () => Stream.make([thread, clean]),
+      WatchSettledThreads: () => Stream.make([thread.id, clean.id]),
+      GetRemovalWarnings: ({ threadId }) =>
+        Effect.succeed(
+          new RemovalWarnings({
+            uncommittedChanges: threadId === clean.id ? "none" : "some",
+          }),
+        ),
+      RemoveThread: ({ threadId }) => Effect.sync(() => void removed.push(threadId)),
+    },
+    "/threads",
+  )
+
+  await user.click(await screen.findByRole("button", { name: "Remove Settled Threads" }))
+
+  const dialog = await screen.findByRole("alertdialog", {
+    name: "Remove 2 Settled Threads?",
+  })
+
+  await user.click(within(dialog).getByRole("button", { name: "Remove Threads" }))
+
+  await waitFor(() => expect(removed).toEqual([clean.id]))
+})
+
 it("says in the Threads panel how a Turn that finished unseen ended", async () => {
   const ended = {
     at: DateTime.add(sentAt, { seconds: 3 }),

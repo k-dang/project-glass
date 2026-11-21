@@ -445,6 +445,33 @@ export const removeThread = async (registry: AtomRegistry.AtomRegistry, thread: 
     })
 }
 
+export const removeSettledThreads = async (
+  registry: AtomRegistry.AtomRegistry,
+  settled: ReadonlyArray<Thread>,
+  beforeRemoving: (thread: Thread) => void,
+) => {
+  let kept = 0
+
+  for (const thread of settled) {
+    const warnings = await backendRuntimeOf(registry).runPromiseExit(
+      Backend.use((backend) => backend.GetRemovalWarnings({ threadId: thread.id })),
+    )
+
+    if (Exit.isSuccess(warnings) && warnings.value.uncommittedChanges === "none") {
+      beforeRemoving(thread)
+      await removeThread(registry, thread)
+    } else kept++
+  }
+
+  if (kept > 0)
+    toast.add({
+      type: "info",
+      title: kept === 1 ? "Kept 1 Settled Thread" : `Kept ${kept} Settled Threads`,
+      description:
+        "They have uncommitted changes, or Glass couldn't check. Remove each one to see what it discards.",
+    })
+}
+
 const groupOrder: ReadonlyArray<PlaceTag> = ["local", "sandbox"]
 
 export const groupThreads = (threads: ReadonlyArray<Thread>) =>
