@@ -61,7 +61,7 @@ import {
   settled,
   watchGlobal,
 } from "../test/threadsFixture"
-import { childProcesses, startedHost } from "../test/agentHostProcesses"
+import { runningHost } from "../test/agentHostProcesses"
 
 const onPullRequest = PullRequestContext.make({
   pullRequest: new PullRequestRef({ owner: "glass-demo", repo: "greeter", number: 7 }),
@@ -138,33 +138,32 @@ it.live(
     }),
 )
 
-// Flaky: listing processes through PowerShell returned JSON that failed to parse on Windows; passed on rerun.
-// oxlint-disable-next-line vitest/no-disabled-tests
-it.skip("gives each start of pi a fresh credential, revoking the last when the agent host stops", () =>
-  Effect.gen(function* () {
-    const f = yield* threadsFixture
-    const earlierHosts = childProcesses(process.pid, "scriptedAgentHost.mjs")
-    yield* f.client.AddToDo({ title: "Reply to Sam", notes: "" })
+it.live(
+  "gives each start of pi a fresh credential, revoking the last when the agent host stops",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* threadsFixture
+      yield* f.client.AddToDo({ title: "Reply to Sam", notes: "" })
 
-    yield* sendGlobal(f.client, "hold:never")
-    yield* globalTurns(f.client, holding)
+      yield* sendGlobal(f.client, "hold:never")
+      yield* globalTurns(f.client, holding)
 
-    const host = startedHost(earlierHosts)
-    assert.isDefined(host, "the backend has no agent host running")
-    process.kill(host, "SIGKILL")
-    yield* globalTurns(f.client, settled(1))
+      const host = runningHost(f.home)
+      process.kill(host, "SIGKILL")
+      yield* globalTurns(f.client, settled(1))
 
-    yield* sendGlobal(f.client, "call-ended:list_to_dos")
-    yield* sendGlobal(f.client, "call:list_to_dos")
-    const [, ended, restarted] = yield* globalTurns(f.client, settled(3))
+      yield* sendGlobal(f.client, "call-ended:list_to_dos")
+      yield* sendGlobal(f.client, "call:list_to_dos")
+      const [, ended, restarted] = yield* globalTurns(f.client, settled(3))
 
-    assert.deepStrictEqual(glassCalls(ended), [{ status: "failed", output: "Refused with 401" }])
-    assert.deepStrictEqual(
-      glassCalls(restarted)?.map(({ status }) => status),
-      ["done"],
-    )
-    assert.include(glassCalls(restarted)?.[0]?.output, "Reply to Sam")
-  }))
+      assert.deepStrictEqual(glassCalls(ended), [{ status: "failed", output: "Refused with 401" }])
+      assert.deepStrictEqual(
+        glassCalls(restarted)?.map(({ status }) => status),
+        ["done"],
+      )
+      assert.include(glassCalls(restarted)?.[0]?.output, "Reply to Sam")
+    }),
+)
 
 it.live("leaves a Thread it created running when its own Turn stops", () =>
   Effect.gen(function* () {
