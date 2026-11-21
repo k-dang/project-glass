@@ -105,18 +105,23 @@ const listedModelIds = (listing: string) =>
     .slice(1)
     .map((row) => row.trim().split(/\s+/, 2).join("/"))
 
+const logFailedRun = <A, E, R>(run: Effect.Effect<A, E, R>, command: string) =>
+  run.pipe(
+    Effect.scoped,
+    Effect.tapError((cause) => Effect.logWarning(`Couldn't run ${command}`, cause)),
+  )
+
 const runnerStrategies = Effect.gen(function* () {
   const commands = yield* AgentCommands
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
   const fs = yield* FileSystem.FileSystem
 
-  const workingDirectory = fs
-    .makeTempDirectoryScoped({ prefix: "glass-agent-" })
-    .pipe(
-      Effect.mapError(() =>
-        agentFailure("storage", "Couldn't prepare a directory for the agent. Try again."),
-      ),
-    )
+  const workingDirectory = fs.makeTempDirectoryScoped({ prefix: "glass-agent-" }).pipe(
+    Effect.tapError((cause) => Effect.logWarning("Couldn't make the agent's directory", cause)),
+    Effect.mapError(() =>
+      agentFailure("storage", "Couldn't prepare a directory for the agent. Try again."),
+    ),
+  )
 
   const execute = Effect.fnUntraced(function* (
     command: string,
@@ -150,7 +155,7 @@ const runnerStrategies = Effect.gen(function* () {
     )
 
     return { stdout, stderr, code }
-  }, Effect.scoped)
+  }, logFailedRun)
 
   const decodeClaude = Schema.decodeUnknownEffect(
     Schema.fromJsonString(
@@ -287,13 +292,12 @@ const runnerStrategies = Effect.gen(function* () {
 
       // WARNING: pi reads --system-prompt from a file path, which keeps instructions out of argv, where endpoint security tools may kill long commands.
       const instructions = join(instructionsDirectory, "instructions.md")
-      yield* fs
-        .writeFileString(instructions, task.instructions)
-        .pipe(
-          Effect.mapError(() =>
-            agentFailure("storage", "Couldn't prepare pi's instructions. Try again.", identity),
-          ),
-        )
+      yield* fs.writeFileString(instructions, task.instructions).pipe(
+        Effect.tapError((cause) => Effect.logWarning("Couldn't write pi's instructions", cause)),
+        Effect.mapError(() =>
+          agentFailure("storage", "Couldn't prepare pi's instructions. Try again.", identity),
+        ),
+      )
 
       const result = yield* execute(
         commands.piCommand,

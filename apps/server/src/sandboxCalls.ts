@@ -217,10 +217,10 @@ const shutDownHost = (provider: SandboxProvider, state: SandboxState, token: str
       ).pipe(Effect.filterOrFail((response) => response.ok)),
     ),
     Effect.timeout(SANDBOX_DEADLINES.endHost),
-    Effect.tapError((cause) =>
-      Effect.logWarning(`Couldn't end the agent host in a Sandbox of ${provider.name}`, cause),
-    ),
-    Effect.ignore,
+    Effect.ignore({
+      log: "Warn",
+      message: `Couldn't end the agent host in a Sandbox of ${provider.name}`,
+    }),
   )
 
 export const deleteSandbox = (

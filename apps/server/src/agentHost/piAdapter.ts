@@ -593,11 +593,12 @@ export const piAdapter = (command: string) =>
                 { discard: true },
               ).pipe(Effect.ignore)
 
-              yield* rpc.request({ type: "abort" }, Schema.Unknown).pipe(
-                Effect.tapError((error) => Effect.logWarning("pi didn't abort", error)),
-                Effect.ignore,
-                Effect.forkIn(scope),
-              )
+              yield* rpc
+                .request({ type: "abort" }, Schema.Unknown)
+                .pipe(
+                  Effect.ignore({ log: "Warn", message: "pi didn't abort" }),
+                  Effect.forkIn(scope),
+                )
 
               return leftover(steers, cleared)
             }),
