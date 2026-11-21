@@ -1,6 +1,6 @@
 import { BinaryFile, type ThreadFile, FileTooLarge, ImageFile, TextFile } from "@glass/contracts"
 import { Context, Effect, FileSystem, Layer } from "effect"
-import { extname, isAbsolute, join, relative, sep } from "node:path"
+import { extname, isAbsolute, relative, resolve, sep } from "node:path"
 import { failure, type HostThreadError } from "./protocol"
 
 const MAX_FILE_BYTES = 10_000_000
@@ -48,7 +48,7 @@ export class FolderFiles extends Context.Service<
       const fs = yield* FileSystem.FileSystem
 
       const fileIn = Effect.fnUntraced(function* (root: string, path: string) {
-        const file = yield* fs.realPath(join(root, path))
+        const file = yield* fs.realPath(resolve(root, path))
 
         if (!isInside(root, file)) return yield* Effect.fail(`${path} leaves the folder`)
 

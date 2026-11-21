@@ -30,6 +30,7 @@ import {
   type SandboxReach,
   SandboxStatus,
   SavedPlace,
+  ImageFile,
   TextFile,
   TextPart,
   ThinkingPart,
@@ -1705,6 +1706,76 @@ it("links the files a Turn named once it ends, and opens HTML beside the Chat as
   expect(frame.getAttribute("sandbox")).toBe("allow-scripts allow-forms allow-popups")
   expect(frame.getAttribute("src")).toBe("glass-page://page/1")
   expect(opened).toEqual([withPageNotes("<h1>docs/explainer.html</h1>")])
+})
+
+it("shows a Turn's Markdown images and links to Windows paths in the Thread's folder, rereading images when a Turn ends", async () => {
+  const read: Array<string> = []
+  const nextEnded = Deferred.makeUnsafe<void>()
+  const nextTurn = { ...runningTurn, id: "turn-2" }
+
+  const user = mount({
+    FindThreadFiles: ({ paths }) => Effect.succeed(paths),
+    GetThreadFile: ({ path }) =>
+      Effect.sync(() => {
+        read.push(path)
+
+        return path.endsWith(".png")
+          ? ImageFile.make({ mediaType: "image/png", data: `shot${read.length}` })
+          : TextFile.make({ text: "ran 3 tests" })
+      }),
+    WatchTranscript: () =>
+      Stream.make(
+        TranscriptSnapshot.make({
+          turns: [
+            {
+              ...runningTurn,
+              parts: [
+                TextPart.make({
+                  text: "![The picker](C:\\work\\.verify\\picker.png)\n\nSee [the log](C:\\work\\.verify\\run.log:12).",
+                }),
+              ],
+              ended: { at: sentAt, ending: TurnDone.make({}) },
+            },
+            nextTurn,
+          ],
+          queued: [],
+          status: null,
+        }),
+      ).pipe(
+        Stream.concat(
+          Stream.fromEffect(
+            Deferred.await(nextEnded).pipe(
+              Effect.as(
+                TurnEnded.make({
+                  turnId: nextTurn.id,
+                  ended: { at: DateTime.add(sentAt, { seconds: 3 }), ending: TurnDone.make({}) },
+                }),
+              ),
+            ),
+          ),
+        ),
+      ),
+  })
+
+  const transcript = await screen.findByRole("region", { name: "Transcript" })
+  const image = await within(transcript).findByRole("img", { name: "The picker" })
+
+  expect(image.getAttribute("src")).toBe("data:image/png;base64,shot1")
+  expect(within(transcript).queryByText(/\[blocked\]/)).toBeNull()
+
+  Deferred.doneUnsafe(nextEnded, Exit.void)
+
+  await waitFor(() => expect(image.getAttribute("src")).toBe("data:image/png;base64,shot2"))
+
+  await user.click(await within(transcript).findByRole("button", { name: "the log" }))
+
+  const pane = await screen.findByRole("complementary", { name: "File" })
+  expect(within(pane).getByRole("heading", { name: "run.log" })).toBeTruthy()
+  expect(read).toEqual([
+    "C:\\work\\.verify\\picker.png",
+    "C:\\work\\.verify\\picker.png",
+    "C:\\work\\.verify\\run.log",
+  ])
 })
 
 it("leaves a Feedback note on the part of an HTML page the page reports, and sends it with the next message", async () => {

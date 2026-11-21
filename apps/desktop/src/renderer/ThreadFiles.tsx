@@ -2,6 +2,7 @@ import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
 import { type ThreadFile, MAX_FOUND_FILES, type Turn } from "@glass/contracts"
 import { Data, Effect, Match, Option, Predicate } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
+import type { Image, Link, Nodes, Root } from "mdast"
 import { fromMarkdown } from "mdast-util-from-markdown"
 import {
   createContext,
@@ -34,14 +35,86 @@ const pathOf = (code: string) => code.trim().replace(/^\.\//, "")
 const looksLikePath = (text: string) =>
   text.length <= 260 && /[./]/.test(text) && !/\s|:\/\//.test(text) && !text.startsWith("-")
 
-interface MarkdownNode {
-  readonly type: string
-  readonly value?: string
-  readonly children?: ReadonlyArray<MarkdownNode>
+const childrenOf = (node: Nodes): ReadonlyArray<Nodes> => ("children" in node ? node.children : [])
+
+const inlineCodeIn = (node: Nodes): ReadonlyArray<string> =>
+  node.type === "inlineCode" ? [node.value] : childrenOf(node).flatMap(inlineCodeIn)
+
+const LOCAL_FILE = "/glass-file/"
+
+const windowsPath = /^[a-z]:[\\/]/i
+
+const destination = /\]\(\s*(?:<([^>]*)>|(\S+?))(?:\s+(?:"[^"]*"|'[^']*'|\([^)]*\)))?\s*\)$/
+
+// WARNING: Markdown reads `\.` in `C:\Users\me\.config` as an escaped dot, so take the destination as written.
+const writtenUrl = (node: Link | Image, source: string) => {
+  const start = node.position?.start.offset
+  const end = node.position?.end.offset
+
+  const written =
+    start === undefined || end === undefined ? null : destination.exec(source.slice(start, end))
+
+  const raw = written?.[1] ?? written?.[2]
+
+  return raw !== undefined &&
+    /^[a-z]:\\/i.test(raw) &&
+    raw.replace(/\\([!-/:-@[-`{-~])/g, "$1") === node.url
+    ? raw
+    : node.url
 }
 
-const inlineCodeIn = (node: MarkdownNode): ReadonlyArray<string> =>
-  node.type === "inlineCode" ? [node.value ?? ""] : (node.children ?? []).flatMap(inlineCodeIn)
+const decoded = (text: string) => {
+  try {
+    return decodeURIComponent(text)
+  } catch {
+    return null
+  }
+}
+
+const localPathOf = (url: string) => {
+  const written = url.replace(/#.*$/, "").replace(/:\d+(?::\d+)?$/, "")
+  const path = decoded(written) ?? written
+  const hasScheme = /^[a-z][\w+.-]*:/i.test(path) && !windowsPath.test(path)
+
+  return path === "" || hasScheme || path.startsWith("//") ? null : pathOf(path)
+}
+
+const forEachLocalFile = (
+  node: Nodes,
+  source: string,
+  found: (node: Link | Image, path: string) => void,
+) => {
+  if (node.type === "link" || node.type === "image") {
+    const path = localPathOf(writtenUrl(node, source))
+
+    if (path !== null) found(node, path)
+  }
+
+  for (const child of childrenOf(node)) forEachLocalFile(child, source, found)
+}
+
+export const remarkLocalFiles = () => (tree: Root, file: { readonly value: unknown }) =>
+  forEachLocalFile(tree, String(file.value), (node, path) => {
+    node.url = LOCAL_FILE + encodeURIComponent(path)
+  })
+
+export const localFilePath = (url: string | Blob | undefined) =>
+  Predicate.isString(url) && url.startsWith(LOCAL_FILE)
+    ? decoded(url.slice(LOCAL_FILE.length))
+    : null
+
+const readBeforeTurnEnds = (node: Link | Image) => node.type === "image"
+
+const pathsIn = (text: string) => {
+  const tree = fromMarkdown(text)
+  const paths = inlineCodeIn(tree).map(pathOf).filter(looksLikePath)
+
+  forEachLocalFile(tree, text, (node, path) => {
+    if (!readBeforeTurnEnds(node)) paths.push(path)
+  })
+
+  return paths
+}
 
 const turnPaths = new WeakMap<Turn, ReadonlyArray<string>>()
 
@@ -51,9 +124,7 @@ const pathsOfTurn = (turn: Turn) => {
   if (known !== undefined) return known
 
   const paths = turn.parts.flatMap((part) =>
-    Predicate.isTagged(part, "Text")
-      ? inlineCodeIn(fromMarkdown(part.text)).map(pathOf).filter(looksLikePath)
-      : [],
+    Predicate.isTagged(part, "Text") ? pathsIn(part.text) : [],
   )
 
   turnPaths.set(turn, paths)
@@ -118,21 +189,81 @@ export function useFileLinks(
 
   if (Option.isSome(result) && result.value !== lastFoundFiles) setLastFoundFiles(result.value)
 
-  useRereadWhenTurnEnds(atom, loaded ? lastEndedOf(turns) : undefined)
+  const lastEnded = loaded ? lastEndedOf(turns) : undefined
 
-  return useMemo(() => ({ files: new Set(lastFoundFiles), open }), [lastFoundFiles, open])
+  useRereadWhenTurnEnds(atom, lastEnded)
+
+  return useMemo(
+    (): FileLinksValue => ({ threadId, files: new Set(lastFoundFiles), lastEnded, open }),
+    [threadId, lastFoundFiles, lastEnded, open],
+  )
 }
 
-export const FileLinks = createContext<{
+interface FileLinksValue {
+  readonly threadId: string
   readonly files: ReadonlySet<string>
+  readonly lastEnded: string | null | undefined
   readonly open: (path: string) => void
-} | null>(null)
+}
+
+export const FileLinks = createContext<FileLinksValue | null>(null)
+
+export function FileImage(props: { path: string; alt: string | undefined }) {
+  const links = useContext(FileLinks)
+  const alt = props.alt || fileName(props.path)
+
+  return links === null ? (
+    <ImageAlt text={alt} />
+  ) : (
+    <LoadedImage links={links} path={props.path} alt={alt} />
+  )
+}
+
+function ImageAlt(props: { text: string }) {
+  return <span className="text-muted-foreground">{props.text}</span>
+}
+
+function LoadedImage(props: { links: FileLinksValue; path: string; alt: string }) {
+  const { links, path } = props
+  const insideLink = useContext(InsideFileLink)
+  const atom = threadFileAtom(new FileKey({ threadId: links.threadId, path }))
+  const result = useAtomValue(atom)
+  const file = AsyncResult.isFailure(result) ? null : Option.getOrNull(AsyncResult.value(result))
+
+  useRereadWhenTurnEnds(atom, links.lastEnded)
+
+  if (file?._tag !== "ImageFile") return <ImageAlt text={props.alt} />
+
+  const image = (
+    <img
+      src={imageSrc(file.mediaType, file.data)}
+      alt={props.alt}
+      className="max-h-96 max-w-full rounded-md border"
+    />
+  )
+
+  return insideLink ? (
+    image
+  ) : (
+    <button
+      type="button"
+      title={`Open ${path}`}
+      className="block cursor-pointer"
+      onClick={() => links.open(path)}
+    >
+      {image}
+    </button>
+  )
+}
+
+const InsideFileLink = createContext(false)
 
 export function FileLink(props: { text: string; children: ReactNode }) {
   const links = useContext(FileLinks)
+  const insideLink = useContext(InsideFileLink)
   const path = pathOf(props.text)
 
-  if (links === null || !links.files.has(path)) return props.children
+  if (links === null || insideLink || !links.files.has(path)) return props.children
 
   return (
     <button
@@ -141,7 +272,7 @@ export function FileLink(props: { text: string; children: ReactNode }) {
       className="cursor-pointer underline decoration-muted-foreground/50 underline-offset-2 hover:decoration-foreground"
       onClick={() => links.open(path)}
     >
-      {props.children}
+      <InsideFileLink value>{props.children}</InsideFileLink>
     </button>
   )
 }
