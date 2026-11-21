@@ -13,12 +13,12 @@ import {
   type PlatformError,
   Redacted,
   type Scope,
-  Semaphore,
 } from "effect"
 import { randomUUID } from "node:crypto"
 import { dirname, join } from "node:path"
 import { Git } from "./git"
 import { gitBasicAuthorization } from "./gitEnv"
+import { keyedLock } from "./keyedLock"
 import { GitHubAuth } from "./github/GitHubAuth"
 import { Deadlines, ServerConfig } from "./ServerConfig"
 import { annotateUnit } from "./wideEvents"
@@ -77,18 +77,7 @@ export class Checkouts extends Context.Service<
       const auth = yield* GitHubAuth
       const fs = yield* FileSystem.FileSystem
       const gitService = yield* Git
-      const locks = new Map<string, Semaphore.Semaphore>()
-
-      const lock = (key: string) => {
-        const existing = locks.get(key)
-
-        if (existing !== undefined) return existing
-
-        const created = Semaphore.makeUnsafe(1)
-        locks.set(key, created)
-
-        return created
-      }
+      const repositoryLock = keyedLock()
 
       const git = (args: ReadonlyArray<string>, env: Record<string, string>) =>
         gitService.isolated(args, env).pipe(
@@ -211,7 +200,7 @@ export class Checkouts extends Context.Service<
             duration: deadlines.checkoutMs,
             orElse: () => Effect.fail(new CheckoutFailure({ reason: "timeout" })),
           }),
-          Semaphore.withPermit(lock(repository)),
+          (effect) => repositoryLock.withLock(repository, effect),
         )
       })
 
