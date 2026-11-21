@@ -19,7 +19,7 @@ import { DialogTrigger } from "@ui-sdk/react/dialog"
 import { Predicate } from "effect"
 import { ArrowUp, LoaderCircle, Paperclip, Square, X } from "lucide-react"
 import { memo, type ReactNode, useLayoutEffect, useRef, useState } from "react"
-import { BorderBeam } from "@/components/border-beam"
+import { BorderBeam } from "@/components/border-beam/BorderBeam"
 import { InputGroup, InputGroupAddon, InputGroupButton } from "@/components/ui/input-group"
 import { Suggestion, Suggestions } from "@/components/ui/suggestion"
 import { threadColumn } from "./threadColumn"
@@ -330,99 +330,98 @@ export function MessageBox(props: {
             {picker.choices !== null && (
               <div className="absolute inset-x-0 bottom-full z-50 mb-2">{picker.choices}</div>
             )}
-            <BorderBeam active={props.beam ?? false} theme="auto">
-              <InputGroup className="has-[[data-slot=input-group-control]:focus-visible]:border-foreground/25 has-[[data-slot=input-group-control]:focus-visible]:ring-0">
-                {composed.images.length > 0 && (
-                  <InputGroupAddon align="block-start" className="flex-wrap gap-2">
-                    {composed.images.map((_image, index) => (
-                      <span key={index} className="relative">
-                        <Attachment
-                          images={composed.images}
-                          index={index}
-                          viewer={viewer}
-                          className="size-14 rounded-md border object-cover"
-                        />
-                        <InputGroupButton
-                          size="icon-xs"
-                          variant="secondary"
-                          className="absolute -top-1.5 -right-1.5 rounded-full"
-                          aria-label={`Remove attachment ${index + 1}`}
-                          onClick={() =>
-                            setComposed((current) => ({
-                              ...current,
-                              images: current.images.filter((_, at) => at !== index),
-                            }))
-                          }
-                        >
-                          <X />
-                        </InputGroupButton>
-                      </span>
-                    ))}
-                    <ImageViewer controller={viewer} />
-                  </InputGroupAddon>
-                )}
-                <EditorContent editor={editor} className="w-full min-w-0" />
-                <InputGroupAddon align="block-end" className="min-w-0 items-end gap-1">
-                  {!props.textOnly && (
-                    <>
-                      <input
-                        ref={fileInput}
-                        type="file"
-                        accept={ImageMediaType.literals.join(",")}
-                        multiple
-                        hidden
-                        onChange={(event) => {
-                          addImages(event.currentTarget.files ?? [])
-                          event.currentTarget.value = ""
-                          editor.commands.focus()
-                        }}
+            <InputGroup className="has-[[data-slot=input-group-control]:focus-visible]:border-foreground/25 has-[[data-slot=input-group-control]:focus-visible]:ring-0">
+              {composed.images.length > 0 && (
+                <InputGroupAddon align="block-start" className="flex-wrap gap-2">
+                  {composed.images.map((_image, index) => (
+                    <span key={index} className="relative">
+                      <Attachment
+                        images={composed.images}
+                        index={index}
+                        viewer={viewer}
+                        className="size-14 rounded-md border object-cover"
                       />
                       <InputGroupButton
-                        size="icon-sm"
-                        className="text-muted-foreground"
-                        aria-label="Attach images"
-                        title="Attach images"
-                        disabled={awaiting}
-                        onClick={() => fileInput.current?.click()}
-                      >
-                        <Paperclip />
-                      </InputGroupButton>
-                    </>
-                  )}
-                  <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1 [&>button]:min-w-0">
-                    {props.pickers}
-                  </div>
-                  <div className="ml-auto flex shrink-0 gap-1">
-                    {props.onStop !== null && (
-                      <InputGroupButton
-                        size="icon-sm"
+                        size="icon-xs"
                         variant="secondary"
-                        className="rounded-full"
-                        aria-label="Stop"
-                        onClick={props.onStop}
+                        className="absolute -top-1.5 -right-1.5 rounded-full"
+                        aria-label={`Remove attachment ${index + 1}`}
+                        onClick={() =>
+                          setComposed((current) => ({
+                            ...current,
+                            images: current.images.filter((_, at) => at !== index),
+                          }))
+                        }
                       >
-                        <Square className="fill-current" />
+                        <X />
                       </InputGroupButton>
-                    )}
-                    <InputGroupButton
-                      type="submit"
-                      size="icon-sm"
-                      variant="default"
-                      className="rounded-full"
-                      disabled={
-                        props.blocked ||
-                        awaiting ||
-                        (composed.message.trim() === "" && !props.allowEmpty)
-                      }
-                      aria-label="Send"
-                      aria-busy={awaiting}
-                    >
-                      {awaiting ? <LoaderCircle className="animate-spin" /> : <ArrowUp />}
-                    </InputGroupButton>
-                  </div>
+                    </span>
+                  ))}
+                  <ImageViewer controller={viewer} />
                 </InputGroupAddon>
-              </InputGroup>
-            </BorderBeam>
+              )}
+              <EditorContent editor={editor} className="w-full min-w-0" />
+              <InputGroupAddon align="block-end" className="min-w-0 items-end gap-1">
+                {!props.textOnly && (
+                  <>
+                    <input
+                      ref={fileInput}
+                      type="file"
+                      accept={ImageMediaType.literals.join(",")}
+                      multiple
+                      hidden
+                      onChange={(event) => {
+                        addImages(event.currentTarget.files ?? [])
+                        event.currentTarget.value = ""
+                        editor.commands.focus()
+                      }}
+                    />
+                    <InputGroupButton
+                      size="icon-sm"
+                      className="text-muted-foreground"
+                      aria-label="Attach images"
+                      title="Attach images"
+                      disabled={awaiting}
+                      onClick={() => fileInput.current?.click()}
+                    >
+                      <Paperclip />
+                    </InputGroupButton>
+                  </>
+                )}
+                <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1 [&>button]:min-w-0">
+                  {props.pickers}
+                </div>
+                <div className="ml-auto flex shrink-0 gap-1">
+                  {props.onStop !== null && (
+                    <InputGroupButton
+                      size="icon-sm"
+                      variant="secondary"
+                      className="rounded-full"
+                      aria-label="Stop"
+                      onClick={props.onStop}
+                    >
+                      <Square className="fill-current" />
+                    </InputGroupButton>
+                  )}
+                  <InputGroupButton
+                    type="submit"
+                    size="icon-sm"
+                    variant="default"
+                    className="rounded-full"
+                    disabled={
+                      props.blocked ||
+                      awaiting ||
+                      (composed.message.trim() === "" && !props.allowEmpty)
+                    }
+                    aria-label="Send"
+                    aria-busy={awaiting}
+                  >
+                    {awaiting ? <LoaderCircle className="animate-spin" /> : <ArrowUp />}
+                  </InputGroupButton>
+                </div>
+              </InputGroupAddon>
+              {props.beam === true && <BorderBeam />}
+            </InputGroup>
           </div>
           {props.children}
         </div>

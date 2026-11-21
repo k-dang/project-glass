@@ -42,7 +42,7 @@ export function applyAppearance(appearance: Appearance) {
 
 const colorSchemeTimeout = 300
 
-const darkScheme = window.matchMedia("(prefers-color-scheme: dark)")
+export const darkScheme = window.matchMedia("(prefers-color-scheme: dark)")
 
 const colorSchemeFollows = (colorScheme: ColorScheme) =>
   new Promise<void>((resolve) => {

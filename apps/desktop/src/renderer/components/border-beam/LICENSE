@@ -1,3 +1,7 @@
+The palette, gradient stops and timings in BorderBeam.tsx come from Jakub Antalik's
+border-beam (https://github.com/Jakubantalik/Libraries.dev, packages/border-beam),
+used under the license below.
+
 MIT License
 
 Copyright (c) 2026 Jakub Antalik
