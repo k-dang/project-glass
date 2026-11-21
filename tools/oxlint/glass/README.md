@@ -1,6 +1,7 @@
 # Glass boundary and wait checks
 
-`pnpm check` runs `glass/architecture`, `glass/module-casing`, and `glass/test-waits` through the root
+`pnpm check` runs `glass/architecture`, `glass/effect-runners`, `glass/module-casing`, and
+`glass/test-waits` through the root
 Vite+/Oxlint configuration.
 
 ## Imports
@@ -44,6 +45,25 @@ the Node platform's HTTP exports, and `effect/ai`'s `McpServer` and `McpProtocol
 `*.test.*` files and files under `apps/*/test/` or `apps/*/e2e/` may import across
 tiers. This preserves fixtures such as `apps/desktop/e2e/glass.ts`. Production renderer
 code cannot use those fixtures as an import bridge.
+
+## Effect runners
+
+[effect-runners.ts](effect-runners.ts) rejects any reference to `Effect.runFork`, `runPromise`,
+`runPromiseExit`, `runSync`, `runSyncExit` and `runCallback` in production code under
+`apps/server/src/`, so calls, `pipe(effect, Effect.runPromise)`, named and namespace imports from
+`effect/Effect`, local aliases and destructuring declarations are all caught. These run with an empty
+context, so their logs go to Effect's console logger instead of the JSON `lineLogger` in
+`apps/server/src/wideEvents.ts` and lose the unit's trace ID. The server's stdout is piped into
+`backend.log`, so they write the plain-text lines that ADR 0012 forbids. Use
+`FiberSet.makeRuntime()` or `makeRuntimePromise()` inside a scope, or `Effect.runForkWith(context)`
+with a captured context; the `*With` runners are allowed.
+
+`ManagedRuntime.make` is rejected there too: it builds a second runtime from its own layer, which
+lacks the logger and the unit's trace unless it re-provides them, and the server's services all
+live in one layer.
+
+The desktop renderer and `apps/desktop/src/main/backend.ts` are outside this rule: their runners
+are deliberate bridges from React and Electron. Tests run Effects through `@effect/vitest`.
 
 ## Module casing
 
