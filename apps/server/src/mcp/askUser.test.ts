@@ -9,7 +9,20 @@ import {
   OutsideChoice,
   OutsideText,
 } from "@glass/contracts"
-import { Effect, Exit, Fiber, Option, Predicate, Redacted, Schema, Scope, Stream } from "effect"
+import {
+  Duration,
+  Effect,
+  Exit,
+  Fiber,
+  Option,
+  Predicate,
+  Redacted,
+  Schema,
+  Scope,
+  Stream,
+} from "effect"
+import { TestClock } from "effect/testing"
+import { withWatchedClock } from "../../test/deadlines"
 import { startBackend } from "../../test/harness"
 import { connectMcp, initialize, mcpPost, toolResult, toolText } from "../../test/mcpClient"
 
@@ -153,33 +166,40 @@ describe("ask_user", () => {
     }),
   )
 
-  it.live("returns timed out and drops the question when nobody answers", () =>
-    Effect.gen(function* () {
-      const { client, mcp } = yield* start
+  it.effect("returns timed out and drops the question when nobody answers", () => {
+    const timeout = Duration.seconds(1)
 
-      const call = mcp.request("tools/call", {
-        name: "ask_user",
-        arguments: { question: "Still there?", timeoutSeconds: 1 },
-      })
+    return withWatchedClock(timeout, (deadlineSet) =>
+      Effect.gen(function* () {
+        const { client, mcp } = yield* start
 
-      const inFlight = yield* Effect.forkChild(call.response)
+        const call = mcp.request("tools/call", {
+          name: "ask_user",
+          arguments: { question: "Still there?", timeoutSeconds: Duration.toSeconds(timeout) },
+        })
 
-      const [asked] = outside(yield* needsYou(client, (items) => outside(items).length === 1))
-      assert.isDefined(asked)
+        const inFlight = yield* Effect.forkChild(call.response)
 
-      assert.deepStrictEqual(
-        askResult(toolResult(yield* Fiber.join(inFlight)).structuredContent),
-        AskUserTimedOut.make({}),
-      )
-      yield* needsYou(client, (items) => outside(items).length === 0)
+        const [asked] = outside(yield* needsYou(client, (items) => outside(items).length === 1))
+        assert.isDefined(asked)
 
-      const late = yield* client
-        .AnswerOutsideQuestion({ id: asked.id, answer: OutsideText.make({ text: "too late" }) })
-        .pipe(Effect.flip)
+        yield* deadlineSet
+        yield* TestClock.adjust(timeout)
 
-      assert.equal(late._tag, "OutsideQuestionNotWaiting")
-    }),
-  )
+        assert.deepStrictEqual(
+          askResult(toolResult(yield* Fiber.join(inFlight)).structuredContent),
+          AskUserTimedOut.make({}),
+        )
+        yield* needsYou(client, (items) => outside(items).length === 0)
+
+        const late = yield* client
+          .AnswerOutsideQuestion({ id: asked.id, answer: OutsideText.make({ text: "too late" }) })
+          .pipe(Effect.flip)
+
+        assert.equal(late._tag, "OutsideQuestionNotWaiting")
+      }),
+    )
+  })
 
   it.live("rejects an unauthorized caller and posts nothing", () =>
     Effect.gen(function* () {

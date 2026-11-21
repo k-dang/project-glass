@@ -2,9 +2,9 @@ import { Duration, Match } from "effect"
 
 const LOST_AFTER_MISSES = 4
 
-const QUICK_RETRY_SPACING = Duration.millis(500)
+export const QUICK_RETRY_SPACING = Duration.millis(500)
 
-const FIRST_LOST_RETRY_SPACING = Duration.seconds(5)
+export const FIRST_LOST_RETRY_SPACING = Duration.seconds(5)
 
 const MAX_LOST_RETRY_SPACING = Duration.minutes(5)
 

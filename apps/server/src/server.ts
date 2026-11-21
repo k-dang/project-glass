@@ -61,11 +61,27 @@ const RendererRoutes = Layer.mergeAll(
   HttpRouter.add("GET", "/health", HttpServerResponse.empty()),
 ).pipe(Layer.provide(RendererAccess.layer))
 
+// WARNING: server.close only drops the connections idle when it is called. One still answering stays open until its client lets go, so drop each as its response ends.
+const closingAnsweredConnections = () => {
+  const server = createServer()
+
+  server.on("request", (request, response) =>
+    response.once("close", () => {
+      if (!server.listening) request.socket.destroy()
+    }),
+  )
+
+  return server
+}
+
 const NodeServerLive = Layer.unwrap(
   Effect.gen(function* () {
     const config = yield* ServerConfig
 
-    return NodeHttpServer.layer(createServer, { port: config.port, host: "127.0.0.1" })
+    return NodeHttpServer.layer(closingAnsweredConnections, {
+      port: config.port,
+      host: "127.0.0.1",
+    })
   }),
 )
 

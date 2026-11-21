@@ -18,6 +18,7 @@ import { writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { DatabaseSync } from "node:sqlite"
 import { threadsFixture, holding, lastText, settled } from "../test/threadsFixture"
+import { withSkippableWaits } from "../test/deadlines"
 import { hostExited, runningHost } from "../test/agentHostProcesses"
 import { LAUNCH_TOKEN } from "../test/harness"
 import {
@@ -28,6 +29,7 @@ import {
 } from "./agentHost/hostAddress"
 import { AgentHostRpcs } from "./agentHost/protocol"
 import { greet } from "./hostJournal"
+import { JOURNAL_RETRY_SPACING } from "./LocalAgentHost"
 import { connectRpcClient } from "./rpcSocket"
 
 const toTestBackend = (url: string | URL) => String(url).includes(`${TOKEN_PARAM}=${LAUNCH_TOKEN}`)
@@ -282,65 +284,68 @@ it.live("stops the agent host when Glass quits with no Turn running", () =>
   }),
 )
 
-it.live(
+it.effect(
   "fills in what it missed while it lost its connection to the agent host, repeating nothing",
   () =>
-    Effect.gen(function* () {
-      const connections = yield* droppableHostConnections
+    withSkippableWaits(JOURNAL_RETRY_SPACING, (skipRetryWaits) =>
+      Effect.gen(function* () {
+        const connections = yield* droppableHostConnections
 
-      const f = yield* threadsFixture.pipe(
-        Effect.provideService(Socket.WebSocketConstructor, connections.constructor),
-      )
+        const f = yield* threadsFixture.pipe(
+          Effect.provideService(Socket.WebSocketConstructor, connections.constructor),
+        )
 
-      const thread = yield* f.start("First")
-      yield* f.transcript(thread.id, settled(1))
-      const opened = connections.opened()
+        const thread = yield* f.start("First")
+        yield* f.transcript(thread.id, settled(1))
+        const opened = connections.opened()
 
-      yield* f.send(thread.id, "hold:second")
+        yield* f.send(thread.id, "hold:second")
 
-      const running = yield* f.transcript(
-        thread.id,
-        (turns) => turns.length === 2 && holding(turns.slice(1)),
-      )
+        const running = yield* f.transcript(
+          thread.id,
+          (turns) => turns.length === 2 && holding(turns.slice(1)),
+        )
 
-      const secondTurnId = running[1]!.id
+        const secondTurnId = running[1]!.id
 
-      yield* connections.drop
-      yield* f.release("second")
+        yield* connections.drop
+        yield* f.release("second")
 
-      const witness = yield* connections.witness
-      yield* witness.WatchJournal({ host: yield* greet(witness), after: 0 }).pipe(
-        Stream.filter(
-          ({ threadId, event }) =>
-            threadId === thread.id &&
-            Predicate.isTagged(event, "TurnEnded") &&
-            event.turnId === secondTurnId,
-        ),
-        Stream.runHead,
-        Effect.map(Option.getOrThrow),
-      )
+        const witness = yield* connections.witness
+        yield* witness.WatchJournal({ host: yield* greet(witness), after: 0 }).pipe(
+          Stream.filter(
+            ({ threadId, event }) =>
+              threadId === thread.id &&
+              Predicate.isTagged(event, "TurnEnded") &&
+              event.turnId === secondTurnId,
+          ),
+          Stream.runHead,
+          Effect.map(Option.getOrThrow),
+        )
 
-      const beforeReconnect = yield* f.transcript(thread.id, (turns) => turns.length === 2)
-      assert.isNull(beforeReconnect[1]?.ended)
-      yield* connections.reconnect
+        const beforeReconnect = yield* f.transcript(thread.id, (turns) => turns.length === 2)
+        assert.isNull(beforeReconnect[1]?.ended)
+        yield* connections.reconnect
+        yield* skipRetryWaits
 
-      const turns = yield* f.transcript(thread.id, settled(2))
-      assert.isAbove(connections.opened(), opened)
+        const turns = yield* f.transcript(thread.id, settled(2))
+        assert.isAbove(connections.opened(), opened)
 
-      assert.deepStrictEqual(
-        turns.map((turn) => ({ parts: turn.parts, ending: turn.ended?.ending })),
-        [
-          { parts: [TextPart.make({ text: "Reply to: First" })], ending: TurnDone.make({}) },
-          {
-            parts: [
-              TextPart.make({ text: "Holding." }),
-              TextPart.make({ text: "Reply to: hold:second" }),
-            ],
-            ending: TurnDone.make({}),
-          },
-        ],
-      )
-    }),
+        assert.deepStrictEqual(
+          turns.map((turn) => ({ parts: turn.parts, ending: turn.ended?.ending })),
+          [
+            { parts: [TextPart.make({ text: "Reply to: First" })], ending: TurnDone.make({}) },
+            {
+              parts: [
+                TextPart.make({ text: "Holding." }),
+                TextPart.make({ text: "Reply to: hold:second" }),
+              ],
+              ending: TurnDone.make({}),
+            },
+          ],
+        )
+      }),
+    ),
 )
 
 it.live(
