@@ -73,7 +73,7 @@ describe("GetConnection", () => {
   it.live("explains a dropped connection in plain words", () =>
     Effect.gen(function* () {
       const { github, client } = yield* startSignedInBackend
-      github.failNext("disconnect")
+      github.failNext("/user", "disconnect")
 
       const error = yield* Effect.flip(client.GetConnection())
 
@@ -89,7 +89,7 @@ describe("GetConnection", () => {
   it.live("explains a GitHub server error in plain words", () =>
     Effect.gen(function* () {
       const { github, client } = yield* startSignedInBackend
-      github.failNext(503)
+      github.failNext("/user", 503)
 
       const error = yield* Effect.flip(client.GetConnection())
 

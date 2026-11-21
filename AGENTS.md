@@ -23,5 +23,6 @@ Before using ui-sdk (`@ui-sdk/react`, `@ui-sdk/core` in `apps/desktop`), follow 
 
 - Wait on events, never on time: no elapsed-time assertions, no sleeps to order work, and product deadlines in success-path tests set far above the test timeout.
 - When what Glass sends Claude Code or pi changes, or a pinned SDK or bundled pi version moves, recording tests fail until you run `pnpm --filter @glass/server record:sessions [claude|pi] --pi-model <provider/model>` or `pnpm --filter @glass/server record:runners --pi-model <provider/model>`, which use your own logins.
+- Vitest shuffles test order. Before calling a failure flaky, rerun with the printed `--sequence.seed`; a test that fails on that seed or alone with `-t` depends on an earlier test, so fix it.
 - When a test turns out flaky (fails, then passes on a quick rerun with no code change), skip it so it stops blocking work, put a one-line `// Flaky: <what you saw>` comment above it, and log the sighting in [`docs/flaky-tests.md`](docs/flaky-tests.md).
 - Wait with `eventually` from each app's `test/eventually.ts`, or Testing Library's `waitFor` in desktop tests with a DOM. Don't use `Effect.repeat` on a `Schedule`, which stalls under the `TestClock`, or add `Effect.timeout` guards inside tests.

@@ -83,6 +83,7 @@ export default defineConfig({
   test: {
     include: ["src/**/*.test.ts", "test/**/*.test.ts"],
     testTimeout: 30_000,
+    sequence: { shuffle: true },
     silent: "passed-only",
     globalSetup: ["test/buildBundles.ts", "test/isolateHome.ts"],
   },

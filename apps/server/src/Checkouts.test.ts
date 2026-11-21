@@ -278,7 +278,7 @@ it.live("fails as a failed fetch when GitHub errors", () =>
   Effect.gen(function* () {
     const { github, failure } = yield* fixture()
     const pr = seed(github)
-    github.failNext(500)
+    github.failNext("/git/", 500)
 
     const error = yield* failure(pr)
 

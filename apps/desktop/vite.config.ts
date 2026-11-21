@@ -27,5 +27,6 @@ export default defineConfig({
     include: ["src/**/*.test.{ts,tsx}"],
     setupFiles: ["test/setup.ts"],
     testTimeout: 30_000,
+    sequence: { shuffle: true },
   },
 })
