@@ -1,319 +1,206 @@
-import {
-  forwardRef,
-  useId,
-  useEffect,
-  useState,
-  useSyncExternalStore,
-  useCallback,
-  useMemo,
-  useRef,
-  type CSSProperties,
-  type ForwardedRef,
-  type AnimationEvent,
-  type MutableRefObject,
-} from "react"
-import type { BorderBeamProps, BorderBeamTheme } from "./types"
-import { sizePresets, sizeThemePresets, generateBeamCSS, getPulseDriverConfig } from "./styles"
-import { registerPulseInstance } from "./pulseDriver"
+import { type ShaderDefinition, ShaderSurface } from "@/ShaderSurface"
+import { darkScheme } from "@/theme"
 
-const darkScheme = window.matchMedia("(prefers-color-scheme: dark)")
+const fragmentShader = `#version 300 es
+precision highp float;
+uniform vec2 size;
+uniform float dpr;
+uniform float radius;
+uniform float angle;
+uniform mat3 hueRotation;
+uniform mat3 saturation;
+uniform vec3 ink;
+uniform float highlightValue[11];
+uniform vec4 shadow;
+uniform float strokeOpacity;
+uniform float innerOpacity;
+out vec4 color;
 
-function subscribeToSystemTheme(onChange: () => void) {
-  darkScheme.addEventListener("change", onChange)
-  return () => darkScheme.removeEventListener("change", onChange)
+const vec3 blobColor[9] = vec3[9](
+  vec3(255, 50, 100), vec3(40, 140, 255), vec3(50, 200, 80),
+  vec3(30, 185, 170), vec3(100, 70, 255), vec3(40, 140, 255),
+  vec3(255, 120, 40), vec3(240, 50, 180), vec3(180, 40, 240)
+);
+const vec2 blobAt[9] = vec2[9](
+  vec2(0.33, -0.074), vec2(0.12, -0.05), vec2(0.021, 0.683),
+  vec2(0.021, 0.683), vec2(0.744, 1.0), vec2(0.55, 1.0),
+  vec2(0.939, 0.0), vec2(1.0, 0.271), vec2(1.0, 0.271)
+);
+const vec2 strokeBlob[9] = vec2[9](
+  vec2(70, 40), vec2(60, 35), vec2(40, 70), vec2(20, 35), vec2(180, 32),
+  vec2(85, 26), vec2(74, 32), vec2(26, 42), vec2(52, 48)
+);
+
+const float windowAt[11] = float[11](0.0, 0.3, 0.36, 0.44, 0.52, 0.8, 0.86, 0.92, 0.95, 1.0, 1.0);
+const float windowValue[11] = float[11](0.0, 0.0, 0.1, 0.35, 1.0, 1.0, 0.35, 0.1, 0.0, 0.0, 0.0);
+const float highlightAt[11] = float[11](0.0, 0.54, 0.57, 0.6, 0.63, 0.66, 0.69, 0.72, 0.75, 0.78, 1.0);
+const float rimWidth = 28.0;
+
+float ramp(float t, float at[11], float value[11]) {
+  for (int i = 1; i < 11; i++) {
+    if (t <= at[i]) return mix(value[i - 1], value[i], (t - at[i - 1]) / max(at[i] - at[i - 1], 1e-5));
+  }
+  return value[10];
 }
 
-function getSystemTheme(): "dark" | "light" {
-  return darkScheme.matches ? "dark" : "light"
+float roundedBox(vec2 p, vec2 extent, float r) {
+  vec2 q = abs(p) - extent + r;
+  return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
 }
 
-function useSystemTheme(): "dark" | "light" {
-  return useSyncExternalStore(subscribeToSystemTheme, getSystemTheme)
+vec4 over(vec4 top, vec4 bottom) { return top + bottom * (1.0 - top.a); }
+
+vec4 filtered(vec4 premultiplied) {
+  if (premultiplied.a <= 0.0) return premultiplied;
+  vec3 c = clamp(hueRotation * (premultiplied.rgb / premultiplied.a), 0.0, 1.0);
+  c = clamp(saturation * clamp(c * 1.3, 0.0, 1.0), 0.0, 1.0);
+  return vec4(c * premultiplied.a, premultiplied.a);
 }
 
-function resolveTheme(theme: BorderBeamTheme, systemTheme: "dark" | "light"): "dark" | "light" {
-  return theme === "auto" ? systemTheme : theme
-}
+void main() {
+  vec2 p = vec2(gl_FragCoord.x, size.y * dpr - gl_FragCoord.y) / dpr;
+  vec2 fromCenter = p - size * 0.5;
+  float edge = roundedBox(fromCenter, size * 0.5, radius);
 
-/**
- * BorderBeam component - Animated border beam effect for React
- *
- * @example
- * ```tsx
- * <BorderBeam>
- *   <Card>Content</Card>
- * </BorderBeam>
- * ```
- */
-export const BorderBeam = forwardRef<HTMLDivElement, BorderBeamProps>(function BorderBeam(
-  {
-    children,
-    size = "md",
-    colorVariant = "colorful",
-    theme = "dark",
-    staticColors = false,
-    duration,
-    active = true,
-    borderRadius: customBorderRadius,
-    brightness: brightnessProp,
-    saturation,
-    hueRange = 30,
-    glowSize = 1,
-    strength = 1,
-    className,
-    style,
-    css: extraCss,
-    onActivate,
-    onDeactivate,
-    onAnimationEnd: consumerOnAnimationEnd,
-    ...props
-  }: BorderBeamProps,
-  ref: ForwardedRef<HTMLDivElement>,
-) {
-  const baseId = useId()
-  const id = baseId.replace(/:/g, "-")
-  const systemTheme = useSystemTheme()
-  const internalRef = useRef<HTMLDivElement>(null)
+  if (edge > 0.5 || min(min(p.x, size.x - p.x), min(p.y, size.y - p.y)) > rimWidth) discard;
 
-  const [isActive, setIsActive] = useState(active)
-  const [isFading, setIsFading] = useState(false)
-  const [isVisible, setIsVisible] = useState(true)
-  const [detectedRadius, setDetectedRadius] = useState<number | null>(null)
-  const [pulseGlowScale, setPulseGlowScale] = useState<{ x: number; y: number }>({ x: 1, y: 1 })
+  float turn = fract((degrees(atan(fromCenter.x, -fromCenter.y)) - angle) / 360.0);
+  float window = ramp(turn, windowAt, windowValue);
 
-  if (active && !isActive && !isFading) {
-    setIsActive(true)
-  } else if (!active && isActive && !isFading) {
-    setIsFading(true)
+  if (window <= 0.0) discard;
+
+  vec4 stroke = vec4(0.0);
+  vec4 inner = vec4(0.0);
+  for (int i = 8; i >= 0; i--) {
+    vec3 rgb = blobColor[i] / 255.0;
+    vec2 at = blobAt[i] * size;
+    float s = 1.0 - min(length((p - at) / strokeBlob[i]), 1.0);
+    stroke = over(vec4(rgb * s, s), stroke);
+    float n = 0.45 * (1.0 - min(length((p - at) / (strokeBlob[i] * 0.9)), 1.0));
+    inner = over(vec4(rgb * n, n), inner);
   }
 
-  // Auto-detect child border radius when no explicit value is provided
-  useEffect(() => {
-    if (customBorderRadius != null) return
-    const el = internalRef.current
-    if (!el) return
+  float highlight = ramp(turn, highlightAt, highlightValue);
+  stroke = over(vec4(ink * highlight, highlight), stroke);
 
-    const detect = () => {
-      const child = el.firstElementChild as HTMLElement | null
-      if (!child) return
-      const computed = getComputedStyle(child)
-      const raw = parseFloat(computed.borderTopLeftRadius)
-      if (!isNaN(raw) && raw > 0) {
-        setDetectedRadius(raw)
-      }
-    }
+  float depth = -edge - 1.0;
+  float x = depth / 4.5;
+  float shade = 1.0 - 0.5 * (1.0 + tanh(0.7978846 * (x + 0.044715 * x * x * x)));
+  inner = over(shadow * shade, inner);
 
-    detect()
+  float ring = clamp(0.5 - roundedBox(fromCenter, size * 0.5, radius - 1.0), 0.0, 1.0)
+    - clamp(0.5 - roundedBox(fromCenter, size * 0.5 - 1.0, radius - 2.0), 0.0, 1.0);
+  float vertical = clamp(max(1.0 - p.y / rimWidth, 1.0 - (size.y - p.y) / rimWidth), 0.0, 1.0);
+  float horizontal = clamp(max(1.0 - p.x / rimWidth, 1.0 - (size.x - p.x) / rimWidth), 0.0, 1.0);
+  float rim = vertical + horizontal * (1.0 - vertical);
+  float inside = clamp(0.5 - edge, 0.0, 1.0);
 
-    // Re-detect if child layout changes (e.g. CSS loaded late)
-    const observer = new MutationObserver(detect)
-    observer.observe(el, { childList: true, subtree: false })
-    return () => observer.disconnect()
-  }, [customBorderRadius, children])
+  vec4 strokeLayer = filtered(stroke) * ring * window * strokeOpacity;
+  vec4 innerLayer = filtered(inner) * window * rim * inside * innerOpacity;
+  color = over(strokeLayer, innerLayer);
+}`
 
-  // Pause the (paint-heavy) animations while the element is scrolled offscreen.
-  // This stops per-frame painting entirely for hidden instances without changing
-  // their logical active/fading state, so it never fires onActivate/onDeactivate.
-  useEffect(() => {
-    const el = internalRef.current
-    if (!el || typeof IntersectionObserver === "undefined") return
+const spinSeconds = 1.96
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) setIsVisible(entry.isIntersecting)
+const hueSeconds = 12
+
+const hueRotationOf = (degrees: number) => {
+  const k = Math.cos((degrees * Math.PI) / 180)
+  const s = Math.sin((degrees * Math.PI) / 180)
+
+  return [
+    0.213 + k * 0.787 - s * 0.213,
+    0.715 - k * 0.715 - s * 0.715,
+    0.072 - k * 0.072 + s * 0.928,
+    0.213 - k * 0.213 + s * 0.143,
+    0.715 + k * 0.285 + s * 0.14,
+    0.072 - k * 0.072 - s * 0.283,
+    0.213 - k * 0.213 - s * 0.787,
+    0.715 - k * 0.715 + s * 0.715,
+    0.072 + k * 0.928 + s * 0.072,
+  ]
+}
+
+const saturationOf = (amount: number) => [
+  0.213 + 0.787 * amount,
+  0.715 - 0.715 * amount,
+  0.072 - 0.072 * amount,
+  0.213 - 0.213 * amount,
+  0.715 + 0.285 * amount,
+  0.072 - 0.072 * amount,
+  0.213 - 0.213 * amount,
+  0.715 - 0.715 * amount,
+  0.072 + 0.928 * amount,
+]
+
+const looks = {
+  dark: {
+    ink: [1, 1, 1],
+    highlight: [0, 0, 0.1, 0.3, 0.6, 0.75, 0.6, 0.3, 0.1, 0, 0],
+    shadow: [0.27, 0.27, 0.27, 0.27],
+    strokeOpacity: 0.26,
+    innerOpacity: 0.42,
+    saturation: saturationOf(1.2),
+  },
+  light: {
+    ink: [0, 0, 0],
+    highlight: [0, 0, 0.08, 0.2, 0.4, 0.55, 0.4, 0.2, 0.08, 0, 0],
+    shadow: [0, 0, 0, 0.14],
+    strokeOpacity: 0.12,
+    innerOpacity: 0.26,
+    saturation: saturationOf(1.5),
+  },
+}
+
+const beam: ShaderDefinition = {
+  canvasClassName:
+    "block size-full opacity-100 transition-opacity duration-600 ease-out starting:opacity-0",
+  fragmentShader,
+  framesPerSecond: 30,
+  stillSeconds: 0,
+  setup: ({ canvas, gl, uniform, paint }, host) => {
+    const size = uniform("size")
+    const dpr = uniform("dpr")
+    const radius = uniform("radius")
+    const angle = uniform("angle")
+    const hueRotation = uniform("hueRotation")
+    const saturation = uniform("saturation")
+    const ink = uniform("ink")
+    const highlight = uniform("highlightValue")
+    const shadow = uniform("shadow")
+    const strokeOpacity = uniform("strokeOpacity")
+    const innerOpacity = uniform("innerOpacity")
+
+    return {
+      resize: ({ width, height, deviceWidth, deviceHeight, pixelRatio }) => {
+        canvas.width = deviceWidth
+        canvas.height = deviceHeight
+        gl.uniform2f(size, width, height)
+        gl.uniform1f(dpr, pixelRatio)
       },
-      // Start animating slightly before the element scrolls into view.
-      { rootMargin: "256px" },
-    )
-
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [])
-
-  // Pulse Outside glow geometry is authored in fixed pixels for a reference
-  // element (~350x140). Measure the actual wrapped element and scale the glow
-  // per-axis so the halo grows/shrinks to fit any component it's applied to.
-  useEffect(() => {
-    if (size !== "pulse-outside") return
-
-    const el = internalRef.current
-    if (!el) return
-
-    const REF_WIDTH = 350
-    const REF_HEIGHT = 140
-    // Allow the glow to both shrink (small buttons) and grow (large cards),
-    // with generous bounds to avoid degenerate geometry at the extremes.
-    const MIN_SCALE = 0.35
-    const MAX_SCALE = 4
-    const clamp = (value: number) => Math.max(MIN_SCALE, Math.min(MAX_SCALE, value))
-
-    const measure = () => {
-      const child = el.firstElementChild as HTMLElement | null
-      if (!child) return
-      const rect = child.getBoundingClientRect()
-      if (!rect.width || !rect.height) return
-      const x = +clamp(rect.width / REF_WIDTH).toFixed(3)
-      const y = +clamp(rect.height / REF_HEIGHT).toFixed(3)
-      setPulseGlowScale((prev) => (prev.x === x && prev.y === y ? prev : { x, y }))
+      restyle: () => {
+        const look = darkScheme.matches ? looks.dark : looks.light
+        gl.uniform1f(radius, Number.parseFloat(getComputedStyle(host).borderTopLeftRadius))
+        gl.uniform3fv(ink, look.ink)
+        gl.uniform1fv(highlight, look.highlight)
+        gl.uniform4fv(shadow, look.shadow)
+        gl.uniform1f(strokeOpacity, look.strokeOpacity)
+        gl.uniform1f(innerOpacity, look.innerOpacity)
+        gl.uniformMatrix3fv(saturation, true, look.saturation)
+      },
+      draw: (seconds) => {
+        gl.uniform1f(angle, ((seconds / spinSeconds) % 1) * 360)
+        gl.uniformMatrix3fv(
+          hueRotation,
+          true,
+          hueRotationOf(-30 * Math.cos((2 * Math.PI * seconds) / hueSeconds)),
+        )
+        paint()
+      },
     }
+  },
+}
 
-    measure()
-    if (typeof ResizeObserver === "undefined") return
-
-    const child = el.firstElementChild as HTMLElement | null
-    if (!child) return
-
-    const resizeObserver = new ResizeObserver(measure)
-    resizeObserver.observe(child)
-    return () => resizeObserver.disconnect()
-  }, [size, children])
-
-  const handleAnimationEnd = useCallback(
-    (e: AnimationEvent<HTMLDivElement>) => {
-      const animationName = e.animationName
-
-      if (animationName.includes("fade-out")) {
-        setIsActive(false)
-        setIsFading(false)
-        onDeactivate?.()
-      } else if (animationName.includes("fade-in")) {
-        onActivate?.()
-      }
-
-      consumerOnAnimationEnd?.(e)
-    },
-    [onActivate, onDeactivate, consumerOnAnimationEnd],
-  )
-
-  const resolvedTheme = resolveTheme(theme, systemTheme)
-  const themeConfig = sizeThemePresets[size][resolvedTheme]
-  const sizeConfig = sizePresets[size]
-
-  const isPulse = size === "pulse-inner" || size === "pulse-outside"
-
-  const finalBorderRadius = customBorderRadius ?? detectedRadius ?? sizeConfig.borderRadius
-  const finalDuration = duration ?? (size === "line" ? 3.1 : isPulse ? 2.3 : 1.96)
-  const finalSaturation = saturation ?? themeConfig.saturation
-  const finalBrightness = brightnessProp ?? themeConfig.brightness ?? 1.3
-  const finalHueRange = size === "line" ? Math.min(hueRange, 13) : hueRange
-  const finalStaticColors = colorVariant === "mono" ? true : staticColors
-
-  const cssStyles = useMemo(
-    () =>
-      generateBeamCSS({
-        id,
-        borderRadius: finalBorderRadius,
-        borderWidth: sizeConfig.borderWidth,
-        duration: finalDuration,
-        strokeOpacity: themeConfig.strokeOpacity,
-        innerOpacity: themeConfig.innerOpacity,
-        bloomOpacity: themeConfig.bloomOpacity,
-        innerShadow: themeConfig.innerShadow,
-        size,
-        colorVariant,
-        staticColors: finalStaticColors,
-        brightness: finalBrightness,
-        saturation: finalSaturation,
-        hueRange: finalHueRange,
-        theme: resolvedTheme,
-        hairlineOpacity: themeConfig.hairlineOpacity,
-        glowSize,
-      }),
-    [
-      id,
-      finalBorderRadius,
-      sizeConfig.borderWidth,
-      finalDuration,
-      themeConfig.strokeOpacity,
-      themeConfig.innerOpacity,
-      themeConfig.bloomOpacity,
-      themeConfig.innerShadow,
-      themeConfig.hairlineOpacity,
-      size,
-      colorVariant,
-      finalStaticColors,
-      finalBrightness,
-      finalSaturation,
-      finalHueRange,
-      glowSize,
-      resolvedTheme,
-    ],
-  )
-
-  // Runtime config for the JS breathing driver (null for non-pulse sizes).
-  const driverConfig = useMemo(
-    () =>
-      isPulse
-        ? getPulseDriverConfig(
-            size,
-            resolvedTheme,
-            finalDuration,
-            finalHueRange,
-            finalStaticColors,
-            id,
-          )
-        : null,
-    [isPulse, size, resolvedTheme, finalDuration, finalHueRange, finalStaticColors, id],
-  )
-
-  // Drive the Pulse breathing from the shared, fps-capped rAF loop while the
-  // instance is on, onscreen, and the user hasn't requested reduced motion.
-  useEffect(() => {
-    if (!driverConfig) return
-    if (!(isActive || isFading) || !isVisible) return
-
-    const el = internalRef.current
-    if (!el) return
-
-    if (
-      typeof window !== "undefined" &&
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
-    ) {
-      return
-    }
-
-    return registerPulseInstance(el, driverConfig)
-  }, [driverConfig, isActive, isFading, isVisible])
-
-  const setRefs = useCallback(
-    (node: HTMLDivElement | null) => {
-      ;(internalRef as MutableRefObject<HTMLDivElement | null>).current = node
-      if (typeof ref === "function") {
-        ref(node)
-      } else if (ref) {
-        ;(ref as MutableRefObject<HTMLDivElement | null>).current = node
-      }
-    },
-    [ref],
-  )
-
-  const mergedStyle = {
-    ...(style ?? {}),
-    "--beam-strength": Math.max(0, Math.min(1, strength)),
-    ...(size === "pulse-outside"
-      ? { "--pulse-glow-sx": pulseGlowScale.x, "--pulse-glow-sy": pulseGlowScale.y }
-      : {}),
-  } as CSSProperties
-
-  return (
-    <>
-      <style>{extraCss ? `${cssStyles}\n${extraCss.split("{id}").join(id)}` : cssStyles}</style>
-      <div
-        {...props}
-        ref={setRefs}
-        data-beam={id}
-        data-active={isActive && !isFading ? "" : undefined}
-        data-fading={isFading ? "" : undefined}
-        data-paused={isActive && !isFading && !isVisible ? "" : undefined}
-        className={className}
-        style={mergedStyle}
-        onAnimationEnd={handleAnimationEnd}
-      >
-        {children}
-        <div data-beam-bloom />
-      </div>
-    </>
-  )
-})
-
-export default BorderBeam
+export function BorderBeam() {
+  return <ShaderSurface definition={beam} className="absolute -inset-px z-2 rounded-[inherit]" />
+}

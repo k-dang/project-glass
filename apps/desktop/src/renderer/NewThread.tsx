@@ -45,6 +45,7 @@ import {
   placeOfKey,
 } from "./threadsArea"
 import { threadColumn } from "./threadColumn"
+import { DitherGlow } from "./DitherGlow"
 import { ThreadFrame } from "./ThreadFrame"
 import { UserMessage } from "./ThreadView"
 import type { BackendError } from "./backend"
@@ -412,7 +413,7 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
   return (
     <ThreadFrame
       label="New Thread"
-      className="[&_[data-slot=input-group]]:[view-transition-name:new-thread-composer]"
+      className="[&_[data-slot=input-group]]:bg-card [&_[data-slot=input-group]]:[view-transition-name:new-thread-composer]"
       heading={
         <h1 className="truncate font-medium">
           {starting === null ? "New Thread" : "Starting Thread…"}
@@ -421,10 +422,13 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
       details={null}
     >
       {starting === null ? (
-        <div className="flex flex-1 flex-col items-center justify-end gap-2 px-6 pb-4 text-center">
-          <h2 className="text-2xl font-semibold tracking-tight">What should we work on?</h2>
-          <p className="max-w-md text-sm text-muted-foreground">{where.describe(key)}</p>
-        </div>
+        <>
+          <DitherGlow className="absolute inset-0 -z-10" />
+          <div className="flex flex-1 flex-col items-center justify-end gap-2 px-6 pb-4 text-center">
+            <h2 className="text-2xl font-semibold tracking-tight">What should we work on?</h2>
+            <p className="max-w-md text-sm text-muted-foreground">{where.describe(key)}</p>
+          </div>
+        </>
       ) : (
         <div className="flex-1 overflow-y-auto px-6 py-4">
           <MessageGroup

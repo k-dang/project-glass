@@ -111,23 +111,6 @@ export default defineConfig({
           "anti-slop/no-runtime-typeof": "off",
         },
       },
-      {
-        files: ["apps/desktop/src/renderer/components/border-beam/**"],
-        rules: {
-          "anti-slop/no-conditional-empty-object-spread": "off",
-          "anti-slop/no-runtime-typeof": "off",
-          "anti-slop/require-readable-spacing": "off",
-          "anti-slop/require-safety-comment-for-type-assertion": "off",
-          "eslint/no-unused-vars": "off",
-          "landmines-style/no-comments": "off",
-          "react/exhaustive-effect-dependencies": "off",
-          "react/set-state-in-effect": "off",
-          "typescript/consistent-return": "off",
-          "typescript/no-unnecessary-type-assertion": "off",
-          "typescript/no-unsafe-type-assertion": "off",
-          "unicorn/no-useless-fallback-in-spread": "off",
-        },
-      },
     ],
     options: {
       typeAware: true,
